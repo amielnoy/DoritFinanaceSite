@@ -7,6 +7,7 @@ import Perspective from "@/components/dorit/Perspective";
 import ServiceMatrix from "@/components/dorit/ServiceMatrix";
 import ProofCarousel from "@/components/dorit/ProofCarousel";
 import Testimonials from "@/components/dorit/Testimonials";
+import FAQ from "@/components/dorit/FAQ";
 import ConsultationBuilder from "@/components/dorit/ConsultationBuilder";
 import QuickContact from "@/components/dorit/QuickContact";
 import Footer from "@/components/dorit/Footer";
@@ -23,6 +24,7 @@ export default function Home() {
         <ServiceMatrix />
         <ProofCarousel />
         <Testimonials />
+        <FAQ />
         <ConsultationBuilder />
         <QuickContact />
       </main>
