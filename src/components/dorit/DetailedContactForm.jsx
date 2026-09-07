@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Send, Loader2, Check, AlertCircle } from "lucide-react";
 
-const NOTIFY_EMAIL = "dorit@govari-fin.co.il";
+const NOTIFY_EMAIL = "amielnoy@gmail.com";
+const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 const SERVICES = [
   "פנסיה ופיננסים",
@@ -61,6 +62,15 @@ export default function DetailedContactForm() {
         subject: `פנייה מפורטת — ${form.name} (${form.service})`,
         body,
       });
+      try {
+        await base44.integrations.Core.SendEmail({
+          to: SECONDARY_EMAIL,
+          subject: `פנייה מפורטת — ${form.name} (${form.service})`,
+          body,
+        });
+      } catch (e) {
+        /* עותק מיטבי לדורית */
+      }
       setSent(true);
       setForm({
         name: "",
@@ -72,7 +82,7 @@ export default function DetailedContactForm() {
         consent: false,
       });
     } catch (err) {
-      setError("לא הצלחנו לשלוח את הטופס כרגע. נסו/י שוב או חייגו/י ישירות.");
+      setError("לא הצלחנו לשלוח את הטופס כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
     } finally {
       setBusy(false);
     }

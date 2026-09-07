@@ -3,7 +3,8 @@ import { base44 } from "@/api/base44Client";
 import { Send, Loader2, Check, Mail, MessageCircle } from "lucide-react";
 
 // הכתובת שאליה יגיעו הפניות. לשליחה מובטחת — ודא/י שזו כתובת משתמש רשום באפליקציה.
-const NOTIFY_EMAIL = "dorit@govari-fin.co.il";
+const NOTIFY_EMAIL = "amielnoy@gmail.com";
+const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 export default function QuickContact() {
   const [form, setForm] = useState({ name: "", phone: "", email: "", message: "" });
@@ -29,10 +30,19 @@ export default function QuickContact() {
         subject: `פנייה חדשה מהאתר — ${form.name}`,
         body,
       });
+      try {
+        await base44.integrations.Core.SendEmail({
+          to: SECONDARY_EMAIL,
+          subject: `פנייה חדשה מהאתר — ${form.name}`,
+          body,
+        });
+      } catch (e) {
+        /* עותק מיטבי לדורית */
+      }
       setSent(true);
       setForm({ name: "", phone: "", email: "", message: "" });
     } catch (e) {
-      setError("לא הצלחנו לשלוח כרגע. נסו/י שוב או חייגו/י ישירות.");
+      setError("לא הצלחנו לשלוח כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
     } finally {
       setBusy(false);
     }

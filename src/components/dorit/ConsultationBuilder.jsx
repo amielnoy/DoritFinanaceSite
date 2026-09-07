@@ -3,7 +3,8 @@ import { Check, ChevronLeft, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import GoogleCalendarBooking from "@/components/dorit/GoogleCalendarBooking";
 
-const NOTIFY_EMAIL = "dorit@govari-fin.co.il";
+const NOTIFY_EMAIL = "amielnoy@gmail.com";
+const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 const STEPS = [
   {
@@ -79,6 +80,15 @@ export default function ConsultationBuilder() {
       setError("לא הצלחנו לשלוח את הבקשה כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
       setSending(false);
       return;
+    }
+    try {
+      await base44.integrations.Core.SendEmail({
+        to: SECONDARY_EMAIL,
+        subject: `בקשת ייעוץ חדשה — ${data.name}`,
+        body: agentBody,
+      });
+    } catch (e) {
+      /* עותק מיטבי לדורית — מתעלם אם הכתובת עדיין אינה רשומה/דומיין לא מאומת */
     }
     if (data.email) {
       try {
