@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Phone } from "lucide-react";
+import { CONTACT } from "@/config/contact";
 
 const NAV = [
   { label: "אודות", href: "#about" },
@@ -55,6 +56,15 @@ export default function FloatingHeader() {
         </nav>
 
         <div className="flex items-center gap-4">
+          <a
+            href={`tel:${CONTACT.phoneE164}`}
+            aria-label="התקשרות לדורית גוב ארי"
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-border text-sm font-medium hover:border-accent hover:text-accent transition-colors duration-300"
+          >
+            <Phone size={16} />
+            <span className="hidden sm:inline" dir="ltr">{CONTACT.phoneDisplay}</span>
+            <span className="sm:hidden">חייגו</span>
+          </a>
           <a
             href="#consultation"
             className="hidden md:inline-flex items-center px-5 py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:bg-accent transition-colors duration-300"

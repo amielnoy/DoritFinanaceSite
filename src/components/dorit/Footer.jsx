@@ -2,6 +2,7 @@ import React from "react";
 import { Image } from "@/components/ui/image";
 import { Phone, Mail, MapPin, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
+import { CONTACT } from "@/config/contact";
 
 const HANDSHAKE =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/8f139c5ff_generated_14b746d4.jpg";
@@ -66,15 +67,15 @@ export default function Footer() {
           <ul className="space-y-4 text-primary-foreground/80">
             <li className="flex items-center gap-3">
               <Phone size={16} className="text-[#C4A484]" />
-              <a href="https://wa.me/972508311776" target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:text-[#C4A484] transition-colors">050-831-1776</a>
+              <a href={`tel:${CONTACT.phoneE164}`} dir="ltr" className="hover:text-[#C4A484] transition-colors">{CONTACT.phoneDisplay}</a>
             </li>
             <li className="flex items-center gap-3">
               <MessageCircle size={16} className="text-[#C4A484]" />
-              <a href="https://wa.me/972508311776" target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:text-[#C4A484] transition-colors">WhatsApp</a>
+              <a href={`https://wa.me/${CONTACT.whatsapp}`} target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:text-[#C4A484] transition-colors">WhatsApp</a>
             </li>
             <li className="flex items-center gap-3">
               <Mail size={16} className="text-[#C4A484]" />
-              <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@govari-fin.co.il</a>
+              <a href={`mailto:${CONTACT.email}`} dir="ltr" className="hover:text-[#C4A484] transition-colors">{CONTACT.email}</a>
             </li>
             <li className="flex items-center gap-3">
               <MapPin size={16} className="text-[#C4A484]" />
