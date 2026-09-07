@@ -15,6 +15,7 @@ import ConsultationBuilder from "@/components/dorit/ConsultationBuilder";
 import DetailedContactForm from "@/components/dorit/DetailedContactForm";
 import QuickContact from "@/components/dorit/QuickContact";
 import QuickShare from "@/components/dorit/QuickShare";
+import DetailedFAQ from "@/components/dorit/DetailedFAQ";
 import Footer from "@/components/dorit/Footer";
 import MobileStickyBar from "@/components/dorit/MobileStickyBar";
 
@@ -37,6 +38,7 @@ export default function Home() {
         <DetailedContactForm />
         <QuickContact />
         <QuickShare />
+        <DetailedFAQ />
       </main>
       <SectionNav />
       <MobileStickyBar />
