@@ -4,6 +4,8 @@ import SectionNav from "@/components/dorit/SectionNav";
 import SecurityScroll from "@/components/dorit/SecurityScroll";
 import Hero from "@/components/dorit/Hero";
 import About from "@/components/dorit/About";
+import CarrierLogos from "@/components/dorit/CarrierLogos";
+import ReviewsWidget from "@/components/dorit/ReviewsWidget";
 import Perspective from "@/components/dorit/Perspective";
 import ServiceMatrix from "@/components/dorit/ServiceMatrix";
 import ProofCarousel from "@/components/dorit/ProofCarousel";
@@ -22,6 +24,8 @@ export default function Home() {
       <main>
         <Hero />
         <About />
+        <CarrierLogos />
+        <ReviewsWidget />
         <Perspective />
         <ServiceMatrix />
         <ProofCarousel />

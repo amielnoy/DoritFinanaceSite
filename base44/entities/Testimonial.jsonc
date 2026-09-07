@@ -17,6 +17,20 @@
     "image_url": {
       "type": "string",
       "title": "\u05ea\u05de\u05d5\u05e0\u05d4"
+    },
+    "rating": {
+      "type": "number",
+      "title": "\u05d3\u05d9\u05e8\u05d5\u05d2 (1-5)",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "source": {
+      "type": "string",
+      "title": "\u05de\u05e7\u05d5\u05e8 \u05d7\u05d5\u05d5\u05ea \u05d4\u05d3\u05e2\u05ea",
+      "enum": [
+        "google",
+        "midrag"
+      ]
     }
   },
   "required": [
