@@ -66,11 +66,12 @@ export default function About() {
 
           <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-px bg-border/60 border border-border/60">
             {STATS.map((s, i) => (
-              <div key={i} className="bg-background p-6 text-center">
-                <p className="font-heading text-3xl md:text-4xl text-accent">
+              <div key={i} className="bg-background p-6 md:p-7 text-center">
+                <p className="font-heading text-4xl md:text-5xl text-accent leading-none">
                   {s.num}
                 </p>
-                <p className="text-xs tracking-[0.15em] uppercase text-muted-foreground mt-2">
+                <div className="mx-auto mt-3 h-px w-8 bg-[#C4A484]/50" />
+                <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground mt-3">
                   {s.label}
                 </p>
               </div>

@@ -46,14 +46,21 @@
     @apply bg-background text-foreground;
     font-family: var(--font-body);
     font-size: 1.125rem;
-    line-height: 1.6;
+    line-height: 1.7;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   h1, h2, h3, h4 {
     font-family: var(--font-heading);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
     font-weight: 700;
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: hsl(var(--accent) / 0.16);
+    color: hsl(var(--foreground));
   }
 }
 

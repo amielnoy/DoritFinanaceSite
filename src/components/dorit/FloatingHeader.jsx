@@ -27,12 +27,17 @@ export default function FloatingHeader() {
       }`}
     >
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 flex items-center justify-between">
-        <a href="#top" className="flex flex-col leading-none">
-          <span className="font-heading text-xl md:text-2xl font-bold tracking-tight">
-            דורית גוב ארי
+        <a href="#top" className="flex items-center gap-3 leading-none">
+          <span className="hidden sm:flex w-9 h-9 items-center justify-center border border-accent/40 font-heading text-base text-accent">
+            ד
           </span>
-          <span className="text-[10px] md:text-[11px] tracking-[0.3em] uppercase text-muted-foreground mt-1">
-            Architecture of Security
+          <span className="flex flex-col leading-none">
+            <span className="font-heading text-xl md:text-2xl font-bold tracking-tight">
+              דורית גוב ארי
+            </span>
+            <span className="text-[10px] md:text-[11px] tracking-[0.3em] uppercase text-muted-foreground mt-1">
+              Architecture of Security
+            </span>
           </span>
         </a>
 

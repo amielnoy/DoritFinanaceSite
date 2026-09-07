@@ -20,10 +20,9 @@ export default function Hero() {
     <section id="top" className="relative min-h-screen flex flex-col">
       {/* Quad-axis rules */}
       <div className="pointer-events-none absolute inset-0 z-0">
-        <div className="absolute top-0 bottom-0 right-[20%] w-px bg-border/50" />
-        <div className="absolute top-0 bottom-0 right-[55%] w-px bg-border/50" />
-        <div className="absolute top-0 bottom-0 right-[80%] w-px bg-border/50" />
-        <div className="absolute inset-x-0 top-1/2 h-px bg-border/50" />
+        <div className="absolute top-0 bottom-0 right-[20%] w-px bg-border/25" />
+        <div className="absolute top-0 bottom-0 right-[55%] w-px bg-border/25" />
+        <div className="absolute top-0 bottom-0 right-[80%] w-px bg-border/25" />
       </div>
 
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 max-w-[1400px] mx-auto w-full px-6 md:px-10 pt-28 md:pt-24">
