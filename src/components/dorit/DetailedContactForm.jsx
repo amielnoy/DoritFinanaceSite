@@ -91,25 +91,25 @@ export default function DetailedContactForm() {
   return (
     <section
       id="detailed-contact"
-      className="relative py-24 md:py-32 border-t border-border/60"
+      className="relative py-20 md:py-32 border-t border-border/60"
     >
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+      <div className="max-w-[1400px] mx-auto px-5 sm:px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
           <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
             Personal Message
           </span>
-          <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
+          <h2 className="font-heading text-4xl sm:text-5xl md:text-6xl mt-5 leading-tight">
             ספר/י לי
             <br />
             עליך
           </h2>
-          <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">
+          <p className="mt-6 md:mt-8 text-foreground/70 max-w-md leading-relaxed text-base sm:text-lg">
             ככל שאדע יותר על הצורך שלך, כך אוכל להגיע מוכנה יותר לפגישה הראשונה.
             מלא/י את הפרטים והשאר/י הודעה אישית — אחזור אלייך באופן שמתאים לך.
           </p>
         </div>
 
-        <div className="lg:col-span-7 bg-card border border-border/60 p-8 md:p-12">
+        <div className="lg:col-span-7 bg-card border border-border/60 p-6 sm:p-8 md:p-12">
           {sent ? (
             <div className="text-center py-10">
               <div className="w-14 h-14 mx-auto rounded-full border border-[#C4A484] flex items-center justify-center mb-6">
@@ -127,7 +127,7 @@ export default function DetailedContactForm() {
               </button>
             </div>
           ) : (
-            <form onSubmit={submit} noValidate className="space-y-6">
+            <form onSubmit={submit} noValidate className="space-y-5 sm:space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label htmlFor="dc-name" className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
