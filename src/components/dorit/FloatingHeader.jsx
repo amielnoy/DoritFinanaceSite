@@ -3,6 +3,7 @@ import { Menu, X } from "lucide-react";
 
 const NAV = [
   { label: "אודות", href: "#about" },
+  { label: "נקודת מבט", href: "#perspective" },
   { label: "שירותים", href: "#services" },
   { label: "הוכחות", href: "#proof" },
   { label: "ייעוץ", href: "#consultation" },
