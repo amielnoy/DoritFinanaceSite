@@ -76,7 +76,7 @@ export default function ConsultationBuilder() {
         body: agentBody,
       });
     } catch (e) {
-      setError("לא הצלחנו לשלוח את הבקשה כרגע. נסו/י שוב או חייגו/י ישירות.");
+      setError("לא הצלחנו לשלוח את הבקשה כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
       setSending(false);
       return;
     }
