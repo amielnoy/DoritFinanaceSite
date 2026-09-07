@@ -1,0 +1,71 @@
+{
+  "name": "Lead",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "\u05e9\u05dd"
+    },
+    "phone": {
+      "type": "string",
+      "title": "\u05d8\u05dc\u05e4\u05d5\u05df"
+    },
+    "email": {
+      "type": "string",
+      "title": "\u05d0\u05d9\u05de\u05d9\u05d9\u05dc"
+    },
+    "source": {
+      "type": "string",
+      "title": "\u05de\u05e7\u05d5\u05e8 \u05d4\u05e4\u05e0\u05d9\u05d9\u05d4",
+      "enum": [
+        "consultation",
+        "detailed",
+        "quick"
+      ]
+    },
+    "topic": {
+      "type": "string",
+      "title": "\u05ea\u05d7\u05d5\u05dd / \u05e9\u05d9\u05e8\u05d5\u05ea"
+    },
+    "timing": {
+      "type": "string",
+      "title": "\u05de\u05d5\u05e2\u05d3"
+    },
+    "message": {
+      "type": "string",
+      "title": "\u05d4\u05d5\u05d3\u05e2\u05d4"
+    },
+    "status": {
+      "type": "string",
+      "title": "\u05e1\u05d8\u05d8\u05d5\u05e1",
+      "enum": [
+        "new",
+        "contacted",
+        "closed"
+      ],
+      "default": "new"
+    }
+  },
+  "required": [
+    "name",
+    "phone"
+  ],
+  "rls": {
+    "create": true,
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

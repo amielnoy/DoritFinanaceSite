@@ -99,6 +99,20 @@ export default function ConsultationBuilder() {
         /* מייל תיעוד ללקוח — מיטבי מאמץ */
       }
     }
+    try {
+      await base44.entities.Lead.create({
+        name: data.name,
+        phone: data.phone,
+        email: data.email || "",
+        source: "consultation",
+        topic: data.topic || "",
+        timing: data.timing || "",
+        message: data.notes || "",
+        status: "new",
+      });
+    } catch (e) {
+      /* תיעוד הפנייה במאגר — מיטבי */
+    }
     setSending(false);
     setDone(true);
   };
