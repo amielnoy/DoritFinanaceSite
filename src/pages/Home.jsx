@@ -14,6 +14,7 @@ import FAQ from "@/components/dorit/FAQ";
 import ConsultationBuilder from "@/components/dorit/ConsultationBuilder";
 import DetailedContactForm from "@/components/dorit/DetailedContactForm";
 import QuickContact from "@/components/dorit/QuickContact";
+import QuickShare from "@/components/dorit/QuickShare";
 import Footer from "@/components/dorit/Footer";
 
 export default function Home() {
@@ -34,6 +35,7 @@ export default function Home() {
         <ConsultationBuilder />
         <DetailedContactForm />
         <QuickContact />
+        <QuickShare />
       </main>
       <SectionNav />
       <Footer />
