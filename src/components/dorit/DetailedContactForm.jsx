@@ -69,6 +69,20 @@ export default function DetailedContactForm() {
       } catch (e) {
         /* עותק מיטבי לדורית */
       }
+      try {
+        await base44.entities.Lead.create({
+          name: form.name,
+          phone: form.phone,
+          email: form.email || "",
+          source: "detailed",
+          topic: form.service || "",
+          timing: form.contactTime || "",
+          message: form.message || "",
+          status: "new",
+        });
+      } catch (e) {
+        /* תיעוד הפנייה במאגר — מיטבי */
+      }
       setSent(true);
       setForm({
         name: "",
