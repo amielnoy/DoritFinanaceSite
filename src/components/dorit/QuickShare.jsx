@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { MessageCircle, Linkedin, Link2, Check } from "lucide-react";
 
 const SHARE_TEXT =
-  "ממליצ/ה בחום על דורית גוב ארי — ייעוץ ביטוחי ופיננסי אישי, מקצועי ואנושי. מומלץ ביותר.";
+  "ממליצים בחום על דורית גוב ארי — ייעוץ ביטוחי ופיננסי אישי, מקצועי ואנושי. מומלץ ביותר.";
 const SHARE_URL = "https://safe-arch-plan.base44.app";
 
 export default function QuickShare() {
@@ -28,10 +28,10 @@ export default function QuickShare() {
           Pass It On
         </span>
         <h2 className="font-heading text-3xl md:text-4xl mt-4 leading-tight">
-          מכיר/ה מישהו שזקוק לייעוץ?
+          מכירים מישהו שזקוק לייעוץ?
         </h2>
         <p className="mt-5 text-foreground/70 leading-relaxed">
-          שיתוף אחד קטן יכול לעשות סדר בחיים של מישהו. שלח/י את ההמלצה בקלות —
+          שיתוף אחד קטן יכול לעשות סדר בחיים של מישהו. שלחו את ההמלצה בקלות —
           בוואטסאפ או בלינקדאין.
         </p>
 

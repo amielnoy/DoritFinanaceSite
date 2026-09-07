@@ -57,12 +57,12 @@ export default function ConsultationBuilder() {
       `הערות: ${data.notes || "—"}`;
     const clientBody =
       `שלום ${firstName},\n\n` +
-      `קיבלתי את בקשת הייעוץ שלך והפרטים תועדו במערכת בהצלחה.\n` +
-      `כל פרט שמסרת נשמר בסודיות מלאה ובכבוד.\n\n` +
+      `קיבלתי את בקשת הייעוץ שלכם והפרטים תועדו במערכת בהצלחה.\n` +
+      `כל פרט שמסרתם נשמר בסודיות מלאה ובכבוד.\n\n` +
       `נושא הפגישה: ${data.topic || "ייעוץ כללי"}\n` +
       `מועד מבוקש: ${when}\n\n` +
-      `אחזור אלייך אישית תוך יום עסקים אחד לתיאום מועד מדויק לפגישה.\n` +
-      `עד אז — נשמו רגועה. הכל מתוכנן.\n\n` +
+      `אחזור אליכם אישית תוך יום עסקים אחד לתיאום מועד מדויק לפגישה.\n` +
+      `עד אז — נשמו רגועים. הכל מתוכנן.\n\n` +
       `לכל שאלה או עדכון, ניתן להשיב ישירות למייל זה.\n\n` +
       `בברכה חמה,\n` +
       `דורית גוב ארי\n` +
@@ -92,7 +92,7 @@ export default function ConsultationBuilder() {
       try {
         await base44.integrations.Core.SendEmail({
           to: data.email,
-          subject: `אישור — קיבלנו את בקשת הייעוץ שלך · דורית גוב ארי`,
+          subject: `אישור — קיבלנו את בקשת הייעוץ שלכם · דורית גוב ארי`,
           body: clientBody,
         });
       } catch (e) {
@@ -141,8 +141,8 @@ export default function ConsultationBuilder() {
             תודה, {data.name.split(" ")[0]}.
           </h2>
           <p className="mt-6 text-primary-foreground/80 leading-relaxed">
-            קיבלתי את בקשתך. אחזור אליך אישית תוך יום עסקים אחד כדי לתאם את
-            פגישת הייעוץ הראשונה. עד אז — נשמו רגועה. הכל מתוכנן.
+            קיבלתי את בקשתכם. אחזור אליכם אישית תוך יום עסקים אחד כדי לתאם את
+            פגישת הייעוץ הראשונה. עד אז — נשמו רגועים. הכל מתוכנן.
           </p>
           <button
             onClick={() => {
@@ -152,7 +152,7 @@ export default function ConsultationBuilder() {
             }}
             className="mt-10 text-sm tracking-wide underline underline-offset-4 hover:text-[#C4A484] transition-colors"
           >
-            שלחי בקשה נוספת
+            שליחת בקשה נוספת
           </button>
         </div>
       </section>
@@ -180,7 +180,7 @@ export default function ConsultationBuilder() {
           </p>
           <div className="mt-10">
             <p className="text-xs tracking-[0.2em] uppercase text-muted-foreground mb-4">
-              או קבע/י ישירות ביומן
+              או לקביעה ישירה ביומן
             </p>
             <GoogleCalendarBooking data={data} />
           </div>
@@ -297,7 +297,7 @@ export default function ConsultationBuilder() {
               className="inline-flex items-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground font-medium hover:bg-accent disabled:opacity-40 disabled:hover:bg-primary transition-colors"
             >
               {sending && <Loader2 size={16} className="animate-spin" />}
-              {isLast ? "שלחי בקשה" : "המשך"}
+              {isLast ? "שליחת בקשה" : "המשך"}
             </button>
           </div>
           {error && (

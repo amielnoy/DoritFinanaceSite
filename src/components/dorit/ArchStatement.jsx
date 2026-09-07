@@ -39,15 +39,15 @@ export default function ArchStatement() {
           </g>
         </svg>
         {/* Statement */}
-        <div className="relative z-10 text-center py-12 md:py-20 px-6">
-          <p className="font-heading text-[7.5vw] md:text-[4.25rem] leading-[1.1] font-bold text-foreground">
+        <h1 className="relative z-10 text-center py-12 md:py-20 px-6">
+          <span className="block font-heading text-[7.5vw] md:text-[4.25rem] leading-[1.1] font-bold text-foreground">
             מקצועיות, יושר
-          </p>
+          </span>
           <div className="mx-auto my-5 h-[3px] w-36 md:w-52 bg-[#9C836A]" />
-          <p className="font-heading text-[7.5vw] md:text-[4.25rem] leading-[1.1] font-bold text-foreground">
+          <span className="block font-heading text-[7.5vw] md:text-[4.25rem] leading-[1.1] font-bold text-foreground">
             ואנושיות נפגשים
-          </p>
-        </div>
+          </span>
+        </h1>
       </div>
     </div>
   );

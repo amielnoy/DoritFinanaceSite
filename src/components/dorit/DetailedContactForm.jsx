@@ -111,13 +111,13 @@ export default function DetailedContactForm() {
             Personal Message
           </span>
           <h2 className="font-heading text-4xl sm:text-5xl md:text-6xl mt-5 leading-tight">
-            ספר/י לי
+            ספרו לי
             <br />
-            עליך
+            עליכם
           </h2>
           <p className="mt-6 md:mt-8 text-foreground/70 max-w-md leading-relaxed text-base sm:text-lg">
-            ככל שאדע יותר על הצורך שלך, כך אוכל להגיע מוכנה יותר לפגישה הראשונה.
-            מלא/י את הפרטים והשאר/י הודעה אישית — אחזור אלייך באופן שמתאים לך.
+            ככל שאדע יותר על הצורך שלכם, כך אוכל להגיע מוכנה יותר לפגישה הראשונה.
+            מלאו את הפרטים והשאירו הודעה אישית — אחזור אליכם באופן שמתאים לכם.
           </p>
         </div>
 
@@ -129,7 +129,7 @@ export default function DetailedContactForm() {
               </div>
               <p className="font-heading text-2xl">תודה, הטופס נשלח.</p>
               <p className="mt-4 text-foreground/70 max-w-md mx-auto">
-                קיבלתי את פנייתך ואחזור אלייך אישית במועד שבחרת.
+                קיבלתי את פנייתכם ואחזור אליכם אישית במועד שבחרתם.
               </p>
               <button
                 onClick={() => setSent(false)}

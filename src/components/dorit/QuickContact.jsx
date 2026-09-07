@@ -68,12 +68,12 @@ export default function QuickContact() {
             Direct Line
           </span>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
-            השאר/י פרטים,
+            השאירו פרטים,
             <br />
-            אחזור אלייך היום
+            אחזור אליכם היום
           </h2>
           <p className="mt-8 text-primary-foreground/70 max-w-md leading-relaxed">
-            שלוש שדות בלבד — וההודעה מגיעה ישירות לתיבת הדוא״ל שלי. אחזור אליך
+            שלוש שדות בלבד — וההודעה מגיעה ישירות לתיבת הדוא״ל שלי. אחזור אליכם
             אישית ובמהירות האפשרית.
           </p>
           <div className="mt-8 flex items-center gap-3 text-primary-foreground/60">
@@ -99,7 +99,7 @@ export default function QuickContact() {
               </div>
               <p className="font-heading text-2xl">ההודעה נשלחה. תודה.</p>
               <p className="mt-4 text-primary-foreground/70">
-                קיבלתי את פרטייך ואחזור אלייך בהקדם האפשרי.
+                קיבלתי את פרטיכם ואחזור אליכם בהקדם האפשרי.
               </p>
               <button
                 onClick={() => setSent(false)}

@@ -62,13 +62,13 @@ export default function Hero() {
               href="#consultation"
               className="inline-flex items-center px-7 py-4 bg-primary text-primary-foreground font-medium hover:bg-accent transition-colors duration-300"
             >
-              קבעי פגישת ייעוץ
+              לקביעת פגישת ייעוץ
             </a>
             <a
               href="#services"
               className="inline-flex items-center gap-2 text-sm tracking-wide text-foreground/70 hover:text-accent transition-colors"
             >
-              גלו את השירותים <ArrowDown size={16} />
+              לצפייה בשירותים <ArrowDown size={16} />
             </a>
           </div>
         </div>

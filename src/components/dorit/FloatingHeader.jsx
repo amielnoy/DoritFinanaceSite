@@ -69,7 +69,7 @@ export default function FloatingHeader() {
             href="#consultation"
             className="hidden md:inline-flex items-center px-5 py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:bg-accent transition-colors duration-300"
           >
-            קבעי פגישת ייעוץ
+            לקביעת פגישת ייעוץ
           </a>
           <button
             className="md:hidden p-2"
@@ -99,7 +99,7 @@ export default function FloatingHeader() {
               onClick={() => setOpen(false)}
               className="mt-4 inline-flex justify-center px-5 py-3 bg-primary text-primary-foreground text-sm font-medium"
             >
-              קבעי פגישת ייעוץ
+              לקביעת פגישת ייעוץ
             </a>
           </nav>
         </div>

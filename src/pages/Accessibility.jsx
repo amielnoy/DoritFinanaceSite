@@ -45,7 +45,7 @@ export default function Accessibility() {
           <section>
             <h2 className="font-heading text-2xl mb-3">ידוע על קשיי נגישות</h2>
             <p>
-              מצאת/ בעיה בנגישות האתר? נשמח לדעת. ניתן לפנות אלינו ונטפל
+              מצאתם בעיה בנגישות האתר? נשמח לדעת. ניתן לפנות אלינו ונטפל
               בבקשה בהקדם האפשרי.
             </p>
           </section>
