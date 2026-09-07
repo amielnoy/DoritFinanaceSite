@@ -1,5 +1,6 @@
 import React from "react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
+import SectionNav from "@/components/dorit/SectionNav";
 import SecurityScroll from "@/components/dorit/SecurityScroll";
 import Hero from "@/components/dorit/Hero";
 import About from "@/components/dorit/About";
@@ -30,6 +31,7 @@ export default function Home() {
         <DetailedContactForm />
         <QuickContact />
       </main>
+      <SectionNav />
       <Footer />
     </div>
   );
