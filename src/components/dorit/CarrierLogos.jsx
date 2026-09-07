@@ -1,16 +1,16 @@
 import React from "react";
 
 const CARRIERS = [
-  { he: "מגדל", en: "Migdal" },
-  { he: "כלל", en: "Clal" },
-  { he: "הראל", en: "Harel" },
-  { he: "מנורה מבטחים", en: "Menora Mivtachim" },
-  { he: "הפניקס", en: "The Phoenix" },
-  { he: "עמיתים", en: "Amitim" },
-  { he: "איילון", en: "Ayalon" },
-  { he: "טרם", en: "Tarem" },
-  { he: "AIG", en: "AIG" },
-  { he: "מונפורט", en: "Monfort" },
+  { he: "מגדל", en: "Migdal", url: "https://www.migdal.co.il" },
+  { he: "כלל", en: "Clal", url: "https://www.clalbit.co.il" },
+  { he: "הראל", en: "Harel", url: "https://www.harel.co.il" },
+  { he: "מנורה מבטחים", en: "Menora Mivtachim", url: "https://www.menoramivtachim.co.il" },
+  { he: "הפניקס", en: "The Phoenix", url: "https://www.phoenix.co.il" },
+  { he: "עמיתים", en: "Amitim", url: "https://www.amitim.co.il" },
+  { he: "איילון", en: "Ayalon", url: "https://www.ayalon.co.il" },
+  { he: "טרם", en: "Tarem", url: "https://www.tarem.co.il" },
+  { he: "AIG", en: "AIG", url: "https://www.aig.co.il" },
+  { he: "מונפורט", en: "Monfort", url: "https://www.monfort.co.il" },
 ];
 
 export default function CarrierLogos() {
@@ -28,9 +28,13 @@ export default function CarrierLogos() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-10 md:gap-y-12 items-center">
           {CARRIERS.map((c) => (
-            <div
+            <a
               key={c.en}
-              className="group flex flex-col items-center text-center cursor-default"
+              href={c.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`אתר ${c.he}`}
+              className="group flex flex-col items-center text-center"
             >
               <span className="font-heading text-xl md:text-2xl tracking-tight leading-none text-muted-foreground/65 group-hover:text-foreground transition-colors duration-500">
                 {c.he}
@@ -40,7 +44,7 @@ export default function CarrierLogos() {
                   {c.en}
                 </span>
               )}
-            </div>
+            </a>
           ))}
         </div>
 
