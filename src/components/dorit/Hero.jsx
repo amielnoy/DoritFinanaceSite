@@ -48,12 +48,14 @@ export default function Hero() {
         {/* Headline */}
         <div className="order-1 md:order-2 flex flex-col justify-center pr-0 md:pr-12 pb-10 md:pb-0">
           <span className="text-[11px] tracking-[0.35em] uppercase text-accent mb-6 animate-fade-up">
-            ביטוח · פנסיה · ייעוץ פיננסי
+            דורית גוב ארי · אדריכלות של ביטחון
           </span>
-          <h1 className="font-heading text-[15vw] md:text-[7.5rem] leading-[0.92] font-bold animate-fade-up">
-            אדריכלות
+          <h1 className="font-heading text-[10vw] md:text-[5.25rem] leading-[1.05] font-bold animate-fade-up">
+            כש<span className="text-accent">מקצועית</span>,
             <br />
-            <span className="text-accent">של</span> ביטחון
+            <span className="text-accent">יושר</span> ו<span className="text-accent">אנושיות</span>
+            <br />
+            נפגשים
           </h1>
           <p className="mt-8 max-w-md text-lg text-foreground/75 leading-relaxed animate-fade-up">
             אני לא מוכרת פוליסות — אני מתכננת עתיד. ליווי אישי, מדויק ושקוף לאורך כל
