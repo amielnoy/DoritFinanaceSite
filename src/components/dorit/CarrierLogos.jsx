@@ -15,28 +15,39 @@ const CARRIERS = [
 
 export default function CarrierLogos() {
   return (
-    <section className="relative py-16 md:py-20 border-y border-border/60 bg-secondary/30">
+    <section className="relative py-20 md:py-24 border-y border-border/60 bg-secondary/40 overflow-hidden">
+      {/* subtle architectural accent line */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-accent/30 to-transparent" />
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
-        <p className="text-center text-[11px] tracking-[0.35em] uppercase text-accent mb-10">
-          עובדת מול מיטב חברות הביטוח והפנסיה בישראל
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-6 gap-y-8 md:gap-y-10 items-center">
+        <div className="text-center mb-12 md:mb-14">
+          <p className="text-[11px] tracking-[0.35em] uppercase text-accent">
+            עובדת מול מיטב חברות הביטוח והפנסיה בישראל
+          </p>
+          <div className="mt-5 mx-auto w-12 h-px bg-highlight/50" />
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-10 md:gap-y-12 items-center">
           {CARRIERS.map((c) => (
             <div
               key={c.en}
-              className="flex flex-col items-center text-center text-muted-foreground/70 hover:text-foreground transition-colors duration-300"
+              className="group flex flex-col items-center text-center cursor-default"
             >
-              <span className="font-heading text-xl md:text-2xl tracking-tight leading-none">
+              <span className="font-heading text-xl md:text-2xl tracking-tight leading-none text-muted-foreground/65 group-hover:text-foreground transition-colors duration-500">
                 {c.he}
               </span>
               {c.en && c.en !== c.he && (
-                <span className="mt-1.5 text-[10px] tracking-[0.25em] uppercase opacity-70">
+                <span className="mt-2 text-[9px] tracking-[0.3em] uppercase text-muted-foreground/40 group-hover:text-accent/70 transition-colors duration-500">
                   {c.en}
                 </span>
               )}
             </div>
           ))}
         </div>
+
+        <p className="mt-14 text-center text-sm text-muted-foreground/60 max-w-xl mx-auto leading-relaxed">
+          גישה בלתי-תלויה לכל שוק הביטוח והפנסיה — ההמלצה נגזרת אך ורק מהצורך שלך,
+          לא משייכות מסחרית לחברה כלשהי.
+        </p>
       </div>
     </section>
   );
