@@ -53,14 +53,21 @@ export default function Hero() {
             דורית גוב ארי · אדריכלות של ביטחון
           </span>
           <ArchStatement />
-          <p className="mt-8 max-w-md text-lg text-foreground/75 leading-relaxed animate-fade-up">
+          <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-foreground/70 animate-fade-up">
+            <span className="font-heading text-base text-accent">30 שנות ניסיון</span>
+            <span className="text-[#C4A484]">·</span>
+            <span className="font-heading text-base text-accent">97% תביעות שאושרו</span>
+            <span className="text-[#C4A484]">·</span>
+            <span className="font-heading text-base text-accent">ליווי אישי 1:1</span>
+          </div>
+          <p className="mt-6 max-w-md text-lg text-foreground/75 leading-relaxed animate-fade-up">
             אני לא מוכרת פוליסות — אני מתכננת עתיד. ליווי אישי, מדויק ושקוף לאורך כל
             חייכם, מהרגע שבו אתם בוחרים ועד הרגע שבו אתם נשענים על הרשת.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-5 animate-fade-up">
             <a
               href="#consultation"
-              className="inline-flex items-center px-7 py-4 bg-primary text-primary-foreground font-medium hover:bg-accent transition-colors duration-300"
+              className="inline-flex items-center px-7 py-4 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] transition-colors duration-300"
             >
               לקביעת פגישת ייעוץ
             </a>

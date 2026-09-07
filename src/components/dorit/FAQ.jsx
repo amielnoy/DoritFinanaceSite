@@ -39,7 +39,7 @@ export default function FAQ() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-4">
           <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            Clarity, Not Jargon
+            06 · Clarity, Not Jargon
           </span>
           <h2 className="font-heading text-4xl md:text-5xl mt-5 leading-tight">
             שאלות

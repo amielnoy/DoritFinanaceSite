@@ -1,5 +1,6 @@
 import React from "react";
 import { Image } from "@/components/ui/image";
+import Reveal from "@/components/dorit/Reveal";
 
 const ATMOS =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/5b05202dd_generated_7c8e0421.jpg";
@@ -43,19 +44,27 @@ export default function About() {
         </div>
 
         <div className="lg:col-span-7 flex flex-col justify-center">
-          <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            The Principal Architect
-          </span>
-          <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
-            אני לא סוכנת.
-            <br />
-            אני האדריכלית שלכם.
-          </h2>
+          <Reveal>
+            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
+              01 · The Principal Architect
+            </span>
+            <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
+              אני לא סוכנת.
+              <br />
+              אני האדריכלית שלכם.
+            </h2>
+          </Reveal>
           <div className="mt-8 space-y-5 text-foreground/75 max-w-2xl leading-relaxed">
             <p>
-              במשך 30 שנות ניסיון, דורית גוב ארי בונה עבור מאות לקוחותיה
-              לא רק תיק ביטוחי — אלא מערכת שלמה של ודאות. כל פוליסה היא קורה,
-              כל כיסוי הוא יסוד, וכל החלטה נעשית תוך מבט קדימה אל העתיד שלכם.
+              כל לקוח שנכנס אליי הוא עולם שלם — עם חלומות, דאגות וסיפור חיים
+              משלו. לכן אני לא מציעה פתרונות מהמדף. אני מקשיבה תחילה, מבינה
+              לעומק את הצורך, ורק אז בונה תיק מותאם אישית — ומלווה אותו יחד אתכם
+              לאורך כל הדרך, מהרגע שבו אתם בוחרים ועד הרגע שבו אתם נשענים על הרשת.
+            </p>
+            <p>
+              במשך 30 שנות ניסיון, דורית גוב ארי בונה עבור מאות לקוחותיה לא רק
+              תיק ביטוחי — אלא מערכת שלמה של ודאות. כל פוליסה היא קורה, כל
+              כיסוי הוא יסוד, וכל החלטה נעשית תוך מבט קדימה אל העתיד שלכם.
             </p>
             <p>
               הגישה שלי פשוטה ומוחלטת: להקשיב עמוק, לתכנן בדיוק, ולהיות שם ברגע
@@ -63,6 +72,9 @@ export default function About() {
               אלא בשקט הנפשי שמגיע כשיודעים שהכל מכוסה.
             </p>
           </div>
+          <p className="mt-6 font-heading italic text-2xl text-accent">
+            — דורית
+          </p>
 
           <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-px bg-border/60 border border-border/60">
             {STATS.map((s, i) => (

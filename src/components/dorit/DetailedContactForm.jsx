@@ -276,7 +276,7 @@ export default function DetailedContactForm() {
                 <button
                   type="submit"
                   disabled={!valid || busy}
-                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground font-medium hover:bg-accent disabled:opacity-40 disabled:hover:bg-primary transition-colors"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] disabled:opacity-40 disabled:hover:bg-[#C4A484] transition-colors"
                 >
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   שליחת פנייה

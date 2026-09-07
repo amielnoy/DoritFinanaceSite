@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import Reveal from "@/components/dorit/Reveal";
 
 const BRIEFS = [
   {
@@ -61,12 +62,14 @@ export default function ProofCarousel() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
-            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-              Proof of Resilience
-            </span>
-            <h2 className="font-heading text-5xl md:text-6xl mt-4">
-              תיקי הצלחה
-            </h2>
+            <Reveal>
+              <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
+                04 · Proof of Resilience
+              </span>
+              <h2 className="font-heading text-5xl md:text-6xl mt-4">
+                תיקי הצלחה
+              </h2>
+            </Reveal>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -108,7 +111,7 @@ export default function ProofCarousel() {
               {b.body}
             </p>
             <div className="mt-8 pt-6 border-t border-border/60 flex items-center justify-between">
-              <span className="font-heading text-xl text-[#C4A484]">
+              <span className="font-heading text-3xl md:text-4xl text-[#C4A484] leading-none">
                 {b.metric}
               </span>
               <span className="text-[10px] tracking-[0.25em] uppercase text-muted-foreground">

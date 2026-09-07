@@ -16,16 +16,17 @@ import DetailedContactForm from "@/components/dorit/DetailedContactForm";
 import QuickContact from "@/components/dorit/QuickContact";
 import QuickShare from "@/components/dorit/QuickShare";
 import Footer from "@/components/dorit/Footer";
+import MobileStickyBar from "@/components/dorit/MobileStickyBar";
 
 export default function Home() {
   return (
-    <div className="relative bg-background">
+    <div className="relative bg-background pb-14 md:pb-0">
       <SecurityScroll />
       <FloatingHeader />
       <main>
         <Hero />
-        <About />
         <CarrierLogos />
+        <About />
         <ReviewsWidget />
         <Perspective />
         <ServiceMatrix />
@@ -38,6 +39,7 @@ export default function Home() {
         <QuickShare />
       </main>
       <SectionNav />
+      <MobileStickyBar />
       <Footer />
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Heart, Landmark, ShieldCheck, Home, HeartHandshake } from "lucide-react";
+import Reveal from "@/components/dorit/Reveal";
 
 const PILLARS = [
   {
@@ -49,12 +50,14 @@ export default function ServiceMatrix() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
           <div>
-            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-              Gallery of Certainty
-            </span>
-            <h2 className="font-heading text-5xl md:text-6xl mt-4 max-w-xl">
-              חמישה עמודי חיים
-            </h2>
+            <Reveal>
+              <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
+                03 · Gallery of Certainty
+              </span>
+              <h2 className="font-heading text-5xl md:text-6xl mt-4 max-w-xl">
+                חמישה עמודי חיים
+              </h2>
+            </Reveal>
           </div>
           <p className="max-w-sm text-foreground/70">
             מורכבות הביטוח מתורגמת לשפה פשוטה ואלגנטית — כל תחום הוא עמוד תמיכה

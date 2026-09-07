@@ -167,7 +167,7 @@ export default function ConsultationBuilder() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
           <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            The Direct Path
+            07 · The Direct Path
           </span>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
             בונים יחד
@@ -294,7 +294,7 @@ export default function ConsultationBuilder() {
             <button
               onClick={next}
               disabled={!canNext || sending}
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground font-medium hover:bg-accent disabled:opacity-40 disabled:hover:bg-primary transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] disabled:opacity-40 disabled:hover:bg-[#C4A484] transition-colors"
             >
               {sending && <Loader2 size={16} className="animate-spin" />}
               {isLast ? "שליחת בקשה" : "המשך"}

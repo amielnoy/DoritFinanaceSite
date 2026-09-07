@@ -3,13 +3,15 @@ import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { Image } from "@/components/ui/image";
 import { Plus, X, Quote, Trash2, Loader2, Upload } from "lucide-react";
+import Reveal from "@/components/dorit/Reveal";
+import Stars from "@/components/dorit/Stars";
 
 export default function Testimonials() {
   const { isAuthenticated } = useAuth();
   const [items, setItems] = useState(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", role: "", quote: "", image_url: "" });
+  const [form, setForm] = useState({ name: "", role: "", quote: "", image_url: "", rating: 5, source: "google" });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +40,7 @@ export default function Testimonials() {
   };
 
   const reset = () => {
-    setForm({ name: "", role: "", quote: "", image_url: "" });
+    setForm({ name: "", role: "", quote: "", image_url: "", rating: 5, source: "google" });
     setFile(null);
     setPreview("");
     setOpen(false);
@@ -58,6 +60,8 @@ export default function Testimonials() {
         role: form.role,
         quote: form.quote,
         image_url,
+        rating: Number(form.rating) || 5,
+        source: form.source || "google",
       });
       reset();
       await load();
@@ -76,10 +80,12 @@ export default function Testimonials() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
           <div>
-            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-              Clients Speak
-            </span>
-            <h2 className="font-heading text-5xl md:text-6xl mt-4">לקוחות מספרים</h2>
+            <Reveal>
+              <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
+                05 · Clients Speak
+              </span>
+              <h2 className="font-heading text-5xl md:text-6xl mt-4">לקוחות מספרים</h2>
+            </Reveal>
           </div>
           {isAuthenticated && (
             <button
@@ -139,6 +145,29 @@ export default function Testimonials() {
                     className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors resize-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">דירוג</label>
+                  <select
+                    value={form.rating}
+                    onChange={(e) => setForm((f) => ({ ...f, rating: Number(e.target.value) }))}
+                    className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors"
+                  >
+                    {[5, 4, 3, 2, 1].map((r) => (
+                      <option key={r} value={r}>{r} כוכבים</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">מקור חוות דעת</label>
+                  <select
+                    value={form.source}
+                    onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
+                    className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors"
+                  >
+                    <option value="google">Google</option>
+                    <option value="midrag">Midrag</option>
+                  </select>
+                </div>
                 <div className="md:col-span-2 flex justify-end">
                   <button
                     onClick={submit}
@@ -192,6 +221,14 @@ export default function Testimonials() {
                   <div>
                     <p className="font-heading text-lg leading-tight">{t.name}</p>
                     {t.role && <p className="text-xs tracking-[0.1em] uppercase text-muted-foreground mt-1">{t.role}</p>}
+                    <div className="flex items-center gap-2 mt-2">
+                      {t.rating ? <Stars value={t.rating} /> : null}
+                      {t.source && (
+                        <span className="text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground">
+                          {t.source === "google" ? "Google" : "Midrag"}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <Quote size={18} className="text-[#C4A484] mb-3" strokeWidth={1.25} />
