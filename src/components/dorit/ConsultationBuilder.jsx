@@ -1,0 +1,233 @@
+import React, { useState } from "react";
+import { Check, ChevronLeft } from "lucide-react";
+
+const STEPS = [
+  {
+    key: "topic",
+    label: "תחום הייעוץ",
+    options: [
+      "ביטוח חיים ובריאות",
+      "פנסיה ופיננסים",
+      "ביטוח משכנתא",
+      "עסק והון",
+      "ליווי תביעות",
+    ],
+  },
+  {
+    key: "timing",
+    label: "מתעניינים",
+    options: ["השבוע", "החודש", "בעוד מספר חודשים", "רק מתלבט/ת"],
+  },
+  {
+    key: "contact",
+    label: "פרטים ליצירת קשר",
+  },
+];
+
+export default function ConsultationBuilder() {
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState({ topic: "", timing: "", name: "", phone: "", email: "", notes: "" });
+  const [done, setDone] = useState(false);
+
+  const isLast = step === STEPS.length - 1;
+  const canNext =
+    step === 0
+      ? !!data.topic
+      : step === 1
+      ? !!data.timing
+      : !!data.name && !!data.phone;
+
+  const next = () => {
+    if (!canNext) return;
+    if (isLast) {
+      setDone(true);
+    } else {
+      setStep((s) => s + 1);
+    }
+  };
+  const back = () => setStep((s) => Math.max(0, s - 1));
+
+  if (done) {
+    return (
+      <section
+        id="consultation"
+        className="relative py-24 md:py-32 bg-primary text-primary-foreground"
+      >
+        <div className="max-w-2xl mx-auto px-6 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full border border-[#C4A484] flex items-center justify-center mb-8">
+            <Check size={28} className="text-[#C4A484]" />
+          </div>
+          <h2 className="font-heading text-4xl md:text-5xl">
+            תודה, {data.name.split(" ")[0]}.
+          </h2>
+          <p className="mt-6 text-primary-foreground/80 leading-relaxed">
+            קיבלתי את בקשתך. אחזור אליך אישית תוך יום עסקים אחד כדי לתאם את
+            פגישת הייעוץ הראשונה. עד אז — נשמו רגועה. הכל מתוכנן.
+          </p>
+          <button
+            onClick={() => {
+              setDone(false);
+              setStep(0);
+              setData({ topic: "", timing: "", name: "", phone: "", email: "", notes: "" });
+            }}
+            className="mt-10 text-sm tracking-wide underline underline-offset-4 hover:text-[#C4A484] transition-colors"
+          >
+            שלחי בקשה נוספת
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      id="consultation"
+      className="relative py-24 md:py-32 border-t border-border/60"
+    >
+      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+        <div className="lg:col-span-5 flex flex-col justify-center">
+          <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
+            The Direct Path
+          </span>
+          <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
+            בונים יחד
+            <br />
+            את הייעוץ
+          </h2>
+          <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">
+            שלושה צעדים קצרים, כמו שיחה. ללא טפסים מיותרים — רק המידע שדרוש לי
+            כדי להגיע מוכנה לפגישה הראשונה שלנו.
+          </p>
+        </div>
+
+        <div className="lg:col-span-7 bg-card border border-border/60 p-8 md:p-12">
+          {/* progress */}
+          <div className="flex items-center gap-3 mb-10">
+            {STEPS.map((s, i) => (
+              <React.Fragment key={s.key}>
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border transition-colors ${
+                    i <= step
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {i + 1}
+                </div>
+                {i < STEPS.length - 1 && (
+                  <div
+                    className={`flex-1 h-px transition-colors ${
+                      i < step ? "bg-primary" : "bg-border"
+                    }`}
+                  />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          <div className="min-h-[260px]">
+            {step < 2 ? (
+              <>
+                <p className="text-sm tracking-[0.2em] uppercase text-accent mb-6">
+                  {STEPS[step].label}
+                </p>
+                <div className="flex flex-col gap-3">
+                  {STEPS[step].options.map((opt) => {
+                    const selected = data[STEPS[step].key] === opt;
+                    return (
+                      <button
+                        key={opt}
+                        onClick={() =>
+                          setData((d) => ({ ...d, [STEPS[step].key]: opt }))
+                        }
+                        className={`text-right px-6 py-4 border transition-all duration-300 flex items-center justify-between ${
+                          selected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border hover:border-accent hover:bg-background"
+                        }`}
+                      >
+                        <span className="text-lg">{opt}</span>
+                        {selected && <Check size={18} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-5">
+                <p className="text-sm tracking-[0.2em] uppercase text-accent mb-2">
+                  {STEPS[step].label}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field
+                    label="שם מלא"
+                    value={data.name}
+                    onChange={(v) => setData((d) => ({ ...d, name: v }))}
+                    placeholder="ישראל ישראלי"
+                  />
+                  <Field
+                    label="טלפון"
+                    value={data.phone}
+                    onChange={(v) => setData((d) => ({ ...d, phone: v }))}
+                    placeholder="050-0000000"
+                  />
+                </div>
+                <Field
+                  label="אימייל (לא חובה)"
+                  value={data.email}
+                  onChange={(v) => setData((d) => ({ ...d, email: v }))}
+                  placeholder="you@example.com"
+                />
+                <div>
+                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+                    הערות (לא חובה)
+                  </label>
+                  <textarea
+                    value={data.notes}
+                    onChange={(e) => setData((d) => ({ ...d, notes: e.target.value }))}
+                    rows={3}
+                    placeholder="ספר/י בקצרה על הצורך"
+                    className="w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent transition-colors resize-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-10 pt-6 border-t border-border/60">
+            <button
+              onClick={back}
+              disabled={step === 0}
+              className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-accent disabled:opacity-30 transition-colors"
+            >
+              <ChevronLeft size={16} /> חזור
+            </button>
+            <button
+              onClick={next}
+              disabled={!canNext}
+              className="inline-flex items-center px-7 py-3.5 bg-primary text-primary-foreground font-medium hover:bg-accent disabled:opacity-40 disabled:hover:bg-primary transition-colors"
+            >
+              {isLast ? "שלחי בקשה" : "המשך"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Field({ label, value, onChange, placeholder }) {
+  return (
+    <div>
+      <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+        {label}
+      </label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent transition-colors"
+      />
+    </div>
+  );
+}
