@@ -1,6 +1,9 @@
 import React, { useState } from "react";
-import { Check, ChevronLeft } from "lucide-react";
+import { Check, ChevronLeft, Loader2 } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 import GoogleCalendarBooking from "@/components/dorit/GoogleCalendarBooking";
+
+const NOTIFY_EMAIL = "dorit@gov-ari.co.il";
 
 const STEPS = [
   {
@@ -29,6 +32,8 @@ export default function ConsultationBuilder() {
   const [step, setStep] = useState(0);
   const [data, setData] = useState({ topic: "", timing: "", name: "", phone: "", email: "", notes: "" });
   const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
   const isLast = step === STEPS.length - 1;
   const canNext =
@@ -38,10 +43,56 @@ export default function ConsultationBuilder() {
       ? !!data.timing
       : !!data.name && !!data.phone;
 
+  const submitRequest = async () => {
+    setSending(true);
+    setError("");
+    const when = data.timing || "לפי תיאום";
+    const firstName = data.name.split(" ")[0];
+    const agentBody =
+      `בקשת ייעוץ חדשה — ${new Date().toLocaleString("he-IL")}\n\n` +
+      `שם: ${data.name}\n` +
+      `טלפון: ${data.phone}\n` +
+      `אימייל: ${data.email || "—"}\n` +
+      `תחום ייעוץ: ${data.topic || "—"}\n` +
+      `מועד מבוקש: ${when}\n` +
+      `הערות: ${data.notes || "—"}`;
+    const clientBody =
+      `שלום ${firstName},\n\n` +
+      `תודה על פנייתך. בקשת הייעוץ שלך התקבלה ותועדה.\n\n` +
+      `נושא הפגישה: ${data.topic || "ייעוץ כללי"}\n` +
+      `מועד מבוקש: ${when}\n\n` +
+      `אחזור אלייך אישית תוך יום עסקים אחד לתיאום מועד מדויק לפגישה.\n\n` +
+      `בברכה,\nדורית גוב ארי`;
+    try {
+      await base44.integrations.Core.SendEmail({
+        to: NOTIFY_EMAIL,
+        subject: `בקשת ייעוץ חדשה — ${data.name}`,
+        body: agentBody,
+      });
+    } catch (e) {
+      setError("לא הצלחנו לשלוח את הבקשה כרגע. נסו/י שוב או חייגו/י ישירות.");
+      setSending(false);
+      return;
+    }
+    if (data.email) {
+      try {
+        await base44.integrations.Core.SendEmail({
+          to: data.email,
+          subject: `אישור בקשת ייעוץ — דורית גוב ארי`,
+          body: clientBody,
+        });
+      } catch (e) {
+        /* מייל תיעוד ללקוח — מיטבי מאמץ */
+      }
+    }
+    setSending(false);
+    setDone(true);
+  };
+
   const next = () => {
-    if (!canNext) return;
+    if (!canNext || sending) return;
     if (isLast) {
-      setDone(true);
+      submitRequest();
     } else {
       setStep((s) => s + 1);
     }
@@ -204,19 +255,23 @@ export default function ConsultationBuilder() {
           <div className="flex items-center justify-between mt-10 pt-6 border-t border-border/60">
             <button
               onClick={back}
-              disabled={step === 0}
+              disabled={step === 0 || sending}
               className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-accent disabled:opacity-30 transition-colors"
             >
               <ChevronLeft size={16} /> חזור
             </button>
             <button
               onClick={next}
-              disabled={!canNext}
-              className="inline-flex items-center px-7 py-3.5 bg-primary text-primary-foreground font-medium hover:bg-accent disabled:opacity-40 disabled:hover:bg-primary transition-colors"
+              disabled={!canNext || sending}
+              className="inline-flex items-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground font-medium hover:bg-accent disabled:opacity-40 disabled:hover:bg-primary transition-colors"
             >
+              {sending && <Loader2 size={16} className="animate-spin" />}
               {isLast ? "שלחי בקשה" : "המשך"}
             </button>
           </div>
+          {error && (
+            <p className="mt-4 text-sm text-destructive text-right">{error}</p>
+          )}
         </div>
       </div>
     </section>
