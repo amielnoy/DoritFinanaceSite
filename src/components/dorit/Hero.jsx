@@ -34,6 +34,8 @@ export default function Hero() {
               alt="דורית גוב ארי — דיוקן מקצועי"
               className="w-full h-full object-cover"
               fittingType="fill"
+              loading="eager"
+              fetchpriority="high"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background/40 to-transparent" />
           </div>
