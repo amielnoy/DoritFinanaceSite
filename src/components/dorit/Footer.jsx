@@ -48,6 +48,7 @@ export default function Footer() {
             {[
               { l: "אודות", h: "#about" },
               { l: "שירותים", h: "#services" },
+              { l: "מדריך תביעות", h: "/claims", route: true },
               { l: "תיקי הצלחה", h: "#proof" },
               { l: "בלוג", h: "/blog", route: true },
               { l: "קביעת ייעוץ", h: "#consultation" },
