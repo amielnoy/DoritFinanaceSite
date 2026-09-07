@@ -6,6 +6,7 @@ import About from "@/components/dorit/About";
 import Perspective from "@/components/dorit/Perspective";
 import ServiceMatrix from "@/components/dorit/ServiceMatrix";
 import ProofCarousel from "@/components/dorit/ProofCarousel";
+import Testimonials from "@/components/dorit/Testimonials";
 import ConsultationBuilder from "@/components/dorit/ConsultationBuilder";
 import Footer from "@/components/dorit/Footer";
 
@@ -20,6 +21,7 @@ export default function Home() {
         <Perspective />
         <ServiceMatrix />
         <ProofCarousel />
+        <Testimonials />
         <ConsultationBuilder />
       </main>
       <Footer />
