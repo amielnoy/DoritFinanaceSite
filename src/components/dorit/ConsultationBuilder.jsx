@@ -3,7 +3,7 @@ import { Check, ChevronLeft, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import GoogleCalendarBooking from "@/components/dorit/GoogleCalendarBooking";
 
-const NOTIFY_EMAIL = "dorit@gov-ari.co.il";
+const NOTIFY_EMAIL = "dorit@govari-fin.co.il";
 
 const STEPS = [
   {

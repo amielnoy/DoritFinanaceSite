@@ -74,7 +74,7 @@ export default function Footer() {
             </li>
             <li className="flex items-center gap-3">
               <Mail size={16} className="text-[#C4A484]" />
-              <a href="mailto:dorit@gov-ari.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@gov-ari.co.il</a>
+              <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@govari-fin.co.il</a>
             </li>
             <li className="flex items-center gap-3">
               <MapPin size={16} className="text-[#C4A484]" />

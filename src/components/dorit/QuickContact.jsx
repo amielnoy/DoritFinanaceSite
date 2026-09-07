@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Send, Loader2, Check, Mail, MessageCircle } from "lucide-react";
 
 // הכתובת שאליה יגיעו הפניות. לשליחה מובטחת — ודא/י שזו כתובת משתמש רשום באפליקציה.
-const NOTIFY_EMAIL = "dorit@gov-ari.co.il";
+const NOTIFY_EMAIL = "dorit@govari-fin.co.il";
 
 export default function QuickContact() {
   const [form, setForm] = useState({ name: "", phone: "", email: "", message: "" });
@@ -56,7 +56,7 @@ export default function QuickContact() {
           </p>
           <div className="mt-8 flex items-center gap-3 text-primary-foreground/60">
             <Mail size={16} className="text-[#C4A484]" />
-            <a href="mailto:dorit@gov-ari.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@gov-ari.co.il</a>
+            <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@govari-fin.co.il</a>
           </div>
           <a
             href="https://wa.me/972508311776"
