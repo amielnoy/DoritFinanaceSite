@@ -18,8 +18,10 @@ export default function FloatingActions() {
         <MessageCircle size={26} className="group-hover:rotate-6 transition-transform" />
       </a>
       <a
-        href={`tel:${PHONE}`}
-        aria-label="התקשרות טלפונית"
+        href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent("שלום דורית, אשמח/ה לשוחח על ייעוץ ביטוחי ופיננסי.")}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="שיחת וואטסאפ"
         className="group w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:scale-105 transition-transform duration-300"
       >
         <Phone size={24} />
