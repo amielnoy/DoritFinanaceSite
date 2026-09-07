@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Check, ChevronLeft } from "lucide-react";
+import CalendlyBooking from "@/components/dorit/CalendlyBooking";
 
 const STEPS = [
   {
@@ -98,6 +99,12 @@ export default function ConsultationBuilder() {
             שלושה צעדים קצרים, כמו שיחה. ללא טפסים מיותרים — רק המידע שדרוש לי
             כדי להגיע מוכנה לפגישה הראשונה שלנו.
           </p>
+          <div className="mt-10">
+            <p className="text-xs tracking-[0.2em] uppercase text-muted-foreground mb-4">
+              או קבע/י ישירות ביומן
+            </p>
+            <CalendlyBooking />
+          </div>
         </div>
 
         <div className="lg:col-span-7 bg-card border border-border/60 p-8 md:p-12">
