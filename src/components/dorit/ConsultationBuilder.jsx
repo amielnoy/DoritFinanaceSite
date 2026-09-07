@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Check, ChevronLeft } from "lucide-react";
-import CalendlyBooking from "@/components/dorit/CalendlyBooking";
+import GoogleCalendarBooking from "@/components/dorit/GoogleCalendarBooking";
 
 const STEPS = [
   {
@@ -103,7 +103,7 @@ export default function ConsultationBuilder() {
             <p className="text-xs tracking-[0.2em] uppercase text-muted-foreground mb-4">
               או קבע/י ישירות ביומן
             </p>
-            <CalendlyBooking />
+            <GoogleCalendarBooking data={data} />
           </div>
         </div>
 
