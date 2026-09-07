@@ -4,7 +4,7 @@ import { CONTACT } from "@/config/contact";
 
 export default function FloatingActions() {
   return (
-    <div className="fixed left-4 bottom-4 z-50 flex flex-col gap-3">
+    <div className="fixed bottom-4 z-50 flex flex-row gap-3 right-4 left-auto md:flex-col md:left-4 md:right-auto">
       <a
         href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent("שלום דורית, אשמח/ה לשמוע פרטים נוספים על ייעוץ ביטוחי ופיננסי.")}`}
         target="_blank"
