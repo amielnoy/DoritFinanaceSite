@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, Phone } from "lucide-react";
+import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
 
 const NAV = [
@@ -22,6 +23,18 @@ export default function FloatingHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+      const onKey = (e) => e.key === "Escape" && setOpen(false);
+      window.addEventListener("keydown", onKey);
+      return () => {
+        document.body.style.overflow = "";
+        window.removeEventListener("keydown", onKey);
+      };
+    }
+  }, [open]);
 
   return (
     <header
@@ -94,40 +107,93 @@ export default function FloatingHeader() {
         </div>
       </div>
 
-      {open && (
-        <div className="md:hidden glass border-t border-border/60 mt-3">
-          <nav className="flex flex-col px-6 py-4">
-            {NAV.map((n) =>
-              n.route ? (
-                <Link
-                  key={n.href}
-                  to={n.href}
-                  onClick={() => setOpen(false)}
-                  className="py-3 text-base border-b border-border/40 last:border-0"
-                >
-                  {n.label}
-                </Link>
-              ) : (
-                <a
-                  key={n.href}
-                  href={n.href}
-                  onClick={() => setOpen(false)}
-                  className="py-3 text-base border-b border-border/40 last:border-0"
-                >
-                  {n.label}
-                </a>
-              )
-            )}
-            <a
-              href="#consultation"
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              className="md:hidden fixed inset-0 z-[60] bg-primary/40 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
               onClick={() => setOpen(false)}
-              className="mt-4 inline-flex justify-center px-5 py-3 bg-[#C4A484] text-primary text-sm font-medium"
+            />
+            <motion.div
+              className="md:hidden fixed top-0 right-0 bottom-0 z-[70] w-[86%] max-w-sm bg-background shadow-2xl flex flex-col"
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "tween", duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             >
-              לקביעת פגישת ייעוץ
-            </a>
-          </nav>
-        </div>
-      )}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-border/60">
+                <span className="font-heading text-lg font-bold">תפריט</span>
+                <button
+                  onClick={() => setOpen(false)}
+                  aria-label="סגירת תפריט"
+                  className="w-10 h-10 flex items-center justify-center border border-border hover:border-accent hover:text-accent transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <nav className="flex-1 overflow-y-auto px-2 py-3">
+                {NAV.map((n) =>
+                  n.route ? (
+                    <Link
+                      key={n.href}
+                      to={n.href}
+                      onClick={() => setOpen(false)}
+                      className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors"
+                    >
+                      <span>{n.label}</span>
+                      <ChevronLeft size={18} className="text-muted-foreground" />
+                    </Link>
+                  ) : (
+                    <a
+                      key={n.href}
+                      href={n.href}
+                      onClick={() => setOpen(false)}
+                      className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors"
+                    >
+                      <span>{n.label}</span>
+                      <ChevronLeft size={18} className="text-muted-foreground" />
+                    </a>
+                  )
+                )}
+              </nav>
+
+              <div className="px-6 py-5 border-t border-border/60 space-y-3">
+                <a
+                  href="#consultation"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full py-3.5 bg-[#C4A484] text-primary font-medium"
+                >
+                  <Calendar size={18} />
+                  לקביעת פגישת ייעוץ
+                </a>
+                <div className="grid grid-cols-2 gap-3">
+                  <a
+                    href={`tel:${CONTACT.phoneE164}`}
+                    className="flex items-center justify-center gap-2 py-3 border border-border text-sm font-medium hover:border-accent hover:text-accent transition-colors"
+                  >
+                    <Phone size={16} />
+                    חייגו
+                  </a>
+                  <a
+                    href={`https://wa.me/${CONTACT.whatsapp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 py-3 border border-border text-sm font-medium hover:border-accent hover:text-accent transition-colors"
+                  >
+                    <MessageCircle size={16} />
+                    WhatsApp
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
