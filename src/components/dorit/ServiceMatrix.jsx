@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Heart, Landmark, ShieldCheck, Home, Briefcase, HeartHandshake } from "lucide-react";
+import { Heart, Landmark, ShieldCheck, Home, HeartHandshake } from "lucide-react";
 
 const PILLARS = [
   {
@@ -25,12 +25,6 @@ const PILLARS = [
     title: "בית ונכסים",
     sub: "Estate Cover",
     desc: "הגנה מקיפה למשכנתא ולנכסים שלכם, עם מבט קדימה שמונע הפתעות יקרות.",
-  },
-  {
-    icon: Briefcase,
-    title: "עסק והון",
-    sub: "Business & Capital",
-    desc: "פתרונות לעצמאים ובעלי עסקים — הגנה על הון, הכנסה והמשכורת של מי שתלויים בכם.",
   },
   {
     icon: HeartHandshake,
@@ -59,7 +53,7 @@ export default function ServiceMatrix() {
               Gallery of Certainty
             </span>
             <h2 className="font-heading text-5xl md:text-6xl mt-4 max-w-xl">
-              שישה עמודי חיים
+              חמישה עמודי חיים
             </h2>
           </div>
           <p className="max-w-sm text-foreground/70">

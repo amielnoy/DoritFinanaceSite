@@ -8,8 +8,6 @@ const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 const SERVICES = [
   "פנסיה ופיננסים",
   "ביטוח חיים ובריאות",
-  "ביטוח משכנתא",
-  "עסק והון",
   "ליווי תביעות",
   "אחר / לא בטוח/ה",
 ];
