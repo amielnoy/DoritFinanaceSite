@@ -17,6 +17,9 @@ import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import Leads from '@/pages/Leads';
+import Blog from '@/pages/Blog';
+import BlogPost from '@/pages/BlogPost';
+import BlogAdmin from '@/pages/BlogAdmin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -49,12 +52,15 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Home />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/accessibility" element={<Accessibility />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:id" element={<BlogPost />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
           <Route path="/admin/leads" element={<Leads />} />
+          <Route path="/admin/blog" element={<BlogAdmin />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>

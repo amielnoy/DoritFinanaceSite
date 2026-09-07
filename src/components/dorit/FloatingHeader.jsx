@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Menu, X, Phone } from "lucide-react";
 import { CONTACT } from "@/config/contact";
 
@@ -8,6 +9,7 @@ const NAV = [
   { label: "שירותים", href: "#services" },
   { label: "הצלחות", href: "#proof" },
   { label: "לקוחות מספרים", href: "#testimonials" },
+  { label: "בלוג", href: "/blog", route: true },
   { label: "ייעוץ", href: "#consultation" },
 ];
 
@@ -43,16 +45,27 @@ export default function FloatingHeader() {
         </a>
 
         <nav className="hidden md:flex items-center gap-10">
-          {NAV.map((n) => (
-            <a
-              key={n.href}
-              href={n.href}
-              className="text-sm tracking-wide text-foreground/80 hover:text-accent transition-colors relative group"
-            >
-              {n.label}
-              <span className="absolute -bottom-1 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
-            </a>
-          ))}
+          {NAV.map((n) =>
+            n.route ? (
+              <Link
+                key={n.href}
+                to={n.href}
+                className="text-sm tracking-wide text-foreground/80 hover:text-accent transition-colors relative group"
+              >
+                {n.label}
+                <span className="absolute -bottom-1 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
+              </Link>
+            ) : (
+              <a
+                key={n.href}
+                href={n.href}
+                className="text-sm tracking-wide text-foreground/80 hover:text-accent transition-colors relative group"
+              >
+                {n.label}
+                <span className="absolute -bottom-1 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
+              </a>
+            )
+          )}
         </nav>
 
         <div className="flex items-center gap-4">
@@ -84,16 +97,27 @@ export default function FloatingHeader() {
       {open && (
         <div className="md:hidden glass border-t border-border/60 mt-3">
           <nav className="flex flex-col px-6 py-4">
-            {NAV.map((n) => (
-              <a
-                key={n.href}
-                href={n.href}
-                onClick={() => setOpen(false)}
-                className="py-3 text-base border-b border-border/40 last:border-0"
-              >
-                {n.label}
-              </a>
-            ))}
+            {NAV.map((n) =>
+              n.route ? (
+                <Link
+                  key={n.href}
+                  to={n.href}
+                  onClick={() => setOpen(false)}
+                  className="py-3 text-base border-b border-border/40 last:border-0"
+                >
+                  {n.label}
+                </Link>
+              ) : (
+                <a
+                  key={n.href}
+                  href={n.href}
+                  onClick={() => setOpen(false)}
+                  className="py-3 text-base border-b border-border/40 last:border-0"
+                >
+                  {n.label}
+                </a>
+              )
+            )}
             <a
               href="#consultation"
               onClick={() => setOpen(false)}

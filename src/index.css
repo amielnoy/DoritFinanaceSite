@@ -102,4 +102,15 @@
   .animate-fade-up {
     animation: fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
+
+  .blog-body { color: hsl(var(--foreground) / 0.82); line-height: 1.8; }
+  .blog-body h2 { font-family: var(--font-heading); font-size: 1.75rem; margin: 2rem 0 0.75rem; color: hsl(var(--foreground)); }
+  .blog-body h3 { font-family: var(--font-heading); font-size: 1.375rem; margin: 1.5rem 0 0.5rem; color: hsl(var(--foreground)); }
+  .blog-body p { margin: 1rem 0; }
+  .blog-body ul { list-style: disc; padding-right: 1.5rem; margin: 1rem 0; }
+  .blog-body ol { list-style: decimal; padding-right: 1.5rem; margin: 1rem 0; }
+  .blog-body li { margin: 0.25rem 0; }
+  .blog-body a { color: hsl(var(--accent)); text-decoration: underline; text-underline-offset: 2px; }
+  .blog-body blockquote { border-right: 2px solid #C4A484; padding-right: 1rem; margin: 1.5rem 0; color: hsl(var(--foreground) / 0.7); font-style: italic; }
+  .blog-body strong { font-weight: 600; color: hsl(var(--foreground)); }
 }

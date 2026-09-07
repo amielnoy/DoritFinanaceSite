@@ -49,12 +49,15 @@ export default function Footer() {
               { l: "אודות", h: "#about" },
               { l: "שירותים", h: "#services" },
               { l: "תיקי הצלחה", h: "#proof" },
+              { l: "בלוג", h: "/blog", route: true },
               { l: "קביעת ייעוץ", h: "#consultation" },
             ].map((n) => (
               <li key={n.h}>
-                <a href={n.h} className="hover:text-[#C4A484] transition-colors">
-                  {n.l}
-                </a>
+                {n.route ? (
+                  <Link to={n.h} className="hover:text-[#C4A484] transition-colors">{n.l}</Link>
+                ) : (
+                  <a href={n.h} className="hover:text-[#C4A484] transition-colors">{n.l}</a>
+                )}
               </li>
             ))}
           </ul>

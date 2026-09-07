@@ -1,0 +1,53 @@
+{
+  "name": "BlogPost",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "\u05db\u05d5\u05ea\u05e8\u05ea"
+    },
+    "excerpt": {
+      "type": "string",
+      "title": "\u05ea\u05e7\u05e6\u05d9\u05e8"
+    },
+    "body": {
+      "type": "string",
+      "title": "\u05ea\u05d5\u05db\u05df (Markdown)"
+    },
+    "image_url": {
+      "type": "string",
+      "title": "\u05ea\u05de\u05d5\u05e0\u05ea \u05e9\u05e2\u05e8"
+    },
+    "tags": {
+      "type": "string",
+      "title": "\u05ea\u05d2\u05d9\u05d5\u05ea (\u05de\u05d5\u05e4\u05e8\u05d3\u05d9\u05dd \u05d1\u05e4\u05e1\u05d9\u05e7)"
+    },
+    "published": {
+      "type": "boolean",
+      "title": "\u05e4\u05e8\u05e1\u05d5\u05dd",
+      "default": false
+    }
+  },
+  "required": [
+    "title",
+    "body"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": true,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
