@@ -9,6 +9,7 @@ import ProofCarousel from "@/components/dorit/ProofCarousel";
 import Testimonials from "@/components/dorit/Testimonials";
 import FAQ from "@/components/dorit/FAQ";
 import ConsultationBuilder from "@/components/dorit/ConsultationBuilder";
+import DetailedContactForm from "@/components/dorit/DetailedContactForm";
 import QuickContact from "@/components/dorit/QuickContact";
 import Footer from "@/components/dorit/Footer";
 
@@ -26,6 +27,7 @@ export default function Home() {
         <Testimonials />
         <FAQ />
         <ConsultationBuilder />
+        <DetailedContactForm />
         <QuickContact />
       </main>
       <Footer />
