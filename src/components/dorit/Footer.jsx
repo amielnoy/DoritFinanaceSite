@@ -1,6 +1,6 @@
 import React from "react";
 import { Image } from "@/components/ui/image";
-import { Phone, Mail, MapPin } from "lucide-react";
+import { Phone, Mail, MapPin, MessageCircle } from "lucide-react";
 
 const HANDSHAKE =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/8f139c5ff_generated_14b746d4.jpg";
@@ -65,11 +65,15 @@ export default function Footer() {
           <ul className="space-y-4 text-primary-foreground/80">
             <li className="flex items-center gap-3">
               <Phone size={16} className="text-[#C4A484]" />
-              <span dir="ltr">050-000-0000</span>
+              <a href="tel:+972500000000" dir="ltr" className="hover:text-[#C4A484] transition-colors">050-000-0000</a>
+            </li>
+            <li className="flex items-center gap-3">
+              <MessageCircle size={16} className="text-[#C4A484]" />
+              <a href="https://wa.me/972500000000" target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:text-[#C4A484] transition-colors">WhatsApp</a>
             </li>
             <li className="flex items-center gap-3">
               <Mail size={16} className="text-[#C4A484]" />
-              <span dir="ltr">dorit@gov-ari.co.il</span>
+              <a href="mailto:dorit@gov-ari.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@gov-ari.co.il</a>
             </li>
             <li className="flex items-center gap-3">
               <MapPin size={16} className="text-[#C4A484]" />
