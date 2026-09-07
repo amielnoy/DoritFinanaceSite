@@ -7,7 +7,7 @@ const PEN =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/199524e64_generated_35057100.jpg";
 
 const STATS = [
-  { num: "30+", label: "שנות ניסיון" },
+  { num: "30", label: "שנות ניסיון" },
   { num: "מאות", label: "לקוחות מרוצים" },
   { num: "97%", label: "שיעור תביעות שאושרו" },
   { num: "1:1", label: "ליווי אישי" },
@@ -35,7 +35,7 @@ export default function About() {
             />
           </div>
           <div className="flex flex-col justify-end bg-primary text-primary-foreground p-6 h-48 md:h-56">
-            <p className="font-heading text-3xl">30+</p>
+            <p className="font-heading text-3xl">30</p>
             <p className="text-xs tracking-[0.2em] uppercase opacity-80 mt-2">
               שנות ניסיון
             </p>
@@ -53,7 +53,7 @@ export default function About() {
           </h2>
           <div className="mt-8 space-y-5 text-foreground/75 max-w-2xl leading-relaxed">
             <p>
-              במשך יותר משלושה עשורים, דורית גוב ארי בונה עבור מאות לקוחותיה
+              במשך 30 שנות ניסיון, דורית גוב ארי בונה עבור מאות לקוחותיה
               לא רק תיק ביטוחי — אלא מערכת שלמה של ודאות. כל פוליסה היא קורה,
               כל כיסוי הוא יסוד, וכל החלטה נעשית תוך מבט קדימה אל העתיד שלכם.
             </p>
