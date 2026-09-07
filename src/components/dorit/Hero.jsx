@@ -1,6 +1,7 @@
 import React from "react";
 import { Image } from "@/components/ui/image";
 import { ArrowDown } from "lucide-react";
+import ArchStatement from "@/components/dorit/ArchStatement";
 
 const HERO_IMG =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/589e9d0cd_generated_11fed895.jpg";
@@ -50,13 +51,7 @@ export default function Hero() {
           <span className="text-[11px] tracking-[0.35em] uppercase text-accent mb-6 animate-fade-up">
             דורית גוב ארי · אדריכלות של ביטחון
           </span>
-          <h1 className="font-heading text-[10vw] md:text-[5.25rem] leading-[1.05] font-bold animate-fade-up">
-            כש<span className="text-accent">מקצועית</span>,
-            <br />
-            <span className="text-accent">יושר</span> ו<span className="text-accent">אנושיות</span>
-            <br />
-            נפגשים
-          </h1>
+          <ArchStatement />
           <p className="mt-8 max-w-md text-lg text-foreground/75 leading-relaxed animate-fade-up">
             אני לא מוכרת פוליסות — אני מתכננת עתיד. ליווי אישי, מדויק ושקוף לאורך כל
             חייכם, מהרגע שבו אתם בוחרים ועד הרגע שבו אתם נשענים על הרשת.
