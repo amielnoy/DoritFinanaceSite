@@ -2,6 +2,7 @@ import React from "react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import SecurityScroll from "@/components/dorit/SecurityScroll";
 import Hero from "@/components/dorit/Hero";
+import BrandStatement from "@/components/dorit/BrandStatement";
 import About from "@/components/dorit/About";
 import ServiceMatrix from "@/components/dorit/ServiceMatrix";
 import ProofCarousel from "@/components/dorit/ProofCarousel";
@@ -15,6 +16,7 @@ export default function Home() {
       <FloatingHeader />
       <main>
         <Hero />
+        <BrandStatement />
         <About />
         <ServiceMatrix />
         <ProofCarousel />
