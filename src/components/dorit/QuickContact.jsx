@@ -90,40 +90,46 @@ export default function QuickContact() {
             <div className="bg-primary-foreground/5 border border-primary-foreground/15 p-8 md:p-10">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs tracking-[0.15em] uppercase text-primary-foreground/50 mb-2">שם מלא *</label>
+                  <label htmlFor="qc-name" className="block text-xs tracking-[0.15em] uppercase text-primary-foreground/50 mb-2">שם מלא *</label>
                   <input
+                    id="qc-name"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] transition-colors"
+                    className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/40 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs tracking-[0.15em] uppercase text-primary-foreground/50 mb-2">טלפון *</label>
+                  <label htmlFor="qc-phone" className="block text-xs tracking-[0.15em] uppercase text-primary-foreground/50 mb-2">טלפון *</label>
                   <input
+                    id="qc-phone"
+                    type="tel"
                     value={form.phone}
                     onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                     placeholder="050-0000000"
-                    className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] transition-colors"
+                    className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/40 transition-colors"
                   />
                 </div>
               </div>
               <div className="mt-5">
-                <label className="block text-xs tracking-[0.15em] uppercase text-primary-foreground/50 mb-2">אימייל (לא חובה)</label>
+                <label htmlFor="qc-email" className="block text-xs tracking-[0.15em] uppercase text-primary-foreground/50 mb-2">אימייל (לא חובה)</label>
                 <input
+                  id="qc-email"
+                  type="email"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   placeholder="you@example.com"
-                  className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] transition-colors"
+                  className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/40 transition-colors"
                 />
               </div>
               <div className="mt-5">
-                <label className="block text-xs tracking-[0.15em] uppercase text-primary-foreground/50 mb-2">הודעה (לא חובה)</label>
+                <label htmlFor="qc-message" className="block text-xs tracking-[0.15em] uppercase text-primary-foreground/50 mb-2">הודעה (לא חובה)</label>
                 <textarea
+                  id="qc-message"
                   value={form.message}
                   onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
                   rows={3}
                   placeholder="במה מדובר?"
-                  className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] transition-colors resize-none"
+                  className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/40 transition-colors resize-none"
                 />
               </div>
 

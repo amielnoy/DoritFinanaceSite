@@ -1,6 +1,7 @@
 import React from "react";
 import { Image } from "@/components/ui/image";
 import { Phone, Mail, MapPin, MessageCircle } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const HANDSHAKE =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/8f139c5ff_generated_14b746d4.jpg";
@@ -84,7 +85,16 @@ export default function Footer() {
       </div>
 
       <div className="border-t border-primary-foreground/15">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-primary-foreground/40">
+        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-primary-foreground/60">
+          <p>
+            דורית גוב ארי — סוכנות ביטוח בע״מ · ח.פ. 51XXXXXX · רישיון סוכן ביטוח מספר XXXXX
+          </p>
+          <div className="flex items-center gap-5">
+            <Link to="/privacy" className="hover:text-[#C4A484] transition-colors">מדיניות פרטיות</Link>
+            <Link to="/accessibility" className="hover:text-[#C4A484] transition-colors">הצהרת נגישות</Link>
+          </div>
+        </div>
+        <div className="max-w-[1400px] mx-auto px-6 md:px-10 pb-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-primary-foreground/40">
           <p>© {new Date().getFullYear()} דורית גוב ארי. כל הזכויות שמורות.</p>
           <p className="tracking-[0.2em] uppercase">Designed with Structural Serenity</p>
         </div>

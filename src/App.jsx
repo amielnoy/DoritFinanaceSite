@@ -9,6 +9,8 @@ import ScrollToTop from './components/ScrollToTop';
 // Add page imports here
 import Home from '@/pages/Home';
 import FloatingActions from '@/components/dorit/FloatingActions';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import Accessibility from '@/pages/Accessibility';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -39,6 +41,8 @@ const AuthenticatedApp = () => {
       <Routes>
         {/* Add your page Route elements here */}
         <Route path="/" element={<Home />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/accessibility" element={<Accessibility />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
       <FloatingActions />

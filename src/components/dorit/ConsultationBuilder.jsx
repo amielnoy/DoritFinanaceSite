@@ -189,12 +189,14 @@ export default function ConsultationBuilder() {
                 <p className="text-sm tracking-[0.2em] uppercase text-accent mb-6">
                   {STEPS[step].label}
                 </p>
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3" role="group" aria-label={STEPS[step].label}>
                   {STEPS[step].options.map((opt) => {
                     const selected = data[STEPS[step].key] === opt;
                     return (
                       <button
                         key={opt}
+                        type="button"
+                        aria-pressed={selected}
                         onClick={() =>
                           setData((d) => ({ ...d, [STEPS[step].key]: opt }))
                         }
@@ -237,15 +239,16 @@ export default function ConsultationBuilder() {
                   placeholder="you@example.com"
                 />
                 <div>
-                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+                  <label htmlFor="cb-notes" className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
                     הערות (לא חובה)
                   </label>
                   <textarea
+                    id="cb-notes"
                     value={data.notes}
                     onChange={(e) => setData((d) => ({ ...d, notes: e.target.value }))}
                     rows={3}
                     placeholder="ספר/י בקצרה על הצורך"
-                    className="w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent transition-colors resize-none"
+                    className="w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors resize-none"
                   />
                 </div>
               </div>
@@ -279,16 +282,18 @@ export default function ConsultationBuilder() {
 }
 
 function Field({ label, value, onChange, placeholder }) {
+  const id = React.useId();
   return (
     <div>
-      <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+      <label htmlFor={id} className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
         {label}
       </label>
       <input
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent transition-colors"
+        className="w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
       />
     </div>
   );
