@@ -59,7 +59,7 @@ export default function QuickContact() {
             <a href="mailto:dorit@gov-ari.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@gov-ari.co.il</a>
           </div>
           <a
-            href="https://wa.me/972500000000"
+            href="https://wa.me/972508311776"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-4 inline-flex items-center gap-3 text-primary-foreground/60 hover:text-[#C4A484] transition-colors"
@@ -105,7 +105,7 @@ export default function QuickContact() {
                     type="tel"
                     value={form.phone}
                     onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                    placeholder="050-0000000"
+                    placeholder="050-8311776"
                     className="w-full bg-primary border border-primary-foreground/15 px-4 py-3 text-primary-foreground placeholder:text-primary-foreground/30 focus:outline-none focus:border-[#C4A484] focus:ring-2 focus:ring-[#C4A484]/40 transition-colors"
                   />
                 </div>

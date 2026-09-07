@@ -2,8 +2,8 @@ import React from "react";
 import { Phone, MessageCircle } from "lucide-react";
 
 // החלפ/י במספר האמיתי בשני המקומות (ללא 0 מוביל, עם קידומת 972)
-const PHONE = "+972500000000";
-const WHATSAPP = "972500000000";
+const PHONE = "+972508311776";
+const WHATSAPP = "972508311776";
 
 export default function FloatingActions() {
   return (

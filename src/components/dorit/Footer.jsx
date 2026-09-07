@@ -66,11 +66,11 @@ export default function Footer() {
           <ul className="space-y-4 text-primary-foreground/80">
             <li className="flex items-center gap-3">
               <Phone size={16} className="text-[#C4A484]" />
-              <a href="tel:+972500000000" dir="ltr" className="hover:text-[#C4A484] transition-colors">050-000-0000</a>
+              <a href="tel:+972508311776" dir="ltr" className="hover:text-[#C4A484] transition-colors">050-831-1776</a>
             </li>
             <li className="flex items-center gap-3">
               <MessageCircle size={16} className="text-[#C4A484]" />
-              <a href="https://wa.me/972500000000" target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:text-[#C4A484] transition-colors">WhatsApp</a>
+              <a href="https://wa.me/972508311776" target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:text-[#C4A484] transition-colors">WhatsApp</a>
             </li>
             <li className="flex items-center gap-3">
               <Mail size={16} className="text-[#C4A484]" />

@@ -54,7 +54,7 @@ export default function Accessibility() {
             <h2 className="font-heading text-2xl mb-3">פרטי קשר לנגישות</h2>
             <ul className="space-y-1.5">
               <li>דוא״ל: <a href="mailto:dorit@gov-ari.co.il" dir="ltr" className="text-accent hover:underline">dorit@gov-ari.co.il</a></li>
-              <li>טלפון: <a href="tel:+972500000000" dir="ltr" className="text-accent hover:underline">050-000-0000</a></li>
+              <li>טלפון: <a href="tel:+972508311776" dir="ltr" className="text-accent hover:underline">050-831-1776</a></li>
             </ul>
           </section>
 
