@@ -113,6 +113,18 @@ export default function ConsultationBuilder() {
     } catch (e) {
       /* תיעוד הפנייה במאגר — מיטבי */
     }
+    try {
+      await base44.functions.invoke("createConsultationEvent", {
+        name: data.name,
+        phone: data.phone,
+        email: data.email || "",
+        topic: data.topic || "",
+        timing: data.timing || "",
+        notes: data.notes || "",
+      });
+    } catch (e) {
+      /* יצירת אירוע ביומן Google — מיטבי, לא חוסם את התהליך */
+    }
     setSending(false);
     setDone(true);
   };
