@@ -6,11 +6,9 @@ const CARRIERS = [
   { he: "הראל", en: "Harel", url: "https://www.harel.co.il" },
   { he: "מנורה מבטחים", en: "Menora Mivtachim", url: "https://www.menoramivtachim.co.il" },
   { he: "הפניקס", en: "The Phoenix", url: "https://www.phoenix.co.il" },
-  { he: "עמיתים", en: "Amitim", url: "https://www.amitim.co.il" },
+  { he: "עמיתים", en: "Amitim", url: "https://www.amitim.com" },
   { he: "איילון", en: "Ayalon", url: "https://www.ayalon.co.il" },
-  { he: "טרם", en: "Tarem", url: "https://www.tarem.co.il" },
   { he: "AIG", en: "AIG", url: "https://www.aig.co.il" },
-  { he: "מונפורט", en: "Monfort", url: "https://www.monfort.co.il" },
 ];
 
 export default function CarrierLogos() {
