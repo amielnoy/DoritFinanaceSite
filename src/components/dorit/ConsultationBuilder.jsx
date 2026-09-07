@@ -58,11 +58,17 @@ export default function ConsultationBuilder() {
       `הערות: ${data.notes || "—"}`;
     const clientBody =
       `שלום ${firstName},\n\n` +
-      `תודה על פנייתך. בקשת הייעוץ שלך התקבלה ותועדה.\n\n` +
+      `קיבלתי את בקשת הייעוץ שלך והפרטים תועדו במערכת בהצלחה.\n` +
+      `כל פרט שמסרת נשמר בסודיות מלאה ובכבוד.\n\n` +
       `נושא הפגישה: ${data.topic || "ייעוץ כללי"}\n` +
       `מועד מבוקש: ${when}\n\n` +
-      `אחזור אלייך אישית תוך יום עסקים אחד לתיאום מועד מדויק לפגישה.\n\n` +
-      `בברכה,\nדורית גוב ארי`;
+      `אחזור אלייך אישית תוך יום עסקים אחד לתיאום מועד מדויק לפגישה.\n` +
+      `עד אז — נשמו רגועה. הכל מתוכנן.\n\n` +
+      `לכל שאלה או עדכון, ניתן להשיב ישירות למייל זה.\n\n` +
+      `בברכה חמה,\n` +
+      `דורית גוב ארי\n` +
+      `ייעוץ ביטוחי ופיננסי\n` +
+      `dorit@govari-fin.co.il`;
     try {
       await base44.integrations.Core.SendEmail({
         to: NOTIFY_EMAIL,
@@ -78,7 +84,7 @@ export default function ConsultationBuilder() {
       try {
         await base44.integrations.Core.SendEmail({
           to: data.email,
-          subject: `אישור בקשת ייעוץ — דורית גוב ארי`,
+          subject: `אישור — קיבלנו את בקשת הייעוץ שלך · דורית גוב ארי`,
           body: clientBody,
         });
       } catch (e) {
