@@ -46,7 +46,7 @@ export default function QuickContact() {
             Direct Line
           </span>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
-            עזב/י פרטים,
+            השאר/י פרטים,
             <br />
             אחזור אלייך היום
           </h2>
