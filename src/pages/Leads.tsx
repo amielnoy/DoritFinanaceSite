@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { Loader2, Download, Trash2, ArrowRight } from "lucide-react";
 
 type LeadStatus = "new" | "contacted" | "closed";
-type LeadSource = "consultation" | "detailed" | "quick";
+type LeadSource = "consultation" | "detailed" | "quick" | "claim";
 
 interface LeadItem {
   id: string;
@@ -34,6 +34,7 @@ const SOURCE_LABEL: Record<LeadSource, string> = {
   consultation: "בנאי ייעוץ",
   detailed: "טופס מפורט",
   quick: "פנייה מהירה",
+  claim: "דיווח תביעה",
 };
 
 function csvEscape(v: unknown): string {
@@ -65,9 +66,10 @@ export default function Leads() {
 
   const filtered = (leads || []).filter((l) => filter === "all" || l.status === filter);
 
-  const exportCsv = () => {
+  const exportCsv = (all: boolean) => {
+    const source = all ? (leads || []) : filtered;
     const headers = ["תאריך", "שם", "טלפון", "אימייל", "מקור", "תחום/שירות", "מועד", "סטטוס", "הודעה"];
-    const rows = filtered.map((l) => [
+    const rows = source.map((l) => [
       l.created_date ? new Date(l.created_date).toLocaleString("he-IL") : "",
       l.name,
       l.phone,
@@ -83,7 +85,7 @@ export default function Leads() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `leads-${new Date().toISOString().slice(0, 10)}${all ? "-all" : ""}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -157,13 +159,22 @@ export default function Leads() {
               );
             })}
           </div>
-          <button
-            onClick={exportCsv}
-            disabled={!filtered.length}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground font-medium hover:bg-accent/90 disabled:opacity-40 transition-colors"
-          >
-            <Download size={16} /> ייצוא ל-CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportCsv(false)}
+              disabled={!filtered.length}
+              className="inline-flex items-center gap-2 px-4 py-2.5 border border-border text-sm font-medium hover:border-accent hover:text-accent disabled:opacity-40 transition-colors"
+            >
+              <Download size={15} /> ייצוא מסונן
+            </button>
+            <button
+              onClick={() => exportCsv(true)}
+              disabled={!leads?.length}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground font-medium hover:bg-accent/90 disabled:opacity-40 transition-colors"
+            >
+              <Download size={16} /> ייצוא הכל ל-CSV
+            </button>
+          </div>
         </div>
 
         {loading ? (
