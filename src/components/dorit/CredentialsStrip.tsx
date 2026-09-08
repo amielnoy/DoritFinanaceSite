@@ -11,7 +11,7 @@ export default function CredentialsStrip() {
         <div className="flex items-center gap-3">
           <BadgeCheck size={20} className="text-[#C4A484] shrink-0" />
           <span className="text-sm text-foreground/80">
-            רישיון סוכן ביטוח מספר{" "}
+            רישיון סוכן מרשות שוק ההון מספר{" "}
             <span className="font-medium text-foreground tracking-wide" dir="ltr">
               {LICENSE}
             </span>

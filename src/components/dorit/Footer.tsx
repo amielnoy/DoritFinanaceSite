@@ -98,7 +98,7 @@ export default function Footer() {
       <div className="border-t border-primary-foreground/15">
         <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-primary-foreground/60">
           <p>
-            דורית גוב ארי — סוכנות ביטוח בע״מ · ח.פ. 51XXXXXX · רישיון סוכן ביטוח מספר L-00107009
+            דורית גוב ארי — סוכנות ביטוח בע״מ · ח.פ. 51XXXXXX · רישיון סוכן מרשות שוק ההון מספר L-00107009
           </p>
           <div className="flex items-center gap-5">
             <Link to="/privacy" className="hover:text-[#C4A484] transition-colors">מדיניות פרטיות</Link>
