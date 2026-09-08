@@ -96,6 +96,18 @@ export default function ConsultationBuilder() {
     } catch (e) {
       /* יצירת אירוע ביומן Google — מיטבי, לא חוסם את התהליך */
     }
+    try {
+      await base44.functions.invoke("createOutlookEvent", {
+        name: data.name,
+        phone: data.phone,
+        email: data.email || "",
+        topic: data.topic || "",
+        timing: data.timing || "",
+        notes: data.notes || "",
+      });
+    } catch (e) {
+      /* יצירת אירוע ביומן Outlook — מיטבי, לא חוסם את התהליך */
+    }
     setSending(false);
     setDone(true);
   };
