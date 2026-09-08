@@ -17,6 +17,7 @@ import Footer from "@/components/dorit/Footer";
 import Reveal from "@/components/dorit/Reveal";
 import { CONTACT } from "@/config/contact";
 import CredentialsStrip from "@/components/dorit/CredentialsStrip";
+import ClaimForm from "@/components/dorit/ClaimForm";
 
 interface ClaimStep {
   n: string;
@@ -275,6 +276,29 @@ export default function Claims() {
                 </ul>
               </Reveal>
             </div>
+          </div>
+        </section>
+
+        {/* Claim submission form */}
+        <section className="relative py-20 md:py-24 border-t border-border/60">
+          <div className="max-w-[1100px] mx-auto px-6 md:px-10">
+            <Reveal>
+              <div className="max-w-2xl mb-10">
+                <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
+                  04 · Report an Event
+                </span>
+                <h2 className="font-heading text-4xl md:text-5xl mt-4 leading-tight">
+                  דיווח אירוע ביטוחי
+                </h2>
+                <p className="mt-5 text-foreground/70 leading-relaxed">
+                  מלאו את הפרטים הבסיסיים וצרפו מסמכים רלוונטיים. הדיווח מגיע
+                  ישירות לדורית, והיא חוזרת אליכם אישית להמשך טיפול התביעה.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delay={0.1}>
+              <ClaimForm />
+            </Reveal>
           </div>
         </section>
 

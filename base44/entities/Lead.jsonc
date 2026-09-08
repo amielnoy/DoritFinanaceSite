@@ -20,7 +20,8 @@
       "enum": [
         "consultation",
         "detailed",
-        "quick"
+        "quick",
+        "claim"
       ]
     },
     "topic": {
