@@ -1,0 +1,370 @@
+<title>Design System Drift Report</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap">
+
+<style>
+  :root {
+    --paper:      #FBFAF8;
+    --card:       #FFFFFF;
+    --sunk:       #F3F1ED;
+    --ink:        #1B1A18;
+    --ink-2:      #57534C;
+    --ink-3:      #8A857C;
+    --rule:       #E0DCD4;
+    --rule-2:     #C9C3B8;
+    --accent:     #1F5E5B;
+    --accent-bg:  #E4EFEE;
+    --high:       #A33429;
+    --high-bg:    #F8E7E5;
+    --med:        #8A5A12;
+    --med-bg:     #F8EEDC;
+    --low:        #4A5568;
+    --low-bg:     #EDEFF2;
+    --good:       #1F6B44;
+    --good-bg:    #E2F0E8;
+    --shadow:     0 1px 2px rgba(27,26,24,.05), 0 10px 28px -16px rgba(27,26,24,.22);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #14150F;
+      --card:      #1C1E17;
+      --sunk:      #23261D;
+      --ink:       #ECEAE2;
+      --ink-2:     #A8A497;
+      --ink-3:     #78746A;
+      --rule:      #2E3126;
+      --rule-2:    #434737;
+      --accent:    #6FBDB6;
+      --accent-bg: #17302E;
+      --high:      #F09287;
+      --high-bg:   #331B18;
+      --med:       #E0AE5E;
+      --med-bg:    #2E2414;
+      --low:       #A9B4C4;
+      --low-bg:    #232830;
+      --good:      #6CC694;
+      --good-bg:   #14291D;
+      --shadow:    0 1px 2px rgba(0,0,0,.5), 0 10px 28px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#14150F; --card:#1C1E17; --sunk:#23261D;
+    --ink:#ECEAE2; --ink-2:#A8A497; --ink-3:#78746A;
+    --rule:#2E3126; --rule-2:#434737;
+    --accent:#6FBDB6; --accent-bg:#17302E;
+    --high:#F09287; --high-bg:#331B18;
+    --med:#E0AE5E; --med-bg:#2E2414;
+    --low:#A9B4C4; --low-bg:#232830;
+    --good:#6CC694; --good-bg:#14291D;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 28px -16px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "Archivo", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px 100px; }
+
+  h1, h2, h3 { font-family: "Newsreader", Georgia, serif; font-weight: 600; }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+
+  header { padding: 72px 0 36px; border-bottom: 2px solid var(--ink); margin-bottom: 8px; }
+  .kicker {
+    font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin-bottom: 20px;
+  }
+  h1 { font-size: clamp(2.3rem, 5.5vw, 3.6rem); line-height: 1.03; letter-spacing: -.02em; margin: 0 0 16px; text-wrap: balance; }
+  .stand { font-size: 1.14rem; color: var(--ink-2); max-width: 60ch; margin: 0; }
+
+  .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin: 40px 0 56px; }
+  .score { background: var(--card); padding: 18px 20px; }
+  .score dt { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 8px; font-weight: 600; }
+  .score dd { margin: 0; font-family: "Newsreader", serif; font-size: 1.55rem; line-height: 1.1; }
+  .score .note { display:block; font-family: "Archivo", sans-serif; font-size: 12px; color: var(--ink-2); margin-top: 6px; line-height:1.45; }
+
+  section { margin-bottom: 64px; scroll-margin-top: 20px; }
+  h2 { font-size: 1.55rem; margin: 0 0 4px; padding-top: 22px; border-top: 1px solid var(--ink); display: flex; align-items: baseline; gap: 12px; letter-spacing: -.01em; }
+  h2 .n { font-family: "JetBrains Mono", monospace; font-size: .68rem; color: var(--accent); font-weight: 500; }
+  h3 { font-size: 1.02rem; margin: 30px 0 8px; font-family: "Archivo", sans-serif; font-weight: 600; }
+  .lede { color: var(--ink-2); margin: 0 0 22px; max-width: 64ch; }
+  p { max-width: 66ch; margin: 0 0 14px; }
+  ul { max-width: 64ch; padding-left: 20px; } li { margin-bottom: 6px; }
+  code { font-size: .85em; background: var(--sunk); border: 1px solid var(--rule); padding: 1px 5px; }
+  a { color: var(--accent); }
+
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin: 22px 0 8px; }
+  .sw { border: 1px solid var(--rule); background: var(--card); overflow: hidden; }
+  .sw .chip { height: 64px; display:block; }
+  .sw .meta { padding: 10px 12px; }
+  .sw .hex { font-family: "JetBrains Mono", monospace; font-size: 12.5px; font-weight: 500; }
+  .sw .count { font-size: 11.5px; color: var(--ink-2); margin-top: 3px; }
+  .sw.token { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .sw .tag { display:inline-block; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:700; margin-top:4px; }
+
+  .find { display: grid; grid-template-columns: 3px 1fr; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--shadow); margin-bottom: 16px; }
+  .find .bar { background: var(--rule-2); }
+  .find[data-s="high"] .bar { background: var(--high); }
+  .find[data-s="med"]  .bar { background: var(--med); }
+  .find[data-s="low"]  .bar { background: var(--low); }
+  .find[data-s="good"] .bar { background: var(--good); }
+  .find .in { padding: 15px 18px 17px; }
+  .find .top { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin-bottom:7px; }
+  .find h3 { margin:0; font-size:.99rem; }
+  .sev { font-family:"JetBrains Mono",monospace; font-size:9.5px; letter-spacing:.09em; text-transform:uppercase; padding:2px 7px; border:1px solid currentColor; }
+  .s-high{color:var(--high);background:var(--high-bg);} .s-med{color:var(--med);background:var(--med-bg);}
+  .s-low{color:var(--low);background:var(--low-bg);}   .s-good{color:var(--good);background:var(--good-bg);}
+  .id { font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--ink-3); }
+  .find p { font-size:.93rem; margin:0 0 9px; } .find p:last-child { margin-bottom:0; }
+  .fix { border-top:1px solid var(--rule); padding-top:9px; margin-top:11px; font-size:.87rem; color:var(--ink-2); }
+  .fix b { color: var(--ink); }
+
+  .scroll { overflow-x:auto; border:1px solid var(--rule); background:var(--card); box-shadow:var(--shadow); margin:20px 0 26px; }
+  table { border-collapse:collapse; width:100%; font-size:13.5px; }
+  th,td { text-align:left; padding:9px 13px; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); font-weight:700; background:var(--sunk); white-space:nowrap; border-bottom:1px solid var(--rule-2); }
+  tbody tr:last-child td { border-bottom:0; }
+  .num { font-variant-numeric: tabular-nums; white-space:nowrap; }
+  td code { background:none; border:0; padding:0; }
+
+  .callout { border-left:3px solid var(--accent); background:var(--accent-bg); padding:13px 17px; margin:22px 0; font-size:.93rem; }
+  .callout .lb { font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); font-weight:700; display:block; margin-bottom:4px; }
+  .callout p:last-child { margin-bottom:0; }
+
+  footer { border-top:1px solid var(--rule); margin-top:36px; padding-top:18px; font-size:12.5px; color:var(--ink-3); display:flex; flex-wrap:wrap; gap:6px 26px; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="kicker">Code &amp; Design Review · main @ df87517 + branch</div>
+  <h1>Five bronzes and one unused token</h1>
+  <p class="stand">A review of the design system, code structure, recurring patterns, and the test suite — written from what the codebase actually contains, not from what it intends.</p>
+</header>
+
+<dl class="scores">
+  <div class="score"><dt>Design system</dt><dd>Drifting<span class="note">Token defined, 141 hardcoded copies</span></dd></div>
+  <div class="score"><dt>Structure</dt><dd>Flat<span class="note">33 files in one folder</span></dd></div>
+  <div class="score"><dt>Patterns</dt><dd>Copied<span class="note">4 forms, 3 chats, 14 fetches</span></dd></div>
+  <div class="score"><dt>Tests</dt><dd>710 green<span class="note">19 components untouched</span></dd></div>
+</dl>
+
+<main>
+
+<section id="design">
+  <h2><span class="n">01</span> Design system</h2>
+  <p class="lede">The visual language is genuinely good — a warm parchment ground, obsidian ink, a serif/sans pairing with real character, and a vertical rhythm held consistently across fourteen sections. The system describing it is the problem.</p>
+
+  <h3>The bronze has forked five ways</h3>
+  <p><code>src/index.css</code> defines <code>--highlight: 32 33% 65%</code> — the soft bronze that carries every call to action on the site. Nothing references it. Instead the raw hex is pasted into components, and it has already drifted into five values that no one can now tell apart by eye:</p>
+
+  <div class="swatches">
+    <div class="sw token"><span class="chip" style="background:#C4A484"></span><div class="meta"><div class="hex">#C4A484</div><div class="count">93 occurrences</div><span class="tag">= --highlight</span></div></div>
+    <div class="sw"><span class="chip" style="background:#C3AD96"></span><div class="meta"><div class="hex">#C3AD96</div><div class="count">27 occurrences</div></div></div>
+    <div class="sw"><span class="chip" style="background:#b8916f"></span><div class="meta"><div class="hex">#b8916f</div><div class="count">13 occurrences</div></div></div>
+    <div class="sw"><span class="chip" style="background:#b89a80"></span><div class="meta"><div class="hex">#b89a80</div><div class="count">5 occurrences</div></div></div>
+    <div class="sw"><span class="chip" style="background:#9C836A"></span><div class="meta"><div class="hex">#9C836A</div><div class="count">3 occurrences</div></div></div>
+  </div>
+
+  <p>The sharpest illustration sits in <code>PensionFeeCalculator.tsx</code>: a component with a prop literally named <code>highlight</code>, which renders <code>border-[#C3AD96]/50</code> — a hardcoded hex that is not even the token of the same name.</p>
+
+  <div class="find" data-s="high">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-high">High</span><h3>141 hardcoded hexes bypass the token layer</h3><span class="id">D-01</span></div>
+      <p>A palette change — including the WCAG contrast fix still outstanding — is a 141-site find-and-replace across five near-identical values, not a one-line token edit. The drift is already here; it will keep widening.</p>
+      <p class="fix"><b>Fix</b> — map the five to their intended roles, expose them as <code>--highlight</code> / <code>--highlight-hover</code>, and add a lint rule banning raw hex outside <code>index.css</code>. That last part is what stops it recurring.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="med">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-med">Medium</span><h3>The home page is a 24-section scroll with three separate AI chats</h3><span class="id">D-02</span></div>
+      <p>Hero, credentials, carriers, about, reviews, perspective, services, <em>needs-interview chat</em>, calculator, quick contact, proof, testimonials, FAQ, <em>booking chat</em>, consultation wizard, detailed form, share, <em>blog-recommender chat</em>, detailed FAQ — then nav, sticky bar, footer.</p>
+      <p>That is five separate ways to start a conversation, three of them chatbots, competing on one page. Each is individually well built; together they compete for the same decision and dilute it.</p>
+      <p class="fix"><b>Fix</b> — pick one primary conversion path per scroll depth. The three agents plausibly belong behind a single launcher with a mode switch, not as three inline sections.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="good">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-good">Sound</span><h3>Vertical rhythm and the type pairing hold</h3><span class="id">D-03</span></div>
+      <p>Fourteen sections use exactly <code>py-24 md:py-32</code> — no drift at all. Frank Ruhl Libre against Heebo is a deliberate, well-judged Hebrew pairing, and the eyebrow-label device is applied consistently. The <em>craft</em> is consistent; only the token plumbing is not.</p>
+    </div>
+  </div>
+</section>
+
+<section id="structure">
+  <h2><span class="n">02</span> Structure</h2>
+  <p class="lede">One flat folder holds nearly everything, and the layer boundaries are conventions rather than enforced lines.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Location</th><th class="num">Files</th><th>Observation</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/components/dorit/</code></td><td class="num">33</td><td>Flat. Sections, forms, chats, primitives and layout chrome all together</td></tr>
+        <tr><td><code>src/pages/</code></td><td class="num">14</td><td>Reasonable; <code>Claims.tsx</code> at 370 lines is the largest file in the app</td></tr>
+        <tr><td><code>src/lib/</code></td><td class="num">9</td><td>Mixed concerns: auth context, query client, SEO, 404 page, utils</td></tr>
+        <tr><td><code>src/components/ui/</code></td><td class="num">49</td><td>Untouched shadcn primitives, correctly excluded from typecheck</td></tr>
+        <tr><td><code>base44/</code></td><td class="num">11</td><td>Entities, agents, connectors, functions — genuinely well organised</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="find" data-s="med">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-med">Medium</span><h3>33 files in one folder with no internal grouping</h3><span class="id">S-01</span></div>
+      <p><code>Stars.tsx</code> (22 lines, a leaf primitive) sits beside <code>ConsultationBuilder.tsx</code> (350 lines, a multi-step form with backend calls). Nothing in the layout distinguishes a shared primitive from a one-off page section, so reuse is discovered by memory.</p>
+      <p class="fix"><b>Fix</b> — split by role: <code>sections/</code>, <code>forms/</code>, <code>chat/</code>, <code>primitives/</code>. Mechanical, and it makes the next finding visible instead of invisible.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="low">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-low">Low</span><h3><code>src/lib/</code> is a catch-all</h3><span class="id">S-02</span></div>
+      <p>It holds the auth context, the query client, the SEO engine, URL helpers, <em>and</em> <code>PageNotFound.jsx</code> — a rendered page living in a utilities folder.</p>
+      <p class="fix"><b>Fix</b> — move <code>PageNotFound</code> to <code>pages/</code>. The rest can stay until the folder grows further.</p>
+    </div>
+  </div>
+</section>
+
+<section id="patterns">
+  <h2><span class="n">03</span> Patterns</h2>
+  <p class="lede">The same four or five shapes are re-implemented by hand each time they are needed. Each copy is competent; the cost is that every fix has to be made three or four times, and the copies have already diverged.</p>
+
+  <div class="find" data-s="high">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-high">High</span><h3>One submission state machine, four implementations, two vocabularies</h3><span class="id">P-01</span></div>
+      <p>All four forms model the identical <em>idle → sending → sent / error</em> flow. Two call it <code>busy</code>/<code>sent</code>, two call it <code>sending</code>/<code>done</code>. The failure copy is written out three times, differing only in the noun:</p>
+      <ul>
+        <li>“לא הצלחנו לשלוח <b>כרגע</b>…”</li>
+        <li>“לא הצלחנו לשלוח את <b>הטופס</b> כרגע…”</li>
+        <li>“לא הצלחנו לשלוח את <b>הבקשה</b> כרגע…”</li>
+      </ul>
+      <p>Each embeds the contact address in the string, even though <code>src/config/contact.js</code> exists precisely to hold it — so the address is duplicated in prose in three files and will be missed by the next change to it.</p>
+      <p class="fix"><b>Fix</b> — one <code>useSubmission()</code> hook owning the state and the error copy, with the address interpolated from <code>CONTACT.email</code>. The four forms keep their own fields and validation.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="high">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-high">High</span><h3>Three chat components, ~30 lines of genuine difference</h3><span class="id">P-02</span></div>
+      <p><code>NeedsInterviewChat</code> and <code>BookingAssistantChat</code> are both 194 lines; <code>BlogRecommenderChat</code> is 214. Ignoring names, only about 30 lines differ between the first two — the agent name, the greeting, and the section copy. Conversation lifecycle, subscription, scroll handling, send, reset and markdown rendering are triplicated verbatim.</p>
+      <p>This is why the missing <code>aria-label</code> on the message box was three separate bugs rather than one.</p>
+      <p class="fix"><b>Fix</b> — a single <code>&lt;AgentChat agent="…" greeting="…" /&gt;</code>. Roughly 400 lines disappear and future fixes land once.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="med">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-med">Medium</span><h3>Data fetching is hand-rolled in 14 files while React Query sits idle</h3><span class="id">P-03</span></div>
+      <p><code>@tanstack/react-query</code> is installed, configured with retry and <code>refetchOnWindowFocus</code>, and mounted at the root — and is used by exactly one component, <code>PageNotFound</code>. Everywhere else is <code>useEffect</code> plus manual <code>loading</code>/<code>error</code> state, with no caching, no retry, and no deduplication.</p>
+      <p class="fix"><b>Fix</b> — decide. Move entity reads onto <code>useQuery</code> and inherit retry and caching, or drop the dependency. Two idioms for one job is the only outcome worth avoiding.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="med">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-med">Medium</span><h3>Silent-catch is the house error-handling idiom</h3><span class="id">P-04</span></div>
+      <p><code>catch (e) { /* מיטבי */ }</code> — “best effort” — appears throughout the backend functions and formerly throughout the components. It is applied to the Lead entity write, which is the durable record of an enquiry. A failure there produces no log, no retry and no signal.</p>
+      <p>The pattern is reasonable for a calendar hop and wrong for the database write; it is currently used for both.</p>
+      <p class="fix"><b>Fix</b> — keep silent-catch for genuinely optional side effects, and make the record write the operation whose failure is reported. This is the same defect as R-01 in the architecture review.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="low">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-low">Low</span><h3>Email HTML is assembled with raw interpolation</h3><span class="id">P-05</span></div>
+      <p>The confirmation emails build ~90 lines of HTML per function via template literals, interpolating <code>${firstName}</code>, <code>${topic}</code> and <code>${claimTypeLabel}</code> with no escaping anywhere in <code>base44/functions/</code>. The two functions also duplicate the entire shell — header, signature, footer.</p>
+      <p class="fix"><b>Fix</b> — one shared layout helper plus an <code>escapeHtml()</code> for interpolated values.</p>
+    </div>
+  </div>
+</section>
+
+<section id="tests">
+  <h2><span class="n">04</span> Tests</h2>
+  <p class="lede">710 cases pass across four platforms, and they have already earned their keep — seven real defects surfaced from writing them. The honest weakness is that coverage tracks what I wrote tests for, not what the app now does.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Suite</th><th class="num">Cases</th><th>Protects</th></tr></thead>
+      <tbody>
+        <tr><td>Unit</td><td class="num">62</td><td>Fee maths, open-redirect guard, SEO helpers</td></tr>
+        <tr><td>Component</td><td class="num">21</td><td>Render, accessible names, client calls</td></tr>
+        <tr><td>Contract</td><td class="num">62</td><td>Browser → function → entity, both boundaries</td></tr>
+        <tr><td>Security</td><td class="num">24</td><td>Secrets, sinks, tab-nabbing, RLS</td></tr>
+        <tr><td>e2e</td><td class="num">541</td><td>Journeys, HTTP, XSS, WCAG, SEO × 4 platforms</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="find" data-s="high">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-high">High</span><h3>The three AI agents have no tests at all</h3><span class="id">T-01</span></div>
+      <p>They are the newest, least-proven and most abusable surface in the app: three LLM agents reachable by any anonymous visitor, one of them holding <code>Lead.create</code> plus write access to two real calendars. The suite stubs their transport so other tests stay quiet, and asserts nothing about them.</p>
+      <p class="fix"><b>Fix</b> — cover what is deterministic: the conversation opens, a message posts, a transport failure degrades without breaking the page, and the tool permissions in the agent definitions stay within what each agent needs (a contract test over <code>base44/agents/*.jsonc</code>).</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="med">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-med">Medium</span><h3>19 of 33 components are never referenced by a test</h3><span class="id">T-02</span></div>
+      <p>Including <code>Hero</code>, <code>About</code>, <code>ServiceMatrix</code>, <code>Testimonials</code>, <code>CredentialsStrip</code> and the two calendar-booking components. Several are covered <em>incidentally</em> by page-level e2e, but nothing asserts their behaviour.</p>
+      <p><code>ClaimForm</code> is the notable gap: its critical labelling bug was caught by a page-level axe scan, not by any test of the form itself, and its submission path has no e2e at all.</p>
+      <p class="fix"><b>Fix</b> — an e2e for the claim submission journey first; it is the highest-stakes form in the app.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="med">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-med">Medium</span><h3>Backend functions are asserted by reading them, not by running them</h3><span class="id">T-03</span></div>
+      <p>The contract suite greps <code>entry.ts</code> for its guard, its status codes and its response shape. That catches drift but proves no behaviour: it cannot tell you that a failed <code>SendEmail</code> loses the lead — which is exactly the live defect in <code>submitLead</code>.</p>
+      <p class="fix"><b>Fix</b> — the functions are plain modules with an injected client. Import and invoke them with a stub to test ordering and failure handling directly.</p>
+    </div>
+  </div>
+
+  <div class="find" data-s="good">
+    <div class="bar"></div><div class="in">
+      <div class="top"><span class="sev s-good">Sound</span><h3>The contract tests survived a 44-commit architecture change</h3><span class="id">T-04</span></div>
+      <p>When lead capture moved from the browser to a backend function, the contract suite failed loudly and precisely — pointing at the exact call sites that had moved. Because it reads real source rather than restating payloads, updating it was mechanical. That is the behaviour you want from a contract test.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="lb">Worth stating plainly</span>
+    <p>Coverage counts measure the tests, not the app. 710 green cases sit alongside an untested agent surface with calendar-write access. Weight the next tests by consequence, not by what is easy to reach.</p>
+  </div>
+</section>
+
+<section id="order">
+  <h2><span class="n">05</span> Suggested order</h2>
+  <p class="lede">Sequenced so each step makes the next cheaper, and the two that can lose a real enquiry come first.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th class="num">#</th><th>Change</th><th>Refs</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>Persist the Lead before notifying; report failures</td><td><code>P-04</code></td><td>hours</td></tr>
+        <tr><td class="num">2</td><td>Extract <code>useSubmission()</code>; move error copy and address to config</td><td><code>P-01</code></td><td>half a day</td></tr>
+        <tr><td class="num">3</td><td>Collapse the three chats into one <code>AgentChat</code></td><td><code>P-02</code> <code>T-01</code></td><td>half a day</td></tr>
+        <tr><td class="num">4</td><td>Rate-limit / gate the public agent endpoints</td><td><code>T-01</code></td><td>needs a decision</td></tr>
+        <tr><td class="num">5</td><td>Consolidate the bronzes onto tokens; ban raw hex in lint</td><td><code>D-01</code></td><td>half a day</td></tr>
+        <tr><td class="num">6</td><td>e2e for the claim submission journey</td><td><code>T-02</code></td><td>hours</td></tr>
+        <tr><td class="num">7</td><td>Group <code>components/dorit/</code> by role</td><td><code>S-01</code></td><td>mechanical</td></tr>
+        <tr><td class="num">8</td><td>Pick one data-fetching idiom</td><td><code>P-03</code></td><td>a day</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <span>Code &amp; design review · rev 1.0</span>
+  <span>Findings <span class="mono">D-01–03 · S-01–02 · P-01–05 · T-01–04</span></span>
+  <span>Companion to the architecture record</span>
+</footer>
+
+</div>

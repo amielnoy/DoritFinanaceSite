@@ -9,7 +9,7 @@ export default function CredentialsStrip() {
     <div className="border-y border-border/60 bg-secondary/40">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-5 px-6 md:px-10">
         <div className="flex items-center gap-3">
-          <BadgeCheck size={20} className="text-[#C4A484] shrink-0" />
+          <BadgeCheck size={20} className="text-highlight shrink-0" />
           <span className="text-sm text-foreground/80">
             רישיון סוכן מרשות שוק ההון מספר{" "}
             <span className="font-medium text-foreground tracking-wide" dir="ltr">
@@ -22,7 +22,7 @@ export default function CredentialsStrip() {
             href={`tel:${CONTACT.phoneE164}`}
             className="flex items-center gap-2 text-foreground/80 hover:text-accent transition-colors"
           >
-            <Phone size={16} className="text-[#C4A484]" />
+            <Phone size={16} className="text-highlight" />
             <span dir="ltr">{CONTACT.phoneDisplay}</span>
           </a>
           <a
@@ -38,7 +38,7 @@ export default function CredentialsStrip() {
             href={`mailto:${CONTACT.email}`}
             className="flex items-center gap-2 text-foreground/80 hover:text-accent transition-colors"
           >
-            <Mail size={16} className="text-[#C4A484]" />
+            <Mail size={16} className="text-highlight" />
             <span dir="ltr">{CONTACT.email}</span>
           </a>
         </div>

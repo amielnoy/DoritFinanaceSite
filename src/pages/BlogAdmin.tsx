@@ -153,7 +153,7 @@ export default function BlogAdmin() {
           </div>
           <button
             onClick={startNew}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors"
           >
             <Plus size={18} /> מאמר חדש
           </button>
@@ -259,7 +259,7 @@ export default function BlogAdmin() {
                 <button
                   onClick={save}
                   disabled={busy || !editing.title || !editing.body}
-                  className="inline-flex items-center gap-2 px-7 py-2.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] disabled:opacity-40 transition-colors"
+                  className="inline-flex items-center gap-2 px-7 py-2.5 bg-highlight text-primary font-medium hover:bg-highlight-strong disabled:opacity-40 transition-colors"
                 >
                   {busy ? (
                     <Loader2 size={16} className="animate-spin" />

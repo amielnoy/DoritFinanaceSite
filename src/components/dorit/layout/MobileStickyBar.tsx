@@ -15,7 +15,7 @@ export default function MobileStickyBar() {
         </a>
         <a
           href="#consultation"
-          className="flex items-center justify-center gap-2 py-3.5 text-sm font-medium bg-[#C4A484] text-primary"
+          className="flex items-center justify-center gap-2 py-3.5 text-sm font-medium bg-highlight text-primary"
         >
           <Calendar size={18} />
           קביעת ייעוץ

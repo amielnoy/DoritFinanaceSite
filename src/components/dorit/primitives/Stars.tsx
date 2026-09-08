@@ -15,7 +15,7 @@ export default function Stars({ value = 0, size = 16 }: StarsProps) {
         <Star
           key={n}
           size={size}
-          className={n <= rounded ? "text-[#C4A484] fill-[#C4A484]" : "text-border"}
+          className={n <= rounded ? "text-highlight fill-highlight" : "text-border"}
           strokeWidth={1.5}
         />
       ))}

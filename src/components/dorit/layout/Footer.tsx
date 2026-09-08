@@ -62,9 +62,9 @@ export default function Footer() {
             ] as FooterLink[]).map((n) => (
               <li key={n.h}>
                 {n.route ? (
-                  <Link to={n.h} className="hover:text-[#C4A484] transition-colors">{n.l}</Link>
+                  <Link to={n.h} className="hover:text-highlight transition-colors">{n.l}</Link>
                 ) : (
-                  <a href={n.h} className="hover:text-[#C4A484] transition-colors">{n.l}</a>
+                  <a href={n.h} className="hover:text-highlight transition-colors">{n.l}</a>
                 )}
               </li>
             ))}
@@ -77,19 +77,19 @@ export default function Footer() {
           </p>
           <ul className="space-y-4 text-primary-foreground/80">
             <li className="flex items-center gap-3">
-              <Phone size={16} className="text-[#C4A484]" />
-              <a href={`tel:${CONTACT.phoneE164}`} dir="ltr" className="hover:text-[#C4A484] transition-colors">{CONTACT.phoneDisplay}</a>
+              <Phone size={16} className="text-highlight" />
+              <a href={`tel:${CONTACT.phoneE164}`} dir="ltr" className="hover:text-highlight transition-colors">{CONTACT.phoneDisplay}</a>
             </li>
             <li className="flex items-center gap-3">
-              <MessageCircle size={16} className="text-[#C4A484]" />
-              <a href={`https://wa.me/${CONTACT.whatsapp}`} target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:text-[#C4A484] transition-colors">WhatsApp</a>
+              <MessageCircle size={16} className="text-highlight" />
+              <a href={`https://wa.me/${CONTACT.whatsapp}`} target="_blank" rel="noopener noreferrer" dir="ltr" className="hover:text-highlight transition-colors">WhatsApp</a>
             </li>
             <li className="flex items-center gap-3">
-              <Mail size={16} className="text-[#C4A484]" />
-              <a href={`mailto:${CONTACT.email}`} dir="ltr" className="hover:text-[#C4A484] transition-colors">{CONTACT.email}</a>
+              <Mail size={16} className="text-highlight" />
+              <a href={`mailto:${CONTACT.email}`} dir="ltr" className="hover:text-highlight transition-colors">{CONTACT.email}</a>
             </li>
             <li className="flex items-center gap-3">
-              <MapPin size={16} className="text-[#C4A484]" />
+              <MapPin size={16} className="text-highlight" />
               <span>תל אביב · פגישות גם בזום</span>
             </li>
           </ul>
@@ -102,8 +102,8 @@ export default function Footer() {
             דורית גוב ארי — סוכנות ביטוח בע״מ · ח.פ. 51XXXXXX · רישיון סוכן מרשות שוק ההון מספר L-00107009
           </p>
           <div className="flex items-center gap-5">
-            <Link to="/privacy" className="hover:text-[#C4A484] transition-colors">מדיניות פרטיות</Link>
-            <Link to="/accessibility" className="hover:text-[#C4A484] transition-colors">הצהרת נגישות</Link>
+            <Link to="/privacy" className="hover:text-highlight transition-colors">מדיניות פרטיות</Link>
+            <Link to="/accessibility" className="hover:text-highlight transition-colors">הצהרת נגישות</Link>
           </div>
         </div>
         <div className="max-w-[1400px] mx-auto px-6 md:px-10 pb-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-primary-foreground/40">

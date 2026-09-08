@@ -46,7 +46,7 @@ export default function CalendlyBooking() {
   return (
     <button
       onClick={open}
-      className="inline-flex items-center gap-3 px-7 py-4 bg-[#C4A484] text-primary font-heading text-lg hover:bg-[#b8916f] transition-colors"
+      className="inline-flex items-center gap-3 px-7 py-4 bg-highlight text-primary font-heading text-lg hover:bg-highlight-strong transition-colors"
     >
       {ready ? <CalendarClock size={20} /> : <Loader2 size={20} className="animate-spin" />}
       קביעת שיחה ביומן

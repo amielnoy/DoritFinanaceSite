@@ -92,7 +92,7 @@ export default function FloatingHeader() {
         <div className="flex items-center gap-3">
           <a
             href="#consultation"
-            className="hidden md:inline-flex items-center px-5 py-2.5 bg-[#C3AD96] text-primary text-sm font-medium hover:bg-[#b89a80] transition-colors duration-300"
+            className="hidden md:inline-flex items-center px-5 py-2.5 bg-highlight-muted text-primary text-sm font-medium hover:bg-highlight-strong transition-colors duration-300"
           >
             לקביעת פגישת ייעוץ
           </a>
@@ -175,7 +175,7 @@ export default function FloatingHeader() {
                 <a
                   href="#consultation"
                   onClick={() => setOpen(false)}
-                  className="flex items-center justify-center gap-2 w-full py-3.5 bg-[#C4A484] text-primary font-medium"
+                  className="flex items-center justify-center gap-2 w-full py-3.5 bg-highlight text-primary font-medium"
                 >
                   <Calendar size={18} />
                   לקביעת פגישת ייעוץ

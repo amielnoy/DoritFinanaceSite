@@ -26,7 +26,7 @@ const STATUS_LABEL: Record<LeadStatus, string> = {
   closed: "נסגרה",
 };
 const STATUS_COLOR: Record<LeadStatus, string> = {
-  new: "bg-[#C4A484]/15 text-[#8a6f54]",
+  new: "bg-highlight/15 text-[#8a6f54]",
   contacted: "bg-accent/15 text-accent",
   closed: "bg-muted text-muted-foreground",
 };

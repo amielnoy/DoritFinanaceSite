@@ -17,7 +17,7 @@ export default function SecurityScroll() {
   return (
     <div className="fixed left-0 top-0 bottom-0 z-40 w-px bg-border/40 hidden md:block">
       <div
-        className="absolute top-0 left-0 w-px bg-[#C4A484] transition-[height] duration-150"
+        className="absolute top-0 left-0 w-px bg-highlight transition-[height] duration-150"
         style={{ height: `${progress}%` }}
       />
     </div>

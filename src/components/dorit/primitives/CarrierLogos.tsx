@@ -27,7 +27,7 @@ export default function CarrierLogos() {
           <p className="text-[11px] tracking-[0.35em] uppercase text-accent">
             עובדת מול מיטב חברות הפנסיה והביטוח בישראל
           </p>
-          <div className="mt-4 mx-auto w-10 h-px bg-[#C3AD96]/60" />
+          <div className="mt-4 mx-auto w-10 h-px bg-highlight-muted/60" />
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-x-2 gap-y-8 md:gap-y-10 items-center">
