@@ -19,6 +19,7 @@ import QuickShare from "@/components/dorit/QuickShare";
 import DetailedFAQ from "@/components/dorit/DetailedFAQ";
 import NeedsInterviewChat from "@/components/dorit/NeedsInterviewChat";
 import BookingAssistantChat from "@/components/dorit/BookingAssistantChat";
+import BlogRecommenderChat from "@/components/dorit/BlogRecommenderChat";
 import Footer from "@/components/dorit/Footer";
 import MobileStickyBar from "@/components/dorit/MobileStickyBar";
 import CredentialsStrip from "@/components/dorit/CredentialsStrip";
@@ -46,6 +47,7 @@ export default function Home() {
         <ConsultationBuilder />
         <DetailedContactForm />
         <QuickShare />
+        <BlogRecommenderChat />
         <DetailedFAQ />
       </main>
       <SectionNav />
