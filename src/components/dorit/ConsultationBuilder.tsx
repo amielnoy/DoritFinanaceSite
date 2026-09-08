@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { Check, ChevronLeft, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import GoogleCalendarBooking from "@/components/dorit/GoogleCalendarBooking";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { he } from "date-fns/locale";
 
 const NOTIFY_EMAIL = "amielnoy@gmail.com";
 const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
@@ -34,7 +37,7 @@ const STEPS: StepDef[] = [
   {
     key: "timing",
     label: "מתעניינים",
-    options: ["השבוע", "החודש", "בעוד מספר חודשים"],
+    options: ["השבוע"],
   },
   {
     key: "contact",
@@ -55,6 +58,7 @@ export default function ConsultationBuilder() {
   const [done, setDone] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const isLast = step === STEPS.length - 1;
   const canNext =
@@ -183,6 +187,7 @@ export default function ConsultationBuilder() {
               setDone(false);
               setStep(0);
               setData({ topic: "", timing: "", name: "", phone: "", email: "", notes: "" });
+              setSelectedDate(undefined);
             }}
             className="mt-10 text-sm tracking-wide underline underline-offset-4 hover:text-[#C4A484] transition-colors"
           >
@@ -259,9 +264,10 @@ export default function ConsultationBuilder() {
                         key={opt}
                         type="button"
                         aria-pressed={selected}
-                        onClick={() =>
-                          setData((d) => ({ ...d, [STEPS[step].key as keyof ConsultationData]: opt }))
-                        }
+                        onClick={() => {
+                          setData((d) => ({ ...d, [STEPS[step].key as keyof ConsultationData]: opt }));
+                          if (step === 1) setSelectedDate(undefined);
+                        }}
                         className={`text-right px-6 py-4 border transition-all duration-300 flex items-center justify-between ${
                           selected
                             ? "border-primary bg-primary text-primary-foreground"
@@ -274,6 +280,29 @@ export default function ConsultationBuilder() {
                     );
                   })}
                 </div>
+                {step === 1 && (
+                  <div className="mt-6">
+                    <p className="text-xs tracking-[0.15em] uppercase text-muted-foreground mb-3 text-center">
+                      או לבחירת תאריך מדויק
+                    </p>
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                          setSelectedDate(date);
+                          if (date) {
+                            setData((d) => ({ ...d, timing: format(date, "dd/MM/yyyy") }));
+                          }
+                        }}
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                        dir="rtl"
+                        locale={he}
+                        className="rounded-md border"
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="space-y-5">
