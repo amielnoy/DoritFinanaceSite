@@ -1,0 +1,64 @@
+# Run the full automated test battery in a pinned container.
+#
+#   docker compose -f docker-compose.test.yml run --rm tests
+#   docker compose -f docker-compose.test.yml run --rm tests unit contract
+#   docker compose -f docker-compose.test.yml run --rm e2e-ios
+#   docker compose -f docker-compose.test.yml run --rm tests-watch      # shell in
+#
+# Reports land in ./test-results and ./playwright-report on the host.
+
+x-test-base: &test-base
+  # One shared image for every service, so `docker compose build tests` is
+  # enough — otherwise each service would build (and cache) its own copy.
+  image: dorit-finance-tests:local
+  build:
+    context: .
+    dockerfile: Dockerfile.test
+  # Playwright's Chromium needs more than Docker's default 64MB of shared memory.
+  shm_size: 1gb
+  init: true
+  environment:
+    CI: "1"
+    VITE_BASE44_APP_ID: e2e-sanity-app
+    # Point at a deployment to smoke-test it instead of the local preview build.
+    PLAYWRIGHT_BASE_URL: ${PLAYWRIGHT_BASE_URL:-}
+    E2E_ENFORCE_CONTRAST: ${E2E_ENFORCE_CONTRAST:-}
+    E2E_ENFORCE_SECURITY_HEADERS: ${E2E_ENFORCE_SECURITY_HEADERS:-}
+  volumes:
+    - ./test-results:/app/test-results
+    - ./playwright-report:/app/playwright-report
+
+services:
+  # Everything: lint → typecheck → unit → component → contract → security → e2e.
+  tests:
+    <<: *test-base
+    entrypoint: ["./scripts/run-tests.sh"]
+
+  # Fast feedback: no browsers, no build.
+  tests-node:
+    <<: *test-base
+    entrypoint: ["./scripts/run-tests.sh"]
+    command: ["lint", "typecheck", "unit", "component", "contract", "security"]
+
+  # One platform at a time.
+  e2e-web:
+    <<: *test-base
+    entrypoint: ["./scripts/run-tests.sh"]
+    command: ["e2e", "--project=web-chromium", "--project=web-webkit"]
+
+  e2e-ios:
+    <<: *test-base
+    entrypoint: ["./scripts/run-tests.sh"]
+    command: ["e2e", "--project=ios-safari"]
+
+  e2e-android:
+    <<: *test-base
+    entrypoint: ["./scripts/run-tests.sh"]
+    command: ["e2e", "--project=android-chrome"]
+
+  # Interactive shell for debugging a failing suite inside the image.
+  shell:
+    <<: *test-base
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true

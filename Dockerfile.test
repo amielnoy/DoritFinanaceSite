@@ -1,0 +1,25 @@
+# Reproducible test image: Node + the three browser engines Playwright drives
+# (Chromium for desktop Chrome and Android Chrome, WebKit for desktop Safari
+# and iOS Safari, Firefox pulled in by the base image).
+#
+# The tag must track the @playwright/test version in package.json — a mismatch
+# makes Playwright refuse to launch the preinstalled browsers.
+FROM mcr.microsoft.com/playwright:v1.62.1-noble
+
+ENV CI=1 \
+    NODE_ENV=development \
+    PLAYWRIGHT_PORT=4173 \
+    VITE_BASE44_APP_ID=e2e-sanity-app
+
+WORKDIR /app
+
+# Dependencies first so edits to source do not bust the npm layer.
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+# Everything the suites read: app source, configs, tests, static assets.
+COPY . .
+
+# Default: the whole battery — lint, typecheck, unit, component, contract,
+# static security, then e2e across web + iOS + Android.
+CMD ["./scripts/run-tests.sh"]
