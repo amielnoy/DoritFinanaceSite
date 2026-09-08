@@ -25,7 +25,7 @@ export default function CarrierLogos() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <div className="text-center mb-12 md:mb-14">
           <p className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            עובדת מול מיטב חברות הביטוח והפנסיה בישראל
+            עובדת מול מיטב חברות הפנסיה והביטוח בישראל
           </p>
           <div className="mt-5 mx-auto w-12 h-px bg-highlight/50" />
         </div>
@@ -53,7 +53,7 @@ export default function CarrierLogos() {
         </div>
 
         <p className="mt-14 text-center text-sm text-muted-foreground/60 max-w-xl mx-auto leading-relaxed">
-          גישה בלתי-תלויה לכל שוק הביטוח והפנסיה — ההמלצה נגזרת אך ורק מהצורך שלך,
+          גישה בלתי-תלויה לכל שוק הפנסיה והביטוח — ההמלצה נגזרת אך ורק מהצורך שלך,
           לא משייכות מסחרית לחברה כלשהי.
         </p>
       </div>

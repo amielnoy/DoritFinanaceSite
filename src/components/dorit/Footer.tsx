@@ -42,7 +42,7 @@ export default function Footer() {
             התכנון שלי — הרווח שלך
           </p>
           <p className="mt-6 text-primary-foreground/70 leading-relaxed max-w-xs">
-            ייעוץ ביטוחי ופיננסי אישי. ליווי לקוחות לאורך כל החיים.
+            ייעוץ פיננסי וביטוחי אישי. ליווי לקוחות לאורך כל החיים.
           </p>
         </div>
 

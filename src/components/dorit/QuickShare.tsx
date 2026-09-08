@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { MessageCircle, Linkedin, Link2, Check } from "lucide-react";
 
 const SHARE_TEXT =
-  "ממליצים בחום על דורית גוב ארי — ייעוץ ביטוחי ופיננסי אישי, מקצועי ואנושי. מומלץ ביותר.";
+  "ממליצים בחום על דורית גוב ארי — ייעוץ פיננסי וביטוחי אישי, מקצועי ואנושי. מומלץ ביותר.";
 const SHARE_URL = "https://safe-arch-plan.base44.app";
 
 export default function QuickShare() {

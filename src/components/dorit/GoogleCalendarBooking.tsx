@@ -31,7 +31,7 @@ export default function GoogleCalendarBooking({ data = {} }: GoogleCalendarBooki
     const details =
       lines.length > 0
         ? lines.join("\n")
-        : "ייעוץ ביטוחי ופיננסי אישי עם דורית גוב ארי.";
+        : "ייעוץ פיננסי וביטוחי אישי עם דורית גוב ארי.";
 
     const start = new Date();
     start.setDate(start.getDate() + 1);

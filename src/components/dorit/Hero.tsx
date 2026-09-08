@@ -7,11 +7,11 @@ const HERO_IMG =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/589e9d0cd_generated_11fed895.jpg";
 
 const TICKER: string[] = [
-  "Personalized Care",
-  "Claims Advocacy",
   "Future Proofing",
   "Legacy Planning",
+  "Personalized Care",
   "Tailored Coverage",
+  "Claims Advocacy",
   "Trusted Counsel",
 ];
 
@@ -62,7 +62,7 @@ export default function Hero() {
           </div>
           <p className="mt-6 max-w-md text-lg text-foreground/75 leading-relaxed animate-fade-up">
             אני לא מוכרת פוליסות — אני מתכננת עתיד. ליווי אישי, מדויק ושקוף לאורך כל
-            חייכם, מהרגע שבו אתם בוחרים ועד הרגע שבו אתם נשענים על הרשת.
+            חייכם, מהרגע שבו אתם בוחרים ועד הרגע שבו אתם מממשים את החזון.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-5 animate-fade-up">
             <a
