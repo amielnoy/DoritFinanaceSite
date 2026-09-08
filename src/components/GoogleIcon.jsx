@@ -1,3 +1,6 @@
+/* eslint-disable no-restricted-syntax -- The Google "G" is a third-party
+   brand mark and must reproduce Google's exact palette. These are asset
+   values, not design-system colours, so they are deliberately not tokens. */
 import React from "react";
 
 export default function GoogleIcon({ className = "w-5 h-5" }) {

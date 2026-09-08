@@ -14,7 +14,7 @@ import SeoRouteGuard from '@/components/SeoRouteGuard';
 // Core Web Vitals on the phone experience, and a visitor landing on the home
 // page should not download the blog admin and the rich-text editor to read it.
 import Home from '@/pages/Home';
-import FloatingActions from '@/components/dorit/FloatingActions';
+import FloatingActions from '@/components/dorit/layout/FloatingActions';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));

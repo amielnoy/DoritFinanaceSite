@@ -12,13 +12,13 @@ import {
   CheckCircle2,
   ChevronLeft,
 } from "lucide-react";
-import FloatingHeader from "@/components/dorit/FloatingHeader";
-import Footer from "@/components/dorit/Footer";
+import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
+import Footer from "@/components/dorit/layout/Footer";
 import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
-import Reveal from "@/components/dorit/Reveal";
+import Reveal from "@/components/dorit/primitives/Reveal";
 import { CONTACT } from "@/config/contact";
-import CredentialsStrip from "@/components/dorit/CredentialsStrip";
-import ClaimForm from "@/components/dorit/ClaimForm";
+import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
+import ClaimForm from "@/components/dorit/forms/ClaimForm";
 
 interface ClaimStep {
   n: string;
@@ -156,7 +156,7 @@ export default function Claims() {
                 href={`tel:${CONTACT.phoneE164}`}
                 className="flex items-center gap-4 p-5 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                <Phone size={22} className="text-[#C4A484]" />
+                <Phone size={22} className="text-highlight" />
                 <span className="flex flex-col">
                   <span className="text-xs tracking-[0.2em] uppercase text-primary-foreground/60">דיווח מיידי</span>
                   <span dir="ltr" className="font-medium">{CONTACT.phoneDisplay}</span>
@@ -249,7 +249,7 @@ export default function Claims() {
                     <ul className="space-y-3">
                       {c.points.map((p) => (
                         <li key={p} className="flex items-start gap-3 text-foreground/75 leading-relaxed">
-                          <CheckCircle2 size={18} className="text-[#C4A484] mt-1 shrink-0" />
+                          <CheckCircle2 size={18} className="text-highlight mt-1 shrink-0" />
                           <span>{p}</span>
                         </li>
                       ))}
@@ -266,7 +266,7 @@ export default function Claims() {
           <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
             <div className="lg:col-span-5">
               <Reveal>
-                <span className="text-[11px] tracking-[0.35em] uppercase text-[#C4A484]">
+                <span className="text-[11px] tracking-[0.35em] uppercase text-highlight">
                   03 · Checklist
                 </span>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4 leading-tight">
@@ -278,7 +278,7 @@ export default function Claims() {
                   רשימה כללית של מסמכים שמזרזים את הגשת התביעה. לא כל מסמך רלוונטי
                   לכל מקרה — אני אתאם אתכם אישית את המסמכים המדויקים הדרושים.
                 </p>
-                <div className="mt-8 flex items-center gap-3 text-[#C4A484]">
+                <div className="mt-8 flex items-center gap-3 text-highlight">
                   <FileText size={20} />
                   <span className="text-sm tracking-wide">שמרו מסמכים במקום אחד, מסודר ונגיש</span>
                 </div>
@@ -290,9 +290,9 @@ export default function Claims() {
                   {DOCS.map((d) => (
                     <li
                       key={d}
-                      className="flex items-start gap-3 p-4 border border-primary-foreground/15 hover:border-[#C4A484]/50 transition-colors"
+                      className="flex items-start gap-3 p-4 border border-primary-foreground/15 hover:border-highlight/50 transition-colors"
                     >
-                      <CheckCircle2 size={20} className="text-[#C4A484] mt-0.5 shrink-0" />
+                      <CheckCircle2 size={20} className="text-highlight mt-0.5 shrink-0" />
                       <span className="text-primary-foreground/85 leading-relaxed">{d}</span>
                     </li>
                   ))}
@@ -348,7 +348,7 @@ export default function Claims() {
                 </a>
                 <a
                   href="#consultation"
-                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] transition-colors"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors"
                 >
                   ייעוץ מקדים
                 </a>

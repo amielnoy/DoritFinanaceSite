@@ -7,11 +7,11 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ChevronLeft, HelpCircle, Phone, MessageCircle } from "lucide-react";
-import FloatingHeader from "@/components/dorit/FloatingHeader";
-import Footer from "@/components/dorit/Footer";
+import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
+import Footer from "@/components/dorit/layout/Footer";
 import { absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
-import Reveal from "@/components/dorit/Reveal";
-import CredentialsStrip from "@/components/dorit/CredentialsStrip";
+import Reveal from "@/components/dorit/primitives/Reveal";
+import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { CONTACT } from "@/config/contact";
 
 interface QAItem {
@@ -227,7 +227,7 @@ export default function FAQPage() {
                             : "border-border hover:border-accent hover:bg-secondary/40"
                         }`}
                       >
-                        <cat.icon size={18} className={active ? "text-[#C4A484]" : "text-accent"} />
+                        <cat.icon size={18} className={active ? "text-highlight" : "text-accent"} />
                         <span className="font-heading text-lg">{cat.label}</span>
                       </button>
                     );
@@ -241,7 +241,7 @@ export default function FAQPage() {
                   </p>
                   <a
                     href="/#consultation"
-                    className="inline-flex items-center gap-2 px-5 py-3 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] transition-colors w-full justify-center"
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors w-full justify-center"
                   >
                     יצירת קשר
                   </a>
@@ -264,7 +264,7 @@ export default function FAQPage() {
                     value={`${activeCat}-${i}`}
                     className="border-b border-border/60"
                   >
-                    <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-[#C4A484]">
+                    <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
                       {item.q}
                     </AccordionTrigger>
                     <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
@@ -290,13 +290,13 @@ export default function FAQPage() {
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a
                   href="/#consultation"
-                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] transition-colors"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors"
                 >
                   קביעת פגישת ייעוץ
                 </a>
                 <a
                   href={`tel:${CONTACT.phoneE164}`}
-                  className="inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-[#C4A484] hover:text-[#C4A484] transition-colors"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors"
                 >
                   <Phone size={18} />
                   <span dir="ltr">{CONTACT.phoneDisplay}</span>
@@ -305,7 +305,7 @@ export default function FAQPage() {
                   href={`https://wa.me/${CONTACT.whatsapp}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-[#C4A484] hover:text-[#C4A484] transition-colors"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors"
                 >
                   <MessageCircle size={18} />
                   WhatsApp
@@ -313,7 +313,7 @@ export default function FAQPage() {
               </div>
               <Link
                 to="/"
-                className="mt-10 inline-flex items-center gap-1 text-sm text-primary-foreground/60 hover:text-[#C4A484] transition-colors"
+                className="mt-10 inline-flex items-center gap-1 text-sm text-primary-foreground/60 hover:text-highlight transition-colors"
               >
                 <ChevronLeft size={16} />
                 חזרה לדף הבית

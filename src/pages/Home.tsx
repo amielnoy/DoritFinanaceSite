@@ -1,30 +1,29 @@
 import React from "react";
 import { useSeo } from "@/lib/seo";
 import { HOME_FAQ_LD } from "@/lib/structured-data";
-import FloatingHeader from "@/components/dorit/FloatingHeader";
-import SectionNav from "@/components/dorit/SectionNav";
-import SecurityScroll from "@/components/dorit/SecurityScroll";
-import Hero from "@/components/dorit/Hero";
-import About from "@/components/dorit/About";
-import CarrierLogos from "@/components/dorit/CarrierLogos";
-import ReviewsWidget from "@/components/dorit/ReviewsWidget";
-import Perspective from "@/components/dorit/Perspective";
-import ServiceMatrix from "@/components/dorit/ServiceMatrix";
-import ProofCarousel from "@/components/dorit/ProofCarousel";
-import Testimonials from "@/components/dorit/Testimonials";
-import FAQ from "@/components/dorit/FAQ";
-import ConsultationBuilder from "@/components/dorit/ConsultationBuilder";
-import DetailedContactForm from "@/components/dorit/DetailedContactForm";
-import PensionFeeCalculator from "@/components/dorit/PensionFeeCalculator";
-import QuickContact from "@/components/dorit/QuickContact";
-import QuickShare from "@/components/dorit/QuickShare";
-import DetailedFAQ from "@/components/dorit/DetailedFAQ";
-import NeedsInterviewChat from "@/components/dorit/NeedsInterviewChat";
-import BookingAssistantChat from "@/components/dorit/BookingAssistantChat";
-import BlogRecommenderChat from "@/components/dorit/BlogRecommenderChat";
-import Footer from "@/components/dorit/Footer";
-import MobileStickyBar from "@/components/dorit/MobileStickyBar";
-import CredentialsStrip from "@/components/dorit/CredentialsStrip";
+import AgentChat from "@/components/dorit/chat/AgentChat";
+import { AGENTS } from "@/config/agents";
+import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
+import SectionNav from "@/components/dorit/layout/SectionNav";
+import SecurityScroll from "@/components/dorit/layout/SecurityScroll";
+import Hero from "@/components/dorit/sections/Hero";
+import About from "@/components/dorit/sections/About";
+import CarrierLogos from "@/components/dorit/primitives/CarrierLogos";
+import ReviewsWidget from "@/components/dorit/sections/ReviewsWidget";
+import Perspective from "@/components/dorit/sections/Perspective";
+import ServiceMatrix from "@/components/dorit/sections/ServiceMatrix";
+import ProofCarousel from "@/components/dorit/sections/ProofCarousel";
+import Testimonials from "@/components/dorit/sections/Testimonials";
+import FAQ from "@/components/dorit/sections/FAQ";
+import ConsultationBuilder from "@/components/dorit/forms/ConsultationBuilder";
+import DetailedContactForm from "@/components/dorit/forms/DetailedContactForm";
+import PensionFeeCalculator from "@/components/dorit/sections/PensionFeeCalculator";
+import QuickContact from "@/components/dorit/forms/QuickContact";
+import QuickShare from "@/components/dorit/primitives/QuickShare";
+import DetailedFAQ from "@/components/dorit/sections/DetailedFAQ";
+import Footer from "@/components/dorit/layout/Footer";
+import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
+import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 
 export default function Home() {
   useSeo({
@@ -48,17 +47,17 @@ export default function Home() {
         <ReviewsWidget />
         <Perspective />
         <ServiceMatrix />
-        <NeedsInterviewChat />
+        <AgentChat descriptor={AGENTS.needsInterview} />
         <PensionFeeCalculator />
         <QuickContact />
         <ProofCarousel />
         <Testimonials />
         <FAQ />
-        <BookingAssistantChat />
+        <AgentChat descriptor={AGENTS.bookingAssistant} />
         <ConsultationBuilder />
         <DetailedContactForm />
         <QuickShare />
-        <BlogRecommenderChat />
+        <AgentChat descriptor={AGENTS.blogRecommender} />
         <DetailedFAQ />
       </main>
       <SectionNav />

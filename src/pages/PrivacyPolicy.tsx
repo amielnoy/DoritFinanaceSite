@@ -1,8 +1,8 @@
 import React from "react";
-import FloatingHeader from "@/components/dorit/FloatingHeader";
-import Footer from "@/components/dorit/Footer";
+import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
+import Footer from "@/components/dorit/layout/Footer";
 import { breadcrumbLd, useSeo } from "@/lib/seo";
-import CredentialsStrip from "@/components/dorit/CredentialsStrip";
+import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 
 export default function PrivacyPolicy() {
   useSeo({

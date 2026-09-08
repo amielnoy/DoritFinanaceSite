@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { useArticle } from "@/hooks/useContent";
 import { Image } from "@/components/ui/image";
 import ReactMarkdown from "react-markdown";
 import { Loader2, ArrowRight, Calendar } from "lucide-react";
-import FloatingHeader from "@/components/dorit/FloatingHeader";
-import Footer from "@/components/dorit/Footer";
-import ShareButtons from "@/components/dorit/ShareButtons";
-import CredentialsStrip from "@/components/dorit/CredentialsStrip";
+import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
+import Footer from "@/components/dorit/layout/Footer";
+import ShareButtons from "@/components/dorit/primitives/ShareButtons";
+import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import {
   DEFAULT_OG_IMAGE,
   SITE_NAME,
@@ -28,22 +28,9 @@ interface BlogPostData {
 
 export default function BlogPost() {
   const { id } = useParams<string>();
-  const [post, setPost] = useState<BlogPostData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [notFound, setNotFound] = useState<boolean>(false);
+  const { data, isPending: loading, isError: notFound } = useArticle(id);
+  const post = (data ?? null) as BlogPostData | null;
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await base44.entities.BlogPost.get(id as string);
-        setPost(data as unknown as BlogPostData);
-      } catch {
-        setNotFound(true);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id]);
 
   const tagList = (post?.tags ?? "")
     .split(",")

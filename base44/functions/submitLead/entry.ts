@@ -138,23 +138,62 @@ export default async function(req) {
     const agentBody = buildAgentBody(source, data);
     const subject = subjectFor(source, data);
 
-    // הודעה לסוכנת — חובה
-    await base44.asServiceRole.integrations.Core.SendEmail({
-      to: NOTIFY_EMAIL,
-      subject,
-      body: agentBody,
-    });
+    // ── סדר הפעולות ─────────────────────────────────────────────────────
+    // הפנייה נשמרת ראשונה. המייל הוא הערוץ השביר (מסירה, דומיין מאומת,
+    // נמען רשום) והמאגר הוא האמין — אם נכשלת שליחת המייל, הפנייה כבר
+    // מתועדת ואינה אובדת. כשל בשמירה הוא היחיד שמחזיר שגיאה ללקוח.
+    //
+    // The record is written first. Email is the fragile channel and the
+    // database is the reliable one, so a failed send can no longer lose the
+    // enquiry; only a failed write is reported to the caller as an error.
+    let leadId = null;
+    try {
+      const lead = await base44.entities.Lead.create({
+        name,
+        phone,
+        email: email || '',
+        source: source || 'quick',
+        topic: topic || '',
+        timing: timing || '',
+        message: message || notes || '',
+        status: 'new',
+      });
+      leadId = lead?.id ?? null;
+    } catch (e) {
+      // אין ערוץ גיבוי — הפנייה תאבד. זהו הכשל היחיד שחייב להיכשל בקול.
+      return Response.json(
+        { error: 'לא הצלחנו לשמור את הפנייה. נסו שוב או צרו קשר ישירות.', details: e?.message },
+        { status: 500 }
+      );
+    }
 
-    // עותק לדורית — מיטבי
+    // מכאן והלאה — מיטבי. הפנייה כבר שמורה, ולכן כשל בהודעה מדווח
+    // בתשובה במקום להיכשל, כדי שניתן יהיה לנטר אותו.
+    const warnings = [];
+
+    // הודעה לסוכנת
+    try {
+      await base44.asServiceRole.integrations.Core.SendEmail({
+        to: NOTIFY_EMAIL,
+        subject,
+        body: agentBody,
+      });
+    } catch (e) {
+      warnings.push('notify_email_failed');
+    }
+
+    // עותק לדורית
     try {
       await base44.asServiceRole.integrations.Core.SendEmail({
         to: SECONDARY_EMAIL,
         subject,
         body: agentBody,
       });
-    } catch (e) { /* מיטבי */ }
+    } catch (e) {
+      warnings.push('secondary_email_failed');
+    }
 
-    // אישור ללקוח — מיטבי
+    // אישור ללקוח
     if (email) {
       try {
         const clientSubject = source === 'consultation'
@@ -166,22 +205,10 @@ export default async function(req) {
           html: buildClientHtml(source, data),
           text: buildClientText(source, data),
         });
-      } catch (e) { /* מיטבי */ }
+      } catch (e) {
+        warnings.push('client_confirmation_failed');
+      }
     }
-
-    // תיעוד הפנייה במאגר
-    try {
-      await base44.entities.Lead.create({
-        name,
-        phone,
-        email: email || '',
-        source: source || 'quick',
-        topic: topic || '',
-        timing: timing || '',
-        message: message || notes || '',
-        status: 'new',
-      });
-    } catch (e) { /* מיטבי */ }
 
     // יצירת אירוע תזכורת ביומן Outlook — מיטבי, רק עבור בקשות ייעוץ
     if (source === 'consultation') try {
@@ -213,9 +240,11 @@ export default async function(req) {
           }),
         });
       }
-    } catch (e) { /* מיטבי */ }
+    } catch (e) {
+      warnings.push('calendar_event_failed');
+    }
 
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, leadId, warnings });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
