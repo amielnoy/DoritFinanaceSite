@@ -15,6 +15,7 @@ const NAV: NavItem[] = [
   { label: "נקודת מבט", href: "#perspective" },
   { label: "שירותים", href: "#services" },
   { label: "תביעות", href: "/claims", route: true },
+  { label: "שאלות ותשובות", href: "/faq", route: true },
   { label: "הצלחות", href: "#proof" },
   { label: "לקוחות מספרים", href: "#testimonials" },
   { label: "בלוג", href: "/blog", route: true },
