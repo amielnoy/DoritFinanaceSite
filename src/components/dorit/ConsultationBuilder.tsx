@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { he } from "date-fns/locale";
 
 const NOTIFY_EMAIL = "amielnoy@gmail.com";
-const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
+const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
 
 interface ConsultationData {
   topic: string;
@@ -93,7 +93,7 @@ export default function ConsultationBuilder() {
       `בברכה חמה,\n` +
       `דורית גוב ארי\n` +
       `מתכננת פיננסית בכירה\n` +
-      `dorit@govari-fin.co.il`;
+      `doritg@fsfp-fin.co.il`;
     try {
       await base44.integrations.Core.SendEmail({
         to: NOTIFY_EMAIL,
@@ -101,7 +101,7 @@ export default function ConsultationBuilder() {
         body: agentBody,
       });
     } catch (e) {
-      setError("לא הצלחנו לשלוח את הבקשה כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
+      setError("לא הצלחנו לשלוח את הבקשה כרגע. ניתן לשלוח מייל ישירות ל-doritg@fsfp-fin.co.il או לנסות שוב.");
       setSending(false);
       return;
     }

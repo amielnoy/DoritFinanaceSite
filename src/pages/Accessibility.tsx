@@ -56,7 +56,7 @@ export default function Accessibility() {
           <section>
             <h2 className="font-heading text-2xl mb-3">פרטי קשר לנגישות</h2>
             <ul className="space-y-1.5">
-              <li>דוא״ל: <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="text-accent hover:underline">dorit@govari-fin.co.il</a></li>
+              <li>דוא״ל: <a href="mailto:doritg@fsfp-fin.co.il" dir="ltr" className="text-accent hover:underline">doritg@fsfp-fin.co.il</a></li>
               <li>טלפון: <a href="https://wa.me/972508311776" target="_blank" rel="noopener noreferrer" dir="ltr" className="text-accent hover:underline">050-831-1776</a></li>
             </ul>
           </section>
