@@ -1,12 +1,14 @@
 import React, { useRef } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Reveal from "@/components/dorit/Reveal";
+import Stars from "@/components/dorit/Stars";
 
 interface Brief {
   tag: string;
   title: string;
   body: string;
   metric: string;
+  rating: number;
 }
 
 const BRIEFS: Brief[] = [
@@ -15,42 +17,49 @@ const BRIEFS: Brief[] = [
     title: "מ-דחייה לאישור מלא תוך 11 ימים",
     body: "משפחה שנתקלה בסירוב ראשוני לתביעת חיים. ניהלתי את ההליך מול החברה, השלמתי תיעוד והבאתי את הכיסוי המלא — בלי שהמשפחה נאלצה להרים טלפון.",
     metric: "₪850K שולמו",
+    rating: 5,
   },
   {
     tag: "תכנון פנסיה",
     title: "מסלול שכפל את ההכנסה הצפויה",
     body: "לקוח עצמאי בן 47 עם תיק מפוזר. איחדתי מוצרים, בניתי מסלול מסלק והתאמתי את החשיפה — התוצאה: הכנסה חודשית צפויה כפולה בפרישה.",
     metric: "x2 הכנסה צפויה",
+    rating: 5,
   },
   {
     tag: "ביטוח משכנתא",
     title: "חיסכון של 38% בפרמיה",
     body: "זוג עם משכנתא חדשה קיבל הצעה סטנדרטית. בדקתי את הכיסויים מול פרופיל הסיכון האמיתי, הסרתי כפילויות והוזלתי את העלות משמעותית.",
     metric: "38% חיסכון",
+    rating: 5,
   },
   {
     tag: "בריאות",
     title: "כיסוי ניתוח שאושר תוך 48 שעות",
     body: "לקוחה שנזקקה לניתוח דחוף ונדחתה פעמיים. התערבתי ישירות מול מחלקת האישורים, והכיסוי אושר בטרם הניתוח.",
     metric: "48 שעות",
+    rating: 5,
   },
   {
     tag: "עסק",
     title: "הגנת הון לבעלי עסק",
     body: "שותפים בעסק בינוני ללא הסכם שותפים. בניתי מערך כיסויים שמבטיח המשכיות עסקית והגנת משפחות במקרה של אובדן כושר או פטירה.",
     metric: "100% הגנה",
+    rating: 5,
   },
   {
     tag: "חיסכון פנסיוני",
     title: "חיסכון של ₪420K בעמלות ודמי ניהול",
     body: "שכירה בת 39 שהפרישה לארבעה מוצרים שונים עם דמי ניהול גבוהים. איחדתי לשני מסלולים ממוקדים, מיקחתי מול הגופים המוסדיים והורדתי את העמלות — החיסכון המצטבר עד הפרישה מוערך ב-₪420 אלף.",
     metric: "₪420K חיסכון",
+    rating: 5,
   },
   {
     tag: "תכנון פיננסי",
     title: "יציאה לעצמאות עם כרית ביטחון בת 3 שנים",
     body: "זוג בשנות ה-40 שרצה לעבור לעצמאות אך חשש מאי-הוודאות. בניתי תכנון פיננסי רב-שנתי: קרן חירום, מיפוי סיכונים ומסלול השקעה מדורג. כעבור שלוש שנים יצאו לעצמאות עם כרית ביטחון מלאה.",
     metric: "3 שנים לעצמאות",
+    rating: 5,
   },
 ];
 
@@ -76,6 +85,12 @@ export default function ProofCarousel() {
               <h2 className="font-heading text-5xl md:text-6xl mt-4">
                 תיקי הצלחה
               </h2>
+              <div className="mt-5 flex items-center gap-3">
+                <Stars value={5} size={20} />
+                <span className="text-sm text-foreground/70">
+                  <span className="font-heading text-lg text-foreground">5.0</span> · שביעות רצון מלאה בקרב לקוחות
+                </span>
+              </div>
             </Reveal>
           </div>
           <div className="flex items-center gap-3">
@@ -111,7 +126,10 @@ export default function ProofCarousel() {
             <span className="text-[10px] tracking-[0.3em] uppercase text-accent">
               {b.tag}
             </span>
-            <h3 className="font-heading text-2xl md:text-3xl mt-4 leading-snug">
+            <div className="mt-3">
+              <Stars value={b.rating} size={16} />
+            </div>
+            <h3 className="font-heading text-2xl md:text-3xl mt-3 leading-snug">
               {b.title}
             </h3>
             <p className="mt-5 text-foreground/70 leading-relaxed flex-1">
