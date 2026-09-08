@@ -8,6 +8,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { base44Mock, resetBase44Mock } from "./base44-mock";
@@ -34,16 +35,30 @@ vi.mock("framer-motion", async () => {
 });
 
 import { CONTACT } from "@/config/contact";
-import Stars from "@/components/dorit/Stars";
-import MobileStickyBar from "@/components/dorit/MobileStickyBar";
-import FloatingActions from "@/components/dorit/FloatingActions";
-import PensionFeeCalculator from "@/components/dorit/PensionFeeCalculator";
-import QuickContact from "@/components/dorit/QuickContact";
-import FAQ from "@/components/dorit/FAQ";
-import ShareButtons from "@/components/dorit/ShareButtons";
-import ReviewsWidget from "@/components/dorit/ReviewsWidget";
+import Stars from "@/components/dorit/primitives/Stars";
+import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
+import FloatingActions from "@/components/dorit/layout/FloatingActions";
+import PensionFeeCalculator from "@/components/dorit/sections/PensionFeeCalculator";
+import QuickContact from "@/components/dorit/forms/QuickContact";
+import FAQ from "@/components/dorit/sections/FAQ";
+import ShareButtons from "@/components/dorit/primitives/ShareButtons";
+import ReviewsWidget from "@/components/dorit/sections/ReviewsWidget";
 
-const withRouter = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
+/**
+ * Components that read content now go through React Query over the ContentPort,
+ * so they need a client. Retries are off so an error case fails fast instead of
+ * back-off looping through the test timeout.
+ */
+const withProviders = (ui: React.ReactElement) => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>
+  );
+};
 
 beforeEach(() => resetBase44Mock());
 
@@ -258,21 +273,22 @@ describe("<ShareButtons />", () => {
 
 describe("<ReviewsWidget />", () => {
   it("asks the backend for testimonials on mount", async () => {
-    withRouter(<ReviewsWidget />);
+    withProviders(<ReviewsWidget />);
     await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
+    // The limit is the port's default; the sort is the contract the widget relies on.
     expect(base44Mock.entities.Testimonial.list).toHaveBeenCalledWith("-created_date", 50);
   });
 
   it("renders without crashing when the backend returns nothing", async () => {
     base44Mock.entities.Testimonial.list.mockResolvedValueOnce([]);
-    const { container } = withRouter(<ReviewsWidget />);
+    const { container } = withProviders(<ReviewsWidget />);
     await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
     expect(container).toBeTruthy();
   });
 
   it("survives a backend error without throwing", async () => {
     base44Mock.entities.Testimonial.list.mockRejectedValueOnce(new Error("boom"));
-    const { container } = withRouter(<ReviewsWidget />);
+    const { container } = withProviders(<ReviewsWidget />);
     await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
     expect(container).toBeTruthy();
   });
