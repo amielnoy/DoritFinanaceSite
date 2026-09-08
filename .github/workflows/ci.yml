@@ -25,6 +25,12 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
+  # .npmrc sets `min-release-age=7`, a supply-chain cooldown that only npm >= 12
+  # understands. On the npm bundled with Node 22 the setting is ignored, so CI
+  # would resolve versions newer than the lockfile — `npm ci` then fails as
+  # out of sync, and any install would silently skip the cooldown the policy
+  # exists to enforce. Pin the client that honours it.
+  NPM_VERSION: "12"
   VITE_BASE44_APP_ID: e2e-sanity-app
 
 jobs:
@@ -40,6 +46,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
+      - name: Pin npm (honours the .npmrc release cooldown)
+        run: npm i -g npm@${{ env.NPM_VERSION }}
 
       - name: Install dependencies
         run: npm ci
@@ -79,6 +88,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
+      - name: Pin npm (honours the .npmrc release cooldown)
+        run: npm i -g npm@${{ env.NPM_VERSION }}
 
       - run: npm ci
 
@@ -127,6 +139,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
+      - name: Pin npm (honours the .npmrc release cooldown)
+        run: npm i -g npm@${{ env.NPM_VERSION }}
 
       - run: npm ci
 
@@ -182,6 +197,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
+      - name: Pin npm (honours the .npmrc release cooldown)
+        run: npm i -g npm@${{ env.NPM_VERSION }}
+
       - run: npm ci
 
       - name: Check publish credentials
@@ -218,6 +236,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
+      - name: Pin npm (honours the .npmrc release cooldown)
+        run: npm i -g npm@${{ env.NPM_VERSION }}
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium
