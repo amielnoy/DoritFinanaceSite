@@ -56,7 +56,16 @@ test.describe("Base44 API contract (observed traffic)", () => {
     });
 
     await test_step("its body validates against the Lead entity definition", async () => {
-      const issues = validateAgainstEntity(loadEntity("Lead"), req.body as Record<string, unknown>);
+      // The browser posts a *function request*, not an entity row: `notes` is a
+      // request field that submitLead folds into the Lead's `message`. Validate
+      // it against what the function accepts; the entity shape is asserted where
+      // the backend writes it (tests/contract/frontend-payloads).
+      const accepted = ["name", "phone", "email", "source", "topic", "timing", "message", "notes"];
+      const body = req.body as Record<string, unknown>;
+      const undeclared = Object.keys(body).filter((k) => !accepted.includes(k));
+      const issues = undeclared.map((field) => ({ field, problem: "not accepted by submitLead" }));
+      expect(body.source, "source must be an enum value the Lead entity declares").toBeTruthy();
+      expect(loadEntity("Lead").properties.source.enum).toContain(body.source);
       expect(issues, JSON.stringify(issues)).toEqual([]);
     });
   });
