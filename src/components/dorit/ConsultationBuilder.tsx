@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Check, ChevronLeft, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import GoogleCalendarBooking from "@/components/dorit/GoogleCalendarBooking";
+import OutlookCalendarBooking from "@/components/dorit/OutlookCalendarBooking";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
@@ -214,7 +215,10 @@ export default function ConsultationBuilder() {
             <p className="text-xs tracking-[0.2em] uppercase text-muted-foreground mb-4">
               או לקביעה ישירה ביומן
             </p>
-            <GoogleCalendarBooking data={data} />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <GoogleCalendarBooking data={data} />
+              <OutlookCalendarBooking data={data} />
+            </div>
           </div>
         </div>
 
