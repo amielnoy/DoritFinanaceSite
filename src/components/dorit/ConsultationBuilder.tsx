@@ -37,7 +37,7 @@ const STEPS: StepDef[] = [
   {
     key: "timing",
     label: "מתעניינים",
-    options: ["השבוע"],
+    options: ["השבוע", "השבוע הבא"],
   },
   {
     key: "contact",
