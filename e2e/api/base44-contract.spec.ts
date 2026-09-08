@@ -47,7 +47,7 @@ test.describe("Base44 API contract (observed traffic)", () => {
     });
 
     const req = await test_step("capture the Lead the app wrote", () =>
-      mockApi.waitForRequest("/entities/Lead")
+      mockApi.waitForRequest("/functions/submitLead")
     );
 
     await test_step("it is a JSON POST", async () => {
@@ -67,9 +67,9 @@ test.describe("Base44 API contract (observed traffic)", () => {
     await test_step("book a consultation through the wizard", async () => {
       await gotoApp(page);
       await wizard.scrollIntoViewIfNeeded();
-      await wizard.getByRole("button", { name: "פנסיה ופיננסים" }).click();
+      await wizard.getByRole("button", { name: "גמל, השתלמות ופנסיה", exact: true }).click();
       await wizard.getByRole("button", { name: "המשך" }).click();
-      await wizard.getByRole("button", { name: "השבוע" }).click();
+      await wizard.getByRole("button", { name: "השבוע", exact: true }).click();
       await wizard.getByRole("button", { name: "המשך" }).click();
       await wizard.getByLabel("שם מלא").fill("ישראלה ישראלי");
       await wizard.getByLabel("טלפון").fill("050-1234567");
@@ -102,7 +102,7 @@ test.describe("Base44 API contract (observed traffic)", () => {
       await form.locator("#qc-name").fill("ישראלה");
       await form.locator("#qc-phone").fill("050-1234567");
       await form.getByRole("button", { name: "שליחת הודעה" }).click();
-      await mockApi.waitForRequest("/entities/Lead");
+      await mockApi.waitForRequest("/functions/submitLead");
     });
 
     await test_step("no request left the origin or the /api prefix", async () => {
@@ -124,7 +124,7 @@ test.describe("Base44 API contract (observed traffic)", () => {
       await form.locator("#qc-phone").fill("0501234567");
       await form.locator("#qc-email").fill("secret@example.com");
       await form.getByRole("button", { name: "שליחת הודעה" }).click();
-      await mockApi.waitForRequest("/entities/Lead");
+      await mockApi.waitForRequest("/functions/submitLead");
     });
 
     await test_step("no query string leaked the details or a credential", async () => {

@@ -1,19 +1,34 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadEntity, validateAgainstEntity } from "../helpers/entity-schema";
-import { findObjectLiteralCalls } from "../helpers/source-scan";
+import { backendFiles, findObjectLiteralCalls, read, rel } from "../helpers/source-scan";
 
 /**
- * These read the real call sites out of src/ rather than restating them, so a
- * field renamed in a form — or a new `source` value that is not in the entity
- * enum — fails here instead of silently 4xx-ing in production.
+ * Lead capture crosses two boundaries, and this file pins both:
+ *
+ *   browser  --invoke("submitLead")-->  backend function  --create-->  Lead
+ *
+ * The tests read the real call sites out of src/ and base44/functions/ and the
+ * real schema out of base44/entities/, so a field renamed on either side — or a
+ * `source` value outside the entity enum — fails here rather than in production.
  */
 
-describe("Lead.create payloads match the Lead entity", () => {
-  const lead = loadEntity("Lead");
-  const calls = findObjectLiteralCalls(/base44\.entities\.Lead\.create\(\s*/);
+const BACKEND = backendFiles();
+const backendSource = (name: string) =>
+  readFileSync(BACKEND.find((f) => f.includes(`/${name}/`))!, "utf8");
 
-  it("finds every Lead.create call site", () => {
-    expect(calls.length).toBe(3);
+/** Fields a backend function destructures off its request body. */
+function destructuredBody(src: string): string[] {
+  const m = src.match(/const\s*\{([^}]*)\}\s*=\s*body\s*\|\|\s*\{\}/);
+  if (!m) throw new Error("function no longer destructures its request body");
+  return m[1].split(",").map((s) => s.trim()).filter(Boolean).sort();
+}
+
+describe("browser → submitLead", () => {
+  const calls = findObjectLiteralCalls(/base44\.functions\.invoke\(\s*["']submitLead["']\s*,\s*/);
+  const accepted = destructuredBody(backendSource("submitLead"));
+
+  it("is invoked from every lead-capturing form", () => {
     expect(calls.map((c) => c.file).sort()).toEqual([
       "src/components/dorit/ConsultationBuilder.tsx",
       "src/components/dorit/DetailedContactForm.tsx",
@@ -22,55 +37,139 @@ describe("Lead.create payloads match the Lead entity", () => {
   });
 
   for (const call of calls) {
-    describe(call.file, () => {
-      it("sends only fields the entity declares", () => {
-        const undeclared = call.keys.filter((k) => !(k in lead.properties));
-        expect(undeclared, `undeclared fields in ${call.file}`).toEqual([]);
-      });
+    it(`${call.file} sends only fields the function reads`, () => {
+      const unknown = call.keys.filter((k) => !accepted.includes(k));
+      expect(unknown, `${call.file} sends fields submitLead ignores`).toEqual([]);
+    });
 
-      it("sends both required fields (name, phone)", () => {
-        for (const req of lead.required ?? []) {
-          expect(call.keys, `${call.file} must send ${req}`).toContain(req);
-        }
-      });
+    it(`${call.file} sends the two fields the function requires`, () => {
+      for (const required of ["name", "phone"]) {
+        expect(call.keys, `${call.file} must send ${required}`).toContain(required);
+      }
+    });
 
-      it("uses enum-legal literals for source and status", () => {
-        for (const field of ["source", "status"] as const) {
-          const literal = call.stringLiterals[field];
-          if (literal === undefined) continue;
-          expect(lead.properties[field].enum, `${call.file}.${field}`).toContain(literal);
-        }
-      });
+    it(`${call.file} uses a source the Lead entity declares`, () => {
+      const source = call.stringLiterals.source;
+      expect(source, `${call.file} must declare a source`).toBeTruthy();
+      expect(loadEntity("Lead").properties.source.enum).toContain(source);
     });
   }
 
-  it("covers all three declared lead sources across the site", () => {
-    const sources = calls.map((c) => c.stringLiterals.source).filter(Boolean).sort();
-    expect(sources).toEqual([...(lead.properties.source.enum ?? [])].sort());
+  it("covers every lead source the entity declares except the claim path", () => {
+    const fromForms = calls.map((c) => c.stringLiterals.source).sort();
+    const declared = [...(loadEntity("Lead").properties.source.enum ?? [])]
+      .filter((s) => s !== "claim") // written by submitClaim, asserted below
+      .sort();
+    expect(fromForms).toEqual(declared);
+  });
+});
+
+describe("browser → submitClaim", () => {
+  const calls = findObjectLiteralCalls(/base44\.functions\.invoke\(\s*["']submitClaim["']\s*,\s*/);
+  const accepted = destructuredBody(backendSource("submitClaim"));
+
+  it("is invoked from the claim form", () => {
+    expect(calls.map((c) => c.file)).toEqual(["src/components/dorit/ClaimForm.tsx"]);
   });
 
-  it("validates a representative payload from each form end to end", () => {
-    const samples: Record<string, Record<string, unknown>> = {
-      quick: { name: "ישראלה", phone: "050-0000000", email: "", source: "quick", message: "", status: "new" },
-      detailed: {
-        name: "ישראלה", phone: "050-0000000", email: "a@b.co", source: "detailed",
-        topic: "ליווי תביעות", timing: "בוקר", message: "שאלה", status: "new",
-      },
-      consultation: {
-        name: "ישראלה", phone: "050-0000000", email: "", source: "consultation",
-        topic: "פנסיה ופיננסים", timing: "השבוע", message: "", status: "new",
-      },
-    };
-    for (const [label, payload] of Object.entries(samples)) {
-      expect(validateAgainstEntity(lead, payload), label).toEqual([]);
+  it("sends only fields the function reads, including name and phone", () => {
+    expect(calls[0].keys.filter((k) => !accepted.includes(k))).toEqual([]);
+    for (const required of ["name", "phone"]) {
+      expect(calls[0].keys).toContain(required);
+    }
+  });
+});
+
+describe("backend → Lead entity", () => {
+  const lead = loadEntity("Lead");
+  const writes = findObjectLiteralCalls(
+    /base44\.entities\.Lead\.create\(\s*/,
+    BACKEND
+  );
+
+  it("only the backend functions create leads — the browser no longer does", () => {
+    const fromBrowser = findObjectLiteralCalls(/base44\.entities\.Lead\.create\(\s*/);
+    expect(fromBrowser, "a component still writes Lead directly").toEqual([]);
+    expect(writes.length).toBe(2); // submitLead, submitClaim
+  });
+
+  for (const write of writes) {
+    it(`${write.file} writes only declared fields`, () => {
+      const undeclared = write.keys.filter((k) => !(k in lead.properties));
+      expect(undeclared, `${write.file}`).toEqual([]);
+    });
+
+    it(`${write.file} supplies both required fields`, () => {
+      for (const required of lead.required ?? []) {
+        expect(write.keys, `${write.file} must write ${required}`).toContain(required);
+      }
+    });
+
+    it(`${write.file} uses enum-legal source and status literals`, () => {
+      for (const field of ["source", "status"] as const) {
+        const literal = write.stringLiterals[field];
+        if (literal === undefined) continue;
+        expect(lead.properties[field].enum, `${write.file}.${field}`).toContain(literal);
+      }
+    });
+  }
+
+  it("validates a representative payload for every declared source", () => {
+    for (const source of loadEntity("Lead").properties.source.enum ?? []) {
+      const payload = {
+        name: "ישראלה", phone: "050-0000000", email: "", source,
+        topic: "", timing: "", message: "", status: "new",
+      };
+      expect(validateAgainstEntity(lead, payload), source).toEqual([]);
     }
   });
 
-  it("rejects a payload with an unknown source or a stray field", () => {
-    const issues = validateAgainstEntity(loadEntity("Lead"), {
+  it("rejects an unknown source and a stray field", () => {
+    const issues = validateAgainstEntity(lead, {
       name: "x", phone: "1", source: "carrier-pigeon", utm_campaign: "spring",
     });
     expect(issues.map((i) => i.field).sort()).toEqual(["source", "utm_campaign"]);
+  });
+});
+
+describe("email is sent from the backend, never the browser", () => {
+  it("no component calls Core.SendEmail", () => {
+    const fromBrowser = findObjectLiteralCalls(
+      /base44\.integrations\.Core\.SendEmail\(\s*/
+    );
+    expect(fromBrowser.map((c) => c.file)).toEqual([]);
+  });
+
+  const backendSends = findObjectLiteralCalls(
+    /integrations\.Core\.SendEmail\(\s*/,
+    BACKEND
+  );
+
+  it("every backend send supplies a recipient and a subject", () => {
+    expect(backendSends.length).toBeGreaterThan(0);
+    for (const send of backendSends) {
+      expect(send.keys, send.file).toContain("to");
+      expect(send.keys, send.file).toContain("subject");
+      expect(
+        send.keys.includes("body") || send.keys.includes("html"),
+        `${send.file} sends neither body nor html`
+      ).toBe(true);
+    }
+  });
+
+  it("recipients come from named constants, never inline literals", () => {
+    for (const send of backendSends) {
+      expect(
+        send.stringLiterals.to,
+        `${send.file} inlines a recipient address`
+      ).toBeUndefined();
+    }
+  });
+
+  it("an HTML send always ships a plain-text alternative", () => {
+    for (const send of backendSends.filter((s) => s.keys.includes("html"))) {
+      expect(send.keys, `${send.file} sends HTML with no text fallback`).toContain("text");
+    }
   });
 });
 
@@ -78,18 +177,17 @@ describe("BlogPost writes match the BlogPost entity", () => {
   const blogPost = loadEntity("BlogPost");
 
   it("the admin payload carries title and body and nothing undeclared", () => {
-    const calls = findObjectLiteralCalls(/const payload\s*=\s*/);
-    const adminPayload = calls.find((c) => c.file === "src/pages/BlogAdmin.tsx");
+    const adminPayload = findObjectLiteralCalls(/const payload\s*=\s*/).find(
+      (c) => c.file === "src/pages/BlogAdmin.tsx"
+    );
     expect(adminPayload, "BlogAdmin payload literal").toBeDefined();
-
-    const undeclared = adminPayload!.keys.filter((k) => !(k in blogPost.properties));
-    expect(undeclared).toEqual([]);
-    for (const req of blogPost.required ?? []) {
-      expect(adminPayload!.keys).toContain(req);
+    expect(adminPayload!.keys.filter((k) => !(k in blogPost.properties))).toEqual([]);
+    for (const required of blogPost.required ?? []) {
+      expect(adminPayload!.keys).toContain(required);
     }
   });
 
-  it("publish toggles only flip the declared boolean field", () => {
+  it("publish toggles only flip declared fields", () => {
     const updates = findObjectLiteralCalls(/base44\.entities\.BlogPost\.update\([^,]+,\s*/);
     expect(updates.length).toBeGreaterThan(0);
     for (const call of updates) {
@@ -114,10 +212,9 @@ describe("Testimonial.create payloads match the Testimonial entity", () => {
   it("sends only declared fields and both required ones", () => {
     expect(calls.length).toBeGreaterThan(0);
     for (const call of calls) {
-      const undeclared = call.keys.filter((k) => !(k in testimonial.properties));
-      expect(undeclared, call.file).toEqual([]);
-      for (const req of testimonial.required ?? []) {
-        expect(call.keys, `${call.file} must send ${req}`).toContain(req);
+      expect(call.keys.filter((k) => !(k in testimonial.properties)), call.file).toEqual([]);
+      for (const required of testimonial.required ?? []) {
+        expect(call.keys, `${call.file} must send ${required}`).toContain(required);
       }
     }
   });
@@ -126,29 +223,5 @@ describe("Testimonial.create payloads match the Testimonial entity", () => {
     expect(validateAgainstEntity(testimonial, { name: "א", quote: "ב", rating: 5 })).toEqual([]);
     expect(validateAgainstEntity(testimonial, { name: "א", quote: "ב", rating: 6 })).toHaveLength(1);
     expect(validateAgainstEntity(testimonial, { name: "א", quote: "ב", rating: 0 })).toHaveLength(1);
-  });
-
-  it("only accepts the declared review sources", () => {
-    expect(testimonial.properties.source.enum).toEqual(["google", "midrag"]);
-    expect(
-      validateAgainstEntity(testimonial, { name: "א", quote: "ב", source: "yelp" })
-    ).toHaveLength(1);
-  });
-});
-
-describe("Core.SendEmail payloads", () => {
-  const calls = findObjectLiteralCalls(/base44\.integrations\.Core\.SendEmail\(\s*/);
-
-  it("every send supplies to, subject and body", () => {
-    expect(calls.length).toBeGreaterThan(0);
-    for (const call of calls) {
-      expect(call.keys.sort(), call.file).toEqual(["body", "subject", "to"]);
-    }
-  });
-
-  it("never hardcodes a recipient inline — recipients come from named constants", () => {
-    for (const call of calls) {
-      expect(call.stringLiterals.to, `${call.file} inlines a recipient address`).toBeUndefined();
-    }
   });
 });

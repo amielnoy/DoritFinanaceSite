@@ -4,6 +4,21 @@ import { REPO_ROOT } from "./entity-schema";
 
 const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx"]);
 
+/** Backend function entry points under base44/functions. */
+export function backendFiles(): string[] {
+  const root = join(REPO_ROOT, "base44/functions");
+  const out: string[] = [];
+  for (const name of readdirSync(root)) {
+    const entry = join(root, name, "entry.ts");
+    try {
+      if (statSync(entry).isFile()) out.push(entry);
+    } catch {
+      /* not a function directory */
+    }
+  }
+  return out.sort();
+}
+
 /** All first-party source files, excluding the untouched shadcn/ui primitives. */
 export function sourceFiles(
   dir = join(REPO_ROOT, "src"),

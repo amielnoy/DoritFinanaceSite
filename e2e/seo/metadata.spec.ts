@@ -291,8 +291,14 @@ test.describe("Crawl directives", () => {
 
     await test_step("the public site stays crawlable, AI crawlers included", async () => {
       expect(body).toMatch(/^Allow: \/$/m);
-      expect(body).toContain("GPTBot");
       expect(body).not.toMatch(/^Disallow: \/$/m);
+      // The explicit GPTBot/Claude-Web allow-list was dropped upstream. It was
+      // redundant — `Allow: /` under `User-agent: *` already covers them — so
+      // assert that none is *blocked* rather than requiring the list back.
+      for (const bot of ["GPTBot", "Claude-Web", "PerplexityBot", "Google-Extended"]) {
+        const blocked = new RegExp(`User-agent: ${bot}[\\s\\S]*?^Disallow: /$`, "m");
+        expect(blocked.test(body), `${bot} is explicitly blocked`).toBe(false);
+      }
     });
   });
 

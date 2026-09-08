@@ -139,13 +139,36 @@ export const test = base.extend<{ mockApi: MockApi }>({
         return json(route, { status: "sent" });
       }
 
-      // Backend functions
-      if (path.includes("/functions/createConsultationEvent")) {
+      // Backend functions. submitLead and submitClaim now own email delivery
+      // and the Lead write, so the browser only ever sees this one call.
+      if (path.includes("/functions/")) {
         const payload = (body ?? {}) as Record<string, unknown>;
-        if (!payload.name || !payload.phone) {
-          return json(route, { error: "נדרשים שם וטלפון" }, 400);
+        const fn = path.split("/functions/")[1] ?? "";
+
+        if (["submitLead", "submitClaim", "createConsultationEvent", "createOutlookEvent"].includes(fn)) {
+          if (!payload.name || !payload.phone) {
+            return json(route, { error: "נדרשים שם וטלפון" }, 400);
+          }
         }
-        return json(route, { ok: true, eventId: "evt_1", htmlLink: "https://calendar.google.com/event?eid=evt_1" });
+        if (fn === "createConsultationEvent") {
+          return json(route, {
+            ok: true,
+            eventId: "evt_1",
+            htmlLink: "https://calendar.google.com/event?eid=evt_1",
+          });
+        }
+        if (fn === "createOutlookEvent") return json(route, { ok: true, eventId: "outlook_1" });
+        return json(route, { ok: true });
+      }
+
+      // Agent conversations. Three LLM chat widgets sit on the home page and
+      // open a conversation on first message; the suite never drives a real
+      // model, it only needs the transport to stay quiet.
+      if (path.includes("/agents/")) {
+        if (request.method() === "POST" && path.endsWith("/conversations")) {
+          return json(route, { id: "conv_1", messages: [] });
+        }
+        return json(route, { id: "conv_1", messages: [], status: "idle" });
       }
 
       // Anything unmodelled: fail loudly rather than silently hanging.

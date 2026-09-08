@@ -165,7 +165,7 @@ describe("<QuickContact />", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("emails the office and records a Lead with source=quick", async () => {
+  it("hands the lead to the submitLead backend function", async () => {
     const user = userEvent.setup();
     render(<QuickContact />);
 
@@ -174,19 +174,19 @@ describe("<QuickContact />", () => {
     await user.type(screen.getByLabelText(/אימייל/), "a@b.co");
     await user.click(screen.getByRole("button", { name: /שליחת הודעה/ }));
 
-    await waitFor(() => expect(base44Mock.integrations.Core.SendEmail).toHaveBeenCalled());
-    const email = base44Mock.integrations.Core.SendEmail.mock.calls[0][0] as any;
-    expect(email).toMatchObject({ to: expect.stringContaining("@") });
-    expect(email.body).toContain("050-1234567");
-
-    await waitFor(() => expect(base44Mock.entities.Lead.create).toHaveBeenCalled());
-    expect(base44Mock.entities.Lead.create.mock.calls[0][0]).toMatchObject({
+    // Email delivery and the Lead write now live in the backend function, so
+    // the component's whole contract is this one call.
+    await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalled());
+    const [fnName, payload] = base44Mock.functions.invoke.mock.calls[0] as [string, any];
+    expect(fnName).toBe("submitLead");
+    expect(payload).toMatchObject({
       name: "ישראלה",
       phone: "050-1234567",
       email: "a@b.co",
       source: "quick",
-      status: "new",
     });
+    expect(base44Mock.integrations.Core.SendEmail).not.toHaveBeenCalled();
+    expect(base44Mock.entities.Lead.create).not.toHaveBeenCalled();
   });
 
   it("confirms to the visitor and clears the form after a successful send", async () => {
@@ -204,7 +204,7 @@ describe("<QuickContact />", () => {
 
   it("keeps the visitor's input and offers a fallback when sending fails", async () => {
     const user = userEvent.setup();
-    base44Mock.integrations.Core.SendEmail.mockRejectedValueOnce(new Error("smtp down"));
+    base44Mock.functions.invoke.mockRejectedValueOnce(new Error("backend down"));
     render(<QuickContact />);
 
     await user.type(screen.getByLabelText(/שם מלא/), "ישראלה");
@@ -224,7 +224,7 @@ describe("<QuickContact />", () => {
     const submit = screen.getByRole("button", { name: /שליחת הודעה/ });
     await user.dblClick(submit);
 
-    await waitFor(() => expect(base44Mock.entities.Lead.create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalledTimes(1));
   });
 });
 

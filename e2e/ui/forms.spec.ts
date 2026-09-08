@@ -87,13 +87,15 @@ class ConsultationWizard {
 
   @test_step("step 1 — choose a topic and continue")
   async chooseTopic(topic: string) {
-    await this.root.getByRole("button", { name: topic }).click();
+    await this.root.getByRole("button", { name: topic, exact: true }).click();
     await this.root.getByRole("button", { name: "המשך" }).click();
   }
 
   @test_step("step 2 — choose a timing and continue")
   async chooseTiming(timing: string) {
-    await this.root.getByRole("button", { name: timing }).click();
+    // exact: the wizard offers both "השבוע" and "השבוע הבא", and getByRole
+    // matches accessible names by substring unless told otherwise.
+    await this.root.getByRole("button", { name: timing, exact: true }).click();
     await this.root.getByRole("button", { name: "המשך" }).click();
   }
 
@@ -139,30 +141,27 @@ test.describe("Quick contact form", () => {
       await expect(form.root.getByText("ההודעה נשלחה. תודה.")).toBeVisible();
     });
 
-    await test_step("an email is sent to the adviser with the visitor's details", async () => {
-      const email = await mockApi.waitForRequest("/integration-endpoints/Core/SendEmail");
-      const emailBody = email.body as Record<string, string>;
-      expect(emailBody.to).toContain("@");
-      expect(emailBody.subject).toContain(LEAD.name);
-      expect(emailBody.body).toContain(LEAD.phone);
-    });
+    const submission = await test_step(
+      "the browser hands the lead to the submitLead backend function",
+      async () => mockApi.waitForRequest("/functions/submitLead")
+    );
 
-    await test_step("the lead is recorded with the shape the backend expects", async () => {
-      const lead = await mockApi.waitForRequest("/entities/Lead");
-      expect(lead.method).toBe("POST");
-      expect(lead.body).toMatchObject({
+    await test_step("it carries the shape the function destructures", async () => {
+      expect(submission.method).toBe("POST");
+      // Email delivery, the Lead write and `status` all live in the backend
+      // now, so the browser sends only what the visitor typed.
+      expect(submission.body).toMatchObject({
         name: LEAD.name,
         phone: LEAD.phone,
         email: LEAD.email,
         source: "quick",
-        status: "new",
       });
     });
   });
 
   test("shows a recoverable error and a direct mail fallback when sending fails", async ({ page, mockApi }) => {
     await test_step("break the mail integration with a 500", async () => {
-      mockApi.failOn("/integration-endpoints/Core/SendEmail", 500, { error: "smtp down" });
+      mockApi.failOn("/functions/submitLead", 500, { error: "backend down" });
     });
 
     const form = new QuickContactForm(page);
@@ -188,7 +187,7 @@ test.describe("Quick contact form", () => {
 
     await test_step("the visitor is confirmed and exactly one lead is written", async () => {
       await expect(form.root.getByText("ההודעה נשלחה. תודה.")).toBeVisible();
-      expect(mockApi.requestsTo("/entities/Lead").filter((r) => r.method === "POST")).toHaveLength(1);
+      expect(mockApi.requestsTo("/functions/submitLead").filter((r) => r.method === "POST")).toHaveLength(1);
     });
   });
 });
@@ -207,7 +206,7 @@ test.describe("Detailed contact form", () => {
       await expect(form.submit).toBeDisabled(); // no service, no consent
     });
 
-    await form.chooseService("ליווי תביעות");
+    await form.chooseService("ביטוחי חיים ובריאות");
     await test_step("choosing a service still leaves consent missing", async () => {
       await expect(form.submit).toBeDisabled();
     });
@@ -222,13 +221,13 @@ test.describe("Detailed contact form", () => {
     const form = new DetailedContactForm(page);
     await form.open();
 
-    const service = form.root.getByRole("button", { name: "פנסיה ופיננסים" });
+    const service = form.root.getByRole("button", { name: "גמל, השתלמות ופנסיה" });
 
     await test_step("the service starts out unpressed", async () => {
       await expect(service).toHaveAttribute("aria-pressed", "false");
     });
 
-    await form.chooseService("פנסיה ופיננסים");
+    await form.chooseService("גמל, השתלמות ופנסיה");
 
     await test_step("choosing it announces the selection to a screen reader", async () => {
       await expect(service).toHaveAttribute("aria-pressed", "true");
@@ -239,7 +238,7 @@ test.describe("Detailed contact form", () => {
     const form = new DetailedContactForm(page);
     await form.open();
     await form.fillBasics({ name: LEAD.name, phone: LEAD.phone });
-    await form.chooseService("ליווי תביעות");
+    await form.chooseService("ביטוחי חיים ובריאות");
 
     await test_step("pick a preferred time to be called back", async () => {
       await form.root.locator("#dc-contact-time").selectOption("ערב");
@@ -257,12 +256,11 @@ test.describe("Detailed contact form", () => {
     });
 
     await test_step("the lead carries the topic and the timing", async () => {
-      const lead = await mockApi.waitForRequest("/entities/Lead");
+      const lead = await mockApi.waitForRequest("/functions/submitLead");
       expect(lead.body).toMatchObject({
         source: "detailed",
-        topic: "ליווי תביעות",
+        topic: "ביטוחי חיים ובריאות",
         timing: "ערב",
-        status: "new",
       });
     });
   });
@@ -277,7 +275,7 @@ test.describe("Consultation builder", () => {
       await expect(wizard.root.getByRole("button", { name: "המשך" })).toBeDisabled();
     });
 
-    await wizard.chooseTopic("פנסיה ופיננסים");
+    await wizard.chooseTopic("גמל, השתלמות ופנסיה");
     await wizard.chooseTiming("השבוע");
 
     await test_step("the last step is gated on contact details", async () => {
@@ -297,10 +295,10 @@ test.describe("Consultation builder", () => {
     });
 
     await test_step("the lead records the topic and timing chosen in the wizard", async () => {
-      const lead = await mockApi.waitForRequest("/entities/Lead");
+      const lead = await mockApi.waitForRequest("/functions/submitLead");
       expect(lead.body).toMatchObject({
         source: "consultation",
-        topic: "פנסיה ופיננסים",
+        topic: "גמל, השתלמות ופנסיה",
         timing: "השבוע",
       });
     });
@@ -317,7 +315,7 @@ test.describe("Consultation builder", () => {
   test("lets the visitor step back without losing their answers", async ({ page }) => {
     const wizard = new ConsultationWizard(page);
     await wizard.open();
-    await wizard.chooseTopic("ליווי תביעות");
+    await wizard.chooseTopic("ביטוחי חיים ובריאות");
 
     await test_step("go back to the topic step", async () => {
       await wizard.root.getByRole("button", { name: "חזור" }).click();
@@ -335,27 +333,27 @@ test.describe("Consultation builder", () => {
 
     const wizard = new ConsultationWizard(page);
     await wizard.open();
-    await wizard.chooseTopic("פנסיה ופיננסים");
+    await wizard.chooseTopic("גמל, השתלמות ופנסיה");
     await wizard.chooseTiming("השבוע");
     await wizard.fillContact({ name: LEAD.name, phone: LEAD.phone });
     await wizard.send();
 
     await test_step("the calendar hop is best-effort — the lead is what must survive", async () => {
       await expect(wizard.root.getByText(/תודה, ישראלה/)).toBeVisible();
-      expect(mockApi.requestsTo("/entities/Lead")).not.toHaveLength(0);
+      expect(mockApi.requestsTo("/functions/submitLead")).not.toHaveLength(0);
     });
   });
 
   test("refuses to submit the wizard without a phone number", async ({ page, mockApi }) => {
     const wizard = new ConsultationWizard(page);
     await wizard.open();
-    await wizard.chooseTopic("פנסיה ופיננסים");
+    await wizard.chooseTopic("גמל, השתלמות ופנסיה");
     await wizard.chooseTiming("השבוע");
     await wizard.fillContact({ name: LEAD.name });
 
     await test_step("the request cannot be sent and no lead reaches the backend", async () => {
       await expect(wizard.submit).toBeDisabled();
-      expect(mockApi.requestsTo("/entities/Lead")).toHaveLength(0);
+      expect(mockApi.requestsTo("/functions/submitLead")).toHaveLength(0);
     });
   });
 });
