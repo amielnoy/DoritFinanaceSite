@@ -13,6 +13,7 @@ import Testimonials from "@/components/dorit/Testimonials";
 import FAQ from "@/components/dorit/FAQ";
 import ConsultationBuilder from "@/components/dorit/ConsultationBuilder";
 import DetailedContactForm from "@/components/dorit/DetailedContactForm";
+import PensionFeeCalculator from "@/components/dorit/PensionFeeCalculator";
 import QuickContact from "@/components/dorit/QuickContact";
 import QuickShare from "@/components/dorit/QuickShare";
 import DetailedFAQ from "@/components/dorit/DetailedFAQ";
@@ -31,6 +32,7 @@ export default function Home() {
         <ReviewsWidget />
         <Perspective />
         <ServiceMatrix />
+        <PensionFeeCalculator />
         <QuickContact />
         <ProofCarousel />
         <Testimonials />
