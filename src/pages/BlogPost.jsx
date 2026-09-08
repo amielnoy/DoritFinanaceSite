@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { Loader2, ArrowRight, Calendar } from "lucide-react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
+import ShareButtons from "@/components/dorit/ShareButtons";
 
 export default function BlogPost() {
   const { id } = useParams();
@@ -104,6 +105,8 @@ export default function BlogPost() {
           <div className="mt-10 blog-body">
             <ReactMarkdown>{post.body || ""}</ReactMarkdown>
           </div>
+
+          <ShareButtons title={post.title} />
         </div>
       </div>
       <Footer />
