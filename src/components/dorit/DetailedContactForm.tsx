@@ -6,7 +6,7 @@ const NOTIFY_EMAIL = "amielnoy@gmail.com";
 const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
 
 const SERVICES: string[] = [
-  "גמל השתלמות ופנסיה",
+  "פיננסים מיסוי וקיבוע זכויות",
   "מיסוי וקבוע זכויות",
   "אחר / לא בטוח/ה",
 ];
