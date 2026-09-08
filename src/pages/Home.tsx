@@ -17,6 +17,7 @@ import PensionFeeCalculator from "@/components/dorit/PensionFeeCalculator";
 import QuickContact from "@/components/dorit/QuickContact";
 import QuickShare from "@/components/dorit/QuickShare";
 import DetailedFAQ from "@/components/dorit/DetailedFAQ";
+import NeedsInterviewChat from "@/components/dorit/NeedsInterviewChat";
 import Footer from "@/components/dorit/Footer";
 import MobileStickyBar from "@/components/dorit/MobileStickyBar";
 import CredentialsStrip from "@/components/dorit/CredentialsStrip";
@@ -34,6 +35,7 @@ export default function Home() {
         <ReviewsWidget />
         <Perspective />
         <ServiceMatrix />
+        <NeedsInterviewChat />
         <PensionFeeCalculator />
         <QuickContact />
         <ProofCarousel />
