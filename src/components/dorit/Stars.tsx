@@ -8,8 +8,9 @@ interface StarsProps {
 
 export default function Stars({ value = 0, size = 16 }: StarsProps) {
   const rounded = Math.round(Number(value) || 0);
+  // role="img": aria-label is prohibited on a bare div (axe: aria-prohibited-attr).
   return (
-    <div className="flex items-center gap-0.5" aria-label={`דירוג ${rounded} מתוך 5`}>
+    <div role="img" className="flex items-center gap-0.5" aria-label={`דירוג ${rounded} מתוך 5`}>
       {[1, 2, 3, 4, 5].map((n) => (
         <Star
           key={n}
