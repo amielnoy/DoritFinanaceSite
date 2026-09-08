@@ -7,6 +7,7 @@ import { Loader2, ArrowRight, Calendar } from "lucide-react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import ShareButtons from "@/components/dorit/ShareButtons";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 interface BlogPostData {
   id: string;
@@ -113,6 +114,10 @@ export default function BlogPost() {
 
           <div className="mt-10 blog-body">
             <ReactMarkdown>{post.body || ""}</ReactMarkdown>
+          </div>
+
+          <div className="mt-10">
+            <CredentialsStrip />
           </div>
 
           <ShareButtons title={post.title} />

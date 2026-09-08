@@ -6,6 +6,7 @@ import { Loader2, ArrowLeft, Newspaper } from "lucide-react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import Reveal from "@/components/dorit/Reveal";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 interface BlogListItem {
   id: string;
@@ -54,6 +55,8 @@ export default function Blog() {
               הפיננסיות שלכם.
             </p>
           </Reveal>
+
+          <CredentialsStrip />
 
           <div className="mt-14 border-t border-border/60">
             {loading ? (

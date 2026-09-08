@@ -1,6 +1,7 @@
 import React from "react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 export default function PrivacyPolicy() {
   return (
@@ -12,6 +13,8 @@ export default function PrivacyPolicy() {
           מדיניות פרטיות
         </h1>
         <p className="text-sm text-muted-foreground mt-3">עודכן: ספטמבר 2026</p>
+
+        <CredentialsStrip />
 
         <div className="mt-12 space-y-10 leading-relaxed text-foreground/80">
           <section>

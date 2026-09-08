@@ -16,6 +16,7 @@ import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import Reveal from "@/components/dorit/Reveal";
 import { CONTACT } from "@/config/contact";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 interface ClaimStep {
   n: string;
@@ -162,6 +163,10 @@ export default function Claims() {
             </div>
           </Reveal>
         </section>
+
+        <div className="max-w-[1400px] mx-auto px-6 md:px-10">
+          <CredentialsStrip />
+        </div>
 
         {/* Steps */}
         <section className="relative py-20 md:py-24 border-t border-border/60 bg-secondary/40">

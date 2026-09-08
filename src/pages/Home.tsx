@@ -19,6 +19,7 @@ import QuickShare from "@/components/dorit/QuickShare";
 import DetailedFAQ from "@/components/dorit/DetailedFAQ";
 import Footer from "@/components/dorit/Footer";
 import MobileStickyBar from "@/components/dorit/MobileStickyBar";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 export default function Home() {
   return (
@@ -27,6 +28,7 @@ export default function Home() {
       <FloatingHeader />
       <main>
         <Hero />
+        <CredentialsStrip />
         <CarrierLogos />
         <About />
         <ReviewsWidget />
