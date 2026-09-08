@@ -185,6 +185,7 @@ export default function BlogRecommenderChat() {
           <div className="px-4 py-4 border-t border-border/60">
             <div className="flex items-end gap-2">
               <textarea
+                aria-label="הודעה לסוכן המלצות התוכן"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
