@@ -8,7 +8,6 @@ const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
 const SERVICES: string[] = [
   "גמל השתלמות ופנסיה",
   "ביטוח חיים ובריאות",
-  "ליווי תביעות",
   "אחר / לא בטוח/ה",
 ];
 
