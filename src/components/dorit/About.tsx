@@ -51,12 +51,12 @@ export default function About() {
         <div className="lg:col-span-7 flex flex-col justify-center">
           <Reveal>
             <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-              01 · The Principal Architect
+              01 · Senior Financial Planner
             </span>
             <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
               אני לא סוכנת.
               <br />
-              אני האדריכלית שלכם.
+              אני המתכננת שלכם.
             </h2>
           </Reveal>
           <div className="mt-8 space-y-5 text-foreground/75 max-w-2xl leading-relaxed">

@@ -42,7 +42,7 @@ export default function Hero() {
           <div className="absolute bottom-6 right-6 glass px-4 py-3 border border-border/60">
             <p className="font-heading text-sm">דורית גוב ארי</p>
             <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">
-              Insurance Architect
+              Senior Financial Planner
             </p>
           </div>
         </div>
@@ -50,7 +50,7 @@ export default function Hero() {
         {/* Headline */}
         <div className="order-1 md:order-2 flex flex-col justify-center pr-0 md:pr-12 pb-10 md:pb-0">
           <span className="text-[11px] tracking-[0.35em] uppercase text-accent mb-6 animate-fade-up">
-            דורית גוב ארי · אדריכלות של ביטחון
+            דורית גוב ארי · מתכננת פיננסית בכירה
           </span>
           <ArchStatement />
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-foreground/70 animate-fade-up">

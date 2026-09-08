@@ -88,7 +88,7 @@ export default function ConsultationBuilder() {
       `לכל שאלה או עדכון, ניתן להשיב ישירות למייל זה.\n\n` +
       `בברכה חמה,\n` +
       `דורית גוב ארי\n` +
-      `ייעוץ ביטוחי ופיננסי\n` +
+      `מתכננת פיננסית בכירה\n` +
       `doritg@fsfp-fin.co.il`;
     try {
       await base44.integrations.Core.SendEmail({
@@ -291,7 +291,7 @@ export default function ConsultationBuilder() {
                     label="טלפון"
                     value={data.phone}
                     onChange={(v) => setData((d) => ({ ...d, phone: v }))}
-                    placeholder="050-8311776"
+                    placeholder="052-7077776"
                   />
                 </div>
                 <Field
