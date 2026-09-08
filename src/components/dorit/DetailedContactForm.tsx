@@ -7,7 +7,7 @@ const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
 
 const SERVICES: string[] = [
   "פיננסים מיסוי וקיבוע זכויות",
-  "מיסוי וקבוע זכויות",
+  "גמל, השתלמות ופנסיה",
   "אחר / לא בטוח/ה",
 ];
 
