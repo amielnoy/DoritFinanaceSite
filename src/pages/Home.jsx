@@ -31,12 +31,12 @@ export default function Home() {
         <ReviewsWidget />
         <Perspective />
         <ServiceMatrix />
+        <QuickContact />
         <ProofCarousel />
         <Testimonials />
         <FAQ />
         <ConsultationBuilder />
         <DetailedContactForm />
-        <QuickContact />
         <QuickShare />
         <DetailedFAQ />
       </main>
