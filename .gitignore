@@ -44,3 +44,5 @@ base44/.app.jsonc
 # Allure: raw results from a run, and the report generated from them.
 /allure-results
 /allure-report
+.vercel
+.env*
