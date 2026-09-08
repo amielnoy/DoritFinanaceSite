@@ -1,0 +1,20 @@
+{
+  "name": "דורית גוב ארי — אדריכלות של ביטחון",
+  "short_name": "דורית גוב ארי",
+  "description": "ייעוץ ביטוחי ופיננסי אישי, ליווי תביעות ותכנון עתיד.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F9F7F2",
+  "theme_color": "#F9F7F2",
+  "icons": [
+    {
+      "src": "https://base44.com/logo_v2.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
