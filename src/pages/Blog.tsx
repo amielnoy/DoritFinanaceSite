@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { useArticles } from "@/hooks/useContent";
 import { Image } from "@/components/ui/image";
 import { Loader2, ArrowLeft, Newspaper, Search, X } from "lucide-react";
-import FloatingHeader from "@/components/dorit/FloatingHeader";
-import Footer from "@/components/dorit/Footer";
-import Reveal from "@/components/dorit/Reveal";
-import CredentialsStrip from "@/components/dorit/CredentialsStrip";
+import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
+import Footer from "@/components/dorit/layout/Footer";
+import Reveal from "@/components/dorit/primitives/Reveal";
+import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
 
 interface BlogListItem {
@@ -19,8 +19,8 @@ interface BlogListItem {
 }
 
 export default function Blog() {
-  const [posts, setPosts] = useState<BlogListItem[] | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { data, isPending: loading } = useArticles();
+  const posts = (data ?? null) as BlogListItem[] | null;
   const [query, setQuery] = useState<string>("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
 
@@ -55,22 +55,6 @@ export default function Blog() {
     ],
   });
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await base44.entities.BlogPost.filter(
-          { published: true },
-          "-created_date",
-          50
-        );
-        setPosts(data as unknown as BlogListItem[]);
-      } catch {
-        setPosts([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   const allTags = React.useMemo(() => {
     if (!posts) return [];
@@ -184,20 +168,20 @@ export default function Blog() {
               </div>
             ) : !posts || posts.length === 0 ? (
               <div className="text-center py-20 border border-dashed border-border">
-                <Newspaper size={28} className="mx-auto text-[#C4A484] mb-4" strokeWidth={1.25} />
+                <Newspaper size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
                 <p className="text-foreground/60">
                   עדיין אין מאמרים — בקרוב יעלו כאן עדכונים חדשים.
                 </p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-20 border border-dashed border-border">
-                <Search size={28} className="mx-auto text-[#C4A484] mb-4" strokeWidth={1.25} />
+                <Search size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
                 <p className="text-foreground/60">
                   לא נמצאו מאמרים התואמים את החיפוש. ניתן לנסות מילים אחרות או נושא אחר.
                 </p>
                 <button
                   onClick={() => { setQuery(""); setActiveTag(null); }}
-                  className="mt-4 text-sm text-accent underline underline-offset-4 hover:text-[#C4A484] transition-colors"
+                  className="mt-4 text-sm text-accent underline underline-offset-4 hover:text-highlight transition-colors"
                 >
                   ניקוי החיפוש
                 </button>
