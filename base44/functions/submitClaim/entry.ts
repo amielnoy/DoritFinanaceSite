@@ -35,21 +35,61 @@ export default async function(req) {
 
     const subject = `דיווח אירוע ביטוחי — ${name} (${claimType || 'כללי'})`;
 
-    // הודעה לסוכנת — חובה
-    await base44.asServiceRole.integrations.Core.SendEmail({
-      to: NOTIFY_EMAIL,
-      subject,
-      body: agentBody,
-    });
+    // הפנייה נשמרת ראשונה — ראו את ההסבר ב-submitLead.
+    // The record is written first; see submitLead for the reasoning.
+    const messageBody = [
+      `סוג: ${claimType || ''}`,
+      `תאריך אירוע: ${eventDate || ''}`,
+      `פוליסה: ${policyNumber || ''}`,
+      ``,
+      description || '',
+      ``,
+      docList.length ? `מסמכים: ${docList.join(' | ')}` : '',
+    ].filter(Boolean).join('\n');
 
-    // עותק לדורית — מיטבי
+    let leadId = null;
+    try {
+      const lead = await base44.entities.Lead.create({
+        name,
+        phone,
+        email: email || '',
+        source: 'claim',
+        topic: claimType || '',
+        timing: eventDate || '',
+        message: messageBody,
+        status: 'new',
+      });
+      leadId = lead?.id ?? null;
+    } catch (e) {
+      return Response.json(
+        { error: 'לא הצלחנו לשמור את הדיווח. נסו שוב או צרו קשר ישירות.', details: e?.message },
+        { status: 500 }
+      );
+    }
+
+    const warnings = [];
+
+    // הודעה לסוכנת
+    try {
+      await base44.asServiceRole.integrations.Core.SendEmail({
+        to: NOTIFY_EMAIL,
+        subject,
+        body: agentBody,
+      });
+    } catch (e) {
+      warnings.push('notify_email_failed');
+    }
+
+    // עותק לדורית
     try {
       await base44.asServiceRole.integrations.Core.SendEmail({
         to: SECONDARY_EMAIL,
         subject,
         body: agentBody,
       });
-    } catch (e) { /* מיטבי */ }
+    } catch (e) {
+      warnings.push('secondary_email_failed');
+    }
 
     // אישור ללקוח — מיטבי
     if (email) {
@@ -118,33 +158,12 @@ export default async function(req) {
           html: clientHtml,
           text: clientText,
         });
-      } catch (e) { /* מיטבי */ }
+      } catch (e) {
+        warnings.push('client_confirmation_failed');
+      }
     }
 
-    // תיעוד הפנייה במאגר
-    try {
-      const messageBody = [
-        `סוג: ${claimType || ''}`,
-        `תאריך אירוע: ${eventDate || ''}`,
-        `פוליסה: ${policyNumber || ''}`,
-        ``,
-        description || '',
-        ``,
-        docList.length ? `מסמכים: ${docList.join(' | ')}` : '',
-      ].filter(Boolean).join('\n');
-      await base44.entities.Lead.create({
-        name,
-        phone,
-        email: email || '',
-        source: 'claim',
-        topic: claimType || '',
-        timing: eventDate || '',
-        message: messageBody,
-        status: 'new',
-      });
-    } catch (e) { /* מיטבי */ }
-
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, leadId, warnings });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
