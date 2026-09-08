@@ -1,0 +1,974 @@
+<title>Dorit Finance Site Architecture</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+
+<style>
+  /* ── Tokens: drafting ink on cool paper. Light is the base set. ───────── */
+  :root {
+    --ground:      #EEF1F4;
+    --surface:     #FFFFFF;
+    --surface-2:   #F6F8FA;
+    --ink:         #16202B;
+    --ink-2:       #55636F;
+    --ink-3:       #8695A2;
+    --rule:        #D2DAE1;
+    --rule-strong: #B4C0CB;
+    --accent:      #1F5FA9;
+    --accent-soft: #E3ECF7;
+    --ok:          #1B6E4E;
+    --warn:        #96590A;
+    --crit:        #A72019;
+    --ok-soft:     #E0F0E8;
+    --warn-soft:   #F7EBD8;
+    --crit-soft:   #F8E4E2;
+    --shadow:      0 1px 2px rgba(22, 32, 43, .06), 0 8px 24px -12px rgba(22, 32, 43, .18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0E141A;
+      --surface:     #151D25;
+      --surface-2:   #1B242D;
+      --ink:         #E3EAF1;
+      --ink-2:       #9AA9B7;
+      --ink-3:       #6D7D8B;
+      --rule:        #27323C;
+      --rule-strong: #3A4855;
+      --accent:      #74AEEC;
+      --accent-soft: #17293C;
+      --ok:          #64C79B;
+      --warn:        #DFA85C;
+      --crit:        #F08A82;
+      --ok-soft:     #12291F;
+      --warn-soft:   #2E2314;
+      --crit-soft:   #331917;
+      --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0E141A;
+    --surface:     #151D25;
+    --surface-2:   #1B242D;
+    --ink:         #E3EAF1;
+    --ink-2:       #9AA9B7;
+    --ink-3:       #6D7D8B;
+    --rule:        #27323C;
+    --rule-strong: #3A4855;
+    --accent:      #74AEEC;
+    --accent-soft: #17293C;
+    --ok:          #64C79B;
+    --warn:        #DFA85C;
+    --crit:        #F08A82;
+    --ok-soft:     #12291F;
+    --warn-soft:   #2E2314;
+    --crit-soft:   #331917;
+    --shadow:      0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, .sans { font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  code, kbd, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ── Page frame ───────────────────────────────────────────────────────── */
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px 120px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  @media (min-width: 1060px) {
+    .page { grid-template-columns: 210px minmax(0, 1fr); column-gap: 56px; }
+    .masthead, .colophon { grid-column: 1 / -1; }
+  }
+
+  /* ── Masthead ─────────────────────────────────────────────────────────── */
+  .masthead {
+    padding: 72px 0 40px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 44px;
+  }
+  .stamp {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 5px 10px;
+    margin-bottom: 26px;
+  }
+  .stamp::before { content: ""; width: 6px; height: 6px; background: var(--accent); }
+  h1 {
+    font-size: clamp(2.4rem, 5.2vw, 3.9rem);
+    line-height: 1.02;
+    letter-spacing: -.025em;
+    font-weight: 600;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.19rem;
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin: 0 0 30px;
+  }
+  .facts {
+    display: flex; flex-wrap: wrap; gap: 0;
+    border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Sans", sans-serif;
+  }
+  .fact { padding: 14px 26px 14px 0; margin-right: 26px; border-right: 1px solid var(--rule); }
+  .fact:last-child { border-right: 0; }
+  .fact dt { font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 3px; }
+  .fact dd { margin: 0; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  /* ── Contents rail ────────────────────────────────────────────────────── */
+  .rail { display: none; }
+  @media (min-width: 1060px) {
+    .rail {
+      display: block;
+      position: sticky; top: 32px; align-self: start;
+      font-family: "IBM Plex Sans", sans-serif;
+      max-height: calc(100vh - 64px); overflow-y: auto;
+    }
+    /* Reset the section-heading rule/padding inherited from the global h2. */
+    .rail h2 { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 12px; padding-top: 0; border-top: 0; font-weight: 600; display: block; }
+    .rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; counter-reset: rail; }
+    .rail a {
+      display: flex; gap: 9px; padding: 5px 0;
+      color: var(--ink-2); text-decoration: none; font-size: 13.5px; line-height: 1.35;
+      border-bottom: 1px solid transparent;
+    }
+    .rail a::before {
+      counter-increment: rail; content: counter(rail, decimal-leading-zero);
+      font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-3); padding-top: 1px;
+    }
+    .rail a:hover { color: var(--accent); }
+    .rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  }
+
+  /* ── Sections ─────────────────────────────────────────────────────────── */
+  main { min-width: 0; }
+  section { margin-bottom: 68px; scroll-margin-top: 24px; }
+  h2 {
+    font-size: 1.62rem; font-weight: 600; letter-spacing: -.015em;
+    margin: 0 0 6px; padding-top: 20px; border-top: 1px solid var(--ink);
+    display: flex; align-items: baseline; gap: 14px;
+  }
+  h2 .num {
+    font-family: "IBM Plex Mono", monospace; font-size: .72rem; font-weight: 500;
+    color: var(--accent); letter-spacing: .08em; padding-top: 2px;
+  }
+  h3 {
+    font-size: 1.03rem; font-weight: 600; margin: 34px 0 8px;
+    letter-spacing: .01em;
+  }
+  .lede { color: var(--ink-2); margin: 0 0 26px; max-width: 66ch; }
+  p { max-width: 68ch; margin: 0 0 16px; }
+  ul, ol { max-width: 66ch; padding-left: 20px; }
+  li { margin-bottom: 7px; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  strong { font-weight: 600; }
+  code {
+    font-size: .855em; background: var(--surface-2);
+    border: 1px solid var(--rule); padding: 1px 5px;
+    color: var(--ink);
+  }
+
+  /* ── Plates: tables, diagrams ─────────────────────────────────────────── */
+  .plate {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    margin: 26px 0 30px;
+  }
+  .plate-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+    padding: 12px 18px; border-bottom: 1px solid var(--rule);
+    background: var(--surface-2);
+    font-family: "IBM Plex Sans", sans-serif;
+  }
+  .plate-head .label { font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .plate-head .note { font-size: 12.5px; color: var(--ink-2); }
+  .plate-body { padding: 22px 18px; overflow-x: auto; }
+  .plate-body svg { display: block; max-width: 100%; height: auto; min-width: 560px; }
+
+  .scroll { overflow-x: auto; margin: 24px 0 30px; border: 1px solid var(--rule); background: var(--surface); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-family: "IBM Plex Sans", sans-serif; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600; background: var(--surface-2);
+    border-bottom: 1px solid var(--rule-strong); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code { background: none; border: 0; padding: 0; color: var(--ink-2); }
+  .num-col { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ── Findings register ────────────────────────────────────────────────── */
+  .finding {
+    display: grid; grid-template-columns: 4px 1fr; gap: 0;
+    background: var(--surface); border: 1px solid var(--rule);
+    box-shadow: var(--shadow); margin-bottom: 18px;
+  }
+  .finding .stripe { background: var(--rule-strong); }
+  .finding[data-sev="high"] .stripe { background: var(--crit); }
+  .finding[data-sev="medium"] .stripe { background: var(--warn); }
+  .finding[data-sev="low"] .stripe { background: var(--ink-3); }
+  .finding[data-sev="good"] .stripe { background: var(--ok); }
+  .finding-body { padding: 16px 20px 18px; }
+  .finding-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .finding-head h3 { margin: 0; font-size: 1rem; }
+  .sev {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; padding: 2px 7px; border: 1px solid currentColor;
+  }
+  .sev-high   { color: var(--crit);  background: var(--crit-soft); }
+  .sev-medium { color: var(--warn);  background: var(--warn-soft); }
+  .sev-low    { color: var(--ink-2); background: var(--surface-2); }
+  .sev-good   { color: var(--ok);    background: var(--ok-soft); }
+  .ref { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-3); }
+  .finding p { margin: 0 0 10px; font-size: .95rem; }
+  .finding p:last-child { margin-bottom: 0; }
+  .fix {
+    font-family: "IBM Plex Sans", sans-serif; font-size: .875rem;
+    border-top: 1px solid var(--rule); padding-top: 10px; margin-top: 12px; color: var(--ink-2);
+  }
+  .fix b { color: var(--ink); font-weight: 600; }
+
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 14px 18px; margin: 24px 0; font-size: .95rem;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .label {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 10.5px; letter-spacing: .13em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600; display: block; margin-bottom: 5px;
+  }
+
+  .colophon {
+    border-top: 1px solid var(--rule); margin-top: 40px; padding-top: 20px;
+    font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: 8px 28px;
+  }
+
+  /* SVG diagram styling hooks */
+  .d-box  { fill: var(--surface-2); stroke: var(--rule-strong); stroke-width: 1; }
+  .d-box-a{ fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1; }
+  .d-box-w{ fill: var(--crit-soft); stroke: var(--crit); stroke-width: 1; }
+  .d-t    { font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; fill: var(--ink); }
+  .d-t-b  { font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; font-weight: 600; fill: var(--ink); }
+  .d-s    { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; fill: var(--ink-3); }
+  .d-line { stroke: var(--rule-strong); stroke-width: 1.25; fill: none; }
+  .d-line-a { stroke: var(--accent); stroke-width: 1.5; fill: none; }
+  .d-line-w { stroke: var(--crit); stroke-width: 1.5; fill: none; }
+  .d-dash { stroke-dasharray: 4 3; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a { transition: color .15s ease; }
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <span class="stamp">Architecture Record · Rev 1.0</span>
+    <h1>Dorit Gov-Ari Finance Site</h1>
+    <p class="standfirst">
+      How the site is built, how a request travels through it, and where the
+      structure works against the one job it exists to do — turning a visitor
+      into a phone call. Written alongside the automated test suite, so every
+      claim here has a test behind it.
+    </p>
+    <dl class="facts">
+      <div class="fact"><dt>Type</dt><dd>Base44 app · React SPA</dd></div>
+      <div class="fact"><dt>Surface</dt><dd>13 routes · 2 admin</dd></div>
+      <div class="fact"><dt>Entities</dt><dd>4</dd></div>
+      <div class="fact"><dt>Bundle</dt><dd>790 KB · 242 KB gz</dd></div>
+      <div class="fact"><dt>Locale</dt><dd>he-IL · RTL</dd></div>
+      <div class="fact"><dt>Tests</dt><dd>140 unit · 399 e2e</dd></div>
+    </dl>
+  </header>
+
+  <nav class="rail" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#overview">What the system is</a></li>
+      <li><a href="#topology">Runtime topology</a></li>
+      <li><a href="#frontend">Frontend</a></li>
+      <li><a href="#backend">Backend</a></li>
+      <li><a href="#boot">The boot path</a></li>
+      <li><a href="#delivery">Build &amp; delivery</a></li>
+      <li><a href="#testing">Test architecture</a></li>
+      <li><a href="#review">Review findings</a></li>
+      <li><a href="#sequence">What to do first</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- 1 ────────────────────────────────────────────────────────────────── -->
+    <section id="overview">
+      <h2><span class="num">01</span> What the system is</h2>
+      <p class="lede">
+        A single-page marketing and lead-generation site for an independent
+        Israeli insurance and financial adviser, in Hebrew with right-to-left
+        layout, running on the Base44 platform.
+      </p>
+      <p>
+        Everything the business needs from it comes down to three transactions:
+        a visitor reads the adviser's story and services, a visitor models what
+        their pension management fees actually cost them, and a visitor hands
+        over a name and a phone number. A small admin area behind
+        authentication lets the adviser read those leads and publish blog posts.
+      </p>
+      <p>
+        There is no native mobile application. Mobile is the same SPA at a phone
+        viewport, which is why the test suite's <code>ios-safari</code> and
+        <code>android-chrome</code> platforms drive mobile <em>web</em> through
+        WebKit and Chromium device profiles rather than a device farm.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <caption class="sans" style="text-align:left;padding:10px 14px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);">Stack</caption>
+          <thead>
+            <tr><th>Layer</th><th>Choice</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>UI</td><td>React 18.2</td><td>Function components, hooks, no SSR</td></tr>
+            <tr><td>Build</td><td>Vite 8 + <code>@base44/vite-plugin</code></td><td>Plugin supplies the <code>/api</code> dev proxy, HMR notifier, analytics beacon</td></tr>
+            <tr><td>Language</td><td>TypeScript (partial)</td><td><code>strict: true</code>, <code>checkJs: false</code>; <code>src/components/ui</code> and <code>src/api</code> excluded</td></tr>
+            <tr><td>Routing</td><td>react-router-dom 6</td><td><code>BrowserRouter</code>, all routes declared in one file</td></tr>
+            <tr><td>Styling</td><td>Tailwind 3 + shadcn/ui</td><td>HSL design tokens in <code>src/index.css</code>; 49 unmodified primitives</td></tr>
+            <tr><td>Data access</td><td><code>@base44/sdk</code></td><td>Same-origin <code>/api</code>; axios under the hood</td></tr>
+            <tr><td>Backend</td><td>Base44 entities, Core integrations, one Deno function</td><td>Declared as JSON in <code>base44/</code></td></tr>
+            <tr><td>Delivery</td><td>git → Base44 sync → dashboard publish</td><td>Not <code>base44 deploy</code>; see §6</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2 ────────────────────────────────────────────────────────────────── -->
+    <section id="topology">
+      <h2><span class="num">02</span> Runtime topology</h2>
+      <p class="lede">
+        Everything is same-origin. The SPA never talks to a third party for
+        data — the Base44 edge fronts the entity store, the Core integrations
+        and the function runtime under one <code>/api</code> prefix, which is
+        also why the whole backend can be stubbed at a single route pattern in
+        the tests.
+      </p>
+
+      <div class="plate">
+        <div class="plate-head">
+          <span class="label">Figure 1 — Request paths</span>
+          <span class="note">Solid: same-origin. Dashed: server-to-server, token from the connector.</span>
+        </div>
+        <div class="plate-body">
+          <svg viewBox="0 0 940 372" role="img" aria-label="Diagram: the browser loads static assets and calls the same-origin /api prefix, which fans out to the entity store with row-level security, the Core integrations, the Deno function runtime and auth. The function runtime calls the Google Calendar API server-to-server.">
+            <!-- Browser -->
+            <rect class="d-box-a" x="8" y="24" width="232" height="200" rx="2"/>
+            <text class="d-t-b" x="24" y="48">Browser</text>
+            <text class="d-s" x="24" y="66">Chrome · Safari · iOS · Android</text>
+            <rect class="d-box" x="24" y="80" width="200" height="46" rx="2"/>
+            <text class="d-t" x="36" y="99">SPA bundle</text>
+            <text class="d-s" x="36" y="115">index-*.js · 790 KB</text>
+            <rect class="d-box" x="24" y="136" width="200" height="46" rx="2"/>
+            <text class="d-t" x="36" y="155">Static files</text>
+            <text class="d-s" x="36" y="171">robots · sitemap · manifest</text>
+            <text class="d-s" x="24" y="208">React 18 · Router 6 · Tailwind</text>
+
+            <!-- Edge -->
+            <rect class="d-box-a" x="272" y="86" width="158" height="72" rx="2"/>
+            <text class="d-t-b" x="288" y="112">Base44 edge</text>
+            <text class="d-s" x="288" y="130">same-origin</text>
+            <text class="d-s" x="288" y="146">/api/apps/:appId/…</text>
+
+            <!-- Backend services -->
+            <rect class="d-box" x="470" y="16" width="214" height="72" rx="2"/>
+            <text class="d-t-b" x="486" y="40">Entity store</text>
+            <text class="d-s" x="486" y="58">BlogPost · Lead · Testimonial</text>
+            <text class="d-s" x="486" y="74">row-level security per op</text>
+
+            <rect class="d-box" x="470" y="104" width="214" height="56" rx="2"/>
+            <text class="d-t-b" x="486" y="127">Core integrations</text>
+            <text class="d-s" x="486" y="145">SendEmail · UploadFile</text>
+
+            <rect class="d-box" x="470" y="176" width="214" height="72" rx="2"/>
+            <text class="d-t-b" x="486" y="200">Function runtime</text>
+            <text class="d-s" x="486" y="218">createConsultationEvent</text>
+            <text class="d-s" x="486" y="234">Deno · asServiceRole connector</text>
+
+            <rect class="d-box" x="470" y="264" width="214" height="56" rx="2"/>
+            <text class="d-t-b" x="486" y="287">Auth</text>
+            <text class="d-s" x="486" y="305">email+OTP · Google OAuth</text>
+
+            <!-- External -->
+            <rect class="d-box" x="724" y="184" width="176" height="56" rx="2"/>
+            <text class="d-t-b" x="740" y="208">Google Calendar</text>
+            <text class="d-s" x="740" y="226">events.insert</text>
+
+            <!-- Connectors -->
+            <path class="d-line-a" d="M240 122 H272"/>
+            <path class="d-line-a" d="M430 122 H452 V52 H470"/>
+            <path class="d-line-a" d="M430 122 H470"/>
+            <path class="d-line-a" d="M430 122 H452 V212 H470"/>
+            <path class="d-line-a" d="M430 122 H452 V292 H470"/>
+            <circle cx="452" cy="122" r="2.6" fill="var(--accent)"/>
+            <path class="d-line d-dash" d="M684 212 H724"/>
+
+            <!-- Static asset path -->
+            <path class="d-line" d="M124 224 V256 H272 V158"/>
+            <text class="d-s" x="136" y="272">static assets over the same origin</text>
+          </svg>
+        </div>
+      </div>
+
+      <p>
+        The consequence worth naming: because <code>serverUrl</code> is empty in
+        <code>src/api/base44Client.js</code>, every call is relative. That is
+        good for cookies and CORS, and it is what lets the end-to-end suite
+        intercept <code>**/api/**</code> once and run the entire site offline
+        with no credentials and no risk to production data.
+      </p>
+    </section>
+
+    <!-- 3 ────────────────────────────────────────────────────────────────── -->
+    <section id="frontend">
+      <h2><span class="num">03</span> Frontend</h2>
+
+      <h3>Routing</h3>
+      <p>
+        All thirteen routes are declared in <code>src/App.jsx</code>. Eleven are
+        public; <code>/admin/leads</code> and <code>/admin/blog</code> sit
+        inside a <code>&lt;ProtectedRoute&gt;</code> that redirects to
+        <code>/login</code>. Every page module is imported eagerly at the top of
+        the file, so the router does no code splitting — see finding
+        <span class="ref">R-05</span>.
+      </p>
+
+      <h3>Composition</h3>
+      <p>
+        The home page is a single scroll of sixteen sections, each an
+        independent component in <code>src/components/dorit/</code> with its own
+        anchor id. Section ids are the site's real navigation contract: the
+        header nav, the section rail, the mobile sticky bar and the calculator's
+        call-to-action all target them, and the test suite asserts all twelve
+        top-level ids exist.
+      </p>
+
+      <h3>State and data</h3>
+      <p>
+        There are two idioms in the codebase and only one of them is used.
+        <code>@tanstack/react-query</code> is installed, configured in
+        <code>src/lib/query-client.js</code> and mounted in
+        <code>App.jsx</code> — but the only <code>useQuery</code> call in the
+        whole application is in <code>PageNotFound.jsx</code>. Every other fetch
+        is a hand-rolled <code>useEffect</code> with local
+        <code>loading</code> / <code>error</code> state. Authentication state is
+        a plain React context.
+      </p>
+
+      <div class="callout">
+        <span class="label">Why it matters</span>
+        <p>
+          Two idioms means two sets of caching, retry and error semantics for
+          the same backend, and the one that is actually used is the one with
+          none. Reviewers have to read each component to know how it fails.
+        </p>
+      </div>
+
+      <h3>Styling</h3>
+      <p>
+        Tailwind utilities over HSL custom properties declared in
+        <code>src/index.css</code> — <code>--background</code>,
+        <code>--foreground</code>, <code>--accent</code> and friends. Two brand
+        colours are also hard-coded as hex literals throughout the
+        <code>dorit/</code> components (<code>#C4A484</code> and
+        <code>#7D6B5D</code>) rather than going through the token layer, which
+        is what makes the contrast finding in
+        <span class="ref">R-09</span> a multi-file change instead of a
+        one-token change.
+      </p>
+    </section>
+
+    <!-- 4 ────────────────────────────────────────────────────────────────── -->
+    <section id="backend">
+      <h2><span class="num">04</span> Backend</h2>
+      <p class="lede">
+        Declarative, and unusually well-scoped. The backend is four JSON entity
+        definitions, two Core integrations and one Deno function — all in
+        <code>base44/</code>, all in version control.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Entity</th><th>Purpose</th><th>Create</th><th>Read</th><th>Update / Delete</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>Lead</code></td><td>Enquiries from the three forms</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
+            <tr><td><code>BlogPost</code></td><td>Articles</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
+            <tr><td><code>Testimonial</code></td><td>Reviews on the home page</td><td>default</td><td>default</td><td>default</td></tr>
+            <tr><td><code>User</code></td><td>Role carrier (<code>admin</code> / <code>user</code>)</td><td colspan="3">platform-managed</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        The <code>Lead</code> rules are exactly right for the job: anyone may
+        submit, only an admin may read. That single line is what stands between
+        a public contact form and a public list of clients' names and phone
+        numbers, which is why the contract suite asserts it explicitly rather
+        than trusting it.
+      </p>
+
+      <h3>The one function</h3>
+      <p>
+        <code>createConsultationEvent</code> takes a booking, pulls a Google
+        access token from the <code>googlecalendar</code> connector under
+        <code>asServiceRole</code>, and writes a follow-up event for 09:00
+        Jerusalem time the next day. It validates <code>name</code> and
+        <code>phone</code>, returns 400 without them, 502 when Google refuses,
+        500 on anything else, and never puts the access token in a response.
+        Its request shape and every one of those status codes are pinned by
+        contract tests.
+      </p>
+    </section>
+
+    <!-- 5 ────────────────────────────────────────────────────────────────── -->
+    <section id="boot">
+      <h2><span class="num">05</span> The boot path</h2>
+      <p class="lede">
+        This is the architectural decision with the largest business
+        consequence, so it gets its own figure.
+      </p>
+      <p>
+        <code>AuthProvider</code> calls <code>base44.app.getPublicSettings()</code>
+        on mount, and <code>AuthenticatedApp</code> renders a spinner —
+        nothing else — until that promise resolves. Every route sits behind it,
+        including the entirely public marketing pages. If the call returns a 403
+        with <code>auth_required</code>, the visitor is redirected to a login
+        screen.
+      </p>
+
+      <div class="plate">
+        <div class="plate-head">
+          <span class="label">Figure 2 — Critical path to first meaningful paint</span>
+          <span class="note">The marketing content cannot paint until an API round trip that has nothing to do with it resolves.</span>
+        </div>
+        <div class="plate-body">
+          <svg viewBox="0 0 880 236" role="img" aria-label="Diagram: HTML arrives, then the 790 KB bundle downloads and parses, then React mounts, then the app blocks on a public-settings API call before any content paints. The blocked segment is highlighted.">
+            <text class="d-s" x="8" y="18">t →</text>
+
+            <rect class="d-box" x="8" y="30" width="118" height="40" rx="2"/>
+            <text class="d-t" x="20" y="48">HTML</text>
+            <text class="d-s" x="20" y="63">12 KB · metadata</text>
+
+            <rect class="d-box" x="134" y="30" width="196" height="40" rx="2"/>
+            <text class="d-t" x="146" y="48">Bundle download + parse</text>
+            <text class="d-s" x="146" y="63">242 KB gz · single chunk</text>
+
+            <rect class="d-box" x="338" y="30" width="120" height="40" rx="2"/>
+            <text class="d-t" x="350" y="48">React mounts</text>
+            <text class="d-s" x="350" y="63">AuthProvider</text>
+
+            <rect class="d-box-w" x="466" y="30" width="238" height="40" rx="2"/>
+            <text class="d-t" x="478" y="48">getPublicSettings() round trip</text>
+            <text class="d-s" x="478" y="63">spinner only · every route blocked</text>
+
+            <rect class="d-box-a" x="712" y="30" width="156" height="40" rx="2"/>
+            <text class="d-t" x="724" y="48">First content paint</text>
+            <text class="d-s" x="724" y="63">hero · headline · CTA</text>
+
+            <path class="d-line" d="M126 50 H134 M330 50 H338 M458 50 H466 M704 50 H712"/>
+
+            <!-- Blocked bracket -->
+            <path class="d-line-w" d="M466 84 V96 H704 V84"/>
+            <path class="d-line-w" d="M585 96 V108"/>
+            <text class="d-t" x="466" y="126" style="fill: var(--crit); font-weight: 600">Blocking segment</text>
+            <text class="d-s" x="466" y="144">A public marketing page waits on an authentication concern.</text>
+            <text class="d-s" x="466" y="159">On failure the visitor is sent to /login instead of the site.</text>
+
+            <!-- Crawler lane -->
+            <rect class="d-box" x="8" y="176" width="450" height="48" rx="2"/>
+            <text class="d-t-b" x="20" y="197">Crawler without JS</text>
+            <text class="d-s" x="20" y="214">receives an empty &lt;div id="root"&gt; — head metadata and JSON-LD only</text>
+            <path class="d-line d-dash" d="M67 70 V176"/>
+          </svg>
+        </div>
+      </div>
+
+      <p>
+        For an authenticated product this design is correct. For a lead
+        generation site it inverts the priority: the content that earns the
+        phone call is gated on a service that only the admin area needs. The
+        project's own README documents the sharp edge — before the app has been
+        published once, that call fails and <em>every</em> page redirects to
+        login.
+      </p>
+    </section>
+
+    <!-- 6 ────────────────────────────────────────────────────────────────── -->
+    <section id="delivery">
+      <h2><span class="num">06</span> Build &amp; delivery</h2>
+      <p>
+        <code>vite build</code> emits one JavaScript chunk and one stylesheet
+        into <code>dist/</code>. Delivery is git-based: pushing to
+        <code>main</code> syncs the repository to Base44, and the app is
+        published from the Base44 dashboard. A CLI <code>base44 deploy</code>
+        ships the local tree directly and bypasses that sync, so the deployed
+        state silently diverges from the repository — which is why the CI
+        workflow treats publishing as an opt-in step gated on credentials
+        rather than something that happens on every green build.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Stage</th><th>Trigger</th><th>Gate</th></tr></thead>
+          <tbody>
+            <tr><td>Install · lint · typecheck · build</td><td>PR and push</td><td>lint blocks; typecheck reports only (<span class="ref">R-08</span>)</td></tr>
+            <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
+            <tr><td>e2e × 4 platforms (matrix)</td><td>PR and push</td><td>blocking</td></tr>
+            <tr><td>Publish to Base44</td><td>push to <code>main</code>, or manual</td><td>runs only when <code>BASE44_TOKEN</code> and <code>BASE44_APP_ID</code> are set</td></tr>
+            <tr><td>Production smoke</td><td>after a successful publish</td><td>runs when <code>PRODUCTION_URL</code> is set</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 7 ────────────────────────────────────────────────────────────────── -->
+    <section id="testing">
+      <h2><span class="num">07</span> Test architecture</h2>
+      <p class="lede">
+        Four layers, two runners, four browser platforms. The full battery runs
+        from one command and inside one pinned container.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Layer</th><th>Runner</th><th class="num-col">Cases</th><th>What it protects</th></tr></thead>
+          <tbody>
+            <tr><td>Unit</td><td>Vitest</td><td class="num-col">43</td><td>Fee maths, the open-redirect guard, contact config</td></tr>
+            <tr><td>Component</td><td>Vitest + RTL</td><td class="num-col">21</td><td>Render, accessible names, client call payloads</td></tr>
+            <tr><td>Contract</td><td>Vitest</td><td class="num-col">52</td><td>Frontend payloads vs. entity schemas, function shape, RLS</td></tr>
+            <tr><td>Security (static)</td><td>Vitest</td><td class="num-col">24</td><td>Secrets, sinks, tab-nabbing, token handling</td></tr>
+            <tr><td>UI · API · security · a11y</td><td>Playwright</td><td class="num-col">399</td><td>Journeys, HTTP surface, XSS, WCAG 2.1 AA</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        The end-to-end layer runs against the <em>production build</em> served
+        by <code>vite preview</code>, so a green run also proves the bundle
+        boots. The whole Base44 surface plus analytics, fonts and media hosts
+        are intercepted in one fixture, which makes the suite hermetic: no
+        credentials, no network, no possibility of writing to production. An
+        opt-in block re-checks the same contract against a real backend when one
+        is available.
+      </p>
+
+      <div class="callout">
+        <span class="label">Test-first payoff</span>
+        <p>
+          Five defects were found by writing these tests, not by reading the
+          code: a broken <code>manifest.json</code> reference masked by the SPA
+          fallback, a 38-pixel mobile tap target, two screen-reader defects on
+          the star ratings and the proof carousel, and a console-error source
+          that only reproduced inside the container.
+        </p>
+      </div>
+    </section>
+
+    <!-- 8 ────────────────────────────────────────────────────────────────── -->
+    <section id="review">
+      <h2><span class="num">08</span> Review findings</h2>
+      <p class="lede">
+        Ordered by business consequence, not by how interesting they are to fix.
+        Each references the test that would catch a regression once addressed.
+      </p>
+
+      <div class="finding" data-sev="high">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-high">High</span>
+            <h3>Lead capture treats the durable record as optional</h3>
+            <span class="ref">R-01</span>
+          </div>
+          <p>
+            All three forms do the same thing in the same order: send an email,
+            and <em>then</em> try to write the <code>Lead</code> entity inside a
+            <code>try</code> whose <code>catch</code> is empty. If
+            <code>SendEmail</code> fails, the visitor sees an error and the lead
+            is never persisted at all. If <code>Lead.create</code> fails, nobody
+            finds out — the visitor is thanked and the enquiry evaporates.
+          </p>
+          <p>
+            The email is the fragile channel (deliverability, verified domains,
+            registered recipients) and it is load-bearing; the database write is
+            the reliable one and it is best-effort.
+          </p>
+          <p class="fix"><b>Fix</b> — invert the order: persist the <code>Lead</code> first and treat that as success, then notify. Surface a failure only when the persist fails. Covered today by <code>E2E-FRM-002/003/004</code>, which will pin the new ordering.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="high">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-high">High</span>
+            <h3>Client enquiries are addressed to a developer's personal inbox</h3>
+            <span class="ref">R-02</span>
+          </div>
+          <p>
+            <code>NOTIFY_EMAIL = "amielnoy@gmail.com"</code> is hard-coded in
+            <code>QuickContact.tsx</code>, <code>DetailedContactForm.tsx</code>
+            and <code>ConsultationBuilder.tsx</code>. It is the <em>primary</em>
+            recipient; the adviser's own address is sent as a secondary copy
+            inside a swallowed <code>catch</code>.
+          </p>
+          <p>
+            The payload is a named individual's phone number, email and the
+            financial matter they want help with. For a regulated adviser that
+            routing is a data-protection question, not a configuration detail.
+          </p>
+          <p class="fix"><b>Fix</b> — move both recipients into <code>src/config/contact.js</code> (which already exists for exactly this reason) and make the adviser's address primary. <code>CTR-EML-002</code> already forbids inline recipient literals.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="high">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-high">High</span>
+            <h3>Public content is gated behind an authentication round trip</h3>
+            <span class="ref">R-03</span>
+          </div>
+          <p>
+            Described in full in §5. First paint of a marketing page depends on
+            <code>getPublicSettings()</code>; a failure sends the visitor to a
+            login screen on a site that has nothing to log into.
+          </p>
+          <p class="fix"><b>Fix</b> — render public routes immediately and resolve auth in the background; keep the gate on <code>&lt;ProtectedRoute&gt;</code>, where it belongs. <code>E2E-HOM-001</code> and <code>E2E-HOM-006</code> already assert the page survives a dead backend.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="medium">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-medium">Medium</span>
+            <h3>No error boundary anywhere in the tree</h3>
+            <span class="ref">R-04</span>
+          </div>
+          <p>
+            A render-time throw in any one of the sixteen home-page sections
+            unmounts the entire application and leaves a white screen — no
+            phone number, no WhatsApp link, no fallback.
+          </p>
+          <p class="fix"><b>Fix</b> — one boundary around <code>&lt;Routes&gt;</code> and one per home-page section, falling back to the contact details. <code>SEC-ERR-001</code> watches for uncaught errors but cannot recover from them.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="medium">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-medium">Medium</span>
+            <h3>One 790 KB chunk, and roughly a dozen dependencies nothing imports</h3>
+            <span class="ref">R-05</span>
+          </div>
+          <p>
+            Every route is imported eagerly, so a visitor reading the privacy
+            policy downloads the blog admin, the rich-text editor and the
+            calculator. Vite's own build warns about the chunk size.
+          </p>
+          <p>
+            Separately, <code>three</code>, <code>jspdf</code>,
+            <code>html2canvas</code>, <code>moment</code>, <code>lodash</code>,
+            <code>react-leaflet</code>, <code>@stripe/react-stripe-js</code>,
+            <code>react-quill-new</code>, <code>@hello-pangea/dnd</code> and
+            <code>canvas-confetti</code> are declared dependencies with no
+            import anywhere in <code>src/</code> — starter-template residue.
+          </p>
+          <p class="fix"><b>Fix</b> — <code>React.lazy</code> for the admin routes and the blog first (they are never on the marketing critical path), then prune the unused packages. <code>API-HTP-009</code> keeps asserting that every emitted asset resolves.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="medium">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-medium">Medium</span>
+            <h3>The same 40 lines of lead submission live in three components</h3>
+            <span class="ref">R-06</span>
+          </div>
+          <p>
+            Recipient constants, message body assembly, email send, secondary
+            copy, entity write and error copy are duplicated across
+            <code>QuickContact</code>, <code>DetailedContactForm</code> and
+            <code>ConsultationBuilder</code>. R-01 and R-02 each have to be
+            fixed three times because of it.
+          </p>
+          <p class="fix"><b>Fix</b> — one <code>submitLead(payload, source)</code> in <code>src/lib/</code>; the components keep their own field validation and copy. The contract suite reads the real call sites, so it follows the refactor automatically.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="medium">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-medium">Medium</span>
+            <h3>React Query is mounted but effectively unused</h3>
+            <span class="ref">R-07</span>
+          </div>
+          <p>
+            The provider, the client and the default options are all configured;
+            one component uses it. Everything else re-implements loading and
+            error state by hand, with no caching and no retry.
+          </p>
+          <p class="fix"><b>Fix</b> — pick one. Either move the entity reads onto <code>useQuery</code> and get retry and caching for free, or drop the dependency. Two idioms is the only outcome worth avoiding.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="medium">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-medium">Medium</span>
+            <h3><code>npm run typecheck</code> fails on <code>main</code></h3>
+            <span class="ref">R-08</span>
+          </div>
+          <p>
+            Roughly 74 errors, all pre-existing: components passing props to
+            untyped shadcn wrappers (<code>Image</code>, the accordion
+            primitives) plus one lucide icon prop-variance mismatch. Nothing
+            breaks at runtime because Vite strips types without checking them —
+            which is exactly why the errors have been able to accumulate.
+          </p>
+          <p class="fix"><b>Fix</b> — type <code>src/components/ui/image.jsx</code> and the accordion wrapper, then make the check blocking in <code>scripts/run-tests.sh</code> and CI. Both currently carry a comment pointing at this finding.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="medium">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-medium">Medium</span>
+            <h3>Brand accent falls just short of WCAG AA contrast</h3>
+            <span class="ref">R-09</span>
+          </div>
+          <p>
+            <code>#7D6B5D</code> on <code>#F9F7F2</code> measures about 4.4:1
+            against a 4.5:1 floor — 41 elements on the home page, mostly 11-pixel
+            uppercase eyebrow labels, plus the footer greys on every page. The
+            site publishes an accessibility statement, so this is a stated
+            commitment it currently misses.
+          </p>
+          <p class="fix"><b>Fix</b> — darken <code>--accent</code> to roughly <code>26 14% 34%</code>, or lift the small labels to <code>--foreground</code>. The a11y suite reports it on every run and enforces it under <code>E2E_ENFORCE_CONTRAST=1</code>.</p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="low">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-low">Low</span>
+            <h3>Three smaller items</h3>
+            <span class="ref">R-10 · R-11 · R-12</span>
+          </div>
+          <p>
+            <b>R-10</b> — the JSON-LD in <code>index.html</code> publishes
+            <code>dorit@govari-fin.co.il</code> while every visible surface uses
+            <code>doritg@fsfp-fin.co.il</code>. Search engines and AI crawlers
+            read the former. Left unchanged because which address is canonical
+            is a business fact, not a code decision.
+          </p>
+          <p>
+            <b>R-11</b> — <code>src/lib/utils.js</code> reads <code>window</code>
+            at module scope, so the module cannot load outside a browser. It
+            forces its own unit tests into jsdom and would block any future
+            prerender step.
+          </p>
+          <p>
+            <b>R-12</b> — the Deno function pins <code>@base44/sdk@0.8.44</code>
+            while the frontend tracks <code>^0.8.48</code>. Harmless today, a
+            silent drift generator later.
+          </p>
+        </div>
+      </div>
+
+      <div class="finding" data-sev="good">
+        <div class="stripe"></div>
+        <div class="finding-body">
+          <div class="finding-head">
+            <span class="sev sev-good">Sound</span>
+            <h3>What the architecture already gets right</h3>
+            <span class="ref">R-13</span>
+          </div>
+          <p>
+            Entity row-level security is scoped correctly and deliberately — the
+            lead inbox is admin-read, and no entity is world-writable. The
+            <code>?returnTo=</code> open-redirect guard is centralised in one
+            documented module and handles the non-obvious
+            <code>/.//evil.com</code> and backslash cases. Blog markdown renders
+            without <code>rehype-raw</code>, closing the stored-XSS hole. The
+            Deno function takes its token from the connector and never echoes
+            it. Contact details already live in one config module. All of it is
+            now pinned by tests.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9 ────────────────────────────────────────────────────────────────── -->
+    <section id="sequence">
+      <h2><span class="num">09</span> What to do first</h2>
+      <p class="lede">
+        Sequenced so each step makes the next one cheaper, and so the two
+        findings that can lose a real enquiry are closed before anything else.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <thead><tr><th class="num-col">Step</th><th>Change</th><th>Findings</th><th>Effort</th></tr></thead>
+          <tbody>
+            <tr><td class="num-col">1</td><td>Extract <code>submitLead()</code>, persist before notifying, move recipients into config</td><td><span class="ref">R-01 R-02 R-06</span></td><td>half a day</td></tr>
+            <tr><td class="num-col">2</td><td>Confirm the canonical email address; fix the JSON-LD; add the assertion</td><td><span class="ref">R-10</span></td><td>minutes, once confirmed</td></tr>
+            <tr><td class="num-col">3</td><td>Render public routes without waiting on auth</td><td><span class="ref">R-03</span></td><td>half a day</td></tr>
+            <tr><td class="num-col">4</td><td>Error boundaries around the router and each home section</td><td><span class="ref">R-04</span></td><td>a couple of hours</td></tr>
+            <tr><td class="num-col">5</td><td>Lazy-load admin and blog routes; prune unused dependencies</td><td><span class="ref">R-05</span></td><td>a couple of hours</td></tr>
+            <tr><td class="num-col">6</td><td>Settle the accent colour; turn on <code>E2E_ENFORCE_CONTRAST</code></td><td><span class="ref">R-09</span></td><td>design call + an hour</td></tr>
+            <tr><td class="num-col">7</td><td>Type the shadcn wrappers; make <code>typecheck</code> blocking</td><td><span class="ref">R-08</span></td><td>a day</td></tr>
+            <tr><td class="num-col">8</td><td>Consolidate on one data-fetching idiom</td><td><span class="ref">R-07</span></td><td>a day</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="colophon">
+    <span>Architecture record · revision 1.0</span>
+    <span>Findings <span class="ref">R-01 – R-13</span></span>
+    <span>Test plan: <code>tests/test-plan/</code></span>
+    <span>Run everything: <code>./scripts/run-tests.sh</code></span>
+  </footer>
+
+</div>

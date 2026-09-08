@@ -153,9 +153,9 @@ export default function ClaimForm() {
         </Field>
 
         <div>
-          <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+          <span className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
             צירוף מסמכים (תעודות, דוחות, קבלות, תמונות)
-          </label>
+          </span>
           <label className="flex flex-col items-center justify-center gap-2 p-8 border border-dashed border-border hover:border-accent transition-colors cursor-pointer text-center">
             <Upload size={22} className="text-accent" />
             <span className="text-sm text-foreground/70">
@@ -213,12 +213,23 @@ const inputCls =
   "w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  // The control is passed in as a child, so generate an id here and clone it on.
+  // Without it the <label> is associated with nothing and screen readers
+  // announce the field as unlabelled (axe: label / select-name, critical).
+  const id = React.useId();
+  const control = React.isValidElement(children)
+    ? React.cloneElement(children as React.ReactElement<{ id?: string }>, { id })
+    : children;
+
   return (
     <div>
-      <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+      <label
+        htmlFor={id}
+        className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2"
+      >
         {label}
       </label>
-      {children}
+      {control}
     </div>
   );
 }

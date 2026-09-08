@@ -7,6 +7,7 @@ import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import Reveal from "@/components/dorit/Reveal";
 import CredentialsStrip from "@/components/dorit/CredentialsStrip";
+import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
 
 interface BlogListItem {
   id: string;
@@ -22,6 +23,37 @@ export default function Blog() {
   const [loading, setLoading] = useState<boolean>(true);
   const [query, setQuery] = useState<string>("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+
+  useSeo({
+    title: "בלוג — חידושים ותובנות בביטוח ובפיננסים | דורית גוב ארי",
+    description:
+      "מאמרים קצרים על פנסיה, דמי ניהול, ביטוחי חיים ובריאות וליווי תביעות — תובנות מהשטח שיעזרו לכם לקבל החלטות פיננסיות מושכלות.",
+    path: "/blog",
+    jsonLd: [
+      breadcrumbLd([
+        { name: "ראשי", path: "/" },
+        { name: "בלוג", path: "/blog" },
+      ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "Blog",
+        name: `בלוג · ${SITE_NAME}`,
+        url: absoluteUrl("/blog"),
+        inLanguage: "he-IL",
+        ...(posts?.length
+          ? {
+              blogPost: posts.slice(0, 20).map((post) => ({
+                "@type": "BlogPosting",
+                headline: post.title,
+                url: absoluteUrl(`/blog/${post.id}`),
+                datePublished: post.created_date,
+                ...(post.image_url ? { image: post.image_url } : {}),
+              })),
+            }
+          : {}),
+      },
+    ],
+  });
 
   useEffect(() => {
     (async () => {

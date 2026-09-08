@@ -1,0 +1,9 @@
+node_modules
+dist
+test-results
+playwright-report
+.git
+.env
+.env.*
+base44/.app.jsonc
+*.log

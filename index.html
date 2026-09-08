@@ -4,7 +4,9 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#F9F7F2" />
+    <meta name="theme-color" content="#F9F7F2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#F9F7F2" media="(prefers-color-scheme: dark)" />
+    <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Primary Meta -->
@@ -40,7 +42,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://media.base44.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" />
+    <!-- LCP: the hero portrait is the largest element above the fold on every
+         viewport. Preloading it starts the fetch during HTML parse instead of
+         after the JS bundle mounts React — the single biggest mobile LCP win. -->
+    <link rel="preload" as="image" fetchpriority="high" href="https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/589e9d0cd_generated_11fed895.jpg" />
+
+    <!-- Fonts load without blocking the first paint. `display=swap` already
+         shows fallback text immediately; switching the stylesheet to a preload
+         removes it from the critical path too, which matters most on mobile. -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" /></noscript>
 
     <!-- Structured Data: FinancialService / LocalBusiness -->
     <script type="application/ld+json">
@@ -75,55 +86,8 @@
     }
     </script>
 
-    <!-- Structured Data: FAQPage -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "כיצד ניתן להוריד דמי ניהול בפנסיה, גמל והשתלמות?",
-          "acceptedAnswer": { "@type": "Answer", "text": "דמי ניהול מצטברים לעשרות אלפי שקלים לאורך שנות החיסכון. ניתן להורידם באמצעות משא ומתן עם הגוף המוסדי — קרנות פנסיה, קרנות גמל וקרנות השתלמות — העברת כספים לגוף עם דמי ניהול נמוכים יותר, או ניצול תיקון 190. גם הפרש של אחוז אחד בלבד מצטבר לסכום משמעותי לאורך השנים." }
-        },
-        {
-          "@type": "Question",
-          "name": "מהו תיקון 190 וכיצד הוא חוסך בדמי ניהול ופרמיה?",
-          "acceptedAnswer": { "@type": "Answer", "text": "תיקון 190 לחוק הפיקוח על שירותים פיננסיים מאפשר העברת כספים בין ביטוחי מנהלים ומוצרים פנסיוניים תוך הורדת דמי ניהול ופרמיה. באמצעות משא ומתן מול הגוף המוסדי ניתן להפחית משמעותית את עלויות החיסכון הפנסיוני ולשפר את התשואה לטווח ארוך." }
-        },
-        {
-          "@type": "Question",
-          "name": "מה זה קיבוע זכויות ולמה זה חשוב?",
-          "acceptedAnswer": { "@type": "Answer", "text": "קיבוע זכויות הוא תהליך שבו מבוטח מקבע את הזכויות הרפואיות שלו בביטוח בריאות וביטוח חיים, כך ששינויים במצב הבריאותי בעתיד לא יפגעו בכיסוי הביטוחי. קיבוע זכויות חשוב כי הוא מבטיח כיסוי מלא גם אם מצב הבריאות משתנה, ומונע דחיית תביעות עקב מצב רפואי קודם." }
-        },
-        {
-          "@type": "Question",
-          "name": "כיצד משפרים תשואות בקרנות פנסיה וגמל?",
-          "acceptedAnswer": { "@type": "Answer", "text": "שיפור תשואות מושג באמצעות בחירת מסלולי השקעה המתאימים לגיל ולמצב הכלכלי, הפחתת דמי ניהול, פיזור נכון של הנכסים ומעקב שוטף אחר ביצועי הקרן. התאמה אישית של מסלול ההשקעה יכולה להוסיף אחוזי תשואה משמעותיים לאורך זמן." }
-        },
-        {
-          "@type": "Question",
-          "name": "מה ההבדל בין פנסיה, גמל והשתלמות?",
-          "acceptedAnswer": { "@type": "Answer", "text": "פנסיה מיועדת לחיסכון ארוך טווח לגיל פרישה ומשלמת קצבה חודשית. קרן גמל היא חיסכון לטווח בינוני-ארוך עם אפשרות משיכה הונית מגיל 60. קרן השתלמות היא חיסכון לטווח קצר-בינוני (6 שנים לפחות) עם פטור ממס על הרווחים. כל מוצר מתאים למטרות חיסכון שונות." }
-        },
-        {
-          "@type": "Question",
-          "name": "כיצד תכנון מס נכון חוסך בחיסכון הפנסיוני?",
-          "acceptedAnswer": { "@type": "Answer", "text": "תכנון מס נכון כולל ניצול הטבות מס בהפקדות לפנסיה, גמל והשתלמות, מיצוי זיכויים במס, ובחירת מוצרי חיסכון עם יחס מס נמוך. הפקדה לפנסיה מזכה בהטבת מס משמעותית עד לתקרה שנתית, ומשיכה כקצבה מזכה בהטבת מס נוספת." }
-        },
-        {
-          "@type": "Question",
-          "name": "כדאי לבדוק את דמי הניהול בכל מוצר — ולא רק בפנסיה?",
-          "acceptedAnswer": { "@type": "Answer", "text": "הפרש של אחוז אחד בלבד בדמי ניהול מצטבר לעשרות אלפי שקלים לאורך השנים. כדאי לבקש מכל גוף מוסדי פירוט מדויק של דמי הניהול בקרן, בביטוח המנהלים ובקרן ההשתלמות, ולהשוות. במקרים רבים ניתן להוריד את העמלה במשא ומתן פשוט — גם מבלי לעבור קרן." }
-        },
-        {
-          "@type": "Question",
-          "name": "באיזו תדירות כדאי לבצע ביקורת תיק מסכמת?",
-          "acceptedAnswer": { "@type": "Answer", "text": "מצב משפחתי, מקום עבודה ומצב בריאותי משתנים — ואיתם גם הכיסויים הנכונים. כדאי לקבוע פגישת סיכום שנתית שבה עוברים יחד על כל המוצרים: פנסיה, גמל, השתלמות וביטוחים. עדכון שגרתי מונע פערים יקרים ומאפשר הורדת עלויות ושיפור תשואות." }
-        }
-      ]
-    }
-    </script>
+    <!-- Structured Data: FAQPage is injected per-route by src/lib/seo.ts,
+         so only the home page (which renders the questions) claims it. -->
 
     <!-- Structured Data: Person -->
     <script type="application/ld+json">

@@ -1,9 +1,23 @@
 import React from "react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
+import { breadcrumbLd, useSeo } from "@/lib/seo";
 import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 export default function Accessibility() {
+  useSeo({
+    title: "הצהרת נגישות | דורית גוב ארי",
+    description:
+      "הצהרת הנגישות של האתר לפי חוק שוויון זכויות לאנשים עם מוגבלות — רמת ההנגשה, ההתאמות שבוצעו ודרכי פנייה לרכז הנגישות.",
+    path: "/accessibility",
+    jsonLd: [
+      breadcrumbLd([
+        { name: "ראשי", path: "/" },
+        { name: "הצהרת נגישות", path: "/accessibility" },
+      ]),
+    ],
+  });
+
   return (
     <div id="top">
       <FloatingHeader />

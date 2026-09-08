@@ -35,3 +35,12 @@ dist-ssr
 .env
 .vite
 base44/.app.jsonc
+
+# Test output
+/test-results
+/playwright-report
+/playwright/.cache
+
+# Allure: raw results from a run, and the report generated from them.
+/allure-results
+/allure-report

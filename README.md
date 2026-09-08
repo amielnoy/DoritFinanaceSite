@@ -53,6 +53,45 @@ base44 dashboard open
 
 This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
 
+## Tests
+
+The full battery — lint, typecheck, unit, component, contract, security, and
+end-to-end across desktop web, iOS Safari and Android Chrome — runs from one
+command:
+
+```bash
+./scripts/run-tests.sh                    # everything
+./scripts/run-tests.sh unit contract      # selected suites
+./scripts/run-tests.sh e2e --project=ios-safari
+```
+
+Or in a pinned container, with no local Node or browser install:
+
+```bash
+docker compose -f docker-compose.test.yml run --rm tests        # everything
+docker compose -f docker-compose.test.yml run --rm tests-node   # no browsers
+docker compose -f docker-compose.test.yml run --rm e2e-ios
+```
+
+| Suite | Command | Location |
+|---|---|---|
+| Unit | `npm run test:unit` | `tests/unit/` |
+| Component | `npm run test:component` | `tests/component/` |
+| Contract | `npm run test:contract` | `tests/contract/` |
+| Security (static) | `npm run test:security` | `tests/security/` |
+| e2e — UI, API, security, a11y, SEO | `npm run test:e2e` | `e2e/` |
+| SEO only | `npm run test:e2e:seo` | `e2e/seo/` |
+
+The end-to-end suites are hermetic: `e2e/fixtures/app.ts` intercepts the whole
+Base44 `/api` surface plus third-party beacons, so they need no credentials, no
+`base44 link`, and can never write to production data. They run against the
+production build served by `vite preview` — point `PLAYWRIGHT_BASE_URL` at a
+deployment to smoke-test it instead.
+
+- **Test plan and per-suite test descriptions:** [`tests/test-plan/`](tests/test-plan/)
+- **Architecture record and review findings:** [`Architecture.html`](Architecture.html)
+- **CI/CD:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
 ## Docs & Support
 
 GitHub integration: [https://docs.base44.com/developers/app-code/local-development/github](https://docs.base44.com/developers/app-code/local-development/github)

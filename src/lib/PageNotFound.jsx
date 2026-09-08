@@ -1,11 +1,20 @@
 import { useLocation } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { useSeo } from '@/lib/seo';
 
 
 export default function PageNotFound({}) {
     const location = useLocation();
     const pageName = location.pathname.substring(1);
+
+    // A 404 must never be indexed as a duplicate of the home page.
+    useSeo({
+        title: 'הדף לא נמצא | דורית גוב ארי',
+        description: 'הדף המבוקש אינו קיים. חזרו לעמוד הראשי כדי למצוא את מה שחיפשתם.',
+        path: location.pathname,
+        noIndex: true,
+    });
 
     const { data: authData, isFetched } = useQuery({
         queryKey: ['user'],

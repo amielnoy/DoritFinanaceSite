@@ -114,7 +114,12 @@ export default function ProofCarousel() {
 
       <div
         ref={ref}
-        className="flex gap-6 overflow-x-auto px-6 md:px-10 pb-6 snap-x snap-mandatory scroll-pl-6 [&::-webkit-scrollbar]:hidden"
+        /* tabIndex + role: a horizontally scrollable region needs keyboard
+           access (axe: scrollable-region-focusable). */
+        tabIndex={0}
+        role="region"
+        aria-label="תיקי הצלחה — גלילה אופקית"
+        className="flex gap-6 overflow-x-auto px-6 md:px-10 pb-6 snap-x snap-mandatory scroll-pl-6 [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         style={{ scrollbarWidth: "none" }}
       >
         <div className="shrink-0 w-4 md:w-10" />

@@ -106,7 +106,8 @@ export default function FloatingHeader() {
             <span className="sm:hidden">חייגו</span>
           </a>
           <button
-            className="md:hidden p-2"
+            /* p-3 keeps the tap target at 46px — WCAG 2.5.5 / iOS HIG want >= 44. */
+            className="md:hidden p-3"
             onClick={() => setOpen((v) => !v)}
             aria-label="תפריט"
           >

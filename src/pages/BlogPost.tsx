@@ -8,6 +8,14 @@ import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import ShareButtons from "@/components/dorit/ShareButtons";
 import CredentialsStrip from "@/components/dorit/CredentialsStrip";
+import {
+  DEFAULT_OG_IMAGE,
+  SITE_NAME,
+  absoluteUrl,
+  breadcrumbLd,
+  clampDescription,
+  useSeo,
+} from "@/lib/seo";
 
 interface BlogPostData {
   id: string;
@@ -36,6 +44,72 @@ export default function BlogPost() {
       }
     })();
   }, [id]);
+
+  const tagList = (post?.tags ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  // Strip markdown so the description is prose, not syntax.
+  const summary = post
+    ? clampDescription(
+        (post.body ?? "")
+          .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+          .replace(/[#*_>`~-]/g, " ")
+      )
+    : "";
+
+  useSeo(
+    post
+      ? {
+          title: `${post.title} | בלוג · דורית גוב ארי`,
+          description: summary || `מאמר מאת דורית גוב ארי — ${post.title}`,
+          path: `/blog/${post.id}`,
+          type: "article",
+          image: post.image_url || DEFAULT_OG_IMAGE,
+          imageAlt: post.title,
+          publishedTime: post.created_date,
+          tags: tagList,
+          jsonLd: [
+            breadcrumbLd([
+              { name: "ראשי", path: "/" },
+              { name: "בלוג", path: "/blog" },
+              { name: post.title, path: `/blog/${post.id}` },
+            ]),
+            {
+              "@context": "https://schema.org",
+              "@type": "BlogPosting",
+              headline: post.title,
+              description: summary,
+              datePublished: post.created_date,
+              dateModified: post.created_date,
+              inLanguage: "he-IL",
+              mainEntityOfPage: {
+                "@type": "WebPage",
+                "@id": absoluteUrl(`/blog/${post.id}`),
+              },
+              author: {
+                "@type": "Person",
+                name: "דורית גוב ארי",
+                jobTitle: "מתכננת פיננסית בכירה",
+                url: absoluteUrl("/"),
+              },
+              publisher: { "@type": "Organization", name: SITE_NAME, url: absoluteUrl("/") },
+              ...(post.image_url ? { image: post.image_url } : {}),
+              ...(tagList.length ? { keywords: tagList.join(", ") } : {}),
+            },
+          ],
+        }
+      : notFound
+        ? {
+            // A missing post must never be indexed as a real article.
+            title: "המאמר לא נמצא | דורית גוב ארי",
+            description: "המאמר המבוקש אינו קיים או הוסר.",
+            path: "/blog",
+            noIndex: true,
+          }
+        : null
+  );
 
   if (loading) {
     return (

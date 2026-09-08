@@ -9,6 +9,7 @@ import {
 import { ChevronLeft, HelpCircle, Phone, MessageCircle } from "lucide-react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
+import { absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
 import Reveal from "@/components/dorit/Reveal";
 import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 import { CONTACT } from "@/config/contact";
@@ -154,6 +155,26 @@ const CATEGORIES: FAQCategory[] = [
 ];
 
 export default function FAQPage() {
+  useSeo({
+    title: "שאלות ותשובות — פנסיה, גמל, ביטוח ומיסוי | דורית גוב ארי",
+    description:
+      "תשובות ברורות לשאלות הנפוצות על פנסיה, קרנות השתלמות, דמי ניהול, קיבוע זכויות, תיקון 190 וביטוחי חיים ובריאות.",
+    path: "/faq",
+    jsonLd: [
+      breadcrumbLd([
+        { name: "ראשי", path: "/" },
+        { name: "שאלות ותשובות", path: "/faq" },
+      ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: "שאלות ותשובות",
+        url: absoluteUrl("/faq"),
+        inLanguage: "he-IL",
+      },
+    ],
+  });
+
   const [activeCat, setActiveCat] = useState<string>(CATEGORIES[0].id);
   const current = CATEGORIES.find((c) => c.id === activeCat)!;
 

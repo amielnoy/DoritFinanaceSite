@@ -1,5 +1,13 @@
 User-agent: *
 Allow: /
+
+# Private and non-content routes. These also send `noindex` at runtime
+# (src/components/SeoRouteGuard.tsx); this keeps them out of crawl budget too.
 Disallow: /admin/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /oauth/
 
 Sitemap: https://safe-arch-plan.base44.app/sitemap.xml
