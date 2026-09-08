@@ -21,10 +21,10 @@ const STATS: Stat[] = [
 
 export default function About() {
   return (
-    <section id="about" className="relative py-24 md:py-32 border-y border-border/60">
+    <section id="about" className="relative py-24 md:py-32 border-y border-border/50">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
-        <div className="lg:col-span-5 grid grid-cols-2 gap-4 self-start">
-          <div className="lens-hover overflow-hidden h-64 md:h-80 col-span-2">
+        <div className="lg:col-span-5 grid grid-cols-2 gap-3 self-start">
+          <div className="lens-hover overflow-hidden h-64 md:h-80 col-span-2 border border-border/40">
             <Image
               src={ATMOS}
               alt="פרט אדריכלי — אור על זכוכית"
@@ -32,7 +32,7 @@ export default function About() {
               fittingType="fill"
             />
           </div>
-          <div className="lens-hover overflow-hidden h-48 md:h-56">
+          <div className="lens-hover overflow-hidden h-48 md:h-56 border border-border/40">
             <Image
               src={PEN}
               alt="עט נוצה על משטח אבן"
@@ -40,8 +40,8 @@ export default function About() {
               fittingType="fill"
             />
           </div>
-          <div className="flex flex-col justify-end bg-primary text-primary-foreground p-6 h-48 md:h-56">
-            <p className="font-heading text-3xl">30</p>
+          <div className="flex flex-col justify-end bg-primary text-primary-foreground p-6 h-48 md:h-56 border border-primary">
+            <p className="font-heading text-3xl leading-none">30</p>
             <p className="text-xs tracking-[0.2em] uppercase opacity-80 mt-2">
               שנות ניסיון
             </p>
@@ -89,13 +89,13 @@ export default function About() {
             — דורית
           </p>
 
-          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-px bg-border/60 border border-border/60">
+          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-px bg-border/50 border border-border/50">
             {STATS.map((s, i) => (
-              <div key={i} className="bg-background p-6 md:p-7 text-center">
-                <p className="font-heading text-4xl md:text-5xl text-accent leading-none">
+              <div key={i} className="bg-background p-6 md:p-8 text-center group transition-colors duration-300 hover:bg-secondary/40">
+                <p className="font-heading text-4xl md:text-5xl text-accent leading-none transition-transform duration-300 group-hover:scale-105">
                   {s.num}
                 </p>
-                <div className="mx-auto mt-3 h-px w-8 bg-[#C4A484]/50" />
+                <div className="mx-auto mt-4 h-px w-8 bg-[#C3AD96]/60 transition-all duration-300 group-hover:w-12" />
                 <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground mt-3">
                   {s.label}
                 </p>

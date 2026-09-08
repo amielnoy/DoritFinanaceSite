@@ -139,7 +139,7 @@ export default function QuickContact() {
                 <button
                   onClick={submit}
                   disabled={!valid || busy}
-                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] disabled:opacity-40 disabled:hover:bg-[#C4A484] transition-colors"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C3AD96] text-primary font-medium hover:bg-[#b89a80] disabled:opacity-40 disabled:hover:bg-[#C3AD96] transition-colors duration-300 shadow-sm"
                 >
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   שליחת הודעה

@@ -72,7 +72,7 @@ export default function ServiceMatrix() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-border/60 border border-border/60">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-border/50 border border-border/50">
           {PILLARS.map((p, i) => {
             const Icon = p.icon;
             const isActive = active === i;
@@ -82,17 +82,24 @@ export default function ServiceMatrix() {
                 onMouseEnter={() => setActive(i)}
                 onMouseLeave={() => setActive(null)}
                 className={`group relative bg-background p-10 md:p-12 transition-all duration-500 cursor-default overflow-hidden ${
-                  isActive ? "bg-card" : ""
+                  isActive ? "bg-secondary/50" : ""
                 }`}
               >
+                {isActive && (
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#C3AD96]/5 rounded-bl-full pointer-events-none" />
+                )}
                 <div className="flex items-start justify-between mb-8">
-                  <Icon
-                    size={28}
-                    className={`transition-colors duration-500 ${
-                      isActive ? "text-[#C4A484]" : "text-accent"
-                    }`}
-                    strokeWidth={1.25}
-                  />
+                  <div className={`w-12 h-12 flex items-center justify-center border transition-all duration-500 ${
+                    isActive ? "border-[#C3AD96] bg-[#C3AD96]/10" : "border-border/60 bg-secondary/40"
+                  }`}>
+                    <Icon
+                      size={24}
+                      className={`transition-colors duration-500 ${
+                        isActive ? "text-[#9C836A]" : "text-accent"
+                      }`}
+                      strokeWidth={1.25}
+                    />
+                  </div>
                   <span className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
                     0{i + 1}
                   </span>
@@ -111,7 +118,7 @@ export default function ServiceMatrix() {
                   {p.desc}
                 </p>
                 <div
-                  className={`mt-8 h-px bg-[#C4A484] transition-all duration-500 ${
+                  className={`mt-8 h-px bg-[#C3AD96] transition-all duration-500 ${
                     isActive ? "w-16" : "w-0"
                   }`}
                 />

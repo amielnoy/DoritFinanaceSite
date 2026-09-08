@@ -93,17 +93,17 @@ export default function ProofCarousel() {
               </div>
             </Reveal>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => scroll(1)}
-              className="w-11 h-11 border border-border flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"
+              className="w-11 h-11 border border-border/60 flex items-center justify-center hover:border-[#C3AD96] hover:text-accent transition-colors duration-300"
               aria-label="הבא"
             >
               <ArrowRight size={18} />
             </button>
             <button
               onClick={() => scroll(-1)}
-              className="w-11 h-11 border border-border flex items-center justify-center hover:bg-primary hover:text-primary-foreground transition-colors"
+              className="w-11 h-11 border border-border/60 flex items-center justify-center hover:border-[#C3AD96] hover:text-accent transition-colors duration-300"
               aria-label="הקודם"
             >
               <ArrowLeft size={18} />
@@ -121,11 +121,16 @@ export default function ProofCarousel() {
         {BRIEFS.map((b, i) => (
           <article
             key={i}
-            className="snap-start shrink-0 w-[340px] md:w-[400px] bg-card border border-border/60 p-8 md:p-10 flex flex-col"
+            className="snap-start shrink-0 w-[340px] md:w-[400px] bg-card border border-border/50 p-8 md:p-10 flex flex-col group hover:border-[#C3AD96]/40 transition-colors duration-300"
           >
-            <span className="text-[10px] tracking-[0.3em] uppercase text-accent">
-              {b.tag}
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] tracking-[0.3em] uppercase text-accent">
+                {b.tag}
+              </span>
+              <span className="text-[10px] tracking-[0.25em] uppercase text-muted-foreground/60">
+                0{i + 1}
+              </span>
+            </div>
             <div className="mt-3">
               <Stars value={b.rating} size={16} />
             </div>
@@ -135,8 +140,8 @@ export default function ProofCarousel() {
             <p className="mt-5 text-foreground/70 leading-relaxed flex-1">
               {b.body}
             </p>
-            <div className="mt-8 pt-6 border-t border-border/60 flex items-center justify-between">
-              <span className="font-heading text-3xl md:text-4xl text-[#C4A484] leading-none">
+            <div className="mt-8 pt-6 border-t border-border/50 flex items-center justify-between">
+              <span className="font-heading text-3xl md:text-4xl text-[#C3AD96] leading-none">
                 {b.metric}
               </span>
               <span className="text-[10px] tracking-[0.25em] uppercase text-muted-foreground">

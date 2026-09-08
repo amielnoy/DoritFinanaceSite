@@ -129,8 +129,8 @@ export default function ConsultationBuilder() {
         className="relative py-24 md:py-32 bg-primary text-primary-foreground"
       >
         <div className="max-w-2xl mx-auto px-6 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full border border-[#C4A484] flex items-center justify-center mb-8">
-            <Check size={28} className="text-[#C4A484]" />
+          <div className="w-16 h-16 mx-auto rounded-full border border-[#C3AD96] flex items-center justify-center mb-8">
+            <Check size={28} className="text-[#C3AD96]" />
           </div>
           <h2 className="font-heading text-4xl md:text-5xl">
             תודה, {data.name.split(" ")[0]}.
@@ -158,7 +158,7 @@ export default function ConsultationBuilder() {
   return (
     <section
       id="consultation"
-      className="relative py-24 md:py-32 border-t border-border/60"
+      className="relative py-24 md:py-32 border-t border-border/50"
     >
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
@@ -317,7 +317,7 @@ export default function ConsultationBuilder() {
             <button
               onClick={next}
               disabled={!canNext || sending}
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] disabled:opacity-40 disabled:hover:bg-[#C4A484] transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C3AD96] text-primary font-medium hover:bg-[#b89a80] disabled:opacity-40 disabled:hover:bg-[#C3AD96] transition-colors duration-300 shadow-sm"
             >
               {sending && <Loader2 size={16} className="animate-spin" />}
               {isLast ? "שליחת בקשה" : "המשך"}
