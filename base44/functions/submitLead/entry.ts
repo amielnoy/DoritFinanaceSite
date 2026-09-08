@@ -146,40 +146,6 @@ export default async function(req) {
       }
     } catch (e) { /* מיטבי */ }
 
-    // יצירת אירוע תזכורת ביומן Google — מיטבי
-    try {
-      const { accessToken: gToken } = await base44.asServiceRole.connectors.getConnection('googlecalendar');
-      if (gToken) {
-        const now = new Date();
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        const yyyy = tomorrow.getUTCFullYear();
-        const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
-        const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
-        const dateStr = `${yyyy}-${mm}-${dd}`;
-
-        await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${gToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            summary: subject,
-            description: `${agentBody}\n\nלייצר קשר ולתאם מעקב.`,
-            start: { dateTime: `${dateStr}T09:00:00`, timeZone: 'Asia/Jerusalem' },
-            end: { dateTime: `${dateStr}T09:30:00`, timeZone: 'Asia/Jerusalem' },
-            reminders: {
-              useDefault: false,
-              overrides: [
-                { method: 'popup', minutes: 60 },
-                { method: 'email', minutes: 720 },
-              ],
-            },
-          }),
-        });
-      }
-    } catch (e) { /* מיטבי */ }
-
     return Response.json({ ok: true });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
