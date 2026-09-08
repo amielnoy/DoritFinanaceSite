@@ -1,21 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { Calculator, TrendingDown, Wallet, PiggyBank } from "lucide-react";
-
-const fmtCurrency = (n: number): string =>
-  new Intl.NumberFormat("he-IL", {
-    style: "currency",
-    currency: "ILS",
-    maximumFractionDigits: 0,
-  }).format(Math.round(n || 0));
-
-interface CalcResult {
-  totalDeposited: number;
-  totalDepositFees: number;
-  totalAnnualFees: number;
-  totalFees: number;
-  balance: number;
-  lostToFees: number;
-}
+import {
+  computePensionFees,
+  formatIls as fmtCurrency,
+  type PensionFeeResult,
+} from "@/lib/pension-fee";
 
 interface NumFieldProps {
   label: string;
@@ -39,49 +28,17 @@ export default function PensionFeeCalculator() {
   const [years, setYears] = useState<number | string>(25);
   const [annualReturn, setAnnualReturn] = useState<number | string>(5);
 
-  const result: CalcResult = useMemo(() => {
-    const M = Number(monthlyDeposit) || 0;
-    const df = (Number(depositFee) || 0) / 100;
-    const af = (Number(annualFee) || 0) / 100;
-    const Y = Number(years) || 0;
-    const r = (Number(annualReturn) || 0) / 100;
-
-    let balance = 0;
-    let totalDeposited = 0;
-    let totalDepositFees = 0;
-    let totalAnnualFees = 0;
-    const monthlyReturn = r / 12;
-    const monthlyAnnualFee = af / 12;
-
-    for (let m = 1; m <= Y * 12; m++) {
-      balance *= 1 + monthlyReturn;
-      const feeOnDeposit = M * df;
-      const netDeposit = M - feeOnDeposit;
-      totalDeposited += M;
-      totalDepositFees += feeOnDeposit;
-      balance += netDeposit;
-      const mgmtFee = balance * monthlyAnnualFee;
-      balance -= mgmtFee;
-      totalAnnualFees += mgmtFee;
-    }
-
-    const totalFees = totalDepositFees + totalAnnualFees;
-    let optimal = 0;
-    for (let m = 1; m <= Y * 12; m++) {
-      optimal *= 1 + monthlyReturn;
-      optimal += M;
-    }
-    const lostToFees = optimal - balance;
-
-    return {
-      totalDeposited,
-      totalDepositFees,
-      totalAnnualFees,
-      totalFees,
-      balance,
-      lostToFees,
-    };
-  }, [monthlyDeposit, depositFee, annualFee, years, annualReturn]);
+  const result: PensionFeeResult = useMemo(
+    () =>
+      computePensionFees({
+        monthlyDeposit,
+        depositFee,
+        annualFee,
+        years,
+        annualReturn,
+      }),
+    [monthlyDeposit, depositFee, annualFee, years, annualReturn]
+  );
 
   return (
     <section id="fee-calculator" className="relative py-24 md:py-32 border-t border-border/60">
