@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Image } from "@/components/ui/image";
-import { Loader2, ArrowLeft, Newspaper } from "lucide-react";
+import { Loader2, ArrowLeft, Newspaper, Search, X } from "lucide-react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import Reveal from "@/components/dorit/Reveal";
@@ -20,6 +20,8 @@ interface BlogListItem {
 export default function Blog() {
   const [posts, setPosts] = useState<BlogListItem[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [query, setQuery] = useState<string>("");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -37,6 +39,39 @@ export default function Blog() {
       }
     })();
   }, []);
+
+  const allTags = React.useMemo(() => {
+    if (!posts) return [];
+    const set = new Set<string>();
+    posts.forEach((p) => {
+      if (p.tags) {
+        p.tags.split(",").forEach((t) => {
+          const trimmed = t.trim();
+          if (trimmed) set.add(trimmed);
+        });
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "he"));
+  }, [posts]);
+
+  const filtered = React.useMemo(() => {
+    if (!posts) return [];
+    const q = query.trim().toLowerCase();
+    return posts.filter((p) => {
+      const matchesQuery =
+        !q ||
+        p.title.toLowerCase().includes(q) ||
+        (p.excerpt || "").toLowerCase().includes(q) ||
+        (p.tags || "").toLowerCase().includes(q);
+      const matchesTag =
+        !activeTag ||
+        (p.tags || "")
+          .split(",")
+          .map((t) => t.trim())
+          .includes(activeTag);
+      return matchesQuery && matchesTag;
+    });
+  }, [posts, query, activeTag]);
 
   return (
     <div className="relative bg-background min-h-screen">
@@ -58,7 +93,59 @@ export default function Blog() {
 
           <CredentialsStrip />
 
-          <div className="mt-14 border-t border-border/60">
+          {!loading && posts && posts.length > 0 && (
+            <div className="mt-12 space-y-6">
+              <div className="relative max-w-xl">
+                <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="חיפוש מאמרים…"
+                  className="w-full bg-card border border-border pr-12 pl-12 py-3.5 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
+                />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="ניקוי חיפוש"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {allTags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setActiveTag(null)}
+                    className={`text-xs tracking-[0.15em] uppercase px-3.5 py-1.5 border transition-colors ${
+                      !activeTag
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+                    }`}
+                  >
+                    הכל
+                  </button>
+                  {allTags.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => setActiveTag((cur) => (cur === tag ? null : tag))}
+                      className={`text-xs tracking-[0.15em] uppercase px-3.5 py-1.5 border transition-colors ${
+                        activeTag === tag
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-8 border-t border-border/60">
             {loading ? (
               <div className="flex justify-center py-20">
                 <Loader2 className="animate-spin text-accent" />
@@ -70,9 +157,22 @@ export default function Blog() {
                   עדיין אין מאמרים — בקרוב יעלו כאן עדכונים חדשים.
                 </p>
               </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-20 border border-dashed border-border">
+                <Search size={28} className="mx-auto text-[#C4A484] mb-4" strokeWidth={1.25} />
+                <p className="text-foreground/60">
+                  לא נמצאו מאמרים התואמים את החיפוש. ניתן לנסות מילים אחרות או נושא אחר.
+                </p>
+                <button
+                  onClick={() => { setQuery(""); setActiveTag(null); }}
+                  className="mt-4 text-sm text-accent underline underline-offset-4 hover:text-[#C4A484] transition-colors"
+                >
+                  ניקוי החיפוש
+                </button>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 py-12">
-                {posts.map((p) => (
+                {filtered.map((p) => (
                   <Link
                     key={p.id}
                     to={`/blog/${p.id}`}
