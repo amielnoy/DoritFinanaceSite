@@ -174,8 +174,8 @@ export default function ConsultationBuilder() {
             תודה, {data.name.split(" ")[0]}.
           </h2>
           <p className="mt-6 text-primary-foreground/80 leading-relaxed">
-            קיבלתי את בקשתכם. אחזור אליכם אישית תוך יום עסקים אחד כדי לתאם את
-            פגישת הייעוץ הראשונה. עד אז — נשמו רגועים. הכל מתוכנן.
+            קיבלתי את הבקשה. אחזור אישית תוך יום עסקים אחד לתיאום פגישת
+            הייעוץ הראשונה. עד אז — לשמור על רוגע. הכל מתוכנן.
           </p>
           <button
             onClick={() => {
