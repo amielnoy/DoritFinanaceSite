@@ -139,7 +139,7 @@ export default function PensionFeeCalculator() {
                 {fmtCurrency(result.balance + result.lostToFees)}
               </span>{" "}
               — הפרש של{" "}
-              <span className="font-semibold text-[#C4A484]">
+              <span className="font-semibold text-[#9C836A]">
                 {fmtCurrency(result.lostToFees)}
               </span>{" "}
               שנשאר ברשות הגוף המנהל במקום אצלכם.
@@ -148,7 +148,7 @@ export default function PensionFeeCalculator() {
 
           <a
             href="#quick-contact"
-            className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] transition-colors"
+            className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-[#C3AD96] text-primary font-medium hover:bg-[#b89a80] transition-colors duration-300 shadow-sm"
           >
             רוצים לדעת אם אפשר לחסוך? שאלו אותי
           </a>
@@ -182,11 +182,11 @@ function ResultCard({ icon: Icon, label, value, highlight }: ResultCardProps) {
   return (
     <div
       className={`p-4 border ${
-        highlight ? "border-[#C4A484]/50 bg-[#C4A484]/5" : "border-border/60 bg-background"
+        highlight ? "border-[#C3AD96]/50 bg-[#C3AD96]/5" : "border-border/50 bg-background"
       }`}
     >
       <div className="flex items-center gap-2 text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
-        <Icon size={14} className={highlight ? "text-[#C4A484]" : "text-accent"} />
+        <Icon size={14} className={highlight ? "text-[#C3AD96]" : "text-accent"} />
         {label}
       </div>
       <p className={`font-heading text-2xl ${highlight ? "text-foreground" : "text-foreground/85"}`}>

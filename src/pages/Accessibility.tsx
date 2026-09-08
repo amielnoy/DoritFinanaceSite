@@ -2,6 +2,7 @@ import React from "react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import { breadcrumbLd, useSeo } from "@/lib/seo";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 export default function Accessibility() {
   useSeo({
@@ -16,6 +17,7 @@ export default function Accessibility() {
       ]),
     ],
   });
+
   return (
     <div id="top">
       <FloatingHeader />
@@ -25,6 +27,8 @@ export default function Accessibility() {
           הצהרת נגישות
         </h1>
         <p className="text-sm text-muted-foreground mt-3">עודכן: ספטמבר 2026</p>
+
+        <CredentialsStrip />
 
         <div className="mt-12 space-y-10 leading-relaxed text-foreground/80">
           <section>
@@ -66,7 +70,7 @@ export default function Accessibility() {
           <section>
             <h2 className="font-heading text-2xl mb-3">פרטי קשר לנגישות</h2>
             <ul className="space-y-1.5">
-              <li>דוא״ל: <a href="mailto:dorit@gov-ari.co.il" dir="ltr" className="text-accent hover:underline">dorit@gov-ari.co.il</a></li>
+              <li>דוא״ל: <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="text-accent hover:underline">dorit@govari-fin.co.il</a></li>
               <li>טלפון: <a href="https://wa.me/972508311776" target="_blank" rel="noopener noreferrer" dir="ltr" className="text-accent hover:underline">050-831-1776</a></li>
             </ul>
           </section>

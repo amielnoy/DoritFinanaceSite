@@ -2,6 +2,7 @@ import React from "react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import { breadcrumbLd, useSeo } from "@/lib/seo";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 export default function PrivacyPolicy() {
   useSeo({
@@ -16,6 +17,7 @@ export default function PrivacyPolicy() {
       ]),
     ],
   });
+
   return (
     <div id="top">
       <FloatingHeader />
@@ -25,6 +27,8 @@ export default function PrivacyPolicy() {
           מדיניות פרטיות
         </h1>
         <p className="text-sm text-muted-foreground mt-3">עודכן: ספטמבר 2026</p>
+
+        <CredentialsStrip />
 
         <div className="mt-12 space-y-10 leading-relaxed text-foreground/80">
           <section>
@@ -105,7 +109,7 @@ export default function PrivacyPolicy() {
             <h2 className="font-heading text-2xl mb-3">8. אחראי לפרטיות</h2>
             <p>
               האחראי לענייני פרטיות בסוכנות הוא דורית גוב ארי. ניתן לפנות
-              בכתובת dorit@gov-ari.co.il או בטלפון המפורסם באתר.
+              בכתובת dorit@govari-fin.co.il או בטלפון המפורסם באתר.
             </p>
           </section>
         </div>

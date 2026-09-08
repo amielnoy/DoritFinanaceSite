@@ -10,15 +10,17 @@ interface BookingData {
   notes?: string;
 }
 
-interface GoogleCalendarBookingProps {
+interface OutlookCalendarBookingProps {
   data?: BookingData;
 }
 
-export default function GoogleCalendarBooking({ data = {} }: GoogleCalendarBookingProps) {
+const ORGANIZER_EMAIL = "dorit@govari-fin.co.il";
+
+export default function OutlookCalendarBooking({ data = {} }: OutlookCalendarBookingProps) {
   const openCalendar = () => {
     const topic = data.topic ? ` — ${data.topic}` : "";
     const name = data.name ? ` · ${data.name}` : "";
-    const text = `ייעוץ עם דורית גוב ארי${topic}${name}`;
+    const subject = `ייעוץ עם דורית גוב ארי${topic}${name}`;
 
     const lines = [
       data.name ? `שם: ${data.name}` : "",
@@ -27,27 +29,28 @@ export default function GoogleCalendarBooking({ data = {} }: GoogleCalendarBooki
       data.topic ? `תחום ייעוץ: ${data.topic}` : "",
       data.timing ? `עיתוי מבוקש: ${data.timing}` : "",
       data.notes ? `הערות: ${data.notes}` : "",
+      `מתוכננת עבור: ${ORGANIZER_EMAIL}`,
     ].filter(Boolean);
-    const details =
-      lines.length > 0
-        ? lines.join("\n")
-        : "ייעוץ פיננסי וביטוחי אישי עם דורית גוב ארי.";
+    const body = lines.join("\n");
 
     const start = new Date();
     start.setDate(start.getDate() + 1);
-    start.setHours(0, 0, 0, 0);
+    start.setHours(10, 0, 0, 0);
     const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    const fmt = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
+    end.setHours(end.getHours() + 1);
+    const fmt = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
+
     const params = new URLSearchParams({
-      action: "TEMPLATE",
-      text,
-      dates: `${fmt(start)}/${fmt(end)}`,
-      details,
+      path: "/calendar/action/compose",
+      rru: "addevent",
+      startdt: fmt(start),
+      enddt: fmt(end),
+      subject,
+      body,
       location: "פגישת ייעוץ · טלפון או זום",
     });
     window.open(
-      `https://calendar.google.com/calendar/render?${params.toString()}`,
+      `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`,
       "_blank",
       "noopener"
     );
@@ -57,10 +60,10 @@ export default function GoogleCalendarBooking({ data = {} }: GoogleCalendarBooki
     <button
       type="button"
       onClick={openCalendar}
-      className="inline-flex items-center gap-3 px-7 py-4 bg-[#C4A484] text-primary font-heading text-lg hover:bg-[#b8916f] transition-colors"
+      className="inline-flex items-center gap-3 px-7 py-4 border border-[#C4A484] text-[#C4A484] font-heading text-lg hover:bg-[#C4A484] hover:text-primary transition-colors"
     >
       <CalendarClock size={20} />
-      קביעת שיחה ביומן
+      קביעת שיחה ב-Outlook
     </button>
   );
 }

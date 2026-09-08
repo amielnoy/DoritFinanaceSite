@@ -15,6 +15,7 @@ const NAV: NavItem[] = [
   { label: "נקודת מבט", href: "#perspective" },
   { label: "שירותים", href: "#services" },
   { label: "תביעות", href: "/claims", route: true },
+  { label: "שאלות ותשובות", href: "/faq", route: true },
   { label: "הצלחות", href: "#proof" },
   { label: "לקוחות מספרים", href: "#testimonials" },
   { label: "בלוג", href: "/blog", route: true },
@@ -59,7 +60,7 @@ export default function FloatingHeader() {
               דורית גוב ארי
             </span>
             <span className="text-[10px] md:text-[11px] tracking-[0.3em] uppercase text-muted-foreground mt-1">
-              Architecture of Security
+              התכנון שלי — הרווח שלך
             </span>
           </span>
         </a>
@@ -88,21 +89,21 @@ export default function FloatingHeader() {
           )}
         </nav>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <a
+            href="#consultation"
+            className="hidden md:inline-flex items-center px-5 py-2.5 bg-[#C3AD96] text-primary text-sm font-medium hover:bg-[#b89a80] transition-colors duration-300"
+          >
+            לקביעת פגישת ייעוץ
+          </a>
           <a
             href={`tel:${CONTACT.phoneE164}`}
             aria-label="התקשרות לדורית גוב ארי"
-            className="inline-flex items-center gap-2 px-4 py-2.5 border border-border text-sm font-medium hover:border-accent hover:text-accent transition-colors duration-300"
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#9c9c9c] text-sm font-medium hover:border-accent hover:text-accent transition-colors duration-300"
           >
-            <Phone size={16} />
+            <Phone size={15} className="text-[#9c9c9c]" />
             <span className="hidden sm:inline" dir="ltr">{CONTACT.phoneDisplay}</span>
             <span className="sm:hidden">חייגו</span>
-          </a>
-          <a
-            href="#consultation"
-            className="hidden md:inline-flex items-center px-5 py-2.5 bg-[#C4A484] text-primary text-sm font-medium hover:bg-[#b8916f] transition-colors duration-300"
-          >
-            לקביעת פגישת ייעוץ
           </a>
           <button
             /* p-3 keeps the tap target at 46px — WCAG 2.5.5 / iOS HIG want >= 44. */

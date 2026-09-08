@@ -39,10 +39,10 @@ export default function Footer() {
         <div>
           <p className="font-heading text-2xl mb-2">דורית גוב ארי</p>
           <p className="text-[11px] tracking-[0.3em] uppercase text-primary-foreground/50">
-            Architecture of Security
+            התכנון שלי — הרווח שלך
           </p>
           <p className="mt-6 text-primary-foreground/70 leading-relaxed max-w-xs">
-            ייעוץ ביטוחי ופיננסי אישי. ליווי לקוחות לאורך כל החיים.
+            ייעוץ פיננסי וביטוחי אישי. ליווי לקוחות לאורך כל החיים.
           </p>
         </div>
 
@@ -55,6 +55,7 @@ export default function Footer() {
               { l: "אודות", h: "#about" },
               { l: "שירותים", h: "#services" },
               { l: "מדריך תביעות", h: "/claims", route: true },
+              { l: "שאלות ותשובות", h: "/faq", route: true },
               { l: "תיקי הצלחה", h: "#proof" },
               { l: "בלוג", h: "/blog", route: true },
               { l: "קביעת ייעוץ", h: "#consultation" },
@@ -98,7 +99,7 @@ export default function Footer() {
       <div className="border-t border-primary-foreground/15">
         <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-primary-foreground/60">
           <p>
-            דורית גוב ארי — סוכנות ביטוח בע״מ · ח.פ. 51XXXXXX · רישיון סוכן ביטוח מספר XXXXX
+            דורית גוב ארי — סוכנות ביטוח בע״מ · ח.פ. 51XXXXXX · רישיון סוכן מרשות שוק ההון מספר L-00107009
           </p>
           <div className="flex items-center gap-5">
             <Link to="/privacy" className="hover:text-[#C4A484] transition-colors">מדיניות פרטיות</Link>

@@ -19,8 +19,12 @@ import PensionFeeCalculator from "@/components/dorit/PensionFeeCalculator";
 import QuickContact from "@/components/dorit/QuickContact";
 import QuickShare from "@/components/dorit/QuickShare";
 import DetailedFAQ from "@/components/dorit/DetailedFAQ";
+import NeedsInterviewChat from "@/components/dorit/NeedsInterviewChat";
+import BookingAssistantChat from "@/components/dorit/BookingAssistantChat";
+import BlogRecommenderChat from "@/components/dorit/BlogRecommenderChat";
 import Footer from "@/components/dorit/Footer";
 import MobileStickyBar from "@/components/dorit/MobileStickyBar";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 
 export default function Home() {
   useSeo({
@@ -38,19 +42,23 @@ export default function Home() {
       <FloatingHeader />
       <main>
         <Hero />
+        <CredentialsStrip />
         <CarrierLogos />
         <About />
         <ReviewsWidget />
         <Perspective />
         <ServiceMatrix />
+        <NeedsInterviewChat />
         <PensionFeeCalculator />
         <QuickContact />
         <ProofCarousel />
         <Testimonials />
         <FAQ />
+        <BookingAssistantChat />
         <ConsultationBuilder />
         <DetailedContactForm />
         <QuickShare />
+        <BlogRecommenderChat />
         <DetailedFAQ />
       </main>
       <SectionNav />

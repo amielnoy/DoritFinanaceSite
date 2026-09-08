@@ -95,7 +95,7 @@ export default function Testimonials() {
   };
 
   return (
-    <section id="testimonials" className="relative py-24 md:py-32 border-t border-border/60 bg-secondary/40">
+    <section id="testimonials" className="relative py-24 md:py-32 border-t border-border/50 bg-secondary/30">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
           <div>

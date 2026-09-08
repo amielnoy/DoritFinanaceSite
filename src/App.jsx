@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import SeoRouteGuard from '@/components/SeoRouteGuard';
+// Add page imports here
 // The home page is the marketing entry point and the LCP path, so it stays in
 // the main chunk. Everything else is split out: mobile-first indexing scores
 // Core Web Vitals on the phone experience, and a visitor landing on the home
@@ -27,6 +28,7 @@ const Blog = lazy(() => import('@/pages/Blog'));
 const BlogPost = lazy(() => import('@/pages/BlogPost'));
 const BlogAdmin = lazy(() => import('@/pages/BlogAdmin'));
 const Claims = lazy(() => import('@/pages/Claims'));
+const FAQPage = lazy(() => import('@/pages/FAQPage'));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -69,6 +71,7 @@ const AuthenticatedApp = () => {
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:id" element={<BlogPost />} />
         <Route path="/claims" element={<Claims />} />
+        <Route path="/faq" element={<FAQPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

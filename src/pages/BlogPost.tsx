@@ -7,6 +7,7 @@ import { Loader2, ArrowRight, Calendar } from "lucide-react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
 import ShareButtons from "@/components/dorit/ShareButtons";
+import CredentialsStrip from "@/components/dorit/CredentialsStrip";
 import {
   DEFAULT_OG_IMAGE,
   SITE_NAME,
@@ -90,7 +91,7 @@ export default function BlogPost() {
               author: {
                 "@type": "Person",
                 name: "דורית גוב ארי",
-                jobTitle: "יועצת ביטוחית ופיננסית",
+                jobTitle: "מתכננת פיננסית בכירה",
                 url: absoluteUrl("/"),
               },
               publisher: { "@type": "Organization", name: SITE_NAME, url: absoluteUrl("/") },
@@ -187,6 +188,10 @@ export default function BlogPost() {
 
           <div className="mt-10 blog-body">
             <ReactMarkdown>{post.body || ""}</ReactMarkdown>
+          </div>
+
+          <div className="mt-10">
+            <CredentialsStrip />
           </div>
 
           <ShareButtons title={post.title} />

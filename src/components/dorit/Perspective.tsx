@@ -37,7 +37,7 @@ const GUIDELINES: Guideline[] = [
 
 export default function Perspective() {
   return (
-    <section id="perspective" className="relative py-24 md:py-32 border-y border-border/60 bg-secondary/40">
+    <section id="perspective" className="relative py-24 md:py-32 border-y border-border/50 bg-secondary/30">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         {/* Header */}
         <div className="max-w-3xl mb-16">
@@ -49,6 +49,7 @@ export default function Perspective() {
             <br />
             הקול השקול הוא הנכס
           </h2>
+          <div className="mt-6 h-px w-16 bg-[#C3AD96]/60" />
         </div>
 
         {/* Anecdote in her voice */}
@@ -68,8 +69,8 @@ export default function Perspective() {
             </p>
           </div>
 
-          <aside className="lg:col-span-5 lg:border-r lg:border-border/60 lg:pr-12 flex flex-col justify-center">
-            <Quote size={32} className="text-[#C4A484] mb-5" strokeWidth={1.25} />
+          <aside className="lg:col-span-5 lg:border-r lg:border-border/50 lg:pr-12 flex flex-col justify-center">
+            <Quote size={32} className="text-[#C3AD96] mb-5" strokeWidth={1.25} />
             <p className="font-heading text-2xl md:text-3xl leading-snug">
               ״הלקוחות שלי לא צריכים להתנצל. החיים הכלכליים שלהם הם בדיוק
               המקום שבו האנושיות והמקצועיות נפגשות.״
@@ -81,17 +82,17 @@ export default function Perspective() {
         </div>
 
         {/* Guidelines */}
-        <div className="border-t border-border/60">
+        <div className="border-t border-border/50">
           <p className="text-sm tracking-[0.2em] uppercase text-accent mt-10 mb-8">
             חמישה עקרונות לניהול כלכלי בזמן משבר
           </p>
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-border/50">
             {GUIDELINES.map((g) => (
               <div
                 key={g.n}
-                className="group grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 py-7 transition-colors duration-300 hover:bg-background/60 -mx-4 md:-mx-6 px-4 md:px-6"
+                className="group grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 py-7 transition-colors duration-300 hover:bg-secondary/40 -mx-4 md:-mx-6 px-4 md:px-6"
               >
-                <div className="md:col-span-2 font-heading text-3xl md:text-4xl text-[#C4A484]">
+                <div className="md:col-span-2 font-heading text-3xl md:text-4xl text-[#C3AD96] transition-transform duration-300 group-hover:scale-110">
                   {g.n}
                 </div>
                 <h3 className="md:col-span-4 font-heading text-xl md:text-2xl self-center">

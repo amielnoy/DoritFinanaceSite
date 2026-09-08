@@ -40,7 +40,7 @@ const FAQS: FAQItem[] = [
 
 export default function FAQ() {
   return (
-    <section id="faq" className="relative py-24 md:py-32 border-t border-border/60">
+    <section id="faq" className="relative py-24 md:py-32 border-t border-border/50">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-4">
           <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
@@ -51,6 +51,7 @@ export default function FAQ() {
             <br />
             שכדאי לשאול
           </h2>
+          <div className="mt-6 h-px w-16 bg-[#C3AD96]/60" />
           <p className="mt-8 text-foreground/70 leading-relaxed max-w-sm">
             שישה טיפים אפקטיביים מהשטח — כדי שתדעו מה כדאי לבדוק, לשאול ולתקן עוד
             השנה. רוצים ליישם אותם על התיק שלכם? נעשה את זה יחד.
@@ -58,14 +59,14 @@ export default function FAQ() {
         </div>
 
         <div className="lg:col-span-8">
-          <Accordion type="single" collapsible className="border-t border-border/60">
+          <Accordion type="single" collapsible className="border-t border-border/50">
             {FAQS.map((item, i) => (
               <AccordionItem
                 key={i}
                 value={`faq-${i}`}
-                className="border-b border-border/60"
+                className="border-b border-border/50"
               >
-                <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-[#C4A484]">
+                <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-[#C3AD96]">
                   {item.q}
                 </AccordionTrigger>
                 <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">

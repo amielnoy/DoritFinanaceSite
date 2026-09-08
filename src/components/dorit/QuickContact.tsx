@@ -2,10 +2,6 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Send, Loader2, Check, Mail, MessageCircle } from "lucide-react";
 
-// הכתובת שאליה יגיעו הפניות. לשליחה מובטחת — ודא/י שזו כתובת משתמש רשום באפליקציה.
-const NOTIFY_EMAIL = "amielnoy@gmail.com";
-const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
-
 interface QuickContactForm {
   name: string;
   phone: string;
@@ -26,42 +22,17 @@ export default function QuickContact() {
     setBusy(true);
     setError("");
     try {
-      const body =
-        `פנייה חדשה מהאתר — ${new Date().toLocaleString("he-IL")}\n\n` +
-        `שם: ${form.name}\n` +
-        `טלפון: ${form.phone}\n` +
-        `אימייל: ${form.email || "—"}\n\n` +
-        `הודעה:\n${form.message || "—"}`;
-      await base44.integrations.Core.SendEmail({
-        to: NOTIFY_EMAIL,
-        subject: `פנייה חדשה מהאתר — ${form.name}`,
-        body,
+      await base44.functions.invoke("submitLead", {
+        name: form.name,
+        phone: form.phone,
+        email: form.email || "",
+        source: "quick",
+        message: form.message || "",
       });
-      try {
-        await base44.integrations.Core.SendEmail({
-          to: SECONDARY_EMAIL,
-          subject: `פנייה חדשה מהאתר — ${form.name}`,
-          body,
-        });
-      } catch (e) {
-        /* עותק מיטבי לדורית */
-      }
-      try {
-        await base44.entities.Lead.create({
-          name: form.name,
-          phone: form.phone,
-          email: form.email || "",
-          source: "quick",
-          message: form.message || "",
-          status: "new",
-        });
-      } catch (e) {
-        /* תיעוד הפנייה במאגר — מיטבי */
-      }
       setSent(true);
       setForm({ name: "", phone: "", email: "", message: "" });
     } catch (e) {
-      setError("לא הצלחנו לשלוח כרגע. ניתן לשלוח מייל ישירות ל-doritg@fsfp-fin.co.il או לנסות שוב.");
+      setError("לא הצלחנו לשלוח כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
     } finally {
       setBusy(false);
     }
@@ -85,7 +56,7 @@ export default function QuickContact() {
           </p>
           <div className="mt-8 flex items-center gap-3 text-primary-foreground/60">
             <Mail size={16} className="text-[#C4A484]" />
-            <a href="mailto:doritg@fsfp-fin.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">doritg@fsfp-fin.co.il</a>
+            <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@govari-fin.co.il</a>
           </div>
           <a
             href="https://wa.me/972508311776"
@@ -168,7 +139,7 @@ export default function QuickContact() {
                 <button
                   onClick={submit}
                   disabled={!valid || busy}
-                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] disabled:opacity-40 disabled:hover:bg-[#C4A484] transition-colors"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C3AD96] text-primary font-medium hover:bg-[#b89a80] disabled:opacity-40 disabled:hover:bg-[#C3AD96] transition-colors duration-300 shadow-sm"
                 >
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   שליחת הודעה

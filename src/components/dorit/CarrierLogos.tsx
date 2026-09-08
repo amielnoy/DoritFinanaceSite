@@ -19,18 +19,18 @@ const CARRIERS: Carrier[] = [
 
 export default function CarrierLogos() {
   return (
-    <section className="relative py-20 md:py-24 border-y border-border/60 bg-secondary/40 overflow-hidden">
+    <section className="relative py-16 md:py-20 border-y border-border/50 bg-secondary/30 overflow-hidden">
       {/* subtle architectural accent line */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-accent/30 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-accent/25 to-transparent" />
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
-        <div className="text-center mb-12 md:mb-14">
+        <div className="text-center mb-10 md:mb-12">
           <p className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            עובדת מול מיטב חברות הביטוח והפנסיה בישראל
+            עובדת מול מיטב חברות הפנסיה והביטוח בישראל
           </p>
-          <div className="mt-5 mx-auto w-12 h-px bg-highlight/50" />
+          <div className="mt-4 mx-auto w-10 h-px bg-[#C3AD96]/60" />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-10 md:gap-y-12 items-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-x-2 gap-y-8 md:gap-y-10 items-center">
           {CARRIERS.map((c) => (
             <a
               key={c.en}
@@ -40,11 +40,11 @@ export default function CarrierLogos() {
               aria-label={`אתר ${c.he}`}
               className="group flex flex-col items-center text-center"
             >
-              <span className="font-heading text-xl md:text-2xl tracking-tight leading-none text-muted-foreground/65 group-hover:text-foreground transition-colors duration-500">
+              <span className="font-heading text-lg md:text-xl tracking-tight leading-none text-muted-foreground/55 group-hover:text-foreground transition-colors duration-500">
                 {c.he}
               </span>
               {c.en && c.en !== c.he && (
-                <span className="mt-2 text-[9px] tracking-[0.3em] uppercase text-muted-foreground/40 group-hover:text-accent/70 transition-colors duration-500">
+                <span className="mt-1.5 text-[9px] tracking-[0.3em] uppercase text-muted-foreground/35 group-hover:text-accent/70 transition-colors duration-500">
                   {c.en}
                 </span>
               )}
@@ -52,8 +52,8 @@ export default function CarrierLogos() {
           ))}
         </div>
 
-        <p className="mt-14 text-center text-sm text-muted-foreground/60 max-w-xl mx-auto leading-relaxed">
-          גישה בלתי-תלויה לכל שוק הביטוח והפנסיה — ההמלצה נגזרת אך ורק מהצורך שלך,
+        <p className="mt-12 text-center text-sm text-muted-foreground/55 max-w-xl mx-auto leading-relaxed">
+          גישה בלתי-תלויה לכל שוק הפנסיה והביטוח — ההמלצה נגזרת אך ורק מהצורך שלך,
           לא משייכות מסחרית לחברה כלשהי.
         </p>
       </div>

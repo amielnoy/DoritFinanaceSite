@@ -6,7 +6,7 @@ export default function FloatingActions() {
   return (
     <div className="hidden md:flex fixed bottom-4 z-50 flex-row gap-3 right-4 left-auto md:flex-col md:left-4 md:right-auto">
       <a
-        href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent("שלום דורית, אשמח/ה לשמוע פרטים נוספים על ייעוץ ביטוחי ופיננסי.")}`}
+        href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent("שלום דורית, אשמח/ה לשמוע פרטים נוספים על ייעוץ פיננסי וביטוחי.")}`}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="פתיחת שיחה בוואטסאפ"

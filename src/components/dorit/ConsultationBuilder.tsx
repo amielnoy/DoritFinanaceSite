@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { Check, ChevronLeft, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import GoogleCalendarBooking from "@/components/dorit/GoogleCalendarBooking";
-
-const NOTIFY_EMAIL = "amielnoy@gmail.com";
-const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
+import OutlookCalendarBooking from "@/components/dorit/OutlookCalendarBooking";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { he } from "date-fns/locale";
 
 interface ConsultationData {
   topic: string;
@@ -26,15 +27,15 @@ const STEPS: StepDef[] = [
     key: "topic",
     label: "תחום הייעוץ",
     options: [
-      "פנסיה ופיננסים",
-      "ביטוח חיים ובריאות",
-      "ליווי תביעות",
+      "פיננסים מיסוי וקיבוע זכויות",
+      "גמל, השתלמות ופנסיה",
+      "ביטוחי חיים ובריאות",
     ],
   },
   {
     key: "timing",
     label: "מתעניינים",
-    options: ["השבוע", "החודש", "בעוד מספר חודשים", "רק מתלבט/ת"],
+    options: ["השבוע", "השבוע הבא"],
   },
   {
     key: "contact",
@@ -55,6 +56,7 @@ export default function ConsultationBuilder() {
   const [done, setDone] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
   const isLast = step === STEPS.length - 1;
   const canNext =
@@ -67,73 +69,20 @@ export default function ConsultationBuilder() {
   const submitRequest = async () => {
     setSending(true);
     setError("");
-    const when = data.timing || "לפי תיאום";
-    const firstName = data.name.split(" ")[0];
-    const agentBody =
-      `בקשת ייעוץ חדשה — ${new Date().toLocaleString("he-IL")}\n\n` +
-      `שם: ${data.name}\n` +
-      `טלפון: ${data.phone}\n` +
-      `אימייל: ${data.email || "—"}\n` +
-      `תחום ייעוץ: ${data.topic || "—"}\n` +
-      `מועד מבוקש: ${when}\n` +
-      `הערות: ${data.notes || "—"}`;
-    const clientBody =
-      `שלום ${firstName},\n\n` +
-      `קיבלתי את בקשת הייעוץ שלכם והפרטים תועדו במערכת בהצלחה.\n` +
-      `כל פרט שמסרתם נשמר בסודיות מלאה ובכבוד.\n\n` +
-      `נושא הפגישה: ${data.topic || "ייעוץ כללי"}\n` +
-      `מועד מבוקש: ${when}\n\n` +
-      `אחזור אליכם אישית תוך יום עסקים אחד לתיאום מועד מדויק לפגישה.\n` +
-      `עד אז — נשמו רגועים. הכל מתוכנן.\n\n` +
-      `לכל שאלה או עדכון, ניתן להשיב ישירות למייל זה.\n\n` +
-      `בברכה חמה,\n` +
-      `דורית גוב ארי\n` +
-      `ייעוץ ביטוחי ופיננסי\n` +
-      `doritg@fsfp-fin.co.il`;
     try {
-      await base44.integrations.Core.SendEmail({
-        to: NOTIFY_EMAIL,
-        subject: `בקשת ייעוץ חדשה — ${data.name}`,
-        body: agentBody,
-      });
-    } catch (e) {
-      setError("לא הצלחנו לשלוח את הבקשה כרגע. ניתן לשלוח מייל ישירות ל-doritg@fsfp-fin.co.il או לנסות שוב.");
-      setSending(false);
-      return;
-    }
-    try {
-      await base44.integrations.Core.SendEmail({
-        to: SECONDARY_EMAIL,
-        subject: `בקשת ייעוץ חדשה — ${data.name}`,
-        body: agentBody,
-      });
-    } catch (e) {
-      /* עותק מיטבי לדורית — מתעלם אם הכתובת עדיין אינה רשומה/דומיין לא מאומת */
-    }
-    if (data.email) {
-      try {
-        await base44.integrations.Core.SendEmail({
-          to: data.email,
-          subject: `אישור — קיבלנו את בקשת הייעוץ שלכם · דורית גוב ארי`,
-          body: clientBody,
-        });
-      } catch (e) {
-        /* מייל תיעוד ללקוח — מיטבי מאמץ */
-      }
-    }
-    try {
-      await base44.entities.Lead.create({
+      await base44.functions.invoke("submitLead", {
         name: data.name,
         phone: data.phone,
         email: data.email || "",
         source: "consultation",
         topic: data.topic || "",
         timing: data.timing || "",
-        message: data.notes || "",
-        status: "new",
+        notes: data.notes || "",
       });
     } catch (e) {
-      /* תיעוד הפנייה במאגר — מיטבי */
+      setError("לא הצלחנו לשלוח את הבקשה כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
+      setSending(false);
+      return;
     }
     try {
       await base44.functions.invoke("createConsultationEvent", {
@@ -146,6 +95,18 @@ export default function ConsultationBuilder() {
       });
     } catch (e) {
       /* יצירת אירוע ביומן Google — מיטבי, לא חוסם את התהליך */
+    }
+    try {
+      await base44.functions.invoke("createOutlookEvent", {
+        name: data.name,
+        phone: data.phone,
+        email: data.email || "",
+        topic: data.topic || "",
+        timing: data.timing || "",
+        notes: data.notes || "",
+      });
+    } catch (e) {
+      /* יצירת אירוע ביומן Outlook — מיטבי, לא חוסם את התהליך */
     }
     setSending(false);
     setDone(true);
@@ -168,21 +129,22 @@ export default function ConsultationBuilder() {
         className="relative py-24 md:py-32 bg-primary text-primary-foreground"
       >
         <div className="max-w-2xl mx-auto px-6 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full border border-[#C4A484] flex items-center justify-center mb-8">
-            <Check size={28} className="text-[#C4A484]" />
+          <div className="w-16 h-16 mx-auto rounded-full border border-[#C3AD96] flex items-center justify-center mb-8">
+            <Check size={28} className="text-[#C3AD96]" />
           </div>
           <h2 className="font-heading text-4xl md:text-5xl">
             תודה, {data.name.split(" ")[0]}.
           </h2>
           <p className="mt-6 text-primary-foreground/80 leading-relaxed">
-            קיבלתי את בקשתכם. אחזור אליכם אישית תוך יום עסקים אחד כדי לתאם את
-            פגישת הייעוץ הראשונה. עד אז — נשמו רגועים. הכל מתוכנן.
+            קיבלתי את הבקשה. אחזור אישית תוך יום עסקים אחד לתיאום פגישת
+            הייעוץ הראשונה. עד אז — לשמור על רוגע. הכל מתוכנן.
           </p>
           <button
             onClick={() => {
               setDone(false);
               setStep(0);
               setData({ topic: "", timing: "", name: "", phone: "", email: "", notes: "" });
+              setSelectedDate(undefined);
             }}
             className="mt-10 text-sm tracking-wide underline underline-offset-4 hover:text-[#C4A484] transition-colors"
           >
@@ -196,7 +158,7 @@ export default function ConsultationBuilder() {
   return (
     <section
       id="consultation"
-      className="relative py-24 md:py-32 border-t border-border/60"
+      className="relative py-24 md:py-32 border-t border-border/50"
     >
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
@@ -216,7 +178,10 @@ export default function ConsultationBuilder() {
             <p className="text-xs tracking-[0.2em] uppercase text-muted-foreground mb-4">
               או לקביעה ישירה ביומן
             </p>
-            <GoogleCalendarBooking data={data} />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <GoogleCalendarBooking data={data} />
+              <OutlookCalendarBooking data={data} />
+            </div>
           </div>
         </div>
 
@@ -259,9 +224,10 @@ export default function ConsultationBuilder() {
                         key={opt}
                         type="button"
                         aria-pressed={selected}
-                        onClick={() =>
-                          setData((d) => ({ ...d, [STEPS[step].key as keyof ConsultationData]: opt }))
-                        }
+                        onClick={() => {
+                          setData((d) => ({ ...d, [STEPS[step].key as keyof ConsultationData]: opt }));
+                          if (step === 1) setSelectedDate(undefined);
+                        }}
                         className={`text-right px-6 py-4 border transition-all duration-300 flex items-center justify-between ${
                           selected
                             ? "border-primary bg-primary text-primary-foreground"
@@ -274,6 +240,29 @@ export default function ConsultationBuilder() {
                     );
                   })}
                 </div>
+                {step === 1 && (
+                  <div className="mt-6">
+                    <p className="text-xs tracking-[0.15em] uppercase text-muted-foreground mb-3 text-center">
+                      או לבחירת תאריך מדויק
+                    </p>
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                          setSelectedDate(date);
+                          if (date) {
+                            setData((d) => ({ ...d, timing: format(date, "dd/MM/yyyy") }));
+                          }
+                        }}
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                        dir="rtl"
+                        locale={he}
+                        className="rounded-md border"
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="space-y-5">
@@ -328,7 +317,7 @@ export default function ConsultationBuilder() {
             <button
               onClick={next}
               disabled={!canNext || sending}
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C4A484] text-primary font-medium hover:bg-[#b8916f] disabled:opacity-40 disabled:hover:bg-[#C4A484] transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3.5 bg-[#C3AD96] text-primary font-medium hover:bg-[#b89a80] disabled:opacity-40 disabled:hover:bg-[#C3AD96] transition-colors duration-300 shadow-sm"
             >
               {sending && <Loader2 size={16} className="animate-spin" />}
               {isLast ? "שליחת בקשה" : "המשך"}
