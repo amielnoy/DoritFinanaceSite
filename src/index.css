@@ -18,8 +18,14 @@
     --muted-foreground: 30 10% 40%;
     --accent: 26 14% 39%;           /* #7D6B5D Deep Taupe */
     --accent-foreground: 36 38% 97%;
-    --highlight: 32 33% 65%;         /* #C4A484 Soft Bronze */
+    /* Soft Bronze ramp. Every bronze on the site resolves to one of these
+       three; raw hex is banned outside this file (see eslint.config.js). */
+    --highlight: 32 33% 65%;          /* #C4A484  base — CTAs, accents      */
+    --highlight-strong: 27 34% 58%;   /* #b8916f  hover / pressed           */
+    --highlight-muted: 30 26% 68%;    /* #C3AD96  surfaces, borders, rules  */
     --highlight-foreground: 240 3% 10%;
+    /* Third-party brand colour, fixed by WhatsApp — not ours to restyle. */
+    --brand-whatsapp: 142 70% 49%;    /* #25D366 */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
     --border: 30 10% 85%;

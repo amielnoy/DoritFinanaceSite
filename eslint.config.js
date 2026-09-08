@@ -35,6 +35,27 @@ export default [
       "unused-imports": pluginUnusedImports,
     },
     rules: {
+      // ── Design tokens ────────────────────────────────────────────────────
+      // Raw colour hex is banned in application code. The bronze had already
+      // forked into five near-identical values (#C4A484, #C3AD96, #b8916f,
+      // #b89a80, #9C836A) with a --highlight token defined and referenced by
+      // nothing, so a palette change meant a 141-site find-and-replace.
+      // Colours belong in src/index.css and reach components as Tailwind
+      // classes: bg-highlight, text-highlight-strong, border-highlight-muted.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "Literal[value=/#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\\b/]",
+          message:
+            'Raw colour hex is not allowed here. Add a token to src/index.css and use the Tailwind class (e.g. bg-highlight).',
+        },
+        {
+          selector: "TemplateElement[value.raw=/#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\\b/]",
+          message:
+            'Raw colour hex is not allowed here. Add a token to src/index.css and use the Tailwind class (e.g. bg-highlight).',
+        },
+      ],
+
       "no-unused-vars": "off",
       "react/jsx-uses-vars": "error",
       "react/jsx-uses-react": "error",

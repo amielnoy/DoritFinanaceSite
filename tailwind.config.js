@@ -37,6 +37,13 @@ module.exports = {
   				DEFAULT: 'hsl(var(--accent))',
   				foreground: 'hsl(var(--accent-foreground))'
   			},
+  			whatsapp: 'hsl(var(--brand-whatsapp))',
+  			highlight: {
+  				DEFAULT: 'hsl(var(--highlight))',
+  				strong: 'hsl(var(--highlight-strong))',
+  				muted: 'hsl(var(--highlight-muted))',
+  				foreground: 'hsl(var(--highlight-foreground))'
+  			},
   			destructive: {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
