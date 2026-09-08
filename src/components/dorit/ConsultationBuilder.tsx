@@ -7,9 +7,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { he } from "date-fns/locale";
 
-const NOTIFY_EMAIL = "amielnoy@gmail.com";
-const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
-
 interface ConsultationData {
   topic: string;
   timing: string;
@@ -72,66 +69,20 @@ export default function ConsultationBuilder() {
   const submitRequest = async () => {
     setSending(true);
     setError("");
-    const when = data.timing || "לפי תיאום";
-    const firstName = data.name.split(" ")[0];
-    const agentBody =
-      `בקשת ייעוץ חדשה — ${new Date().toLocaleString("he-IL")}\n\n` +
-      `שם: ${data.name}\n` +
-      `טלפון: ${data.phone}\n` +
-      `אימייל: ${data.email || "—"}\n` +
-      `תחום ייעוץ: ${data.topic || "—"}\n` +
-      `מועד מבוקש: ${when}\n` +
-      `הערות: ${data.notes || "—"}`;
-    const clientBody =
-      `שלום ${firstName}, קיבלתי את בקשת הייעוץ והפרטים תועדו בהצלחה.\n` +
-      `נושא: ${data.topic || "ייעוץ כללי"} · מועד מבוקש: ${when}\n` +
-      `אחזור אליכם אישית תוך יום עסקים אחד לתיאום מדויק.\n` +
-      `לכל שאלה — ניתן להשיב ישירות למייל זה.\n` +
-      `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`;
     try {
-      await base44.integrations.Core.SendEmail({
-        to: NOTIFY_EMAIL,
-        subject: `בקשת ייעוץ חדשה — ${data.name}`,
-        body: agentBody,
-      });
-    } catch (e) {
-      setError("לא הצלחנו לשלוח את הבקשה כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
-      setSending(false);
-      return;
-    }
-    try {
-      await base44.integrations.Core.SendEmail({
-        to: SECONDARY_EMAIL,
-        subject: `בקשת ייעוץ חדשה — ${data.name}`,
-        body: agentBody,
-      });
-    } catch (e) {
-      /* עותק מיטבי לדורית — מתעלם אם הכתובת עדיין אינה רשומה/דומיין לא מאומת */
-    }
-    if (data.email) {
-      try {
-        await base44.integrations.Core.SendEmail({
-          to: data.email,
-          subject: `אישור — קיבלנו את בקשת הייעוץ שלכם · דורית גוב ארי`,
-          body: clientBody,
-        });
-      } catch (e) {
-        /* מייל תיעוד ללקוח — מיטבי מאמץ */
-      }
-    }
-    try {
-      await base44.entities.Lead.create({
+      await base44.functions.invoke("submitLead", {
         name: data.name,
         phone: data.phone,
         email: data.email || "",
         source: "consultation",
         topic: data.topic || "",
         timing: data.timing || "",
-        message: data.notes || "",
-        status: "new",
+        notes: data.notes || "",
       });
     } catch (e) {
-      /* תיעוד הפנייה במאגר — מיטבי */
+      setError("לא הצלחנו לשלוח את הבקשה כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
+      setSending(false);
+      return;
     }
     try {
       await base44.functions.invoke("createConsultationEvent", {

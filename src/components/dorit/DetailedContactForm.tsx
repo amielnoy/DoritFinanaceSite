@@ -2,9 +2,6 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Send, Loader2, Check, AlertCircle } from "lucide-react";
 
-const NOTIFY_EMAIL = "amielnoy@gmail.com";
-const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
-
 const SERVICES: string[] = [
   "פיננסים מיסוי וקיבוע זכויות",
   "גמל, השתלמות ופנסיה",
@@ -57,42 +54,15 @@ export default function DetailedContactForm() {
     setBusy(true);
     setError("");
     try {
-      const body =
-        `פנייה מפורטת מהאתר — ${new Date().toLocaleString("he-IL")}\n\n` +
-        `שם: ${form.name}\n` +
-        `טלפון: ${form.phone}\n` +
-        `אימייל: ${form.email || "—"}\n` +
-        `שירות מבוקש: ${form.service}\n` +
-        `מועד מועדף ליצירת קשר: ${form.contactTime || "—"}\n\n` +
-        `הודעה אישית:\n${form.message}`;
-      await base44.integrations.Core.SendEmail({
-        to: NOTIFY_EMAIL,
-        subject: `פנייה מפורטת — ${form.name} (${form.service})`,
-        body,
+      await base44.functions.invoke("submitLead", {
+        name: form.name,
+        phone: form.phone,
+        email: form.email || "",
+        source: "detailed",
+        topic: form.service || "",
+        timing: form.contactTime || "",
+        message: form.message || "",
       });
-      try {
-        await base44.integrations.Core.SendEmail({
-          to: SECONDARY_EMAIL,
-          subject: `פנייה מפורטת — ${form.name} (${form.service})`,
-          body,
-        });
-      } catch (e) {
-        /* עותק מיטבי לדורית */
-      }
-      try {
-        await base44.entities.Lead.create({
-          name: form.name,
-          phone: form.phone,
-          email: form.email || "",
-          source: "detailed",
-          topic: form.service || "",
-          timing: form.contactTime || "",
-          message: form.message || "",
-          status: "new",
-        });
-      } catch (e) {
-        /* תיעוד הפנייה במאגר — מיטבי */
-      }
       setSent(true);
       setForm({
         name: "",
