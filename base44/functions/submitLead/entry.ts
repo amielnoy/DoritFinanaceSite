@@ -114,6 +114,38 @@ export default async function(req) {
       });
     } catch (e) { /* מיטבי */ }
 
+    // יצירת אירוע תזכורת ביומן Outlook — מיטבי
+    try {
+      const { accessToken } = await base44.asServiceRole.connectors.getConnection('outlook');
+      if (accessToken) {
+        const now = new Date();
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const yyyy = tomorrow.getUTCFullYear();
+        const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        const calSubject = subject;
+        const calContent = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
+
+        await fetch('https://graph.microsoft.com/v1.0/me/events', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            subject: calSubject,
+            body: { contentType: 'Text', content: calContent },
+            start: { dateTime: `${dateStr}T09:00:00`, timeZone: 'Israel Standard Time' },
+            end: { dateTime: `${dateStr}T09:30:00`, timeZone: 'Israel Standard Time' },
+            isReminderOn: true,
+            reminderMinutesBeforeStart: 60,
+          }),
+        });
+      }
+    } catch (e) { /* מיטבי */ }
+
     return Response.json({ ok: true });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
