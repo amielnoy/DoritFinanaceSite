@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Send, Loader2, Check, AlertCircle } from "lucide-react";
 
 const NOTIFY_EMAIL = "amielnoy@gmail.com";
-const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
+const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 const SERVICES: string[] = [
   "פיננסים מיסוי וקיבוע זכויות",
@@ -104,7 +104,7 @@ export default function DetailedContactForm() {
         consent: false,
       });
     } catch (err) {
-      setError("לא הצלחנו לשלוח את הטופס כרגע. ניתן לשלוח מייל ישירות ל-doritg@fsfp-fin.co.il או לנסות שוב.");
+      setError("לא הצלחנו לשלוח את הטופס כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
     } finally {
       setBusy(false);
     }

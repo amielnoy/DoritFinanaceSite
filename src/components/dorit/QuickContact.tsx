@@ -4,7 +4,7 @@ import { Send, Loader2, Check, Mail, MessageCircle } from "lucide-react";
 
 // הכתובת שאליה יגיעו הפניות. לשליחה מובטחת — ודא/י שזו כתובת משתמש רשום באפליקציה.
 const NOTIFY_EMAIL = "amielnoy@gmail.com";
-const SECONDARY_EMAIL = "doritg@fsfp-fin.co.il";
+const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 interface QuickContactForm {
   name: string;
@@ -61,7 +61,7 @@ export default function QuickContact() {
       setSent(true);
       setForm({ name: "", phone: "", email: "", message: "" });
     } catch (e) {
-      setError("לא הצלחנו לשלוח כרגע. ניתן לשלוח מייל ישירות ל-doritg@fsfp-fin.co.il או לנסות שוב.");
+      setError("לא הצלחנו לשלוח כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.");
     } finally {
       setBusy(false);
     }
@@ -85,7 +85,7 @@ export default function QuickContact() {
           </p>
           <div className="mt-8 flex items-center gap-3 text-primary-foreground/60">
             <Mail size={16} className="text-[#C4A484]" />
-            <a href="mailto:doritg@fsfp-fin.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">doritg@fsfp-fin.co.il</a>
+            <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="hover:text-[#C4A484] transition-colors">dorit@govari-fin.co.il</a>
           </div>
           <a
             href="https://wa.me/972508311776"

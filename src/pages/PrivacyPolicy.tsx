@@ -95,7 +95,7 @@ export default function PrivacyPolicy() {
             <h2 className="font-heading text-2xl mb-3">8. אחראי לפרטיות</h2>
             <p>
               האחראי לענייני פרטיות בסוכנות הוא דורית גוב ארי. ניתן לפנות
-              בכתובת doritg@fsfp-fin.co.il או בטלפון המפורסם באתר.
+              בכתובת dorit@govari-fin.co.il או בטלפון המפורסם באתר.
             </p>
           </section>
         </div>
