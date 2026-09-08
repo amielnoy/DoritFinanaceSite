@@ -320,7 +320,7 @@ export default function ConsultationBuilder() {
                     label="טלפון"
                     value={data.phone}
                     onChange={(v) => setData((d) => ({ ...d, phone: v }))}
-                    placeholder="052-7077776"
+                    placeholder="050-8311776"
                   />
                 </div>
                 <Field
