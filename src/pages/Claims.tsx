@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
+import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
 import Reveal from "@/components/dorit/Reveal";
 import { CONTACT } from "@/config/contact";
 
@@ -101,6 +102,28 @@ const DOCS: string[] = [
 ];
 
 export default function Claims() {
+  useSeo({
+    title: "ליווי תביעות ביטוח — מה לעשות בעת אירוע | דורית גוב ארי",
+    description:
+      "מדריך מעשי להגשת תביעת ביטוח: מה לתעד, אילו מסמכים נדרשים, ואיך מתנהלים מול חברת הביטוח. ליווי אישי לאורך כל התהליך, 97% תביעות שאושרו.",
+    path: "/claims",
+    jsonLd: [
+      breadcrumbLd([
+        { name: "ראשי", path: "/" },
+        { name: "ליווי תביעות", path: "/claims" },
+      ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "Service",
+        name: "ליווי תביעות ביטוח",
+        serviceType: "ליווי והגשת תביעות מול חברות ביטוח",
+        areaServed: { "@type": "Country", name: "IL" },
+        inLanguage: "he-IL",
+        url: absoluteUrl("/claims"),
+        provider: { "@type": "FinancialService", name: SITE_NAME, url: absoluteUrl("/") },
+      },
+    ],
+  });
   return (
     <div className="min-h-screen bg-background">
       <FloatingHeader />

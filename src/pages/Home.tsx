@@ -1,4 +1,6 @@
 import React from "react";
+import { useSeo } from "@/lib/seo";
+import { HOME_FAQ_LD } from "@/lib/structured-data";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import SectionNav from "@/components/dorit/SectionNav";
 import SecurityScroll from "@/components/dorit/SecurityScroll";
@@ -21,6 +23,15 @@ import Footer from "@/components/dorit/Footer";
 import MobileStickyBar from "@/components/dorit/MobileStickyBar";
 
 export default function Home() {
+  useSeo({
+    title: "דורית גוב ארי | ייעוץ ביטוחי ופיננסי — אדריכלות של ביטחון",
+    description:
+      "יועצת ביטוחית ופיננסית עם 30 שנות ניסיון. ייעוץ פנסיוני, ביטוח חיים ובריאות וליווי תביעות — אישי, שקוף ובגובה העיניים. מחשבון דמי ניהול חינם.",
+    path: "/",
+    // FAQPage markup belongs only where the questions are actually rendered.
+    jsonLd: [HOME_FAQ_LD],
+  });
+
   return (
     <div className="relative bg-background pb-14 md:pb-0">
       <SecurityScroll />

@@ -1,6 +1,15 @@
 User-agent: *
 Allow: /
 
+# Private and non-content areas. These also send `noindex` at runtime
+# (src/components/SeoRouteGuard.tsx); this keeps them out of crawl budget too.
+Disallow: /admin/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /oauth/
+
 # AI / LLM crawlers — explicitly allowed for generative search
 User-agent: GPTBot
 Allow: /

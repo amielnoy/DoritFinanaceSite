@@ -1,8 +1,21 @@
 import React from "react";
 import FloatingHeader from "@/components/dorit/FloatingHeader";
 import Footer from "@/components/dorit/Footer";
+import { breadcrumbLd, useSeo } from "@/lib/seo";
 
 export default function PrivacyPolicy() {
+  useSeo({
+    title: "מדיניות פרטיות | דורית גוב ארי",
+    description:
+      "כיצד נאספים, נשמרים ומשמשים הפרטים שאתם מוסרים באתר — ומהן זכויותיכם לגבי המידע האישי שלכם.",
+    path: "/privacy",
+    jsonLd: [
+      breadcrumbLd([
+        { name: "ראשי", path: "/" },
+        { name: "מדיניות פרטיות", path: "/privacy" },
+      ]),
+    ],
+  });
   return (
     <div id="top">
       <FloatingHeader />

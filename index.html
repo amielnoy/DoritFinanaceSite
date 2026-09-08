@@ -4,7 +4,9 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#F9F7F2" />
+    <meta name="theme-color" content="#F9F7F2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#F9F7F2" media="(prefers-color-scheme: dark)" />
+    <meta name="format-detection" content="telephone=no" />
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Primary Meta -->
@@ -40,7 +42,29 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://media.base44.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+    <!-- LCP: the hero portrait is the largest element above the fold on every
+         viewport. Preloading it starts the fetch during HTML parse instead of
+         after the JS bundle mounts React — the single biggest mobile LCP win. -->
+    <link
+      rel="preload"
+      as="image"
+      fetchpriority="high"
+      href="https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/589e9d0cd_generated_11fed895.jpg"
+    />
+
+    <!-- Fonts load without blocking the first paint. `display=swap` already
+         shows fallback text immediately; switching the stylesheet to a preload
+         removes it from the critical path too, which matters most on mobile. -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" />
+    </noscript>
 
     <!-- Structured Data: FinancialService / LocalBusiness -->
     <script type="application/ld+json">
@@ -73,45 +97,8 @@
     }
     </script>
 
-    <!-- Structured Data: FAQPage -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "כדאי לבדוק את דמי הניהול בכל מוצר — ולא רק בפנסיה?",
-          "acceptedAnswer": { "@type": "Answer", "text": "הפרש של אחוז אחד בלבד בדמי ניהול מצטבר לעשרות אלפי שקלים לאורך השנים. כדאי לבקש מכל גוף מוסדי פירוט מדויק של דמי הניהול בקרן, בביטוח המנהלים ובקרן ההשתלמות, ולהשוות. במקרים רבים ניתן להוריד את העמלה במשא ומתן פשוט — גם מבלי לעבור קרן." }
-        },
-        {
-          "@type": "Question",
-          "name": "האם חשוב להקפיד על כיסוי אובדן כושר עבודה?",
-          "acceptedAnswer": { "@type": "Answer", "text": "ביטוח אובדן כושר עבודה הוא קו ההגנה הראשון — לא פחות חשוב מהחיסכון עצמו. כדאי לוודא שגובה הכיסוי תואם את ההכנסה הנוכחית, שתקופת ההמתנה מתאימה ליכולת הכלכלית, ושההגדרה 'עיסוק אובייקטיבי' מופיעה בפוליסה." }
-        },
-        {
-          "@type": "Question",
-          "name": "באיזו תדירות כדאי לבצע ביקורת תיק מסכמת?",
-          "acceptedAnswer": { "@type": "Answer", "text": "מצב משפחתי, מקום עבודה ומצב בריאותי משתנים — ואיתם גם הכיסויים הנכונים. כדאי לקבוע פגישת סיכום שנתית שבה עוברים יחד על כל המוצרים: פנסיה, ביטוחי בריאות, חיים ומשכנתא. עדכון שגרתי מונע פערים יקרים." }
-        },
-        {
-          "@type": "Question",
-          "name": "מתי כדאי להתחיל לחסוך לילדים?",
-          "acceptedAnswer": { "@type": "Answer", "text": "הפקדה חודשית קטנה לחיסכון לילד מגיל חודשיים צומחת לאורך 20+ שנה לסכום משמעותי הודות לריבית דריבית. כדאי לבחור במוצר עם דמי ניהול נמוכים ונזילות גבוהה, ולהגדיר מראש את המטרה (לימודים, דירה, צבירת הון)." }
-        },
-        {
-          "@type": "Question",
-          "name": "האם ביטוח בריאות משלים הכרחי?",
-          "acceptedAnswer": { "@type": "Answer", "text": "לפני רכישת ביטוח בריאות משלים, כדאי לבדוק מה כבר מכסה קופת החולים והפנסיה הקיימת. המפתח הוא השלמה מדויקת של פערים — ניתוחים פרטיים, תרופות יקרות, אשפוז במחלקה סגורה — ולא רכישה גורפת של פוליסות נוספות." }
-        },
-        {
-          "@type": "Question",
-          "name": "כיצד עצמאים יכולים למקסם הטבות מס פנסיוניות?",
-          "acceptedAnswer": { "@type": "Answer", "text": "עצמאים שדוחים הפקדות 'עד שיהיה רווחי יותר' מפסידים הטבות מס משמעותיות ושנות צבירת הון שאינן חוזרות. כדאי להתחיל בהפקדה חודשית קבועה, גם צנועה, ולהגדיל אותה עם הזמן. בנוסף, כדאי לוודא כיסוי אובדן כושר עבודה — ללא מעסיק שמפרנס, הוא קריטי פי כמה." }
-        }
-      ]
-    }
-    </script>
+    <!-- Structured Data: FAQPage is injected per-route by src/lib/seo.ts,
+         so only the home page (which renders the questions) claims it. -->
 
     <!-- Structured Data: Person -->
     <script type="application/ld+json">
