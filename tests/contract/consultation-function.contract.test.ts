@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 import { REPO_ROOT, loadEntity } from "../helpers/entity-schema";
 import { findObjectLiteralCalls } from "../helpers/source-scan";
 
+/** Calendar holds are issued by the lead adapter, not by a component. */
+const LEAD_ADAPTER = [join(REPO_ROOT, "src/services/base44/Base44LeadService.ts")];
+
 const FN_PATH = join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts");
 const fnSource = readFileSync(FN_PATH, "utf8");
 
@@ -18,17 +21,35 @@ const destructured = (() => {
 })();
 
 describe("createConsultationEvent — request contract", () => {
-  const invocations = findObjectLiteralCalls(
-    /base44\.functions\.invoke\(\s*["']createConsultationEvent["']\s*,\s*/
-  );
+  const adapterSource = readFileSync(LEAD_ADAPTER[0], "utf8");
+  // The adapter builds one payload and sends it to both calendars, so the
+  // contract lives in that literal rather than at each call site.
+  const payload = findObjectLiteralCalls(/const payload\s*=\s*/, LEAD_ADAPTER);
 
-  it("is invoked from the consultation builder", () => {
-    expect(invocations.length).toBe(1);
-    expect(invocations[0].file).toBe("src/components/dorit/ConsultationBuilder.tsx");
+  it("is issued by the lead adapter, so components never call it directly", () => {
+    expect(adapterSource).toContain('invoke("createConsultationEvent"');
+    expect(adapterSource).toContain('invoke("createOutlookEvent"');
+
+    const fromComponents = findObjectLiteralCalls(
+      /functions\.invoke\(\s*["']createConsultationEvent["']\s*,\s*/
+    );
+    expect(fromComponents, "a component is calling the calendar function directly").toEqual([]);
   });
 
-  it("the client sends exactly the fields the function reads", () => {
-    expect([...invocations[0].keys].sort()).toEqual([...destructured].sort());
+  it("both calendars receive the same payload", () => {
+    expect(payload).toHaveLength(1);
+    expect(adapterSource).toMatch(
+      /invoke\("createConsultationEvent", payload\)[\s\S]*invoke\("createOutlookEvent", payload\)/
+    );
+  });
+
+  it("the payload carries exactly the fields the function reads", () => {
+    expect([...payload[0].keys].sort()).toEqual([...destructured].sort());
+  });
+
+  it("a calendar failure can never fail the submission", () => {
+    // allSettled, not all: the lead is already saved by this point.
+    expect(adapterSource).toContain("Promise.allSettled");
   });
 
   it("the function's mandatory fields are the same as the Lead entity's", () => {

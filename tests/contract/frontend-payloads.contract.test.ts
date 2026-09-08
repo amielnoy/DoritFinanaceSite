@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadEntity, validateAgainstEntity } from "../helpers/entity-schema";
-import { backendFiles, findObjectLiteralCalls, read, rel } from "../helpers/source-scan";
+import { join } from "node:path";
+import { REPO_ROOT } from "../helpers/entity-schema";
+import { backendFiles, findObjectLiteralCalls, read, rel, sourceFiles } from "../helpers/source-scan";
 
 /**
  * Lead capture crosses two boundaries, and this file pins both:
@@ -24,52 +26,45 @@ function destructuredBody(src: string): string[] {
   return m[1].split(",").map((s) => s.trim()).filter(Boolean).sort();
 }
 
-describe("browser → submitLead", () => {
-  const calls = findObjectLiteralCalls(/base44\.functions\.invoke\(\s*["']submitLead["']\s*,\s*/);
+const ADAPTERS = [
+  join(REPO_ROOT, "src/services/base44/Base44LeadService.ts"),
+  join(REPO_ROOT, "src/services/base44/Base44ContentService.ts"),
+];
+
+describe("adapter → submitLead", () => {
+  const calls = findObjectLiteralCalls(
+    /functions\.invoke\(\s*["']submitLead["']\s*,\s*/,
+    ADAPTERS
+  );
   const accepted = destructuredBody(backendSource("submitLead"));
 
-  it("is invoked from every lead-capturing form", () => {
-    expect(calls.map((c) => c.file).sort()).toEqual([
-      "src/components/dorit/ConsultationBuilder.tsx",
-      "src/components/dorit/DetailedContactForm.tsx",
-      "src/components/dorit/QuickContact.tsx",
-    ]);
+  it("exactly one adapter owns the call", () => {
+    // Previously three components each built this payload by hand. The contract
+    // now has a single place to drift, which is the point of the adapter.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].file).toBe("src/services/base44/Base44LeadService.ts");
   });
 
-  for (const call of calls) {
-    it(`${call.file} sends only fields the function reads`, () => {
-      const unknown = call.keys.filter((k) => !accepted.includes(k));
-      expect(unknown, `${call.file} sends fields submitLead ignores`).toEqual([]);
-    });
+  it("sends exactly the fields the function destructures", () => {
+    expect([...calls[0].keys].sort()).toEqual(accepted);
+  });
 
-    it(`${call.file} sends the two fields the function requires`, () => {
-      for (const required of ["name", "phone"]) {
-        expect(call.keys, `${call.file} must send ${required}`).toContain(required);
-      }
-    });
-
-    it(`${call.file} uses a source the Lead entity declares`, () => {
-      const source = call.stringLiterals.source;
-      expect(source, `${call.file} must declare a source`).toBeTruthy();
-      expect(loadEntity("Lead").properties.source.enum).toContain(source);
-    });
-  }
-
-  it("covers every lead source the entity declares except the claim path", () => {
-    const fromForms = calls.map((c) => c.stringLiterals.source).sort();
-    const declared = [...(loadEntity("Lead").properties.source.enum ?? [])]
-      .filter((s) => s !== "claim") // written by submitClaim, asserted below
-      .sort();
-    expect(fromForms).toEqual(declared);
+  it("sends the two fields the function requires", () => {
+    for (const required of ["name", "phone"]) {
+      expect(calls[0].keys).toContain(required);
+    }
   });
 });
 
-describe("browser → submitClaim", () => {
-  const calls = findObjectLiteralCalls(/base44\.functions\.invoke\(\s*["']submitClaim["']\s*,\s*/);
+describe("adapter → submitClaim", () => {
+  const calls = findObjectLiteralCalls(
+    /functions\.invoke\(\s*["']submitClaim["']\s*,\s*/,
+    ADAPTERS
+  );
   const accepted = destructuredBody(backendSource("submitClaim"));
 
-  it("is invoked from the claim form", () => {
-    expect(calls.map((c) => c.file)).toEqual(["src/components/dorit/ClaimForm.tsx"]);
+  it("exactly one adapter owns the call", () => {
+    expect(calls).toHaveLength(1);
   });
 
   it("sends only fields the function reads, including name and phone", () => {
@@ -77,6 +72,48 @@ describe("browser → submitClaim", () => {
     for (const required of ["name", "phone"]) {
       expect(calls[0].keys).toContain(required);
     }
+  });
+});
+
+describe("dependency inversion holds", () => {
+  const uiFiles = sourceFiles().filter(
+    (f) => rel(f).startsWith("src/components/") || rel(f).startsWith("src/pages/")
+  );
+
+  /** Admin and auth screens still talk to the SDK directly — a known boundary. */
+  const ALLOWED_DIRECT_SDK = [
+    "src/components/dorit/sections/Testimonials.tsx",
+    "src/pages/BlogAdmin.tsx",
+    "src/pages/Leads.tsx",
+    "src/pages/Login.tsx",
+    "src/pages/Register.tsx",
+    "src/pages/ForgotPassword.tsx",
+    "src/pages/ResetPassword.tsx",
+  ];
+
+  it("no public-facing component imports the Base44 SDK directly", () => {
+    const offenders = uiFiles
+      .filter((f) => /from ["']@\/api\/base44Client["']/.test(read(f)))
+      .map(rel)
+      .filter((f) => !ALLOWED_DIRECT_SDK.includes(f));
+    expect(offenders, "these should depend on @/services instead").toEqual([]);
+  });
+
+  it("only the composition root names a concrete implementation", () => {
+    const wiring = sourceFiles().filter((f) => {
+      const r = rel(f);
+      if (r.startsWith("src/services/")) return false;
+      return /new Base44\w+Service\(/.test(read(f));
+    });
+    expect(wiring.map(rel)).toEqual([]);
+  });
+
+  it("the lead source union matches the entity enum", () => {
+    const ports = read(join(REPO_ROOT, "src/services/ports.ts"));
+    const union = ports.match(/export type LeadSource =([^;]+);/)![1];
+    const declared = (loadEntity("Lead").properties.source.enum ?? []).slice().sort();
+    const inCode = [...union.matchAll(/"([a-z]+)"/g)].map((m) => m[1]).sort();
+    expect(inCode).toEqual(declared);
   });
 });
 
@@ -197,11 +234,17 @@ describe("BlogPost writes match the BlogPost entity", () => {
     }
   });
 
-  it("the public blog list filters on the published flag only", () => {
-    const filters = findObjectLiteralCalls(/base44\.entities\.BlogPost\.filter\(\s*/);
-    expect(filters.length).toBe(1);
-    expect(filters[0].keys).toEqual(["published"]);
+  it("the published filter lives in the content adapter, not in a page", () => {
+    // Keeping it in the port means no caller can accidentally list drafts.
+    const inAdapter = findObjectLiteralCalls(/BlogPost\.filter\(\s*/, [
+      join(REPO_ROOT, "src/services/base44/Base44ContentService.ts"),
+    ]);
+    expect(inAdapter).toHaveLength(1);
+    expect(inAdapter[0].keys).toEqual(["published"]);
     expect(blogPost.properties.published.type).toBe("boolean");
+
+    const inPages = findObjectLiteralCalls(/BlogPost\.filter\(\s*/, sourceFiles().filter((f) => rel(f).startsWith("src/pages/")));
+    expect(inPages).toEqual([]);
   });
 });
 
