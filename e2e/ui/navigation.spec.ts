@@ -1,4 +1,19 @@
+import type { Page } from "@playwright/test";
 import { collectPageErrors, expect, gotoApp, test, test_step } from "../fixtures/app";
+
+/**
+ * Reach the header's navigation on whatever platform is running.
+ *
+ * The desktop nav is `hidden md:flex`, so on a phone the links exist only
+ * inside the drawer behind the hamburger. Tests that skip this step do not
+ * fail honestly — before this helper existed, the anchor test selected
+ * `a[href="#services"]` unscoped, and on mobile the only visible match was the
+ * *footer* link, so it silently exercised the footer instead of the header.
+ */
+async function openHeaderNav(page: Page, isMobile: boolean | undefined): Promise<void> {
+  if (!isMobile) return;
+  await page.getByRole("button", { name: "תפריט" }).click();
+}
 
 const PUBLIC_ROUTES = [
   { path: "/", heading: /דורית גוב ארי|אדריכלות/ },
@@ -53,17 +68,40 @@ test.describe("Routing — sanity", () => {
     });
   });
 
-  test("in-page anchors move the viewport to the right section", async ({ page }) => {
+  test("in-page anchors move the viewport to the right section", async ({ page, isMobile }) => {
     await test_step("open the home page", async () => {
       await gotoApp(page);
     });
 
-    await test_step("click the services link in the navigation", async () => {
-      // :visible — the desktop nav and the mobile drawer both carry this href.
-      await page.locator('a[href="#services"]:visible').first().click();
+    await test_step("click the services link in the header navigation", async () => {
+      await openHeaderNav(page, isMobile);
+      await page.locator("header").getByRole("link", { name: "שירותים" }).first().click();
     });
 
     await test_step("the services section is scrolled into view", async () => {
+      await expect(page.locator("#services")).toBeInViewport({ ratio: 0.05 });
+    });
+  });
+
+  test("the main menu reaches a home section from another route", async ({ page, isMobile }) => {
+    // The header renders on every route, but every section it names lives on
+    // the home page. While these were bare `#section` hrefs, clicking one from
+    // /blog set the URL to /blog#services and did nothing at all — the whole
+    // menu was dead on every route except home.
+    await test_step("open the blog, away from the home page", async () => {
+      await gotoApp(page, "/blog");
+      await expect(page).toHaveURL(/\/blog$/);
+    });
+
+    await test_step("click the services link in the header", async () => {
+      // By its label rather than its href: the point is that the visitor gets
+      // there, not how the anchor happens to be written.
+      await openHeaderNav(page, isMobile);
+      await page.locator("header").getByRole("link", { name: "שירותים" }).first().click();
+    });
+
+    await test_step("it lands on the home page at that section", async () => {
+      await expect(page).toHaveURL(/\/#services$/);
       await expect(page.locator("#services")).toBeInViewport({ ratio: 0.05 });
     });
   });

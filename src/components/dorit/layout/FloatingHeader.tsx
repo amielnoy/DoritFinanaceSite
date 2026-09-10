@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
@@ -24,6 +24,37 @@ const NAV: NavItem[] = [
 export default function FloatingHeader() {
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [open, setOpen] = useState<boolean>(false);
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  /**
+   * Every section these anchors name lives on the home page, and the header is
+   * rendered on every route. A bare `href="#services"` on /blog therefore sets
+   * the URL to /blog#services, finds no element of that id, and does nothing
+   * whatsoever — which left the entire main menu dead on /blog, /claims, /faq,
+   * /privacy and /accessibility, the CTA and the logo included. (A hash-only
+   * anchor fires `hashchange`, not `popstate`, so React Router never sees the
+   * change either and ScrollToTop cannot rescue it.)
+   *
+   * Route home first, then scroll — the same thing SectionNav does. The href
+   * stays a real `/#section` URL so middle-click, "open in new tab" and a
+   * JS-less load all still land in the right place.
+   */
+  const goToSection = (e: React.MouseEvent, hash: string) => {
+    // Leave modified clicks to the browser, or new-tab stops working.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    setOpen(false);
+
+    if (pathname !== "/") {
+      navigate(`/${hash}`);
+      return;
+    }
+
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+    // Keep the address bar honest without letting the browser jump-scroll.
+    window.history.replaceState(null, "", hash);
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -50,7 +81,11 @@ export default function FloatingHeader() {
       }`}
     >
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 flex items-center justify-between">
-        <a href="#top" className="flex items-center gap-3 leading-none">
+        <a
+          href="/#top"
+          onClick={(e) => goToSection(e, "#top")}
+          className="flex items-center gap-3 leading-none"
+        >
           <span className="hidden sm:flex w-9 h-9 items-center justify-center border border-accent/40 font-heading text-base text-accent">
             ד
           </span>
@@ -78,7 +113,8 @@ export default function FloatingHeader() {
             ) : (
               <a
                 key={n.href}
-                href={n.href}
+                href={`/${n.href}`}
+                onClick={(e) => goToSection(e, n.href)}
                 className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 relative group py-1"
               >
                 {n.label}
@@ -90,7 +126,8 @@ export default function FloatingHeader() {
 
         <div className="flex items-center gap-2.5">
           <a
-            href="#consultation"
+            href="/#consultation"
+            onClick={(e) => goToSection(e, "#consultation")}
             className="hidden md:inline-flex items-center px-5 py-2.5 bg-highlight-muted text-primary text-[13px] font-medium tracking-wide hover:bg-highlight-strong transition-colors duration-300"
           >
             לקביעת פגישת ייעוץ
@@ -159,8 +196,8 @@ export default function FloatingHeader() {
                   ) : (
                     <a
                       key={n.href}
-                      href={n.href}
-                      onClick={() => setOpen(false)}
+                      href={`/${n.href}`}
+                      onClick={(e) => goToSection(e, n.href)}
                       className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors"
                     >
                       <span>{n.label}</span>
@@ -172,8 +209,8 @@ export default function FloatingHeader() {
 
               <div className="px-6 py-5 border-t border-border/60 space-y-3">
                 <a
-                  href="#consultation"
-                  onClick={() => setOpen(false)}
+                  href="/#consultation"
+                  onClick={(e) => goToSection(e, "#consultation")}
                   className="flex items-center justify-center gap-2 w-full py-3.5 bg-highlight text-primary font-medium"
                 >
                   <Calendar size={18} />
