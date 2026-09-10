@@ -12,6 +12,7 @@ import CarrierLogos from "@/components/dorit/primitives/CarrierLogos";
 import ReviewsWidget from "@/components/dorit/sections/ReviewsWidget";
 import Perspective from "@/components/dorit/sections/Perspective";
 import ServiceMatrix from "@/components/dorit/sections/ServiceMatrix";
+import InsuranceAssessment from "@/components/dorit/sections/InsuranceAssessment";
 import ProofCarousel from "@/components/dorit/sections/ProofCarousel";
 import Testimonials from "@/components/dorit/sections/Testimonials";
 import FAQ from "@/components/dorit/sections/FAQ";
@@ -47,6 +48,7 @@ export default function Home() {
         <ReviewsWidget />
         <Perspective />
         <ServiceMatrix />
+        <InsuranceAssessment />
         <AgentChat descriptor={AGENTS.needsInterview} />
         <PensionFeeCalculator />
         <QuickContact />
