@@ -151,12 +151,26 @@ describe("auth and token handling", () => {
     expect(login).toMatch(/window\.location\.href\s*=\s*returnTo/);
   });
 
-  it("admin routes stay behind ProtectedRoute", () => {
+  it("admin routes stay behind a gate that requires both sign-in and the admin role", () => {
+    // The admin pages used to sit directly inside ProtectedRoute, an auth-only
+    // gate. They now sit inside AdminRoute, which delegates to ProtectedRoute
+    // when signed out and additionally turns away non-admins — so this asserts
+    // the block that holds them *and* that the gate itself still gates. A gate
+    // that stopped doing either would pass a "is it wrapped" check alone.
     const app = read(join(REPO_ROOT, "src/App.jsx"));
-    const protectedBlock = app.slice(app.indexOf("<ProtectedRoute"), app.indexOf("</Route>"));
+    const gateStart = app.indexOf("<AdminRoute");
+    expect(gateStart, "the admin pages must be wrapped in AdminRoute").toBeGreaterThan(-1);
+
+    const gateBlock = app.slice(gateStart, app.indexOf("</Route>", gateStart));
     for (const path of ["/admin/leads", "/admin/blog"]) {
-      expect(protectedBlock, `${path} must be inside ProtectedRoute`).toContain(path);
+      expect(gateBlock, `${path} must be inside AdminRoute`).toContain(path);
     }
+
+    const gate = read(join(REPO_ROOT, "src/components/AdminRoute.jsx"));
+    expect(gate, "AdminRoute must fall back to the auth gate when signed out").toContain(
+      "<ProtectedRoute"
+    );
+    expect(gate, "AdminRoute must turn away non-admin roles").toMatch(/role\s*!==\s*['"]admin['"]/);
   });
 });
 
