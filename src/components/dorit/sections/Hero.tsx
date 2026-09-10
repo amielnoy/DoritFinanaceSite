@@ -36,19 +36,24 @@ export default function Hero() {
               fittingType="fill"
               loading="eager"
               fetchpriority="high"
-              style={{ filter: "sepia(0.18) saturate(0.85) contrast(1.05) brightness(0.96)" }}
+              style={{ filter: "saturate(0.78) contrast(1.04) brightness(0.94)" }}
             />
-            {/* Warm duotone wash — harmonizes the cool water backdrop into the parchment palette */}
+            {/* Parchment duotone — shifts the cool water backdrop into the site's warm palette */}
+            <div
+              className="absolute inset-0 mix-blend-color pointer-events-none"
+              style={{ background: "linear-gradient(170deg, rgba(196,164,132,0.42) 0%, rgba(125,107,93,0.30) 50%, rgba(26,26,27,0.46) 100%)" }}
+            />
+            {/* Warm light wash to restore natural skin tones over the color blend */}
             <div
               className="absolute inset-0 mix-blend-soft-light pointer-events-none"
-              style={{ background: "linear-gradient(160deg, rgba(196,164,132,0.28) 0%, rgba(125,107,93,0.18) 55%, rgba(26,26,27,0.32) 100%)" }}
+              style={{ background: "linear-gradient(170deg, rgba(249,247,242,0.22) 0%, transparent 45%, rgba(26,26,27,0.18) 100%)" }}
             />
             {/* Bottom fade into the page background */}
-            <div className="absolute inset-0 bg-gradient-to-t from-background/55 via-background/5 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-background/10 to-transparent" />
             {/* Subtle vignette to focus attention on the subject */}
             <div
               className="absolute inset-0 pointer-events-none"
-              style={{ boxShadow: "inset 0 0 120px 20px rgba(26,26,27,0.35)" }}
+              style={{ boxShadow: "inset 0 0 140px 24px rgba(26,26,27,0.38)" }}
             />
           </div>
           <div className="absolute bottom-6 right-6 glass px-5 py-3.5 border border-border/50 shadow-sm">
