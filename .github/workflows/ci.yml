@@ -227,6 +227,8 @@ jobs:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
     needs: [build, test-node, test-e2e]
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || inputs.deploy)
@@ -357,3 +359,44 @@ jobs:
           name: playwright-report-smoke
           path: playwright-report/
           retention-days: 14
+
+  # ── 7. Where the two sites live ──────────────────────────────────────────
+  # Written to the run summary on every run, including when a deploy was
+  # skipped, so the links are always one click from the Actions tab rather
+  # than something you have to remember or dig out of a log.
+  sites:
+    name: Deployed sites
+    runs-on: ubuntu-latest
+    needs: [deploy-vercel, test-e2e]
+    if: always()
+    steps:
+      - name: Write the site links to the run summary
+        env:
+          BASE44_URL: ${{ vars.PRODUCTION_URL }}
+          VERCEL_URL: ${{ needs.deploy-vercel.outputs.url }}
+          VERCEL_RESULT: ${{ needs.deploy-vercel.result }}
+          TESTS_RESULT: ${{ needs.test-e2e.result }}
+        run: |
+          vercel_link="${VERCEL_URL:-https://vercel.com/amielnoy-9725s-projects/dorit-finance-site}"
+
+          case "$VERCEL_RESULT" in
+            success)  vercel_state="✅ deployed this run" ;;
+            skipped)  vercel_state="⏭️ not deployed (this run was not a push to main)" ;;
+            failure)  vercel_state="❌ deploy failed — the link is the previous deployment" ;;
+            *)        vercel_state="⚠️ $VERCEL_RESULT" ;;
+          esac
+
+          {
+            echo "## Deployed sites"
+            echo
+            echo "| Environment | URL | This run |"
+            echo "| --- | --- | --- |"
+            echo "| **Base44 — production** (client-facing) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | not deployed by CI — see note |"
+            echo "| **Vercel — staging** (login-protected) | ${vercel_link} | ${vercel_state} |"
+            echo
+            echo "Tests across all five platforms: **${TESTS_RESULT}**"
+            echo
+            echo "> Base44 is published with \`base44 deploy\` from a clean checkout of \`main\`, not by this pipeline —"
+            echo "> its GitHub connection is broken, so it cannot pull the merged code itself."
+            echo "> The Vercel staging link answers anonymous requests with a 302; sign in to Vercel to view it."
+          } >> "$GITHUB_STEP_SUMMARY"
