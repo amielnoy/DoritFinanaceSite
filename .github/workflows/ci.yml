@@ -328,7 +328,10 @@ jobs:
           # The project keeps Vercel Authentication on, so an anonymous curl is
           # answered with a 302 to a login page. `vercel curl` carries the
           # bypass, which is what makes this a real check rather than a ping.
-          body=$(npx vercel curl "$URL/" --token "$VERCEL_TOKEN")
+          # No --token here: `vercel curl` forwards flags it does not recognise
+          # to the real curl, which rejects --token. It authenticates from the
+          # VERCEL_TOKEN environment variable instead, which this step sets.
+          body=$(npx vercel curl "$URL/")
           echo "$body" | grep -q '<div id="root">' \
             || { echo "::error::Deployment did not serve the app shell"; exit 1; }
           echo "$body" | grep -q 'lang="he"' \
