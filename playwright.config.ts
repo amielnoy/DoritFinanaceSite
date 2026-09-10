@@ -86,6 +86,18 @@ export default defineConfig({
       name: "android-chrome",
       use: { ...devices["Pixel 7"] },
     },
+    {
+      // Samsung flagship. Playwright ships no S25 descriptor; the S24 is the
+      // newest and the two share a display geometry (6.2", 1080x2340 → 360x780
+      // CSS px at dpr 3), so this covers the S25 class honestly rather than
+      // inventing metrics.
+      //
+      // It earns its place on width, not on engine: at 360px this is 52px
+      // narrower than the Pixel 7, and narrow viewports are where RTL layouts
+      // break first.
+      name: "android-galaxy",
+      use: { ...devices["Galaxy S24"] },
+    },
   ],
 
   // Serve the real production build, so the e2e run also proves the bundle boots.

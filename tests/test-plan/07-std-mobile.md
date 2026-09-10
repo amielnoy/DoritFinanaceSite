@@ -1,7 +1,7 @@
 # STD-07 — Mobile Web (iOS & Android)
 
 **Suite:** `ui` (mobile block) · **Runners:** `npm run test:e2e:ios`, `npm run test:e2e:android`
-**Location:** `e2e/ui/mobile.spec.ts` · **Cases:** 10 × 2 platforms
+**Location:** `e2e/ui/mobile.spec.ts` · **Cases:** 10 × 3 platforms
 
 ---
 
@@ -16,14 +16,22 @@ ships:
 |---|---|---|---|---|---|
 | `ios-safari` | WebKit | iPhone 14 | 390 × 664 | 3 | yes |
 | `android-chrome` | Chromium | Pixel 7 | 412 × 839 | 2.625 | yes |
+| `android-galaxy` | Chromium | Galaxy S24 | 360 × 780 | 3 | yes |
 
 WebKit is the engine behind Safari on iOS (and the only engine iOS permits), so
 a WebKit run is a faithful check of iOS rendering and JS behaviour. It is **not**
 a substitute for a real-device pass on installability, push, or Safari UI chrome
 (address-bar resize, safe-area insets) — those need a device lab.
 
+Playwright ships no Galaxy S25 descriptor; the S24 is its newest Samsung
+flagship and the two share a display geometry (6.2", 1080×2340 → 360×780 CSS px
+at dpr 3), so `android-galaxy` covers the S25 class without inventing metrics.
+It earns its place on width rather than engine — it runs the same Chromium as
+the Pixel, but 52px narrower, and narrow viewports are where RTL layouts break
+first.
+
 The block is selected by Playwright's `isMobile` fixture, so it runs on exactly
-the two mobile projects and is skipped on the two desktop ones.
+the three mobile projects and is skipped on the two desktop ones.
 
 ## 2. Test cases
 

@@ -132,6 +132,8 @@ jobs:
             browser: webkit
           - project: android-chrome
             browser: chromium
+          - project: android-galaxy
+            browser: chromium
     steps:
       - uses: actions/checkout@v4
 
