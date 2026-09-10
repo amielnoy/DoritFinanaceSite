@@ -44,6 +44,8 @@ const STEPS: StepDef[] = [
   },
 ];
 
+const TIME_SLOTS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
+
 interface FieldProps {
   label: string;
   value: string;
@@ -56,6 +58,7 @@ export default function ConsultationBuilder() {
   const [step, setStep] = useState<number>(0);
   const [data, setData] = useState<ConsultationData>({ topic: "", timing: "", name: "", phone: "", email: "", notes: "" });
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState<string>("");
 
   const isLast = step === STEPS.length - 1;
   const canNext =
@@ -66,6 +69,13 @@ export default function ConsultationBuilder() {
       : !!data.name && !!data.phone;
 
   const submitRequest = async () => {
+    let scheduledAt = "";
+    if (selectedDate && selectedTime) {
+      const dt = new Date(selectedDate);
+      const [h, m] = selectedTime.split(":").map(Number);
+      dt.setHours(h, m, 0, 0);
+      scheduledAt = dt.toISOString();
+    }
     const lead = {
       name: data.name,
       phone: data.phone,
@@ -74,6 +84,7 @@ export default function ConsultationBuilder() {
       topic: data.topic,
       timing: data.timing,
       notes: data.notes,
+      scheduledAt,
     };
     // The lead is the operation that must succeed; the calendar holds are
     // decoration and are deliberately not awaited into the result.
@@ -114,6 +125,7 @@ export default function ConsultationBuilder() {
               setStep(0);
               setData({ topic: "", timing: "", name: "", phone: "", email: "", notes: "" });
               setSelectedDate(undefined);
+              setSelectedTime("");
             }}
             className="mt-10 text-sm tracking-wide underline underline-offset-4 hover:text-highlight transition-colors"
           >
@@ -195,7 +207,10 @@ export default function ConsultationBuilder() {
                         aria-pressed={selected}
                         onClick={() => {
                           setData((d) => ({ ...d, [STEPS[step].key as keyof ConsultationData]: opt }));
-                          if (step === 1) setSelectedDate(undefined);
+                          if (step === 1) {
+                            setSelectedDate(undefined);
+                            setSelectedTime("");
+                          }
                         }}
                         className={`text-right px-6 py-4 border transition-all duration-300 flex items-center justify-between ${
                           selected
@@ -221,7 +236,11 @@ export default function ConsultationBuilder() {
                         onSelect={(date) => {
                           setSelectedDate(date);
                           if (date) {
-                            setData((d) => ({ ...d, timing: format(date, "dd/MM/yyyy") }));
+                            const dateStr = format(date, "dd/MM/yyyy");
+                            setData((d) => ({
+                              ...d,
+                              timing: selectedTime ? `${dateStr} בשעה ${selectedTime}` : dateStr,
+                            }));
                           }
                         }}
                         disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
@@ -230,6 +249,37 @@ export default function ConsultationBuilder() {
                         className="rounded-md border"
                       />
                     </div>
+                    {selectedDate && (
+                      <div className="mt-5 flex flex-col items-center gap-3">
+                        <p className="text-xs tracking-[0.15em] uppercase text-muted-foreground">
+                          בחירת שעה
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {TIME_SLOTS.map((slot) => {
+                            const active = selectedTime === slot;
+                            return (
+                              <button
+                                key={slot}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => {
+                                  setSelectedTime(slot);
+                                  const dateStr = format(selectedDate, "dd/MM/yyyy");
+                                  setData((d) => ({ ...d, timing: `${dateStr} בשעה ${slot}` }));
+                                }}
+                                className={`px-4 py-2 text-sm border transition-colors ${
+                                  active
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border hover:border-accent hover:bg-background"
+                                }`}
+                              >
+                                {slot}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

@@ -128,7 +128,7 @@ export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { name, phone, email, source, topic, timing, message, notes } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt } = body || {};
 
     if (!name || !phone) {
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
@@ -214,12 +214,21 @@ export default async function(req) {
     if (source === 'consultation') try {
       const { accessToken } = await base44.asServiceRole.connectors.getConnection('outlook');
       if (accessToken) {
-        const now = new Date();
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        const yyyy = tomorrow.getUTCFullYear();
-        const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
-        const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
-        const dateStr = `${yyyy}-${mm}-${dd}`;
+        let calStartIso, calEndIso;
+        if (scheduledAt) {
+          const calStart = new Date(scheduledAt);
+          const calEnd = new Date(calStart.getTime() + 30 * 60 * 1000);
+          calStartIso = calStart.toISOString();
+          calEndIso = calEnd.toISOString();
+        } else {
+          const now = new Date();
+          const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          const yyyy = tomorrow.getUTCFullYear();
+          const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+          const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
+          calStartIso = `${yyyy}-${mm}-${dd}T09:00:00`;
+          calEndIso = `${yyyy}-${mm}-${dd}T09:30:00`;
+        }
 
         const calSubject = subject;
         const calContent = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
@@ -233,8 +242,8 @@ export default async function(req) {
           body: JSON.stringify({
             subject: calSubject,
             body: { contentType: 'Text', content: calContent },
-            start: { dateTime: `${dateStr}T09:00:00`, timeZone: 'Israel Standard Time' },
-            end: { dateTime: `${dateStr}T09:30:00`, timeZone: 'Israel Standard Time' },
+            start: { dateTime: calStartIso, timeZone: 'Israel Standard Time' },
+            end: { dateTime: calEndIso, timeZone: 'Israel Standard Time' },
             isReminderOn: true,
             reminderMinutesBeforeStart: 60,
           }),

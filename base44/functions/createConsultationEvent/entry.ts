@@ -4,7 +4,7 @@ export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { name, phone, email, topic, timing, notes } = body || {};
+    const { name, phone, email, topic, timing, notes, scheduledAt } = body || {};
 
     if (!name || !phone) {
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
@@ -12,13 +12,22 @@ export default async function(req) {
 
     const { accessToken } = await base44.asServiceRole.connectors.getConnection('googlecalendar');
 
-    // תזמון תזכורת מעקב למחר ב-09:00 שעון ישראל
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const yyyy = tomorrow.getUTCFullYear();
-    const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
-    const dateStr = `${yyyy}-${mm}-${dd}`;
+    // תזמון האירוע — לפי התאריך והשעה שנבחרו, או ברירת מחדל למחר ב-09:00
+    let startIso, endIso;
+    if (scheduledAt) {
+      const start = new Date(scheduledAt);
+      const end = new Date(start.getTime() + 30 * 60 * 1000);
+      startIso = start.toISOString();
+      endIso = end.toISOString();
+    } else {
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const yyyy = tomorrow.getUTCFullYear();
+      const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
+      startIso = `${yyyy}-${mm}-${dd}T09:00:00`;
+      endIso = `${yyyy}-${mm}-${dd}T09:30:00`;
+    }
 
     const summary = `ייעוץ חדש — ${name}`;
     const description = [
@@ -37,8 +46,8 @@ export default async function(req) {
     const eventBody = {
       summary,
       description,
-      start: { dateTime: `${dateStr}T09:00:00`, timeZone: 'Asia/Jerusalem' },
-      end: { dateTime: `${dateStr}T09:30:00`, timeZone: 'Asia/Jerusalem' },
+      start: { dateTime: startIso, timeZone: 'Asia/Jerusalem' },
+      end: { dateTime: endIso, timeZone: 'Asia/Jerusalem' },
       reminders: {
         useDefault: false,
         overrides: [

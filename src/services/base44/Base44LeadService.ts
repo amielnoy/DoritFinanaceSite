@@ -25,6 +25,7 @@ export class Base44LeadService implements LeadPort {
       timing: lead.timing ?? "",
       message: lead.message ?? "",
       notes: lead.notes ?? "",
+      scheduledAt: lead.scheduledAt ?? "",
     })) as SubmissionReceipt | undefined;
 
     return receipt ?? { ok: true };
@@ -58,6 +59,7 @@ export class Base44LeadService implements LeadPort {
       topic: lead.topic ?? "",
       timing: lead.timing ?? "",
       notes: lead.notes ?? "",
+      scheduledAt: lead.scheduledAt ?? "",
     };
     await Promise.allSettled([
       this.client.functions.invoke("createConsultationEvent", payload),

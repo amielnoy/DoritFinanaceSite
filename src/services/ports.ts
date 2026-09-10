@@ -19,6 +19,8 @@ export interface Lead {
   timing?: string;
   message?: string;
   notes?: string;
+  /** ISO datetime when the visitor picked a specific date+time; empty otherwise. */
+  scheduledAt?: string;
 }
 
 export type LeadSource = "quick" | "detailed" | "consultation" | "claim";
