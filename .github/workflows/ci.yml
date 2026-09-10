@@ -1,10 +1,16 @@
-# CI/CD — install → build → test → promote → deploy.
+# CI/CD — install → build → test → deploy.
 #
-# Branches. The Base44 Builder syncs its edits to `builder`, never to `main`.
-# Every push there runs the same battery a pull request does, and only a fully
-# green run promotes it into `main` (the `promote` job). So work generated in
-# the Builder cannot reach the trunk — or either deployment — untested, and a
-# red Builder run leaves `main` exactly where it was.
+# Branches. Today the Base44 Builder syncs straight to `main`, so its edits
+# land on the trunk untested — twice in one day that put a broken suite there.
+# Nothing reaches the client's site regardless, because the Base44 publish
+# still requires a fully green run, but `main` itself can go red at any time.
+#
+# The `promote` job at the bottom of this file closes that hole, and is
+# DORMANT until someone points the Builder at `builder` instead: it triggers
+# only on pushes to that branch, and no such branch is in use. Switching the
+# Builder's target is a Base44-side setting that costs Builder tokens, which
+# is why it has not happened yet. Nothing below changes behaviour until it
+# does — see the README for the switch-over.
 #
 # The two deployment targets are gated differently, on purpose:
 #
@@ -30,9 +36,9 @@ name: CI
 
 on:
   push:
-    # `builder` is where the Base44 Builder syncs. It is tested exactly like
-    # main and reaches main only through the promote job at the bottom of this
-    # file — see the branch note in the header.
+    # `builder` is listed ahead of being used: the day the Base44 Builder is
+    # pointed at it, pushes are tested and promoted with no workflow change.
+    # Until then no such branch exists and this line does nothing.
     branches: [main, builder]
   pull_request:
     branches: [main]
@@ -612,10 +618,14 @@ jobs:
 
   # ── 9. Promote a green `builder` run into `main` ─────────────────────────
   #
-  # This is the gate the Base44 Builder cannot go around. The Builder syncs to
-  # `builder`; this job is the only thing that moves that work to `main`, and
-  # it needs every suite above to have passed. A red Builder run therefore
-  # leaves main — and both deployments — exactly where they were.
+  # DORMANT. It fires only on pushes to `builder`, and the Base44 Builder still
+  # syncs to `main` — pointing it elsewhere is a Base44-side setting that costs
+  # Builder tokens. Nothing here runs until that switch is made, and this job
+  # is deliberately kept in place so the switch is the only step required.
+  #
+  # Once live it is the gate the Builder cannot go around: it needs every suite
+  # above to have passed, so a red Builder run leaves main — and both
+  # deployments — exactly where they were.
   #
   # `needs` without always() carries the whole gate: if any of these jobs
   # failed or was cancelled, this one never starts.

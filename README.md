@@ -124,8 +124,20 @@ run's summary, along with the two site links.
 
 ### Branches
 
-The Base44 Builder syncs to **`builder`**, never to `main`. Every push there
-runs the full battery, and only a green run is promoted:
+**Today the Base44 Builder syncs straight to `main`**, so its edits land on the
+trunk untested. Nothing reaches the client's site regardless — the Base44
+publish requires a green run — but `main` itself can go red at any time, and
+has.
+
+CI already carries the gate that closes this, and it is **dormant**: the
+`promote` job triggers only on pushes to a `builder` branch, and the Builder
+isn't pointed at one yet. To switch over — a Base44-side setting that costs
+Builder tokens:
+
+1. In the Builder's branch dropdown, **Create new branch**, named `builder`.
+2. Confirm it appears on GitHub (`git ls-remote --heads origin`).
+
+From then on:
 
 ```
 builder ──[unit · component · contract · security · e2e × 4]──> main ──> deploy
@@ -133,11 +145,12 @@ builder ──[unit · component · contract · security · e2e × 4]──> mai
               └─ red? promotion stops. main and both sites stay put.
 ```
 
-So changes made in the Builder cannot reach the trunk untested. If the run is
-red, read the Allure report — `builder` runs publish it too — fix it in the
-Builder, and push again. Promotion fast-forwards when `main` hasn't moved, so
-what deploys is exactly what was tested; if a pull request landed meanwhile it
-merges instead and `main` re-tests the result before anything deploys.
+No workflow change is needed for that — the trigger and the job are already in
+place. If a run is red, read the Allure report (`builder` runs publish it too),
+fix it in the Builder, and push again. Promotion fast-forwards when `main`
+hasn't moved, so what deploys is exactly what was tested; if a pull request
+landed meanwhile it merges instead and `main` re-tests the result before
+anything deploys.
 
 ### What a red run costs
 
