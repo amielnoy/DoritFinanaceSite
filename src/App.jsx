@@ -16,6 +16,7 @@ import SeoRouteGuard from '@/components/SeoRouteGuard';
 import Home from '@/pages/Home';
 import FloatingActions from '@/components/dorit/layout/FloatingActions';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import AdminRoute from '@/components/AdminRoute';
 
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const Accessibility = lazy(() => import('@/pages/Accessibility'));
@@ -76,7 +77,7 @@ const AuthenticatedApp = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        <Route element={<AdminRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
           <Route path="/admin/leads" element={<Leads />} />
           <Route path="/admin/blog" element={<BlogAdmin />} />
         </Route>
