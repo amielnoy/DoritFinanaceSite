@@ -4,7 +4,7 @@ import { ArrowDown } from "lucide-react";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
 
 const HERO_IMG =
-  "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/589e9d0cd_generated_11fed895.jpg";
+  "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/9620f0028_119895334_119505229701692_7118383656602926716_n.jpg";
 
 const TICKER: string[] = [
   "Future Proofing",
@@ -28,7 +28,7 @@ export default function Hero() {
       <div className="flex-1 grid grid-cols-1 md:grid-cols-12 max-w-[1400px] mx-auto w-full px-6 md:px-10 pt-28 md:pt-24">
         {/* Portrait */}
         <div className="relative order-2 md:order-1 md:col-span-5 flex items-end">
-          <div className="relative w-full h-[55vh] md:h-[80vh] overflow-hidden lens-hover">
+          <div className="relative w-full h-[55vh] md:h-[80vh] overflow-hidden lens-hover bg-primary">
             <Image
               src={HERO_IMG}
               alt="דורית גוב ארי — דיוקן מקצועי"
@@ -36,8 +36,20 @@ export default function Hero() {
               fittingType="fill"
               loading="eager"
               fetchpriority="high"
+              style={{ filter: "sepia(0.18) saturate(0.85) contrast(1.05) brightness(0.96)" }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-background/30 via-transparent to-transparent" />
+            {/* Warm duotone wash — harmonizes the cool water backdrop into the parchment palette */}
+            <div
+              className="absolute inset-0 mix-blend-soft-light pointer-events-none"
+              style={{ background: "linear-gradient(160deg, rgba(196,164,132,0.28) 0%, rgba(125,107,93,0.18) 55%, rgba(26,26,27,0.32) 100%)" }}
+            />
+            {/* Bottom fade into the page background */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background/55 via-background/5 to-transparent" />
+            {/* Subtle vignette to focus attention on the subject */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{ boxShadow: "inset 0 0 120px 20px rgba(26,26,27,0.35)" }}
+            />
           </div>
           <div className="absolute bottom-6 right-6 glass px-5 py-3.5 border border-border/50 shadow-sm">
             <p className="font-heading text-sm leading-tight">דורית גוב ארי</p>
