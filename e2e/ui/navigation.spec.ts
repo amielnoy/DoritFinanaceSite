@@ -60,10 +60,32 @@ test.describe("Routing — sanity", () => {
 
     await test_step("click the services link in the navigation", async () => {
       // :visible — the desktop nav and the mobile drawer both carry this href.
-      await page.locator('a[href="#services"]:visible').first().click();
+      await page.locator('a[href="/#services"]:visible').first().click();
     });
 
     await test_step("the services section is scrolled into view", async () => {
+      await expect(page.locator("#services")).toBeInViewport({ ratio: 0.05 });
+    });
+  });
+
+  test("the main menu reaches a home section from another route", async ({ page }) => {
+    // The header renders on every route, but every section it names lives on
+    // the home page. While these were bare `#section` hrefs, clicking one from
+    // /blog set the URL to /blog#services and did nothing at all — the whole
+    // menu was dead on every route except home.
+    await test_step("open the blog, away from the home page", async () => {
+      await gotoApp(page, "/blog");
+      await expect(page).toHaveURL(/\/blog$/);
+    });
+
+    await test_step("click the services link in the header", async () => {
+      // By its label rather than its href: the point is that the visitor gets
+      // there, not how the anchor happens to be written.
+      await page.locator("header").getByRole("link", { name: "שירותים" }).first().click();
+    });
+
+    await test_step("it lands on the home page at that section", async () => {
+      await expect(page).toHaveURL(/\/#services$/);
       await expect(page.locator("#services")).toBeInViewport({ ratio: 0.05 });
     });
   });
