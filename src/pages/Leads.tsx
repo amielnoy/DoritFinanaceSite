@@ -138,6 +138,42 @@ export default function Leads() {
       </header>
 
       <main className="max-w-[1200px] mx-auto px-6 py-8">
+        {/* תצוגת סיכום סטטוסים */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <button
+            onClick={() => setFilter("all")}
+            className={`text-right p-5 border transition-colors ${filter === "all" ? "border-primary bg-primary/[0.03]" : "border-border/60 hover:border-accent/50 bg-card"}`}
+          >
+            <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">סה״כ פניות</p>
+            <p className="font-heading text-3xl mt-2">{(leads || []).length}</p>
+            <p className="text-xs text-foreground/50 mt-1">כל הרשומות במערכת</p>
+          </button>
+          <button
+            onClick={() => setFilter("new")}
+            className={`text-right p-5 border transition-colors ${filter === "new" ? "border-highlight bg-highlight/10" : "border-border/60 hover:border-highlight/50 bg-card"}`}
+          >
+            <p className="text-[11px] tracking-[0.2em] uppercase text-[#8a6f54]">דורשות טיפול</p>
+            <p className="font-heading text-3xl mt-2 text-[#8a6f54]">{counts.new || 0}</p>
+            <p className="text-xs text-foreground/50 mt-1">לקוחות חדשים — ליצור קשר</p>
+          </button>
+          <button
+            onClick={() => setFilter("contacted")}
+            className={`text-right p-5 border transition-colors ${filter === "contacted" ? "border-accent bg-accent/10" : "border-border/60 hover:border-accent/50 bg-card"}`}
+          >
+            <p className="text-[11px] tracking-[0.2em] uppercase text-accent">בתהליך</p>
+            <p className="font-heading text-3xl mt-2 text-accent">{counts.contacted || 0}</p>
+            <p className="text-xs text-foreground/50 mt-1">נוצר קשר — להמשיך במכירה</p>
+          </button>
+          <button
+            onClick={() => setFilter("closed")}
+            className={`text-right p-5 border transition-colors ${filter === "closed" ? "border-primary bg-primary/[0.03]" : "border-border/60 hover:border-accent/50 bg-card"}`}
+          >
+            <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">נסגרו</p>
+            <p className="font-heading text-3xl mt-2 text-muted-foreground">{counts.closed || 0}</p>
+            <p className="text-xs text-foreground/50 mt-1">טופלו והסתיימו</p>
+          </button>
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="flex flex-wrap items-center gap-2">
             {["all", ...STATUS].map((s) => {
