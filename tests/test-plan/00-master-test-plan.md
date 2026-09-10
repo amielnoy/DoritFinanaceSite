@@ -123,6 +123,10 @@ The suites run on every pull request and every push to `main`
 (`.github/workflows/ci.yml`), and again as a post-deploy smoke test against the
 production URL. Locally: `./scripts/run-tests.sh`.
 
+Work made in the Base44 Builder syncs to `builder` and reaches `main` only
+through a promotion that requires every suite to have passed, so Builder output
+is never merged untested.
+
 A red run costs production, not staging. The Vercel staging deployment goes out
 whenever the build succeeds — a failing run is exactly when it helps to open the
 broken build next to the report that says what broke — while the Base44

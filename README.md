@@ -122,6 +122,23 @@ CI publishes the merged report — all four platforms plus the Vitest suites —
 its own Vercel project on every push to `main`, pass or fail. A link is in each
 run's summary, along with the two site links.
 
+### Branches
+
+The Base44 Builder syncs to **`builder`**, never to `main`. Every push there
+runs the full battery, and only a green run is promoted:
+
+```
+builder ──[unit · component · contract · security · e2e × 4]──> main ──> deploy
+              │
+              └─ red? promotion stops. main and both sites stay put.
+```
+
+So changes made in the Builder cannot reach the trunk untested. If the run is
+red, read the Allure report — `builder` runs publish it too — fix it in the
+Builder, and push again. Promotion fast-forwards when `main` hasn't moved, so
+what deploys is exactly what was tested; if a pull request landed meanwhile it
+merges instead and `main` re-tests the result before anything deploys.
+
 ### What a red run costs
 
 | Target | Deploys when |

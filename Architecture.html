@@ -642,6 +642,16 @@
         rather than something that happens on every green build.
       </p>
       <p>
+        The Builder writes to <code>builder</code>, not to the trunk. It
+        generates code without review and without tests — twice in one day that
+        put a broken suite on <code>main</code> — so every push it makes runs
+        the full battery, and a <code>promote</code> job moves the result to
+        <code>main</code> only when all of it is green. Promotion
+        fast-forwards where it can, so what deploys is byte for byte what was
+        tested; where a pull request has landed in the meantime it merges, and
+        <code>main</code> re-tests the combined tree before anything deploys.
+      </p>
+      <p>
         There are two deployment targets, and they are gated
         <b>differently on purpose</b>. <b>Vercel</b> carries staging: it deploys
         whenever the build succeeds, whether the tests passed or not, because a
@@ -658,9 +668,10 @@
         <table>
           <thead><tr><th>Stage</th><th>Trigger</th><th>Gate</th></tr></thead>
           <tbody>
-            <tr><td>Install · lint · typecheck · build</td><td>PR and push</td><td>lint blocks; typecheck reports only (<span class="ref">R-08</span>)</td></tr>
+            <tr><td>Install · lint · typecheck · build</td><td>PR, and push to <code>main</code> or <code>builder</code></td><td>lint blocks; typecheck reports only (<span class="ref">R-08</span>)</td></tr>
             <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>e2e × 4 platforms (matrix)</td><td>PR and push</td><td>blocking</td></tr>
+            <tr><td>Promote <code>builder</code> → <code>main</code></td><td>push to <code>builder</code> (the Base44 Builder's sync target)</td><td>needs <b>every suite green</b> — the only route from the Builder to the trunk</td></tr>
             <tr><td>Deploy to Vercel <em>(staging, login-protected)</em></td><td>push to <code>main</code>, or manual</td><td>needs a successful <b>build</b> only — deploys with red tests on purpose</td></tr>
             <tr><td>Publish to Base44 <em>(production, client-facing)</em></td><td>push to <code>main</code>, or manual</td><td>needs <b>every suite green</b>; also requires <code>BASE44_API_KEY</code> and <code>BASE44_APP_ID</code></td></tr>
             <tr><td>Production smoke</td><td>after a successful publish</td><td>runs when <code>PRODUCTION_URL</code> is set</td></tr>
