@@ -42,17 +42,20 @@ function buildClientHtml(source, data) {
     : 'תודה שפניתם אליי. הפרטים תועדו בהצלחה, ואחזור אליכם אישית בהקדם האפשרי.';
 
   const detailsBlock = isConsultation ? `
-        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:28px 0; background:#F3EDE7; border:1px solid #D3C6B9; border-radius:4px;">
-          <tr><td style="padding:24px 28px;">
-            <p style="margin:0 0 16px; font-size:11px; letter-spacing:0.25em; text-transform:uppercase; color:#7D6B5D; font-family:Arial,sans-serif;">פרטי הבקשה</p>
-            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:32px 0; background:#F6F1EA; border:1px solid #E0D4C6; border-radius:6px;">
+          <tr><td style="padding:28px 32px;">
+            <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.25em; text-transform:uppercase; color:#7D6B5D; font-family:Arial,sans-serif; text-align:right;">פרטי הבקשה</p>
+            <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%">
               <tr>
-                <td style="padding:6px 0; font-size:13px; color:#7D6B5D; font-family:Arial,sans-serif; width:120px;">תחום ייעוץ</td>
-                <td style="padding:6px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold;">${topic}</td>
+                <td style="padding:10px 0; font-size:13px; color:#7D6B5D; font-family:Arial,sans-serif; width:130px; text-align:right;">תחום ייעוץ</td>
+                <td style="padding:10px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold; text-align:right;">${topic}</td>
               </tr>
               <tr>
-                <td style="padding:6px 0; font-size:13px; color:#7D6B5D; font-family:Arial,sans-serif;">מועד מבוקש</td>
-                <td style="padding:6px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold;">${when}</td>
+                <td colspan="2" style="padding:0; font-size:0; line-height:0; border-top:1px solid #E0D4C6;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 0; font-size:13px; color:#7D6B5D; font-family:Arial,sans-serif; text-align:right;">מועד מבוקש</td>
+                <td style="padding:10px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold; text-align:right;">${when}</td>
               </tr>
             </table>
           </td></tr>
@@ -61,34 +64,34 @@ function buildClientHtml(source, data) {
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0; padding:0; background:#F9F7F2; font-family:Arial,Helvetica,sans-serif; color:#1A1A1B; line-height:1.7;">
-  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F9F7F2;">
+<body style="margin:0; padding:0; background:#F9F7F2; font-family:Arial,Helvetica,sans-serif; color:#1A1A1B; line-height:1.7; -webkit-text-size-adjust:100%;">
+  <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F9F7F2;">
     <tr><td align="center" style="padding:32px 16px;">
-      <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; background:#FFFFFF; border:1px solid #E5DDD0;">
+      <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; width:600px; background:#FFFFFF; border:1px solid #E5DDD0; border-radius:6px; overflow:hidden;">
         <!-- Header -->
-        <tr><td style="padding:36px 48px 28px; border-bottom:1px solid #E5DDD0; text-align:center;">
-          <p style="margin:0 0 6px; font-family:Georgia,serif; font-size:22px; font-weight:bold; color:#1A1A1B; letter-spacing:-0.02em;">דורית גוב ארי</p>
+        <tr><td style="padding:40px 48px 30px; border-bottom:1px solid #E5DDD0; text-align:center;">
+          <p style="margin:0 0 6px; font-family:Georgia,serif; font-size:24px; font-weight:bold; color:#1A1A1B; letter-spacing:-0.02em;">דורית גוב ארי</p>
           <p style="margin:0; font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">התכנון שלי — הרווח שלך</p>
         </td></tr>
         <!-- Body -->
-        <tr><td style="padding:40px 48px;">
-          <p style="margin:0 0 24px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">אישור קבלה</p>
-          <h1 style="margin:0 0 20px; font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#1A1A1B; line-height:1.25; letter-spacing:-0.02em;">${heading}</h1>
-          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8;">שלום ${firstName},</p>
-          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8;">${intro}</p>
+        <tr><td style="padding:44px 48px 36px; text-align:right;">
+          <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">אישור קבלה</p>
+          <h1 style="margin:0 0 24px; font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#1A1A1B; line-height:1.3; letter-spacing:-0.02em; text-align:right;">${heading}</h1>
+          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">שלום ${firstName},</p>
+          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${intro}</p>
           ${detailsBlock}
-          <div style="height:2px; width:48px; background:#C3AD96; margin:28px 0;"></div>
-          <p style="margin:0 0 8px; font-size:15px; color:#3D3D3F; line-height:1.8;">לכל שאלה או עדכון — ניתן להשיב ישירות למייל זה.</p>
+          <div style="height:2px; width:48px; background:#C3AD96; margin:32px 0 20px;"></div>
+          <p style="margin:0; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">לכל שאלה או עדכון — ניתן להשיב ישירות למייל זה.</p>
         </td></tr>
         <!-- Signature -->
-        <tr><td style="padding:0 48px 40px;">
-          <p style="margin:0; font-family:Georgia,serif; font-size:17px; font-weight:bold; color:#1A1A1B;">דורית גוב ארי</p>
+        <tr><td style="padding:0 48px 40px; text-align:right;">
+          <p style="margin:0; font-family:Georgia,serif; font-size:18px; font-weight:bold; color:#1A1A1B;">דורית גוב ארי</p>
           <p style="margin:4px 0 0; font-size:13px; color:#7D6B5D;">מתכננת פיננסית בכירה · רישיון L-00107009</p>
           <p style="margin:8px 0 0; font-size:13px; color:#7D6B5D; direction:ltr; text-align:right;">dorit@govari-fin.co.il</p>
         </td></tr>
         <!-- Footer -->
-        <tr><td style="padding:24px 48px; background:#1A1A1B; text-align:center;">
-          <p style="margin:0 0 4px; font-size:11px; color:rgba(249,247,242,0.5);">דורית גוב ארי — סוכנות ביטוח בע״מ · רישיון סוכן מרשות שוק ההון מספר L-00107009</p>
+        <tr><td style="padding:26px 48px; background:#1A1A1B; text-align:center;">
+          <p style="margin:0 0 4px; font-size:11px; color:rgba(249,247,242,0.5); line-height:1.6;">דורית גוב ארי — סוכנות ביטוח בע״מ · רישיון סוכן מרשות שוק ההון מספר L-00107009</p>
           <p style="margin:0; font-size:10px; color:rgba(249,247,242,0.35); letter-spacing:0.15em; text-transform:uppercase;">Designed with Structural Serenity</p>
         </td></tr>
       </table>
