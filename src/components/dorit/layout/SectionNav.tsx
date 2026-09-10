@@ -1,31 +1,34 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
 interface SectionItem {
   id: string;
   label: string;
+  route?: boolean;
 }
 
 const SECTIONS: SectionItem[] = [
-  { id: "top", label: "ראשי" },
   { id: "about", label: "אודות" },
-  { id: "perspective", label: "נקודת מבט" },
   { id: "services", label: "שירותים" },
+  { id: "/claims", label: "מדריך תביעות", route: true },
+  { id: "/faq", label: "שאלות ותשובות", route: true },
   { id: "proof", label: "תיקי הצלחה" },
-  { id: "testimonials", label: "המלצות" },
-  { id: "faq", label: "שאלות נפוצות" },
+  { id: "/blog", label: "בלוג", route: true },
   { id: "consultation", label: "קביעת ייעוץ" },
-  { id: "detailed-contact", label: "יצירת קשר" },
 ];
 
 export default function SectionNav() {
   const [open, setOpen] = useState<boolean>(false);
   const [active, setActive] = useState<string>("top");
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const handler = () => {
       let current = "top";
       for (const s of SECTIONS) {
+        if (s.route) continue;
         const el = document.getElementById(s.id);
         if (el) {
           const top = el.getBoundingClientRect().top;
@@ -39,15 +42,27 @@ export default function SectionNav() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
-  const jump = (id: string) => {
+  const jump = (s: SectionItem) => {
+    setOpen(false);
+    if (s.route) {
+      navigate(s.id);
+      return;
+    }
+    // If we're not on the home page, navigate home first then scroll.
+    if (location.pathname !== "/") {
+      navigate("/");
+      setTimeout(() => scrollToSection(s.id), 120);
+      return;
+    }
+    scrollToSection(s.id);
+  };
+
+  const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
-    if (id === "top") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else if (el) {
+    if (el) {
       const y = el.getBoundingClientRect().top + window.scrollY - 80;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
-    setOpen(false);
   };
 
   return (
@@ -60,9 +75,9 @@ export default function SectionNav() {
           {SECTIONS.map((s) => (
             <button
               key={s.id}
-              onClick={() => jump(s.id)}
+              onClick={() => jump(s)}
               className={`text-right px-5 py-3 text-sm border-b border-border/40 last:border-b-0 transition-colors ${
-                active === s.id
+                !s.route && active === s.id
                   ? "bg-primary text-primary-foreground"
                   : "hover:bg-background text-foreground/80"
               }`}
