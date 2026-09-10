@@ -308,13 +308,13 @@ export default function InsuranceAssessment() {
                   <h3 className="font-heading text-3xl md:text-4xl mb-3 leading-tight">
                     {recs.length} סוגי ביטוח רלוונטיים עבורך
                   </h3>
-                  <p className="text-muted-foreground mb-10">
+                  <p className="text-muted-foreground mb-12">
                     {priorityCount > 0
                       ? `${priorityCount} מהם מומלצים כעדיפות גבוהה לפי התשובות שלך.`
                       : "לפי התשובות שלך, אלו סוגי הביטוח שכדאי לבחון."}
                   </p>
 
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {recs.map((rec, idx) => {
                       const Icon = rec.icon;
                       return (
@@ -323,21 +323,21 @@ export default function InsuranceAssessment() {
                           initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: idx * 0.08 }}
-                          className={`flex gap-5 p-5 md:p-6 border rounded-sm ${
+                          className={`flex gap-5 p-6 md:p-7 border rounded-sm transition-colors duration-300 ${
                             rec.priority
-                              ? "border-highlight/50 bg-highlight-muted/20"
-                              : "border-border bg-background"
+                              ? "border-highlight/40 bg-highlight-muted/15 hover:bg-highlight-muted/25"
+                              : "border-border bg-secondary/30 hover:bg-secondary/50"
                           }`}
                         >
                           <div
-                            className={`shrink-0 w-11 h-11 rounded-full flex items-center justify-center ${
-                              rec.priority ? "bg-highlight text-primary-foreground" : "bg-secondary text-accent"
+                            className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                              rec.priority ? "bg-highlight text-primary-foreground" : "bg-background text-accent border border-border"
                             }`}
                           >
-                            <Icon size={20} />
+                            <Icon size={22} />
                           </div>
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1.5">
+                            <div className="flex items-center gap-2.5 mb-2">
                               <h4 className="font-heading text-xl">{rec.title}</h4>
                               {rec.priority && (
                                 <span className="text-[10px] tracking-[0.2em] uppercase text-highlight-strong border border-highlight/40 px-2 py-0.5 rounded-sm">
@@ -352,7 +352,7 @@ export default function InsuranceAssessment() {
                     })}
                   </div>
 
-                  <div className="mt-10 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-5">
+                  <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-5">
                     <p className="text-sm text-muted-foreground text-center sm:text-right">
                       ההערכה כאן היא כללית בלבד. להמלצות מדויקות — כדאי לשוחח עם דורית.
                     </p>
