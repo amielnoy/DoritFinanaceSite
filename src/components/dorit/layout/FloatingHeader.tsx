@@ -19,7 +19,6 @@ const NAV: NavItem[] = [
   { label: "הצלחות", href: "#proof" },
   { label: "לקוחות מספרים", href: "#testimonials" },
   { label: "בלוג", href: "/blog", route: true },
-  { label: "ייעוץ", href: "#consultation" },
 ];
 
 export default function FloatingHeader() {
