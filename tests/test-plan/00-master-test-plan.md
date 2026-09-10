@@ -124,9 +124,12 @@ The suites run on every pull request and every push to `main`
 production URL. Locally: `./scripts/run-tests.sh`.
 
 Work made in the Base44 Builder currently syncs straight to `main`, so it lands
-untested and `main` can go red without warning. A dormant `promote` job gates
-Builder output behind the full battery, and activates the day the Builder is
-pointed at a `builder` branch — see the README.
+untested and `main` can go red without warning. Dormant support for a `builder`
+branch runs the full battery on each Builder push, deploys a preview of it, and
+reports whether it is safe to merge; it activates the day the Builder is pointed
+at that branch — see the README. Merging stays the Builder's own action, so the
+enforcement lives at the publish step, which only runs from `main` and only on
+a green run.
 
 A red run costs production, not staging. The Vercel staging deployment goes out
 whenever the build succeeds — a failing run is exactly when it helps to open the

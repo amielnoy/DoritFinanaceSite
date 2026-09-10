@@ -649,14 +649,23 @@
         not protected from it.
       </p>
       <p>
-        The <code>promote</code> job closes that hole and is <b>dormant</b>: it
-        triggers only on pushes to a <code>builder</code> branch, and pointing
-        the Builder at one is a Base44-side setting that costs Builder tokens.
-        Once switched, every Builder push runs the full battery and reaches
-        <code>main</code> only when all of it is green — fast-forwarding where
-        it can, so what deploys is byte for byte what was tested, and merging
-        where a pull request has landed in the meantime, with <code>main</code>
-        re-testing the combined tree before anything deploys.
+        Support for working on a Builder branch is already in the workflow and
+        is <b>dormant</b>: everything keyed to <code>builder</code> triggers
+        only on pushes to that branch, and pointing the Builder at one is a
+        Base44-side setting that costs Builder tokens. Once switched, each
+        Builder push runs the full battery, gets a <b>Vercel preview on its own
+        URL</b>, publishes a report, and ends with a <em>safe to merge</em>
+        verdict in the run summary.
+      </p>
+      <p>
+        CI deliberately does not merge. On a branch the Builder replaces its
+        Publish button with <em>Merge to main</em>, and Base44 keeps each
+        Builder branch as a real branch in this repository — so promotion is
+        already its job, and a CI job doing the same would race it and leave
+        the two disagreeing about whether the branch had merged. The guarantee
+        is not weakened by that, because publishing only ever happens from
+        <code>main</code> and the publish there demands a green run: the gate
+        sits where users are affected rather than where the merge is recorded.
       </p>
       <p>
         There are two deployment targets, and they are gated
@@ -678,8 +687,9 @@
             <tr><td>Install · lint · typecheck · build</td><td>PR, and push to <code>main</code> or <code>builder</code></td><td>lint blocks; typecheck reports only (<span class="ref">R-08</span>)</td></tr>
             <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>e2e × 4 platforms (matrix)</td><td>PR and push</td><td>blocking</td></tr>
-            <tr><td>Promote <code>builder</code> → <code>main</code></td><td>push to <code>builder</code> — <b>dormant</b>, the Builder still syncs to <code>main</code></td><td>needs <b>every suite green</b>; becomes the only route from the Builder to the trunk once enabled</td></tr>
             <tr><td>Deploy to Vercel <em>(staging, login-protected)</em></td><td>push to <code>main</code>, or manual</td><td>needs a successful <b>build</b> only — deploys with red tests on purpose</td></tr>
+            <tr><td>Deploy to Vercel <em>(preview, per change)</em></td><td>push to <code>builder</code> — <b>dormant</b>, the Builder still syncs to <code>main</code></td><td>needs a successful <b>build</b> only; its own URL, for looking at a Builder edit before merging</td></tr>
+            <tr><td>Safe to merge?</td><td>push to <code>builder</code> — <b>dormant</b></td><td>reports the verdict; the merge itself belongs to the Builder</td></tr>
             <tr><td>Publish to Base44 <em>(production, client-facing)</em></td><td>push to <code>main</code>, or manual</td><td>needs <b>every suite green</b>; also requires <code>BASE44_API_KEY</code> and <code>BASE44_APP_ID</code></td></tr>
             <tr><td>Production smoke</td><td>after a successful publish</td><td>runs when <code>PRODUCTION_URL</code> is set</td></tr>
             <tr><td>Publish Allure report</td><td>push to <code>main</code>, pass or fail</td><td><code>always()</code> — a red run is when the report is worth reading</td></tr>
