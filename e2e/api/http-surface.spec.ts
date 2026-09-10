@@ -5,6 +5,39 @@ import { expect, test, test_step } from "../fixtures/app";
  * against whatever PLAYWRIGHT_BASE_URL points at — the local production
  * preview by default, a deployed URL in CI smoke runs.
  */
+
+/**
+ * Read a tag's attributes instead of matching raw markup.
+ *
+ * Base44 serves the deployed HTML through a pretty-printer that reorders every
+ * attribute alphabetically: what the source writes as
+ * `<meta name="description" content="…">` arrives as
+ * `<meta content="…" name="description"/>`. A regex over the byte order
+ * therefore passes against the local `dist/` and fails against production —
+ * which is what the smoke test kept reporting, on a head that was in fact
+ * complete. Serving order is the platform's business; presence and value are
+ * ours, so assert on those.
+ */
+function attributesOf(tag: string): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  for (const [, name, value] of tag.matchAll(/([a-zA-Z][\w:-]*)="([^"]*)"/g)) {
+    attributes[name] = value;
+  }
+  return attributes;
+}
+
+/** Every `<meta>` or `<link>` in the document, as attribute maps. */
+function tags(html: string, element: "meta" | "link"): Record<string, string>[] {
+  return [...html.matchAll(new RegExp(`<${element}\\s[^>]*>`, "g"))].map(([tag]) =>
+    attributesOf(tag)
+  );
+}
+
+/** The `content` of the `<meta>` identified by `name=` / `property=`, or "". */
+function metaContent(html: string, key: "name" | "property", value: string): string {
+  return tags(html, "meta").find((tag) => tag[key] === value)?.content ?? "";
+}
+
 test.describe("HTTP surface — sanity", () => {
   test("GET / returns HTML with the Hebrew RTL shell", async ({ request }) => {
     const res = await test_step("GET /", () => request.get("/"));
@@ -29,18 +62,19 @@ test.describe("HTTP surface — sanity", () => {
 
     await test_step("the title and description are present and substantial", async () => {
       expect(html).toMatch(/<title>[^<]*דורית גוב ארי[^<]*<\/title>/);
-      expect(html).toMatch(/<meta name="description" content="[^"]{50,}"/);
+      expect(metaContent(html, "name", "description").length).toBeGreaterThanOrEqual(50);
     });
 
     await test_step("the canonical and the social card are complete", async () => {
-      expect(html).toMatch(/<link rel="canonical" href="https:\/\//);
-      expect(html).toMatch(/<meta property="og:title"/);
-      expect(html).toMatch(/<meta property="og:image" content="https:\/\//);
-      expect(html).toMatch(/<meta name="twitter:card" content="summary_large_image"/);
+      const canonical = tags(html, "link").find((tag) => tag.rel === "canonical");
+      expect(canonical?.href).toMatch(/^https:\/\//);
+      expect(metaContent(html, "property", "og:title")).not.toBe("");
+      expect(metaContent(html, "property", "og:image")).toMatch(/^https:\/\//);
+      expect(metaContent(html, "name", "twitter:card")).toBe("summary_large_image");
     });
 
     await test_step("the document is responsive", async () => {
-      expect(html).toMatch(/<meta name="viewport" content="[^"]*width=device-width/);
+      expect(metaContent(html, "name", "viewport")).toContain("width=device-width");
     });
   });
 

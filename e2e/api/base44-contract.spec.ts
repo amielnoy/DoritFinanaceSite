@@ -56,11 +56,23 @@ test.describe("Base44 API contract (observed traffic)", () => {
     });
 
     await test_step("its body validates against the Lead entity definition", async () => {
-      // The browser posts a *function request*, not an entity row: `notes` is a
-      // request field that submitLead folds into the Lead's `message`. Validate
-      // it against what the function accepts; the entity shape is asserted where
-      // the backend writes it (tests/contract/frontend-payloads).
-      const accepted = ["name", "phone", "email", "source", "topic", "timing", "message", "notes"];
+      // The browser posts a *function request*, not an entity row: `notes` and
+      // `scheduledAt` are request fields the function consumes without storing
+      // — `notes` folds into the Lead's `message`, `scheduledAt` only dates the
+      // calendar event. Validate against what the function accepts; the entity
+      // shape is asserted where the backend writes it
+      // (tests/contract/frontend-payloads).
+      const accepted = [
+        "name",
+        "phone",
+        "email",
+        "source",
+        "topic",
+        "timing",
+        "message",
+        "notes",
+        "scheduledAt",
+      ];
       const body = req.body as Record<string, unknown>;
       const undeclared = Object.keys(body).filter((k) => !accepted.includes(k));
       const issues = undeclared.map((field) => ({ field, problem: "not accepted by submitLead" }));
@@ -98,7 +110,17 @@ test.describe("Base44 API contract (observed traffic)", () => {
       const body = req.body as Record<string, string>;
       expect(body.name).toBeTruthy();
       expect(body.phone).toBeTruthy();
-      expect(Object.keys(body).sort()).toEqual(["email", "name", "notes", "phone", "timing", "topic"]);
+      // scheduledAt carries the exact slot the wizard's time picker produced; it
+      // is "" when the visitor only chose a rough timing.
+      expect(Object.keys(body).sort()).toEqual([
+        "email",
+        "name",
+        "notes",
+        "phone",
+        "scheduledAt",
+        "timing",
+        "topic",
+      ]);
     });
   });
 

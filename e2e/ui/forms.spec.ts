@@ -307,7 +307,7 @@ test.describe("Consultation builder", () => {
       const fn = await mockApi.waitForRequest("/functions/createConsultationEvent");
       expect(fn.method).toBe("POST");
       expect(Object.keys(fn.body as object).sort()).toEqual(
-        ["email", "name", "notes", "phone", "timing", "topic"]
+        ["email", "name", "notes", "phone", "scheduledAt", "timing", "topic"]
       );
     });
   });

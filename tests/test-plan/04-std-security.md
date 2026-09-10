@@ -46,7 +46,7 @@ lead inbox.
 | SEC-STA-019 | "pages that consume `?returnTo=` go through the shared guard" | `Login` and `Register` import `safeReturnTo` |
 | SEC-STA-020 | "no page reads `returnTo` out of the query string without the guard" | Zero offenders outside `authReturnTo.js` |
 | SEC-STA-021 | "redirects derived from `returnTo` are assigned from the guarded value" | `Login` assigns `window.location.href` from `safeReturnTo()` |
-| SEC-STA-022 | "admin routes stay behind `ProtectedRoute`" | `/admin/leads` and `/admin/blog` inside the guarded block |
+| SEC-STA-022 | "admin routes stay behind a gate that requires both sign-in and the admin role" | `/admin/leads` and `/admin/blog` inside the `AdminRoute` block; `AdminRoute` falls back to `ProtectedRoute` when signed out and rejects `role !== "admin"` |
 | SEC-STA-023 | "no entity that stores personal data is world-readable" | `Lead.rls.read !== true` |
 | SEC-STA-024 | "every entity used by the app has an explicit definition" | Every `base44.entities.X` has a `.jsonc` |
 

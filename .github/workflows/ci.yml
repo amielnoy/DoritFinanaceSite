@@ -1,10 +1,25 @@
 # CI/CD — install → build → test → deploy.
 #
-# Deploy note: this repo syncs to Base44 through git (see README), so pushing to
-# `main` is what reaches the platform; the workflow's deploy job publishes that
-# synced state and then smoke-tests the live site. The publish step is opt-in —
-# it runs only when the BASE44_TOKEN secret and BASE44_APP_ID variable are set,
-# so a fork or a fresh clone gets a green CI without any credentials.
+# The two deployment targets are gated differently, on purpose:
+#
+#   Vercel (staging, login-protected) — deploys whenever the build succeeds,
+#   green or red. A failing run is when you most want to open the thing.
+#
+#   Base44 (production, client-facing) — deploys only when every test passed.
+#
+# So a test failure costs you production, never staging.
+#
+# Deploy note: this repo syncs to Base44 through git (see README), and a git
+# sync still needs a Publish in the Builder to reach users. The deploy job can
+# do that publish unattended instead, then smoke-test the live site. It is
+# opt-in — it runs only when the BASE44_API_KEY secret and BASE44_APP_ID
+# variable are set, so a fork or a fresh clone gets a green CI with no
+# credentials.
+#
+# BASE44_API_KEY is a workspace API key — it starts with `b44k_`. It is the only
+# credential the CLI reads from the environment besides a BASE44_ACCESS_TOKEN /
+# BASE44_REFRESH_TOKEN pair, which expires and so cannot live in a secret;
+# `base44 login` is a device-code flow and cannot run unattended.
 name: CI
 
 on:
@@ -114,6 +129,18 @@ jobs:
           path: test-results/
           retention-days: 7
 
+      # The four suites above run in one job and append to a single
+      # allure-results/, so this is all 174 of them. The name has to match the
+      # `allure-results-*` pattern the publish job downloads, or the report
+      # silently goes back to being e2e-only.
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-vitest
+          path: allure-results/
+          retention-days: 7
+
   # ── 3. e2e: UI, API, security and accessibility, per platform ─────────────
   test-e2e:
     name: e2e (${{ matrix.project }})
@@ -178,8 +205,9 @@ jobs:
           retention-days: 14
 
       # Raw Allure results, kept per platform so the allure job can merge all
-      # five legs into one report. Generating per-leg would give five partial
-      # reports instead of one picture of the run.
+      # four platform legs — plus the Vitest job's upload — into one report.
+      # Generating per-leg would give five partial reports instead of one
+      # picture of the run.
       - name: Upload Allure results
         if: always()
         uses: actions/upload-artifact@v4
@@ -189,6 +217,11 @@ jobs:
           retention-days: 7
 
   # ── 4. Deploy (main only) ────────────────────────────────────────────────
+  #
+  # A red test run stops here and goes no further. `needs` without always()
+  # means every one of these jobs must have *succeeded* — this is the gate that
+  # keeps a known-broken build off the client's site, and it is deliberately
+  # the strictest one in the file. Staging still deploys; see deploy-vercel.
   deploy:
     name: Publish to Base44
     runs-on: ubuntu-latest
@@ -216,24 +249,41 @@ jobs:
       - name: Check publish credentials
         id: creds
         run: |
-          if [ -n "${{ secrets.BASE44_TOKEN }}" ] && [ -n "${{ vars.BASE44_APP_ID }}" ]; then
+          if [ -n "${{ secrets.BASE44_API_KEY }}" ] && [ -n "${{ vars.BASE44_APP_ID }}" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::BASE44_TOKEN secret or BASE44_APP_ID variable is unset — skipping the publish step. The git sync to Base44 still happened on push."
+            echo "::notice::BASE44_API_KEY secret or BASE44_APP_ID variable is unset — skipping the publish step. Production stays on whatever was last published by hand."
           fi
 
+      # Two npm 12 defaults block this install: the CLI pulls `@deno/loader` from
+      # a remote URL, refused as EALLOWREMOTE unless --allow-remote is given, and
+      # workerd's postinstall is skipped unless it is named in --allow-scripts.
+      # Both flags are scoped to this one global install, not to the repo's deps.
       - name: Publish
         if: steps.creds.outputs.ready == 'true'
         env:
-          BASE44_TOKEN: ${{ secrets.BASE44_TOKEN }}
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
           BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
         run: |
-          npm install -g base44@latest
+          npm install -g base44@latest --allow-remote=all --allow-scripts=workerd
           base44 link --app-id "$BASE44_APP_ID" --non-interactive
           base44 deploy
 
   # ── 5. Deploy the built site to Vercel ───────────────────────────────────
+  #
+  # Staging deploys even when the tests are red — that is the point of it. A
+  # failing run is exactly when you want the broken build somewhere you can
+  # open, next to the Allure report that says what broke. The site is
+  # login-protected, so nobody outside the team can reach it.
+  #
+  # Two things still stop it:
+  #   - the build failing, since there would be nothing to deploy; asserted
+  #     explicitly, because always() would otherwise run this job on a red
+  #     build and fail confusingly inside `vercel build`
+  #   - the run being cancelled — !cancelled() rather than always(), so a
+  #     superseded push (concurrency cancels in-progress runs) does not race a
+  #     deployment out of a half-finished run
   deploy-vercel:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
@@ -241,6 +291,8 @@ jobs:
     outputs:
       url: ${{ steps.deploy.outputs.url }}
     if: >-
+      !cancelled() &&
+      needs.build.result == 'success' &&
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || inputs.deploy)
     environment:
@@ -381,7 +433,7 @@ jobs:
   sites:
     name: Deployed sites
     runs-on: ubuntu-latest
-    needs: [deploy-vercel, test-e2e, allure]
+    needs: [deploy-vercel, deploy, test-node, test-e2e, allure]
     if: always()
     steps:
       - name: Write the site links to the run summary
@@ -389,16 +441,43 @@ jobs:
           BASE44_URL: ${{ vars.PRODUCTION_URL }}
           VERCEL_URL: ${{ needs.deploy-vercel.outputs.url }}
           VERCEL_RESULT: ${{ needs.deploy-vercel.result }}
+          BASE44_RESULT: ${{ needs.deploy.result }}
+          UNIT_RESULT: ${{ needs.test-node.result }}
           TESTS_RESULT: ${{ needs.test-e2e.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
         run: |
           vercel_link="${VERCEL_URL:-https://vercel.com/amielnoy-9725s-projects/dorit-finance-site}"
 
+          # Did anything go red? That is what splits the two environments now:
+          # staging takes the build either way, production does not.
+          if [ "$UNIT_RESULT" = "success" ] && [ "$TESTS_RESULT" = "success" ]; then
+            tests_green=true
+          else
+            tests_green=false
+          fi
+
           case "$VERCEL_RESULT" in
-            success)  vercel_state="✅ deployed this run" ;;
+            success)
+              if [ "$tests_green" = true ]; then
+                vercel_state="✅ deployed this run"
+              else
+                vercel_state="⚠️ deployed with failing tests — staging deploys either way"
+              fi ;;
             skipped)  vercel_state="⏭️ not deployed (this run was not a push to main)" ;;
             failure)  vercel_state="❌ deploy failed — the link is the previous deployment" ;;
             *)        vercel_state="⚠️ $VERCEL_RESULT" ;;
+          esac
+
+          case "$BASE44_RESULT" in
+            success)  base44_state="✅ published this run" ;;
+            failure)  base44_state="❌ publish failed" ;;
+            skipped)
+              if [ "$tests_green" = true ]; then
+                base44_state="⏭️ not published (no credentials, or not a push to main)"
+              else
+                base44_state="🛑 held back — the tests were red"
+              fi ;;
+            *)        base44_state="⚠️ $BASE44_RESULT" ;;
           esac
 
           {
@@ -406,7 +485,7 @@ jobs:
             echo
             echo "| Environment | URL | This run |"
             echo "| --- | --- | --- |"
-            echo "| **Base44 — production** (client-facing) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | not deployed by CI — see note |"
+            echo "| **Base44 — production** (client-facing) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | ${base44_state} |"
             echo "| **Vercel — staging** (login-protected) | ${vercel_link} | ${vercel_state} |"
             if [ -n "$ALLURE_URL" ]; then
               echo "| **Allure — test report** | ${ALLURE_URL} | published this run |"
@@ -414,10 +493,10 @@ jobs:
               echo "| **Allure — test report** | downloadable from this run's artifacts | not published |"
             fi
             echo
-            echo "Tests across all five platforms: **${TESTS_RESULT}**"
+            echo "Unit suites: **${UNIT_RESULT}** · e2e across all four platforms: **${TESTS_RESULT}**"
             echo
-            echo "> Base44 is published with \`base44 deploy\` from a clean checkout of \`main\`, not by this pipeline —"
-            echo "> its GitHub connection is broken, so it cannot pull the merged code itself."
+            echo "> A red run still deploys to **staging** — the point is to be able to open the broken build"
+            echo "> next to the report that says what broke. **Production is held back until the run is green.**"
             echo "> The Vercel staging link answers anonymous requests with a 302; sign in to Vercel to view it."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -425,7 +504,9 @@ jobs:
   allure:
     name: Publish Allure report
     runs-on: ubuntu-latest
-    needs: test-e2e
+    # Both test jobs, or the report races the vitest artifact and publishes
+    # without it.
+    needs: [test-node, test-e2e]
     # always(): a failing run is exactly when the report is worth reading.
     if: always() && github.ref == 'refs/heads/main'
     outputs:

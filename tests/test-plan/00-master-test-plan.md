@@ -101,14 +101,33 @@ Resume after the environment is corrected; no partial sign-off.
 | JUnit XML (Vitest) | `test-results/vitest-junit.xml` |
 | JUnit XML (Playwright) | `test-results/e2e-junit.xml` |
 | HTML report | `playwright-report/` |
+| Allure results — **every suite**, unit through e2e | `allure-results/` |
+| Allure report | `allure-report/` — `npm run allure:open`, or `./scripts/run-tests.sh --report` |
 | Failure screenshots, video, traces | `test-results/<test>/` |
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
+
+Both runners write Allure results into the same `allure-results/`, so one
+`allure generate` covers the whole battery — 174 unit/component/contract/
+security cases plus 156 e2e cases per platform. CI merges the five uploads
+(one per platform, one for the Vitest job) into a single published report;
+generating per-leg would give five partial reports instead of one picture of
+the run.
+
+> A run invoked with `--reporter=` on the command line replaces the configured
+> reporters and writes **no** Allure results. Omit the flag for any run whose
+> results should reach the report.
 
 ## 9. Responsibilities and schedule
 
 The suites run on every pull request and every push to `main`
 (`.github/workflows/ci.yml`), and again as a post-deploy smoke test against the
 production URL. Locally: `./scripts/run-tests.sh`.
+
+A red run costs production, not staging. The Vercel staging deployment goes out
+whenever the build succeeds — a failing run is exactly when it helps to open the
+broken build next to the report that says what broke — while the Base44
+production publish requires every suite to have passed, and the post-deploy
+smoke test runs only after that publish succeeds.
 
 ## 10. Risks
 

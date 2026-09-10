@@ -53,6 +53,18 @@ base44 dashboard open
 
 This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
 
+CI can do the publish for you instead, from a clean checkout of `main` and only
+when the whole run is green. It is opt-in: set the `BASE44_API_KEY` secret (a
+workspace API key — it starts with `b44k_`) and the `BASE44_APP_ID` variable on
+the repository. Without them the step is skipped and production simply stays
+where it was.
+
+> The sync moves code into the Builder; it is not a publish. If the Builder
+> reports **"Couldn't fetch your code"**, check that the Base44 GitHub App is
+> installed on the account that *currently owns* this repository — the stored
+> connection is an owner/name pair, and transferring the repo between accounts
+> leaves it pointing at the old path while push webhooks keep arriving.
+
 ## Tests
 
 The full battery — lint, typecheck, unit, component, contract, security, and
@@ -87,6 +99,38 @@ Base44 `/api` surface plus third-party beacons, so they need no credentials, no
 `base44 link`, and can never write to production data. They run against the
 production build served by `vite preview` — point `PLAYWRIGHT_BASE_URL` at a
 deployment to smoke-test it instead.
+
+### The report
+
+Every suite writes Allure results, unit through e2e, into one `allure-results/`,
+so a single report covers the whole battery:
+
+```bash
+./scripts/run-tests.sh --report      # run everything, then open the report
+npm run allure:open                  # open the report from the last run
+```
+
+The report **must be served**, not opened from disk — it loads its data over
+XHR, so double-clicking `allure-report/index.html` shows an empty shell. Both
+commands above route through `allure open`, which serves it on localhost.
+
+⚠️ Passing `--reporter=` to `vitest` or `playwright` on the command line
+*replaces* the configured reporters, so such a run writes no Allure results at
+all. Omit the flag for any run you want in the report.
+
+CI publishes the merged report — all four platforms plus the Vitest suites — to
+its own Vercel project on every push to `main`, pass or fail. A link is in each
+run's summary, along with the two site links.
+
+### What a red run costs
+
+| Target | Deploys when |
+|---|---|
+| **Vercel** — staging, login-protected | the build succeeds, tests green **or red** |
+| **Base44** — production, client-facing | every suite passed |
+
+A failing run is exactly when you want the broken build somewhere you can open
+it, so staging takes it either way; production does not.
 
 - **Test plan and per-suite test descriptions:** [`tests/test-plan/`](tests/test-plan/)
 - **Architecture record and review findings:** [`Architecture.html`](Architecture.html)

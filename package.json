@@ -113,6 +113,7 @@
     "@vitejs/plugin-react": "^6.0.5",
     "allure-commandline": "^2.43.0",
     "allure-playwright": "^3.11.1",
+    "allure-vitest": "^3.11.1",
     "autoprefixer": "^10.4.20",
     "baseline-browser-mapping": "^2.8.32",
     "eslint": "^9.19.0",

@@ -66,7 +66,7 @@ timezone `Asia/Jerusalem`.
 | E2E-FRM-005 | "gates submission on service, message and the consent checkbox" | Submit stays disabled until all three are supplied |
 | E2E-FRM-006 | "marks the chosen service as pressed for assistive tech" | `aria-pressed` flips false → true |
 | E2E-FRM-007 | "sends a detailed lead with topic and timing" | `source: detailed`, `topic`, `timing` present |
-| E2E-FRM-008 | "walks the three steps and books a consultation end to end" | Thank-you shown; `Lead.create` with `source: consultation`; function invoked with the six documented keys |
+| E2E-FRM-008 | "walks the three steps and books a consultation end to end" | Thank-you shown; `Lead.create` with `source: consultation`; function invoked with the seven documented keys |
 | E2E-FRM-009 | "lets the visitor step back without losing their answers" | "Continue" still enabled after going back |
 | E2E-FRM-010 | "still confirms to the visitor when calendar booking fails" | Function 502 → visitor still sees the thank-you; the lead is still recorded |
 | E2E-FRM-011 | "refuses to submit the wizard without a phone number" | Submit disabled; zero lead requests |
