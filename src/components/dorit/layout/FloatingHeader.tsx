@@ -64,41 +64,41 @@ export default function FloatingHeader() {
           </span>
         </a>
 
-        <nav className="hidden md:flex items-center gap-10">
+        <nav className="hidden md:flex items-center gap-7 lg:gap-9 whitespace-nowrap">
           {NAV.map((n) =>
             n.route ? (
               <Link
                 key={n.href}
                 to={n.href}
-                className="text-sm tracking-wide text-foreground/80 hover:text-accent transition-colors relative group"
+                className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 relative group py-1"
               >
                 {n.label}
-                <span className="absolute -bottom-1 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
+                <span className="absolute -bottom-0.5 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
               </Link>
             ) : (
               <a
                 key={n.href}
                 href={n.href}
-                className="text-sm tracking-wide text-foreground/80 hover:text-accent transition-colors relative group"
+                className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 relative group py-1"
               >
                 {n.label}
-                <span className="absolute -bottom-1 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
+                <span className="absolute -bottom-0.5 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
               </a>
             )
           )}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <a
             href="#consultation"
-            className="hidden md:inline-flex items-center px-5 py-2.5 bg-highlight-muted text-primary text-sm font-medium hover:bg-highlight-strong transition-colors duration-300"
+            className="hidden md:inline-flex items-center px-5 py-2.5 bg-highlight-muted text-primary text-[13px] font-medium tracking-wide hover:bg-highlight-strong transition-colors duration-300"
           >
             לקביעת פגישת ייעוץ
           </a>
           <a
             href={`tel:${CONTACT.phoneE164}`}
             aria-label="התקשרות לדורית גוב ארי"
-            className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#9c9c9c] text-sm font-medium hover:border-accent hover:text-accent transition-colors duration-300"
+            className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#9c9c9c] text-[13px] font-medium hover:border-accent hover:text-accent transition-colors duration-300"
           >
             <Phone size={15} className="text-[#9c9c9c]" />
             <span className="hidden sm:inline" dir="ltr">{CONTACT.phoneDisplay}</span>
