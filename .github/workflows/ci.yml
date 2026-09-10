@@ -1,10 +1,16 @@
 # CI/CD — install → build → test → deploy.
 #
-# Deploy note: this repo syncs to Base44 through git (see README), so pushing to
-# `main` is what reaches the platform; the workflow's deploy job publishes that
-# synced state and then smoke-tests the live site. The publish step is opt-in —
-# it runs only when the BASE44_TOKEN secret and BASE44_APP_ID variable are set,
-# so a fork or a fresh clone gets a green CI without any credentials.
+# Deploy note: this repo syncs to Base44 through git (see README), and a git
+# sync still needs a Publish in the Builder to reach users. The deploy job can
+# do that publish unattended instead, then smoke-test the live site. It is
+# opt-in — it runs only when the BASE44_API_KEY secret and BASE44_APP_ID
+# variable are set, so a fork or a fresh clone gets a green CI with no
+# credentials.
+#
+# BASE44_API_KEY is a workspace API key — it starts with `b44k_`. It is the only
+# credential the CLI reads from the environment besides a BASE44_ACCESS_TOKEN /
+# BASE44_REFRESH_TOKEN pair, which expires and so cannot live in a secret;
+# `base44 login` is a device-code flow and cannot run unattended.
 name: CI
 
 on:
@@ -114,6 +120,18 @@ jobs:
           path: test-results/
           retention-days: 7
 
+      # The four suites above run in one job and append to a single
+      # allure-results/, so this is all 174 of them. The name has to match the
+      # `allure-results-*` pattern the publish job downloads, or the report
+      # silently goes back to being e2e-only.
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-vitest
+          path: allure-results/
+          retention-days: 7
+
   # ── 3. e2e: UI, API, security and accessibility, per platform ─────────────
   test-e2e:
     name: e2e (${{ matrix.project }})
@@ -216,20 +234,24 @@ jobs:
       - name: Check publish credentials
         id: creds
         run: |
-          if [ -n "${{ secrets.BASE44_TOKEN }}" ] && [ -n "${{ vars.BASE44_APP_ID }}" ]; then
+          if [ -n "${{ secrets.BASE44_API_KEY }}" ] && [ -n "${{ vars.BASE44_APP_ID }}" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::BASE44_TOKEN secret or BASE44_APP_ID variable is unset — skipping the publish step. The git sync to Base44 still happened on push."
+            echo "::notice::BASE44_API_KEY secret or BASE44_APP_ID variable is unset — skipping the publish step. Production stays on whatever was last published by hand."
           fi
 
+      # Two npm 12 defaults block this install: the CLI pulls `@deno/loader` from
+      # a remote URL, refused as EALLOWREMOTE unless --allow-remote is given, and
+      # workerd's postinstall is skipped unless it is named in --allow-scripts.
+      # Both flags are scoped to this one global install, not to the repo's deps.
       - name: Publish
         if: steps.creds.outputs.ready == 'true'
         env:
-          BASE44_TOKEN: ${{ secrets.BASE44_TOKEN }}
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
           BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
         run: |
-          npm install -g base44@latest
+          npm install -g base44@latest --allow-remote=all --allow-scripts=workerd
           base44 link --app-id "$BASE44_APP_ID" --non-interactive
           base44 deploy
 
@@ -425,7 +447,9 @@ jobs:
   allure:
     name: Publish Allure report
     runs-on: ubuntu-latest
-    needs: test-e2e
+    # Both test jobs, or the report races the vitest artifact and publishes
+    # without it.
+    needs: [test-node, test-e2e]
     # always(): a failing run is exactly when the report is worth reading.
     if: always() && github.ref == 'refs/heads/main'
     outputs:
