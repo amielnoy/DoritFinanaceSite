@@ -250,26 +250,42 @@ jobs:
       - name: Check Vercel credentials
         id: creds
         run: |
-          if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && [ -n "${{ vars.VERCEL_PROJECT_ID }}" ]; then
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && [ -n "${{ vars.VERCEL_SCOPE }}" ] && [ -n "${{ vars.VERCEL_PROJECT_NAME }}" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::VERCEL_TOKEN secret or VERCEL_PROJECT_ID variable is unset — skipping the Vercel deploy. See .github/workflows/ci.yml for the two values needed."
+            echo "::notice::VERCEL_TOKEN secret, or the VERCEL_SCOPE / VERCEL_PROJECT_NAME variables, are unset — skipping the Vercel deploy."
           fi
 
-      # Build on the runner rather than on Vercel, so the artifact that ships is
-      # produced by the same commit the tests just passed against, with the same
-      # npm client. `vercel build` reads the project's own environment
-      # variables, so VITE_BASE44_APP_ID is baked in exactly as it is for a
-      # dashboard-triggered build.
+      # Confirm the token can actually see the project before doing any work.
+      # The first run failed with "Could not retrieve Project Settings", which
+      # is what a scope mismatch looks like — the ID env vars are only honoured
+      # when the token's scope owns that project.
+      - name: Verify the token reaches the project
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          SCOPE: ${{ vars.VERCEL_SCOPE }}
+        run: |
+          who=$(npx vercel whoami --token "$VERCEL_TOKEN" 2>&1 | tail -1) || true
+          echo "Token identity: $who"
+          if ! npx vercel project ls --scope "$SCOPE" --token "$VERCEL_TOKEN" >/dev/null 2>&1; then
+            echo "::error::VERCEL_TOKEN cannot list projects in scope '$SCOPE'. Recreate the token at https://vercel.com/account/tokens with that scope selected."
+            exit 1
+          fi
+
+      # Link by name and scope rather than by ID env vars. IDs only resolve when
+      # the token's scope matches; the name+scope pair is unambiguous and gives
+      # a readable error when it is not.
       - name: Build for Vercel
         if: steps.creds.outputs.ready == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          SCOPE: ${{ vars.VERCEL_SCOPE }}
+          PROJECT: ${{ vars.VERCEL_PROJECT_NAME }}
         run: |
-          npx vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+          npx vercel link --yes --project "$PROJECT" --scope "$SCOPE" --token "$VERCEL_TOKEN"
+          npx vercel pull --yes --environment=production --scope "$SCOPE" --token "$VERCEL_TOKEN"
           npx vercel build --prod --token "$VERCEL_TOKEN"
 
       - name: Deploy
@@ -277,12 +293,11 @@ jobs:
         if: steps.creds.outputs.ready == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          SCOPE: ${{ vars.VERCEL_SCOPE }}
         run: |
           # npx can interleave notices on stdout, so take the last https line
           # rather than trusting the whole capture to be just the URL.
-          url=$(npx vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN" \
+          url=$(npx vercel deploy --prebuilt --prod --scope "$SCOPE" --token "$VERCEL_TOKEN" \
                 | grep -oE 'https://[^[:space:]]+' | tail -1)
           if [ -z "$url" ]; then
             echo "::error::Vercel deploy produced no URL"
