@@ -456,9 +456,13 @@
       <p>
         All thirteen routes are declared in <code>src/App.jsx</code>. Eleven are
         public; <code>/admin/leads</code> and <code>/admin/blog</code> sit
-        inside a <code>&lt;ProtectedRoute&gt;</code> that redirects to
-        <code>/login</code>. Every page module is imported eagerly at the top of
-        the file, so the router does no code splitting — see finding
+        inside an <code>&lt;AdminRoute&gt;</code>, which delegates to
+        <code>&lt;ProtectedRoute&gt;</code> when the visitor is signed out —
+        redirecting to <code>/login</code> — and additionally sends anyone whose
+        role is not <code>admin</code> back to the home page. The row data is
+        already locked down by RLS; the gate keeps the page itself out of reach.
+        Every page module is imported eagerly at the top of the file, so the
+        router does no code splitting — see finding
         <span class="ref">R-05</span>.
       </p>
 
@@ -637,6 +641,18 @@
         workflow treats publishing as an opt-in step gated on credentials
         rather than something that happens on every green build.
       </p>
+      <p>
+        There are two deployment targets, and they are gated
+        <b>differently on purpose</b>. <b>Vercel</b> carries staging: it deploys
+        whenever the build succeeds, whether the tests passed or not, because a
+        failing run is precisely when it helps to open the broken build next to
+        the Allure report that says what broke. The site sits behind Vercel
+        Authentication, so a red build is never reachable by the public.
+        <b>Base44</b> carries production, and its publish job requires every
+        suite to have passed — the strictest gate in the pipeline. A test
+        failure therefore costs the team its staging convenience, never the
+        client's live site.
+      </p>
 
       <div class="scroll">
         <table>
@@ -645,8 +661,10 @@
             <tr><td>Install · lint · typecheck · build</td><td>PR and push</td><td>lint blocks; typecheck reports only (<span class="ref">R-08</span>)</td></tr>
             <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>e2e × 4 platforms (matrix)</td><td>PR and push</td><td>blocking</td></tr>
-            <tr><td>Publish to Base44</td><td>push to <code>main</code>, or manual</td><td>runs only when <code>BASE44_API_KEY</code> and <code>BASE44_APP_ID</code> are set</td></tr>
+            <tr><td>Deploy to Vercel <em>(staging, login-protected)</em></td><td>push to <code>main</code>, or manual</td><td>needs a successful <b>build</b> only — deploys with red tests on purpose</td></tr>
+            <tr><td>Publish to Base44 <em>(production, client-facing)</em></td><td>push to <code>main</code>, or manual</td><td>needs <b>every suite green</b>; also requires <code>BASE44_API_KEY</code> and <code>BASE44_APP_ID</code></td></tr>
             <tr><td>Production smoke</td><td>after a successful publish</td><td>runs when <code>PRODUCTION_URL</code> is set</td></tr>
+            <tr><td>Publish Allure report</td><td>push to <code>main</code>, pass or fail</td><td><code>always()</code> — a red run is when the report is worth reading</td></tr>
           </tbody>
         </table>
       </div>
