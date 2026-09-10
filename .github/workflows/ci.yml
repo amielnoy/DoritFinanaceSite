@@ -1,4 +1,10 @@
-# CI/CD — install → build → test → deploy.
+# CI/CD — install → build → test → promote → deploy.
+#
+# Branches. The Base44 Builder syncs its edits to `builder`, never to `main`.
+# Every push there runs the same battery a pull request does, and only a fully
+# green run promotes it into `main` (the `promote` job). So work generated in
+# the Builder cannot reach the trunk — or either deployment — untested, and a
+# red Builder run leaves `main` exactly where it was.
 #
 # The two deployment targets are gated differently, on purpose:
 #
@@ -24,7 +30,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # `builder` is where the Base44 Builder syncs. It is tested exactly like
+    # main and reaches main only through the promote job at the bottom of this
+    # file — see the branch note in the header.
+    branches: [main, builder]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -362,7 +371,13 @@ jobs:
         run: |
           # npx can interleave notices on stdout, so take the last https line
           # rather than trusting the whole capture to be just the URL.
-          url=$(npx vercel deploy --prebuilt --prod --scope "$SCOPE" --token "$VERCEL_TOKEN" \
+          #
+          # --archive=tgz uploads one tarball instead of one request per file.
+          # The free plan allows 5000 uploads per 24h, and this pipeline blew
+          # through that in a day — mostly on the Allure report, which is
+          # thousands of small JSON files — leaving deploys dead with
+          # "api-upload-free" until the window rolled over.
+          url=$(npx vercel deploy --prebuilt --prod --archive=tgz --scope "$SCOPE" --token "$VERCEL_TOKEN" \
                 | grep -oE 'https://[^[:space:]]+' | tail -1)
           if [ -z "$url" ]; then
             echo "::error::Vercel deploy produced no URL"
@@ -508,7 +523,12 @@ jobs:
     # without it.
     needs: [test-node, test-e2e]
     # always(): a failing run is exactly when the report is worth reading.
-    if: always() && github.ref == 'refs/heads/main'
+    # Builder runs publish it too: a red `builder` run is the one someone
+    # actually has to read, and it is the only place that says why main did
+    # not move.
+    if: >-
+      always() &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/builder')
     outputs:
       url: ${{ steps.publish.outputs.url }}
     timeout-minutes: 15
@@ -571,7 +591,12 @@ jobs:
           # A static export: no build step, no rewrites. Allure routes on the
           # hash, so index.html serves every view already.
           printf '{ "cleanUrls": false, "trailingSlash": false }' > vercel.json
-          url=$(npx vercel deploy --prod --yes \
+          # --archive=tgz is not optional here. A generated report is thousands
+          # of small JSON files, and the free plan counts 5000 file uploads per
+          # 24 hours: publishing it file-by-file spends most of a day's budget
+          # in one job and takes the app's own deployment down with it.
+          echo "publishing $(find . -type f | wc -l) files as one archive"
+          url=$(npx vercel deploy --prod --yes --archive=tgz \
                   --name "$PROJECT" --scope "$SCOPE" --token "$VERCEL_TOKEN" \
                 | grep -oE 'https://[^[:space:]]+' | tail -1)
           echo "url=$url" >> "$GITHUB_OUTPUT"
@@ -584,3 +609,65 @@ jobs:
           name: allure-report
           path: allure-report/
           retention-days: 14
+
+  # ── 9. Promote a green `builder` run into `main` ─────────────────────────
+  #
+  # This is the gate the Base44 Builder cannot go around. The Builder syncs to
+  # `builder`; this job is the only thing that moves that work to `main`, and
+  # it needs every suite above to have passed. A red Builder run therefore
+  # leaves main — and both deployments — exactly where they were.
+  #
+  # `needs` without always() carries the whole gate: if any of these jobs
+  # failed or was cancelled, this one never starts.
+  promote:
+    name: Promote builder → main
+    runs-on: ubuntu-latest
+    needs: [build, test-node, test-e2e]
+    if: github.ref == 'refs/heads/builder' && github.event_name == 'push'
+    permissions:
+      contents: write   # to push the promoted commit to main
+      actions: write    # to dispatch the main pipeline (see below)
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a shallow clone cannot merge into main.
+          fetch-depth: 0
+
+      - name: Move the tested commit onto main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+
+          # Fast-forward whenever main has not moved, so what deploys is byte
+          # for byte what the suites just ran against. When main *has* moved —
+          # a human PR landed while the Builder was working — take the merge
+          # instead and let main's own run re-test the combined tree before
+          # anything deploys.
+          if git merge-base --is-ancestor origin/main "$GITHUB_SHA"; then
+            echo "fast-forward: main has not moved since this run started"
+          else
+            echo "::notice::main moved since this run started — merging rather than fast-forwarding, and main will re-test the result"
+          fi
+
+          if ! git merge --no-edit "$GITHUB_SHA"; then
+            git merge --abort || true
+            echo "::error::builder conflicts with main. Merge main into builder in the Builder (or locally) and push again — CI will not resolve this for you."
+            exit 1
+          fi
+
+          git push origin main
+          echo "::notice::Promoted $GITHUB_SHA to main"
+
+      - name: Run the main pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A push made with GITHUB_TOKEN deliberately does not trigger
+          # workflows — that is GitHub's recursion guard. Without this dispatch
+          # the promotion would land silently and never deploy.
+          # workflow_dispatch is one of the two events exempt from the guard.
+          gh workflow run CI --ref main -f deploy=true
+          echo "::notice::Dispatched the main pipeline; deployment happens there"
