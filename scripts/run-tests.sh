@@ -5,12 +5,14 @@
 #   ./scripts/run-tests.sh                 everything
 #   ./scripts/run-tests.sh unit contract   only those suites
 #   ./scripts/run-tests.sh e2e --project=ios-safari
+#   ./scripts/run-tests.sh --report        open the Allure report when done
 #
 # Suites: lint typecheck unit component contract security e2e
 # Env:
 #   SKIP_BUILD=1                 reuse an existing dist/ for the e2e run
 #   PLAYWRIGHT_BASE_URL=<url>    run e2e against a deployment instead of a local preview
 #   E2E_ENFORCE_CONTRAST=1       fail the a11y suite on WCAG colour-contrast findings
+#   NO_REPORT=1                  skip generating the Allure report entirely
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -21,10 +23,12 @@ BOLD=$'\033[1m'; RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; DIM=$'\
 ALL_SUITES=(lint typecheck unit component contract security e2e)
 SUITES=()
 EXTRA_ARGS=()
+OPEN_REPORT=0
 
 for arg in "$@"; do
   case "$arg" in
-    -h|--help) sed -n '/^# One command/,/^# *E2E_ENFORCE_CONTRAST/p' "$0" | sed 's/^#\{1,\} \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '/^# One command/,/^# *NO_REPORT/p' "$0" | sed 's/^#\{1,\} \{0,1\}//'; exit 0 ;;
+    --report) OPEN_REPORT=1 ;;
     -*) EXTRA_ARGS+=("$arg") ;;
     *)
       if [[ " ${ALL_SUITES[*]} " == *" $arg "* ]]; then
@@ -97,6 +101,28 @@ if has e2e; then
     export SKIP_BUILD=1
   fi
   run_suite "e2e (web + iOS + Android)" npx playwright test "${EXTRA_ARGS[@]}"
+fi
+
+# ── Allure report ───────────────────────────────────────────────────────────
+# Generated whenever the e2e suite ran, because a run you cannot read is a run
+# you will re-run. `allure open` serves it on localhost — the report is a set of
+# XHR-loading pages, so opening index.html from the filesystem shows an empty
+# shell. Skipped in CI, where the workflow publishes it instead.
+if has e2e && [[ "${NO_REPORT:-}" != "1" && -z "${CI:-}" ]]; then
+  if [[ -d allure-results && -n "$(ls -A allure-results 2>/dev/null)" ]]; then
+    if npx allure generate allure-results --clean -o allure-report >/dev/null 2>&1; then
+      printf '\n%sAllure report%s generated in %sallure-report/%s\n' "$BOLD" "$OFF" "$DIM" "$OFF"
+      if [[ $OPEN_REPORT -eq 1 ]]; then
+        printf '  opening on localhost — %sCtrl-C to stop the server%s\n' "$DIM" "$OFF"
+        npx allure open allure-report
+      else
+        printf '  view it: %snpm run allure:open%s   (or re-run with %s--report%s)\n' \
+          "$YELLOW" "$OFF" "$YELLOW" "$OFF"
+      fi
+    else
+      printf '\n%sAllure report could not be generated%s (is Java installed?)\n' "$YELLOW" "$OFF"
+    fi
+  fi
 fi
 
 printf '\n%s%s%s\n' "$BOLD" "── summary ─────────────────────────────" "$OFF"
