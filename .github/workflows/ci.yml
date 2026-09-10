@@ -177,6 +177,17 @@ jobs:
             test-results/
           retention-days: 14
 
+      # Raw Allure results, kept per platform so the allure job can merge all
+      # five legs into one report. Generating per-leg would give five partial
+      # reports instead of one picture of the run.
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.project }}
+          path: allure-results/
+          retention-days: 7
+
   # ── 4. Deploy (main only) ────────────────────────────────────────────────
   deploy:
     name: Publish to Base44
@@ -317,7 +328,10 @@ jobs:
           # The project keeps Vercel Authentication on, so an anonymous curl is
           # answered with a 302 to a login page. `vercel curl` carries the
           # bypass, which is what makes this a real check rather than a ping.
-          body=$(npx vercel curl "$URL/" --token "$VERCEL_TOKEN")
+          # No --token here: `vercel curl` forwards flags it does not recognise
+          # to the real curl, which rejects --token. It authenticates from the
+          # VERCEL_TOKEN environment variable instead, which this step sets.
+          body=$(npx vercel curl "$URL/")
           echo "$body" | grep -q '<div id="root">' \
             || { echo "::error::Deployment did not serve the app shell"; exit 1; }
           echo "$body" | grep -q 'lang="he"' \
@@ -367,7 +381,7 @@ jobs:
   sites:
     name: Deployed sites
     runs-on: ubuntu-latest
-    needs: [deploy-vercel, test-e2e]
+    needs: [deploy-vercel, test-e2e, allure]
     if: always()
     steps:
       - name: Write the site links to the run summary
@@ -376,6 +390,7 @@ jobs:
           VERCEL_URL: ${{ needs.deploy-vercel.outputs.url }}
           VERCEL_RESULT: ${{ needs.deploy-vercel.result }}
           TESTS_RESULT: ${{ needs.test-e2e.result }}
+          ALLURE_URL: ${{ needs.allure.outputs.url }}
         run: |
           vercel_link="${VERCEL_URL:-https://vercel.com/amielnoy-9725s-projects/dorit-finance-site}"
 
@@ -393,6 +408,11 @@ jobs:
             echo "| --- | --- | --- |"
             echo "| **Base44 — production** (client-facing) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | not deployed by CI — see note |"
             echo "| **Vercel — staging** (login-protected) | ${vercel_link} | ${vercel_state} |"
+            if [ -n "$ALLURE_URL" ]; then
+              echo "| **Allure — test report** | ${ALLURE_URL} | published this run |"
+            else
+              echo "| **Allure — test report** | downloadable from this run's artifacts | not published |"
+            fi
             echo
             echo "Tests across all five platforms: **${TESTS_RESULT}**"
             echo
@@ -400,3 +420,86 @@ jobs:
             echo "> its GitHub connection is broken, so it cannot pull the merged code itself."
             echo "> The Vercel staging link answers anonymous requests with a 302; sign in to Vercel to view it."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 8. Publish the merged Allure report ──────────────────────────────────
+  allure:
+    name: Publish Allure report
+    runs-on: ubuntu-latest
+    needs: test-e2e
+    # always(): a failing run is exactly when the report is worth reading.
+    if: always() && github.ref == 'refs/heads/main'
+    outputs:
+      url: ${{ steps.publish.outputs.url }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Pin npm (honours the .npmrc release cooldown)
+        run: npm i -g npm@${{ env.NPM_VERSION }}
+
+      - run: npm ci
+
+      - name: Collect the results from every platform
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: allure-parts
+
+      - name: Merge into one results directory
+        run: |
+          mkdir -p allure-results
+          # Each artifact unpacks to its own directory; flatten them together.
+          find allure-parts -type f -exec cp -n {} allure-results/ \; 2>/dev/null || true
+          echo "merged $(ls allure-results | wc -l) result files"
+
+      # History makes the trend graphs meaningful across runs. Without it every
+      # report claims to be the first one.
+      - name: Restore report history
+        uses: actions/cache@v4
+        with:
+          path: allure-history
+          key: allure-history-${{ github.run_id }}
+          restore-keys: allure-history-
+
+      - name: Carry history into this run
+        run: |
+          if [ -d allure-history ]; then cp -r allure-history allure-results/history || true; fi
+
+      - name: Generate the report
+        run: |
+          npx allure generate allure-results --clean -o allure-report
+          cp -r allure-report/history allure-history 2>/dev/null || true
+
+      - name: Publish to Vercel
+        id: publish
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          SCOPE: ${{ vars.VERCEL_SCOPE }}
+          PROJECT: ${{ vars.VERCEL_REPORT_PROJECT }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$PROJECT" ]; then
+            echo "::notice::VERCEL_TOKEN or VERCEL_REPORT_PROJECT unset — report generated but not published."
+            exit 0
+          fi
+          cd allure-report
+          # A static export: no build step, no rewrites. Allure routes on the
+          # hash, so index.html serves every view already.
+          printf '{ "cleanUrls": false, "trailingSlash": false }' > vercel.json
+          url=$(npx vercel deploy --prod --yes \
+                  --name "$PROJECT" --scope "$SCOPE" --token "$VERCEL_TOKEN" \
+                | grep -oE 'https://[^[:space:]]+' | tail -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "::notice::Allure report: $url"
+
+      - name: Keep the report as an artifact too
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 14
