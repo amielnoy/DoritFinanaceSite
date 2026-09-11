@@ -1,5 +1,23 @@
 # CI/CD — install → build → test → deploy.
 #
+# Branches. Today the Base44 Builder syncs straight to `main`, so its edits
+# land there untested — twice in one day that put a broken suite on `main`.
+#
+# The support for working on a Builder branch instead is already here and is
+# DORMANT: everything keyed to `builder` triggers only on pushes to that
+# branch, and no such branch is in use yet. Pointing the Builder at one is a
+# Base44-side setting that costs Builder tokens, which is why it has not
+# happened. Nothing below changes behaviour until it does — the README carries
+# the switch-over.
+#
+# Once it is live, a push to `builder` gets the full battery, a Vercel preview
+# on its own URL, a published report, and a "safe to merge" verdict in the run
+# summary. What it does NOT get is an automatic merge: on a branch the Builder
+# replaces its Publish button with "Merge to main", and Base44 keeps each
+# Builder branch as a real branch here, so merging is already its job. A CI
+# job that merged `builder` into `main` would race that and leave the two
+# disagreeing about what happened.
+#
 # The two deployment targets are gated differently, on purpose:
 #
 #   Vercel (staging, login-protected) — deploys whenever the build succeeds,
@@ -24,7 +42,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # `builder` is listed ahead of being used: the day the Base44 Builder is
+    # pointed at it, its pushes are tested, previewed and judged with no
+    # workflow change. Until then no such branch exists and this does nothing.
+    branches: [main, builder]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -290,13 +311,16 @@ jobs:
     needs: [build, test-node, test-e2e]
     outputs:
       url: ${{ steps.deploy.outputs.url }}
+    # Also on `builder`, where it deploys a *preview* rather than production.
+    # That is the point of the branch: a Builder edit gets a URL you can open
+    # and look at before you merge it, instead of being judged from a diff.
     if: >-
       !cancelled() &&
       needs.build.result == 'success' &&
-      github.ref == 'refs/heads/main' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/builder') &&
       (github.event_name == 'push' || inputs.deploy)
     environment:
-      name: vercel
+      name: ${{ github.ref == 'refs/heads/main' && 'vercel' || 'vercel-preview' }}
       url: ${{ steps.deploy.outputs.url }}
     timeout-minutes: 15
     steps:
@@ -339,6 +363,22 @@ jobs:
             exit 1
           fi
 
+      # main deploys production; `builder` deploys a preview on its own URL.
+      # One job rather than two: everything else about the two is identical,
+      # and a second copy would drift from this one within a week.
+      - name: Choose production or preview
+        id: target
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "prod=--prod" >> "$GITHUB_OUTPUT"
+            echo "env=production" >> "$GITHUB_OUTPUT"
+            echo "kind=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "prod=" >> "$GITHUB_OUTPUT"
+            echo "env=preview" >> "$GITHUB_OUTPUT"
+            echo "kind=preview" >> "$GITHUB_OUTPUT"
+          fi
+
       # Link by name and scope rather than by ID env vars. IDs only resolve when
       # the token's scope matches; the name+scope pair is unambiguous and gives
       # a readable error when it is not.
@@ -350,8 +390,8 @@ jobs:
           PROJECT: ${{ vars.VERCEL_PROJECT_NAME }}
         run: |
           npx vercel link --yes --project "$PROJECT" --scope "$SCOPE" --token "$VERCEL_TOKEN"
-          npx vercel pull --yes --environment=production --scope "$SCOPE" --token "$VERCEL_TOKEN"
-          npx vercel build --prod --token "$VERCEL_TOKEN"
+          npx vercel pull --yes --environment=${{ steps.target.outputs.env }} --scope "$SCOPE" --token "$VERCEL_TOKEN"
+          npx vercel build ${{ steps.target.outputs.prod }} --token "$VERCEL_TOKEN"
 
       - name: Deploy
         id: deploy
@@ -362,14 +402,20 @@ jobs:
         run: |
           # npx can interleave notices on stdout, so take the last https line
           # rather than trusting the whole capture to be just the URL.
-          url=$(npx vercel deploy --prebuilt --prod --scope "$SCOPE" --token "$VERCEL_TOKEN" \
+          #
+          # --archive=tgz uploads one tarball instead of one request per file.
+          # The free plan allows 5000 uploads per 24h, and this pipeline blew
+          # through that in a day — mostly on the Allure report, which is
+          # thousands of small JSON files — leaving deploys dead with
+          # "api-upload-free" until the window rolled over.
+          url=$(npx vercel deploy --prebuilt ${{ steps.target.outputs.prod }} --archive=tgz --scope "$SCOPE" --token "$VERCEL_TOKEN" \
                 | grep -oE 'https://[^[:space:]]+' | tail -1)
           if [ -z "$url" ]; then
             echo "::error::Vercel deploy produced no URL"
             exit 1
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "::notice::Deployed to $url"
+          echo "::notice::Deployed a ${{ steps.target.outputs.kind }} to $url"
 
       - name: Verify the deployment serves the app
         if: steps.creds.outputs.ready == 'true'
@@ -434,7 +480,10 @@ jobs:
     name: Deployed sites
     runs-on: ubuntu-latest
     needs: [deploy-vercel, deploy, test-node, test-e2e, allure]
-    if: always()
+    # Not on `builder`: that URL is a preview of one change, not a site anyone
+    # lives on, and merge-readiness already reports it. Two tables in one
+    # summary calling the same URL different things is worse than one.
+    if: always() && github.ref != 'refs/heads/builder'
     steps:
       - name: Write the site links to the run summary
         env:
@@ -508,7 +557,12 @@ jobs:
     # without it.
     needs: [test-node, test-e2e]
     # always(): a failing run is exactly when the report is worth reading.
-    if: always() && github.ref == 'refs/heads/main'
+    # Builder runs publish it too: a red `builder` run is the one someone
+    # actually has to read, and it is the only place that says why main did
+    # not move.
+    if: >-
+      always() &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/builder')
     outputs:
       url: ${{ steps.publish.outputs.url }}
     timeout-minutes: 15
@@ -571,7 +625,12 @@ jobs:
           # A static export: no build step, no rewrites. Allure routes on the
           # hash, so index.html serves every view already.
           printf '{ "cleanUrls": false, "trailingSlash": false }' > vercel.json
-          url=$(npx vercel deploy --prod --yes \
+          # --archive=tgz is not optional here. A generated report is thousands
+          # of small JSON files, and the free plan counts 5000 file uploads per
+          # 24 hours: publishing it file-by-file spends most of a day's budget
+          # in one job and takes the app's own deployment down with it.
+          echo "publishing $(find . -type f | wc -l) files as one archive"
+          url=$(npx vercel deploy --prod --yes --archive=tgz \
                   --name "$PROJECT" --scope "$SCOPE" --token "$VERCEL_TOKEN" \
                 | grep -oE 'https://[^[:space:]]+' | tail -1)
           echo "url=$url" >> "$GITHUB_OUTPUT"
@@ -584,3 +643,68 @@ jobs:
           name: allure-report
           path: allure-report/
           retention-days: 14
+
+
+  # ── 9. Is this Builder branch safe to merge? ─────────────────────────────
+  #
+  # Base44 owns promotion, not this pipeline. On a branch the Builder replaces
+  # its Publish button with "Merge to main", and merging there is what moves
+  # the work — including to GitHub, since Base44 keeps each Builder branch as a
+  # real branch in this repository. A CI job that merged `builder` into `main`
+  # itself would race that, and leave the Builder's own record of the branch
+  # saying "not merged" over a merge that already happened.
+  #
+  # So CI does the half it is good at: run everything, put the verdict and a
+  # preview URL somewhere obvious, and let the human press the button. The
+  # enforcement that matters is downstream anyway — publishing only happens
+  # from main, and the publish job there demands a green run.
+  merge-readiness:
+    name: Safe to merge?
+    runs-on: ubuntu-latest
+    needs: [build, test-node, test-e2e, deploy-vercel, allure]
+    if: always() && github.ref == 'refs/heads/builder'
+    steps:
+      - name: Write the verdict to the run summary
+        env:
+          BUILD: ${{ needs.build.result }}
+          UNIT: ${{ needs.test-node.result }}
+          E2E: ${{ needs.test-e2e.result }}
+          PREVIEW_URL: ${{ needs.deploy-vercel.outputs.url }}
+          ALLURE_URL: ${{ needs.allure.outputs.url }}
+        run: |
+          if [ "$BUILD" = "success" ] && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ]; then
+            verdict="## ✅ Safe to merge"
+            advice="Everything passed. Press **Merge to main** in the Builder; the publish from main is gated on a green run there too."
+          else
+            verdict="## 🛑 Do not merge yet"
+            advice="Something is red. Open the report below, fix it in the Builder, and push again — merging now would put this on main."
+          fi
+
+          {
+            echo "$verdict"
+            echo
+            echo "$advice"
+            echo
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| Build · lint · typecheck | ${BUILD} |"
+            echo "| Unit · component · contract · security | ${UNIT} |"
+            echo "| e2e across four platforms | ${E2E} |"
+            echo
+            if [ -n "$PREVIEW_URL" ]; then
+              echo "**Preview of this change:** ${PREVIEW_URL}"
+              echo
+              echo "> Sign in to Vercel to open it — previews answer anonymous requests with a 302."
+            else
+              echo "_No preview was deployed for this run._"
+            fi
+            echo
+            if [ -n "$ALLURE_URL" ]; then
+              echo "**Test report:** ${ALLURE_URL}"
+            else
+              echo "_Test report: downloadable from this run's artifacts._"
+            fi
+            echo
+            echo "> Heads-up: every Builder branch shares the app's **live data**. The tests never"
+            echo "> touch it, but anything you do by hand in the Builder writes to real records."
+          } >> "$GITHUB_STEP_SUMMARY"
