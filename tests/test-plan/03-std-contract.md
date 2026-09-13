@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 52
+**Location:** `tests/contract/` · **Cases:** 158
 
 ---
 
@@ -18,8 +18,10 @@ than in production.
 | Item | Source |
 |---|---|
 | Entity schemas | `base44/entities/{BlogPost,Lead,Testimonial,User}.jsonc` |
+| Agent prompts | `base44/agents/{needs_interview,booking_assistant,blog_recommender}.jsonc` |
+| Published articles | `content/blog/*.md` |
 | Frontend write paths | `base44.entities.*.create/update/filter`, `integrations.Core.SendEmail` |
-| Backend function | `base44/functions/createConsultationEvent/entry.ts` |
+| Backend function | `base44/functions/{createConsultationEvent,escalateToHuman}/entry.ts` |
 | Connector | `base44/connectors/googlecalendar.jsonc` |
 
 ## 3. Approach
@@ -79,6 +81,36 @@ Two helpers do the work:
 | CTR-FN-010 | "does not echo the access token back to the caller" | No `accessToken` in any `Response.json(...)` |
 | CTR-FN-011 | "uses a declared connector that exists in the repo" | `base44/connectors/googlecalendar.jsonc` present |
 
+## 4a. The compliance contract
+
+Two files here test text rather than shape, and do so on purpose. Both cover
+artefacts that a regulator, not a compiler, is the reader of.
+
+**`agents.contract.test.ts` — `CTR-AGT-001..083`** — the three agent prompts. For each
+agent it asserts the eighteen mandatory clauses of the compliance block (bot
+disclosure, licence number `L-00107009`, the marketing-not-advice statement, the
+absolute bans on product recommendation and figures, the privacy-law citation
+and data-minimisation rule, the complaint and privacy-request routes, the
+"never guess — escalate" default, and the fallback phone and email), that
+`escalateToHuman` is wired as a tool, that the prompt opens by disclosing it is
+automated, and that no agent is granted an entity operation beyond its job.
+
+It then pins the four places the escalation vocabulary is written down —
+`Lead.escalation_reason`, each prompt, `src/config/compliance.ts` and the
+`EscalationReason` union — and fails if any of them drifts from the others.
+
+Finally it asserts what the shell enforces and a prompt cannot: no message may
+be sent before consent, the handoff path exists independently of the model, and
+the fence published beside the interview agent matches what the prompt actually
+forbids. A page that claims the agent gives no figures while the prompt has
+stopped saying so is a false statement to a visitor, and fails here.
+
+**`blog-content.contract.test.ts` — `CTR-ART-001..013`** — the repo-held articles under
+`content/blog/`. Each must parse, be a real article rather than a stub, carry
+the גילוי נאות block with the licence number and the affiliation, contain no
+promise of a return, map cleanly onto the `BlogPost` entity, and ship as a
+draft: publishing stays a human decision.
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -88,5 +120,5 @@ time.
 
 ## 6. Pass criteria
 
-All 52 cases pass. A failure means either the frontend or the backend definition
+All 158 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.

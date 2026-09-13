@@ -17,11 +17,12 @@ In scope:
 |---|---|
 | Pure logic | Pension fee maths, URL/class helpers, the open-redirect guard, contact config |
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
-| Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` function, RLS rules |
+| Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` and `escalateToHuman` functions, RLS rules |
+| Agent compliance | The three agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
-| UI e2e | Landing page, routing, calculator, three lead forms, blog |
+| UI e2e | Landing page, routing, calculator, three lead forms, blog, the agent chat's regulatory shell |
 | Mobile web | iOS Safari and Android Chrome behaviour and layout |
-| Security | XSS, open redirect, token handling, tab-nabbing, secret leakage, RLS |
+| Security | XSS (page and chat), HTML injection into outbound mail, phishing vectors, prompt injection via UI and via tool payloads, DLP, open redirect, token handling, tab-nabbing, secret leakage, RLS |
 | Accessibility | WCAG 2.1 AA via axe-core, plus structural RTL/labelling checks |
 
 Out of scope: native iOS/Android applications (none exist in this repo — the
@@ -55,7 +56,8 @@ backend when one is available.
 | Item | Version reference |
 |---|---|
 | Application source | `src/**` at the commit under test |
-| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/createConsultationEvent` |
+| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{createConsultationEvent,escalateToHuman}`, `base44/agents/*.jsonc` |
+| Published copy | `content/blog/*.md`, `src/config/compliance.ts` |
 | Static assets | `index.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`, `public/manifest.json` |
 | Build output | `dist/` produced by `npm run build` |
 
@@ -82,7 +84,7 @@ backend when one is available.
 | Suite | Criterion |
 |---|---|
 | lint | zero errors |
-| typecheck | **advisory** — see [10-known-issues](10-known-issues.md) |
+| typecheck | zero **new** errors against `tests/typecheck-baseline.json` — see [10-known-issues](10-known-issues.md) |
 | unit, component, contract, security | 100% pass |
 | e2e (all four platforms) | 100% pass, no more than the documented skips |
 | accessibility | zero `serious`/`critical` axe violations except the tracked colour-contrast finding |
@@ -102,16 +104,20 @@ Resume after the environment is corrected; no partial sign-off.
 | JUnit XML (Playwright) | `test-results/e2e-junit.xml` |
 | HTML report | `playwright-report/` |
 | Allure results — **every suite**, unit through e2e | `allure-results/` |
-| Allure report | `allure-report/` — `npm run allure:open`, or `./scripts/run-tests.sh --report` |
+| Allure report | `allure-report/index.html` — one self-contained file; `npm run allure:open`, or `./scripts/run-tests.sh --report`, to serve it |
+| Allure report, from CI | the `allure-report` artifact on each run, and a Cloudflare Pages deployment behind Cloudflare Access |
 | Failure screenshots, video, traces | `test-results/<test>/` |
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
 Both runners write Allure results into the same `allure-results/`, so one
-`allure generate` covers the whole battery — 174 unit/component/contract/
-security cases plus 156 e2e cases per platform. CI merges the five uploads
+`allure generate` covers the whole battery — 345 unit/component/contract/
+security cases plus 162 e2e cases per platform. CI merges the five uploads
 (one per platform, one for the Vitest job) into a single published report;
 generating per-leg would give five partial reports instead of one picture of
-the run.
+the run. Allure 3 emits the merged report as a single self-contained
+HTML file, which CI attaches to every run; a multi-file copy is deployed to
+Cloudflare Pages behind Cloudflare Access, and CI fails the run if that copy
+answers an anonymous request.
 
 > A run invoked with `--reporter=` on the command line replaces the configured
 > reporters and writes **no** Allure results. Omit the flag for any run whose

@@ -23,6 +23,9 @@ gap is visible and a failure points at a feature.
 | F-18 | Rich results: FAQ, article, breadcrumb, service | SEO-BRD-001 | — | — | — | SEO-LD-001..005 | SEO-MOB-001 | — | — |
 | F-19 | Mobile-first indexing parity and mobile usability | — | — | — | — | — | SEO-MOB-001..007 | — | A11Y-STR-007, E2E-MOB-005/010 |
 | F-15 | Site degrades safely when the backend fails | — | CMP-RVW-003, CMP-QCF-004 | — | — | E2E-HOM-006, E2E-BLG-006, E2E-FRM-003/010 | — | SEC-ERR-001 | — |
+| F-20 | Visitor talks to an on-site agent, behind a consent gate | — | — | CTR-AGT-001..083 | — | E2E-AGT-001..003 | — | — | — |
+| F-21 | Visitor is handed to a person whenever the agent may not answer | — | — | CTR-AGT-001..083, CTR-FN-* | — | E2E-AGT-004/005 | — | — | — |
+| F-22 | Published articles carry the mandatory גילוי נאות | — | — | CTR-ART-001..013 | — | — | — | — | — |
 | F-16 | No secrets ship to the browser | — | — | CTR-FN-009/010 | — | — | — | SEC-STA-001..009, SEC-BND-001 | — |
 
 ## Coverage gaps (accepted)
@@ -36,3 +39,5 @@ gap is visible and a failure points at a feature.
 | Blog post URLs in the static sitemap | Posts are entity-backed, so their URLs are unknown at build time; they are reachable from `/blog` and each carries its own canonical and `BlogPosting` markup (SEO-LD-004) |
 | Performance / Core Web Vitals | Out of scope for a sanity suite |
 | Real-device iOS/Android | Needs a device lab; see [STD-07 §1](07-std-mobile.md) |
+| What an agent actually says in a live conversation | The reply comes from a model, so it cannot be asserted. What is testable is split out and tested: the shell's gates (E2E-AGT-*) and the presence of every mandatory clause in the prompts (CTR-AGT-*). See [`base44/agents/COMPLIANCE.md`](../../base44/agents/COMPLIANCE.md) §4 for which rules are enforced where |
+| The `escalateToHuman` notification reaching דורית | A third-party side effect; the function's contract and its error path are covered (CTR-AGT-*, E2E-AGT-005) |

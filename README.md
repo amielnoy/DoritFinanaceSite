@@ -65,6 +65,45 @@ where it was.
 > connection is an owner/name pair, and transferring the repo between accounts
 > leaves it pointing at the old path while push webhooks keep arriving.
 
+## The agents, and where they stop
+
+Three LLM agents run on the site — `needs_interview`, `booking_assistant` and
+`blog_recommender` (`base44/agents/`). They belong to a licensed insurance
+agency, which makes most of what a visitor would like to ask them off-limits:
+no product recommendation, no figures, no view on whether to move, withdraw or
+cancel anything. Every one of those ends in a handoff to דורית rather than a
+partial answer, and so does any case where the agent is simply not sure.
+
+Two of those guarantees do not depend on the model at all, on purpose:
+
+- **Nothing is sent before consent.** The message box is disabled until the
+  visitor accepts the notice, and no conversation is opened with the backend
+  until then — a prompt can be talked out of asking; this cannot.
+- **The route to a person is a button**, present from the first frame, that
+  calls `escalateToHuman` and renders דורית's phone, WhatsApp and email even
+  when the call fails, and even before consent.
+
+The rest lives in the prompts, and `tests/contract/agents.contract.test.ts`
+fails if a mandatory clause disappears from any of them.
+
+Full description of the layer, what is enforced where, and one open question
+for דורית's compliance adviser: [`base44/agents/COMPLIANCE.md`](base44/agents/COMPLIANCE.md).
+
+## Blog articles in the repo
+
+Articles under [`content/blog/`](content/blog/) are Markdown with front matter.
+They live here rather than only in the Builder because a post published by a
+licensed agency carries a mandatory גילוי נאות block, and a disclosure that
+exists only as a database row is one nobody reviews.
+
+```bash
+npm run seed:blog                    # dry run — lists what would be written
+node scripts/seed-blog.mjs --apply   # writes, needs an admin sign-in
+```
+
+Posts are matched by title (update if present, create if not) and ship as
+**drafts** — publishing stays a decision made from `/admin/blog`.
+
 ## Tests
 
 The full battery — lint, typecheck, unit, component, contract, security, and
@@ -110,17 +149,73 @@ so a single report covers the whole battery:
 npm run allure:open                  # open the report from the last run
 ```
 
-The report **must be served**, not opened from disk — it loads its data over
-XHR, so double-clicking `allure-report/index.html` shows an empty shell. Both
-commands above route through `allure open`, which serves it on localhost.
+**Allure 3** inlines the whole report into a single self-contained
+`allure-report/index.html`, so you can also just open that file. Allure 2 could
+not: it fetched thousands of small JSON files over XHR and showed an empty shell
+when opened from disk, which is the only reason the report ever needed hosting
+at all. Both commands above still serve it on localhost, which is the nicer way
+to click through a failure.
 
 ⚠️ Passing `--reporter=` to `vitest` or `playwright` on the command line
 *replaces* the configured reporters, so such a run writes no Allure results at
 all. Omit the flag for any run you want in the report.
 
-CI publishes the merged report — all four platforms plus the Vitest suites — to
-its own Vercel project on every push to `main`, pass or fail. A link is in each
-run's summary, along with the two site links.
+CI builds the merged report — all four platforms plus the Vitest suites — on
+every run of `main` or `builder`, pass or fail, and puts it in two places:
+
+| Where | Shape | Who can read it |
+|---|---|---|
+| The run itself, as the `allure-report` artifact | one self-contained `index.html` | anyone who can see this repository |
+| **Cloudflare Pages** | the ordinary multi-file report | whoever Cloudflare Access lets in |
+
+Two shapes because Cloudflare rejects any single asset over **25 MiB**, and a
+full run's single-file report is around 46 MB. The hosted copy is therefore the
+split one — roughly 4,000 files against a 20,000-file ceiling. Both come from
+the same results, and both have the analytics beacon stripped.
+
+The artifact needs nothing set up and always exists. The Cloudflare deploy is
+opt-in, and skips with a notice when these are missing:
+
+All three live in **GitHub**, not Cloudflare — *this repository → Settings →
+Secrets and variables → Actions*. Only their values come from Cloudflare:
+
+| Name | Kind | Where the value comes from |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | secret | Cloudflare → My Profile → API Tokens → Create Token, with the **Cloudflare Pages: Edit** permission |
+| `CLOUDFLARE_ACCOUNT_ID` | secret | Cloudflare dashboard sidebar, or `npx wrangler whoami` |
+| `CLOUDFLARE_PAGES_PROJECT` | variable | any project name you like — CI creates the project if it does not exist |
+
+#### Keeping the hosted report private
+
+The report carries the client's copy and failure screenshots of her site, so it
+must not be world-readable. **CI enforces that rather than trusting it**: after
+each deploy it fetches the URL anonymously and fails the run if the report comes
+back. A protection nothing checks is one that silently lapses.
+
+Cloudflare Access is what provides it, and there is a trap in how it applies:
+
+> Cloudflare's project-level **Enable access policy** toggle (Workers & Pages →
+> the project → Settings → General) protects **preview deployments only** — not
+> the `*.pages.dev` production domain, and not a custom domain.
+
+The project therefore needs a **production branch that CI never pushes**. When
+CI creates the project it sets that to `production` for exactly this reason:
+deploys use `--branch` = the git ref (`main` or `builder`), so every report
+lands as a *preview* deployment, which is what the toggle covers. **If you
+created the project yourself**, check that setting — a project whose production
+branch is `main` will serve every report from the unprotected production
+domain.
+
+Flipping the toggle on is still a manual step, once, in the dashboard. If you
+would rather serve the report from the production domain, protect that hostname
+with an Access application in Zero Trust instead; the verification step treats
+both the same way, because all it asks is whether an anonymous request can read
+the report.
+
+Generating the report also strips a Google Analytics beacon that Allure injects
+into every one it produces — see `scripts/strip-allure-analytics.mjs`. It
+reports to Qameta's property rather than ours, and there is no config flag or
+environment variable that turns it off.
 
 ### Branches
 

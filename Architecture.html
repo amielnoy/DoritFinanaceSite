@@ -311,6 +311,7 @@
       <li><a href="#topology">Runtime topology</a></li>
       <li><a href="#frontend">Frontend</a></li>
       <li><a href="#backend">Backend</a></li>
+      <li><a href="#agents">The agent layer</a></li>
       <li><a href="#boot">The boot path</a></li>
       <li><a href="#delivery">Build &amp; delivery</a></li>
       <li><a href="#testing">Test architecture</a></li>
@@ -515,8 +516,10 @@
     <section id="backend">
       <h2><span class="num">04</span> Backend</h2>
       <p class="lede">
-        Declarative, and unusually well-scoped. The backend is four JSON entity
-        definitions, two Core integrations and one Deno function — all in
+        Declarative, and still legible. The backend is four JSON entity
+        definitions, <b>five Deno functions</b>, three OAuth connectors
+        (<code>googlecalendar</code>, <code>outlook</code>,
+        <code>googlesheets</code>) and three agent definitions — all in
         <code>base44/</code>, all in version control.
       </p>
 
@@ -542,22 +545,128 @@
         than trusting it.
       </p>
 
-      <h3>The one function</h3>
+      <h3>The five functions</h3>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Function</th><th>What it does</th><th>Side effects</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>submitLead</code></td><td>The enquiry path for all three forms and for the booking agent</td><td>writes <code>Lead</code>; mails the agency, the operations team and the visitor; Outlook event; sheet row</td></tr>
+            <tr><td><code>submitClaim</code></td><td>The claims form</td><td>writes <code>Lead</code>; mails</td></tr>
+            <tr><td><code>escalateToHuman</code></td><td>Hands a conversation to a person, for any reason an agent may not handle</td><td>writes <code>Lead</code> when contactable; always notifies; sheet row</td></tr>
+            <tr><td><code>createConsultationEvent</code></td><td>Books the follow-up in Google Calendar</td><td><code>googlecalendar</code> connector</td></tr>
+            <tr><td><code>createOutlookEvent</code></td><td>The same, in Outlook</td><td><code>outlook</code> connector</td></tr>
+          </tbody>
+        </table>
+      </div>
       <p>
-        <code>createConsultationEvent</code> takes a booking, pulls a Google
-        access token from the <code>googlecalendar</code> connector under
-        <code>asServiceRole</code>, and writes a follow-up event for 09:00
-        Jerusalem time the next day. It validates <code>name</code> and
-        <code>phone</code>, returns 400 without them, 502 when Google refuses,
-        500 on anything else, and never puts the access token in a response.
-        Its request shape and every one of those status codes are pinned by
-        contract tests.
+        They share a discipline worth naming: <b>the record is written first and
+        everything after it is best-effort.</b> Email is the fragile channel —
+        deliverability, a verified domain, a recipient who typed their address —
+        and the database is the reliable one, so a failed send can no longer
+        lose an enquiry. Only a failed write returns an error to the caller;
+        everything else is collected into a <code>warnings</code> array and
+        reported in the response.
       </p>
+      <p>
+        <code>createConsultationEvent</code> is the one to read first if you
+        want the house style: it validates <code>name</code> and
+        <code>phone</code>, returns 400 without them, 502 when Google refuses,
+        500 on anything else, and never puts the access token in a response. Its
+        request shape and every one of those status codes are pinned by contract
+        tests.
+      </p>
+      <div class="callout">
+        <span class="label">Unchecked</span>
+        <p>
+        <b>Nothing type-checks these files.</b> <code>tsconfig.json</code>
+        includes only <code>src/**</code>, and they run on Deno inside Base44 —
+        so neither <code>tsc</code> nor the lint step ever sees them, despite
+        their holding the compliance logic. The contract and security suites
+        read them as text, which is the only check that currently exists.
+        </p>
+      </div>
+    </section>
+
+    <!-- 5 ────────────────────────────────────────────────────────────────── -->
+    <section id="agents">
+      <h2><span class="num">05</span> The agent layer</h2>
+      <p class="lede">
+        Three LLM agents run on the site. They belong to a licensed insurance
+        agency, which makes most of what a visitor would like to ask them
+        off-limits — so the interesting part of this layer is not what it does,
+        but what it refuses to do, and which of those refusals survive a model
+        that has been talked into something.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Agent</th><th>Job</th><th>Tools</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>needs_interview</code></td><td>Gathers context before a meeting</td><td><code>Lead.create</code>, <code>escalateToHuman</code></td></tr>
+            <tr><td><code>booking_assistant</code></td><td>Arranges the meeting itself</td><td><code>submitLead</code>, <code>createConsultationEvent</code>, <code>escalateToHuman</code></td></tr>
+            <tr><td><code>blog_recommender</code></td><td>Points at articles</td><td><code>BlogPost.read</code>, <code>escalateToHuman</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Prompt or gate</h3>
+      <p>
+        This is the distinction the whole layer turns on. An instruction in a
+        prompt is a <em>request</em> to a model. A gate in code is not.
+      </p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Rule</th><th>Enforced where</th><th>Depends on the model?</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Nothing is sent before consent</td><td><code>AgentChat.tsx</code> — the box is disabled and no conversation opens with the backend</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>A route to a person exists at all times</td><td>A button present from the first frame, before consent</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>Contact details survive a total failure</td><td><code>Base44SupportService</code> degrades to a receipt; the function returns <code>contact</code> on its error path too</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>Sensitive identifiers never reach storage</td><td><code>redact()</code> — ID numbers, cards, IBANs, account-length digits</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>An escalation reason is one of the declared set</td><td><code>hasOwnProperty</code> clamp, falling back to <code>uncertain</code></td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>No advice, no figures, no product recommendation</td><td>Prompt</td><td class="sans" style="color:var(--warn);font-weight:600">Yes</td></tr>
+            <tr><td>Wording of the handoff and its reported reason</td><td>Prompt</td><td class="sans" style="color:var(--warn);font-weight:600">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        What depends on the model is backed by text assertions instead:
+        <code>tests/contract/agents.contract.test.ts</code> fails if a mandatory
+        clause disappears from any of the three prompts, and the security suite
+        pins the gates above.
+      </p>
+
+      <h3>Where a lead goes</h3>
+      <p>
+        Every enquiry reaches four places, and the split matters more than the
+        count. The agency and the operations team receive the full details; the
+        <code>Lead</code> table is the record; the Google Sheet is a filterable
+        log tagged with the event type. Because the details leave the agency,
+        the consent the visitor ticks says so — it names the operating team
+        rather than claiming the data stays with דורית alone, and a contract
+        test fails if the code and that wording ever disagree, <b>in either
+        direction</b>.
+      </p>
+      <div class="callout">
+        <span class="label">Known gap</span>
+        <p>
+        A retention gap worth carrying knowingly: the privacy policy commits to
+        deleting a lead after 24 months. That is enforceable against the
+        <code>Lead</code> table. It is not enforceable against the sheet, nor
+        against the email copies already sitting in two inboxes — which is what
+        a deletion request under תיקון 13 actually asks about.
+        </p>
+      </div>
     </section>
 
     <!-- 5 ────────────────────────────────────────────────────────────────── -->
     <section id="boot">
-      <h2><span class="num">05</span> The boot path</h2>
+      <h2><span class="num">06</span> The boot path</h2>
       <p class="lede">
         This is the architectural decision with the largest business
         consequence, so it gets its own figure.
@@ -630,7 +739,7 @@
 
     <!-- 6 ────────────────────────────────────────────────────────────────── -->
     <section id="delivery">
-      <h2><span class="num">06</span> Build &amp; delivery</h2>
+      <h2><span class="num">07</span> Build &amp; delivery</h2>
       <p>
         <code>vite build</code> emits one JavaScript chunk and one stylesheet
         into <code>dist/</code>. Delivery is git-based: pushing to
@@ -673,7 +782,14 @@
         whenever the build succeeds, whether the tests passed or not, because a
         failing run is precisely when it helps to open the broken build next to
         the Allure report that says what broke. The site sits behind Vercel
-        Authentication, so a red build is never reachable by the public.
+        Authentication, so a red build is never reachable by the public. The
+        report itself goes two ways: Allure 3 emits it as a single
+        self-contained HTML file attached to every run, and — when Cloudflare
+        credentials are set — as an ordinary multi-file report deployed to
+        <b>Cloudflare Pages</b> behind Cloudflare Access. CI re-checks that
+        protection after each deploy and fails the run if the report answers an
+        anonymous request, because a private repository's test report has no
+        business on a public URL.
         <b>Base44</b> carries production, and its publish job requires every
         suite to have passed — the strictest gate in the pipeline. A test
         failure therefore costs the team its staging convenience, never the
@@ -684,7 +800,7 @@
         <table>
           <thead><tr><th>Stage</th><th>Trigger</th><th>Gate</th></tr></thead>
           <tbody>
-            <tr><td>Install · lint · typecheck · build</td><td>PR, and push to <code>main</code> or <code>builder</code></td><td>lint blocks; typecheck reports only (<span class="ref">R-08</span>)</td></tr>
+            <tr><td>Install · lint · typecheck · build</td><td>PR, and push to <code>main</code> or <code>builder</code></td><td>lint blocks; typecheck blocks on <em>new</em> errors, against a baseline of the 93 inherited ones (<span class="ref">R-08</span>)</td></tr>
             <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>e2e × 4 platforms (matrix)</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>Deploy to Vercel <em>(staging, login-protected)</em></td><td>push to <code>main</code>, or manual</td><td>needs a successful <b>build</b> only — deploys with red tests on purpose</td></tr>
@@ -692,7 +808,7 @@
             <tr><td>Safe to merge?</td><td>push to <code>builder</code> — <b>dormant</b></td><td>reports the verdict; the merge itself belongs to the Builder</td></tr>
             <tr><td>Publish to Base44 <em>(production, client-facing)</em></td><td>push to <code>main</code>, or manual</td><td>needs <b>every suite green</b>; also requires <code>BASE44_API_KEY</code> and <code>BASE44_APP_ID</code></td></tr>
             <tr><td>Production smoke</td><td>after a successful publish</td><td>runs when <code>PRODUCTION_URL</code> is set</td></tr>
-            <tr><td>Publish Allure report</td><td>push to <code>main</code>, pass or fail</td><td><code>always()</code> — a red run is when the report is worth reading</td></tr>
+            <tr><td>Build and deploy Allure report <em>(run artifact + Cloudflare Pages)</em></td><td>push to <code>main</code> or <code>builder</code>, pass or fail</td><td><code>always()</code> — a red run is when the report is worth reading; the deploy needs Cloudflare credentials, and CI fails the run if the deployed report answers an anonymous request</td></tr>
           </tbody>
         </table>
       </div>
@@ -700,7 +816,7 @@
 
     <!-- 7 ────────────────────────────────────────────────────────────────── -->
     <section id="testing">
-      <h2><span class="num">07</span> Test architecture</h2>
+      <h2><span class="num">08</span> Test architecture</h2>
       <p class="lede">
         Four layers, two runners, four browser platforms. The full battery runs
         from one command and inside one pinned container.
@@ -743,7 +859,7 @@
 
     <!-- 8 ────────────────────────────────────────────────────────────────── -->
     <section id="review">
-      <h2><span class="num">08</span> Review findings</h2>
+      <h2><span class="num">09</span> Review findings</h2>
       <p class="lede">
         Ordered by business consequence, not by how interesting they are to fix.
         Each references the test that would catch a regression once addressed.
@@ -902,9 +1018,17 @@
             <span class="ref">R-08</span>
           </div>
           <p>
-            Roughly 74 errors, all pre-existing: components passing props to
-            untyped shadcn wrappers (<code>Image</code>, the accordion
-            primitives) plus one lucide icon prop-variance mismatch. Nothing
+            93 errors, all pre-existing, and their distribution is the finding:
+            <b>every one is in a <code>.tsx</code> file, none in a
+            <code>.jsx</code> file.</b> 95 of the reported lines name
+            <code>RefAttributes&lt;any&gt;</code> — a typed page passing props to
+            an untyped shadcn primitive (<code>button</code>, <code>input</code>,
+            <code>label</code>, <code>image</code>, the accordion), with the
+            implicit-<code>any</code> handlers as knock-on. It is a boundary
+            problem, so porting more application code to TypeScript fixes none
+            of it. Since 2026-09-13 the step <b>blocks on new errors</b> against
+            a committed baseline, which is what the advisory setting was costing:
+            a real type error could land silently among the 93. Nothing
             breaks at runtime because Vite strips types without checking them —
             which is exactly why the errors have been able to accumulate.
           </p>
@@ -985,7 +1109,7 @@
 
     <!-- 9 ────────────────────────────────────────────────────────────────── -->
     <section id="sequence">
-      <h2><span class="num">09</span> What to do first</h2>
+      <h2><span class="num">10</span> What to do first</h2>
       <p class="lede">
         Sequenced so each step makes the next one cheaper, and so the two
         findings that can lose a real enquiry are closed before anything else.
@@ -1001,7 +1125,7 @@
             <tr><td class="num-col">4</td><td>Error boundaries around the router and each home section</td><td><span class="ref">R-04</span></td><td>a couple of hours</td></tr>
             <tr><td class="num-col">5</td><td>Lazy-load admin and blog routes; prune unused dependencies</td><td><span class="ref">R-05</span></td><td>a couple of hours</td></tr>
             <tr><td class="num-col">6</td><td>Settle the accent colour; turn on <code>E2E_ENFORCE_CONTRAST</code></td><td><span class="ref">R-09</span></td><td>design call + an hour</td></tr>
-            <tr><td class="num-col">7</td><td>Type the shadcn wrappers; make <code>typecheck</code> blocking</td><td><span class="ref">R-08</span></td><td>a day</td></tr>
+            <tr><td class="num-col">7</td><td>Declare the ~8 consumed shadcn wrappers, then lower the typecheck baseline (blocking is already on)</td><td><span class="ref">R-08</span></td><td>hours</td></tr>
             <tr><td class="num-col">8</td><td>Consolidate on one data-fetching idiom</td><td><span class="ref">R-07</span></td><td>a day</td></tr>
           </tbody>
         </table>
