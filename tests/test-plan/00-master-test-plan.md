@@ -143,6 +143,14 @@ at that branch — see the README. Merging stays the Builder's own action, so th
 enforcement lives at the publish step, which only runs from `main` and only on
 a green run.
 
+Work made in the Base44 Builder currently syncs straight to `main`, so it lands
+untested and `main` can go red without warning. Dormant support for a `builder`
+branch runs the full battery on each Builder push, deploys a preview of it, and
+reports whether it is safe to merge; it activates the day the Builder is pointed
+at that branch — see the README. Merging stays the Builder's own action, so the
+enforcement lives at the publish step, which only runs from `main` and only on
+a green run.
+
 A red run costs production, not staging. The Vercel staging deployment goes out
 whenever the build succeeds — a failing run is exactly when it helps to open the
 broken build next to the report that says what broke — while the Base44

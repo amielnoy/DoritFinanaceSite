@@ -801,6 +801,7 @@
           <thead><tr><th>Stage</th><th>Trigger</th><th>Gate</th></tr></thead>
           <tbody>
             <tr><td>Install · lint · typecheck · build</td><td><b>push to any branch</b>, and a PR when it opens</td><td>lint blocks; typecheck blocks on <em>new</em> errors, against a baseline of the 93 inherited ones (<span class="ref">R-08</span>)</td></tr>
+
             <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>e2e × 4 platforms (matrix)</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>Deploy to Vercel <em>(staging, login-protected)</em></td><td>push to <code>main</code>, or manual</td><td>needs a successful <b>build</b> only — deploys with red tests on purpose</td></tr>

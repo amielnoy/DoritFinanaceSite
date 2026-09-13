@@ -431,6 +431,7 @@ jobs:
           # over. The report is not deployed anywhere at all now — it is a
           # single file attached to the run — but this flag stays: the budget
           # is per-account and a built site is plenty of files on its own.
+
           url=$(npx vercel deploy --prebuilt ${{ steps.target.outputs.prod }} --archive=tgz --scope "$SCOPE" --token "$VERCEL_TOKEN" \
                 | grep -oE 'https://[^[:space:]]+' | tail -1)
           if [ -z "$url" ]; then
@@ -509,6 +510,7 @@ jobs:
     # feature branch nothing is deployed at all, so the table would be three
     # rows of "not deployed" on every push.
     if: always() && github.ref == 'refs/heads/main'
+
     steps:
       - name: Write the site links to the run summary
         env:
@@ -616,6 +618,7 @@ jobs:
     # red run needs reading and the artifact costs nothing to produce. Only
     # `main` and `builder` publish it — see the deploy condition below.
     if: always()
+
     outputs:
       url: ${{ steps.cfdeploy.outputs.url }}
     timeout-minutes: 15
@@ -721,6 +724,7 @@ jobs:
             echo "Project '$PROJECT' already exists, or could not be created — the deploy step will say which."
           fi
 
+
       # --branch is the git ref, never Cloudflare's configured production
       # branch: that makes every one of these a *preview* deployment, which is
       # the only thing the project's one-click "Enable access policy" toggle
@@ -740,6 +744,7 @@ jobs:
                   --branch "$GITHUB_REF_NAME" \
                   --commit-hash "$GITHUB_SHA" \
                   --commit-dirty=true \
+
                 | grep -oE 'https://[^[:space:]]+' | tail -1)
           if [ -z "$url" ]; then
             echo "::error::wrangler produced no deployment URL"
@@ -763,6 +768,15 @@ jobs:
             exit 1
           fi
           echo "::notice::Anonymous request got HTTP ${code} and no report content — Access is in front of it."
+
+      - name: Keep the report as an artifact too
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 14
+
 
 
   # ── 9. Is this Builder branch safe to merge? ─────────────────────────────
@@ -793,6 +807,7 @@ jobs:
           ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
         run: |
           if [ "$BUILD" = "success" ] && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ]; then
             verdict="## ✅ Safe to merge"
@@ -829,6 +844,7 @@ jobs:
               echo "\`index.html\`; unzip and open it, no server needed."
             else
               echo "_Test report: not built (${ALLURE_RESULT})._"
+
             fi
             echo
             echo "> Heads-up: every Builder branch shares the app's **live data**. The tests never"
