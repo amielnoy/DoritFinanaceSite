@@ -67,6 +67,7 @@ export default defineConfig({
   // budget because four WebKit instances were fighting for two cores. Raise
   // this only alongside a runner with the cores to match.
   workers: process.env.CI ? 2 : undefined,
+
   timeout: 45_000,
   expect: { timeout: 10_000 },
   reporter: [...builtInReporters, allureReporter],

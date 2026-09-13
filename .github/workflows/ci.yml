@@ -68,6 +68,7 @@ on:
     # Scheduled runs use the default branch, and no deploy job can fire from
     # them — every one requires `github.event_name == 'push'`.
     - cron: "0 19 * * *"
+
   workflow_dispatch:
     inputs:
       deploy:
@@ -823,6 +824,7 @@ jobs:
             exit 1
           fi
           echo "::notice::Anonymous request got HTTP ${code} and no report content — Access is in front of it."
+
 
 
 

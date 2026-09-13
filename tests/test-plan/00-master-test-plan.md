@@ -142,6 +142,7 @@ at 19:00 UTC (22:00 Israel during IDT)** get all four platforms (~12 min). The
 WebKit costs 9 minutes against Chromium's 4 for identical tests, and two of the
 four legs are WebKit; `main` is deliberately excluded from the narrowing,
 because its green run is what the production publish is gated on. The pull-request trigger is narrowed to
+
 `opened`/`reopened` because pushes to the branch already run — reacting to
 `synchronize` as well would run the whole matrix twice per commit.
 
