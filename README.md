@@ -266,6 +266,46 @@ where users are actually affected.
 everywhere", in Base44's words. Tests never touch it, but anything you do by
 hand in the Builder writes to דורית's real leads.
 
+### Branches
+
+**Today the Base44 Builder syncs straight to `main`**, so its edits land on the
+trunk untested. Nothing reaches the client's site regardless — the Base44
+publish requires a green run — but `main` itself can go red at any time, and
+has.
+
+CI already carries the support for working on a Builder branch, and it is
+**dormant** — everything keyed to `builder` triggers only on pushes to that
+branch, and the Builder isn't pointed at one yet. To switch over (a Base44-side
+setting that costs Builder tokens):
+
+1. In the Builder's branch dropdown, **Create new branch**, named `builder`.
+2. Confirm it appears on GitHub (`git ls-remote --heads origin`).
+
+No workflow change is needed. From then on, every Builder edit gets:
+
+```
+builder ──[unit · component · contract · security · e2e × 4]──┬── Vercel preview URL
+                                                              ├── Allure report
+                                                              └── ✅ / 🛑 safe to merge
+```
+
+The preview is the part worth having: a URL for *that* change, which you open
+and look at before merging, instead of judging a Builder edit from a diff.
+
+**CI does not merge for you, on purpose.** On a branch the Builder replaces its
+Publish button with **Merge to main**, and Base44 keeps each Builder branch as
+a real branch here — so merging is already its job, and a CI job doing it too
+would race and leave the two disagreeing. CI runs everything and posts the
+verdict; you press the button.
+
+That isn't a weaker guarantee than it sounds, because **publishing only ever
+happens from main**, and the publish there requires a green run. The gate sits
+where users are actually affected.
+
+⚠️ Every Builder branch shares the app's **live data** — "the same live records
+everywhere", in Base44's words. Tests never touch it, but anything you do by
+hand in the Builder writes to דורית's real leads.
+
 ### What a red run costs
 
 | Target | Deploys when |
