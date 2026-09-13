@@ -57,6 +57,17 @@ on:
     # way, so reacting to `synchronize` as well would run the whole matrix
     # twice for every push to an open PR.
     types: [opened, reopened]
+  schedule:
+    # 19:00 UTC — **22:00 in Israel while IDT is in force** (UTC+3, late March
+    # to late October). GitHub cron has no timezone, so between late October
+    # and late March this lands at 21:00 local. That hour of drift is accepted
+    # rather than worked around: nothing here cares which hour of the night it
+    # runs, and a job that rewrites its own schedule twice a year is a worse
+    # thing to own than an hour of slack.
+    #
+    # Scheduled runs use the default branch, and no deploy job can fire from
+    # them — every one requires `github.event_name == 'push'`.
+    - cron: "0 19 * * *"
   workflow_dispatch:
     inputs:
       deploy:
@@ -188,24 +199,62 @@ jobs:
           path: allure-results/
           retention-days: 7
 
-  # ── 3. e2e: UI, API, security and accessibility, per platform ─────────────
+  # ── 3. How much e2e this run gets ────────────────────────────────────────
+  #
+  # The four platform legs are the whole cost of a run: 32 job-minutes, and a
+  # wall clock set by the slowest of them. WebKit takes 9m against Chromium's
+  # 4m for identical tests, and `ios-safari` is WebKit too — so two of the four
+  # legs are more than twice the price of the other two.
+  #
+  # Paying that on every push to a feature branch buys very little: a defect
+  # that only WebKit sees is rare, and when it happens the nightly run finds it
+  # the same day. Paying it before a merge to main, and before a production
+  # publish, buys a great deal.
+  #
+  #   feature branch, PR      →  Chromium only, about 5 minutes
+  #   main, nightly, manual   →  all four platforms
+  #
+  # main is deliberately on the full matrix even though the request was for
+  # feature branches and PRs: the publish job below refuses to run unless
+  # test-e2e succeeded, so main's run is the gate in front of the client's
+  # site. Narrowing it would quietly weaken that gate.
+  plan:
+    name: Choose the e2e matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      depth: ${{ steps.pick.outputs.depth }}
+    steps:
+      - name: Decide which platforms this run needs
+        id: pick
+        run: |
+          full='[{"project":"web-chromium","browser":"chromium"},
+                 {"project":"web-webkit","browser":"webkit"},
+                 {"project":"ios-safari","browser":"webkit"},
+                 {"project":"android-chrome","browser":"chromium"}]'
+          quick='[{"project":"web-chromium","browser":"chromium"}]'
+
+          case "${{ github.event_name }}:${{ github.ref }}" in
+            schedule:*|workflow_dispatch:*|*:refs/heads/main|*:refs/heads/builder)
+              echo "matrix=$(echo "$full" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
+              echo "depth=all four platforms" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "matrix=$quick" >> "$GITHUB_OUTPUT"
+              echo "depth=Chromium only — the nightly run covers WebKit and mobile" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Say so in the run summary
+        run: echo "**e2e depth:** ${{ steps.pick.outputs.depth }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 3b. e2e: UI, API, security and accessibility, per platform ────────────
   test-e2e:
     name: e2e (${{ matrix.project }})
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, plan]
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - project: web-chromium
-            browser: chromium
-          - project: web-webkit
-            browser: webkit
-          - project: ios-safari
-            browser: webkit
-          - project: android-chrome
-            browser: chromium
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 

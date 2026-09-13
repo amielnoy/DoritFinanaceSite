@@ -28,6 +28,7 @@ const workflow = parse(
       needs?: string | string[];
       if?: string;
       outputs?: Record<string, string>;
+      strategy?: { matrix?: { include?: unknown } };
       steps?: Array<{ name?: string; uses?: string; id?: string; with?: Record<string, string> }>;
     }
   >;
@@ -134,6 +135,43 @@ describe("the workflow tests every branch and deploys from only two", () => {
     for (const name of ["deploy", "deploy-vercel"]) {
       const condition = workflow.jobs[name].if ?? "";
       expect(condition, `${name} must check the branch`).toMatch(/github\.ref == 'refs\/heads\//);
+    }
+  });
+
+  it("runs the heavy platforms nightly", () => {
+    const schedule = (workflow.on as { schedule?: Array<{ cron: string }> }).schedule;
+    expect(schedule, "the nightly run is gone").toBeTruthy();
+    // 19:00 UTC is 22:00 in Israel while IDT is in force. GitHub cron has no
+    // timezone, so this drifts by an hour in winter, knowingly.
+    expect(schedule![0].cron).toBe("0 19 * * *");
+  });
+
+  it("lets no deploy fire from the nightly run", () => {
+    // Every deploying job must require a push, or a scheduled run would
+    // publish to the client's site at 22:00 with nobody watching.
+    for (const name of ["deploy", "deploy-vercel"]) {
+      expect(workflow.jobs[name].if ?? "", name).toMatch(/github\.event_name == 'push'/);
+    }
+  });
+
+  it("builds the e2e matrix from the plan job rather than hard-coding it", () => {
+    const matrix = workflow.jobs["test-e2e"].strategy?.matrix;
+    expect(String(matrix?.include)).toContain("needs.plan.outputs.matrix");
+    expect(needsOf(workflow.jobs["test-e2e"])).toContain("plan");
+  });
+
+  it("covers every Playwright project in the full matrix", () => {
+    // A project added to playwright.config.ts that nobody lists here would
+    // simply never run in CI, and nothing else would say so.
+    const config = readFileSync(join(REPO_ROOT, "playwright.config.ts"), "utf8");
+    const declared = [...config.matchAll(/^\s{6}name:\s*"([a-z-]+)"/gm)].map((m) => m[1]);
+    expect(declared.length, "found no Playwright projects to compare against").toBeGreaterThan(1);
+
+    const planStep = stepsOf(workflow.jobs.plan)
+      .map((s) => String((s as { run?: string }).run ?? ""))
+      .join("\n");
+    for (const project of declared) {
+      expect(planStep, `playwright project "${project}" is in no CI matrix`).toContain(project);
     }
   });
 

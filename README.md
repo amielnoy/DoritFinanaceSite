@@ -227,11 +227,27 @@ environment variable that turns it off.
 
 ### Branches
 
-**Every push, on every branch, runs the full battery** — lint, the typecheck
-gate, build, the four Vitest suites, e2e across four platforms, and an Allure
-report attached to the run. A feature branch deploys **nothing**: every deploy
-job checks the ref, so `main` and `builder` stay the only branches that can
-reach a site, and only those two publish the report.
+**Every push, on every branch, runs the battery** — lint, the typecheck gate,
+build, the five Vitest suites, e2e, and an Allure report attached to the run.
+How much e2e depends on where you are:
+
+| Where | e2e | Roughly |
+|---|---|---|
+| A feature branch, or a PR | **Chromium only** | ~5 min |
+| `main`, `builder`, or a manual run | **all four platforms** | ~12 min |
+| **Nightly at 22:00** (19:00 UTC) | all four platforms | ~12 min |
+
+The four legs are the whole cost of a run — WebKit alone takes 9 minutes
+against Chromium's 4, and `ios-safari` is WebKit too. Paying that on every push
+to a feature branch buys little: a defect only WebKit sees is rare, and the
+nightly run finds it the same day. `main` keeps the full matrix on purpose,
+because the publish job refuses to run unless e2e passed — narrowing it there
+would quietly weaken the gate in front of the client's site.
+
+A feature branch deploys **nothing**: every deploy job checks the ref, so
+`main` and `builder` stay the only branches that can reach a site, and only
+those two publish the report. Nor can the nightly run deploy — every deploy job
+also requires a `push` event.
 
 A pull request triggers a run when it **opens**; later commits are covered by
 the push trigger, so the matrix does not run twice for the same SHA.

@@ -803,7 +803,7 @@
             <tr><td>Install · lint · typecheck · build</td><td><b>push to any branch</b>, and a PR when it opens</td><td>lint blocks; typecheck blocks on <em>new</em> errors, against a baseline of the 93 inherited ones (<span class="ref">R-08</span>)</td></tr>
 
             <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
-            <tr><td>e2e × 4 platforms (matrix)</td><td>PR and push</td><td>blocking</td></tr>
+            <tr><td>e2e (matrix)</td><td>Chromium on a branch or PR; all four on <code>main</code>, <code>builder</code>, a manual run, and nightly at 19:00 UTC</td><td>blocking</td></tr>
             <tr><td>Deploy to Vercel <em>(staging, login-protected)</em></td><td>push to <code>main</code>, or manual</td><td>needs a successful <b>build</b> only — deploys with red tests on purpose</td></tr>
             <tr><td>Deploy to Vercel <em>(preview, per change)</em></td><td>push to <code>builder</code> — <b>dormant</b>, the Builder still syncs to <code>main</code></td><td>needs a successful <b>build</b> only; its own URL, for looking at a Builder edit before merging</td></tr>
             <tr><td>Safe to merge?</td><td>push to <code>builder</code> — <b>dormant</b></td><td>reports the verdict; the merge itself belongs to the Builder</td></tr>
