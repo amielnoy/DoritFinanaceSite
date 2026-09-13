@@ -106,9 +106,9 @@ Posts are matched by title (update if present, create if not) and ship as
 
 ## Tests
 
-The full battery — lint, typecheck, unit, component, contract, security, and
-end-to-end across desktop web, iOS Safari and Android Chrome — runs from one
-command:
+The full battery — lint, typecheck, unit, component, contract, integration,
+security, and end-to-end across desktop web, iOS Safari and Android Chrome —
+runs from one command:
 
 ```bash
 ./scripts/run-tests.sh                    # everything
@@ -129,9 +129,17 @@ docker compose -f docker-compose.test.yml run --rm e2e-ios
 | Unit | `npm run test:unit` | `tests/unit/` |
 | Component | `npm run test:component` | `tests/component/` |
 | Contract | `npm run test:contract` | `tests/contract/` |
+| Integration | `npm run test:integration` | `tests/integration/` |
 | Security (static) | `npm run test:security` | `tests/security/` |
 | e2e — UI, API, security, a11y, SEO | `npm run test:e2e` | `e2e/` |
 | SEO only | `npm run test:e2e:seo` | `e2e/seo/` |
+
+**The integration suite runs the Base44 backend functions for real.** They sit
+outside `tsconfig.json` and execute on Deno inside Base44, so nothing else in
+the repo ever runs them — the other suites match strings against their source.
+`tests/helpers/base44-function.ts` loads one in-process against a recording
+client and reports what it stored, who it mailed, what each recipient saw, and
+what survived a failure.
 
 The end-to-end suites are hermetic: `e2e/fixtures/app.ts` intercepts the whole
 Base44 `/api` surface plus third-party beacons, so they need no credentials, no
