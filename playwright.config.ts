@@ -53,12 +53,21 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // Four workers in CI. The suite is hermetic — every test stubs the backend
-  // at the network layer and shares no state — so parallelism is bounded by
-  // the runner's cores rather than by anything in the tests. Watch for
-  // timeout-shaped flake if the matrix ever moves to a smaller runner: that is
-  // what oversubscription looks like here, not a genuine failure.
-  workers: process.env.CI ? 4 : undefined,
+  // Two workers in CI, and this number is measured rather than chosen.
+  //
+  // Four was tried on 2026-09-13 and was worse on every leg: web-webkit went
+  // 9m22 → 11m52 and then failed, ios-safari 8m15 → 9m50, web-chromium
+  // 4m20 → 4m44. A standard GitHub runner has two cores, so a third and fourth
+  // browser do not get a core — they get a share of one, and everything slows
+  // down together.
+  //
+  // The failure that followed is worth recognising: an a11y test timed out
+  // waiting 10s for `#root` to stop being empty, on all three attempts. That is
+  // not a broken assertion, it is the app not finishing its boot inside the
+  // budget because four WebKit instances were fighting for two cores. Raise
+  // this only alongside a runner with the cores to match.
+  workers: process.env.CI ? 2 : undefined,
+
   timeout: 45_000,
   expect: { timeout: 10_000 },
   reporter: [...builtInReporters, allureReporter],

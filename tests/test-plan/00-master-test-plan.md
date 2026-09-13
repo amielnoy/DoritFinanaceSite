@@ -131,9 +131,18 @@ The suites run on **every push to every branch** (`.github/workflows/ci.yml`),
 on a pull request when it opens, and again as a post-deploy smoke test against
 the production URL. Locally: `./scripts/run-tests.sh`.
 
-A feature branch gets the full battery and an Allure report, and deploys
-nothing: every deploy job checks the ref, so `main` and `builder` remain the
-only branches that can reach a site. The pull-request trigger is narrowed to
+A feature branch gets the battery and an Allure report, and deploys nothing:
+every deploy job checks the ref, so `main` and `builder` remain the only
+branches that can reach a site.
+
+**e2e depth varies by where the run is.** A feature branch or a PR gets
+Chromium only (~5 min); `main`, `builder`, a manual run and the **nightly run
+at 19:00 UTC (22:00 Israel during IDT)** get all four platforms (~12 min). The
+`plan` job decides and says which in the run summary. The split exists because
+WebKit costs 9 minutes against Chromium's 4 for identical tests, and two of the
+four legs are WebKit; `main` is deliberately excluded from the narrowing,
+because its green run is what the production publish is gated on. The pull-request trigger is narrowed to
+
 `opened`/`reopened` because pushes to the branch already run — reacting to
 `synchronize` as well would run the whole matrix twice per commit.
 
