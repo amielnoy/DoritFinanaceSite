@@ -23,7 +23,7 @@ export interface Lead {
   scheduledAt?: string;
 }
 
-export type LeadSource = "quick" | "detailed" | "consultation" | "claim";
+export type LeadSource = "quick" | "detailed" | "consultation" | "claim" | "escalation";
 
 export interface ClaimReport {
   name: string;
@@ -95,6 +95,62 @@ export interface AgentPort {
   start(agentName: string, metadata?: Record<string, unknown>): Promise<AgentConversation>;
   send(conversation: AgentConversation, text: string): Promise<void>;
   subscribe(conversationId: string, onMessages: (messages: AgentMessage[]) => void): () => void;
+}
+
+/**
+ * Reasons an automated conversation must stop and become a human one.
+ * Mirrors `Lead.escalation_reason` and the list the agents are given.
+ */
+export type EscalationReason =
+  | "regulated_advice"
+  | "product_recommendation"
+  | "numbers_or_returns"
+  | "claim_or_policy"
+  | "complaint"
+  | "privacy_request"
+  | "sensitive_data"
+  | "out_of_scope"
+  | "user_request"
+  | "uncertain";
+
+export interface EscalationRequest {
+  reason: EscalationReason;
+  /** Plain-language summary of what the visitor needs. Never sensitive data. */
+  summary: string;
+  /** Which on-site agent was talking, for audit. */
+  agent?: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  consentVersion?: string;
+  consentAt?: string;
+}
+
+export interface HumanContact {
+  phoneDisplay: string;
+  phoneE164: string;
+  whatsapp: string;
+  email: string;
+}
+
+export interface EscalationReceipt {
+  ok: boolean;
+  /** True when the enquiry was written to the lead store, not only emailed. */
+  recorded?: boolean;
+  contact: HumanContact;
+  acknowledgement: string;
+  warnings?: string[];
+}
+
+/**
+ * Handing a conversation to a person.
+ *
+ * Separate from LeadPort on purpose: escalation is the one path that must keep
+ * working when everything else fails, and it is the only path a component may
+ * trigger without the visitor having filled in a form.
+ */
+export interface SupportPort {
+  escalate(request: EscalationRequest): Promise<EscalationReceipt>;
 }
 
 /** Uploading a document from the claim form. */
