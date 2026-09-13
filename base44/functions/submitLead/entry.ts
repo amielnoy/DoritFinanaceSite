@@ -1,7 +1,100 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
+// שני נמענים, שניהם מקבלים את הפנייה המלאה.
+//
+// SECONDARY_EMAIL הוא הסוכנת. NOTIFY_EMAIL הוא הצוות שמתפעל את האתר מטעמה,
+// ומקבל בנוסף נספח מצב על השמירה, היומן והמיילים.
+//
+// זה מחייב גילוי, וקיים כזה: נוסח ההסכמה ב-src/config/compliance.ts ומדיניות
+// הפרטיות אומרים "אצל דורית ואצל הצוות שמתפעל את האתר מטעמה" — ולא "אצל
+// דורית בלבד", שהיה הנוסח הקודם והיה הופך להצהרה לא נכונה ברגע שנשלח עותק
+// החוצה. tests/contract/agents.contract.test.ts אוכף שהקוד והנוסח מסכימים,
+// לשני הכיוונים: מי שיצמצם כאן את השליחה חייב להחזיר גם את הנוסח.
 const NOTIFY_EMAIL = "amielnoy@gmail.com";
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
+
+/**
+ * הסרת מזהים רגישים מתקציר שנכתב על ידי מודל.
+ *
+ * משוכפל מ-escalateToHuman/entry.ts בכוונה: כל פונקציה ב-Base44 היא נקודת
+ * כניסה עצמאית ואין ביניהן מודול משותף. שתי העותקות חייבות להישאר זהות —
+ * tests/contract/agents.contract.test.ts נכשל אם אחת מהן מתפצלת.
+ */
+function redact(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g, '[הושמט — מספר כרטיס]')
+    .replace(/\bIL\d{2}[A-Z0-9]{17,}\b/gi, '[הושמט — חשבון בנק]')
+    .replace(/\b\d{9}\b/g, '[הושמט — מספר מזהה]')
+    .replace(/\b\d{6,8}\b/g, '[הושמט — מספר]')
+    .slice(0, 2000);
+}
+
+// ── יומן האירועים בגיליון Google ──────────────────────────────────────────
+//
+// מזהה הגיליון מתוך כתובת ה-URL שלו:
+//   https://docs.google.com/spreadsheets/d/<המזהה>/edit
+// ריק = הרישום מדולג בשקט, כדי שהתקנה בלי גיליון תמשיך לעבוד.
+//
+// זהו עותק שלישי של פרטי המבקר, אחרי המאגר והמיילים, והיחיד שאינו נמחק על ידי
+// מחיקת רשומה במאגר. ראו את ההערה על שמירה ב-base44/agents/COMPLIANCE.md §6.
+const SHEET_ID = '';
+const SHEET_TAB = 'Events';
+
+/**
+ * סדר העמודות בגיליון.
+ *
+ * משוכפל בכל פונקציה שכותבת ליומן, ו-tests/contract/agents.contract.test.ts
+ * נכשל אם שתי הרשימות מתפצלות — שורה שנכתבת בסדר אחר הורסת את הגיליון בשקט,
+ * בלי שדבר ייכשל.
+ */
+const SHEET_COLUMNS = [
+  'מועד', 'סוג האירוע', 'מקור', 'סוכן', 'נושא', 'מועד מבוקש',
+  'שם', 'טלפון', 'אימייל', 'מזהה רשומה', 'סיבת העברה', 'תקציר',
+];
+
+/** הוספת שורה אחת ליומן. מחזירה מחרוזת מצב לנספח התפעולי. */
+async function appendEventRow(base44, row) {
+  if (!SHEET_ID) return 'לא מוגדר';
+  const { accessToken } = await base44.asServiceRole.connectors.getConnection('googlesheets');
+  if (!accessToken) return 'אין חיבור';
+
+  const range = `${SHEET_TAB}!A:${String.fromCharCode(64 + SHEET_COLUMNS.length)}`;
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}` +
+      `:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ values: [row] }),
+    },
+  );
+  if (!res.ok) throw new Error(`sheets ${res.status}`);
+  return 'נרשם ✓';
+}
+
+/** סוג האירוע כפי שהוא נרשם בגיליון — הערך שמאפשר לסנן את הגיליון לפי סוג. */
+function eventTypeFor(source) {
+  if (source === 'consultation') return 'consultation_request';
+  if (source === 'detailed') return 'detailed_enquiry';
+  return 'quick_contact';
+}
+
+/** נספח תפעולי — מה עלה בגורלם של השמירה, היומן והמיילים. */
+function buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings }) {
+  return [
+    `── מצב תפעולי ──`,
+    `מקור: ${source || 'quick'}`,
+    `נושא: ${topic || '—'}`,
+    `מזהה רשומה: ${leadId || '—'}`,
+    `יומן: ${calendar}`,
+    `גיליון: ${sheet}`,
+    `תקלות: ${warnings.length ? warnings.join(', ') : 'אין'}`,
+  ].join('\n');
+}
 
 function buildAgentBody(source, data) {
   const header = source === 'consultation'
@@ -27,13 +120,33 @@ function buildAgentBody(source, data) {
   } else {
     lines.push(``, `הודעה:`, data.message || '—');
   }
+  if (data.summary) {
+    lines.push(``, `תקציר השיחה (לאחר השמטת פרטים רגישים):`, data.summary);
+  }
   return lines.join('\n');
 }
 
+/**
+ * בריחת תווים לפני שילוב טקסט מהמבקר בגוף HTML.
+ *
+ * המייל הזה נשלח לכתובת שהמבקר הקליד, מהדומיין המאומת של הסוכנות, והשם והנושא
+ * מגיעים ממנו. בלי בריחה אפשר להגיש טופס עם המייל של מישהו אחר ועם שם שהוא
+ * בעצם תגית — והנמען מקבל מייל ממותג של דורית שמכיל קישור של התוקף. זה אינו
+ * XSS בדפדפן של המבקר אלא וקטור פישינג על חשבון המוניטין של הסוכנות.
+ */
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildClientHtml(source, data) {
-  const firstName = (data.name || '').split(' ')[0];
-  const when = data.timing || 'לפי תיאום';
-  const topic = data.topic || 'ייעוץ כללי';
+  const firstName = escapeHtml((data.name || '').split(' ')[0]);
+  const when = escapeHtml(data.timing || 'לפי תיאום');
+  const topic = escapeHtml(data.topic || 'ייעוץ כללי');
   const isConsultation = source === 'consultation';
 
   const heading = isConsultation ? 'קיבלנו את בקשת הייעוץ' : 'קיבלנו את פנייתכם';
@@ -131,13 +244,15 @@ export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { name, phone, email, source, topic, timing, message, notes, scheduledAt } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary } = body || {};
 
     if (!name || !phone) {
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
     }
 
-    const data = { name, phone, email, topic, timing, message, notes };
+    // התקציר נכתב על ידי מודל, ולכן עובר סינון לפני שהוא נשלח לאן שהוא.
+    const safeSummary = redact(summary);
+    const data = { name, phone, email, topic, timing, message, notes, summary: safeSummary };
     const agentBody = buildAgentBody(source, data);
     const subject = subjectFor(source, data);
 
@@ -174,18 +289,8 @@ export default async function(req) {
     // בתשובה במקום להיכשל, כדי שניתן יהיה לנטר אותו.
     const warnings = [];
 
-    // הודעה לסוכנת
-    try {
-      await base44.asServiceRole.integrations.Core.SendEmail({
-        to: NOTIFY_EMAIL,
-        subject,
-        body: agentBody,
-      });
-    } catch (e) {
-      warnings.push('notify_email_failed');
-    }
-
-    // עותק לדורית
+    // הודעה לדורית — הפנייה המלאה, כולל תקציר השיחה אם הסוכן מסר אחד.
+    // ההודעה התפעולית נשלחת בסוף, אחרי היומן, כדי שתוכל לדווח גם עליו.
     try {
       await base44.asServiceRole.integrations.Core.SendEmail({
         to: SECONDARY_EMAIL,
@@ -214,6 +319,7 @@ export default async function(req) {
     }
 
     // יצירת אירוע תזכורת ביומן Outlook — מיטבי, רק עבור בקשות ייעוץ
+    let calendar = source === 'consultation' ? 'לא נוצר' : 'לא רלוונטי';
     if (source === 'consultation') try {
       const { accessToken } = await base44.asServiceRole.connectors.getConnection('outlook');
       if (accessToken) {
@@ -251,9 +357,44 @@ export default async function(req) {
             reminderMinutesBeforeStart: 60,
           }),
         });
+        calendar = 'אירוע נוצר ✓';
       }
     } catch (e) {
       warnings.push('calendar_event_failed');
+    }
+
+    // רישום ביומן האירועים — מיטבי. הגיליון הוא תצוגה, לא מקור האמת: הרשומה
+    // כבר נשמרה, ולכן כשל כאן מדווח ב-warnings ואינו מפיל את הפנייה.
+    let sheet = 'לא נרשם';
+    try {
+      sheet = await appendEventRow(base44, [
+        new Date().toISOString(),
+        eventTypeFor(source),
+        source || 'quick',
+        '',                       // סוכן — רלוונטי רק בהעברה לאדם
+        topic || '',
+        timing || '',
+        name,
+        phone,
+        email || '',
+        leadId || '',
+        '',                       // סיבת העברה — רלוונטי רק בהעברה לאדם
+        safeSummary,
+      ]);
+    } catch (e) {
+      warnings.push('sheet_append_failed');
+    }
+
+    // עותק לצוות התפעול — אותה פנייה מלאה, בתוספת נספח המצב. נשלח אחרון
+    // כדי שיוכל לדווח גם על תוצאת היומן והגיליון. ראו ההערה ליד NOTIFY_EMAIL.
+    try {
+      await base44.asServiceRole.integrations.Core.SendEmail({
+        to: NOTIFY_EMAIL,
+        subject,
+        body: `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings })}`,
+      });
+    } catch (e) {
+      warnings.push('notify_email_failed');
     }
 
     return Response.json({ ok: true, leadId, warnings });

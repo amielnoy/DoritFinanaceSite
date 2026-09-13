@@ -38,6 +38,13 @@ describe("adapter → submitLead", () => {
   );
   const accepted = destructuredBody(backendSource("submitLead"));
 
+  // Fields the agent passes as a tool call and that no browser form has. The
+  // booking agent composes `summary` from the conversation; a contact form has
+  // no conversation to summarise. Listing them here keeps the check strict for
+  // everything else — a field the backend starts accepting that is neither sent
+  // by the adapter nor named here still fails.
+  const AGENT_ONLY = ["summary"];
+
   it("exactly one adapter owns the call", () => {
     // Previously three components each built this payload by hand. The contract
     // now has a single place to drift, which is the point of the adapter.
@@ -45,8 +52,14 @@ describe("adapter → submitLead", () => {
     expect(calls[0].file).toBe("src/services/base44/Base44LeadService.ts");
   });
 
-  it("sends exactly the fields the function destructures", () => {
-    expect([...calls[0].keys].sort()).toEqual(accepted);
+  it("sends exactly the fields the function destructures, bar the agent-only ones", () => {
+    expect([...calls[0].keys].sort()).toEqual(accepted.filter((k) => !AGENT_ONLY.includes(k)));
+  });
+
+  it("keeps every agent-only field genuinely accepted by the function", () => {
+    // Guards the escape hatch above: a name listed there that the backend does
+    // not actually destructure would silently excuse a real mismatch.
+    for (const field of AGENT_ONLY) expect(accepted).toContain(field);
   });
 
   it("sends the two fields the function requires", () => {
@@ -127,7 +140,7 @@ describe("backend → Lead entity", () => {
   it("only the backend functions create leads — the browser no longer does", () => {
     const fromBrowser = findObjectLiteralCalls(/base44\.entities\.Lead\.create\(\s*/);
     expect(fromBrowser, "a component still writes Lead directly").toEqual([]);
-    expect(writes.length).toBe(2); // submitLead, submitClaim
+    expect(writes.length).toBe(3); // submitLead, submitClaim, escalateToHuman
   });
 
   for (const write of writes) {
