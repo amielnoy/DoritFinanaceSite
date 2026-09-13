@@ -10,14 +10,24 @@ interface NavItem {
   route?: boolean;
 }
 
+/**
+ * Four, where there were eight.
+ *
+ * Eight items is past the number a reader scans and into the number they
+ * read — a lot of deliberation to put in front of a page whose job is one
+ * booking. Several also named the same promise twice: `הצלחות` and
+ * `לקוחות מספרים` are both social proof, `נקודת מבט` and `אודות` are both
+ * who she is.
+ *
+ * Nothing was deleted from the page. Those sections are still there and still
+ * reached by scrolling; they simply no longer each claim a slot in the bar.
+ * `שאלות ותשובות` moved to the footer, which is where a reader looks for it
+ * once they have not found an answer above.
+ */
 const NAV: NavItem[] = [
   { label: "אודות", href: "#about" },
-  { label: "נקודת מבט", href: "#perspective" },
   { label: "שירותים", href: "#services" },
   { label: "תביעות", href: "/claims", route: true },
-  { label: "שאלות ותשובות", href: "/faq", route: true },
-  { label: "הצלחות", href: "#proof" },
-  { label: "לקוחות מספרים", href: "#testimonials" },
   { label: "בלוג", href: "/blog", route: true },
 ];
 
@@ -132,14 +142,18 @@ export default function FloatingHeader() {
           >
             לקביעת פגישת ייעוץ
           </a>
+          {/* Desktop only. On a phone the sticky bar at the bottom of every
+              screen already offers חיוג עכשיו, at thumb height and always in
+              view — so this one only competed with it, and left the first
+              screen carrying four buttons for two intentions. The drawer still
+              has a call button for anyone who opens it. */}
           <a
             href={`tel:${CONTACT.phoneE164}`}
             aria-label="התקשרות לדורית גוב ארי"
-            className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#9c9c9c] text-[13px] font-medium hover:border-accent hover:text-accent transition-colors duration-300"
+            className="hidden md:inline-flex items-center gap-2 px-4 py-2.5 border border-[#9c9c9c] text-[13px] font-medium hover:border-accent hover:text-accent transition-colors duration-300"
           >
             <Phone size={15} className="text-[#9c9c9c]" />
-            <span className="hidden sm:inline" dir="ltr">{CONTACT.phoneDisplay}</span>
-            <span className="sm:hidden">חייגו</span>
+            <span dir="ltr">{CONTACT.phoneDisplay}</span>
           </a>
           <button
             /* p-3 keeps the tap target at 46px — WCAG 2.5.5 / iOS HIG want >= 44. */

@@ -6,13 +6,24 @@ import ArchStatement from "@/components/dorit/sections/ArchStatement";
 const HERO_IMG =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/9620f0028_119895334_119505229701692_7118383656602926716_n.jpg";
 
+/**
+ * Hebrew, because the reader is.
+ *
+ * These ran in English under a right-to-left Hebrew hero, which asks someone
+ * comparing pension options to switch alphabet and direction for a phrase
+ * carrying nothing the Hebrew beside it did not already say.
+ *
+ * None of them uses the word ייעוץ: the licence here is a סוכן licence, and
+ * base44/agents/COMPLIANCE.md §7 already flags the marketing copy that blurs
+ * the two. No reason to add more of it in a decorative strip.
+ */
 const TICKER: string[] = [
-  "Future Proofing",
-  "Legacy Planning",
-  "Personalized Care",
-  "Tailored Coverage",
-  "Claims Advocacy",
-  "Trusted Counsel",
+  "תכנון לטווח ארוך",
+  "העברה בין-דורית",
+  "ליווי אישי",
+  "כיסוי מותאם",
+  "ליווי בתביעות",
+  "שקיפות מלאה",
 ];
 
 export default function Hero() {
@@ -58,8 +69,8 @@ export default function Hero() {
           </div>
           <div className="absolute bottom-6 right-6 glass px-5 py-3.5 border border-border/50 shadow-sm">
             <p className="font-heading text-sm leading-tight">דורית גוב ארי</p>
-            <p className="text-[10px] tracking-[0.25em] uppercase text-muted-foreground mt-1">
-              Senior Financial Planner
+            <p className="text-[11px] text-muted-foreground mt-1">
+              מתכננת פיננסית בכירה
             </p>
           </div>
         </div>
@@ -70,11 +81,15 @@ export default function Hero() {
             דורית גוב ארי · מתכננת פיננסית בכירה
           </span>
           <ArchStatement />
-          <div className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-foreground/70 animate-fade-up">
+          {/* Three claims of equal weight. Wrapping left the third alone on its
+              own line at 390px, which read as an afterthought rather than as
+              one of a set — so on phones all three stack, and the dots that
+              separated them are only drawn when they are in a row. */}
+          <div className="mt-7 flex flex-col items-start gap-y-1.5 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-2 text-sm text-foreground/70 animate-fade-up">
             <span className="font-heading text-base text-accent">30 שנות ניסיון</span>
-            <span className="w-1 h-1 rounded-full bg-highlight" />
+            <span className="hidden md:block w-1 h-1 rounded-full bg-highlight" />
             <span className="font-heading text-base text-accent">97% תביעות שאושרו</span>
-            <span className="w-1 h-1 rounded-full bg-highlight" />
+            <span className="hidden md:block w-1 h-1 rounded-full bg-highlight" />
             <span className="font-heading text-base text-accent">ליווי אישי 1:1</span>
           </div>
           <p className="mt-7 max-w-md text-lg text-foreground/75 leading-relaxed animate-fade-up">
@@ -105,7 +120,7 @@ export default function Hero() {
           {[...TICKER, ...TICKER, ...TICKER, ...TICKER].map((t, i) => (
             <span
               key={i}
-              className="mx-8 text-xs tracking-[0.3em] uppercase text-muted-foreground/80 flex items-center gap-8"
+              className="mx-8 text-xs tracking-[0.08em] text-muted-foreground/80 flex items-center gap-8"
             >
               {t}
               <span className="text-highlight text-[8px]">◆</span>

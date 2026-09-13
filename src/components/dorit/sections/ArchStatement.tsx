@@ -19,8 +19,11 @@ export default function ArchStatement() {
         <svg
           viewBox="0 0 640 360"
           preserveAspectRatio="xMidYMid meet"
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ opacity: 0.4 }}
+          /* 0.4 put the columns at roughly the weight of the headline
+             they sit behind, so every line crossed two or three strokes.
+             Lower still on phones, where the drawing does not shrink as
+             fast as the container and lands closer to the letterforms. */
+          className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.12] md:opacity-[0.18]"
         >
           <g stroke="#7D6B5D" strokeWidth="1.2" fill="none">
             <line x1="60" y1="312" x2="580" y2="312" />

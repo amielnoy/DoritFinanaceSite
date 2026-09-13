@@ -58,8 +58,8 @@ export default function ServiceMatrix() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
           <div>
             <Reveal>
-              <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-                03 · Gallery of Certainty
+              <span className="text-[11px] tracking-[0.12em] text-accent">
+                03 · תחומי הליווי
               </span>
               <h2 className="font-heading text-5xl md:text-6xl mt-4 max-w-xl">
                 חמישה עמודי חיים
@@ -100,14 +100,14 @@ export default function ServiceMatrix() {
                       strokeWidth={1.25}
                     />
                   </div>
-                  <span className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
+                  <span className="text-[10px] tracking-[0.12em] text-muted-foreground">
                     0{i + 1}
                   </span>
                 </div>
                 <h3 className="font-heading text-2xl md:text-3xl mb-2">
                   {p.title}
                 </h3>
-                <p className="text-[11px] tracking-[0.25em] uppercase text-accent mb-5">
+                <p className="text-[11px] tracking-[0.12em] text-accent mb-5">
                   {p.sub}
                 </p>
                 <p

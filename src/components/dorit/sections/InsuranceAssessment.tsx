@@ -202,8 +202,8 @@ export default function InsuranceAssessment() {
     <section id="assessment" className="py-24 md:py-32 bg-background border-t border-border">
       <div className="max-w-[1100px] mx-auto px-6 md:px-10">
         <div className="text-center max-w-2xl mx-auto mb-14">
-          <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            Self-Assessment
+          <span className="text-[11px] tracking-[0.12em] text-accent">
+            בדיקה עצמית
           </span>
           <h2 className="font-heading text-4xl md:text-5xl mt-5 leading-tight">
             איזה ביטוח באמת מתאים לך?
@@ -236,7 +236,7 @@ export default function InsuranceAssessment() {
                   transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-center justify-between mb-8">
-                    <span className="text-[11px] tracking-[0.25em] uppercase text-muted-foreground">
+                    <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
                       שאלה {step + 1} מתוך {QUESTIONS.length}
                     </span>
                     {step > 0 && (
@@ -293,7 +293,7 @@ export default function InsuranceAssessment() {
                   transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-center justify-between mb-8">
-                    <span className="text-[11px] tracking-[0.25em] uppercase text-muted-foreground">
+                    <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
                       התוצאה שלך
                     </span>
                     <button

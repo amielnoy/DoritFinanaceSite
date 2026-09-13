@@ -102,6 +102,7 @@ export default function Footer() {
             דורית גוב ארי — סוכנות ביטוח בע״מ · ח.פ. 51XXXXXX · רישיון סוכן מרשות שוק ההון מספר L-00107009
           </p>
           <div className="flex items-center gap-5">
+            <Link to="/faq" className="hover:text-highlight transition-colors">שאלות ותשובות</Link>
             <Link to="/privacy" className="hover:text-highlight transition-colors">מדיניות פרטיות</Link>
             <Link to="/accessibility" className="hover:text-highlight transition-colors">הצהרת נגישות</Link>
           </div>

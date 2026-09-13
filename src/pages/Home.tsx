@@ -4,7 +4,6 @@ import { HOME_FAQ_LD } from "@/lib/structured-data";
 import AgentChat from "@/components/dorit/chat/AgentChat";
 import { AGENTS } from "@/config/agents";
 import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
-import SectionNav from "@/components/dorit/layout/SectionNav";
 import SecurityScroll from "@/components/dorit/layout/SecurityScroll";
 import Hero from "@/components/dorit/sections/Hero";
 import About from "@/components/dorit/sections/About";
@@ -62,7 +61,6 @@ export default function Home() {
         <AgentChat descriptor={AGENTS.blogRecommender} />
         <DetailedFAQ />
       </main>
-      <SectionNav />
       <MobileStickyBar />
       <Footer />
     </div>

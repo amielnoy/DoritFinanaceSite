@@ -73,8 +73,8 @@ export default function DetailedContactForm() {
     >
       <div className="max-w-[1400px] mx-auto px-5 sm:px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
-          <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            Personal Message
+          <span className="text-[11px] tracking-[0.12em] text-accent">
+            הודעה אישית
           </span>
           <h2 className="font-heading text-4xl sm:text-5xl md:text-6xl mt-5 leading-tight">
             ספרו לי

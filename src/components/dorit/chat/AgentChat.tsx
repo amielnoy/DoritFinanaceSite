@@ -187,7 +187,7 @@ export default function AgentChat({ descriptor }: { descriptor: AgentDescriptor 
     <section id={descriptor.sectionId} className={descriptor.sectionClassName}>
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
-          <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
+          <span className="text-[11px] tracking-[0.12em] text-accent">
             {descriptor.eyebrow}
           </span>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
@@ -213,7 +213,7 @@ export default function AgentChat({ descriptor }: { descriptor: AgentDescriptor 
 
           {descriptor.guardrails ? (
             <div className="mt-6 border border-border/60 bg-secondary/30 px-5 py-5">
-              <p className="text-[11px] tracking-[0.3em] uppercase text-accent">כללי הגדר</p>
+              <p className="text-[11px] tracking-[0.12em] text-accent">כללי הגדר</p>
               <dl className="mt-4 space-y-3.5 text-[13.5px] leading-relaxed">
                 <div>
                   <dt className="text-foreground/50">מה הוא עושה</dt>
@@ -244,7 +244,15 @@ export default function AgentChat({ descriptor }: { descriptor: AgentDescriptor 
               </span>
               <div className="leading-tight min-w-0">
                 <p className="font-heading text-base font-bold truncate">{descriptor.panelTitle}</p>
-                <p className="text-[11px] tracking-[0.15em] uppercase text-muted-foreground truncate">
+                {/* Wraps rather than truncates. At 390px this was cut to about
+                    a third of its width — "עם הסוכן…" — which loses the
+                    "עוזר אוטומטי" half, and that half is the disclosure that
+                    the visitor is not talking to דורית. It is the one line in
+                    this header doing compliance work rather than decoration.
+
+                    The uppercase/letterspacing went with it: neither does
+                    anything for Hebrew except loosen it. */}
+                <p className="text-[11px] text-muted-foreground leading-snug">
                   {descriptor.panelSubtitle} · עוזר אוטומטי
                 </p>
               </div>
