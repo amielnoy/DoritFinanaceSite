@@ -219,6 +219,15 @@ environment variable that turns it off.
 
 ### Branches
 
+**Every push, on every branch, runs the full battery** — lint, the typecheck
+gate, build, the four Vitest suites, e2e across four platforms, and an Allure
+report attached to the run. A feature branch deploys **nothing**: every deploy
+job checks the ref, so `main` and `builder` stay the only branches that can
+reach a site, and only those two publish the report.
+
+A pull request triggers a run when it **opens**; later commits are covered by
+the push trigger, so the matrix does not run twice for the same SHA.
+
 **Today the Base44 Builder syncs straight to `main`**, so its edits land on the
 trunk untested. Nothing reaches the client's site regardless — the Base44
 publish requires a green run — but `main` itself can go red at any time, and

@@ -125,9 +125,15 @@ answers an anonymous request.
 
 ## 9. Responsibilities and schedule
 
-The suites run on every pull request and every push to `main`
-(`.github/workflows/ci.yml`), and again as a post-deploy smoke test against the
-production URL. Locally: `./scripts/run-tests.sh`.
+The suites run on **every push to every branch** (`.github/workflows/ci.yml`),
+on a pull request when it opens, and again as a post-deploy smoke test against
+the production URL. Locally: `./scripts/run-tests.sh`.
+
+A feature branch gets the full battery and an Allure report, and deploys
+nothing: every deploy job checks the ref, so `main` and `builder` remain the
+only branches that can reach a site. The pull-request trigger is narrowed to
+`opened`/`reopened` because pushes to the branch already run — reacting to
+`synchronize` as well would run the whole matrix twice per commit.
 
 Work made in the Base44 Builder currently syncs straight to `main`, so it lands
 untested and `main` can go red without warning. Dormant support for a `builder`

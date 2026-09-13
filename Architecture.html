@@ -800,7 +800,7 @@
         <table>
           <thead><tr><th>Stage</th><th>Trigger</th><th>Gate</th></tr></thead>
           <tbody>
-            <tr><td>Install · lint · typecheck · build</td><td>PR, and push to <code>main</code> or <code>builder</code></td><td>lint blocks; typecheck blocks on <em>new</em> errors, against a baseline of the 93 inherited ones (<span class="ref">R-08</span>)</td></tr>
+            <tr><td>Install · lint · typecheck · build</td><td><b>push to any branch</b>, and a PR when it opens</td><td>lint blocks; typecheck blocks on <em>new</em> errors, against a baseline of the 93 inherited ones (<span class="ref">R-08</span>)</td></tr>
             <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>e2e × 4 platforms (matrix)</td><td>PR and push</td><td>blocking</td></tr>
             <tr><td>Deploy to Vercel <em>(staging, login-protected)</em></td><td>push to <code>main</code>, or manual</td><td>needs a successful <b>build</b> only — deploys with red tests on purpose</td></tr>
@@ -808,7 +808,7 @@
             <tr><td>Safe to merge?</td><td>push to <code>builder</code> — <b>dormant</b></td><td>reports the verdict; the merge itself belongs to the Builder</td></tr>
             <tr><td>Publish to Base44 <em>(production, client-facing)</em></td><td>push to <code>main</code>, or manual</td><td>needs <b>every suite green</b>; also requires <code>BASE44_API_KEY</code> and <code>BASE44_APP_ID</code></td></tr>
             <tr><td>Production smoke</td><td>after a successful publish</td><td>runs when <code>PRODUCTION_URL</code> is set</td></tr>
-            <tr><td>Build and deploy Allure report <em>(run artifact + Cloudflare Pages)</em></td><td>push to <code>main</code> or <code>builder</code>, pass or fail</td><td><code>always()</code> — a red run is when the report is worth reading; the deploy needs Cloudflare credentials, and CI fails the run if the deployed report answers an anonymous request</td></tr>
+            <tr><td>Build and deploy Allure report <em>(run artifact + Cloudflare Pages)</em></td><td>every branch builds it, pass or fail; only <code>main</code> and <code>builder</code> publish</td><td><code>always()</code> — a red run is when the report is worth reading; the deploy needs Cloudflare credentials, and CI fails the run if the deployed report answers an anonymous request</td></tr>
           </tbody>
         </table>
       </div>

@@ -42,12 +42,21 @@ name: CI
 
 on:
   push:
-    # `builder` is listed ahead of being used: the day the Base44 Builder is
-    # pointed at it, its pushes are tested, previewed and judged with no
-    # workflow change. Until then no such branch exists and this does nothing.
-    branches: [main, builder]
+    # Every branch, so work in progress is tested where it is cheap to fix
+    # rather than at the merge. `main` and `builder` are not special here —
+    # they are special further down, where the deploy jobs check the ref. A
+    # feature branch runs the full battery and deploys nothing.
+    #
+    # (`builder` is named ahead of being used: the day the Base44 Builder is
+    # pointed at it, its pushes are previewed and judged with no change here.)
+    branches: ['**']
   pull_request:
     branches: [main]
+    # Only the moment the PR appears. New commits on the branch already
+    # trigger the push event above, and checks attach to the commit either
+    # way, so reacting to `synchronize` as well would run the whole matrix
+    # twice for every push to an open PR.
+    types: [opened, reopened]
   workflow_dispatch:
     inputs:
       deploy:
@@ -494,10 +503,12 @@ jobs:
     name: Deployed sites
     runs-on: ubuntu-latest
     needs: [deploy-vercel, deploy, test-node, test-e2e, allure]
-    # Not on `builder`: that URL is a preview of one change, not a site anyone
-    # lives on, and merge-readiness already reports it. Two tables in one
-    # summary calling the same URL different things is worse than one.
-    if: always() && github.ref != 'refs/heads/builder'
+    # `main` only. On `builder` the URL is a preview of one change rather than
+    # a site anyone lives on, and merge-readiness already reports it — two
+    # tables calling the same URL different things is worse than one. On a
+    # feature branch nothing is deployed at all, so the table would be three
+    # rows of "not deployed" on every push.
+    if: always() && github.ref == 'refs/heads/main'
     steps:
       - name: Write the site links to the run summary
         env:
@@ -601,15 +612,10 @@ jobs:
     # actually has to read, and it is the only place that says why main did
     # not move.
     #
-    # workflow_dispatch is here so the report — and the Cloudflare deploy under
-    # it — can be exercised from any branch, by hand, without first merging it
-    # to main. Wiring a deployment you cannot try until it is on the trunk is
-    # how you find out it was broken on the trunk.
-    if: >-
-      always() &&
-      (github.ref == 'refs/heads/main' ||
-       github.ref == 'refs/heads/builder' ||
-       github.event_name == 'workflow_dispatch')
+    # Every branch gets a report, because a feature branch is exactly where a
+    # red run needs reading and the artifact costs nothing to produce. Only
+    # `main` and `builder` publish it — see the deploy condition below.
+    if: always()
     outputs:
       url: ${{ steps.cfdeploy.outputs.url }}
     timeout-minutes: 15
@@ -667,8 +673,17 @@ jobs:
 
       # Opt-in, like every other deploy here: no credentials, no deployment,
       # and the run still goes green with the report on it as an artifact.
+      #
+      # Restricted to the two long-lived branches. Every branch builds a report
+      # — that is the artifact above — but a repository has one Pages site, and
+      # letting every feature branch overwrite it would mean the URL shows
+      # whichever branch pushed last rather than the state of the trunk.
       - name: Check Cloudflare credentials
         id: cf
+        if: >-
+          github.ref == 'refs/heads/main' ||
+          github.ref == 'refs/heads/builder' ||
+          github.event_name == 'workflow_dispatch'
         env:
           TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
