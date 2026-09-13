@@ -1,0 +1,148 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { parse } from "yaml";
+import { describe, expect, it } from "vitest";
+import { REPO_ROOT } from "../helpers/entity-schema";
+
+/**
+ * The CI workflow as a contract.
+ *
+ * This file exists because of a real failure. A merge brought back a step that
+ * had been renamed, leaving two `upload-artifact` steps in one job both
+ * claiming the name `allure-report`. GitHub rejects the second with a 409 and
+ * fails the job — after the whole battery has already run. Nothing in the repo
+ * could have caught it, and the branch is merged into often enough that it
+ * would have happened again.
+ *
+ * These are cheap structural checks on a file that is edited by hand, merged
+ * frequently, and only validated by running it.
+ */
+
+const workflow = parse(
+  readFileSync(join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8"),
+) as {
+  on: Record<string, unknown>;
+  jobs: Record<
+    string,
+    {
+      needs?: string | string[];
+      if?: string;
+      outputs?: Record<string, string>;
+      steps?: Array<{ name?: string; uses?: string; id?: string; with?: Record<string, string> }>;
+    }
+  >;
+};
+
+const jobs = Object.entries(workflow.jobs);
+const stepsOf = (job: (typeof jobs)[number][1]) => job.steps ?? [];
+const needsOf = (job: (typeof jobs)[number][1]) => {
+  const n = job.needs;
+  return n === undefined ? [] : Array.isArray(n) ? n : [n];
+};
+
+describe("the CI workflow is internally consistent", () => {
+  it("never uploads two artifacts under the same name in one job", () => {
+    // The 409 that started this file.
+    for (const [name, job] of jobs) {
+      const uploaded = stepsOf(job)
+        .filter((s) => (s.uses ?? "").includes("upload-artifact"))
+        .map((s) => s.with?.name)
+        .filter(Boolean) as string[];
+      const seen = new Set<string>();
+      for (const artifact of uploaded) {
+        expect(seen.has(artifact), `${name} uploads "${artifact}" more than once`).toBe(false);
+        seen.add(artifact);
+      }
+    }
+  });
+
+  it("runs every Vitest suite that exists on disk", () => {
+    // A new directory under tests/ is easy to add and easy to forget to wire
+    // in, and a suite CI never runs is worse than no suite: it reads as
+    // coverage. Compared against the directory listing rather than a list
+    // maintained here, so adding one is enough to be caught.
+    // A suite is a directory that actually holds test files — which leaves
+    // helpers/, setup/ and test-plan/ out without naming them, so the check
+    // keeps working as those grow.
+    const testsDir = join(REPO_ROOT, "tests");
+    const suites = readdirSync(testsDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .filter((e) => readdirSync(join(testsDir, e.name)).some((f) => f.includes(".test.")))
+      .map((e) => e.name);
+    expect(suites.length, "no test suites found at all").toBeGreaterThan(0);
+
+    const ciCommands = stepsOf(workflow.jobs["test-node"])
+      .map((s) => String((s as { run?: string }).run ?? ""))
+      .join("\n");
+
+    for (const suite of suites) {
+      expect(ciCommands, `tests/${suite} exists but no CI step runs it`).toContain(
+        `npm run test:${suite}`,
+      );
+    }
+  });
+
+  it("depends only on jobs that exist", () => {
+    const known = new Set(jobs.map(([n]) => n));
+    for (const [name, job] of jobs) {
+      for (const dep of needsOf(job)) {
+        expect(known.has(dep), `${name} needs "${dep}", which is not a job`).toBe(true);
+      }
+    }
+  });
+
+  it("reads no output from a job it does not depend on", () => {
+    // `needs.x.outputs.y` silently evaluates to empty when x is not in needs,
+    // which shows up as a blank link in a summary rather than as an error.
+    for (const [name, job] of jobs) {
+      const declared = new Set(needsOf(job));
+      const body = JSON.stringify(job);
+      for (const match of body.matchAll(/needs\.([a-z0-9_-]+)\./g)) {
+        expect(
+          declared.has(match[1]),
+          `${name} reads needs.${match[1]} without listing it in needs`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("reads only outputs the producing job actually declares", () => {
+    const body = JSON.stringify(workflow.jobs);
+    for (const match of body.matchAll(/needs\.([a-z0-9_-]+)\.outputs\.([a-z0-9_-]+)/g)) {
+      const [, producer, key] = match;
+      expect(workflow.jobs[producer], `unknown job ${producer}`).toBeTruthy();
+      expect(
+        Object.keys(workflow.jobs[producer].outputs ?? {}),
+        `${producer} does not declare output "${key}"`,
+      ).toContain(key);
+    }
+  });
+});
+
+describe("the workflow tests every branch and deploys from only two", () => {
+  it("runs on a push to any branch", () => {
+    expect((workflow.on as { push: { branches: string[] } }).push.branches).toEqual(["**"]);
+  });
+
+  it("does not also run the whole matrix on every push to an open PR", () => {
+    // push already covers new commits; reacting to `synchronize` would double.
+    const pr = (workflow.on as { pull_request: { types: string[] } }).pull_request;
+    expect(pr.types).not.toContain("synchronize");
+  });
+
+  it("gates every deploying job on the ref, so a feature branch ships nothing", () => {
+    for (const name of ["deploy", "deploy-vercel"]) {
+      const condition = workflow.jobs[name].if ?? "";
+      expect(condition, `${name} must check the branch`).toMatch(/github\.ref == 'refs\/heads\//);
+    }
+  });
+
+  it("keeps the report deploy off feature branches while still building it", () => {
+    // The job runs everywhere — a red feature-branch run is worth reading —
+    // but a repository has one Pages site, so only main/builder may publish.
+    expect(workflow.jobs.allure.if?.trim()).toBe("always()");
+    const cf = stepsOf(workflow.jobs.allure).find((s) => s.id === "cf");
+    expect(cf, "the Cloudflare credential gate is missing").toBeTruthy();
+    expect(cf!.if ?? "").toMatch(/refs\/heads\/main/);
+  });
+});

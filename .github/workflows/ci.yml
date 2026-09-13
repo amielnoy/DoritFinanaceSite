@@ -775,14 +775,6 @@ jobs:
           fi
           echo "::notice::Anonymous request got HTTP ${code} and no report content — Access is in front of it."
 
-      - name: Keep the report as an artifact too
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: allure-report
-          path: allure-report/
-          retention-days: 14
-
 
 
   # ── 9. Is this Builder branch safe to merge? ─────────────────────────────
