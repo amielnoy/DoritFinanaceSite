@@ -242,11 +242,6 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   /** Does the outside recipient get the visitor's actual details? */
   const outsideGetsFullLead = /to: NOTIFY_EMAIL,[\s\S]{0,240}?body: `\$\{agentBody\}/.test(submitLead);
 
-  it("sends to both inboxes, and names them", () => {
-    expect(submitLead).toMatch(/const NOTIFY_EMAIL = "amielnoy@gmail\.com"/);
-    expect(submitLead).toMatch(/const SECONDARY_EMAIL = "dorit@govari-fin\.co\.il"/);
-    expect(submitLead).toMatch(/to: SECONDARY_EMAIL,\s*\n\s*subject,\s*\n\s*body: agentBody,/);
-  });
 
   it("keeps the consent notice honest about the second recipient", () => {
     if (outsideGetsFullLead) {
@@ -280,17 +275,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(consent).toMatch(/CONSENT_VERSION = "2026-09-agents-v\d+"/);
   });
 
-  it("tells the operations copy apart with a status appendix", () => {
-    const footer = topLevelFn(submitLead, "buildOpsFooter");
-    expect(footer).toMatch(/מצב תפעולי/);
-    expect(footer).toMatch(/יומן/);
-    expect(footer).toMatch(/תקלות/);
-  });
 
-  it("redacts the conversation summary before it is sent anywhere", () => {
-    expect(submitLead).toMatch(/const safeSummary = redact\(summary\)/);
-    expect(submitLead).toMatch(/summary: safeSummary/);
-  });
 
   it("keeps the two copies of redact() identical", () => {
     // Base44 functions are isolated entry points with no shared module, so the

@@ -129,9 +129,9 @@ jobs:
           path: dist
           retention-days: 7
 
-  # ── 2. Fast suites: unit, component, contract, static security ────────────
+  # ── 2. Fast suites: unit, component, contract, integration, security ──────
   test-node:
-    name: Unit, component, contract, security
+    name: Unit, component, contract, integration, security
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -159,6 +159,12 @@ jobs:
       - name: Contract tests
         run: npm run test:contract
 
+      # Runs the Base44 functions in-process against a recording client. They
+      # are outside tsconfig and execute on Deno in production, so this is the
+      # only place their behaviour — not their source — is checked.
+      - name: Integration tests
+        run: npm run test:integration
+
       - name: Static security tests
         run: npm run test:security
 
@@ -170,10 +176,10 @@ jobs:
           path: test-results/
           retention-days: 7
 
-      # The four suites above run in one job and append to a single
-      # allure-results/, so this is all 174 of them. The name has to match the
-      # `allure-results-*` pattern the publish job downloads, or the report
-      # silently goes back to being e2e-only.
+      # The five suites above run in one job and append to a single
+      # allure-results/, so this upload carries all of them. The name has to
+      # match the `allure-results-*` pattern the publish job downloads, or the
+      # report silently goes back to being e2e-only.
       - name: Upload Allure results
         if: always()
         uses: actions/upload-artifact@v4

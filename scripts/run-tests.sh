@@ -7,7 +7,7 @@
 #   ./scripts/run-tests.sh e2e --project=ios-safari
 #   ./scripts/run-tests.sh --report        open the Allure report when done
 #
-# Suites: lint typecheck unit component contract security e2e
+# Suites: lint typecheck unit component contract integration security e2e
 # Env:
 #   SKIP_BUILD=1                 reuse an existing dist/ for the e2e run
 #   PLAYWRIGHT_BASE_URL=<url>    run e2e against a deployment instead of a local preview
@@ -20,7 +20,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 BOLD=$'\033[1m'; RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; OFF=$'\033[0m'
 [[ -t 1 ]] || { BOLD=""; RED=""; GREEN=""; YELLOW=""; DIM=""; OFF=""; }
 
-ALL_SUITES=(lint typecheck unit component contract security e2e)
+ALL_SUITES=(lint typecheck unit component contract integration security e2e)
 SUITES=()
 EXTRA_ARGS=()
 OPEN_REPORT=0
@@ -93,6 +93,9 @@ has typecheck && run_suite "typecheck" npm run typecheck:gate
 has unit      && run_suite "unit" npx vitest run tests/unit
 has component && run_suite "component" npx vitest run tests/component
 has contract  && run_suite "contract" npx vitest run tests/contract
+# Runs the Base44 functions for real, against a recording client. Nothing
+# else executes them: they sit outside tsconfig and run on Deno in production.
+has integration && run_suite "integration" npx vitest run tests/integration
 has security  && run_suite "security (static)" npx vitest run tests/security
 
 if has e2e; then

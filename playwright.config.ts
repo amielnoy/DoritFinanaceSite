@@ -53,7 +53,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // Four workers in CI. The suite is hermetic — every test stubs the backend
+  // at the network layer and shares no state — so parallelism is bounded by
+  // the runner's cores rather than by anything in the tests. Watch for
+  // timeout-shaped flake if the matrix ever moves to a smaller runner: that is
+  // what oversubscription looks like here, not a genuine failure.
+  workers: process.env.CI ? 4 : undefined,
   timeout: 45_000,
   expect: { timeout: 10_000 },
   reporter: [...builtInReporters, allureReporter],

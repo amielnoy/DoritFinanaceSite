@@ -18,6 +18,7 @@ In scope:
 | Pure logic | Pension fee maths, URL/class helpers, the open-redirect guard, contact config |
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
 | Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` and `escalateToHuman` functions, RLS rules |
+| Integration | The Base44 functions executed in-process against a recording client — what is stored, who is mailed, what each recipient sees, and what survives a failure |
 | Agent compliance | The three agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
 | UI e2e | Landing page, routing, calculator, three lead forms, blog, the agent chat's regulatory shell |
@@ -36,6 +37,7 @@ regression, and load/performance testing.
         ╱╲          e2e  — 4 platforms × UI/API/security/a11y     (Playwright)
        ╱  ╲
       ╱────╲        contract — payloads vs entity schemas          (Vitest)
+     ╱      ╲       integration — backend functions, executed        (Vitest)
      ╱      ╲       component — RTL render + interaction           (Vitest + RTL)
     ╱────────╲      unit — pure functions                          (Vitest)
 ```
@@ -85,7 +87,7 @@ backend when one is available.
 |---|---|
 | lint | zero errors |
 | typecheck | zero **new** errors against `tests/typecheck-baseline.json` — see [10-known-issues](10-known-issues.md) |
-| unit, component, contract, security | 100% pass |
+| unit, component, contract, integration, security | 100% pass |
 | e2e (all four platforms) | 100% pass, no more than the documented skips |
 | accessibility | zero `serious`/`critical` axe violations except the tracked colour-contrast finding |
 
