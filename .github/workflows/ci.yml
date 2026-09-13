@@ -92,12 +92,23 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Non-blocking: `tsc` reports ~74 errors inherited from the JS→TS
-      # conversion (untyped shadcn wrappers, lucide icon prop variance). They
-      # are surfaced on every run; drop continue-on-error once they are fixed.
-      - name: Typecheck (known pre-existing failures)
-        run: npm run typecheck
-        continue-on-error: true
+      # Blocking, on a ratchet.
+      #
+      # `tsc` reports 93 errors inherited from the JS→TS conversion. Every one
+      # of them sits in a `.tsx` file that passes props to an untyped `.jsx`
+      # shadcn primitive — TypeScript sees `RefAttributes<any>` and rejects the
+      # lot. None are in the JavaScript files, and none are bugs. Flipping this
+      # step to blocking as it stood would have painted CI red without finding
+      # anything.
+      #
+      # What it cost while advisory: a genuinely new type error landed silently
+      # among the 93 and nobody had to fix it. So the gate allows for exactly
+      # the inherited set (tests/typecheck-baseline.json, keyed by file and
+      # error code, never by line) and fails on anything on top of it.
+      #
+      # Fixed some? `npm run typecheck:baseline` lowers the bar; commit it.
+      - name: Typecheck (blocks on new errors)
+        run: npm run typecheck:gate
 
       - name: Build
         run: npm run build
@@ -405,9 +416,12 @@ jobs:
           #
           # --archive=tgz uploads one tarball instead of one request per file.
           # The free plan allows 5000 uploads per 24h, and this pipeline blew
-          # through that in a day — mostly on the Allure report, which is
-          # thousands of small JSON files — leaving deploys dead with
-          # "api-upload-free" until the window rolled over.
+          # through that in a day — mostly on the Allure report, which was
+          # published here at the time and is thousands of small JSON files —
+          # leaving deploys dead with "api-upload-free" until the window rolled
+          # over. The report is not deployed anywhere at all now — it is a
+          # single file attached to the run — but this flag stays: the budget
+          # is per-account and a built site is plenty of files on its own.
           url=$(npx vercel deploy --prebuilt ${{ steps.target.outputs.prod }} --archive=tgz --scope "$SCOPE" --token "$VERCEL_TOKEN" \
                 | grep -oE 'https://[^[:space:]]+' | tail -1)
           if [ -z "$url" ]; then
@@ -493,7 +507,9 @@ jobs:
           BASE44_RESULT: ${{ needs.deploy.result }}
           UNIT_RESULT: ${{ needs.test-node.result }}
           TESTS_RESULT: ${{ needs.test-e2e.result }}
+          ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           vercel_link="${VERCEL_URL:-https://vercel.com/amielnoy-9725s-projects/dorit-finance-site}"
 
@@ -537,9 +553,11 @@ jobs:
             echo "| **Base44 — production** (client-facing) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | ${base44_state} |"
             echo "| **Vercel — staging** (login-protected) | ${vercel_link} | ${vercel_state} |"
             if [ -n "$ALLURE_URL" ]; then
-              echo "| **Allure — test report** | ${ALLURE_URL} | published this run |"
+              echo "| **Allure — test report** (Cloudflare, behind Access) | ${ALLURE_URL} | deployed this run |"
+            elif [ "$ALLURE_RESULT" = "success" ]; then
+              echo "| **Allure — test report** | [\`allure-report\` on this run](${RUN_URL}) | attached to this run |"
             else
-              echo "| **Allure — test report** | downloadable from this run's artifacts | not published |"
+              echo "| **Allure — test report** | — | not built (${ALLURE_RESULT}) |"
             fi
             echo
             echo "Unit suites: **${UNIT_RESULT}** · e2e across all four platforms: **${TESTS_RESULT}**"
@@ -547,11 +565,33 @@ jobs:
             echo "> A red run still deploys to **staging** — the point is to be able to open the broken build"
             echo "> next to the report that says what broke. **Production is held back until the run is green.**"
             echo "> The Vercel staging link answers anonymous requests with a 302; sign in to Vercel to view it."
+            echo ">"
+            echo "> The test report also rides on this run as the \`allure-report\` artifact — one self-contained"
+            echo "> \`index.html\`, no server needed. The Cloudflare copy sits behind Cloudflare Access, which CI"
+            echo "> re-checks on every deploy: the repository is private and the report carries the client's copy."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # ── 8. Publish the merged Allure report ──────────────────────────────────
+  # ── 8. Attach the merged Allure report to the run ────────────────────────
+  #
+  # The report goes to two places, in two shapes, from one set of results:
+  #
+  #   - **This run**, as the `allure-report` artifact: one self-contained
+  #     index.html that opens from the filesystem. Always produced, needs no
+  #     credentials, and visible to exactly the people who can already see this
+  #     private repository.
+  #
+  #   - **Cloudflare Pages**, as the ordinary multi-file report, when the
+  #     credentials are set. Cloudflare refuses any single asset over 25 MiB
+  #     and a full run's single-file report is ~46 MB, so the hosted copy has
+  #     to be the split one (~4,000 files against a 20,000-file ceiling).
+  #
+  # The hosted copy must not be world-readable — it carries the client's copy
+  # and screenshots of her site — so the deploy is followed by a step that
+  # fetches it anonymously and fails if the report comes back. Cloudflare
+  # Access is configured in the dashboard, not from here, and a protection
+  # that nothing checks is a protection that silently lapses.
   allure:
-    name: Publish Allure report
+    name: Build and deploy Allure report
     runs-on: ubuntu-latest
     # Both test jobs, or the report races the vitest artifact and publishes
     # without it.
@@ -560,11 +600,18 @@ jobs:
     # Builder runs publish it too: a red `builder` run is the one someone
     # actually has to read, and it is the only place that says why main did
     # not move.
+    #
+    # workflow_dispatch is here so the report — and the Cloudflare deploy under
+    # it — can be exercised from any branch, by hand, without first merging it
+    # to main. Wiring a deployment you cannot try until it is on the trunk is
+    # how you find out it was broken on the trunk.
     if: >-
       always() &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/builder')
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/builder' ||
+       github.event_name == 'workflow_dispatch')
     outputs:
-      url: ${{ steps.publish.outputs.url }}
+      url: ${{ steps.cfdeploy.outputs.url }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -592,8 +639,11 @@ jobs:
           find allure-parts -type f -exec cp -n {} allure-results/ \; 2>/dev/null || true
           echo "merged $(ls allure-results | wc -l) result files"
 
-      # History makes the trend graphs meaningful across runs. Without it every
-      # report claims to be the first one.
+      # History makes the trend graphs meaningful across runs; without it every
+      # report claims to be the first one. Allure 3 reads and rewrites
+      # `allure-history/history.jsonl` itself (`historyPath` in allurerc.mjs),
+      # so restoring the cache is the whole mechanism — none of the copying in
+      # and out of the report directory that Allure 2 needed.
       - name: Restore report history
         uses: actions/cache@v4
         with:
@@ -601,48 +651,103 @@ jobs:
           key: allure-history-${{ github.run_id }}
           restore-keys: allure-history-
 
-      - name: Carry history into this run
-        run: |
-          if [ -d allure-history ]; then cp -r allure-history allure-results/history || true; fi
-
+      # Also strips the Google Analytics beacon Allure injects into every
+      # report — see scripts/strip-allure-analytics.mjs for why that is not
+      # just a config flag.
       - name: Generate the report
-        run: |
-          npx allure generate allure-results --clean -o allure-report
-          cp -r allure-report/history allure-history 2>/dev/null || true
+        run: npm run allure:generate
 
-      - name: Publish to Vercel
-        id: publish
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          SCOPE: ${{ vars.VERCEL_SCOPE }}
-          PROJECT: ${{ vars.VERCEL_REPORT_PROJECT }}
-        run: |
-          if [ -z "$VERCEL_TOKEN" ] || [ -z "$PROJECT" ]; then
-            echo "::notice::VERCEL_TOKEN or VERCEL_REPORT_PROJECT unset — report generated but not published."
-            exit 0
-          fi
-          cd allure-report
-          # A static export: no build step, no rewrites. Allure routes on the
-          # hash, so index.html serves every view already.
-          printf '{ "cleanUrls": false, "trailingSlash": false }' > vercel.json
-          # --archive=tgz is not optional here. A generated report is thousands
-          # of small JSON files, and the free plan counts 5000 file uploads per
-          # 24 hours: publishing it file-by-file spends most of a day's budget
-          # in one job and takes the app's own deployment down with it.
-          echo "publishing $(find . -type f | wc -l) files as one archive"
-          url=$(npx vercel deploy --prod --yes --archive=tgz \
-                  --name "$PROJECT" --scope "$SCOPE" --token "$VERCEL_TOKEN" \
-                | grep -oE 'https://[^[:space:]]+' | tail -1)
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "::notice::Allure report: $url"
-
-      - name: Keep the report as an artifact too
+      - name: Attach the report to this run
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: allure-report
           path: allure-report/
           retention-days: 14
+
+      # Opt-in, like every other deploy here: no credentials, no deployment,
+      # and the run still goes green with the report on it as an artifact.
+      - name: Check Cloudflare credentials
+        id: cf
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ] && [ -n "$PROJECT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets or the CLOUDFLARE_PAGES_PROJECT variable are unset — the report is attached to this run and was not deployed."
+          fi
+
+      # The split report, for Cloudflare's 25 MiB-per-asset limit. Same results,
+      # same analytics strip — see allurerc.mjs.
+      - name: Build the hosted copy
+        if: steps.cf.outputs.ready == 'true'
+        run: npm run allure:generate:site
+
+      # Idempotent, and the `--production-branch` is the point of it: set to a
+      # name this pipeline never pushes, so every deploy below is a *preview*
+      # deployment. That is the only kind Cloudflare's one-click access policy
+      # protects — the toggle does not cover the production domain. A failure
+      # here usually just means the project already exists, so it is not fatal;
+      # the deploy step is the real check.
+      - name: Ensure the Pages project exists
+        if: steps.cf.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          if npx wrangler pages project create "$PROJECT" --production-branch production >/dev/null 2>&1; then
+            echo "::notice::Created Cloudflare Pages project '$PROJECT' with production branch 'production', so CI deploys land as preview deployments."
+          else
+            echo "Project '$PROJECT' already exists, or could not be created — the deploy step will say which."
+          fi
+
+      # --branch is the git ref, never Cloudflare's configured production
+      # branch: that makes every one of these a *preview* deployment, which is
+      # the only thing the project's one-click "Enable access policy" toggle
+      # protects. Cloudflare's own docs are explicit that the toggle does not
+      # cover the `*.pages.dev` production domain or a custom domain — those
+      # need an Access application in Zero Trust covering the hostname.
+      - name: Deploy to Cloudflare Pages
+        id: cfdeploy
+        if: steps.cf.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          url=$(npx wrangler pages deploy allure-report-site \
+                  --project-name "$PROJECT" \
+                  --branch "$GITHUB_REF_NAME" \
+                  --commit-hash "$GITHUB_SHA" \
+                  --commit-dirty=true \
+                | grep -oE 'https://[^[:space:]]+' | tail -1)
+          if [ -z "$url" ]; then
+            echo "::error::wrangler produced no deployment URL"
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "::notice::Allure report deployed to $url"
+
+      # The requirement is that it is not world-readable, so assert it rather
+      # than assume the dashboard is still set the way someone left it. Access
+      # answers an anonymous request with its own login page, so a 200 alone
+      # proves nothing — what must not come back is the report itself.
+      - name: Verify the report is not world-readable
+        if: steps.cf.outputs.ready == 'true'
+        env:
+          URL: ${{ steps.cfdeploy.outputs.url }}
+        run: |
+          code=$(curl -sL -o anon.html -w '%{http_code}' "$URL/" || echo 000)
+          if grep -qi 'allure\|Dorit Gov-Ari' anon.html 2>/dev/null; then
+            echo "::error::${URL} served the report to an anonymous request (HTTP ${code}). Cloudflare Access is not in front of it. Enable the project's access policy (Workers & Pages → the project → Settings → General → Enable access policy), or add a Zero Trust Access application covering this hostname, then re-run."
+            exit 1
+          fi
+          echo "::notice::Anonymous request got HTTP ${code} and no report content — Access is in front of it."
 
 
   # ── 9. Is this Builder branch safe to merge? ─────────────────────────────
@@ -670,7 +775,9 @@ jobs:
           UNIT: ${{ needs.test-node.result }}
           E2E: ${{ needs.test-e2e.result }}
           PREVIEW_URL: ${{ needs.deploy-vercel.outputs.url }}
+          ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ "$BUILD" = "success" ] && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ]; then
             verdict="## ✅ Safe to merge"
@@ -700,9 +807,13 @@ jobs:
             fi
             echo
             if [ -n "$ALLURE_URL" ]; then
-              echo "**Test report:** ${ALLURE_URL}"
+              echo "**Test report:** ${ALLURE_URL} (sign in through Cloudflare Access), or the"
+              echo "\`allure-report\` artifact on [this run](${RUN_URL})."
+            elif [ "$ALLURE_RESULT" = "success" ]; then
+              echo "**Test report:** the \`allure-report\` artifact on [this run](${RUN_URL}) — one self-contained"
+              echo "\`index.html\`; unzip and open it, no server needed."
             else
-              echo "_Test report: downloadable from this run's artifacts._"
+              echo "_Test report: not built (${ALLURE_RESULT})._"
             fi
             echo
             echo "> Heads-up: every Builder branch shares the app's **live data**. The tests never"

@@ -85,10 +85,11 @@ soft_suite() {
 }
 
 has lint      && run_suite "lint" npx eslint . --quiet
-# `tsc` reports ~74 pre-existing errors inherited from the JS→TS conversion
-# (mostly untyped shadcn wrappers). Tracked and reported, but it does not gate
-# the run until that debt is paid down; flip to run_suite once it is clean.
-has typecheck && soft_suite "typecheck" npx tsc -p ./tsconfig.json
+# Blocking, but only on what is new. `tsc` reports 93 errors inherited from the
+# JS→TS conversion — all of them .tsx files passing props to untyped .jsx shadcn
+# primitives — so the gate allows for exactly those (tests/typecheck-baseline.json)
+# and fails on anything on top. `npm run typecheck` still prints the full list.
+has typecheck && run_suite "typecheck" npm run typecheck:gate
 has unit      && run_suite "unit" npx vitest run tests/unit
 has component && run_suite "component" npx vitest run tests/component
 has contract  && run_suite "contract" npx vitest run tests/contract
@@ -105,22 +106,29 @@ fi
 
 # ── Allure report ───────────────────────────────────────────────────────────
 # Generated whenever the e2e suite ran, because a run you cannot read is a run
-# you will re-run. `allure open` serves it on localhost — the report is a set of
-# XHR-loading pages, so opening index.html from the filesystem shows an empty
-# shell. Skipped in CI, where the workflow publishes it instead.
+# you will re-run.
+#
+# Allure 3 inlines the whole report into one self-contained index.html, so —
+# unlike Allure 2, which fetched thousands of JSON files over XHR and showed an
+# empty shell when opened from disk — you can just open the file. `--report`
+# still serves it on localhost, which is the nicer way to click through a
+# failure rather than file it away.
+#
+# Skipped in CI, where the workflow attaches the same file to the run as an
+# artifact instead of publishing it anywhere.
 if has e2e && [[ "${NO_REPORT:-}" != "1" && -z "${CI:-}" ]]; then
   if [[ -d allure-results && -n "$(ls -A allure-results 2>/dev/null)" ]]; then
-    if npx allure generate allure-results --clean -o allure-report >/dev/null 2>&1; then
-      printf '\n%sAllure report%s generated in %sallure-report/%s\n' "$BOLD" "$OFF" "$DIM" "$OFF"
+    if npm run --silent allure:generate >/dev/null 2>&1; then
+      printf '\n%sAllure report%s generated at %sallure-report/index.html%s\n' "$BOLD" "$OFF" "$DIM" "$OFF"
       if [[ $OPEN_REPORT -eq 1 ]]; then
-        printf '  opening on localhost — %sCtrl-C to stop the server%s\n' "$DIM" "$OFF"
+        printf '  serving on localhost — %sCtrl-C to stop the server%s\n' "$DIM" "$OFF"
         npx allure open allure-report
       else
-        printf '  view it: %snpm run allure:open%s   (or re-run with %s--report%s)\n' \
+        printf '  open the file, or serve it: %snpm run allure:open%s   (or re-run with %s--report%s)\n' \
           "$YELLOW" "$OFF" "$YELLOW" "$OFF"
       fi
     else
-      printf '\n%sAllure report could not be generated%s (is Java installed?)\n' "$YELLOW" "$OFF"
+      printf '\n%sAllure report could not be generated%s\n' "$YELLOW" "$OFF"
     fi
   fi
 fi

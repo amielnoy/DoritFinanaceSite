@@ -41,8 +41,11 @@ base44/.app.jsonc
 /playwright-report
 /playwright/.cache
 
-# Allure: raw results from a run, and the report generated from them.
+# Allure: raw results from a run, the report generated from them, and the
+# trend history the report is built against (CI keeps that one in a cache).
 /allure-results
 /allure-report
+/allure-report-site
+/allure-history
 .vercel
 .env*
