@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 41 desktop-relevant, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 46 desktop-relevant, run on all four platforms
 
 ---
 
@@ -88,6 +88,20 @@ timezone `Asia/Jerusalem`.
 |---|---|---|
 | E2E-DSK-001 | "shows the floating WhatsApp/phone dock and hides the mobile bar" | Dock visible; sticky bar hidden |
 | E2E-DSK-002 | "shows the full desktop nav rather than a burger" | Burger hidden; "שירותים" link visible |
+
+### 3.7 Agent chat — regulatory shell — `agent-compliance.spec.ts`
+
+The three chat widgets are driven by prompts, and a prompt is a request to a
+model. These five cases cover only what the shell enforces regardless of what
+the model does — the part that is a gate rather than an instruction.
+
+| ID | Title | Expected result |
+|---|---|---|
+| E2E-AGT-001 | "a visitor cannot type before accepting the consent notice" | Message box disabled with the "יש לאשר את ההסכמה" placeholder; **zero** requests to `/agents/`; accepting the notice enables the box |
+| E2E-AGT-002 | "the notice discloses the bot, the licence and the data collected" | "עוזר אוטומטי", `L-00107009`, the marketing-not-advice line, the ban on typing an ID number, and a link to `/privacy` all visible |
+| E2E-AGT-003 | "the fence is published beside the interview agent" | The tagline and the כללי הגדר block (what it does / does not do / when it hands over) visible in `#interview` |
+| E2E-AGT-004 | "a standing disclaimer sits under every message box" | The "אינו ייעוץ, שיווק פנסיוני או המלצה אישית" line visible in all three sections |
+| E2E-AGT-005 | "the route to a person works without the model, and before consent" | Handoff button present on first frame; pressing it POSTs to `escalateToHuman`; phone and WhatsApp links render even though the visitor never consented and no conversation exists |
 
 ## 4. Pass criteria
 

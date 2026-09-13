@@ -4,47 +4,81 @@
   "properties": {
     "name": {
       "type": "string",
-      "title": "\u05e9\u05dd"
+      "title": "שם"
     },
     "phone": {
       "type": "string",
-      "title": "\u05d8\u05dc\u05e4\u05d5\u05df"
+      "title": "טלפון"
     },
     "email": {
       "type": "string",
-      "title": "\u05d0\u05d9\u05de\u05d9\u05d9\u05dc"
+      "title": "אימייל"
     },
     "source": {
       "type": "string",
-      "title": "\u05de\u05e7\u05d5\u05e8 \u05d4\u05e4\u05e0\u05d9\u05d9\u05d4",
+      "title": "מקור הפנייה",
       "enum": [
         "consultation",
         "detailed",
         "quick",
-        "claim"
+        "claim",
+        "escalation"
       ]
     },
     "topic": {
       "type": "string",
-      "title": "\u05ea\u05d7\u05d5\u05dd / \u05e9\u05d9\u05e8\u05d5\u05ea"
+      "title": "תחום / שירות"
     },
     "timing": {
       "type": "string",
-      "title": "\u05de\u05d5\u05e2\u05d3"
+      "title": "מועד"
     },
     "message": {
       "type": "string",
-      "title": "\u05d4\u05d5\u05d3\u05e2\u05d4"
+      "title": "הודעה"
     },
     "status": {
       "type": "string",
-      "title": "\u05e1\u05d8\u05d8\u05d5\u05e1",
+      "title": "סטטוס",
       "enum": [
         "new",
         "contacted",
-        "closed"
+        "closed",
+        "escalated"
       ],
       "default": "new"
+    },
+    "escalation_reason": {
+      "type": "string",
+      "title": "סיבת ההעברה לטיפול אנושי",
+      "description": "מדוע הסוכן האוטומטי הפסיק לטפל והעביר את הפנייה לדורית. ריק בפניות שלא הועברו.",
+      "enum": [
+        "regulated_advice",
+        "product_recommendation",
+        "numbers_or_returns",
+        "claim_or_policy",
+        "complaint",
+        "privacy_request",
+        "sensitive_data",
+        "out_of_scope",
+        "user_request",
+        "uncertain"
+      ]
+    },
+    "handled_by_agent": {
+      "type": "string",
+      "title": "סוכן אוטומטי מטפל",
+      "description": "שם הסוכן שבו נפתחה השיחה, לצורך תיעוד ובקרה."
+    },
+    "consent_version": {
+      "type": "string",
+      "title": "גרסת ההסכמה שאושרה",
+      "description": "מזהה נוסח ההסכמה שהוצג למבקר בעת האיסוף — חובת יידוע לפי חוק הגנת הפרטיות."
+    },
+    "consent_at": {
+      "type": "string",
+      "title": "מועד מתן ההסכמה",
+      "description": "חותמת זמן ISO של אישור ההסכמה בממשק."
     }
   },
   "required": [

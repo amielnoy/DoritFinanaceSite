@@ -2,8 +2,9 @@ import { base44 } from "@/api/base44Client";
 import { Base44AgentService } from "./base44/Base44AgentService";
 import { Base44ContentService } from "./base44/Base44ContentService";
 import { Base44LeadService } from "./base44/Base44LeadService";
+import { Base44SupportService } from "./base44/Base44SupportService";
 import { Base44UploadService } from "./base44/Base44UploadService";
-import type { AgentPort, ContentPort, LeadPort, UploadPort } from "./ports";
+import type { AgentPort, ContentPort, LeadPort, SupportPort, UploadPort } from "./ports";
 
 /**
  * Composition root — the single place that knows the concrete implementations.
@@ -16,6 +17,7 @@ export interface Services {
   content: ContentPort;
   agents: AgentPort;
   uploads: UploadPort;
+  support: SupportPort;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,6 +28,7 @@ export const services: Services = {
   content: new Base44ContentService(client),
   agents: new Base44AgentService(client),
   uploads: new Base44UploadService(client),
+  support: new Base44SupportService(client),
 };
 
 export * from "./ports";

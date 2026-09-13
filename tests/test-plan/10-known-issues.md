@@ -64,20 +64,33 @@ not do today. The two options, in increasing order of effort:
 Until then the runtime layer is the right trade: it fixes the case that governs
 search ranking, and it is fully tested.
 
-### B-3 · `npm run typecheck` has ~74 pre-existing errors
+### B-3 · `npm run typecheck` has 93 inherited errors, now held on a ratchet
 
 `tsc` fails on the current `main`, unchanged by this work (verified by running
-it on a clean tree). The errors are almost all in components that pass props to
-untyped shadcn wrappers — `Image` (`src`, `alt`, `fittingType`), the accordion
-primitives (`children`, `value`) — plus one lucide icon prop-variance mismatch
-in the calculator's `ResultCardProps`. `noEmit` means nothing is broken at
-runtime, and `npm run build` succeeds because Vite strips types without
-checking them.
+it on a clean tree). The distribution is the whole story: **all 93 errors are in
+`.tsx` files — none in the `.jsx` files at all.** 95 of the reported lines name
+the same signature, `IntrinsicAttributes & RefAttributes<any>`, which is what an
+untyped `forwardRef` component looks like from TypeScript's side. A typed page
+imports an untyped shadcn primitive (`button`, `input`, `label`, `input-otp`,
+`image`, the accordion) and every prop it passes is rejected; the 10 `TS7006`
+implicit-`any` parameters are knock-on from the same cause, since an untyped
+component supplies no event type to its own handler.
 
-Consequently `typecheck` is **reported but non-blocking**: a `WARN` line in
-`scripts/run-tests.sh` and `continue-on-error: true` in CI. Both carry a comment
-pointing here. Closing it means typing `src/components/ui/image.jsx` and the
-accordion wrapper, then removing the two escape hatches.
+So this is a boundary problem, not a file-count problem. **Porting more
+application code to TypeScript fixes none of it** — the fix is to type the ~8
+primitives that are actually consumed, or to declare them in one `.d.ts`.
+
+`noEmit` means nothing is broken at runtime, and `npm run build` succeeds
+because Vite strips types without checking them.
+
+**Since 2026-09-13 the step blocks.** What it cost while advisory was that a
+genuinely new type error landed silently among the 93 and nobody had to fix it.
+`npm run typecheck:gate` (`scripts/typecheck-gate.mjs`) allows for exactly the
+inherited set, recorded in `tests/typecheck-baseline.json` keyed by file and
+error code — never by line, so unrelated edits that shift lines do not trip it.
+It fails on a new file/code pair, or on more errors of a known kind in a known
+file. Fixing some and running `npm run typecheck:baseline` lowers the bar
+permanently; the raw list is still `npm run typecheck`.
 
 ### B-4 · Structured-data email disagrees with the rest of the site
 

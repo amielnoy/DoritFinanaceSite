@@ -17,11 +17,13 @@ In scope:
 |---|---|
 | Pure logic | Pension fee maths, URL/class helpers, the open-redirect guard, contact config |
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
-| Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` function, RLS rules |
+| Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` and `escalateToHuman` functions, RLS rules |
+| Integration | The Base44 functions executed in-process against a recording client — what is stored, who is mailed, what each recipient sees, and what survives a failure |
+| Agent compliance | The three agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
-| UI e2e | Landing page, routing, calculator, three lead forms, blog |
+| UI e2e | Landing page, routing, calculator, three lead forms, blog, the agent chat's regulatory shell |
 | Mobile web | iOS Safari and Android Chrome behaviour and layout |
-| Security | XSS, open redirect, token handling, tab-nabbing, secret leakage, RLS |
+| Security | XSS (page and chat), HTML injection into outbound mail, phishing vectors, prompt injection via UI and via tool payloads, DLP, open redirect, token handling, tab-nabbing, secret leakage, RLS |
 | Accessibility | WCAG 2.1 AA via axe-core, plus structural RTL/labelling checks |
 
 Out of scope: native iOS/Android applications (none exist in this repo — the
@@ -35,6 +37,7 @@ regression, and load/performance testing.
         ╱╲          e2e  — 4 platforms × UI/API/security/a11y     (Playwright)
        ╱  ╲
       ╱────╲        contract — payloads vs entity schemas          (Vitest)
+     ╱      ╲       integration — backend functions, executed        (Vitest)
      ╱      ╲       component — RTL render + interaction           (Vitest + RTL)
     ╱────────╲      unit — pure functions                          (Vitest)
 ```
@@ -55,7 +58,8 @@ backend when one is available.
 | Item | Version reference |
 |---|---|
 | Application source | `src/**` at the commit under test |
-| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/createConsultationEvent` |
+| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{createConsultationEvent,escalateToHuman}`, `base44/agents/*.jsonc` |
+| Published copy | `content/blog/*.md`, `src/config/compliance.ts` |
 | Static assets | `index.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`, `public/manifest.json` |
 | Build output | `dist/` produced by `npm run build` |
 
@@ -82,8 +86,8 @@ backend when one is available.
 | Suite | Criterion |
 |---|---|
 | lint | zero errors |
-| typecheck | **advisory** — see [10-known-issues](10-known-issues.md) |
-| unit, component, contract, security | 100% pass |
+| typecheck | zero **new** errors against `tests/typecheck-baseline.json` — see [10-known-issues](10-known-issues.md) |
+| unit, component, contract, integration, security | 100% pass |
 | e2e (all four platforms) | 100% pass, no more than the documented skips |
 | accessibility | zero `serious`/`critical` axe violations except the tracked colour-contrast finding |
 
@@ -102,16 +106,20 @@ Resume after the environment is corrected; no partial sign-off.
 | JUnit XML (Playwright) | `test-results/e2e-junit.xml` |
 | HTML report | `playwright-report/` |
 | Allure results — **every suite**, unit through e2e | `allure-results/` |
-| Allure report | `allure-report/` — `npm run allure:open`, or `./scripts/run-tests.sh --report` |
+| Allure report | `allure-report/index.html` — one self-contained file; `npm run allure:open`, or `./scripts/run-tests.sh --report`, to serve it |
+| Allure report, from CI | the `allure-report` artifact on each run, and a Cloudflare Pages deployment behind Cloudflare Access |
 | Failure screenshots, video, traces | `test-results/<test>/` |
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
 Both runners write Allure results into the same `allure-results/`, so one
-`allure generate` covers the whole battery — 174 unit/component/contract/
-security cases plus 156 e2e cases per platform. CI merges the five uploads
+`allure generate` covers the whole battery — 345 unit/component/contract/
+security cases plus 162 e2e cases per platform. CI merges the five uploads
 (one per platform, one for the Vitest job) into a single published report;
 generating per-leg would give five partial reports instead of one picture of
-the run.
+the run. Allure 3 emits the merged report as a single self-contained
+HTML file, which CI attaches to every run; a multi-file copy is deployed to
+Cloudflare Pages behind Cloudflare Access, and CI fails the run if that copy
+answers an anonymous request.
 
 > A run invoked with `--reporter=` on the command line replaces the configured
 > reporters and writes **no** Allure results. Omit the flag for any run whose
@@ -119,9 +127,23 @@ the run.
 
 ## 9. Responsibilities and schedule
 
-The suites run on every pull request and every push to `main`
-(`.github/workflows/ci.yml`), and again as a post-deploy smoke test against the
-production URL. Locally: `./scripts/run-tests.sh`.
+The suites run on **every push to every branch** (`.github/workflows/ci.yml`),
+on a pull request when it opens, and again as a post-deploy smoke test against
+the production URL. Locally: `./scripts/run-tests.sh`.
+
+A feature branch gets the full battery and an Allure report, and deploys
+nothing: every deploy job checks the ref, so `main` and `builder` remain the
+only branches that can reach a site. The pull-request trigger is narrowed to
+`opened`/`reopened` because pushes to the branch already run — reacting to
+`synchronize` as well would run the whole matrix twice per commit.
+
+Work made in the Base44 Builder currently syncs straight to `main`, so it lands
+untested and `main` can go red without warning. Dormant support for a `builder`
+branch runs the full battery on each Builder push, deploys a preview of it, and
+reports whether it is safe to merge; it activates the day the Builder is pointed
+at that branch — see the README. Merging stays the Builder's own action, so the
+enforcement lives at the publish step, which only runs from `main` and only on
+a green run.
 
 Work made in the Base44 Builder currently syncs straight to `main`, so it lands
 untested and `main` can go red without warning. Dormant support for a `builder`
