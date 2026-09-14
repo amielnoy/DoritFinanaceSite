@@ -79,8 +79,8 @@ export default function ProofCarousel() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <Reveal>
-              <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-                04 · Proof of Resilience
+              <span className="text-[11px] tracking-[0.12em] text-accent">
+                04 · מקרים מהשטח
               </span>
               <h2 className="font-heading text-5xl md:text-6xl mt-4">
                 תיקי הצלחה
@@ -129,10 +129,10 @@ export default function ProofCarousel() {
             className="snap-start shrink-0 w-[340px] md:w-[400px] bg-card border border-border/50 p-8 md:p-10 flex flex-col group hover:border-highlight-muted/40 transition-colors duration-300"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] tracking-[0.3em] uppercase text-accent">
+              <span className="text-[10px] tracking-[0.12em] text-accent">
                 {b.tag}
               </span>
-              <span className="text-[10px] tracking-[0.25em] uppercase text-muted-foreground/60">
+              <span className="text-[10px] tracking-[0.12em] text-muted-foreground/60">
                 0{i + 1}
               </span>
             </div>
@@ -149,8 +149,8 @@ export default function ProofCarousel() {
               <span className="font-heading text-3xl md:text-4xl text-highlight-muted leading-none">
                 {b.metric}
               </span>
-              <span className="text-[10px] tracking-[0.25em] uppercase text-muted-foreground">
-                Case 0{i + 1}
+              <span className="text-[10px] tracking-[0.12em] text-muted-foreground">
+                מקרה 0{i + 1}
               </span>
             </div>
           </article>

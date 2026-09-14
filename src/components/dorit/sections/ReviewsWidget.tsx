@@ -52,8 +52,8 @@ export default function ReviewsWidget() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
           <div>
-            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-              Verified Reputation
+            <span className="text-[11px] tracking-[0.12em] text-accent">
+              המלצות מאומתות
             </span>
             <h2 className="font-heading text-4xl md:text-5xl mt-4 leading-tight">
               לקוחות ממליצים,
@@ -116,7 +116,7 @@ export default function ReviewsWidget() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <Stars n={t.rating || 0} />
-                  <span className="text-[10px] tracking-[0.25em] uppercase text-muted-foreground">
+                  <span className="text-[10px] tracking-[0.12em] text-muted-foreground">
                     {t.source ? SOURCE_LABEL[t.source] || "לקוח/ה" : "לקוח/ה"}
                   </span>
                 </div>

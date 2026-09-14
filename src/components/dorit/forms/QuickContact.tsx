@@ -34,8 +34,8 @@ export default function QuickContact() {
     <section id="quick-contact" className="relative py-24 md:py-32 bg-secondary/60 text-foreground border-t border-border">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
         <div className="lg:col-span-5">
-          <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            Direct Line
+          <span className="text-[11px] tracking-[0.12em] text-accent">
+            קו ישיר
           </span>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
             השאירו פרטים,

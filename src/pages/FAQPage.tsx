@@ -186,8 +186,8 @@ export default function FAQPage() {
         {/* Hero */}
         <section className="relative max-w-[1400px] mx-auto px-6 md:px-10 pb-12 md:pb-16">
           <Reveal>
-            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-              FAQ · שאלות ותשובות
+            <span className="text-[11px] tracking-[0.12em] text-accent">
+              שאלות ותשובות
             </span>
             <h1 className="font-heading text-5xl md:text-6xl mt-5 leading-tight max-w-3xl">
               שאלות
@@ -211,7 +211,7 @@ export default function FAQPage() {
             {/* Sidebar */}
             <aside className="lg:col-span-4">
               <div className="lg:sticky lg:top-32">
-                <p className="text-[11px] tracking-[0.25em] uppercase text-muted-foreground mb-5">
+                <p className="text-[11px] tracking-[0.12em] text-muted-foreground mb-5">
                   ניווט לפי נושא
                 </p>
                 <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">

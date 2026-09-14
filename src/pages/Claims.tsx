@@ -134,8 +134,8 @@ export default function Claims() {
         {/* Hero */}
         <section className="relative max-w-[1400px] mx-auto px-6 md:px-10 pb-16 md:pb-20">
           <Reveal>
-            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-              Claims Guidance · ליווי תביעות
+            <span className="text-[11px] tracking-[0.12em] text-accent">
+              ליווי תביעות
             </span>
             <h1 className="font-heading text-5xl md:text-6xl mt-5 leading-tight max-w-3xl">
               מה לעשות
@@ -197,8 +197,8 @@ export default function Claims() {
           <div className="max-w-[1400px] mx-auto px-6 md:px-10">
             <Reveal>
               <div className="max-w-2xl mb-14">
-                <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-                  01 · The Process
+                <span className="text-[11px] tracking-[0.12em] text-accent">
+                  01 · התהליך
                 </span>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4">
                   ארבעה צעדים עד לכיסוי
@@ -224,8 +224,8 @@ export default function Claims() {
           <div className="max-w-[1400px] mx-auto px-6 md:px-10">
             <Reveal>
               <div className="max-w-2xl mb-14">
-                <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-                  02 · By Claim Type
+                <span className="text-[11px] tracking-[0.12em] text-accent">
+                  02 · לפי סוג תביעה
                 </span>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4">
                   הנחיות לפי סוג אירוע
@@ -266,7 +266,7 @@ export default function Claims() {
           <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
             <div className="lg:col-span-5">
               <Reveal>
-                <span className="text-[11px] tracking-[0.35em] uppercase text-highlight">
+                <span className="text-[11px] tracking-[0.12em] text-highlight">
                   03 · Checklist
                 </span>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4 leading-tight">
@@ -307,8 +307,8 @@ export default function Claims() {
           <div className="max-w-[1100px] mx-auto px-6 md:px-10">
             <Reveal>
               <div className="max-w-2xl mb-10">
-                <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-                  04 · Report an Event
+                <span className="text-[11px] tracking-[0.12em] text-accent">
+                  04 · דיווח על אירוע
                 </span>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4 leading-tight">
                   דיווח אירוע ביטוחי

@@ -76,10 +76,27 @@
 
   .text-balance { text-wrap: balance; }
 
+  /* The opaque background is the base, and the blur is the enhancement on top
+     of it — not the other way round.
+
+     At 0.72 alone the header is simply 28% transparent, and Hebrew scrolling
+     underneath reads straight through it into the wordmark. That is what every
+     browser without backdrop-filter sees, and there was nothing behind it. */
   .glass {
-    background: rgba(249, 247, 242, 0.72);
+    background: rgba(249, 247, 242, 0.97);
     backdrop-filter: blur(16px) saturate(140%);
     -webkit-backdrop-filter: blur(16px) saturate(140%);
+  }
+
+  /* 0.90, not 0.72, even where the filter is supported.
+     `@supports` answers whether the declaration is understood — not whether it
+     is actually composited. Headless Chromium says yes and then paints no blur,
+     and a browser in a reduced-transparency or low-power mode does the same. At
+     0.72 with no blur behind it, Hebrew reads straight through the wordmark; at
+     0.90 the worst case is a faint ghost, and the blur still does its work on
+     top where it exists. */
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass { background: rgba(249, 247, 242, 0.90); }
   }
 
   .rule-x { border-top: 0.5px solid hsl(var(--border)); }

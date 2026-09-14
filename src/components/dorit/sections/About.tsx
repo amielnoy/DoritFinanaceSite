@@ -50,8 +50,8 @@ export default function About() {
 
         <div className="lg:col-span-7 flex flex-col justify-center">
           <Reveal>
-            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-              01 · Senior Financial Planner
+            <span className="text-[11px] tracking-[0.12em] text-accent">
+              01 · מתכננת פיננסית בכירה
             </span>
             <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
               אני לא סוכנת.

@@ -44,8 +44,8 @@ export default function PensionFeeCalculator() {
     <section id="fee-calculator" className="relative py-24 md:py-32 border-t border-border/60">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
-          <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
-            04 · Transparency Tool
+          <span className="text-[11px] tracking-[0.12em] text-accent">
+            04 · כלי שקיפות
           </span>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
             כמה באמת
