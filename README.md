@@ -65,6 +65,47 @@ where it was.
 > connection is an owner/name pair, and transferring the repo between accounts
 > leaves it pointing at the old path while push webhooks keep arriving.
 
+## Moving production to the custom domain
+
+Today the client-facing site is `safe-arch-plan.base44.app` — Base44 serves both the
+app and the backend. Production is moving to `govari-fin.co.il` on Vercel, which keeps
+Base44 as the backend and is the precondition for the Python migration: the Vercel
+`/api/*` rewrite is what lets a Python service take paths over one at a time, and
+Base44's own host has no equivalent — it answers `405` to any path it does not own.
+
+The repo side is already done and is inert until the last step. `VITE_SITE_URL` sets
+the canonical origin: `src/lib/seo.ts` reads it at runtime, and a build plugin rewrites
+`sitemap.xml`, `robots.txt` and `llms.txt` to match. Unset, the build emits exactly what
+it does today, so nothing moves until you move it.
+
+**Do these in order.** The variable goes last, because a sitemap advertising a host that
+does not resolve is worse than one pointing at the old site.
+
+1. **Point DNS at Vercel.** Add `govari-fin.co.il` and `www.govari-fin.co.il` to the
+   Vercel project, then set the records the dashboard shows at the registrar. Pick one
+   as canonical — `www` or the apex — and let Vercel redirect the other. Wait for both
+   to resolve before continuing.
+2. **Take the production deployment out from behind login.** Vercel → Settings →
+   Deployment Protection. Staging is protected on purpose; production cannot be, or the
+   site is unreachable. Leave preview protection alone.
+3. **Check the site answers on the domain**, including `/api/*`. The rewrite forwards to
+   Base44, so a form submission is the honest test: if a lead arrives, the domain and the
+   backend are talking.
+4. **Set `VITE_SITE_URL`** to the canonical origin in the Vercel project (Production
+   scope). `vercel pull` carries it into the build, and the next deploy moves the
+   canonical tags, the sitemap, robots.txt, llms.txt and the share links together.
+5. **Set the `PRODUCTION_URL` repository variable** to the same origin, and
+   `BASE44_URL` to `https://safe-arch-plan.base44.app`. The smoke test targets
+   `PRODUCTION_URL`, so this is what repoints it; the two were one variable while the
+   two hosts coincided.
+6. **Resubmit the sitemap** in Search Console for the new property, and keep the old
+   one until it stops receiving traffic. Base44 cannot `301` to Vercel — you do not
+   control its routing — so the old URL ages out rather than redirecting.
+
+Base44 keeps being deployed throughout. It still owns auth, the agents, the entity
+store and the connectors; what changes is that the browser reaches it through Vercel
+instead of directly.
+
 ## The agents, and where they stop
 
 Three LLM agents run on the site — `needs_interview`, `booking_assistant` and
