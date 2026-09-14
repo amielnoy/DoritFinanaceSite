@@ -100,6 +100,17 @@ has security  && run_suite "security (static)" npx vitest run tests/security
 
 if has e2e; then
   if [[ -z "${PLAYWRIGHT_BASE_URL:-}" && "${SKIP_BUILD:-}" != "1" ]]; then
+    # The app id has to be set on the *build*, not on the preview server.
+    # Vite inlines `import.meta.env.VITE_BASE44_APP_ID` into the bundle, so a
+    # value handed to `vite preview` arrives after the only moment it could
+    # have been read. playwright.config.ts sets it on its own webServer — which
+    # covers the case where that server runs the build — but this branch builds
+    # first and then sets SKIP_BUILD=1, and used to leave the id unset: every
+    # form in the bundle under test posted to `/api/apps/undefined/...`. The
+    # suite passed anyway, because e2e/fixtures/app.ts stubs `**/api/**` and
+    # never looks at the app id, so the run proved nothing about the one path a
+    # visitor actually takes.
+    export VITE_BASE44_APP_ID="${VITE_BASE44_APP_ID:-e2e-sanity-app}"
     run_suite "build" npm run build
     # Built here; tell the preview server not to build it again.
     export SKIP_BUILD=1

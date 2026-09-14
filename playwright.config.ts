@@ -119,7 +119,22 @@ export default defineConfig({
         timeout: 180_000,
         env: {
           // The stubbed backend keys off this id; it never reaches a real app.
+          //
+          // It matters here only while this command still runs `npm run build`:
+          // Vite inlines `import.meta.env.VITE_BASE44_APP_ID` at build time, so
+          // once SKIP_BUILD=1 the bundle is already sealed and this value has
+          // nothing left to affect. scripts/run-tests.sh, which is what sets
+          // SKIP_BUILD, exports the same default around its own build.
           VITE_BASE44_APP_ID: process.env.VITE_BASE44_APP_ID || "e2e-sanity-app",
+          // Hold the preview server's /api proxy off, whatever the developer's
+          // .env.local says. Setting this variable is how you point a local
+          // preview at the live backend (see the README), and it is the same
+          // variable the Base44 Vite plugin uses for `vite dev` — so it is
+          // exactly the sort of thing that ends up in .env.local and stays
+          // there. This suite is hermetic because e2e/fixtures/app.ts stubs
+          // every /api call; a request that slipped past the fixture has to
+          // 404, not create a real lead and send real email.
+          VITE_BASE44_APP_BASE_URL: "",
         },
       },
 });
