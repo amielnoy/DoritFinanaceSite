@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { services, type Article } from "@/services";
 import { Image } from "@/components/ui/image";
 import {
   Plus,
@@ -15,16 +15,9 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-interface BlogPostItem {
-  id: string;
-  title: string;
-  excerpt?: string;
-  body: string;
-  image_url?: string;
-  tags?: string;
-  published: boolean;
-  created_date: string;
-}
+/* The admin list shows drafts as well as published posts, so it reads through
+   `contentAdmin` rather than the published-only `content` port. */
+type BlogPostItem = Article & { body: string; published: boolean };
 
 interface BlogPostEdit {
   id?: string;
@@ -56,8 +49,7 @@ export default function BlogAdmin() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await base44.entities.BlogPost.list("-created_date", 100);
-      setPosts(data as unknown as BlogPostItem[]);
+      setPosts((await services.contentAdmin.listArticles()) as BlogPostItem[]);
     } catch {
       setPosts([]);
     } finally {
@@ -100,8 +92,7 @@ export default function BlogAdmin() {
     try {
       let image_url = editing.image_url;
       if (file) {
-        const res = await base44.integrations.Core.UploadFile({ file });
-        image_url = res.file_url;
+        ({ url: image_url } = await services.uploads.upload(file));
       }
       const payload = {
         title: editing.title,
@@ -112,9 +103,9 @@ export default function BlogAdmin() {
         image_url,
       };
       if (editing.id) {
-        await base44.entities.BlogPost.update(editing.id, payload);
+        await services.contentAdmin.updateArticle(editing.id, payload);
       } else {
-        await base44.entities.BlogPost.create(payload);
+        await services.contentAdmin.createArticle(payload);
       }
       cancel();
       await load();
@@ -125,12 +116,12 @@ export default function BlogAdmin() {
 
   const remove = async (id: string) => {
     if (!window.confirm("למחוק את המאמר?")) return;
-    await base44.entities.BlogPost.delete(id);
+    await services.contentAdmin.removeArticle(id);
     load();
   };
 
   const togglePublished = async (p: BlogPostItem) => {
-    await base44.entities.BlogPost.update(p.id, { published: !p.published });
+    await services.contentAdmin.updateArticle(p.id, { published: !p.published });
     load();
   };
 
