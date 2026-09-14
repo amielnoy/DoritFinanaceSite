@@ -134,6 +134,18 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Publishing from the Base44 dashboard stays supported, so the build has to
+      # keep working without anything this workflow supplies. CI sets
+      # VITE_BASE44_APP_ID globally and Vercel adds VITE_SITE_URL, which means the
+      # build above proves nothing about the Builder's environment — a step that
+      # started requiring either of them would pass here and fail there, after a
+      # publish, on production.
+      #
+      # `env -u` rather than a separate job: same checkout, a few seconds, and it
+      # fails next to the build it is guarding.
+      - name: Build the way the Base44 Builder does (no CI environment)
+        run: env -u VITE_BASE44_APP_ID -u VITE_SITE_URL -u VERCEL -u CI npm run build
+
       - name: Upload build output
         uses: actions/upload-artifact@v4
         with:

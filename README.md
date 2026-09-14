@@ -131,10 +131,25 @@ Base44 keeps being deployed throughout. It still owns auth, the agents, the enti
 store and the connectors; what changes is that the browser reaches it through Vercel
 instead of directly.
 
-Nothing above touches the Base44 workflow: the GitHub App still syncs the repo into the
-Builder, and publishing from the dashboard still works exactly as it does today. The
-`git.deploymentEnabled` setting in step 0 lives in `vercel.json`, which only Vercel
-reads — Base44 builds from `base44/config.jsonc` and is unaffected by it.
+### Publishing from the Base44 dashboard stays supported
+
+Nothing above takes it away, and that is deliberate rather than incidental. The GitHub
+App still syncs the repo into the Builder, and `base44 dashboard open` → publish works
+exactly as it does today. The `git.deploymentEnabled` setting in step 0 lives in
+`vercel.json`, which only Vercel reads; Base44 builds from `base44/config.jsonc` and is
+unaffected by it.
+
+What could quietly take it away is a build that starts depending on something only CI or
+Vercel provides. CI sets `VITE_BASE44_APP_ID` for the whole workflow and Vercel adds
+`VITE_SITE_URL`, so a green build here says nothing about the Builder's environment —
+the failure would appear after a publish, on production. The build job therefore builds a
+second time with those unset, the way the Builder runs it. If that step goes red, a
+dashboard publish is broken even though everything else is green.
+
+The one thing to remember when publishing from the GUI: the Builder has its own
+environment, so `VITE_SITE_URL` has to be set there too (step 4). Without it that build
+keeps emitting the old canonical, and the copy Base44 serves starts competing with the
+production domain for the same content.
 
 ## The agents, and where they stop
 
