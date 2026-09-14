@@ -6,6 +6,13 @@
 
   "installCommand": "npm i -g npm@12 && npm ci",
 
+  "git": {
+    "deploymentEnabled": {
+      "main": false,
+      "builder": false
+    }
+  },
+
   "rewrites": [
     {
       "source": "/api/:path*",

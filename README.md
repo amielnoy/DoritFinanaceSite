@@ -81,6 +81,21 @@ it does today, so nothing moves until you move it.
 **Do these in order.** The variable goes last, because a sitemap advertising a host that
 does not resolve is worse than one pointing at the old site.
 
+0. **Check that only CI promotes production.** Vercel's Git integration and this
+   workflow both deploy the project, so a push to `main` built it twice and the later
+   one won. That was merely wasteful while Vercel was staging. It is not once the
+   domain points there: the Git integration fires immediately and ignores the test run,
+   so a red push would reach customers while the workflow was still deciding whether to
+   allow it. `vercel.json` now sets `git.deploymentEnabled` to `false` for `main` and
+   `builder` — the two branches CI deploys itself — and leaves it on everywhere else so
+   pull requests keep their previews. Confirm in the Vercel dashboard that a push to
+   `main` produces exactly one deployment, and that it is the one from the workflow.
+
+   This makes CI the only path to production, so its Vercel credentials have to be
+   working: `VERCEL_TOKEN`, `VERCEL_SCOPE` and `VERCEL_PROJECT_NAME`. The job skips with
+   a notice rather than failing when they are missing, which before this change meant a
+   missed staging deploy and afterwards means production silently stops updating.
+
 1. **Point DNS at Vercel.** Add `govari-fin.co.il` and `www.govari-fin.co.il` to the
    Vercel project, then set the records the dashboard shows at the registrar. Pick one
    as canonical — `www` or the apex — and let Vercel redirect the other. Wait for both
