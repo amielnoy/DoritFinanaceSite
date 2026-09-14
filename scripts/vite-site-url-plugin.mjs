@@ -21,16 +21,34 @@ export const HOST_BEARING_ASSETS = ["sitemap.xml", "robots.txt", "llms.txt"];
 
 const trimTrailingSlashes = (value) => value.replace(/\/+$/, "");
 
-export function siteUrl({ env = process.env } = {}) {
+export function siteUrl({ env: override } = {}) {
+  /**
+   * Read the origin from Vite's own resolved env, not from `process.env`.
+   *
+   * `seo.ts` sees `import.meta.env.VITE_SITE_URL`, which Vite assembles from the shell
+   * *and* from `.env` files. `process.env` only has the first of those. Reading it meant
+   * a `.env.production` moved the canonical tag while leaving the sitemap on the old
+   * host — precisely the split this plugin exists to prevent, and invisible because each
+   * half looked right on its own. Taking the value from the same place the application
+   * takes it is what makes them unable to disagree.
+   */
+  let resolved = override;
+  const outDirOf = (config) => config?.build?.outDir ?? "dist";
+  let outDir = "dist";
+
   return {
     name: "site-url",
     apply: "build",
+    configResolved(config) {
+      resolved = override ?? config.env;
+      outDir = outDirOf(config);
+    },
     async closeBundle() {
-      const configured = trimTrailingSlashes(env.VITE_SITE_URL ?? "");
+      const configured = trimTrailingSlashes(resolved?.VITE_SITE_URL ?? "");
       if (!configured || configured === DEFAULT_SITE_URL) return;
 
       for (const asset of HOST_BEARING_ASSETS) {
-        const path = join("dist", asset);
+        const path = join(outDir, asset);
         let contents;
         try {
           contents = await readFile(path, "utf8");

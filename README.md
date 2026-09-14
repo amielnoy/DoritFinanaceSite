@@ -106,9 +106,19 @@ does not resolve is worse than one pointing at the old site.
 3. **Check the site answers on the domain**, including `/api/*`. The rewrite forwards to
    Base44, so a form submission is the honest test: if a lead arrives, the domain and the
    backend are talking.
-4. **Set `VITE_SITE_URL`** to the canonical origin in the Vercel project (Production
-   scope). `vercel pull` carries it into the build, and the next deploy moves the
-   canonical tags, the sitemap, robots.txt, llms.txt and the share links together.
+4. **Set `VITE_SITE_URL`** to the canonical origin — in **both** builders.
+
+   In the Vercel project (Production scope): `vercel pull` carries it into the build.
+   In Base44's app settings too, and this half is easy to forget. Base44 keeps serving a
+   complete copy of the site at `safe-arch-plan.base44.app` after the move; if that copy
+   still declares itself canonical, it competes with the real site for the same content.
+   Given the variable it declares the production domain instead, which is what tells a
+   search engine the two are one site.
+
+   Either way the next build moves the canonical tags, the sitemap, robots.txt,
+   llms.txt and the share links together — Vite resolves the variable from the shell or
+   from a `.env` file, and the build plugin reads the same resolved value the
+   application does, so the two cannot disagree.
 5. **Set the `PRODUCTION_URL` repository variable** to the same origin, and
    `BASE44_URL` to `https://safe-arch-plan.base44.app`. The smoke test targets
    `PRODUCTION_URL`, so this is what repoints it; the two were one variable while the
@@ -120,6 +130,11 @@ does not resolve is worse than one pointing at the old site.
 Base44 keeps being deployed throughout. It still owns auth, the agents, the entity
 store and the connectors; what changes is that the browser reaches it through Vercel
 instead of directly.
+
+Nothing above touches the Base44 workflow: the GitHub App still syncs the repo into the
+Builder, and publishing from the dashboard still works exactly as it does today. The
+`git.deploymentEnabled` setting in step 0 lives in `vercel.json`, which only Vercel
+reads — Base44 builds from `base44/config.jsonc` and is unaffected by it.
 
 ## The agents, and where they stop
 

@@ -84,3 +84,26 @@ describe("the canonical host has a single source", () => {
     expect(apiRewrite.destination).toContain("base44.app");
   });
 });
+
+describe("the build plugin reads the same env the application does", () => {
+  it("takes the origin from Vite's resolved env, not from process.env", async () => {
+    /* Regression guard. Reading `process.env` looked right and passed when the variable
+       came from the shell, but Vite also assembles `import.meta.env` from `.env` files —
+       which `process.env` never sees. A `.env.production` therefore moved the canonical
+       tag in seo.ts and left the sitemap on the old host: two halves that each looked
+       correct alone. The plugin must read what the application reads. */
+    const source = readFileSync(join(REPO_ROOT, "scripts/vite-site-url-plugin.mjs"), "utf8");
+    expect(source).toContain("configResolved");
+    expect(source).not.toMatch(/env\s*=\s*process\.env/);
+  });
+
+  it("rewrites the origin wherever the build actually emits", async () => {
+    const { siteUrl } = await import("../../scripts/vite-site-url-plugin.mjs");
+    const plugin = siteUrl({ env: { VITE_SITE_URL: "https://example.test" } });
+    expect(plugin.apply).toBe("build");
+    // outDir is read from the resolved config rather than assumed to be `dist`.
+    expect(readFileSync(join(REPO_ROOT, "scripts/vite-site-url-plugin.mjs"), "utf8")).toContain(
+      "build?.outDir"
+    );
+  });
+});
