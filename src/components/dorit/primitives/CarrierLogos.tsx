@@ -14,11 +14,14 @@ const CARRIERS: Carrier[] = [
   // visitor following a carrier logo wants to read about the company, not be
   // asked to sign in to an account they may not have.
   { he: "הראל", en: "Harel", url: "https://www.harel-group.co.il" },
-  { he: "מנורה מבטחים", en: "Menora Mivtachim", url: "https://www.menoramivtachim.co.il" },
+  // menoramivt.co.il, not menoramivtachim.co.il — the long spelling has no
+  // A record at all. menora.co.il redirects here too.
+  { he: "מנורה מבטחים", en: "Menora Mivtachim", url: "https://www.menoramivt.co.il" },
   // fnx.co.il, not phoenix.co.il — the latter does not resolve at all.
   { he: "הפניקס", en: "The Phoenix", url: "https://www.fnx.co.il" },
   { he: "עמיתים", en: "Amitim", url: "https://www.amitim.com" },
-  { he: "איילון", en: "Ayalon", url: "https://www.ayalon.co.il" },
+  // ayalon-ins.co.il, not ayalon.co.il — the short form does not resolve.
+  { he: "איילון", en: "Ayalon", url: "https://www.ayalon-ins.co.il" },
   { he: "AIG", en: "AIG", url: "https://www.aig.co.il" },
 ];
 
