@@ -1,6 +1,7 @@
 import base44 from "@base44/vite-plugin"
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { siteUrl } from './scripts/vite-site-url-plugin.mjs'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,5 +16,8 @@ export default defineConfig({
       visualEditAgent: true
     }),
     react(),
+    // Rewrites the canonical host in sitemap.xml, robots.txt and llms.txt when
+    // VITE_SITE_URL names a different origin. See the plugin for why.
+    siteUrl(),
   ]
 });

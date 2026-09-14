@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { MessageCircle, Linkedin, Link2, Check } from "lucide-react";
+import { SITE_URL } from "@/lib/seo";
 
 const SHARE_TEXT =
   "ממליצים בחום על דורית גוב ארי — ייעוץ פיננסי וביטוחי אישי, מקצועי ואנושי. מומלץ ביותר.";
-const SHARE_URL = "https://safe-arch-plan.base44.app";
+/* The canonical origin, not a second copy of it. A share link that outlived a host
+   change would send every recommendation to the old site. */
+const SHARE_URL = SITE_URL;
 
 export default function QuickShare() {
   const [copied, setCopied] = useState<boolean>(false);
