@@ -93,11 +93,19 @@ describe("dependency inversion holds", () => {
     (f) => rel(f).startsWith("src/components/") || rel(f).startsWith("src/pages/")
   );
 
-  /** Admin and auth screens still talk to the SDK directly — a known boundary. */
+  /**
+   * Auth screens still talk to the SDK directly — the remaining known boundary.
+   *
+   * The admin screens used to be on this list too. They came off it when the ports
+   * grew an owner-only surface (`leadsAdmin`, `contentAdmin`), which is what lets them
+   * be tested against a fake instead of a mocked vendor module.
+   *
+   * What is left is auth, and it is all of what is left: identity is the one thing the
+   * application still takes from Base44 rather than from an interface of its own. These
+   * four cannot come off until that question is answered, so a name added back to this
+   * list should be an auth screen or a mistake.
+   */
   const ALLOWED_DIRECT_SDK = [
-    "src/components/dorit/sections/Testimonials.tsx",
-    "src/pages/BlogAdmin.tsx",
-    "src/pages/Leads.tsx",
     "src/pages/Login.tsx",
     "src/pages/Register.tsx",
     "src/pages/ForgotPassword.tsx",
@@ -238,7 +246,10 @@ describe("BlogPost writes match the BlogPost entity", () => {
   });
 
   it("publish toggles only flip declared fields", () => {
-    const updates = findObjectLiteralCalls(/base44\.entities\.BlogPost\.update\([^,]+,\s*/);
+    /* The literal is authored at the port call now that the admin screens go through
+       `contentAdmin` instead of the SDK. That is also the better place to check it: the
+       component is what decides the fields, and the adapter only forwards them. */
+    const updates = findObjectLiteralCalls(/services\.contentAdmin\.updateArticle\([^,]+,\s*/);
     expect(updates.length).toBeGreaterThan(0);
     for (const call of updates) {
       for (const key of call.keys) {
@@ -263,7 +274,7 @@ describe("BlogPost writes match the BlogPost entity", () => {
 
 describe("Testimonial.create payloads match the Testimonial entity", () => {
   const testimonial = loadEntity("Testimonial");
-  const calls = findObjectLiteralCalls(/base44\.entities\.Testimonial\.create\(\s*/);
+  const calls = findObjectLiteralCalls(/services\.contentAdmin\.createTestimonial\(\s*/);
 
   it("sends only declared fields and both required ones", () => {
     expect(calls.length).toBeGreaterThan(0);

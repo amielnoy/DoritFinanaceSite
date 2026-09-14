@@ -1,20 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { services, type Testimonial } from "@/services";
 import { useAuth } from "@/lib/AuthContext";
 import { Image } from "@/components/ui/image";
 import { Plus, X, Quote, Trash2, Loader2, Upload } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Stars from "@/components/dorit/primitives/Stars";
 
-interface TestimonialItem {
-  id: string;
-  name: string;
-  role?: string;
-  quote: string;
-  image_url?: string;
-  rating?: number;
-  source?: string;
-}
+type TestimonialItem = Testimonial;
 
 interface TestimonialForm {
   name: string;
@@ -38,8 +30,7 @@ export default function Testimonials() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await base44.entities.Testimonial.list("-created_date", 50);
-      setItems(data as unknown as TestimonialItem[]);
+      setItems(await services.content.listTestimonials());
     } catch {
       setItems([]);
     } finally {
@@ -71,16 +62,15 @@ export default function Testimonials() {
     try {
       let image_url = form.image_url;
       if (file) {
-        const res = await base44.integrations.Core.UploadFile({ file });
-        image_url = res.file_url;
+        ({ url: image_url } = await services.uploads.upload(file));
       }
-      await base44.entities.Testimonial.create({
+      await services.contentAdmin.createTestimonial({
         name: form.name,
         role: form.role,
         quote: form.quote,
         image_url,
-        rating: Number(form.rating) || 5,
-        source: form.source || "google",
+        rating: form.rating,
+        source: form.source,
       });
       reset();
       await load();
@@ -90,7 +80,7 @@ export default function Testimonials() {
   };
 
   const remove = async (id: string) => {
-    await base44.entities.Testimonial.delete(id);
+    await services.contentAdmin.removeTestimonial(id);
     load();
   };
 

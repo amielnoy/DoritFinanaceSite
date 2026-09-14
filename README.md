@@ -65,6 +65,92 @@ where it was.
 > connection is an owner/name pair, and transferring the repo between accounts
 > leaves it pointing at the old path while push webhooks keep arriving.
 
+## Moving production to the custom domain
+
+Today the client-facing site is `safe-arch-plan.base44.app` — Base44 serves both the
+app and the backend. Production is moving to `govari-fin.co.il` on Vercel, which keeps
+Base44 as the backend and is the precondition for the Python migration: the Vercel
+`/api/*` rewrite is what lets a Python service take paths over one at a time, and
+Base44's own host has no equivalent — it answers `405` to any path it does not own.
+
+The repo side is already done and is inert until the last step. `VITE_SITE_URL` sets
+the canonical origin: `src/lib/seo.ts` reads it at runtime, and a build plugin rewrites
+`sitemap.xml`, `robots.txt` and `llms.txt` to match. Unset, the build emits exactly what
+it does today, so nothing moves until you move it.
+
+**Do these in order.** The variable goes last, because a sitemap advertising a host that
+does not resolve is worse than one pointing at the old site.
+
+0. **Check that only CI promotes production.** Vercel's Git integration and this
+   workflow both deploy the project, so a push to `main` built it twice and the later
+   one won. That was merely wasteful while Vercel was staging. It is not once the
+   domain points there: the Git integration fires immediately and ignores the test run,
+   so a red push would reach customers while the workflow was still deciding whether to
+   allow it. `vercel.json` now sets `git.deploymentEnabled` to `false` for `main` and
+   `builder` — the two branches CI deploys itself — and leaves it on everywhere else so
+   pull requests keep their previews. Confirm in the Vercel dashboard that a push to
+   `main` produces exactly one deployment, and that it is the one from the workflow.
+
+   This makes CI the only path to production, so its Vercel credentials have to be
+   working: `VERCEL_TOKEN`, `VERCEL_SCOPE` and `VERCEL_PROJECT_NAME`. The job skips with
+   a notice rather than failing when they are missing, which before this change meant a
+   missed staging deploy and afterwards means production silently stops updating.
+
+1. **Point DNS at Vercel.** Add `govari-fin.co.il` and `www.govari-fin.co.il` to the
+   Vercel project, then set the records the dashboard shows at the registrar. Pick one
+   as canonical — `www` or the apex — and let Vercel redirect the other. Wait for both
+   to resolve before continuing.
+2. **Take the production deployment out from behind login.** Vercel → Settings →
+   Deployment Protection. Staging is protected on purpose; production cannot be, or the
+   site is unreachable. Leave preview protection alone.
+3. **Check the site answers on the domain**, including `/api/*`. The rewrite forwards to
+   Base44, so a form submission is the honest test: if a lead arrives, the domain and the
+   backend are talking.
+4. **Set `VITE_SITE_URL`** to the canonical origin — in **both** builders.
+
+   In the Vercel project (Production scope): `vercel pull` carries it into the build.
+   In Base44's app settings too, and this half is easy to forget. Base44 keeps serving a
+   complete copy of the site at `safe-arch-plan.base44.app` after the move; if that copy
+   still declares itself canonical, it competes with the real site for the same content.
+   Given the variable it declares the production domain instead, which is what tells a
+   search engine the two are one site.
+
+   Either way the next build moves the canonical tags, the sitemap, robots.txt,
+   llms.txt and the share links together — Vite resolves the variable from the shell or
+   from a `.env` file, and the build plugin reads the same resolved value the
+   application does, so the two cannot disagree.
+5. **Set the `PRODUCTION_URL` repository variable** to the same origin, and
+   `BASE44_URL` to `https://safe-arch-plan.base44.app`. The smoke test targets
+   `PRODUCTION_URL`, so this is what repoints it; the two were one variable while the
+   two hosts coincided.
+6. **Resubmit the sitemap** in Search Console for the new property, and keep the old
+   one until it stops receiving traffic. Base44 cannot `301` to Vercel — you do not
+   control its routing — so the old URL ages out rather than redirecting.
+
+Base44 keeps being deployed throughout. It still owns auth, the agents, the entity
+store and the connectors; what changes is that the browser reaches it through Vercel
+instead of directly.
+
+### Publishing from the Base44 dashboard stays supported
+
+Nothing above takes it away, and that is deliberate rather than incidental. The GitHub
+App still syncs the repo into the Builder, and `base44 dashboard open` → publish works
+exactly as it does today. The `git.deploymentEnabled` setting in step 0 lives in
+`vercel.json`, which only Vercel reads; Base44 builds from `base44/config.jsonc` and is
+unaffected by it.
+
+What could quietly take it away is a build that starts depending on something only CI or
+Vercel provides. CI sets `VITE_BASE44_APP_ID` for the whole workflow and Vercel adds
+`VITE_SITE_URL`, so a green build here says nothing about the Builder's environment —
+the failure would appear after a publish, on production. The build job therefore builds a
+second time with those unset, the way the Builder runs it. If that step goes red, a
+dashboard publish is broken even though everything else is green.
+
+The one thing to remember when publishing from the GUI: the Builder has its own
+environment, so `VITE_SITE_URL` has to be set there too (step 4). Without it that build
+keeps emitting the old canonical, and the copy Base44 serves starts competing with the
+production domain for the same content.
+
 ## The agents, and where they stop
 
 Three LLM agents run on the site — `needs_interview`, `booking_assistant` and

@@ -134,6 +134,18 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Publishing from the Base44 dashboard stays supported, so the build has to
+      # keep working without anything this workflow supplies. CI sets
+      # VITE_BASE44_APP_ID globally and Vercel adds VITE_SITE_URL, which means the
+      # build above proves nothing about the Builder's environment — a step that
+      # started requiring either of them would pass here and fail there, after a
+      # publish, on production.
+      #
+      # `env -u` rather than a separate job: same checkout, a few seconds, and it
+      # fails next to the build it is guarding.
+      - name: Build the way the Base44 Builder does (no CI environment)
+        run: env -u VITE_BASE44_APP_ID -u VITE_SITE_URL -u VERCEL -u CI npm run build
+
       - name: Upload build output
         uses: actions/upload-artifact@v4
         with:
@@ -516,11 +528,23 @@ jobs:
             || { echo "::error::Deployment did not serve the Hebrew RTL document"; exit 1; }
 
   # ── 6. Post-deploy smoke test against the live site ──────────────────────
+  #
+  # Waits on both publishes and smokes whatever `PRODUCTION_URL` names, rather
+  # than assuming which host is the client-facing one. That assumption is about
+  # to change: production moves from Base44 to Vercel with the custom domain, and
+  # a smoke wired to one publisher would either stop running or keep testing the
+  # host nobody visits any more. This way the cutover is a variable, not an edit.
+  #
+  # Either publish succeeding is enough to be worth smoking — if Base44 published
+  # and Vercel failed, the live site still changed.
   smoke:
     name: Production smoke test
     runs-on: ubuntu-latest
-    needs: deploy
-    if: ${{ needs.deploy.result == 'success' && vars.PRODUCTION_URL != '' }}
+    needs: [deploy, deploy-vercel]
+    if: >-
+      !cancelled() &&
+      vars.PRODUCTION_URL != '' &&
+      (needs.deploy.result == 'success' || needs['deploy-vercel'].result == 'success')
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -570,7 +594,11 @@ jobs:
     steps:
       - name: Write the site links to the run summary
         env:
-          BASE44_URL: ${{ vars.PRODUCTION_URL }}
+          # Where the Base44 app lives, which stops being the same thing as where
+          # customers go the moment the custom domain points at Vercel. They were one
+          # variable until now because the two happened to coincide.
+          BASE44_URL: ${{ vars.BASE44_URL }}
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
           VERCEL_URL: ${{ needs.deploy-vercel.outputs.url }}
           VERCEL_RESULT: ${{ needs.deploy-vercel.result }}
           BASE44_RESULT: ${{ needs.deploy.result }}
@@ -619,8 +647,14 @@ jobs:
             echo
             echo "| Environment | URL | This run |"
             echo "| --- | --- | --- |"
-            echo "| **Base44 — production** (client-facing) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | ${base44_state} |"
-            echo "| **Vercel — staging** (login-protected) | ${vercel_link} | ${vercel_state} |"
+            echo "| **Base44** (app, backend functions, auth) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | ${base44_state} |"
+            echo "| **Vercel** (the built site) | ${vercel_link} | ${vercel_state} |"
+            # Named rather than asserted. Which of the two above is client-facing is a
+            # deployment decision that is in the middle of changing, and a hardcoded
+            # label would have gone stale silently at exactly the wrong moment.
+            if [ -n "$PRODUCTION_URL" ]; then
+              echo "| **Production** (client-facing) | ${PRODUCTION_URL} | smoke-tested after every publish |"
+            fi
             if [ -n "$ALLURE_URL" ]; then
               echo "| **Allure — test report** (Cloudflare, behind Access) | ${ALLURE_URL} | deployed this run |"
             elif [ "$ALLURE_RESULT" = "success" ]; then

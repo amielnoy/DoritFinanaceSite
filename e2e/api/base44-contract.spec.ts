@@ -222,12 +222,46 @@ test.describe("Live Base44 backend (opt-in)", () => {
   test("leads are NOT readable without an admin session (RLS)", async ({ playwright }) => {
     const api = await playwright.request.newContext({ baseURL: LIVE_URL });
 
-    await test_step("an anonymous read of Lead is refused", async () => {
-      const res = await api.get(`/api/apps/${LIVE_APP_ID}/entities/Lead`);
+    /**
+     * Base44 protects these two entities by different mechanisms, and the test has to
+     * accept both or it fails against a backend that is behaving correctly:
+     *
+     *   User  → 401, the request itself is refused
+     *   Lead  → 200 with `[]`, the request is served and the rows are filtered away
+     *
+     * The property worth asserting is the one a leaked lead would violate — that no
+     * record comes back — not the transport shape of the refusal. Asserting 401/403
+     * alone failed against production while zero lead data was in fact exposed.
+     *
+     * An empty list is only evidence of filtering if the endpoint returns rows when it
+     * is allowed to, so a public entity is read first as a control. Without it, a
+     * backend that answered `[]` to everything would pass this test.
+     */
+    await test_step("a public entity returns rows, so an empty list means filtering", async () => {
+      const control = await api.get(`/api/apps/${LIVE_APP_ID}/entities/BlogPost`, {
+        params: { q: JSON.stringify({ published: true }), limit: 5 },
+      });
+      expect(control.status()).toBe(200);
       expect(
-        [401, 403].includes(res.status()),
-        `anonymous read of Lead returned ${res.status()} — RLS may be open`
-      ).toBe(true);
+        (await control.json()).length,
+        "no published posts came back — the control proves nothing, so the Lead check below is not trustworthy"
+      ).toBeGreaterThan(0);
+    });
+
+    await test_step("an anonymous read of Lead yields no lead", async () => {
+      const res = await api.get(`/api/apps/${LIVE_APP_ID}/entities/Lead`);
+      if ([401, 403].includes(res.status())) return;
+
+      expect(
+        res.status(),
+        `anonymous read of Lead returned ${res.status()} — expected a refusal or a filtered 200`
+      ).toBe(200);
+      const rows = await res.json();
+      expect(Array.isArray(rows)).toBe(true);
+      expect(
+        rows.length,
+        `anonymous read of Lead returned ${rows.length} records — RLS is open`
+      ).toBe(0);
     });
 
     await api.dispose();

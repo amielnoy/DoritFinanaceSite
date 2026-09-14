@@ -1,23 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { services, type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
 import { Link } from "react-router-dom";
 import { Loader2, Download, Trash2, ArrowRight } from "lucide-react";
 
-type LeadStatus = "new" | "contacted" | "closed";
-type LeadSource = "consultation" | "detailed" | "quick" | "claim";
-
-interface LeadItem {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  source: LeadSource;
-  topic?: string;
-  timing?: string;
-  message?: string;
-  status: LeadStatus;
-  created_date: string;
-}
+type LeadItem = LeadRecord;
 
 const STATUS: LeadStatus[] = ["new", "contacted", "closed"];
 const STATUS_LABEL: Record<LeadStatus, string> = {
@@ -30,11 +16,15 @@ const STATUS_COLOR: Record<LeadStatus, string> = {
   contacted: "bg-accent/15 text-accent",
   closed: "bg-muted text-muted-foreground",
 };
+/* Every value the Lead entity's `source` enum can hold. `escalation` was missing
+   while this screen kept its own narrower copy of the type, so a lead handed over
+   by an agent rendered with its raw English key. */
 const SOURCE_LABEL: Record<LeadSource, string> = {
   consultation: "בנאי ייעוץ",
   detailed: "טופס מפורט",
   quick: "פנייה מהירה",
   claim: "דיווח תביעה",
+  escalation: "העברה לטיפול אנושי",
 };
 
 function csvEscape(v: unknown): string {
@@ -51,8 +41,7 @@ export default function Leads() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await base44.entities.Lead.list("-created_date", 500);
-      setLeads((data as unknown as LeadItem[]) || []);
+      setLeads(await services.leadsAdmin.list());
     } catch {
       setLeads([]);
     } finally {
@@ -93,7 +82,7 @@ export default function Leads() {
   const updateStatus = async (id: string, status: LeadStatus) => {
     setBusy(true);
     try {
-      await base44.entities.Lead.update(id, { status });
+      await services.leadsAdmin.setStatus(id, status);
       setLeads((ls) => (ls || []).map((l) => (l.id === id ? { ...l, status } : l)));
     } catch {
       /* ignore */
@@ -106,7 +95,7 @@ export default function Leads() {
     if (!window.confirm("למחוק את הפנייה?")) return;
     setBusy(true);
     try {
-      await base44.entities.Lead.delete(id);
+      await services.leadsAdmin.remove(id);
       setLeads((ls) => (ls || []).filter((l) => l.id !== id));
     } catch {
       /* ignore */

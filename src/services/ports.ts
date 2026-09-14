@@ -157,3 +157,76 @@ export interface SupportPort {
 export interface UploadPort {
   upload(file: File): Promise<{ url: string }>;
 }
+/* ─────────────────────────────────────────────────────────────────────────
+ * Admin surface
+ *
+ * The ports above describe what a *visitor* can do: submit an enquiry, read
+ * published content. These describe what the site owner can do once signed in,
+ * and they are deliberately separate interfaces rather than extra methods on
+ * the public ones — `ContentPort.listArticles` must stay incapable of returning
+ * a draft, and nothing a public page can reach should be able to delete a lead.
+ *
+ * Segregating them is also what makes the admin screens testable against a fake
+ * instead of a mocked vendor module, which is the reason they were the last
+ * three files still importing the SDK directly.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+export type LeadStatus = "new" | "contacted" | "closed";
+
+/** A lead as stored, which is not the shape that was submitted: the store adds
+ *  an id, a received timestamp and a status the owner moves through. */
+export interface LeadRecord {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  source: LeadSource;
+  topic?: string;
+  timing?: string;
+  message?: string;
+  status: LeadStatus;
+  created_date: string;
+}
+
+/** Managing received enquiries. Every method here touches personal data. */
+export interface LeadAdminPort {
+  list(limit?: number): Promise<LeadRecord[]>;
+  setStatus(id: string, status: LeadStatus): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+export interface ArticleDraft {
+  title: string;
+  excerpt?: string;
+  body: string;
+  image_url?: string;
+  tags?: string;
+  published: boolean;
+}
+
+export interface TestimonialDraft {
+  name: string;
+  role?: string;
+  quote: string;
+  image_url?: string;
+  rating?: number;
+  source?: string;
+}
+
+/**
+ * Managing content, published or not.
+ *
+ * `listArticles` here returns drafts as well, which is exactly what
+ * `ContentPort.listArticles` must never do — the same verb on two ports
+ * answering to two different audiences.
+ */
+export interface ContentAdminPort {
+  listArticles(limit?: number): Promise<Article[]>;
+  createArticle(draft: ArticleDraft): Promise<void>;
+  updateArticle(id: string, draft: Partial<ArticleDraft>): Promise<void>;
+  removeArticle(id: string): Promise<void>;
+
+  listTestimonials(limit?: number): Promise<Testimonial[]>;
+  createTestimonial(draft: TestimonialDraft): Promise<void>;
+  removeTestimonial(id: string): Promise<void>;
+}
