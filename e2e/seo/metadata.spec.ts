@@ -213,12 +213,47 @@ test.describe("Structured data", () => {
   });
 
   test("FAQPage markup appears only where the questions are rendered", async ({ page }) => {
-    await test_step("the home page claims FAQPage and displays the questions", async () => {
+    // The home page used to declare FAQPage for six pension questions that only
+    // /faq renders — it displayed a list of tips instead. Two URLs claiming the
+    // same FAQ, one of them without the answers on it, is the A-6 defect again.
+    await test_step("the home page claims no FAQ it does not display", async () => {
       await gotoApp(page);
       await expect
         .poll(async () => (await head.jsonLd(page)).map((b) => b["@type"]))
+        .not.toContain("FAQPage");
+    });
+
+    await test_step("every question and answer the markup declares is in the HTML", async () => {
+      await gotoApp(page, "/faq");
+      const declared = (await head.jsonLd(page)).find((b) => b["@type"] === "FAQPage") as
+        | { mainEntity?: Array<{ name: string; acceptedAnswer?: { text?: string } }> }
+        | undefined;
+      expect(declared?.mainEntity?.length, "FAQPage declares no questions").toBeGreaterThan(5);
+
+      // Present, not visible. Google's FAQ guidance allows hidden content and
+      // requires present content — unmounted is absent, which was the defect:
+      // the page rendered one category and dropped the rest. Radix keeps a
+      // collapsed answer mounted, so the accordion itself was never the
+      // problem; this asserts the property rather than the mechanism, and will
+      // fail if a future Radix starts unmounting it. Read off the markup, so
+      // the two can never disagree.
+      const html = await page.content();
+      for (const item of declared!.mainEntity!) {
+        expect(html, `question not in the HTML: ${item.name}`).toContain(item.name);
+        const answer = item.acceptedAnswer?.text ?? "";
+        expect(html, `answer not in the HTML: ${item.name}`).toContain(answer.slice(0, 40));
+      }
+    });
+
+    await test_step("/faq claims it, and renders the questions", async () => {
+      await gotoApp(page, "/faq");
+      await expect
+        .poll(async () => (await head.jsonLd(page)).map((b) => b["@type"]))
         .toContain("FAQPage");
-      await expect(page.locator("#faq")).toHaveCount(1);
+      // A question from the default category. The page renders one category at
+      // a time and unmounts the rest, so most of what the markup declares is
+      // not in the DOM until a tab is clicked — see 10-known-issues B.
+      await expect(page.getByText("כיצד תכנון מס נכון חוסך")).toBeVisible();
     });
 
     for (const path of ["/privacy", "/blog", "/accessibility"]) {
@@ -309,7 +344,7 @@ test.describe("Crawl directives", () => {
     });
 
     await test_step("every public route is listed", async () => {
-      for (const expected of ["/", "/blog", "/claims", "/privacy", "/accessibility"]) {
+      for (const expected of ["/", "/blog", "/claims", "/faq", "/tools", "/perspective", "/privacy", "/accessibility"]) {
         expect(paths, `sitemap is missing ${expected}`).toContain(expected);
       }
     });

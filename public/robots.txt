@@ -10,4 +10,49 @@ Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /oauth/
 
+# AI assistants and their crawlers are allowed, deliberately.
+#
+# These are stated rather than left to the wildcard above for two reasons: the
+# wildcard's meaning for AI training is contested, and an explicit rule is what
+# a person auditing this file needs to see. Most of these crawlers do not run
+# JavaScript, and this is a client-rendered app — so /llms.txt, not the rendered
+# page, is what they can actually read. See the note at the end of that file.
+#
+# To opt out of AI training while staying answerable in AI search, disallow
+# GPTBot, ClaudeBot, Google-Extended and Applebot-Extended, and keep
+# OAI-SearchBot, ChatGPT-User, Claude-User, Claude-SearchBot and PerplexityBot.
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
 Sitemap: https://safe-arch-plan.base44.app/sitemap.xml

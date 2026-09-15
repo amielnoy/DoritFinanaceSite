@@ -119,6 +119,28 @@
       gtag('js', new Date());
       gtag('config', 'G-LLSYPMGV58');
     </script>
+
+    <!-- WebSite, stated statically.
+         Every route serves this file, and the crawlers that do not run
+         JavaScript never see the per-page JSON-LD that `useSeo` writes at
+         runtime. What is in this head is therefore the whole of what they get,
+         so the site-level entity belongs here rather than in a component. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "דורית גוב ארי — סוכנות ביטוח בע״מ",
+      "url": "https://safe-arch-plan.base44.app/",
+      "inLanguage": "he-IL",
+      "publisher": {
+        "@type": "FinancialService",
+        "name": "דורית גוב ארי — סוכנות ביטוח בע״מ",
+        "telephone": "+972508311776",
+        "email": "dorit@govari-fin.co.il"
+      }
+    }
+    </script>
+
   </head>
   <body>
     <div id="root"></div>
