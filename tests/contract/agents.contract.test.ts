@@ -64,8 +64,12 @@ const MANDATORY_CLAUSES: Array<[label: string, needle: string]> = [
 ];
 
 describe("on-site agent definitions", () => {
-  it("ships exactly the three agents the frontend renders", () => {
-    expect(agentNames).toEqual(["blog_recommender", "booking_assistant", "needs_interview"]);
+  it("ships exactly the agents the frontend renders", () => {
+    // Two, where there were three. `booking_assistant` was merged into
+    // `needs_interview`: booking a first meeting was never a separate errand
+    // from being interviewed for one, and the visitor met a second chat that
+    // asked for their name again after answering six questions.
+    expect(agentNames).toEqual(["blog_recommender", "needs_interview"]);
   });
 
   for (const name of agentNames) {
@@ -309,6 +313,45 @@ describe("who receives a lead, and whether the consent text admits it", () => {
 
 
 
+  /**
+   * One team, spelled the same in three files.
+   *
+   * `NOTIFY_EMAILS` is the fourth thing Base44's isolated entry points force us
+   * to duplicate, alongside `redact`, `escapeHtml` and `SHEET_COLUMNS`. It is
+   * the one whose drift is hardest to see: a mailbox added to `submitLead` and
+   * not to `escalateToHuman` produces no error anywhere — enquiries arrive, and
+   * escalations, the messages that matter most, quietly reach one fewer person.
+   */
+  it("keeps the operations mailbox list identical in every function that mails", () => {
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    const listOf = (src: string, name: string) => {
+      const i = src.indexOf("const NOTIFY_EMAILS = [");
+      expect(i, `${name} declares no NOTIFY_EMAILS`).toBeGreaterThan(-1);
+      return src.slice(i, src.indexOf("];", i)).replace(/\s+/g, " ").trim();
+    };
+    const lists = [
+      listOf(submitLead, "submitLead"),
+      listOf(escalate, "escalateToHuman"),
+      listOf(claim, "submitClaim"),
+    ];
+    expect(lists[1], "escalateToHuman drifted from submitLead").toBe(lists[0]);
+    expect(lists[2], "submitClaim drifted from submitLead").toBe(lists[0]);
+    // And it is a list rather than a single address that happens to parse.
+    expect(lists[0].match(/"[^"]+@[^"]+"/g) ?? []).not.toHaveLength(0);
+  });
+
+  it("gives every mailbox its own delivery attempt", () => {
+    // One `try` around the whole loop would let the first bounce swallow the
+    // rest of the list. The catch has to be inside the loop, in each function.
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    for (const [name, src] of [["submitLead", submitLead], ["submitClaim", claim]] as const) {
+      const i = src.indexOf("for (const to of NOTIFY_EMAILS)");
+      expect(i, `${name} does not loop the mailbox list`).toBeGreaterThan(-1);
+      const loop = src.slice(i, i + 700);
+      expect(loop, `${name} catches outside the loop`).toMatch(/try \{[\s\S]*?catch \(e\) \{/);
+    }
+  });
+
   it("keeps the two copies of redact() identical", () => {
     // Base44 functions are isolated entry points with no shared module, so the
     // helper is duplicated. Duplicated is fine; drifted is not.
@@ -316,12 +359,16 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(norm(submitLead)).toBe(norm(escalate));
   });
 
-  it("has the booking agent compose a summary and hand it to submitLead", () => {
-    const booking = loadAgent("booking_assistant").instructions;
-    expect(booking).toMatch(/summary/);
-    expect(booking).toMatch(/תקציר/);
-    // And the same data-minimisation rule the rest of the layer runs on.
-    expect(booking).toMatch(/אל תכלול ת"ז, מספרי חשבון או פוליסה/);
+  it("has the interview agent close the booking it used to hand off", () => {
+    // The merge has to be real in the prompt, not only in the page: the agent
+    // that collects the context is the one that agrees the meeting, and there
+    // is no second agent left to send anyone to.
+    const interview = loadAgent("needs_interview").instructions;
+    expect(interview).toMatch(/תיאום הפגישה/);
+    expect(interview).toMatch(/meetingTopic/);
+    expect(interview).toMatch(/scheduledAt/);
+    expect(interview).toMatch(/createConsultationEvent/);
+    expect(interview).toMatch(/אל תפנה את המבקר לצ׳אט אחר/);
   });
 
   /**

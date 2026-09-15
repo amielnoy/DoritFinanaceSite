@@ -82,47 +82,12 @@ test.describe("Base44 API contract (observed traffic)", () => {
     });
   });
 
-  test("invokes the consultation function on the documented path and shape", async ({ page, mockApi }) => {
-    const wizard = page.locator("#consultation");
-
-    await test_step("book a consultation through the wizard", async () => {
-      await gotoApp(page);
-      await wizard.scrollIntoViewIfNeeded();
-      await wizard.getByRole("button", { name: "גמל, השתלמות ופנסיה", exact: true }).click();
-      await wizard.getByRole("button", { name: "המשך" }).click();
-      await wizard.getByRole("button", { name: "השבוע", exact: true }).click();
-      await wizard.getByRole("button", { name: "המשך" }).click();
-      await wizard.getByLabel("שם מלא").fill("ישראלה ישראלי");
-      await wizard.getByLabel("טלפון").fill("050-1234567");
-      await wizard.getByRole("button", { name: "שליחת בקשה" }).click();
-    });
-
-    const req = await test_step("capture the backend function call", () =>
-      mockApi.waitForRequest("/functions/createConsultationEvent")
-    );
-
-    await test_step("it is a POST on the documented function path", async () => {
-      expect(req.method).toBe("POST");
-      expect(req.path).toMatch(/^\/api\/apps\/[^/]+\/functions\/createConsultationEvent$/);
-    });
-
-    await test_step("its payload carries exactly the documented fields", async () => {
-      const body = req.body as Record<string, string>;
-      expect(body.name).toBeTruthy();
-      expect(body.phone).toBeTruthy();
-      // scheduledAt carries the exact slot the wizard's time picker produced; it
-      // is "" when the visitor only chose a rough timing.
-      expect(Object.keys(body).sort()).toEqual([
-        "email",
-        "name",
-        "notes",
-        "phone",
-        "scheduledAt",
-        "timing",
-        "topic",
-      ]);
-    });
-  });
+  // The consultation wizard that drove `createConsultationEvent` from the
+  // browser is gone — it was one of five ways the home page asked for the same
+  // name and phone number. The function is still called, but now by the
+  // interview agent at the end of its scheduling step, which is server-side and
+  // therefore covered by `tests/contract/consultation-function.contract.test.ts`
+  // and the agent prompt contract rather than by a browser flow.
 
   test("every API call is same-origin and relative to /api", async ({ page, mockApi }) => {
     const form = page.locator("#quick-contact");

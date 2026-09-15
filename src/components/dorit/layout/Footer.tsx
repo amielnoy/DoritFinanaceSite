@@ -63,7 +63,9 @@ export default function Footer() {
               { l: "שאלות ותשובות", h: "/faq", route: true },
               { l: "תיקי הצלחה", h: "#proof" },
               { l: "בלוג", h: "/blog", route: true },
-              { l: "קביעת ייעוץ", h: "#consultation" },
+              { l: "כלים", h: "/tools", route: true },
+              { l: "נקודת מבט", h: "/perspective", route: true },
+              { l: "לשיחה קצרה עם דורית", h: "#start" },
             ] as FooterLink[]).map((n) => (
               <li key={n.h}>
                 {n.route ? (

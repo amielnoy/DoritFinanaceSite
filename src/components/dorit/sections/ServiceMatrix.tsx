@@ -59,7 +59,7 @@ export default function ServiceMatrix() {
           <div>
             <Reveal>
               <span className="text-[11px] tracking-[0.12em] text-accent">
-                03 · תחומי הליווי
+                02 · תחומי הליווי
               </span>
               <h2 className="font-heading text-5xl md:text-6xl mt-4 max-w-xl">
                 חמישה עמודי חיים

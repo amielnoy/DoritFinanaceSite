@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Loader2, RotateCcw, Send, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { AnimatePresence, motion } from "framer-motion";
@@ -30,6 +31,15 @@ export interface AgentDescriptor {
   greeting: string;
   conversationName: string;
   conversationDescription: string;
+  /**
+   * The mark in the panel header.
+   *
+   * Every agent used to render the same "ד", which said the one thing the
+   * header must not: that these are דורית. They are separate automated
+   * helpers, and a reader who tells them apart at a glance is a reader who
+   * knows which one they are talking to.
+   */
+  icon: LucideIcon;
   /**
    * One line stating what this agent is and where it stops. Rendered beside the
    * chat, not inside it, so a visitor reads it before typing rather than after.
@@ -66,7 +76,21 @@ const LIMIT_COPY: Record<string, string> = {
  * notice, and the route to a human is a button that is present from the first
  * frame — not something that depends on the model choosing to offer it.
  */
-export default function AgentChat({ descriptor }: { descriptor: AgentDescriptor }) {
+export default function AgentChat({
+  descriptor,
+  embedded = false,
+}: {
+  descriptor: AgentDescriptor;
+  /**
+   * Render the chat panel alone, at full width, with no section around it.
+   *
+   * The split layout puts the heading in a column beside the chat, which is
+   * right when the agent *is* the section. On the home page's "נתחיל בשיחה
+   * קצרה" the section owns the heading and carries other ways to make contact
+   * beneath it, so the chat takes the width of the page and nothing else.
+   */
+  embedded?: boolean;
+}) {
   const [consentAt, setConsentAt] = useState<string | null>(null);
   const [consentChecked, setConsentChecked] = useState<boolean>(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -183,64 +207,16 @@ export default function AgentChat({ descriptor }: { descriptor: AgentDescriptor 
   const [line1, line2] = descriptor.heading.split(/<br\s*\/?>/);
   const started = consentAt !== null;
 
-  return (
-    <section id={descriptor.sectionId} className={descriptor.sectionClassName}>
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
-        <div className="lg:col-span-5 flex flex-col justify-center">
-          <span className="text-[11px] tracking-[0.12em] text-accent">
-            {descriptor.eyebrow}
-          </span>
-          <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
-            {line1?.trim()}
-            {line2 ? (
-              <>
-                <br />
-                {line2.trim()}
-              </>
-            ) : null}
-          </h2>
-          <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">{descriptor.blurb}</p>
-          <div className="mt-8 flex items-start gap-3 text-sm text-foreground/60">
-            <Sparkles size={18} className="text-highlight mt-0.5 shrink-0" />
-            <p className="leading-relaxed">{descriptor.note}</p>
-          </div>
+  const Icon = descriptor.icon;
 
-          {descriptor.tagline ? (
-            <p className="mt-8 border-r-2 border-accent pr-4 font-heading text-[17px] leading-relaxed text-foreground/85">
-              {descriptor.tagline}
-            </p>
-          ) : null}
-
-          {descriptor.guardrails ? (
-            <div className="mt-6 border border-border/60 bg-secondary/30 px-5 py-5">
-              <p className="text-[11px] tracking-[0.12em] text-accent">כללי הגדר</p>
-              <dl className="mt-4 space-y-3.5 text-[13.5px] leading-relaxed">
-                <div>
-                  <dt className="text-foreground/50">מה הוא עושה</dt>
-                  <dd className="text-foreground/80">
-                    {descriptor.guardrails.allowed.join(" · ")}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-foreground/50">מה הוא לא עושה</dt>
-                  <dd className="text-foreground/80">
-                    {descriptor.guardrails.forbidden.join(" · ")}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-foreground/50">מתי עובר לאדם</dt>
-                  <dd className="text-foreground/80">{descriptor.guardrails.handoff}</dd>
-                </div>
-              </dl>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="lg:col-span-7 bg-card border border-border/60 flex flex-col h-[560px]">
+  // The chat itself. Rendered alone when embedded, or beside the heading
+  // column below when the agent is the whole section.
+  const panel = (
+    <div className={`${embedded ? "w-full" : "lg:col-span-7"} bg-card border border-border/60 flex flex-col h-[560px]`}>
           <div className="flex items-center justify-between px-6 py-4 border-b border-border/60 gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="w-9 h-9 flex items-center justify-center border border-accent/40 font-heading text-base text-accent shrink-0">
-                ד
+              <span className="w-9 h-9 flex items-center justify-center border border-accent/40 text-accent shrink-0">
+                <Icon size={18} aria-hidden="true" />
               </span>
               <div className="leading-tight min-w-0">
                 <p className="font-heading text-base font-bold truncate">{descriptor.panelTitle}</p>
@@ -408,6 +384,64 @@ export default function AgentChat({ descriptor }: { descriptor: AgentDescriptor 
             </p>
           </div>
         </div>
+  );
+
+  if (embedded) return panel;
+
+  return (
+    <section id={descriptor.sectionId} className={descriptor.sectionClassName}>
+      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+        <div className="lg:col-span-5 flex flex-col justify-center">
+          <span className="text-[11px] tracking-[0.12em] text-accent">
+            {descriptor.eyebrow}
+          </span>
+          <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
+            {line1?.trim()}
+            {line2 ? (
+              <>
+                <br />
+                {line2.trim()}
+              </>
+            ) : null}
+          </h2>
+          <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">{descriptor.blurb}</p>
+          <div className="mt-8 flex items-start gap-3 text-sm text-foreground/60">
+            <Sparkles size={18} className="text-highlight mt-0.5 shrink-0" />
+            <p className="leading-relaxed">{descriptor.note}</p>
+          </div>
+
+          {descriptor.tagline ? (
+            <p className="mt-8 border-r-2 border-accent pr-4 font-heading text-[17px] leading-relaxed text-foreground/85">
+              {descriptor.tagline}
+            </p>
+          ) : null}
+
+          {descriptor.guardrails ? (
+            <div className="mt-6 border border-border/60 bg-secondary/30 px-5 py-5">
+              <p className="text-[11px] tracking-[0.12em] text-accent">כללי הגדר</p>
+              <dl className="mt-4 space-y-3.5 text-[13.5px] leading-relaxed">
+                <div>
+                  <dt className="text-foreground/50">מה הוא עושה</dt>
+                  <dd className="text-foreground/80">
+                    {descriptor.guardrails.allowed.join(" · ")}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-foreground/50">מה הוא לא עושה</dt>
+                  <dd className="text-foreground/80">
+                    {descriptor.guardrails.forbidden.join(" · ")}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-foreground/50">מתי עובר לאדם</dt>
+                  <dd className="text-foreground/80">{descriptor.guardrails.handoff}</dd>
+                </div>
+              </dl>
+            </div>
+          ) : null}
+        </div>
+
+        {panel}
       </div>
     </section>
   );

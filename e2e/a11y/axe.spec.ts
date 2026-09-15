@@ -125,7 +125,7 @@ test.describe("Accessibility — axe (WCAG 2.1 AA)", () => {
       await gotoApp(page);
     });
 
-    for (const section of ["#quick-contact", "#detailed-contact", "#fee-calculator", "#consultation"]) {
+    for (const section of ["#start", "#quick-contact"]) {
       await test_step(`scan ${section} on its own`, async () => {
         await page.locator(section).scrollIntoViewIfNeeded();
         const { violations } = await scan(page, { include: section });
@@ -151,7 +151,7 @@ test.describe("Accessibility — structural sanity", () => {
   test("every form control has an accessible name", async ({ page }) => {
     await test_step("open the home page and scroll through its forms", async () => {
       await gotoApp(page);
-      await page.locator("#detailed-contact").scrollIntoViewIfNeeded();
+      await page.locator("#quick-contact").scrollIntoViewIfNeeded();
     });
 
     await test_step("no input, select or textarea is left unlabelled", async () => {

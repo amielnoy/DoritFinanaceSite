@@ -185,7 +185,7 @@ test.describe("Routing — sanity", () => {
       ["שאלות ותשובות", /\/faq$/],
       ["תיקי הצלחה", /\/#proof$/],
       ["בלוג", /\/blog$/],
-      ["קביעת ייעוץ", /\/#consultation$/],
+      ["לשיחה קצרה עם דורית", /\/#start$/],
     ];
 
     for (const [label, url] of EXPECTED) {
@@ -200,7 +200,7 @@ test.describe("Routing — sanity", () => {
   test("navigating between routes scrolls back to the top", async ({ page }) => {
     await test_step("open the home page and scroll down to the contact form", async () => {
       await gotoApp(page);
-      await page.locator("#detailed-contact").scrollIntoViewIfNeeded();
+      await page.locator("#common-questions").scrollIntoViewIfNeeded();
       expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     });
 

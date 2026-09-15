@@ -13,7 +13,7 @@ const field = (page: import("@playwright/test").Page, label: string) =>
 /** Every case starts the same way: land on the home page, scroll to the tool. */
 const openCalculator = (page: import("@playwright/test").Page) =>
   test_step("open the home page and scroll to the fee calculator", async () => {
-    await gotoApp(page);
+    await gotoApp(page, "/tools");
     await page.locator("#fee-calculator").scrollIntoViewIfNeeded();
   });
 
@@ -114,11 +114,11 @@ test.describe("Pension fee calculator — sanity", () => {
 
   test("its CTA points at the contact form", async ({ page }) => {
     await test_step("open the home page", async () => {
-      await gotoApp(page);
+      await gotoApp(page, "/tools");
     });
 
     await test_step("the calculator's CTA leads to the quick contact form", async () => {
-      const cta = page.locator('#fee-calculator a[href="#quick-contact"]');
+      const cta = page.locator('#fee-calculator a[href="/#start"]');
       await expect(cta).toBeVisible();
     });
   });

@@ -47,7 +47,7 @@ describe("adapter → submitLead", () => {
   // `track` and `profile` are the interview's fixed schema, which no form on the
   // site collects. The test below keeps this list honest by requiring the
   // function to actually destructure every name in it.
-  const AGENT_ONLY = ["summary", "track", "profile"];
+  const AGENT_ONLY = ["summary", "track", "profile", "stage", "meetingTopic"];
 
   it("exactly one adapter owns the call", () => {
     // Previously three components each built this payload by hand. The contract

@@ -22,7 +22,18 @@ const STATS: Stat[] = [
   { num: "1:1", label: "ליווי אישי" },
 ];
 
-export default function About() {
+/**
+ * `brief` keeps the first paragraph and the numbers, and drops the career
+ * history and the closing note.
+ *
+ * On the home page this section sits between the hero and the services, where
+ * its job is to establish who she is in one breath before the reader moves on.
+ * Four paragraphs of biography is the right depth on a page someone chose to
+ * open about her — `/perspective` — and the wrong depth here, where it pushes
+ * the actual conversation below a second screenful.
+ */
+export default function About({ variant = "full" }: { variant?: "full" | "brief" }) {
+  const brief = variant === "brief";
   return (
     <section id="about" className="relative py-24 md:py-32 border-y border-border/50">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
@@ -68,29 +79,31 @@ export default function About() {
               30 שנה בתחומי הפיננסים והביטוח, בעלת רישיון פנסיוני ותואר אקדמאי
               במדעי ההתנהגות, ניהול וכלכלה.
             </p>
-            <p>
+            {brief ? null : <p>
               עבדתי שנים ארוכות כמתכננת פיננסית וביטוח עצמאית, 12 שנים בבנק
               מזרחי טפחות כיועצת פנסיונית, ותקופה ארוכה כמתכננת פנסיה ומיסוי
               במרכז לתכנון כלכלי מתקדם בחברת הראל. בשנים האחרונות אני עובדת
               כמתכננת פיננסית בכירה עם התמחות בהיבטי המיסוי השונים, בשיתוף עם
               חברת ארבע עונות — בין חברות התכנון הפיננסי הגדולות בארץ.
-            </p>
-            <p>
+            </p>}
+            {brief ? null : <p>
               במהלך השנים הבנתי כמה דברים בתחום הפנסיוני: הבלבול, תחושת חוסר
               האונים מול קופות הגמל, ההשתלמות והמוצרים הפנסיוניים השונים, וחוסר
               הידע של האנשים מביא לטעויות משמעותיות דווקא בקשר לכספים הגדולים
               והמשמעותיים ביותר שלהם. הלקוחות זקוקים לפתרונות מותאמים לצרכים
               האישיים שלהם ושל בן/בת הזוג.
-            </p>
-            <p>
+            </p>}
+            {brief ? null : <p>
               מה שמייחד אותי כאשת מקצוע: שילוב בין מקצועיות וניסיון רבים מאד,
               אכפתיות ויושר אמיתיים כלפי הלקוחות, הסברים בגובה העיניים המובנים
               לכולם בתחום המורכב הזה — ובעיקר אנושיות, יחס חם וחיוך תמיד.
-            </p>
+            </p>}
           </div>
-          <p className="mt-6 font-heading italic text-2xl text-accent">
-            — דורית
-          </p>
+          {brief ? null : (
+            <p className="mt-6 font-heading italic text-2xl text-accent">
+              — דורית
+            </p>
+          )}
 
           <div className="mt-12 grid grid-cols-3 gap-px bg-border/50 border border-border/50">
             {STATS.map((s, i) => (

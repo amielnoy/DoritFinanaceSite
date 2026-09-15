@@ -25,11 +25,11 @@ test.describe("Mobile web (iOS + Android)", () => {
 
     await test_step("the sticky bar offers a call and a consultation link", async () => {
       const stickyCall = stickyBar(page).getByRole("link", { name: /חייגו עכשיו/ });
-      const stickyBook = stickyBar(page).getByRole("link", { name: /קביעת ייעוץ/ });
+      const stickyBook = stickyBar(page).getByRole("link", { name: /לשיחה קצרה עם דורית/ });
       await expect(stickyCall).toBeVisible();
       await expect(stickyBook).toBeVisible();
       await expect(stickyCall).toHaveAttribute("href", "tel:+972508311776");
-      await expect(stickyBook).toHaveAttribute("href", "#consultation");
+      await expect(stickyBook).toHaveAttribute("href", "#start");
     });
 
     await test_step("the desktop floating dock is hidden below md", async () => {
@@ -107,7 +107,7 @@ test.describe("Mobile web (iOS + Android)", () => {
     await test_step("every primary control is big enough to hit with a thumb", async () => {
       const targets = [
         stickyBar(page).getByRole("link", { name: /חייגו עכשיו/ }),
-        stickyBar(page).getByRole("link", { name: /קביעת ייעוץ/ }),
+        stickyBar(page).getByRole("link", { name: /לשיחה קצרה עם דורית/ }),
         page.getByRole("button", { name: "תפריט" }),
       ];
 
@@ -159,8 +159,8 @@ test.describe("Mobile web (iOS + Android)", () => {
   test("the calculator is usable on a narrow screen", async ({ page }) => {
     const section = page.locator("#fee-calculator");
 
-    await test_step("open the home page and scroll to the fee calculator", async () => {
-      await gotoApp(page);
+    await test_step("open the tools page and scroll to the fee calculator", async () => {
+      await gotoApp(page, "/tools");
       await section.scrollIntoViewIfNeeded();
     });
 

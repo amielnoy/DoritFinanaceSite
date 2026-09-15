@@ -10,7 +10,7 @@ import { expect, gotoApp, test, test_step } from "../fixtures/app";
  * are testable — and this is where they are tested.
  */
 
-const INTERVIEW = "#interview";
+const INTERVIEW = "#start";
 
 test.describe("Agent chat — regulatory shell", () => {
   test("a visitor cannot type before accepting the consent notice", async ({ page, mockApi }) => {
@@ -78,7 +78,7 @@ test.describe("Agent chat — regulatory shell", () => {
 
   test("a standing disclaimer sits under every message box", async ({ page }) => {
     await gotoApp(page, "/");
-    for (const id of ["#interview", "#booking-assistant", "#blog-recommender"]) {
+    for (const id of ["#start"]) {
       await expect(
         page.locator(id).getByText(/אינו ייעוץ, שיווק פנסיוני או המלצה אישית/)
       ).toBeVisible();
@@ -104,7 +104,9 @@ test.describe("Agent chat — regulatory shell", () => {
 
     await test_step("the visitor is given direct channels either way", async () => {
       await expect(section.getByRole("link", { name: /050-831-1776/ })).toBeVisible();
-      await expect(section.getByRole("link", { name: "וואטסאפ" })).toBeVisible();
+      // Exact: the section also carries an "עדיף לי בוואטסאפ" alternative, and
+      // Playwright matches accessible names by substring unless told otherwise.
+      await expect(section.getByRole("link", { name: "וואטסאפ", exact: true })).toBeVisible();
     });
   });
 });

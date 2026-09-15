@@ -45,7 +45,7 @@ export default function PensionFeeCalculator() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
           <span className="text-[11px] tracking-[0.12em] text-accent">
-            04 · כלי שקיפות
+            כלי שקיפות
           </span>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
             כמה באמת
@@ -147,7 +147,7 @@ export default function PensionFeeCalculator() {
           </div>
 
           <a
-            href="#quick-contact"
+            href="/#start"
             className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-highlight-muted text-primary font-medium hover:bg-highlight-strong transition-colors duration-300 shadow-sm"
           >
             רוצים לדעת אם אפשר לחסוך? שאלו אותי

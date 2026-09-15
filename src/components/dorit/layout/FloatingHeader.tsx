@@ -28,6 +28,8 @@ interface NavItem {
 const NAV: NavItem[] = [
   { label: "אודות", href: "#about" },
   { label: "שירותים", href: "#services" },
+  { label: "נקודת מבט", href: "/perspective", route: true },
+  { label: "כלים", href: "/tools", route: true },
   { label: "תביעות", href: "/claims", route: true },
   { label: "בלוג", href: "/blog", route: true },
 ];
@@ -120,11 +122,11 @@ export default function FloatingHeader() {
 
         <div className="flex items-center gap-2.5">
           <a
-            href="/#consultation"
-            onClick={(e) => goToSection(e, "#consultation")}
+            href="/#start"
+            onClick={(e) => goToSection(e, "#start")}
             className="hidden md:inline-flex items-center px-5 py-2.5 bg-highlight-muted text-primary text-[13px] font-medium tracking-wide hover:bg-highlight-strong transition-colors duration-300"
           >
-            לקביעת פגישת ייעוץ
+            לשיחה קצרה עם דורית
           </a>
           {/* Desktop only. On a phone the sticky bar at the bottom of every
               screen already offers חיוג עכשיו, at thumb height and always in
@@ -207,12 +209,12 @@ export default function FloatingHeader() {
 
               <div className="px-6 py-5 border-t border-border/60 space-y-3">
                 <a
-                  href="/#consultation"
-                  onClick={(e) => goToSection(e, "#consultation")}
+                  href="/#start"
+                  onClick={(e) => goToSection(e, "#start")}
                   className="flex items-center justify-center gap-2 w-full py-3.5 bg-highlight text-primary font-medium"
                 >
                   <Calendar size={18} />
-                  לקביעת פגישת ייעוץ
+                  לשיחה קצרה עם דורית
                 </a>
                 <div className="grid grid-cols-2 gap-3">
                   <a
