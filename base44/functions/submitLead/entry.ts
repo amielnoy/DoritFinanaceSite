@@ -243,6 +243,7 @@ function completenessLine({ answered, total, unknown }) {
   return unknown ? `${base} · ${unknown} מהם לא ידועים למבקר` : base;
 }
 
+/** סדר השדות של מסלול, כולל המשותפים. מסלול לא מוכר מקבל את המשותפים בלבד. */
 
 function interviewFields(track) {
   const chosen = INTERVIEW_TRACKS[track];
@@ -305,6 +306,8 @@ function buildAgentBody(source, data) {
     lines.push(``, `הודעה אישית:`, data.message || '—');
   } else if (source === 'interview') {
     lines.push(`מסלול: ${data.trackLabel || '—'}`);
+    lines.push(`נושא הפגישה: ${data.topic || '—'}`);
+    lines.push(`מועד מבוקש: ${data.timing || 'לפי תיאום'}`);
 
     lines.push(`נושא הפגישה: ${data.topic || '—'}`);
     lines.push(`מועד מבוקש: ${data.timing || 'לפי תיאום'}`);
@@ -697,9 +700,9 @@ export default async function(req) {
       profile: safeProfile, trackLabel, completeness,
 
     const data = {
-      name, phone, email, topic, timing,
+      name, phone, email, topic: effectiveTopic, timing,
       message: safeMessage, notes, summary: safeSummary,
-      profile: safeProfile, trackLabel,
+      profile: safeProfile, trackLabel, completeness,
     };
     const agentBody = buildAgentBody(source, data);
     const subject = subjectFor(source, data);
