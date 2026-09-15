@@ -1,7 +1,11 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SITE_URL, HOST_BEARING_ASSETS } from "../../scripts/vite-site-url-plugin.mjs";
+import {
+  ASSET_SOURCES,
+  DEFAULT_SITE_URL,
+  HOST_BEARING_ASSETS,
+} from "../../scripts/vite-site-url-plugin.mjs";
 
 /**
  * One origin, written in one place.
@@ -39,13 +43,34 @@ describe("the canonical host has a single source", () => {
     expect(read("src/lib/seo.ts")).toContain(DEFAULT_SITE_URL);
   });
 
+  /** The checked-in file behind an emitted one. Everything unlisted is in `public/`. */
+  const sourceOf = (asset: string): string =>
+    (ASSET_SOURCES as Record<string, string>)[asset] ?? join("public", asset);
+
   it("rewrites every static file that spells the origin out", () => {
     for (const asset of HOST_BEARING_ASSETS) {
-      const contents = read(join("public", asset));
-      expect(contents, `public/${asset} no longer mentions the canonical host`).toContain(
+      const source = sourceOf(asset);
+      expect(read(source), `${source} no longer mentions the canonical host`).toContain(
         DEFAULT_SITE_URL
       );
     }
+  });
+
+  it("covers the document a crawler is actually served", () => {
+    // index.html was the omission that made the rest of this file a false
+    // comfort: the sitemap moved hosts and the served HTML did not, in the
+    // canonical tag, og:url and two static JSON-LD blocks. `applySeo` patches
+    // the first two in the browser, which is exactly the audience that did not
+    // need it — a link scraper reads the response body, and clearRouteScoped
+    // only removes `script[data-seo-jsonld]`, so the JSON-LD never moved at all.
+    expect(HOST_BEARING_ASSETS).toContain("index.html");
+    const html = read("index.html");
+    expect(html).toMatch(new RegExp(`rel="canonical" href="${DEFAULT_SITE_URL}`));
+    expect(html).toMatch(new RegExp(`og:url" content="${DEFAULT_SITE_URL}`));
+    expect(
+      html.split(`"url": "${DEFAULT_SITE_URL}`).length - 1,
+      "the JSON-LD blocks no longer name the default host",
+    ).toBeGreaterThan(0);
   });
 
   it("leaves no public asset naming the host that the build does not rewrite", () => {

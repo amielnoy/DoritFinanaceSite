@@ -57,6 +57,34 @@ describe("the CI workflow is internally consistent", () => {
     }
   });
 
+  it("never lets a build that strips the environment write the tested artifact", () => {
+    // The build job runs `npm run build` twice: once properly, and once with
+    // `env -u VITE_BASE44_APP_ID …` to prove the build still works in the
+    // Builder's bare environment. The guard used to write over `dist/`, and the
+    // upload below it then shipped *that* bundle as the `dist` artifact — the
+    // one every e2e shard downloads. Vite inlines the app id at build time, so
+    // the whole suite ran against a bundle posting to `/api/apps/undefined/…`,
+    // and stayed green because e2e/fixtures/app.ts stubs `**/api/**`.
+    //
+    // A guard for a build must not be able to become the build.
+    for (const [name, job] of jobs) {
+      const uploadsDist = stepsOf(job).some(
+        (s) => (s.uses ?? "").includes("upload-artifact") && s.with?.path === "dist",
+      );
+      if (!uploadsDist) continue;
+
+      for (const step of stepsOf(job)) {
+        const run = (step as { run?: string }).run ?? "";
+        if (!/env -u [A-Z_ -]*VITE_BASE44_APP_ID/.test(run)) continue;
+        expect(
+          run,
+          `${name} → "${step.name}" strips the environment into the default outDir, ` +
+            "which is the artifact the e2e shards test — give it its own --outDir",
+        ).toMatch(/--outDir\s+\S+/);
+      }
+    }
+  });
+
   it("runs every Vitest suite that exists on disk", () => {
     // A new directory under tests/ is easy to add and easy to forget to wire
     // in, and a suite CI never runs is worse than no suite: it reads as
