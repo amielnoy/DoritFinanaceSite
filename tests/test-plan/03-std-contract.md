@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 219
+**Location:** `tests/contract/` · **Cases:** 223
 
 ---
 
@@ -51,7 +51,7 @@ Two helpers do the work:
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-LED-001 | "finds every Lead.create call site" | Exactly 3: `QuickContact`, `DetailedContactForm`, `ConsultationBuilder` |
+| CTR-LED-001 | "finds every Lead.create call site" | None in the browser — the three backend functions own every write |
 | CTR-LED-002..010 | Per call site (×3): sends only declared fields; sends `name` and `phone`; uses enum-legal `source`/`status` literals | All pass |
 | CTR-LED-011 | "covers all three declared lead sources across the site" | `{quick, detailed, consultation}` = the entity's `source` enum |
 | CTR-LED-012 | "validates a representative payload from each form end to end" | Zero validation issues for all three |
@@ -69,7 +69,7 @@ Two helpers do the work:
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-FN-001 | "is invoked from the consultation builder" | One call site, in `ConsultationBuilder.tsx` |
+| CTR-FN-001 | "is invoked from the interview agent" | Called server-side at the end of the scheduling step; the browser wizard that used to call it is deleted |
 | CTR-FN-002 | "the client sends exactly the fields the function reads" | Client keys ≡ the function's destructured body fields |
 | CTR-FN-003 | "the function's mandatory fields are the same as the Lead entity's" | Guard is on `name` and `phone`, matching `Lead.required` |
 | CTR-FN-004 | "returns 400 with an error message when name or phone is missing" | A 400 `Response.json({error})` exists |
@@ -105,7 +105,29 @@ the fence published beside the interview agent matches what the prompt actually
 forbids. A page that claims the agent gives no figures while the prompt has
 stopped saying so is a false statement to a visitor, and fails here.
 
-One block covers how the interview agent *ends*. A finished interview has to
+Three blocks cover the interview agent specifically.
+
+The first is the **schema**, which exists in two places and has to agree in
+both: `INTERVIEW_TRACKS` in `submitLead` decides what is rendered and stored,
+the prompt decides what is asked. The test parses the track table out of the
+function and fails if a track or a field is never named in the prompt — drift
+there fails silently in the direction that shows least, with the agent
+collecting answers the function drops on the floor. A second case pins the
+declaration that the interview collects rather than advises, in the prompt and
+in the mail; a third pins that the health question stays a flag and never grows
+back into asking what the condition is, with the `Lead` entity checked for a
+place to put one.
+
+The **operations mailbox list** is the fourth thing Base44's isolated entry
+points force us to duplicate, alongside `redact`, `escapeHtml` and
+`SHEET_COLUMNS`, and the one whose drift is hardest to see: a mailbox added to
+`submitLead` and not to `escalateToHuman` produces no error anywhere —
+enquiries arrive, and escalations, the messages that matter most, quietly reach
+one fewer person. One case pins the three copies byte-identical; another pins
+that each mailbox gets its own `try`, since one wrapped around the whole loop
+would let the first bounce swallow the rest.
+
+A last block covers how the interview agent *ends*. A finished interview has to
 reach a person, and a bare `Lead.create` reaches nobody — it stores the summary
 and sends no mail, so it waits for whoever next opens the leads screen. The
 block pins that the agent is wired to `submitLead` and not to the `Lead` entity,
@@ -113,6 +135,22 @@ that it calls it with the source the function knows how to lay out, that the
 prompt says in so many words not to write the record directly, that it carries
 the same data-minimisation rule as the booking agent, and that it does not
 confirm a save that failed.
+
+**`ai-surface.contract.test.ts` — `CTR-AI-001..014`** — what an AI assistant can
+read. The app is client-rendered, so a crawler that does not execute JavaScript
+receives the home page's `<head>` on every route; `public/llms.txt` is therefore
+the only surface such a crawler reads in full, and the one nothing was checking.
+It had drifted to a phone number and an email that do not reach her — a static
+file in `public/` is invisible to the type-checker and to every other suite. The
+block derives the expected contact details from `src/config/contact.js`, fails
+on any other address or number in the file, and pins the disclosures an
+assistant would summarise: the licence number, the affiliation, that the
+automated helpers collect rather than advise, and that nothing promises a
+return. It also pins that `llms.txt` links every route the sitemap advertises —
+the two drift in opposite directions, because a new page reaches the sitemap
+when an SEO test asks for it and is forgotten here because nothing does — and
+that `robots.txt` names each AI crawler explicitly rather than leaving them to
+the wildcard.
 
 **`blog-content.contract.test.ts` — `CTR-ART-001..013`** — the repo-held articles under
 `content/blog/`. Each must parse, be a real article rather than a stub, carry
