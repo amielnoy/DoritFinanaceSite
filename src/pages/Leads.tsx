@@ -5,11 +5,21 @@ import { Loader2, Download, Trash2, ArrowRight } from "lucide-react";
 
 type LeadItem = LeadRecord;
 
+/* The statuses an admin may set. `escalated` and `partial` are written by the
+   backend and are not offered here — an admin moves such a lead on to
+   "contacted" or "closed" rather than back into them. */
 const STATUS: LeadStatus[] = ["new", "contacted", "closed"];
 const STATUS_LABEL: Record<LeadStatus, string> = {
   new: "חדשה",
   contacted: "טופלה",
   closed: "נסגרה",
+};
+/* Display labels for every status the entity can hold, settable or not. Without
+   the backend-written ones a lead rendered with its raw English key. */
+const ANY_STATUS_LABEL: Record<string, string> = {
+  ...STATUS_LABEL,
+  escalated: "הועברה לטיפול אישי",
+  partial: "ראיון שלא הושלם",
 };
 const STATUS_COLOR: Record<LeadStatus, string> = {
   new: "bg-highlight/15 text-[#8a6f54]",
@@ -67,7 +77,7 @@ export default function Leads() {
       SOURCE_LABEL[l.source] || l.source || "",
       l.topic || "",
       l.timing || "",
-      STATUS_LABEL[l.status] || l.status || "",
+      ANY_STATUS_LABEL[l.status] || l.status || "",
       l.message || "",
     ]);
     const csv = [headers, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
@@ -241,7 +251,7 @@ export default function Leads() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2.5 py-1 text-xs ${STATUS_COLOR[l.status] || ""}`}>
-                        {STATUS_LABEL[l.status] || l.status}
+                        {ANY_STATUS_LABEL[l.status] || l.status}
                       </span>
                     </td>
                     <td className="px-4 py-3">

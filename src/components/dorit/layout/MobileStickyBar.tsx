@@ -14,11 +14,11 @@ export default function MobileStickyBar() {
           חייגו עכשיו
         </a>
         <a
-          href="#consultation"
+          href="#start"
           className="flex items-center justify-center gap-2 py-3.5 text-sm font-medium bg-highlight text-primary"
         >
           <Calendar size={18} />
-          קביעת ייעוץ
+          לשיחה קצרה עם דורית
         </a>
       </div>
     </div>

@@ -18,6 +18,7 @@
     "test:component": "vitest run tests/component",
     "test:contract": "vitest run tests/contract",
     "test:integration": "vitest run tests/integration",
+    "test:eval": "vitest run tests/eval",
     "test:security": "vitest run tests/security",
     "test:vitest": "vitest run",
     "test:watch": "vitest",

@@ -10,7 +10,7 @@ interface QuickContactForm {
   message: string;
 }
 
-export default function QuickContact() {
+export default function QuickContact({ embedded = false }: { embedded?: boolean }) {
   const [form, setForm] = useState<QuickContactForm>({ name: "", phone: "", email: "", message: "" });
   const { sending: busy, sent, error, submit, reset } = useSubmission("message");
 
@@ -30,38 +30,13 @@ export default function QuickContact() {
     if (ok) setForm({ name: "", phone: "", email: "", message: "" });
   };
 
-  return (
-    <section id="quick-contact" className="relative py-24 md:py-32 bg-secondary/60 text-foreground border-t border-border">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-        <div className="lg:col-span-5">
-          <span className="text-[11px] tracking-[0.12em] text-accent">
-            קו ישיר
-          </span>
-          <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
-            השאירו פרטים,
-            <br />
-            אחזור אליכם היום
-          </h2>
-          <p className="mt-8 text-muted-foreground max-w-md leading-relaxed">
-            שלוש שדות בלבד — וההודעה מגיעה ישירות לתיבת הדוא״ל שלי. אחזור אליכם
-            אישית ובמהירות האפשרית.
-          </p>
-          <div className="mt-8 flex items-center gap-3 text-muted-foreground">
-            <Mail size={16} className="text-accent" />
-            <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="hover:text-accent transition-colors">dorit@govari-fin.co.il</a>
-          </div>
-          <a
-            href="https://wa.me/972508311776"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center gap-3 text-muted-foreground hover:text-accent transition-colors"
-          >
-            <MessageCircle size={16} className="text-accent" />
-            <span dir="ltr">WhatsApp</span>
-          </a>
-        </div>
-
-        <div className="lg:col-span-7">
+  // The form itself. On the home page it sits inside "נתחיל בשיחה קצרה" as
+  // the secondary card, so it renders alone and at full width.
+  const formCard = (
+    // The id travels with the form. Embedded on the home page the <section>
+    // below is not rendered, and #quick-contact is what the anchor links, the
+    // accessibility scans and the form tests all address.
+    <div id={embedded ? "quick-contact" : undefined} className={embedded ? "w-full" : "lg:col-span-7"}>
           {sent ? (
             <div className="bg-card border border-border p-10 text-center">
               <div className="w-14 h-14 mx-auto rounded-full border border-highlight flex items-center justify-center mb-6">
@@ -140,6 +115,41 @@ export default function QuickContact() {
             </div>
           )}
         </div>
+  );
+
+  if (embedded) return formCard;
+
+  return (
+    <section id="quick-contact" className="relative py-24 md:py-32 bg-secondary/60 text-foreground border-t border-border">
+      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+        <div className="lg:col-span-5">
+          <span className="text-[11px] tracking-[0.12em] text-accent">
+            קו ישיר
+          </span>
+          <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
+            השאירו פרטים,
+            <br />
+            אחזור אליכם היום
+          </h2>
+          <p className="mt-8 text-muted-foreground max-w-md leading-relaxed">
+            שלוש שדות בלבד — וההודעה מגיעה ישירות לתיבת הדוא״ל שלי. אחזור אליכם
+            אישית ובמהירות האפשרית.
+          </p>
+          <div className="mt-8 flex items-center gap-3 text-muted-foreground">
+            <Mail size={16} className="text-accent" />
+            <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="hover:text-accent transition-colors">dorit@govari-fin.co.il</a>
+          </div>
+          <a
+            href="https://wa.me/972508311776"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-3 text-muted-foreground hover:text-accent transition-colors"
+          >
+            <MessageCircle size={16} className="text-accent" />
+            <span dir="ltr">WhatsApp</span>
+          </a>
+        </div>
+        {formCard}
       </div>
     </section>
   );

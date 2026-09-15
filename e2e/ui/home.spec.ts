@@ -49,18 +49,18 @@ test.describe("Home — sanity", () => {
       await gotoApp(page);
     });
 
+    // The new order, top to bottom. `perspective`, `fee-calculator` and
+    // `assessment` moved to their own pages; `consultation` and
+    // `detailed-contact` were deleted — the page offered five ways to send the
+    // same name and phone number and now offers one. See src/pages/Home.tsx.
     for (const id of [
       "top",
       "about",
-      "perspective",
       "services",
-      "fee-calculator",
+      "start",
       "quick-contact",
       "proof",
       "testimonials",
-      "faq",
-      "consultation",
-      "detailed-contact",
       "common-questions",
     ]) {
       await test_step(`the "${id}" section is on the page`, async () => {
@@ -133,7 +133,7 @@ test.describe("Home — sanity", () => {
     await test_step("the consultation CTA is visible", async () => {
       // :visible — the same hrefs also exist in the desktop nav / mobile drawer,
       // only one set of which is rendered per viewport.
-      const cta = page.locator('a[href="#consultation"]:visible').first();
+      const cta = page.locator('a[href="#start"]:visible').first();
       await expect(cta).toBeVisible();
     });
 

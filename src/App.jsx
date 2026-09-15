@@ -30,6 +30,8 @@ const BlogPost = lazy(() => import('@/pages/BlogPost'));
 const BlogAdmin = lazy(() => import('@/pages/BlogAdmin'));
 const Claims = lazy(() => import('@/pages/Claims'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
+const Tools = lazy(() => import('@/pages/Tools'));
+const Perspective = lazy(() => import('@/pages/Perspective'));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -73,6 +75,8 @@ const AuthenticatedApp = () => {
         <Route path="/blog/:id" element={<BlogPost />} />
         <Route path="/claims" element={<Claims />} />
         <Route path="/faq" element={<FAQPage />} />
+        <Route path="/tools" element={<Tools />} />
+        <Route path="/perspective" element={<Perspective />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -1,7 +1,5 @@
 {
   "src/components/dorit/forms/ClaimForm.tsx|TS2304": 2,
-  "src/components/dorit/forms/ConsultationBuilder.tsx|TS2741": 1,
-  "src/components/dorit/forms/ConsultationBuilder.tsx|TS7006": 2,
   "src/components/dorit/layout/Footer.tsx|TS2322": 1,
   "src/components/dorit/primitives/ShareButtons.tsx|TS2322": 5,
   "src/components/dorit/sections/About.tsx|TS2322": 2,

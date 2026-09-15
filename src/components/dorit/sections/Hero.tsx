@@ -99,10 +99,10 @@ export default function Hero() {
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-5 animate-fade-up">
             <a
-              href="#consultation"
+              href="#start"
               className="inline-flex items-center px-8 py-4 bg-highlight-muted text-primary font-medium hover:bg-highlight-strong transition-colors duration-300 shadow-sm"
             >
-              לקביעת פגישת ייעוץ
+              לשיחה קצרה עם דורית
             </a>
             <a
               href="#services"

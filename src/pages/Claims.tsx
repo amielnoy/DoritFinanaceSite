@@ -349,11 +349,11 @@ export default function Claims() {
                   <Phone size={18} />
                   דיווח מיידי
                 </a>
-                {/* `#consultation` is a home-page section, and this is /claims —
+                {/* `#start` is a home-page section, and this is /claims —
                     as a bare hash it did nothing at all. */}
                 <a
-                  href="/#consultation"
-                  onClick={(e) => goToSection(e, "#consultation")}
+                  href="/#start"
+                  onClick={(e) => goToSection(e, "#start")}
                   className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors"
                 >
                   ייעוץ מקדים

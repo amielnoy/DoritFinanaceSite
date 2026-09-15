@@ -19,6 +19,7 @@ In scope:
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
 | Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` and `escalateToHuman` functions, RLS rules |
 | Integration | The Base44 functions executed in-process against a recording client — what is stored, who is mailed, what each recipient sees, and what survives a failure |
+| Eval | The deployed interview agent driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md) |
 | Agent compliance | The three agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
 | UI e2e | Landing page, routing, calculator, three lead forms, blog, the agent chat's regulatory shell |
@@ -58,7 +59,7 @@ backend when one is available.
 | Item | Version reference |
 |---|---|
 | Application source | `src/**` at the commit under test |
-| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{createConsultationEvent,escalateToHuman}`, `base44/agents/*.jsonc` |
+| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{submitLead,submitClaim,createConsultationEvent,escalateToHuman}`, `base44/agents/*.jsonc` |
 | Published copy | `content/blog/*.md`, `src/config/compliance.ts` |
 | Static assets | `index.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`, `public/manifest.json` |
 | Build output | `dist/` produced by `npm run build` |
@@ -88,6 +89,7 @@ backend when one is available.
 | lint | zero errors |
 | typecheck | zero **new** errors against `tests/typecheck-baseline.json` — see [10-known-issues](10-known-issues.md) |
 | unit, component, contract, integration, security | 100% pass |
+| eval | not gated — opt-in, non-deterministic, and a failure wants a human reading the transcript |
 | e2e (all four platforms) | 100% pass, no more than the documented skips |
 | accessibility | zero `serious`/`critical` axe violations except the tracked colour-contrast finding |
 
@@ -112,8 +114,9 @@ Resume after the environment is corrected; no partial sign-off.
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
 Both runners write Allure results into the same `allure-results/`, so one
-`allure generate` covers the whole battery — 436 Vitest cases (81 unit, 21
-component, 219 contract, 45 integration, 70 security) plus 167 e2e cases per
+`allure generate` covers the whole battery — 511 Vitest cases (81 unit, 21
+component, 223 contract, 109 integration, 68 security, plus 9 opt-in agent
+evals that skip without credentials) plus 159 e2e cases per
 platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
 eleven on the full matrix, two on a feature branch — into a single published
 report; generating per-leg would give a pile of partial reports instead of one

@@ -93,7 +93,7 @@ describe("<MobileStickyBar />", () => {
       "href",
       `tel:${CONTACT.phoneE164}`
     );
-    expect(screen.getByRole("link", { name: /קביעת ייעוץ/ })).toHaveAttribute("href", "#consultation");
+    expect(screen.getByRole("link", { name: /לשיחה קצרה עם דורית/ })).toHaveAttribute("href", "#start");
   });
 });
 

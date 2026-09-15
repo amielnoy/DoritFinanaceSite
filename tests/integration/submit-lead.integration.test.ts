@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { invokeFunction } from "../helpers/base44-function";
+import { REPO_ROOT } from "../helpers/entity-schema";
 
 /**
  * `submitLead`, executed.
@@ -557,6 +560,122 @@ describe("submitLead — the interview schema", () => {
     }
   });
 
+  /**
+   * Every track, executed — and a fixture list that cannot fall behind.
+   *
+   * Two tracks were exercised here and five were not, which is the failure mode
+   * a table invites: the schema grows, the tests keep passing, and nobody
+   * notices that `savings` has never once been rendered. The first case reads
+   * the track names out of the function and fails if this file does not carry a
+   * fixture for each, so adding a track to the code forces a fixture with it.
+   */
+  describe("every declared track", () => {
+    const fixtures: Record<string, { label: string; profile: Record<string, string> }> = {
+      pension: {
+        label: "פנסיה, גמל והשתלמות",
+        profile: { employer: "שכיר בהייטק", seniority: "בערך 14 שנה", products: "פנסיה, השתלמות", fees: "לא ידוע למבקר" },
+      },
+      insurance: {
+        label: "ביטוחי חיים ובריאות",
+        profile: { dependents: "בן זוג ושלושה ילדים", mortgage: "יש, עוד כ-18 שנה", health_flag: "יש נושא לדיון בפגישה", coverage: "דרך העבודה בלבד" },
+      },
+      retirement: {
+        label: "פרישה וקיבוע זכויות",
+        profile: { retirement_horizon: "בעוד כשנתיים", employment_status: "שכיר", rights_fixing: "לא ידוע", severance_history: "לא" },
+      },
+      tax: {
+        label: "מיסוי ופיננסים",
+        profile: { tax_event: "פרישה", filing_status: "לא מגיש", prior_handling: "לא", products: "פנסיה, גמל" },
+      },
+      savings: {
+        label: "חיסכון לטווח",
+        profile: { horizon: "עד גיל 18 של הילד", purpose: "חיסכון לילדים", existing_savings: "אין", liquidity: "לא נדרשת" },
+      },
+      self_employed: {
+        label: "עצמאים",
+        profile: { business_type: "עיצוב גרפי", years_active: "בערך 6 שנים", pension_status: "קיים", study_fund_status: "לא קיים" },
+      },
+      general: {
+        label: "הקשר כללי",
+        profile: { products: "פנסיה בלבד", notes: "עוד לא בטוח מה מחפש" },
+      },
+    };
+
+    it("carries a fixture for every track the function declares", () => {
+      const fn = readFileSync(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"), "utf8");
+      const body = fn.slice(fn.indexOf("const INTERVIEW_TRACKS"), fn.indexOf("\n};", fn.indexOf("const INTERVIEW_TRACKS")));
+      const declared = [...body.matchAll(/^  ([a-z_]+): \{$/gm)].map((m) => m[1]);
+      expect(declared.length).toBeGreaterThan(1);
+      expect(Object.keys(fixtures).sort()).toEqual(declared.sort());
+    });
+
+    for (const [track, { label, profile }] of Object.entries(fixtures)) {
+      it(`renders the ${track} track end to end`, async () => {
+        const r = await invokeFunction("submitLead", {
+          name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
+          topic: "בדיקה", track,
+          profile: { life_stage: "בן 45", goal: "יעד כלשהו", concern: "דאגה כלשהי", ...profile },
+        });
+        expect(r.status).toBe(200);
+        const mail = r.mailTo(AGENCY);
+        expect(mail.html, `${track} label`).toContain(label);
+        expect(mail.text, `${track} label`).toContain(label);
+        // Every value the fixture supplied reaches the agency, in both halves.
+        for (const value of Object.values(profile)) {
+          expect(mail.html, `${track}: ${value}`).toContain(value);
+          expect(mail.text, `${track}: ${value}`).toContain(value);
+        }
+        // And the record holds the same fields the mail showed.
+        for (const value of Object.values(profile)) {
+          expect(r.leads[0].message as string, `${track} record`).toContain(value);
+        }
+      });
+    }
+  });
+
+  describe("a track that is missing or unknown", () => {
+    const base = {
+      name: "אורי לוי", phone: "0541112233", email: "", source: "interview", topic: "בדיקה",
+      profile: { life_stage: "בן 45", goal: "יעד", concern: "דאגה", employer: "שכיר" },
+    };
+
+    it("still delivers the common fields when no track was chosen", async () => {
+      const r = await invokeFunction("submitLead", base);
+      expect(r.status).toBe(200);
+      const html = r.mailTo(AGENCY).html!;
+      for (const label of ["שלב חיים", "יעד עיקרי", "דאגה מרכזית"]) {
+        expect(html, label).toContain(label);
+      }
+    });
+
+    it("drops track-specific fields rather than guessing a track", async () => {
+      const r = await invokeFunction("submitLead", base);
+      // `employer` belongs to pension; without a track there is nothing to say
+      // it applies, so it is not rendered under a label that was never chosen.
+      expect(r.mailTo(AGENCY).html).not.toContain("מעסיק / מעמד תעסוקתי");
+    });
+
+    it("treats an invented track the same as none", async () => {
+      const r = await invokeFunction("submitLead", { ...base, track: "crypto" });
+      expect(r.status).toBe(200);
+      expect(r.mailTo(AGENCY).html).toContain("שלב חיים");
+      expect(r.mailTo(AGENCY).html).not.toContain("crypto");
+    });
+  });
+
+  it("escapes markup a model put inside a profile value", async () => {
+    // Same class of defect as the hostile-name case above, one layer in: the
+    // profile is model-written text interpolated into HTML that staff open.
+    const r = await invokeFunction("submitLead", {
+      name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
+      topic: "בדיקה", track: "pension",
+      profile: { life_stage: '<a href="https://evil.example">לחצו</a>', goal: "יעד", concern: "דאגה" },
+    });
+    const html = r.mailTo(AGENCY).html!;
+    expect(html).not.toContain('<a href="https://evil.example"');
+    expect(html).toContain("&lt;a href=");
+  });
+
   it("runs the insurance track off the same machinery", async () => {
     const r = await invokeFunction("submitLead", {
       ...pension,
@@ -634,5 +753,179 @@ describe("submitLead — the operations mailboxes", () => {
     const r = await invokeFunction("submitLead", lead, { failEmailTo: [OPS2] });
     expect(r.emails.map((e) => e.to)).toContain(OPS);
     expect(r.json.warnings).toContain("notify_email_failed");
+  });
+});
+
+/**
+ * The interview, saved twice.
+ *
+ * Contact details used to be collected last, so a visitor who answered four
+ * questions and closed the tab left nothing at all — and for a chat interview
+ * that is likely the common case. The agent now saves once as soon as it has a
+ * name and a number, and again at the end; the second call has to find the
+ * first rather than create a second row, which is also what stops a visitor
+ * running the interview three times from producing three leads.
+ */
+describe("submitLead — a partial interview, and the upsert that completes it", () => {
+  const partial = {
+    name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
+    stage: "partial", track: "pension",
+    profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
+  };
+
+  it("stores a partial interview and tells nobody", async () => {
+    const r = await invokeFunction("submitLead", partial);
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, stage: "partial", notified: false });
+    expect(r.leads).toHaveLength(1);
+    expect(r.leads[0]).toMatchObject({ source: "interview", status: "partial" });
+    // The point of the early save is the record, not a message: mailing on
+    // everyone who starts answering would turn the inbox into noise.
+    expect(r.emails).toHaveLength(0);
+  });
+
+  it("keeps what was answered so far, so an abandoned interview is still useful", async () => {
+    const r = await invokeFunction("submitLead", partial);
+    const stored = r.leads[0].message as string;
+    expect(stored).toContain("שלב חיים: בן 52");
+    expect(stored).toContain("דאגה מרכזית: דמי ניהול");
+  });
+
+  it("updates that row on completion rather than creating a second", async () => {
+    const existing = {
+      id: "LEAD-EXISTING", phone: "0541112233", source: "interview",
+      status: "partial", email: "", created_date: new Date().toISOString(),
+    };
+    const r = await invokeFunction("submitLead", {
+      ...partial,
+      stage: "complete",
+      profile: { ...partial.profile, employer: "שכיר בהייטק", seniority: "14 שנה" },
+    }, { existingLeads: [existing] });
+
+    expect(r.leads, "a second row was created").toHaveLength(0);
+    expect(r.leadUpdates).toHaveLength(1);
+    expect(r.leadUpdates[0].id).toBe("LEAD-EXISTING");
+    expect(r.leadUpdates[0].fields).toMatchObject({ status: "new" });
+    expect(r.leadUpdates[0].fields.message).toContain("שכיר בהייטק");
+    // And now the mail goes out, against the same record.
+    expect(r.json).toMatchObject({ leadId: "LEAD-EXISTING" });
+    expect(r.emails.map((e) => e.to)).toContain(AGENCY);
+  });
+
+  it("does not adopt an interview that is too old to be this conversation", async () => {
+    const stale = {
+      id: "LEAD-OLD", phone: "0541112233", source: "interview", status: "partial",
+      created_date: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+    };
+    const r = await invokeFunction("submitLead", { ...partial, stage: "complete" }, { existingLeads: [stale] });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
+  });
+
+  it("does not adopt another person's interview", async () => {
+    const other = {
+      id: "LEAD-OTHER", phone: "0529998888", source: "interview",
+      status: "partial", created_date: new Date().toISOString(),
+    };
+    const r = await invokeFunction("submitLead", { ...partial, stage: "complete" }, { existingLeads: [other] });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
+  });
+
+  it("does not adopt a lead that was never an interview", async () => {
+    const form = {
+      id: "LEAD-FORM", phone: "0541112233", source: "consultation",
+      status: "new", created_date: new Date().toISOString(),
+    };
+    const r = await invokeFunction("submitLead", { ...partial, stage: "complete" }, { existingLeads: [form] });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
+  });
+
+  it("creates rather than loses the interview when the lookup itself fails", async () => {
+    // A duplicate row is a nuisance; a dropped interview is not recoverable.
+    const r = await invokeFunction("submitLead", { ...partial, stage: "complete" }, {
+      existingLeads: [{ id: "LEAD-EXISTING", phone: "0541112233", source: "interview", created_date: new Date().toISOString() }],
+      failLeadLookup: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+  });
+
+  it("leaves every other source on the create path untouched", async () => {
+    const r = await invokeFunction("submitLead", {
+      name: "יעל", phone: "0541112233", source: "quick", message: "שלום",
+    }, { existingLeads: [{ id: "LEAD-EXISTING", phone: "0541112233", source: "interview", created_date: new Date().toISOString() }] });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
+  });
+});
+
+describe("submitLead — how complete the interview was", () => {
+  const base = {
+    name: "אורי לוי", phone: "0541112233", email: "", source: "interview", track: "pension",
+  };
+
+  it("counts answered fields against the track's total", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...base,
+      profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
+    });
+    // pension carries seven fields; three were answered.
+    expect(r.mailTo(AGENCY).html).toContain("3 מתוך 7 שדות נענו");
+    expect(r.mailTo(AGENCY).text).toContain("3 מתוך 7 שדות נענו");
+  });
+
+  it("separates what the visitor did not know from what was never asked", async () => {
+    // Both matter to someone preparing a meeting, and they are not the same:
+    // an unanswered field is a gap in the interview, "לא ידוע למבקר" is a fact
+    // about the visitor.
+    const r = await invokeFunction("submitLead", {
+      ...base,
+      profile: {
+        life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול",
+        employer: "שכיר", seniority: "לא ידוע למבקר", fees: "לא ידוע למבקר",
+      },
+    });
+    const html = r.mailTo(AGENCY).html!;
+    expect(html).toContain("6 מתוך 7 שדות נענו");
+    expect(html).toContain("2 מהם לא ידועים למבקר");
+  });
+
+  it("says nothing about unknowns when there are none", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...base,
+      profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
+    });
+    expect(r.mailTo(AGENCY).html).not.toContain("לא ידועים למבקר");
+  });
+});
+
+describe("submitLead — the topic the interview no longer asks for", () => {
+  it("derives it from the concern the schema already carries", async () => {
+    const r = await invokeFunction("submitLead", {
+      name: "אורי לוי", phone: "0541112233", email: "uri@example.com",
+      source: "interview", track: "pension",
+      profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי הניהול גבוהים" },
+    });
+    expect(r.leads[0].topic).toBe("דמי הניהול גבוהים");
+    // And the visitor's confirmation names it, which is where topic is shown.
+    expect(r.mailTo("uri@example.com").html).toContain("דמי הניהול גבוהים");
+  });
+
+  it("falls back to an explicit topic when no concern was recorded", async () => {
+    const r = await invokeFunction("submitLead", {
+      name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
+      track: "pension", topic: "נושא שנמסר במפורש",
+      profile: { life_stage: "בן 52" },
+    });
+    expect(r.leads[0].topic).toBe("נושא שנמסר במפורש");
+  });
+
+  it("leaves topic alone for every other source", async () => {
+    const r = await invokeFunction("submitLead", {
+      name: "יעל", phone: "0521234567", source: "consultation", topic: "פנסיה",
+    });
+    expect(r.leads[0].topic).toBe("פנסיה");
   });
 });

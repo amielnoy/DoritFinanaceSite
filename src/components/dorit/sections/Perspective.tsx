@@ -42,7 +42,7 @@ export default function Perspective() {
         {/* Header */}
         <div className="max-w-3xl mb-16">
           <span className="text-[11px] tracking-[0.12em] text-accent">
-            02 · נקודת מבט · מתוך השטח
+            נקודת מבט · מתוך השטח
           </span>
           <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
             בזמנים לא ודאיים,

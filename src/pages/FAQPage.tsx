@@ -10,6 +10,7 @@ import { ChevronLeft, HelpCircle, Phone, MessageCircle } from "lucide-react";
 import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
 import Footer from "@/components/dorit/layout/Footer";
 import { absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
+import { faqLd } from "@/lib/structured-data";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { CONTACT } from "@/config/contact";
@@ -172,6 +173,11 @@ export default function FAQPage() {
         url: absoluteUrl("/faq"),
         inLanguage: "he-IL",
       },
+      // Built from the same array rendered below, so the markup cannot claim a
+      // question the page does not show. This is the only URL on the site that
+      // declares FAQPage — the home page used to as well, for questions it
+      // never displayed.
+      faqLd(CATEGORIES.flatMap((c) => c.items)),
     ],
   });
 
@@ -240,7 +246,7 @@ export default function FAQPage() {
                     שאלו אותי ישירות — אחזור אליכם אישית תוך יום עסקים אחד.
                   </p>
                   <a
-                    href="/#consultation"
+                    href="/#start"
                     className="inline-flex items-center gap-2 px-5 py-3 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors w-full justify-center"
                   >
                     יצירת קשר
@@ -251,28 +257,37 @@ export default function FAQPage() {
 
             {/* Accordion */}
             <div className="lg:col-span-8">
-              <div className="mb-6">
-                <h2 className="font-heading text-3xl md:text-4xl">{current.label}</h2>
-                <p className="text-sm tracking-[0.2em] uppercase text-accent mt-2">
-                  {current.labelEn} · {current.items.length} שאלות
-                </p>
-              </div>
-              <Accordion type="single" collapsible className="border-t border-border/60">
-                {current.items.map((item, i) => (
-                  <AccordionItem
-                    key={`${activeCat}-${i}`}
-                    value={`${activeCat}-${i}`}
-                    className="border-b border-border/60"
-                  >
-                    <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
-                      {item.q}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
-                      {item.a}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
+              {/* Every category is rendered; the inactive ones are hidden with
+                  CSS rather than unmounted. This page declares FAQPage markup
+                  for all of them, and markup may only describe content that is
+                  actually in the HTML — see 10-known-issues B-0. Nothing about
+                  what a visitor sees changes. */}
+              {CATEGORIES.map((cat) => (
+                <div key={cat.id} hidden={cat.id !== activeCat}>
+                  <div className="mb-6">
+                    <h2 className="font-heading text-3xl md:text-4xl">{cat.label}</h2>
+                    <p className="text-sm tracking-[0.2em] uppercase text-accent mt-2">
+                      {cat.labelEn} · {cat.items.length} שאלות
+                    </p>
+                  </div>
+                  <Accordion type="single" collapsible className="border-t border-border/60">
+                    {cat.items.map((item, i) => (
+                      <AccordionItem
+                        key={`${cat.id}-${i}`}
+                        value={`${cat.id}-${i}`}
+                        className="border-b border-border/60"
+                      >
+                        <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
+                          {item.q}
+                        </AccordionTrigger>
+                        <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
+                          {item.a}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -289,7 +304,7 @@ export default function FAQPage() {
               </p>
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a
-                  href="/#consultation"
+                  href="/#start"
                   className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors"
                 >
                   קביעת פגישת ייעוץ

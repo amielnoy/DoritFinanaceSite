@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 45
+**Location:** `tests/integration/` · **Cases:** 109
 
 ---
 
@@ -24,14 +24,19 @@ the function.
 ## 2. Environment
 
 `tests/helpers/base44-function.ts` loads a function's `entry.ts` and runs its
-default export against a recording client. Entity writes, `Core.SendEmail`,
-connector lookups and outbound `fetch` are all captured rather than performed, so
-a run touches no network, no mailbox and no live data. The harness can be told to
-fail any of them — `failLeadWrite`, `failEmailTo`, `failFetch`, a `null`
-connector token — which is how the failure paths below are reached.
+default export against a recording client. Entity writes and reads,
+`Core.SendEmail`, connector lookups and outbound `fetch` are all captured rather
+than performed, so a run touches no network, no mailbox and no live data. The
+harness can be told to fail any of them — `failLeadWrite`, `failLeadLookup`,
+`failEmailTo`, `failFetch`, a `null` connector token — which is how the failure
+paths below are reached.
 
-Its result exposes `status`, `json`, `leads`, `emails`, `mailTo(address)` and
-`callsTo(host)`.
+`existingLeads` seeds rows the function can find *before* it writes. Without a
+readable store the interview lookup always misses, every case takes the create
+path, and the upsert in §4.11 would be exercised by nothing.
+
+Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
+`mailTo(address)` and `callsTo(host)`.
 
 ## 3. Coverage
 
@@ -39,9 +44,10 @@ Its result exposes `status`, `json`, `leads`, `emails`, `mailTo(address)` and
 |---|---|
 | `submitLead` | every form on the site, and the booking and interview agents |
 | `escalateToHuman` | all three on-site agents |
+| `submitClaim` | the claims form |
 
-`submitClaim`, `createConsultationEvent` and `createOutlookEvent` are not yet
-executed here. See §6.
+`createConsultationEvent` and `createOutlookEvent` are not yet executed here.
+See §6.
 
 ## 4. Test cases
 
@@ -121,6 +127,81 @@ rest of the contract: the collect-not-advise declaration rides on every
 interview to both staff copies, and the pre-schema free-text path still works —
 that is what a mid-deploy agent is still sending.
 
+### 4.8 `submitLead` — every declared track — `INT-LEAD-049..060`
+
+One case per track in `INTERVIEW_TRACKS`, each rendering a full profile and
+asserting that the track's label and every value it carried reach the agency in
+both halves of the mail and the stored record. A thirteenth case reads the track
+names out of the function and fails unless this file carries a fixture for each
+— that guard exists because two tracks were covered and five were not, which is
+the failure a table invites: the schema grows, the suite stays green, and nobody
+notices that `savings` has never been rendered once.
+
+Three further cases cover a track that is missing or invented: the common fields
+still arrive, track-specific fields are dropped rather than guessed at, and a
+track name the model made up behaves exactly like none. A last case escapes
+markup placed inside a profile value — the same defect class as the hostile-name
+case in §4.2, one layer further in, because the profile is model-written text
+interpolated into HTML that staff open.
+
+### 4.9 `submitLead` / `escalateToHuman` — the operations mailboxes — `INT-LEAD-061..064`, `INT-ESC-018/019`
+
+The operations copy goes to more than one mailbox. Every mailbox receives the
+identical copy, appendix included, while the agency's stays free of it; and each
+mailbox is its own delivery attempt, verified from both directions — the first
+bouncing must not cost the second, nor the second the first. The risk being
+pinned is not the happy path but a future simplification: one `try` around the
+whole loop would let the first bounce swallow the rest of the list silently.
+For escalations the same cases add that a partial delivery still reports
+`notified: true`, since an escalation that reached nobody is a regulatory
+failure and one that reached two of three is not.
+
+### 4.10 `submitClaim` — the claim lands — `INT-CLAIM-001..013`
+
+Previously a known gap, now executed. Stores the claim and tells the agency,
+both operations mailboxes and the reporter; gives every staff mailbox the same
+report; pins `status` and `source` rather than taking them from the caller;
+says so when no documents were attached; skips the confirmation when no address
+was given. The mailbox cases mirror §4.9. The failure cases pin that a claim
+nobody stored fails loudly and mails nobody — worse than an unmailed claim,
+because the reporter believes it is in hand — and that a bounced confirmation
+costs the message and never the record. A last case escapes markup in a name
+arriving from a public form.
+
+### 4.11 `submitLead` — a partial interview, and the upsert — `INT-LEAD-065..072`
+
+Contact details used to be collected last, so a visitor who answered four
+questions and closed the tab left nothing at all. The agent now saves once as
+soon as it has a name and a number, and again at the end. These pin that the
+partial save stores the row and mails nobody — mailing on everyone who starts
+answering would turn the inbox into noise — and that the completing call
+*updates that row* rather than creating a second, which is also what stops a
+visitor running the interview three times from producing three leads.
+
+Four cases pin what the lookup must not adopt: an interview older than the
+six-hour window, another phone number's interview, a lead that was never an
+interview, and — when the lookup itself fails — a created row rather than a lost
+one, because a duplicate is a nuisance and a dropped interview is not
+recoverable. A last case pins that every other source still takes the create
+path untouched.
+
+### 4.12 `submitLead` — how complete the interview was — `INT-LEAD-073..075`
+
+A thorough seven-field interview and a two-answer one used to produce mails that
+looked alike at a glance. The mail now carries "3 מתוך 7 שדות נענו", and
+separates a field the visitor did not know from one that was never asked: the
+first is a fact about the visitor, the second is a gap in the interview, and
+they are not interchangeable to someone preparing a meeting.
+
+### 4.13 `submitLead` — the topic the interview no longer asks for — `INT-LEAD-076..078`
+
+`topic` and `profile.concern` were the same fact supplied twice, and after the
+schema change `topic` was not rendered in the staff mail at all. It is now
+derived from the concern, falling back to an explicit `topic` when no concern
+was recorded, and left alone for every other source.
+
+### 4.14 `escalateToHuman` — handing over — `INT-ESC-001..005`
+=======
 ### 4.8 `escalateToHuman` — handing over — `INT-ESC-001..005`
 
 Records the escalation and notifies both inboxes, stamps the record with the
@@ -128,14 +209,14 @@ consent wording the visitor was shown, always hands the contact channels back to
 the agent whatever else failed, and flags the reasons that must not wait in a
 queue.
 
-### 4.7 `escalateToHuman` — a reason the model made up — `INT-ESC-006..010`
+### 4.15 `escalateToHuman` — a reason the model made up — `INT-ESC-006..010`
 
 The reason arrives from a language model, so it is clamped to the declared
 vocabulary. `__proto__` and `constructor` are clamped to `uncertain` rather than
 resolving off the prototype chain; anything simply invented, or missing, is
 clamped too; a declared reason is kept exactly as given.
 
-### 4.8 `escalateToHuman` — redaction and precedence — `INT-ESC-011..017`
+### 4.16 `escalateToHuman` — redaction and precedence — `INT-ESC-011..017`
 
 Identifiers are redacted before the record is written *and* before the
 notification is sent, while an ordinary summary is left alone. The notification
@@ -146,17 +227,14 @@ agent is named, so a pattern is visible later.
 
 ## 5. Pass criteria
 
-All 45 cases pass. These assert behaviour, not shape — a failure means the
+All 109 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
 ## 6. Known gaps
 
-- **`submitClaim` is not executed here.** Its customer confirmation shares the
-  template `submitLead` uses, and `agents.contract.test.ts` pins the two copies
-  byte-identical, but no test calls the function. Its escaping is therefore
-  guaranteed by duplication rather than by execution.
 - **`createConsultationEvent` and `createOutlookEvent`** are only observed
   indirectly, through the `Promise.allSettled` that `submitLead` fires at them.
 
-Both belong in [10-known-issues.md](10-known-issues.md) until they are covered.
+That one belongs in [10-known-issues.md](10-known-issues.md) until it is covered.
+`submitClaim` was on this list and no longer is — §4.10 executes it.

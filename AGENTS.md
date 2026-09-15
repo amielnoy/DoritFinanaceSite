@@ -23,8 +23,11 @@ npx skills add base44/skills
 - `src/api/base44Client.js`: frontend Base44 SDK client.
 - `base44/functions/*/entry.ts`: backend functions. Isolated entry points with no
   shared module, so some helpers are duplicated by hand — `redact`, `escapeHtml`,
-  `buildClientHtml`, `SHEET_COLUMNS`. Duplicated is fine; drifted is not, and
-  `tests/contract/agents.contract.test.ts` fails when copies stop matching.
+  `buildClientHtml`, `SHEET_COLUMNS`, `NOTIFY_EMAILS`. Duplicated is fine;
+  drifted is not, and `tests/contract/agents.contract.test.ts` fails when copies
+  stop matching. `NOTIFY_EMAILS` is the easiest to get wrong: a mailbox added to
+  one function and not another raises no error anywhere — the mail simply
+  reaches one fewer person, and escalations are where that costs most.
 - `vite.config.js`: Vite config and Base44 Vite plugin setup.
 - `.env.local`: local-only environment values; never commit secrets.
 - `tests/test-plan/`: the test plan and one Software Test Description per suite.

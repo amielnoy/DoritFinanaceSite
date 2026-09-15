@@ -4,6 +4,8 @@ import { useArticles } from "@/hooks/useContent";
 import { Image } from "@/components/ui/image";
 import { Loader2, ArrowLeft, Newspaper, Search, X } from "lucide-react";
 import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
+import AgentChat from "@/components/dorit/chat/AgentChat";
+import { AGENTS } from "@/config/agents";
 import Footer from "@/components/dorit/layout/Footer";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
@@ -108,6 +110,17 @@ export default function Blog() {
           </Reveal>
 
           <CredentialsStrip />
+        </div>
+      </div>
+
+      {/* The reading recommender, where the reading is.
+          It sat on the home page between a contact form and an FAQ, recommending
+          articles to people who had not said they wanted to read anything. Here
+          it answers the question the visitor arrived with. */}
+      <AgentChat descriptor={AGENTS.blogRecommender} />
+
+      <div className="pb-24">
+        <div className="max-w-[1400px] mx-auto px-6 md:px-10">
 
           {!loading && posts && posts.length > 0 && (
             <div className="mt-12 space-y-6">

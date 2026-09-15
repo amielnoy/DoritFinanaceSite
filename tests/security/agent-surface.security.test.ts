@@ -30,7 +30,7 @@ const COMPLIANCE = read(join(REPO_ROOT, "src/config/compliance.ts"));
 const CONTACT = read(join(REPO_ROOT, "src/config/contact.js"));
 const PKG = read(join(REPO_ROOT, "package.json"));
 
-const AGENT_PROMPTS = ["needs_interview", "booking_assistant", "blog_recommender"].map((n) => ({
+const AGENT_PROMPTS = ["needs_interview", "blog_recommender"].map((n) => ({
   name: n,
   src: read(join(REPO_ROOT, `base44/agents/${n}.jsonc`)),
 }));

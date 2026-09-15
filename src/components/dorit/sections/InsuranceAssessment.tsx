@@ -357,11 +357,11 @@ export default function InsuranceAssessment() {
                       ההערכה כאן היא כללית בלבד. להמלצות מדויקות — כדאי לשוחח עם דורית.
                     </p>
                     <a
-                      href="#consultation"
+                      href="#start"
                       className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary-foreground font-medium hover:bg-highlight-strong transition-colors duration-300 shadow-sm whitespace-nowrap"
                     >
                       <Calendar size={18} />
-                      לקביעת פגישת ייעוץ
+                      לשיחה קצרה עם דורית
                     </a>
                   </div>
                 </motion.div>

@@ -57,7 +57,7 @@ export default function DetailedFAQ() {
         <div className="lg:col-span-4">
           <Reveal>
             <span className="text-[11px] tracking-[0.12em] text-accent">
-              08 · שאלות ותשובות
+              06 · שאלות ותשובות
             </span>
             <h2 className="font-heading text-4xl md:text-5xl mt-5 leading-tight">
               שאלות
@@ -69,10 +69,10 @@ export default function DetailedFAQ() {
               הייעוץ הראשונה. אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.
             </p>
             <a
-              href="#consultation"
+              href="#start"
               className="mt-8 inline-flex items-center px-6 py-3 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors duration-300"
             >
-              שאלה אישית? נשוחח
+              לשיחה קצרה עם דורית
             </a>
           </Reveal>
         </div>

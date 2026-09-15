@@ -45,7 +45,8 @@
         "new",
         "contacted",
         "closed",
-        "escalated"
+        "escalated",
+        "partial"
       ],
       "default": "new"
     },

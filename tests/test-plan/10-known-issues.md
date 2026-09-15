@@ -26,8 +26,52 @@ closing it would take.
 | A-14 | **The staff notification email arrived as one running paragraph.** It was sent as `body` plain text, and Gmail collapsed the newlines — eight fields with no line breaks, which is the mail the agent opens on a phone to decide whether to call someone back. Separately, `submitClaim`'s customer confirmation had drifted from `submitLead`'s: no `dir="rtl"` (so the details table rendered its columns reversed), no `text-align`, a different panel colour, and no escaping at all on a name arriving from a public form. | Notification rebuilt as HTML in the site's palette with the plain text as its twin; one `buildClientHtml` duplicated byte-identically across both functions, enforced by `agents.contract.test.ts`. |
 | A-15 | **"97% שיעור תביעות שאושרו" was published in three places** — the hero, the About stats grid and the `/claims` meta description. A licensed agent quoting a performance figure is a regulated claim, and nothing in the repo substantiated it. The meta-description copy was not visible on the page at all, so it reached search results and link previews unnoticed. | Removed from all three; the About grid resized from four columns to three so the strip has no empty cell. |
 | A-16 | **A locally built bundle could not reach a backend.** Base44's hosting injects `VITE_BASE44_APP_ID`; nothing supplied it to a build from a clone, so `appId` inlined to `undefined` and every form reported the generic send failure. `vite preview` also serves no `/api` at all. | `scripts/vite-base44-backend-plugin.mjs` falls back to the linked app in `base44/.app.jsonc` and adds an opt-in preview proxy. Both inert in CI, which keeps the Builder-parity build honest. |
+| A-17 | **A finished ראיון היכרות reached nobody.** The interview agent ended by writing the approved profile straight to `Lead.create`, which stores a row and sends nothing — so the summary waited in the database until somebody happened to open the leads screen, while every other enquiry on the site arrived as mail the same minute. Every other agent already ended through `submitLead`; this one never had. | Rewired to `submitLead` under a new `source='interview'`, so the interview rides the path every form uses. `CTR-AGT-*` now fails if the agent is wired to the `Lead` entity instead, and `INT-LEAD-031..038` execute the send. |
+| A-18 | **The interview mail called itself two different things.** `headingFor()` was source-aware and rendered "סיכום ראיון היכרות", but the kicker above it was a string literal reading "פנייה מהאתר" — so the letter opened by calling an interview an enquiry, one line above calling it an interview. Introduced with A-17 and found by reading the mail that actually arrived, not by a test. | `eyebrowFor()` beside `headingFor()`. `INT-LEAD-041` pins the kicker and fails if it is ever hardcoded back. |
+| A-19 | **The interview summary carried a redundant `[ראיון היכרות]` tag.** It printed as a bare line under a block already titled "פרופיל המבקר", and duplicated `source='interview'` — which the record carries structurally and the admin screen already labels. It was a leftover from the `Lead.create` prompt, where the source was `'consultation'` and the tag was the only thing marking an interview. | Dropped from the prompt; the source field is the marker. |
+| A-20 | **The interview collected whatever the model chose to remember.** It ended in a paragraph the model composed, which read well and compared to nothing — what got recorded changed from conversation to conversation. | A fixed schema: seven tracks in `INTERVIEW_TRACKS`, selected from the visitor's goal, with the function whitelisting keys so a field the model invents is dropped before it reaches Dorit or the record. `CTR-AGT-*` pins code and prompt in agreement; `INT-LEAD-039..060` execute every track. |
+| A-21 | **`submitClaim` had no integration coverage at all**, and was the third place the operations mailbox list had to be threaded through. A recipient change there is exactly what a source-matching test waves through: the constant is renamed, the loop is added, every string assertion still passes, and nobody notices until a claim is reported and one inbox stays empty. | `tests/integration/submit-claim.integration.test.ts` — `INT-CLAIM-001..013`. Removed from STD-12 §6. |
+| A-22 | **An abandoned interview left nothing behind.** Contact details were the last thing asked, after every track question, so a visitor who answered four and closed the tab was invisible — and for a chat interview that is likely the common case. Dorit never learned they existed. | Name and phone moved ahead of the track questions; the agent saves a `partial` record as soon as it has them, silently. The closing call updates that row rather than creating a second. `INT-LEAD-065..072`. |
+| A-23 | **Nothing tested whether the model obeys the prompt.** Every layer downstream of the agent was executed by a test — whitelist, redaction, rendering, recipients — while the part most likely to be wrong was covered only by asserting that a clause is *present* in the prompt file. | `tests/eval/` — opt-in evals that drive the deployed agent over the real conversation API. See [13-std-eval](13-std-eval.md), including why no scenario completes an interview. |
+| A-24 | **"Didn't ask" and "asked, they don't know" collapsed to the same thing.** Empty fields are dropped, so a gap in the interview and a fact about the visitor were indistinguishable to whoever read the summary. | The prompt separates them explicitly, and the mail carries a completeness line — "5 מתוך 7 שדות נענו · 2 מהם לא ידועים למבקר". `INT-LEAD-073..075`. |
+| A-25 | **The agent picked a track with no confirmation.** It announced a direction but the visitor could not correct it, and a mis-route costs them the entire four-question set. | One confirming question before committing. `EVAL-INT-003`. |
+| A-26 | **`topic` and `profile.concern` were the same fact, supplied twice** — and after the schema change `topic` was not rendered in the staff mail at all, so one of the two copies was invisible. Two copies of a fact invite them to disagree. | Derived from the concern in the function; the agent no longer sends `topic`. `INT-LEAD-076..078`. |
+| A-27 | **Nothing stopped a visitor creating three leads** by running the interview three times — "call it once" was a prompt instruction with no enforcement. | Same upsert as A-22: an interview open on that phone within six hours is updated, not duplicated. |
+| A-28 | **The home page offered five ways to do one thing.** An interview chat, a booking chat, a three-step wizard, a detailed form and a short form — each asking for a name and a phone number — while the header, hero, sticky bar and footer each pointed at a different one. A visitor who wanted to talk to דורית had to decide, repeatedly, which door was the real one. | One `#start` section: the interview agent at full width, WhatsApp and phone beside it, the short form as a secondary card. Every CTA reads "לשיחה קצרה עם דורית" and points at `#start`. The wizard and detailed form are deleted. |
+| A-29 | **The booking agent asked for a name the interview had already taken.** Two chats, back to back, for one errand. | `booking_assistant` merged into `needs_interview`, which now runs the scheduling step and calls `createConsultationEvent` itself. `CTR-AGT-*` fails if the prompt loses it. |
+| A-30 | **Every agent rendered the same "ד" avatar** — saying the one thing the header must not, that these are דורית. | Per-agent `icon` in the descriptor: a speech bubble for the interview, a book for the reading recommender. |
+| A-31 | **The home page declared FAQPage markup for questions it never displayed.** `HOME_FAQ_LD` carried six pension questions that only `/faq` renders; the home page showed a list of tips. Google requires the answer to be visible on the URL claiming it — the same defect as A-6, one section along — and `/faq` declared only `CollectionPage`, so the site had FAQ markup on the page without the answers and none on the page with them. | Markup moved to `/faq` and generated from the array the page maps over, so it cannot drift from what is rendered. `SEO-LD-*` asserts the home page claims none. |
+| A-32 | **Embedding the chat dropped the published fence.** `AgentChat`'s guardrails panel rendered in the heading column, which the full-width layout does not draw — so "כללי הגדר" silently disappeared from the page while the prompt still claimed it. Caught by `E2E-AGT-002`. | Rendered by `StartConversation` instead, from the same descriptor. |
+| A-33 | **`/faq` unmounted the answers its own markup declared.** The page rendered one category and dropped the rest, so most of the questions the `FAQPage` block described were not in the HTML at all. Google's guidance is that content hidden behind an accordion qualifies *because it is present*; unmounted content is absent. | Every category rendered, inactive ones hidden with `hidden`. `SEO-LD-*` reads the declared `mainEntity` and asserts every question **and answer** appears in `page.content()` — the property, not the mechanism. Nothing a visitor sees changed. |
+| A-34 | **`llms.txt` published a phone number and an email that do not reach her** — `052-707-7776` and `doritg@fsfp-fin.co.il`, while every other surface had moved to `050-831-1776` and `dorit@govari-fin.co.il`. It is a static file in `public/`, so the type-checker and every suite were blind to it; the only symptom would have been an AI assistant handing a prospect a dead number. Resolves the `llms.txt` half of B-4. | Rewritten against `src/config/contact.js`, and `CTR-AI-001..010` now fail if any address or number in the file is not the canonical one. |
 
 ## B. Open findings — decisions for the owner
+
+### B-0 · Routes are invisible to crawlers that do not run JavaScript
+
+**This outranks every other SEO item in the file.**
+
+The app is client-rendered and `useSeo` writes each page's title, description,
+canonical and JSON-LD at runtime. The server returns the same `index.html` for
+every path, so a crawler that does not execute JavaScript sees the **home
+page's** metadata on `/faq`, `/blog`, `/tools`, `/claims` and `/perspective`.
+Verified directly: serving `dist/` and requesting `/faq` returns the home
+`<title>`.
+
+Google renders JavaScript and recovers. GPTBot, ClaudeBot, PerplexityBot and
+CCBot largely do not — so to an AI assistant this site is one page, and
+`public/llms.txt` is the only thing it can read in full. That file is now
+accurate and complete, which is mitigation rather than a fix.
+
+The fix is prerendering the eight public routes at build time. Playwright is
+already a dev dependency, so a post-build step could render each route and write
+`dist/<route>/index.html` without adding anything to the tree — but whether a
+real file is served ahead of the SPA rewrite differs between Vercel
+(`vercel.json` rewrites) and Base44 hosting, and that needs checking on both
+before it is worth building.
+
+**Not done**, because it changes what the hosts serve and wants verification on
+each of them first.
 
 ### B-1 · Colour contrast below WCAG AA
 
@@ -99,22 +143,15 @@ It fails on a new file/code pair, or on more errors of a known kind in a known
 file. Fixing some and running `npm run typecheck:baseline` lowers the bar
 permanently; the raw list is still `npm run typecheck`.
 
-### B-4 · Structured-data email disagrees with the rest of the site
+### B-4 · ~~Structured-data email disagrees with the rest of the site~~ — closed
 
-`index.html`'s JSON-LD (both the `FinancialService` and the `Person` block)
-publishes `dorit@govari-fin.co.il`, while every visible surface — the footer,
-the contact form copy, the SDK error fallbacks and `src/config/contact.js` —
-uses `doritg@fsfp-fin.co.il`. Search engines and AI crawlers read the JSON-LD,
-so this is the address a prospect may be handed.
+`index.html`'s JSON-LD, `src/config/contact.js`, the footer and the escalation
+fallback all publish `dorit@govari-fin.co.il` and `+972508311776`. The last
+holdout was `public/llms.txt`, which still carried the old pair; see A-34.
 
-**Not changed**, because which address is canonical is a business fact, not a
-code decision. Once you confirm it, the fix is two string edits in `index.html`,
-and the assertion below can be added to `e2e/api/http-surface.spec.ts` to keep
-them in step:
-
-```ts
-expect(JSON.parse(ldBlock).email).toBe(CONTACT.email);
-```
+`tests/contract/ai-surface.contract.test.ts` now derives the expected values
+from `src/config/contact.js` and fails on any address or number in `llms.txt`
+that is not the canonical one, which is the assertion this entry asked for.
 
 ### B-5 · Transport security headers are not asserted by default
 

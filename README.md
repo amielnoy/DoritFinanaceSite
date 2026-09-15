@@ -211,6 +211,26 @@ environment, so `VITE_SITE_URL` has to be set there too (step 4). Without it tha
 keeps emitting the old canonical, and the copy Base44 serves starts competing with the
 production domain for the same content.
 
+## The home page, and the one conversation
+
+The landing page runs eight sections: hero, carrier logos, a short About, the
+five service pillars, **`#start`**, the case studies, testimonials and the
+questions. `#start` is the only place it asks for anything — the interview agent
+at full width, WhatsApp and phone beside it, and the short form as a secondary
+card for anyone who would rather not chat.
+
+It used to run seventeen sections and five separate ways to send the same name
+and phone number, with the header, hero, sticky bar and footer each pointing at
+a different one. Everything that left is still on the site: the two
+self-assessment tools at [`/tools`](src/pages/Tools.tsx), the essay and the full
+biography at [`/perspective`](src/pages/Perspective.tsx), the reading
+recommender at the top of `/blog`. Only the duplicate routes to the same
+conversation were deleted.
+
+Anchors into those sections work from every route — `useSectionNav` routes home
+first and then scrolls, because a bare `#services` on `/blog` sets the URL and
+does nothing.
+
 ## The agents, and where they stop
 
 Three LLM agents run on the site — `needs_interview`, `booking_assistant` and
@@ -235,11 +255,64 @@ team operating the site in the site's own layout, and confirms to the visitor if
 they gave an address. It used to end at `Lead.create` instead — stored, and
 nobody told, until somebody happened to open the leads screen.
 
+What it hands over is a **fixed schema, not free text**. The agent picks one of
+seven tracks from the visitor's stated goal — pension, insurance, retirement,
+tax, savings, self-employed, or a general fallback — and fills that track's
+named fields. `INTERVIEW_TRACKS` in `submitLead/entry.ts` is the whitelist: a
+key the model invents is dropped before it reaches anyone, which is what stops a
+model handed a form from inventing a field called `advice`. Every value passes
+through `redact()`, because a profile is written by a model that just heard the
+visitor type things it was told not to record.
+
+The interview is saved **twice**. Name and phone are asked after the goal and
+before the track questions, and the agent saves a `partial` record the moment it
+has them — silently, mailing nobody. A visitor who answers four questions and
+closes the tab used to leave nothing at all; now they leave a row דורית can
+follow up. The closing call updates that same row rather than creating a second,
+keyed on the phone number within a six-hour window, which is also what stops a
+visitor running the interview three times from producing three leads.
+
+Two fields are deliberately narrower than they look. **Management fees** are
+recorded as the visitor stated them, or as "לא ידוע למבקר" — the agent notes the
+number and is barred from saying whether it is high, because §2 forbids
+supplying figures and opinions, not recording what it was told. **Health** is a
+flag and never a description: the insurance track asks whether there is anything
+דורית should know, records "יש"/"אין", and a visitor who volunteers detail
+triggers the `sensitive_data` handoff instead of being written down.
+
 The rest lives in the prompts, and `tests/contract/agents.contract.test.ts`
 fails if a mandatory clause disappears from any of them.
 
 Full description of the layer, what is enforced where, and one open question
 for דורית's compliance adviser: [`base44/agents/COMPLIANCE.md`](base44/agents/COMPLIANCE.md).
+
+## Search engines, and AI assistants
+
+Two different readers, and they do not get the same thing.
+
+Google executes JavaScript, so it sees what a visitor sees: `useSeo` writes each
+route's title, description, canonical and JSON-LD at runtime, `/faq` carries
+`FAQPage` markup generated from the questions it renders, posts carry
+`BlogPosting`, and every page carries breadcrumbs.
+
+**AI crawlers mostly do not run JavaScript.** GPTBot, ClaudeBot, PerplexityBot
+and CCBot receive the static `index.html` on every path — so to them `/faq`,
+`/tools` and `/blog` all look like the home page. That is the single largest SEO
+constraint on this site and it is architectural; it is written up as B-0 in
+[10-known-issues](tests/test-plan/10-known-issues.md), with prerendering as the
+fix and the reason it has not been done yet.
+
+What mitigates it is [`public/llms.txt`](public/llms.txt): a static file those
+crawlers *can* read in full, carrying the services, the contact details, the
+licence number, the affiliation disclosure, what the automated helpers refuse to
+do, and a link to every public route. It had drifted to a phone number and an
+email that do not reach her, because a file in `public/` is invisible to the
+type-checker and to every suite. `tests/contract/ai-surface.contract.test.ts`
+now derives the contact details from `src/config/contact.js` and fails on any
+other address or number in the file.
+
+`robots.txt` names each AI crawler explicitly and allows it, with a comment
+saying how to opt out of training while staying answerable in AI search.
 
 ## Blog articles in the repo
 
