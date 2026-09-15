@@ -201,8 +201,6 @@ derived from the concern, falling back to an explicit `topic` when no concern
 was recorded, and left alone for every other source.
 
 ### 4.14 `escalateToHuman` — handing over — `INT-ESC-001..005`
-=======
-### 4.8 `escalateToHuman` — handing over — `INT-ESC-001..005`
 
 Records the escalation and notifies both inboxes, stamps the record with the
 consent wording the visitor was shown, always hands the contact channels back to
