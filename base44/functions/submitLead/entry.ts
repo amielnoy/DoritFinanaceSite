@@ -244,6 +244,7 @@ function completenessLine({ answered, total, unknown }) {
 }
 
 /** סדר השדות של מסלול, כולל המשותפים. מסלול לא מוכר מקבל את המשותפים בלבד. */
+
 function interviewFields(track) {
   const chosen = INTERVIEW_TRACKS[track];
   return chosen ? [...INTERVIEW_COMMON, ...chosen.fields] : [...INTERVIEW_COMMON];
@@ -307,6 +308,10 @@ function buildAgentBody(source, data) {
     lines.push(`מסלול: ${data.trackLabel || '—'}`);
     lines.push(`נושא הפגישה: ${data.topic || '—'}`);
     lines.push(`מועד מבוקש: ${data.timing || 'לפי תיאום'}`);
+
+    lines.push(`נושא הפגישה: ${data.topic || '—'}`);
+    lines.push(`מועד מבוקש: ${data.timing || 'לפי תיאום'}`);
+
     lines.push(``, `פרופיל המבקר (כפי שאישר אותו בשיחה):`);
     if (data.profile && data.profile.length) {
       for (const [label, value] of data.profile) lines.push(`${label}: ${value}`);
@@ -425,6 +430,7 @@ function buildAgentHtml(source, data, ops) {
         detailRow('נושא הפגישה', data.topic),
         detailRow('מועד מבוקש', data.timing || 'לפי תיאום', { last: true }),
       ].join(''))
+    what = block('הראיון', detailRow('מסלול', data.trackLabel, { last: true }))
       + block(
           'פרופיל המבקר · כפי שאישר אותו בשיחה',
           rows.length
@@ -650,6 +656,7 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track } = body || {};
 
     if (!name || !phone) {
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
@@ -686,6 +693,11 @@ export default async function(req) {
     // ראיון חלקי: הרשומה נשמרת ואיש אינו מקבל הודעה. ההודעה שייכת לראיון
     // שהושלם — מייל על כל מי שהתחיל לענות היה הופך את התיבה לרעש.
     const partial = source === 'interview' && stage === 'partial';
+
+    const data = {
+      name, phone, email, topic: effectiveTopic, timing,
+      message: safeMessage, notes, summary: safeSummary,
+      profile: safeProfile, trackLabel, completeness,
 
     const data = {
       name, phone, email, topic: effectiveTopic, timing,
@@ -733,6 +745,8 @@ export default async function(req) {
         timing: timing || '',
         message: leadMessage,
         status: partial ? 'partial' : 'new',
+        message: profileText || safeMessage || notes || '',
+        status: 'new',
       });
       leadId = lead?.id ?? null;
     } catch (e) {

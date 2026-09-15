@@ -48,6 +48,7 @@ describe("adapter → submitLead", () => {
   // site collects. The test below keeps this list honest by requiring the
   // function to actually destructure every name in it.
   const AGENT_ONLY = ["summary", "track", "profile", "stage", "meetingTopic"];
+  const AGENT_ONLY = ["summary", "track", "profile"];
 
   it("exactly one adapter owns the call", () => {
     // Previously three components each built this payload by hand. The contract
