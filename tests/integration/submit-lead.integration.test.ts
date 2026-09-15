@@ -17,6 +17,7 @@ import { invokeFunction } from "../helpers/base44-function";
 
 const AGENCY = "dorit@govari-fin.co.il";
 const OPS = "amielnoy@gmail.com";
+const OPS2 = "amielnoy@outlook.com";
 
 const consultation = {
   name: "יעל כהן",
@@ -44,7 +45,7 @@ describe("submitLead — the enquiry actually lands", () => {
       status: "new",
     });
 
-    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, AGENCY, "yael@example.com"].sort());
+    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, OPS2, AGENCY, "yael@example.com"].sort());
     expect(r.callsTo("graph.microsoft.com")).toHaveLength(1);
   });
 
@@ -118,7 +119,7 @@ describe("submitLead — the enquiry actually lands", () => {
 
   it("skips the visitor's confirmation when no address was given", async () => {
     const r = await invokeFunction("submitLead", { ...consultation, email: "" });
-    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, AGENCY].sort());
+    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, OPS2, AGENCY].sort());
     expect(r.status).toBe(200);
   });
 });
@@ -340,7 +341,7 @@ describe("submitLead — a finished introduction interview", () => {
     source: "interview",
     topic: "דמי ניהול בקרן ההשתלמות",
     message:
-      "[ראיון היכרות]\n\n· בן 52, נשוי, שני ילדים, שכיר בהייטק.\n" +
+      "· בן 52, נשוי, שני ילדים, שכיר בהייטק.\n" +
       "· קיימים: פנסיה, קרן השתלמות, ביטוח חיים. חסר: ביטוח בריאות פרטי.\n" +
       "· דאגה מרכזית: דמי הניהול בקרן ההשתלמות.\n" +
       "· יעד עיקרי: פרישה מסודרת בעוד כעשור.",
@@ -351,7 +352,7 @@ describe("submitLead — a finished introduction interview", () => {
 
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ ok: true, warnings: [] });
-    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, AGENCY, "uri@example.com"].sort());
+    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, OPS2, AGENCY, "uri@example.com"].sort());
     for (const to of [AGENCY, OPS]) {
       expect(r.mailTo(to).html, to).toContain("<table");
       expect(r.mailTo(to).text, to).toBeTruthy();
@@ -377,6 +378,11 @@ describe("submitLead — a finished introduction interview", () => {
     // Same headline in the body, so subject and content cannot drift apart.
     expect(r.mailTo(AGENCY).html).toContain("סיכום ראיון היכרות");
     expect(r.mailTo(AGENCY).text).toContain("סיכום ראיון היכרות");
+    // And the kicker above it agrees. It was hardcoded to "פנייה מהאתר", so the
+    // letter opened by calling an interview an enquiry one line above a heading
+    // that called it an interview.
+    expect(r.mailTo(AGENCY).html).toContain("ראיון היכרות</p>");
+    expect(r.mailTo(AGENCY).html).not.toContain("פנייה מהאתר");
   });
 
   it("lays the profile out under its own heading", async () => {
@@ -396,7 +402,10 @@ describe("submitLead — a finished introduction interview", () => {
       status: "new",
       topic: "דמי ניהול בקרן ההשתלמות",
     });
-    expect(r.leads[0].message).toContain("[ראיון היכרות]");
+    // מה שמסמן ראיון הוא השדה, לא תווית בתוך הטקסט: התווית הייתה כפילות של
+    // source ונראתה במייל כשורה מיותרת מתחת לכותרת שכבר אומרת את אותו דבר.
+    expect(r.leads[0].message).toContain("שכיר בהייטק");
+    expect(r.leads[0].message).not.toMatch(/^\[/);
   });
 
   it("books no calendar slot — an interview agrees no time", async () => {
@@ -411,7 +420,7 @@ describe("submitLead — a finished introduction interview", () => {
     // mid-conversation and the model can reflect it back into the summary.
     const r = await invokeFunction("submitLead", {
       ...interview,
-      message: "[ראיון היכרות]\n\n· מסר את ת״ז 123456789 באמצע השיחה.",
+      message: "· מסר את ת״ז 123456789 באמצע השיחה.",
     });
     for (const mail of r.emails) {
       expect(`${mail.html ?? ""}${mail.text ?? ""}`, mail.to).not.toContain("123456789");
@@ -437,6 +446,193 @@ describe("submitLead — a finished introduction interview", () => {
   it("still lands when no address was given, because the staff copies matter", async () => {
     const r = await invokeFunction("submitLead", { ...interview, email: "" });
     expect(r.status).toBe(200);
-    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, AGENCY].sort());
+    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, OPS2, AGENCY].sort());
+  });
+});
+
+/**
+ * The interview's fixed schema.
+ *
+ * The interview used to end in a paragraph the model composed, which read well
+ * and compared to nothing: what got collected changed from conversation to
+ * conversation depending on what the model chose to remember. It now hands over
+ * named fields, chosen by a track derived from the visitor's goal, and the
+ * function decides what is renderable — so a key the model invents cannot reach
+ * Dorit or the record.
+ */
+describe("submitLead — the interview schema", () => {
+  const pension = {
+    name: "אורי לוי",
+    phone: "0541112233",
+    email: "",
+    source: "interview",
+    topic: "דמי ניהול",
+    track: "pension",
+    profile: {
+      life_stage: "בן 52, נשוי, שני ילדים",
+      goal: "פרישה מסודרת בעוד כעשור",
+      concern: "דמי הניהול נראים גבוהים",
+      employer: "שכיר בהייטק",
+      seniority: "בערך 14 שנה",
+      products: "פנסיה, השתלמות. אין ביטוח בריאות פרטי",
+      fees: "לא ידוע למבקר",
+    },
+  };
+
+  it("renders every field of the track, with its label", async () => {
+    const r = await invokeFunction("submitLead", pension);
+    const html = r.mailTo(AGENCY).html!;
+    for (const label of ["שלב חיים", "יעד עיקרי", "דאגה מרכזית", "מעסיק / מעמד תעסוקתי", "ותק", "מוצרים קיימים"]) {
+      expect(html, label).toContain(label);
+    }
+    for (const value of ["בן 52, נשוי, שני ילדים", "שכיר בהייטק", "בערך 14 שנה", "לא ידוע למבקר"]) {
+      expect(html, value).toContain(value);
+    }
+  });
+
+  it("names the track it ran", async () => {
+    const r = await invokeFunction("submitLead", pension);
+    expect(r.mailTo(AGENCY).html).toContain("פנסיה, גמל והשתלמות");
+    expect(r.mailTo(AGENCY).text).toContain("פנסיה, גמל והשתלמות");
+  });
+
+  it("drops a key the model invented", async () => {
+    // The whitelist is the point: a schema the model can extend is not a schema.
+    const r = await invokeFunction("submitLead", {
+      ...pension,
+      profile: { ...pension.profile, estimated_savings: "₪840,000", advice: "כדאי לנייד" },
+    });
+    for (const mail of r.emails) {
+      const all = `${mail.html ?? ""}${mail.text ?? ""}`;
+      expect(all, mail.to).not.toContain("840,000");
+      expect(all, mail.to).not.toContain("כדאי לנייד");
+    }
+    expect(JSON.stringify(r.leads[0])).not.toContain("840,000");
+  });
+
+  it("renders only the fields of the track it was given", async () => {
+    // An insurance field arriving on a pension interview is a model mistake,
+    // not a new column.
+    const r = await invokeFunction("submitLead", {
+      ...pension,
+      profile: { ...pension.profile, health_flag: "יש נושא לדיון בפגישה" },
+    });
+    expect(r.mailTo(AGENCY).html).not.toContain("סוגיה בריאותית");
+  });
+
+  it("omits a field the visitor never answered, rather than printing a dash", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...pension,
+      profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
+    });
+    const html = r.mailTo(AGENCY).html!;
+    expect(html).toContain("שלב חיים");
+    expect(html).not.toContain("ותק");
+  });
+
+  it("redacts an identifier the model echoed into a field", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...pension,
+      profile: { ...pension.profile, employer: "שכיר, ת״ז 123456789" },
+    });
+    for (const mail of r.emails) {
+      expect(`${mail.html ?? ""}${mail.text ?? ""}`, mail.to).not.toContain("123456789");
+    }
+    expect(JSON.stringify(r.leads[0])).not.toContain("123456789");
+  });
+
+  it("stores the same fields it mailed, so record and mail cannot disagree", async () => {
+    const r = await invokeFunction("submitLead", pension);
+    const stored = r.leads[0].message as string;
+    expect(stored).toContain("שלב חיים: בן 52, נשוי, שני ילדים");
+    expect(stored).toContain("ותק: בערך 14 שנה");
+  });
+
+  it("carries the collect-not-advise declaration on every interview", async () => {
+    const r = await invokeFunction("submitLead", pension);
+    for (const to of [AGENCY, OPS]) {
+      for (const part of [r.mailTo(to).html, r.mailTo(to).text]) {
+        expect(part, to).toContain("אינו בירור צרכים");
+      }
+    }
+  });
+
+  it("runs the insurance track off the same machinery", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...pension,
+      track: "insurance",
+      profile: {
+        life_stage: "בת 41, נשואה",
+        goal: "להגן על המשפחה",
+        concern: "אין ביטוח חיים",
+        dependents: "בן זוג ושלושה ילדים",
+        mortgage: "יש, עוד כ-18 שנה",
+        health_flag: "יש נושא לדיון בפגישה",
+        coverage: "ביטוח בריאות דרך העבודה בלבד",
+      },
+    });
+    const html = r.mailTo(AGENCY).html!;
+    expect(html).toContain("ביטוחי חיים ובריאות");
+    expect(html).toContain("תלויים");
+    expect(html).toContain("בן זוג ושלושה ילדים");
+    // The flag is a flag. Nothing downstream should ever hold a description.
+    expect(html).toContain("יש נושא לדיון בפגישה");
+  });
+
+  it("still works for an interview sent without a schema at all", async () => {
+    // The free-text path predates the schema and is what a mid-deploy agent
+    // still sends; it must not start dropping summaries.
+    const r = await invokeFunction("submitLead", {
+      name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
+      topic: "דמי ניהול", message: "· בן 52, שכיר.\n· דאגה: דמי ניהול.",
+    });
+    expect(r.status).toBe(200);
+    expect(r.mailTo(AGENCY).html).toContain("דאגה: דמי ניהול");
+  });
+});
+
+/**
+ * Two mailboxes, one team.
+ *
+ * The operations copy goes to more than one address now. The risk in a list is
+ * not that it is wrong on the happy path — it is that somebody folds it back
+ * into a single call, or wraps the whole loop in one `try`, at which point the
+ * first mailbox to bounce silently takes the rest of the list with it.
+ */
+describe("submitLead — the operations mailboxes", () => {
+  const lead = {
+    name: "יעל כהן", phone: "0521234567", email: "",
+    source: "consultation", topic: "פנסיה", timing: "השבוע",
+  };
+
+  it("sends the same operations copy to every mailbox", async () => {
+    const r = await invokeFunction("submitLead", lead);
+    const first = r.mailTo(OPS);
+    const second = r.mailTo(OPS2);
+    expect(second.subject).toBe(first.subject);
+    expect(second.html).toBe(first.html);
+    expect(second.text).toBe(first.text);
+    // And it is the operations copy, not the agency's: appendix included.
+    expect(second.html).toContain("מצב תפעולי");
+  });
+
+  it("keeps the agency copy free of the appendix, with the list in place", async () => {
+    const r = await invokeFunction("submitLead", lead);
+    expect(r.mailTo(AGENCY).html).not.toContain("מצב תפעולי");
+  });
+
+  it("delivers to the second mailbox when the first bounces", async () => {
+    const r = await invokeFunction("submitLead", lead, { failEmailTo: [OPS] });
+    expect(r.emails.map((e) => e.to)).toContain(OPS2);
+    expect(r.json.warnings).toContain("notify_email_failed");
+    // The lead still stored, and the agency still told.
+    expect(r.status).toBe(200);
+    expect(r.emails.map((e) => e.to)).toContain(AGENCY);
+  });
+
+  it("delivers to the first when the second bounces", async () => {
+    const r = await invokeFunction("submitLead", lead, { failEmailTo: [OPS2] });
+    expect(r.emails.map((e) => e.to)).toContain(OPS);
+    expect(r.json.warnings).toContain("notify_email_failed");
   });
 });

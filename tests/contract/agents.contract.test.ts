@@ -256,17 +256,19 @@ describe("who receives a lead, and whether the consent text admits it", () => {
    * the wrong end of the problem. The two assertions below are what catch it.
    */
   const outsideGetsFullLead =
-    /to: NOTIFY_EMAIL,[\s\S]{0,400}?(?:body|text): `\$\{agentBody\}/.test(submitLead) ||
-    /to: NOTIFY_EMAIL,[\s\S]{0,400}?html: buildAgentHtml\(\s*source,\s*data\b/.test(submitLead);
+    /for \(const to of NOTIFY_EMAILS\)/.test(submitLead) &&
+    (/const opsHtml = buildAgentHtml\(\s*source,\s*data\b/.test(submitLead) ||
+      /const opsText = `\$\{agentBody\}/.test(submitLead));
 
   it("reads the outside recipient's payload off a send that exists", () => {
     // Guards the detector above rather than the code: a renamed builder or a
     // reshaped SendEmail call would quietly turn every check in this block into
     // an assertion about a branch that no longer runs.
-    expect(submitLead, "no send to NOTIFY_EMAIL found at all").toMatch(/to: NOTIFY_EMAIL,/);
+    expect(submitLead, "no ops mailbox list found at all").toMatch(/const NOTIFY_EMAILS = \[/);
+    expect(submitLead, "nothing sends to the ops mailboxes").toMatch(/for \(const to of NOTIFY_EMAILS\)/);
     expect(
       outsideGetsFullLead,
-      "a send to NOTIFY_EMAIL exists but carries neither agentBody nor buildAgentHtml — " +
+      "a send to NOTIFY_EMAILS exists but carries neither agentBody nor buildAgentHtml — " +
         "if that is deliberate, narrow the consent text with it; if the call was just " +
         "reshaped, teach outsideGetsFullLead the new shape",
     ).toBe(true);
@@ -352,7 +354,84 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     });
 
     it("carries the same data-minimisation rule as the booking agent", () => {
-      expect(interview.instructions).toMatch(/אל תכלול ת"ז, מספרי חשבון או פוליסה/);
+      // Broader than the booking agent's, because a schema invites a model to
+      // fill every field: balances, accrual and medical detail are named too.
+      expect(interview.instructions).toMatch(/אל תכלול בשום שדה ת"ז/);
+      for (const forbidden of ["מספרי חשבון", "נתוני שכר", "יתרות", "צבירה", "פירוט רפואי"]) {
+        expect(interview.instructions, forbidden).toMatch(new RegExp(forbidden));
+      }
+    });
+
+    /**
+     * The schema exists in two places and has to agree in both.
+     *
+     * `INTERVIEW_TRACKS` in submitLead decides what is rendered and stored; the
+     * prompt decides what is asked. A track added to one and not the other
+     * fails silently in the direction that matters least visibly — the agent
+     * collects fields the function drops on the floor, and Dorit gets a mail
+     * missing exactly the answers the visitor took the trouble to give.
+     */
+    describe("the interview schema agrees between prompt and function", () => {
+      const fn = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+      const tracks = [...fn.matchAll(/^  ([a-z_]+): \{\n    label:/gm)].map((m) => m[1]);
+
+      it("declares tracks in the function at all", () => {
+        expect(tracks.length, "INTERVIEW_TRACKS parsed as empty").toBeGreaterThan(1);
+      });
+
+      it("offers every function track to the model", () => {
+        for (const track of tracks) {
+          expect(interview.instructions, `track '${track}' is never named in the prompt`)
+            .toMatch(new RegExp(`track='${track}'`));
+        }
+      });
+
+      it("asks for every field the function is willing to render", () => {
+        // Field keys, per track, straight out of the table.
+        const body = fn.slice(fn.indexOf("const INTERVIEW_TRACKS"), fn.indexOf("\n};", fn.indexOf("const INTERVIEW_TRACKS")));
+        const keys = [...body.matchAll(/\['([a-z_]+)',/g)].map((m) => m[1]);
+        expect(keys.length).toBeGreaterThan(4);
+        for (const key of new Set(keys)) {
+          expect(interview.instructions, `field '${key}' is rendered but never asked for`)
+            .toMatch(new RegExp(`\\b${key}\\b`));
+        }
+      });
+
+      it("names the three fields every track carries", () => {
+        for (const common of ["life_stage", "goal", "concern"]) {
+          expect(fn).toMatch(new RegExp(`'${common}'`));
+          expect(interview.instructions).toMatch(new RegExp(`\\b${common}\\b`));
+        }
+      });
+    });
+
+    /**
+     * The interview looks like a needs analysis and is not one, and that
+     * difference is regulatory rather than stylistic. It is said to the visitor
+     * in the opening; this pins the copy that travels with the summary, so a
+     * reader coming to it later sees what the document is not.
+     */
+    it("declares that it collects rather than advises, in both places", () => {
+      expect(interview.instructions).toMatch(/אני אוסף מידע, לא מייעץ/);
+      const fn = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+      expect(fn).toMatch(/INTERVIEW_DECLARATION/);
+      expect(fn).toMatch(/אינו בירור צרכים/);
+    });
+
+    /**
+     * The one field that had to be narrowed to ship at all.
+     *
+     * A general medical picture is what a licensed agent needs for underwriting
+     * and is exactly what §3 of every prompt forbids this agent from asking —
+     * `sensitive_data` escalation exists for a visitor who volunteers it. So the
+     * track records a flag and never a description, and this fails if the
+     * question ever grows back into asking what the condition is.
+     */
+    it("takes a health flag and never a medical description", () => {
+      expect(interview.instructions).toMatch(/health_flag/);
+      expect(interview.instructions).toMatch(/אל תשאל מה, אל תתעד תיאור, אבחנה, תרופה או טיפול/);
+      // And nothing downstream grew a place to put one.
+      expect(read(join(REPO_ROOT, "base44/entities/Lead.jsonc"))).not.toMatch(/medical|רפואי/);
     });
 
     it("does not confirm a save that failed", () => {

@@ -108,7 +108,20 @@ itself passes through `redact()`, unlike a message a visitor typed, and the
 visitor's own confirmation names the topic without mailing the bullets back. A
 last case pins that the staff copies still go out when no address was given.
 
-### 4.7 `escalateToHuman` — handing over — `INT-ESC-001..005`
+### 4.7 `submitLead` — the interview schema — `INT-LEAD-039..048`
+
+The interview hands over named fields rather than a paragraph, under a track
+derived from the visitor's goal, and these run all of it. Every field of a track
+renders with its label and the track names itself; a key the model invented is
+dropped from both the mail and the record; a field belonging to another track
+does not render; an unanswered field is omitted rather than printed as a dash;
+an identifier echoed into a field is redacted everywhere; the record stores the
+same fields that were mailed, so the two cannot disagree. Two cases cover the
+rest of the contract: the collect-not-advise declaration rides on every
+interview to both staff copies, and the pre-schema free-text path still works —
+that is what a mid-deploy agent is still sending.
+
+### 4.8 `escalateToHuman` — handing over — `INT-ESC-001..005`
 
 Records the escalation and notifies both inboxes, stamps the record with the
 consent wording the visitor was shown, always hands the contact channels back to

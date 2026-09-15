@@ -180,7 +180,7 @@ describe("Phishing — the site's name on somebody else's message", () => {
       );
       for (const e of new Set(emails)) {
         expect(
-          ["dorit@govari-fin.co.il", "amielnoy@gmail.com"].includes(e),
+          ["dorit@govari-fin.co.il", "amielnoy@gmail.com", "amielnoy@outlook.com"].includes(e),
           `unexpected address ${e}`,
         ).toBe(true);
       }

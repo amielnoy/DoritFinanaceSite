@@ -19,6 +19,7 @@ import { invokeFunction } from "../helpers/base44-function";
 
 const AGENCY = "dorit@govari-fin.co.il";
 const OPS = "amielnoy@gmail.com";
+const OPS2 = "amielnoy@outlook.com";
 
 const escalation = {
   reason: "product_recommendation",
@@ -44,7 +45,7 @@ describe("escalateToHuman — handing a conversation to a person", () => {
       escalation_reason: "product_recommendation",
       handled_by_agent: "needs_interview",
     });
-    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, AGENCY].sort());
+    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, OPS2, AGENCY].sort());
   });
 
   it("stores the consent the visitor was shown, so a record ties to its wording", async () => {
@@ -170,7 +171,7 @@ describe("escalateToHuman — the notification outranks the record", () => {
     // given a way to reach a person, so the agent can read it out.
     const r = await invokeFunction("escalateToHuman", escalation, {
       failLeadWrite: true,
-      failEmailTo: [AGENCY, OPS],
+      failEmailTo: [AGENCY, OPS, OPS2],
     });
     expect(r.status).toBe(200);
     expect(r.json.notified).toBe(false);
@@ -180,5 +181,22 @@ describe("escalateToHuman — the notification outranks the record", () => {
   it("names the agent that handed over, so a pattern is visible later", async () => {
     const r = await invokeFunction("escalateToHuman", escalation);
     expect(r.mailTo(AGENCY).body).toContain("needs_interview");
+  });
+});
+
+describe("escalateToHuman — the operations mailboxes", () => {
+  it("notifies both operations mailboxes as well as the agency", async () => {
+    const r = await invokeFunction("escalateToHuman", escalation);
+    for (const to of [OPS, OPS2, AGENCY]) {
+      expect(r.emails.map((e) => e.to), to).toContain(to);
+    }
+  });
+
+  it("still reports notified when only one mailbox bounces", async () => {
+    // An escalation that reached nobody is a regulatory failure; one that
+    // reached two of three is not, and must not be reported as one.
+    const r = await invokeFunction("escalateToHuman", escalation, { failEmailTo: [OPS] });
+    expect(r.json.notified).toBe(true);
+    expect(r.emails.map((e) => e.to)).toContain(OPS2);
   });
 });
