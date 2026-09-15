@@ -187,6 +187,62 @@ const INTERVIEW_TRACKS = {
   },
 };
 
+// ── ראיון אחד, רשומה אחת ──────────────────────────────────────────────────
+//
+// הסוכן מוסר את הראיון פעמיים: פעם אחת ברגע שיש שם, טלפון ויעד — לפני שאלות
+// המסלול — ופעם שנייה בסיומו. הקריאה הראשונה נועדה למי שנוטש: עד כה פרטי הקשר
+// נאספו אחרונים, ולכן מבקר שענה על ארבע שאלות וסגר את החלון נעלם בלי שייוותר
+// דבר. עכשיו נשארת רשומה, מסומנת כ-partial.
+//
+// הקריאה השנייה מעדכנת את אותה רשומה במקום ליצור שנייה — וזו גם ההגנה מפני
+// מבקר שמריץ את הראיון שלוש פעמים.
+const INTERVIEW_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * הראיון הפתוח של אותו מספר טלפון, אם קיים בחלון הזמן.
+ *
+ * החיפוש מיטבי: אם הוא נכשל נוצרת רשומה חדשה, כי רשומה כפולה עדיפה על ראיון
+ * שאבד. נעשה ב-asServiceRole מפני שקריאת Lead חסומה ל-RLS של מנהל בלבד.
+ */
+async function findOpenInterview(base44, phone) {
+  if (!phone) return null;
+  try {
+    const found = await base44.asServiceRole.entities.Lead.filter({
+      phone,
+      source: 'interview',
+    });
+    const cutoff = Date.now() - INTERVIEW_WINDOW_MS;
+    const open = (found || []).filter((lead) => {
+      const at = Date.parse(lead?.created_date ?? '');
+      return Number.isNaN(at) ? true : at >= cutoff;
+    });
+    // האחרון קודם: ריצה חוזרת מתחברת לראיון העדכני ולא לישן.
+    return open.length ? open[open.length - 1] : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * כמה מהשדות של המסלול נענו בפועל.
+ *
+ * בלי זה ראיון יסודי וראיון בן שתי תשובות נראים אותו דבר במבט ראשון, ואי אפשר
+ * לתעדף. ההפרדה בין "נענה: לא ידוע" ל"לא נשאל" נשמרת כאן: ערך שנמסר כ"לא ידוע"
+ * נספר כתשובה — זו אינפורמציה על המבקר — ושדה חסר אינו נספר כלל.
+ */
+function interviewCompleteness(rows, track) {
+  const total = interviewFields(track).length;
+  const answered = rows.length;
+  const unknown = rows.filter(([, value]) => /^לא ידוע/.test(String(value))).length;
+  return { answered, total, unknown };
+}
+
+/** "5 מתוך 7 שדות נענו · 2 מהם לא ידועים למבקר" */
+function completenessLine({ answered, total, unknown }) {
+  const base = `${answered} מתוך ${total} שדות נענו`;
+  return unknown ? `${base} · ${unknown} מהם לא ידועים למבקר` : base;
+}
+
 /** סדר השדות של מסלול, כולל המשותפים. מסלול לא מוכר מקבל את המשותפים בלבד. */
 function interviewFields(track) {
   const chosen = INTERVIEW_TRACKS[track];
@@ -249,12 +305,15 @@ function buildAgentBody(source, data) {
     lines.push(``, `הודעה אישית:`, data.message || '—');
   } else if (source === 'interview') {
     lines.push(`מסלול: ${data.trackLabel || '—'}`);
+    lines.push(`נושא הפגישה: ${data.topic || '—'}`);
+    lines.push(`מועד מבוקש: ${data.timing || 'לפי תיאום'}`);
     lines.push(``, `פרופיל המבקר (כפי שאישר אותו בשיחה):`);
     if (data.profile && data.profile.length) {
       for (const [label, value] of data.profile) lines.push(`${label}: ${value}`);
     } else {
       lines.push(data.message || '—');
     }
+    if (data.completeness) lines.push(`שלמות: ${completenessLine(data.completeness)}`);
     lines.push(``, `— ${INTERVIEW_DECLARATION}`);
   } else {
     lines.push(``, `הודעה:`, data.message || '—');
@@ -360,7 +419,12 @@ function buildAgentHtml(source, data, ops) {
     // הראיון אינו בקשה אלא פרופיל. השדות קבועים ונגזרים מהמסלול, ולכן שני
     // ראיונות באותו מסלול נקראים אותו דבר ואפשר להשוות ביניהם.
     const rows = data.profile ?? [];
-    what = block('הראיון', detailRow('מסלול', data.trackLabel, { last: true }))
+    what = block('הראיון', [
+        detailRow('מסלול', data.trackLabel),
+        detailRow('שלמות', data.completeness ? completenessLine(data.completeness) : ''),
+        detailRow('נושא הפגישה', data.topic),
+        detailRow('מועד מבוקש', data.timing || 'לפי תיאום', { last: true }),
+      ].join(''))
       + block(
           'פרופיל המבקר · כפי שאישר אותו בשיחה',
           rows.length
@@ -585,7 +649,7 @@ export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic } = body || {};
 
     if (!name || !phone) {
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
@@ -606,14 +670,31 @@ export default async function(req) {
     const safeProfile = source === 'interview' ? buildInterviewProfile(profile, track) : [];
     const trackLabel = INTERVIEW_TRACKS[track]?.label || '';
     const profileText = safeProfile.map(([label, value]) => `${label}: ${value}`).join('\n');
+    const completeness = source === 'interview' ? interviewCompleteness(safeProfile, track) : null;
+
+    // הדאגה המרכזית נשאלה כבר כשדה בסכימה. עד כה הסוכן התבקש למסור אותה שוב
+    // כ-topic, כלומר אותה עובדה פעמיים, ואחד העותקים אינו מוצג לדורית כלל.
+    // כאן היא נגזרת מהסכימה, ו-topic נותר לטפסים שבאמת שולחים אותו.
+    // הראיון מתאם כעת גם את הפגישה, ולכן יש לו שני "נושאים": הדאגה שהביאה את
+    // המבקר, והנושא שעליו סוכם להיפגש. מה שנרשם ברשומה הוא השני — זה מה שדורית
+    // מכינה לקראתו — והדאגה נשארת בפרופיל, שם היא כבר מוצגת.
+    const concern = safeProfile.find(([label]) => label === 'דאגה מרכזית')?.[1] || '';
+    const effectiveTopic = source === 'interview'
+      ? (meetingTopic || concern || topic || '')
+      : topic;
+
+    // ראיון חלקי: הרשומה נשמרת ואיש אינו מקבל הודעה. ההודעה שייכת לראיון
+    // שהושלם — מייל על כל מי שהתחיל לענות היה הופך את התיבה לרעש.
+    const partial = source === 'interview' && stage === 'partial';
 
     const data = {
-      name, phone, email, topic, timing,
+      name, phone, email, topic: effectiveTopic, timing,
       message: safeMessage, notes, summary: safeSummary,
-      profile: safeProfile, trackLabel,
+      profile: safeProfile, trackLabel, completeness,
     };
     const agentBody = buildAgentBody(source, data);
     const subject = subjectFor(source, data);
+    const leadMessage = profileText || safeMessage || notes || '';
 
     // ── סדר הפעולות ─────────────────────────────────────────────────────
     // הפנייה נשמרת ראשונה. המייל הוא הערוץ השביר (מסירה, דומיין מאומת,
@@ -624,16 +705,34 @@ export default async function(req) {
     // database is the reliable one, so a failed send can no longer lose the
     // enquiry; only a failed write is reported to the caller as an error.
     let leadId = null;
-    try {
+
+    // ראיון שכבר נפתח בשיחה הזו מתעדכן במקום להיווצר מחדש.
+    const openInterview = source === 'interview' ? await findOpenInterview(base44, phone) : null;
+    if (openInterview?.id) {
+      try {
+        await base44.asServiceRole.entities.Lead.update(openInterview.id, {
+          email: email || openInterview.email || '',
+          topic: effectiveTopic || '',
+          message: leadMessage,
+          status: partial ? 'partial' : 'new',
+        });
+        leadId = openInterview.id;
+      } catch (e) {
+        return Response.json(
+          { error: 'לא הצלחנו לעדכן את הפנייה. נסו שוב או צרו קשר ישירות.', details: e?.message },
+          { status: 500 }
+        );
+      }
+    } else try {
       const lead = await base44.entities.Lead.create({
         name,
         phone,
         email: email || '',
         source: source || 'quick',
-        topic: topic || '',
+        topic: effectiveTopic || '',
         timing: timing || '',
-        message: profileText || safeMessage || notes || '',
-        status: 'new',
+        message: leadMessage,
+        status: partial ? 'partial' : 'new',
       });
       leadId = lead?.id ?? null;
     } catch (e) {
@@ -647,6 +746,13 @@ export default async function(req) {
     // מכאן והלאה — מיטבי. הפנייה כבר שמורה, ולכן כשל בהודעה מדווח
     // בתשובה במקום להיכשל, כדי שניתן יהיה לנטר אותו.
     const warnings = [];
+
+    // ראיון חלקי נגמר בשמירה. הוא ימשיך להתעדכן כשהמבקר יסיים; אם לא יסיים,
+    // הרשומה נשארת כ-partial וגלויה במסך הפניות — וזה ההבדל בין נוטש שנעלם
+    // לנוטש שאפשר לחזור אליו.
+    if (partial) {
+      return Response.json({ ok: true, leadId, stage: 'partial', notified: false, warnings });
+    }
 
     // הודעה לדורית — הפנייה המלאה, כולל תקציר השיחה אם הסוכן מסר אחד.
     // ההודעה התפעולית נשלחת בסוף, אחרי היומן, כדי שתוכל לדווח גם עליו.
@@ -685,8 +791,11 @@ export default async function(req) {
     }
 
     // יצירת אירוע תזכורת ביומן Outlook — מיטבי, רק עבור בקשות ייעוץ
-    let calendar = source === 'consultation' ? 'לא נוצר' : 'לא רלוונטי';
-    if (source === 'consultation') try {
+    // הראיון מתאם פגישה בעצמו מאז שסוכן התיאום מוזג לתוכו, ולכן הוא מקבל
+    // תזכורת ביומן בדיוק כמו בקשת ייעוץ — אבל רק כשבאמת סוכם מועד.
+    const booksCalendar = source === 'consultation' || (source === 'interview' && Boolean(scheduledAt));
+    let calendar = booksCalendar ? 'לא נוצר' : 'לא רלוונטי';
+    if (booksCalendar) try {
       const { accessToken } = await base44.asServiceRole.connectors.getConnection('outlook');
       if (accessToken) {
         let calStartIso, calEndIso;

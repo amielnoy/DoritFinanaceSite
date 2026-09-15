@@ -43,6 +43,10 @@ export interface HarnessOptions {
   connections?: Record<string, string | null>;
   /** Make the entity write fail, as a database outage would. */
   failLeadWrite?: boolean;
+  /** Rows the function can find before it writes — see `stored` in the harness. */
+  existingLeads?: Record<string, unknown>[];
+  /** Make the entity lookup fail, leaving the function to create rather than update. */
+  failLeadLookup?: boolean;
   /** Recipients whose delivery should throw. */
   failEmailTo?: string[];
   /** Make every outbound HTTP call fail. */
@@ -55,6 +59,8 @@ export interface Invocation {
   status: number;
   json: Record<string, unknown>;
   leads: Record<string, unknown>[];
+  /** Updates applied to rows that already existed, in order. */
+  leadUpdates: { id: string; fields: Record<string, unknown> }[];
   emails: EmailCall[];
   fetches: FetchCall[];
   /** The single email sent to this address, asserted to exist exactly once. */
@@ -105,13 +111,40 @@ export async function invokeFunction(
   const factory = compiled.get(name)!;
 
   const leads: Record<string, unknown>[] = [];
+  const leadUpdates: { id: string; fields: Record<string, unknown> }[] = [];
   const emails: EmailCall[] = [];
   const fetches: FetchCall[] = [];
 
   const createLead = async (fields: Record<string, unknown>) => {
     if (options.failLeadWrite) throw new Error("simulated database outage");
-    leads.push(fields);
+    leads.push({ id: `LEAD-${leads.length + 1}`, ...fields });
     return { id: `LEAD-${leads.length}` };
+  };
+
+  /**
+   * Rows the function can find before it writes.
+   *
+   * `submitLead` looks for an interview already open on this phone number so a
+   * second call updates it rather than creating a duplicate. Without a readable
+   * store the lookup always misses, every test takes the create path, and the
+   * upsert is exercised by nothing — so seeded rows go in here and are matched
+   * on the same fields the function filters by.
+   */
+  const stored: Record<string, unknown>[] = [...(options.existingLeads ?? [])];
+
+  const filterLeads = async (where: Record<string, unknown>) => {
+    if (options.failLeadLookup) throw new Error("simulated lookup outage");
+    return stored.filter((row) =>
+      Object.entries(where).every(([field, value]) => row[field] === value),
+    );
+  };
+
+  const updateLead = async (id: string, fields: Record<string, unknown>) => {
+    if (options.failLeadWrite) throw new Error("simulated database outage");
+    const row = stored.find((r) => r.id === id);
+    if (row) Object.assign(row, fields);
+    leadUpdates.push({ id, fields });
+    return { id, ...fields };
   };
 
   const sendEmail = async (call: EmailCall) => {
@@ -128,8 +161,8 @@ export async function invokeFunction(
 
   const entities = new Proxy(
     {},
-    { get: () => ({ create: createLead }) },
-  ) as Record<string, { create: typeof createLead }>;
+    { get: () => ({ create: createLead, filter: filterLeads, update: updateLead }) },
+  ) as Record<string, unknown>;
 
   const client = {
     entities,
@@ -172,6 +205,7 @@ export async function invokeFunction(
     status: response.status,
     json,
     leads,
+    leadUpdates,
     emails,
     fetches,
     mailTo(address) {
