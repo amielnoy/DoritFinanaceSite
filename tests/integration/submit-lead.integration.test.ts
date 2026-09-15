@@ -57,33 +57,63 @@ describe("submitLead — the enquiry actually lands", () => {
     const r = await invokeFunction("submitLead", consultation);
     for (const to of [AGENCY, OPS]) {
       const mail = r.mailTo(to);
-      expect(mail.body, to).toContain("יעל כהן");
-      expect(mail.body, to).toContain("0521234567");
-      expect(mail.body, to).toContain("עברה מעביד לעצמאית השנה");
+      // Both halves, because a reader gets whichever one their client renders.
+      // A field that reached only the text copy would be invisible to everyone
+      // in practice — which is what makes checking both worth the repetition.
+      for (const [part, content] of [["html", mail.html], ["text", mail.text]] as const) {
+        expect(content, `${to} (${part})`).toContain("יעל כהן");
+        expect(content, `${to} (${part})`).toContain("0521234567");
+        expect(content, `${to} (${part})`).toContain("עברה מעביד לעצמאית השנה");
+      }
     }
   });
 
   it("adds the operational appendix only to the operations copy", async () => {
     const r = await invokeFunction("submitLead", consultation);
-    expect(r.mailTo(OPS).body).toContain("מצב תפעולי");
-    expect(r.mailTo(AGENCY).body).not.toContain("מצב תפעולי");
+    expect(r.mailTo(OPS).html).toContain("מצב תפעולי");
+    expect(r.mailTo(OPS).text).toContain("מצב תפעולי");
+    expect(r.mailTo(AGENCY).html).not.toContain("מצב תפעולי");
+    expect(r.mailTo(AGENCY).text).not.toContain("מצב תפעולי");
   });
 
   it("reports the calendar and sheet outcome in that appendix", async () => {
     const r = await invokeFunction("submitLead", consultation);
-    const ops = r.mailTo(OPS).body!;
+    const ops = r.mailTo(OPS).text!;
     expect(ops).toMatch(/יומן: אירוע נוצר/);
     // No spreadsheet is configured in this repo, so the append is skipped —
     // and says so, rather than reporting a success that never happened.
     expect(ops).toMatch(/גיליון: לא מוגדר/);
     expect(ops).toMatch(/תקלות: אין/);
+
+    // The HTML says the same, in a table — label and value are separate cells,
+    // so the pairing cannot be asserted as one string. That the values are
+    // present is the part that matters.
+    const html = r.mailTo(OPS).html!;
+    expect(html).toContain("אירוע נוצר");
+    expect(html).toContain("לא מוגדר");
   });
 
-  it("sends the staff copies as plain text and the visitor's as HTML", async () => {
+  it("sends every copy as HTML with a plain-text twin", async () => {
+    // The staff copies used to be text-only, and Gmail collapsed the newlines
+    // into one running paragraph — eight fields, no line breaks, unreadable on
+    // a phone. They are laid out now like the visitor's, and keep the text as
+    // the fallback rather than as the only form.
     const r = await invokeFunction("submitLead", consultation);
-    expect(r.mailTo(AGENCY).html).toBeUndefined();
-    expect(r.mailTo(OPS).html).toBeUndefined();
-    expect(r.mailTo("yael@example.com").html).toContain("<table");
+    for (const to of [AGENCY, OPS, "yael@example.com"]) {
+      expect(r.mailTo(to).html, to).toContain("<table");
+      expect(r.mailTo(to).text, to).toBeTruthy();
+    }
+  });
+
+  it("breaks the staff copy into blocks rather than one running paragraph", async () => {
+    // The point of the rewrite, stated as something that can fail: the reader
+    // gets separated, titled sections. Asserting on the headings rather than on
+    // markup keeps this about legibility and not about a particular table.
+    const r = await invokeFunction("submitLead", consultation);
+    const html = r.mailTo(OPS).html!;
+    for (const heading of ["מי פנה", "הבקשה", "תקציר השיחה", "מצב תפעולי"]) {
+      expect(html, heading).toContain(heading);
+    }
   });
 
   it("skips the visitor's confirmation when no address was given", async () => {
@@ -127,7 +157,40 @@ describe("submitLead — a name that is really a payload", () => {
     // Escaping the text copy too would only make the staff email unreadable.
     // This pins the boundary: escaping belongs to the HTML builder alone.
     const r = await invokeFunction("submitLead", hostile);
-    expect(r.mailTo(AGENCY).body).toContain('<a href="https://evil.example">');
+    expect(r.mailTo(AGENCY).text).toContain('<a href="https://evil.example">');
+  });
+
+  it("renders no live markup into the staff HTML either", async () => {
+    // The staff copy became a rendered email, so it inherited the vector the
+    // visitor's copy already guarded against — and this one is worse: it is the
+    // mail Dorit opens on her phone, and the attacker controls the name and the
+    // topic. Every field goes through escapeHtml; this is what says so.
+    const r = await invokeFunction("submitLead", hostile);
+    for (const to of [AGENCY, OPS]) {
+      const html = r.mailTo(to).html!;
+      expect(html, to).not.toContain("<img src=x");
+      expect(html, to).not.toContain('onerror="');
+      expect(html, to).not.toContain('<a href="https://evil.example"');
+      // Present, but as text the client displays rather than markup it runs.
+      expect(html, to).toContain("&lt;img src=x");
+      expect(html, to).toContain("&lt;a href=&quot;https://evil.example&quot;");
+    }
+  });
+
+  it("does not turn a hostile phone number into a live link", async () => {
+    // The phone is the one field rendered into an href. Anything that is not a
+    // digit or a leading + is stripped before it gets there, so the attribute
+    // cannot be escaped out of.
+    const r = await invokeFunction("submitLead", {
+      ...hostile,
+      phone: '052"><script>alert(1)</script>',
+    });
+    const html = r.mailTo(AGENCY).html!;
+    // `0521` — the digits of the payload survive (the 1 comes from `alert(1)`)
+    // and nothing else does. A useless phone number, which is the right outcome
+    // for a useless phone number; the attribute is what had to stay intact.
+    expect(html).toContain('href="tel:0521"');
+    expect(html).not.toContain("<script>");
   });
 
   it("stores the raw value, so the record matches what was submitted", async () => {
@@ -143,8 +206,8 @@ describe("submitLead — identifiers a visitor volunteered", () => {
       summary: "מסרה את ת״ז 123456789 בשיחה, ומספר כרטיס 4580 1234 5678 9012.",
     });
     for (const mail of r.emails) {
-      expect(mail.body ?? "", mail.to).not.toContain("123456789");
-      expect(mail.body ?? "", mail.to).not.toContain("4580");
+      expect(`${mail.html ?? ""}${mail.text ?? ""}`, mail.to).not.toContain("123456789");
+      expect(`${mail.html ?? ""}${mail.text ?? ""}`, mail.to).not.toContain("4580");
     }
   });
 
@@ -153,7 +216,8 @@ describe("submitLead — identifiers a visitor volunteered", () => {
       ...consultation,
       summary: "ת״ז 123456789",
     });
-    expect(r.mailTo(AGENCY).body).toContain("הושמט");
+    expect(r.mailTo(AGENCY).text).toContain("הושמט");
+    expect(r.mailTo(AGENCY).html).toContain("הושמט");
   });
 });
 
@@ -197,8 +261,8 @@ describe("submitLead — what survives a failure", () => {
 
   it("reports the calendar failure in the operations appendix", async () => {
     const r = await invokeFunction("submitLead", consultation, { failFetch: true });
-    expect(r.mailTo(OPS).body).toMatch(/יומן: לא נוצר/);
-    expect(r.mailTo(OPS).body).toMatch(/תקלות:.*calendar_event_failed/);
+    expect(r.mailTo(OPS).text).toMatch(/יומן: לא נוצר/);
+    expect(r.mailTo(OPS).text).toMatch(/תקלות:.*calendar_event_failed/);
   });
 
   it("does not attempt a calendar event without a connector token", async () => {
@@ -214,7 +278,7 @@ describe("submitLead — the calendar event it books", () => {
   it("books nothing for a quick contact form", async () => {
     const r = await invokeFunction("submitLead", { ...consultation, source: "quick" });
     expect(r.callsTo("graph.microsoft.com")).toHaveLength(0);
-    expect(r.mailTo(OPS).body).toMatch(/יומן: לא רלוונטי/);
+    expect(r.mailTo(OPS).text).toMatch(/יומן: לא רלוונטי/);
   });
 
   it("honours an explicit scheduledAt", async () => {
