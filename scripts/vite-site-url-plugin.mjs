@@ -16,8 +16,28 @@ import { join } from "node:path";
  */
 export const DEFAULT_SITE_URL = "https://safe-arch-plan.base44.app";
 
-/** Files copied from `public/` that spell the origin out. */
-export const HOST_BEARING_ASSETS = ["sitemap.xml", "robots.txt", "llms.txt"];
+/**
+ * Emitted files that spell the origin out, by their path in the build output.
+ *
+ * Three of these are copied verbatim from `public/`. The fourth is `index.html`,
+ * which is the document every visitor and every link scraper actually receives —
+ * and it was missing. Moving the host rewrote the sitemap and left the served
+ * HTML advertising the old origin in four places: `rel="canonical"`, `og:url`,
+ * and two static JSON-LD blocks.
+ *
+ * `applySeo` repairs the first two at runtime, which hides the problem from a
+ * browser and from nobody else: a social or search crawler reads the response
+ * body, and `clearRouteScoped` only removes `script[data-seo-jsonld]`, so the
+ * two JSON-LD blocks were never touched at all. That is precisely the
+ * half-happened host move this plugin exists to prevent.
+ */
+export const HOST_BEARING_ASSETS = ["index.html", "sitemap.xml", "robots.txt", "llms.txt"];
+
+/**
+ * Where each emitted file comes from, for the tests that check the checked-in
+ * copy still names the host. Everything not listed here lives in `public/`.
+ */
+export const ASSET_SOURCES = { "index.html": "index.html" };
 
 const trimTrailingSlashes = (value) => value.replace(/\/+$/, "");
 

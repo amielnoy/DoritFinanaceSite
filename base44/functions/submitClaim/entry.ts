@@ -13,9 +13,13 @@ function clientMailFor(data) {
     heading: 'קיבלנו את דיווח האירוע',
     intro: 'קיבלתי את דיווח האירוע הביטוחי והפרטים תועדו בהצלחה. אחזור אליכם אישית בהקדם האפשרי להמשך טיפול התביעה וליווי צמוד ברגע האמת.',
     panelTitle: 'פרטי האירוע',
+    // '—' rather than '': buildClientHtml drops rows with no value, so an empty
+    // string would take the row out of the HTML while the plain-text twin went
+    // on printing it — the two halves of one email disagreeing about which
+    // fields exist. A claim filed without a date should say so in both.
     details: [
       ['סוג אירוע', data.claimType || 'כללי'],
-      ['תאריך אירוע', data.eventDate || ''],
+      ['תאריך אירוע', data.eventDate || '—'],
     ],
   };
 }

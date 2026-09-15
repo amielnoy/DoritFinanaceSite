@@ -38,9 +38,38 @@ describe("production has one promoter", () => {
     expect(Object.keys(vercel.git.deploymentEnabled).sort()).toEqual(["builder", "main"]);
   });
 
-  it("keeps CI the thing that deploys, and keeps it behind the tests", () => {
+  it("keeps CI the thing that deploys", () => {
     expect(workflow).toContain("vercel deploy --prebuilt");
-    // The job must not start until the suites have, or the gate is decorative.
     expect(workflow).toMatch(/deploy-vercel:[\s\S]*?needs: \[build, test-node, test-e2e\]/);
+  });
+
+  it("promotes to production only when the suites went green", () => {
+    // This test used to be part of the one above, asserting the `needs:` line
+    // and calling that "behind the tests". It is not: `needs:` orders jobs, it
+    // does not gate them, and deploy-vercel's own `if:` requires only `build`.
+    // A red run reached the deploy step and, on main, handed it `--prod`.
+    //
+    // So assert the thing that actually decides, which is the step that chooses
+    // the flag. Deploying on red is deliberate — promoting on red is the bug.
+    const step = workflow.slice(
+      workflow.indexOf("- name: Choose production or preview"),
+      workflow.indexOf("- name: Build for Vercel"),
+    );
+    expect(step, "the step that picks --prod has moved or been renamed").toContain("prod=--prod");
+
+    for (const result of ["needs.test-node.result", "needs.test-e2e.result"]) {
+      expect(step, `--prod is not conditioned on ${result}`).toContain(result);
+    }
+    // Both suites, and the ref, on the branch that sets --prod.
+    expect(step).toMatch(/\[ "\$GITHUB_REF" = "refs\/heads\/main" \][\s\S]*?\$UNIT[\s\S]*?\$E2E[\s\S]*?prod=--prod/);
+  });
+
+  it("still deploys a red run, as a preview", () => {
+    // The reason staging exists: a failing run is when you most want the build
+    // somewhere you can open it. Narrowing the job's `if:` to green would have
+    // fixed the promotion hole by removing that, which is the wrong trade.
+    const job = workflow.slice(workflow.indexOf("  deploy-vercel:"), workflow.indexOf("  smoke:"));
+    expect(job).toMatch(/if: >-\s*\n\s*!cancelled\(\) &&\s*\n\s*needs\.build\.result == 'success'/);
+    expect(job).not.toMatch(/if:[\s\S]{0,200}needs\.test-e2e\.result == 'success' &&[\s\S]{0,80}github\.ref/);
   });
 });

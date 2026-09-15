@@ -146,8 +146,17 @@ jobs:
       #
       # `env -u` rather than a separate job: same checkout, a few seconds, and it
       # fails next to the build it is guarding.
+      #
+      # `--outDir` is not tidiness. Without it this wrote over `dist/`, and the
+      # upload below then shipped *this* bundle as the `dist` artifact — the one
+      # every e2e shard downloads. Since the point of the step is to strip
+      # VITE_BASE44_APP_ID, the whole suite was running against a bundle whose
+      # app id inlined to `undefined`, posting every form to
+      # `/api/apps/undefined/...`, and staying green only because
+      # e2e/fixtures/app.ts stubs `**/api/**` and never looks at the app id.
+      # The guard for a build must not be able to become the build.
       - name: Build the way the Base44 Builder does (no CI environment)
-        run: env -u VITE_BASE44_APP_ID -u VITE_SITE_URL -u VERCEL -u CI npm run build
+        run: env -u VITE_BASE44_APP_ID -u VITE_SITE_URL -u VERCEL -u CI npm run build -- --outDir dist-builder-check
 
       - name: Upload build output
         uses: actions/upload-artifact@v4
@@ -522,14 +531,34 @@ jobs:
       # main deploys production; `builder` deploys a preview on its own URL.
       # One job rather than two: everything else about the two is identical,
       # and a second copy would drift from this one within a week.
+      # Deploying on red is the point of staging; *promoting* on red is not.
+      #
+      # The job's own `if:` only requires `build` to have succeeded, which is
+      # deliberate — a failing run is exactly when you want the thing somewhere
+      # you can open it. But on `main` this step used to hand `--prod` to the
+      # CLI regardless, and `needs:` does not gate, it only orders. That was
+      # harmless while Vercel was staging behind a login. It stops being
+      # harmless at README step 1: once the customer domain points here, and
+      # with `vercel.json` disabling Git-triggered builds on `main` so CI is the
+      # only promoter, a red push would land on customers.
+      #
+      # So a red run still deploys — as a preview, on its own URL, which is the
+      # artefact you actually wanted. Only `--prod` waits for green.
       - name: Choose production or preview
         id: target
+        env:
+          UNIT: ${{ needs.test-node.result }}
+          E2E: ${{ needs.test-e2e.result }}
         run: |
-          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+          if [ "$GITHUB_REF" = "refs/heads/main" ] \
+            && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ]; then
             echo "prod=--prod" >> "$GITHUB_OUTPUT"
             echo "env=production" >> "$GITHUB_OUTPUT"
             echo "kind=production" >> "$GITHUB_OUTPUT"
           else
+            if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+              echo "::warning::Tests are red (unit: ${UNIT}, e2e: ${E2E}) — deploying this as a preview instead of promoting it to production."
+            fi
             echo "prod=" >> "$GITHUB_OUTPUT"
             echo "env=preview" >> "$GITHUB_OUTPUT"
             echo "kind=preview" >> "$GITHUB_OUTPUT"
@@ -962,7 +991,13 @@ jobs:
     name: Safe to merge?
     runs-on: ubuntu-latest
     needs: [build, test-node, test-e2e, deploy-vercel, allure]
-    if: always() && github.ref != 'refs/heads/main'
+    # `!cancelled()` rather than `always()`. `always()` includes cancellation,
+    # and this workflow sets `cancel-in-progress: true` — so pushing twice in
+    # quick succession cancelled run #1, whose verdict job still ran, read
+    # `E2E == 'cancelled'`, overwrote the PR's one edited comment with "do not
+    # merge" and failed the check. A superseded run has no opinion worth
+    # posting; the run that replaced it does.
+    if: ${{ !cancelled() && github.ref != 'refs/heads/main' }}
     permissions:
       contents: read
       pull-requests: write
