@@ -4,6 +4,29 @@ Use this repository to run and edit the app locally, then publish changes back t
 
 Any change pushed to the repo will also be reflected in the Base44 Builder.
 
+## The two environments
+
+| | Host | URL | Deploys when |
+| --- | --- | --- | --- |
+| **Production** | Base44 | <https://safe-arch-plan.base44.app> | a push to `main`, **only if the whole run is green** |
+| **Staging** | Vercel | the `deploy-vercel` job's URL, on the run summary | a push to `main` or `builder`, **even when the tests are red** |
+
+That difference is the point of having two, not an oversight. A failing run is exactly
+when you want the broken build somewhere you can open it, next to the Allure report that
+says what broke — so staging takes it anyway, behind Vercel's login. Only the build
+itself has to have succeeded, since otherwise there is nothing to deploy. Production is
+gated: the publish job in `.github/workflows/ci.yml` refuses to run unless `build`,
+`test-node` and every `test-e2e` shard succeeded.
+
+On `builder` the Vercel deploy is a *preview* of one change rather than a site anyone
+lives on, which is why the run summary's table is written on `main` only.
+
+Neither URL is written into the pipeline. Production comes from the `BASE44_URL`
+repository variable and staging from the deploy job's own output, both reported in the
+**Deployed sites** table on every `main` run — so the table keeps telling the truth
+through the domain move described in [Moving production to the custom
+domain](#moving-production-to-the-custom-domain), which swaps these two roles around.
+
 ## Prerequisites
 
 1. Clone the repository using the project's Git URL.

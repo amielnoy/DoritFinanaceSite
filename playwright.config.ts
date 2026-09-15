@@ -64,8 +64,26 @@ export default defineConfig({
   // The failure that followed is worth recognising: an a11y test timed out
   // waiting 10s for `#root` to stop being empty, on all three attempts. That is
   // not a broken assertion, it is the app not finishing its boot inside the
-  // budget because four WebKit instances were fighting for two cores. Raise
-  // this only alongside a runner with the cores to match.
+  // budget because four WebKit instances were fighting for two cores.
+  //
+  // "Then give it more cores" was tested too, and does not rescue it. On a
+  // 12-core machine on 2026-09-15, web-chromium ran:
+  //
+  //   2 workers  35.7s     8 workers  25.1s
+  //   4 workers  23.0s    10 workers  31.8s
+  //   6 workers  23.6s    12 workers  34.2s
+  //
+  // The curve bottoms out at 4–6 and climbs from there, with six cores still
+  // idle. These tests are not CPU-bound — they are a browser waiting on a page
+  // — and crowding them makes every one of them slower. So this number is not
+  // the lever it looks like, in CI or out of it.
+  //
+  // The lever that does work is more runners, not more workers per runner: CI
+  // splits each platform with `--shard`, which buys two real cores per shard.
+  // See the sharding note in .github/workflows/ci.yml.
+  //
+  // `undefined` locally means Playwright's own default, half the core count —
+  // 6 on a 12-core machine, which is where the curve above already bottoms out.
   workers: process.env.CI ? 2 : undefined,
 
   timeout: 45_000,

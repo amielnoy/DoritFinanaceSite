@@ -231,6 +231,36 @@ jobs:
   # feature branches and PRs: the publish job below refuses to run unless
   # test-e2e succeeded, so main's run is the gate in front of the client's
   # site. Narrowing it would quietly weaken that gate.
+  #
+  # ── Sharding ──────────────────────────────────────────────────────────────
+  #
+  # A leg is split across runners with `--shard=i/n`, each shard a job of its
+  # own. This is the only lever that actually buys wall clock here, and it is
+  # worth being precise about why the obvious one does not:
+  #
+  #   *More workers per runner does not work.* A standard runner has two cores,
+  #   so a third and fourth browser do not get a core, they get a slice of one.
+  #   Measured on 2026-09-13: four workers took web-webkit 9m22 → 11m52 and then
+  #   failed. Re-measured on 2026-09-15 on a 12-core machine, where the excuse
+  #   of too few cores does not apply, web-chromium ran 2 workers → 35.7s,
+  #   4 → 23.0s, 6 → 23.6s, 8 → 25.1s, 10 → 31.8s, 12 → 34.2s. The curve turns
+  #   upwards well before the core count: browsers are not CPU-bound here, and
+  #   crowding them makes every one of them slower. See playwright.config.ts.
+  #
+  #   *More runners does work*, because each shard is two more real cores.
+  #
+  # Shards are bought where the time actually is. The WebKit legs are the wall
+  # clock (9m22 and 8m15 against Chromium's 4m20), so they get three each and
+  # the Chromium legs two. Every shard re-pays its own setup — checkout, npm ci,
+  # the browser, the dist artifact, call it two minutes — so this trades total
+  # job-minutes for wall clock, and the trade stops being worth it quickly:
+  #
+  #   web-webkit   9m22  ≈ 2m setup + 7m20 tests  →  3 shards ≈ 2m + 2m27 ≈ 4m30
+  #   full matrix  10 jobs, ~9m22 wall → ~4m30 wall, ~32 → ~48 job-minutes
+  #
+  # Feature branches stay on a single Chromium shard. That path is already
+  # ~5 minutes, over half of it setup, so a second shard would roughly double
+  # its cost to save about a minute — on the event that fires most often.
   plan:
     name: Choose the e2e matrix
     runs-on: ubuntu-latest
@@ -241,29 +271,45 @@ jobs:
       - name: Decide which platforms this run needs
         id: pick
         run: |
-          full='[{"project":"web-chromium","browser":"chromium"},
-                 {"project":"web-webkit","browser":"webkit"},
-                 {"project":"ios-safari","browser":"webkit"},
-                 {"project":"android-chrome","browser":"chromium"}]'
-          quick='[{"project":"web-chromium","browser":"chromium"}]'
+          # project:browser:shards — the shard count lives next to the platform
+          # it pays for, so the two policies are read and changed together.
+          full='web-chromium:chromium:2 web-webkit:webkit:3 ios-safari:webkit:3 android-chrome:chromium:2'
+          quick='web-chromium:chromium:1'
+
+          # Expanded to one matrix entry per shard. `shard` and `shards` stay
+          # separate fields rather than a single "1/3": that string is fine for
+          # --shard but illegal in an artifact name, and every shard uploads one.
+          expand() {
+            local entry project browser shards shard out=""
+            for entry in $1; do
+              IFS=: read -r project browser shards <<<"$entry"
+              for shard in $(seq 1 "$shards"); do
+                out="${out}{\"project\":\"$project\",\"browser\":\"$browser\",\"shard\":$shard,\"shards\":$shards},"
+              done
+            done
+            echo "[${out%,}]"
+          }
 
           case "${{ github.event_name }}:${{ github.ref }}" in
             schedule:*|workflow_dispatch:*|*:refs/heads/main|*:refs/heads/builder)
-              echo "matrix=$(echo "$full" | tr -d '\n ')" >> "$GITHUB_OUTPUT"
-              echo "depth=all four platforms" >> "$GITHUB_OUTPUT" ;;
+              echo "matrix=$(expand "$full")" >> "$GITHUB_OUTPUT"
+              echo "depth=all four platforms, sharded across 10 runners" >> "$GITHUB_OUTPUT" ;;
             *)
-              echo "matrix=$quick" >> "$GITHUB_OUTPUT"
+              echo "matrix=$(expand "$quick")" >> "$GITHUB_OUTPUT"
               echo "depth=Chromium only — the nightly run covers WebKit and mobile" >> "$GITHUB_OUTPUT" ;;
           esac
       - name: Say so in the run summary
         run: echo "**e2e depth:** ${{ steps.pick.outputs.depth }}" >> "$GITHUB_STEP_SUMMARY"
 
-  # ── 3b. e2e: UI, API, security and accessibility, per platform ────────────
+  # ── 3b. e2e: UI, API, security and accessibility, per platform shard ──────
   test-e2e:
-    name: e2e (${{ matrix.project }})
+    name: e2e (${{ matrix.project }} ${{ matrix.shard }}/${{ matrix.shards }})
     runs-on: ubuntu-latest
     needs: [build, plan]
-    timeout-minutes: 30
+    # Per shard, not per platform: a shard is a fraction of a leg, so 30 minutes
+    # stopped being a timeout and became a licence. Ten covers the slowest leg
+    # (9m22) even unsharded, which is the failure this is meant to catch.
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -288,8 +334,18 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('package-lock.json') }}
 
+      # The cache above was being populated and then ignored: this step had no
+      # `if`, so every job re-downloaded a browser it already had on disk. That
+      # was a minute of waste per job when there were four; with ten shards it
+      # is ten. On a hit only the OS packages are installed — those live outside
+      # ~/.cache/ms-playwright and are not what the cache holds.
       - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Install Playwright OS dependencies (browser came from cache)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps ${{ matrix.browser }}
 
       - name: Download build output
         uses: actions/download-artifact@v4
@@ -298,8 +354,13 @@ jobs:
           path: dist
 
       # SKIP_BUILD: the dist/ artifact from the build job is what we test.
+      #
+      # --shard splits the leg by test, balanced by file, and Playwright makes
+      # the split itself — the shards do not need to agree with each other about
+      # anything beyond n. A single-shard leg (feature branches) passes 1/1,
+      # which is a no-op.
       - name: Run e2e suite
-        run: npx playwright test --project=${{ matrix.project }}
+        run: npx playwright test --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
         env:
           SKIP_BUILD: "1"
 
@@ -307,21 +368,25 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.project }}
+          name: playwright-report-${{ matrix.project }}-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
           retention-days: 14
 
-      # Raw Allure results, kept per platform so the allure job can merge all
-      # four platform legs — plus the Vitest job's upload — into one report.
-      # Generating per-leg would give five partial reports instead of one
-      # picture of the run.
+      # Raw Allure results, kept per platform shard so the allure job can merge
+      # every leg — plus the Vitest job's upload — into one report. Generating
+      # per-leg would give a pile of partial reports instead of one picture of
+      # the run, and sharding only makes that worse: the merge is what keeps a
+      # three-way split of web-webkit readable as one platform.
+      #
+      # The name still matches the `allure-results-*` pattern the publish job
+      # downloads, which is the only contract between the two jobs.
       - name: Upload Allure results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: allure-results-${{ matrix.project }}
+          name: allure-results-${{ matrix.project }}-${{ matrix.shard }}
           path: allure-results/
           retention-days: 7
 
