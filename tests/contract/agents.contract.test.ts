@@ -324,6 +324,77 @@ describe("who receives a lead, and whether the consent text admits it", () => {
 });
 
 /**
+ * One letter, whoever is writing it.
+ *
+ * Every email a customer receives is the agency introducing itself, so they have
+ * to be the same letter with different words in it. They were not: submitClaim
+ * carried a hand-copied template that had drifted from submitLead's — no
+ * `dir="rtl"`, which silently reverses the columns of the details table in an
+ * RTL message; no `text-align`; a different panel colour; and no escaping at all
+ * on a name that arrives from a public form.
+ *
+ * The shape is shared by duplication, because Base44 gives these entry points no
+ * module to share — the same arrangement `redact()` is under, and the same rule:
+ * duplicated is fine, drifted is not. What differs between messages is content,
+ * and content is passed in.
+ */
+describe("the letter a customer gets", () => {
+  const submitLead = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+  const submitClaim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+  const CUSTOMER_MAILERS = { submitLead, submitClaim };
+
+  /** A top-level function, from its signature to the start of the next one. */
+  const fnSource = (src: string, name: string): string => {
+    const start = src.indexOf(`function ${name}(`);
+    expect(start, `${name} is missing`).toBeGreaterThan(-1);
+    const rest = src.slice(start + 1);
+    const next = rest.search(/\n(?:\/\*\*|function |const |export )/);
+    return next === -1 ? rest : rest.slice(0, next);
+  };
+  const norm = (src: string, name: string) => fnSource(src, name).replace(/\s+/g, " ").trim();
+
+  it("renders both confirmations from the same template", () => {
+    expect(norm(submitLead, "buildClientHtml")).toBe(norm(submitClaim, "buildClientHtml"));
+  });
+
+  it("escapes with the same helper in both", () => {
+    expect(norm(submitLead, "escapeHtml")).toBe(norm(submitClaim, "escapeHtml"));
+  });
+
+  for (const [fn, src] of Object.entries(CUSTOMER_MAILERS)) {
+    describe(fn, () => {
+      const template = fnSource(src, "buildClientHtml");
+
+      it("lays the message out right-to-left", () => {
+        // The failure this catches is not a crash: an RTL email whose details
+        // table is LTR puts the value where the label belongs, and only a Hebrew
+        // reader looking at the rendered mail would ever notice.
+        expect(template).toMatch(/<html lang="he" dir="rtl">/);
+        for (const table of template.match(/<table[^>]*>/g) ?? []) {
+          expect(table, `${fn}: a table without dir="rtl"`).toMatch(/dir="rtl"/);
+        }
+      });
+
+      it("escapes every value it is given", () => {
+        // Each `${...}` in the template either is an escapeHtml call or is one of
+        // the pre-built fragments assembled above it. Anything else is a value
+        // reaching the HTML raw.
+        const bindings = template.match(/\$\{([^}]*)\}/g) ?? [];
+        const allowed = /^\$\{(escapeHtml\(|detailRows|detailsBlock|divider)/;
+        for (const binding of bindings) {
+          expect(binding, `${fn}: unescaped binding`).toMatch(allowed);
+        }
+      });
+
+      it("signs with the one contact identity", () => {
+        expect(template).toContain("dorit@govari-fin.co.il");
+        expect(template).toContain("L-00107009");
+      });
+    });
+  }
+});
+
+/**
  * The event log in Google Sheets.
  *
  * Two functions append to one sheet, and Base44 gives them no shared module —

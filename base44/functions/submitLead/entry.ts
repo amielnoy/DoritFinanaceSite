@@ -267,6 +267,25 @@ function buildAgentHtml(source, data, ops) {
 }
 
 /**
+ * מה שמשתנה בין ההודעות של submitLead — התוכן בלבד. התבנית עצמה משותפת.
+ */
+function clientMailFor(source, data) {
+  const isConsultation = source === 'consultation';
+  return {
+    firstName: (data.name || '').split(' ')[0],
+    eyebrow: 'אישור קבלה',
+    heading: isConsultation ? 'קיבלנו את בקשת הייעוץ' : 'קיבלנו את פנייתכם',
+    intro: isConsultation
+      ? 'תודה שבחרתם לשתף אותי בצרכים שלכם. הפרטים תועדו בהצלחה, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום פגישה מדויקת.'
+      : 'תודה שפניתם אליי. הפרטים תועדו בהצלחה, ואחזור אליכם אישית בהקדם האפשרי.',
+    panelTitle: 'פרטי הבקשה',
+    details: isConsultation
+      ? [['תחום ייעוץ', data.topic || 'ייעוץ כללי'], ['מועד מבוקש', data.timing || 'לפי תיאום']]
+      : [],
+  };
+}
+
+/**
  * בריחת תווים לפני שילוב טקסט מהמבקר בגוף HTML.
  *
  * המייל הזה נשלח לכתובת שהמבקר הקליד, מהדומיין המאומת של הסוכנות, והשם והנושא
@@ -283,33 +302,44 @@ function escapeHtml(text) {
     .replace(/'/g, '&#39;');
 }
 
-function buildClientHtml(source, data) {
-  const firstName = escapeHtml((data.name || '').split(' ')[0]);
-  const when = escapeHtml(data.timing || 'לפי תיאום');
-  const topic = escapeHtml(data.topic || 'ייעוץ כללי');
-  const isConsultation = source === 'consultation';
-
-  const heading = isConsultation ? 'קיבלנו את בקשת הייעוץ' : 'קיבלנו את פנייתכם';
-  const intro = isConsultation
-    ? 'תודה שבחרתם לשתף אותי בצרכים שלכם. הפרטים תועדו בהצלחה, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום פגישה מדויקת.'
-    : 'תודה שפניתם אליי. הפרטים תועדו בהצלחה, ואחזור אליכם אישית בהקדם האפשרי.';
-
-  const detailsBlock = isConsultation ? `
-        <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:32px 0; background:#F6F1EA; border:1px solid #E0D4C6; border-radius:6px;">
-          <tr><td style="padding:28px 32px;">
-            <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.25em; text-transform:uppercase; color:#7D6B5D; font-family:Arial,sans-serif; text-align:right;">פרטי הבקשה</p>
-            <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%">
-              <tr>
-                <td style="padding:10px 0; font-size:13px; color:#7D6B5D; font-family:Arial,sans-serif; width:130px; text-align:right;">תחום ייעוץ</td>
-                <td style="padding:10px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold; text-align:right;">${topic}</td>
-              </tr>
+/**
+ * המייל ללקוח — תבנית אחת לכל הודעה שיוצאת למבקר.
+ *
+ * זהו המכתב שהלקוח מקבל בשם הסוכנות, ולכן הוא צריך להיראות אותו דבר בכל פעם:
+ * אישור בקשת ייעוץ, אישור פנייה ואישור דיווח תביעה. עד כאן היו שתי תבניות —
+ * submitClaim החזיק עותק שנשר ממנה: בלי dir="rtl" (כלומר עמודות הפוכות בטבלת
+ * הפרטים), בלי text-align, עם גוון פאנל אחר, ובלי escapeHtml על שם הלקוח.
+ *
+ * מה שמשתנה בין הודעה להודעה הוא תוכן ולא עיצוב, ולכן הוא נכנס כפרמטרים:
+ * כותרת קטנה, כותרת, פסקת פתיחה ורשימת שדות. ההודעה עצמה זהה.
+ *
+ * One letter, three messages. Base44 gives these entry points no shared module,
+ * so this function is duplicated by hand — and tests/contract/agents.contract.test.ts
+ * fails when the copies stop being identical. Duplicated is fine; drifted is not.
+ *
+ * Callers pass raw values. Escaping happens here, at the binding site, so a new
+ * field cannot be added without it.
+ */
+function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, details }) {
+  const rows = (details || []).filter(([, value]) => value);
+  const divider =
+    `
               <tr>
                 <td colspan="2" style="padding:0; font-size:0; line-height:0; border-top:1px solid #E0D4C6;">&nbsp;</td>
-              </tr>
+              </tr>`;
+  const detailRows = rows
+    .map(([label, value]) => `
               <tr>
-                <td style="padding:10px 0; font-size:13px; color:#7D6B5D; font-family:Arial,sans-serif; text-align:right;">מועד מבוקש</td>
-                <td style="padding:10px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold; text-align:right;">${when}</td>
-              </tr>
+                <td style="padding:10px 0; font-size:13px; color:#7D6B5D; font-family:Arial,sans-serif; width:130px; text-align:right;">${escapeHtml(label)}</td>
+                <td style="padding:10px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold; text-align:right;">${escapeHtml(value)}</td>
+              </tr>`)
+    .join(divider);
+
+  const detailsBlock = rows.length ? `
+        <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:32px 0; background:#F6F1EA; border:1px solid #E0D4C6; border-radius:6px;">
+          <tr><td style="padding:28px 32px;">
+            <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.25em; text-transform:uppercase; color:#7D6B5D; font-family:Arial,sans-serif; text-align:right;">${escapeHtml(panelTitle)}</p>
+            <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%">${detailRows}
             </table>
           </td></tr>
         </table>` : '';
@@ -328,10 +358,10 @@ function buildClientHtml(source, data) {
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:44px 48px 36px; text-align:right;">
-          <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">אישור קבלה</p>
-          <h1 style="margin:0 0 24px; font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#1A1A1B; line-height:1.3; letter-spacing:-0.02em; text-align:right;">${heading}</h1>
-          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">שלום ${firstName},</p>
-          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${intro}</p>
+          <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">${escapeHtml(eyebrow)}</p>
+          <h1 style="margin:0 0 24px; font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#1A1A1B; line-height:1.3; letter-spacing:-0.02em; text-align:right;">${escapeHtml(heading)}</h1>
+          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">שלום ${escapeHtml(firstName)},</p>
+          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(intro)}</p>
           ${detailsBlock}
           <div style="height:2px; width:48px; background:#C3AD96; margin:32px 0 20px;"></div>
           <p style="margin:0; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">לכל שאלה או עדכון — ניתן להשיב ישירות למייל זה.</p>
@@ -452,7 +482,7 @@ export default async function(req) {
         await base44.asServiceRole.integrations.Core.SendEmail({
           to: email,
           subject: clientSubject,
-          html: buildClientHtml(source, data),
+          html: buildClientHtml(clientMailFor(source, data)),
           text: buildClientText(source, data),
         });
       } catch (e) {
