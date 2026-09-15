@@ -204,6 +204,13 @@ jobs:
       - name: Static security tests
         run: npm run test:security
 
+      # Prompt-adherence evals against the live agent. Every case is skipped
+      # unless EVAL_BASE44_APP_ID and EVAL_BASE44_TOKEN are set, which CI does
+      # not set: a completed interview would mail דורית and write a real lead.
+      # The step runs so the suite stays compiled and its skip stays visible.
+      - name: Agent evals (skipped without credentials)
+        run: npm run test:eval
+
       - name: Upload JUnit report
         if: always()
         uses: actions/upload-artifact@v4
