@@ -43,6 +43,37 @@ base44 dev --remote
 
 ⚠️ In this mode writes go to your app's **production data** — plain `base44 dev` keeps everything local.
 
+## Previewing the Production Build
+
+`npm run preview` serves the real `dist/` bundle, which is the only way to check
+the site the way a visitor gets it. Two things that Base44's hosting supplies are
+missing from a local build, and the repo now fills both in:
+
+- **The app id.** Base44 injects `VITE_BASE44_APP_ID` into its own builds, and
+  Vite inlines it, so a build from a clone used to ship `appId: undefined` and
+  post every form to `/api/apps/undefined/...`. It now falls back to the app this
+  clone is linked to, read from `base44/.app.jsonc` — so `base44 link` is what
+  makes a local build able to reach a backend at all.
+- **The `/api` route.** `vite preview` serves static files and nothing else. The
+  deployed site answers `/api` (Vercel rewrites it to Base44; Base44's own host
+  owns the path), so the preview needs a proxy to match. It is **opt-in**, by
+  naming the backend:
+
+  ```bash
+  VITE_BASE44_APP_BASE_URL=https://safe-arch-plan.base44.app npm run preview
+  ```
+
+⚠️ That proxy points at **production data** — a form you submit through it creates
+a real lead and sends real email. It stays off by default for that reason, and
+because `npm run test:e2e` serves the site from this same preview server: its
+specs are hermetic only because `e2e/fixtures/app.ts` stubs every `/api` call, and
+a proxy that switched itself on would turn any request the fixture missed into a
+write against the live app.
+
+Without the variable, `/api` simply 404s and every form on the site reports
+*"לא הצלחנו לשלוח את הבקשה כרגע"*. That is the preview server having no backend,
+not the site being broken.
+
 ## Publish Your Changes
 
 After pushing your changes to git, open the Base44 dashboard and publish the app:
