@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 // שני נמענים, שניהם מקבלים את הפנייה המלאה.
 //
-// SECONDARY_EMAIL הוא הסוכנת. NOTIFY_EMAIL הוא הצוות שמתפעל את האתר מטעמה,
+// SECONDARY_EMAIL הוא הסוכנת. NOTIFY_EMAILS הן תיבות הצוות שמתפעל את האתר מטעמה,
 // ומקבל בנוסף נספח מצב על השמירה, היומן והמיילים.
 //
 // זה מחייב גילוי, וקיים כזה: נוסח ההסכמה ב-src/config/compliance.ts ומדיניות
@@ -10,7 +10,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 // דורית בלבד", שהיה הנוסח הקודם והיה הופך להצהרה לא נכונה ברגע שנשלח עותק
 // החוצה. tests/contract/agents.contract.test.ts אוכף שהקוד והנוסח מסכימים,
 // לשני הכיוונים: מי שיצמצם כאן את השליחה חייב להחזיר גם את הנוסח.
-const NOTIFY_EMAIL = "amielnoy@gmail.com";
+// כמה תיבות, אותו צוות. הרשימה קיימת כדי שתוספת תיבה תהיה שורה אחת ולא
+// שכפול של הקריאה — וכדי שכשל במסירה לתיבה אחת לא ימנע את השאר.
+const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 /**
@@ -104,6 +106,123 @@ function buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings }) {
  * עותק של אותה שרשרת תנאים, ומקור שנוסף רק לאחת מהן היה שולח מייל שכותרתו
  * אומרת דבר אחד וגופו דבר אחר.
  */
+// ── סכימת ראיון ההיכרות ───────────────────────────────────────────────────
+//
+// עד כאן הראיון הסתיים בפסקת טקסט חופשי שהמודל ניסח. זה קריא, אבל אינו ניתן
+// להשוואה בין ראיונות, ומה שנאסף השתנה משיחה לשיחה לפי מה שהמודל בחר לזכור.
+// כאן הוא מוסר שדות בעלי שם, והפונקציה היא שמחליטה מה נכנס למייל: מפתח שאינו
+// ברשימה נזרק, ולכן שדה שהמודל המציא אינו יכול להגיע לדורית או למאגר.
+//
+// המסלול נגזר מהיעד שהמבקר תיאר, ולכן השאלות הנשאלות משתנות איתו.
+
+const INTERVIEW_COMMON = [
+  ['life_stage', 'שלב חיים'],
+  ['goal', 'יעד עיקרי'],
+  ['concern', 'דאגה מרכזית'],
+];
+
+const INTERVIEW_TRACKS = {
+  pension: {
+    label: 'פנסיה, גמל והשתלמות',
+    fields: [
+      ['employer', 'מעסיק / מעמד תעסוקתי'],
+      ['seniority', 'ותק'],
+      ['products', 'מוצרים קיימים'],
+      ['fees', 'דמי ניהול — כפי שנמסר על ידי המבקר'],
+    ],
+  },
+  insurance: {
+    label: 'ביטוחי חיים ובריאות',
+    fields: [
+      ['dependents', 'תלויים'],
+      ['mortgage', 'משכנתא'],
+      // דגל בלבד: "יש נושא בריאותי לדיון" / "אין". פירוט רפואי אינו נאסף
+      // ואינו נשמר — ראו את ההערה על מידע רגיש ליד buildInterviewProfile.
+      ['health_flag', 'סוגיה בריאותית לפגישה'],
+      ['coverage', 'כיסויים קיימים'],
+    ],
+  },
+  retirement: {
+    label: 'פרישה וקיבוע זכויות',
+    fields: [
+      ['retirement_horizon', 'אופק הפרישה'],
+      ['employment_status', 'מעמד תעסוקתי נוכחי'],
+      ['rights_fixing', 'קיבוע זכויות — האם נעשה'],
+      ['severance_history', 'פיצויים — האם נמשכו בעבר'],
+    ],
+  },
+  tax: {
+    label: 'מיסוי ופיננסים',
+    fields: [
+      ['tax_event', 'האירוע המיסויי שמעסיק'],
+      ['filing_status', 'הגשת דוח שנתי'],
+      ['prior_handling', 'האם טופל בעבר על ידי גורם מקצועי'],
+      ['products', 'מוצרים קיימים'],
+    ],
+  },
+  savings: {
+    label: 'חיסכון לטווח',
+    fields: [
+      ['horizon', 'טווח החיסכון'],
+      ['purpose', 'ייעוד הכסף'],
+      ['existing_savings', 'אפיקים קיימים'],
+      ['liquidity', 'צורך בנזילות'],
+    ],
+  },
+  self_employed: {
+    label: 'עצמאים',
+    fields: [
+      ['business_type', 'תחום העיסוק'],
+      ['years_active', 'ותק בעסק'],
+      ['pension_status', 'פנסיה לעצמאים'],
+      ['study_fund_status', 'קרן השתלמות לעצמאים'],
+    ],
+  },
+  general: {
+    label: 'הקשר כללי',
+    fields: [
+      ['products', 'מוצרים קיימים'],
+      ['notes', 'מה עוד המבקר רצה לשתף'],
+    ],
+  },
+};
+
+/** סדר השדות של מסלול, כולל המשותפים. מסלול לא מוכר מקבל את המשותפים בלבד. */
+function interviewFields(track) {
+  const chosen = INTERVIEW_TRACKS[track];
+  return chosen ? [...INTERVIEW_COMMON, ...chosen.fields] : [...INTERVIEW_COMMON];
+}
+
+/**
+ * הפרופיל שהמודל מסר, מסונן לשדות המוכרים בלבד ומנוקה ממזהים.
+ *
+ * זהו הגבול בין מה שהמודל כתב לבין מה שיוצא מכאן. כל ערך עובר redact() —
+ * הסוכן מונחה לא לרשום מזהים, אבל הפרופיל נכתב על ידי מודל ששמע את המבקר
+ * מקליד אותם. שדה ריק מושמט ואינו מוצג כמקף.
+ */
+function buildInterviewProfile(profile, track) {
+  const given = profile && typeof profile === 'object' ? profile : {};
+  return interviewFields(track)
+    .map(([key, label]) => [label, redact(given[key])])
+    .filter(([, value]) => value);
+}
+
+/**
+ * ההצהרה שמתלווה לכל ראיון.
+ *
+ * הראיון נראה כמו בירור צרכים ואינו בירור צרכים, וההבדל הזה הוא רגולטורי ולא
+ * סגנוני. הוא נאמר למבקר בפתיחת השיחה; זה העותק שנוסע עם הסיכום, כדי שגם מי
+ * שקורא אותו בדיעבד — דורית, או בודק מטעמה — יראה מה המסמך הזה אינו.
+ */
+const INTERVIEW_DECLARATION =
+  'הסיכום נאסף על ידי עוזר אוטומטי, שאוסף מידע בלבד. אין בו ייעוץ, שיווק פנסיוני ' +
+  'או המלצה, והוא אינו בירור צרכים — בירור הצרכים נעשה על ידי דורית בפגישה, כנדרש בדין. ' +
+  'הפרטים נמסרו על ידי המבקר ולא אומתו.';
+
+function eyebrowFor(source) {
+  return source === 'interview' ? 'ראיון היכרות' : 'פנייה מהאתר';
+}
+
 function headingFor(source) {
   if (source === 'consultation') return 'בקשת ייעוץ חדשה';
   if (source === 'detailed') return 'פנייה מפורטת מהאתר';
@@ -129,8 +248,14 @@ function buildAgentBody(source, data) {
     lines.push(`מועד מועדף ליצירת קשר: ${data.timing || '—'}`);
     lines.push(``, `הודעה אישית:`, data.message || '—');
   } else if (source === 'interview') {
-    lines.push(`דאגה מרכזית: ${data.topic || '—'}`);
-    lines.push(``, `פרופיל המבקר (כפי שאישר אותו בשיחה):`, data.message || '—');
+    lines.push(`מסלול: ${data.trackLabel || '—'}`);
+    lines.push(``, `פרופיל המבקר (כפי שאישר אותו בשיחה):`);
+    if (data.profile && data.profile.length) {
+      for (const [label, value] of data.profile) lines.push(`${label}: ${value}`);
+    } else {
+      lines.push(data.message || '—');
+    }
+    lines.push(``, `— ${INTERVIEW_DECLARATION}`);
   } else {
     lines.push(``, `הודעה:`, data.message || '—');
   }
@@ -232,9 +357,19 @@ function buildAgentHtml(source, data, ops) {
       detailRow('מועד מועדף', data.timing, { last: true }),
     ].join('')) + block('הודעה אישית', proseRow(data.message));
   } else if (source === 'interview') {
-    // הראיון אינו בקשה אלא פרופיל: שדה אחד, ואחריו מה שהמבקר אישר להעביר.
-    what = block('הראיון', detailRow('דאגה מרכזית', data.topic, { last: true }))
-      + block('פרופיל המבקר · כפי שאישר אותו בשיחה', proseRow(data.message));
+    // הראיון אינו בקשה אלא פרופיל. השדות קבועים ונגזרים מהמסלול, ולכן שני
+    // ראיונות באותו מסלול נקראים אותו דבר ואפשר להשוות ביניהם.
+    const rows = data.profile ?? [];
+    what = block('הראיון', detailRow('מסלול', data.trackLabel, { last: true }))
+      + block(
+          'פרופיל המבקר · כפי שאישר אותו בשיחה',
+          rows.length
+            ? rows.map(([label, value], i) =>
+                detailRow(label, value, { last: i === rows.length - 1 })).join('')
+            : proseRow(data.message),
+        )
+      // ההצהרה אחרונה ובנימה שקטה: היא מסייגת את מה שמעליה, ולכן היא באה אחריו.
+      + block('מה המסמך הזה אינו', proseRow(INTERVIEW_DECLARATION));
   } else {
     what = block('הודעה', proseRow(data.message));
   }
@@ -264,7 +399,7 @@ function buildAgentHtml(source, data, ops) {
     <tr><td align="center" style="padding:28px 16px;">
       <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; width:600px; background:${MAIL.card}; border:1px solid ${MAIL.border}; border-radius:6px; overflow:hidden;">
         <tr><td style="padding:34px 40px 24px; border-bottom:1px solid ${MAIL.border}; text-align:right;">
-          <p style="margin:0 0 10px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:${MAIL.muted};">פנייה מהאתר</p>
+          <p style="margin:0 0 10px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:${MAIL.muted};">${escapeHtml(eyebrowFor(source))}</p>
           <h1 style="margin:0; font-family:Georgia,serif; font-size:26px; font-weight:bold; color:${MAIL.ink}; line-height:1.3; letter-spacing:-0.02em;">${escapeHtml(heading)}</h1>
           <div style="height:2px; width:44px; background:${MAIL.rule}; margin:18px 0 0;"></div>
           <p style="margin:14px 0 0; font-size:13px; color:${MAIL.muted};">${escapeHtml(new Date().toLocaleString('he-IL'))}</p>
@@ -450,7 +585,7 @@ export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track } = body || {};
 
     if (!name || !phone) {
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
@@ -465,7 +600,18 @@ export default async function(req) {
     // להקליד ת"ז באמצע השיחה והמודל עלול לשקף אותה בחזרה. בשאר המקורות זהו
     // טקסט חופשי של המבקר עצמו, והוא נשמר כפי שנכתב.
     const safeMessage = source === 'interview' ? redact(message) : message;
-    const data = { name, phone, email, topic, timing, message: safeMessage, notes, summary: safeSummary };
+
+    // הפרופיל המובנה. הוא מסונן לשדות המוכרים של המסלול, ומה שנשאר הוא גם מה
+    // שנשלח וגם מה שנשמר — הרשומה והמייל אינם יכולים לספר שני סיפורים.
+    const safeProfile = source === 'interview' ? buildInterviewProfile(profile, track) : [];
+    const trackLabel = INTERVIEW_TRACKS[track]?.label || '';
+    const profileText = safeProfile.map(([label, value]) => `${label}: ${value}`).join('\n');
+
+    const data = {
+      name, phone, email, topic, timing,
+      message: safeMessage, notes, summary: safeSummary,
+      profile: safeProfile, trackLabel,
+    };
     const agentBody = buildAgentBody(source, data);
     const subject = subjectFor(source, data);
 
@@ -486,7 +632,7 @@ export default async function(req) {
         source: source || 'quick',
         topic: topic || '',
         timing: timing || '',
-        message: safeMessage || notes || '',
+        message: profileText || safeMessage || notes || '',
         status: 'new',
       });
       leadId = lead?.id ?? null;
@@ -606,18 +752,23 @@ export default async function(req) {
     }
 
     // עותק לצוות התפעול — אותה פנייה מלאה, בתוספת נספח המצב. נשלח אחרון
-    // כדי שיוכל לדווח גם על תוצאת היומן והגיליון. ראו ההערה ליד NOTIFY_EMAIL.
-    try {
-      await base44.asServiceRole.integrations.Core.SendEmail({
-        to: NOTIFY_EMAIL,
-        subject,
-        // The same full lead the agent gets, plus the ops appendix — see the
-        // note beside NOTIFY_EMAIL, and the consent wording it obliges.
-        html: buildAgentHtml(source, data, { source, leadId, topic, calendar, sheet, warnings }),
-        text: `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings })}`,
-      });
-    } catch (e) {
-      warnings.push('notify_email_failed');
+    // כדי שיוכל לדווח גם על תוצאת היומן והגיליון. ראו ההערה ליד NOTIFY_EMAILS.
+    // The same full lead the agent gets, plus the ops appendix — see the note
+    // beside NOTIFY_EMAILS, and the consent wording it obliges. Each mailbox is
+    // its own attempt: one that bounces must not take the others with it.
+    const opsHtml = buildAgentHtml(source, data, { source, leadId, topic, calendar, sheet, warnings });
+    const opsText = `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings })}`;
+    for (const to of NOTIFY_EMAILS) {
+      try {
+        await base44.asServiceRole.integrations.Core.SendEmail({
+          to,
+          subject,
+          html: opsHtml,
+          text: opsText,
+        });
+      } catch (e) {
+        warnings.push('notify_email_failed');
+      }
     }
 
     return Response.json({ ok: true, leadId, warnings });

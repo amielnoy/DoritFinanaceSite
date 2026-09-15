@@ -43,7 +43,11 @@ describe("adapter → submitLead", () => {
   // no conversation to summarise. Listing them here keeps the check strict for
   // everything else — a field the backend starts accepting that is neither sent
   // by the adapter nor named here still fails.
-  const AGENT_ONLY = ["summary"];
+  // Fields only a conversational agent sends. `summary` is the free-text recap;
+  // `track` and `profile` are the interview's fixed schema, which no form on the
+  // site collects. The test below keeps this list honest by requiring the
+  // function to actually destructure every name in it.
+  const AGENT_ONLY = ["summary", "track", "profile"];
 
   it("exactly one adapter owns the call", () => {
     // Previously three components each built this payload by hand. The contract

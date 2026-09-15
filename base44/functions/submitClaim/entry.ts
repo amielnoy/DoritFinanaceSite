@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
-const NOTIFY_EMAIL = "amielnoy@gmail.com";
+// כמה תיבות, אותו צוות. ראו את ההערה המקבילה ב-submitLead/entry.ts.
+const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 /**
@@ -189,15 +190,17 @@ export default async function(req) {
 
     const warnings = [];
 
-    // הודעה לסוכנת
-    try {
-      await base44.asServiceRole.integrations.Core.SendEmail({
-        to: NOTIFY_EMAIL,
-        subject,
-        body: agentBody,
-      });
-    } catch (e) {
-      warnings.push('notify_email_failed');
+    // הודעה לצוות התפעול — תיבה אחת שנכשלת אינה מונעת את השאר.
+    for (const to of NOTIFY_EMAILS) {
+      try {
+        await base44.asServiceRole.integrations.Core.SendEmail({
+          to,
+          subject,
+          body: agentBody,
+        });
+      } catch (e) {
+        warnings.push('notify_email_failed');
+      }
     }
 
     // עותק לדורית

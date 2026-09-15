@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
-const NOTIFY_EMAIL = "amielnoy@gmail.com";
+// כמה תיבות, אותו צוות. ראו את ההערה המקבילה ב-submitLead/entry.ts.
+const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 // ערוצי הקשר האנושיים שהסוכן מוסר למבקר. מקור האמת בצד הדפדפן הוא
@@ -155,7 +156,7 @@ export default async function(req) {
     const subject = `${URGENT.has(safeReason) ? '🔴 ' : ''}העברה לטיפול אנושי — ${REASONS[safeReason]}${name ? ` · ${name}` : ''}`;
 
     let notified = false;
-    for (const to of [NOTIFY_EMAIL, SECONDARY_EMAIL]) {
+    for (const to of [...NOTIFY_EMAILS, SECONDARY_EMAIL]) {
       try {
         await base44.asServiceRole.integrations.Core.SendEmail({
           to,
