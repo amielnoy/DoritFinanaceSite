@@ -321,6 +321,46 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     // And the same data-minimisation rule the rest of the layer runs on.
     expect(booking).toMatch(/אל תכלול ת"ז, מספרי חשבון או פוליסה/);
   });
+
+  /**
+   * A finished interview has to reach a person.
+   *
+   * The interview agent used to end by writing the approved profile straight to
+   * `Lead.create`. That stored it and told nobody — the summary sat in the
+   * database until somebody happened to open the leads screen, while every
+   * other enquiry on the site arrived as mail the same minute. Ending through
+   * `submitLead` is what makes the two recipients in this file apply to the
+   * interview as well, so it is pinned here rather than left to the prompt.
+   */
+  describe("the interview agent ends through submitLead, not a bare entity write", () => {
+    const interview = loadAgent("needs_interview");
+
+    it("is wired to submitLead and no longer to Lead.create", () => {
+      const fns = (interview.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
+      expect(fns).toContain("submitLead");
+      const entities = (interview.tool_configs ?? []).map((t) => t.entity_name).filter(Boolean);
+      expect(entities, "a direct Lead write would send no mail at all").not.toContain("Lead");
+    });
+
+    it("calls it with the source the function knows how to lay out", () => {
+      expect(interview.instructions).toMatch(/submitLead/);
+      expect(interview.instructions).toMatch(/source='interview'/);
+    });
+
+    it("says in so many words not to write the record directly", () => {
+      expect(interview.instructions).toMatch(/אל תיצור רשומת Lead ישירות/);
+    });
+
+    it("carries the same data-minimisation rule as the booking agent", () => {
+      expect(interview.instructions).toMatch(/אל תכלול ת"ז, מספרי חשבון או פוליסה/);
+    });
+
+    it("does not confirm a save that failed", () => {
+      // Silence here is the bad failure: the visitor is told Dorit has their
+      // summary, and she does not.
+      expect(interview.instructions).toMatch(/אם submitLead נכשלה/);
+    });
+  });
 });
 
 /**
@@ -447,6 +487,7 @@ describe("the event log in Google Sheets", () => {
     expect(writers.submitLead).toMatch(/'consultation_request'/);
     expect(writers.submitLead).toMatch(/'detailed_enquiry'/);
     expect(writers.submitLead).toMatch(/'quick_contact'/);
+    expect(writers.submitLead).toMatch(/'interview_summary'/);
     expect(writers.escalateToHuman).toMatch(/'conversation_escalation'/);
   });
 

@@ -105,6 +105,15 @@ the fence published beside the interview agent matches what the prompt actually
 forbids. A page that claims the agent gives no figures while the prompt has
 stopped saying so is a false statement to a visitor, and fails here.
 
+One block covers how the interview agent *ends*. A finished interview has to
+reach a person, and a bare `Lead.create` reaches nobody — it stores the summary
+and sends no mail, so it waits for whoever next opens the leads screen. The
+block pins that the agent is wired to `submitLead` and not to the `Lead` entity,
+that it calls it with the source the function knows how to lay out, that the
+prompt says in so many words not to write the record directly, that it carries
+the same data-minimisation rule as the booking agent, and that it does not
+confirm a save that failed.
+
 **`blog-content.contract.test.ts` — `CTR-ART-001..013`** — the repo-held articles under
 `content/blog/`. Each must parse, be a real article rather than a stub, carry
 the גילוי נאות block with the licence number and the affiliation, contain no

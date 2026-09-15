@@ -25,6 +25,7 @@ const SOURCE_LABEL: Record<LeadSource, string> = {
   quick: "פנייה מהירה",
   claim: "דיווח תביעה",
   escalation: "העברה לטיפול אנושי",
+  interview: "ראיון היכרות",
 };
 
 function csvEscape(v: unknown): string {

@@ -320,3 +320,123 @@ describe("submitLead — the calendar event it books", () => {
     expect(JSON.stringify(r.json)).not.toContain("secret-outlook-token");
   });
 });
+
+/**
+ * The introduction interview, ending.
+ *
+ * Until this source existed the interview agent finished by writing the
+ * approved profile straight to `Lead.create`: the summary was stored and
+ * nobody was told, so it waited in the database for whoever next opened the
+ * leads screen. Routing it through `submitLead` is what puts it in Dorit's
+ * inbox the same minute, laid out like every other enquiry — and these run the
+ * function to check it actually arrives that way, rather than that the branch
+ * is spelled correctly in the source.
+ */
+describe("submitLead — a finished introduction interview", () => {
+  const interview = {
+    name: "אורי לוי",
+    phone: "0541112233",
+    email: "uri@example.com",
+    source: "interview",
+    topic: "דמי ניהול בקרן ההשתלמות",
+    message:
+      "[ראיון היכרות]\n\n· בן 52, נשוי, שני ילדים, שכיר בהייטק.\n" +
+      "· קיימים: פנסיה, קרן השתלמות, ביטוח חיים. חסר: ביטוח בריאות פרטי.\n" +
+      "· דאגה מרכזית: דמי הניהול בקרן ההשתלמות.\n" +
+      "· יעד עיקרי: פרישה מסודרת בעוד כעשור.",
+  };
+
+  it("reaches Dorit and the operations team as HTML, and confirms to the visitor", async () => {
+    const r = await invokeFunction("submitLead", interview);
+
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, warnings: [] });
+    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, AGENCY, "uri@example.com"].sort());
+    for (const to of [AGENCY, OPS]) {
+      expect(r.mailTo(to).html, to).toContain("<table");
+      expect(r.mailTo(to).text, to).toBeTruthy();
+    }
+  });
+
+  it("carries the whole approved profile in both halves of the staff copy", async () => {
+    const r = await invokeFunction("submitLead", interview);
+    for (const to of [AGENCY, OPS]) {
+      const mail = r.mailTo(to);
+      for (const [part, content] of [["html", mail.html], ["text", mail.text]] as const) {
+        expect(content, `${to} (${part})`).toContain("אורי לוי");
+        expect(content, `${to} (${part})`).toContain("0541112233");
+        expect(content, `${to} (${part})`).toContain("דמי הניהול בקרן ההשתלמות");
+        expect(content, `${to} (${part})`).toContain("פרישה מסודרת בעוד כעשור");
+      }
+    }
+  });
+
+  it("names itself an interview rather than an enquiry", async () => {
+    const r = await invokeFunction("submitLead", interview);
+    expect(r.mailTo(AGENCY).subject).toBe("סיכום ראיון היכרות — אורי לוי");
+    // Same headline in the body, so subject and content cannot drift apart.
+    expect(r.mailTo(AGENCY).html).toContain("סיכום ראיון היכרות");
+    expect(r.mailTo(AGENCY).text).toContain("סיכום ראיון היכרות");
+  });
+
+  it("lays the profile out under its own heading", async () => {
+    const r = await invokeFunction("submitLead", interview);
+    const html = r.mailTo(AGENCY).html!;
+    for (const heading of ["מי פנה", "הראיון", "פרופיל המבקר"]) {
+      expect(html, heading).toContain(heading);
+    }
+  });
+
+  it("stores the profile on the record under the interview source", async () => {
+    const r = await invokeFunction("submitLead", interview);
+    expect(r.leads).toHaveLength(1);
+    expect(r.leads[0]).toMatchObject({
+      name: "אורי לוי",
+      source: "interview",
+      status: "new",
+      topic: "דמי ניהול בקרן ההשתלמות",
+    });
+    expect(r.leads[0].message).toContain("[ראיון היכרות]");
+  });
+
+  it("books no calendar slot — an interview agrees no time", async () => {
+    const r = await invokeFunction("submitLead", interview);
+    expect(r.callsTo("graph.microsoft.com")).toEqual([]);
+    expect(r.mailTo(OPS).text).toMatch(/יומן: לא רלוונטי/);
+  });
+
+  it("redacts the profile itself, not only a separate summary", async () => {
+    // The profile is written by a model, not typed by the visitor: the agent
+    // is told never to record an ID number, but the visitor can type one
+    // mid-conversation and the model can reflect it back into the summary.
+    const r = await invokeFunction("submitLead", {
+      ...interview,
+      message: "[ראיון היכרות]\n\n· מסר את ת״ז 123456789 באמצע השיחה.",
+    });
+    for (const mail of r.emails) {
+      expect(`${mail.html ?? ""}${mail.text ?? ""}`, mail.to).not.toContain("123456789");
+    }
+    expect(r.leads[0].message).not.toContain("123456789");
+    expect(r.leads[0].message).toContain("הושמט");
+  });
+
+  it("tells the visitor what was kept, without repeating the profile back", async () => {
+    const r = await invokeFunction("submitLead", interview);
+    const mail = r.mailTo("uri@example.com");
+    // Subject and opening line, pinned together: `toContain("אישור")` passed
+    // while the subject still said "פנייתכם" and the letter said something else.
+    expect(mail.subject).toBe("אישור — קיבלנו את סיכום השיחה · דורית גוב ארי");
+    expect(mail.html).toContain("קיבלנו את סיכום השיחה");
+    expect(mail.html).toContain("דמי ניהול בקרן ההשתלמות");
+    // The bullets are for Dorit. Mailing them back adds a fourth copy of the
+    // visitor's own words to an inbox neither of them controls.
+    expect(mail.html).not.toContain("שני ילדים");
+    expect(mail.text).not.toContain("שני ילדים");
+  });
+
+  it("still lands when no address was given, because the staff copies matter", async () => {
+    const r = await invokeFunction("submitLead", { ...interview, email: "" });
+    expect(r.status).toBe(200);
+    expect(r.emails.map((e) => e.to).sort()).toEqual([OPS, AGENCY].sort());
+  });
+});

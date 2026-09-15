@@ -22,7 +22,8 @@
         "detailed",
         "quick",
         "claim",
-        "escalation"
+        "escalation",
+        "interview"
       ]
     },
     "topic": {

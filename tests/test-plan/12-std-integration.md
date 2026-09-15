@@ -37,7 +37,7 @@ Its result exposes `status`, `json`, `leads`, `emails`, `mailTo(address)` and
 
 | Function | Where it is called from |
 |---|---|
-| `submitLead` | every form on the site, and the booking agent |
+| `submitLead` | every form on the site, and the booking and interview agents |
 | `escalateToHuman` | all three on-site agents |
 
 `submitClaim`, `createConsultationEvent` and `createOutlookEvent` are not yet
@@ -94,7 +94,21 @@ back to tomorrow morning when no time was agreed; asks for a reminder and sets
 the Israel timezone; authorises with the connector token and never returns it to
 the caller.
 
-### 4.6 `escalateToHuman` — handing over — `INT-ESC-001..005`
+### 4.6 `submitLead` — a finished introduction interview — `INT-LEAD-031..038`
+
+The interview agent used to end at `Lead.create`: the approved profile was
+stored and nobody was told. It ends at `submitLead` now, under
+`source='interview'`, and these run that path. Both staff copies go out as HTML
+with a plain-text twin and carry the whole profile in each half; the subject and
+the headline both name it an interview rather than an enquiry; the profile gets
+its own heading in the layout; the record keeps the `[ראיון היכרות]` marker and
+the interview source; no calendar slot is booked, because an interview agrees no
+time. Two cases cover what is specific to a model-written record: the profile
+itself passes through `redact()`, unlike a message a visitor typed, and the
+visitor's own confirmation names the topic without mailing the bullets back. A
+last case pins that the staff copies still go out when no address was given.
+
+### 4.7 `escalateToHuman` — handing over — `INT-ESC-001..005`
 
 Records the escalation and notifies both inboxes, stamps the record with the
 consent wording the visitor was shown, always hands the contact channels back to

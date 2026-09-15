@@ -23,7 +23,13 @@ export interface Lead {
   scheduledAt?: string;
 }
 
-export type LeadSource = "quick" | "detailed" | "consultation" | "claim" | "escalation";
+export type LeadSource =
+  | "quick"
+  | "detailed"
+  | "consultation"
+  | "claim"
+  | "escalation"
+  | "interview";
 
 export interface ClaimReport {
   name: string;

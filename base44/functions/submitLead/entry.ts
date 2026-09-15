@@ -80,6 +80,7 @@ async function appendEventRow(base44, row) {
 function eventTypeFor(source) {
   if (source === 'consultation') return 'consultation_request';
   if (source === 'detailed') return 'detailed_enquiry';
+  if (source === 'interview') return 'interview_summary';
   return 'quick_contact';
 }
 
@@ -96,12 +97,22 @@ function buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings }) {
   ].join('\n');
 }
 
+/**
+ * כותרת ההודעה הפנימית, לפי מקור הפנייה.
+ *
+ * הוצאה החוצה כשנוסף מקור רביעי: buildAgentBody ו-buildAgentHtml החזיקו כל אחת
+ * עותק של אותה שרשרת תנאים, ומקור שנוסף רק לאחת מהן היה שולח מייל שכותרתו
+ * אומרת דבר אחד וגופו דבר אחר.
+ */
+function headingFor(source) {
+  if (source === 'consultation') return 'בקשת ייעוץ חדשה';
+  if (source === 'detailed') return 'פנייה מפורטת מהאתר';
+  if (source === 'interview') return 'סיכום ראיון היכרות';
+  return 'פנייה חדשה מהאתר';
+}
+
 function buildAgentBody(source, data) {
-  const header = source === 'consultation'
-    ? 'בקשת ייעוץ חדשה'
-    : source === 'detailed'
-    ? 'פנייה מפורטת מהאתר'
-    : 'פנייה חדשה מהאתר';
+  const header = headingFor(source);
   const lines = [
     `${header} — ${new Date().toLocaleString("he-IL")}`,
     ``,
@@ -117,6 +128,9 @@ function buildAgentBody(source, data) {
     lines.push(`שירות מבוקש: ${data.topic || '—'}`);
     lines.push(`מועד מועדף ליצירת קשר: ${data.timing || '—'}`);
     lines.push(``, `הודעה אישית:`, data.message || '—');
+  } else if (source === 'interview') {
+    lines.push(`דאגה מרכזית: ${data.topic || '—'}`);
+    lines.push(``, `פרופיל המבקר (כפי שאישר אותו בשיחה):`, data.message || '—');
   } else {
     lines.push(``, `הודעה:`, data.message || '—');
   }
@@ -195,11 +209,7 @@ function proseRow(text) {
  * דורית מקבלת את אותה הודעה בלעדיו.
  */
 function buildAgentHtml(source, data, ops) {
-  const heading = source === 'consultation'
-    ? 'בקשת ייעוץ חדשה'
-    : source === 'detailed'
-    ? 'פנייה מפורטת מהאתר'
-    : 'פנייה חדשה מהאתר';
+  const heading = headingFor(source);
 
   // 1 · מי פנה. טלפון ואימייל כקישורים — זו ההודעה שפותחים בטלפון כדי לחייג.
   const who = block('מי פנה', [
@@ -221,6 +231,10 @@ function buildAgentHtml(source, data, ops) {
       detailRow('שירות מבוקש', data.topic),
       detailRow('מועד מועדף', data.timing, { last: true }),
     ].join('')) + block('הודעה אישית', proseRow(data.message));
+  } else if (source === 'interview') {
+    // הראיון אינו בקשה אלא פרופיל: שדה אחד, ואחריו מה שהמבקר אישר להעביר.
+    what = block('הראיון', detailRow('דאגה מרכזית', data.topic, { last: true }))
+      + block('פרופיל המבקר · כפי שאישר אותו בשיחה', proseRow(data.message));
   } else {
     what = block('הודעה', proseRow(data.message));
   }
@@ -270,9 +284,21 @@ function buildAgentHtml(source, data, ops) {
  * מה שמשתנה בין ההודעות של submitLead — התוכן בלבד. התבנית עצמה משותפת.
  */
 function clientMailFor(source, data) {
+  const firstName = (data.name || '').split(' ')[0];
+  if (source === 'interview') {
+    return {
+      firstName,
+      eyebrow: 'אישור קבלה',
+      heading: 'קיבלנו את סיכום השיחה',
+      intro:
+        'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה.',
+      panelTitle: 'מה נשמר',
+      details: [['נושא מרכזי', data.topic || 'הקשר כללי']],
+    };
+  }
   const isConsultation = source === 'consultation';
   return {
-    firstName: (data.name || '').split(' ')[0],
+    firstName,
     eyebrow: 'אישור קבלה',
     heading: isConsultation ? 'קיבלנו את בקשת הייעוץ' : 'קיבלנו את פנייתכם',
     intro: isConsultation
@@ -387,6 +413,15 @@ function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, detai
 function buildClientText(source, data) {
   const firstName = (data.name || '').split(' ')[0];
   const when = data.timing || 'לפי תיאום';
+  if (source === 'interview') {
+    return [
+      `שלום ${firstName}, תודה על השיחה. הסיכום שאישרתם הועבר אליי כפי שהוא.`,
+      `נושא מרכזי: ${data.topic || 'הקשר כללי'}`,
+      `אחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה.`,
+      `לכל שאלה — ניתן להשיב ישירות למייל זה.`,
+      `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,
+    ].join('\n');
+  }
   if (source === 'consultation') {
     return [
       `שלום ${firstName}, קיבלתי את בקשת הייעוץ והפרטים תועדו בהצלחה.`,
@@ -405,6 +440,7 @@ function buildClientText(source, data) {
 }
 
 function subjectFor(source, data) {
+  if (source === 'interview') return `סיכום ראיון היכרות — ${data.name}`;
   if (source === 'consultation') return `בקשת ייעוץ חדשה — ${data.name}`;
   if (source === 'detailed') return `פנייה מפורטת — ${data.name} (${data.topic || 'כללי'})`;
   return `פנייה חדשה מהאתר — ${data.name}`;
@@ -422,7 +458,14 @@ export default async function(req) {
 
     // התקציר נכתב על ידי מודל, ולכן עובר סינון לפני שהוא נשלח לאן שהוא.
     const safeSummary = redact(summary);
-    const data = { name, phone, email, topic, timing, message, notes, summary: safeSummary };
+
+    // ראיון ההיכרות הוא המקור היחיד שבו ה-message נכתב על ידי מודל ולא הוקלד
+    // על ידי המבקר — זהו פרופיל שהסוכן ניסח וקיבל עליו אישור. ככזה הוא עובר
+    // את אותו סינון כמו התקציר: הסוכן מונחה לא לרשום מזהים, אבל המבקר יכול
+    // להקליד ת"ז באמצע השיחה והמודל עלול לשקף אותה בחזרה. בשאר המקורות זהו
+    // טקסט חופשי של המבקר עצמו, והוא נשמר כפי שנכתב.
+    const safeMessage = source === 'interview' ? redact(message) : message;
+    const data = { name, phone, email, topic, timing, message: safeMessage, notes, summary: safeSummary };
     const agentBody = buildAgentBody(source, data);
     const subject = subjectFor(source, data);
 
@@ -443,7 +486,7 @@ export default async function(req) {
         source: source || 'quick',
         topic: topic || '',
         timing: timing || '',
-        message: message || notes || '',
+        message: safeMessage || notes || '',
         status: 'new',
       });
       leadId = lead?.id ?? null;
@@ -476,7 +519,12 @@ export default async function(req) {
     // אישור ללקוח
     if (email) {
       try {
-        const clientSubject = source === 'consultation'
+        // הכותרת חייבת לומר את מה שגוף המכתב אומר. clientMailFor פותח ראיון
+        // ב"קיבלנו את סיכום השיחה", ונושא שאומר "פנייתכם" הופך את אותו מייל
+        // לשני דברים שונים בשורת הנושא ובפתיחה.
+        const clientSubject = source === 'interview'
+          ? `אישור — קיבלנו את סיכום השיחה · דורית גוב ארי`
+          : source === 'consultation'
           ? `אישור — קיבלנו את בקשת הייעוץ שלכם · דורית גוב ארי`
           : `אישור — קיבלנו את פנייתכם · דורית גוב ארי`;
         await base44.asServiceRole.integrations.Core.SendEmail({

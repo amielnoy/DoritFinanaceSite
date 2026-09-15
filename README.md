@@ -229,6 +229,12 @@ Two of those guarantees do not depend on the model at all, on purpose:
   calls `escalateToHuman` and renders דורית's phone, WhatsApp and email even
   when the call fails, and even before consent.
 
+A finished interview leaves the same way a form does. The agent hands the
+summary the visitor approved to `submitLead`, which mails it to דורית and to the
+team operating the site in the site's own layout, and confirms to the visitor if
+they gave an address. It used to end at `Lead.create` instead — stored, and
+nobody told, until somebody happened to open the leads screen.
+
 The rest lives in the prompts, and `tests/contract/agents.contract.test.ts`
 fails if a mandatory clause disappears from any of them.
 
