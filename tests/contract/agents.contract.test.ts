@@ -239,8 +239,38 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     return src.slice(start, end + 2);
   };
 
-  /** Does the outside recipient get the visitor's actual details? */
-  const outsideGetsFullLead = /to: NOTIFY_EMAIL,[\s\S]{0,240}?body: `\$\{agentBody\}/.test(submitLead);
+  /**
+   * Does the outside recipient get the visitor's actual details?
+   *
+   * Read off the send itself, so the consent wording is checked against what
+   * the code does rather than against what someone remembered. Both payload
+   * shapes count, and both carry the whole lead: `agentBody` is the plain-text
+   * notification, `buildAgentHtml(source, data, …)` the same fields laid out in
+   * the site's palette. A send that stopped carrying either — a summary, a bare
+   * "you have a new lead", nothing at all — is the only thing that makes this
+   * false, and that is exactly when the narrower consent promise becomes the
+   * honest one.
+   *
+   * This pattern has to keep up with the send. If it silently stops matching, the
+   * suite does not go red on a leak — it goes red on the consent text, which is
+   * the wrong end of the problem. The two assertions below are what catch it.
+   */
+  const outsideGetsFullLead =
+    /to: NOTIFY_EMAIL,[\s\S]{0,400}?(?:body|text): `\$\{agentBody\}/.test(submitLead) ||
+    /to: NOTIFY_EMAIL,[\s\S]{0,400}?html: buildAgentHtml\(\s*source,\s*data\b/.test(submitLead);
+
+  it("reads the outside recipient's payload off a send that exists", () => {
+    // Guards the detector above rather than the code: a renamed builder or a
+    // reshaped SendEmail call would quietly turn every check in this block into
+    // an assertion about a branch that no longer runs.
+    expect(submitLead, "no send to NOTIFY_EMAIL found at all").toMatch(/to: NOTIFY_EMAIL,/);
+    expect(
+      outsideGetsFullLead,
+      "a send to NOTIFY_EMAIL exists but carries neither agentBody nor buildAgentHtml — " +
+        "if that is deliberate, narrow the consent text with it; if the call was just " +
+        "reshaped, teach outsideGetsFullLead the new shape",
+    ).toBe(true);
+  });
 
 
   it("keeps the consent notice honest about the second recipient", () => {

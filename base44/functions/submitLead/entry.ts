@@ -126,6 +126,146 @@ function buildAgentBody(source, data) {
   return lines.join('\n');
 }
 
+// ── ההודעה הפנימית, בעיצוב של האתר ────────────────────────────────────────
+//
+// buildAgentBody לבדו נשלח כ-`body`, ו-Gmail מקפל אותו לפסקה אחת: שמונה שדות,
+// שם, טלפון, נושא, מועד והנספח התפעולי — הכל בשורה רצה אחת. פנייה חדשה היא
+// הדבר שדורית צריכה לקרוא בשנייה אחת בטלפון, וזה בדיוק מה שלא היה אפשרי.
+//
+// אותו מידע, ללא שינוי, בארבעה בלוקים מופרדים: מי פנה, מה ביקש, תקציר השיחה
+// (אם יש) והמצב התפעולי. הפלטה זהה לזו של buildClientHtml למטה — שני המיילים
+// יוצאים מאותה כתובת ונראים כמו אותה סוכנות.
+//
+// The plain text goes out as `text` alongside it, unchanged: a client that
+// cannot render HTML still gets every field, and `buildAgentBody` stays the
+// single definition of what a notification contains.
+
+/** לוח הצבעים של המיילים — אותם ערכים כמו src/index.css, בקוד שאינו רואה טוקנים. */
+const MAIL = {
+  page: '#F9F7F2',      // --background · Warm Parchment
+  card: '#FFFFFF',
+  panel: '#F6F1EA',
+  ink: '#1A1A1B',       // --foreground · Obsidian Matte
+  body: '#3D3D3F',
+  muted: '#7D6B5D',     // --accent · Deep Taupe
+  border: '#E5DDD0',
+  panelBorder: '#E0D4C6',
+  rule: '#C3AD96',      // --highlight-muted
+  alert: '#EF4444',     // --destructive
+};
+
+/** שורת "תווית: ערך" אחת בתוך בלוק. */
+function detailRow(label, value, { link = '', last = false } = {}) {
+  const shown = escapeHtml(value || '—');
+  const cell = link
+    ? `<a href="${escapeHtml(link)}" style="color:${MAIL.ink}; text-decoration:none;">${shown}</a>`
+    : shown;
+  const divider = last
+    ? ''
+    : `<tr><td colspan="2" style="padding:0; font-size:0; line-height:0; border-top:1px solid ${MAIL.panelBorder};">&nbsp;</td></tr>`;
+  return `
+              <tr>
+                <td style="padding:9px 0; font-size:13px; color:${MAIL.muted}; font-family:Arial,sans-serif; width:120px; text-align:right; vertical-align:top;">${escapeHtml(label)}</td>
+                <td style="padding:9px 0; font-size:15px; color:${MAIL.ink}; font-family:Arial,sans-serif; font-weight:bold; text-align:right;">${cell}</td>
+              </tr>${divider}`;
+}
+
+/** בלוק אחד: כותרת קטנה ומסגרת סביב תוכן. */
+function block(title, inner, { tone = 'panel' } = {}) {
+  const bg = tone === 'plain' ? MAIL.card : MAIL.panel;
+  const edge = tone === 'alert' ? MAIL.alert : MAIL.panelBorder;
+  return `
+        <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px; background:${bg}; border:1px solid ${edge}; border-radius:6px;">
+          <tr><td style="padding:22px 26px;">
+            <p style="margin:0 0 14px; font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:${MAIL.muted}; font-family:Arial,sans-serif; text-align:right;">${escapeHtml(title)}</p>
+            <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%">${inner}
+            </table>
+          </td></tr>
+        </table>`;
+}
+
+/** פסקת טקסט חופשי בתוך בלוק — הודעה, הערות, תקציר. */
+function proseRow(text) {
+  return `
+              <tr><td style="padding:2px 0 0; font-size:15px; color:${MAIL.body}; font-family:Arial,sans-serif; line-height:1.8; text-align:right; white-space:pre-line;">${escapeHtml(text || '—')}</td></tr>`;
+}
+
+/**
+ * ההודעה הפנימית כ-HTML. `ops` הוא הנספח התפעולי, ונשלח רק לצוות —
+ * דורית מקבלת את אותה הודעה בלעדיו.
+ */
+function buildAgentHtml(source, data, ops) {
+  const heading = source === 'consultation'
+    ? 'בקשת ייעוץ חדשה'
+    : source === 'detailed'
+    ? 'פנייה מפורטת מהאתר'
+    : 'פנייה חדשה מהאתר';
+
+  // 1 · מי פנה. טלפון ואימייל כקישורים — זו ההודעה שפותחים בטלפון כדי לחייג.
+  const who = block('מי פנה', [
+    detailRow('שם', data.name),
+    detailRow('טלפון', data.phone, { link: `tel:${String(data.phone || '').replace(/[^\d+]/g, '')}` }),
+    detailRow('אימייל', data.email, { link: data.email ? `mailto:${data.email}` : '', last: true }),
+  ].join(''));
+
+  // 2 · מה ביקש. השדות משתנים לפי מקור הפנייה, בדיוק כמו בגרסת הטקסט.
+  let what;
+  if (source === 'consultation') {
+    what = block('הבקשה', [
+      detailRow('תחום ייעוץ', data.topic),
+      detailRow('מועד מבוקש', data.timing || 'לפי תיאום'),
+      detailRow('הערות', data.notes, { last: true }),
+    ].join(''));
+  } else if (source === 'detailed') {
+    what = block('הבקשה', [
+      detailRow('שירות מבוקש', data.topic),
+      detailRow('מועד מועדף', data.timing, { last: true }),
+    ].join('')) + block('הודעה אישית', proseRow(data.message));
+  } else {
+    what = block('הודעה', proseRow(data.message));
+  }
+
+  // 3 · תקציר השיחה, רק כשסוכן אוטומטי מסר אחד. כבר עבר redact.
+  const summary = data.summary
+    ? block('תקציר השיחה · לאחר השמטת פרטים רגישים', proseRow(data.summary))
+    : '';
+
+  // 4 · המצב התפעולי, רק לצוות. מסגרת אדומה כשמשהו נפל, כדי שתקלה תיראה
+  //     מהמסך הראשון ולא מהשורה השביעית.
+  const opsBlock = ops
+    ? block('מצב תפעולי', [
+        detailRow('מקור', ops.source || 'quick'),
+        detailRow('מזהה רשומה', ops.leadId),
+        detailRow('יומן', ops.calendar),
+        detailRow('גיליון', ops.sheet),
+        detailRow('תקלות', ops.warnings.length ? ops.warnings.join(', ') : 'אין', { last: true }),
+      ].join(''), { tone: ops.warnings.length ? 'alert' : 'panel' })
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0; padding:0; background:${MAIL.page}; font-family:Arial,Helvetica,sans-serif; color:${MAIL.ink}; line-height:1.7; -webkit-text-size-adjust:100%;">
+  <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${MAIL.page};">
+    <tr><td align="center" style="padding:28px 16px;">
+      <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; width:600px; background:${MAIL.card}; border:1px solid ${MAIL.border}; border-radius:6px; overflow:hidden;">
+        <tr><td style="padding:34px 40px 24px; border-bottom:1px solid ${MAIL.border}; text-align:right;">
+          <p style="margin:0 0 10px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:${MAIL.muted};">פנייה מהאתר</p>
+          <h1 style="margin:0; font-family:Georgia,serif; font-size:26px; font-weight:bold; color:${MAIL.ink}; line-height:1.3; letter-spacing:-0.02em;">${escapeHtml(heading)}</h1>
+          <div style="height:2px; width:44px; background:${MAIL.rule}; margin:18px 0 0;"></div>
+          <p style="margin:14px 0 0; font-size:13px; color:${MAIL.muted};">${escapeHtml(new Date().toLocaleString('he-IL'))}</p>
+        </td></tr>
+        <tr><td style="padding:26px 40px 10px;">${who}${what}${summary}${opsBlock}</td></tr>
+        <tr><td style="padding:20px 40px; background:${MAIL.ink}; text-align:center;">
+          <p style="margin:0; font-size:11px; color:rgba(249,247,242,0.5);">הודעה אוטומטית מאתר דורית גוב ארי · אין להשיב לכתובת זו</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 /**
  * בריחת תווים לפני שילוב טקסט מהמבקר בגוף HTML.
  *
@@ -295,7 +435,9 @@ export default async function(req) {
       await base44.asServiceRole.integrations.Core.SendEmail({
         to: SECONDARY_EMAIL,
         subject,
-        body: agentBody,
+        // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
+        html: buildAgentHtml(source, data, null),
+        text: agentBody,
       });
     } catch (e) {
       warnings.push('secondary_email_failed');
@@ -391,7 +533,10 @@ export default async function(req) {
       await base44.asServiceRole.integrations.Core.SendEmail({
         to: NOTIFY_EMAIL,
         subject,
-        body: `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings })}`,
+        // The same full lead the agent gets, plus the ops appendix — see the
+        // note beside NOTIFY_EMAIL, and the consent wording it obliges.
+        html: buildAgentHtml(source, data, { source, leadId, topic, calendar, sheet, warnings }),
+        text: `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings })}`,
       });
     } catch (e) {
       warnings.push('notify_email_failed');
