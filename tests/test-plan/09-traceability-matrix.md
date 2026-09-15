@@ -14,10 +14,10 @@ gap is visible and a failure points at a feature.
 | F-07 | Visitor calls / opens WhatsApp | UNIT-CNT-001..005 | CMP-BAR-001, CMP-FLA-001/002 | — | — | E2E-HOM-007 | E2E-MOB-001/002/006 | SEC-LNK-001 | A11Y-STR-003 |
 | F-08 | Visitor browses the blog and reads a post | — | — | CTR-BLG-001..003 | API-HTP-008 | E2E-BLG-001..006 | — | SEC-XSS-001..004 | A11Y-AXE-002/003 |
 | F-09 | Visitor shares a post | — | CMP-SHR-001 | — | — | E2E-BLG-005 | — | SEC-LNK-001, SEC-STA-014/015 | — |
-| F-10 | Visitor navigates between routes | UNIT-UTL-001..003 | — | — | API-HTP-008 | E2E-NAV-001..011 | E2E-MOB-003 | — | — |
-| F-11 | Visitor reads privacy / accessibility statements | — | — | — | API-HTP-006 | E2E-NAV-004/005 | E2E-MOB-005 | — | A11Y-AXE-005/006, A11Y-STR-006 |
-| F-12 | Admin signs in | UNIT-RET-001..020 | — | — | — | E2E-NAV-006 | — | SEC-RED-001, SEC-STA-019..021 | — |
-| F-13 | Admin manages leads and blog posts | — | — | CTR-RLS-001/002, CTR-BLG-002 | API-LIV-003 | E2E-NAV-012 | — | SEC-RLS-001, SEC-STA-022/023 | — |
+| F-10 | Visitor navigates between routes | UNIT-UTL-001..003 | — | — | API-HTP-008 | E2E-NAV-001..017 | E2E-MOB-003 | — | — |
+| F-11 | Visitor reads privacy / accessibility statements | — | — | — | API-HTP-006 | E2E-NAV-005/006 | E2E-MOB-005 | — | A11Y-AXE-005/006, A11Y-STR-006 |
+| F-12 | Admin signs in | UNIT-RET-001..020 | — | — | — | E2E-NAV-007 | — | SEC-RED-001, SEC-STA-019..021 | — |
+| F-13 | Admin manages leads and blog posts | — | — | CTR-RLS-001/002, CTR-BLG-002 | API-LIV-003 | E2E-NAV-018 | — | SEC-RLS-001, SEC-STA-022/023 | — |
 | F-14 | Site is discoverable by search and AI crawlers | SEO-URL-*, SEO-DSC-* | — | — | API-HTP-002..007/010 | — | — | — | — |
 | F-17 | Every route is indexed under its own title, description and canonical | SEO-APL-001..010 | — | — | — | SEO-MET-001..008 | SEO-MOB-001/002 | SEO-IDX-007..012 | — |
 | F-18 | Rich results: FAQ, article, breadcrumb, service | SEO-BRD-001 | — | — | — | SEO-LD-001..005 | SEO-MOB-001 | — | — |

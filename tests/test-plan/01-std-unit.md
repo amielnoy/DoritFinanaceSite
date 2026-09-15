@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 43 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 81 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 ---
 

@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 158
+**Location:** `tests/contract/` · **Cases:** 219
 
 ---
 
@@ -111,6 +111,47 @@ the גילוי נאות block with the licence number and the affiliation, conta
 promise of a return, map cleanly onto the `BlogPost` entity, and ship as a
 draft: publishing stays a human decision.
 
+### 4.4 The repository as a contract
+
+Five files here assert things about the repo's own configuration rather than
+about application data. They exist because each covers something that fails
+*silently* — a wrong value produces a green run and a broken result.
+
+**`workflow.contract.test.ts`** — `.github/workflows/ci.yml`, parsed rather than
+grepped. No job may upload two artifacts under one name (a real 409 that failed a
+run after the whole battery had passed), every Vitest suite on disk must be run
+by some job, and no job may depend on or read an output from a job that does not
+declare it. It also forbids a build that strips `VITE_BASE44_APP_ID` from writing
+the default `dist/` in any job that uploads `dist` — that arrangement shipped a
+bundle whose app id inlined to `undefined` as the artifact all ten e2e shards
+tested, and the suite stayed green because the fixture stubs `**/api/**`.
+
+**`deploy-gate.contract.test.ts`** — that exactly one thing promotes production.
+`vercel.json` must disable Git-triggered deploys on `main` and `builder` and
+leave them on elsewhere, so pull-request previews survive. And `--prod` must be
+conditioned on both suites going green: `needs:` orders jobs, it does not gate
+them, so an earlier version of this file asserted the `needs:` line and called
+that "behind the tests" while a red run still reached `--prod`. A companion case
+pins that a red run *does* still deploy, as a preview — staging on red is the
+point of staging, and a later fix must not buy the gate by removing it.
+
+**`canonical-host.contract.test.ts`** — one origin, written in one place.
+`VITE_SITE_URL` is the runtime source, and every checked-in file that spells the
+host out must be one the build rewrites. `index.html` was missing from that list,
+so a host move shifted the sitemap and left the served document advertising the
+old origin in its canonical tag, `og:url` and two static JSON-LD blocks.
+
+**`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
+bundle reach a real backend. The app id falls back to the linked app only when
+the environment supplies none, never overriding it; a checkout with no
+`base44/.app.jsonc` stays silent, which is what keeps CI's "build the way the
+Builder does" guard meaningful; and the `/api` preview proxy stays opt-in,
+because `npm run test:e2e` serves the site from that same preview server and is
+hermetic only while every `/api` call is stubbed.
+
+**`carriers.contract.test.ts`** — every insurer link resolves to a domain that
+exists, and each carrier's name and URL agree.
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -120,5 +161,5 @@ time.
 
 ## 6. Pass criteria
 
-All 158 cases pass. A failure means either the frontend or the backend definition
+All 219 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.

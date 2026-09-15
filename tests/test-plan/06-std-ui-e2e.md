@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 46 desktop-relevant, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 70 in `e2e/ui`, of 167 across the whole e2e suite, run on all four platforms
 
 ---
 
@@ -36,13 +36,32 @@ timezone `Asia/Jerusalem`.
 
 | ID | Title | Expected result |
 |---|---|---|
-| E2E-NAV-001..006 | "`<route>` renders without a client-side error" for `/`, `/blog`, `/claims`, `/privacy`, `/accessibility`, `/login` | Non-empty root, a visible heading, expected copy, zero console errors |
-| E2E-NAV-007 | "an unknown path lands on the app's not-found page, not a blank screen" | Root non-empty |
-| E2E-NAV-008 | "deep links are served by the SPA fallback with a 200" | `/blog` → 200 HTML |
-| E2E-NAV-009 | "in-page anchors move the viewport to the right section" | `#services` in viewport after clicking the visible anchor |
-| E2E-NAV-010 | "navigating between routes scrolls back to the top" | `scrollY < 50` after a route change (verifies `ScrollToTop`) |
-| E2E-NAV-011 | "browser back returns to the previous route" | Back from `/blog` lands on `/` with `#top` visible |
-| E2E-NAV-012 | "admin routes bounce an anonymous visitor to login" | `/admin/leads` → `/login` |
+| E2E-NAV-001..007 | "`<route>` renders without a client-side error" for `/`, `/blog`, `/claims`, `/faq`, `/privacy`, `/accessibility`, `/login` | Non-empty root, a visible heading, expected copy, zero console errors |
+| E2E-NAV-008 | "an unknown path lands on the app's not-found page, not a blank screen" | Root non-empty |
+| E2E-NAV-009 | "deep links are served by the SPA fallback with a 200" | `/blog` → 200 HTML |
+| E2E-NAV-010 | "in-page anchors move the viewport to the right section" | `#services` in viewport after clicking the visible anchor |
+| E2E-NAV-011 | "the main menu reaches a home section from another route" | From `/blog`, the header's `שירותים` lands on `/#services` with the section in view |
+| E2E-NAV-012 | "the footer reaches a home section from another route" | From `/blog`, the footer's `אודות` lands on `/#about` with the section in view |
+| E2E-NAV-013 | "no link anywhere points at a section the page does not have" | On every public route, every `a[href^="#"]` resolves to an element on that route |
+| E2E-NAV-014 | "every internal link lands on a real route, not the not-found page" | Every internal `href` collected from the home page renders without the 404 heading |
+| E2E-NAV-015 | "every link in the footer menu goes where its label says" | All seven footer nav links, clicked from `/blog`, reach their documented URL |
+| E2E-NAV-016 | "navigating between routes scrolls back to the top" | `scrollY < 50` after a route change (verifies `ScrollToTop`) |
+| E2E-NAV-017 | "browser back returns to the previous route" | Back from `/blog` lands on `/` with `#top` visible |
+| E2E-NAV-018 | "admin routes bounce an anonymous visitor to login" | `/admin/leads` → `/login` |
+
+**Why five of these are about links.** Dead navigation has shipped more than
+once, and it is the failure mode least likely to be noticed: every section this
+site links to with a `#hash` lives on the home page, while the header and footer
+render on all seven routes. A bare `#about` on `/blog` sets the URL to
+`/blog#about`, matches no element, and does nothing — no error, no console
+warning, no visible change. It was fixed in the header and left in the footer,
+which carries the larger menu.
+
+E2E-NAV-011/012 pin the two menus by behaviour. E2E-NAV-013/014 are the general
+forms — an anchor naming a section that is not on the page, and a link naming a
+route that is not registered — so the next one is caught without anybody having
+to think of it. All four were confirmed to fail against the unfixed code before
+being committed.
 
 ### 3.3 Pension fee calculator — `calculator.spec.ts`
 

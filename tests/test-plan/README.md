@@ -18,6 +18,7 @@ Software Test Description (STD) per suite.
 | 09 | [Traceability matrix](09-traceability-matrix.md) | all | — | — |
 | 10 | [Known issues & deviations](10-known-issues.md) | all | — | — |
 | 11 | [STD — SEO](11-std-seo.md) | seo | Playwright + Vitest | `e2e/seo/`, `tests/unit/seo.dom.test.ts` |
+| 12 | [STD — Integration](12-std-integration.md) | integration | Vitest (node) | `tests/integration/` |
 
 ## Test case identifiers
 

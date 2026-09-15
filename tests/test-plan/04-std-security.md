@@ -4,7 +4,7 @@
 `npm run test:e2e:security` (runtime, Playwright)
 **Location:** `tests/security/static-security.test.ts`,
 `tests/security/agent-surface.security.test.ts`, `e2e/security/security.spec.ts`
-**Cases:** 81 static (24 site + 57 agent surface) + 15 runtime (× 4 platforms)
+**Cases:** 70 static (24 site + 57 agent surface) + 15 runtime (× 4 platforms)
 
 ---
 

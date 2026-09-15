@@ -19,6 +19,9 @@ const PUBLIC_ROUTES = [
   { path: "/", heading: /דורית גוב ארי|אדריכלות/ },
   { path: "/blog", heading: /בלוג|מאמרים/ },
   { path: "/claims", heading: /תביע/ },
+  // /faq was missing from this list, so none of the checks below ever ran
+  // against it — while the footer linked to it twice.
+  { path: "/faq", heading: /שאלות|תשובות/ },
   { path: "/privacy", heading: /פרטיות/ },
   { path: "/accessibility", heading: /נגישות/ },
   // The auth screens ship with the Base44 starter copy (English).
@@ -104,6 +107,94 @@ test.describe("Routing — sanity", () => {
       await expect(page).toHaveURL(/\/#services$/);
       await expect(page.locator("#services")).toBeInViewport({ ratio: 0.05 });
     });
+  });
+
+  test("the footer reaches a home section from another route", async ({ page }) => {
+    // The same defect the header test above guards against, in the menu that
+    // carries more links and sits on all seven pages. The header was fixed and
+    // the footer was not, so `אודות`, `שירותים`, `תיקי הצלחה` and `קביעת ייעוץ`
+    // stayed dead everywhere except home — a bare `#about` on /blog resolves to
+    // no element and silently does nothing.
+    await test_step("open the blog, away from the home page", async () => {
+      await gotoApp(page, "/blog");
+    });
+
+    await test_step("click the about link in the footer", async () => {
+      await page.locator("footer").getByRole("link", { name: "אודות" }).first().click();
+    });
+
+    await test_step("it lands on the home page at that section", async () => {
+      await expect(page).toHaveURL(/\/#about$/);
+      await expect(page.locator("#about")).toBeInViewport({ ratio: 0.05 });
+    });
+  });
+
+  test("no link anywhere points at a section the page does not have", async ({ page }) => {
+    // The general form of the bug, checked rather than enumerated. Every
+    // same-page `#hash` anchor on every public route must resolve to an element
+    // on that route — an anchor that does not is inert, and inert is invisible:
+    // nothing throws, nothing logs, the click simply does nothing.
+    for (const route of PUBLIC_ROUTES) {
+      await test_step(`every in-page anchor on ${route.path} resolves`, async () => {
+        await gotoApp(page, route.path);
+        const dead = await page.evaluate(() =>
+          [...document.querySelectorAll('a[href^="#"]')]
+            .map((a) => a.getAttribute("href") as string)
+            .filter((href) => href.length > 1 && !document.getElementById(href.slice(1))),
+        );
+        expect(dead, `${route.path} has anchors pointing nowhere`).toEqual([]);
+      });
+    }
+  });
+
+  test("every internal link lands on a real route, not the not-found page", async ({ page }) => {
+    // The other half of the dead-link problem. An anchor that names a section
+    // which is not there does nothing; a link that names a route which is not
+    // registered does something worse — it renders the 404 and looks like the
+    // site is broken. Neither throws, so neither shows up in a console check.
+    await gotoApp(page, "/");
+    const hrefs = await page.evaluate(() =>
+      [...new Set(
+        [...document.querySelectorAll("a[href]")]
+          .map((a) => a.getAttribute("href") as string)
+          .filter((h) => h.startsWith("/") && !h.startsWith("//")),
+      )],
+    );
+    expect(hrefs.length, "no internal links found — the selector has rotted").toBeGreaterThan(3);
+
+    for (const href of hrefs) {
+      const path = href.split("#")[0].split("?")[0];
+      if (!path || path === "/") continue;
+      await test_step(`${path} is a registered route`, async () => {
+        await gotoApp(page, path);
+        await expect(
+          page.getByRole("heading", { name: "404" }),
+          `${path} is linked from the site but renders the not-found page`,
+        ).toHaveCount(0);
+      });
+    }
+  });
+
+  test("every link in the footer menu goes where its label says", async ({ page }) => {
+    // Driven from /blog on purpose: on the home page a bare `#about` works by
+    // accident, which is exactly why the footer's dead links survived so long.
+    const EXPECTED: Array<[label: string, url: RegExp]> = [
+      ["אודות", /\/#about$/],
+      ["שירותים", /\/#services$/],
+      ["מדריך תביעות", /\/claims$/],
+      ["שאלות ותשובות", /\/faq$/],
+      ["תיקי הצלחה", /\/#proof$/],
+      ["בלוג", /\/blog$/],
+      ["קביעת ייעוץ", /\/#consultation$/],
+    ];
+
+    for (const [label, url] of EXPECTED) {
+      await test_step(`${label} reaches its target from /blog`, async () => {
+        await gotoApp(page, "/blog");
+        await page.locator("footer").getByRole("link", { name: label, exact: true }).first().click();
+        await expect(page).toHaveURL(url);
+      });
+    }
   });
 
   test("navigating between routes scrolls back to the top", async ({ page }) => {

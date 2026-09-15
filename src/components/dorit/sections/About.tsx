@@ -12,10 +12,13 @@ interface Stat {
   label: string;
 }
 
+// Three, not four. "97% שיעור תביעות שאושרו" was here and is gone: a licensed
+// agent quoting a performance figure is a regulated claim, and nothing in this
+// repo could substantiate it. The grid below is sized to this list — keep the
+// two in step, or the bordered strip renders with an empty cell.
 const STATS: Stat[] = [
   { num: "30", label: "שנות ניסיון" },
   { num: "מאות", label: "לקוחות מרוצים" },
-  { num: "97%", label: "שיעור תביעות שאושרו" },
   { num: "1:1", label: "ליווי אישי" },
 ];
 
@@ -89,7 +92,7 @@ export default function About() {
             — דורית
           </p>
 
-          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-px bg-border/50 border border-border/50">
+          <div className="mt-12 grid grid-cols-3 gap-px bg-border/50 border border-border/50">
             {STATS.map((s, i) => (
               <div key={i} className="bg-background p-6 md:p-8 text-center group transition-colors duration-300 hover:bg-secondary/40">
                 <p className="font-heading text-4xl md:text-5xl text-accent leading-none transition-transform duration-300 group-hover:scale-105">
