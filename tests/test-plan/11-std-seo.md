@@ -28,6 +28,7 @@ one.
 | Private-route noindex guard | `src/components/SeoRouteGuard.tsx` |
 | Static head | `index.html` |
 | Crawl directives | `public/robots.txt`, `public/sitemap.xml` |
+| Host rewriting | `scripts/vite-site-url-plugin.mjs` — rewrites the origin in `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` when `VITE_SITE_URL` names a different one |
 | Page-level declarations | `src/pages/{Home,Blog,BlogPost,Claims,PrivacyPolicy,Accessibility}.tsx`, `src/lib/PageNotFound.jsx` |
 
 ## 3. Unit cases — `tests/unit/seo.dom.test.ts`
@@ -94,7 +95,7 @@ one.
 | ID | Title | Expected result |
 |---|---|---|
 | SEO-CRW-001 | "robots.txt keeps private areas out of crawl budget" | `Disallow` for `/admin/`, `/login`, `/register`, `/oauth/`; public site still allowed; AI crawlers still allowed |
-| SEO-CRW-002 | "the sitemap lists every public content route" | `/`, `/blog`, `/claims`, `/privacy`, `/accessibility` |
+| SEO-CRW-002 | "the sitemap lists every public content route" | `/`, `/blog`, `/claims`, `/faq`, `/privacy`, `/accessibility` |
 | SEO-CRW-003 | "the sitemap lists no route that is marked noindex" | No contradiction between the two signals |
 | SEO-CRW-004 | "sitemap URLs share the canonical origin the pages declare" | One origin across both |
 

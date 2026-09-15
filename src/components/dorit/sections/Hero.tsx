@@ -81,14 +81,15 @@ export default function Hero() {
             דורית גוב ארי · מתכננת פיננסית בכירה
           </span>
           <ArchStatement />
-          {/* Three claims of equal weight. Wrapping left the third alone on its
-              own line at 390px, which read as an afterthought rather than as
-              one of a set — so on phones all three stack, and the dots that
-              separated them are only drawn when they are in a row. */}
+          {/* Claims of equal weight. Wrapping left the last one alone on its own
+              line at 390px, which read as an afterthought rather than as one of
+              a set — so on phones they stack, and the dots that separate them
+              are only drawn when they are in a row.
+              "97% תביעות שאושרו" used to sit in the middle. It is gone: a
+              licensed agent quoting a performance figure is a regulated claim,
+              and nothing here could substantiate it. */}
           <div className="mt-7 flex flex-col items-start gap-y-1.5 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-2 text-sm text-foreground/70 animate-fade-up">
             <span className="font-heading text-base text-accent">30 שנות ניסיון</span>
-            <span className="hidden md:block w-1 h-1 rounded-full bg-highlight" />
-            <span className="font-heading text-base text-accent">97% תביעות שאושרו</span>
             <span className="hidden md:block w-1 h-1 rounded-full bg-highlight" />
             <span className="font-heading text-base text-accent">ליווי אישי 1:1</span>
           </div>

@@ -129,8 +129,14 @@ Base44's own host has no equivalent — it answers `405` to any path it does not
 
 The repo side is already done and is inert until the last step. `VITE_SITE_URL` sets
 the canonical origin: `src/lib/seo.ts` reads it at runtime, and a build plugin rewrites
-`sitemap.xml`, `robots.txt` and `llms.txt` to match. Unset, the build emits exactly what
-it does today, so nothing moves until you move it.
+`index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` to match. Unset, the build emits
+exactly what it does today, so nothing moves until you move it.
+
+`index.html` is on that list because the document a crawler is served is the one that
+matters, and it was the one being missed: the sitemap moved hosts while the served HTML
+kept advertising the old origin in its canonical tag, `og:url` and two static JSON-LD
+blocks. `applySeo` patches the first two in the browser — the audience that did not need
+it — and never touches the JSON-LD at all.
 
 **Do these in order.** The variable goes last, because a sitemap advertising a host that
 does not resolve is worse than one pointing at the old site.
@@ -266,6 +272,7 @@ docker compose -f docker-compose.test.yml run --rm e2e-ios
 
 | Suite | Command | Location |
 |---|---|---|
+| Everything (Vitest, one process) | `npm run test:vitest` | `tests/` |
 | Unit | `npm run test:unit` | `tests/unit/` |
 | Component | `npm run test:component` | `tests/component/` |
 | Contract | `npm run test:contract` | `tests/contract/` |
@@ -273,6 +280,13 @@ docker compose -f docker-compose.test.yml run --rm e2e-ios
 | Security (static) | `npm run test:security` | `tests/security/` |
 | e2e — UI, API, security, a11y, SEO | `npm run test:e2e` | `e2e/` |
 | SEO only | `npm run test:e2e:seo` | `e2e/seo/` |
+
+`npm test` is `test:vitest` followed by `test:e2e`. The five Vitest suites used
+to run as five separate `vitest run` invocations, which paid the startup cost
+five times — 8.5s against 4.1s for the same 436 cases in one process. The
+per-suite commands remain for running one on its own, and `./scripts/run-tests.sh`
+still invokes them separately so its summary can report each suite's own
+pass/fail.
 
 **The integration suite runs the Base44 backend functions for real.** They sit
 outside `tsconfig.json` and execute on Deno inside Base44, so nothing else in
@@ -422,6 +436,13 @@ Publish button with **Merge to main**, and Base44 keeps each Builder branch as
 a real branch here — so merging is already its job, and a CI job doing it too
 would race and leave the two disagreeing. CI runs everything and posts the
 verdict; you press the button.
+
+**The verdict is not Builder-only.** The `Safe to merge?` job runs on every
+branch except `main`, writes to the run summary, and — when the commit has an
+open PR — posts a comment on it, edited in place so there is one comment always
+describing the latest run. The check goes red when the answer is no, because a
+check called "Safe to merge?" sitting green beside a body that says *do not
+merge* is worse than no check at all.
 
 That isn't a weaker guarantee than it sounds, because **publishing only ever
 happens from main**, and the publish there requires a green run. The gate sits

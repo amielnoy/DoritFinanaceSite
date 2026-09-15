@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
+import { useSectionNav } from "@/hooks/useSectionNav";
 
 interface NavItem {
   label: string;
@@ -34,36 +35,19 @@ const NAV: NavItem[] = [
 export default function FloatingHeader() {
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [open, setOpen] = useState<boolean>(false);
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const navigateToSection = useSectionNav();
 
   /**
-   * Every section these anchors name lives on the home page, and the header is
-   * rendered on every route. A bare `href="#services"` on /blog therefore sets
-   * the URL to /blog#services, finds no element of that id, and does nothing
-   * whatsoever — which left the entire main menu dead on /blog, /claims, /faq,
-   * /privacy and /accessibility, the CTA and the logo included. (A hash-only
-   * anchor fires `hashchange`, not `popstate`, so React Router never sees the
-   * change either and ScrollToTop cannot rescue it.)
+   * Anchors here name sections that live only on the home page, and this header
+   * is rendered on every route — so a bare `#services` on /blog would set the
+   * URL to /blog#services and do nothing at all. Route home first, then scroll.
    *
-   * Route home first, then scroll — the same thing SectionNav does. The href
-   * stays a real `/#section` URL so middle-click, "open in new tab" and a
-   * JS-less load all still land in the right place.
+   * The implementation moved to `useSectionNav` when the footer turned out to
+   * have the same links and none of the handling. See the hook.
    */
   const goToSection = (e: React.MouseEvent, hash: string) => {
-    // Leave modified clicks to the browser, or new-tab stops working.
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault();
     setOpen(false);
-
-    if (pathname !== "/") {
-      navigate(`/${hash}`);
-      return;
-    }
-
-    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
-    // Keep the address bar honest without letting the browser jump-scroll.
-    window.history.replaceState(null, "", hash);
+    navigateToSection(e, hash);
   };
 
   useEffect(() => {

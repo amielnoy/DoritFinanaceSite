@@ -112,11 +112,12 @@ Resume after the environment is corrected; no partial sign-off.
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
 Both runners write Allure results into the same `allure-results/`, so one
-`allure generate` covers the whole battery — 345 unit/component/contract/
-security cases plus 162 e2e cases per platform. CI merges the five uploads
-(one per platform, one for the Vitest job) into a single published report;
-generating per-leg would give five partial reports instead of one picture of
-the run. Allure 3 emits the merged report as a single self-contained
+`allure generate` covers the whole battery — 436 Vitest cases (81 unit, 21
+component, 219 contract, 45 integration, 70 security) plus 167 e2e cases per
+platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
+eleven on the full matrix, two on a feature branch — into a single published
+report; generating per-leg would give a pile of partial reports instead of one
+picture of the run, and sharding only makes that worse. Allure 3 emits the merged report as a single self-contained
 HTML file, which CI attaches to every run; a multi-file copy is deployed to
 Cloudflare Pages behind Cloudflare Access, and CI fails the run if that copy
 answers an anonymous request.
@@ -136,12 +137,22 @@ every deploy job checks the ref, so `main` and `builder` remain the only
 branches that can reach a site.
 
 **e2e depth varies by where the run is.** A feature branch or a PR gets
-Chromium only (~5 min); `main`, `builder`, a manual run and the **nightly run
-at 19:00 UTC (22:00 Israel during IDT)** get all four platforms (~12 min). The
-`plan` job decides and says which in the run summary. The split exists because
-WebKit costs 9 minutes against Chromium's 4 for identical tests, and two of the
-four legs are WebKit; `main` is deliberately excluded from the narrowing,
-because its green run is what the production publish is gated on. The pull-request trigger is narrowed to
+Chromium only, on a single shard (~5 min); `main`, `builder`, a manual run and
+the **nightly run at 19:00 UTC (22:00 Israel during IDT)** get all four
+platforms, sharded across ten runners (~4m30 wall, ~48 job-minutes). The `plan`
+job decides both the platforms and the shard counts, and says which in the run
+summary. The split exists because WebKit costs 9 minutes against Chromium's 4
+for identical tests, and two of the four legs are WebKit; `main` is deliberately
+excluded from the narrowing, because its green run is what the production
+publish is gated on.
+
+**Shards, not workers.** The WebKit legs get three shards each and the Chromium
+legs two, because a shard is two more real cores. Raising `workers` instead does
+not work and has been measured twice: four workers on a two-core runner took
+web-webkit 9m22 → 11m52 and then failed, and on a 12-core machine web-chromium
+ran 2 workers → 35.7s, 4 → 23.0s, 6 → 23.6s, 8 → 25.1s, 10 → 31.8s, 12 → 34.2s.
+The curve turns upwards well before the core count: these tests are a browser
+waiting on a page, not CPU-bound work. See `playwright.config.ts`. The pull-request trigger is narrowed to
 
 `opened`/`reopened` because pushes to the branch already run — reacting to
 `synchronize` as well would run the whole matrix twice per commit.

@@ -21,8 +21,14 @@ npx skills add base44/skills
 
 - `src/`: frontend application source.
 - `src/api/base44Client.js`: frontend Base44 SDK client.
+- `base44/functions/*/entry.ts`: backend functions. Isolated entry points with no
+  shared module, so some helpers are duplicated by hand — `redact`, `escapeHtml`,
+  `buildClientHtml`, `SHEET_COLUMNS`. Duplicated is fine; drifted is not, and
+  `tests/contract/agents.contract.test.ts` fails when copies stop matching.
 - `vite.config.js`: Vite config and Base44 Vite plugin setup.
 - `.env.local`: local-only environment values; never commit secrets.
+- `tests/test-plan/`: the test plan and one Software Test Description per suite.
+  Update the relevant STD when you add or change tests.
 
 ## Working Notes
 
@@ -31,4 +37,10 @@ npx skills add base44/skills
 - Use `npm run dev` only for frontend-only work against the hosted Base44 backend.
 - Prefer the existing Base44 CLI workflow over adding new npm scripts for Base44-specific tasks.
 - Reuse the existing SDK client and Vite plugin patterns before adding new Base44 integration paths.
-- Run the relevant checks from `package.json` before finishing code changes.
+- Run the relevant checks from `package.json` before finishing code changes:
+  `npm run lint`, `npm run typecheck:gate`, `npm run test:vitest`, and
+  `npm run test:e2e` (or `./scripts/run-tests.sh` for everything with a summary).
+- Anchors like `#about` name sections that exist **only on the home page**, while
+  the header and footer render on every route. Use `useSectionNav` and give the
+  anchor a real `/#section` href — a bare `#section` is inert off the home page
+  and fails silently.

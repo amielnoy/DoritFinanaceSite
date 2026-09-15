@@ -19,6 +19,7 @@ import Reveal from "@/components/dorit/primitives/Reveal";
 import { CONTACT } from "@/config/contact";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import ClaimForm from "@/components/dorit/forms/ClaimForm";
+import { useSectionNav } from "@/hooks/useSectionNav";
 
 interface ClaimStep {
   n: string;
@@ -104,10 +105,12 @@ const DOCS: string[] = [
 ];
 
 export default function Claims() {
+  const goToSection = useSectionNav();
+
   useSeo({
     title: "ליווי תביעות ביטוח — מה לעשות בעת אירוע | דורית גוב ארי",
     description:
-      "מדריך מעשי להגשת תביעת ביטוח: מה לתעד, אילו מסמכים נדרשים, ואיך מתנהלים מול חברת הביטוח. ליווי אישי לאורך כל התהליך, 97% תביעות שאושרו.",
+      "מדריך מעשי להגשת תביעת ביטוח: מה לתעד, אילו מסמכים נדרשים, ואיך מתנהלים מול חברת הביטוח. ליווי אישי לאורך כל התהליך.",
     path: "/claims",
     jsonLd: [
       breadcrumbLd([
@@ -346,8 +349,11 @@ export default function Claims() {
                   <Phone size={18} />
                   דיווח מיידי
                 </a>
+                {/* `#consultation` is a home-page section, and this is /claims —
+                    as a bare hash it did nothing at all. */}
                 <a
-                  href="#consultation"
+                  href="/#consultation"
+                  onClick={(e) => goToSection(e, "#consultation")}
                   className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors"
                 >
                   ייעוץ מקדים

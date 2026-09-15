@@ -3,6 +3,7 @@ import { Image } from "@/components/ui/image";
 import { Phone, Mail, MapPin, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CONTACT } from "@/config/contact";
+import { useSectionNav } from "@/hooks/useSectionNav";
 
 const HANDSHAKE =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/8f139c5ff_generated_14b746d4.jpg";
@@ -14,6 +15,10 @@ interface FooterLink {
 }
 
 export default function Footer() {
+  // The footer sits on all seven pages, so its `#section` links point at
+  // something that exists on only one of them. See the hook.
+  const goToSection = useSectionNav();
+
   return (
     <footer className="relative bg-primary text-primary-foreground">
       <div className="grid grid-cols-1 md:grid-cols-2 h-64 md:h-80">
@@ -64,7 +69,13 @@ export default function Footer() {
                 {n.route ? (
                   <Link to={n.h} className="hover:text-highlight transition-colors">{n.l}</Link>
                 ) : (
-                  <a href={n.h} className="hover:text-highlight transition-colors">{n.l}</a>
+                  <a
+                    href={`/${n.h}`}
+                    onClick={(e) => goToSection(e, n.h)}
+                    className="hover:text-highlight transition-colors"
+                  >
+                    {n.l}
+                  </a>
                 )}
               </li>
             ))}
