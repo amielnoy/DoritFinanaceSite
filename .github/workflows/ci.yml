@@ -11,8 +11,11 @@
 # the switch-over.
 #
 # Once it is live, a push to `builder` gets the full battery, a Vercel preview
-# on its own URL, a published report, and a "safe to merge" verdict in the run
-# summary. What it does NOT get is an automatic merge: on a branch the Builder
+# on its own URL, and a published report. The "safe to merge" verdict is no
+# longer part of that list, because it is no longer a Builder perk: every
+# branch but `main` gets one, on the PR and in the run summary (see §9).
+#
+# What `builder` does NOT get is an automatic merge: on a branch the Builder
 # replaces its Publish button with "Merge to main", and Base44 keeps each
 # Builder branch as a real branch here, so merging is already its job. A CI
 # job that merged `builder` into `main` would race that and leave the two
@@ -927,26 +930,45 @@ jobs:
 
 
 
-  # ── 9. Is this Builder branch safe to merge? ─────────────────────────────
+  # ── 9. Is this safe to merge? ────────────────────────────────────────────
   #
-  # Base44 owns promotion, not this pipeline. On a branch the Builder replaces
-  # its Publish button with "Merge to main", and merging there is what moves
-  # the work — including to GitHub, since Base44 keeps each Builder branch as a
-  # real branch in this repository. A CI job that merged `builder` into `main`
-  # itself would race that, and leave the Builder's own record of the branch
-  # saying "not merged" over a merge that already happened.
+  # This job was gated to `builder` and skipped everywhere else, which meant the
+  # check named "Safe to merge?" never produced a verdict on the branches people
+  # actually open pull requests from. A green PR showed no verdict, no preview
+  # link and no report link — the one question the job exists to answer went
+  # unanswered on every PR. It now runs on every branch except `main`, where
+  # there is nothing left to merge and the "Deployed sites" table says more.
   #
-  # So CI does the half it is good at: run everything, put the verdict and a
-  # preview URL somewhere obvious, and let the human press the button. The
-  # enforcement that matters is downstream anyway — publishing only happens
-  # from main, and the publish job there demands a green run.
+  # CI reports; it does not merge. On a Builder branch that is because Base44
+  # owns promotion — the Builder replaces its Publish button with "Merge to
+  # main", and it keeps each Builder branch as a real branch here, so a CI job
+  # that merged would race it and leave the two disagreeing about what happened.
+  # On an ordinary PR it is because nobody asked for an unattended merge. Either
+  # way the enforcement that matters is downstream: publishing happens only from
+  # main, and the publish job there demands a green run.
+  #
+  # The verdict goes two places. The run summary, as before, and — when the
+  # commit has an open PR — a comment on it, edited in place so there is one
+  # comment that is always about the latest run rather than a pile of stale
+  # ones. That matters more than usual here: `pull_request` fires only on
+  # `opened`/`reopened` (see the trigger), so most runs on a PR arrive as pushes
+  # and a create-only comment would freeze at whatever the first run said.
+  #
+  # And it fails when the answer is no. A check called "Safe to merge?" sitting
+  # green next to a body that says "do not merge" is worse than no check at all.
+  # Nothing depends on this job, so the failure costs nothing but the red mark
+  # it is there to give.
   merge-readiness:
     name: Safe to merge?
     runs-on: ubuntu-latest
     needs: [build, test-node, test-e2e, deploy-vercel, allure]
-    if: always() && github.ref == 'refs/heads/builder'
+    if: always() && github.ref != 'refs/heads/main'
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
-      - name: Write the verdict to the run summary
+      - name: Compose the verdict
+        id: verdict
         env:
           BUILD: ${{ needs.build.result }}
           UNIT: ${{ needs.test-node.result }}
@@ -955,15 +977,26 @@ jobs:
           ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
+          IS_BUILDER: ${{ github.ref == 'refs/heads/builder' || github.head_ref == 'builder' }}
         run: |
           if [ "$BUILD" = "success" ] && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ]; then
+            green=true
             verdict="## ✅ Safe to merge"
-            advice="Everything passed. Press **Merge to main** in the Builder; the publish from main is gated on a green run there too."
+            if [ "$IS_BUILDER" = "true" ]; then
+              advice="Everything passed. Press **Merge to main** in the Builder; the publish from main is gated on a green run there too."
+            else
+              advice="Everything passed. The publish from main is gated on a green run there too, so merging is the last judgement call."
+            fi
           else
+            green=false
             verdict="## 🛑 Do not merge yet"
-            advice="Something is red. Open the report below, fix it in the Builder, and push again — merging now would put this on main."
+            if [ "$IS_BUILDER" = "true" ]; then
+              advice="Something is red. Open the report below, fix it in the Builder, and push again — merging now would put this on main."
+            else
+              advice="Something is red. Open the report below and fix it on this branch — merging now would put it on main."
+            fi
           fi
+          echo "green=$green" >> "$GITHUB_OUTPUT"
 
           {
             echo "$verdict"
@@ -992,9 +1025,64 @@ jobs:
               echo "\`index.html\`; unzip and open it, no server needed."
             else
               echo "_Test report: not built (${ALLURE_RESULT})._"
-
             fi
             echo
-            echo "> Heads-up: every Builder branch shares the app's **live data**. The tests never"
-            echo "> touch it, but anything you do by hand in the Builder writes to real records."
-          } >> "$GITHUB_STEP_SUMMARY"
+            if [ "$IS_BUILDER" = "true" ]; then
+              echo "> Heads-up: every Builder branch shares the app's **live data**. The tests never"
+              echo "> touch it, but anything you do by hand in the Builder writes to real records."
+              echo
+            fi
+            echo "<sub>[This run](${RUN_URL}) · re-runs replace this comment rather than adding one.</sub>"
+          } > verdict.md
+
+      - name: Write it to the run summary
+        run: cat verdict.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Only if the commit has an open PR. A push to a branch with no PR yet
+      # still gets the run summary above, so nothing is lost by staying quiet
+      # here — and `gh pr list` is what makes this work on a push event, where
+      # there is no PR context in the payload at all.
+      #
+      # Never fatal. This step reports; the verdict itself is already in the run
+      # summary and the step below is what colours the check. A posting failure
+      # is an infrastructure problem, and failing here would turn every PR red
+      # for a reason that has nothing to do with the code under test — while
+      # saying nothing about why.
+      #
+      # The likely reason is named explicitly because it is invisible from the
+      # log otherwise: this repository's default workflow permissions are
+      # read-only (Settings → Actions → General → Workflow permissions). The
+      # job-level `permissions:` block above asks for `pull-requests: write`;
+      # if that setting caps it, the API answers 403 and the comment silently
+      # never appears — which is exactly the symptom this job was fixed to cure.
+      - name: Post it on the pull request, if there is one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_FROM_EVENT: ${{ github.event.pull_request.number }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          pr="$PR_FROM_EVENT"
+          if [ -z "$pr" ]; then
+            pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty') || true
+          fi
+          if [ -z "$pr" ]; then
+            echo "::notice::No open PR for ${BRANCH} — the verdict is in the run summary only."
+            exit 0
+          fi
+          # --edit-last keeps one comment per PR. It errors when there is no
+          # previous one, hence the fallback rather than a version-dependent
+          # --create-if-none.
+          if gh pr comment "$pr" --edit-last --body-file verdict.md \
+            || gh pr comment "$pr" --body-file verdict.md; then
+            echo "::notice::Verdict posted on PR #${pr}."
+          else
+            echo "::warning::Could not comment on PR #${pr}. The verdict is in the run summary. If this is a 403, set Settings → Actions → General → Workflow permissions to 'Read and write permissions' — this repository is currently on read-only, which caps the pull-requests: write this job asks for."
+          fi
+
+      # Last, so the verdict is published either way before this decides the
+      # colour of the check.
+      - name: Fail if the answer is no
+        if: steps.verdict.outputs.green != 'true'
+        run: |
+          echo "::error::Not safe to merge — see the verdict on the PR and in the run summary."
+          exit 1
