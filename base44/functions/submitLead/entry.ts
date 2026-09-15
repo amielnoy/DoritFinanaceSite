@@ -13,6 +13,23 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 // כמה תיבות, אותו צוות. הרשימה קיימת כדי שתוספת תיבה תהיה שורה אחת ולא
 // שכפול של הקריאה — וכדי שכשל במסירה לתיבה אחת לא ימנע את השאר.
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
+
+/**
+ * מסירה נכשלת — עם הסיבה, לא רק עם השם.
+ *
+ * `secondary_email_failed` לבדו אינו ניתן לפעולה: הוא אומר שמישהו לא קיבל,
+ * ולא למה. וההסבר כאן כמעט תמיד אחד ויחיד — `Core.SendEmail` של Base44 מוסרת
+ * **רק לנמענים הרשומים כמשתמשי האפליקציה** ("Send emails to registered users
+ * of your app"). כתובת שאינה רשומה נכשלת בשקט, וזה בדיוק מה שקרה לתיבה של
+ * דורית בעוד שהעותק לצוות הגיע.
+ *
+ * צירוף הודעת השגיאה לאזהרה הופך את התקלה הבאה לכזו שאפשר לאבחן מתוך המייל
+ * עצמו, בלי לוגים — ואין לוגים: האפליקציה אינה שומרת אותם.
+ */
+function deliveryWarning(label, error) {
+  const reason = String(error?.message ?? error ?? '').slice(0, 120);
+  return reason ? `${label} (${reason})` : label;
+}
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 /**
@@ -765,7 +782,7 @@ export default async function(req) {
         text: agentBody,
       });
     } catch (e) {
-      warnings.push('secondary_email_failed');
+      warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
     // אישור ללקוח
@@ -786,7 +803,7 @@ export default async function(req) {
           text: buildClientText(source, data),
         });
       } catch (e) {
-        warnings.push('client_confirmation_failed');
+        warnings.push(deliveryWarning('client_confirmation_failed', e));
       }
     }
 
@@ -876,7 +893,7 @@ export default async function(req) {
           text: opsText,
         });
       } catch (e) {
-        warnings.push('notify_email_failed');
+        warnings.push(deliveryWarning('notify_email_failed', e));
       }
     }
 

@@ -231,6 +231,22 @@ Anchors into those sections work from every route — `useSectionNav` routes hom
 first and then scrolls, because a bare `#services` on `/blog` sets the URL and
 does nothing.
 
+## A platform limit worth knowing before you add a recipient
+
+Base44's `Core.SendEmail` delivers **only to registered users of the app**. An
+address that is not registered fails silently and shows up as a warning in the
+operations copy, nowhere else.
+
+This is not theoretical: `dorit@govari-fin.co.il` was not a registered user, so
+she received none of the leads the site collected while the operations mailbox
+received all of them. Adding an address to `NOTIFY_EMAILS` is therefore only
+half the job — the other half is registering it as a user of the app.
+
+A visitor is never a registered user, so the confirmation email the site used to
+offer them could not arrive. The interview no longer promises one. Sending real
+confirmations needs an external mail provider with a verified domain rather than
+the Core integration.
+
 ## The agents, and where they stop
 
 Three LLM agents run on the site — `needs_interview`, `booking_assistant` and

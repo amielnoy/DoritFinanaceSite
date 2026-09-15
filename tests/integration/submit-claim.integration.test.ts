@@ -79,7 +79,7 @@ describe("submitClaim — the operations mailboxes", () => {
   it("delivers to the second mailbox when the first bounces", async () => {
     const r = await invokeFunction("submitClaim", claim, { failEmailTo: [OPS] });
     expect(r.emails.map((e) => e.to)).toContain(OPS2);
-    expect(r.json.warnings).toContain("notify_email_failed");
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("notify_email_failed")));
     // The agency and the reporter are on separate sends and are unaffected.
     expect(r.emails.map((e) => e.to)).toContain(AGENCY);
     expect(r.status).toBe(200);
@@ -88,7 +88,7 @@ describe("submitClaim — the operations mailboxes", () => {
   it("delivers to the first when the second bounces", async () => {
     const r = await invokeFunction("submitClaim", claim, { failEmailTo: [OPS2] });
     expect(r.emails.map((e) => e.to)).toContain(OPS);
-    expect(r.json.warnings).toContain("notify_email_failed");
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("notify_email_failed")));
   });
 
   it("still tells the agency when both operations mailboxes bounce", async () => {
@@ -123,7 +123,7 @@ describe("submitClaim — what survives a failure", () => {
     const r = await invokeFunction("submitClaim", claim, { failEmailTo: ["ronit@example.com"] });
     expect(r.status).toBe(200);
     expect(r.leads).toHaveLength(1);
-    expect(r.json.warnings).toContain("client_confirmation_failed");
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("client_confirmation_failed")));
   });
 });
 

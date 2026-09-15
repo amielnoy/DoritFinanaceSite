@@ -481,6 +481,21 @@ describe("who receives a lead, and whether the consent text admits it", () => {
       expect(read(join(REPO_ROOT, "base44/entities/Lead.jsonc"))).not.toMatch(/medical|רפואי/);
     });
 
+    /**
+     * An email the platform cannot deliver must not be promised.
+     *
+     * Base44's `Core.SendEmail` delivers only to registered users of the app —
+     * "Send emails to registered users of your app". A visitor is never one, so
+     * the confirmation the prompt used to offer ("אשלח אליך אישור") could not
+     * arrive, and the interview was making a promise the system fails silently.
+     * The address is still worth asking for; it is a way to reach them, not a
+     * mailbox the site can write to.
+     */
+    it("does not promise the visitor an email the platform cannot send", () => {
+      expect(interview.instructions).not.toMatch(/אשלח אליך אישור/);
+      expect(interview.instructions).toMatch(/אל תבטיח שיישלח אישור או עותק למייל/);
+    });
+
     it("does not confirm a save that failed", () => {
       // Silence here is the bad failure: the visitor is told Dorit has their
       // summary, and she does not.
