@@ -110,11 +110,13 @@ function redact(text) {
 // משוכפל מ-submitLead/entry.ts, כמו redact(), מאותה סיבה: אין מודול משותף בין
 // פונקציות Base44. tests/contract/agents.contract.test.ts נכשל אם העמודות או
 // הפונקציה מתפצלות — שורה שנכתבת בסדר אחר הורסת את הגיליון בלי שדבר ייכשל.
-const SHEET_ID = '';
-const SHEET_TAB = 'Events';
+// מזהה הגיליון מגיע מהסביבה ולא מהקוד: המאגר ציבורי, ופריסה בלי גיליון צריכה
+// להמשיך לעבוד. ריק = הרישום מדולג בשקט ומדווח כ"לא מוגדר" בנספח התפעולי.
+const SHEET_ID = (Deno.env.get('SHEET_ID') || '').trim();
+const SHEET_TAB = (Deno.env.get('SHEET_TAB') || 'Events').trim();
 
 const SHEET_COLUMNS = [
-  'מועד', 'סוג האירוע', 'מקור', 'סוכן', 'נושא', 'מועד מבוקש',
+  'מועד', 'סוג האירוע', 'מקור', 'מסלול', 'סוכן', 'נושא', 'מועד מבוקש',
   'שם', 'טלפון', 'אימייל', 'מזהה רשומה', 'סיבת העברה', 'תקציר',
 ];
 
@@ -235,6 +237,7 @@ export default async function(req) {
         new Date().toISOString(),
         'conversation_escalation',
         'escalation',
+        '',                       // מסלול — רלוונטי רק בראיון
         agent || '',
         topic || REASONS[safeReason],
         '',                       // מועד מבוקש — אין בהעברה לאדם

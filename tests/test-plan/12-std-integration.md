@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 155
+**Location:** `tests/integration/` · **Cases:** 161
 
 ---
 
@@ -193,6 +193,23 @@ because the reporter believes it is in hand — and that a bounced confirmation
 costs the message and never the record. A last case escapes markup in a name
 arriving from a public form.
 
+### 4.11b `submitLead` — the row it appends to the sheet — `INT-LEAD-079..084`
+
+The Google Sheets log existed and had never run: `SHEET_ID` was a hardcoded
+empty string, so `appendEventRow` returned before touching the network and every
+case took that branch. The column order was pinned by a contract test; what
+landed in a row was pinned by nothing — and an interview would have written a
+name and a phone number with the interview missing.
+
+These append for real against a stubbed Sheets API: one row in the pinned column
+order, the interview's track, derived meeting topic and profile text in the
+cells that were empty, and an identifier redacted before it reaches the sheet —
+which matters more here than anywhere, since the sheet is the copy that outlives
+deleting the Lead. Two more pin that no sheet is touched when none is
+configured, that a failed append never costs the enquiry, and that a *partial*
+interview writes no row at all: logging someone who started and left would
+retain their details in the one place a deletion request does not reach.
+
 ### 4.12 `submitLead` — a partial interview, and the upsert — `INT-LEAD-065..072`
 
 Contact details used to be collected last, so a visitor who answered four
@@ -250,7 +267,7 @@ agent is named, so a pattern is visible later.
 
 ## 5. Pass criteria
 
-All 155 cases pass. These assert behaviour, not shape — a failure means the
+All 161 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

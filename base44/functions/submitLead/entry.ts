@@ -95,8 +95,10 @@ function redact(text) {
 //
 // זהו עותק שלישי של פרטי המבקר, אחרי המאגר והמיילים, והיחיד שאינו נמחק על ידי
 // מחיקת רשומה במאגר. ראו את ההערה על שמירה ב-base44/agents/COMPLIANCE.md §6.
-const SHEET_ID = '';
-const SHEET_TAB = 'Events';
+// מזהה הגיליון מגיע מהסביבה ולא מהקוד: המאגר ציבורי, ופריסה בלי גיליון צריכה
+// להמשיך לעבוד. ריק = הרישום מדולג בשקט ומדווח כ"לא מוגדר" בנספח התפעולי.
+const SHEET_ID = (Deno.env.get('SHEET_ID') || '').trim();
+const SHEET_TAB = (Deno.env.get('SHEET_TAB') || 'Events').trim();
 
 /**
  * סדר העמודות בגיליון.
@@ -106,7 +108,7 @@ const SHEET_TAB = 'Events';
  * בלי שדבר ייכשל.
  */
 const SHEET_COLUMNS = [
-  'מועד', 'סוג האירוע', 'מקור', 'סוכן', 'נושא', 'מועד מבוקש',
+  'מועד', 'סוג האירוע', 'מקור', 'מסלול', 'סוכן', 'נושא', 'מועד מבוקש',
   'שם', 'טלפון', 'אימייל', 'מזהה רשומה', 'סיבת העברה', 'תקציר',
 ];
 
@@ -901,15 +903,20 @@ export default async function(req) {
         new Date().toISOString(),
         eventTypeFor(source),
         source || 'quick',
+        trackLabel,               // מסלול — רלוונטי רק בראיון
         '',                       // סוכן — רלוונטי רק בהעברה לאדם
-        topic || '',
+        // הנושא הנרשם הוא זה שנשלח בפועל: בראיון הוא נגזר מנושא הפגישה או
+        // מהדאגה המרכזית, ו-`topic` הגולמי כבר אינו מגיע מהסוכן.
+        effectiveTopic || '',
         timing || '',
         name,
         phone,
         email || '',
         leadId || '',
         '',                       // סיבת העברה — רלוונטי רק בהעברה לאדם
-        safeSummary,
+        // התקציר של הראיון הוא הפרופיל שהסוכן מסר, לא שדה summary נפרד. בלי
+        // הנפילה הזו שורת הראיון נרשמת ריקה — שם וטלפון בלי מה שנאסף.
+        safeSummary || profileText || safeMessage || '',
       ]);
     } catch (e) {
       warnings.push('sheet_append_failed');
