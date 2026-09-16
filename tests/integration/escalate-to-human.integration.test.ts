@@ -126,8 +126,12 @@ describe("escalateToHuman — identifiers in a model-written summary", () => {
   it("redacts before the notification is sent", async () => {
     const r = await invokeFunction("escalateToHuman", leaky);
     for (const mail of r.emails) {
-      expect(mail.body, mail.to).not.toContain("123456789");
-      expect(mail.body, mail.to).not.toContain("4580");
+      // Every half of every copy. `body` is absent once a message carries HTML
+      // — Base44 rejects the two together — so asserting on it alone would pass
+      // by reading undefined rather than by finding nothing.
+      const whole = `${mail.html ?? ""}${mail.text ?? ""}${mail.body ?? ""}`;
+      expect(whole, mail.to).not.toContain("123456789");
+      expect(whole, mail.to).not.toContain("4580");
     }
   });
 

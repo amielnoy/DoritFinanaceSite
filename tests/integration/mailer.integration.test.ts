@@ -78,3 +78,48 @@ it('keeps the mail transport identical in all isolated entry points', () => {
   expect(helpers[0]).toBeTruthy();
   expect(new Set(helpers).size).toBe(1);
 });
+
+/**
+ * What Base44's own mailer is handed.
+ *
+ * `Core.SendEmail` treats `html` and `body` as alternatives, not companions.
+ * Passing both makes it reject the call with "SendEmail accepts only …" — a
+ * *validation* error, not a delivery failure, so the enquiry is still saved and
+ * a warning is recorded and nobody is told. Leads kept arriving in the database
+ * while the operations mailbox went quiet, which is a hard failure to notice.
+ *
+ * Nothing pinned the shape of that payload, so the split that introduced `body`
+ * alongside `html` looked correct in every test.
+ */
+describe('the Core payload', () => {
+  const lead = { name: 'יעל', phone: '0521234567', source: 'quick', message: 'שלום' };
+
+  it('never sends html and body together', async () => {
+    const r = await invokeFunction('submitLead', lead);
+    const core = r.emails.filter(e => e.to === 'amielnoy@gmail.com');
+    expect(core.length, 'the operations copy did not take the Core path').toBeGreaterThan(0);
+    for (const mail of core) {
+      expect(
+        Boolean(mail.html) && Boolean(mail.body),
+        'html and body together — Base44 rejects this as a validation error',
+      ).toBe(false);
+    }
+  });
+
+  it('still carries a readable message whichever shape it takes', async () => {
+    // Rejecting the combination must not become dropping the content.
+    const r = await invokeFunction('submitLead', lead);
+    const mail = r.emails.find(e => e.to === 'amielnoy@gmail.com')!;
+    expect(`${mail.html ?? ''}${mail.text ?? ''}${mail.body ?? ''}`).toContain('יעל');
+  });
+
+  it('falls back to body when there is no html to send', async () => {
+    // submitClaim notifies in plain text; that path must not send an empty
+    // `body` alongside an absent `html`.
+    const r = await invokeFunction('submitClaim', {
+      name: 'רונית', phone: '0536667788', claimType: 'תאונת דרכים', description: 'נזק',
+    });
+    const mail = r.emails.find(e => e.to === 'amielnoy@gmail.com')!;
+    expect(mail.body ?? mail.text).toContain('רונית');
+  });
+});

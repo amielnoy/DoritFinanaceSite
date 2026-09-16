@@ -26,7 +26,7 @@ const CORE_EMAILS = ["amielnoy@gmail.com"];
 
 // Include a safe delivery reason in the operations notification.
 function deliveryWarning(label, error) {
-  const reason = String(error?.message ?? error ?? '').slice(0, 120);
+  const reason = String(error?.message ?? error ?? '').slice(0, 300);
   return reason ? `${label} (${reason})` : label;
 }
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
@@ -55,13 +55,15 @@ const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
  */
 async function sendMail({ base44, to, subject, html, text, body }) {
   if (CORE_EMAILS.includes(to)) {
-    await base44.asServiceRole.integrations.Core.SendEmail({
-      to,
-      subject,
-      html,
-      text: text ?? body,
-      body: text ?? body,
-    });
+    // `html` and `body` are alternatives, not companions: passing both makes
+    // Base44 reject the whole call with "SendEmail accepts only …", and the
+    // rejection is a validation error rather than a delivery failure — so the
+    // enquiry is saved, a warning is recorded, and nobody is told. That is what
+    // stopped the operations copy arriving after the transports were split.
+    const plain = text ?? body;
+    await base44.asServiceRole.integrations.Core.SendEmail(
+      html ? { to, subject, html, text: plain } : { to, subject, body: plain },
+    );
     return;
   }
 
