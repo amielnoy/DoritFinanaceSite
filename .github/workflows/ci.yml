@@ -464,10 +464,21 @@ jobs:
             echo "::notice::BASE44_API_KEY secret or BASE44_APP_ID variable is unset — skipping the publish step. Production stays on whatever was last published by hand."
           fi
 
-      # Two npm 12 defaults block this install: the CLI pulls `@deno/loader` from
-      # a remote URL, refused as EALLOWREMOTE unless --allow-remote is given, and
-      # workerd's postinstall is skipped unless it is named in --allow-scripts.
-      # Both flags are scoped to this one global install, not to the repo's deps.
+      # Three npm 12 defaults block this install: the CLI pulls `@deno/loader`
+      # from a remote URL, refused as EALLOWREMOTE unless --allow-remote is
+      # given, and the postinstalls for workerd and esbuild are skipped unless
+      # they are named in --allow-scripts — the CLI needs both to bundle the
+      # functions. All are scoped to this one global install, not to the repo's
+      # dependencies.
+      #
+      # `base44 link` is not called. It existed to write the gitignored app-id
+      # pointer, and its `--non-interactive` flag no longer exists — the CLI
+      # dropped it, which is what broke this step. The app id travels in
+      # BASE44_APP_ID, which the CLI reads directly, so there is nothing to link.
+      #
+      # `deploy` prompts twice without these flags — once to confirm and once
+      # about building the site — and a prompt in CI is a hung job, not an
+      # error.
       - name: Publish
         id: publish
         if: steps.creds.outputs.ready == 'true'
@@ -475,9 +486,8 @@ jobs:
           BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
           BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
         run: |
-          npm install -g base44@latest --allow-remote=all --allow-scripts=workerd
-          base44 link --app-id "$BASE44_APP_ID" --non-interactive
-          base44 deploy
+          npm install -g base44@latest --allow-remote=all --allow-scripts=workerd,esbuild
+          base44 deploy --yes --build
           echo "published=true" >> "$GITHUB_OUTPUT"
 
   # ── 5. Deploy the built site to Vercel ───────────────────────────────────

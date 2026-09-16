@@ -78,7 +78,14 @@ describe('production smoke requires the actual production publisher', () => {
   it('emits publish evidence only after the deploy command succeeds', () => {
     const workflow = read('.github/workflows/ci.yml');
     expect(workflow).toContain('published: ${{ steps.publish.outputs.published }}');
-    expect(workflow).toMatch(/base44 deploy\s+echo "published=true"/);
+    // Non-interactive, or the job hangs instead of failing: `deploy` prompts to
+    // confirm and again about building the site. `base44 link` is deliberately
+    // absent — its `--non-interactive` flag was removed from the CLI, which is
+    // what broke this step, and the app id travels in BASE44_APP_ID anyway.
+    expect(workflow).toMatch(/base44 deploy --yes --build\s+echo "published=true"/);
+    // Anchored to a command line, so the comment explaining its absence does
+    // not read as its presence.
+    expect(workflow, "base44 link is back, and it prompts").not.toMatch(/^\s*base44 link/m);
     expect(workflow).toContain('deployed: ${{ steps.deploy.outputs.deployed }}');
     expect(workflow).toMatch(/echo "url=\$url"[^\n]*\n\s+echo "deployed=true"/);
     const smoke = workflow.slice(workflow.indexOf('  smoke:'), workflow.indexOf('  # ── 7.'));
