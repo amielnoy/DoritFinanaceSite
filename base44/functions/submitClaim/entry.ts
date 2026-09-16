@@ -4,6 +4,62 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
+// Include a safe delivery reason in the operations notification.
+function deliveryWarning(label, error) {
+  const reason = String(error?.message ?? error ?? '').slice(0, 120);
+  return reason ? `${label} (${reason})` : label;
+}
+
+/**
+ * The one way this app sends mail. Kept identical across the isolated entry points.
+ *
+ * Everything used to go through Base44's `Core.SendEmail`, which delivers only
+ * to registered users of the app — "Send emails to registered users of your
+ * app". The app has one registered user, so the operations gmail received
+ * everything and every other recipient failed silently: the agency never got a
+ * lead, the second operations mailbox never worked, and a visitor could not be
+ * sent a confirmation at all, because a visitor is never a registered user.
+ *
+ * Resend has no such rule. One sender, every recipient, and the recipient is an
+ * argument rather than a constant baked into the function.
+ *
+ * Replies go to the agency from every message, including the operations copies:
+ * if one of them is forwarded to a client, the reply must reach Dorit and not a
+ * mailbox nobody reads.
+ */
+async function sendMail({ to, subject, html, text, body }) {
+  const apiKey = Deno.env.get('RESEND_API_KEY')?.trim();
+  const from = Deno.env.get('RESEND_FROM_EMAIL')?.trim();
+  if (!apiKey || !from) throw new Error('resend_not_configured');
+
+  let response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        reply_to: SECONDARY_EMAIL,
+        subject,
+        html,
+        text: text ?? body,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    throw new Error('resend_network_error');
+  }
+  // Never surface provider response bodies or credentials in public warnings.
+  if (!response.ok) throw new Error(`resend_http_${response.status}`);
+  const result = await response.json().catch(() => null);
+  if (!result?.id) throw new Error('resend_invalid_response');
+}
+
+
 /**
  * מה שמשתנה בהודעה של submitClaim — התוכן בלבד. התבנית עצמה משותפת.
  */
@@ -193,25 +249,25 @@ export default async function(req) {
     // הודעה לצוות התפעול — תיבה אחת שנכשלת אינה מונעת את השאר.
     for (const to of NOTIFY_EMAILS) {
       try {
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await sendMail({
           to,
           subject,
           body: agentBody,
         });
       } catch (e) {
-        warnings.push('notify_email_failed');
+        warnings.push(deliveryWarning('notify_email_failed', e));
       }
     }
 
     // עותק לדורית
     try {
-      await base44.asServiceRole.integrations.Core.SendEmail({
+      await sendMail({
         to: SECONDARY_EMAIL,
         subject,
         body: agentBody,
       });
     } catch (e) {
-      warnings.push('secondary_email_failed');
+      warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
     // אישור ללקוח — מיטבי
@@ -225,14 +281,14 @@ export default async function(req) {
           `לכל שאלה — ניתן להשיב ישירות למייל זה.`,
           `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,
         ].join('\n');
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await sendMail({
           to: email,
           subject: `אישור — קיבלנו את דיווח האירוע שלכם · דורית גוב ארי`,
           html: buildClientHtml(clientMailFor({ name, claimType, eventDate })),
           text: clientText,
         });
       } catch (e) {
-        warnings.push('client_confirmation_failed');
+        warnings.push(deliveryWarning('client_confirmation_failed', e));
       }
     }
 

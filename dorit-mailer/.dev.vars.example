@@ -1,0 +1,4 @@
+RESEND_API_KEY=re_xxxxxxxxxxxx
+MAIL_TO=dorit@govari-fin.co.il
+MAIL_FROM=דורית גוב ארי <site@govari-fin.co.il>
+ALLOWED_ORIGIN=https://safe-arch-plan.base44.app

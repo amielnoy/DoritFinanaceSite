@@ -236,3 +236,14 @@ expectation.
 
 That one belongs in [10-known-issues.md](10-known-issues.md) until it is covered.
 `submitClaim` was on this list and no longer is — §4.10 executes it.
+
+### Resend delivery to the agency
+
+`tests/integration/resend.integration.test.ts` runs all three notification entry
+points with mocked Resend HTTP and backend secrets. It checks fixed recipients,
+configured sender and authorization, missing key/sender, HTTP 401/403/429/500,
+network failures, and malformed successful responses. Failures retain the enquiry
+and allow operations notifications to proceed. The helper parity check guards
+against drift across isolated entry points. No test sends real email.
+The shared harness injects Deno environment access and records Resend deliveries
+alongside existing Base44 deliveries for the existing recipient/content tests.

@@ -210,3 +210,14 @@ time.
 
 All 219 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
+
+### Production smoke publish preflight
+
+`production-smoke.contract.test.ts` executes the CI preflight and checks that
+only the publisher of `PRODUCTION_URL` can enable browser smoke tests. Covers
+missing Base44 credentials despite a successful Vercel deploy, trailing slashes,
+a configured Base44 origin, Vercel previews, skipped deployments, and successful
+production publishes. `deploy-gate.contract.test.ts` verifies the workflow passes
+actual deployment outputs into this preflight before starting Playwright.
+Missing production publication stays a CI failure with an actionable message;
+it does not weaken the home section or accessibility assertions.

@@ -231,6 +231,42 @@ Anchors into those sections work from every route — `useSectionNav` routes hom
 first and then scrolls, because a bare `#services` on `/blog` sets the URL and
 does nothing.
 
+## Every message goes through Resend
+
+`sendMail()` — byte-identical in `submitLead`, `submitClaim` and
+`escalateToHuman` — is the only way this app sends mail. All three staff
+recipients go through it (`dorit@govari-fin.co.il`, `amielnoy@gmail.com`,
+`amielnoy@outlook.com`) and so does the visitor's confirmation. Reply-To is the
+agency on every message, including the operations copies, so a forwarded copy
+still replies to Dorit.
+
+Each recipient is its own attempt: a rejected send costs one message, not the
+list.
+
+**There is no fallback to Base44, deliberately.** If `RESEND_API_KEY` or
+`RESEND_FROM_EMAIL` is missing, or the domain is not verified, *nothing* is
+sent — every recipient produces a warning carrying the provider's reason, and
+the enquiry is still saved. A fallback would have reached the one registered
+mailbox out of three and looked like success.
+
+## The platform limit that led there
+
+
+
+Base44's `Core.SendEmail` delivers **only to registered users of the app**. An
+address that is not registered fails silently and shows up as a warning in the
+operations copy, nowhere else.
+
+This is not theoretical: `dorit@govari-fin.co.il` was not a registered user, so
+she received none of the leads the site collected while the operations mailbox
+received all of them. Adding an address to `NOTIFY_EMAILS` is therefore only
+half the job — the other half is registering it as a user of the app.
+
+A visitor is never a registered user, so the confirmation email the site used to
+offer them could not arrive. The interview no longer promises one. Sending real
+confirmations needs an external mail provider with a verified domain rather than
+the Core integration.
+
 ## The agents, and where they stop
 
 Three LLM agents run on the site — `needs_interview`, `booking_assistant` and
@@ -592,3 +628,43 @@ GitHub integration: [https://docs.base44.com/developers/app-code/local-developme
 Local development: [https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview)
 
 Support: [https://app.base44.com/support](https://app.base44.com/support)
+
+## Dorit's notifications through Resend
+
+`submitLead`, `submitClaim`, and `escalateToHuman` send Dorit's copy through
+[Resend's email API](https://resend.com/docs/api-reference/emails/send-email).
+She does not need a Base44 account. Operations copies and customer confirmations
+still use Base44's existing email integration and its registered-user restrictions.
+
+Before publishing:
+
+1. Add a sending domain in Resend (for example `mail.govari-fin.co.il`), add the
+   DNS records Resend provides, and wait until Resend marks it verified.
+2. Create a Resend API key with sending permission for that domain.
+3. Set **backend secrets** in Base44:
+   - `RESEND_API_KEY`: the Resend API key.
+   - `RESEND_FROM_EMAIL`: an address on the verified domain, optionally with a
+     display name, e.g. `Dorit Gov Ari <notifications@mail.govari-fin.co.il>`.
+   These are server secrets, never `VITE_` variables or committed values.
+4. Publish through the normal git/dashboard workflow above. Check a real
+   submission's delivery in Resend and Dorit's inbox.
+
+The recipient and Reply-To are fixed to `dorit@govari-fin.co.il` in the backend.
+Missing configuration, rejected sends, and network timeouts produce delivery
+warnings while retaining the saved enquiry and attempting the operations copies.
+There is no fallback to Base44 for Dorit, since it cannot deliver to her without
+registration. API acceptance is not confirmation of inbox delivery.
+
+### Production smoke says the deployed page is missing `#start`
+
+A successful deployment **job** may have skipped its publish step because its
+credentials were missing. Run #105 did exactly that: Base44 stayed on an older
+page while Vercel updated, then new smoke tests ran against the older Base44 site.
+
+CI now checks actual publish outputs for the host named by `PRODUCTION_URL`
+before starting smoke tests. Missing publication fails immediately with the
+relevant deployment configuration, and the run summary reports no publication.
+For the current Base44 production host, configure the GitHub Actions
+`BASE44_API_KEY` secret and `BASE44_APP_ID` variable, then rerun CI on `main` with
+publishing enabled. The key must be available to the `production` environment.
+Changing test selectors or increasing timeouts cannot update an older deployment.

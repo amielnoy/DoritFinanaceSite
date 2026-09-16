@@ -44,8 +44,31 @@ closing it would take.
 | A-32 | **Embedding the chat dropped the published fence.** `AgentChat`'s guardrails panel rendered in the heading column, which the full-width layout does not draw — so "כללי הגדר" silently disappeared from the page while the prompt still claimed it. Caught by `E2E-AGT-002`. | Rendered by `StartConversation` instead, from the same descriptor. |
 | A-33 | **`/faq` unmounted the answers its own markup declared.** The page rendered one category and dropped the rest, so most of the questions the `FAQPage` block described were not in the HTML at all. Google's guidance is that content hidden behind an accordion qualifies *because it is present*; unmounted content is absent. | Every category rendered, inactive ones hidden with `hidden`. `SEO-LD-*` reads the declared `mainEntity` and asserts every question **and answer** appears in `page.content()` — the property, not the mechanism. Nothing a visitor sees changed. |
 | A-34 | **`llms.txt` published a phone number and an email that do not reach her** — `052-707-7776` and `doritg@fsfp-fin.co.il`, while every other surface had moved to `050-831-1776` and `dorit@govari-fin.co.il`. It is a static file in `public/`, so the type-checker and every suite were blind to it; the only symptom would have been an AI assistant handing a prospect a dead number. Resolves the `llms.txt` half of B-4. | Rewritten against `src/config/contact.js`, and `CTR-AI-001..010` now fail if any address or number in the file is not the canonical one. |
+| A-35 | **Dorit was not receiving any of the leads.** `Core.SendEmail` on Base44 delivers only to registered users of the app, and the app has exactly one — `amielnoy@gmail.com`. So the operations copy arrived every time while `dorit@govari-fin.co.il` failed, reported as a bare `secondary_email_failed` in an appendix only the operations team reads. `amielnoy@outlook.com` had never worked either, and the visitor's confirmation cannot work at all, because a visitor is never a registered user. | Warnings now carry the delivery error itself (`deliveryWarning`), since the app keeps no logs and the mail is the only diagnostic. The interview stopped promising the visitor a confirmation it cannot send. **Registering the recipients remains an account action** — see B-6. |
 
 ## B. Open findings — decisions for the owner
+
+### B-6 · Two mail recipients are still unregistered, and one of them is the agency
+
+`Core.SendEmail` delivers only to registered users. `dorit@govari-fin.co.il` and
+`amielnoy@outlook.com` are not registered, so every send to them fails.
+
+Until they are registered, the site collects leads that only one mailbox ever
+sees. Registering a person creates an account for them in the app, which is an
+account action rather than a code change, so it is left here.
+
+Two ways to close it:
+
+1. **Register both addresses as users of the Base44 app** (the dashboard's user
+   management). Dorit needs an account regardless — the `/admin/leads` screen is
+   role-gated, and she is the person the leads are for.
+2. **Move transactional mail to an external provider** with a verified sending
+   domain, via a Marketplace integration. This is the only route that also makes
+   the visitor's confirmation possible, since a visitor will never be a
+   registered user.
+
+The second is the real fix if confirmations are wanted; the first is enough to
+stop losing leads today.
 
 ### B-0 · Routes are invisible to crawlers that do not run JavaScript
 

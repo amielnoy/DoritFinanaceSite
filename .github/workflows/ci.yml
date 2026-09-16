@@ -417,6 +417,9 @@ jobs:
   # the strictest one in the file. Staging still deploys; see deploy-vercel.
   deploy:
     name: Publish to Base44
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      previous_asset: ${{ steps.before.outputs.asset }}
     runs-on: ubuntu-latest
     needs: [build, test-node, test-e2e]
     if: >-
@@ -439,6 +442,18 @@ jobs:
 
       - run: npm ci
 
+      # What production serves *now*, before anything replaces it. The smoke
+      # job waits for this to change rather than assuming a returned CLI means
+      # a served release — see scripts/wait-for-deployment.mjs.
+      - name: Record the release production is serving
+        id: before
+        continue-on-error: true
+        run: |
+          asset=$(curl -fsSL --max-time 30 "${{ vars.PRODUCTION_URL }}" \
+            | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1 || true)
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "Production currently serves: ${asset:-unknown}"
+
       - name: Check publish credentials
         id: creds
         run: |
@@ -454,6 +469,7 @@ jobs:
       # workerd's postinstall is skipped unless it is named in --allow-scripts.
       # Both flags are scoped to this one global install, not to the repo's deps.
       - name: Publish
+        id: publish
         if: steps.creds.outputs.ready == 'true'
         env:
           BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
@@ -462,6 +478,7 @@ jobs:
           npm install -g base44@latest --allow-remote=all --allow-scripts=workerd
           base44 link --app-id "$BASE44_APP_ID" --non-interactive
           base44 deploy
+          echo "published=true" >> "$GITHUB_OUTPUT"
 
   # ── 5. Deploy the built site to Vercel ───────────────────────────────────
   #
@@ -483,6 +500,8 @@ jobs:
     needs: [build, test-node, test-e2e]
     outputs:
       url: ${{ steps.deploy.outputs.url }}
+      deployed: ${{ steps.deploy.outputs.deployed }}
+      kind: ${{ steps.target.outputs.kind }}
     # Also on `builder`, where it deploys a *preview* rather than production.
     # That is the point of the branch: a Builder edit gets a URL you can open
     # and look at before you merge it, instead of being judged from a diff.
@@ -611,6 +630,7 @@ jobs:
             exit 1
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
           echo "::notice::Deployed a ${{ steps.target.outputs.kind }} to $url"
 
       - name: Verify the deployment serves the app
@@ -639,14 +659,15 @@ jobs:
   # a smoke wired to one publisher would either stop running or keep testing the
   # host nobody visits any more. This way the cutover is a variable, not an edit.
   #
-  # Either publish succeeding is enough to be worth smoking — if Base44 published
-  # and Vercel failed, the live site still changed.
+  # Check the publisher of PRODUCTION_URL before starting browsers. A successful
+  # job can have skipped its publish step, and a staging deploy is not production.
   smoke:
     name: Production smoke test
     runs-on: ubuntu-latest
     needs: [deploy, deploy-vercel]
     if: >-
       !cancelled() &&
+      github.ref == 'refs/heads/main' &&
       vars.PRODUCTION_URL != '' &&
       (needs.deploy.result == 'success' || needs['deploy-vercel'].result == 'success')
     timeout-minutes: 15
@@ -660,6 +681,25 @@ jobs:
 
       - name: Pin npm (honours the .npmrc release cooldown)
         run: npm i -g npm@${{ env.NPM_VERSION }}
+
+      - name: Verify production was published by this run
+        run: node scripts/check-production-publish.mjs
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+          BASE44_URL: ${{ vars.BASE44_URL }}
+          BASE44_PUBLISHED: ${{ needs.deploy.outputs.published }}
+          VERCEL_DEPLOYED: ${{ needs.deploy-vercel.outputs.deployed }}
+          VERCEL_KIND: ${{ needs.deploy-vercel.outputs.kind }}
+
+      # A publish that returned is not a release that is being served. Base44's
+      # edge can keep handing out the previous bundle for minutes, and the smoke
+      # then fails on whatever the new release added — which is exactly how
+      # `#start` went red at publish time and green against the same URL later.
+      - name: Wait for the new release to reach the edge
+        run: node scripts/wait-for-deployment.mjs
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+          PREVIOUS_ASSET: ${{ needs.deploy.outputs.previous_asset }}
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium
@@ -706,6 +746,7 @@ jobs:
           VERCEL_URL: ${{ needs.deploy-vercel.outputs.url }}
           VERCEL_RESULT: ${{ needs.deploy-vercel.result }}
           BASE44_RESULT: ${{ needs.deploy.result }}
+          BASE44_PUBLISHED: ${{ needs.deploy.outputs.published }}
           UNIT_RESULT: ${{ needs.test-node.result }}
           TESTS_RESULT: ${{ needs.test-e2e.result }}
           ALLURE_RESULT: ${{ needs.allure.result }}
@@ -724,7 +765,9 @@ jobs:
 
           case "$VERCEL_RESULT" in
             success)
-              if [ "$tests_green" = true ]; then
+              if [ -z "$VERCEL_URL" ]; then
+                vercel_state="⏭️ not deployed — deployment credentials are missing"
+              elif [ "$tests_green" = true ]; then
                 vercel_state="✅ deployed this run"
               else
                 vercel_state="⚠️ deployed with failing tests — staging deploys either way"
@@ -735,7 +778,12 @@ jobs:
           esac
 
           case "$BASE44_RESULT" in
-            success)  base44_state="✅ published this run" ;;
+            success)
+              if [ "$BASE44_PUBLISHED" = "true" ]; then
+                base44_state="✅ published this run"
+              else
+                base44_state="⏭️ not published — publishing credentials are missing; production is unchanged"
+              fi ;;
             failure)  base44_state="❌ publish failed" ;;
             skipped)
               if [ "$tests_green" = true ]; then

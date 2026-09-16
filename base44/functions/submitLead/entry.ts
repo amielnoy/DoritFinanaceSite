@@ -13,7 +13,63 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 // כמה תיבות, אותו צוות. הרשימה קיימת כדי שתוספת תיבה תהיה שורה אחת ולא
 // שכפול של הקריאה — וכדי שכשל במסירה לתיבה אחת לא ימנע את השאר.
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
+
+// Include a safe delivery reason in the operations notification.
+function deliveryWarning(label, error) {
+  const reason = String(error?.message ?? error ?? '').slice(0, 120);
+  return reason ? `${label} (${reason})` : label;
+}
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
+
+/**
+ * The one way this app sends mail. Kept identical across the isolated entry points.
+ *
+ * Everything used to go through Base44's `Core.SendEmail`, which delivers only
+ * to registered users of the app — "Send emails to registered users of your
+ * app". The app has one registered user, so the operations gmail received
+ * everything and every other recipient failed silently: the agency never got a
+ * lead, the second operations mailbox never worked, and a visitor could not be
+ * sent a confirmation at all, because a visitor is never a registered user.
+ *
+ * Resend has no such rule. One sender, every recipient, and the recipient is an
+ * argument rather than a constant baked into the function.
+ *
+ * Replies go to the agency from every message, including the operations copies:
+ * if one of them is forwarded to a client, the reply must reach Dorit and not a
+ * mailbox nobody reads.
+ */
+async function sendMail({ to, subject, html, text, body }) {
+  const apiKey = Deno.env.get('RESEND_API_KEY')?.trim();
+  const from = Deno.env.get('RESEND_FROM_EMAIL')?.trim();
+  if (!apiKey || !from) throw new Error('resend_not_configured');
+
+  let response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        reply_to: SECONDARY_EMAIL,
+        subject,
+        html,
+        text: text ?? body,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    throw new Error('resend_network_error');
+  }
+  // Never surface provider response bodies or credentials in public warnings.
+  if (!response.ok) throw new Error(`resend_http_${response.status}`);
+  const result = await response.json().catch(() => null);
+  if (!result?.id) throw new Error('resend_invalid_response');
+}
+
 
 /**
  * הסרת מזהים רגישים מתקציר שנכתב על ידי מודל.
@@ -757,7 +813,7 @@ export default async function(req) {
     // הודעה לדורית — הפנייה המלאה, כולל תקציר השיחה אם הסוכן מסר אחד.
     // ההודעה התפעולית נשלחת בסוף, אחרי היומן, כדי שתוכל לדווח גם עליו.
     try {
-      await base44.asServiceRole.integrations.Core.SendEmail({
+      await sendMail({
         to: SECONDARY_EMAIL,
         subject,
         // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
@@ -765,7 +821,7 @@ export default async function(req) {
         text: agentBody,
       });
     } catch (e) {
-      warnings.push('secondary_email_failed');
+      warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
     // אישור ללקוח
@@ -779,14 +835,14 @@ export default async function(req) {
           : source === 'consultation'
           ? `אישור — קיבלנו את בקשת הייעוץ שלכם · דורית גוב ארי`
           : `אישור — קיבלנו את פנייתכם · דורית גוב ארי`;
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await sendMail({
           to: email,
           subject: clientSubject,
           html: buildClientHtml(clientMailFor(source, data)),
           text: buildClientText(source, data),
         });
       } catch (e) {
-        warnings.push('client_confirmation_failed');
+        warnings.push(deliveryWarning('client_confirmation_failed', e));
       }
     }
 
@@ -869,14 +925,14 @@ export default async function(req) {
     const opsText = `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings })}`;
     for (const to of NOTIFY_EMAILS) {
       try {
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await sendMail({
           to,
           subject,
           html: opsHtml,
           text: opsText,
         });
       } catch (e) {
-        warnings.push('notify_email_failed');
+        warnings.push(deliveryWarning('notify_email_failed', e));
       }
     }
 

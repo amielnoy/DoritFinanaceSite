@@ -251,7 +251,7 @@ describe("submitLead — what survives a failure", () => {
     const r = await invokeFunction("submitLead", consultation, { failEmailTo: [AGENCY] });
     expect(r.status).toBe(200);
     expect(r.leads).toHaveLength(1);
-    expect(r.json.warnings).toContain("secondary_email_failed");
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("secondary_email_failed")));
     expect(r.emails.map((e) => e.to)).toContain(OPS);
     expect(r.emails.map((e) => e.to)).toContain("yael@example.com");
   });
@@ -259,12 +259,12 @@ describe("submitLead — what survives a failure", () => {
   it("keeps the enquiry when the calendar refuses", async () => {
     const r = await invokeFunction("submitLead", consultation, { failFetch: true });
     expect(r.status).toBe(200);
-    expect(r.json.warnings).toContain("calendar_event_failed");
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("calendar_event_failed")));
     expect(r.leads).toHaveLength(1);
   });
 
   it("reports the calendar failure in the operations appendix", async () => {
-    const r = await invokeFunction("submitLead", consultation, { failFetch: true });
+    const r = await invokeFunction("submitLead", consultation, { failCalendar: true });
     expect(r.mailTo(OPS).text).toMatch(/יומן: לא נוצר/);
     expect(r.mailTo(OPS).text).toMatch(/תקלות:.*calendar_event_failed/);
   });
@@ -743,7 +743,7 @@ describe("submitLead — the operations mailboxes", () => {
   it("delivers to the second mailbox when the first bounces", async () => {
     const r = await invokeFunction("submitLead", lead, { failEmailTo: [OPS] });
     expect(r.emails.map((e) => e.to)).toContain(OPS2);
-    expect(r.json.warnings).toContain("notify_email_failed");
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("notify_email_failed")));
     // The lead still stored, and the agency still told.
     expect(r.status).toBe(200);
     expect(r.emails.map((e) => e.to)).toContain(AGENCY);
@@ -752,7 +752,7 @@ describe("submitLead — the operations mailboxes", () => {
   it("delivers to the first when the second bounces", async () => {
     const r = await invokeFunction("submitLead", lead, { failEmailTo: [OPS2] });
     expect(r.emails.map((e) => e.to)).toContain(OPS);
-    expect(r.json.warnings).toContain("notify_email_failed");
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("notify_email_failed")));
   });
 });
 
