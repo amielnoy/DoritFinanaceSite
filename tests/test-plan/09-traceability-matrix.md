@@ -28,6 +28,7 @@ gap is visible and a failure points at a feature.
 | F-22 | Published articles carry the mandatory גילוי נאות | — | — | CTR-ART-001..013 | — | — | — | — | — | — | — |
 | F-23 | Visitor reports an insurance claim | — | — | CTR-LED-*, CTR-EML-* | INT-CLAIM-001..013 | — | — | — | — | SEC-XSS-* | A11Y-AXE-008 |
 | F-24 | Interview hands the agency a structured summary, not free text | — | — | CTR-AGT-084..116 | INT-LEAD-039..064 | EVAL-INT-002..005/007 | — | — | — | SEC-AGT-* | — |
+| F-25 | Every enquiry reaches the agency by mail | — | — | CTR-AGT-*, CTR-EML-* | INT-LEAD-*, INT-ESC-*, INT-MAIL-*, INT-CLAIM-* | — | — | — | — | SEC-AGT-* | — |
 | F-16 | No secrets ship to the browser | — | — | CTR-FN-009/010 | — | — | — | — | — | SEC-STA-001..009, SEC-BND-001 | — |
 
 ## Coverage gaps (accepted)

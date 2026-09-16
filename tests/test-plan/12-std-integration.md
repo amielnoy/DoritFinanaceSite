@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 161
+**Location:** `tests/integration/` · **Cases:** 168
 
 ---
 
@@ -210,6 +210,23 @@ configured, that a failed append never costs the enquiry, and that a *partial*
 interview writes no row at all: logging someone who started and left would
 retain their details in the one place a deletion request does not reach.
 
+### 4.11c `escalateToHuman` — the notification is readable — `INT-ESC-020..028`
+
+The handover went out as plain text only, and clients folded it into one running
+line: reason, name, phone and the conversation summary with no separation. It is
+the message Dorit opens on a phone to decide whether to call somebody back, so
+that was the one thing it had to support. Same defect as A-14, fixed for
+enquiries and left here.
+
+These assert the layout, not only the content: HTML with the text alongside
+rather than instead of it, four titled blocks, the phone rendered as a `tel:`
+link, an urgent reason marked so a complaint does not look like an out-of-scope
+question, and the plain statement that nothing was stored — because in that case
+the mail is the only record of the enquiry. Two more cover what rendering
+introduced: a name that is really a payload is escaped, and redaction still
+holds now the summary appears twice, since a value stripped from the HTML but
+not the text would be the worst of both.
+
 ### 4.12 `submitLead` — a partial interview, and the upsert — `INT-LEAD-065..072`
 
 Contact details used to be collected last, so a visitor who answered four
@@ -267,7 +284,7 @@ agent is named, so a pattern is visible later.
 
 ## 5. Pass criteria
 
-All 161 cases pass. These assert behaviour, not shape — a failure means the
+All 168 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
