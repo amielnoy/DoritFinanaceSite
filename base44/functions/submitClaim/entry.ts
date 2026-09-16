@@ -4,6 +4,40 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
+// Kept identical across the isolated Base44 entry points.
+async function sendDoritEmail({ subject, html, text, body }) {
+  const apiKey = Deno.env.get('RESEND_API_KEY')?.trim();
+  const from = Deno.env.get('RESEND_FROM_EMAIL')?.trim();
+  if (!apiKey || !from) throw new Error('resend_not_configured');
+
+  let response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [SECONDARY_EMAIL],
+        reply_to: SECONDARY_EMAIL,
+        subject,
+        html,
+        text: text ?? body,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    throw new Error('resend_network_error');
+  }
+  // Never surface provider response bodies or credentials in public warnings.
+  if (!response.ok) throw new Error(`resend_http_${response.status}`);
+  const result = await response.json().catch(() => null);
+  if (!result?.id) throw new Error('resend_invalid_response');
+}
+
+
 /**
  * מה שמשתנה בהודעה של submitClaim — התוכן בלבד. התבנית עצמה משותפת.
  */
@@ -205,8 +239,7 @@ export default async function(req) {
 
     // עותק לדורית
     try {
-      await base44.asServiceRole.integrations.Core.SendEmail({
-        to: SECONDARY_EMAIL,
+      await sendDoritEmail({
         subject,
         body: agentBody,
       });

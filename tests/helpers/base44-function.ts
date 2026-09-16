@@ -53,6 +53,9 @@ export interface HarnessOptions {
   failFetch?: boolean;
   /** Status returned by the stubbed fetch when it does not fail. */
   fetchStatus?: number;
+  env?: Record<string, string>;
+  resendStatus?: number;
+  resendResponse?: unknown;
 }
 
 export interface Invocation {
@@ -73,7 +76,7 @@ type Handler = (req: Request) => Promise<Response>;
 
 const SDK_IMPORT = /^\s*import\s*\{[^}]*\}\s*from\s*['"]npm:@base44\/sdk[^'"]*['"];?\s*$/m;
 
-function compile(name: string): (sdk: unknown, fetchImpl: unknown) => Handler {
+function compile(name: string): (sdk: unknown, fetchImpl: unknown, deno: unknown) => Handler {
   const entry = join(REPO_ROOT, "base44/functions", name, "entry.ts");
   const source = readFileSync(entry, "utf8");
 
@@ -95,8 +98,9 @@ function compile(name: string): (sdk: unknown, fetchImpl: unknown) => Handler {
   return new Function(
     "createClientFromRequest",
     "fetch",
+    "Deno",
     `${code}\n;return __entry;`,
-  ) as (sdk: unknown, fetchImpl: unknown) => Handler;
+  ) as (sdk: unknown, fetchImpl: unknown, deno: unknown) => Handler;
 }
 
 const compiled = new Map<string, ReturnType<typeof compile>>();
@@ -180,6 +184,16 @@ export async function invokeFunction(
       headers: (init.headers ?? {}) as Record<string, string>,
       body: typeof init.body === "string" ? JSON.parse(init.body) : init.body,
     });
+    if (String(url) === "https://api.resend.com/emails") {
+      if (options.failFetch) throw new Error("simulated network failure");
+      const payload = JSON.parse(String(init.body));
+      const status = options.resendStatus ?? (options.failEmailTo?.includes(payload.to[0]) ? 422 : 200);
+      if (status >= 200 && status < 300) {
+        emails.push({ to: payload.to[0], subject: payload.subject, html: payload.html, text: payload.text, body: payload.text });
+      }
+      return { ok: status >= 200 && status < 300, status,
+        json: async () => options.resendResponse ?? { id: "resend-test-id" } };
+    }
     if (options.failFetch) throw new Error("simulated network failure");
     const status = options.fetchStatus ?? 200;
     return {
@@ -190,7 +204,8 @@ export async function invokeFunction(
     };
   };
 
-  const handler = factory(() => client, fetchImpl);
+  const env = options.env ?? { RESEND_API_KEY: "test-only-key", RESEND_FROM_EMAIL: "Notifications <notifications@mail.example.com>" };
+  const handler = factory(() => client, fetchImpl, { env: { get: (key: string) => env[key] } });
   const response = await handler(
     new Request("https://example.test/fn", {
       method: "POST",

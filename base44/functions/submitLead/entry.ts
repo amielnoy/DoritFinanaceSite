@@ -14,23 +14,46 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 // שכפול של הקריאה — וכדי שכשל במסירה לתיבה אחת לא ימנע את השאר.
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 
-/**
- * מסירה נכשלת — עם הסיבה, לא רק עם השם.
- *
- * `secondary_email_failed` לבדו אינו ניתן לפעולה: הוא אומר שמישהו לא קיבל,
- * ולא למה. וההסבר כאן כמעט תמיד אחד ויחיד — `Core.SendEmail` של Base44 מוסרת
- * **רק לנמענים הרשומים כמשתמשי האפליקציה** ("Send emails to registered users
- * of your app"). כתובת שאינה רשומה נכשלת בשקט, וזה בדיוק מה שקרה לתיבה של
- * דורית בעוד שהעותק לצוות הגיע.
- *
- * צירוף הודעת השגיאה לאזהרה הופך את התקלה הבאה לכזו שאפשר לאבחן מתוך המייל
- * עצמו, בלי לוגים — ואין לוגים: האפליקציה אינה שומרת אותם.
- */
+// Include a safe delivery reason in the operations notification.
 function deliveryWarning(label, error) {
   const reason = String(error?.message ?? error ?? '').slice(0, 120);
   return reason ? `${label} (${reason})` : label;
 }
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
+
+// Kept identical across the isolated Base44 entry points.
+async function sendDoritEmail({ subject, html, text, body }) {
+  const apiKey = Deno.env.get('RESEND_API_KEY')?.trim();
+  const from = Deno.env.get('RESEND_FROM_EMAIL')?.trim();
+  if (!apiKey || !from) throw new Error('resend_not_configured');
+
+  let response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [SECONDARY_EMAIL],
+        reply_to: SECONDARY_EMAIL,
+        subject,
+        html,
+        text: text ?? body,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    throw new Error('resend_network_error');
+  }
+  // Never surface provider response bodies or credentials in public warnings.
+  if (!response.ok) throw new Error(`resend_http_${response.status}`);
+  const result = await response.json().catch(() => null);
+  if (!result?.id) throw new Error('resend_invalid_response');
+}
+
 
 /**
  * הסרת מזהים רגישים מתקציר שנכתב על ידי מודל.
@@ -774,8 +797,7 @@ export default async function(req) {
     // הודעה לדורית — הפנייה המלאה, כולל תקציר השיחה אם הסוכן מסר אחד.
     // ההודעה התפעולית נשלחת בסוף, אחרי היומן, כדי שתוכל לדווח גם עליו.
     try {
-      await base44.asServiceRole.integrations.Core.SendEmail({
-        to: SECONDARY_EMAIL,
+      await sendDoritEmail({
         subject,
         // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
         html: buildAgentHtml(source, data, null),
