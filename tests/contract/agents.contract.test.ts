@@ -381,6 +381,29 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     }
   });
 
+  it("keeps the mail layout helpers identical across the functions that render", () => {
+    // `escalateToHuman` grew an HTML notification of its own, which meant
+    // copying the palette helpers into a third entry point. Base44 gives these
+    // files no shared module, so duplicated is the only option — drifted is
+    // not, and a drifted `escapeHtml` is a phishing vector rather than a
+    // cosmetic difference.
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    const norm = (src: string, name: string) => topLevelFn(src, name).replace(/\s+/g, " ").trim();
+    for (const helper of ["escapeHtml", "detailRow", "block", "proseRow"]) {
+      if (!escalate.includes(`function ${helper}(`)) continue;
+      expect(norm(escalate, helper), `escalateToHuman.${helper} drifted`).toBe(norm(submitLead, helper));
+    }
+    expect(norm(claim, "escapeHtml"), "submitClaim.escapeHtml drifted").toBe(norm(submitLead, "escapeHtml"));
+  });
+
+  it("renders the handover rather than sending a paragraph", () => {
+    // The mail Dorit opens on a phone to decide whether to call someone back.
+    expect(escalate).toMatch(/function buildEscalationHtml\(/);
+    expect(escalate).toMatch(/html: escalationHtml/);
+    // And the text still travels with it, not instead of it.
+    expect(escalate).toMatch(/text: notification/);
+  });
+
   it("keeps the two copies of redact() identical", () => {
     // Base44 functions are isolated entry points with no shared module, so the
     // helper is duplicated. Duplicated is fine; drifted is not.
