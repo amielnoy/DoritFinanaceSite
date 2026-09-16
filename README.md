@@ -249,18 +249,31 @@ two operations mailboxes. Each is a separate delivery attempt, so one rejected
 address costs one message rather than the list, and Reply-To is always the
 agency so a forwarded operations copy still answers to Dorit.
 
-**The endpoint is public, so it is authenticated.** Anything that names its own
-recipient or ships its own HTML needs `Authorization: Bearer $MAILER_TOKEN`;
-without it the function would send branded mail for anyone who read the site's
-JavaScript. A deployment with no token configured refuses everything rather than
-falling open. `tests/integration/dorit-mailer.integration.test.ts` runs the
-Worker in-process and pins that.
+**The endpoint is public, so every request is authenticated.** All of them need
+`Authorization: Bearer $MAILER_TOKEN` — not only the ones naming a recipient.
+The `contact`/`intake` types were built for a form posting straight from a
+browser, and nothing does that; leaving them open was a way into a mailer that
+sends from a verified domain, with no user to justify it. A deployment with no
+token configured refuses everything rather than falling open, which is the case
+a "check the token if one is present" guard would wave through.
+
+`ALLOWED_ORIGIN` is therefore decorative. CORS is enforced by browsers and
+ignored entirely by `curl` or a server, so it was never what protected this.
+
+`tests/integration/dorit-mailer.integration.test.ts` runs the Worker in-process
+and pins all of it.
 
 ### Configuring it
 
 In **Cloudflare Pages → Settings → Environment variables** (see
 [`.dev.vars.example`](dorit-mailer/.dev.vars.example)):
 `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO`, `MAILER_TOKEN`, `ALLOWED_ORIGIN`.
+Set the key and the token as **Secret**, the rest as Text.
+
+The Pages project must build **`dorit-mailer`**, not the repository root: set
+Root directory to `dorit-mailer` and Build output directory to `public`, with no
+build command. Left empty, Cloudflare serves the repo root — which is the
+website — and the function is never deployed at all.
 
 In **Base44 secrets**: `MAILER_URL` and the same `MAILER_TOKEN`.
 

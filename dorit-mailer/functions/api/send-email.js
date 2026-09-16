@@ -21,11 +21,13 @@
  *   MAIL_TO          dorit@govari-fin.co.il,amielnoy@gmail.com,amielnoy@outlook.com
  *                    רשימה מופרדת בפסיקים. כל נמען הוא ניסיון מסירה נפרד, כדי
  *                    שתיבה אחת שנכשלת לא תיקח איתה את השאר.
- *   MAILER_TOKEN     מחרוזת אקראית. חובה עבור type=rendered ועבור כל שליחה
- *                    לנמען חופשי. בלעדיה הנקודה הזו היא ממסר דואר פתוח שכל
- *                    אחד יכול לשלוח ממנו בשם הסוכנות.
- *   ALLOWED_ORIGIN   https://safe-arch-plan.base44.app  (CORS, לטפסים בדפדפן)
- *   TURNSTILE_SECRET (אופציונלי) — אם מוסיפים Cloudflare Turnstile בטופס
+ *   MAILER_TOKEN     מחרוזת אקראית. חובה לכל בקשה, בלי יוצא מן הכלל. בלעדיה
+ *                    הנקודה הזו היא ממסר דואר פתוח שכל אחד יכול לשלוח ממנו
+ *                    בשם הסוכנות, מהדומיין המאומת שלה.
+ *   ALLOWED_ORIGIN   https://safe-arch-plan.base44.app
+ *                    CORS בלבד, ואינו אמצעי אבטחה: הוא נאכף על ידי דפדפנים
+ *                    ומתעלמים ממנו לחלוטין curl או שרת. מה ששומר על הנקודה
+ *                    הזו הוא הטוקן.
  */
 
 const RESEND_URL = "https://api.resend.com/emails";
@@ -51,23 +53,22 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false, error: "invalid_json" }, 400, headers);
   }
 
-  const type = ["rendered", "intake", "contact"].includes(body.type) ? body.type : "contact";
-  const authorised = isAuthorised(request, env);
-
-  // Anything that names its own recipient, or ships its own HTML, must prove it
-  // is the backend. Without this the endpoint sends branded mail for anyone who
-  // reads the site's JavaScript.
-  if ((type === "rendered" || body.to) && !authorised) {
+  // Every request, not only the ones that name their own recipient.
+  //
+  // The contact/intake types were meant for a form posting straight from the
+  // browser, and nothing does: the site talks to Base44, and Base44 talks to
+  // this. So that path was an unauthenticated way into an endpoint that sends
+  // mail from a verified domain, with no user to justify it. One way in now.
+  //
+  // A honeypot and a Turnstile check lived here for that browser path. They are
+  // gone with it — they defend against a stranger's browser, and a stranger no
+  // longer gets this far. If a public form is ever added, it needs both back,
+  // plus a decision about which types it may use.
+  if (!isAuthorised(request, env)) {
     return json({ ok: false, error: "unauthorised" }, 401, headers);
   }
 
-  // Honeypot — שדה נסתר שבני אדם לא ממלאים
-  if (body.website) return json({ ok: true }, 200, headers);
-
-  if (env.TURNSTILE_SECRET && !authorised) {
-    const ok = await verifyTurnstile(env.TURNSTILE_SECRET, body.turnstileToken, request);
-    if (!ok) return json({ ok: false, error: "captcha_failed" }, 403, headers);
-  }
+  const type = ["rendered", "intake", "contact"].includes(body.type) ? body.type : "contact";
 
   let mail;
   let recipients;
@@ -210,20 +211,6 @@ function validate(d, type) {
   return null;
 }
 
-async function verifyTurnstile(secret, token, request) {
-  if (!token) return false;
-  const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      secret,
-      response: token,
-      remoteip: request.headers.get("CF-Connecting-IP"),
-    }),
-  });
-  const j = await r.json().catch(() => ({}));
-  return !!j.success;
-}
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

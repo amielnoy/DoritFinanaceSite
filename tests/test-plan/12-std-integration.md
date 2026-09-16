@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 153
+**Location:** `tests/integration/` · **Cases:** 155
 
 ---
 
@@ -157,14 +157,17 @@ For escalations the same cases add that a partial delivery still reports
 `notified: true`, since an escalation that reached nobody is a regulatory
 failure and one that reached two of three is not.
 
-### 4.10 `dorit-mailer` — the one endpoint a stranger can reach — `INT-MAIL-001..013`
+### 4.10 `dorit-mailer` — the one endpoint a stranger can reach — `INT-MAIL-001..015`
 
 Everything else on this site needs a Base44 session or a form; the mailer
 answers a POST from anyone who knows its URL, and sends from the agency's
-verified domain when it does. So the first block is about refusing: a rendered
-message with no token, with the wrong token, a caller-named recipient on any
-payload type, and — the one that matters most — a deployment with no
-`MAILER_TOKEN` configured at all, which must fail closed rather than open.
+verified domain when it does. So the first block is about refusing, and it
+covers every way in: a rendered message with no token and with the wrong token,
+a caller-named recipient on any payload type, an ordinary `contact` submission,
+an `intake` submission — the browser-facing types are authenticated too, because
+nothing posts here from a browser and an open path with no user is only a
+surface — and, the one that matters most, a deployment with no `MAILER_TOKEN`
+configured at all, which must fail closed rather than open.
 
 The rest pin that the sender identity comes from the environment and not from
 the caller, that Reply-To is the agency rather than the visitor, that a rendered
@@ -247,7 +250,7 @@ agent is named, so a pattern is visible later.
 
 ## 5. Pass criteria
 
-All 153 cases pass. These assert behaviour, not shape — a failure means the
+All 155 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

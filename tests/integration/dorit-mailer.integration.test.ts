@@ -92,11 +92,35 @@ describe("dorit-mailer — who is allowed to send", () => {
   });
 
   it("refuses a caller-named recipient without a token, whatever the type", async () => {
-    // The danger is not only `rendered`: `to` on any payload lets a stranger
-    // point the agency's verified domain at an address of their choosing.
+    // Not only `rendered`: `to` on any payload would let a stranger point the
+    // agency's verified domain at an address of their choosing.
     const mailer = await loadMailer();
     const res = await mailer.onRequestPost({
       request: post({ type: "contact", name: "x", phone: "0501234567", to: "victim@example.com" }),
+      env: ENV,
+    });
+    expect(res.status).toBe(401);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("refuses an ordinary contact submission too", async () => {
+    // The contact and intake types were for a form posting from a browser, and
+    // nothing does — the site talks to Base44 and Base44 talks to this. An
+    // unauthenticated way into an endpoint that sends from a verified domain is
+    // a surface with no user, so it is closed: there is one way in.
+    const mailer = await loadMailer();
+    const res = await mailer.onRequestPost({
+      request: post({ type: "contact", name: "יעל", phone: "0521234567", message: "שלום" }),
+      env: ENV,
+    });
+    expect(res.status).toBe(401);
+    expect(sent, "an unauthenticated form submission sent mail").toHaveLength(0);
+  });
+
+  it("refuses an intake submission without a token", async () => {
+    const mailer = await loadMailer();
+    const res = await mailer.onRequestPost({
+      request: post({ type: "intake", name: "יעל", phone: "0521234567", summary: "סיכום" }),
       env: ENV,
     });
     expect(res.status).toBe(401);
