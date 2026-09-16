@@ -41,6 +41,8 @@ function deliveryWarning(label, error) {
  * each failure carries its reason, but it is worth remembering which is which
  * when only some of the three arrive.
  *
+
+
  * What travels is the finished message: these functions own the templates, the
  * escaping and `redact()` on anything a model wrote.
  */
@@ -55,6 +57,7 @@ async function sendMail({ base44, to, subject, html, text, body }) {
     });
     return;
   }
+
 
 
  * It posts to the `dorit-mailer` Cloudflare Pages Function rather than to a
@@ -72,6 +75,9 @@ async function sendMail({ base44, to, subject, html, text, body }) {
  * enquiry is already stored by the time this runs.
  */
 async function sendMail({ to, subject, html, text, body }) {
+
+
+
 
   const endpoint = Deno.env.get('MAILER_URL')?.trim();
   const token = Deno.env.get('MAILER_TOKEN')?.trim();

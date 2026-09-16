@@ -7,6 +7,7 @@ const payload = { name: 'Test', phone: '0501234567', source: 'contact', reason: 
 
 describe.each(names)('%s — external agency email', (name) => {
 
+
   it('posts the agency copy to the mailer, and the operations copies elsewhere', async () => {
     const r = await invokeFunction(name, { ...payload, to: 'attacker@example.com', from: 'attacker@example.com' });
     expect(r.status).toBe(200);
@@ -25,6 +26,8 @@ describe.each(names)('%s — external agency email', (name) => {
     // And the operations mailboxes were still told, by the other transport.
     expect(r.emails.map(e => e.to), 'operations was not told').toContain('amielnoy@gmail.com');
 
+
+  
   it('posts finished mail to the mailer, for every recipient, with the shared token', async () => {
     const r = await invokeFunction(name, { ...payload, to: 'attacker@example.com', from: 'attacker@example.com' });
     expect(r.status).toBe(200);
@@ -39,6 +42,8 @@ describe.each(names)('%s — external agency email', (name) => {
     }
     // The caller cannot choose the sender or steer a copy to itself.
     expect(recipients).not.toContain('attacker@example.com');
+
+
 
     const [call] = calls;
     expect(call.method).toBe('POST');
@@ -57,17 +62,20 @@ describe.each(names)('%s — external agency email', (name) => {
     expect(r.leads).toHaveLength(1);
     expect(r.callsTo(MAILER_URL)).toHaveLength(0);
 
+
     // The agency's copy is lost and says so. The operations copies ride a
     // different transport and are unaffected — which is the point of reporting
     // each failure with its own reason rather than one flag for "mail".
     expect(r.json.warnings).not.toEqual([]);
     expect(r.emails.map(e => e.to)).toContain('amielnoy@gmail.com');
 
+
     // And nothing falls back to Base44, which is the point: a fallback that
     // reaches one registered mailbox out of three looks like success and is not.
     // Misconfiguration now costs every notification, loudly, and never the record.
     expect(r.emails).toHaveLength(0);
     expect(r.json.warnings).not.toEqual([]);
+
 
   });
 
@@ -76,6 +84,11 @@ describe.each(names)('%s — external agency email', (name) => {
     expect(r.status).toBe(200);
     expect(r.leads).toHaveLength(1);
 
+    // Each recipient is its own attempt, so a rejected send costs one message
+    // rather than the rest of the list.
+    expect(r.callsTo(MAILER_URL).length).toBeGreaterThanOrEqual(3);
+
+
     // A provider that rejects the agency's copy costs that one message; the
     // operations copies do not travel this way and still arrive.
     expect(r.callsTo(MAILER_URL).length).toBeGreaterThanOrEqual(1);
@@ -83,6 +96,7 @@ describe.each(names)('%s — external agency email', (name) => {
     // Each recipient is its own attempt, so a rejected send costs one message
     // rather than the rest of the list.
     expect(r.callsTo(MAILER_URL).length).toBeGreaterThanOrEqual(3);
+
 
     expect(r.json.warnings).not.toEqual([]);
     expect(JSON.stringify(r.json)).not.toContain('test-only-key');
