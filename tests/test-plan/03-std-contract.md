@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 223
+**Location:** `tests/contract/` · **Cases:** 240
 
 ---
 
@@ -135,6 +135,24 @@ that it calls it with the source the function knows how to lay out, that the
 prompt says in so many words not to write the record directly, that it carries
 the same data-minimisation rule as the booking agent, and that it does not
 confirm a save that failed.
+
+One block covers **which transport reaches whom**. `Core.SendEmail` delivers
+only to registered users of the app, so `CORE_EMAILS` is not a list of people —
+it is the list of addresses the platform is able to reach, and everyone else
+takes the mailer. The tests pin that list byte-identical across the three
+isolated entry points, because a disagreement would mail the same address one
+way here and another way there; that the single `Core.SendEmail` call sits
+inside the routing helper rather than being a choice made three times; and that
+**the agency never appears on the Core path** — that last one is the original
+defect stated as an assertion, since a copy that silently fails to her looks
+exactly like one that arrived.
+
+A second block pins `escapeHtml`, `detailRow`, `block` and `proseRow`
+byte-identical across every function that renders mail. `escalateToHuman` grew
+an HTML notification of its own, which meant a third copy of the palette
+helpers; Base44's isolated entries leave no way to share them. Duplicated is
+fine, drifted is not, and a drifted `escapeHtml` is a phishing vector rather
+than a cosmetic difference.
 
 **`ai-surface.contract.test.ts` — `CTR-AI-001..014`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript

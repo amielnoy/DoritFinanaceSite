@@ -34,25 +34,11 @@ const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 /**
  * The one way this app sends mail, over two transports chosen by recipient.
  *
-
- * It posts to the `dorit-mailer` Cloudflare Pages Function rather than to a
- * provider directly, so the Resend key, the sender identity and the recipient
- * list live in that project's environment and not in this one. What travels
- * from here is the finished message: these functions own the templates, the
- * HTML escaping and `redact()` on anything a model wrote, and the mailer sends
- * what it is given.
- *
- * `type: "rendered"` is the authenticated path — it names its own recipient, so
- * the mailer refuses it without the shared token. The contact/intake templates
- * on the other side are for a browser posting directly, which this is not.
- *
-
  * `CORE_EMAILS` go through Base44's own `Core.SendEmail`, which delivers only
  * to registered users of the app. Everyone else — the agency, the second
  * operations mailbox and the visitor — goes through the `dorit-mailer` Pages
  * Function, which sends from the agency's verified domain via Resend.
  *
-
  * The split is not about who they are, it is about what each transport can
  * reach. Core needs an account that only exists once the address has signed
  * into the app, which is a dependency worth shedding: `CORE_EMAILS` is meant
@@ -78,27 +64,6 @@ async function sendMail({ base44, to, subject, html, text, body }) {
     });
     return;
   }
-
-
- * It posts to the `dorit-mailer` Cloudflare Pages Function rather than to a
- * provider directly, so the Resend key, the sender identity and the recipient
- * list live in that project's environment and not in this one. What travels
- * from here is the finished message: these functions own the templates, the
- * HTML escaping and `redact()` on anything a model wrote, and the mailer sends
- * what it is given.
- *
- * `type: "rendered"` is the authenticated path — it names its own recipient, so
- * the mailer refuses it without the shared token. The contact/intake templates
- * on the other side are for a browser posting directly, which this is not.
- *
-
- * Failure is reported to the caller as a warning and never swallowed: the
- * enquiry is already stored by the time this runs.
- */
-async function sendMail({ to, subject, html, text, body }) {
-
-
-
 
   const endpoint = Deno.env.get('MAILER_URL')?.trim();
   const token = Deno.env.get('MAILER_TOKEN')?.trim();
