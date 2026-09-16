@@ -4,8 +4,30 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
-// Kept identical across the isolated Base44 entry points.
-async function sendDoritEmail({ subject, html, text, body }) {
+// Include a safe delivery reason in the operations notification.
+function deliveryWarning(label, error) {
+  const reason = String(error?.message ?? error ?? '').slice(0, 120);
+  return reason ? `${label} (${reason})` : label;
+}
+
+/**
+ * The one way this app sends mail. Kept identical across the isolated entry points.
+ *
+ * Everything used to go through Base44's `Core.SendEmail`, which delivers only
+ * to registered users of the app — "Send emails to registered users of your
+ * app". The app has one registered user, so the operations gmail received
+ * everything and every other recipient failed silently: the agency never got a
+ * lead, the second operations mailbox never worked, and a visitor could not be
+ * sent a confirmation at all, because a visitor is never a registered user.
+ *
+ * Resend has no such rule. One sender, every recipient, and the recipient is an
+ * argument rather than a constant baked into the function.
+ *
+ * Replies go to the agency from every message, including the operations copies:
+ * if one of them is forwarded to a client, the reply must reach Dorit and not a
+ * mailbox nobody reads.
+ */
+async function sendMail({ to, subject, html, text, body }) {
   const apiKey = Deno.env.get('RESEND_API_KEY')?.trim();
   const from = Deno.env.get('RESEND_FROM_EMAIL')?.trim();
   if (!apiKey || !from) throw new Error('resend_not_configured');
@@ -20,7 +42,7 @@ async function sendDoritEmail({ subject, html, text, body }) {
       },
       body: JSON.stringify({
         from,
-        to: [SECONDARY_EMAIL],
+        to: [to],
         reply_to: SECONDARY_EMAIL,
         subject,
         html,
@@ -227,24 +249,25 @@ export default async function(req) {
     // הודעה לצוות התפעול — תיבה אחת שנכשלת אינה מונעת את השאר.
     for (const to of NOTIFY_EMAILS) {
       try {
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await sendMail({
           to,
           subject,
           body: agentBody,
         });
       } catch (e) {
-        warnings.push('notify_email_failed');
+        warnings.push(deliveryWarning('notify_email_failed', e));
       }
     }
 
     // עותק לדורית
     try {
-      await sendDoritEmail({
+      await sendMail({
+        to: SECONDARY_EMAIL,
         subject,
         body: agentBody,
       });
     } catch (e) {
-      warnings.push('secondary_email_failed');
+      warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
     // אישור ללקוח — מיטבי
@@ -258,14 +281,14 @@ export default async function(req) {
           `לכל שאלה — ניתן להשיב ישירות למייל זה.`,
           `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,
         ].join('\n');
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await sendMail({
           to: email,
           subject: `אישור — קיבלנו את דיווח האירוע שלכם · דורית גוב ארי`,
           html: buildClientHtml(clientMailFor({ name, claimType, eventDate })),
           text: clientText,
         });
       } catch (e) {
-        warnings.push('client_confirmation_failed');
+        warnings.push(deliveryWarning('client_confirmation_failed', e));
       }
     }
 

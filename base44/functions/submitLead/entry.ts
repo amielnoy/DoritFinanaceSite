@@ -21,8 +21,24 @@ function deliveryWarning(label, error) {
 }
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
-// Kept identical across the isolated Base44 entry points.
-async function sendDoritEmail({ subject, html, text, body }) {
+/**
+ * The one way this app sends mail. Kept identical across the isolated entry points.
+ *
+ * Everything used to go through Base44's `Core.SendEmail`, which delivers only
+ * to registered users of the app — "Send emails to registered users of your
+ * app". The app has one registered user, so the operations gmail received
+ * everything and every other recipient failed silently: the agency never got a
+ * lead, the second operations mailbox never worked, and a visitor could not be
+ * sent a confirmation at all, because a visitor is never a registered user.
+ *
+ * Resend has no such rule. One sender, every recipient, and the recipient is an
+ * argument rather than a constant baked into the function.
+ *
+ * Replies go to the agency from every message, including the operations copies:
+ * if one of them is forwarded to a client, the reply must reach Dorit and not a
+ * mailbox nobody reads.
+ */
+async function sendMail({ to, subject, html, text, body }) {
   const apiKey = Deno.env.get('RESEND_API_KEY')?.trim();
   const from = Deno.env.get('RESEND_FROM_EMAIL')?.trim();
   if (!apiKey || !from) throw new Error('resend_not_configured');
@@ -37,7 +53,7 @@ async function sendDoritEmail({ subject, html, text, body }) {
       },
       body: JSON.stringify({
         from,
-        to: [SECONDARY_EMAIL],
+        to: [to],
         reply_to: SECONDARY_EMAIL,
         subject,
         html,
@@ -797,7 +813,8 @@ export default async function(req) {
     // הודעה לדורית — הפנייה המלאה, כולל תקציר השיחה אם הסוכן מסר אחד.
     // ההודעה התפעולית נשלחת בסוף, אחרי היומן, כדי שתוכל לדווח גם עליו.
     try {
-      await sendDoritEmail({
+      await sendMail({
+        to: SECONDARY_EMAIL,
         subject,
         // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
         html: buildAgentHtml(source, data, null),
@@ -818,7 +835,7 @@ export default async function(req) {
           : source === 'consultation'
           ? `אישור — קיבלנו את בקשת הייעוץ שלכם · דורית גוב ארי`
           : `אישור — קיבלנו את פנייתכם · דורית גוב ארי`;
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await sendMail({
           to: email,
           subject: clientSubject,
           html: buildClientHtml(clientMailFor(source, data)),
@@ -908,7 +925,7 @@ export default async function(req) {
     const opsText = `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings })}`;
     for (const to of NOTIFY_EMAILS) {
       try {
-        await base44.asServiceRole.integrations.Core.SendEmail({
+        await sendMail({
           to,
           subject,
           html: opsHtml,

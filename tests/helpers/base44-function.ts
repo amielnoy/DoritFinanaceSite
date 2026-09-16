@@ -51,6 +51,14 @@ export interface HarnessOptions {
   failEmailTo?: string[];
   /** Make every outbound HTTP call fail. */
   failFetch?: boolean;
+  /**
+   * Fail every outbound call *except* the mailer.
+   *
+   * Mail and the calendar both travel by `fetch` now that Resend replaced
+   * Base44's Core integration, so `failFetch` can no longer express "the
+   * calendar refused but the notifications went out" — it breaks both.
+   */
+  failCalendar?: boolean;
   /** Status returned by the stubbed fetch when it does not fail. */
   fetchStatus?: number;
   env?: Record<string, string>;
@@ -194,7 +202,7 @@ export async function invokeFunction(
       return { ok: status >= 200 && status < 300, status,
         json: async () => options.resendResponse ?? { id: "resend-test-id" } };
     }
-    if (options.failFetch) throw new Error("simulated network failure");
+    if (options.failFetch || options.failCalendar) throw new Error("simulated network failure");
     const status = options.fetchStatus ?? 200;
     return {
       ok: status >= 200 && status < 300,

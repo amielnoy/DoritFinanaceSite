@@ -264,7 +264,7 @@ describe("submitLead — what survives a failure", () => {
   });
 
   it("reports the calendar failure in the operations appendix", async () => {
-    const r = await invokeFunction("submitLead", consultation, { failFetch: true });
+    const r = await invokeFunction("submitLead", consultation, { failCalendar: true });
     expect(r.mailTo(OPS).text).toMatch(/יומן: לא נוצר/);
     expect(r.mailTo(OPS).text).toMatch(/תקלות:.*calendar_event_failed/);
   });

@@ -202,10 +202,26 @@ describe("email is sent from the backend, never the browser", () => {
     expect(fromBrowser.map((c) => c.file)).toEqual([]);
   });
 
-  const backendSends = findObjectLiteralCalls(
-    /integrations\.Core\.SendEmail\(\s*/,
-    BACKEND
-  );
+  it("no backend function still uses Base44's own mailer", () => {
+    // It delivers only to registered users. One address on this site is one,
+    // so anything left on it reaches exactly one person and fails quietly for
+    // everyone else — which is how the agency received no leads at all.
+    for (const file of BACKEND) {
+      const src = read(file);
+      const calls = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+      expect(calls, `${rel(file)} still calls Core.SendEmail`).not.toMatch(
+        /integrations\.Core\.SendEmail\(/
+      );
+    }
+  });
+
+  // Every send now goes through `sendMail`, the one Resend call each function
+  // carries. Base44's Core integration delivers only to registered users of the
+  // app, which silently dropped the agency, the second operations mailbox and
+  // every visitor confirmation — so the shape this scans for changed with it.
+  // `await` scopes this to call sites: the helper's own signature destructures
+  // the same names, and would otherwise be scanned as a send with no keys.
+  const backendSends = findObjectLiteralCalls(/await sendMail\(\s*/, BACKEND);
 
   it("every backend send supplies a recipient and a subject", () => {
     expect(backendSends.length).toBeGreaterThan(0);

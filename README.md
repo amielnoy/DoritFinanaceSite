@@ -231,7 +231,27 @@ Anchors into those sections work from every route — `useSectionNav` routes hom
 first and then scrolls, because a bare `#services` on `/blog` sets the URL and
 does nothing.
 
-## A platform limit worth knowing before you add a recipient
+## Every message goes through Resend
+
+`sendMail()` — byte-identical in `submitLead`, `submitClaim` and
+`escalateToHuman` — is the only way this app sends mail. All three staff
+recipients go through it (`dorit@govari-fin.co.il`, `amielnoy@gmail.com`,
+`amielnoy@outlook.com`) and so does the visitor's confirmation. Reply-To is the
+agency on every message, including the operations copies, so a forwarded copy
+still replies to Dorit.
+
+Each recipient is its own attempt: a rejected send costs one message, not the
+list.
+
+**There is no fallback to Base44, deliberately.** If `RESEND_API_KEY` or
+`RESEND_FROM_EMAIL` is missing, or the domain is not verified, *nothing* is
+sent — every recipient produces a warning carrying the provider's reason, and
+the enquiry is still saved. A fallback would have reached the one registered
+mailbox out of three and looked like success.
+
+## The platform limit that led there
+
+
 
 Base44's `Core.SendEmail` delivers **only to registered users of the app**. An
 address that is not registered fails silently and shows up as a warning in the

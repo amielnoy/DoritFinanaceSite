@@ -2,7 +2,7 @@
   "name": "dorit-mailer",
   "private": true,
   "scripts": {
-    "deploy": "wrangler pages deploy public --project-name dorit-mailer",
+    "deploy": "wrangler pages deploy public --project-name dorit-mailer --branch main --commit-dirty=true",
     "dev": "wrangler pages dev public"
   },
   "devDependencies": { "wrangler": "^4" }
