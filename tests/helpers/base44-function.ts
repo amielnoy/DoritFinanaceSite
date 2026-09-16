@@ -23,6 +23,9 @@ import { REPO_ROOT } from "./entity-schema";
  * what runs here is the code that ships.
  */
 
+/** Where the backend posts finished mail. Mirrors MAILER_URL in production. */
+export const MAILER_URL = "https://dorit-mailer.pages.dev/api/send-email";
+
 export interface EmailCall {
   to: string;
   subject: string;
@@ -192,15 +195,18 @@ export async function invokeFunction(
       headers: (init.headers ?? {}) as Record<string, string>,
       body: typeof init.body === "string" ? JSON.parse(init.body) : init.body,
     });
-    if (String(url) === "https://api.resend.com/emails") {
+    // The mailer, not the provider. The functions post finished messages to the
+    // `dorit-mailer` Pages Function, which holds the Resend key and the sender
+    // identity — so this is the boundary a test can see.
+    if (String(url) === MAILER_URL) {
       if (options.failFetch) throw new Error("simulated network failure");
       const payload = JSON.parse(String(init.body));
-      const status = options.resendStatus ?? (options.failEmailTo?.includes(payload.to[0]) ? 422 : 200);
+      const status = options.resendStatus ?? (options.failEmailTo?.includes(payload.to) ? 422 : 200);
       if (status >= 200 && status < 300) {
-        emails.push({ to: payload.to[0], subject: payload.subject, html: payload.html, text: payload.text, body: payload.text });
+        emails.push({ to: payload.to, subject: payload.subject, html: payload.html, text: payload.text, body: payload.text });
       }
       return { ok: status >= 200 && status < 300, status,
-        json: async () => options.resendResponse ?? { id: "resend-test-id" } };
+        json: async () => options.resendResponse ?? { ok: status >= 200 && status < 300, ids: ["mailer-test-id"] } };
     }
     if (options.failFetch || options.failCalendar) throw new Error("simulated network failure");
     const status = options.fetchStatus ?? 200;
@@ -212,7 +218,7 @@ export async function invokeFunction(
     };
   };
 
-  const env = options.env ?? { RESEND_API_KEY: "test-only-key", RESEND_FROM_EMAIL: "Notifications <notifications@mail.example.com>" };
+  const env = options.env ?? { MAILER_URL, MAILER_TOKEN: "test-only-token" };
   const handler = factory(() => client, fetchImpl, { env: { get: (key: string) => env[key] } });
   const response = await handler(
     new Request("https://example.test/fn", {

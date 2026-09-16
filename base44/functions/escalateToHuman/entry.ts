@@ -13,37 +13,36 @@ function deliveryWarning(label, error) {
 /**
  * The one way this app sends mail. Kept identical across the isolated entry points.
  *
- * Everything used to go through Base44's `Core.SendEmail`, which delivers only
- * to registered users of the app — "Send emails to registered users of your
- * app". The app has one registered user, so the operations gmail received
- * everything and every other recipient failed silently: the agency never got a
- * lead, the second operations mailbox never worked, and a visitor could not be
- * sent a confirmation at all, because a visitor is never a registered user.
+ * It posts to the `dorit-mailer` Cloudflare Pages Function rather than to a
+ * provider directly, so the Resend key, the sender identity and the recipient
+ * list live in that project's environment and not in this one. What travels
+ * from here is the finished message: these functions own the templates, the
+ * HTML escaping and `redact()` on anything a model wrote, and the mailer sends
+ * what it is given.
  *
- * Resend has no such rule. One sender, every recipient, and the recipient is an
- * argument rather than a constant baked into the function.
+ * `type: "rendered"` is the authenticated path — it names its own recipient, so
+ * the mailer refuses it without the shared token. The contact/intake templates
+ * on the other side are for a browser posting directly, which this is not.
  *
- * Replies go to the agency from every message, including the operations copies:
- * if one of them is forwarded to a client, the reply must reach Dorit and not a
- * mailbox nobody reads.
+ * Failure is reported to the caller as a warning and never swallowed: the
+ * enquiry is already stored by the time this runs.
  */
 async function sendMail({ to, subject, html, text, body }) {
-  const apiKey = Deno.env.get('RESEND_API_KEY')?.trim();
-  const from = Deno.env.get('RESEND_FROM_EMAIL')?.trim();
-  if (!apiKey || !from) throw new Error('resend_not_configured');
+  const endpoint = Deno.env.get('MAILER_URL')?.trim();
+  const token = Deno.env.get('MAILER_TOKEN')?.trim();
+  if (!endpoint || !token) throw new Error('mailer_not_configured');
 
   let response;
   try {
-    response = await fetch('https://api.resend.com/emails', {
+    response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from,
-        to: [to],
-        reply_to: SECONDARY_EMAIL,
+        type: 'rendered',
+        to,
         subject,
         html,
         text: text ?? body,
@@ -51,12 +50,12 @@ async function sendMail({ to, subject, html, text, body }) {
       signal: AbortSignal.timeout(10000),
     });
   } catch {
-    throw new Error('resend_network_error');
+    throw new Error('mailer_network_error');
   }
   // Never surface provider response bodies or credentials in public warnings.
-  if (!response.ok) throw new Error(`resend_http_${response.status}`);
+  if (!response.ok) throw new Error(`mailer_http_${response.status}`);
   const result = await response.json().catch(() => null);
-  if (!result?.id) throw new Error('resend_invalid_response');
+  if (!result?.ok) throw new Error('mailer_rejected');
 }
 
 
@@ -111,11 +110,13 @@ function redact(text) {
 // משוכפל מ-submitLead/entry.ts, כמו redact(), מאותה סיבה: אין מודול משותף בין
 // פונקציות Base44. tests/contract/agents.contract.test.ts נכשל אם העמודות או
 // הפונקציה מתפצלות — שורה שנכתבת בסדר אחר הורסת את הגיליון בלי שדבר ייכשל.
-const SHEET_ID = '';
-const SHEET_TAB = 'Events';
+// מזהה הגיליון מגיע מהסביבה ולא מהקוד: המאגר ציבורי, ופריסה בלי גיליון צריכה
+// להמשיך לעבוד. ריק = הרישום מדולג בשקט ומדווח כ"לא מוגדר" בנספח התפעולי.
+const SHEET_ID = (Deno.env.get('SHEET_ID') || '').trim();
+const SHEET_TAB = (Deno.env.get('SHEET_TAB') || 'Events').trim();
 
 const SHEET_COLUMNS = [
-  'מועד', 'סוג האירוע', 'מקור', 'סוכן', 'נושא', 'מועד מבוקש',
+  'מועד', 'סוג האירוע', 'מקור', 'מסלול', 'סוכן', 'נושא', 'מועד מבוקש',
   'שם', 'טלפון', 'אימייל', 'מזהה רשומה', 'סיבת העברה', 'תקציר',
 ];
 
@@ -236,6 +237,7 @@ export default async function(req) {
         new Date().toISOString(),
         'conversation_escalation',
         'escalation',
+        '',                       // מסלול — רלוונטי רק בראיון
         agent || '',
         topic || REASONS[safeReason],
         '',                       // מועד מבוקש — אין בהעברה לאדם

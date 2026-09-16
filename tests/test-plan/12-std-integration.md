@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 109
+**Location:** `tests/integration/` · **Cases:** 161
 
 ---
 
@@ -45,6 +45,7 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `submitLead` | every form on the site, and the booking and interview agents |
 | `escalateToHuman` | all three on-site agents |
 | `submitClaim` | the claims form |
+| `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
 `createConsultationEvent` and `createOutlookEvent` are not yet executed here.
 See §6.
@@ -156,7 +157,31 @@ For escalations the same cases add that a partial delivery still reports
 `notified: true`, since an escalation that reached nobody is a regulatory
 failure and one that reached two of three is not.
 
-### 4.10 `submitClaim` — the claim lands — `INT-CLAIM-001..013`
+### 4.10 `dorit-mailer` — the one endpoint a stranger can reach — `INT-MAIL-001..015`
+
+Everything else on this site needs a Base44 session or a form; the mailer
+answers a POST from anyone who knows its URL, and sends from the agency's
+verified domain when it does. So the first block is about refusing, and it
+covers every way in: a rendered message with no token and with the wrong token,
+a caller-named recipient on any payload type, an ordinary `contact` submission,
+an `intake` submission — the browser-facing types are authenticated too, because
+nothing posts here from a browser and an open path with no user is only a
+surface — and, the one that matters most, a deployment with no `MAILER_TOKEN`
+configured at all, which must fail closed rather than open.
+
+The rest pin that the sender identity comes from the environment and not from
+the caller, that Reply-To is the agency rather than the visitor, that a rendered
+body passes through untouched (rebuilding it would discard the templates,
+escaping and `redact()` the Base44 functions apply), and that a form submission
+fans out to every configured mailbox. Failure cases: one rejected mailbox still
+reports success for the others, no mailbox taking it reports 502, and the
+provider's error text — which can quote the API key — never reaches the
+response.
+
+The Worker is loaded and executed in-process, the way the Base44 harness loads
+an entry point. Nothing else in the repository runs this file.
+
+### 4.11 `submitClaim` — the claim lands — `INT-CLAIM-001..013`
 
 Previously a known gap, now executed. Stores the claim and tells the agency,
 both operations mailboxes and the reporter; gives every staff mailbox the same
@@ -168,7 +193,24 @@ because the reporter believes it is in hand — and that a bounced confirmation
 costs the message and never the record. A last case escapes markup in a name
 arriving from a public form.
 
-### 4.11 `submitLead` — a partial interview, and the upsert — `INT-LEAD-065..072`
+### 4.11b `submitLead` — the row it appends to the sheet — `INT-LEAD-079..084`
+
+The Google Sheets log existed and had never run: `SHEET_ID` was a hardcoded
+empty string, so `appendEventRow` returned before touching the network and every
+case took that branch. The column order was pinned by a contract test; what
+landed in a row was pinned by nothing — and an interview would have written a
+name and a phone number with the interview missing.
+
+These append for real against a stubbed Sheets API: one row in the pinned column
+order, the interview's track, derived meeting topic and profile text in the
+cells that were empty, and an identifier redacted before it reaches the sheet —
+which matters more here than anywhere, since the sheet is the copy that outlives
+deleting the Lead. Two more pin that no sheet is touched when none is
+configured, that a failed append never costs the enquiry, and that a *partial*
+interview writes no row at all: logging someone who started and left would
+retain their details in the one place a deletion request does not reach.
+
+### 4.12 `submitLead` — a partial interview, and the upsert — `INT-LEAD-065..072`
 
 Contact details used to be collected last, so a visitor who answered four
 questions and closed the tab left nothing at all. The agent now saves once as
@@ -185,7 +227,7 @@ one, because a duplicate is a nuisance and a dropped interview is not
 recoverable. A last case pins that every other source still takes the create
 path untouched.
 
-### 4.12 `submitLead` — how complete the interview was — `INT-LEAD-073..075`
+### 4.13 `submitLead` — how complete the interview was — `INT-LEAD-073..075`
 
 A thorough seven-field interview and a two-answer one used to produce mails that
 looked alike at a glance. The mail now carries "3 מתוך 7 שדות נענו", and
@@ -193,28 +235,28 @@ separates a field the visitor did not know from one that was never asked: the
 first is a fact about the visitor, the second is a gap in the interview, and
 they are not interchangeable to someone preparing a meeting.
 
-### 4.13 `submitLead` — the topic the interview no longer asks for — `INT-LEAD-076..078`
+### 4.14 `submitLead` — the topic the interview no longer asks for — `INT-LEAD-076..078`
 
 `topic` and `profile.concern` were the same fact supplied twice, and after the
 schema change `topic` was not rendered in the staff mail at all. It is now
 derived from the concern, falling back to an explicit `topic` when no concern
 was recorded, and left alone for every other source.
 
-### 4.14 `escalateToHuman` — handing over — `INT-ESC-001..005`
+### 4.15 `escalateToHuman` — handing over — `INT-ESC-001..005`
 
 Records the escalation and notifies both inboxes, stamps the record with the
 consent wording the visitor was shown, always hands the contact channels back to
 the agent whatever else failed, and flags the reasons that must not wait in a
 queue.
 
-### 4.15 `escalateToHuman` — a reason the model made up — `INT-ESC-006..010`
+### 4.16 `escalateToHuman` — a reason the model made up — `INT-ESC-006..010`
 
 The reason arrives from a language model, so it is clamped to the declared
 vocabulary. `__proto__` and `constructor` are clamped to `uncertain` rather than
 resolving off the prototype chain; anything simply invented, or missing, is
 clamped too; a declared reason is kept exactly as given.
 
-### 4.16 `escalateToHuman` — redaction and precedence — `INT-ESC-011..017`
+### 4.17 `escalateToHuman` — redaction and precedence — `INT-ESC-011..017`
 
 Identifiers are redacted before the record is written *and* before the
 notification is sent, while an ordinary summary is left alone. The notification
@@ -225,7 +267,7 @@ agent is named, so a pattern is visible later.
 
 ## 5. Pass criteria
 
-All 109 cases pass. These assert behaviour, not shape — a failure means the
+All 161 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

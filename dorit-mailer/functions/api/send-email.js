@@ -1,21 +1,39 @@
 /**
  * Cloudflare Pages Function — POST /api/send-email
  *
- * שולח מייל דרך Resend. המפתח נשאר בשרת (env.RESEND_API_KEY).
- * תומך בשני סוגי הודעות:
+ * כל הדואר של האתר יוצא מכאן. מפתח Resend, כתובת השולח ורשימת הנמענים חיים
+ * בהגדרות ה-Pages project ולא בקוד של האתר — זו הסיבה שהשירות הזה קיים.
+ *
+ * שלושה סוגי הודעות:
+ *   type: "rendered" — הודעה שנבנתה כבר במלואה (subject/html/text) על ידי
+ *                      פונקציות Base44. הן מחזיקות את התבניות של האתר, את
+ *                      בריחת ה-HTML ואת redact() על טקסט שנכתב על ידי מודל,
+ *                      ולכן מה שמגיע לכאן נשלח כפי שהוא. דורש אימות.
  *   type: "contact"  — טופס צור קשר (name, phone, email?, message?)
- *   type: "intake"   — סיכום ראיון היכרות מהסוכן (שדות מובנים + summary)
+ *   type: "intake"   — סיכום ראיון היכרות (שדות מובנים + summary)
  *
  * משתני סביבה (Cloudflare Pages → Settings → Environment variables):
  *   RESEND_API_KEY   re_xxxxxxxx
- *   MAIL_TO          dorit@govari-fin.co.il          (נמען)
- *   MAIL_FROM        "דורית גוב ארי <site@govari-fin.co.il>"  (דומיין מאומת ב-Resend)
- *   ALLOWED_ORIGIN   https://safe-arch-plan.base44.app  (אופציונלי, ל-CORS)
- *   TURNSTILE_SECRET (אופציונלי) — אם מוסיפים Cloudflare Turnstile בטופס
+ *   MAIL_FROM        "דורית גוב ארי <notifications@mail.govari-fin.co.il>"
+ *                    חייבת להיות על הדומיין המאומת ב-Resend. לא על הדומיין
+ *                    הראשי: govari-fin.co.il מפנה ל-Microsoft 365 עם SPF
+ *                    שמסתיים ב--all, ושליחה ממנו תיכשל.
+ *   MAIL_TO          dorit@govari-fin.co.il,amielnoy@gmail.com,amielnoy@outlook.com
+ *                    רשימה מופרדת בפסיקים. כל נמען הוא ניסיון מסירה נפרד, כדי
+ *                    שתיבה אחת שנכשלת לא תיקח איתה את השאר.
+ *   MAILER_TOKEN     מחרוזת אקראית. חובה לכל בקשה, בלי יוצא מן הכלל. בלעדיה
+ *                    הנקודה הזו היא ממסר דואר פתוח שכל אחד יכול לשלוח ממנו
+ *                    בשם הסוכנות, מהדומיין המאומת שלה.
+ *   ALLOWED_ORIGIN   https://safe-arch-plan.base44.app
+ *                    CORS בלבד, ואינו אמצעי אבטחה: הוא נאכף על ידי דפדפנים
+ *                    ומתעלמים ממנו לחלוטין curl או שרת. מה ששומר על הנקודה
+ *                    הזו הוא הטוקן.
  */
 
 const RESEND_URL = "https://api.resend.com/emails";
 const MAX_LEN = { name: 100, phone: 30, email: 120, message: 3000, summary: 6000 };
+/** גוף הודעה מוכנה יכול להיות ארוך — נספח תפעולי, פרופיל מלא ו-HTML. */
+const MAX_RENDERED = { subject: 300, html: 200_000, text: 60_000 };
 
 export async function onRequestOptions({ env }) {
   return new Response(null, { status: 204, headers: cors(env) });
@@ -35,57 +53,125 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false, error: "invalid_json" }, 400, headers);
   }
 
-  // Honeypot — שדה נסתר שבני אדם לא ממלאים
-  if (body.website) return json({ ok: true }, 200, headers);
-
-  // Turnstile (אופציונלי)
-  if (env.TURNSTILE_SECRET) {
-    const ok = await verifyTurnstile(env.TURNSTILE_SECRET, body.turnstileToken, request);
-    if (!ok) return json({ ok: false, error: "captcha_failed" }, 403, headers);
+  // Every request, not only the ones that name their own recipient.
+  //
+  // The contact/intake types were meant for a form posting straight from the
+  // browser, and nothing does: the site talks to Base44, and Base44 talks to
+  // this. So that path was an unauthenticated way into an endpoint that sends
+  // mail from a verified domain, with no user to justify it. One way in now.
+  //
+  // A honeypot and a Turnstile check lived here for that browser path. They are
+  // gone with it — they defend against a stranger's browser, and a stranger no
+  // longer gets this far. If a public form is ever added, it needs both back,
+  // plus a decision about which types it may use.
+  if (!isAuthorised(request, env)) {
+    return json({ ok: false, error: "unauthorised" }, 401, headers);
   }
 
-  const type = body.type === "intake" ? "intake" : "contact";
-  const data = sanitize(body, type);
+  const type = ["rendered", "intake", "contact"].includes(body.type) ? body.type : "contact";
 
-  const validation = validate(data, type);
-  if (validation) return json({ ok: false, error: validation }, 400, headers);
+  let mail;
+  let recipients;
 
-  const mail = type === "intake" ? buildIntakeMail(data) : buildContactMail(data);
-
-  const res = await fetch(RESEND_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: env.MAIL_FROM,
-      to: [env.MAIL_TO],
-      reply_to: data.email || undefined,
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
-      tags: [{ name: "type", value: type }],
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => "");
-    console.error("Resend error", res.status, err);
-    return json({ ok: false, error: "send_failed" }, 502, headers);
+  if (type === "rendered") {
+    mail = {
+      subject: clip(body.subject, MAX_RENDERED.subject),
+      html: clip(body.html, MAX_RENDERED.html),
+      text: clip(body.text, MAX_RENDERED.text),
+    };
+    if (!mail.subject || (!mail.html && !mail.text)) {
+      return json({ ok: false, error: "missing_content" }, 400, headers);
+    }
+    recipients = [clip(body.to, MAX_LEN.email)].filter(Boolean);
+    if (!recipients.length) return json({ ok: false, error: "missing_recipient" }, 400, headers);
+  } else {
+    const data = sanitize(body, type);
+    const validation = validate(data, type);
+    if (validation) return json({ ok: false, error: validation }, 400, headers);
+    mail = type === "intake" ? buildIntakeMail(data) : buildContactMail(data);
+    recipients = staffRecipients(env);
   }
 
-  const { id } = await res.json();
-  return json({ ok: true, id }, 200, headers);
+  // Reply-To is always the agency, never the visitor: an operations copy that
+  // gets forwarded to a client must reply to Dorit and not to a mailbox nobody
+  // reads. The first configured recipient is hers.
+  const replyTo = staffRecipients(env)[0];
+
+  // One attempt per recipient. A single address that Resend rejects — a typo, a
+  // bounce, a suppression — must not decide whether anyone else was told.
+  const results = await Promise.all(
+    recipients.map((to) => deliver({ env, to, replyTo, mail, type })),
+  );
+
+  const sent = results.filter((r) => r.ok);
+  const failed = results.filter((r) => !r.ok);
+
+  if (!sent.length) {
+    return json({ ok: false, error: "send_failed", failed: failed.map((f) => f.reason) }, 502, headers);
+  }
+  return json(
+    { ok: true, ids: sent.map((s) => s.id), ...(failed.length ? { failed: failed.map((f) => f.reason) } : {}) },
+    200,
+    headers,
+  );
 }
 
 /* ---------- helpers ---------- */
+
+/** Bearer token, compared in full. Absent MAILER_TOKEN means nothing is authorised. */
+function isAuthorised(request, env) {
+  if (!env.MAILER_TOKEN) return false;
+  const header = request.headers.get("Authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  return token.length > 0 && token === env.MAILER_TOKEN;
+}
+
+/** The configured staff mailboxes, in order. The first is the agency's. */
+function staffRecipients(env) {
+  return String(env.MAIL_TO || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+async function deliver({ env, to, replyTo, mail, type }) {
+  try {
+    const res = await fetch(RESEND_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: env.MAIL_FROM,
+        to: [to],
+        reply_to: replyTo || undefined,
+        subject: mail.subject,
+        html: mail.html || undefined,
+        text: mail.text || undefined,
+        tags: [{ name: "type", value: type }],
+      }),
+    });
+    if (!res.ok) {
+      // Log the provider's words for whoever reads the Cloudflare logs, but
+      // never return them: they can carry the key or the recipient list.
+      const err = await res.text().catch(() => "");
+      console.error("Resend error", res.status, err);
+      return { ok: false, reason: `http_${res.status}` };
+    }
+    const { id } = await res.json();
+    return id ? { ok: true, id } : { ok: false, reason: "no_message_id" };
+  } catch (e) {
+    console.error("Resend request failed", e);
+    return { ok: false, reason: "network_error" };
+  }
+}
 
 function cors(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
 }
 
@@ -125,20 +211,6 @@ function validate(d, type) {
   return null;
 }
 
-async function verifyTurnstile(secret, token, request) {
-  if (!token) return false;
-  const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      secret,
-      response: token,
-      remoteip: request.headers.get("CF-Connecting-IP"),
-    }),
-  });
-  const j = await r.json().catch(() => ({}));
-  return !!j.success;
-}
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

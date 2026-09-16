@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { invokeFunction } from "../helpers/base44-function";
+import { MAILER_URL, invokeFunction } from "../helpers/base44-function";
 import { REPO_ROOT } from "../helpers/entity-schema";
 
 /**
@@ -927,5 +927,108 @@ describe("submitLead — the topic the interview no longer asks for", () => {
       name: "יעל", phone: "0521234567", source: "consultation", topic: "פנסיה",
     });
     expect(r.leads[0].topic).toBe("פנסיה");
+  });
+});
+
+/**
+ * The event log in Google Sheets.
+ *
+ * This existed and had never run. `SHEET_ID` was a hardcoded empty string, so
+ * `appendEventRow` returned "לא מוגדר" before touching the network and every
+ * test took that branch — the column order was pinned by a contract test, and
+ * what actually landed in a row was pinned by nothing.
+ *
+ * Which mattered, because an interview wrote a blank one: the row took `topic`,
+ * which the interview agent stopped sending once the meeting topic was derived,
+ * and `summary`, which it never sends at all — the profile travels in
+ * `profile`. Name and phone would have arrived in the sheet with the interview
+ * itself missing.
+ */
+describe("submitLead — the row it appends to the sheet", () => {
+  const SHEET = { SHEET_ID: "sheet-test-id", MAILER_URL, MAILER_TOKEN: "test-only-token" };
+
+  /** The single row appended, as the Sheets API received it. */
+  const rowFrom = (r: Awaited<ReturnType<typeof invokeFunction>>) => {
+    const [call] = r.callsTo("sheets.googleapis.com");
+    expect(call, "nothing was appended").toBeTruthy();
+    return (call.body as { values: string[][] }).values[0];
+  };
+
+  it("appends one row, in the column order the contract pins", async () => {
+    const r = await invokeFunction("submitLead", {
+      name: "יעל כהן", phone: "0521234567", email: "yael@example.com",
+      source: "consultation", topic: "פנסיה", timing: "השבוע",
+    }, { env: SHEET });
+
+    expect(r.callsTo("sheets.googleapis.com")).toHaveLength(1);
+    const row = rowFrom(r);
+    expect(row).toHaveLength(13);
+    expect(row[1]).toBe("consultation_request");
+    expect(row[2]).toBe("consultation");
+    expect(row[5]).toBe("פנסיה");
+    expect(row[6]).toBe("השבוע");
+    expect(row[7]).toBe("יעל כהן");
+    expect(row[8]).toBe("0521234567");
+  });
+
+  it("writes the interview's profile, not an empty summary column", async () => {
+    const r = await invokeFunction("submitLead", {
+      name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
+      track: "pension", meetingTopic: "גמל, השתלמות ופנסיה", timing: "השבוע הבא",
+      profile: {
+        life_stage: "בן 52, נשוי", goal: "פרישה מסודרת",
+        concern: "דמי ניהול", employer: "שכיר בהייטק",
+      },
+    }, { env: SHEET });
+
+    const row = rowFrom(r);
+    expect(row[1]).toBe("interview_summary");
+    expect(row[3], "the track is not recorded").toBe("פנסיה, גמל והשתלמות");
+    expect(row[5], "the meeting topic is not recorded").toBe("גמל, השתלמות ופנסיה");
+    // The point of the whole row.
+    expect(row[12]).toContain("שלב חיים: בן 52, נשוי");
+    expect(row[12]).toContain("מעסיק / מעמד תעסוקתי: שכיר בהייטק");
+  });
+
+  it("writes no row for a partial interview", async () => {
+    // A partial is the quiet save that catches someone who abandoned; it mails
+    // nobody and it does not reach the sheet either. That is deliberate rather
+    // than an oversight: the sheet is the copy that survives deleting the Lead
+    // (COMPLIANCE §6), so logging people who started and left would retain
+    // their details in the one place a deletion request does not reach. The
+    // Lead row already makes an abandoned interview visible in the admin.
+    const r = await invokeFunction("submitLead", {
+      name: "אורי לוי", phone: "0541112233", source: "interview", stage: "partial",
+      track: "pension", profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
+    }, { env: SHEET });
+    expect(r.emails).toHaveLength(0);
+    expect(r.callsTo("sheets.googleapis.com")).toHaveLength(0);
+    expect(r.leads, "the record itself is still written").toHaveLength(1);
+  });
+
+  it("redacts an identifier before it reaches the sheet", async () => {
+    // The sheet is the copy that outlives a deleted Lead — see COMPLIANCE §6.
+    const r = await invokeFunction("submitLead", {
+      name: "אורי לוי", phone: "0541112233", source: "interview", track: "pension",
+      profile: { life_stage: "מסר ת״ז 123456789", goal: "פרישה", concern: "דמי ניהול" },
+    }, { env: SHEET });
+    expect(JSON.stringify(rowFrom(r))).not.toContain("123456789");
+  });
+
+  it("skips the sheet entirely when none is configured", async () => {
+    const r = await invokeFunction("submitLead", {
+      name: "יעל", phone: "0521234567", source: "quick", message: "שלום",
+    });
+    expect(r.callsTo("sheets.googleapis.com")).toHaveLength(0);
+    expect(r.status).toBe(200);
+  });
+
+  it("never lets a failed append cost the enquiry", async () => {
+    const r = await invokeFunction("submitLead", {
+      name: "יעל", phone: "0521234567", source: "quick", message: "שלום",
+    }, { env: SHEET, fetchStatus: 500 });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+    expect(r.json.warnings).toSatisfy((w: string[]) => w.some((x) => x.startsWith("sheet_append_failed")));
   });
 });

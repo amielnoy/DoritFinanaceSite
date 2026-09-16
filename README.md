@@ -231,23 +231,57 @@ Anchors into those sections work from every route — `useSectionNav` routes hom
 first and then scrolls, because a bare `#services` on `/blog` sets the URL and
 does nothing.
 
-## Every message goes through Resend
+## Every message goes through the mailer
+
+Mail leaves through [`dorit-mailer`](dorit-mailer/), a Cloudflare Pages Function
+that holds the Resend key, the sender identity and the recipient list in its own
+environment — none of that lives in this app's config.
 
 `sendMail()` — byte-identical in `submitLead`, `submitClaim` and
-`escalateToHuman` — is the only way this app sends mail. All three staff
-recipients go through it (`dorit@govari-fin.co.il`, `amielnoy@gmail.com`,
-`amielnoy@outlook.com`) and so does the visitor's confirmation. Reply-To is the
-agency on every message, including the operations copies, so a forwarded copy
-still replies to Dorit.
+`escalateToHuman` — posts the *finished* message to it. These functions keep the
+templates, the HTML escaping and `redact()` on anything a model wrote; the
+mailer sends what it is given (`type: "rendered"`) rather than rebuilding it. It
+also carries its own `contact` and `intake` templates for a browser posting
+directly, which this backend does not use.
 
-Each recipient is its own attempt: a rejected send costs one message, not the
-list.
+Recipients come from `MAIL_TO` in the Pages project — currently the agency and
+two operations mailboxes. Each is a separate delivery attempt, so one rejected
+address costs one message rather than the list, and Reply-To is always the
+agency so a forwarded operations copy still answers to Dorit.
 
-**There is no fallback to Base44, deliberately.** If `RESEND_API_KEY` or
-`RESEND_FROM_EMAIL` is missing, or the domain is not verified, *nothing* is
-sent — every recipient produces a warning carrying the provider's reason, and
-the enquiry is still saved. A fallback would have reached the one registered
-mailbox out of three and looked like success.
+**The endpoint is public, so every request is authenticated.** All of them need
+`Authorization: Bearer $MAILER_TOKEN` — not only the ones naming a recipient.
+The `contact`/`intake` types were built for a form posting straight from a
+browser, and nothing does that; leaving them open was a way into a mailer that
+sends from a verified domain, with no user to justify it. A deployment with no
+token configured refuses everything rather than falling open, which is the case
+a "check the token if one is present" guard would wave through.
+
+`ALLOWED_ORIGIN` is therefore decorative. CORS is enforced by browsers and
+ignored entirely by `curl` or a server, so it was never what protected this.
+
+`tests/integration/dorit-mailer.integration.test.ts` runs the Worker in-process
+and pins all of it.
+
+### Configuring it
+
+In **Cloudflare Pages → Settings → Environment variables** (see
+[`.dev.vars.example`](dorit-mailer/.dev.vars.example)):
+`RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO`, `MAILER_TOKEN`, `ALLOWED_ORIGIN`.
+Set the key and the token as **Secret**, the rest as Text.
+
+The Pages project must build **`dorit-mailer`**, not the repository root: set
+Root directory to `dorit-mailer` and Build output directory to `public`, with no
+build command. Left empty, Cloudflare serves the repo root — which is the
+website — and the function is never deployed at all.
+
+In **Base44 secrets**: `MAILER_URL` and the same `MAILER_TOKEN`.
+
+`MAIL_FROM` must be on the domain verified in Resend — the subdomain
+`mail.govari-fin.co.il`, never the apex, which points at Microsoft 365 with an
+SPF ending in `-all`.
+
+## The platform limit that led there
 
 ## The platform limit that led there
 

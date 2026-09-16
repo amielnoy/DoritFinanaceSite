@@ -613,7 +613,7 @@ describe("the event log in Google Sheets", () => {
     expect(columns[0]).toBe(columns[1]);
     // And the row every writer builds has to be that long. Counting quoted
     // headers rather than commas — the list carries a trailing one.
-    expect(columns[0].match(/'[^']+'/g) ?? []).toHaveLength(12);
+    expect(columns[0].match(/'[^']+'/g) ?? []).toHaveLength(13);
   });
 
   it("keeps appendEventRow identical in both writers", () => {

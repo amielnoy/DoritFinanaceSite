@@ -1,4 +1,19 @@
+# Cloudflare Pages → Settings → Environment variables.
+# Copy to .dev.vars for `wrangler pages dev` (it is gitignored).
+
 RESEND_API_KEY=re_xxxxxxxxxxxx
-MAIL_TO=dorit@govari-fin.co.il
-MAIL_FROM=דורית גוב ארי <site@govari-fin.co.il>
+
+# Must be on the domain verified in Resend — the subdomain, not the apex.
+# govari-fin.co.il points at Microsoft 365 with an SPF ending in -all, so
+# sending as the apex fails hard.
+MAIL_FROM=דורית גוב ארי <notifications@mail.govari-fin.co.il>
+
+# Comma-separated. The first is the agency's and is used as Reply-To.
+MAIL_TO=dorit@govari-fin.co.il,amielnoy@gmail.com,amielnoy@outlook.com
+
+# Shared secret the Base44 backend sends as `Authorization: Bearer <token>`.
+# Without it this endpoint is an open relay for anyone who reads the site's JS.
+# Generate: openssl rand -hex 32
+MAILER_TOKEN=
+
 ALLOWED_ORIGIN=https://safe-arch-plan.base44.app
