@@ -2,6 +2,16 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 // כמה תיבות, אותו צוות. ראו את ההערה המקבילה ב-submitLead/entry.ts.
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
+
+// מי מהם אפשר להגיע אליו דרך Core של Base44.
+//
+// Core מוסרת אך ורק למשתמש רשום של האפליקציה, ורישום אינו דבר שאפשר להוסיף
+// בצד: הוא נוצר כשהכתובת נכנסת לאפליקציה עצמה. לכן הרשימה הזו אינה "מי בצוות"
+// אלא "למי הפלטפורמה מסוגלת למסור", והיא מכוונת להצטמצם לאפס — כל כתובת שעוברת
+// לשירות הדואר מפסיקה להיות תלויה בחשבון.
+//
+// כל השאר — הסוכנת, התיבה השנייה והמבקר — עוברים דרך dorit-mailer.
+const CORE_EMAILS = ["amielnoy@gmail.com"];
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 // Include a safe delivery reason in the operations notification.
@@ -11,8 +21,41 @@ function deliveryWarning(label, error) {
 }
 
 /**
- * The one way this app sends mail. Kept identical across the isolated entry points.
+ * The one way this app sends mail, over two transports chosen by recipient.
  *
+ * `CORE_EMAILS` go through Base44's own `Core.SendEmail`, which delivers only
+ * to registered users of the app. Everyone else — the agency, the second
+ * operations mailbox and the visitor — goes through the `dorit-mailer` Pages
+ * Function, which sends from the agency's verified domain via Resend.
+ *
+
+ * The split is not about who they are, it is about what each transport can
+ * reach. Core needs an account that only exists once the address has signed
+ * into the app, which is a dependency worth shedding: `CORE_EMAILS` is meant
+ * to shrink to nothing once the sending domain is verified.
+ *
+ * Two transports is what caused the original silent failure — the agency was on
+ * a path that could not deliver to her and nobody noticed, because the copy
+ * that *did* arrive looked like success. The split is deliberate this time and
+ * each failure carries its reason, but it is worth remembering which is which
+ * when only some of the three arrive.
+ *
+ * What travels is the finished message: these functions own the templates, the
+ * escaping and `redact()` on anything a model wrote.
+ */
+async function sendMail({ base44, to, subject, html, text, body }) {
+  if (CORE_EMAILS.includes(to)) {
+    await base44.asServiceRole.integrations.Core.SendEmail({
+      to,
+      subject,
+      html,
+      text: text ?? body,
+      body: text ?? body,
+    });
+    return;
+  }
+
+
  * It posts to the `dorit-mailer` Cloudflare Pages Function rather than to a
  * provider directly, so the Resend key, the sender identity and the recipient
  * list live in that project's environment and not in this one. What travels
@@ -28,6 +71,7 @@ function deliveryWarning(label, error) {
  * enquiry is already stored by the time this runs.
  */
 async function sendMail({ to, subject, html, text, body }) {
+
   const endpoint = Deno.env.get('MAILER_URL')?.trim();
   const token = Deno.env.get('MAILER_TOKEN')?.trim();
   if (!endpoint || !token) throw new Error('mailer_not_configured');
@@ -168,6 +212,133 @@ function buildNotification(reason, data) {
   ].join('\n');
 }
 
+/** לוח הצבעים של המיילים — אותם ערכים כמו src/index.css, בקוד שאינו רואה טוקנים. */
+const MAIL = {
+  page: '#F9F7F2',      // --background · Warm Parchment
+  card: '#FFFFFF',
+  panel: '#F6F1EA',
+  ink: '#1A1A1B',       // --foreground · Obsidian Matte
+  body: '#3D3D3F',
+  muted: '#7D6B5D',     // --accent · Deep Taupe
+  border: '#E5DDD0',
+  panelBorder: '#E0D4C6',
+  rule: '#C3AD96',      // --highlight-muted
+  alert: '#EF4444',     // --destructive
+};
+
+/** שורת "תווית: ערך" אחת בתוך בלוק. */
+function detailRow(label, value, { link = '', last = false } = {}) {
+  const shown = escapeHtml(value || '—');
+  const cell = link
+    ? `<a href="${escapeHtml(link)}" style="color:${MAIL.ink}; text-decoration:none;">${shown}</a>`
+    : shown;
+  const divider = last
+    ? ''
+    : `<tr><td colspan="2" style="padding:0; font-size:0; line-height:0; border-top:1px solid ${MAIL.panelBorder};">&nbsp;</td></tr>`;
+  return `
+              <tr>
+                <td style="padding:9px 0; font-size:13px; color:${MAIL.muted}; font-family:Arial,sans-serif; width:120px; text-align:right; vertical-align:top;">${escapeHtml(label)}</td>
+                <td style="padding:9px 0; font-size:15px; color:${MAIL.ink}; font-family:Arial,sans-serif; font-weight:bold; text-align:right;">${cell}</td>
+              </tr>${divider}`;
+}
+
+/** בלוק אחד: כותרת קטנה ומסגרת סביב תוכן. */
+function block(title, inner, { tone = 'panel' } = {}) {
+  const bg = tone === 'plain' ? MAIL.card : MAIL.panel;
+  const edge = tone === 'alert' ? MAIL.alert : MAIL.panelBorder;
+  return `
+        <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px; background:${bg}; border:1px solid ${edge}; border-radius:6px;">
+          <tr><td style="padding:22px 26px;">
+            <p style="margin:0 0 14px; font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:${MAIL.muted}; font-family:Arial,sans-serif; text-align:right;">${escapeHtml(title)}</p>
+            <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%">${inner}
+            </table>
+          </td></tr>
+        </table>`;
+}
+
+/** פסקת טקסט חופשי בתוך בלוק — הודעה, הערות, תקציר. */
+function proseRow(text) {
+  return `
+              <tr><td style="padding:2px 0 0; font-size:15px; color:${MAIL.body}; font-family:Arial,sans-serif; line-height:1.8; text-align:right; white-space:pre-line;">${escapeHtml(text || '—')}</td></tr>`;
+}
+
+/**
+ * בריחת תווים לפני שילוב טקסט מהמבקר בגוף HTML.
+ *
+ * המייל הזה נשלח לכתובת שהמבקר הקליד, מהדומיין המאומת של הסוכנות, והשם והנושא
+ * מגיעים ממנו. בלי בריחה אפשר להגיש טופס עם המייל של מישהו אחר ועם שם שהוא
+ * בעצם תגית — והנמען מקבל מייל ממותג של דורית שמכיל קישור של התוקף. זה אינו
+ * XSS בדפדפן של המבקר אלא וקטור פישינג על חשבון המוניטין של הסוכנות.
+ */
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ── ההתראה, בעיצוב של האתר ────────────────────────────────────────────────
+//
+// עד כה היא נשלחה כטקסט בלבד, ולקוח הדואר קיפל אותה לפסקה אחת רצה: סיבת
+// ההעברה, השם, הטלפון והתקציר בשורה אחת בלי הפרדה. זו ההודעה שדורית פותחת
+// בטלפון כדי להחליט אם לחזור למישהו עכשיו, וזה בדיוק מה שלא היה אפשרי — אותו
+// ליקוי שתוקן בפניות הרגילות (A-14) ונשאר כאן.
+//
+// אותו מידע בדיוק, באותה פלטה של submitLead, בבלוקים מופרדים. הטקסט ממשיך
+// להישלח לצידו ולא במקומו.
+
+/** ההעברה כ-HTML. מסגרת אדומה כשהסיבה דחופה, כדי שתיראה מהמסך הראשון. */
+function buildEscalationHtml(reason, data) {
+  const urgent = URGENT.has(reason);
+
+  const who = block('מי פנה', [
+    detailRow('שם', data.name || 'לא נמסר'),
+    detailRow('טלפון', data.phone || 'לא נמסר', {
+      link: data.phone ? `tel:${String(data.phone).replace(/[^\d+]/g, '')}` : '',
+    }),
+    detailRow('אימייל', data.email, { link: data.email ? `mailto:${data.email}` : '', last: true }),
+  ].join(''));
+
+  const why = block('ההעברה', [
+    detailRow('סיבה', REASONS[reason] || reason),
+    detailRow('דחיפות', urgent ? 'דחוף — לטפל היום' : 'רגילה'),
+    detailRow('סוכן', data.agent || '—', { last: true }),
+  ].join(''), { tone: urgent ? 'alert' : 'panel' });
+
+  const summary = block('תקציר השיחה · לאחר השמטת פרטים רגישים', proseRow(data.summary));
+
+  const stored = block('מצב', proseRow(
+    data.contactable
+      ? 'הפנייה נשמרה במאגר בסטטוס "escalated".'
+      : 'המבקר לא מסר שם וטלפון — אין רשומה במאגר, וזו ההודעה היחידה על הפנייה.',
+  ), { tone: data.contactable ? 'panel' : 'alert' });
+
+  return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0; padding:0; background:${MAIL.page}; font-family:Arial,Helvetica,sans-serif; color:${MAIL.ink}; line-height:1.7; -webkit-text-size-adjust:100%;">
+  <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${MAIL.page};">
+    <tr><td align="center" style="padding:28px 16px;">
+      <table dir="rtl" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; width:600px; background:${MAIL.card}; border:1px solid ${urgent ? MAIL.alert : MAIL.border}; border-radius:6px; overflow:hidden;">
+        <tr><td style="padding:34px 40px 24px; border-bottom:1px solid ${MAIL.border}; text-align:right;">
+          <p style="margin:0 0 10px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:${urgent ? MAIL.alert : MAIL.muted};">${urgent ? 'העברה דחופה' : 'העברה לאדם'}</p>
+          <h1 style="margin:0; font-family:Georgia,serif; font-size:26px; font-weight:bold; color:${MAIL.ink}; line-height:1.3; letter-spacing:-0.02em;">${escapeHtml('פנייה שהועברה לטיפול אישי')}</h1>
+          <div style="height:2px; width:44px; background:${urgent ? MAIL.alert : MAIL.rule}; margin:18px 0 0;"></div>
+          <p style="margin:14px 0 0; font-size:13px; color:${MAIL.muted};">${escapeHtml(new Date().toLocaleString('he-IL'))}</p>
+        </td></tr>
+        <tr><td style="padding:26px 40px 10px;">${who}${why}${summary}${stored}</td></tr>
+        <tr><td style="padding:20px 40px; background:${MAIL.ink}; text-align:center;">
+          <p style="margin:0; font-size:11px; color:rgba(249,247,242,0.5);">הודעה אוטומטית מאתר דורית גוב ארי · אין להשיב לכתובת זו</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -211,6 +382,9 @@ export default async function(req) {
 
     const notification = buildNotification(safeReason, { name, phone, email, agent, summary: safeSummary });
     const subject = `${URGENT.has(safeReason) ? '🔴 ' : ''}העברה לטיפול אנושי — ${REASONS[safeReason]}${name ? ` · ${name}` : ''}`;
+    const escalationHtml = buildEscalationHtml(safeReason, {
+      name, phone, email, agent, summary: safeSummary, contactable,
+    });
 
     let notified = false;
     // One sender for all three. The branch that used to be here sent Dorit's
@@ -220,8 +394,11 @@ export default async function(req) {
     for (const to of [...NOTIFY_EMAILS, SECONDARY_EMAIL]) {
       try {
         await sendMail({
+          base44,
           to,
           subject,
+          html: escalationHtml,
+          text: notification,
           body: notification,
         });
         notified = true;

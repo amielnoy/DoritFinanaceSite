@@ -200,3 +200,74 @@ describe("escalateToHuman — the operations mailboxes", () => {
     expect(r.emails.map((e) => e.to)).toContain(OPS2);
   });
 });
+
+/**
+ * The handover, laid out.
+ *
+ * It went out as plain text only, and mail clients folded it into one running
+ * paragraph: reason, name, phone and the conversation summary in a single line
+ * with no separation. This is the message Dorit opens on a phone to decide
+ * whether to call someone back now — exactly the thing that was not possible.
+ *
+ * The same defect was found and fixed for ordinary enquiries (A-14) and left
+ * here, which is why these assert the layout rather than only the content.
+ */
+describe("escalateToHuman — the notification is readable", () => {
+  it("sends HTML with the plain text alongside it, not instead of it", async () => {
+    const r = await invokeFunction("escalateToHuman", escalation);
+    for (const to of [AGENCY, OPS, OPS2]) {
+      const mail = r.mailTo(to);
+      expect(mail.html, `${to} got no HTML`).toContain("<table");
+      expect(mail.text ?? mail.body, `${to} lost the text fallback`).toBeTruthy();
+    }
+  });
+
+  it("breaks it into titled blocks rather than one paragraph", async () => {
+    const r = await invokeFunction("escalateToHuman", escalation);
+    const html = r.mailTo(AGENCY).html!;
+    for (const heading of ["מי פנה", "ההעברה", "תקציר השיחה", "מצב"]) {
+      expect(html, heading).toContain(heading);
+    }
+  });
+
+  it("makes the phone dialable, because that is what this mail is for", async () => {
+    const r = await invokeFunction("escalateToHuman", escalation);
+    expect(r.mailTo(AGENCY).html).toContain("tel:");
+  });
+
+  it("marks an urgent reason so it reads as urgent at a glance", async () => {
+    // A complaint and an out-of-scope question must not look alike in a list.
+    const urgent = await invokeFunction("escalateToHuman", { ...escalation, reason: "complaint" });
+    expect(urgent.mailTo(AGENCY).html).toContain("דחוף");
+
+    const ordinary = await invokeFunction("escalateToHuman", { ...escalation, reason: "out_of_scope" });
+    expect(ordinary.mailTo(AGENCY).html).not.toContain("דחוף — לטפל היום");
+  });
+
+  it("says plainly when nothing was stored, because then this is the only record", async () => {
+    const r = await invokeFunction("escalateToHuman", { ...escalation, name: "", phone: "" });
+    expect(r.mailTo(AGENCY).html).toContain("זו ההודעה היחידה");
+  });
+
+  it("escapes a name that is really a payload", async () => {
+    const r = await invokeFunction("escalateToHuman", {
+      ...escalation,
+      name: '<a href="https://evil.example">לחצו</a> כהן',
+    });
+    const html = r.mailTo(AGENCY).html!;
+    expect(html).not.toContain('<a href="https://evil.example"');
+    expect(html).toContain("&lt;a");
+  });
+
+  it("keeps the redaction, now that the summary is rendered twice", async () => {
+    // It reaches both the HTML and the text. A value stripped from one and not
+    // the other would be the worst of both.
+    const r = await invokeFunction("escalateToHuman", {
+      ...escalation,
+      summary: "מסר ת״ז 123456789 בשיחה",
+    });
+    for (const mail of r.emails) {
+      expect(`${mail.html ?? ""}${mail.text ?? ""}${mail.body ?? ""}`, mail.to).not.toContain("123456789");
+    }
+  });
+});

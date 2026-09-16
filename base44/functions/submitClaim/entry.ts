@@ -2,6 +2,16 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
 // כמה תיבות, אותו צוות. ראו את ההערה המקבילה ב-submitLead/entry.ts.
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
+
+// מי מהם אפשר להגיע אליו דרך Core של Base44.
+//
+// Core מוסרת אך ורק למשתמש רשום של האפליקציה, ורישום אינו דבר שאפשר להוסיף
+// בצד: הוא נוצר כשהכתובת נכנסת לאפליקציה עצמה. לכן הרשימה הזו אינה "מי בצוות"
+// אלא "למי הפלטפורמה מסוגלת למסור", והיא מכוונת להצטמצם לאפס — כל כתובת שעוברת
+// לשירות הדואר מפסיקה להיות תלויה בחשבון.
+//
+// כל השאר — הסוכנת, התיבה השנייה והמבקר — עוברים דרך dorit-mailer.
+const CORE_EMAILS = ["amielnoy@gmail.com"];
 const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 // Include a safe delivery reason in the operations notification.
@@ -11,8 +21,42 @@ function deliveryWarning(label, error) {
 }
 
 /**
- * The one way this app sends mail. Kept identical across the isolated entry points.
+ * The one way this app sends mail, over two transports chosen by recipient.
  *
+ * `CORE_EMAILS` go through Base44's own `Core.SendEmail`, which delivers only
+ * to registered users of the app. Everyone else — the agency, the second
+ * operations mailbox and the visitor — goes through the `dorit-mailer` Pages
+ * Function, which sends from the agency's verified domain via Resend.
+ *
+
+
+ * The split is not about who they are, it is about what each transport can
+ * reach. Core needs an account that only exists once the address has signed
+ * into the app, which is a dependency worth shedding: `CORE_EMAILS` is meant
+ * to shrink to nothing once the sending domain is verified.
+ *
+ * Two transports is what caused the original silent failure — the agency was on
+ * a path that could not deliver to her and nobody noticed, because the copy
+ * that *did* arrive looked like success. The split is deliberate this time and
+ * each failure carries its reason, but it is worth remembering which is which
+ * when only some of the three arrive.
+ *
+ * What travels is the finished message: these functions own the templates, the
+ * escaping and `redact()` on anything a model wrote.
+ */
+async function sendMail({ base44, to, subject, html, text, body }) {
+  if (CORE_EMAILS.includes(to)) {
+    await base44.asServiceRole.integrations.Core.SendEmail({
+      to,
+      subject,
+      html,
+      text: text ?? body,
+      body: text ?? body,
+    });
+    return;
+  }
+
+
  * It posts to the `dorit-mailer` Cloudflare Pages Function rather than to a
  * provider directly, so the Resend key, the sender identity and the recipient
  * list live in that project's environment and not in this one. What travels
@@ -28,6 +72,7 @@ function deliveryWarning(label, error) {
  * enquiry is already stored by the time this runs.
  */
 async function sendMail({ to, subject, html, text, body }) {
+
   const endpoint = Deno.env.get('MAILER_URL')?.trim();
   const token = Deno.env.get('MAILER_TOKEN')?.trim();
   if (!endpoint || !token) throw new Error('mailer_not_configured');
@@ -249,6 +294,7 @@ export default async function(req) {
     for (const to of NOTIFY_EMAILS) {
       try {
         await sendMail({
+          base44,
           to,
           subject,
           body: agentBody,
@@ -261,6 +307,7 @@ export default async function(req) {
     // עותק לדורית
     try {
       await sendMail({
+        base44,
         to: SECONDARY_EMAIL,
         subject,
         body: agentBody,
@@ -281,6 +328,7 @@ export default async function(req) {
           `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,
         ].join('\n');
         await sendMail({
+          base44,
           to: email,
           subject: `אישור — קיבלנו את דיווח האירוע שלכם · דורית גוב ארי`,
           html: buildClientHtml(clientMailFor({ name, claimType, eventDate })),
