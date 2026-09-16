@@ -239,6 +239,9 @@ environment — none of that lives in this app's config.
 
 `sendMail()` — byte-identical in `submitLead`, `submitClaim` and
 
+`escalateToHuman` — posts the *finished* message to it. These functions keep the
+
+
 `escalateToHuman` — routes by recipient. `CORE_EMAILS` go through Base44's own
 `Core.SendEmail`; everyone else goes to the mailer, which posts the *finished*
 message to Resend.
@@ -252,6 +255,7 @@ shrink to nothing once the sending domain is verified, at which point there is
 one transport again. These functions keep the
 
 `escalateToHuman` — posts the *finished* message to it. These functions keep the
+
 
 templates, the HTML escaping and `redact()` on anything a model wrote; the
 mailer sends what it is given (`type: "rendered"`) rather than rebuilding it. It
