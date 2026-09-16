@@ -238,6 +238,7 @@ that holds the Resend key, the sender identity and the recipient list in its own
 environment — none of that lives in this app's config.
 
 `sendMail()` — byte-identical in `submitLead`, `submitClaim` and
+
 `escalateToHuman` — routes by recipient. `CORE_EMAILS` go through Base44's own
 `Core.SendEmail`; everyone else goes to the mailer, which posts the *finished*
 message to Resend.
@@ -249,6 +250,9 @@ itself. The agency and the second operations mailbox are not users and cannot
 practically become them, so they take the mailer. `CORE_EMAILS` is meant to
 shrink to nothing once the sending domain is verified, at which point there is
 one transport again. These functions keep the
+
+`escalateToHuman` — posts the *finished* message to it. These functions keep the
+
 templates, the HTML escaping and `redact()` on anything a model wrote; the
 mailer sends what it is given (`type: "rendered"`) rather than rebuilding it. It
 also carries its own `contact` and `intake` templates for a browser posting
