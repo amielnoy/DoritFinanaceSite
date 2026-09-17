@@ -404,10 +404,16 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(escalate).toMatch(/text: notification/);
   });
 
-  it("keeps the two copies of redact() identical", () => {
+  it("keeps the three copies of redact() identical", () => {
     // Base44 functions are isolated entry points with no shared module, so the
     // helper is duplicated. Duplicated is fine; drifted is not.
+    //
+    // `upsertContact` is the third copy, and the one with the least forgiving
+    // input: it redacts a note taken from a WhatsApp message, where people
+    // paste an ID number or a policy number without being asked for one.
     const norm = (src: string) => topLevelFn(src, "redact").replace(/\s+/g, " ").trim();
+    const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
+    expect(norm(contacts)).toBe(norm(submitLead));
     expect(norm(submitLead)).toBe(norm(escalate));
   });
 
@@ -640,6 +646,8 @@ describe("the event log in Google Sheets", () => {
     submitLead: read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts")),
     escalateToHuman: read(join(REPO_ROOT, "base44/functions/escalateToHuman/entry.ts")),
   };
+  /** The third writer, on its own tab: people rather than events. */
+  const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
 
   const block = (src: string, start: string, close: string): string => {
     const i = src.indexOf(start);
@@ -668,11 +676,15 @@ describe("the event log in Google Sheets", () => {
     expect(columns[0].match(/'[^']+'/g) ?? []).toHaveLength(13);
   });
 
-  it("keeps appendEventRow identical in both writers", () => {
-    const fns = Object.values(writers).map((src) =>
+  it("keeps appendEventRow identical in every writer", () => {
+    // Three copies now: the two event writers and `upsertContact`, which
+    // appends to a different tab of the same spreadsheet. The tab and the
+    // columns differ between them — those are the constants above it — but the
+    // append itself is one piece of code that happens to exist three times.
+    const fns = [...Object.values(writers), contacts].map((src) =>
       block(src, "async function appendEventRow(", "\n}"),
     );
-    expect(fns[0]).toBe(fns[1]);
+    for (const [i, fn] of fns.entries()) expect(fn, `copy ${i}`).toBe(fns[0]);
   });
 
   it("labels every customer event with a type", () => {
@@ -686,9 +698,9 @@ describe("the event log in Google Sheets", () => {
 
   it("never lets a failed append cost the enquiry", () => {
     // The sheet is a view, not the record. Lead.create is the only hard failure.
-    for (const [name, src] of Object.entries(writers)) {
+    for (const [name, src] of Object.entries({ ...writers, upsertContact: contacts })) {
       expect(src, `${name} must not throw on a sheet failure`).toMatch(
-        /catch \(e\) \{\s*warnings\.push\('sheet_append_failed'\);/,
+        /catch \(e\) \{\s*warnings\.push\(\s*(?:'sheet_append_failed'|deliveryWarning\('sheet_append_failed')/,
       );
     }
   });
@@ -697,6 +709,89 @@ describe("the event log in Google Sheets", () => {
     // A fresh clone, or a deploy without the sheet, still takes enquiries.
     for (const src of Object.values(writers)) {
       expect(src).toMatch(/if \(!SHEET_ID\) return/);
+    }
+  });
+});
+
+/**
+ * The contact behind the enquiries.
+ *
+ * `Lead` is an event: one enquiry, at one moment, with whatever was said in it.
+ * `Contact` is the person those enquiries came from. It exists for a channel
+ * that delivers a phone number with the message — before a name, and before any
+ * consent screen — where the same person can write again next month from the
+ * same number with nothing to tie the two together. No such channel is
+ * connected yet; this lands built and dormant rather than arriving half-written
+ * on the day one is.
+ *
+ * Two failures are worth pinning. The first is quiet duplication: the number
+ * spelled `972…` by the channel and `05…` by the site is one person, and two
+ * rows mean Dorit rings someone she has already spoken to as a stranger. The
+ * second is the channel's own hazard — a number that was never requested is
+ * still personal data, and a person who was never asked has to be told what was
+ * kept and be able to have it removed.
+ */
+describe("the contact record behind the enquiries", () => {
+  const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
+  const entity = read(join(REPO_ROOT, "base44/entities/Contact.jsonc"));
+
+  it("keys the record on the phone number and nothing else", () => {
+    expect(entity).toMatch(/"required":\s*\[\s*"phone"\s*\]/);
+    expect(contacts).toMatch(/Contact\.filter\(\{ phone: key \}\)/);
+  });
+
+  it("normalises the number before it becomes a key", () => {
+    // Without this the entity has three rows for one person and the filter
+    // above matches none of them.
+    expect(contacts).toMatch(/function normalisePhone\(/);
+    expect(contacts).toMatch(/startsWith\('972'\)/);
+  });
+
+  it("asks for nothing the agency has no reason to hold", () => {
+    // Minimisation under חוק הגנת הפרטיות: the fields are the ones needed to
+    // call someone back. An ID number, a policy number or anything medical has
+    // no field to land in, so a prompt change alone cannot start storing them.
+    const fields = Object.keys((parseJsonc(entity) as { properties: Record<string, unknown> }).properties);
+    expect(fields).toEqual(["phone", "name", "email", "channel", "notes", "last_seen"]);
+  });
+
+  it("redacts the free-text note the way every other model-written text is", () => {
+    expect(contacts).toMatch(/const safeNotes = redact\(notes\)/);
+  });
+
+  it("returns what was stored, so a caller can read it back rather than guess", () => {
+    // The confirmation step this exists for: a number kept without being asked
+    // for has to be disclosed, correctable and erasable, and an agent that
+    // recited the request instead of the record would be confirming nothing.
+    expect(contacts).toMatch(/saved: \{ phone: key/);
+  });
+
+  it("is wired to no agent, and is dormant until a channel needs it", () => {
+    // Built, tested and switched off. It exists for a channel that delivers a
+    // phone number with the message, and no such channel is connected — so no
+    // agent holds it. Enabling one is then a deliberate act, not a prompt edit.
+    for (const name of agentNames) {
+      const fns = (loadAgent(name).tool_configs ?? []).map((t) => t.function_name);
+      expect(fns, `${name} can write contacts`).not.toContain("upsertContact");
+    }
+  });
+
+  it("writes new contacts to their own tab, not the event log", () => {
+    // Same spreadsheet, different sheet. A row per message would turn the list
+    // of people into a second event log, and one of those already exists.
+    expect(contacts).toMatch(/SHEET_TAB_CONTACTS.*\|\| 'Contacts'/);
+    expect(contacts).toMatch(/if \(created\) \{/);
+  });
+
+  it("sends no mail when someone says hello", () => {
+    expect(contacts).not.toMatch(/sendMail|SendEmail|MAILER_URL/);
+  });
+
+  it("keeps the record admin-only, like the leads it sits beside", () => {
+    const rls = (parseJsonc(entity) as { rls: Record<string, unknown> }).rls;
+    expect(rls.create).toBe(true);
+    for (const op of ["read", "update", "delete"]) {
+      expect(rls[op], op).toEqual({ user_condition: { role: "admin" } });
     }
   });
 });
