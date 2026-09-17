@@ -1104,3 +1104,58 @@ describe("how the interview speaks to people", () => {
     expect(interview.instructions).toMatch(/'זה נשמע גבוה' על דמי ניהול הוא חוות דעת/);
   });
 });
+
+/**
+ * The financial practice, as the `<head>` describes it.
+ *
+ * The visible components were disciplined about this — Hero carries a comment
+ * explaining that none of its copy says ייעוץ, because the licence is a סוכן
+ * licence with a זיקה to institutions and "ייעוץ פנסיוני" names a regulated
+ * activity she does not hold a licence for. The `<head>` was not: the title,
+ * every description, the keywords and the JSON-LD organisation name all
+ * advertised ייעוץ, and the structured data is what an AI assistant quotes.
+ */
+describe("what the head claims the practice is", () => {
+  const html = read(join(REPO_ROOT, "index.html"));
+  const llms = read(join(REPO_ROOT, "public/llms.txt"));
+
+  it("never advertises a licensed activity she does not hold", () => {
+    // `llms.txt` may cite the law by name; the head has no such reason.
+    expect(html).not.toMatch(/ייעוץ/);
+  });
+
+  it("still carries the financial terms people search for", () => {
+    for (const term of ["פנסיה", "גמל", "השתלמות", "מיסוי", "קיבוע זכויות", "תיקון 190", "דמי ניהול"]) {
+      expect(html, term).toContain(term);
+    }
+  });
+
+  it("names the organisation as the entity that holds the licence", () => {
+    expect(html).toContain("דורית גוב ארי — סוכנות ביטוח בע״מ");
+  });
+
+  it("describes the same five pillars the site displays", () => {
+    // `llms.txt` is the only surface a non-JS crawler reads in full, and it
+    // used to list a set of pillars the page had stopped showing.
+    const matrix = read(join(REPO_ROOT, "src/components/dorit/sections/ServiceMatrix.tsx"));
+    for (const pillar of [
+      "פנסיה, גמל והשתלמות",
+      "מיסוי וקיבוע זכויות",
+      "דמי ניהול ועלויות",
+      "ביטוחי חיים ובריאות",
+      "סנגור תביעות",
+    ]) {
+      expect(matrix, `the page lost the ${pillar} pillar`).toContain(pillar);
+      expect(llms, `llms.txt does not list ${pillar}`).toContain(pillar);
+    }
+  });
+
+  it("promises no outcome in the copy that sells the service", () => {
+    // §2 binds the marketing copy exactly as it binds the agents.
+    const matrix = read(join(REPO_ROOT, "src/components/dorit/sections/ServiceMatrix.tsx"));
+    const hero = read(join(REPO_ROOT, "src/components/dorit/sections/Hero.tsx"));
+    for (const [name, src] of Object.entries({ matrix, hero, html })) {
+      expect(src, `${name} promises a return`).not.toMatch(/נחסוך לך|תחסכו|מובטח|רווח מובטח/);
+    }
+  });
+});

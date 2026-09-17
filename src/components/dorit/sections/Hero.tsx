@@ -93,9 +93,15 @@ export default function Hero() {
             <span className="hidden md:block w-1 h-1 rounded-full bg-highlight" />
             <span className="font-heading text-base text-accent">ליווי אישי 1:1</span>
           </div>
+          {/* The financial work, named. "מתכננת עתיד" is true and says nothing
+              a visitor can act on; most people arrive holding a pension, a
+              gemel fund and a study fund they have never looked at, and that is
+              the conversation. Still no figure and no promise — §2 binds this
+              copy as it binds the agents. */}
           <p className="mt-7 max-w-md text-lg text-foreground/75 leading-relaxed animate-fade-up">
-            אני לא מוכרת פוליסות — אני מתכננת עתיד. ליווי אישי, מדויק ושקוף לאורך כל
-            חייכם, מהרגע שבו אתם בוחרים ועד הרגע שבו אתם מממשים את החזון.
+            אני לא מוכרת פוליסות — אני מתכננת עתיד. פנסיה, גמל והשתלמות, מיסוי
+            וקיבוע זכויות, ודמי הניהול שנגבים מהחיסכון לאורך השנים: מה שיש לכם,
+            מה הוא עולה, ומה הוא אמור לעשות עבורכם.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-5 animate-fade-up">
             <a

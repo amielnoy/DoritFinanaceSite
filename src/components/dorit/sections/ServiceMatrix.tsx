@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Heart, Landmark, ShieldCheck, Home, HeartHandshake } from "lucide-react";
+import { Calculator, Heart, Landmark, HeartHandshake, TrendingDown } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 
 interface Pillar {
@@ -9,36 +9,55 @@ interface Pillar {
   desc: string;
 }
 
+// The five pillars, financial work first.
+//
+// They used to open on legacy planning and then spend three of the five on
+// insurance — life, mortgage, and a car-and-home pillar. That ordering described
+// an insurance agency, while everything else on the site describes a financial
+// practice: five of the interview's seven tracks are financial, the FAQ leads
+// with tax and pensions, and `llms.txt` lists her services as gemel/pension,
+// tax and rights fixing, management fees, life and health cover, and claims.
+// This section was the one place a visitor met the old framing first.
+//
+// The car-and-home pillar is gone rather than reordered: elementary insurance
+// appears in none of her own materials, and a pillar for work she does not list
+// is a promise the rest of the site does not keep. Life and health cover
+// absorbs the mortgage protection that "בית ונכסים" carried.
+//
+// Every line stays descriptive. No figure, no "saves you", no comparison
+// between institutions — §2 of the compliance block binds the site copy exactly
+// as it binds the agents, and "הורדת דמי ניהול" names an activity rather than
+// promising an outcome.
 const PILLARS: Pillar[] = [
   {
     icon: Landmark,
-    title: "תכנון מורשת",
-    sub: "Legacy Planning",
-    desc: "פנסיה, קרנות השתלמות ותכנון פיננסי ארוך טווח שבונים יסודות איתנים לדורות הבאים.",
+    title: "פנסיה, גמל והשתלמות",
+    sub: "Pension & Provident",
+    desc: "בחינת המוצרים הקיימים, מסלולי ההשקעה והניוד — והתאמתם לשלב החיים ולטווח שבו הכסף אמור לעבוד.",
+  },
+  {
+    icon: Calculator,
+    title: "מיסוי וקיבוע זכויות",
+    sub: "Tax & Rights",
+    desc: "תכנון מס לקראת פרישה, קיבוע זכויות, תיקון 190 ומיצוי הטבות המס שעל ההפקדות.",
+  },
+  {
+    icon: TrendingDown,
+    title: "דמי ניהול ועלויות",
+    sub: "Fees & Costs",
+    desc: "בדיקת העלויות שנגבות לאורך שנות החיסכון, והתנהלות מול הגופים המוסדיים בשמכם.",
   },
   {
     icon: Heart,
-    title: "חיים וחיוניות",
-    sub: "Life & Vitality",
-    desc: "ביטוח חיים, מצבים קריטיים ובריאות מותאמים אישית — כדי שהאנשים שאתם אוהבים יישארו מוגנים בכל תרחיש.",
-  },
-  {
-    icon: Home,
-    title: "בית ונכסים",
-    sub: "Estate Cover",
-    desc: "הגנה מקיפה למשכנתא ולנכסים שלכם, עם מבט קדימה שמונע הפתעות יקרות.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "מגן יומיומי",
-    sub: "Everyday Shield",
-    desc: "ביטוח רכב, דירה ונכסים — כיסוי מדויק שמלווה את החיים השקטים שלכם בלי רעש מיותר.",
+    title: "ביטוחי חיים ובריאות",
+    sub: "Life & Health",
+    desc: "כיסוי למשפחה, אובדן כושר עבודה, בריאות וכיסוי למשכנתא — מותאמים למי שתלוי בכם בפועל.",
   },
   {
     icon: HeartHandshake,
     title: "סנגור תביעות",
     sub: "Claims Advocacy",
-    desc: "ליווי צמוד ברגע האמת — ניהול תביעות מול החברות בשמכם, עד שמגיע הכיסוי המלא שמגיע לכם.",
+    desc: "ליווי צמוד ברגע האמת — ניהול התביעה מול החברה בשמכם, מהדיווח ועד ההכרעה.",
   },
 ];
 
@@ -62,13 +81,13 @@ export default function ServiceMatrix() {
                 02 · תחומי הליווי
               </span>
               <h2 className="font-heading text-5xl md:text-6xl mt-4 max-w-xl">
-                חמישה עמודי חיים
+                חמישה עמודי התכנון
               </h2>
             </Reveal>
           </div>
           <p className="max-w-sm text-foreground/70">
-            מורכבות הביטוח מתורגמת לשפה פשוטה ואלגנטית — כל תחום הוא עמוד תמיכה
-            שנבנה סביבכם בלבד.
+            רוב הכסף שלכם כבר מופקד במקום כלשהו — פנסיה, גמל, השתלמות. כאן בודקים
+            מה יש, מה הוא עולה, ומה הוא אמור לעשות עבורכם.
           </p>
         </div>
 
