@@ -42,9 +42,11 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 
 | Function | Where it is called from |
 |---|---|
-| `submitLead` | every form on the site, and the booking and interview agents |
+| `submitLead` | every form on the site, and the interview agent |
 | `escalateToHuman` | all three on-site agents |
 | `submitClaim` | the claims form |
+| `upsertContact` | no caller yet — built for a channel that supplies a phone number, dormant per B-8 |
+| `logSupportChat` | the support agent, at the end of every conversation |
 | `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
 `createConsultationEvent` and `createOutlookEvent` are not yet executed here.
@@ -282,9 +284,60 @@ phone number, or a failed write still produces a notification, and the agent
 still receives contact channels even when every mailbox bounces. The handing
 agent is named, so a pattern is visible later.
 
+### 4.18 `upsertContact` — one person, however they spelled their number — `INT-CONTACT-001..017`
+
+These cover code that nothing currently calls, and they are here rather than
+deleted on purpose: the function is dormant per B-8, not abandoned, and the day
+a channel supplying phone numbers is switched on is the day nobody will remember
+what it was supposed to do.
+
+Such a channel changes the shape of the problem. On the site a visitor types a
+phone number into a field that enforces its format, once. There the number
+arrives with the message, in whatever form the channel hands over, from someone
+who may have written last month under a different name and no email at all.
+
+So the cases are about the two things that actually go wrong. One person becomes
+several rows when their number is spelled three ways — `972501234567` from the
+channel, `050-123-4567` from a form, `+972 50 123 4567` typed by hand — and
+three rows mean Dorit rings someone she has already spoken to as a stranger.
+And a second message erases what the first established: an update has to carry
+what was learned, not what was sent, or a bare "hello" blanks the name.
+
+The rest are restraint and failure. A note taken from a WhatsApp message goes
+through `redact()`, because such a channel is where people paste an ID number
+without being asked for one. A failed lookup creates rather than losing the contact — a
+duplicate is an annoyance, a dropped enquiry is someone nobody calls back. The
+`saved` block returns what was stored rather than echoing the request, since the
+agent reads it back to confirm details and confirming the request would be
+theatre. Nothing is mailed: recording a contact is not an enquiry, and if it
+notified anyone, every "היי" would reach Dorit's inbox. A new contact appends a
+row to `Contacts`; a returning one does not, because a row per message would
+turn the list of people into a second event log.
+
+### 4.19 `logSupportChat` — what was actually asked — `INT-SUPPORT-001..012`
+
+The event log records that someone got in touch and the contact list records who
+they are. Neither records the question, which is the only one of the three that
+can say what to write next or where the agent keeps stopping.
+
+Recording a conversation is also the most intrusive thing on this site, so most
+of these cases are about restraint: the transcript is redacted and capped, the
+outcome comes from a fixed list rather than being phrased freshly by the model
+each time, and a call carrying nothing to record is refused rather than writing
+an empty row. The phone column is normalised by the same function
+`upsertContact` uses. The site chat has no number, so today that column is
+always empty — it is pinned anyway, because two tabs of one spreadsheet
+normalised differently cannot be read together, and that would only surface long
+after this was written.
+
+Failure is the point of the last three. The agent is told not to report this
+call to the visitor, so the function has to leave it nothing to report: a
+refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
+`200`, and the conversation the visitor already had is unaffected.
+
 ## 5. Pass criteria
 
-All 168 cases pass. These assert behaviour, not shape — a failure means the
+All 200 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

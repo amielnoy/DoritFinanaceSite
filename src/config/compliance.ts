@@ -43,6 +43,26 @@ export const CONSENT = {
   startLabel: "התחלת השיחה",
 } as const;
 
+/**
+ * The same gate, worded for the support chat.
+ *
+ * The default points describe the interview: they promise that a name and a
+ * phone number are collected and that a meeting will be arranged. The support
+ * chat does neither — it answers general questions and asks for nothing — so
+ * showing that text here would be a consent notice for something that is not
+ * happening, which is worse than none: it is a specific, wrong description of
+ * what the visitor is agreeing to.
+ *
+ * What it does do, and what the default text has no reason to mention, is keep
+ * a record of the conversation. That is the sentence this version exists for.
+ */
+export const SUPPORT_CONSENT_POINTS = [
+  "השיחה מתנהלת מול עוזר אוטומטי שעונה על שאלות כלליות מתוך התוכן שפורסם באתר. הוא אינו נותן ייעוץ, אינו ממליץ על מוצר ואינו מבצע חישוב.",
+  `${LICENCE.entity} בעלת רישיון סוכן מ${LICENCE.regulator} מס' ${LICENCE.number}, ולה זיקה לגופים מוסדיים. הפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.`,
+  "אין צורך למסור פרטים אישיים כדי לשוחח כאן, ואינך מתבקש/ת למסור אותם. אין למסור בצ׳אט תעודת זהות, מספרי חשבון או פוליסה, נתוני שכר או מידע רפואי.",
+  "תוכן השיחה נשמר אצל דורית ואצל הצוות שמתפעל את האתר מטעמה, כדי לדעת מה נשאל ולשפר את המענה. מזהים שנמסרו בטעות מושמטים לפני השמירה. אפשר לבקש עיון, תיקון או מחיקה בכל עת.",
+] as const;
+
 /** Persistent line under the message box, visible for the whole conversation. */
 export const CHAT_DISCLAIMER =
   "המידע בצ׳אט הוא כללי בלבד ואינו ייעוץ, שיווק פנסיוני או המלצה אישית. אפשר לעבור לדורית בכל שלב.";

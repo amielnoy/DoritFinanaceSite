@@ -14,6 +14,8 @@ import { faqLd } from "@/lib/structured-data";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { CONTACT } from "@/config/contact";
+import AgentChat from "@/components/dorit/chat/AgentChat";
+import { AGENTS } from "@/config/agents";
 
 interface QAItem {
   q: string;
@@ -291,6 +293,12 @@ export default function FAQPage() {
             </div>
           </div>
         </section>
+
+        {/* The open question, where the answered ones end.
+            A visitor who has just read every answer on the page and not found
+            theirs is the one person on the site who definitely has a question,
+            and until now the only thing offered to them was a phone number. */}
+        <AgentChat descriptor={AGENTS.support} />
 
         {/* CTA */}
         <section className="relative py-24 md:py-32 border-t border-border/60 bg-primary text-primary-foreground">

@@ -238,10 +238,6 @@ that holds the Resend key, the sender identity and the recipient list in its own
 environment — none of that lives in this app's config.
 
 `sendMail()` — byte-identical in `submitLead`, `submitClaim` and
-
-`escalateToHuman` — posts the *finished* message to it. These functions keep the
-
-
 `escalateToHuman` — routes by recipient. `CORE_EMAILS` go through Base44's own
 `Core.SendEmail`; everyone else goes to the mailer, which posts the *finished*
 message to Resend.
@@ -252,12 +248,9 @@ of the app, and an account exists only once that address has signed into the app
 itself. The agency and the second operations mailbox are not users and cannot
 practically become them, so they take the mailer. `CORE_EMAILS` is meant to
 shrink to nothing once the sending domain is verified, at which point there is
-one transport again. These functions keep the
+one transport again.
 
-`escalateToHuman` — posts the *finished* message to it. These functions keep the
-
-
-templates, the HTML escaping and `redact()` on anything a model wrote; the
+These functions keep the templates, the HTML escaping and `redact()` on anything a model wrote; the
 mailer sends what it is given (`type: "rendered"`) rather than rebuilding it. It
 also carries its own `contact` and `intake` templates for a browser posting
 directly, which this backend does not use.
@@ -301,10 +294,6 @@ SPF ending in `-all`.
 
 ## The platform limit that led there
 
-## The platform limit that led there
-
-
-
 Base44's `Core.SendEmail` delivers **only to registered users of the app**. An
 address that is not registered fails silently and shows up as a warning in the
 operations copy, nowhere else.
@@ -321,8 +310,8 @@ the Core integration.
 
 ## The agents, and where they stop
 
-Three LLM agents run on the site — `needs_interview`, `booking_assistant` and
-`blog_recommender` (`base44/agents/`). They belong to a licensed insurance
+Three LLM agents run on the site — `needs_interview`, `blog_recommender` and
+`support_agent` (`base44/agents/`). They belong to a licensed insurance
 agency, which makes most of what a visitor would like to ask them off-limits:
 no product recommendation, no figures, no view on whether to move, withdraw or
 cancel anything. Every one of those ends in a handoff to דורית rather than a
@@ -373,6 +362,55 @@ fails if a mandatory clause disappears from any of them.
 
 Full description of the layer, what is enforced where, and one open question
 for דורית's compliance adviser: [`base44/agents/COMPLIANCE.md`](base44/agents/COMPLIANCE.md).
+
+## The open question, and the record it leaves
+
+`support_agent` answers general questions — what a קרן השתלמות is, what happens
+at the first meeting, which article covers management fees — in a free chat at
+the bottom of `/faq`, and nowhere else. The visitor accepted a notice before
+typing and the agent holds no identifying detail at all; it asks for none.
+Someone who wants to be called back is pointed at the interview, which is built
+to collect that.
+
+The notice is its own. The interview's tells the visitor a name and a phone
+number are being collected, which here would describe something that does not
+happen — and consent to processing that does not happen is not consent to the
+processing that does. `SUPPORT_CONSENT_POINTS` says what this chat actually
+does: asks for nothing, and keeps the conversation.
+
+**A WhatsApp channel was considered and rejected.** `+972508311776` is Dorit's
+own WhatsApp account, and it is the number the site, `llms.txt` and
+`escalateToHuman` all publish as the way to reach a *person*. An agent sitting
+on it would answer "I want to speak to someone" with the bot they are already
+talking to. The WhatsApp Business Platform also requires a number not currently
+registered on the app, so connecting it would have taken her WhatsApp away from
+her. See B-8 in `tests/test-plan/10-known-issues.md`. The consequence runs the
+opposite way from what a WhatsApp agent would need: this one hands over *every*
+channel `escalateToHuman` returns, WhatsApp included, because a human answers on
+all three.
+
+Each conversation ends with one `logSupportChat` call. The event log says
+someone got in touch and the contact list says who they are; neither says what
+was actually asked, which is the only one of the three that tells Dorit what to
+write next or where the agent keeps stopping. The transcript passes through
+`redact()` and is capped — a limit of proportion rather than storage. The call
+is internal: the agent is told not to report it, not to wait for it, and a
+failed write answers `ok: true` with a warning so an internal fault never
+becomes the visitor's problem.
+
+`Contact` and `upsertContact` are **built, tested and dormant**. They exist for
+a channel that hands over a phone number with the message — one row per person
+rather than per enquiry, keyed on a normalised number so `972501234567`,
+`050-123-4567` and `+972 50 123 4567` cannot become three people. No agent is
+wired to them, and a contract test fails if one is: enabling that is a
+deliberate act of turning on a channel, which also means deciding how the saving
+is disclosed there.
+
+Three tabs on one spreadsheet: `Events` for what happened, `Contacts` for who
+(empty until the above is switched on), `Support` for what was asked. `SHEET_ID`
+selects the spreadsheet and `SHEET_TAB`, `SHEET_TAB_CONTACTS` and
+`SHEET_TAB_SUPPORT` name the tabs. No `SHEET_ID`, and every writer skips
+silently — a deployment without a spreadsheet still takes enquiries.
 
 ## Search engines, and AI assistants
 

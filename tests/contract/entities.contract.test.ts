@@ -5,7 +5,7 @@ const names = entityNames();
 
 describe("base44 entity definitions", () => {
   it("ships the entities the frontend depends on", () => {
-    expect(names).toEqual(["BlogPost", "Lead", "Testimonial", "User"]);
+    expect(names).toEqual(["BlogPost", "Contact", "Lead", "Testimonial", "User"]);
   });
 
   for (const name of names) {

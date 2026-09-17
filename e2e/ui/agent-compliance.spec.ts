@@ -110,3 +110,65 @@ test.describe("Agent chat — regulatory shell", () => {
     });
   });
 });
+
+/**
+ * The support chat, which is the same shell around a different promise.
+ *
+ * The interview's notice tells the visitor a name and a phone number are being
+ * collected. The support chat collects neither and keeps a record of the
+ * conversation instead, so it shows its own notice — and the failure worth
+ * catching is the quiet one: the wrong notice rendering here would still look
+ * entirely correct, because it is a real consent notice for a different chat.
+ */
+test.describe("Support chat — the open question", () => {
+  const SUPPORT = "#support-chat";
+
+  test("a visitor cannot type before accepting the notice", async ({ page, mockApi }) => {
+    await gotoApp(page, "/faq");
+    const section = page.locator(SUPPORT);
+    const box = section.getByLabel("הודעה לסוכן התמיכה");
+
+    await test_step("the message box is disabled until the notice is accepted", async () => {
+      await expect(box).toBeDisabled();
+      expect(mockApi.requestsTo("/agents/")).toHaveLength(0);
+    });
+
+    await test_step("accepting it unlocks the box", async () => {
+      await section.getByRole("checkbox").check();
+      await section.getByRole("button", { name: "התחלת השיחה" }).click();
+      await expect(box).toBeEnabled();
+    });
+  });
+
+  test("the notice describes this chat and not the interview", async ({ page }) => {
+    await gotoApp(page, "/faq");
+    const section = page.locator(SUPPORT);
+
+    await test_step("it says the conversation itself is kept, and why", async () => {
+      // The clause naming the purpose, which only the consent point carries —
+      // the note beside the chat says the same thing in shorter words.
+      await expect(section.getByText(/כדי לדעת מה נשאל ולשפר את המענה/)).toBeVisible();
+    });
+
+    await test_step("it does not promise to collect a name and a phone number", async () => {
+      // The interview's third point. Here it would describe processing that
+      // does not happen — and consent to processing that does not happen is
+      // not consent to the processing that does.
+      await expect(section.getByText(/נאספים שם וטלפון בלבד/)).toHaveCount(0);
+    });
+
+    await test_step("it still carries the licence and the affiliation", async () => {
+      await expect(section.getByText(/L-00107009/)).toBeVisible();
+      await expect(section.getByText(/שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי/)).toBeVisible();
+    });
+  });
+
+  test("the route to a person is here too", async ({ page, mockApi }) => {
+    await gotoApp(page, "/faq");
+    const section = page.locator(SUPPORT);
+
+    await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+    const req = await mockApi.waitForRequest("escalateToHuman");
+    expect(req.method).toBe("POST");
+  });
+});
