@@ -17,12 +17,12 @@ than in production.
 
 | Item | Source |
 |---|---|
-| Entity schemas | `base44/entities/{BlogPost,Lead,Testimonial,User}.jsonc` |
-| Agent prompts | `base44/agents/{needs_interview,booking_assistant,blog_recommender}.jsonc` |
+| Entity schemas | `base44/entities/{BlogPost,Contact,Lead,Testimonial,User}.jsonc` |
+| Agent prompts | `base44/agents/{needs_interview,blog_recommender,support_agent}.jsonc` |
 | Published articles | `content/blog/*.md` |
 | Frontend write paths | `base44.entities.*.create/update/filter`, `integrations.Core.SendEmail` |
-| Backend function | `base44/functions/{createConsultationEvent,escalateToHuman}/entry.ts` |
-| Connector | `base44/connectors/googlecalendar.jsonc` |
+| Backend functions | `base44/functions/{createConsultationEvent,escalateToHuman,upsertContact,logSupportChat}/entry.ts` |
+| Connectors | `base44/connectors/{googlecalendar,googlesheets}.jsonc` |
 
 ## 3. Approach
 
@@ -86,7 +86,7 @@ Two helpers do the work:
 Two files here test text rather than shape, and do so on purpose. Both cover
 artefacts that a regulator, not a compiler, is the reader of.
 
-**`agents.contract.test.ts` — `CTR-AGT-001..083`** — the three agent prompts. For each
+**`agents.contract.test.ts` — `CTR-AGT-001..102`** — the three agent prompts. For each
 agent it asserts the eighteen mandatory clauses of the compliance block (bot
 disclosure, licence number `L-00107009`, the marketing-not-advice statement, the
 absolute bans on product recommendation and figures, the privacy-law citation
@@ -153,6 +153,35 @@ an HTML notification of its own, which meant a third copy of the palette
 helpers; Base44's isolated entries leave no way to share them. Duplicated is
 fine, drifted is not, and a drifted `escapeHtml` is a phishing vector rather
 than a cosmetic difference.
+
+Two blocks cover the **support agent**, which answers in the free chat on `/faq`
+and nowhere else. The first pins the boundary of that: it collects nothing, has
+nothing to collect, points anyone wanting a callback at the interview, and —
+the inversion worth stating — hands over *every* channel `escalateToHuman`
+returns, WhatsApp included. That last one reads backwards until you know why a
+WhatsApp channel was rejected (B-8): the published number is Dorit's own
+account, so withholding it here would withhold a human from someone asking for
+one. A companion case pins that no agent holds `upsertContact`, which makes the
+contact flow a capability decision rather than a prompt decision.
+
+The second covers the **record**. A chat that keeps its transcript has to say so
+before it starts, and the interview's consent notice describes different
+processing entirely: it promises that a name and a phone number are collected,
+which here would be a precise description of something that does not happen. So
+the support chat carries `SUPPORT_CONSENT_POINTS`, and the block fails if that
+notice loses the storage sentence, gains the interview's collection promise, or
+drops the licence. Alongside it: that `logSupportChat` is called once at the end
+and never mentioned to the visitor — which is only acceptable *because* the
+notice says it, so the two cases hold each other up — that the transcript and
+topic are redacted before anything is written, and that the support row is keyed
+on the same normalised phone number `upsertContact` uses.
+
+The `Contact` entity has a block of its own, covering code no agent calls today.
+It pins that the record is keyed on the phone number and nothing else, that the
+number is normalised before it becomes that key, and — the one that matters most
+— that the field list is exactly the six a callback needs. An ID number, a
+policy number or anything medical has no field to land in, so a reworded prompt
+alone cannot start storing them.
 
 **`ai-surface.contract.test.ts` — `CTR-AI-001..014`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript
@@ -226,7 +255,7 @@ time.
 
 ## 6. Pass criteria
 
-All 219 cases pass. A failure means either the frontend or the backend definition
+All 295 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

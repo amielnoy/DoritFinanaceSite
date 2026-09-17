@@ -545,16 +545,18 @@
         than trusting it.
       </p>
 
-      <h3>The five functions</h3>
+      <h3>The seven functions</h3>
       <div class="scroll">
         <table>
           <thead>
             <tr><th>Function</th><th>What it does</th><th>Side effects</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>submitLead</code></td><td>The enquiry path for all three forms and for the booking agent</td><td>writes <code>Lead</code>; mails the agency, the operations team and the visitor; Outlook event; sheet row</td></tr>
+            <tr><td><code>submitLead</code></td><td>The enquiry path for all three forms and for the interview agent</td><td>writes <code>Lead</code>; mails the agency, the operations team and the visitor; Outlook event; sheet row</td></tr>
             <tr><td><code>submitClaim</code></td><td>The claims form</td><td>writes <code>Lead</code>; mails</td></tr>
             <tr><td><code>escalateToHuman</code></td><td>Hands a conversation to a person, for any reason an agent may not handle</td><td>writes <code>Lead</code> when contactable; always notifies; sheet row</td></tr>
+            <tr><td><code>upsertContact</code></td><td>Records or completes the person behind the enquiries, keyed on a normalised phone number. Built and tested; wired to no agent (see B-8)</td><td>writes <code>Contact</code>; sheet row on creation only</td></tr>
+            <tr><td><code>logSupportChat</code></td><td>Files a finished support conversation — topic, outcome, redacted transcript</td><td>sheet row; nothing else</td></tr>
             <tr><td><code>createConsultationEvent</code></td><td>Books the follow-up in Google Calendar</td><td><code>googlecalendar</code> connector</td></tr>
             <tr><td><code>createOutlookEvent</code></td><td>The same, in Outlook</td><td><code>outlook</code> connector</td></tr>
           </tbody>
@@ -606,9 +608,9 @@
             <tr><th>Agent</th><th>Job</th><th>Tools</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>needs_interview</code></td><td>Gathers context before a meeting</td><td><code>Lead.create</code>, <code>escalateToHuman</code></td></tr>
-            <tr><td><code>booking_assistant</code></td><td>Arranges the meeting itself</td><td><code>submitLead</code>, <code>createConsultationEvent</code>, <code>escalateToHuman</code></td></tr>
+            <tr><td><code>needs_interview</code></td><td>Gathers context before a meeting, and arranges the meeting itself</td><td><code>submitLead</code>, <code>createConsultationEvent</code>, <code>escalateToHuman</code></td></tr>
             <tr><td><code>blog_recommender</code></td><td>Points at articles</td><td><code>BlogPost.read</code>, <code>escalateToHuman</code></td></tr>
+            <tr><td><code>support_agent</code></td><td>Answers general questions from published content, in the free chat on <code>/faq</code></td><td><code>BlogPost.read</code>, <code>logSupportChat</code>, <code>escalateToHuman</code></td></tr>
           </tbody>
         </table>
       </div>

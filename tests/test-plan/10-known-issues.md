@@ -211,6 +211,32 @@ tests into jsdom (`tests/unit/utils.dom.test.ts`) and would break SSR or any
 future prerender step. A one-line guard (`typeof window !== "undefined"`) would
 close it; left alone as it is outside the scope of this work.
 
+### B-8 · ~~The support agent must not sit on the published WhatsApp number~~ — closed by decision
+
+`support_agent` was built to answer on WhatsApp as well as on the site. It does
+not, and will not on this number.
+
+`+972508311776` is Dorit's own WhatsApp account — her photo, her chats, a person
+on the other end — and it is the number the site, the consent notice,
+`llms.txt` and the channels `escalateToHuman` returns all publish as the way to
+reach a human. An agent sitting on it would answer "I want to speak to someone"
+with the bot they are already talking to, on the number advertised as the escape
+from it. Separately, the WhatsApp Business Platform requires a number **not**
+currently registered on the consumer or Business app, so connecting this one
+would have migrated her account and taken normal WhatsApp off her phone.
+
+Resolved by removing the channel rather than the number: the agent answers in
+the free chat on `/faq` only, and its prompt now hands over *every* channel
+`escalateToHuman` returns, WhatsApp included, because a human answers on all
+three. A contract case pins that inversion, and another pins that no agent holds
+`upsertContact`.
+
+**What stays built:** the `Contact` entity, `upsertContact` and their seventeen
+integration cases. They are dormant, not dead — they exist for a channel that
+delivers a phone number with the message, and re-enabling one means adding a
+separate number, wiring the tool back to the agent, and deciding how the saving
+is disclosed on a channel with no consent screen.
+
 ## C. Deliberate deviations in the suite
 
 | Deviation | Reason |
