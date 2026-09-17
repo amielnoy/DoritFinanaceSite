@@ -454,14 +454,32 @@ jobs:
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
           echo "Production currently serves: ${asset:-unknown}"
 
+      # Absent credentials skip the publish; *wrong* ones fail it.
+      #
+      # The CLI only treats BASE44_API_KEY as a key when it starts with `b44k_`:
+      #
+      #     function usingWorkspaceApiKey(): boolean {
+      #       return process.env.BASE44_API_KEY?.trim().startsWith("b44k_") ?? false;
+      #     }
+      #
+      # Any other value — a `B44U_` user token, say — is ignored, and the CLI
+      # falls back to its device-code login. On a runner that is not an error
+      # but a prompt nobody can answer: the step sat for five minutes and was
+      # killed with an orphan node process, which says nothing about the cause.
+      # One prefix check turns that into an instant, legible failure.
       - name: Check publish credentials
         id: creds
+        env:
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
         run: |
-          if [ -n "${{ secrets.BASE44_API_KEY }}" ] && [ -n "${{ vars.BASE44_APP_ID }}" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
+          if [ -z "$BASE44_API_KEY" ] || [ -z "${{ vars.BASE44_APP_ID }}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::BASE44_API_KEY secret or BASE44_APP_ID variable is unset — skipping the publish step. Production stays on whatever was last published by hand."
+          elif [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
+            echo "::error::BASE44_API_KEY is set but is not a workspace API key — those start with 'b44k_'. The CLI ignores any other value and falls back to an interactive device login, which cannot be answered on a runner and hangs until the job times out. Create a workspace API key in the Base44 dashboard and replace the secret."
+            exit 1
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
       # Three npm 12 defaults block this install: the CLI pulls `@deno/loader`
