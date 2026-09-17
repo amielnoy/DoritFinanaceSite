@@ -412,6 +412,54 @@ selects the spreadsheet and `SHEET_TAB`, `SHEET_TAB_CONTACTS` and
 `SHEET_TAB_SUPPORT` name the tabs. No `SHEET_ID`, and every writer skips
 silently — a deployment without a spreadsheet still takes enquiries.
 
+## What the backend writes down
+
+Until recently these functions logged nothing at all. The only diagnosis
+available was the warnings appendix in the operations email — which means only
+an enquiry whose mail actually went out could be diagnosed, and the failures
+worth diagnosing are the ones where it did not. Diagnosing the mail chain meant
+invoking the deployed function by hand and reading the `warnings` array out of
+its response.
+
+Every function now emits a structured line per step: `request.start`,
+`lead.created`, `mail.sent`, `sheet.appended`, `escalation.received`,
+`request.end`, and the failure counterpart of each. Base44 collects the output
+and serves it:
+
+```
+npm run logs                       # the last hour, production
+npx base44 logs --env prod --since 2d --level error
+npx base44 logs --function submitLead --follow
+```
+
+Every line from one request carries the same short `rid`, so an enquiry can be
+followed from arrival to the last mailbox even when several were in flight at
+once.
+
+**The rule for what goes in a line is: what happened, not what was said.** No
+name, phone number, address, message, summary or profile — only events,
+outcomes, durations and that correlation id. Mail is logged by *role*
+(`agency` / `ops` / `visitor`) rather than by recipient, because one of those
+recipients is the visitor. Provider error text is truncated, since it is not
+ours and not bounded: Resend has returned recipient lists in it.
+
+That restraint is not politeness. A log is the one store a deletion request
+never reaches — entities can be deleted, the spreadsheet edited, an inbox
+cleared — and the whole schema exists to keep identifiers out of storage:
+`redact()`, the closed track whitelist, the health flag that is never a
+description. A log recording "all steps" verbatim would reinstate every one of
+them, in the least reachable place. `tests/contract/logging.contract.test.ts`
+enforces this mechanically, because it is the kind of rule that holds until the
+first afternoon somebody is debugging something urgent.
+
+Base44's own retention answers "what is happening now". For "what changed since
+last Tuesday", the nightly CI run archives the previous 24 hours as
+`logs/YYYY-MM-DD.jsonl` and uploads it as an artifact kept for 90 days. It is
+not committed: this repository is public, and enquiry timings, volumes and
+escalation reasons for a real agency are not something to publish even when they
+carry no personal data. `npm run logs:archive` does the same thing locally, into
+a gitignored `logs/`.
+
 ## Search engines, and AI assistants
 
 Two different readers, and they do not get the same thing.
