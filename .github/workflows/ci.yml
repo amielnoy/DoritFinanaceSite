@@ -1204,3 +1204,74 @@ jobs:
         run: |
           echo "::error::Not safe to merge — see the verdict on the PR and in the run summary."
           exit 1
+
+  # ── The daily log archive ──────────────────────────────────────────────────
+  #
+  # Base44 keeps function logs and serves them through `base44 logs`, but not
+  # forever, and only through a CLI that needs a workspace key. That is fine for
+  # "what happened in the last hour" and useless for "what changed between last
+  # Tuesday and today" — which is the question that actually gets asked after a
+  # complaint about a lead that never arrived.
+  #
+  # So once a day the previous 24 hours are fetched and kept as an artifact.
+  # They are deliberately *not* committed: this repository is public, and the
+  # lines — timings, volumes, escalation reasons for a real agency — are not
+  # something to publish, even though they carry no personal data by design.
+  # An artifact is visible to collaborators and expires on its own, which is the
+  # right shape for an operational record.
+  logs:
+    name: Archive yesterday's logs
+    runs-on: ubuntu-latest
+    # Only the nightly run. A push has nothing new to archive, and archiving on
+    # every branch push would spend the private-repo minutes on duplicates.
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check credentials
+        id: creds
+        env:
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+        run: |
+          # Same prefix rule as the publish job: anything that is not a
+          # workspace key sends the CLI to an interactive login it cannot
+          # complete on a runner. Absent credentials skip; wrong ones fail.
+          if [ -z "$BASE44_API_KEY" ] || [ -z "${{ vars.BASE44_APP_ID }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::BASE44_API_KEY or BASE44_APP_ID is unset — no logs were archived. Yesterday's lines stay only in Base44's own retention."
+          elif [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
+            echo "::error::BASE44_API_KEY is not a workspace API key (those start with 'b44k_')."
+            exit 1
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install the CLI
+        if: steps.creds.outputs.ready == 'true'
+        run: npm ci --ignore-scripts
+
+      - name: Fetch the last 24 hours
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
+        run: npm run logs:archive
+
+      - name: Keep them
+        if: steps.creds.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ github.run_id }}
+          path: logs/
+          # Long enough to answer "what happened last quarter", short enough
+          # that an operational record does not become an archive nobody
+          # decided to keep.
+          retention-days: 90
+          if-no-files-found: warn

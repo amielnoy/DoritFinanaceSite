@@ -13,6 +13,8 @@
     "typecheck:baseline": "node scripts/typecheck-gate.mjs --write",
     "preview": "vite preview",
     "seed:blog": "node scripts/seed-blog.mjs",
+    "logs": "base44 logs --env prod --since 1h",
+    "logs:archive": "node scripts/archive-logs.mjs",
     "test": "npm run test:vitest && npm run test:e2e",
     "test:unit": "vitest run tests/unit",
     "test:component": "vitest run tests/component",
