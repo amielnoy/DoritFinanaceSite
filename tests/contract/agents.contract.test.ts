@@ -984,3 +984,63 @@ describe("the support chat on the site", () => {
     expect(names).toContain("logSupportChat");
   });
 });
+
+/**
+ * The pension clearing house, offered without an identity number.
+ *
+ * A full pension picture pulled before the meeting is the single largest
+ * improvement available to a first meeting, and the agency asked for it. The
+ * obvious implementation — have the agent ask for a ת״ז — does not work and is
+ * not safe: the clearing house answers a licence holder only against the
+ * client's signed authorisation (חוק הפיקוח על שירותים פיננסיים (ייעוץ, שיווק
+ * ומערכת סליקה פנסיונית), התשס״ה-2005), so an identity number typed into a chat
+ * advances nothing while placing a national ID in the lead, three mailboxes and
+ * a spreadsheet — after the visitor accepted a notice telling them not to
+ * provide one.
+ *
+ * So the interview collects intent, and the signature is gathered by Dorit in a
+ * channel meant for it. These pin that shape against a future edit that decides
+ * asking would be simpler.
+ */
+describe("the clearing-house offer", () => {
+  const interview = loadAgent("needs_interview");
+  const submitLead = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+
+  it("offers the pull and names what it actually requires", () => {
+    expect(interview.instructions).toMatch(/מסלקה/);
+    expect(interview.instructions).toMatch(/ייפוי כוח חתום/);
+  });
+
+  it("forbids asking for an identity number, for this or anything else", () => {
+    expect(interview.instructions).toMatch(/אסור לך לבקש תעודת זהות, גם לא לצורך הזה/);
+    // And still forbids recording one that arrives unasked.
+    expect(interview.instructions).toMatch(/אל תרשום אותה לשום שדה/);
+  });
+
+  it("keeps the field a flag rather than a place to put a number", () => {
+    expect(submitLead).toMatch(/\['clearinghouse', 'שליפת נתוני מסלקה — מעוניין\/ת'\]/);
+    // `INTERVIEW_COMMON`, so every track carries it: someone who came about
+    // life cover still has a pension.
+    const common = submitLead.slice(
+      submitLead.indexOf("const INTERVIEW_COMMON = ["),
+      submitLead.indexOf("];", submitLead.indexOf("const INTERVIEW_COMMON = [")),
+    );
+    expect(common).toContain("clearinghouse");
+  });
+
+  it("promises nothing about what the pull will show", () => {
+    // §2 bars figures and opinions on whether an action is worthwhile; an
+    // agent that said "this usually saves people money" would breach it while
+    // sounding helpful.
+    expect(interview.instructions).toMatch(/אל תבטיח מה השליפה תגלה/);
+    expect(interview.instructions).toMatch(/אל תתאר אותה כ'ייעוץ'/);
+  });
+
+  it("leaves the ban on identity documents intact everywhere else", () => {
+    // The whole point of the arrangement: this feature was added without
+    // loosening the clause that made it necessary to think about.
+    for (const name of agentNames) {
+      expect(loadAgent(name).instructions, name).toMatch(/אל תבקש לעולם: תעודת זהות/);
+    }
+  });
+});
