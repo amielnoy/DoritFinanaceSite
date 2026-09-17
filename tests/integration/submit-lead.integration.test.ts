@@ -871,9 +871,10 @@ describe("submitLead — how complete the interview was", () => {
       ...base,
       profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
     });
-    // pension carries seven fields; three were answered.
-    expect(r.mailTo(AGENCY).html).toContain("3 מתוך 7 שדות נענו");
-    expect(r.mailTo(AGENCY).text).toContain("3 מתוך 7 שדות נענו");
+    // pension carries eight fields — the four common ones including the
+    // clearing-house offer, plus the track's four; three were answered.
+    expect(r.mailTo(AGENCY).html).toContain("3 מתוך 8 שדות נענו");
+    expect(r.mailTo(AGENCY).text).toContain("3 מתוך 8 שדות נענו");
   });
 
   it("separates what the visitor did not know from what was never asked", async () => {
@@ -888,7 +889,7 @@ describe("submitLead — how complete the interview was", () => {
       },
     });
     const html = r.mailTo(AGENCY).html!;
-    expect(html).toContain("6 מתוך 7 שדות נענו");
+    expect(html).toContain("6 מתוך 8 שדות נענו");
     expect(html).toContain("2 מהם לא ידועים למבקר");
   });
 
@@ -1030,5 +1031,68 @@ describe("submitLead — the row it appends to the sheet", () => {
     expect(r.status).toBe(200);
     expect(r.leads).toHaveLength(1);
     expect(r.json.warnings).toSatisfy((w: string[]) => w.some((x) => x.startsWith("sheet_append_failed")));
+  });
+});
+
+/**
+ * The pension clearing house, offered without an identity number.
+ *
+ * Pulling a full pension picture before the meeting is the single thing that
+ * most improves a first meeting — Dorit arrives with the real products and the
+ * real fees instead of what the visitor remembered. The clearing house serves a
+ * licence holder only against the client's signed authorisation, so what the
+ * interview can usefully collect is the *intent*, not an identifier: an ID typed
+ * into a chat advances nothing, and would place a national ID number in the
+ * lead, three mailboxes and a spreadsheet — after the visitor accepted a notice
+ * telling them not to provide one.
+ */
+describe("submitLead — the clearing-house offer", () => {
+  const base = {
+    name: "אורי לוי", phone: "0541112233", source: "interview", track: "pension",
+  };
+
+  it("carries the visitor's answer through to the agency", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...base,
+      profile: { life_stage: "בן 52", goal: "פרישה", clearinghouse: "מעוניין" },
+    });
+    const html = r.mailTo(AGENCY).html!;
+    expect(html).toContain("שליפת נתוני מסלקה");
+    expect(html).toContain("מעוניין");
+  });
+
+  it("offers it on every track, not only the pension one", async () => {
+    // Someone who came about life cover still has a pension, and the picture is
+    // just as useful there.
+    for (const track of ["insurance", "retirement", "tax", "savings", "self_employed", "general"]) {
+      const r = await invokeFunction("submitLead", {
+        ...base,
+        track,
+        profile: { life_stage: "בת 40", clearinghouse: "לא" },
+      });
+      expect(r.mailTo(AGENCY).html, track).toContain("שליפת נתוני מסלקה");
+    }
+  });
+
+  it("omits the row when the question was never put", async () => {
+    // The distinction the whole schema rests on: not asked is not the same as
+    // declined, and inventing "לא" would tell Dorit the visitor refused.
+    const r = await invokeFunction("submitLead", {
+      ...base,
+      profile: { life_stage: "בן 52", goal: "פרישה" },
+    });
+    expect(r.mailTo(AGENCY).html).not.toContain("שליפת נתוני מסלקה");
+  });
+
+  it("redacts an identity number if one reaches the field anyway", async () => {
+    // The prompt forbids asking, and forbids recording one volunteered. This is
+    // the layer that does not depend on the model having complied.
+    const r = await invokeFunction("submitLead", {
+      ...base,
+      profile: { life_stage: "בן 52", clearinghouse: "מעוניין, ת\"ז 123456789" },
+    });
+    const html = r.mailTo(AGENCY).html!;
+    expect(html).not.toContain("123456789");
+    expect(html).toContain("[הושמט");
   });
 });

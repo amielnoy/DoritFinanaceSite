@@ -460,6 +460,31 @@ escalation reasons for a real agency are not something to publish even when they
 carry no personal data. `npm run logs:archive` does the same thing locally, into
 a gitignored `logs/`.
 
+## The practice the site describes
+
+Five of the interview's seven tracks are financial, the FAQ leads with tax and
+pensions, and `llms.txt` lists her services as pension and provident funds, tax
+and rights fixing, management fees, life and health cover, and claims. The home
+page's five pillars used to say something else — one financial pillar followed
+by three insurance ones, including car and home cover that appears in none of
+her own materials. That section was the first thing a visitor met, so it was the
+framing that stuck.
+
+The pillars now lead with the financial work and match the services she
+publishes. The car-and-home pillar is gone rather than reordered: a pillar for
+work the rest of the site never mentions is a promise nothing keeps. Mortgage
+protection moved into life and health cover, where `llms.txt` already had it.
+
+The `<head>` needed the same pass for a different reason. The visible components
+were careful never to say ייעוץ — Hero carries a comment explaining that the
+licence is a סוכן licence and that "ייעוץ פנסיוני" names a regulated activity
+she does not hold — but the title, every meta description, the keywords and the
+JSON-LD organisation name all advertised it. Structured data is what an AI
+assistant quotes, so that was the copy most likely to be repeated. It now says
+תכנון and שיווק פנסיוני, keeps every term people actually search for, and names
+the organisation as the licensed entity. A contract case fails if ייעוץ returns
+to `index.html`.
+
 ## Search engines, and AI assistants
 
 Two different readers, and they do not get the same thing.

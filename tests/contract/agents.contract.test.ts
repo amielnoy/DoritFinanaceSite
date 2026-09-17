@@ -984,3 +984,178 @@ describe("the support chat on the site", () => {
     expect(names).toContain("logSupportChat");
   });
 });
+
+/**
+ * The pension clearing house, offered without an identity number.
+ *
+ * A full pension picture pulled before the meeting is the single largest
+ * improvement available to a first meeting, and the agency asked for it. The
+ * obvious implementation — have the agent ask for a ת״ז — does not work and is
+ * not safe: the clearing house answers a licence holder only against the
+ * client's signed authorisation (חוק הפיקוח על שירותים פיננסיים (ייעוץ, שיווק
+ * ומערכת סליקה פנסיונית), התשס״ה-2005), so an identity number typed into a chat
+ * advances nothing while placing a national ID in the lead, three mailboxes and
+ * a spreadsheet — after the visitor accepted a notice telling them not to
+ * provide one.
+ *
+ * So the interview collects intent, and the signature is gathered by Dorit in a
+ * channel meant for it. These pin that shape against a future edit that decides
+ * asking would be simpler.
+ */
+describe("the clearing-house offer", () => {
+  const interview = loadAgent("needs_interview");
+  const submitLead = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+
+  it("offers the pull and names what it actually requires", () => {
+    expect(interview.instructions).toMatch(/מסלקה/);
+    expect(interview.instructions).toMatch(/ייפוי כוח חתום/);
+  });
+
+  it("forbids asking for an identity number, for this or anything else", () => {
+    expect(interview.instructions).toMatch(/אסור לך לבקש תעודת זהות, גם לא לצורך הזה/);
+    // And still forbids recording one that arrives unasked.
+    expect(interview.instructions).toMatch(/אל תרשום אותה לשום שדה/);
+  });
+
+  it("keeps the field a flag rather than a place to put a number", () => {
+    expect(submitLead).toMatch(/\['clearinghouse', 'שליפת נתוני מסלקה — מעוניין\/ת'\]/);
+    // `INTERVIEW_COMMON`, so every track carries it: someone who came about
+    // life cover still has a pension.
+    const common = submitLead.slice(
+      submitLead.indexOf("const INTERVIEW_COMMON = ["),
+      submitLead.indexOf("];", submitLead.indexOf("const INTERVIEW_COMMON = [")),
+    );
+    expect(common).toContain("clearinghouse");
+  });
+
+  it("promises nothing about what the pull will show", () => {
+    // §2 bars figures and opinions on whether an action is worthwhile; an
+    // agent that said "this usually saves people money" would breach it while
+    // sounding helpful.
+    expect(interview.instructions).toMatch(/אל תבטיח מה השליפה תגלה/);
+    expect(interview.instructions).toMatch(/אל תתאר אותה כ'ייעוץ'/);
+  });
+
+  it("leaves the ban on identity documents intact everywhere else", () => {
+    // The whole point of the arrangement: this feature was added without
+    // loosening the clause that made it necessary to think about.
+    for (const name of agentNames) {
+      expect(loadAgent(name).instructions, name).toMatch(/אל תבקש לעולם: תעודת זהות/);
+    }
+  });
+});
+
+/**
+ * Warmth, and the line it must not cross.
+ *
+ * People come to this interview to talk about money, retirement, who depends on
+ * them and occasionally what happens when they are gone. Many arrive
+ * embarrassed — that they never checked, never understood what they signed,
+ * kept putting it off — and an agent that reads as a form being filled in is
+ * the failure mode this guidance exists to prevent.
+ *
+ * But warmth has a boundary here that it does not have elsewhere, and it is a
+ * regulatory one rather than a stylistic one. The agent may reassure about the
+ * *feeling* and never about the *situation*: "that sounds stressful, and it is
+ * good that you started looking" is kind; "nothing to worry about", "that
+ * sounds fine", "you are probably owed a refund" are opinions on a person's
+ * financial position, which §2 forbids as squarely as quoting a number. The
+ * cases below pin both halves, because an instruction to be more empathetic is
+ * exactly the kind of edit that quietly deletes the second one.
+ */
+describe("how the interview speaks to people", () => {
+  const interview = loadAgent("needs_interview");
+
+  it("answers the person before it moves to the next field", () => {
+    expect(interview.instructions).toMatch(/ענה לאדם לפני שאתה ממשיך לשדה/);
+    expect(interview.instructions).toMatch(/פיטורים, גירושין, מחלה/);
+  });
+
+  it("treats not knowing as normal rather than as a failed test", () => {
+    // Most people do not know their management fees. Someone made to feel
+    // stupid about that stops answering honestly, and the interview is worth
+    // less than it was.
+    expect(interview.instructions).toMatch(/נרמל את מה שהוא לא יודע/);
+    expect(interview.instructions).toMatch(/לעולם אל תיתן לו להרגיש שנכשל במבחן/);
+  });
+
+  it("slows down where the questions actually frighten people", () => {
+    expect(interview.instructions).toMatch(/היה עדין במיוחד בשלוש נקודות/);
+  });
+
+  it("separates comforting the feeling from reassuring about the situation", () => {
+    // The whole point. Empathy is licensed; opinion is not.
+    expect(interview.instructions).toMatch(/חום אינו הבטחה/);
+    expect(interview.instructions).toMatch(/מותר לך להרגיע לגבי \*\*הרגש\*\*/);
+    expect(interview.instructions).toMatch(/אסור לך להרגיע לגבי \*\*המצב\*\*/);
+    // Named, so the model has instances rather than a principle to interpret.
+    for (const forbidden of ["אין מה לדאוג", "זה נשמע בסדר", "בטח מגיע לך החזר"]) {
+      expect(interview.instructions, forbidden).toContain(forbidden);
+    }
+  });
+
+  it("does not let warmth become a way of extracting more", () => {
+    expect(interview.instructions).toMatch(/אל תשתמש באמפתיה כדי לשכנע/);
+  });
+
+  it("still forbids the opinions warmth is most tempted to offer", () => {
+    // "That sounds high" about a fee is the likeliest breach of all, because it
+    // feels like sympathy rather than advice.
+    expect(interview.instructions).toMatch(/'זה נשמע גבוה' על דמי ניהול הוא חוות דעת/);
+  });
+});
+
+/**
+ * The financial practice, as the `<head>` describes it.
+ *
+ * The visible components were disciplined about this — Hero carries a comment
+ * explaining that none of its copy says ייעוץ, because the licence is a סוכן
+ * licence with a זיקה to institutions and "ייעוץ פנסיוני" names a regulated
+ * activity she does not hold a licence for. The `<head>` was not: the title,
+ * every description, the keywords and the JSON-LD organisation name all
+ * advertised ייעוץ, and the structured data is what an AI assistant quotes.
+ */
+describe("what the head claims the practice is", () => {
+  const html = read(join(REPO_ROOT, "index.html"));
+  const llms = read(join(REPO_ROOT, "public/llms.txt"));
+
+  it("never advertises a licensed activity she does not hold", () => {
+    // `llms.txt` may cite the law by name; the head has no such reason.
+    expect(html).not.toMatch(/ייעוץ/);
+  });
+
+  it("still carries the financial terms people search for", () => {
+    for (const term of ["פנסיה", "גמל", "השתלמות", "מיסוי", "קיבוע זכויות", "תיקון 190", "דמי ניהול"]) {
+      expect(html, term).toContain(term);
+    }
+  });
+
+  it("names the organisation as the entity that holds the licence", () => {
+    expect(html).toContain("דורית גוב ארי — סוכנות ביטוח בע״מ");
+  });
+
+  it("describes the same five pillars the site displays", () => {
+    // `llms.txt` is the only surface a non-JS crawler reads in full, and it
+    // used to list a set of pillars the page had stopped showing.
+    const matrix = read(join(REPO_ROOT, "src/components/dorit/sections/ServiceMatrix.tsx"));
+    for (const pillar of [
+      "פנסיה, גמל והשתלמות",
+      "מיסוי וקיבוע זכויות",
+      "דמי ניהול ועלויות",
+      "ביטוחי חיים ובריאות",
+      "סנגור תביעות",
+    ]) {
+      expect(matrix, `the page lost the ${pillar} pillar`).toContain(pillar);
+      expect(llms, `llms.txt does not list ${pillar}`).toContain(pillar);
+    }
+  });
+
+  it("promises no outcome in the copy that sells the service", () => {
+    // §2 binds the marketing copy exactly as it binds the agents.
+    const matrix = read(join(REPO_ROOT, "src/components/dorit/sections/ServiceMatrix.tsx"));
+    const hero = read(join(REPO_ROOT, "src/components/dorit/sections/Hero.tsx"));
+    for (const [name, src] of Object.entries({ matrix, hero, html })) {
+      expect(src, `${name} promises a return`).not.toMatch(/נחסוך לך|תחסכו|מובטח|רווח מובטח/);
+    }
+  });
+});
