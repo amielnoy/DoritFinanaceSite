@@ -467,19 +467,48 @@ jobs:
       # but a prompt nobody can answer: the step sat for five minutes and was
       # killed with an orphan node process, which says nothing about the cause.
       # One prefix check turns that into an instant, legible failure.
+      # Two ways to authenticate, because only one of them exists on every plan.
+      #
+      #   1. BASE44_API_KEY — a *workspace* API key, `b44k_…`. Scoped to the
+      #      workspace, does not expire, and the right answer. It needs the
+      #      Business plan: below that the "Workspace API Keys" tab in the
+      #      dashboard is greyed out and no such key can be created at all.
+      #
+      #   2. BASE44_ACCESS_TOKEN + BASE44_REFRESH_TOKEN — the pair a local
+      #      `base44 login` leaves in ~/.base44/auth/auth.json. The CLI's
+      #      `seedAuthFromEnv()` writes them into its own auth file at startup,
+      #      which is the supported way to run it unattended without a
+      #      workspace key. Both are required — it discards a session it has no
+      #      way to refresh.
+      #
+      # The second is a wider credential than the first: it acts as the user,
+      # across every app in the workspace, and it expires. When it does, this
+      # step skips with a notice and production stays where it is.
       - name: Check publish credentials
         id: creds
         env:
           BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
+          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
         run: |
-          if [ -z "$BASE44_API_KEY" ] || [ -z "${{ vars.BASE44_APP_ID }}" ]; then
+          if [ -z "${{ vars.BASE44_APP_ID }}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::BASE44_API_KEY secret or BASE44_APP_ID variable is unset — skipping the publish step. Production stays on whatever was last published by hand."
-          elif [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
-            echo "::error::BASE44_API_KEY is set but is not a workspace API key — those start with 'b44k_'. The CLI ignores any other value and falls back to an interactive device login, which cannot be answered on a runner and hangs until the job times out. Create a workspace API key in the Base44 dashboard and replace the secret."
+            echo "::notice::BASE44_APP_ID is unset — skipping the publish step. Production stays on whatever was last published by hand."
+          elif [ -n "$BASE44_API_KEY" ] && [ "${BASE44_API_KEY#b44k_}" != "$BASE44_API_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Publishing with the workspace API key."
+          elif [ -n "$BASE44_API_KEY" ]; then
+            echo "::error::BASE44_API_KEY is set but is not a workspace API key — those start with 'b44k_'. The CLI ignores any other value and falls back to an interactive device login, which cannot be answered on a runner and hangs until the job times out. Either replace it with a workspace key, or delete the secret and set BASE44_ACCESS_TOKEN + BASE44_REFRESH_TOKEN instead."
+            exit 1
+          elif [ -n "$BASE44_ACCESS_TOKEN" ] && [ -n "$BASE44_REFRESH_TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Publishing with a seeded personal session. That credential expires — when this step starts skipping, re-seed it from ~/.base44/auth/auth.json."
+          elif [ -n "$BASE44_ACCESS_TOKEN" ]; then
+            echo "::error::BASE44_ACCESS_TOKEN is set without BASE44_REFRESH_TOKEN. The CLI needs both and ignores a session it cannot refresh."
             exit 1
           else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Base44 credentials are configured — skipping the publish step. Production stays on whatever was last published by hand."
           fi
 
       # Three npm 12 defaults block this install: the CLI pulls `@deno/loader`
@@ -502,6 +531,8 @@ jobs:
         if: steps.creds.outputs.ready == 'true'
         env:
           BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
+          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
           BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
         run: |
           npm install -g base44@latest --allow-remote=all --allow-scripts=workerd,esbuild
@@ -1235,22 +1266,24 @@ jobs:
           node-version: 22
           cache: npm
 
+      # Either credential path, exactly as the publish job accepts them.
       - name: Check credentials
         id: creds
         env:
           BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
+          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
         run: |
-          # Same prefix rule as the publish job: anything that is not a
-          # workspace key sends the CLI to an interactive login it cannot
-          # complete on a runner. Absent credentials skip; wrong ones fail.
-          if [ -z "$BASE44_API_KEY" ] || [ -z "${{ vars.BASE44_APP_ID }}" ]; then
+          if [ -z "${{ vars.BASE44_APP_ID }}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::BASE44_API_KEY or BASE44_APP_ID is unset — no logs were archived. Yesterday's lines stay only in Base44's own retention."
-          elif [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
-            echo "::error::BASE44_API_KEY is not a workspace API key (those start with 'b44k_')."
-            exit 1
-          else
+            echo "::notice::BASE44_APP_ID is unset — no logs were archived."
+          elif [ -n "$BASE44_API_KEY" ] && [ "${BASE44_API_KEY#b44k_}" != "$BASE44_API_KEY" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BASE44_ACCESS_TOKEN" ] && [ -n "$BASE44_REFRESH_TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Base44 credentials — no logs were archived. Yesterday's lines stay only in Base44's own retention."
           fi
 
       - name: Install the CLI
@@ -1261,6 +1294,8 @@ jobs:
         if: steps.creds.outputs.ready == 'true'
         env:
           BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
+          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
           BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
         run: npm run logs:archive
 
