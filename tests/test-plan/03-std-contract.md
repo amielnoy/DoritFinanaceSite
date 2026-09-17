@@ -23,6 +23,7 @@ than in production.
 | Frontend write paths | `base44.entities.*.create/update/filter`, `integrations.Core.SendEmail` |
 | Backend functions | `base44/functions/{createConsultationEvent,escalateToHuman,upsertContact,logSupportChat}/entry.ts` |
 | Connectors | `base44/connectors/{googlecalendar,googlesheets}.jsonc` |
+| Function logging | every `base44/functions/*/entry.ts`, `scripts/archive-logs.mjs`, the `logs` job in `ci.yml` |
 
 ## 3. Approach
 
@@ -183,6 +184,26 @@ number is normalised before it becomes that key, and — the one that matters mo
 policy number or anything medical has no field to land in, so a reworded prompt
 alone cannot start storing them.
 
+**`logging.contract.test.ts` — `CTR-LOG-001..052`** — what the backend is
+allowed to write down. These functions logged nothing until now, so the only
+diagnosis available was the warnings appendix in the operations email — which
+means only an enquiry whose mail went out could be diagnosed, and the failures
+worth diagnosing are the ones where it did not.
+
+Adding logging creates a hazard worth a suite rather than a comment. A log is
+the one store a deletion request never reaches, and the whole schema exists to
+keep identifiers out of storage. So half these cases are about restraint: every
+`log()` call site is parsed out of every function and checked for eleven
+forbidden field names, mail lines must carry a `role` rather than a recipient,
+and any provider error text must be truncated — it is not ours and not bounded.
+The other half are about usefulness: every function opens and closes its
+request, every line carries the correlation id, the helper is byte-identical
+across all seven isolated entries, and each declares its own name exactly once.
+
+A final block pins the archive: nightly only, never committed (the repository
+is public), each file named for the window it covers rather than the day it
+ran, and a fetch failure that warns instead of reddening the nightly badge.
+
 **`ai-surface.contract.test.ts` — `CTR-AI-001..014`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript
 receives the home page's `<head>` on every route; `public/llms.txt` is therefore
@@ -255,7 +276,7 @@ time.
 
 ## 6. Pass criteria
 
-All 295 cases pass. A failure means either the frontend or the backend definition
+All 347 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight
