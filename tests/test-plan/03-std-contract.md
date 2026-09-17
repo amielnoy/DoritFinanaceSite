@@ -184,7 +184,7 @@ number is normalised before it becomes that key, and — the one that matters mo
 policy number or anything medical has no field to land in, so a reworded prompt
 alone cannot start storing them.
 
-**`logging.contract.test.ts` — `CTR-LOG-001..052`** — what the backend is
+**`logging.contract.test.ts` — `CTR-LOG-001..061`** — what the backend is
 allowed to write down. These functions logged nothing until now, so the only
 diagnosis available was the warnings appendix in the operations email — which
 means only an enquiry whose mail went out could be diagnosed, and the failures
@@ -203,6 +203,17 @@ across all seven isolated entries, and each declares its own name exactly once.
 A final block pins the archive: nightly only, never committed (the repository
 is public), each file named for the window it covers rather than the day it
 ran, and a fetch failure that warns instead of reddening the nightly badge.
+
+A last block *executes* the publish gate rather than reading it. Base44 offers
+two credentials and only one exists on every plan — a workspace API key, or the
+access/refresh pair a local login leaves behind — and the first version of the
+gate failed the run whenever `BASE44_API_KEY` held anything that was not a
+workspace key. That is right when it is the only credential (the CLI would fall
+back to a device login and hang) and wrong when a working session sits beside
+it, which is how the merge of #48 failed with all three secrets present. The
+cases extract the step's shell out of the YAML and run it under `bash -e` for
+each combination, since shell embedded in a workflow is covered by nothing else
+here.
 
 **`ai-surface.contract.test.ts` — `CTR-AI-001..014`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript

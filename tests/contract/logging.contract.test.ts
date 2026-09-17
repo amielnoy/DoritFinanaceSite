@@ -1,6 +1,9 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { REPO_ROOT } from "../helpers/entity-schema";
 import { read } from "../helpers/source-scan";
 
@@ -222,5 +225,126 @@ describe("the daily archive", () => {
   it("demands the same credential shape as the publish job", () => {
     const job = workflow.slice(workflow.indexOf("  logs:\n"));
     expect(job).toMatch(/b44k_/);
+  });
+});
+
+/**
+ * Which credential the publish gate picks, executed rather than read.
+ *
+ * Base44 offers two ways to authenticate a runner, and only one of them exists
+ * on every plan: a workspace API key (`b44k_…`, Business plan and above), or
+ * the access/refresh pair a local `base44 login` leaves behind, which the CLI
+ * seeds from the environment.
+ *
+ * The first version of this gate failed the run whenever `BASE44_API_KEY` was
+ * set to anything that was not a workspace key — sound when it is the only
+ * credential, because the CLI would fall back to a device login and hang, and
+ * wrong when a working session sits beside it. That is precisely what happened
+ * on the merge of #48: three secrets present, and the stale one decided the
+ * outcome for the other two.
+ *
+ * Shell embedded in YAML is not covered by anything else in this repository, so
+ * these extract the script and run it against each combination.
+ */
+describe("the publish gate chooses a credential", () => {
+  const workflow = read(join(REPO_ROOT, ".github/workflows/ci.yml"));
+
+  /** The `run:` body of a named step, de-indented and with `${{ }}` filled in. */
+  function gateScript(step: string, appId = "app-123"): string {
+    const at = workflow.indexOf(`      - name: ${step}`);
+    expect(at, `${step} is missing`).toBeGreaterThan(-1);
+    const body = workflow.slice(workflow.indexOf("run: |", at) + "run: |".length);
+    const lines: string[] = [];
+    for (const line of body.split("\n").slice(1)) {
+      if (line.trim() && !line.startsWith("          ")) break;
+      lines.push(line.replace(/^ {10}/, ""));
+    }
+    return lines.join("\n").replace(/\$\{\{ vars\.BASE44_APP_ID \}\}/g, appId);
+  }
+
+  /** Run it the way Actions does — `bash -e` — and report what it decided. */
+  function run(script: string, env: Record<string, string>) {
+    const out = mkdtempSync(join(tmpdir(), "gate-"));
+    const output = join(out, "gh-output");
+    writeFileSync(output, "");
+    const result = spawnSync("bash", ["-e", "-c", script], {
+      env: { PATH: process.env.PATH ?? "", GITHUB_OUTPUT: output, ...env },
+      encoding: "utf8",
+    });
+    const written = readFileSync(output, "utf8");
+    rmSync(out, { recursive: true, force: true });
+    return {
+      status: result.status,
+      ready: /ready=true/.test(written),
+      stdout: result.stdout ?? "",
+    };
+  }
+
+  const KEY = "b44k_workspace_key";
+  const JUNK = "b44u_a_personal_token";
+  const PAIR = { BASE44_ACCESS_TOKEN: "access", BASE44_REFRESH_TOKEN: "refresh" };
+
+  it("publishes with the workspace key when there is one", () => {
+    const r = run(gateScript("Check publish credentials"), { BASE44_API_KEY: KEY });
+    expect(r.status).toBe(0);
+    expect(r.ready).toBe(true);
+  });
+
+  it("publishes with the seeded session when there is no workspace key", () => {
+    const r = run(gateScript("Check publish credentials"), PAIR);
+    expect(r.status).toBe(0);
+    expect(r.ready).toBe(true);
+  });
+
+  it("publishes anyway when a stale key sits beside a usable session", () => {
+    // The regression this file exists for. A credential nobody can use must not
+    // outvote one that works.
+    const r = run(gateScript("Check publish credentials"), { ...PAIR, BASE44_API_KEY: JUNK });
+    expect(r.status, "a stale key failed a runnable publish").toBe(0);
+    expect(r.ready).toBe(true);
+    expect(r.stdout, "the stale secret should still be called out").toMatch(/::warning::/);
+  });
+
+  it("still fails on an unusable key with nothing to fall back on", () => {
+    // Unchanged, and deliberately so: the CLI would fall back to a device
+    // login and hang until the job timed out.
+    const r = run(gateScript("Check publish credentials"), { BASE44_API_KEY: JUNK });
+    expect(r.status).not.toBe(0);
+    expect(r.ready).toBe(false);
+  });
+
+  it("fails on half a session rather than hanging on one", () => {
+    const r = run(gateScript("Check publish credentials"), { BASE44_ACCESS_TOKEN: "access" });
+    expect(r.status).not.toBe(0);
+  });
+
+  it("skips quietly when nothing is configured", () => {
+    const r = run(gateScript("Check publish credentials"), {});
+    expect(r.status).toBe(0);
+    expect(r.ready).toBe(false);
+  });
+
+  it("skips when the app id is missing, whatever the credentials", () => {
+    const r = run(gateScript("Check publish credentials", ""), { BASE44_API_KEY: KEY });
+    expect(r.status).toBe(0);
+    expect(r.ready).toBe(false);
+  });
+
+  it("never fails the nightly archive over credentials", () => {
+    // An unarchived day is a gap in an operational record, not a broken build.
+    for (const env of [{}, { BASE44_API_KEY: JUNK }, { BASE44_ACCESS_TOKEN: "access" }]) {
+      const r = run(gateScript("Check credentials"), env);
+      expect(r.status, JSON.stringify(env)).toBe(0);
+      expect(r.ready).toBe(false);
+    }
+  });
+
+  it("drops an unusable key before the CLI ever sees it", () => {
+    // Belt and braces. The CLI currently ignores a non-`b44k_` value, but the
+    // gate above has already chosen the credential and that choice should not
+    // rest on an implementation detail of a package installed at `@latest`.
+    for (const step of ["Publish", "Fetch the last 24 hours"]) {
+      expect(gateScript(step), step).toMatch(/unset BASE44_API_KEY/);
+    }
   });
 });
