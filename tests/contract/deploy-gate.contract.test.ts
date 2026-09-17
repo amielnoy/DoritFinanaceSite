@@ -110,6 +110,31 @@ describe('production smoke requires the actual production publisher', () => {
    * Playwright's own retries do not cover it — they are seconds apart and this
    * is minutes — so the wait has to happen before any browser starts.
    */
+  /**
+   * A wrong key must fail, not hang.
+   *
+   * The CLI only honours `BASE44_API_KEY` when it starts with `b44k_`:
+   * `usingWorkspaceApiKey()` checks exactly that prefix. Any other value — a
+   * `B44U_` user token, say — is ignored and it falls back to a device-code
+   * login, which on a runner is a prompt nobody can answer. That is not an
+   * error but a five-minute silence ending in a timeout and an orphan process,
+   * and it says nothing about the cause.
+   *
+   * Absent credentials still skip, because a fork has none and should get green
+   * CI. Present-but-wrong is a misconfiguration and must be loud.
+   */
+  it('rejects a key that is not a workspace key rather than hanging on a prompt', () => {
+    const workflow = read('.github/workflows/ci.yml');
+    const deploy = workflow.slice(workflow.indexOf('  deploy:'), workflow.indexOf('  deploy-vercel:'));
+
+    expect(deploy, 'no prefix check on the API key').toContain('b44k_');
+    // It has to exit non-zero: a notice would let the job go green and the
+    // smoke would then fail somewhere far from the cause.
+    expect(deploy).toMatch(/b44k_[\s\S]{0,600}?exit 1/);
+    // And absence must still skip rather than fail.
+    expect(deploy).toMatch(/ready=false[\s\S]{0,300}?::notice::/);
+  });
+
   it('waits for the new release to be served before opening a browser', () => {
     const workflow = read('.github/workflows/ci.yml');
     const smoke = workflow.slice(workflow.indexOf('  smoke:'), workflow.indexOf('  # ── 7.'));
