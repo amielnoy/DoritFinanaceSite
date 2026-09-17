@@ -46,6 +46,14 @@ export interface AgentDescriptor {
    */
   tagline?: string;
   /**
+   * The consent points shown before this agent's chat may start.
+   *
+   * Defaults to the interview's, which promise that a name and a phone number
+   * are collected. An agent that collects neither must not show that text — a
+   * notice describing the wrong processing is worse than a generic one.
+   */
+  consentPoints?: readonly string[];
+  /**
    * The fence, stated out loud. Publishing the boundary is half of honouring
    * it: a visitor who can see what the automation will not do is a visitor who
    * knows to ask for a person, and a reviewer can check the claim against the
@@ -269,7 +277,7 @@ export default function AgentChat({
               </div>
 
               <ul className="mt-5 space-y-3 text-[13.5px] leading-relaxed text-foreground/75">
-                {CONSENT.points.map((point) => (
+                {(descriptor.consentPoints ?? CONSENT.points).map((point) => (
                   <li key={point} className="flex gap-2.5">
                     <span className="text-accent shrink-0">—</span>
                     <span>{point}</span>

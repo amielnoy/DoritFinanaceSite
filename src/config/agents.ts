@@ -1,5 +1,6 @@
-import { BookOpen, MessagesSquare } from "lucide-react";
+import { BookOpen, LifeBuoy, MessagesSquare } from "lucide-react";
 import type { AgentDescriptor } from "@/components/dorit/chat/AgentChat";
+import { SUPPORT_CONSENT_POINTS } from "@/config/compliance";
 
 /**
  * The on-site agents, expressed as data.
@@ -15,7 +16,7 @@ import type { AgentDescriptor } from "@/components/dorit/chat/AgentChat";
  * NeedsInterviewChat, BookingAssistantChat and BlogRecommenderChat is here;
  * everything they shared now lives once, in <AgentChat />.
  */
-export type AgentKey = "needsInterview" | "blogRecommender";
+export type AgentKey = "needsInterview" | "blogRecommender" | "support";
 
 export const AGENTS: Record<AgentKey, AgentDescriptor> = {
   needsInterview: {
@@ -44,6 +45,49 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
       ],
       forbidden: [
         "לא ממליץ על מוצר או גוף",
+        "לא מוסר תשואות, דמי ניהול או חישובים",
+        "לא מפרש פוליסה ולא מטפל בתביעה או בתלונה",
+      ],
+      handoff:
+        "בכל שאלה שדורשת בעל רישיון, בכל ספק — וברגע שתבקשו, בכפתור שבראש הצ׳אט.",
+    },
+  },
+  /**
+   * The open question, with no interview attached.
+   *
+   * The other two chats each want something from the visitor: one interviews
+   * them, one recommends reading. Someone who arrives with a plain question —
+   * what is a קרן השתלמות, what happens at the first meeting — had nowhere to
+   * ask it and had to start an interview to find out. This is the same agent
+   * that answers on WhatsApp, so the answer is the same answer wherever it is
+   * asked; see `base44/agents/support_agent.jsonc`.
+   */
+  support: {
+    agent: "support_agent",
+    icon: LifeBuoy,
+    sectionId: "support-chat",
+    sectionClassName: "py-24 md:py-32 border-t border-border/60",
+    eyebrow: "שאלה חופשית",
+    heading: "לא מצאתם <br /> את התשובה?",
+    blurb: "שאלו כאן בחופשיות. העוזר של דורית עונה על שאלות כלליות מתוך התוכן שפורסם באתר — מסביר מונחים ומפנה למאמר הרלוונטי. לשאלה שנוגעת למקרה שלכם, הוא מעביר לדורית עצמה.",
+    note: "אין צורך למסור פרטים כדי לשאול. תוכן השיחה נשמר אצל דורית ואצל הצוות שמתפעל את האתר מטעמה.",
+    panelTitle: "שאלות ותשובות",
+    panelSubtitle: "עם העוזר של דורית",
+    inputLabel: "הודעה לסוכן התמיכה",
+    greeting: "שלום, כאן העוזר האוטומטי של דורית גוב ארי — לא דורית עצמה. אני עונה על שאלות כלליות מתוך התוכן שפורסם באתר, לא נותן ייעוץ, ואפשר לעבור לדורית בכל רגע. מה תרצו לדעת?",
+    conversationName: "שאלה לתמיכה",
+    conversationDescription: "מענה על שאלות כלליות מתוך תוכן האתר",
+    consentPoints: SUPPORT_CONSENT_POINTS,
+    tagline:
+      "עונה ממה שכבר פורסם. כל דבר שנוגע למקרה שלכם עובר לדורית — היא בעלת הרישיון, לא הצ׳אט.",
+    guardrails: {
+      allowed: [
+        "מסביר מונחים באופן כללי",
+        "מפנה למאמר שפורסם בבלוג",
+        "עונה מה כולל השירות ואיך קובעים פגישה",
+      ],
+      forbidden: [
+        "לא עונה על 'מה כדאי לי' ולא על מקרה אישי",
         "לא מוסר תשואות, דמי ניהול או חישובים",
         "לא מפרש פוליסה ולא מטפל בתביעה או בתלונה",
       ],

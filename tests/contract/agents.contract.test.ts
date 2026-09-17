@@ -69,7 +69,7 @@ describe("on-site agent definitions", () => {
     // `needs_interview`: booking a first meeting was never a separate errand
     // from being interviewed for one, and the visitor met a second chat that
     // asked for their name again after answering six questions.
-    expect(agentNames).toEqual(["blog_recommender", "needs_interview"]);
+    expect(agentNames).toEqual(["blog_recommender", "needs_interview", "support_agent"]);
   });
 
   for (const name of agentNames) {
@@ -116,6 +116,84 @@ describe("on-site agent definitions", () => {
       });
     });
   }
+});
+
+/**
+ * The support agent, and the number it must never become.
+ *
+ * It answers in the free chat at the bottom of `/faq`, and nowhere else. A
+ * WhatsApp channel was considered and rejected: `+972508311776` is Dorit's own
+ * WhatsApp account, and `escalateToHuman` publishes it as the way to reach a
+ * *person*. An agent sitting on it would answer "I want to speak to someone"
+ * with the bot they are already talking to — see B-8 in
+ * `tests/test-plan/10-known-issues.md`.
+ *
+ * So the assertions run the other way round from what a WhatsApp agent would
+ * need. It must hand over every channel `escalateToHuman` returns, WhatsApp
+ * included, because a human is on the other end of all three.
+ */
+describe("the support agent", () => {
+  const support = loadAgent("support_agent");
+
+  it("discloses what it is as the first thing it says", () => {
+    expect(support.instructions).toMatch(/פתיחה — חובה בהודעה הראשונה שלך בכל שיחה/);
+    const opening = support.instructions.slice(
+      support.instructions.indexOf("פתיחה — חובה"),
+      support.instructions.indexOf("מה מותר לך לענות עליו"),
+    );
+    expect(opening, "does not say it is automated").toMatch(/אוטומטי/);
+    expect(opening, "does not deny being Dorit").toMatch(/לא דורית/);
+    expect(opening, "does not disclaim advice").toMatch(/לא נותן ייעוץ/);
+    expect(opening, "offers no route to a person").toMatch(/לעבור לדורית/);
+  });
+
+  it("hands over every channel, because a person answers on all of them", () => {
+    // The inverse of the WhatsApp arrangement, and the reason it was rejected:
+    // withholding the number here would withhold a human from someone asking
+    // for one.
+    expect(support.instructions).toMatch(/טלפון, וואטסאפ ואימייל/);
+    expect(support.instructions).toMatch(/בשלושתם עונה אדם/);
+  });
+
+  it("states that WhatsApp is not its channel", () => {
+    // Stated in the prompt as well as enforced by configuration, so a reader
+    // of the prompt alone cannot conclude otherwise.
+    expect(support.instructions).toMatch(/הוואטסאפ של דורית אינו ערוץ שלך/);
+  });
+
+  it("treats a personal question as a handoff even when it looks easy", () => {
+    // The failure mode here is not refusing to help, it is helping: "should I
+    // move my pension" has an answer the model can produce and is not allowed
+    // to give.
+    expect(support.instructions).toMatch(/מה כדאי לי/);
+    expect(support.instructions).toMatch(/גם כשהתשובה נראית לך פשוטה/);
+  });
+
+  it("answers from published content rather than from itself", () => {
+    expect(support.instructions).toMatch(/BlogPost/);
+    expect(support.instructions).toMatch(/אל תמציא/);
+    const entities = (support.tool_configs ?? []).map((t) => t.entity_name).filter(Boolean);
+    expect(entities).toContain("BlogPost");
+  });
+
+  it("can reach a person, and says where the conversation came from", () => {
+    const fns = (support.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
+    expect(fns).toContain("escalateToHuman");
+    expect(support.instructions).toMatch(/הגיעה מהצ׳אט שבאתר/);
+  });
+
+  it("asks for no identifying detail, having none and needing none", () => {
+    expect(support.instructions).toMatch(/אין בידך שום פרט מזהה עליו/);
+    expect(support.instructions).toMatch(/אל תבקש אותם/);
+  });
+
+  it("cannot record a contact, whatever its prompt says", () => {
+    // Capability, not instruction. The contact flow is built and dormant, and
+    // the agent that would use it has no phone number to key on — so the tool
+    // is not wired. Re-wiring it is the deliberate act of enabling a channel.
+    const fns = (support.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
+    expect(fns).not.toContain("upsertContact");
+  });
 });
 
 describe("escalation reasons agree across prompt, entity and UI config", () => {
@@ -404,7 +482,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(escalate).toMatch(/text: notification/);
   });
 
-  it("keeps the three copies of redact() identical", () => {
+  it("keeps every copy of redact() identical", () => {
     // Base44 functions are isolated entry points with no shared module, so the
     // helper is duplicated. Duplicated is fine; drifted is not.
     //
@@ -412,8 +490,10 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     // input: it redacts a note taken from a WhatsApp message, where people
     // paste an ID number or a policy number without being asked for one.
     const norm = (src: string) => topLevelFn(src, "redact").replace(/\s+/g, " ").trim();
-    const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
-    expect(norm(contacts)).toBe(norm(submitLead));
+    for (const fn of ["upsertContact", "logSupportChat"]) {
+      const src = read(join(REPO_ROOT, `base44/functions/${fn}/entry.ts`));
+      expect(norm(src), fn).toBe(norm(submitLead));
+    }
     expect(norm(submitLead)).toBe(norm(escalate));
   });
 
@@ -646,8 +726,9 @@ describe("the event log in Google Sheets", () => {
     submitLead: read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts")),
     escalateToHuman: read(join(REPO_ROOT, "base44/functions/escalateToHuman/entry.ts")),
   };
-  /** The third writer, on its own tab: people rather than events. */
+  /** The other two writers, each on its own tab of the same spreadsheet. */
   const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
+  const supportLog = read(join(REPO_ROOT, "base44/functions/logSupportChat/entry.ts"));
 
   const block = (src: string, start: string, close: string): string => {
     const i = src.indexOf(start);
@@ -677,11 +758,12 @@ describe("the event log in Google Sheets", () => {
   });
 
   it("keeps appendEventRow identical in every writer", () => {
-    // Three copies now: the two event writers and `upsertContact`, which
-    // appends to a different tab of the same spreadsheet. The tab and the
-    // columns differ between them — those are the constants above it — but the
-    // append itself is one piece of code that happens to exist three times.
-    const fns = [...Object.values(writers), contacts].map((src) =>
+    // Four copies now: the two event writers, `upsertContact` and
+    // `logSupportChat`, each appending to a different tab of the same
+    // spreadsheet. The tab and the columns differ between them — those are the
+    // constants above it — but the append itself is one piece of code that
+    // happens to exist four times.
+    const fns = [...Object.values(writers), contacts, supportLog].map((src) =>
       block(src, "async function appendEventRow(", "\n}"),
     );
     for (const [i, fn] of fns.entries()) expect(fn, `copy ${i}`).toBe(fns[0]);
@@ -698,11 +780,18 @@ describe("the event log in Google Sheets", () => {
 
   it("never lets a failed append cost the enquiry", () => {
     // The sheet is a view, not the record. Lead.create is the only hard failure.
+    // Two shapes of the same rule. The three functions that answer a visitor
+    // collect the failure into the `warnings` they already return; the support
+    // log has nothing else to report, so it answers `ok: true` and carries the
+    // warning with it. What neither may do is let the throw escape.
     for (const [name, src] of Object.entries({ ...writers, upsertContact: contacts })) {
       expect(src, `${name} must not throw on a sheet failure`).toMatch(
         /catch \(e\) \{\s*warnings\.push\(\s*(?:'sheet_append_failed'|deliveryWarning\('sheet_append_failed')/,
       );
     }
+    expect(supportLog, "logSupportChat must not throw on a sheet failure").toMatch(
+      /catch \(e\) \{\s*return Response\.json\(\{ ok: true[^)]*sheet_append_failed/,
+    );
   });
 
   it("skips quietly until a spreadsheet is configured", () => {
@@ -717,12 +806,10 @@ describe("the event log in Google Sheets", () => {
  * The contact behind the enquiries.
  *
  * `Lead` is an event: one enquiry, at one moment, with whatever was said in it.
- * `Contact` is the person those enquiries came from. It exists for a channel
- * that delivers a phone number with the message — before a name, and before any
- * consent screen — where the same person can write again next month from the
- * same number with nothing to tie the two together. No such channel is
- * connected yet; this lands built and dormant rather than arriving half-written
- * on the day one is.
+ * `Contact` is the person those enquiries came from, and WhatsApp is why it
+ * exists — there, the phone number arrives with the message, before a name and
+ * before any consent screen, and the same person can write again next month
+ * from the same number with nothing to tie the two together.
  *
  * Two failures are worth pinning. The first is quiet duplication: the number
  * spelled `972…` by the channel and `05…` by the site is one person, and two
@@ -734,6 +821,7 @@ describe("the event log in Google Sheets", () => {
 describe("the contact record behind the enquiries", () => {
   const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
   const entity = read(join(REPO_ROOT, "base44/entities/Contact.jsonc"));
+  const support = loadAgent("support_agent");
 
   it("keys the record on the phone number and nothing else", () => {
     expect(entity).toMatch(/"required":\s*\[\s*"phone"\s*\]/);
@@ -767,9 +855,10 @@ describe("the contact record behind the enquiries", () => {
   });
 
   it("is wired to no agent, and is dormant until a channel needs it", () => {
-    // Built, tested and switched off. It exists for a channel that delivers a
-    // phone number with the message, and no such channel is connected — so no
-    // agent holds it. Enabling one is then a deliberate act, not a prompt edit.
+    // Built, tested and switched off. `support_agent` is the only agent that
+    // would call it, and it answers in the site chat where there is no phone
+    // number to key on — so the tool is not on its list. Enabling a channel is
+    // then a deliberate act, not a prompt edit.
     for (const name of agentNames) {
       const fns = (loadAgent(name).tool_configs ?? []).map((t) => t.function_name);
       expect(fns, `${name} can write contacts`).not.toContain("upsertContact");
@@ -793,5 +882,96 @@ describe("the contact record behind the enquiries", () => {
     for (const op of ["read", "update", "delete"]) {
       expect(rls[op], op).toEqual({ user_condition: { role: "admin" } });
     }
+  });
+});
+
+/**
+ * The support chat on the site, and the record it keeps.
+ *
+ * A chat that keeps its transcript has to say so before it starts, and the
+ * notice the interview shows describes different processing entirely: it
+ * promises that a name and a phone number are collected, which here would be a
+ * precise description of something that does not happen. So this chat carries
+ * its own notice, and these pin it — because the failure is the quiet kind. The
+ * wrong notice rendering here would look entirely correct.
+ */
+describe("the support chat on the site", () => {
+  const support = loadAgent("support_agent");
+  const log = read(join(REPO_ROOT, "base44/functions/logSupportChat/entry.ts"));
+  const agentsConfig = read(join(REPO_ROOT, "src/config/agents.ts"));
+  const compliance = read(join(REPO_ROOT, "src/config/compliance.ts"));
+  const faqPage = read(join(REPO_ROOT, "src/pages/FAQPage.tsx"));
+
+  it("collects nothing, having been given nothing to collect", () => {
+    expect(support.instructions).toMatch(/אין בידך שום פרט מזהה עליו/);
+    expect(support.instructions).toMatch(/מופנה לראיון ההיכרות/);
+  });
+
+  it("is mounted where the answered questions run out", () => {
+    expect(agentsConfig).toMatch(/agent: "support_agent"/);
+    expect(agentsConfig).toMatch(/sectionId: "support-chat"/);
+    expect(faqPage).toMatch(/<AgentChat descriptor=\{AGENTS\.support\} \/>/);
+  });
+
+  it("shows a notice written for this chat rather than for the interview", () => {
+    // The interview's notice promises that a name and a phone number are
+    // collected. Shown here it would be a precise description of processing
+    // that does not happen — and consent to that is not consent to this.
+    expect(agentsConfig).toMatch(/consentPoints: SUPPORT_CONSENT_POINTS/);
+    expect(compliance).toMatch(/export const SUPPORT_CONSENT_POINTS/);
+    const points = compliance.slice(compliance.indexOf("SUPPORT_CONSENT_POINTS"));
+    expect(points).toContain("תוכן השיחה נשמר אצל דורית");
+    // The licence and the affiliation are interpolated from LICENCE, the same
+    // source the interview's notice reads — that is the point of sharing it.
+    expect(points).toContain("${LICENCE.entity} בעלת רישיון סוכן מ${LICENCE.regulator}");
+    expect(points).not.toContain("נאספים שם וטלפון בלבד");
+  });
+
+  it("keeps the fence published beside the free chat too", () => {
+    const descriptor = agentsConfig.slice(agentsConfig.indexOf('agent: "support_agent"'));
+    expect(descriptor.slice(0, descriptor.indexOf("},\n  blogRecommender"))).toMatch(/guardrails/);
+  });
+
+  it("logs the conversation once, at the end, and says nothing about it", () => {
+    expect(support.instructions).toMatch(/רישום השיחה — פעם אחת, בסופה/);
+    expect(support.instructions).toMatch(/logSupportChat/);
+    expect(support.instructions).toMatch(/קריאה אחת לשיחה/);
+    expect(support.instructions).toMatch(/אל תדווח עליו/);
+  });
+
+  it("leans on the notice for disclosure rather than repeating it", () => {
+    // Silence about the logging is fine here precisely because the visitor
+    // accepted a notice before typing — which is why the notice has to say it,
+    // and why the case above fails if it stops.
+    expect(support.instructions).toMatch(/כבר נאמרה למבקר בהודעת ההסכמה/);
+  });
+
+  it("writes the support log to its own tab, with a fixed set of outcomes", () => {
+    expect(log).toMatch(/SHEET_TAB_SUPPORT.*\|\| 'Support'/);
+    expect(log).toMatch(/const OUTCOMES = \{/);
+    expect(log).toMatch(/OUTCOMES\[outcome\] \|\| 'לא ידוע'/);
+  });
+
+  it("redacts the transcript before it is written anywhere", () => {
+    expect(log).toMatch(/const safeTranscript = redact\(transcript\)/);
+    expect(log).toMatch(/const safeTopic = redact\(topic\)/);
+  });
+
+  it("keys the support row on the same normalised number as the contact list", () => {
+    // The site chat sends no number, so today this column is always empty.
+    // It is pinned anyway: two tabs of one spreadsheet normalised differently
+    // cannot be read together, and that would surface on the day a channel
+    // that does have a number is switched on — long after this was written.
+    const norm = (src: string) => {
+      const start = src.indexOf("function normalisePhone(");
+      expect(start, "normalisePhone is missing").toBeGreaterThan(-1);
+      return src.slice(start, src.indexOf("\n}", start)).replace(/\s+/g, " ").trim();
+    };
+    expect(norm(log)).toBe(norm(read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"))));
+  });
+
+  it("gives the agent the tool it is told to call", () => {
+    const names = (support.tool_configs ?? []).map((t) => t.function_name ?? t.entity_name);
+    expect(names).toContain("logSupportChat");
   });
 });
