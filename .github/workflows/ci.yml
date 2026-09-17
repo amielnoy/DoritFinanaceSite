@@ -491,18 +491,39 @@ jobs:
           BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
           BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
         run: |
+          # Order matters, and it is "can we authenticate" rather than "is
+          # every secret tidy". A leftover BASE44_API_KEY from before the
+          # workspace-key tab turned out to need the Business plan must not
+          # fail a run that has a perfectly good session to publish with — that
+          # is what happened on the merge of #48, where all three secrets were
+          # present and the stale one decided the outcome.
+          #
+          # Reaching the CLI with a non-`b44k_` key is harmless: every consumer
+          # of it guards with `isWorkspaceApiKey()` first, so the value is inert
+          # and the seeded session is used instead. The Publish step below
+          # unsets it anyway, so that this stays true without depending on the
+          # CLI's internals.
           if [ -z "${{ vars.BASE44_APP_ID }}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::BASE44_APP_ID is unset — skipping the publish step. Production stays on whatever was last published by hand."
           elif [ -n "$BASE44_API_KEY" ] && [ "${BASE44_API_KEY#b44k_}" != "$BASE44_API_KEY" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Publishing with the workspace API key."
-          elif [ -n "$BASE44_API_KEY" ]; then
-            echo "::error::BASE44_API_KEY is set but is not a workspace API key — those start with 'b44k_'. The CLI ignores any other value and falls back to an interactive device login, which cannot be answered on a runner and hangs until the job times out. Either replace it with a workspace key, or delete the secret and set BASE44_ACCESS_TOKEN + BASE44_REFRESH_TOKEN instead."
-            exit 1
           elif [ -n "$BASE44_ACCESS_TOKEN" ] && [ -n "$BASE44_REFRESH_TOKEN" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Publishing with a seeded personal session. That credential expires — when this step starts skipping, re-seed it from ~/.base44/auth/auth.json."
+            if [ -n "$BASE44_API_KEY" ]; then
+              echo "::warning::BASE44_API_KEY is set but is not a workspace API key, so it is ignored. Delete the secret — a credential nobody uses is one nobody rotates."
+            fi
+          elif [ -n "$BASE44_API_KEY" ]; then
+            # The original reason this check exists, and still the right answer
+            # when it is the *only* credential: the CLI ignores a non-`b44k_`
+            # value and falls back to an interactive device login, which on a
+            # runner is a prompt nobody can answer. It hung for five minutes
+            # and was killed with an orphan node process, saying nothing about
+            # the cause. Failing instantly and legibly is better.
+            echo "::error::BASE44_API_KEY is set but is not a workspace API key — those start with 'b44k_' — and there is no BASE44_ACCESS_TOKEN + BASE44_REFRESH_TOKEN pair to fall back on. The CLI would fall back to an interactive device login, which cannot be answered on a runner. Replace it with a workspace key, or set the token pair."
+            exit 1
           elif [ -n "$BASE44_ACCESS_TOKEN" ]; then
             echo "::error::BASE44_ACCESS_TOKEN is set without BASE44_REFRESH_TOKEN. The CLI needs both and ignores a session it cannot refresh."
             exit 1
@@ -535,6 +556,15 @@ jobs:
           BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
           BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
         run: |
+          # A key that is not a workspace key is not a credential, and passing
+          # one leaves the CLI to decide what to do with it. It currently
+          # ignores it — every read guards with `isWorkspaceApiKey()` — but the
+          # step above has already chosen which credential to publish with, and
+          # that choice should not depend on an implementation detail of a
+          # package we install at `@latest`.
+          if [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
+            unset BASE44_API_KEY
+          fi
           npm install -g base44@latest --allow-remote=all --allow-scripts=workerd,esbuild
           base44 deploy --yes --build
           echo "published=true" >> "$GITHUB_OUTPUT"
@@ -1274,6 +1304,11 @@ jobs:
           BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
           BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
         run: |
+          # Same precedence as the publish job: a usable credential wins over a
+          # stale one sitting beside it. Nothing here ever fails the run — an
+          # unarchived day is a gap in an operational record, not a broken
+          # build, and a nightly job that reddens the badge is a job everyone
+          # learns to ignore.
           if [ -z "${{ vars.BASE44_APP_ID }}" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::BASE44_APP_ID is unset — no logs were archived."
@@ -1297,7 +1332,11 @@ jobs:
           BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
           BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
           BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
-        run: npm run logs:archive
+        run: |
+          if [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
+            unset BASE44_API_KEY
+          fi
+          npm run logs:archive
 
       - name: Keep them
         if: steps.creds.outputs.ready == 'true'
