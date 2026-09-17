@@ -1044,3 +1044,63 @@ describe("the clearing-house offer", () => {
     }
   });
 });
+
+/**
+ * Warmth, and the line it must not cross.
+ *
+ * People come to this interview to talk about money, retirement, who depends on
+ * them and occasionally what happens when they are gone. Many arrive
+ * embarrassed — that they never checked, never understood what they signed,
+ * kept putting it off — and an agent that reads as a form being filled in is
+ * the failure mode this guidance exists to prevent.
+ *
+ * But warmth has a boundary here that it does not have elsewhere, and it is a
+ * regulatory one rather than a stylistic one. The agent may reassure about the
+ * *feeling* and never about the *situation*: "that sounds stressful, and it is
+ * good that you started looking" is kind; "nothing to worry about", "that
+ * sounds fine", "you are probably owed a refund" are opinions on a person's
+ * financial position, which §2 forbids as squarely as quoting a number. The
+ * cases below pin both halves, because an instruction to be more empathetic is
+ * exactly the kind of edit that quietly deletes the second one.
+ */
+describe("how the interview speaks to people", () => {
+  const interview = loadAgent("needs_interview");
+
+  it("answers the person before it moves to the next field", () => {
+    expect(interview.instructions).toMatch(/ענה לאדם לפני שאתה ממשיך לשדה/);
+    expect(interview.instructions).toMatch(/פיטורים, גירושין, מחלה/);
+  });
+
+  it("treats not knowing as normal rather than as a failed test", () => {
+    // Most people do not know their management fees. Someone made to feel
+    // stupid about that stops answering honestly, and the interview is worth
+    // less than it was.
+    expect(interview.instructions).toMatch(/נרמל את מה שהוא לא יודע/);
+    expect(interview.instructions).toMatch(/לעולם אל תיתן לו להרגיש שנכשל במבחן/);
+  });
+
+  it("slows down where the questions actually frighten people", () => {
+    expect(interview.instructions).toMatch(/היה עדין במיוחד בשלוש נקודות/);
+  });
+
+  it("separates comforting the feeling from reassuring about the situation", () => {
+    // The whole point. Empathy is licensed; opinion is not.
+    expect(interview.instructions).toMatch(/חום אינו הבטחה/);
+    expect(interview.instructions).toMatch(/מותר לך להרגיע לגבי \*\*הרגש\*\*/);
+    expect(interview.instructions).toMatch(/אסור לך להרגיע לגבי \*\*המצב\*\*/);
+    // Named, so the model has instances rather than a principle to interpret.
+    for (const forbidden of ["אין מה לדאוג", "זה נשמע בסדר", "בטח מגיע לך החזר"]) {
+      expect(interview.instructions, forbidden).toContain(forbidden);
+    }
+  });
+
+  it("does not let warmth become a way of extracting more", () => {
+    expect(interview.instructions).toMatch(/אל תשתמש באמפתיה כדי לשכנע/);
+  });
+
+  it("still forbids the opinions warmth is most tempted to offer", () => {
+    // "That sounds high" about a fee is the likeliest breach of all, because it
+    // feels like sympathy rather than advice.
+    expect(interview.instructions).toMatch(/'זה נשמע גבוה' על דמי ניהול הוא חוות דעת/);
+  });
+});
