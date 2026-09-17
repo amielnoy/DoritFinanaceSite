@@ -785,12 +785,21 @@ describe("the event log in Google Sheets", () => {
     // log has nothing else to report, so it answers `ok: true` and carries the
     // warning with it. What neither may do is let the throw escape.
     for (const [name, src] of Object.entries({ ...writers, upsertContact: contacts })) {
-      expect(src, `${name} must not throw on a sheet failure`).toMatch(
-        /catch \(e\) \{\s*warnings\.push\(\s*(?:'sheet_append_failed'|deliveryWarning\('sheet_append_failed')/,
-      );
+      // The catch body, whatever else it now contains — a log line was added
+      // in front of the push, and pinning the two as adjacent would have made
+      // this fail on a change that cannot affect the behaviour it guards.
+      const catchBody = src.slice(src.indexOf("catch (e) {", src.indexOf("await appendEventRow(base44")));
+      const body = catchBody.slice(0, catchBody.indexOf("\n    }"));
+      expect(body, `${name} must record a sheet failure`).toMatch(/sheet_append_failed/);
+      expect(body, `${name} must not throw on a sheet failure`).not.toMatch(/\bthrow\b|\breturn\b/);
     }
-    expect(supportLog, "logSupportChat must not throw on a sheet failure").toMatch(
-      /catch \(e\) \{\s*return Response\.json\(\{ ok: true[^)]*sheet_append_failed/,
+    // Same rule, different shape: it has nothing else to report, so it answers
+    // `ok: true` and carries the warning rather than collecting it.
+    const supportCatch = supportLog.slice(
+      supportLog.indexOf("catch (e) {", supportLog.indexOf("await appendEventRow(base44")),
+    );
+    expect(supportCatch.slice(0, supportCatch.indexOf("\n    }"))).toMatch(
+      /ok: true[\s\S]*sheet_append_failed|sheet_append_failed[\s\S]*ok: true/,
     );
   });
 

@@ -1,5 +1,35 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
+/** שם הפונקציה כפי שהוא מופיע בכל שורת יומן שלה. */
+const FN = 'upsertContact';
+
+/**
+ * שורת יומן מובנית — JSON בשורה אחת, לפלט הפונקציה.
+ *
+ * Base44 אוסף את פלט הקונסולה ומגיש אותו ב-`base44 logs`, ומשם job יומי שומר
+ * אותו תחת `logs/` במאגר. עד כה הפונקציות לא כתבו לשם דבר, והאבחון היחיד היה
+ * נספח האזהרות שבמייל — כלומר אפשר היה לאבחן רק פנייה שהמייל שלה בכלל יצא.
+ *
+ * הכלל שקובע מה נכנס לכאן: **מה קרה, לא מה נאמר.** אירוע, תוצאה, משך ומזהה
+ * בקשה — ולעולם לא שם, טלפון, אימייל, הודעה, תקציר או פרופיל. יומן הוא המקום
+ * היחיד שבקשת מחיקה אינה מגיעה אליו, ולכן הקשירה בין שורות נעשית דרך `rid`
+ * ולא דרך זהות האדם. tests/contract/logging.contract.test.ts נכשל אם שדה אסור
+ * מגיע לכאן.
+ *
+ * משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+ * מפוצל זה לא.
+ */
+function log(level, event, fields) {
+  const line = JSON.stringify({ t: new Date().toISOString(), level, fn: FN, event, ...fields });
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
+}
+
+/** מזהה קצר שקושר את כל שורות היומן של בקשה אחת. */
+const newRequestId = () => crypto.randomUUID().slice(0, 8);
+
+
 // ── יומן אנשי הקשר ────────────────────────────────────────────────────────
 //
 // אותו גיליון כמו יומן האירועים, לשונית אחרת: אירוע הוא מה שקרה, איש קשר הוא
@@ -79,13 +109,19 @@ function normalisePhone(raw) {
 }
 
 export default async function(req) {
+  const rid = newRequestId();
+  const startedAt = Date.now();
   try {
+    log('info', 'request.start', { rid });
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { phone, name, email, channel, notes } = body || {};
 
     const key = normalisePhone(phone);
     if (!key || !validPhone(key)) {
+      // הטלפון עצמו אינו נרשם — רק שנדחה, וזה מה שצריך כדי לאבחן ערוץ
+      // שמוסר מספרים בפורמט שלא ציפינו לו.
+      log('warn', 'contact.rejected', { rid, reason: 'invalid_phone' });
       return Response.json({ error: 'נדרש מספר טלפון תקין' }, { status: 400 });
     }
 
@@ -119,7 +155,9 @@ export default async function(req) {
           last_seen: now,
         });
         contactId = existing.id;
+        log('info', 'contact.updated', { rid, contactId });
       } catch (e) {
+        log('error', 'contact.update_failed', { rid, contactId: existing.id, err: String(e?.message ?? e).slice(0, 200) });
         return Response.json(
           { error: 'לא הצלחנו לעדכן את איש הקשר.', details: e?.message },
           { status: 500 },
@@ -137,7 +175,9 @@ export default async function(req) {
         });
         contactId = contact?.id ?? null;
         created = true;
+        log('info', 'contact.created', { rid, contactId });
       } catch (e) {
+        log('error', 'contact.create_failed', { rid, err: String(e?.message ?? e).slice(0, 200) });
         return Response.json(
           { error: 'לא הצלחנו לשמור את איש הקשר.', details: e?.message },
           { status: 500 },
@@ -158,13 +198,16 @@ export default async function(req) {
           channel || 'other',
           safeNotes,
         ]);
+        log('info', 'sheet.appended', { rid, tab: SHEET_TAB, status: sheet });
       } catch (e) {
+        log('warn', 'sheet.append_failed', { rid, tab: SHEET_TAB, err: String(e?.message ?? e).slice(0, 200) });
         warnings.push(deliveryWarning('sheet_append_failed', e));
       }
     }
 
     // התשובה נבנית כדי שהסוכן יוכל להקריא אותה: הוא מתבקש לאשר מול האדם מה
     // נשמר, ומה שהוא מקריא צריך להיות מה שנשמר בפועל ולא מה שהוא זוכר.
+    log('info', 'request.end', { rid, ms: Date.now() - startedAt, created, warnings: warnings.length });
     return Response.json({
       ok: true,
       contactId,
@@ -174,6 +217,7 @@ export default async function(req) {
       warnings,
     });
   } catch (error) {
+    log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(error?.message ?? error).slice(0, 200) });
     return Response.json({ error: error.message }, { status: 500 });
   }
 }

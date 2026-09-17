@@ -1,5 +1,35 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
+/** שם הפונקציה כפי שהוא מופיע בכל שורת יומן שלה. */
+const FN = 'submitLead';
+
+/**
+ * שורת יומן מובנית — JSON בשורה אחת, לפלט הפונקציה.
+ *
+ * Base44 אוסף את פלט הקונסולה ומגיש אותו ב-`base44 logs`, ומשם job יומי שומר
+ * אותו תחת `logs/` במאגר. עד כה הפונקציות לא כתבו לשם דבר, והאבחון היחיד היה
+ * נספח האזהרות שבמייל — כלומר אפשר היה לאבחן רק פנייה שהמייל שלה בכלל יצא.
+ *
+ * הכלל שקובע מה נכנס לכאן: **מה קרה, לא מה נאמר.** אירוע, תוצאה, משך ומזהה
+ * בקשה — ולעולם לא שם, טלפון, אימייל, הודעה, תקציר או פרופיל. יומן הוא המקום
+ * היחיד שבקשת מחיקה אינה מגיעה אליו, ולכן הקשירה בין שורות נעשית דרך `rid`
+ * ולא דרך זהות האדם. tests/contract/logging.contract.test.ts נכשל אם שדה אסור
+ * מגיע לכאן.
+ *
+ * משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+ * מפוצל זה לא.
+ */
+function log(level, event, fields) {
+  const line = JSON.stringify({ t: new Date().toISOString(), level, fn: FN, event, ...fields });
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
+}
+
+/** מזהה קצר שקושר את כל שורות היומן של בקשה אחת. */
+const newRequestId = () => crypto.randomUUID().slice(0, 8);
+
+
 // שני נמענים, שניהם מקבלים את הפנייה המלאה.
 //
 // SECONDARY_EMAIL הוא הסוכנת. NOTIFY_EMAILS הן תיבות הצוות שמתפעל את האתר מטעמה,
@@ -53,7 +83,10 @@ const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
  * What travels is the finished message: these functions own the templates, the
  * escaping and `redact()` on anything a model wrote.
  */
-async function sendMail({ base44, to, subject, html, text, body }) {
+async function sendMail({ base44, to, subject, html, text, body, rid, role }) {
+  // התפקיד ולא הכתובת. אחד הנמענים הוא המבקר עצמו, וכתובתו לא תיכתב ליומן
+  // שנשמר לאורך זמן — `role` מספיק כדי לדעת איזה עותק לא יצא.
+  const started = Date.now();
   if (CORE_EMAILS.includes(to)) {
     // `html` and `body` are alternatives, not companions: passing both makes
     // Base44 reject the whole call with "SendEmail accepts only …", and the
@@ -64,6 +97,7 @@ async function sendMail({ base44, to, subject, html, text, body }) {
     await base44.asServiceRole.integrations.Core.SendEmail(
       html ? { to, subject, html, text: plain } : { to, subject, body: plain },
     );
+    log('info', 'mail.sent', { rid, role, transport: 'core', ms: Date.now() - started });
     return;
   }
 
@@ -95,6 +129,7 @@ async function sendMail({ base44, to, subject, html, text, body }) {
   if (!response.ok) throw new Error(`mailer_http_${response.status}`);
   const result = await response.json().catch(() => null);
   if (!result?.ok) throw new Error('mailer_rejected');
+  log('info', 'mail.sent', { rid, role, transport: 'mailer', ms: Date.now() - started });
 }
 
 
@@ -731,12 +766,16 @@ function subjectFor(source, data) {
 }
 
 export default async function(req) {
+  const rid = newRequestId();
+  const startedAt = Date.now();
   try {
+    log('info', 'request.start', { rid });
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic } = body || {};
 
     if (!name || !phone) {
+      log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields', source: source || 'quick' });
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
     }
 
@@ -793,6 +832,9 @@ export default async function(req) {
 
     // ראיון שכבר נפתח בשיחה הזו מתעדכן במקום להיווצר מחדש.
     const openInterview = source === 'interview' ? await findOpenInterview(base44, phone) : null;
+    // האם השיחה הזו כבר פתחה רשומה. זה מה שמבדיל עדכון מכפילות, וזה השדה
+    // שמסביר בדיעבד למה ראיון אחד הופיע פעמיים במסך הפניות.
+    log('info', 'lead.resolved', { rid, source: source || 'quick', track: track || '', stage: partial ? 'partial' : 'complete', upsert: Boolean(openInterview?.id) });
     if (openInterview?.id) {
       try {
         await base44.asServiceRole.entities.Lead.update(openInterview.id, {
@@ -802,7 +844,9 @@ export default async function(req) {
           status: partial ? 'partial' : 'new',
         });
         leadId = openInterview.id;
+        log('info', 'lead.updated', { rid, leadId });
       } catch (e) {
+        log('error', 'lead.update_failed', { rid, leadId: openInterview.id, err: String(e?.message ?? e).slice(0, 200) });
         return Response.json(
           { error: 'לא הצלחנו לעדכן את הפנייה. נסו שוב או צרו קשר ישירות.', details: e?.message },
           { status: 500 }
@@ -820,7 +864,9 @@ export default async function(req) {
         status: partial ? 'partial' : 'new',
       });
       leadId = lead?.id ?? null;
+      log('info', 'lead.created', { rid, leadId, source: source || 'quick' });
     } catch (e) {
+      log('error', 'lead.create_failed', { rid, source: source || 'quick', err: String(e?.message ?? e).slice(0, 200) });
       // אין ערוץ גיבוי — הפנייה תאבד. זהו הכשל היחיד שחייב להיכשל בקול.
       return Response.json(
         { error: 'לא הצלחנו לשמור את הפנייה. נסו שוב או צרו קשר ישירות.', details: e?.message },
@@ -836,6 +882,7 @@ export default async function(req) {
     // הרשומה נשארת כ-partial וגלויה במסך הפניות — וזה ההבדל בין נוטש שנעלם
     // לנוטש שאפשר לחזור אליו.
     if (partial) {
+      log('info', 'request.end', { rid, ms: Date.now() - startedAt, leadId, stage: 'partial', notified: false });
       return Response.json({ ok: true, leadId, stage: 'partial', notified: false, warnings });
     }
 
@@ -849,8 +896,11 @@ export default async function(req) {
         // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
         html: buildAgentHtml(source, data, null),
         text: agentBody,
+        rid,
+        role: 'agency',
       });
     } catch (e) {
+      log('warn', 'mail.failed', { rid, role: 'agency', err: String(e?.message ?? e).slice(0, 200) });
       warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
@@ -871,9 +921,12 @@ export default async function(req) {
           subject: clientSubject,
           html: buildClientHtml(clientMailFor(source, data)),
           text: buildClientText(source, data),
+          rid,
+          role: 'visitor',
         });
       } catch (e) {
-        warnings.push(deliveryWarning('client_confirmation_failed', e));
+        log('warn', 'mail.failed', { rid, role: 'visitor', err: String(e?.message ?? e).slice(0, 200) });
+      warnings.push(deliveryWarning('client_confirmation_failed', e));
       }
     }
 
@@ -922,6 +975,7 @@ export default async function(req) {
         calendar = 'אירוע נוצר ✓';
       }
     } catch (e) {
+      log('warn', 'calendar.failed', { rid });
       warnings.push('calendar_event_failed');
     }
 
@@ -948,7 +1002,9 @@ export default async function(req) {
         // הנפילה הזו שורת הראיון נרשמת ריקה — שם וטלפון בלי מה שנאסף.
         safeSummary || profileText || safeMessage || '',
       ]);
+      log('info', 'sheet.appended', { rid, tab: SHEET_TAB, status: sheet });
     } catch (e) {
+      log('warn', 'sheet.append_failed', { rid, tab: SHEET_TAB, err: String(e?.message ?? e).slice(0, 200) });
       warnings.push('sheet_append_failed');
     }
 
@@ -967,14 +1023,19 @@ export default async function(req) {
           subject,
           html: opsHtml,
           text: opsText,
+                  rid,
+          role: 'ops',
         });
       } catch (e) {
+        log('warn', 'mail.failed', { rid, role: 'ops', err: String(e?.message ?? e).slice(0, 200) });
         warnings.push(deliveryWarning('notify_email_failed', e));
       }
     }
 
+    log('info', 'request.end', { rid, ms: Date.now() - startedAt, leadId, source: source || 'quick', warnings: warnings.length });
     return Response.json({ ok: true, leadId, warnings });
   } catch (error) {
+    log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(error?.message ?? error).slice(0, 200) });
     return Response.json({ error: error.message }, { status: 500 });
   }
 }

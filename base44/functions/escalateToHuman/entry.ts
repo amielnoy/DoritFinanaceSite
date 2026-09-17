@@ -1,5 +1,35 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
+/** שם הפונקציה כפי שהוא מופיע בכל שורת יומן שלה. */
+const FN = 'escalateToHuman';
+
+/**
+ * שורת יומן מובנית — JSON בשורה אחת, לפלט הפונקציה.
+ *
+ * Base44 אוסף את פלט הקונסולה ומגיש אותו ב-`base44 logs`, ומשם job יומי שומר
+ * אותו תחת `logs/` במאגר. עד כה הפונקציות לא כתבו לשם דבר, והאבחון היחיד היה
+ * נספח האזהרות שבמייל — כלומר אפשר היה לאבחן רק פנייה שהמייל שלה בכלל יצא.
+ *
+ * הכלל שקובע מה נכנס לכאן: **מה קרה, לא מה נאמר.** אירוע, תוצאה, משך ומזהה
+ * בקשה — ולעולם לא שם, טלפון, אימייל, הודעה, תקציר או פרופיל. יומן הוא המקום
+ * היחיד שבקשת מחיקה אינה מגיעה אליו, ולכן הקשירה בין שורות נעשית דרך `rid`
+ * ולא דרך זהות האדם. tests/contract/logging.contract.test.ts נכשל אם שדה אסור
+ * מגיע לכאן.
+ *
+ * משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+ * מפוצל זה לא.
+ */
+function log(level, event, fields) {
+  const line = JSON.stringify({ t: new Date().toISOString(), level, fn: FN, event, ...fields });
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
+}
+
+/** מזהה קצר שקושר את כל שורות היומן של בקשה אחת. */
+const newRequestId = () => crypto.randomUUID().slice(0, 8);
+
+
 // כמה תיבות, אותו צוות. ראו את ההערה המקבילה ב-submitLead/entry.ts.
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 
@@ -42,7 +72,10 @@ function deliveryWarning(label, error) {
  * What travels is the finished message: these functions own the templates, the
  * escaping and `redact()` on anything a model wrote.
  */
-async function sendMail({ base44, to, subject, html, text, body }) {
+async function sendMail({ base44, to, subject, html, text, body, rid, role }) {
+  // התפקיד ולא הכתובת. אחד הנמענים הוא המבקר עצמו, וכתובתו לא תיכתב ליומן
+  // שנשמר לאורך זמן — `role` מספיק כדי לדעת איזה עותק לא יצא.
+  const started = Date.now();
   if (CORE_EMAILS.includes(to)) {
     // `html` and `body` are alternatives, not companions: passing both makes
     // Base44 reject the whole call with "SendEmail accepts only …", and the
@@ -53,6 +86,7 @@ async function sendMail({ base44, to, subject, html, text, body }) {
     await base44.asServiceRole.integrations.Core.SendEmail(
       html ? { to, subject, html, text: plain } : { to, subject, body: plain },
     );
+    log('info', 'mail.sent', { rid, role, transport: 'core', ms: Date.now() - started });
     return;
   }
 
@@ -84,6 +118,7 @@ async function sendMail({ base44, to, subject, html, text, body }) {
   if (!response.ok) throw new Error(`mailer_http_${response.status}`);
   const result = await response.json().catch(() => null);
   if (!result?.ok) throw new Error('mailer_rejected');
+  log('info', 'mail.sent', { rid, role, transport: 'mailer', ms: Date.now() - started });
 }
 
 
@@ -324,7 +359,10 @@ function buildEscalationHtml(reason, data) {
 }
 
 export default async function(req) {
+  const rid = newRequestId();
+  const startedAt = Date.now();
   try {
+    log('info', 'request.start', { rid });
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { reason, summary, name, phone, email, agent, topic, consentVersion, consentAt } = body || {};
@@ -339,6 +377,10 @@ export default async function(req) {
     // בשמירה במאגר אינו מונע אותה.
     const warnings = [];
     let leadId = null;
+
+    // הסיבה והסוכן — לא התקציר. ההעברה היא האירוע שהכי חשוב לעקוב אחריו,
+    // והתקציר הוא בדיוק מה שהמבקר אמר.
+    log('info', 'escalation.received', { rid, reason: safeReason, agent: agent || 'unknown', contactable });
 
     if (contactable) {
       try {
@@ -358,9 +400,11 @@ export default async function(req) {
         });
         leadId = lead?.id ?? null;
       } catch (e) {
+        log('error', 'lead.create_failed', { rid, err: String(e?.message ?? e).slice(0, 200) });
         warnings.push('lead_write_failed');
       }
     } else {
+      log('info', 'escalation.anonymous', { rid, reason: safeReason });
       warnings.push('no_contact_details');
     }
 
@@ -384,9 +428,13 @@ export default async function(req) {
           html: escalationHtml,
           text: notification,
           body: notification,
+          rid,
+          role: to === SECONDARY_EMAIL ? 'agency' : 'ops',
         });
         notified = true;
       } catch (e) {
+        // ההתראה שלא יצאה היא הכשל היחיד כאן שהוא רגולטורי ולא תפעולי.
+        log('error', 'mail.failed', { rid, role: to === SECONDARY_EMAIL ? 'agency' : 'ops', err: String(e?.message ?? e).slice(0, 200) });
         warnings.push(deliveryWarning('notify_email_failed', e));
       }
     }
@@ -409,7 +457,9 @@ export default async function(req) {
         safeReason,
         safeSummary,
       ]);
+      log('info', 'sheet.appended', { rid, tab: SHEET_TAB });
     } catch (e) {
+      log('warn', 'sheet.append_failed', { rid, tab: SHEET_TAB, err: String(e?.message ?? e).slice(0, 200) });
       warnings.push('sheet_append_failed');
     }
 
@@ -419,6 +469,7 @@ export default async function(req) {
       ? 'הפרטים הועברו לדורית והיא תחזור אישית תוך יום עסקים אחד.'
       : 'אפשר לפנות לדורית ישירות בכל אחד מהערוצים הבאים.';
 
+    log('info', 'request.end', { rid, ms: Date.now() - startedAt, reason: safeReason, notified, recorded: leadId !== null, warnings: warnings.length });
     return Response.json({
       ok: true,
       leadId,
@@ -430,6 +481,7 @@ export default async function(req) {
       warnings,
     });
   } catch (error) {
+    log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(error?.message ?? error).slice(0, 200) });
     // גם מסלול הכישלון מחזיר ערוצי קשר — סוכן שנתקל בשגיאה עדיין חייב
     // להיות מסוגל למסור למבקר איך להגיע לאדם.
     return Response.json(

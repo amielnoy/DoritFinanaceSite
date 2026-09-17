@@ -1,5 +1,35 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 
+/** שם הפונקציה כפי שהוא מופיע בכל שורת יומן שלה. */
+const FN = 'logSupportChat';
+
+/**
+ * שורת יומן מובנית — JSON בשורה אחת, לפלט הפונקציה.
+ *
+ * Base44 אוסף את פלט הקונסולה ומגיש אותו ב-`base44 logs`, ומשם job יומי שומר
+ * אותו תחת `logs/` במאגר. עד כה הפונקציות לא כתבו לשם דבר, והאבחון היחיד היה
+ * נספח האזהרות שבמייל — כלומר אפשר היה לאבחן רק פנייה שהמייל שלה בכלל יצא.
+ *
+ * הכלל שקובע מה נכנס לכאן: **מה קרה, לא מה נאמר.** אירוע, תוצאה, משך ומזהה
+ * בקשה — ולעולם לא שם, טלפון, אימייל, הודעה, תקציר או פרופיל. יומן הוא המקום
+ * היחיד שבקשת מחיקה אינה מגיעה אליו, ולכן הקשירה בין שורות נעשית דרך `rid`
+ * ולא דרך זהות האדם. tests/contract/logging.contract.test.ts נכשל אם שדה אסור
+ * מגיע לכאן.
+ *
+ * משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+ * מפוצל זה לא.
+ */
+function log(level, event, fields) {
+  const line = JSON.stringify({ t: new Date().toISOString(), level, fn: FN, event, ...fields });
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
+}
+
+/** מזהה קצר שקושר את כל שורות היומן של בקשה אחת. */
+const newRequestId = () => crypto.randomUUID().slice(0, 8);
+
+
 // ── יומן שיחות התמיכה ──────────────────────────────────────────────────────
 //
 // אותו גיליון, לשונית שלישית. לשונית האירועים אומרת מי פנה, לשונית אנשי הקשר
@@ -83,18 +113,25 @@ function normalisePhone(raw) {
 }
 
 export default async function(req) {
+  const rid = newRequestId();
+  const startedAt = Date.now();
   try {
+    log('info', 'request.start', { rid });
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { channel, phone, topic, transcript, outcome, messageCount } = body || {};
 
     // אין גיליון — אין מה לעשות, וזה אינו כשל. הסוכן קורא לפונקציה הזו בסוף
     // כל שיחה, וסביבה בלי גיליון עדיין צריכה לענות על שאלות.
-    if (!SHEET_ID) return Response.json({ ok: true, sheet: 'לא מוגדר' });
+    if (!SHEET_ID) {
+      log('info', 'request.end', { rid, ms: Date.now() - startedAt, sheet: 'unconfigured' });
+      return Response.json({ ok: true, sheet: 'לא מוגדר' });
+    }
 
     const safeTranscript = redact(transcript);
     const safeTopic = redact(topic).slice(0, 200);
     if (!safeTranscript && !safeTopic) {
+      log('warn', 'support.empty', { rid });
       return Response.json({ error: 'אין מה לרשום' }, { status: 400 });
     }
 
@@ -113,11 +150,15 @@ export default async function(req) {
     // מחזירים 200 עם אזהרה כדי שהסוכן לא יספר למבקר על תקלה שאינה נוגעת לו.
     try {
       const sheet = await appendEventRow(base44, row);
+      // התוצאה והערוץ בלבד. הנושא והתמלול הם מה שהמבקר אמר, והם נשארים בגיליון.
+      log('info', 'support.logged', { rid, ms: Date.now() - startedAt, channel: row[1], outcome: row[4], status: sheet });
       return Response.json({ ok: true, sheet });
     } catch (e) {
+      log('warn', 'sheet.append_failed', { rid, tab: SHEET_TAB, err: String(e?.message ?? e).slice(0, 200) });
       return Response.json({ ok: true, sheet: 'נכשל', warnings: [deliveryWarning('sheet_append_failed', e)] });
     }
   } catch (error) {
+    log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(error?.message ?? error).slice(0, 200) });
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
