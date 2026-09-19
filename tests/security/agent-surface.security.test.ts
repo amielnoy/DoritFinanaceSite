@@ -30,9 +30,38 @@ const COMPLIANCE = read(join(REPO_ROOT, "src/config/compliance.ts"));
 const CONTACT = read(join(REPO_ROOT, "src/config/contact.js"));
 const PKG = read(join(REPO_ROOT, "package.json"));
 
+/**
+ * The agent prompts, with their Hebrew readable whatever the file looks like.
+ *
+ * These assertions are about what the prompt *says*. They were written against
+ * a file with literal Hebrew in it and matched the raw bytes, which made them
+ * assertions about the file's encoding as well — and the Base44 Builder syncs
+ * its own serialisation straight to `main`, where every Hebrew character comes
+ * back as `\uXXXX`. That turned seven compliance tests red while the compliance
+ * block was still there, word for word: `needs_interview` went from 17,338
+ * characters of instructions to 17,337, and nothing about the agent's
+ * behaviour had changed at all.
+ *
+ * A round trip through `JSON.parse`/`stringify` normalises both spellings —
+ * `stringify` leaves non-ASCII literal — so a clause is found whichever way the
+ * file was written. The property is "the prompt contains this rule"; the
+ * escaping is the mechanism, and the test has no business depending on it.
+ *
+ * Parsing also has to keep working if the file grows a comment (it is `.jsonc`),
+ * so a file that will not parse falls back to its raw text rather than failing
+ * every test in the file with a parse error.
+ */
+const readableAgentSource = (raw: string): string => {
+  try {
+    return JSON.stringify(JSON.parse(raw));
+  } catch {
+    return raw;
+  }
+};
+
 const AGENT_PROMPTS = ["needs_interview", "blog_recommender", "support_agent"].map((n) => ({
   name: n,
-  src: read(join(REPO_ROOT, `base44/agents/${n}.jsonc`)),
+  src: readableAgentSource(read(join(REPO_ROOT, `base44/agents/${n}.jsonc`))),
 }));
 
 /** Lift a top-level function out of a Deno entry point so it can be run here. */
