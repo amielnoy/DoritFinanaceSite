@@ -613,6 +613,19 @@ full run's single-file report is around 46 MB. The hosted copy is therefore the
 split one — roughly 4,000 files against a 20,000-file ceiling. Both come from
 the same results, and both have the analytics beacon stripped.
 
+#### Which Cloudflare URL to use
+
+Each deploy produces two, and the run summary prints both:
+
+| URL | What it is |
+|---|---|
+| `https://<branch>.<project>.pages.dev` | the **branch alias** — stable, always the latest report for that branch. This is the one to bookmark, and the one the summary links first. |
+| `https://<hash>.<project>.pages.dev` | that deploy specifically. Immutable, so it still shows *this* run's failures after the branch has moved on. |
+
+The bare `https://<project>.pages.dev` is neither of those — it is the
+**production** domain, which this pipeline never deploys to and which Access
+does not cover. Nothing links it on purpose; it should stay empty.
+
 The artifact needs nothing set up and always exists. The Cloudflare deploy is
 opt-in, and skips with a notice when these are missing:
 
@@ -623,14 +636,28 @@ Secrets and variables → Actions*. Only their values come from Cloudflare:
 |---|---|---|
 | `CLOUDFLARE_API_TOKEN` | secret | Cloudflare → My Profile → API Tokens → Create Token, with the **Cloudflare Pages: Edit** permission |
 | `CLOUDFLARE_ACCOUNT_ID` | secret | Cloudflare dashboard sidebar, or `npx wrangler whoami` |
-| `CLOUDFLARE_PAGES_PROJECT` | variable | any project name you like — CI creates the project if it does not exist |
+| `CLOUDFLARE_PAGES_PROJECT` | variable | any project name you like — CI creates the project if it does not exist. Currently `dorit-allure`. |
+
+Two traps in the token, both of which produce the same unhelpful
+`Invalid access token [code: 9109]` from wrangler rather than a permissions
+error:
+
+- The permission is **Cloudflare Pages**, not *Account Custom Pages* — the
+  latter is Cloudflare's branded error-page feature and sits right next to it in
+  the same dropdown. It authorizes nothing this pipeline calls.
+- Verify the value before storing it. Transcribing a token by eye is how `I` and
+  `l` get swapped; pipe it from the clipboard instead, and check it with
+  `CLOUDFLARE_API_TOKEN=… npx wrangler pages project list` before putting it in
+  a secret where the only symptom is a red CI run.
 
 #### Keeping the hosted report private
 
 The report carries the client's copy and failure screenshots of her site, so it
 must not be world-readable. **CI enforces that rather than trusting it**: after
-each deploy it fetches the URL anonymously and fails the run if the report comes
-back. A protection nothing checks is one that silently lapses.
+each deploy it fetches both published hostnames — the branch alias and the
+per-deploy URL — anonymously, and fails the run if the report comes back from
+either. Access is applied per hostname, so checking only one proves only one. A
+protection nothing checks is one that silently lapses.
 
 Cloudflare Access is what provides it, and there is a trap in how it applies:
 
