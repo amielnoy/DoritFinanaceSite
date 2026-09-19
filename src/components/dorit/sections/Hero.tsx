@@ -3,8 +3,7 @@ import { Image } from "@/components/ui/image";
 import { ArrowDown } from "lucide-react";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
 
-const HERO_IMG =
-  "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/9620f0028_119895334_119505229701692_7118383656602926716_n.jpg";
+const HERO_IMG = "/images/dorit-office-portrait.png";
 
 /**
  * Hebrew, because the reader is.
@@ -49,7 +48,7 @@ export default function Hero() {
               fetchpriority="high"
               style={{ filter: "saturate(0.78) contrast(1.04) brightness(0.94)" }}
             />
-            {/* Parchment duotone — shifts the cool water backdrop into the site's warm palette */}
+            {/* Parchment duotone blends the portrait into the site's warm palette */}
             <div
               className="absolute inset-0 mix-blend-color pointer-events-none"
               style={{ background: "linear-gradient(170deg, rgba(196,164,132,0.42) 0%, rgba(125,107,93,0.30) 50%, rgba(26,26,27,0.46) 100%)" }}
