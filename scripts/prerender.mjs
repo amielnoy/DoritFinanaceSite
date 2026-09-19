@@ -100,8 +100,23 @@ async function main() {
     browser = await chromium.launch()
   } catch (err) {
     await server.close()
+    const why = err.message.split('\n')[0]
+
+    // Where the artifact is *tested* for being prerendered, a skip is not a
+    // degraded build — it is a build that will fail a later job with nine
+    // opaque failures in a suite that is working correctly. That is exactly how
+    // this was found. `PRERENDER_REQUIRED=1` moves the error to where the cause
+    // is, in the job that could have installed the browser.
+    if (process.env.PRERENDER_REQUIRED === '1') {
+      console.error(
+        `\n::error::Prerendering was required and could not run: ${why}\n` +
+          `Install the browser before building: npx playwright install --with-deps chromium`,
+      )
+      process.exit(1)
+    }
+
     console.warn(
-      `\n::warning::Prerendering skipped — could not launch Chromium (${err.message.split('\n')[0]}).\n` +
+      `\n::warning::Prerendering skipped — could not launch Chromium (${why}).\n` +
         `The build ships the client-rendered SPA, exactly as it did before.\n` +
         `Install the browser with: npx playwright install chromium`,
     )

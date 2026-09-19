@@ -134,8 +134,26 @@ jobs:
       - name: Typecheck (blocks on new errors)
         run: npm run typecheck:gate
 
+      # The e2e shards test the `dist` artifact this job uploads — they run with
+      # SKIP_BUILD=1 and never build for themselves — so the artifact has to be
+      # what production serves. Since prerendering that is `build:prerender`,
+      # and building the plain bundle here is what made every route but `/` fall
+      # through to the SPA shell in `e2e/seo/prerender.spec.ts`: the tests were
+      # right and the artifact was a step behind. Changing the webServer command
+      # in playwright.config.ts fixes the local run and nothing in CI.
+      #
+      # The Base44-builder guard below deliberately stays on the plain `build`:
+      # that is the command Base44 runs, and prerendering it would test a build
+      # nobody performs.
+      - name: Install the browser the prerender step drives
+        run: npx playwright install --with-deps chromium
+
       - name: Build
-        run: npm run build
+        env:
+          # Fail here if the browser is unavailable, rather than shipping a
+          # plain bundle that fails the prerender suite three jobs later.
+          PRERENDER_REQUIRED: "1"
+        run: npm run build:prerender
 
       # Publishing from the Base44 dashboard stays supported, so the build has to
       # keep working without anything this workflow supplies. CI sets
@@ -841,9 +859,19 @@ jobs:
           ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
           ALLURE_ALIAS: ${{ needs.allure.outputs.alias }}
+          PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           vercel_link="${VERCEL_URL:-https://vercel.com/amielnoy-9725s-projects/dorit-finance-site}"
+
+          # The permanent home of the test report: the `main` branch alias, which
+          # always serves the newest report from the trunk. Derived from the same
+          # variable the deploy uses rather than written out, so renaming the
+          # Pages project cannot leave a dead link in the summary.
+          ALLURE_HOME=""
+          if [ -n "$PAGES_PROJECT" ]; then
+            ALLURE_HOME="https://main.${PAGES_PROJECT}.pages.dev"
+          fi
 
           # Did anything go red? That is what splits the two environments now:
           # staging takes the build either way, production does not.
@@ -902,6 +930,17 @@ jobs:
               # bookmark — and this run's immutable copy beside it, since the
               # alias moves on to whatever deploys next.
               echo "| **Allure — test report** (Cloudflare, behind Access) | ${ALLURE_ALIAS:-$ALLURE_URL} | [deployed this run](${ALLURE_URL}) |"
+            elif [ -n "$ALLURE_HOME" ]; then
+              # This run published nothing — only `main`, `builder` and a manual
+              # dispatch do. The hosted report still exists and is still the
+              # place people look, so name it and say plainly that it is the
+              # last `main` run rather than this one. A blank row here sent
+              # people hunting for a URL that was up the whole time.
+              if [ "$ALLURE_RESULT" = "success" ]; then
+                echo "| **Allure — test report** (Cloudflare, behind Access) | ${ALLURE_HOME} | latest \`main\`; this run's copy is the [\`allure-report\` artifact](${RUN_URL}) |"
+              else
+                echo "| **Allure — test report** (Cloudflare, behind Access) | ${ALLURE_HOME} | latest \`main\`; this run built none (${ALLURE_RESULT}) |"
+              fi
             elif [ "$ALLURE_RESULT" = "success" ]; then
               echo "| **Allure — test report** | [\`allure-report\` on this run](${RUN_URL}) | attached to this run |"
             else
@@ -1192,9 +1231,19 @@ jobs:
           ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
           ALLURE_ALIAS: ${{ needs.allure.outputs.alias }}
+          PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           IS_BUILDER: ${{ github.ref == 'refs/heads/builder' || github.head_ref == 'builder' }}
         run: |
+          # The report's permanent home — the `main` alias, newest trunk report.
+          # This job runs on every branch but `main`, and a feature branch never
+          # publishes, so without this the verdict mentioned no hosted report at
+          # all and the URL looked like it did not exist.
+          ALLURE_HOME=""
+          if [ -n "$PAGES_PROJECT" ]; then
+            ALLURE_HOME="https://main.${PAGES_PROJECT}.pages.dev"
+          fi
+
           if [ "$BUILD" = "success" ] && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ]; then
             green=true
             verdict="## ✅ Safe to merge"
@@ -1237,6 +1286,13 @@ jobs:
               echo "**Test report:** ${ALLURE_ALIAS:-$ALLURE_URL} (sign in through Cloudflare Access)"
               echo "— [this run's copy](${ALLURE_URL}) if the branch has moved on since — or the"
               echo "\`allure-report\` artifact on [this run](${RUN_URL})."
+            elif [ -n "$ALLURE_HOME" ] && [ "$ALLURE_RESULT" = "success" ]; then
+              echo "**Test report:** this run's is the \`allure-report\` artifact on"
+              echo "[this run](${RUN_URL}) — one self-contained \`index.html\`, no server needed."
+              echo
+              echo "The hosted report lives at ${ALLURE_HOME} (sign in through Cloudflare"
+              echo "Access). It shows the latest **\`main\`** run, not this branch: only \`main\`,"
+              echo "\`builder\` and a manual dispatch publish there."
             elif [ "$ALLURE_RESULT" = "success" ]; then
               echo "**Test report:** the \`allure-report\` artifact on [this run](${RUN_URL}) — one self-contained"
               echo "\`index.html\`; unzip and open it, no server needed."
