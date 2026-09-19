@@ -2,7 +2,7 @@
 
 **Suite:** `seo` · **Runners:** `npm run test:e2e:seo` (Playwright), `npm run test:unit` (helpers)
 **Location:** `e2e/seo/`, `tests/unit/seo.dom.test.ts`
-**Cases:** 19 unit + 36 e2e (× applicable platforms)
+**Cases:** 19 unit + 47 e2e (× applicable platforms)
 
 ---
 
@@ -27,6 +27,7 @@ one.
 | Home-only FAQ markup | `src/lib/structured-data.ts` |
 | Private-route noindex guard | `src/components/SeoRouteGuard.tsx` |
 | Static head | `index.html` |
+| Build-time prerender | `scripts/prerender.mjs`, wired in as `npm run build:prerender` (the `buildCommand` in `vercel.json`) |
 | Crawl directives | `public/robots.txt`, `public/sitemap.xml` |
 | Host rewriting | `scripts/vite-site-url-plugin.mjs` — rewrites the origin in `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` when `VITE_SITE_URL` names a different one |
 | Page-level declarations | `src/pages/{Home,Blog,BlogPost,Claims,PrivacyPolicy,Accessibility}.tsx`, `src/lib/PageNotFound.jsx` |
@@ -118,8 +119,29 @@ less content than the desktop one loses the desktop version's rankings.
 > promotes its own `preload` to `rel="stylesheet"` once loaded, so a post-load
 > DOM check would always see a "render-blocking" link that never blocked.
 
+## 5a. Prerender cases — `e2e/seo/prerender.spec.ts`
+
+Every other spec here drives a browser, so it measures what **Google** sees —
+Google runs JavaScript. These use `request` and never `page`: nothing may pass
+because a browser repaired it afterwards, which is the entire point. They are
+what fails if `scripts/prerender.mjs` silently stops running.
+
+| ID | Title | Expected result |
+|---|---|---|
+| SEO-PRE-001..008 | "`<route>` is served with its own title and canonical" for the eight public routes | The **served HTML** carries the route's own title, and a canonical whose path is the route — not `/` |
+| SEO-PRE-009 | "no two routes are served the same title or canonical" | Eight distinct titles and canonicals. The regression this catches is the original defect returning wholesale: eight files, all of them the home page |
+| SEO-PRE-010 | "the FAQ answers are in the HTML, not only in the JavaScript" | Every question **and answer** the served `FAQPage` markup declares appears as text in the same document — the property that makes `/faq` citable by an assistant |
+| SEO-PRE-011 | "the prerendered pages carry no build-host URLs" | No `127.0.0.1` or `localhost` in any prerendered page. Vite's `modulepreload` hints arrive absolute from the preview server and would otherwise ship |
+
+> Blog posts are deliberately not prerendered: they come from the Base44 backend
+> at runtime, so a prerender would bake a snapshot into the bundle and go stale
+> the moment a post is edited. They keep the SPA shell, and `useSeo` keeps
+> governing their head for crawlers that execute JavaScript.
+
+
 ## 6. Pass criteria
 
-All 19 unit and 36 e2e cases pass, with SEO-MOB-005 reporting rather than
+All 19 unit and 47 e2e cases pass, with SEO-MOB-005 reporting rather than
 enforcing. SEO-MET-007 and SEO-LD-002 are the two that would fail first if the
-per-route head regressed.
+per-route head regressed in the browser; SEO-PRE-009 is the one that fails if it
+regressed in the HTML.

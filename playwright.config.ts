@@ -127,7 +127,7 @@ export default defineConfig({
         // --host 127.0.0.1: vite preview otherwise binds ::1 only, which the
         // baseURL health check cannot reach.
         command: [
-          skipBuild ? null : "npm run build",
+          skipBuild ? null : "npm run build:prerender",
           `npx vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
         ]
           .filter(Boolean)
