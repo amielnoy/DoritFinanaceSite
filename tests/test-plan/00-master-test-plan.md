@@ -109,7 +109,7 @@ Resume after the environment is corrected; no partial sign-off.
 | HTML report | `playwright-report/` |
 | Allure results — **every suite**, unit through e2e | `allure-results/` |
 | Allure report | `allure-report/index.html` — one self-contained file; `npm run allure:open`, or `./scripts/run-tests.sh --report`, to serve it |
-| Allure report, from CI | the `allure-report` artifact on each run, and a Cloudflare Pages deployment behind Cloudflare Access |
+| Allure report, from CI | the `allure-report` artifact on each run, and a Cloudflare Pages deployment behind Cloudflare Access — linked from the run summary as `<branch>.<project>.pages.dev` (stable) and the per-deploy URL (immutable) |
 | Failure screenshots, video, traces | `test-results/<test>/` |
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
@@ -123,7 +123,9 @@ report; generating per-leg would give a pile of partial reports instead of one
 picture of the run, and sharding only makes that worse. Allure 3 emits the merged report as a single self-contained
 HTML file, which CI attaches to every run; a multi-file copy is deployed to
 Cloudflare Pages behind Cloudflare Access, and CI fails the run if that copy
-answers an anonymous request.
+answers an anonymous request — on both the branch alias and the per-deploy
+hostname, since Access is applied per hostname and only the checked one is
+actually known to be protected.
 
 > A run invoked with `--reporter=` on the command line replaces the configured
 > reporters and writes **no** Allure results. Omit the flag for any run whose

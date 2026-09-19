@@ -840,6 +840,7 @@ jobs:
           TESTS_RESULT: ${{ needs.test-e2e.result }}
           ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
+          ALLURE_ALIAS: ${{ needs.allure.outputs.alias }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           vercel_link="${VERCEL_URL:-https://vercel.com/amielnoy-9725s-projects/dorit-finance-site}"
@@ -897,7 +898,10 @@ jobs:
               echo "| **Production** (client-facing) | ${PRODUCTION_URL} | smoke-tested after every publish |"
             fi
             if [ -n "$ALLURE_URL" ]; then
-              echo "| **Allure — test report** (Cloudflare, behind Access) | ${ALLURE_URL} | deployed this run |"
+              # The stable branch link in the URL column — it is the one to
+              # bookmark — and this run's immutable copy beside it, since the
+              # alias moves on to whatever deploys next.
+              echo "| **Allure — test report** (Cloudflare, behind Access) | ${ALLURE_ALIAS:-$ALLURE_URL} | [deployed this run](${ALLURE_URL}) |"
             elif [ "$ALLURE_RESULT" = "success" ]; then
               echo "| **Allure — test report** | [\`allure-report\` on this run](${RUN_URL}) | attached to this run |"
             else
@@ -952,6 +956,7 @@ jobs:
 
     outputs:
       url: ${{ steps.cfdeploy.outputs.url }}
+      alias: ${{ steps.cfdeploy.outputs.alias }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -1070,19 +1075,43 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
         run: |
-          url=$(npx wrangler pages deploy allure-report-site \
+          # Keep wrangler's own output in the log — piping it straight into
+          # grep meant a failed deploy showed nothing but "produced no URL".
+          out=$(npx wrangler pages deploy allure-report-site \
                   --project-name "$PROJECT" \
                   --branch "$GITHUB_REF_NAME" \
                   --commit-hash "$GITHUB_SHA" \
-                  --commit-dirty=true \
+                  --commit-dirty=true 2>&1)
+          echo "$out"
 
-                | grep -oE 'https://[^[:space:]]+' | tail -1)
+          # Two URLs, and which one belongs in a summary differs:
+          #
+          #   url   — `<hash>.<project>.pages.dev`, immutable, this run's copy.
+          #   alias — `<branch>.<project>.pages.dev`, stable, always the latest
+          #           deploy of the branch. This is the one worth bookmarking.
+          #
+          # Both are preview deployments, so both sit behind the access policy.
+          # The bare `<project>.pages.dev` is neither: it is the production
+          # domain, which this pipeline never deploys to and which the toggle
+          # does not cover — publishing it would hand out a dead link that is
+          # also the one hostname with nothing in front of it.
+          url=$(printf '%s\n' "$out" | grep -vi alias | grep -oE 'https://[^[:space:]]+\.pages\.dev' | tail -1)
+          alias=$(printf '%s\n' "$out" | grep -i alias | grep -oE 'https://[^[:space:]]+\.pages\.dev' | tail -1)
           if [ -z "$url" ]; then
             echo "::error::wrangler produced no deployment URL"
             exit 1
           fi
+          # wrangler has not always printed the alias line. Derive it rather
+          # than drop the stable link from the summary when it doesn't:
+          # Cloudflare lowercases the branch, replaces anything not
+          # alphanumeric with a hyphen, and truncates.
+          if [ -z "$alias" ]; then
+            slug=$(printf '%s' "$GITHUB_REF_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-28 | sed 's/-*$//')
+            alias="https://${slug}.${PROJECT}.pages.dev"
+          fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "::notice::Allure report deployed to $url"
+          echo "alias=$alias" >> "$GITHUB_OUTPUT"
+          echo "::notice::Allure report deployed to $alias (this run's copy: $url)"
 
       # The requirement is that it is not world-readable, so assert it rather
       # than assume the dashboard is still set the way someone left it. Access
@@ -1092,13 +1121,20 @@ jobs:
         if: steps.cf.outputs.ready == 'true'
         env:
           URL: ${{ steps.cfdeploy.outputs.url }}
+          ALIAS: ${{ steps.cfdeploy.outputs.alias }}
         run: |
-          code=$(curl -sL -o anon.html -w '%{http_code}' "$URL/" || echo 000)
-          if grep -qi 'allure\|Dorit Gov-Ari' anon.html 2>/dev/null; then
-            echo "::error::${URL} served the report to an anonymous request (HTTP ${code}). Cloudflare Access is not in front of it. Enable the project's access policy (Workers & Pages → the project → Settings → General → Enable access policy), or add a Zero Trust Access application covering this hostname, then re-run."
-            exit 1
-          fi
-          echo "::notice::Anonymous request got HTTP ${code} and no report content — Access is in front of it."
+          # Both hostnames, because both are published in the run summary and
+          # Access is applied per hostname. Checking only the one nobody opens
+          # is how a protection lapses without anyone noticing.
+          for target in "$URL" "$ALIAS"; do
+            [ -n "$target" ] || continue
+            code=$(curl -sL -o anon.html -w '%{http_code}' "$target/" || echo 000)
+            if grep -qi 'allure\|Dorit Gov-Ari' anon.html 2>/dev/null; then
+              echo "::error::${target} served the report to an anonymous request (HTTP ${code}). Cloudflare Access is not in front of it. Enable the project's access policy (Workers & Pages → the project → Settings → General → Enable access policy), or add a Zero Trust Access application covering this hostname, then re-run."
+              exit 1
+            fi
+            echo "::notice::${target} answered an anonymous request with HTTP ${code} and no report content — Access is in front of it."
+          done
 
 
 
@@ -1155,6 +1191,7 @@ jobs:
           PREVIEW_URL: ${{ needs.deploy-vercel.outputs.url }}
           ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
+          ALLURE_ALIAS: ${{ needs.allure.outputs.alias }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           IS_BUILDER: ${{ github.ref == 'refs/heads/builder' || github.head_ref == 'builder' }}
         run: |
@@ -1197,7 +1234,8 @@ jobs:
             fi
             echo
             if [ -n "$ALLURE_URL" ]; then
-              echo "**Test report:** ${ALLURE_URL} (sign in through Cloudflare Access), or the"
+              echo "**Test report:** ${ALLURE_ALIAS:-$ALLURE_URL} (sign in through Cloudflare Access)"
+              echo "— [this run's copy](${ALLURE_URL}) if the branch has moved on since — or the"
               echo "\`allure-report\` artifact on [this run](${RUN_URL})."
             elif [ "$ALLURE_RESULT" = "success" ]; then
               echo "**Test report:** the \`allure-report\` artifact on [this run](${RUN_URL}) — one self-contained"

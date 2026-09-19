@@ -788,10 +788,18 @@
         report itself goes two ways: Allure 3 emits it as a single
         self-contained HTML file attached to every run, and — when Cloudflare
         credentials are set — as an ordinary multi-file report deployed to
-        <b>Cloudflare Pages</b> behind Cloudflare Access. CI re-checks that
-        protection after each deploy and fails the run if the report answers an
-        anonymous request, because a private repository's test report has no
-        business on a public URL.
+        <b>Cloudflare Pages</b> behind Cloudflare Access. Each deploy yields two
+        links, and the run summary prints both: the <b>branch alias</b>
+        (<code>&lt;branch&gt;.&lt;project&gt;.pages.dev</code>) — stable, always
+        the latest report for that branch — and the immutable per-deploy URL,
+        which still shows this run's failures after the branch has moved on.
+        Both are <em>preview</em> deployments, which is the whole reason the
+        project's production branch is set to a name CI never pushes: Cloudflare's
+        one-click access policy covers previews only, never the bare
+        <code>&lt;project&gt;.pages.dev</code> production domain. CI re-checks that
+        protection on both hostnames after each deploy and fails the run if the
+        report answers an anonymous request, because a private repository's test
+        report has no business on a public URL.
         <b>Base44</b> carries production, and its publish job requires every
         suite to have passed — the strictest gate in the pipeline. A test
         failure therefore costs the team its staging convenience, never the
