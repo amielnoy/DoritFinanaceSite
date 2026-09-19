@@ -62,7 +62,7 @@ backend when one is available.
 | Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{submitLead,submitClaim,createConsultationEvent,escalateToHuman}`, `base44/agents/*.jsonc` |
 | Published copy | `content/blog/*.md`, `src/config/compliance.ts` |
 | Static assets | `index.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`, `public/manifest.json` |
-| Build output | `dist/` produced by `npm run build` |
+| Build output | `dist/` produced by `npm run build:prerender` — the plain `npm run build` omits the prerendered route files, and the e2e suite tests what is in `dist/` |
 
 ## 4. Environment
 
@@ -72,15 +72,17 @@ backend when one is available.
 | Unit/component/contract/security | Vitest 3, jsdom |
 | e2e | Playwright 1.62, Chromium + WebKit |
 | Platforms | `web-chromium` (desktop Chrome), `web-webkit` (desktop Safari), `ios-safari` (iPhone 14 / WebKit), `android-chrome` (Pixel 7 / Chromium) |
-| SUT under e2e | Production build served by `vite preview` on `127.0.0.1:4173`, or any `PLAYWRIGHT_BASE_URL` |
+| SUT under e2e | Production build served by `vite preview` on `127.0.0.1:4173`, or any `PLAYWRIGHT_BASE_URL`. In CI the shards run `SKIP_BUILD=1` against the `dist` artifact the `build` job uploaded — they never build for themselves |
 | Locale | `he-IL`, timezone `Asia/Jerusalem` |
 | Container | `Dockerfile.test` / `docker-compose.test.yml`, pinned to the Playwright image matching the installed version |
 
 ## 5. Entry criteria
 
 1. `npm ci` completes.
-2. `npm run build` produces `dist/`.
-3. Playwright browsers installed (`npx playwright install chromium webkit`) — or the container image is used.
+2. `npm run build:prerender` produces `dist/`, including one `.html` per public
+   route. A plain `npm run build` leaves only `index.html`, and the prerender
+   suite then fails on seven routes — a stale artifact, not a regression.
+3. Playwright browsers installed (`npx playwright install chromium webkit`) — or the container image is used. Chromium is also what the prerender step drives, so the build needs it too.
 
 ## 6. Exit criteria
 
@@ -116,7 +118,7 @@ Resume after the environment is corrected; no partial sign-off.
 Both runners write Allure results into the same `allure-results/`, so one
 `allure generate` covers the whole battery — 757 Vitest cases (81 unit, 21
 component, 376 contract, 204 integration, 70 security, plus 9 opt-in agent
-evals that skip without credentials) plus 162 e2e cases per
+evals that skip without credentials) plus 173 e2e cases per
 platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
 eleven on the full matrix, two on a feature branch — into a single published
 report; generating per-leg would give a pile of partial reports instead of one

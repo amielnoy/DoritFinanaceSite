@@ -748,9 +748,14 @@
         second pass: it runs the built app in a headless browser and writes each
         public route's rendered DOM to <code>dist/&lt;route&gt;.html</code>, so a
         crawler that does not execute JavaScript receives the page rather than an
-        empty <code>&lt;div id="root"&gt;</code>. That is the command Vercel runs;
-        Base44 runs the plain build, and a host with no browser binary warns and
-        ships the client-rendered bundle rather than failing the deploy.
+        empty <code>&lt;div id="root"&gt;</code>. That is the command Vercel and the
+        CI <code>build</code> job run — both install Chromium first, since the
+        step drives a real browser. Base44 runs the plain build, and a host with
+        no browser binary warns and ships the client-rendered bundle rather than
+        failing the deploy. The one exception is the CI <code>build</code> job,
+        where <code>PRERENDER_REQUIRED=1</code> makes it an error: the e2e shards
+        test the artifact that job uploads, so a silent skip there surfaces as
+        failures in a later job rather than where the cause is.
         Delivery is git-based: pushing to
         <code>main</code> syncs the repository to Base44, and the app is
         published from the Base44 dashboard. A CLI <code>base44 deploy</code>
