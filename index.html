@@ -53,7 +53,19 @@
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet" /></noscript>
 
-    <!-- Structured Data: FinancialService / LocalBusiness -->
+    <!-- Structured Data: FinancialService / LocalBusiness
+
+         `sameAs` was removed from this block and from Person rather than left
+         in place: it held a Google *search* URL and the Midrag home page, and
+         neither is a profile of this business. sameAs exists to tie the entity
+         to pages that are, so entries that are not weaken the match they were
+         added to strengthen. Put real ones back as they appear — the Google
+         Business Profile, LinkedIn, the actual Midrag listing.
+
+         `identifier` / `hasCredential` carry the Capital Market Authority agent
+         licence. It is already published in the footer and in llms.txt; stating
+         it as data is what lets a search engine or an assistant verify the
+         claim rather than repeat it. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -68,10 +80,10 @@
       "priceRange": "₪₪",
       "founder": { "@type": "Person", "name": "דורית גוב ארי", "jobTitle": "מתכננת פיננסית בכירה" },
       "knowsAbout": ["פנסיה", "גמל", "השתלמות", "מיסוי", "חיסכון", "קיבוע זכויות", "תיקון 190", "פרמיה", "הורדת דמי ניהול", "הורדת עלויות", "שיפור תשואות", "תכנון פיננסי", "חיסכון לילדים"],
-      "sameAs": [
-        "https://www.google.com/search?q=דורית+גוב+ארי+ביטוח+חוות+דעת",
-        "https://www.midrag.co.il/"
-      ],
+      "address": { "@type": "PostalAddress", "addressCountry": "IL", "addressLocality": "תל אביב" },
+      "availableLanguage": "he-IL",
+      "identifier": "L-00107009",
+
       "hasOfferCatalog": {
         "@type": "OfferCatalog",
         "name": "שירותים",
@@ -103,11 +115,18 @@
       "telephone": "+972508311776",
       "address": { "@type": "PostalAddress", "addressCountry": "IL", "addressLocality": "תל אביב" },
       "knowsAbout": ["פנסיה", "גמל", "השתלמות", "מיסוי", "חיסכון", "קיבוע זכויות", "תיקון 190", "פרמיה", "הורדת דמי ניהול", "שיפור תשואות", "תכנון פיננסי"],
+      "knowsLanguage": "he-IL",
       "worksFor": { "@type": "Organization", "name": "דורית גוב ארי — סוכנות ביטוח בע״מ" },
-      "sameAs": [
-        "https://www.google.com/search?q=דורית+גוב+ארי+ביטוח+חוות+דעת",
-        "https://www.midrag.co.il/"
-      ]
+      "hasCredential": {
+        "@type": "EducationalOccupationalCredential",
+        "credentialCategory": "רישיון סוכן ביטוח פנסיוני",
+        "identifier": "L-00107009",
+        "recognizedBy": {
+          "@type": "GovernmentOrganization",
+          "name": "רשות שוק ההון, ביטוח וחיסכון",
+          "url": "https://www.gov.il/he/departments/capital_market_authority"
+        }
+      }
     }
     </script>
 

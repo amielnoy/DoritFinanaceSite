@@ -723,7 +723,7 @@
             <!-- Crawler lane -->
             <rect class="d-box" x="8" y="176" width="450" height="48" rx="2"/>
             <text class="d-t-b" x="20" y="197">Crawler without JS</text>
-            <text class="d-s" x="20" y="214">receives an empty &lt;div id="root"&gt; — head metadata and JSON-LD only</text>
+            <text class="d-s" x="20" y="214">gets the prerendered page where the build prerenders; else the shell</text>
             <path class="d-line d-dash" d="M67 70 V176"/>
           </svg>
         </div>
@@ -744,7 +744,14 @@
       <h2><span class="num">07</span> Build &amp; delivery</h2>
       <p>
         <code>vite build</code> emits one JavaScript chunk and one stylesheet
-        into <code>dist/</code>. Delivery is git-based: pushing to
+        into <code>dist/</code>. <code>npm run build:prerender</code> adds a
+        second pass: it runs the built app in a headless browser and writes each
+        public route's rendered DOM to <code>dist/&lt;route&gt;.html</code>, so a
+        crawler that does not execute JavaScript receives the page rather than an
+        empty <code>&lt;div id="root"&gt;</code>. That is the command Vercel runs;
+        Base44 runs the plain build, and a host with no browser binary warns and
+        ships the client-rendered bundle rather than failing the deploy.
+        Delivery is git-based: pushing to
         <code>main</code> syncs the repository to Base44, and the app is
         published from the Base44 dashboard. A CLI <code>base44 deploy</code>
         ships the local tree directly and bypasses that sync, so the deployed

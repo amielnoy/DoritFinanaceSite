@@ -206,6 +206,14 @@ test.describe("HTTP surface — sanity", () => {
       return [...html.matchAll(/(?:href|src)="(\/[^"/][^"]*)"/g)]
         .map((m) => m[1])
         .filter((p) => !p.startsWith("/src/")) // dev-only module entry
+        // Files, not routes. `/` used to be the SPA shell, whose only
+        // same-origin references were assets — since prerendering it is the
+        // rendered home page, so it also carries the site's own navigation
+        // (`/faq`, `/#top`), which is *supposed* to answer with HTML. A path
+        // whose last segment has an extension is the thing this test is about:
+        // the manifest, the icons, the hashed bundles. Routes are covered by
+        // "every internal link lands on a real route" in navigation.spec.ts.
+        .filter((p) => /\.[a-z0-9]+$/i.test(p.split(/[?#]/)[0]))
         .filter((p, i, all) => all.indexOf(p) === i);
     });
 

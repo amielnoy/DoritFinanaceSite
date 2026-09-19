@@ -175,6 +175,12 @@ does not resolve is worse than one pointing at the old site.
    Given the variable it declares the production domain instead, which is what tells a
    search engine the two are one site.
 
+   There is now a second reason the Vercel copy should be the canonical one: it is
+   the only one that is prerendered. Vercel runs `npm run build:prerender`, so its
+   eight public routes ship their own HTML; Base44 runs plain `npm run build` and
+   serves the client-rendered shell. Two copies of the same content where only one
+   is legible to an AI crawler — point the canonical at that one.
+
    Either way the next build moves the canonical tags, the sitemap, robots.txt,
    llms.txt and the share links together — Vite resolves the variable from the shell or
    from a `.env` file, and the build plugin reads the same resolved value the
@@ -495,13 +501,41 @@ route's title, description, canonical and JSON-LD at runtime, `/faq` carries
 `BlogPosting`, and every page carries breadcrumbs.
 
 **AI crawlers mostly do not run JavaScript.** GPTBot, ClaudeBot, PerplexityBot
-and CCBot receive the static `index.html` on every path — so to them `/faq`,
-`/tools` and `/blog` all look like the home page. That is the single largest SEO
-constraint on this site and it is architectural; it is written up as B-0 in
-[10-known-issues](tests/test-plan/10-known-issues.md), with prerendering as the
-fix and the reason it has not been done yet.
+and CCBot used to receive the static `index.html` on every path — so to them
+`/faq`, `/tools` and `/blog` all looked like the home page. It was the single
+largest SEO constraint on this site, written up as B-0, and it was measured
+rather than assumed: `/`, `/faq` and `/claims` returned byte-identical HTML from
+live production, all three naming the home page as their canonical.
 
-What mitigates it is [`public/llms.txt`](public/llms.txt): a static file those
+### Prerendering closes it
+
+`npm run build:prerender` — `vite build`, then `scripts/prerender.mjs` — runs
+the real app in a real browser and writes each public route's rendered DOM to
+`dist/<route>.html`. `/faq` goes from an empty shell to 79 KB of HTML with all
+23 questions **and their answers** in the source, which is what makes it
+quotable by an assistant. Nothing in the script knows what any route's title
+should be; it renders the page and asks, so there is no second copy to drift.
+
+Worth knowing before changing it:
+
+- **`<route>.html`, not `<route>/index.html`.** The directory form is served
+  only at `/faq/` with the trailing slash — `/faq` falls through to the SPA
+  fallback. Measured on `vite preview`, not assumed.
+- **`vercel.json` rewrites unmatched paths to `/app.html`**, an untouched copy
+  of the shell, rather than to the prerendered home page. Otherwise a crawler
+  fetching `/blog/some-post` gets the home page's *content* under that URL.
+- **The build command is per host.** Vercel runs `build:prerender`; Base44 runs
+  plain `npm run build` and is unaffected. A host with no Chromium binary warns
+  and ships the plain SPA rather than failing the deploy.
+- **Blog posts stay client-rendered** on purpose: they come from the Base44
+  backend, so prerendering them would bake a snapshot into the bundle that goes
+  stale the moment a post is edited.
+
+`e2e/seo/prerender.spec.ts` is what keeps it honest. It uses Playwright's
+`request`, never `page`, so nothing in it can pass because a browser repaired
+the page afterwards — and it fails if any two routes are served the same title.
+
+What still mitigates the blog-post case is [`public/llms.txt`](public/llms.txt): a static file those
 crawlers *can* read in full, carrying the services, the contact details, the
 licence number, the affiliation disclosure, what the automated helpers refuse to
 do, and a link to every public route. It had drifted to a phone number and an

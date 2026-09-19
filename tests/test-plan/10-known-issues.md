@@ -49,6 +49,7 @@ closing it would take.
 | A-37 | **The handover notification arrived as one running paragraph.** `escalateToHuman` sent plain text only, so mail clients folded the reason, the name, the phone and the conversation summary into a single line. It is the message Dorit opens on a phone to decide whether to call somebody back now, which is precisely what it prevented. Same defect as A-14, fixed for enquiries and left here because this function had no HTML path at all. | Four titled blocks in the site's palette, phone as a `tel:` link, urgent reasons framed in red, and a plain statement when nothing was stored. Text still travels alongside. `INT-ESC-020..028`, plus a contract test pinning the now-triplicated palette helpers byte-identical. |
 | A-38 | **An address cannot be added to the Base44 mail path by adding it to a list.** `Core.SendEmail` delivers only to registered *app users*, and registration is not something that can be arranged from outside: `User.create` returns an id and the row does not exist, and a dashboard collaborator invite grants Builder access without creating an app user. Two attempts to register `amielnoy@outlook.com` looked successful and changed nothing. | `sendMail()` routes by transport capability rather than by role: `CORE_EMAILS` holds the one address the platform can actually reach, and everyone else — the agency, the second operations mailbox, the visitor — goes through the mailer. Contract tests pin the list identical across the three functions and fail if the agency ever lands on the Core path. |
 | A-39 | **Four merges have been resolved by keeping both sides.** Each produced something that either does not parse or parses as the wrong thing: two `"instructions"` keys in the agent prompt (JSON keeps the last, so the file visibly contained a scheduling step the parser never saw — it would have published the wrong agent); two `const AGENT_ONLY` declarations, which stopped a whole contract file loading; two `sendMail` bodies with a doc comment's opening `/**` stripped, failing esbuild and taking 121 integration cases down at once; and an unbalanced brace in a test file. | Each resolved by hand to the newer side after checking the older contributed nothing. The pattern is a conflict inside a long comment or a helper, resolved by concatenation — worth disabling whatever resolves them automatically, since a green-looking merge here has twice produced code that would have shipped. |
+| A-40 | **Every route served byte-identical HTML to a crawler that does not run JavaScript**, all of it declaring the home page as canonical. Confirmed against live production, not a local build: `/`, `/faq` and `/claims` returned the same MD5. Google renders JavaScript and recovered; GPTBot, ClaudeBot, PerplexityBot and CCBot do not, so to an AI assistant the entire site was one page and `/faq` — 23 questions and answers, the richest content here — did not exist. This was [B-0](#b-0--routes-are-invisible-to-crawlers-that-do-not-run-javascript), the top open SEO item. | `scripts/prerender.mjs` runs the real app in a real browser at build time and writes each public route's rendered DOM to `dist/<route>.html`. Nothing declares what a route's title should be — it renders and asks — so there is no second copy to drift. `e2e/seo/prerender.spec.ts` asserts on the **served HTML** with `request`, never `page`: nothing there may pass because a browser repaired it afterwards. |
 
 ## B. Open findings — decisions for the owner
 
@@ -74,9 +75,11 @@ Two ways to close it:
 The second is the real fix if confirmations are wanted; the first is enough to
 stop losing leads today.
 
-### B-0 · Routes are invisible to crawlers that do not run JavaScript
+### B-0 · ~~Routes are invisible to crawlers that do not run JavaScript~~ — closed
 
-**This outranks every other SEO item in the file.**
+**Fixed — see A-40.** Kept here because the reasoning is the reasoning behind
+the build step, and because the two host questions below were the thing that
+had to be answered before it could be built.
 
 The app is client-rendered and `useSeo` writes each page's title, description,
 canonical and JSON-LD at runtime. The server returns the same `index.html` for
@@ -97,8 +100,22 @@ real file is served ahead of the SPA rewrite differs between Vercel
 (`vercel.json` rewrites) and Base44 hosting, and that needs checking on both
 before it is worth building.
 
-**Not done**, because it changes what the hosts serve and wants verification on
-each of them first.
+**Done.** Both host questions were answered by measurement rather than
+assumption:
+
+- **The file layout.** `dist/<route>/index.html` is served only at `/faq/`, with
+  the trailing slash — `/faq` falls through to the SPA fallback. Eight
+  prerendered files that nothing would ever request. `dist/<route>.html` answers
+  `/faq`, `/faq/` and `/faq.html` alike, so that is what the script writes.
+- **The SPA fallback.** `vercel.json` now rewrites unmatched paths to
+  `/app.html`, an untouched copy of the shell, rather than to the prerendered
+  home page — otherwise a crawler fetching `/blog/some-post` would be served the
+  home page's *content* under that URL.
+
+Base44 hosting is untouched by this: it runs `npm run build`, which does not
+prerender, and it does not read `vercel.json`. The step is opt-in per host by
+build command, and a host without a Chromium binary ships the plain SPA with a
+warning rather than failing the deploy.
 
 ### B-1 · Colour contrast below WCAG AA
 
@@ -120,7 +137,7 @@ E2E_ENFORCE_CONTRAST=1 npx playwright test e2e/a11y
 Flip the `CONTRAST_RULE` handling in `e2e/a11y/axe.spec.ts` to unconditional
 once the palette is settled.
 
-### B-2 · Per-route metadata is applied by JavaScript, not served in the HTML
+### B-2 · ~~Per-route metadata is applied by JavaScript, not served in the HTML~~ — closed
 
 `src/lib/seo.ts` sets each route's title, description, canonical and structured
 data at runtime. Google executes JavaScript before indexing, so it sees the
@@ -139,8 +156,10 @@ not do today. The two options, in increasing order of effort:
    everything except individual blog posts.
 2. Moving the app to an SSR-capable host.
 
-Until then the runtime layer is the right trade: it fixes the case that governs
-search ranking, and it is fully tested.
+**Closed by A-40**, via option 1. The runtime layer stays and still governs
+blog posts and any route added without a prerender entry; the eight static
+routes now ship their own head in the HTML itself, so a link to `/faq` pasted
+into a chat app previews as `/faq`.
 
 ### B-3 · `npm run typecheck` has 93 inherited errors, now held on a ratchet
 
