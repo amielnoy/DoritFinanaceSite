@@ -4,8 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
-import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import { AuthProvider } from '@/lib/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
 import SeoRouteGuard from '@/components/SeoRouteGuard';
 // Add page imports here
@@ -39,30 +38,28 @@ const RouteFallback = () => (
   </div>
 );
 
+// The routes render immediately, including before auth has been checked.
+//
+// This used to open with a full-screen spinner held until `getPublicSettings()`
+// resolved, and then send the visitor to `/login` if it came back
+// `auth_required`. On a lead-generation site that inverts the priority twice
+// over: the marketing copy that earns the phone call waited on a service only
+// the admin area needs, and a backend hiccup bounced a visitor to a login screen
+// for a site that has nothing to log into and no account to use.
+//
+// The gate was also redundant. `ProtectedRoute` and `AdminRoute` each run their
+// own `checkUserAuth()` and render their own fallback, so `/admin/*` is guarded
+// by the component that guards it — not by a blanket check in front of the whole
+// router. Nothing outside this file read `appPublicSettings` or
+// `isLoadingPublicSettings`; the gate's only effect was on first paint.
+//
+// `AuthProvider` still resolves auth in the background, so a visitor who *is*
+// signed in still is, and a deep link into the admin area still waits for the
+// answer — inside the guard, where waiting is correct.
+//
+// E2E-HOM-001 and E2E-HOM-006 assert the home page renders with the backend
+// dead, which is exactly the case this used to fail.
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
-
-  // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
-  }
-
-  // Render the main app
   return (
     <>
       <Suspense fallback={<RouteFallback />}>

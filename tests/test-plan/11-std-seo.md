@@ -138,6 +138,26 @@ what fails if `scripts/prerender.mjs` silently stops running.
 > the moment a post is edited. They keep the SPA shell, and `useSeo` keeps
 > governing their head for crawlers that execute JavaScript.
 
+**These cases test an artifact, so the artifact has to be the right one.** In CI
+the e2e shards run with `SKIP_BUILD=1` against the `dist` uploaded by the `build`
+job — they never build for themselves, so `playwright.config.ts`'s `webServer`
+command governs the local run and nothing else. The first CI run after these
+cases landed failed on seven routes for exactly that reason: the `build` job was
+still running plain `npm run build`, and the suite correctly reported that the
+files were not there.
+
+Two guards came out of it, both worth keeping in mind when changing the build:
+
+- The `build` job runs `npm run build:prerender` with `PRERENDER_REQUIRED=1`, so
+  a missing browser fails **there** rather than as nine opaque failures in a
+  later job.
+- Without that variable the script warns and ships the plain SPA, which is the
+  right behaviour for a host that cannot prerender and the reason Base44's build
+  is unaffected.
+
+To reproduce the failure deliberately: `rm -rf dist && npm run build`, then
+`SKIP_BUILD=1 npx playwright test e2e/seo/prerender.spec.ts`.
+
 
 ## 6. Pass criteria
 

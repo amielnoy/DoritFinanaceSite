@@ -18,9 +18,9 @@ gap is visible and a failure points at a feature.
 | F-11 | Visitor reads privacy / accessibility statements | — | — | — | — | — | API-HTP-006 | E2E-NAV-005/006 | E2E-MOB-005 | — | A11Y-AXE-005/006, A11Y-STR-006 |
 | F-12 | Admin signs in | UNIT-RET-001..020 | — | — | — | — | — | E2E-NAV-007 | — | SEC-RED-001, SEC-STA-019..021 | — |
 | F-13 | Admin manages leads and blog posts | — | — | CTR-RLS-001/002, CTR-BLG-002 | INT-LEAD-001..009 | — | API-LIV-003 | E2E-NAV-018 | — | SEC-RLS-001, SEC-STA-022/023 | — |
-| F-14 | Site is discoverable by search and AI crawlers | SEO-URL-*, SEO-DSC-* | — | — | — | — | API-HTP-002..007/010 | — | — | — | — |
+| F-14 | Site is discoverable by search and AI crawlers | SEO-URL-*, SEO-DSC-* | — | — | — | — | API-HTP-002..007/010 | SEO-PRE-001..011 | — | — | — |
 | F-17 | Every route is indexed under its own title, description and canonical | SEO-APL-001..010 | — | — | — | — | — | SEO-MET-001..008 | SEO-MOB-001/002 | SEO-IDX-007..012 | — |
-| F-18 | Rich results: FAQ, article, breadcrumb, service | SEO-BRD-001 | — | — | — | — | — | SEO-LD-001..005 | SEO-MOB-001 | — | — |
+| F-18 | Rich results: FAQ, article, breadcrumb, service | SEO-BRD-001 | — | — | — | — | — | SEO-LD-001..005, SEO-PRE-010 | SEO-MOB-001 | — | — |
 | F-19 | Mobile-first indexing parity and mobile usability | — | — | — | — | — | — | — | SEO-MOB-001..007 | — | A11Y-STR-007, E2E-MOB-005/010 |
 | F-15 | Site degrades safely when the backend fails | — | CMP-RVW-003, CMP-QCF-004 | — | INT-LEAD-018..024, INT-CLAIM-008..011 | — | — | E2E-HOM-006, E2E-BLG-006, E2E-FRM-003/010 | — | SEC-ERR-001 | — |
 | F-20 | Visitor talks to an on-site agent, behind a consent gate | — | — | CTR-AGT-001..083 | INT-LEAD-031..064 | EVAL-INT-001..008 | — | E2E-AGT-001..003 | — | — | — |
