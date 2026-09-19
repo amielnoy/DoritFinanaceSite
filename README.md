@@ -524,9 +524,17 @@ Worth knowing before changing it:
 - **`vercel.json` rewrites unmatched paths to `/app.html`**, an untouched copy
   of the shell, rather than to the prerendered home page. Otherwise a crawler
   fetching `/blog/some-post` gets the home page's *content* under that URL.
-- **The build command is per host.** Vercel runs `build:prerender`; Base44 runs
-  plain `npm run build` and is unaffected. A host with no Chromium binary warns
-  and ships the plain SPA rather than failing the deploy.
+- **The build command is per host.** Vercel and the CI `build` job run
+  `build:prerender`; Base44 runs plain `npm run build` and is unaffected. Both
+  of the first two install the browser first — Vercel in its `buildCommand`, CI
+  in a step before the build.
+- **A host with no Chromium binary warns and ships the plain SPA** rather than
+  failing the deploy — except where `PRERENDER_REQUIRED=1` is set, which the CI
+  `build` job does. The e2e shards test the artifact that job uploads and never
+  build for themselves (`SKIP_BUILD=1`), so a skip there is not a degraded build
+  but nine opaque failures in a later job against a suite that is working
+  correctly. That is how this was found the first time; the variable moves the
+  error to the job that could have installed the browser.
 - **Blog posts stay client-rendered** on purpose: they come from the Base44
   backend, so prerendering them would bake a snapshot into the bundle that goes
   stale the moment a post is edited.
@@ -659,6 +667,11 @@ Each deploy produces two, and the run summary prints both:
 The bare `https://<project>.pages.dev` is neither of those — it is the
 **production** domain, which this pipeline never deploys to and which Access
 does not cover. Nothing links it on purpose; it should stay empty.
+
+A run that publishes nothing — any branch but `main` and `builder` — still names
+`https://main.<project>.pages.dev` in its summary and in the **Safe to merge?**
+verdict, labelled as the latest `main` report rather than this run's. The report
+was always up; a blank row just sent people hunting for a URL that existed.
 
 The artifact needs nothing set up and always exists. The Cloudflare deploy is
 opt-in, and skips with a notice when these are missing:
