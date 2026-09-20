@@ -1,6 +1,7 @@
 import React from "react";
 import { Image } from "@/components/ui/image";
 import Reveal from "@/components/dorit/primitives/Reveal";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 const ATMOS =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/5b05202dd_generated_7c8e0421.jpg";
@@ -64,9 +65,9 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
 
         <div className="lg:col-span-7 flex flex-col justify-center">
           <Reveal>
-            <span className="text-[11px] tracking-[0.12em] text-accent">
+            <Eyebrow>
               01 · מתכננת פיננסית בכירה
-            </span>
+            </Eyebrow>
             <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
               אני לא סוכנת.
               <br />

@@ -1,3 +1,5 @@
+import { CONTACT } from "@/config/contact";
+
 /**
  * Compliance copy and constants for the on-site agents.
  *
@@ -89,6 +91,5 @@ export const HUMAN_HANDOFF = {
   buttonTitle: "מעבר לטיפול אנושי",
   confirmation:
     "העברתי את הפנייה לדורית. אפשר גם לפנות אליה ישירות — היא חוזרת תוך יום עסקים אחד.",
-  failure:
-    "אפשר לפנות לדורית ישירות בטלפון 050-831-1776, בוואטסאפ, או במייל dorit@govari-fin.co.il.",
+  failure: `אפשר לפנות לדורית ישירות בטלפון ${CONTACT.phoneDisplay}, בוואטסאפ, או במייל ${CONTACT.email}.`,
 } as const;

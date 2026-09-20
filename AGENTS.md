@@ -41,7 +41,7 @@ npx skills add base44/skills
 - Prefer the existing Base44 CLI workflow over adding new npm scripts for Base44-specific tasks.
 - Reuse the existing SDK client and Vite plugin patterns before adding new Base44 integration paths.
 - Run the relevant checks from `package.json` before finishing code changes:
-  `npm run lint`, `npm run typecheck:gate`, `npm run test:vitest`, and
+  `npm run lint`, `npm run typecheck`, `npm run test:vitest`, and
   `npm run test:e2e` (or `./scripts/run-tests.sh` for everything with a summary).
 - Anchors like `#about` name sections that exist **only on the home page**, while
   the header and footer render on every route. Use `useSectionNav` and give the

@@ -89,7 +89,7 @@ backend when one is available.
 | Suite | Criterion |
 |---|---|
 | lint | zero errors |
-| typecheck | zero **new** errors against `tests/typecheck-baseline.json` — see [10-known-issues](10-known-issues.md) |
+| typecheck | `tsc` reports zero errors (the inherited-error ratchet is gone — see [10-known-issues](10-known-issues.md) B-3) |
 | unit, component, contract, integration, security | 100% pass |
 | eval | not gated — opt-in, non-deterministic, and a failure wants a human reading the transcript |
 | e2e (all four platforms) | 100% pass, no more than the documented skips |

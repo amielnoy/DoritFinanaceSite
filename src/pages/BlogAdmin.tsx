@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { services, type Article } from "@/services";
+import {
+  useAdminArticles,
+  useRemoveArticle,
+  useSaveArticle,
+  useSetArticlePublished,
+} from "@/hooks/useAdmin";
 import { Image } from "@/components/ui/image";
 import {
   Plus,
@@ -17,7 +23,7 @@ import {
 
 /* The admin list shows drafts as well as published posts, so it reads through
    `contentAdmin` rather than the published-only `content` port. */
-type BlogPostItem = Article & { body: string; published: boolean };
+type BlogPostItem = Article;
 
 interface BlogPostEdit {
   id?: string;
@@ -38,28 +44,34 @@ const EMPTY: BlogPostEdit = {
   published: false,
 };
 
+/** A stored article, with the optional fields the editor needs as strings. */
+const toEdit = (p: BlogPostItem): BlogPostEdit => ({
+  id: p.id,
+  title: p.title,
+  excerpt: p.excerpt ?? "",
+  body: p.body ?? "",
+  image_url: p.image_url ?? "",
+  tags: p.tags ?? "",
+  published: !!p.published,
+});
+
 export default function BlogAdmin() {
-  const [posts, setPosts] = useState<BlogPostItem[] | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { data, isPending: loading, isError } = useAdminArticles();
+  const saveArticle = useSaveArticle();
+  const setPublished = useSetArticlePublished();
+  const removeArticle = useRemoveArticle();
+
   const [editing, setEditing] = useState<BlogPostEdit | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
-  const [busy, setBusy] = useState<boolean>(false);
+  // The cover upload runs before the save mutation and is not part of it, so
+  // it keeps its own in-flight flag; `busy` is what the button reads.
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string>("");
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      setPosts((await services.contentAdmin.listArticles()) as BlogPostItem[]);
-    } catch {
-      setPosts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const posts: BlogPostItem[] = data ?? [];
+  const busy = uploading || saveArticle.isPending;
+  const writeError = saveError || (removeArticle.isError || setPublished.isError ? "הפעולה האחרונה לא נשמרה. ניתן לנסות שוב." : "");
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -75,7 +87,7 @@ export default function BlogAdmin() {
   };
 
   const startEdit = (p: BlogPostItem) => {
-    setEditing({ ...p });
+    setEditing(toEdit(p));
     setFile(null);
     setPreview(p.image_url || "");
   };
@@ -84,46 +96,49 @@ export default function BlogAdmin() {
     setEditing(null);
     setFile(null);
     setPreview("");
+    setSaveError("");
   };
 
   const save = async () => {
     if (!editing || !editing.title || !editing.body) return;
-    setBusy(true);
-    try {
-      let image_url = editing.image_url;
-      if (file) {
+    setSaveError("");
+    let image_url = editing.image_url;
+    if (file) {
+      setUploading(true);
+      try {
         ({ url: image_url } = await services.uploads.upload(file));
+      } catch {
+        setSaveError("העלאת התמונה נכשלה. המאמר לא נשמר.");
+        return;
+      } finally {
+        setUploading(false);
       }
-      const payload = {
-        title: editing.title,
-        excerpt: editing.excerpt,
-        body: editing.body,
-        tags: editing.tags,
-        published: !!editing.published,
-        image_url,
-      };
-      if (editing.id) {
-        await services.contentAdmin.updateArticle(editing.id, payload);
-      } else {
-        await services.contentAdmin.createArticle(payload);
-      }
+    }
+    // Kept as a literal object: tests/contract/frontend-payloads pins its keys
+    // to the BlogPost entity schema.
+    const payload = {
+      title: editing.title,
+      excerpt: editing.excerpt,
+      body: editing.body,
+      tags: editing.tags,
+      published: !!editing.published,
+      image_url,
+    };
+    try {
+      await saveArticle.mutateAsync({ id: editing.id, draft: payload });
       cancel();
-      await load();
-    } finally {
-      setBusy(false);
+    } catch {
+      setSaveError("שמירת המאמר נכשלה. ניתן לנסות שוב.");
     }
   };
 
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
     if (!window.confirm("למחוק את המאמר?")) return;
-    await services.contentAdmin.removeArticle(id);
-    load();
+    removeArticle.mutate(id);
   };
 
-  const togglePublished = async (p: BlogPostItem) => {
-    await services.contentAdmin.updateArticle(p.id, { published: !p.published });
-    load();
-  };
+  const togglePublished = (p: BlogPostItem) =>
+    setPublished.mutate({ id: p.id, published: !p.published });
 
   return (
     <div className="min-h-screen bg-background pt-28 pb-20">
@@ -264,11 +279,21 @@ export default function BlogAdmin() {
           </div>
         )}
 
+        {writeError && (
+          <p role="alert" className="mb-6 text-sm text-destructive">
+            {writeError}
+          </p>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="animate-spin text-accent" />
           </div>
-        ) : !posts || posts.length === 0 ? (
+        ) : isError ? (
+          <div className="text-center py-16 border border-dashed border-border text-destructive">
+            לא הצלחנו לטעון את המאמרים. ניתן לרענן את הדף.
+          </div>
+        ) : posts.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-border text-foreground/60">
             אין מאמרים עדיין.
           </div>

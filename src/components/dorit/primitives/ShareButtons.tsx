@@ -8,6 +8,7 @@ import {
   Link as LinkIcon,
   Check,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 interface ShareButtonsProps {
   title?: string;
@@ -16,7 +17,7 @@ interface ShareButtonsProps {
 
 interface ShareLink {
   label: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: LucideIcon;
   href: string;
 }
 

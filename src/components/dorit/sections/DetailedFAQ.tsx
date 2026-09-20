@@ -6,46 +6,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import Reveal from "@/components/dorit/primitives/Reveal";
+import { HOME_COMMON_QUESTION_IDS, faqByIds } from "@/content/faq";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
-interface QAItem {
-  q: string;
-  a: string;
-}
-
-const QA: QAItem[] = [
-  {
-    q: "האם פגישת ההיכרות הראשונה כרוכה בעלות?",
-    a: "פגישת ההיכרות הראשונה ללא עלות וללא התחייבות. מטרתה להכיר את הצורך שלכם ולהציע כיוון ברור — רק אם תבחרו להמשיך, נתקדם יחד.",
-  },
-  {
-    q: "האם את עצמאית או משויכת לחברת ביטוח מסוימת?",
-    a: "אני סוכנת עצמאית העובדת מול כל חברות הביטוח והפנסיה בישראל. ההמלצה נגזרת אך ורק מהצורך שלכם — לא משייכות מסחרית כלשהי.",
-  },
-  {
-    q: "מה כולל הליווי לאורך החיים?",
-    a: "ביקורת תיק שנתית, עדכון כיסויים בכל שינוי חיים (נישואין, לידה, דירה, עצמאות), מו\"ב מול החברות על דמי ניהול ותנאים, וליווי צמוד בעת תביעה — הכל תחת קורת גג אחת.",
-  },
-  {
-    q: "כיצד מתנהל הליווי בעת תביעה?",
-    a: "אני נוטלת את ניהול התביעה מול החברה על עצמי — השלמת תיעוד, מעקב והופעה בשמכם עד לקבלת הכיסוי המלא. ברוב המקרים לא תצטרכו להרים טלפון.",
-  },
-  {
-    q: "האם ניתן לעבור אלייך מסוכן קודם?",
-    a: "בהחלט. מעבר סוכן הוא תהליך פשוט שאינו כרוך בעלות ואינו פוגע ברצף הכיסויים שלכם. אני מטפלת בכל ההעברה וההסברה מול הגופים המוסדיים.",
-  },
-  {
-    q: "מה קורה כשמשתנה מצב משפחתי או מקצועי?",
-    a: "כל שינוי משפיע על הכיסויים הנכונים. בכל שינוי — נישואין, לידה, גירושין, דירה חדשה או מעבר לעצמאות — נשב יחד ונתאים את התיק למציאות החדשה.",
-  },
-  {
-    q: "האם ניתן לקיים פגישות גם מרחוק?",
-    a: "כן. פגישות ניתן לקיים במשרד בתל אביב, בזום או בטלפון — לפי הנוחות שלכם. הליווי עצמו זהה בכל פורמט.",
-  },
-  {
-    q: "כיצד נשמרת סודיות המידע שלי?",
-    a: "כל המידע שאתם מוסרים נשמר בסודיות מלאה, בכפוף לחוק הגנת הפרטיות ולמדיניות הפרטיות של המשרד. אינו מועבר לצד ג' ללא הסכמתכם.",
-  },
-];
+const QA = faqByIds(HOME_COMMON_QUESTION_IDS);
 
 export default function DetailedFAQ() {
   return (
@@ -56,9 +20,9 @@ export default function DetailedFAQ() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-4">
           <Reveal>
-            <span className="text-[11px] tracking-[0.12em] text-accent">
+            <Eyebrow>
               06 · שאלות ותשובות
-            </span>
+            </Eyebrow>
             <h2 className="font-heading text-4xl md:text-5xl mt-5 leading-tight">
               שאלות
               <br />
@@ -79,10 +43,10 @@ export default function DetailedFAQ() {
 
         <div className="lg:col-span-8">
           <Accordion type="single" collapsible className="border-t border-border/60">
-            {QA.map((item, i) => (
+            {QA.map((item) => (
               <AccordionItem
-                key={i}
-                value={`cq-${i}`}
+                key={item.id}
+                value={`cq-${item.id}`}
                 className="border-b border-border/60"
               >
                 <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">

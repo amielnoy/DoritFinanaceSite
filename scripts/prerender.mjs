@@ -27,13 +27,27 @@
 // under that URL. An empty shell is the honest answer for a route we have not
 // prerendered.
 
-import { createRequire } from 'node:module'
-import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
-const require = createRequire(import.meta.url)
 const DIST = join(process.cwd(), 'dist')
 const PORT = Number(process.env.PRERENDER_PORT ?? 4183)
+
+/**
+ * Stamped into every file this script writes, so a later run can tell a
+ * prerendered page from the shell `vite build` emits.
+ *
+ * Without it, running the script twice against one build destroys the fallback:
+ * the second run copies the already-prerendered `index.html` over `app.html`,
+ * and every route that is *not* prerendered — every blog post — starts being
+ * served the home page's content under its own URL. `npm run build:prerender`
+ * happens to be safe because `vite build` rewrites `index.html` first; running
+ * `npm run prerender` on its own is not, and that is the command someone
+ * reaches for when iterating.
+ */
+const MARKER = '<!-- prerendered by scripts/prerender.mjs -->'
+
+const exists = async (p) => access(p).then(() => true, () => false)
 
 // The public, statically-routed pages — the sitemap's contents.
 //
@@ -79,8 +93,24 @@ async function main() {
   const { preview } = await import('vite')
   const { chromium } = await import('@playwright/test')
 
-  // Keep the shell before anything overwrites index.html.
-  await cp(join(DIST, 'index.html'), join(DIST, 'app.html'))
+  // Keep the shell before anything overwrites index.html — but only when
+  // `index.html` still *is* the shell. See MARKER.
+  const indexPath = join(DIST, 'index.html')
+  const shellPath = join(DIST, 'app.html')
+  if ((await readFile(indexPath, 'utf8')).includes(MARKER)) {
+    if (!(await exists(shellPath))) {
+      console.error(
+        `\n::error::dist/index.html is already prerendered and dist/app.html is missing, ` +
+          `so the SPA shell cannot be recovered. Run a fresh build: npm run build:prerender`,
+      )
+      process.exit(1)
+    }
+    // app.html was written from the pristine shell by the run that prerendered
+    // index.html, so it is already correct. Copying now would overwrite it with
+    // the home page.
+  } else {
+    await cp(indexPath, shellPath)
+  }
 
   const server = await preview({
     preview: { port: PORT, host: '127.0.0.1', strictPort: true },
@@ -159,9 +189,9 @@ async function main() {
         // bakes `http://127.0.0.1:4183/assets/…` into the shipped HTML. The
         // hints are worth keeping — they are the route's own chunks — so make
         // them root-relative rather than dropping them.
-        const html = restoreAsyncFont(
+        const html = `${MARKER}\n${restoreAsyncFont(
           (await page.content()).replaceAll(`http://127.0.0.1:${PORT}/`, '/'),
-        )
+        )}`
         if (html.includes(`127.0.0.1:${PORT}`)) {
           throw new Error(`${route}: the preview origin survived into the HTML`)
         }
@@ -199,6 +229,21 @@ async function main() {
     console.error(
       `\nPrerender produced ${titles.size} distinct titles for ${results.length} routes — ` +
         `the per-route head did not apply. Refusing to ship a directory of identical pages.`,
+    )
+    process.exit(1)
+  }
+
+  // The fallback is the one output nothing downstream inspects — no route
+  // serves it under `vite preview`, so a corrupted `app.html` would reach
+  // production silently and hand crawlers the home page under every blog-post
+  // URL. Assert it is still an empty shell rather than assume.
+  const shell = await readFile(shellPath, 'utf8')
+  const shellRoot = shell.match(/<div id="root">([\s\S]*?)<\/div>/)?.[1] ?? ''
+  if (shell.includes(MARKER) || shellRoot.trim() !== '') {
+    console.error(
+      `\n::error::dist/app.html is not an empty SPA shell (${shellRoot.trim().length} chars in #root). ` +
+        `Every route without a prerendered file would be served this content. ` +
+        `Run a fresh build: npm run build:prerender`,
     )
     process.exit(1)
   }

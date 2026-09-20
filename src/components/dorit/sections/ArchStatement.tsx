@@ -5,7 +5,7 @@ const COLS: number[] = [160, 320, 480];
 export default function ArchStatement() {
   return (
     <div className="relative w-full animate-fade-up">
-      <div className="relative border border-[#D3C6B9]/50 overflow-hidden bg-gradient-to-b from-[#F7F4F1] to-[#F3EDE7]">
+      <div className="relative border border-highlight-muted/50 overflow-hidden bg-gradient-to-b from-background to-secondary">
         {/* Graph paper grid */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -25,7 +25,7 @@ export default function ArchStatement() {
              fast as the container and lands closer to the letterforms. */
           className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.12] md:opacity-[0.18]"
         >
-          <g stroke="#7D6B5D" strokeWidth="1.2" fill="none">
+          <g stroke="hsl(var(--accent))" strokeWidth="1.2" fill="none">
             <line x1="60" y1="312" x2="580" y2="312" />
             {COLS.map((cx) => (
               <g key={cx}>

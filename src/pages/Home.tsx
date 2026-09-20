@@ -36,7 +36,7 @@ export default function Home() {
     description:
       "יועצת ביטוחית ופיננסית עם 30 שנות ניסיון. ייעוץ פנסיוני, ביטוח חיים ובריאות וליווי תביעות — אישי, שקוף ובגובה העיניים. מחשבון דמי ניהול חינם.",
     path: "/",
-    // No FAQPage block here. `HOME_FAQ_LD` carried the six pension questions
+    // No FAQPage block here. A `HOME_FAQ_LD` constant once carried six pension questions
     // that `/faq` renders in full — the home page never displayed them, it
     // displayed a list of tips — so the markup described content that was not
     // on the page, and duplicated the FAQPage `/faq` already declares. Google's

@@ -136,9 +136,9 @@ export default function FloatingHeader() {
           <a
             href={`tel:${CONTACT.phoneE164}`}
             aria-label="התקשרות לדורית גוב ארי"
-            className="hidden md:inline-flex items-center gap-2 px-4 py-2.5 border border-[#9c9c9c] text-[13px] font-medium hover:border-accent hover:text-accent transition-colors duration-300"
+            className="hidden md:inline-flex items-center gap-2 px-4 py-2.5 border border-muted-foreground/60 text-[13px] font-medium hover:border-accent hover:text-accent transition-colors duration-300"
           >
-            <Phone size={15} className="text-[#9c9c9c]" />
+            <Phone size={15} className="text-muted-foreground" />
             <span dir="ltr">{CONTACT.phoneDisplay}</span>
           </a>
           <button

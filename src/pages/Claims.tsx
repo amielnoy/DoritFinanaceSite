@@ -12,14 +12,17 @@ import {
   CheckCircle2,
   ChevronLeft,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
 import Footer from "@/components/dorit/layout/Footer";
 import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
 import Reveal from "@/components/dorit/primitives/Reveal";
+import { CtaLink } from "@/components/dorit/primitives/Cta";
 import { CONTACT } from "@/config/contact";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import ClaimForm from "@/components/dorit/forms/ClaimForm";
 import { useSectionNav } from "@/hooks/useSectionNav";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 interface ClaimStep {
   n: string;
@@ -28,7 +31,7 @@ interface ClaimStep {
 }
 
 interface ClaimType {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   title: string;
   points: string[];
 }
@@ -137,9 +140,9 @@ export default function Claims() {
         {/* Hero */}
         <section className="relative max-w-[1400px] mx-auto px-6 md:px-10 pb-16 md:pb-20">
           <Reveal>
-            <span className="text-[11px] tracking-[0.12em] text-accent">
+            <Eyebrow>
               ליווי תביעות
-            </span>
+            </Eyebrow>
             <h1 className="font-heading text-5xl md:text-6xl mt-5 leading-tight max-w-3xl">
               מה לעשות
               <br />
@@ -171,7 +174,7 @@ export default function Claims() {
                 rel="noopener noreferrer"
                 className="flex items-center gap-4 p-5 border border-border hover:border-accent hover:text-accent transition-colors"
               >
-                <MessageCircle size={22} className="text-[#25D366]" />
+                <MessageCircle size={22} className="text-whatsapp" />
                 <span className="flex flex-col">
                   <span className="text-xs tracking-[0.2em] uppercase text-muted-foreground">הודעה מהירה</span>
                   <span className="font-medium">WhatsApp</span>
@@ -200,9 +203,9 @@ export default function Claims() {
           <div className="max-w-[1400px] mx-auto px-6 md:px-10">
             <Reveal>
               <div className="max-w-2xl mb-14">
-                <span className="text-[11px] tracking-[0.12em] text-accent">
+                <Eyebrow>
                   01 · התהליך
-                </span>
+                </Eyebrow>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4">
                   ארבעה צעדים עד לכיסוי
                 </h2>
@@ -227,9 +230,9 @@ export default function Claims() {
           <div className="max-w-[1400px] mx-auto px-6 md:px-10">
             <Reveal>
               <div className="max-w-2xl mb-14">
-                <span className="text-[11px] tracking-[0.12em] text-accent">
+                <Eyebrow>
                   02 · לפי סוג תביעה
-                </span>
+                </Eyebrow>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4">
                   הנחיות לפי סוג אירוע
                 </h2>
@@ -310,9 +313,9 @@ export default function Claims() {
           <div className="max-w-[1100px] mx-auto px-6 md:px-10">
             <Reveal>
               <div className="max-w-2xl mb-10">
-                <span className="text-[11px] tracking-[0.12em] text-accent">
+                <Eyebrow>
                   04 · דיווח על אירוע
-                </span>
+                </Eyebrow>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4 leading-tight">
                   דיווח אירוע ביטוחי
                 </h2>
@@ -351,13 +354,9 @@ export default function Claims() {
                 </a>
                 {/* `#start` is a home-page section, and this is /claims —
                     as a bare hash it did nothing at all. */}
-                <a
-                  href="/#start"
-                  onClick={(e) => goToSection(e, "#start")}
-                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors"
-                >
+                <CtaLink href="/#start" onClick={(e) => goToSection(e, "#start")}>
                   ייעוץ מקדים
-                </a>
+                </CtaLink>
               </div>
               <Link
                 to="/"

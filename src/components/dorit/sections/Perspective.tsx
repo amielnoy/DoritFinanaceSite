@@ -1,5 +1,6 @@
 import React from "react";
 import { Quote } from "lucide-react";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 interface Guideline {
   n: string;
@@ -41,9 +42,9 @@ export default function Perspective() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         {/* Header */}
         <div className="max-w-3xl mb-16">
-          <span className="text-[11px] tracking-[0.12em] text-accent">
+          <Eyebrow>
             נקודת מבט · מתוך השטח
-          </span>
+          </Eyebrow>
           <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
             בזמנים לא ודאיים,
             <br />

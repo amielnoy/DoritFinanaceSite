@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTestimonials } from "@/hooks/useContent";
 import { Star, ExternalLink, Loader2, Quote } from "lucide-react";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 // TODO: השתמש/י בקישורים האמיתיים של הפרופיל העסקי ב-Google וב-Midrag.
 const GOOGLE_URL = "https://www.google.com/search?q=דורית+גוב+ארי+ביטוח+חוות+דעת";
@@ -52,9 +53,9 @@ export default function ReviewsWidget() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
           <div>
-            <span className="text-[11px] tracking-[0.12em] text-accent">
+            <Eyebrow>
               המלצות מאומתות
-            </span>
+            </Eyebrow>
             <h2 className="font-heading text-4xl md:text-5xl mt-4 leading-tight">
               לקוחות ממליצים,
               <br />

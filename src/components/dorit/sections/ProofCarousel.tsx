@@ -2,6 +2,7 @@ import React, { useRef } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Stars from "@/components/dorit/primitives/Stars";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 interface Brief {
   tag: string;
@@ -79,9 +80,9 @@ export default function ProofCarousel() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <Reveal>
-              <span className="text-[11px] tracking-[0.12em] text-accent">
+              <Eyebrow>
                 04 · מקרים מהשטח
-              </span>
+              </Eyebrow>
               <h2 className="font-heading text-5xl md:text-6xl mt-4">
                 תיקי הצלחה
               </h2>

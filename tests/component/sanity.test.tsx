@@ -14,6 +14,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { base44Mock, resetBase44Mock } from "./base44-mock";
 
 vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
+// The composition root reads the stored-token flag from app-params, which
+// bootstraps the SDK's token handling at import; components never sign in.
+vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
 // framer-motion's layout animations need APIs jsdom does not implement.
 vi.mock("framer-motion", async () => {
@@ -40,6 +43,7 @@ import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
 import FloatingActions from "@/components/dorit/layout/FloatingActions";
 import PensionFeeCalculator from "@/components/dorit/sections/PensionFeeCalculator";
 import QuickContact from "@/components/dorit/forms/QuickContact";
+import ClaimForm from "@/components/dorit/forms/ClaimForm";
 import FAQ from "@/components/dorit/sections/FAQ";
 import ShareButtons from "@/components/dorit/primitives/ShareButtons";
 import ReviewsWidget from "@/components/dorit/sections/ReviewsWidget";
@@ -240,6 +244,64 @@ describe("<QuickContact />", () => {
     await user.dblClick(submit);
 
     await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("<ClaimForm />", () => {
+  const fill = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByLabelText(/שם מלא/), "ישראלה");
+    await user.type(screen.getByLabelText(/טלפון/), "050-1234567");
+  };
+
+  it("hands the report to the submitClaim backend function with uploaded document urls", async () => {
+    const user = userEvent.setup();
+    render(<ClaimForm />);
+
+    await fill(user);
+    const file = new File(["x"], "receipt.png", { type: "image/png" });
+    await user.upload(screen.getByLabelText(/לחצו לבחירת קבצים/), file);
+    expect(await screen.findByText("receipt.png")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
+    await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalled());
+    const [fnName, payload] = base44Mock.functions.invoke.mock.calls[0] as [string, any];
+    expect(fnName).toBe("submitClaim");
+    expect(payload).toMatchObject({
+      name: "ישראלה",
+      phone: "050-1234567",
+      documents: ["https://example.test/f.png"],
+    });
+  });
+
+  it("reports a failed upload instead of crashing, and keeps the form usable", async () => {
+    // Regression: this path used to call a setter that did not exist and threw
+    // a ReferenceError out of the change handler.
+    const user = userEvent.setup();
+    base44Mock.integrations.Core.UploadFile.mockRejectedValueOnce(new Error("storage down"));
+    render(<ClaimForm />);
+
+    await fill(user);
+    await user.upload(
+      screen.getByLabelText(/לחצו לבחירת קבצים/),
+      new File(["x"], "receipt.png", { type: "image/png" })
+    );
+
+    expect(await screen.findByText(/העלאת מסמך נכשלה/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /שליחת דיווח/ })).toBeEnabled();
+  });
+
+  it("offers a blank form again after a successful report", async () => {
+    // Regression: "send another" used to call an undefined setDone and crash.
+    const user = userEvent.setup();
+    render(<ClaimForm />);
+
+    await fill(user);
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
+    expect(await screen.findByText("הדיווח התקבל")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח נוסף/ }));
+    expect(screen.getByLabelText(/שם מלא/)).toHaveValue("");
+    expect(screen.getByRole("button", { name: /שליחת דיווח/ })).toBeDisabled();
   });
 });
 

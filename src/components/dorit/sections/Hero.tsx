@@ -45,7 +45,7 @@ export default function Hero() {
               className="w-full h-full object-cover"
               fittingType="fill"
               loading="eager"
-              fetchpriority="high"
+              fetchPriority="high"
               style={{ filter: "saturate(0.78) contrast(1.04) brightness(0.94)" }}
             />
             {/* Parchment duotone blends the portrait into the site's warm palette */}

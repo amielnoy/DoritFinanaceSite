@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { services, type Testimonial } from "@/services";
 import { useAuth } from "@/lib/AuthContext";
+import { useTestimonials } from "@/hooks/useContent";
+import { useCreateTestimonial, useRemoveTestimonial } from "@/hooks/useAdmin";
 import { Image } from "@/components/ui/image";
 import { Plus, X, Quote, Trash2, Loader2, Upload } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Stars from "@/components/dorit/primitives/Stars";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 type TestimonialItem = Testimonial;
 
@@ -19,28 +22,17 @@ interface TestimonialForm {
 
 export default function Testimonials() {
   const { isAuthenticated } = useAuth();
-  const [items, setItems] = useState<TestimonialItem[] | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { data, isPending: loading } = useTestimonials();
+  const createTestimonial = useCreateTestimonial();
+  const removeTestimonial = useRemoveTestimonial();
   const [open, setOpen] = useState<boolean>(false);
   const [form, setForm] = useState<TestimonialForm>({ name: "", role: "", quote: "", image_url: "", rating: 5, source: "google" });
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
-  const [busy, setBusy] = useState<boolean>(false);
+  const [uploading, setUploading] = useState<boolean>(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      setItems(await services.content.listTestimonials());
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const items: TestimonialItem[] = data ?? [];
+  const busy = uploading || createTestimonial.isPending;
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -58,13 +50,19 @@ export default function Testimonials() {
 
   const submit = async () => {
     if (!form.name || !form.quote) return;
-    setBusy(true);
-    try {
-      let image_url = form.image_url;
-      if (file) {
+    let image_url = form.image_url;
+    if (file) {
+      setUploading(true);
+      try {
         ({ url: image_url } = await services.uploads.upload(file));
+      } catch {
+        return;
+      } finally {
+        setUploading(false);
       }
-      await services.contentAdmin.createTestimonial({
+    }
+    try {
+      await createTestimonial.mutateAsync({
         name: form.name,
         role: form.role,
         quote: form.quote,
@@ -73,16 +71,12 @@ export default function Testimonials() {
         source: form.source,
       });
       reset();
-      await load();
-    } finally {
-      setBusy(false);
+    } catch {
+      /* the mutation's isError drives the notice below */
     }
   };
 
-  const remove = async (id: string) => {
-    await services.contentAdmin.removeTestimonial(id);
-    load();
-  };
+  const remove = (id: string) => removeTestimonial.mutate(id);
 
   return (
     <section id="testimonials" className="relative py-24 md:py-32 border-t border-border/50 bg-secondary/30">
@@ -90,9 +84,9 @@ export default function Testimonials() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
           <div>
             <Reveal>
-              <span className="text-[11px] tracking-[0.12em] text-accent">
+              <Eyebrow>
                 05 · לקוחות מספרים
-              </span>
+              </Eyebrow>
               <h2 className="font-heading text-5xl md:text-6xl mt-4">לקוחות מספרים</h2>
             </Reveal>
           </div>

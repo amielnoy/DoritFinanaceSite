@@ -85,11 +85,9 @@ soft_suite() {
 }
 
 has lint      && run_suite "lint" npx eslint . --quiet
-# Blocking, but only on what is new. `tsc` reports 93 errors inherited from the
-# JS→TS conversion — all of them .tsx files passing props to untyped .jsx shadcn
-# primitives — so the gate allows for exactly those (tests/typecheck-baseline.json)
-# and fails on anything on top. `npm run typecheck` still prints the full list.
-has typecheck && run_suite "typecheck" npm run typecheck:gate
+# `tsc` is blocking on zero errors. The ratchet that used to allow for the
+# inherited set (tests/typecheck-baseline.json) went with the errors it held.
+has typecheck && run_suite "typecheck" npm run typecheck
 has unit      && run_suite "unit" npx vitest run tests/unit
 has component && run_suite "component" npx vitest run tests/component
 has contract  && run_suite "contract" npx vitest run tests/contract

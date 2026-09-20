@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useArticles } from "@/hooks/useContent";
 import { Image } from "@/components/ui/image";
@@ -10,6 +10,7 @@ import Footer from "@/components/dorit/layout/Footer";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 interface BlogListItem {
   id: string;
@@ -97,9 +98,9 @@ export default function Blog() {
       <div className="pt-32 md:pt-36 pb-24">
         <div className="max-w-[1400px] mx-auto px-6 md:px-10">
           <Reveal>
-            <span className="text-[11px] tracking-[0.12em] text-accent">
+            <Eyebrow>
               מאמרים ותובנות
-            </span>
+            </Eyebrow>
             <h1 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
               בלוג · חידושים בעולם הביטוח
             </h1>
