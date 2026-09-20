@@ -301,7 +301,13 @@ describe("BlogPost writes match the BlogPost entity", () => {
 
 describe("Testimonial.create payloads match the Testimonial entity", () => {
   const testimonial = loadEntity("Testimonial");
-  const calls = findObjectLiteralCalls(/services\.contentAdmin\.createTestimonial\(\s*/);
+  /* The literal is authored at the hook call now that the admin screens write through
+     `useCreateTestimonial` rather than reaching for the port themselves. Same reasoning as
+     the publish toggles above — the component decides the fields and everything below it
+     forwards them — with one extra edge: the port call is `createTestimonial(draft)`, which
+     has no literal to read at all, so a scan anchored there walks past it and lands on the
+     `{ queryKey }` of the next `invalidateQueries`. */
+  const calls = findObjectLiteralCalls(/createTestimonial\.mutateAsync\(\s*/);
 
   it("sends only declared fields and both required ones", () => {
     expect(calls.length).toBeGreaterThan(0);
