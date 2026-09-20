@@ -13,6 +13,7 @@ import {
   CONSENT_VERSION,
   HUMAN_HANDOFF,
 } from "@/config/compliance";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 /** Everything that distinguishes one on-site agent from another. */
 export interface AgentDescriptor {
@@ -400,9 +401,9 @@ export default function AgentChat({
     <section id={descriptor.sectionId} className={descriptor.sectionClassName}>
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
-          <span className="text-[11px] tracking-[0.12em] text-accent">
+          <Eyebrow>
             {descriptor.eyebrow}
-          </span>
+          </Eyebrow>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
             {line1?.trim()}
             {line2 ? (

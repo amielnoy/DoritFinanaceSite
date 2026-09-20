@@ -5,6 +5,7 @@ import InsuranceAssessment from "@/components/dorit/sections/InsuranceAssessment
 import PensionFeeCalculator from "@/components/dorit/sections/PensionFeeCalculator";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import { SITE_NAME, breadcrumbLd, useSeo } from "@/lib/seo";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 /**
  * The two self-assessment tools, off the home page.
@@ -37,7 +38,7 @@ export default function Tools() {
         <section className="pt-40 pb-16 md:pt-48 md:pb-20 border-b border-border/50">
           <div className="max-w-[1400px] mx-auto px-6 md:px-10">
             <Reveal>
-              <span className="text-[11px] tracking-[0.12em] text-accent">כלים</span>
+              <Eyebrow>כלים</Eyebrow>
               <h1 className="font-heading text-5xl md:text-7xl mt-5 leading-tight max-w-4xl">
                 כלים לבדיקה עצמית
               </h1>

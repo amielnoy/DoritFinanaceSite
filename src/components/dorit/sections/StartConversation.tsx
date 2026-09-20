@@ -5,6 +5,7 @@ import QuickContact from "@/components/dorit/forms/QuickContact";
 import { AGENTS } from "@/config/agents";
 import { CONTACT } from "@/config/contact";
 import Reveal from "@/components/dorit/primitives/Reveal";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 /**
  * The one place on the home page where a visitor makes contact.
@@ -26,7 +27,7 @@ export default function StartConversation() {
     <section id="start" className="py-24 md:py-32 border-t border-border/60">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <Reveal>
-          <span className="text-[11px] tracking-[0.12em] text-accent">03 · ההקשבה</span>
+          <Eyebrow>03 · ההקשבה</Eyebrow>
           <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight max-w-4xl">
             נתחיל בשיחה קצרה — כדי שדורית תגיע מוכנה
           </h2>

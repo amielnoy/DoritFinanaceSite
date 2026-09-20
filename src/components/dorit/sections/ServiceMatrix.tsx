@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { Calculator, Heart, Landmark, HeartHandshake, TrendingDown } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 interface Pillar {
-  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+  icon: LucideIcon;
   title: string;
   sub: string;
   desc: string;
@@ -77,9 +79,9 @@ export default function ServiceMatrix() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
           <div>
             <Reveal>
-              <span className="text-[11px] tracking-[0.12em] text-accent">
+              <Eyebrow>
                 02 · תחומי הליווי
-              </span>
+              </Eyebrow>
               <h2 className="font-heading text-5xl md:text-6xl mt-4 max-w-xl">
                 חמישה עמודי התכנון
               </h2>

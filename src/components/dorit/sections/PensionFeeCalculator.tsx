@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { Calculator, TrendingDown, Wallet, PiggyBank } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { CtaLink } from "@/components/dorit/primitives/Cta";
 import {
   computePensionFees,
   formatIls as fmtCurrency,
   type PensionFeeResult,
 } from "@/lib/pension-fee";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 interface NumFieldProps {
   label: string;
@@ -15,7 +18,7 @@ interface NumFieldProps {
 }
 
 interface ResultCardProps {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   label: string;
   value: string;
   highlight?: boolean;
@@ -44,9 +47,9 @@ export default function PensionFeeCalculator() {
     <section id="fee-calculator" className="relative py-24 md:py-32 border-t border-border/60">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
-          <span className="text-[11px] tracking-[0.12em] text-accent">
+          <Eyebrow>
             כלי שקיפות
-          </span>
+          </Eyebrow>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
             כמה באמת
             <br />
@@ -146,12 +149,9 @@ export default function PensionFeeCalculator() {
             </p>
           </div>
 
-          <a
-            href="/#start"
-            className="mt-8 inline-flex items-center gap-2 px-7 py-3.5 bg-highlight-muted text-primary font-medium hover:bg-highlight-strong transition-colors duration-300 shadow-sm"
-          >
+          <CtaLink muted href="/#start" className="mt-8">
             רוצים לדעת אם אפשר לחסוך? שאלו אותי
-          </a>
+          </CtaLink>
         </div>
       </div>
     </section>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { MessageCircle, Linkedin, Link2, Check } from "lucide-react";
 import { SITE_URL } from "@/lib/seo";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 const SHARE_TEXT =
   "ממליצים בחום על דורית גוב ארי — ייעוץ פיננסי וביטוחי אישי, מקצועי ואנושי. מומלץ ביותר.";
@@ -27,9 +28,9 @@ export default function QuickShare() {
   return (
     <section className="relative py-20 md:py-24 border-t border-border/60 bg-secondary/30">
       <div className="max-w-2xl mx-auto px-6 text-center">
-        <span className="text-[11px] tracking-[0.12em] text-accent">
+        <Eyebrow>
           שיתוף
-        </span>
+        </Eyebrow>
         <h2 className="font-heading text-3xl md:text-4xl mt-4 leading-tight">
           מכירים מישהו שזקוק לייעוץ?
         </h2>
