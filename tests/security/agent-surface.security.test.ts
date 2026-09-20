@@ -219,7 +219,18 @@ describe("Phishing — the site's name on somebody else's message", () => {
   it("keeps the escalation fallback contact identical to the site's own", () => {
     // The agent reads these out when everything else failed. A stale number
     // here sends a person who already needs help to a dead line.
-    expect(COMPLIANCE).toMatch(/050-831-1776/);
+    //
+    // `compliance.ts` no longer spells the digits out — it interpolates
+    // `CONTACT.phoneDisplay`. That is the stronger version of this property, not a
+    // weaker one: the two cannot drift, because there is only one of them. So the
+    // assertion follows the binding. Asserting the literal here would now fail on a
+    // file that is *more* correct than the one the test was written against.
+    //
+    // `escalateToHuman` gets no such help: it is a Base44 entry point with no shared
+    // module (see AGENTS.md), so its copy is a hand-kept literal and still matches by
+    // hand — which is exactly why it keeps its own assertion below.
+    expect(COMPLIANCE).toMatch(/import \{ CONTACT \} from "@\/config\/contact";/);
+    expect(COMPLIANCE).toMatch(/\$\{CONTACT\.phoneDisplay\}/);
     expect(ESCALATE).toMatch(/050-831-1776/);
     expect(CONTACT).toMatch(/050-831-1776/);
   });
