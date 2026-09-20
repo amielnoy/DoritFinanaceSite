@@ -516,68 +516,222 @@
     <section id="backend">
       <h2><span class="num">04</span> Backend</h2>
       <p class="lede">
-        Declarative, and still legible. The backend is four JSON entity
-        definitions, <b>five Deno functions</b>, three OAuth connectors
-        (<code>googlecalendar</code>, <code>outlook</code>,
+        Declarative, and still legible. The backend is <b>five</b> JSON entity
+        definitions, <b>seven Deno functions</b> (~2,550 lines in total), three
+        OAuth connectors (<code>googlecalendar</code>, <code>outlook</code>,
         <code>googlesheets</code>) and three agent definitions — all in
-        <code>base44/</code>, all in version control.
+        <code>base44/</code>, all in version control. There is no server to
+        operate: Base44 hosts the runtime, and a deploy is a publish.
       </p>
 
+      <h3>4.1 · The data model</h3>
       <div class="scroll">
         <table>
           <thead>
-            <tr><th>Entity</th><th>Purpose</th><th>Create</th><th>Read</th><th>Update / Delete</th></tr>
+            <tr><th>Entity</th><th>Fields</th><th>Create</th><th>Read</th><th>Update / Delete</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>Lead</code></td><td>Enquiries from the three forms</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
-            <tr><td><code>BlogPost</code></td><td>Articles</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
-            <tr><td><code>Testimonial</code></td><td>Reviews on the home page</td><td>default</td><td>default</td><td>default</td></tr>
-            <tr><td><code>User</code></td><td>Role carrier (<code>admin</code> / <code>user</code>)</td><td colspan="3">platform-managed</td></tr>
+            <tr><td><code>Lead</code></td><td class="sans">name, phone, email, source, topic, timing, message, status, escalation_reason, handled_by_agent, consent_version, consent_at</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
+            <tr><td><code>Contact</code></td><td class="sans">phone, name, email, channel, notes, last_seen</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
+            <tr><td><code>BlogPost</code></td><td class="sans">title, excerpt, body, image_url, tags, published</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
+            <tr><td><code>Testimonial</code></td><td class="sans">name, role, quote, image_url, rating, source</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td>unset — platform default</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
+            <tr><td><code>User</code></td><td class="sans">role (<code>admin</code> / <code>user</code>)</td><td colspan="3">platform-managed; no rules of its own</td></tr>
           </tbody>
         </table>
       </div>
 
       <p>
-        The <code>Lead</code> rules are exactly right for the job: anyone may
-        submit, only an admin may read. That single line is what stands between
-        a public contact form and a public list of clients' names and phone
-        numbers, which is why the contract suite asserts it explicitly rather
-        than trusting it.
+        <code>Lead</code> and <code>Contact</code> carry the same rule and it is
+        exactly right for the job: <b>anyone may create, only an admin may
+        read.</b> Those two lines are what stand between a public contact form
+        and a public list of clients' names and phone numbers, which is why the
+        contract suite asserts them explicitly rather than trusting them.
+      </p>
+      <p>
+        The asymmetry is the design. Every entity the public writes to is
+        write-only to the public, and every entity the public reads is
+        admin-only to write — <code>BlogPost</code> is the mirror image of
+        <code>Lead</code>, and there is no entity that is public in both
+        directions.
       </p>
 
-      <h3>The seven functions</h3>
+      <h3>4.2 · The seven functions</h3>
       <div class="scroll">
         <table>
           <thead>
-            <tr><th>Function</th><th>What it does</th><th>Side effects</th></tr>
+            <tr><th>Function</th><th>Lines</th><th>What it does</th><th>Side effects</th><th>Statuses</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>submitLead</code></td><td>The enquiry path for all three forms and for the interview agent</td><td>writes <code>Lead</code>; mails the agency, the operations team and the visitor; Outlook event; sheet row</td></tr>
-            <tr><td><code>submitClaim</code></td><td>The claims form</td><td>writes <code>Lead</code>; mails</td></tr>
-            <tr><td><code>escalateToHuman</code></td><td>Hands a conversation to a person, for any reason an agent may not handle</td><td>writes <code>Lead</code> when contactable; always notifies; sheet row</td></tr>
-            <tr><td><code>upsertContact</code></td><td>Records or completes the person behind the enquiries, keyed on a normalised phone number. Built and tested; wired to no agent (see B-8)</td><td>writes <code>Contact</code>; sheet row on creation only</td></tr>
-            <tr><td><code>logSupportChat</code></td><td>Files a finished support conversation — topic, outcome, redacted transcript</td><td>sheet row; nothing else</td></tr>
-            <tr><td><code>createConsultationEvent</code></td><td>Books the follow-up in Google Calendar</td><td><code>googlecalendar</code> connector</td></tr>
-            <tr><td><code>createOutlookEvent</code></td><td>The same, in Outlook</td><td><code>outlook</code> connector</td></tr>
+            <tr><td><code>submitLead</code></td><td class="sans">~1,050</td><td>The enquiry path for all three forms and for the interview agent</td><td>writes <code>Lead</code>; mails the agency, the operations team and the visitor; Outlook event; sheet row</td><td class="sans">400 · 500</td></tr>
+            <tr><td><code>escalateToHuman</code></td><td class="sans">~500</td><td>Hands a conversation to a person, for any reason an agent may not handle</td><td>writes <code>Lead</code> when contactable; always notifies; sheet row</td><td class="sans">200 only</td></tr>
+            <tr><td><code>submitClaim</code></td><td class="sans">~380</td><td>The claims form</td><td>writes <code>Lead</code>; mails</td><td class="sans">400 · 500</td></tr>
+            <tr><td><code>upsertContact</code></td><td class="sans">~220</td><td>Records or completes the person behind the enquiries, keyed on a normalised phone number. Built and tested; wired to no agent (see B-8)</td><td>writes <code>Contact</code>; sheet row on creation only</td><td class="sans">400 · 500</td></tr>
+            <tr><td><code>logSupportChat</code></td><td class="sans">~165</td><td>Files a finished support conversation — topic, outcome, redacted transcript</td><td>sheet row; nothing else</td><td class="sans">400 · 500</td></tr>
+            <tr><td><code>createConsultationEvent</code></td><td class="sans">~115</td><td>Books the follow-up in Google Calendar</td><td><code>googlecalendar</code> connector</td><td class="sans">400 · 500 · 502</td></tr>
+            <tr><td><code>createOutlookEvent</code></td><td class="sans">~110</td><td>The same, in Outlook</td><td><code>outlook</code> connector</td><td class="sans">400 · 500 · 502</td></tr>
           </tbody>
         </table>
       </div>
       <p>
-        They share a discipline worth naming: <b>the record is written first and
-        everything after it is best-effort.</b> Email is the fragile channel —
-        deliverability, a verified domain, a recipient who typed their address —
-        and the database is the reliable one, so a failed send can no longer
-        lose an enquiry. Only a failed write returns an error to the caller;
-        everything else is collected into a <code>warnings</code> array and
-        reported in the response.
+        <code>escalateToHuman</code> is the one exception in that last column,
+        and deliberately: it answers <b>200 and nothing else</b>. It is the path
+        a visitor reaches when the agent has decided it may not answer, so a
+        failure inside it must not become a second dead end on top of the first
+        — whatever breaks, the visitor still gets the contact details for a
+        person. Everything that could have failed is reported in the body
+        instead.
+      </p>
+
+      <h3>4.3 · The shape of a request</h3>
+      <p>
+        All seven are written to the same spine, and reading
+        <code>createConsultationEvent</code> first is the cheapest way to learn
+        it — it is 116 lines and has one side effect:
+      </p>
+      <ol>
+        <li><b>Mint a request id.</b> <code>crypto.randomUUID().slice(0, 8)</code>,
+          carried as <code>rid</code> through every log line the request emits,
+          so one enquiry can be followed across a mail failure and a sheet
+          append without grepping by timestamp.</li>
+        <li><b>Validate, and refuse early.</b> Missing <code>name</code> or
+          <code>phone</code> is a <code>400</code> before anything is written.</li>
+        <li><b>Persist, and fail loudly if that fails.</b> The entity write is
+          the only step allowed to return <code>500</code> — commented in
+          <code>submitLead</code> as <span dir="rtl">״זהו הכשל היחיד שחייב
+          להיכשל בקול״</span>, the only failure that must fail out loud.</li>
+        <li><b>Then everything else, best-effort.</b> Mail, calendar, sheet —
+          each in its own <code>try</code>, each failure logged and pushed onto
+          a <code>warnings</code> array that ships in the <code>200</code>
+          response.</li>
+      </ol>
+      <p>
+        That ordering is the backend's central discipline and it was once the
+        other way round. <b>Email is the fragile channel</b> — deliverability, a
+        verified domain, a recipient who mistyped their address — and the
+        database is the reliable one, so a failed send can no longer lose an
+        enquiry. An upstream refusal is a <code>502</code> rather than a
+        <code>500</code> where a connector is involved, so "Google said no" and
+        "we broke" stay distinguishable in the logs.
       </p>
       <p>
-        <code>createConsultationEvent</code> is the one to read first if you
-        want the house style: it validates <code>name</code> and
-        <code>phone</code>, returns 400 without them, 502 when Google refuses,
-        500 on anything else, and never puts the access token in a response. Its
-        request shape and every one of those status codes are pinned by contract
-        tests.
+        Logs are single-line JSON — <code>{t, level, fn, event, …fields}</code>
+        — written through one <code>log()</code> helper present in all seven
+        functions. Access tokens never enter a response, and the security suite
+        greps for a <code>console.*</code> call carrying a token or a phone
+        number. <code>createConsultationEvent</code>'s request shape and every
+        one of its status codes are pinned by contract tests, so the spine is
+        enforced and not merely described.
+      </p>
+
+      <h3>4.4 · Two privilege levels, chosen per call</h3>
+      <p>
+        The functions do not run wholesale as an administrator. The public write
+        goes through the <em>caller's own</em> client —
+        <code>base44.entities.Lead.create(…)</code> — so it is admitted by the
+        same <code>create: true</code> rule that governs a browser, and a bug
+        that widened it could not quietly read the table back.
+        <code>base44.asServiceRole</code> is reached for only where the work
+        genuinely exceeds a visitor's rights: finding an open interview to
+        update (<code>read</code> is admin-only), fetching a connector's access
+        token, sending mail through the platform.
+      </p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Function</th><th>Service-role calls</th><th>Caller-scoped entity calls</th></tr></thead>
+          <tbody>
+            <tr><td><code>submitLead</code></td><td class="sans">6</td><td class="sans">1</td></tr>
+            <tr><td><code>upsertContact</code></td><td class="sans">3</td><td class="sans">1</td></tr>
+            <tr><td><code>escalateToHuman</code></td><td class="sans">2</td><td class="sans">1</td></tr>
+            <tr><td><code>submitClaim</code></td><td class="sans">1</td><td class="sans">1</td></tr>
+            <tr><td><code>logSupportChat</code>, <code>createConsultationEvent</code>, <code>createOutlookEvent</code></td><td class="sans">1 each</td><td class="sans">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>4.5 · Duplication, on purpose</h3>
+      <p>
+        Each function is an isolated entry point with <b>no shared module
+        between them</b> — the platform gives them nothing to import. So the
+        helpers that must agree are copied by hand, and the contract suite makes
+        the copies prove they still match:
+      </p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Helper</th><th>Copies</th><th>Lives in</th></tr></thead>
+          <tbody>
+            <tr><td><code>log()</code></td><td class="sans">7</td><td class="sans">every function</td></tr>
+            <tr><td><code>redact()</code></td><td class="sans">4</td><td class="sans">submitLead, escalateToHuman, upsertContact, logSupportChat</td></tr>
+            <tr><td><code>SHEET_COLUMNS</code>, <code>appendEventRow()</code></td><td class="sans">4</td><td class="sans">submitLead, escalateToHuman, upsertContact, logSupportChat</td></tr>
+            <tr><td><code>escapeHtml()</code>, <code>sendMail()</code>, <code>NOTIFY_EMAILS</code></td><td class="sans">3</td><td class="sans">submitLead, submitClaim, escalateToHuman</td></tr>
+            <tr><td><code>buildClientHtml()</code></td><td class="sans">2</td><td class="sans">submitLead, submitClaim</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <b>Duplicated is fine; drifted is not.</b>
+        <code>tests/contract/agents.contract.test.ts</code> fails when the
+        copies stop matching, and the recipient lists are the reason it exists:
+        a mailbox added to one function and not another raises no error
+        anywhere. The mail simply reaches one fewer person, and an escalation is
+        where that costs most.
+      </p>
+
+      <h3>4.6 · What leaves the system</h3>
+      <p>
+        Three outbound surfaces, each with its own failure mode already
+        accounted for above:
+      </p>
+      <ul>
+        <li><b>Mail, through two transports.</b> <code>sendMail()</code> routes
+          by what each transport can actually reach: <code>CORE_EMAILS</code>
+          goes through Base44's <code>Core.SendEmail</code>, which delivers only
+          to registered users of the app, and everyone else goes to
+          <b><code>dorit-mailer</code></b> — a Cloudflare Pages Function holding
+          the Resend key, the sender identity and the recipient list in its own
+          environment. It accepts a fully-composed <code>type: "rendered"</code>
+          message, because the templates, the HTML escaping and
+          <code>redact()</code> belong with the function that knows what the
+          text is. Every request needs <code>MAILER_TOKEN</code>; without it the
+          endpoint is an open relay.</li>
+        <li><b>A Google Sheet</b>, as an operational log: thirteen columns
+          (<span dir="rtl">מועד, סוג האירוע, מקור, מסלול, סוכן, נושא, מועד
+          מבוקש, שם, טלפון, אימייל, מזהה רשומה, סיבת העברה, תקציר</span>) shared
+          by the four functions that append to it, which is why
+          <code>SHEET_COLUMNS</code> is one of the pinned duplicates.</li>
+        <li><b>Two calendars</b>, Google and Outlook, behind OAuth connectors
+          whose tokens are fetched per request and never logged.</li>
+      </ul>
+
+      <h3>4.7 · Who calls what</h3>
+      <p>
+        The browser never touches an entity or a function directly. It goes
+        through the ports in <code>src/services/ports.ts</code> —
+        <code>LeadPort</code> is explicit that submitting an enquiry is
+        <em>"the only write path the public site has"</em> — implemented by the
+        <code>Base44*Service</code> adapters, which call
+        <code>functions.invoke(…)</code> and hand back a
+        <code>SubmissionReceipt</code> carrying <code>ok</code>,
+        <code>leadId</code> and those <code>warnings</code>.
+      </p>
+      <p>
+        The agents reach the same functions as declared tools, and the wiring is
+        deliberately narrow — each agent gets the minimum the job needs:
+      </p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Agent</th><th>Tools</th></tr></thead>
+          <tbody>
+            <tr><td><code>needs_interview</code></td><td><code>submitLead</code>, <code>createConsultationEvent</code>, <code>escalateToHuman</code></td></tr>
+            <tr><td><code>blog_recommender</code></td><td><code>BlogPost</code> (read only), <code>escalateToHuman</code></td></tr>
+            <tr><td><code>support_agent</code></td><td><code>BlogPost</code> (read only), <code>logSupportChat</code>, <code>escalateToHuman</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        No agent can read <code>Lead</code> or <code>Contact</code>, and the two
+        that do not collect details cannot write one either. Every agent holds
+        <code>escalateToHuman</code>, because the route to a person is the one
+        capability none of them may be missing.
       </p>
       <div class="callout">
         <span class="label">Unchecked</span>
