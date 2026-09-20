@@ -1,175 +1,14 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowLeft,
-  Check,
-  RotateCcw,
-  Heart,
-  HeartPulse,
-  Activity,
-  Shield,
-  Umbrella,
-  Briefcase,
-  TrendingUp,
-  Calendar,
-} from "lucide-react";
-
-interface Option {
-  value: string;
-  label: string;
-}
-
-interface Question {
-  id: string;
-  label: string;
-  hint: string;
-  options: Option[];
-}
-
-const QUESTIONS: Question[] = [
-  {
-    id: "stage",
-    label: "באיזה שלב חיים את/ה?",
-    hint: "השלב הנוכחי משפיע על סדר העדיפויות",
-    options: [
-      { value: "single", label: "רווק/ה" },
-      { value: "couple", label: "זוג ללא ילדים" },
-      { value: "parent", label: "הורה לילדים" },
-      { value: "retiree", label: "לקראת פרישה / פרוש/ת" },
-    ],
-  },
-  {
-    id: "work",
-    label: "איך את/ה עובד/ת?",
-    hint: "אופן התעסוקה משנה את סוג ההגנה הנדרשת",
-    options: [
-      { value: "employee", label: "שכיר/ה" },
-      { value: "selfemployed", label: "עצמאי/ת" },
-      { value: "none", label: "לא עובד/ת כרגע" },
-    ],
-  },
-  {
-    id: "mortgage",
-    label: "יש משכנתא או הלוואות משמעותיות?",
-    hint: "התחייבויות גבוהות מחייבות הגנה על המשפחה",
-    options: [
-      { value: "yes", label: "כן" },
-      { value: "no", label: "לא" },
-    ],
-  },
-  {
-    id: "health",
-    label: "יש מחלות כרוניות או סיכון משפחתי?",
-    hint: "רקע רפואי משפיע על היקף הכיסוי המומלץ",
-    options: [
-      { value: "yes", label: "כן" },
-      { value: "no", label: "לא / לא יודע/ת" },
-    ],
-  },
-];
-
-interface Recommendation {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  title: string;
-  why: string;
-  priority: boolean;
-}
-
-function buildRecommendations(answers: Record<string, string>): Recommendation[] {
-  const recs: Recommendation[] = [];
-  const stage = answers.stage;
-  const work = answers.work;
-  const mortgage = answers.mortgage;
-  const health = answers.health;
-
-  // ביטוח חיים — תלויים או התחייבויות
-  if (stage === "parent" || mortgage === "yes" || stage === "couple") {
-    recs.push({
-      icon: Heart,
-      title: "ביטוח חיים",
-      why:
-        stage === "parent"
-          ? "ילדים תלויים בהכנסתך — ביטוח חיים מבטיח שהם יהיו מוגנים גם אם משהו יקרה."
-          : mortgage === "yes"
-          ? "משכנתא משמעותית נשארת גם בלעדיך — ביטוח חיים מגן על המשפחה מפני נטל כלכלי."
-          : "בן/בת זוג תלויים בהכנסתך המשותפת — כדאי להבטיח הגנה בסיסית.",
-      priority: true,
-    });
-  }
-
-  // ביטוח בריאות משלים — כולם, חזק יותר עם סיכון
-  recs.push({
-    icon: Activity,
-    title: "ביטוח בריאות משלים",
-    why:
-      health === "yes"
-        ? "רקע רפואי משפחתי מעלה את החשיבות של כיסוי לרפואה פרטית, תרופות וטיפולים שאינם בסל."
-        : "גם בריאות תקינה נזקקת לרפואה פרטית, טיפולים ותרופות שמחוץ לסל הבסיסי.",
-    priority: health === "yes",
-  });
-
-  // אובדן כושר עבודה — עצמאי או מפרנס עיקרי עם משכנתא
-  if (work === "selfemployed" || (mortgage === "yes" && stage === "parent")) {
-    recs.push({
-      icon: Shield,
-      title: "ביטוח אובדן כושר עבודה",
-      why:
-        work === "selfemployed"
-          ? "עצמאי/ת שאינו/ה עובד/ת עקב מחלה או תאונה — ההכנסה נעצרת לחלוטין. זה הביטוח הקריטי ביותר עבורך."
-          : "כשהמשפחה תלויה בהכנסתך ויש משכנתא — אובדן כושר עבודה מגן על היכולת להמשיך ולעמוד בהתחייבויות.",
-      priority: true,
-    });
-  }
-
-  // תאונות אישיות — עצמאי
-  if (work === "selfemployed") {
-    recs.push({
-      icon: Umbrella,
-      title: "ביטוח תאונות אישיות",
-      why: "כיסוי לנזקי גוף מתאונות — רלוונטי במיוחד לעצמאיים שאינם מוגנים דרך מעסיק.",
-      priority: false,
-    });
-  }
-
-  // תכנון פנסיוני — הורה או לקראת פרישה
-  if (stage === "retiree" || stage === "parent") {
-    recs.push({
-      icon: TrendingUp,
-      title: "תכנון פנסיוני / מנהלים",
-      why:
-        stage === "retiree"
-          ? "לקראת פרישה חשוב לבחון את מוצרי החיסכון, דמי הניהול ומסלולי הפרישה — כדי למקסם את ההכנסה הפנסיונית."
-          : "ככל שמתקרבים לפרישה, דמי הניהול ובחירת המסלול משפיעים על עשרות אלפי שקלים בעתיד.",
-      priority: stage === "retiree",
-    });
-  }
-
-  // מחלות קשות — סיכון בריאותי
-  if (health === "yes") {
-    recs.push({
-      icon: HeartPulse,
-      title: "ביטוח מחלות קשות",
-      why: "רקע משפחתי מצדיק כיסוי למחלות קשות — פיצוי חד-פעמי שמאפשר התמודדות כלכלית בעת משבר בריאותי.",
-      priority: false,
-    });
-  }
-
-  // מנהלים לשכיר — נדיר שיש, אבל רלוונטי
-  if (work === "employee" && stage !== "retiree") {
-    recs.push({
-      icon: Briefcase,
-      title: "בחינת קרן השתלמות / פנסיה",
-      why: "שכירים רבים משלמים דמי ניהול גבוהים מבלי לדעת — כדאי לבחון את המוצרים הקיימים ולהוריד עלויות.",
-      priority: false,
-    });
-  }
-
-  return recs;
-}
+import { ArrowLeft, Check, RotateCcw, Calendar } from "lucide-react";
+import { QUESTIONS, buildRecommendations } from "@/lib/insurance-assessment";
+import type { Answers } from "@/lib/insurance-assessment";
+import { CtaLink } from "@/components/dorit/primitives/Cta";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 export default function InsuranceAssessment() {
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Answers>({});
   const [done, setDone] = useState(false);
 
   const current = QUESTIONS[step];
@@ -202,9 +41,9 @@ export default function InsuranceAssessment() {
     <section id="assessment" className="py-24 md:py-32 bg-background border-t border-border">
       <div className="max-w-[1100px] mx-auto px-6 md:px-10">
         <div className="text-center max-w-2xl mx-auto mb-14">
-          <span className="text-[11px] tracking-[0.12em] text-accent">
+          <Eyebrow>
             בדיקה עצמית
-          </span>
+          </Eyebrow>
           <h2 className="font-heading text-4xl md:text-5xl mt-5 leading-tight">
             איזה ביטוח באמת מתאים לך?
           </h2>
@@ -356,13 +195,10 @@ export default function InsuranceAssessment() {
                     <p className="text-sm text-muted-foreground text-center sm:text-right">
                       ההערכה כאן היא כללית בלבד. להמלצות מדויקות — כדאי לשוחח עם דורית.
                     </p>
-                    <a
-                      href="#start"
-                      className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary-foreground font-medium hover:bg-highlight-strong transition-colors duration-300 shadow-sm whitespace-nowrap"
-                    >
+                    <CtaLink href="#start" className="whitespace-nowrap">
                       <Calendar size={18} />
                       לשיחה קצרה עם דורית
-                    </a>
+                    </CtaLink>
                   </div>
                 </motion.div>
               )}
