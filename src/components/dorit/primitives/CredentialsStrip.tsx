@@ -31,7 +31,7 @@ export default function CredentialsStrip() {
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-foreground/80 hover:text-accent transition-colors"
           >
-            <MessageCircle size={16} className="text-[#25D366]" />
+            <MessageCircle size={16} className="text-whatsapp" />
             WhatsApp
           </a>
           <a
