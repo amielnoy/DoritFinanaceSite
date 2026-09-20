@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Upload, X, FileText, Loader2, Check, AlertTriangle } from "lucide-react";
 import { services } from "@/services";
 import { useSubmission } from "@/hooks/useSubmission";
+import { CtaButton } from "@/components/dorit/primitives/Cta";
+import { Field, inputClass } from "@/components/dorit/primitives/Field";
 
 const CLAIM_TYPES = [
   "ביטוח בריאות משלים",
@@ -16,31 +18,69 @@ interface UploadedDoc {
   url: string;
 }
 
+interface ClaimFields {
+  name: string;
+  phone: string;
+  email: string;
+  claimType: string;
+  eventDate: string;
+  policyNumber: string;
+  description: string;
+}
+
+const EMPTY: ClaimFields = {
+  name: "",
+  phone: "",
+  email: "",
+  claimType: "",
+  eventDate: "",
+  policyNumber: "",
+  description: "",
+};
+
 export default function ClaimForm() {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [claimType, setClaimType] = useState("");
-  const [eventDate, setEventDate] = useState("");
-  const [policyNumber, setPolicyNumber] = useState("");
-  const [description, setDescription] = useState("");
+  const [form, setForm] = useState<ClaimFields>(EMPTY);
   const [docs, setDocs] = useState<UploadedDoc[]>([]);
-  const { sending, sent: done, error, submit: submitReport } = useSubmission("report");
+  const { sending, sent: done, error: submitError, submit: submitReport, reset } = useSubmission("report");
   const [uploading, setUploading] = useState(false);
+  /**
+   * Upload failures are the form's own state, separate from the submission
+   * state machine: a document that failed to upload must not put the whole
+   * form into "error", because the visitor can simply try the file again.
+   *
+   * This used to call a `setError` that did not exist — `error` comes from
+   * `useSubmission`, which exposes no setter — so a failed upload threw a
+   * ReferenceError instead of showing a message. (Baselined as TS2304.)
+   */
+  const [uploadError, setUploadError] = useState("");
+  const error = uploadError || submitError;
+
+  const set = (key: keyof ClaimFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const { name, phone, email, claimType, eventDate, policyNumber, description } = form;
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setUploading(true);
+    setUploadError("");
     try {
       for (const file of Array.from(files)) {
         const { url: file_url } = await services.uploads.upload(file);
         setDocs((d) => [...d, { name: file.name, url: file_url }]);
       }
-    } catch (e) {
-      setError("העלאת מסמך נכשלה. ניתן לנסות שוב.");
+    } catch {
+      setUploadError("העלאת מסמך נכשלה. ניתן לנסות שוב.");
     } finally {
       setUploading(false);
     }
+  };
+
+  const startAnother = () => {
+    reset();
+    setForm(EMPTY);
+    setDocs([]);
+    setUploadError("");
   };
 
   const removeDoc = (idx: number) => {
@@ -77,11 +117,7 @@ export default function ClaimForm() {
           להמשך טיפול התביעה. במקרה דחוף — ניתן לחייג גם עכשיו.
         </p>
         <button
-          onClick={() => {
-            setDone(false);
-            setName(""); setPhone(""); setEmail(""); setClaimType("");
-            setEventDate(""); setPolicyNumber(""); setDescription(""); setDocs([]);
-          }}
+          onClick={startAnother}
           className="mt-8 text-sm tracking-wide underline underline-offset-4 hover:text-accent transition-colors"
         >
           שליחת דיווח נוסף
@@ -103,25 +139,25 @@ export default function ClaimForm() {
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="שם מלא *">
-            <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
+            <input value={name} onChange={set("name")} className={inputClass()} />
           </Field>
           <Field label="טלפון *">
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} dir="ltr" />
+            <input value={phone} onChange={set("phone")} className={inputClass()} dir="ltr" />
           </Field>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="אימייל (לא חובה)">
-            <input value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} dir="ltr" />
+            <input value={email} onChange={set("email")} className={inputClass()} dir="ltr" />
           </Field>
           <Field label="מספר פוליסה (לא חובה)">
-            <input value={policyNumber} onChange={(e) => setPolicyNumber(e.target.value)} className={inputCls} />
+            <input value={policyNumber} onChange={set("policyNumber")} className={inputClass()} />
           </Field>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="סוג אירוע">
-            <select value={claimType} onChange={(e) => setClaimType(e.target.value)} className={inputCls}>
+            <select value={claimType} onChange={set("claimType")} className={inputClass()}>
               <option value="">בחירת סוג…</option>
               {CLAIM_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
@@ -129,17 +165,17 @@ export default function ClaimForm() {
             </select>
           </Field>
           <Field label="תאריך האירוע">
-            <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputCls} dir="ltr" />
+            <input type="date" value={eventDate} onChange={set("eventDate")} className={inputClass()} dir="ltr" />
           </Field>
         </div>
 
         <Field label="תיאור האירוע">
           <textarea
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={set("description")}
             rows={4}
             placeholder="תארו את האירוע: מה, מתי, איפה, מי מעורב, וכל פרט רלוונטי."
-            className={`${inputCls} resize-none`}
+            className={inputClass("resize-none")}
           />
         </Field>
 
@@ -185,42 +221,13 @@ export default function ClaimForm() {
 
         <div className="flex items-center justify-between pt-4 border-t border-border/60">
           <p className="text-xs text-muted-foreground">המסמכים מועלים בצורה מאובטחת וזמינים לדורית בלבד.</p>
-          <button
-            onClick={submit}
-            disabled={sending || uploading || !name || !phone}
-            className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary font-medium hover:bg-highlight-strong disabled:opacity-40 disabled:hover:bg-highlight transition-colors"
-          >
+          <CtaButton onClick={submit} disabled={sending || uploading || !valid}>
             {sending && <Loader2 size={16} className="animate-spin" />}
             {sending ? "שולח…" : "שליחת דיווח"}
-          </button>
+          </CtaButton>
         </div>
         {error && <p className="text-sm text-destructive text-right">{error}</p>}
       </div>
-    </div>
-  );
-}
-
-const inputCls =
-  "w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  // The control is passed in as a child, so generate an id here and clone it on.
-  // Without it the <label> is associated with nothing and screen readers
-  // announce the field as unlabelled (axe: label / select-name, critical).
-  const id = React.useId();
-  const control = React.isValidElement(children)
-    ? React.cloneElement(children as React.ReactElement<{ id?: string }>, { id })
-    : children;
-
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2"
-      >
-        {label}
-      </label>
-      {control}
     </div>
   );
 }

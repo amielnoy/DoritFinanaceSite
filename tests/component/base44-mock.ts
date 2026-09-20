@@ -32,5 +32,6 @@ export const resetBase44Mock = () => {
   base44Mock.entities.Lead.create.mockClear();
   base44Mock.integrations.Core.SendEmail.mockClear();
   base44Mock.functions.invoke.mockClear();
+  base44Mock.integrations.Core.UploadFile.mockClear();
   base44Mock.entities.Testimonial.list.mockClear();
 };

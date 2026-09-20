@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { services } from "@/services";
 import { useSubmission } from "@/hooks/useSubmission";
+import { CONTACT } from "@/config/contact";
+import { CtaButton } from "@/components/dorit/primitives/Cta";
+import { Field, inputClass } from "@/components/dorit/primitives/Field";
 import { Send, Loader2, Check, Mail, MessageCircle } from "lucide-react";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 interface QuickContactForm {
   name: string;
@@ -56,61 +60,53 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
           ) : (
             <div className="bg-card border border-border p-8 md:p-10">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label htmlFor="qc-name" className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">שם מלא *</label>
+                <Field label="שם מלא *">
                   <input
                     id="qc-name"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className="w-full bg-background border border-border px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-highlight focus:ring-2 focus:ring-highlight/30 transition-colors"
+                    className={inputClass()}
                   />
-                </div>
-                <div>
-                  <label htmlFor="qc-phone" className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">טלפון *</label>
+                </Field>
+                <Field label="טלפון *">
                   <input
                     id="qc-phone"
                     type="tel"
                     value={form.phone}
                     onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                    placeholder="050-8311776"
-                    className="w-full bg-background border border-border px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-highlight focus:ring-2 focus:ring-highlight/30 transition-colors"
+                    placeholder={CONTACT.phoneDisplay}
+                    className={inputClass()}
                   />
-                </div>
+                </Field>
               </div>
-              <div className="mt-5">
-                <label htmlFor="qc-email" className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">אימייל (לא חובה)</label>
+              <Field label="אימייל (לא חובה)" className="mt-5">
                 <input
                   id="qc-email"
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   placeholder="you@example.com"
-                  className="w-full bg-background border border-border px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-highlight focus:ring-2 focus:ring-highlight/30 transition-colors"
+                  className={inputClass()}
                 />
-              </div>
-              <div className="mt-5">
-                <label htmlFor="qc-message" className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">הודעה (לא חובה)</label>
+              </Field>
+              <Field label="הודעה (לא חובה)" className="mt-5">
                 <textarea
                   id="qc-message"
                   value={form.message}
                   onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
                   rows={3}
                   placeholder="במה מדובר?"
-                  className="w-full bg-background border border-border px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-highlight focus:ring-2 focus:ring-highlight/30 transition-colors resize-none"
+                  className={inputClass("resize-none")}
                 />
-              </div>
+              </Field>
 
               {error && <p className="mt-5 text-sm text-destructive">{error}</p>}
 
               <div className="mt-7 flex justify-end">
-                <button
-                  onClick={send}
-                  disabled={!valid || busy}
-                  className="inline-flex items-center gap-2 px-7 py-3.5 bg-highlight text-primary-foreground font-medium hover:bg-highlight-strong disabled:opacity-40 disabled:hover:bg-highlight transition-colors duration-300 shadow-sm"
-                >
+                <CtaButton onClick={send} disabled={!valid || busy}>
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   שליחת הודעה
-                </button>
+                </CtaButton>
               </div>
             </div>
           )}
@@ -123,9 +119,9 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
     <section id="quick-contact" className="relative py-24 md:py-32 bg-secondary/60 text-foreground border-t border-border">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
         <div className="lg:col-span-5">
-          <span className="text-[11px] tracking-[0.12em] text-accent">
+          <Eyebrow>
             קו ישיר
-          </span>
+          </Eyebrow>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
             השאירו פרטים,
             <br />
@@ -137,10 +133,10 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
           </p>
           <div className="mt-8 flex items-center gap-3 text-muted-foreground">
             <Mail size={16} className="text-accent" />
-            <a href="mailto:dorit@govari-fin.co.il" dir="ltr" className="hover:text-accent transition-colors">dorit@govari-fin.co.il</a>
+            <a href={`mailto:${CONTACT.email}`} dir="ltr" className="hover:text-accent transition-colors">{CONTACT.email}</a>
           </div>
           <a
-            href="https://wa.me/972508311776"
+            href={`https://wa.me/${CONTACT.whatsapp}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-4 inline-flex items-center gap-3 text-muted-foreground hover:text-accent transition-colors"
