@@ -12,6 +12,10 @@
 #   SKIP_BUILD=1                 reuse an existing dist/ for the e2e run
 #   PLAYWRIGHT_BASE_URL=<url>    run e2e against a deployment instead of a local preview
 #   E2E_ENFORCE_CONTRAST=1       fail the a11y suite on WCAG colour-contrast findings
+#   KEEP_ALLURE_RESULTS=1        keep allure-results from earlier runs instead of
+#                                clearing it first (it is cleared by default: the
+#                                reporters only append, and a large one both skews
+#                                the report and stalls the vitest reporter)
 #   NO_REPORT=1                  skip generating the Allure report entirely
 set -euo pipefail
 
@@ -43,6 +47,31 @@ done
 [[ ${#SUITES[@]} -gt 0 ]] || SUITES=("${ALL_SUITES[@]}")
 
 mkdir -p test-results
+
+# Start each run from an empty allure-results.
+#
+# Nothing used to clear it, and both reporters only ever append: every vitest
+# test and every Playwright test writes a fresh result file (plus attachments)
+# on every run, under a new UUID each time. Nothing collides, so nothing is ever
+# overwritten — the directory only grows.
+#
+# Two things break once it is large enough. The report is generated from
+# whatever is in here, so it stops describing this run and starts describing
+# every run ever made — the same test appearing hundreds of times, old failures
+# sitting next to their fixes. And the allure-vitest reporter's end-of-run pass
+# over the directory goes pathological: at ~65k+ entries a 30-second suite hung
+# for 25 minutes with every worker idle, after the tests themselves had already
+# passed. That reads exactly like a hung test suite, which is the expensive part
+# — the failure is in the reporter, long after the last assertion.
+#
+# CI never saw it: a fresh checkout starts empty every time. It is purely a
+# local accumulation, so the fix belongs here, at the top of a local run.
+# KEEP_ALLURE_RESULTS=1 opts out, for merging a run into an existing set.
+if [[ "${KEEP_ALLURE_RESULTS:-}" != "1" ]]; then
+  rm -rf allure-results
+fi
+mkdir -p allure-results
+
 STARTED_AT=$(date +%s)
 declare -a RESULTS=()
 FAILED=0
