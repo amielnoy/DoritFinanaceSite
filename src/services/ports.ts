@@ -236,3 +236,42 @@ export interface ContentAdminPort {
   createTestimonial(draft: TestimonialDraft): Promise<void>;
   removeTestimonial(id: string): Promise<void>;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Auth
+ *
+ * What the app needs to know about the signed-in owner, and nothing about
+ * how Base44 stores the token. `AuthContext` was the last first-party module
+ * besides the composition root importing the SDK singleton; behind this port
+ * a test can render the admin guards against a fake instead of mocking the
+ * vendor module. The sign-in screens themselves (login, register, password
+ * reset) are Base44's own flow and keep talking to the SDK directly.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+export interface AuthUser {
+  id?: string;
+  email?: string;
+  full_name?: string;
+  /** "admin" unlocks /admin/*; anything else is a signed-in visitor. */
+  role?: string;
+  [key: string]: unknown;
+}
+
+/** An SDK error carries an HTTP status and, on 403, a reason the app reads. */
+export interface AuthFailure {
+  status?: number;
+  message?: string;
+  data?: { extra_data?: { reason?: string } };
+}
+
+export interface AuthPort {
+  /** True when a token is stored, i.e. `me()` has a chance of succeeding. */
+  hasStoredToken(): boolean;
+  /** App-level reachability check; rejects with an AuthFailure on 403. */
+  getPublicSettings(): Promise<unknown>;
+  /** The signed-in user, or a rejection when the token is missing or stale. */
+  me(): Promise<AuthUser>;
+  /** Clears the stored token; with a URL, also sends the browser there. */
+  logout(redirectUrl?: string): void;
+  redirectToLogin(returnUrl: string): void;
+}

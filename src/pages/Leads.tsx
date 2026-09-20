@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { services, type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
+import React, { useState } from "react";
+import { type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
+import { useLeads, useRemoveLead, useSetLeadStatus } from "@/hooks/useAdmin";
 import { Link } from "react-router-dom";
 import { Loader2, Download, Trash2, ArrowRight } from "lucide-react";
 
@@ -22,7 +23,7 @@ const ANY_STATUS_LABEL: Record<string, string> = {
   partial: "ראיון שלא הושלם",
 };
 const STATUS_COLOR: Record<LeadStatus, string> = {
-  new: "bg-highlight/15 text-[#8a6f54]",
+  new: "bg-highlight/15 text-highlight-strong",
   contacted: "bg-accent/15 text-accent",
   closed: "bg-muted text-muted-foreground",
 };
@@ -44,30 +45,19 @@ function csvEscape(v: unknown): string {
 }
 
 export default function Leads() {
-  const [leads, setLeads] = useState<LeadItem[] | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { data, isPending: loading, isError } = useLeads();
+  const setStatus = useSetLeadStatus();
+  const removeLead = useRemoveLead();
   const [filter, setFilter] = useState<string>("all");
-  const [busy, setBusy] = useState<boolean>(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      setLeads(await services.leadsAdmin.list());
-    } catch {
-      setLeads([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const leads: LeadItem[] = data ?? [];
+  const busy = setStatus.isPending || removeLead.isPending;
+  const writeError = setStatus.isError || removeLead.isError;
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const filtered = (leads || []).filter((l) => filter === "all" || l.status === filter);
+  const filtered = leads.filter((l) => filter === "all" || l.status === filter);
 
   const exportCsv = (all: boolean) => {
-    const source = all ? (leads || []) : filtered;
+    const source = all ? leads : filtered;
     const headers = ["תאריך", "שם", "טלפון", "אימייל", "מקור", "תחום/שירות", "מועד", "סטטוס", "הודעה"];
     const rows = source.map((l) => [
       l.created_date ? new Date(l.created_date).toLocaleString("he-IL") : "",
@@ -90,32 +80,14 @@ export default function Leads() {
     URL.revokeObjectURL(url);
   };
 
-  const updateStatus = async (id: string, status: LeadStatus) => {
-    setBusy(true);
-    try {
-      await services.leadsAdmin.setStatus(id, status);
-      setLeads((ls) => (ls || []).map((l) => (l.id === id ? { ...l, status } : l)));
-    } catch {
-      /* ignore */
-    } finally {
-      setBusy(false);
-    }
-  };
+  const updateStatus = (id: string, status: LeadStatus) => setStatus.mutate({ id, status });
 
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
     if (!window.confirm("למחוק את הפנייה?")) return;
-    setBusy(true);
-    try {
-      await services.leadsAdmin.remove(id);
-      setLeads((ls) => (ls || []).filter((l) => l.id !== id));
-    } catch {
-      /* ignore */
-    } finally {
-      setBusy(false);
-    }
+    removeLead.mutate(id);
   };
 
-  const counts = (leads || []).reduce<Record<string, number>>((acc, l) => {
+  const counts = leads.reduce<Record<string, number>>((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
     return acc;
   }, {});
@@ -145,15 +117,15 @@ export default function Leads() {
             className={`text-right p-5 border transition-colors ${filter === "all" ? "border-primary bg-primary/[0.03]" : "border-border/60 hover:border-accent/50 bg-card"}`}
           >
             <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">סה״כ פניות</p>
-            <p className="font-heading text-3xl mt-2">{(leads || []).length}</p>
+            <p className="font-heading text-3xl mt-2">{leads.length}</p>
             <p className="text-xs text-foreground/50 mt-1">כל הרשומות במערכת</p>
           </button>
           <button
             onClick={() => setFilter("new")}
             className={`text-right p-5 border transition-colors ${filter === "new" ? "border-highlight bg-highlight/10" : "border-border/60 hover:border-highlight/50 bg-card"}`}
           >
-            <p className="text-[11px] tracking-[0.2em] uppercase text-[#8a6f54]">דורשות טיפול</p>
-            <p className="font-heading text-3xl mt-2 text-[#8a6f54]">{counts.new || 0}</p>
+            <p className="text-[11px] tracking-[0.2em] uppercase text-highlight-strong">דורשות טיפול</p>
+            <p className="font-heading text-3xl mt-2 text-highlight-strong">{counts.new || 0}</p>
             <p className="text-xs text-foreground/50 mt-1">לקוחות חדשים — ליצור קשר</p>
           </button>
           <button
@@ -179,7 +151,7 @@ export default function Leads() {
             {["all", ...STATUS].map((s) => {
               const active = filter === s;
               const label = s === "all" ? "הכל" : STATUS_LABEL[s as LeadStatus];
-              const count = s === "all" ? (leads || []).length : counts[s] || 0;
+              const count = s === "all" ? leads.length : counts[s] || 0;
               return (
                 <button
                   key={s}
@@ -205,7 +177,7 @@ export default function Leads() {
             </button>
             <button
               onClick={() => exportCsv(true)}
-              disabled={!leads?.length}
+              disabled={!leads.length}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-accent-foreground font-medium hover:bg-accent/90 disabled:opacity-40 transition-colors"
             >
               <Download size={16} /> ייצוא הכל ל-CSV
@@ -213,9 +185,19 @@ export default function Leads() {
           </div>
         </div>
 
+        {writeError && (
+          <p role="alert" className="mb-4 text-sm text-destructive">
+            הפעולה האחרונה לא נשמרה. ניתן לנסות שוב.
+          </p>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="animate-spin text-accent" size={28} />
+          </div>
+        ) : isError ? (
+          <div className="text-center py-20 border border-dashed border-border">
+            <p className="text-destructive">לא הצלחנו לטעון את הפניות. ניתן לרענן את הדף.</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-border">

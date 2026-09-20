@@ -1,5 +1,7 @@
 import { base44 } from "@/api/base44Client";
+import { appParams } from "@/lib/app-params";
 import { Base44AgentService } from "./base44/Base44AgentService";
+import { Base44AuthService } from "./base44/Base44AuthService";
 import { Base44ContentAdminService } from "./base44/Base44ContentAdminService";
 import { Base44ContentService } from "./base44/Base44ContentService";
 import { Base44LeadAdminService } from "./base44/Base44LeadAdminService";
@@ -8,6 +10,7 @@ import { Base44SupportService } from "./base44/Base44SupportService";
 import { Base44UploadService } from "./base44/Base44UploadService";
 import type {
   AgentPort,
+  AuthPort,
   ContentAdminPort,
   ContentPort,
   LeadAdminPort,
@@ -28,6 +31,8 @@ export interface Services {
   agents: AgentPort;
   uploads: UploadPort;
   support: SupportPort;
+  /** Who is signed in. Read by the route guards and the owner-only controls. */
+  auth: AuthPort;
   /** Owner-only surfaces. Reachable from the same object as the public ports,
    *  as they always were — what changed is that they now go through an
    *  interface, so the admin screens can be tested against a fake and the
@@ -45,6 +50,7 @@ export const services: Services = {
   agents: new Base44AgentService(client),
   uploads: new Base44UploadService(client),
   support: new Base44SupportService(client),
+  auth: new Base44AuthService(client, () => !!appParams.token),
   leadsAdmin: new Base44LeadAdminService(client),
   contentAdmin: new Base44ContentAdminService(client),
 };

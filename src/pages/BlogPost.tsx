@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { useArticle } from "@/hooks/useContent";
+import type { Article } from "@/services";
 import { Image } from "@/components/ui/image";
 import ReactMarkdown from "react-markdown";
 import { Loader2, ArrowRight, Calendar } from "lucide-react";
@@ -17,20 +18,10 @@ import {
   useSeo,
 } from "@/lib/seo";
 
-interface BlogPostData {
-  id: string;
-  title: string;
-  body?: string;
-  image_url?: string;
-  tags?: string;
-  created_date: string;
-}
-
 export default function BlogPost() {
   const { id } = useParams<string>();
   const { data, isPending: loading, isError: notFound } = useArticle(id);
-  const post = (data ?? null) as BlogPostData | null;
-
+  const post: Article | null = data ?? null;
 
   const tagList = (post?.tags ?? "")
     .split(",")
