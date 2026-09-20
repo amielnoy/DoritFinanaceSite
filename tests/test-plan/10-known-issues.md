@@ -162,33 +162,21 @@ blog posts and any route added without a prerender entry; the eight static
 routes now ship their own head in the HTML itself, so a link to `/faq` pasted
 into a chat app previews as `/faq`.
 
-### B-3 · `npm run typecheck` has 93 inherited errors, now held on a ratchet
+### B-3 · ~~`npm run typecheck` has 93 inherited errors, now held on a ratchet~~ — closed
 
-`tsc` fails on the current `main`, unchanged by this work (verified by running
-it on a clean tree). The distribution is the whole story: **all 93 errors are in
-`.tsx` files — none in the `.jsx` files at all.** 95 of the reported lines name
-the same signature, `IntrinsicAttributes & RefAttributes<any>`, which is what an
-untyped `forwardRef` component looks like from TypeScript's side. A typed page
-imports an untyped shadcn primitive (`button`, `input`, `label`, `input-otp`,
-`image`, the accordion) and every prop it passes is rejected; the 10 `TS7006`
-implicit-`any` parameters are knock-on from the same cause, since an untyped
-component supplies no event type to its own handler.
+All 93 were one boundary problem: typed pages importing untyped shadcn
+primitives (`button`, `input`, `label`, `input-otp`, `image`, the accordion),
+plus the `React.ComponentType<{ size?: number }>` icon typing that lucide's
+`forwardRef` components do not satisfy. Each consumed primitive now has a
+sibling `.d.ts` (see `src/components/ui/README-types.md`), icon fields are
+typed `LucideIcon`, and `AuthLayout`/`GoogleIcon` are `.tsx`. Two of the
+"inherited, not bugs" errors — `ClaimForm.tsx|TS2304` — were in fact calls to
+setters that did not exist (a failed upload threw a `ReferenceError`); fixed
+and covered by `tests/component/sanity.test.tsx`.
 
-So this is a boundary problem, not a file-count problem. **Porting more
-application code to TypeScript fixes none of it** — the fix is to type the ~8
-primitives that are actually consumed, or to declare them in one `.d.ts`.
-
-`noEmit` means nothing is broken at runtime, and `npm run build` succeeds
-because Vite strips types without checking them.
-
-**Since 2026-09-13 the step blocks.** What it cost while advisory was that a
-genuinely new type error landed silently among the 93 and nobody had to fix it.
-`npm run typecheck:gate` (`scripts/typecheck-gate.mjs`) allows for exactly the
-inherited set, recorded in `tests/typecheck-baseline.json` keyed by file and
-error code — never by line, so unrelated edits that shift lines do not trip it.
-It fails on a new file/code pair, or on more errors of a known kind in a known
-file. Fixing some and running `npm run typecheck:baseline` lowers the bar
-permanently; the raw list is still `npm run typecheck`.
+`npm run typecheck` is the blocking step; `scripts/typecheck-gate.mjs` and
+`tests/typecheck-baseline.json` are deleted. `npm run typecheck:gate` remains
+as an alias so older notes and scripts keep working.
 
 ### B-4 · ~~Structured-data email disagrees with the rest of the site~~ — closed
 

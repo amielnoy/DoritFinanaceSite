@@ -734,7 +734,7 @@ environment variable that turns it off.
 ### Branches
 
 
-**Every push, on every branch, runs the battery** — lint, the typecheck gate,
+**Every push, on every branch, runs the battery** — lint, typecheck,
 build, the five Vitest suites, e2e, and an Allure report attached to the run.
 How much e2e depends on where you are:
 
