@@ -3,6 +3,7 @@ import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
 import Footer from "@/components/dorit/layout/Footer";
 import { breadcrumbLd, useSeo } from "@/lib/seo";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
+import { CONTACT } from "@/config/contact";
 
 export default function PrivacyPolicy() {
   useSeo({
@@ -152,7 +153,7 @@ export default function PrivacyPolicy() {
             <h2 className="font-heading text-2xl mb-3">9. אחראי לפרטיות</h2>
             <p>
               האחראי לענייני פרטיות בסוכנות הוא דורית גוב ארי. ניתן לפנות
-              בכתובת dorit@govari-fin.co.il או בטלפון המפורסם באתר.
+              בכתובת <a href={`mailto:${CONTACT.email}`} dir="ltr" className="text-accent hover:underline">{CONTACT.email}</a> או בטלפון המפורסם באתר.
             </p>
           </section>
         </div>

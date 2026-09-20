@@ -1,4 +1,5 @@
 import React from "react";
+import { CONTACT } from "@/config/contact";
 import { CalendarClock } from "lucide-react";
 
 interface BookingData {
@@ -14,7 +15,7 @@ interface OutlookCalendarBookingProps {
   data?: BookingData;
 }
 
-const ORGANIZER_EMAIL = "dorit@govari-fin.co.il";
+const ORGANIZER_EMAIL = CONTACT.email;
 
 export default function OutlookCalendarBooking({ data = {} }: OutlookCalendarBookingProps) {
   const openCalendar = () => {
