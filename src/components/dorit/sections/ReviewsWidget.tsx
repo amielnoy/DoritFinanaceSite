@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useTestimonials } from "@/hooks/useContent";
 import { Star, ExternalLink, Loader2, Quote } from "lucide-react";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
