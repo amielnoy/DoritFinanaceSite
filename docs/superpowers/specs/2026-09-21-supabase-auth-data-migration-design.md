@@ -1,6 +1,6 @@
 # Moving auth and data off Base44 onto Supabase
 
-**Date:** 2026-09-21 · **Status:** approved design, phase 0 authored
+**Date:** 2026-09-21 · **Status:** approved design; phase 0 applied and verified on hjowdyiwjjrqceumkvgt (Frankfurt)
 
 ## Why
 
@@ -123,11 +123,15 @@ Reconciliation is itself tested: seed divergence, assert the diff catches it.
 
 ## Open items — must be resolved before phase 4
 
-1. **Region and tier.** The project is `ap-south-1` (Mumbai) on the free tier.
-   Free projects pause on inactivity and have no PITR, against a 24-month
-   retention commitment. Mumbai is a cross-border transfer of Israeli customers'
-   personal data under תיקון 13. Deferred by decision; must not reach production
-   unexamined.
+1. ~~**Region.**~~ **Resolved 2026-09-21.** Rebuilt as `hjowdyiwjjrqceumkvgt`
+   in Central EU (Frankfurt); the Mumbai project is gone. Cross-border transfer
+   of Israeli personal data is no longer in question, and latency improves.
+   Created with "automatically expose new tables" off, so the migration carries
+   explicit Data API grants.
+
+   **Tier is still open.** Free projects pause on inactivity and have no PITR,
+   against a 24-month retention commitment. Fine through phases 0-2; must not be
+   what holds live enquiries at cutover.
 2. **`Testimonial.rls.read` is `null`**, not `true`. Public reads clearly work,
    but the semantics are unverified. Phase 0 implements public read to match
    observed behaviour; verify before trusting it.

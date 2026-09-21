@@ -185,3 +185,33 @@ create policy testimonials_read_public on public.testimonials
   for select to anon, authenticated using (true);
 create policy testimonials_write_admin on public.testimonials
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+-- ── Data API grants ─────────────────────────────────────────────────────────
+--
+-- Explicit because the project is created with "automatically expose new
+-- tables" off, per Supabase's own recommendation: with it on, a table added
+-- later and left without RLS is world-readable through the Data API the moment
+-- it exists. Off, nothing is reachable until someone says so here.
+--
+-- These are table-level privileges only. They decide whether PostgREST will
+-- talk about a table at all; the policies above still decide which rows. A
+-- grant without a matching policy returns nothing, which is the failure
+-- direction we want.
+grant usage on schema public to anon, authenticated;
+
+-- The public forms post without signing in; reading them back is admin-only,
+-- and the policies enforce that. anon gets insert and nothing else.
+grant insert                         on public.leads        to anon, authenticated;
+grant select, update, delete         on public.leads        to authenticated;
+grant insert                         on public.contacts     to anon, authenticated;
+grant select, update, delete         on public.contacts     to authenticated;
+
+-- Readable by the world (published rows only, per policy); written by admins.
+grant select                         on public.blog_posts   to anon, authenticated;
+grant insert, update, delete         on public.blog_posts   to authenticated;
+grant select                         on public.testimonials to anon, authenticated;
+grant insert, update, delete         on public.testimonials to authenticated;
+
+-- Never anon: an unauthenticated caller has no business listing who has an
+-- account, let alone who is an admin.
+grant select, insert, update, delete on public.profiles     to authenticated;
