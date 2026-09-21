@@ -206,3 +206,42 @@ Also of note: the phase 4 flip has no wiring, and setting
 to act as the shadow, and there is no reverse of `base44_id` pointing back at a
 Supabase row. Flipping is a deliberate act and can afford to be refused with a
 reason; falling back quietly would leave someone believing they had cut over.
+
+## Reordered 2026-09-22: auth before the rest of the data
+
+Phase 2 could not proceed as planned. The browser's Supabase client is
+anonymous, and content writes need `is_admin()`, so the shadow was refused with
+42501. Of the two ways out — a backend function holding the service key, or
+moving auth first so the browser carries a session — auth first was chosen. It
+builds nothing new: with a real session the decorator works exactly as written.
+
+Lead and contact dual-write is unaffected either way; functions own those writes
+and already hold service credentials. The backend-function route follows auth.
+
+### A prerequisite that turned out to be a live defect
+
+The plan listed "resolve the duplicate AuthContext" as tidying. It was not.
+
+`AuthContext.jsx` and `AuthContext.tsx` both existed, and Vite's default
+`resolve.extensions` places `.jsx` before `.tsx`. The `.jsx` therefore shadowed
+the `.tsx` at every import — so the port-based auth context introduced by
+`0e943ca` had never executed. Production was still calling `base44.auth`
+directly, and the auth port was inert.
+
+Proven, not inferred: before deletion the bundle carried the `.jsx` strings and
+none of the `.tsx` ones; after, the reverse.
+
+The `.jsx` exposed three values the `.tsx` does not — `appPublicSettings`,
+`isLoadingPublicSettings`, `checkAppState`. None is read anywhere, and a comment
+in `App.jsx` already said so. Every `useAuth()` destructuring in the codebase is
+satisfied by the `.tsx` interface.
+
+Worth watching: this replaces the auth context that has actually been running
+with one that never has. The two are close but not identical, and the swap is
+better exercised now, before auth changes underneath it as well.
+
+### Still needed from the operator before Supabase auth can work
+
+Supabase's Google provider needs a Google Cloud OAuth client — id, secret, and
+the Supabase callback URL registered as an authorised redirect. That is console
+work I cannot do, and nothing in the auth migration functions without it.
