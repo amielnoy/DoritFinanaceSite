@@ -245,3 +245,29 @@ better exercised now, before auth changes underneath it as well.
 Supabase's Google provider needs a Google Cloud OAuth client — id, secret, and
 the Supabase callback URL registered as an authorised redirect. That is console
 work I cannot do, and nothing in the auth migration functions without it.
+
+## Auth proven end to end (2026-09-22)
+
+Signed in on localhost with Google against the live project. Every link in the
+chain checked against the database rather than the dashboard:
+
+- `/auth/v1/settings` reports google enabled
+- `auth.identities.provider` = google for amielnoy@gmail.com
+- the trigger created the `profiles` row unprompted, `role = user`
+- `is_admin()` returned false before promotion and true after
+- reading `public.leads` as that identity, with `role authenticated` and the
+  real `sub` in the JWT claims, returns all 25 migrated leads
+- the same read as `anon` is refused outright — no SELECT grant
+
+The bootstrap promotion has been run once, by hand, as designed: nobody can
+grant admin until an admin exists.
+
+**This is what the content dual-write was missing.** The shadow writes were
+refused with 42501 because the browser held an anonymous client; it now holds a
+Google-backed session that `is_admin()` recognises, so the decorator can be
+installed.
+
+Still open: Supabase's email provider remains enabled, so `/auth/v1/signup`
+accepts password sign-ups the UI no longer offers. And domain restriction has no
+enforcement point — the Google consent screen must be External, because the
+Cloud project has no Workspace organisation behind it.
