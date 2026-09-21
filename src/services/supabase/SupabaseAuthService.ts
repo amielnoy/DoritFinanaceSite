@@ -9,7 +9,14 @@ interface SupabaseError {
 export interface SupabaseAuthClient {
   auth: {
     getUser(): Promise<{
-      data: { user: { id: string; email?: string | null } | null };
+      data: {
+        user: {
+          id: string;
+          email?: string | null;
+          /** Whatever the provider sent about the person; Google supplies a name. */
+          user_metadata?: { full_name?: string | null; name?: string | null } | null;
+        } | null;
+      };
       error: SupabaseError | null;
     }>;
     signOut(): Promise<{ error: SupabaseError | null }>;
@@ -33,7 +40,7 @@ export interface SupabaseAuthClient {
         // `catch` and `finally` the builder does not have, and the real client
         // would not satisfy this interface.
         maybeSingle(): PromiseLike<{
-          data: { role?: string | null; full_name?: string | null } | null;
+          data: { role?: string | null } | null;
           error: SupabaseError | null;
         }>;
       };
@@ -93,22 +100,35 @@ export class SupabaseAuthService implements AuthPort {
     // one request and the next, and a token minted an hour ago would still
     // claim it. Everything that matters is enforced by RLS regardless — this
     // read only decides which screens to offer.
-    const { data: profile } = await this.client
+    const { data: profile, error: profileError } = await this.client
       .from("profiles")
-      .select("role, full_name")
+      .select("role")
       .eq("id", data.user.id)
       .maybeSingle();
 
+    // A failed read is not an unprovisioned account, and conflating them is how
+    // a mistyped column name announced itself as "User not registered for this
+    // app" — a confident, wrong diagnosis of a working account. The two states
+    // look identical from `data` alone, so the error has to be asked about.
+    if (profileError) {
+      throw Object.assign(new Error(profileError.message ?? "Could not read the profile"), {
+        status: profileError.status,
+      });
+    }
+
     if (!profile) {
-      // A trigger creates the row on sign-up, so its absence means this account
-      // is not provisioned for the app rather than that the read failed.
+      // No row, and no error: the trigger creates one on sign-up, so absence
+      // really does mean this account is not provisioned for the app.
       throw authFailure("user_not_registered", "User not registered for this app");
     }
 
+    // The display name comes from the provider rather than the table — Google
+    // supplies it, and `profiles` deliberately stores only what authorises.
+    const meta = data.user.user_metadata;
     return {
       id: data.user.id,
       email: data.user.email ?? undefined,
-      full_name: profile.full_name ?? undefined,
+      full_name: meta?.full_name ?? meta?.name ?? undefined,
       role: profile.role ?? "user",
     };
   }

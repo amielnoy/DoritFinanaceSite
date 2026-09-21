@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { SupabaseAuthService, type SupabaseAuthClient } from "@/services/supabase/SupabaseAuthService";
 
-type Profile = { role?: string | null; full_name?: string | null } | null;
+type Profile = { role?: string | null } | null;
 
 const clientWith = (opts: {
-  user?: { id: string; email?: string | null } | null;
+  user?: {
+    id: string;
+    email?: string | null;
+    user_metadata?: { full_name?: string | null; name?: string | null } | null;
+  } | null;
   userError?: { message?: string } | null;
   profile?: Profile;
+  profileError?: { message?: string } | null;
   spy?: Record<string, ReturnType<typeof vi.fn>>;
   passwordError?: { message?: string } | null;
 }): SupabaseAuthClient => ({
@@ -23,7 +28,10 @@ const clientWith = (opts: {
   from: () => ({
     select: () => ({
       eq: () => ({
-        maybeSingle: async () => ({ data: opts.profile ?? null, error: null }),
+        maybeSingle: async () => ({
+          data: opts.profile ?? null,
+          error: opts.profileError ?? null,
+        }),
       }),
     }),
   }),
@@ -32,7 +40,10 @@ const clientWith = (opts: {
 describe("SupabaseAuthService", () => {
   it("reports the signed-in user with the role from profiles", async () => {
     const svc = new SupabaseAuthService(
-      clientWith({ user: { id: "u1", email: "d@example.com" }, profile: { role: "admin", full_name: "דורית" } }),
+      clientWith({
+        user: { id: "u1", email: "d@example.com", user_metadata: { full_name: "דורית" } },
+        profile: { role: "admin" },
+      }),
     );
 
     await expect(svc.me()).resolves.toEqual({
@@ -64,6 +75,25 @@ describe("SupabaseAuthService", () => {
     await expect(svc.me()).rejects.toMatchObject({
       status: 403,
       data: { extra_data: { reason: "auth_required" } },
+    });
+  });
+
+  it("does not call a failed profile read 'not registered'", async () => {
+    // These two states look identical from `data` alone — both give null. A
+    // mistyped column name once surfaced as "User not registered for this app",
+    // which reads as a confident verdict about a perfectly good account and
+    // sends whoever is debugging it to the wrong place entirely.
+    const svc = new SupabaseAuthService(
+      clientWith({
+        user: { id: "u1" },
+        profile: null,
+        profileError: { message: 'column profiles.full_name does not exist' },
+      }),
+    );
+
+    await expect(svc.me()).rejects.toThrow(/does not exist/);
+    await expect(svc.me()).rejects.not.toMatchObject({
+      data: { extra_data: { reason: "user_not_registered" } },
     });
   });
 
