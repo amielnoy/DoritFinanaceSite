@@ -150,11 +150,12 @@ describe("auth and token handling", () => {
     const login = read(join(REPO_ROOT, "src/pages/Login.tsx"));
     expect(login).toMatch(/const\s+returnTo\s*=\s*safeReturnTo\(\)/);
     // The destination used to be assigned to `window.location.href` by the
-    // password form's success path. That form is gone with email-and-password
-    // sign-in, and the only way out of this page now hands the destination to
-    // the provider. Same property — what leaves here is the guarded value —
-    // asserted at the one place it still leaves.
-    expect(login).toMatch(/loginWithProvider\(\s*["']google["']\s*,\s*returnTo\s*\)/);
+    // password form's success path. That form went with email-and-password
+    // sign-in, and the hand-off then named the SDK directly; it now goes
+    // through the auth port so that switching provider switches where the
+    // visitor actually signs in. Same property throughout — what leaves this
+    // page is the guarded value — asserted at the one place it still leaves.
+    expect(login).toMatch(/services\.auth\.signInWithGoogle\(\s*returnTo\s*\)/);
   });
 
   it("admin routes stay behind a gate that requires both sign-in and the admin role", () => {

@@ -7,6 +7,7 @@ export interface AuthClient {
     me(): Promise<AuthUser>;
     logout(redirectUrl?: string): void;
     redirectToLogin(returnUrl: string): void;
+    loginWithProvider(provider: string, returnUrl: string): void;
   };
 }
 
@@ -42,5 +43,9 @@ export class Base44AuthService implements AuthPort {
 
   redirectToLogin(returnUrl: string): void {
     this.client.auth.redirectToLogin(returnUrl);
+  }
+
+  signInWithGoogle(returnUrl: string): void {
+    this.client.auth.loginWithProvider("google", returnUrl);
   }
 }

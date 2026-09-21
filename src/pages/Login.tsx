@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { services } from "@/services";
 import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
@@ -16,8 +16,9 @@ import { safeReturnTo } from "@/lib/authReturnTo";
  * was scheduled for deletion. One route also means one thing to reason about
  * when the provider changes underneath this page.
  *
- * Still Base44's flow: the provider swap happens when Supabase's Google client
- * is configured, not here.
+ * Which provider answers is `VITE_AUTH_PROVIDER`'s business, not this page's.
+ * The button goes through the port, so switching provider switches where the
+ * visitor actually signs in — not just who answers `me()` afterwards.
  */
 export default function Login() {
   const [error, setError] = useState<string>("");
@@ -28,7 +29,7 @@ export default function Login() {
   const handleGoogle = () => {
     setError("");
     try {
-      base44.auth.loginWithProvider("google", returnTo);
+      services.auth.signInWithGoogle(returnTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start sign-in. Please try again.");
     }

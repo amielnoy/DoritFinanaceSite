@@ -299,4 +299,14 @@ export interface AuthPort {
   /** Clears the stored token; with a URL, also sends the browser there. */
   logout(redirectUrl?: string): void;
   redirectToLogin(returnUrl: string): void;
+  /**
+   * Start a Google sign-in, returning to `returnUrl`.
+   *
+   * Distinct from `redirectToLogin`, which hands off to whatever sign-in screen
+   * the provider hosts. This is the button on our own login page, and it exists
+   * on the port so that switching provider switches what the button does —
+   * while it called the SDK directly, flipping VITE_AUTH_PROVIDER changed who
+   * answered `me()` and left the visitor signing in to the old system.
+   */
+  signInWithGoogle(returnUrl: string): void;
 }

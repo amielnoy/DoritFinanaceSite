@@ -119,6 +119,10 @@ export class SupabaseAuthService implements AuthPort {
   }
 
   redirectToLogin(returnUrl: string): void {
+    this.signInWithGoogle(returnUrl);
+  }
+
+  signInWithGoogle(returnUrl: string): void {
     void this.client.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: returnUrl },

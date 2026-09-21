@@ -73,11 +73,25 @@ describe("SupabaseAuthService", () => {
     });
   });
 
+  it("routes redirectToLogin through the same Google flow", async () => {
+    const signInWithOAuth = vi.fn(async () => ({ error: null }));
+    const svc = new SupabaseAuthService(clientWith({ spy: { signInWithOAuth } }));
+
+    // Base44 hosted its own sign-in screen, so the port had two doors. Supabase
+    // has one: both must reach Google or the flag would half-switch.
+    svc.redirectToLogin("https://example.test/admin");
+
+    expect(signInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: { redirectTo: "https://example.test/admin" },
+    });
+  });
+
   it("sends the visitor to Google, returning where they started", async () => {
     const signInWithOAuth = vi.fn(async () => ({ error: null }));
     const svc = new SupabaseAuthService(clientWith({ spy: { signInWithOAuth } }));
 
-    svc.redirectToLogin("https://example.test/admin");
+    svc.signInWithGoogle("https://example.test/admin");
 
     expect(signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
