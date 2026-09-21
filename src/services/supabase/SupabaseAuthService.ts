@@ -24,7 +24,11 @@ export interface SupabaseAuthClient {
         column: string,
         value: string,
       ): {
-        maybeSingle(): Promise<{
+        // PromiseLike, not Promise: PostgREST's builder is a thenable that only
+        // issues the request when awaited. Declaring Promise here would demand
+        // `catch` and `finally` the builder does not have, and the real client
+        // would not satisfy this interface.
+        maybeSingle(): PromiseLike<{
           data: { role?: string | null; full_name?: string | null } | null;
           error: SupabaseError | null;
         }>;

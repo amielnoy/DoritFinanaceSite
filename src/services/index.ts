@@ -1,4 +1,7 @@
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/api/supabaseClient";
+import { AUTH_PROVIDER } from "@/config/auth-provider";
+import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
 import { appParams } from "@/lib/app-params";
 import { Base44AgentService } from "./base44/Base44AgentService";
 import { Base44AuthService } from "./base44/Base44AuthService";
@@ -68,13 +71,30 @@ const client = base44 as any;
  * translation they perform is proven against Postgres. Only the credential the
  * browser can offer is missing.
  */
+/**
+ * Identity, from whichever provider is switched on.
+ *
+ * Falls back to Base44 when Supabase is unconfigured rather than throwing: a
+ * checkout without Supabase credentials should still sign people in, and an
+ * auth provider that fails to construct takes the whole app with it.
+ */
+const authPort: AuthPort =
+  AUTH_PROVIDER === "supabase" && supabase
+    // The cast is narrowing, not widening: `SupabaseAuthClient` describes the
+    // handful of calls this adapter makes, and the real client does satisfy it.
+    // Matching them structurally makes tsc unfold PostgREST's generics until it
+    // gives up (TS2589), so the shape is asserted once here instead of being
+    // re-derived at every call.
+    ? new SupabaseAuthService(supabase as unknown as SupabaseAuthClient)
+    : new Base44AuthService(client, () => !!appParams.token);
+
 export const services: Services = {
   leads: new Base44LeadService(client),
   content: new Base44ContentService(client),
   agents: new Base44AgentService(client),
   uploads: new Base44UploadService(client),
   support: new Base44SupportService(client),
-  auth: new Base44AuthService(client, () => !!appParams.token),
+  auth: authPort,
   leadsAdmin: new Base44LeadAdminService(client),
   contentAdmin: new Base44ContentAdminService(client),
 };
