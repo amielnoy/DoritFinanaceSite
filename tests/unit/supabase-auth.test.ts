@@ -1,3 +1,10 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Needs a DOM: the adapter resolves the guarded path against
+ * `window.location.origin`, and the reason it does is the whole point of two
+ * of the tests below.
+ */
 import { describe, expect, it, vi } from "vitest";
 import { SupabaseAuthService, type SupabaseAuthClient } from "@/services/supabase/SupabaseAuthService";
 
@@ -112,24 +119,39 @@ describe("SupabaseAuthService", () => {
 
     // Base44 hosted its own sign-in screen, so the port had two doors. Supabase
     // has one: both must reach Google or the flag would half-switch.
-    svc.redirectToLogin("https://example.test/admin");
+    svc.redirectToLogin("/admin");
 
     expect(signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
-      options: { redirectTo: "https://example.test/admin" },
+      options: { redirectTo: `${window.location.origin}/admin` },
     });
   });
 
-  it("sends the visitor to Google, returning where they started", async () => {
+  it("makes the guarded path absolute, because Supabase silently ignores a path", async () => {
     const signInWithOAuth = vi.fn(async () => ({ error: null }));
     const svc = new SupabaseAuthService(clientWith({ spy: { signInWithOAuth } }));
 
-    svc.signInWithGoogle("https://example.test/admin");
+    // `safeReturnTo` returns a path, which is all the open-redirect guard can
+    // vouch for. Handed one, Supabase falls back to the project's Site URL —
+    // and that is invisible: sign-in completes and the session is stored
+    // against the *production* origin, leaving the origin you started from
+    // signed out with nothing logged anywhere.
+    svc.signInWithGoogle("/admin/leads");
 
     expect(signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
-      options: { redirectTo: "https://example.test/admin" },
+      options: { redirectTo: `${window.location.origin}/admin/leads` },
     });
+  });
+
+  it("cannot be walked off this origin by the path it is given", async () => {
+    const signInWithOAuth = vi.fn(async () => ({ error: null }));
+    const svc = new SupabaseAuthService(clientWith({ spy: { signInWithOAuth } }));
+
+    svc.signInWithGoogle("https://evil.example/steal");
+
+    const sent = signInWithOAuth.mock.calls[0][0] as { options: { redirectTo: string } };
+    expect(new URL(sent.options.redirectTo).origin).toBe(window.location.origin);
   });
 
   it("signs out before redirecting, not after", async () => {

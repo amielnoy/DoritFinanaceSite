@@ -149,7 +149,7 @@ export class SupabaseAuthService implements AuthPort {
   signInWithGoogle(returnUrl: string): void {
     void this.client.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: returnUrl },
+      options: { redirectTo: absoluteOnThisOrigin(returnUrl) },
     });
   }
 
@@ -160,6 +160,37 @@ export class SupabaseAuthService implements AuthPort {
     if (error) throw new Error(error.message ?? "Invalid email or password");
   }
 }
+
+/**
+ * The guarded path, as an absolute URL on the origin we are running on.
+ *
+ * `safeReturnTo` returns a path — "/admin/leads", or "/" — because that is what
+ * the open-redirect guard can vouch for. Supabase wants an absolute URL, and
+ * silently falls back to the project's Site URL when it does not get one. That
+ * fallback is not a broken redirect anyone notices: sign-in completes, the
+ * session is created, and it is stored against the *production* origin. Signing
+ * in from localhost appeared to work and left localhost signed out.
+ *
+ * Resolving against `window.location.origin` keeps the guarantee intact — the
+ * path was already checked same-origin, and this cannot move it to another host
+ * because the origin is ours, not the caller's.
+ */
+const absoluteOnThisOrigin = (path: string): string | undefined => {
+  if (typeof window === "undefined") return undefined;
+  const origin = window.location.origin;
+  try {
+    const url = new URL(path, origin);
+    // `new URL` ignores the base when the input is already absolute, so a full
+    // URL would pass through untouched. Today's only caller hands over a value
+    // `safeReturnTo` has already vouched for — but this is the last point
+    // before the destination leaves for a third party, and a function that is
+    // only safe because of who happens to call it is one refactor from not
+    // being safe at all.
+    return url.origin === origin ? url.toString() : origin + "/";
+  } catch {
+    return origin + "/";
+  }
+};
 
 /** Looks for Supabase's own storage key rather than guessing the project ref. */
 function defaultSessionPresent(): boolean {
