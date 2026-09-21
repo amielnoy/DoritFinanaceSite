@@ -167,3 +167,42 @@ migration, and worth fixing on its own.
 
 The export contains customer personal data. It is never committed; the
 generator takes its path as an argument and writes SQL to stdout.
+
+## Phase 2 notes (2026-09-22) — a blocker found by wiring it up
+
+The mechanism is built and proven: the dual-write decorator (7 unit tests), the
+Supabase adapter and its id translation (4 integration tests against real
+Postgres), and correlation on create so no row created during the migration
+lands uncorrelated.
+
+It is not installed, for a reason that only appeared once it was:
+
+**The browser cannot write to Supabase.** Its client is anonymous, because
+identity still belongs to Base44, while `blog_posts` and `testimonials` require
+`is_admin()`. Anonymous writes are refused with 42501 — confirmed against a
+database, not inferred. `anon` holds `select` and nothing else.
+
+Installing it regardless would look like success and copy nothing: Base44 takes
+the write, the visitor is told it worked, a warning lands where nobody reads it,
+and Supabase stays empty. That is the failure worth avoiding, so the composition
+root still constructs the Base44 adapter directly and says why.
+
+Two ways out, neither chosen:
+
+1. **Route content writes through a backend function.** It already holds
+   service-role credentials, and the service key stays off the browser. Fits the
+   approach: the functions orchestrate, the adapters forward. Costs a new
+   function for writes that currently go straight from the browser to the SDK.
+2. **Move auth first.** With a Supabase session the browser is `authenticated`
+   and `is_admin()` resolves, so the decorator works as designed. This reorders
+   the plan — auth was to follow data — and it is the smaller change, because
+   nothing new has to be built.
+
+The lead and contact halves of phase 2 are unaffected: those are written by
+functions, which hold the service key already.
+
+Also of note: the phase 4 flip has no wiring, and setting
+`VITE_DATA_PRIMARY=supabase` now throws rather than degrading. Base44 would have
+to act as the shadow, and there is no reverse of `base44_id` pointing back at a
+Supabase row. Flipping is a deliberate act and can afford to be refused with a
+reason; falling back quietly would leave someone believing they had cut over.

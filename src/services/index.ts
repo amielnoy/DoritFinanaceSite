@@ -44,6 +44,30 @@ export interface Services {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const client = base44 as any;
 
+/**
+ * Content admin, during the migration.
+ *
+ * The dual-write decorator is deliberately NOT installed yet, and the reason is
+ * worth writing down because everything else is ready.
+ *
+ * The browser holds an anonymous Supabase client — identity still belongs to
+ * Base44 until the auth half of this migration lands — while writing a post or
+ * a testimonial requires `is_admin()` under row-level security. So every shadow
+ * write is refused with 42501, verified against a real database rather than
+ * assumed. Wiring it anyway would "work": Base44 still takes the write, the
+ * visitor sees success, and a warning is logged where nobody reads it, while
+ * Supabase quietly receives nothing at all. A migration that looks finished and
+ * has copied no data is worse than one that is obviously unstarted.
+ *
+ * Two ways out, both real work and neither yet chosen: route these writes
+ * through a backend function holding the service key, or move auth first so the
+ * browser carries a Supabase session that `is_admin()` can recognise. Until
+ * then this stays exactly what it was.
+ *
+ * The decorator and the Supabase adapter are finished and tested, and the
+ * translation they perform is proven against Postgres. Only the credential the
+ * browser can offer is missing.
+ */
 export const services: Services = {
   leads: new Base44LeadService(client),
   content: new Base44ContentService(client),
