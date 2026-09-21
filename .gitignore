@@ -56,3 +56,5 @@ base44/.app.jsonc
 # Operational logs pulled from Base44 by scripts/archive-logs.mjs.
 # Kept as CI artifacts, never committed — see the `logs` job in ci.yml.
 logs/
+supabase/.temp/
+supabase/.branches/
