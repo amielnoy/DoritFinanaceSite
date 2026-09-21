@@ -90,7 +90,22 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-CNT-004 | "keeps the display number in sync with the dial number" | Digits of `phoneDisplay` reconstruct `phoneE164` |
 | UNIT-CNT-005 | "exposes a valid contact email" | Matches an email shape |
 
+### 4.5 Dual-write cutover mechanism — `tests/unit/dual-write.test.ts`
+
+The mechanism the Base44 → Supabase migration turns on. Writes reach both
+stores, reads only the authoritative one, and a failing shadow must never cost
+a visitor their submission. See
+`docs/superpowers/specs/2026-09-21-supabase-auth-data-migration-design.md`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-DW-001 | "reads from the primary only" | A sick shadow cannot serve stale content |
+| UNIT-DW-002 | "writes to both, primary first" | Order is primary then shadow |
+| UNIT-DW-003 | "fails the caller when the primary fails" | Rejects, and the shadow is never touched |
+| UNIT-DW-004 | "swallows a shadow failure and reports it" | Resolves; the failure is handed to the reporter |
+| UNIT-DW-005 | "covers every write on the port" | All five writes reach the shadow |
+
 ## 5. Pass criteria
 
-All 43 cases pass. Any failure is a functional defect, not an environment issue —
+All 48 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
