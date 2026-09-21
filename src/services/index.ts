@@ -1,6 +1,8 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
 import { AUTH_PROVIDER } from "@/config/auth-provider";
+import { DualWriteContentAdminService } from "./dual/DualWriteContentAdminService";
+import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
 import { appParams } from "@/lib/app-params";
 import { Base44AgentService } from "./base44/Base44AgentService";
@@ -50,27 +52,28 @@ const client = base44 as any;
 /**
  * Content admin, during the migration.
  *
- * The dual-write decorator is deliberately NOT installed yet, and the reason is
- * worth writing down because everything else is ready.
+ * Base44 stays authoritative; Supabase is written alongside it and keyed on
+ * `base44_id`, because the ids handed to the shadow are Base44's and mean
+ * nothing to Postgres. Both of those swap together at the flip.
  *
- * The browser holds an anonymous Supabase client — identity still belongs to
- * Base44 until the auth half of this migration lands — while writing a post or
- * a testimonial requires `is_admin()` under row-level security. So every shadow
- * write is refused with 42501, verified against a real database rather than
- * assumed. Wiring it anyway would "work": Base44 still takes the write, the
- * visitor sees success, and a warning is logged where nobody reads it, while
- * Supabase quietly receives nothing at all. A migration that looks finished and
- * has copied no data is worse than one that is obviously unstarted.
- *
- * Two ways out, both real work and neither yet chosen: route these writes
- * through a backend function holding the service key, or move auth first so the
- * browser carries a Supabase session that `is_admin()` can recognise. Until
- * then this stays exactly what it was.
- *
- * The decorator and the Supabase adapter are finished and tested, and the
- * translation they perform is proven against Postgres. Only the credential the
- * browser can offer is missing.
+ * The auth condition is not belt-and-braces. Writing a post or a testimonial
+ * requires `is_admin()`, which needs a Supabase session — with Base44 still
+ * answering "who is signed in", the browser's client is anonymous and every
+ * shadow write is refused with 42501. Installing the decorator then would look
+ * like success and copy nothing: Base44 takes the write, the visitor is told it
+ * worked, and a warning lands where nobody reads it. So the shadow goes in only
+ * once there is an identity behind it.
  */
+const contentAdmin: ContentAdminPort = (() => {
+  const base44Admin = new Base44ContentAdminService(client);
+  if (!supabase || AUTH_PROVIDER !== "supabase") return base44Admin;
+
+  return new DualWriteContentAdminService(
+    base44Admin,
+    new SupabaseContentAdminService(supabase, "base44_id"),
+  );
+})();
+
 /**
  * Identity, from whichever provider is switched on.
  *
@@ -96,7 +99,7 @@ export const services: Services = {
   support: new Base44SupportService(client),
   auth: authPort,
   leadsAdmin: new Base44LeadAdminService(client),
-  contentAdmin: new Base44ContentAdminService(client),
+  contentAdmin,
 };
 
 export * from "./ports";

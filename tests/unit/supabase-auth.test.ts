@@ -8,6 +8,7 @@ const clientWith = (opts: {
   userError?: { message?: string } | null;
   profile?: Profile;
   spy?: Record<string, ReturnType<typeof vi.fn>>;
+  passwordError?: { message?: string } | null;
 }): SupabaseAuthClient => ({
   auth: {
     getUser: async () => ({
@@ -16,6 +17,8 @@ const clientWith = (opts: {
     }),
     signOut: opts.spy?.signOut ?? (async () => ({ error: null })),
     signInWithOAuth: opts.spy?.signInWithOAuth ?? (async () => ({ error: null })),
+    signInWithPassword:
+      opts.spy?.signInWithPassword ?? (async () => ({ error: opts.passwordError ?? null })),
   },
   from: () => ({
     select: () => ({
@@ -110,6 +113,38 @@ describe("SupabaseAuthService", () => {
     // Navigating first can tear the page down before the request leaves,
     // leaving the session alive on a machine someone just walked away from.
     expect(order).toEqual(["signOut"]);
+  });
+
+  it("signs in with an address and a password", async () => {
+    const signInWithPassword = vi.fn(async () => ({ error: null }));
+    const svc = new SupabaseAuthService(clientWith({ spy: { signInWithPassword } }));
+
+    await expect(svc.signInWithPassword("d@example.com", "hunter2")).resolves.toBeUndefined();
+    expect(signInWithPassword).toHaveBeenCalledWith({
+      email: "d@example.com",
+      password: "hunter2",
+    });
+  });
+
+  it("throws on bad credentials, which Supabase reports without rejecting", async () => {
+    // The failure arrives in the payload, not as a rejection. An unchecked call
+    // resolves and looks exactly like a successful sign-in — except no session
+    // exists, so the visitor is bounced straight back to the login screen with
+    // nothing explaining why.
+    const svc = new SupabaseAuthService(
+      clientWith({ passwordError: { message: "Invalid login credentials" } }),
+    );
+
+    await expect(svc.signInWithPassword("d@example.com", "wrong")).rejects.toThrow(
+      /Invalid login credentials/,
+    );
+  });
+
+  it("does not navigate: the caller owns the guarded destination", async () => {
+    const svc = new SupabaseAuthService(clientWith({}));
+    // Redirecting from in here would put a second destination beside the one
+    // the open-redirect guard returned, and only one of them would be checked.
+    await expect(svc.signInWithPassword("d@example.com", "pw")).resolves.toBeUndefined();
   });
 
   it("answers hasStoredToken synchronously, because the guards ask during render", () => {

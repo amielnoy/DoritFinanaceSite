@@ -309,4 +309,16 @@ export interface AuthPort {
    * answered `me()` and left the visitor signing in to the old system.
    */
   signInWithGoogle(returnUrl: string): void;
+  /**
+   * Sign in with an address and a password.
+   *
+   * Rejects with the provider's message so the form can show it. Unlike the
+   * Google path this does not navigate: the caller owns the destination, which
+   * is the guarded `returnTo`, and keeping the redirect in one place keeps the
+   * open-redirect guard covering both routes in.
+   *
+   * There is no sign-up beside it on purpose. Accounts into a system holding
+   * customer enquiries are provisioned, not self-served.
+   */
+  signInWithPassword(email: string, password: string): Promise<void>;
 }

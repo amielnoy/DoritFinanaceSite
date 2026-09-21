@@ -123,8 +123,12 @@ distinguishes on.
 | UNIT-SBA-006 | "sends the visitor to Google, returning where they started" | `signInWithOAuth` with `redirectTo` |
 | UNIT-SBA-007 | "signs out before redirecting, not after" | `signOut` precedes navigation |
 | UNIT-SBA-008 | "answers hasStoredToken synchronously" | Reflects the injected checker |
+| UNIT-SBA-009 | "routes redirectToLogin through the same Google flow" | Both doors reach Google |
+| UNIT-SBA-010 | "signs in with an address and a password" | Credentials forwarded verbatim |
+| UNIT-SBA-011 | "throws on bad credentials, which Supabase reports without rejecting" | Rejects with the provider's message |
+| UNIT-SBA-012 | "does not navigate: the caller owns the guarded destination" | Resolves without redirecting |
 
 ## 5. Pass criteria
 
-All 58 cases pass. Any failure is a functional defect, not an environment issue —
+All 62 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

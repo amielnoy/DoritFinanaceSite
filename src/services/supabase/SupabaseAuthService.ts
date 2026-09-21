@@ -17,6 +17,10 @@ export interface SupabaseAuthClient {
       provider: "google";
       options?: { redirectTo?: string };
     }): Promise<{ error: SupabaseError | null }>;
+    signInWithPassword(credentials: {
+      email: string;
+      password: string;
+    }): Promise<{ error: SupabaseError | null }>;
   };
   from(table: "profiles"): {
     select(columns: string): {
@@ -127,6 +131,13 @@ export class SupabaseAuthService implements AuthPort {
       provider: "google",
       options: { redirectTo: returnUrl },
     });
+  }
+
+  async signInWithPassword(email: string, password: string): Promise<void> {
+    const { error } = await this.client.auth.signInWithPassword({ email, password });
+    // Supabase reports failure in the payload rather than by rejecting, so an
+    // unchecked call looks like a successful sign-in that leaves no session.
+    if (error) throw new Error(error.message ?? "Invalid email or password");
   }
 }
 

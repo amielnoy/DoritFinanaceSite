@@ -8,6 +8,7 @@ export interface AuthClient {
     logout(redirectUrl?: string): void;
     redirectToLogin(returnUrl: string): void;
     loginWithProvider(provider: string, returnUrl: string): void;
+    loginViaEmailPassword(email: string, password: string): Promise<unknown>;
   };
 }
 
@@ -47,5 +48,9 @@ export class Base44AuthService implements AuthPort {
 
   signInWithGoogle(returnUrl: string): void {
     this.client.auth.loginWithProvider("google", returnUrl);
+  }
+
+  async signInWithPassword(email: string, password: string): Promise<void> {
+    await this.client.auth.loginViaEmailPassword(email, password);
   }
 }
