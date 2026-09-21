@@ -6,9 +6,11 @@
  * failure worth discovering from a default. Set `VITE_AUTH_PROVIDER=supabase`
  * to switch, and unset it to switch back.
  *
- * This is deliberately separate from `DATA_PRIMARY`: identity and data move on
- * their own schedules, and the whole reason auth went first is that the browser
- * needs a Supabase session before it can write anything RLS protects.
+ * It also decides where content writes go. With Base44 answering, the browser
+ * writes Base44 directly as it always has. With Supabase answering, it cannot —
+ * Base44's rules want a Base44 session — so the writes go through the
+ * `contentAdmin` function, which holds both credentials and needs no browser
+ * identity at all.
  */
 export type AuthProvider = "base44" | "supabase";
 

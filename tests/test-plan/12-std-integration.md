@@ -359,18 +359,3 @@ and allow operations notifications to proceed. The helper parity check guards
 against drift across isolated entry points. No test sends real email.
 The shared harness injects Deno environment access and records Resend deliveries
 alongside existing Base44 deliveries for the existing recipient/content tests.
-
-### Supabase shadow — id translation — `tests/integration/supabase-shadow.integration.test.ts`
-
-The one part of dual-write a fake cannot prove. The shadow is handed the
-primary's id, which exists only in `base44_id`; the question is whether the
-right row changes and the others do not. Requires a local stack
-(`supabase start`) and is skipped, not failed, without one — set
-`SUPABASE_TEST_URL` and `SUPABASE_TEST_SERVICE_KEY` to run it.
-
-| ID | Title | Expected result |
-|---|---|---|
-| INT-SHD-001 | "records the primary's id on a mirrored create" | `base44_id` set; the uuid differs from it |
-| INT-SHD-002 | "updates the row the primary means" | Target row changes, its neighbour does not |
-| INT-SHD-003 | "deletes by the primary's id" | Row gone |
-| INT-SHD-004 | "wrong column fails loudly one way, silently the other" | uuid column rejects with 22P02; text column matches nothing and reports success |

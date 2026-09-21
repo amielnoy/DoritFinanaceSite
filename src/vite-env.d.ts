@@ -12,8 +12,6 @@
  * pretending otherwise just moves the failure somewhere less obvious.
  */
 interface ImportMetaEnv {
-  /** Which store is authoritative — see `src/config/data-primary.ts`. */
-  readonly VITE_DATA_PRIMARY?: "base44" | "supabase";
   /** Who answers "who is signed in" — see `src/config/auth-provider.ts`. */
   readonly VITE_AUTH_PROVIDER?: "base44" | "supabase";
   readonly VITE_BASE44_APP_ID?: string;

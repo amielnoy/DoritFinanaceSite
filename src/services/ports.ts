@@ -231,11 +231,10 @@ export interface ContentAdminPort {
   /**
    * Returns the new row's id.
    *
-   * It used to return nothing, which was fine while one store existed. Under
-   * dual-write the id is the only thing tying the two copies together: the
-   * shadow is written after the primary and would otherwise have no idea which
-   * row it is mirroring, leaving every row created during the migration
-   * uncorrelated — precisely the rows reconciliation has to check.
+   * It used to return nothing, which was fine while one store existed. The id
+   * is what ties the two copies together: `contentAdmin` writes Base44 first
+   * and stamps the id it gets back into Supabase's `base44_id`, so a row
+   * created during the migration is one row and not two unrelated ones.
    */
   createArticle(draft: ArticleDraft): Promise<string>;
   updateArticle(id: string, draft: Partial<ArticleDraft>): Promise<void>;
@@ -244,22 +243,6 @@ export interface ContentAdminPort {
   listTestimonials(limit?: number): Promise<Testimonial[]>;
   createTestimonial(draft: TestimonialDraft): Promise<string>;
   removeTestimonial(id: string): Promise<void>;
-}
-
-/**
- * A store that can stand behind another one.
- *
- * The shadow is handed the primary's id for every id-bearing operation, because
- * the ids are not shared: Base44 mints its own and Postgres mints a uuid, so a
- * row has two identities and only the correlation column joins them. A shadow
- * asked to delete "the row with the primary's id" must translate before it can
- * act, or the delete silently matches nothing and the stores drift apart
- * exactly where the migration claims they agree.
- */
-export interface ShadowWritePort extends ContentAdminPort {
-  /** Create, recording which row in the primary this one mirrors. */
-  createArticleMirroring(primaryId: string, draft: ArticleDraft): Promise<void>;
-  createTestimonialMirroring(primaryId: string, draft: TestimonialDraft): Promise<void>;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

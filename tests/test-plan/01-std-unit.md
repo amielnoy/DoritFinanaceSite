@@ -90,24 +90,7 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-CNT-004 | "keeps the display number in sync with the dial number" | Digits of `phoneDisplay` reconstruct `phoneE164` |
 | UNIT-CNT-005 | "exposes a valid contact email" | Matches an email shape |
 
-### 4.5 Dual-write cutover mechanism — `tests/unit/dual-write.test.ts`
-
-The mechanism the Base44 → Supabase migration turns on. Writes reach both
-stores, reads only the authoritative one, and a failing shadow must never cost
-a visitor their submission. See
-`docs/superpowers/specs/2026-09-21-supabase-auth-data-migration-design.md`.
-
-| ID | Title | Expected result |
-|---|---|---|
-| UNIT-DW-001 | "reads from the primary only" | A sick shadow cannot serve stale content |
-| UNIT-DW-002 | "writes to both, primary first" | Order is primary then shadow |
-| UNIT-DW-003 | "fails the caller when the primary fails" | Rejects, and the shadow is never touched |
-| UNIT-DW-004 | "swallows a shadow failure and reports it" | Resolves; the failure is handed to the reporter |
-| UNIT-DW-005 | "covers every write on the port" | All five writes reach the shadow |
-| UNIT-DW-006 | "hands the shadow the primary's id" | Create returns the primary id; shadow mirrors against it |
-| UNIT-DW-007 | "passes the primary's id through on update and delete" | Shadow receives the primary id to translate |
-
-### 4.6 Supabase auth adapter — `tests/unit/supabase-auth.test.ts`
+### 4.5 Supabase auth adapter — `tests/unit/supabase-auth.test.ts`
 
 `AuthPort` over Supabase. The semantics `AuthContext` depends on: the role comes
 from `profiles` rather than the token, and failures carry the reason the context
@@ -128,7 +111,7 @@ distinguishes on.
 | UNIT-SBA-011 | "throws on bad credentials, which Supabase reports without rejecting" | Rejects with the provider's message |
 | UNIT-SBA-012 | "does not navigate: the caller owns the guarded destination" | Resolves without redirecting |
 
-### 4.7 Store reconciliation — `tests/unit/reconcile.test.ts`
+### 4.6 Store reconciliation — `tests/unit/reconcile.test.ts`
 
 The gate phase 4 rests on: the flip is safe once the two stores have agreed for
 a sustained stretch, and "agreed" has to be checkable. Exits non-zero on drift
@@ -147,5 +130,5 @@ so it can gate the cutover rather than merely describe it.
 
 ## 5. Pass criteria
 
-All 70 cases pass. Any failure is a functional defect, not an environment issue —
+All 63 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
