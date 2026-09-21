@@ -175,6 +175,44 @@ const SHEET_COLUMNS = [
   'שם', 'טלפון', 'אימייל', 'מזהה רשומה', 'סיבת העברה', 'תקציר',
 ];
 
+/**
+ * שיקוף הפנייה ל-Supabase. לעולם לא זורק.
+ *
+ * Base44 הוא המקור הסמכותי בשלב הזה: הפנייה כבר נשמרה לפני שמגיעים לכאן, וכשל
+ * בשיקוף הוא עניין של התאמה בין שני מאגרים — לא של פנייה שאבדה. לכן הוא נרשם
+ * ביומן ואינו מחזיר שגיאה למבקר, שאצלו הכל הצליח.
+ *
+ * `on_conflict=base44_id` עם merge-duplicates: מסלול הראיון מעדכן רשומה קיימת
+ * במקום ליצור חדשה, ואותה קריאה משרתת את שני המסלולים בלי לדעת מי מהם קרא לה.
+ *
+ * מפתח השירות עוקף RLS. זה נדרש: קריאת העדכון של ראיון פתוח חסומה למנהלים
+ * בלבד, ולפונקציה אין משתמש מחובר מאחוריה.
+ */
+async function mirrorLeadToSupabase(rid, base44Id, row) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  // לא מוגדר — אין שיקוף, ואין רעש ביומן. כך נראית הפונקציה לפני שההגירה
+  // הופעלה, וזה מצב תקין ולא תקלה.
+  if (!url || !key || !base44Id) return;
+
+  try {
+    const res = await fetch(`${url}/rest/v1/leads?on_conflict=base44_id`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ ...row, base44_id: base44Id }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 140)}`);
+    log('info', 'lead.mirrored', { rid, base44Id });
+  } catch (e) {
+    log('warn', 'lead.mirror_failed', { rid, base44Id, err: String(e?.message ?? e).slice(0, 200) });
+  }
+}
+
 /** הוספת שורה אחת ליומן. מחזירה מחרוזת מצב לנספח התפעולי. */
 async function appendEventRow(base44, row) {
   if (!SHEET_ID) return 'לא מוגדר';
@@ -896,6 +934,22 @@ export default async function(req) {
         { status: 500 }
       );
     }
+
+    // שיקוף ל-Supabase. יושב כאן ולא בתוך ענפי היצירה/העדכון כדי שייקרא פעם
+    // אחת בדיוק, ואחרי שהכתיבה הסמכותית הצליחה — אותו סדר שבו תופעות הלוואי
+    // שבהמשך רצות פעם אחת ולא פעם לכל מאגר.
+    await mirrorLeadToSupabase(rid, leadId, {
+      name,
+      phone,
+      email: email || '',
+      source: source || 'quick',
+      topic: effectiveTopic || '',
+      timing: timing || '',
+      message: leadMessage,
+      status: partial ? 'partial' : 'new',
+      consent_version: consent_version || '',
+      consent_at: consent_at || null,
+    });
 
     // מכאן והלאה — מיטבי. הפנייה כבר שמורה, ולכן כשל בהודעה מדווח
     // בתשובה במקום להיכשל, כדי שניתן יהיה לנטר אותו.

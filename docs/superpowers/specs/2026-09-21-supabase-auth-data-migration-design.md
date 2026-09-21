@@ -271,3 +271,36 @@ Still open: Supabase's email provider remains enabled, so `/auth/v1/signup`
 accepts password sign-ups the UI no longer offers. And domain restriction has no
 enforcement point — the Google consent screen must be External, because the
 Cloud project has no Workspace organisation behind it.
+
+## Phase 2, the function half (2026-09-22)
+
+`submitLead` and `upsertContact` now mirror into Supabase. Both sit after the
+branches converge, so the shadow write happens once per request and only after
+the authoritative write succeeded — the same discipline the side effects already
+followed, and for the same reason.
+
+Neither throws. Base44 is authoritative in this phase, so a failed mirror is two
+stores disagreeing, not an enquiry lost.
+
+Leads upsert on `base44_id`; contacts on `phone`. The difference is deliberate:
+phone is the key the Contact entity is built around — one record per person, not
+per enquiry — and it is what the function already searched by. Conflicting on
+the other column would create a second person with the same number, which is
+precisely what that entity exists to prevent.
+
+Verified against the live database before deploying anything: 201 then 200, one
+row, fields merged, for both tables.
+
+That check found what would otherwise have shipped silently. `service_role` had
+no grants at all — the first migration named only anon and authenticated, and
+with "automatically expose new tables" off nothing is implicit. Bypassing RLS is
+not the same as holding privileges, and the mirror never throws, so every lead
+would have gone to Base44, logged `lead.mirror_failed` where nobody was
+watching, and Supabase would have stayed empty while the migration looked done.
+
+Credentials live in Base44's secret store as SUPABASE_URL and
+SUPABASE_SERVICE_ROLE_KEY. Absent, the mirror is a no-op and the function
+behaves exactly as it did before — which is what a deploy that has not been
+switched on yet should look like.
+
+**Not deployed.** The functions still run their previous version in production.

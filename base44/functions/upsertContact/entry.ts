@@ -108,6 +108,44 @@ function normalisePhone(raw) {
   return digits ? '0' + digits : '';
 }
 
+/**
+ * שיקוף איש הקשר ל-Supabase. לעולם לא זורק.
+ *
+ * Base44 הוא המקור הסמכותי בשלב הזה: הרשומה כבר נשמרה לפני שמגיעים לכאן, וכשל
+ * בשיקוף הוא אי-התאמה בין שני מאגרים — לא איש קשר שאבד.
+ *
+ * `on_conflict=phone` ולא `base44_id`, בניגוד לפניות: הטלפון הוא המפתח שהישות
+ * בנויה סביבו — רשומה אחת לאדם, לא אחת לפנייה — וזה גם המפתח שלפיו הפונקציה
+ * עצמה חיפשה קודם. התנגשות על השדה השני הייתה יוצרת אדם שני עם אותו מספר,
+ * שזה בדיוק מה שהישות קיימת כדי למנוע.
+ *
+ * מפתח השירות עוקף RLS, כנדרש: עדכון אנשי קשר חסום למנהלים ואין משתמש מחובר
+ * מאחורי הפונקציה.
+ */
+async function mirrorContactToSupabase(rid, base44Id, row) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  // לא מוגדר — אין שיקוף ואין רעש. כך נראית הפונקציה לפני שההגירה הופעלה.
+  if (!url || !key) return;
+
+  try {
+    const res = await fetch(`${url}/rest/v1/contacts?on_conflict=phone`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify(base44Id ? { ...row, base44_id: base44Id } : row),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 140)}`);
+    log('info', 'contact.mirrored', { rid, base44Id });
+  } catch (e) {
+    log('warn', 'contact.mirror_failed', { rid, base44Id, err: String(e?.message ?? e).slice(0, 200) });
+  }
+}
+
 export default async function(req) {
   const rid = newRequestId();
   const startedAt = Date.now();
@@ -184,6 +222,17 @@ export default async function(req) {
         );
       }
     }
+
+    // שיקוף ל-Supabase. אחרי ששני הענפים התכנסו, כך שהוא נקרא פעם אחת בדיוק
+    // ורק אחרי שהכתיבה הסמכותית הצליחה.
+    await mirrorContactToSupabase(rid, contactId, {
+      phone: key,
+      name: name || existing?.name || '',
+      email: email || existing?.email || '',
+      channel: ['whatsapp', 'site', 'phone', 'other'].includes(channel) ? channel : 'other',
+      notes: safeNotes || existing?.notes || '',
+      last_seen: now,
+    });
 
     // ── הגיליון ─────────────────────────────────────────────────────────
     // רק על יצירה. הרשומה כבר נשמרה, ולכן כשל כאן מדווח ואינו מפיל דבר.
