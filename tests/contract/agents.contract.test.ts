@@ -418,6 +418,35 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(lists[0].match(/"[^"]+@[^"]+"/g) ?? []).not.toHaveLength(0);
   });
 
+  /**
+   * The mirror is the fifth duplicated helper, and its drift is the quietest of
+   * the lot. It cannot throw — Base44 is authoritative during the migration and
+   * a failed shadow write must never cost a visitor their enquiry — so a copy
+   * that stops working stops working in silence. One function's leads reach
+   * Supabase, another's do not, and the only trace is a log line nobody reads.
+   */
+  it("keeps the Supabase mirror identical in every function that captures a lead", () => {
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    const bodyOf = (src: string, name: string) => {
+      const i = src.indexOf("async function mirrorLeadToSupabase");
+      expect(i, `${name} has no Supabase mirror`).toBeGreaterThan(-1);
+      return src.slice(i, src.indexOf("\n}", i)).replace(/\s+/g, " ").trim();
+    };
+    const copies = [
+      bodyOf(submitLead, "submitLead"),
+      bodyOf(escalate, "escalateToHuman"),
+      bodyOf(claim, "submitClaim"),
+    ];
+    expect(copies[1], "escalateToHuman drifted from submitLead").toBe(copies[0]);
+    expect(copies[2], "submitClaim drifted from submitLead").toBe(copies[0]);
+    // And every one of them is actually called, not merely declared.
+    for (const [src, name] of [[submitLead, "submitLead"], [escalate, "escalateToHuman"], [claim, "submitClaim"]] as const) {
+      expect(src, `${name} declares the mirror but never calls it`).toMatch(
+        /await mirrorLeadToSupabase\(/,
+      );
+    }
+  });
+
   it("keeps the Core-reachable list identical in every function that mails", () => {
     // `CORE_EMAILS` decides which transport a recipient takes. If the three
     // copies disagree, the same address is mailed one way by one function and

@@ -358,6 +358,44 @@ function buildEscalationHtml(reason, data) {
 </html>`;
 }
 
+/**
+ * שיקוף הפנייה ל-Supabase. לעולם לא זורק.
+ *
+ * Base44 הוא המקור הסמכותי בשלב הזה: הפנייה כבר נשמרה לפני שמגיעים לכאן, וכשל
+ * בשיקוף הוא עניין של התאמה בין שני מאגרים — לא של פנייה שאבדה. לכן הוא נרשם
+ * ביומן ואינו מחזיר שגיאה למבקר, שאצלו הכל הצליח.
+ *
+ * `on_conflict=base44_id` עם merge-duplicates: מסלול הראיון מעדכן רשומה קיימת
+ * במקום ליצור חדשה, ואותה קריאה משרתת את שני המסלולים בלי לדעת מי מהם קרא לה.
+ *
+ * מפתח השירות עוקף RLS. זה נדרש: קריאת העדכון של ראיון פתוח חסומה למנהלים
+ * בלבד, ולפונקציה אין משתמש מחובר מאחוריה.
+ */
+async function mirrorLeadToSupabase(rid, base44Id, row) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  // לא מוגדר — אין שיקוף, ואין רעש ביומן. כך נראית הפונקציה לפני שההגירה
+  // הופעלה, וזה מצב תקין ולא תקלה.
+  if (!url || !key || !base44Id) return;
+
+  try {
+    const res = await fetch(`${url}/rest/v1/leads?on_conflict=base44_id`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ ...row, base44_id: base44Id }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 140)}`);
+    log('info', 'lead.mirrored', { rid, base44Id });
+  } catch (e) {
+    log('warn', 'lead.mirror_failed', { rid, base44Id, err: String(e?.message ?? e).slice(0, 200) });
+  }
+}
+
 export default async function(req) {
   const rid = newRequestId();
   const startedAt = Date.now();
@@ -407,6 +445,23 @@ export default async function(req) {
       log('info', 'escalation.anonymous', { rid, reason: safeReason });
       warnings.push('no_contact_details');
     }
+
+    // שיקוף ל-Supabase. העברה אנונימית לא יצרה פנייה ולכן `leadId` ריק —
+    // והפונקציה יוצאת מיד. מי שלא מסר פרטים לא נרשם, בשני המאגרים.
+    await mirrorLeadToSupabase(rid, leadId, {
+      name,
+      phone,
+      email: email || '',
+      source: 'escalation',
+      topic: topic || REASONS[safeReason],
+      timing: '',
+      message: `[הועבר לטיפול אנושי — ${REASONS[safeReason]}]\n\n${safeSummary}`,
+      status: 'escalated',
+      escalation_reason: safeReason,
+      handled_by_agent: agent || '',
+      consent_version: consentVersion || '',
+      consent_at: consentAt || null,
+    });
 
     const notification = buildNotification(safeReason, { name, phone, email, agent, summary: safeSummary });
     const subject = `${URGENT.has(safeReason) ? '🔴 ' : ''}העברה לטיפול אנושי — ${REASONS[safeReason]}${name ? ` · ${name}` : ''}`;
