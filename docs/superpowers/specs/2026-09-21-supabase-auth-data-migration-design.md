@@ -1,6 +1,6 @@
 # Moving auth and data off Base44 onto Supabase
 
-**Date:** 2026-09-21 · **Status:** approved design; phase 0 applied and verified on hjowdyiwjjrqceumkvgt (Frankfurt)
+**Date:** 2026-09-21 · **Status:** phases 0-1 applied and verified on hjowdyiwjjrqceumkvgt (Frankfurt). Phase 2 next.
 
 ## Why
 
@@ -90,7 +90,7 @@ emails and a double-booked calendar are not.
 | Phase | State | Rollback |
 |---|---|---|
 | 0 | Schema + RLS live, no traffic | drop |
-| 1 | Backfill history, populating `base44_id` | re-run |
+| 1 | Backfill history, populating `base44_id` — **done**, 29 rows | re-run |
 | 2 | Dual-write on; Base44 primary | switch off |
 | 3 | Reconcile until the diff is clean | stay in 2 |
 | 4 | Flip: Supabase primary | flip back |
@@ -145,3 +145,21 @@ Reconciliation is itself tested: seed divergence, assert the diff catches it.
    admin until an admin exists.
 6. After the flip, `id` changes format. Internal uses are fine; the **Google
    Sheets export** writes lead data externally and may be keyed on it downstream.
+
+## Phase 1 notes (2026-09-22)
+
+Production was smaller than assumed: 25 leads, 0 contacts, 2 posts, 2
+testimonials. No `is_sample` rows, and every `source`/`status` value already
+satisfied the CHECK constraints.
+
+Base44 attaches `created_by_id` and `is_sample` to every row. Neither is
+carried: the first names a user that will not exist after the migration, the
+second marks demo data.
+
+`consent_version` is empty on all 25 leads, though the entity documents it as
+the evidentiary half of the duty to inform under תיקון 13 and `compliance.ts`
+defines `CONSENT_VERSION`. Nothing writes it. Pre-existing, not caused by the
+migration, and worth fixing on its own.
+
+The export contains customer personal data. It is never committed; the
+generator takes its path as an argument and writes SQL to stdout.
