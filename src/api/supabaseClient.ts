@@ -21,11 +21,15 @@ export const supabase: SupabaseClient | null =
   url && key
     ? createClient(url, key, {
         auth: {
-          // Identity still belongs to Base44 during the dual-write phases, so
-          // this client reads and writes as an anonymous caller and should not
-          // try to own a session. It changes when auth moves, not before.
-          persistSession: false,
-          autoRefreshToken: false,
+          // Auth is moving here, so the session has to survive a reload and
+          // refresh itself — a visitor signed out by a page refresh is not a
+          // session, and an expired token turns every RLS-protected read into a
+          // silent empty result rather than an error anyone can act on.
+          persistSession: true,
+          autoRefreshToken: true,
+          // The OAuth redirect comes back with the session in the URL fragment;
+          // without this it is dropped and the sign-in appears to do nothing.
+          detectSessionInUrl: true,
         },
       })
     : null;

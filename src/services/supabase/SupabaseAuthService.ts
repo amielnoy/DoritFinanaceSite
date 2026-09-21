@@ -1,0 +1,139 @@
+import type { AuthPort, AuthUser } from "../ports";
+
+interface SupabaseError {
+  message?: string;
+  status?: number;
+}
+
+/** The Supabase surface this adapter needs — not the whole client. */
+export interface SupabaseAuthClient {
+  auth: {
+    getUser(): Promise<{
+      data: { user: { id: string; email?: string | null } | null };
+      error: SupabaseError | null;
+    }>;
+    signOut(): Promise<{ error: SupabaseError | null }>;
+    signInWithOAuth(args: {
+      provider: "google";
+      options?: { redirectTo?: string };
+    }): Promise<{ error: SupabaseError | null }>;
+  };
+  from(table: "profiles"): {
+    select(columns: string): {
+      eq(
+        column: string,
+        value: string,
+      ): {
+        maybeSingle(): Promise<{
+          data: { role?: string | null; full_name?: string | null } | null;
+          error: SupabaseError | null;
+        }>;
+      };
+    };
+  };
+}
+
+/**
+ * Shaped like the SDK's own failures, because `AuthContext` reads them.
+ *
+ * It distinguishes "sign in first" from "signed in, but not a user of this app"
+ * by looking for a 403 and a reason, and shows different copy for each. Throwing
+ * a bare Error here would collapse both into "unknown" and lose that, so the
+ * adapter speaks the vocabulary the context already understands rather than the
+ * context learning a second one.
+ */
+const authFailure = (reason: string, message: string) =>
+  Object.assign(new Error(message), {
+    status: 403,
+    data: { extra_data: { reason } },
+  });
+
+export class SupabaseAuthService implements AuthPort {
+  constructor(
+    private readonly client: SupabaseAuthClient,
+    /**
+     * Whether a session is stored, answered synchronously.
+     *
+     * `getUser()` is a network round-trip, and the route guards ask this
+     * question during render to decide whether a check is even worth starting.
+     * Supabase keeps its session in localStorage under `sb-<ref>-auth-token`.
+     */
+    private readonly sessionPresent: () => boolean = defaultSessionPresent,
+  ) {}
+
+  hasStoredToken(): boolean {
+    return this.sessionPresent();
+  }
+
+  /**
+   * Base44 gated on an app-level reachability check that could reject with
+   * "you are not a user of this app". Supabase has no such notion — a project
+   * either answers or does not — so this resolves and the real decision is made
+   * by `me()` and by row-level security.
+   */
+  async getPublicSettings(): Promise<unknown> {
+    return {};
+  }
+
+  async me(): Promise<AuthUser> {
+    const { data, error } = await this.client.auth.getUser();
+    if (error || !data.user) {
+      throw authFailure("auth_required", error?.message ?? "Authentication required");
+    }
+
+    // The role lives in `profiles`, not in the JWT: it can be revoked between
+    // one request and the next, and a token minted an hour ago would still
+    // claim it. Everything that matters is enforced by RLS regardless — this
+    // read only decides which screens to offer.
+    const { data: profile } = await this.client
+      .from("profiles")
+      .select("role, full_name")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (!profile) {
+      // A trigger creates the row on sign-up, so its absence means this account
+      // is not provisioned for the app rather than that the read failed.
+      throw authFailure("user_not_registered", "User not registered for this app");
+    }
+
+    return {
+      id: data.user.id,
+      email: data.user.email ?? undefined,
+      full_name: profile.full_name ?? undefined,
+      role: profile.role ?? "user",
+    };
+  }
+
+  logout(redirectUrl?: string): void {
+    // Fire-and-forget to match the port's synchronous shape, but the redirect
+    // waits for the sign-out: navigating first can leave the session intact if
+    // the page tears down before the request goes out.
+    void this.client.auth.signOut().finally(() => {
+      if (redirectUrl && typeof window !== "undefined") window.location.href = redirectUrl;
+    });
+  }
+
+  redirectToLogin(returnUrl: string): void {
+    void this.client.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: returnUrl },
+    });
+  }
+}
+
+/** Looks for Supabase's own storage key rather than guessing the project ref. */
+function defaultSessionPresent(): boolean {
+  if (typeof window === "undefined" || !window.localStorage) return false;
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && /^sb-.*-auth-token$/.test(key)) return true;
+    }
+  } catch {
+    // Storage can throw outright when cookies are blocked. A wrong "no" here
+    // costs one redundant auth check; an exception costs the render.
+    return false;
+  }
+  return false;
+}

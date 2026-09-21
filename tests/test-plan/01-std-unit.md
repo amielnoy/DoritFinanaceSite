@@ -107,7 +107,24 @@ a visitor their submission. See
 | UNIT-DW-006 | "hands the shadow the primary's id" | Create returns the primary id; shadow mirrors against it |
 | UNIT-DW-007 | "passes the primary's id through on update and delete" | Shadow receives the primary id to translate |
 
+### 4.6 Supabase auth adapter — `tests/unit/supabase-auth.test.ts`
+
+`AuthPort` over Supabase. The semantics `AuthContext` depends on: the role comes
+from `profiles` rather than the token, and failures carry the reason the context
+distinguishes on.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SBA-001 | "reports the signed-in user with the role from profiles" | id, email, full_name, role |
+| UNIT-SBA-002 | "reads the role from the table, never from the token" | A revoked role cannot survive in a stale JWT |
+| UNIT-SBA-003 | "defaults a null role to user" | `role === "user"` |
+| UNIT-SBA-004 | "asks for sign-in with the reason AuthContext looks for" | 403 + `auth_required` |
+| UNIT-SBA-005 | "separates not-provisioned from not-signed-in" | 403 + `user_not_registered` |
+| UNIT-SBA-006 | "sends the visitor to Google, returning where they started" | `signInWithOAuth` with `redirectTo` |
+| UNIT-SBA-007 | "signs out before redirecting, not after" | `signOut` precedes navigation |
+| UNIT-SBA-008 | "answers hasStoredToken synchronously" | Reflects the injected checker |
+
 ## 5. Pass criteria
 
-All 50 cases pass. Any failure is a functional defect, not an environment issue —
+All 58 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
