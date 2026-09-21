@@ -19,9 +19,6 @@ import AdminRoute from '@/components/AdminRoute';
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const Accessibility = lazy(() => import('@/pages/Accessibility'));
 const Login = lazy(() => import('@/pages/Login'));
-const Register = lazy(() => import('@/pages/Register'));
-const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const Leads = lazy(() => import('@/pages/Leads'));
 const Blog = lazy(() => import('@/pages/Blog'));
 const BlogPost = lazy(() => import('@/pages/BlogPost'));
@@ -74,9 +71,6 @@ const AuthenticatedApp = () => {
         <Route path="/tools" element={<Tools />} />
         <Route path="/perspective" element={<Perspective />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
         <Route element={<AdminRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
           <Route path="/admin/leads" element={<Leads />} />
           <Route path="/admin/blog" element={<BlogAdmin />} />

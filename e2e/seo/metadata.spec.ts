@@ -18,7 +18,7 @@ const PUBLIC_ROUTES = [
   { path: "/accessibility", name: "accessibility", titleContains: "נגישות" },
 ];
 
-const PRIVATE_ROUTES = ["/login", "/register", "/forgot-password", "/admin/leads"];
+const PRIVATE_ROUTES = ["/login", "/admin/leads"];
 
 const head = {
   title: (p: Page) => p.title(),
@@ -319,7 +319,7 @@ test.describe("Crawl directives", () => {
     );
 
     await test_step("the private areas are disallowed", async () => {
-      for (const path of ["/admin/", "/login", "/register", "/oauth/"]) {
+      for (const path of ["/admin/", "/login", "/oauth/"]) {
         expect(body, `${path} should be disallowed`).toContain(`Disallow: ${path}`);
       }
     });

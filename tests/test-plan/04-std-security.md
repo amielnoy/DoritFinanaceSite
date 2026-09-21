@@ -50,7 +50,7 @@ lead inbox.
 | SEC-STA-016 | "no source file loads anything over plaintext `http://`" | Zero offenders (localhost excepted) |
 | SEC-STA-017 | "`index.html` loads every external asset over https" | Zero `http://` in `href`/`src` |
 | SEC-STA-018 | "only `app-params.js` touches the stored access token" | Exactly that one file |
-| SEC-STA-019 | "pages that consume `?returnTo=` go through the shared guard" | `Login` and `Register` import `safeReturnTo` |
+| SEC-STA-019 | "pages that consume `?returnTo=` go through the shared guard" | `Login` imports `safeReturnTo` (`Register` went with email/password sign-in) |
 | SEC-STA-020 | "no page reads `returnTo` out of the query string without the guard" | Zero offenders outside `authReturnTo.js` |
 | SEC-STA-021 | "redirects derived from `returnTo` are assigned from the guarded value" | `Login` assigns `window.location.href` from `safeReturnTo()` |
 | SEC-STA-022 | "admin routes stay behind a gate that requires both sign-in and the admin role" | `/admin/leads` and `/admin/blog` inside the `AdminRoute` block; `AdminRoute` falls back to `ProtectedRoute` when signed out and rejects `role !== "admin"` |
@@ -72,7 +72,7 @@ carries a `<script>`, an `<img onerror>`, a `javascript:` markdown link and a
 | SEC-XSS-005 | "a hostile testimonial cannot inject markup on the home page" | Serve a testimonial with script/img payloads | `window.__xss_t` unset |
 | SEC-TOK-001 | "no access token is written to storage for an anonymous visitor" | Load `/` | No storage key matching `token\|secret\|password`; no JWT-shaped value |
 | SEC-TOK-002 | "`?clear_access_token=true` wipes any stored token" | Seed both token keys, reload with the flag | Both keys `null` |
-| SEC-RED-001 | "a hostile `?returnTo=` cannot bounce the visitor off-site" | 4 hostile values on `/login` | Page stays on the login screen; no `evil.example` in the register link |
+| SEC-RED-001 | "a hostile `?returnTo=` cannot bounce the visitor off-site" | 4 hostile values on `/login` | Page stays on the login screen and on the suite's own origin |
 | SEC-LNK-001 | "every new-tab link is protected against reverse tabnabbing" | Load `/` | Every rendered `target=_blank` anchor has `noopener` |
 | SEC-MIX-001 | "no mixed content: the page loads nothing over plain http" | Load `/`, scroll to the bottom | Zero non-localhost `http://` requests |
 | SEC-BND-001 | "the shipped bundle contains no secret-shaped literals" | Fetch every `<script src>` | No Stripe/AWS/private-key/JWT patterns |

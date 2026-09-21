@@ -135,7 +135,7 @@ describe("robots.txt — who is allowed to read it", () => {
   });
 
   it("keeps the private routes out for everyone", () => {
-    for (const path of ["/admin/", "/login", "/register"]) {
+    for (const path of ["/admin/", "/login"]) {
       expect(ROBOTS).toContain(`Disallow: ${path}`);
     }
   });

@@ -5,9 +5,6 @@ Allow: /
 # (src/components/SeoRouteGuard.tsx); this keeps them out of crawl budget too.
 Disallow: /admin/
 Disallow: /login
-Disallow: /register
-Disallow: /forgot-password
-Disallow: /reset-password
 Disallow: /oauth/
 
 # AI assistants and their crawlers are allowed, deliberately.
