@@ -6,7 +6,11 @@
  * of the tests below.
  */
 import { describe, expect, it, vi } from "vitest";
-import { SupabaseAuthService, type SupabaseAuthClient } from "@/services/supabase/SupabaseAuthService";
+import {
+  SupabaseAuthService,
+  hasSupabaseSessionKey,
+  type SupabaseAuthClient,
+} from "@/services/supabase/SupabaseAuthService";
 
 type Profile = { role?: string | null } | null;
 
@@ -203,4 +207,72 @@ describe("SupabaseAuthService", () => {
     expect(new SupabaseAuthService(clientWith({}), () => true).hasStoredToken()).toBe(true);
     expect(new SupabaseAuthService(clientWith({}), () => false).hasStoredToken()).toBe(false);
   });
+
+  describe("the session probe", () => {
+    // A stand-in rather than the real thing: this jsdom build provides `window`
+    // and `location` but no `localStorage` at all, and the bug being guarded
+    // against is in the key pattern, not in any browser.
+    const storage = (keys: string[]) => ({ length: keys.length, key: (i: number) => keys[i] ?? null });
+
+    it("finds a whole session", () => {
+      expect(hasSupabaseSessionKey(storage(["sb-abc123-auth-token"]))).toBe(true);
+    });
+
+    it("finds a session split into chunks", () => {
+      // supabase-js splits a session past a size threshold across numbered
+      // keys, and a Google sign-in carrying a provider token is over it. The
+      // first version anchored on `-auth-token$`: it matched the small case and
+      // missed the one this app actually produces. Silently — "no stored token"
+      // skips the auth check rather than failing it, so the visitor stayed
+      // signed out with nothing logged and no button on the page.
+      expect(hasSupabaseSessionKey(storage(["sb-abc123-auth-token.0", "sb-abc123-auth-token.1"]))).toBe(true);
+    });
+
+    it("is not fooled by somebody else's key", () => {
+      expect(hasSupabaseSessionKey(storage(["theme", "sb-something-else", "auth-token"]))).toBe(false);
+    });
+
+    it("says no rather than throwing when storage is unavailable", () => {
+      const hostile = { length: 1, key: () => { throw new Error("blocked"); } };
+      expect(hasSupabaseSessionKey(hostile)).toBe(false);
+    });
+  });
+
+  it("signs in with an address and a password", async () => {
+    const signInWithPassword = vi.fn(async () => ({ error: null }));
+    const svc = new SupabaseAuthService(clientWith({ spy: { signInWithPassword } }));
+
+    await expect(svc.signInWithPassword("d@example.com", "hunter2")).resolves.toBeUndefined();
+    expect(signInWithPassword).toHaveBeenCalledWith({
+      email: "d@example.com",
+      password: "hunter2",
+    });
+  });
+
+  it("throws on bad credentials, which Supabase reports without rejecting", async () => {
+    // The failure arrives in the payload, not as a rejection. An unchecked call
+    // resolves and looks exactly like a successful sign-in — except no session
+    // exists, so the visitor is bounced straight back to the login screen with
+    // nothing explaining why.
+    const svc = new SupabaseAuthService(
+      clientWith({ passwordError: { message: "Invalid login credentials" } }),
+    );
+
+    await expect(svc.signInWithPassword("d@example.com", "wrong")).rejects.toThrow(
+      /Invalid login credentials/,
+    );
+  });
+
+  it("does not navigate: the caller owns the guarded destination", async () => {
+    const svc = new SupabaseAuthService(clientWith({}));
+    // Redirecting from in here would put a second destination beside the one
+    // the open-redirect guard returned, and only one of them would be checked.
+    await expect(svc.signInWithPassword("d@example.com", "pw")).resolves.toBeUndefined();
+  });
+
+  it("answers hasStoredToken synchronously, because the guards ask during render", () => {
+    expect(new SupabaseAuthService(clientWith({}), () => true).hasStoredToken()).toBe(true);
+    expect(new SupabaseAuthService(clientWith({}), () => false).hasStoredToken()).toBe(false);
+  });
+
 });

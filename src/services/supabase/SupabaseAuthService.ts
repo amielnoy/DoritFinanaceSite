@@ -71,7 +71,11 @@ export class SupabaseAuthService implements AuthPort {
      *
      * `getUser()` is a network round-trip, and the route guards ask this
      * question during render to decide whether a check is even worth starting.
-     * Supabase keeps its session in localStorage under `sb-<ref>-auth-token`.
+     * Supabase keeps its session in localStorage under `sb-<ref>-auth-token`,
+     * possibly split across numbered chunks. Reading a vendor's private storage
+     * key is brittle by nature; it is done here because the question — is a
+     * check worth starting — has to be answered synchronously during render,
+     * and `getSession()` is a promise.
      */
     private readonly sessionPresent: () => boolean = defaultSessionPresent,
   ) {}
@@ -192,18 +196,39 @@ const absoluteOnThisOrigin = (path: string): string | undefined => {
   }
 };
 
-/** Looks for Supabase's own storage key rather than guessing the project ref. */
-function defaultSessionPresent(): boolean {
-  if (typeof window === "undefined" || !window.localStorage) return false;
+/**
+ * Does this storage hold a Supabase session?
+ *
+ * Takes the storage rather than reaching for `window`, so the interesting case
+ * is testable: not every DOM test environment provides `localStorage`, and the
+ * bug this guards against lives in the key pattern, not in the browser.
+ *
+ * Reading a vendor's private storage key is brittle by nature. It is done here
+ * because the question — is an auth check worth starting — must be answered
+ * synchronously during render, and `getSession()` is a promise.
+ */
+export function hasSupabaseSessionKey(storage: Pick<Storage, "length" | "key">): boolean {
   try {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (key && /^sb-.*-auth-token$/.test(key)) return true;
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      // The chunk suffix is the point of the trailing group. supabase-js splits
+      // a session past a size threshold across `…-auth-token.0`, `.1`, … and a
+      // Google sign-in carrying a provider token is comfortably over it.
+      // Anchoring on `-auth-token$` matched the small case and missed the one
+      // this app actually produces — silently, because "no stored token" skips
+      // the auth check rather than failing it, so the visitor simply stays
+      // signed out with nothing logged anywhere.
+      if (key && /^sb-.+-auth-token(\.\d+)?$/.test(key)) return true;
     }
   } catch {
-    // Storage can throw outright when cookies are blocked. A wrong "no" here
-    // costs one redundant auth check; an exception costs the render.
+    // Storage can throw outright when cookies are blocked. A wrong "no" costs
+    // one redundant auth check; an exception costs the render.
     return false;
   }
   return false;
+}
+
+function defaultSessionPresent(): boolean {
+  if (typeof window === "undefined" || !window.localStorage) return false;
+  return hasSupabaseSessionKey(window.localStorage);
 }
