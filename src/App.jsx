@@ -14,7 +14,6 @@ import SeoRouteGuard from '@/components/SeoRouteGuard';
 // page should not download the blog admin and the rich-text editor to read it.
 import Home from '@/pages/Home';
 import FloatingActions from '@/components/dorit/layout/FloatingActions';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import AdminRoute from '@/components/AdminRoute';
 
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));

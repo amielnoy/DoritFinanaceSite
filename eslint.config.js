@@ -64,7 +64,23 @@ export default [
   // The shadcn primitives are generated code and stay out of lint, as before.
   // `src/lib` used to be ignored too; it now holds first-party TypeScript
   // (seo, structured-data, pension-fee) and is linted like everything else.
-  { ignores: ["src/components/ui/**/*", "dist/**", "node_modules/**"] },
+  // The allure-* entries are generated output, not source. They were missing here,
+  // so `eslint .` walked every result file a run had ever written — which is a
+  // directory that grows without bound and had reached the 65k-entry cap, turning
+  // a 3-second lint into a 15-minute one that looked for all the world like a hang.
+  {
+    ignores: [
+      "src/components/ui/**/*",
+      "dist/**",
+      "node_modules/**",
+      "allure-results/**",
+      "allure-report/**",
+      "allure-report-site/**",
+      "allure-history/**",
+      "test-results/**",
+      "playwright-report/**",
+    ],
+  },
 
   // ── JavaScript / JSX ─────────────────────────────────────────────────
   {
