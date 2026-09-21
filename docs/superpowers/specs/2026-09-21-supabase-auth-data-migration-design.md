@@ -304,3 +304,33 @@ behaves exactly as it did before — which is what a deploy that has not been
 switched on yet should look like.
 
 **Not deployed.** The functions still run their previous version in production.
+
+## Phase 3 — reconciliation (2026-09-22)
+
+`scripts/reconcile-stores.mjs` compares a Base44 export against Supabase and
+exits non-zero on drift, so it gates the flip rather than describing it.
+
+Three disagreements, which do not mean the same thing. **missing** is a mirror
+that failed — the visitor is fine, the copy is incomplete, and re-running the
+backfill repairs it. **orphaned** is a Supabase row with no counterpart, which
+before the flip should be impossible and means something wrote directly.
+**mismatched** is both stores holding a row and disagreeing about a field: an
+update that reached one of them.
+
+The comparison is pure and unit-tested, because the cases worth testing are
+awkward to manufacture against live stores — and because the failure that
+matters is not missing drift but inventing it. Base44 writes `""` where the
+mirror writes NULL; a gate that cries drift over that gets switched off within a
+day, and a muted gate is no gate. Phones are matched on digits, ratings by
+value (PostgREST returns them as strings), booleans by truth.
+
+First run against production: **25/25 leads, 2/2 posts, 2/2 testimonials, 0/0
+contacts, zero drift.**
+
+Then the check that mattered more — a status was changed in Supabase directly,
+and reconciliation named that exact lead and field and exited 1; reverting
+returned it to clean. A gate that has only ever passed is not evidence of
+anything.
+
+Phase 3 is now a standing check rather than a finished step: run it over the
+coming days, and a clean run is what justifies phase 4.

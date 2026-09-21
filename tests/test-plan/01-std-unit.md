@@ -128,7 +128,24 @@ distinguishes on.
 | UNIT-SBA-011 | "throws on bad credentials, which Supabase reports without rejecting" | Rejects with the provider's message |
 | UNIT-SBA-012 | "does not navigate: the caller owns the guarded destination" | Resolves without redirecting |
 
+### 4.7 Store reconciliation — `tests/unit/reconcile.test.ts`
+
+The gate phase 4 rests on: the flip is safe once the two stores have agreed for
+a sustained stretch, and "agreed" has to be checkable. Exits non-zero on drift
+so it can gate the cutover rather than merely describe it.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-REC-001 | "is silent when they agree, despite blanks spelled differently" | `""` and NULL are not a disagreement |
+| UNIT-REC-002 | "reports a lead the mirror never copied" | Listed as missing |
+| UNIT-REC-003 | "reports a Supabase row with no counterpart" | Listed as orphaned |
+| UNIT-REC-004 | "reports an update that reached only one store" | Listed as mismatched |
+| UNIT-REC-005 | "names every field that differs, not just the first" | All differing fields |
+| UNIT-REC-006 | "matches contacts on the phone number, however punctuated" | No false drift |
+| UNIT-REC-007 | "compares a rating by value" | `5` equals `"5"` |
+| UNIT-REC-008 | "compares published by truth, not spelling" | Real drift still caught |
+
 ## 5. Pass criteria
 
-All 62 cases pass. Any failure is a functional defect, not an environment issue —
+All 70 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
