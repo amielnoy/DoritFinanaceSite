@@ -129,9 +129,15 @@ Reconciliation is itself tested: seed divergence, assert the diff catches it.
    Created with "automatically expose new tables" off, so the migration carries
    explicit Data API grants.
 
-   **Tier is still open.** Free projects pause on inactivity and have no PITR,
-   against a 24-month retention commitment. Fine through phases 0-2; must not be
-   what holds live enquiries at cutover.
+   ~~**Tier is still open.**~~ **Resolved 2026-09-22 — upgraded to Pro.** The
+   project no longer pauses on inactivity, which mattered more once the mirrors
+   went live: a paused database during a lead submission is a mirror that fails
+   silently and drift nobody notices until reconciliation runs.
+
+   Pro includes daily backups held 7 days. **Point-in-time recovery is a
+   separate paid add-on and is not included** — worth deciding on its own terms
+   against a 24-month retention commitment, since daily backups mean a bad day
+   costs up to a day of enquiries.
 2. **`Testimonial.rls.read` is `null`**, not `true`. Public reads clearly work,
    but the semantics are unverified. Phase 0 implements public read to match
    observed behaviour; verify before trusting it.
