@@ -1,8 +1,7 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
 import { AUTH_PROVIDER } from "@/config/auth-provider";
-import { DualWriteContentAdminService } from "./dual/DualWriteContentAdminService";
-import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
+import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
 import { appParams } from "@/lib/app-params";
 import { Base44AgentService } from "./base44/Base44AgentService";
@@ -52,25 +51,25 @@ const client = base44 as any;
 /**
  * Content admin, during the migration.
  *
- * Base44 stays authoritative; Supabase is written alongside it and keyed on
- * `base44_id`, because the ids handed to the shadow are Base44's and mean
- * nothing to Postgres. Both of those swap together at the flip.
+ * With Base44 answering "who is signed in", the browser writes Base44 directly,
+ * exactly as it always has, and Supabase is left alone — an anonymous client
+ * cannot satisfy `is_admin()` and every shadow write would be refused.
  *
- * The auth condition is not belt-and-braces. Writing a post or a testimonial
- * requires `is_admin()`, which needs a Supabase session — with Base44 still
- * answering "who is signed in", the browser's client is anonymous and every
- * shadow write is refused with 42501. Installing the decorator then would look
- * like success and copy nothing: Base44 takes the write, the visitor is told it
- * worked, and a warning lands where nobody reads it. So the shadow goes in only
- * once there is an identity behind it.
+ * With Supabase answering, the browser cannot write Base44 either: its rules
+ * want a Base44 admin session and a Supabase one is refused with 403, before
+ * the shadow write is even reached. So the writes move to a backend function,
+ * which holds both credentials and needs no browser identity — only proof of
+ * who is asking. Reads stay anonymous on Base44 either way, because posts and
+ * testimonials are public.
  */
 const contentAdmin: ContentAdminPort = (() => {
   const base44Admin = new Base44ContentAdminService(client);
-  if (!supabase || AUTH_PROVIDER !== "supabase") return base44Admin;
+  if (AUTH_PROVIDER !== "supabase") return base44Admin;
 
-  return new DualWriteContentAdminService(
+  return new FunctionContentAdminService(
+    client as unknown as FunctionsClient,
     base44Admin,
-    new SupabaseContentAdminService(supabase, "base44_id"),
+    async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
   );
 })();
 
