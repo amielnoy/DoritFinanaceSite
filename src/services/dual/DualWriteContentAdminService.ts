@@ -1,4 +1,11 @@
-import type { Article, ArticleDraft, ContentAdminPort, Testimonial, TestimonialDraft } from "../ports";
+import type {
+  Article,
+  ArticleDraft,
+  ContentAdminPort,
+  ShadowWritePort,
+  Testimonial,
+  TestimonialDraft,
+} from "../ports";
 
 /** Told about a shadow write that failed. Never throws; the request already succeeded. */
 export type ShadowFailure = (op: string, error: unknown) => void;
@@ -25,7 +32,7 @@ const report: ShadowFailure = (op, error) => {
 export class DualWriteContentAdminService implements ContentAdminPort {
   constructor(
     private readonly primary: ContentAdminPort,
-    private readonly shadow: ContentAdminPort,
+    private readonly shadow: ShadowWritePort,
     private readonly onShadowFailure: ShadowFailure = report,
   ) {}
 
@@ -37,8 +44,16 @@ export class DualWriteContentAdminService implements ContentAdminPort {
     return this.primary.listTestimonials(limit);
   }
 
-  createArticle(draft: ArticleDraft): Promise<void> {
-    return this.both("createArticle", (t) => t.createArticle(draft));
+  /**
+   * The primary creates first and its id becomes the correlation key, so the
+   * shadow is told which row it mirrors rather than minting an unrelated one.
+   * Without this every row created during the migration would be uncorrelated —
+   * and those are exactly the rows reconciliation exists to check.
+   */
+  async createArticle(draft: ArticleDraft): Promise<string> {
+    const primaryId = await this.primary.createArticle(draft);
+    await this.mirror("createArticle", () => this.shadow.createArticleMirroring(primaryId, draft));
+    return primaryId;
   }
 
   updateArticle(id: string, draft: Partial<ArticleDraft>): Promise<void> {
@@ -49,8 +64,12 @@ export class DualWriteContentAdminService implements ContentAdminPort {
     return this.both("removeArticle", (t) => t.removeArticle(id));
   }
 
-  createTestimonial(draft: TestimonialDraft): Promise<void> {
-    return this.both("createTestimonial", (t) => t.createTestimonial(draft));
+  async createTestimonial(draft: TestimonialDraft): Promise<string> {
+    const primaryId = await this.primary.createTestimonial(draft);
+    await this.mirror("createTestimonial", () =>
+      this.shadow.createTestimonialMirroring(primaryId, draft),
+    );
+    return primaryId;
   }
 
   removeTestimonial(id: string): Promise<void> {
@@ -64,8 +83,17 @@ export class DualWriteContentAdminService implements ContentAdminPort {
    */
   private async both(op: string, run: (target: ContentAdminPort) => Promise<void>): Promise<void> {
     await run(this.primary);
+    await this.mirror(op, () => run(this.shadow));
+  }
+
+  /**
+   * The shadow half, which may fail without consequence to the caller. Ids
+   * handed in here are the primary's; translating them is the shadow's job,
+   * because only it knows how the two identities line up.
+   */
+  private async mirror(op: string, run: () => Promise<void>): Promise<void> {
     try {
-      await run(this.shadow);
+      await run();
     } catch (error) {
       this.onShadowFailure(op, error);
     }

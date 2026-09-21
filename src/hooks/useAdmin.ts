@@ -55,8 +55,13 @@ export function useAdminArticles() {
 export function useSaveArticle() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, draft }: { id?: string; draft: ArticleDraft }) =>
-      id ? services.contentAdmin.updateArticle(id, draft) : services.contentAdmin.createArticle(draft),
+    // `createArticle` returns the new id now (dual-write correlates on it) while
+    // `updateArticle` returns nothing. Neither is used here, so the branches are
+    // flattened to void rather than making every caller handle a union.
+    mutationFn: async ({ id, draft }: { id?: string; draft: ArticleDraft }): Promise<void> => {
+      if (id) return services.contentAdmin.updateArticle(id, draft);
+      await services.contentAdmin.createArticle(draft);
+    },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: adminKeys.articles });
       // A publish or unpublish changes what the public blog shows too.

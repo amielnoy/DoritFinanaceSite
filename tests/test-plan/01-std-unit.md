@@ -104,8 +104,10 @@ a visitor their submission. See
 | UNIT-DW-003 | "fails the caller when the primary fails" | Rejects, and the shadow is never touched |
 | UNIT-DW-004 | "swallows a shadow failure and reports it" | Resolves; the failure is handed to the reporter |
 | UNIT-DW-005 | "covers every write on the port" | All five writes reach the shadow |
+| UNIT-DW-006 | "hands the shadow the primary's id" | Create returns the primary id; shadow mirrors against it |
+| UNIT-DW-007 | "passes the primary's id through on update and delete" | Shadow receives the primary id to translate |
 
 ## 5. Pass criteria
 
-All 48 cases pass. Any failure is a functional defect, not an environment issue —
+All 50 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
