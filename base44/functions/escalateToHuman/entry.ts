@@ -374,9 +374,12 @@ function buildEscalationHtml(reason, data) {
 async function mirrorLeadToSupabase(rid, base44Id, row) {
   const url = (Deno.env.get('SUPABASE_URL') || '').trim();
   const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
-  // לא מוגדר — אין שיקוף, ואין רעש ביומן. כך נראית הפונקציה לפני שההגירה
-  // הופעלה, וזה מצב תקין ולא תקלה.
-  if (!url || !key || !base44Id) return;
+  // לא מוגדר — אין שיקוף. נרשם ולא שותק: יציאה שקטה כאן נראית בדיוק כמו שיקוף
+  // שהצליח, והיא מה שהפך פנייה חסרה ב-Supabase לחקירה במקום לשורה ביומן.
+  if (!url || !key || !base44Id) {
+    log('warn', 'lead.mirror_skipped', { rid, hasUrl: Boolean(url), hasKey: Boolean(key), hasId: Boolean(base44Id) });
+    return;
+  }
 
   try {
     const res = await fetch(`${url}/rest/v1/leads?on_conflict=base44_id`, {

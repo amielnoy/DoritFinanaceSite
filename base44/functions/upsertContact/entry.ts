@@ -125,8 +125,11 @@ function normalisePhone(raw) {
 async function mirrorContactToSupabase(rid, base44Id, row) {
   const url = (Deno.env.get('SUPABASE_URL') || '').trim();
   const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
-  // לא מוגדר — אין שיקוף ואין רעש. כך נראית הפונקציה לפני שההגירה הופעלה.
-  if (!url || !key) return;
+  // לא מוגדר — אין שיקוף. נרשם ולא שותק: יציאה שקטה נראית כמו הצלחה.
+  if (!url || !key) {
+    log('warn', 'contact.mirror_skipped', { rid, hasUrl: Boolean(url), hasKey: Boolean(key) });
+    return;
+  }
 
   try {
     const res = await fetch(`${url}/rest/v1/contacts?on_conflict=phone`, {
