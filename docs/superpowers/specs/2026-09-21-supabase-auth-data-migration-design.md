@@ -135,9 +135,13 @@ Reconciliation is itself tested: seed divergence, assert the diff catches it.
 2. **`Testimonial.rls.read` is `null`**, not `true`. Public reads clearly work,
    but the semantics are unverified. Phase 0 implements public read to match
    observed behaviour; verify before trusting it.
-3. **Unverified:** whether a Base44 function can build an `asServiceRole` client
-   without a user request context. Connectors and email depend on it after the
-   migration. Cheap to check, reshapes the function work if false.
+3. ~~**Unverified:** `asServiceRole` without a user request context.~~
+   **Resolved 2026-09-22 — it works.** `createClientFromRequest` reads the
+   service token from its own header, `Base44-Service-Authorization`, injected
+   by the platform; the user token in `Authorization` is separate and optional.
+   So connectors, Sheets and email are unaffected by moving identity to
+   Supabase. It also confirms the JWT must travel in a custom header:
+   `Authorization` is already consumed by Base44's client construction.
 4. **Domain restriction** needs an enforcement point. Google's `hd` is a hint,
    not a control. A trigger on `auth.users` works on any tier; Supabase auth
    hooks are plan-gated. Not in phase 0 — the domain policy is undecided.

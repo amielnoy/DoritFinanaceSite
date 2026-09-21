@@ -785,7 +785,7 @@ export default async function(req) {
     log('info', 'request.start', { rid });
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at } = body || {};
 
     if (!name || !phone) {
       log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields', source: source || 'quick' });
@@ -855,6 +855,10 @@ export default async function(req) {
           topic: effectiveTopic || '',
           message: leadMessage,
           status: partial ? 'partial' : 'new',
+          // נשמר מה שכבר נרשם: ההסכמה ניתנה בתחילת השיחה, והעדכון הזה מגיע
+          // אחריה. דריסה בריק היתה מוחקת את הראייה שהיא ניתנה.
+          consent_version: consent_version || openInterview.consent_version || '',
+          consent_at: consent_at || openInterview.consent_at || '',
         });
         leadId = openInterview.id;
         log('info', 'lead.updated', { rid, leadId });
@@ -875,6 +879,12 @@ export default async function(req) {
         timing: timing || '',
         message: leadMessage,
         status: partial ? 'partial' : 'new',
+        // איזה נוסח הסכמה הוצג, ומתי. חובת היידוע לפי חוק הגנת הפרטיות
+        // (תיקון 13) היא ראייתית: בלי זה אי אפשר לקשור רשומה לנוסח שהמבקר
+        // ראה בפועל. ריק כשהפנייה הגיעה ממסלול שלא הציג שער הסכמה — נרשם רק
+        // מה שבאמת הוצג, ולעולם לא הסכמה שלא נתבקשה.
+        consent_version: consent_version || '',
+        consent_at: consent_at || '',
       });
       leadId = lead?.id ?? null;
       log('info', 'lead.created', { rid, leadId, source: source || 'quick' });
