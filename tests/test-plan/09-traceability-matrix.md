@@ -10,7 +10,7 @@ gap is visible and a failure points at a feature.
 | F-03 | Visitor models pension management fees (/tools) | UNIT-PFC-001..012 | CMP-PFC-001..004 | — | — | — | — | E2E-CAL-001..006 | E2E-MOB-009 | — | A11Y-AXE-008 |
 | F-04 | Visitor submits the quick contact form | — | CMP-QCF-001..005 | CTR-LED-001..013, CTR-EML-001/002 | INT-LEAD-001..024 | — | API-CTR-003/005/006 | E2E-FRM-001..004 | E2E-MOB-008 | SEC-RLS-001 | A11Y-AXE-008, A11Y-STR-002 |
 | F-05 | Visitor leaves details in the short form beside the chat | — | — | CTR-LED-* | INT-LEAD-001..024 | — | API-CTR-003 | E2E-FRM-005..007 | — | — | A11Y-AXE-008 |
-| F-06 | Visitor books the first meeting inside the interview chat | — | — | CTR-FN-001..011 | INT-LEAD-025..030 | — | API-CTR-004, API-LIV-004 | E2E-FRM-008..011 | — | — | A11Y-AXE-008 |
+| F-06 | Visitor books the first meeting inside the interview chat | — | — | CTR-FN-001..011 | INT-LEAD-025..030, INT-LEAD-080..087 | — | API-CTR-004, API-LIV-004 | E2E-FRM-008..011 | — | — | A11Y-AXE-008 |
 | F-07 | Visitor calls / opens WhatsApp | UNIT-CNT-001..005 | CMP-BAR-001, CMP-FLA-001/002 | — | — | — | — | E2E-HOM-007 | E2E-MOB-001/002/006 | SEC-LNK-001 | A11Y-STR-003 |
 | F-08 | Visitor browses the blog and reads a post | — | — | CTR-BLG-001..003 | — | — | API-HTP-008 | E2E-BLG-001..006 | — | SEC-XSS-001..004 | A11Y-AXE-002/003 |
 | F-09 | Visitor shares a post | — | CMP-SHR-001 | — | — | — | — | E2E-BLG-005 | — | SEC-LNK-001, SEC-STA-014/015 | — |

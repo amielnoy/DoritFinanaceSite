@@ -657,7 +657,12 @@ the same results, and both have the analytics beacon stripped.
 
 #### Which Cloudflare URL to use
 
-Each deploy produces two, and the run summary prints both:
+Each deploy produces two, and the run summary prints both — in the **allure job
+itself**, so the links appear on every run that publishes, not only on the
+`main` runs that get the **Deployed sites** table. It used to announce them with
+a `::notice::` alone, which lands at the top of the run and scrolls away behind
+every other annotation; on `builder` and on manual dispatches the report was
+deployed and its address appeared nowhere anyone would look:
 
 | URL | What it is |
 |---|---|

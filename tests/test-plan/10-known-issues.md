@@ -120,16 +120,38 @@ warning rather than failing the deploy.
 
 ### B-1 · Colour contrast below WCAG AA
 
-The brand accent `#7D6B5D` on the parchment background `#F9F7F2` measures about
-**4.4:1**, just under the 4.5:1 AA floor for body-size text. axe flags 41 nodes
-on the home page, 5–7 on `/blog` and `/claims`, and 2 in the footer on every
-page (the muted grey copyright line).
+Half of this is fixed; the description of the other half was wrong.
 
-Most failures are 11 px uppercase eyebrow text, which needs the full 4.5:1.
-Options: darken `--accent` from `26 14% 39%` to roughly `26 14% 34%`, or raise
-those specific labels to `--foreground` at reduced opacity. Both are palette
-decisions, so the suite **reports** contrast on every run and enforces it only
-on request:
+**The accent was never the problem.** This entry used to blame the brand accent
+`#7D6B5D` at ~4.4:1. That hex is a stale comment in `src/index.css` and does not
+match its own token: `--accent: 26 14% 39%` renders `#716256`, which measures
+**5.5:1** on the parchment and clears AA. It has never appeared in an axe
+failure. The comment is the thing that is wrong, not the colour.
+
+**The bronze ramp was the problem, and is fixed** (2026-09-22). Every monetary
+figure on the site was set in a bronze drawn for fills — `--highlight-muted` at
+**2.07:1**, `--highlight-strong` at **2.73:1**, the Claims step numerals at
+~1.6:1. A fourth rung, `--highlight-ink` (`27 38% 30%`, 7.5:1), now carries
+bronze used as type. Measured before and after with `E2E_ENFORCE_CONTRAST=1`:
+**14 bronze nodes → 0**.
+
+**What is still open: the greys.** 51 nodes across the seven swept pages, every
+one an opacity composite of `--foreground` or `--muted-foreground`
+(`text-foreground/50`, `text-muted-foreground/60` and friends) rather than a
+token in its own right:
+
+| ratio | colour | on | size |
+| --- | --- | --- | --- |
+| 1.60 | `#c8c2bc` | `#f7f4f0` | 9 px |
+| 2.19 | `#ada69f` | `#f7f4f0` | 14 px / 20 px |
+| 2.45 | `#a8a19a` | `#fcfaf8` | 10 px |
+| 2.89 | `#99928a` | `#faf8f4` | 12 px |
+| 3.27–3.98 | five more greys | mixed | 12–18 px |
+
+Because each is `<token>/<alpha>` at a call site rather than a palette entry,
+there is no single value to darken — the fix is either raising the alphas or
+giving these a named token of their own, which is still a palette decision. So
+the suite **reports** contrast on every run and enforces it only on request:
 
 ```bash
 E2E_ENFORCE_CONTRAST=1 npx playwright test e2e/a11y
