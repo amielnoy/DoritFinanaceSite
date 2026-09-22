@@ -45,8 +45,10 @@ work; dual-write is a decorator registered in one file.
 
 ## Data model
 
-Five tables plus `profiles` (replacing `User`). Enums become CHECK constraints —
-cheaper to alter, and `escalation_reason` has ten values that will grow.
+Five tables plus `profiles` (replacing `User`), and since 2026-09-22 a sixth,
+`meetings`, which has no Base44 counterpart at all — see "The meeting" below.
+Enums become CHECK constraints — cheaper to alter, and `escalation_reason` has
+ten values that will grow.
 
 Every table carries `base44_id text unique`: the correlation key that makes
 reconciliation and backfill possible, and therefore makes the flip safe.
@@ -340,3 +342,52 @@ anything.
 
 Phase 3 is now a standing check rather than a finished step: run it over the
 coming days, and a clean run is what justifies phase 4.
+
+## The meeting (2026-09-22) — the first table with no Base44 original
+
+Every other table here mirrors a Base44 entity. `meetings` does not, because the
+thing it stores was never stored anywhere.
+
+The interview agent asks when the visitor wants to meet, builds an ISO
+`scheduledAt`, and passes it to the calendar functions. That was the whole life
+of the value: the Base44 `Lead` entity has no field for it and neither did this
+schema, so the agreed time existed only as an argument in flight. The failure
+that exposed it: the agent stopped sending `scheduledAt` (a contradictory line
+in its own prompt), `submitLead` skipped the Outlook hold exactly as designed,
+`createConsultationEvent` fell through to its default and booked *tomorrow
+09:00*, and the mail went out as though all was well. The only trace was one
+line in a function log.
+
+**Two places, because they answer different questions.** Four columns on `leads`
+(`scheduled_at`, `meeting_topic`, `notes`, `track`) answer "when did this
+enquiry want to meet?" while you are looking at the enquiry. A row in `meetings`
+answers "what is in the diary, and did the calendar take it?" — `scheduled_at`
+is the intent, `calendar_status` and `calendar_at` are the outcome, and the gap
+between them is precisely what was invisible.
+
+`meeting_topic` is deliberately not `topic`: `topic` is the interest area,
+derived from the interview profile; the meeting topic is what the two of them
+agreed to sit down about. Usually related, occasionally not.
+
+**Keyed on the lead, and carrying no contact details.**
+`lead_base44_id ... references leads(base44_id) on delete cascade`. The name and
+phone are one join away; a second copy would be a second place a deletion
+request has to reach. Unlike `leads` there is no public insert — nothing in a
+browser writes a meeting — so `anon` gets no policy and no grant.
+
+**Timezone.** `scheduledAt` is a wall-clock string (`2026-09-24T10:00:00`)
+meaning 10:00 *in Israel*. Writing it straight into `timestamptz` has Postgres
+read it as UTC and store 10:00Z — the same three-hour shift that had just been
+fixed in the calendar writers, except stored, and with no log to catch it.
+`israelInstant()` resolves the offset by trying +03 and +02 and keeping the one
+that round-trips through `Asia/Jerusalem`, so DST is handled in both directions
+and the hour that does not exist at spring-forward returns null rather than a
+guess.
+
+These are also the first tests to exercise the Supabase mirror at all: it
+short-circuits unless `SUPABASE_URL` and the service key are set, and no test
+had ever set them, so every earlier run mirrored nothing without saying so.
+
+Reconciliation note: `meetings` has no Base44 side, so it is deliberately
+outside `reconcile-stores.mjs`. Nothing to compare it against is the point.
+

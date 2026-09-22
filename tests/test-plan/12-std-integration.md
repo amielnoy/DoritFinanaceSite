@@ -98,10 +98,17 @@ other recipients told, and the outcome named in the operational appendix.
 
 ### 4.5 `submitLead` — the calendar event — `INT-LEAD-025..030`
 
-Books nothing for a quick contact form; honours an explicit `scheduledAt`; falls
-back to tomorrow morning when no time was agreed; asks for a reminder and sets
-the Israel timezone; authorises with the connector token and never returns it to
-the caller.
+Books nothing for a quick contact form; honours an explicit `scheduledAt`, **at
+the hour it names**; falls back to tomorrow morning when no time was agreed;
+asks for a reminder and sets the Israel timezone; authorises with the connector
+token and never returns it to the caller.
+
+The hour is the part that matters and the part this used to miss: the assertion
+was `toContain("2026-10-01")` — the day only — and passed just as happily on
+`2026-10-01T14:00:00.000Z`, which is what the code was sending. An offset in the
+string overrides the separate `timeZone` field in both Graph and Google, so a
+14:00 meeting was booked at 17:00 and the suite agreed. It now pins the exact
+wall-clock string and the absence of any offset.
 
 ### 4.6 `submitLead` — a finished introduction interview — `INT-LEAD-031..038`
 
@@ -111,11 +118,34 @@ stored and nobody was told. It ends at `submitLead` now, under
 with a plain-text twin and carry the whole profile in each half; the subject and
 the headline both name it an interview rather than an enquiry; the profile gets
 its own heading in the layout; the record keeps the `[ראיון היכרות]` marker and
-the interview source; no calendar slot is booked, because an interview agrees no
-time. Two cases cover what is specific to a model-written record: the profile
+the interview source; and — when the agent sends no `scheduledAt` — no calendar
+slot is booked and the operations mail says **"לא נקבע מועד"** rather than "לא
+רלוונטי", which read like a decision and is how this went unnoticed. A further
+case books the slot an interview *did* agree, at the hour it agreed. Two cases cover what is specific to a model-written record: the profile
 itself passes through `redact()`, unlike a message a visitor typed, and the
 visitor's own confirmation names the topic without mailing the bullets back. A
 last case pins that the staff copies still go out when no address was given.
+
+### 4.6a `submitLead` — what it stores about the meeting — `INT-LEAD-080..087`
+
+*(Ids out of sequence on purpose: these cases belong here by subject, but taking `039..048` would have renumbered four later sections and every id they are referenced by.)*
+
+The agreed time used to be stored nowhere: no field on the Base44 `Lead`, no
+column in Supabase, no table of its own — it existed only as an argument on its
+way to a calendar API. These pin the four meeting columns on `leads`, the
+`meetings` row keyed on the lead, that the row carries no name, phone or email
+(the lead is one join away and cascades on delete), and that the calendar
+outcome is written back beside the intent — including the case where an
+interview agreed nothing, which is the shape the original fault had.
+
+Two of them are about timezone rather than storage: 10:00 Israel must be stored
+as `07:00Z` in September and `08:00Z` in January. Writing the wall-clock string
+into a `timestamptz` would have Postgres read it as UTC, reproducing the same
+three-hour shift as §4.5 — except stored, and with no log line to catch it.
+
+These are also the first tests in the repo to exercise the Supabase mirror at
+all. It short-circuits unless `SUPABASE_URL` and the service key are set, and no
+test had ever set them, so every earlier case ran with mirroring silently off.
 
 ### 4.7 `submitLead` — the interview schema — `INT-LEAD-039..048`
 
