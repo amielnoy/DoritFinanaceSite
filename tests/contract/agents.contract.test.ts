@@ -425,6 +425,35 @@ describe("who receives a lead, and whether the consent text admits it", () => {
    * that stops working stops working in silence. One function's leads reach
    * Supabase, another's do not, and the only trace is a log line nobody reads.
    */
+  /**
+   * The device label is the sixth duplicated helper. Its drift is cosmetic
+   * rather than dangerous — a wrong label on a notification is not a lost
+   * enquiry — but three copies of a regex are three chances for one to learn
+   * about a device the others do not, and then the same phone reads as
+   * "אנדרואיד" on a claim and "לא ידוע" on an escalation.
+   */
+  it("keeps the device label identical in every function that notifies", () => {
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    const bodyOf = (src: string, name: string) => {
+      const i = src.indexOf("function deviceLabel");
+      expect(i, `${name} has no device label`).toBeGreaterThan(-1);
+      return src.slice(i, src.indexOf("\n}", i)).replace(/\s+/g, " ").trim();
+    };
+    const copies = [
+      bodyOf(submitLead, "submitLead"),
+      bodyOf(escalate, "escalateToHuman"),
+      bodyOf(claim, "submitClaim"),
+    ];
+    expect(copies[1], "escalateToHuman drifted from submitLead").toBe(copies[0]);
+    expect(copies[2], "submitClaim drifted from submitLead").toBe(copies[0]);
+    // And each one actually reaches a notification, rather than being declared
+    // and quietly unused.
+    for (const [src, name] of [[submitLead, "submitLead"], [escalate, "escalateToHuman"], [claim, "submitClaim"]] as const) {
+      expect(src, `${name} declares the device label but never uses it`).toMatch(/deviceLabel\(/);
+      expect(src, `${name} never puts it in the notification`).toMatch(/נשלח מ/);
+    }
+  });
+
   it("keeps the Supabase mirror identical in every function that captures a lead", () => {
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
     const bodyOf = (src: string, name: string) => {

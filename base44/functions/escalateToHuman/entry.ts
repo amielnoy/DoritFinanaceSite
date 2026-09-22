@@ -221,6 +221,7 @@ function buildNotification(reason, data) {
     `שם: ${data.name || 'לא נמסר'}`,
     `טלפון: ${data.phone || 'לא נמסר'}`,
     `אימייל: ${data.email || '—'}`,
+    `נשלח מ: ${data.device || 'לא ידוע'}`,
     ``,
     `תקציר השיחה (לאחר השמטת פרטים רגישים):`,
     data.summary || '—',
@@ -317,7 +318,8 @@ function buildEscalationHtml(reason, data) {
     detailRow('טלפון', data.phone || 'לא נמסר', {
       link: data.phone ? `tel:${String(data.phone).replace(/[^\d+]/g, '')}` : '',
     }),
-    detailRow('אימייל', data.email, { link: data.email ? `mailto:${data.email}` : '', last: true }),
+    detailRow('אימייל', data.email, { link: data.email ? `mailto:${data.email}` : '' }),
+    detailRow('נשלח מ', data.device || 'לא ידוע', { last: true }),
   ].join(''));
 
   const why = block('ההעברה', [
@@ -399,6 +401,30 @@ async function mirrorLeadToSupabase(rid, base44Id, row) {
   }
 }
 
+/**
+ * מאיזה מכשיר נשלחה הפנייה.
+ *
+ * נגזר מ-User-Agent של הבקשה, ולא ממשהו שהדפדפן מוסר בגוף הפנייה: זה מגיע
+ * מאותה בקשה שיצרה את הפנייה, ואין טופס שיכול לשקר עליו בטעות.
+ *
+ * תווית ולא המחרוזת המלאה. ל-User-Agent אין מה לחפש במייל שנשמר שנים, והשאלה
+ * שהוא עונה עליה כאן היא "מהטלפון או מהמחשב" — לא איזו גרסת דפדפן.
+ *
+ * iPadOS מדווח על עצמו כ-Macintosh, ולכן אייפד ללא בקשת אתר-שולחן ייספר
+ * כ-Mac. עדיף מלנחש: תווית שגויה גרועה מתווית כללית.
+ */
+function deviceLabel(ua) {
+  const s = String(ua || '');
+  if (!s) return 'לא ידוע';
+  if (/Android/i.test(s)) return 'אנדרואיד';
+  if (/iPhone/i.test(s)) return 'אייפון';
+  if (/iPad/i.test(s)) return 'אייפד';
+  if (/Macintosh|Mac OS X/i.test(s)) return 'מחשב Mac';
+  if (/Windows/i.test(s)) return 'מחשב Windows';
+  if (/Linux/i.test(s)) return 'מחשב Linux';
+  return 'לא ידוע';
+}
+
 export default async function(req) {
   const rid = newRequestId();
   const startedAt = Date.now();
@@ -466,10 +492,11 @@ export default async function(req) {
       consent_at: consentAt || null,
     });
 
-    const notification = buildNotification(safeReason, { name, phone, email, agent, summary: safeSummary });
+    const notification = buildNotification(safeReason, { name, phone, email, agent, summary: safeSummary, device: deviceLabel(req.headers.get('user-agent')) });
     const subject = `${URGENT.has(safeReason) ? '🔴 ' : ''}העברה לטיפול אנושי — ${REASONS[safeReason]}${name ? ` · ${name}` : ''}`;
     const escalationHtml = buildEscalationHtml(safeReason, {
       name, phone, email, agent, summary: safeSummary, contactable,
+      device: deviceLabel(req.headers.get('user-agent')),
     });
 
     let notified = false;
