@@ -278,6 +278,129 @@ describe("submitLead — what survives a failure", () => {
   });
 });
 
+/**
+ * The meeting, in Supabase.
+ *
+ * The agreed time used to exist only as an argument on its way to a calendar
+ * API: no column on the Base44 `Lead`, none on `leads`, and no table of its
+ * own. When the interview agent stopped sending it, the mail still went out
+ * and the calendar quietly booked a default slot — and the only record that
+ * anything had gone wrong was a line in a function log.
+ *
+ * These are also the first tests to exercise the Supabase mirror at all. It
+ * short-circuits unless SUPABASE_URL and the service key are set, so every
+ * earlier test ran with mirroring switched off without ever saying so.
+ */
+describe("submitLead — what it stores about the meeting", () => {
+  const SUPABASE = "https://stub.supabase.co";
+  const env = {
+    MAILER_URL,
+    MAILER_TOKEN: "test-only-token",
+    SUPABASE_URL: SUPABASE,
+    SUPABASE_SERVICE_ROLE_KEY: "test-only-service-key",
+  };
+
+  const booked = {
+    name: "אורי לוי",
+    phone: "0541112233",
+    source: "interview",
+    topic: "דמי ניהול בקרן ההשתלמות",
+    meetingTopic: "גמל, השתלמות ופנסיה",
+    timing: "חמישי השבוע, 24/09, 10:00",
+    notes: "אחרי 09:30",
+    track: "pension",
+    scheduledAt: "2026-09-24T10:00:00",
+  };
+
+  const bodyOf = (r: Awaited<ReturnType<typeof invokeFunction>>, table: string) => {
+    const calls = r.callsTo(`/rest/v1/${table}`);
+    expect(calls.length, `no write reached ${table}`).toBeGreaterThan(0);
+    return calls.map((c) => c.body as Record<string, unknown>);
+  };
+
+  it("puts the meeting fields on the lead", async () => {
+    const r = await invokeFunction("submitLead", booked, { env });
+    const [lead] = bodyOf(r, "leads");
+    expect(lead).toMatchObject({
+      meeting_topic: "גמל, השתלמות ופנסיה",
+      notes: "אחרי 09:30",
+      track: "pension",
+    });
+  });
+
+  it("stores the agreed time as a real instant, not a naive string", async () => {
+    // 10:00 in Israel is 07:00Z in September. Writing the wall-clock string
+    // into a timestamptz column would have Postgres read it as UTC and store
+    // 10:00Z — the same three-hour shift the calendar writers just lost.
+    const r = await invokeFunction("submitLead", booked, { env });
+    const [lead] = bodyOf(r, "leads");
+    expect(lead.scheduled_at).toBe("2026-09-24T07:00:00.000Z");
+  });
+
+  it("honours Israeli winter time too", async () => {
+    const r = await invokeFunction(
+      "submitLead",
+      { ...booked, scheduledAt: "2026-01-15T10:00:00" },
+      { env }
+    );
+    const [lead] = bodyOf(r, "leads");
+    expect(lead.scheduled_at).toBe("2026-01-15T08:00:00.000Z");
+  });
+
+  it("writes the booking to the meetings table, keyed on the lead", async () => {
+    const r = await invokeFunction("submitLead", booked, { env });
+    const calls = r.callsTo("/rest/v1/meetings");
+    expect(calls[0].url).toContain("on_conflict=lead_base44_id");
+    expect(calls[0].body).toMatchObject({
+      lead_base44_id: "LEAD-1",
+      scheduled_at: "2026-09-24T07:00:00.000Z",
+      topic: "גמל, השתלמות ופנסיה",
+      timing: "חמישי השבוע, 24/09, 10:00",
+      track: "pension",
+      source: "interview",
+    });
+  });
+
+  it("carries no contact details into the meetings table", async () => {
+    // The lead is one join away and cascades on delete. A second copy of the
+    // name and phone is a second place a deletion request has to reach.
+    const r = await invokeFunction("submitLead", booked, { env });
+    for (const body of bodyOf(r, "meetings")) {
+      for (const field of ["name", "phone", "email"]) {
+        expect(body, `meetings carries ${field}`).not.toHaveProperty(field);
+      }
+    }
+  });
+
+  it("records what the calendar actually did, beside what was agreed", async () => {
+    const r = await invokeFunction("submitLead", booked, { env });
+    const outcome = bodyOf(r, "meetings").find((b) => "calendar_status" in b);
+    expect(outcome, "the calendar outcome was never written back").toBeTruthy();
+    expect(outcome!.calendar_status).toContain("אירוע נוצר");
+    expect(outcome!.calendar_at).toBe("2026-09-24T07:00:00.000Z");
+  });
+
+  it("says so when an interview agreed no time at all", async () => {
+    // The shape of the bug: a meeting was discussed, nothing was booked, and
+    // the row is what makes that answerable without reading the logs.
+    const { scheduledAt, ...noTime } = booked;
+    const r = await invokeFunction("submitLead", noTime, { env });
+    const outcome = bodyOf(r, "meetings").find((b) => "calendar_status" in b);
+    expect(outcome!.calendar_status).toBe("לא נקבע מועד");
+    expect(outcome!.calendar_at).toBeNull();
+    expect(r.callsTo("graph.microsoft.com")).toEqual([]);
+  });
+
+  it("writes no meeting for a form that books none", async () => {
+    const r = await invokeFunction(
+      "submitLead",
+      { name: "יעל", phone: "0521234567", source: "quick" },
+      { env }
+    );
+    expect(r.callsTo("/rest/v1/meetings")).toEqual([]);
+  });
+});
+
 describe("submitLead — the calendar event it books", () => {
   it("books nothing for a quick contact form", async () => {
     const r = await invokeFunction("submitLead", { ...consultation, source: "quick" });

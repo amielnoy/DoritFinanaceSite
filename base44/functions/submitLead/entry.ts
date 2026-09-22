@@ -57,6 +57,31 @@ function tomorrowInIsrael() {
     .toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' });
 }
 
+/**
+ * מועד שעון-קיר ישראלי → רגע מוחלט, לעמודת timestamptz.
+ *
+ * scheduledAt הוא "2026-09-24T10:00:00" ללא אזור זמן, והכוונה היא 10:00
+ * בישראל. שליחה כזו ל-Postgres נקראת כ-UTC ומחזירה בדיוק את ההסחה של שלוש
+ * השעות שזה עתה תוקנה בכותבי היומן — רק שהפעם היא נשמרת במסד ואין לוג שיגלה.
+ *
+ * ישראל היא UTC+2 או UTC+3 לפי השעון הקיץ, ולכן ההיסט אינו קבוע ואי אפשר
+ * לכתוב אותו. במקום לנחש: מנסים את שניהם ובוחרים את זה שחוזר לאותה שעת קיר.
+ * בשעה הכפולה של סוף שעון הקיץ שתיהן מתאימות, והראשונה — ההיסט הקיצי — היא
+ * הנכונה, כי היא המוקדמת מבין השתיים.
+ */
+function israelInstant(wall) {
+  const w = String(wall || '').slice(0, 19);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(w)) return null;
+  const asUtc = Date.parse(`${w.length === 16 ? `${w}:00` : w}Z`);
+  if (Number.isNaN(asUtc)) return null;
+  for (const offsetHours of [3, 2]) {
+    const t = asUtc - offsetHours * 3600000;
+    const back = new Date(t).toLocaleString('sv-SE', { timeZone: 'Asia/Jerusalem' }).replace(' ', 'T');
+    if (back.slice(0, 16) === w.slice(0, 16)) return new Date(t).toISOString();
+  }
+  return null;
+}
+
 
 
 // שני נמענים, שניהם מקבלים את הפנייה המלאה.
@@ -242,6 +267,43 @@ async function mirrorLeadToSupabase(rid, base44Id, row) {
     log('info', 'lead.mirrored', { rid, base44Id });
   } catch (e) {
     log('warn', 'lead.mirror_failed', { rid, base44Id, err: String(e?.message ?? e).slice(0, 200) });
+  }
+}
+
+/**
+ * שיקוף הפגישה ל-Supabase. לעולם לא זורק, בדיוק כמו שיקוף הפנייה.
+ *
+ * `on_conflict=lead_base44_id` עם merge-duplicates: הראיון כותב פעמיים — פעם
+ * כשסוכם המועד ופעם אחרי שהיומן ענה — ושתי הקריאות נוחתות על אותה שורה. לכן
+ * גם אין כאן דריסה בריק: נשלחים רק השדות שהקריאה הזו באמת יודעת עליהם.
+ *
+ * ה-FK אל leads(base44_id) אומר שהפנייה חייבת להיות משוקפת קודם. היא כן —
+ * mirrorLeadToSupabase רץ לפני — ואם היא נכשלה, גם זה ייכשל וייכתב ביומן
+ * במקום להשתיק את עצמו.
+ */
+async function mirrorMeetingToSupabase(rid, base44Id, row) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  if (!url || !key || !base44Id) {
+    log('warn', 'meeting.mirror_skipped', { rid, hasUrl: Boolean(url), hasKey: Boolean(key), hasId: Boolean(base44Id) });
+    return;
+  }
+
+  try {
+    const res = await fetch(`${url}/rest/v1/meetings?on_conflict=lead_base44_id`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ ...row, lead_base44_id: base44Id }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 140)}`);
+    log('info', 'meeting.mirrored', { rid, base44Id, scheduled: Boolean(row.scheduled_at) });
+  } catch (e) {
+    log('warn', 'meeting.mirror_failed', { rid, base44Id, err: String(e?.message ?? e).slice(0, 200) });
   }
 }
 
@@ -1008,7 +1070,29 @@ export default async function(req) {
       status: partial ? 'partial' : 'new',
       consent_version: consent_version || '',
       consent_at: consent_at || null,
+      // The meeting, on the enquiry. Until now these four arrived in the
+      // payload, were read once on their way to the calendar, and were stored
+      // by neither Base44 nor Supabase.
+      scheduled_at: israelInstant(scheduledAt),
+      meeting_topic: meetingTopic || '',
+      notes: notes || '',
+      track: track || '',
     });
+
+    // And the booking as its own row, when there is a booking to speak of. A
+    // quick contact form has no meeting and gets none; an interview that
+    // agreed nothing still gets one, because "asked for חמישי and nothing was
+    // held" is the case worth being able to query.
+    if (scheduledAt || meetingTopic || timing || notes) {
+      await mirrorMeetingToSupabase(rid, leadId, {
+        scheduled_at: israelInstant(scheduledAt),
+        topic: meetingTopic || effectiveTopic || '',
+        timing: timing || '',
+        notes: notes || '',
+        track: track || '',
+        source: source === 'consultation' || source === 'interview' ? source : null,
+      });
+    }
 
     // מכאן והלאה — מיטבי. הפנייה כבר שמורה, ולכן כשל בהודעה מדווח
     // בתשובה במקום להיכשל, כדי שניתן יהיה לנטר אותו.
@@ -1075,11 +1159,15 @@ export default async function(req) {
     let calendar = booksCalendar
       ? 'לא נוצר'
       : (source === 'interview' ? 'לא נקבע מועד' : 'לא רלוונטי');
+    // The slot the hold was actually placed on, which is not always the slot
+    // that was agreed — it falls back to tomorrow 09:00 when nothing was.
+    let calendarStartedAt = null;
     if (booksCalendar) try {
       const { accessToken } = await base44.asServiceRole.connectors.getConnection('outlook');
       if (accessToken) {
         const calStartIso = wallClock(scheduledAt) ?? `${tomorrowInIsrael()}T09:00:00`;
         const calEndIso = wallClock(calStartIso, 30);
+        calendarStartedAt = calStartIso;
 
         const calSubject = subject;
         const calContent = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
@@ -1104,6 +1192,16 @@ export default async function(req) {
     } catch (e) {
       log('warn', 'calendar.failed', { rid });
       warnings.push('calendar_event_failed');
+    }
+
+    // The outcome, written back onto the booking. `scheduled_at` is what was
+    // agreed and this is what the diary took — tonight's fault was precisely
+    // that those two can differ with nothing anywhere saying so.
+    if (scheduledAt || meetingTopic || timing || notes) {
+      await mirrorMeetingToSupabase(rid, leadId, {
+        calendar_status: calendar,
+        calendar_at: israelInstant(calendarStartedAt),
+      });
     }
 
     // רישום ביומן האירועים — מיטבי. הגיליון הוא תצוגה, לא מקור האמת: הרשומה
