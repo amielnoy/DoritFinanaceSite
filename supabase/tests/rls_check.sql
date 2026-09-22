@@ -24,6 +24,12 @@ update public.profiles set role = 'admin' where id = '11111111-1111-1111-1111-11
 insert into public.leads (name, phone) values ('ראובן','050-000-0001');
 insert into public.blog_posts (title, body, published) values ('published','b', true), ('draft','b', false);
 insert into public.testimonials (name, quote) values ('לקוחה','מצוין');
+-- A booking, hung off a lead with a base44_id so the foreign key has something
+-- to point at. The meeting is the *when and where* of an enquiry; it is at
+-- least as sensitive as the enquiry, and is held to the same rule below.
+insert into public.leads (base44_id, name, phone) values ('B44-1','שרה','050-000-0003');
+insert into public.meetings (lead_base44_id, scheduled_at, topic)
+  values ('B44-1', now() + interval '2 days', 'גמל, השתלמות ופנסיה');
 
 -- ── anonymous visitor ───────────────────────────────────────────────────────
 set local role anon;
@@ -36,6 +42,9 @@ do $$ begin
   end if;
   if (select count(*) from public.blog_posts) <> 1 then
     raise exception 'anon should see exactly the published post, not drafts';
+  end if;
+  if (select count(*) from public.meetings) <> 0 then
+    raise exception 'anon can read meetings — the diary is exposed';
   end if;
   if (select count(*) from public.testimonials) <> 1 then
     raise exception 'anon cannot read testimonials — the reviews widget would break';
@@ -50,6 +59,9 @@ set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","r
 do $$ begin
   if (select count(*) from public.leads) <> 0 then
     raise exception 'a non-admin signed-in user can read leads';
+  end if;
+  if (select count(*) from public.meetings) <> 0 then
+    raise exception 'a non-admin signed-in user can read meetings';
   end if;
   if (select count(*) from public.blog_posts) <> 1 then
     raise exception 'a non-admin should still see only published posts';
@@ -68,8 +80,11 @@ end $$;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
 do $$ begin
-  if (select count(*) from public.leads) <> 2 then
-    raise exception 'admin cannot read all leads (expected the seeded one plus the anon submission)';
+  if (select count(*) from public.leads) <> 3 then
+    raise exception 'admin cannot read all leads (expected the two seeded plus the anon submission)';
+  end if;
+  if (select count(*) from public.meetings) <> 1 then
+    raise exception 'admin cannot read meetings';
   end if;
   if (select count(*) from public.blog_posts) <> 2 then
     raise exception 'admin cannot see drafts';
