@@ -29,6 +29,35 @@ function log(level, event, fields) {
 /** מזהה קצר שקושר את כל שורות היומן של בקשה אחת. */
 const newRequestId = () => crypto.randomUUID().slice(0, 8);
 
+/**
+ * מועד "שעון קיר" — מחרוזת בלי אזור זמן ובלי Z, ועוד דקות עליה.
+ *
+ * גם Google וגם Graph מצפים ל-dateTime מקומי לצד שדה timeZone נפרד. הקוד כאן
+ * המיר קודם דרך `new Date(scheduledAt).toISOString()`, וזה הצמיד Z למחרוזת —
+ * ואז ה-offset שבמחרוזת גובר על timeZone, כך ש-10:00 שביקש המבקר נכנס ליומן
+ * ב-13:00. לכן אין כאן מעבר דרך רגע אמיתי בזמן: השדות נשארים כפי שנמסרו,
+ * ו-Date.UTC משמש כאן כאריתמטיקה על שעון קיר בלבד.
+ *
+ * משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+ * מפוצל זה לא.
+ */
+function wallClock(iso, addMinutes = 0) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) + addMinutes * 60000;
+  const d = new Date(t);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}` +
+    `T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+}
+
+/** התאריך של מחר לפי שעון ישראל — לא לפי UTC, שמזיז אותו ביום סביב חצות. */
+function tomorrowInIsrael() {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000)
+    .toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' });
+}
+
+
 
 // שני נמענים, שניהם מקבלים את הפנייה המלאה.
 //
@@ -1041,25 +1070,16 @@ export default async function(req) {
     // הראיון מתאם פגישה בעצמו מאז שסוכן התיאום מוזג לתוכו, ולכן הוא מקבל
     // תזכורת ביומן בדיוק כמו בקשת ייעוץ — אבל רק כשבאמת סוכם מועד.
     const booksCalendar = source === 'consultation' || (source === 'interview' && Boolean(scheduledAt));
-    let calendar = booksCalendar ? 'לא נוצר' : 'לא רלוונטי';
+    // "לא רלוונטי" על ראיון בלי מועד היה מטעה: הוא נקרא כמו החלטה, בזמן שמה
+    // שקרה הוא שהסוכן לא שלח scheduledAt. מי שקרא את המייל לא ידע שיש מה לתקן.
+    let calendar = booksCalendar
+      ? 'לא נוצר'
+      : (source === 'interview' ? 'לא נקבע מועד' : 'לא רלוונטי');
     if (booksCalendar) try {
       const { accessToken } = await base44.asServiceRole.connectors.getConnection('outlook');
       if (accessToken) {
-        let calStartIso, calEndIso;
-        if (scheduledAt) {
-          const calStart = new Date(scheduledAt);
-          const calEnd = new Date(calStart.getTime() + 30 * 60 * 1000);
-          calStartIso = calStart.toISOString();
-          calEndIso = calEnd.toISOString();
-        } else {
-          const now = new Date();
-          const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-          const yyyy = tomorrow.getUTCFullYear();
-          const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
-          const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
-          calStartIso = `${yyyy}-${mm}-${dd}T09:00:00`;
-          calEndIso = `${yyyy}-${mm}-${dd}T09:30:00`;
-        }
+        const calStartIso = wallClock(scheduledAt) ?? `${tomorrowInIsrael()}T09:00:00`;
+        const calEndIso = wallClock(calStartIso, 30);
 
         const calSubject = subject;
         const calContent = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
@@ -1079,7 +1099,7 @@ export default async function(req) {
             reminderMinutesBeforeStart: 60,
           }),
         });
-        calendar = 'אירוע נוצר ✓';
+        calendar = `אירוע נוצר ✓ — ${calStartIso.slice(0, 16).replace('T', ' ')}`;
       }
     } catch (e) {
       log('warn', 'calendar.failed', { rid });

@@ -292,11 +292,13 @@ describe("submitLead — the calendar event it books", () => {
     });
     const [call] = r.callsTo("graph.microsoft.com");
     const event = call.body as { start: { dateTime: string }; end: { dateTime: string } };
-    expect(event.start.dateTime).toContain("2026-10-01");
-    // Half an hour, not an open-ended hold on the diary.
-    const minutes =
-      (Date.parse(event.end.dateTime) - Date.parse(event.start.dateTime)) / 60000;
-    expect(minutes).toBe(30);
+    // The hour, not just the day. This asserted `toContain("2026-10-01")` while
+    // the code sent `2026-10-01T14:00:00.000Z` beside timeZone "Israel Standard
+    // Time" — Graph and Google both prefer an offset in the string over the
+    // timeZone field, so a 14:00 meeting was held at 17:00 and the test agreed.
+    expect(event.start.dateTime).toBe("2026-10-01T14:00:00");
+    expect(event.end.dateTime).toBe("2026-10-01T14:30:00");
+    expect(event.start.dateTime, "an offset in the string overrides timeZone").not.toMatch(/Z$|[+-]\d{2}:\d{2}$/);
   });
 
   it("falls back to tomorrow morning when no time was agreed", async () => {
@@ -411,10 +413,22 @@ describe("submitLead — a finished introduction interview", () => {
     expect(r.leads[0].message).not.toMatch(/^\[/);
   });
 
-  it("books no calendar slot — an interview agrees no time", async () => {
+  it("books no calendar slot when the interview sent no time, and says so", async () => {
+    // "לא רלוונטי" read like a decision, and that is how this went unnoticed:
+    // the agent had stopped sending scheduledAt, and the ops mail reported the
+    // silence as though a calendar had never been wanted. The label now names
+    // what actually happened, so the next time it is visible in the mail.
     const r = await invokeFunction("submitLead", interview);
     expect(r.callsTo("graph.microsoft.com")).toEqual([]);
-    expect(r.mailTo(OPS).text).toMatch(/יומן: לא רלוונטי/);
+    expect(r.mailTo(OPS).text).toMatch(/יומן: לא נקבע מועד/);
+  });
+
+  it("books the slot the interview did agree, at the hour it agreed", async () => {
+    const r = await invokeFunction("submitLead", { ...interview, scheduledAt: "2026-09-24T10:00:00" });
+    const [call] = r.callsTo("graph.microsoft.com");
+    const event = call.body as { start: { dateTime: string } };
+    expect(event.start.dateTime).toBe("2026-09-24T10:00:00");
+    expect(r.mailTo(OPS).text).toMatch(/יומן: אירוע נוצר ✓ — 2026-09-24 10:00/);
   });
 
   it("redacts the profile itself, not only a separate summary", async () => {
