@@ -142,7 +142,7 @@ export default function PensionFeeCalculator() {
                 {fmtCurrency(result.balance + result.lostToFees)}
               </span>{" "}
               — הפרש של{" "}
-              <span className="font-semibold text-highlight-strong">
+              <span className="font-semibold text-highlight-ink">
                 {fmtCurrency(result.lostToFees)}
               </span>{" "}
               שנשאר ברשות הגוף המנהל במקום אצלכם.
@@ -186,10 +186,10 @@ function ResultCard({ icon: Icon, label, value, highlight }: ResultCardProps) {
       }`}
     >
       <div className="flex items-center gap-2 text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
-        <Icon size={14} className={highlight ? "text-highlight-muted" : "text-accent"} />
+        <Icon size={14} className={highlight ? "text-highlight-ink" : "text-accent"} />
         {label}
       </div>
-      <p className={`font-heading text-2xl ${highlight ? "text-foreground" : "text-foreground/85"}`}>
+      <p className={`font-heading text-2xl ${highlight ? "text-highlight-ink" : "text-foreground"}`}>
         {value}
       </p>
     </div>

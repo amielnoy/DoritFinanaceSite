@@ -42,6 +42,7 @@ module.exports = {
   				DEFAULT: 'hsl(var(--highlight))',
   				strong: 'hsl(var(--highlight-strong))',
   				muted: 'hsl(var(--highlight-muted))',
+  				ink: 'hsl(var(--highlight-ink))',
   				foreground: 'hsl(var(--highlight-foreground))'
   			},
   			destructive: {

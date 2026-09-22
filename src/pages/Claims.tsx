@@ -215,7 +215,7 @@ export default function Claims() {
               {STEPS.map((s, i) => (
                 <Reveal key={s.n} delay={i * 0.08}>
                   <div className="h-full bg-background p-8 flex flex-col">
-                    <span className="font-heading text-5xl text-highlight/70 leading-none">{s.n}</span>
+                    <span className="font-heading text-5xl text-highlight-ink leading-none">{s.n}</span>
                     <h3 className="font-heading text-xl mt-6 mb-3">{s.title}</h3>
                     <p className="text-foreground/70 leading-relaxed text-sm">{s.body}</p>
                   </div>
