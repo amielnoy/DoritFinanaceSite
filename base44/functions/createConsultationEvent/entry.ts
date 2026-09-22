@@ -29,6 +29,34 @@ function log(level, event, fields) {
 /** מזהה קצר שקושר את כל שורות היומן של בקשה אחת. */
 const newRequestId = () => crypto.randomUUID().slice(0, 8);
 
+/**
+ * מועד "שעון קיר" — מחרוזת בלי אזור זמן ובלי Z, ועוד דקות עליה.
+ *
+ * גם Google וגם Graph מצפים ל-dateTime מקומי לצד שדה timeZone נפרד. הקוד כאן
+ * המיר קודם דרך `new Date(scheduledAt).toISOString()`, וזה הצמיד Z למחרוזת —
+ * ואז ה-offset שבמחרוזת גובר על timeZone, כך ש-10:00 שביקש המבקר נכנס ליומן
+ * ב-13:00. לכן אין כאן מעבר דרך רגע אמיתי בזמן: השדות נשארים כפי שנמסרו,
+ * ו-Date.UTC משמש כאן כאריתמטיקה על שעון קיר בלבד.
+ *
+ * משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+ * מפוצל זה לא.
+ */
+function wallClock(iso, addMinutes = 0) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) + addMinutes * 60000;
+  const d = new Date(t);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}` +
+    `T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+}
+
+/** התאריך של מחר לפי שעון ישראל — לא לפי UTC, שמזיז אותו ביום סביב חצות. */
+function tomorrowInIsrael() {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000)
+    .toLocaleDateString('sv-SE', { timeZone: 'Asia/Jerusalem' });
+}
+
 
 export default async function(req) {
   const rid = newRequestId();
@@ -46,24 +74,19 @@ export default async function(req) {
 
     const { accessToken } = await base44.asServiceRole.connectors.getConnection('googlecalendar');
 
-    // תזמון האירוע — לפי התאריך והשעה שנבחרו, או ברירת מחדל למחר ב-09:00
-    let startIso, endIso;
-    if (scheduledAt) {
-      const start = new Date(scheduledAt);
-      const end = new Date(start.getTime() + 30 * 60 * 1000);
-      startIso = start.toISOString();
-      endIso = end.toISOString();
-    } else {
-      const now = new Date();
-      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const yyyy = tomorrow.getUTCFullYear();
-      const mm = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
-      const dd = String(tomorrow.getUTCDate()).padStart(2, '0');
-      startIso = `${yyyy}-${mm}-${dd}T09:00:00`;
-      endIso = `${yyyy}-${mm}-${dd}T09:30:00`;
-    }
+    // תזמון האירוע — לפי המועד שסוכם, או תזכורת למחר ב-09:00 כשלא סוכם מועד.
+    //
+    // האירוע נוצר גם בלי מועד מוסכם, כי אירוע שלא נוצר הוא פנייה שנשכחת. אבל
+    // הוא חייב להיראות שונה: עד כה שובץ "מחר ב-09:00" בשקט, וזה נראה ביומן
+    // בדיוק כמו מועד שסוכם — מי שחיפש את הפגישה ביום שביקש לא מצא דבר.
+    const agreedStart = wallClock(scheduledAt);
+    const startIso = agreedStart ?? `${tomorrowInIsrael()}T09:00:00`;
+    const endIso = wallClock(startIso, 30);
+    const slotAgreed = Boolean(agreedStart);
 
-    const summary = `ייעוץ חדש — ${name}`;
+    const summary = slotAgreed
+      ? `ייעוץ חדש — ${name}`
+      : `לתאם מועד — ${name}`;
     const description = [
       `פנייה חדשה מהאתר`,
       ``,

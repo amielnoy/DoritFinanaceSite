@@ -454,6 +454,38 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     }
   });
 
+  /**
+   * Both calendar writers hand the agreed time to an API that wants a local
+   * wall-clock string beside a separate timeZone field. They used to route it
+   * through `new Date(scheduledAt).toISOString()`, which stamped a Z on the
+   * string — and an offset in the string beats the timeZone field, so a 10:00
+   * meeting was booked at 13:00. One copy learning that and not the other is
+   * how Google and Outlook end up holding the same meeting an hour apart.
+   */
+  it("keeps the wall-clock conversion identical in both calendar writers", () => {
+    const google = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
+    const bodyOf = (src: string, name: string) => {
+      const i = src.indexOf("function wallClock");
+      expect(i, `${name} has no wall-clock helper`).toBeGreaterThan(-1);
+      return src.slice(i, src.indexOf("\n}", i)).replace(/\s+/g, " ").trim();
+    };
+    expect(bodyOf(google, "createConsultationEvent"), "the two calendar writers drifted").toBe(
+      bodyOf(submitLead, "submitLead")
+    );
+    // Comments stripped first: the helper's own docstring names the bug it
+    // replaced, and a scan of the prose would keep finding it there forever.
+    const code = (src: string) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    for (const [src, name] of [[submitLead, "submitLead"], [google, "createConsultationEvent"]] as const) {
+      expect(src, `${name} declares the helper but never uses it`).toMatch(/wallClock\(/);
+      // The bug this replaced, in the shape it had: a scheduled time pushed
+      // through a real instant and then labelled with a timeZone.
+      expect(code(src), `${name} still converts the agreed time through a real instant`).not.toMatch(
+        /new Date\(\s*(scheduledAt|calStart)\s*\)/
+      );
+    }
+  });
+
   it("keeps the Supabase mirror identical in every function that captures a lead", () => {
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
     const bodyOf = (src: string, name: string) => {
