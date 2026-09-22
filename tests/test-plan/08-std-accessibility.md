@@ -36,9 +36,10 @@ walkthrough by a person.
 | A11Y-AXE-004 | "claims …" | `/claims` | Zero |
 | A11Y-AXE-005 | "privacy policy …" | `/privacy` | Zero |
 | A11Y-AXE-006 | "accessibility statement …" | `/accessibility` | Zero |
+| A11Y-AXE-009 | "tools …" | `/tools` | Zero |
 | A11Y-AXE-007 | "the open mobile menu is accessible" | drawer open, mobile projects only | Zero |
 | A11Y-AXE-008 | "the contact forms are accessible in isolation" | `#quick-contact`, `#detailed-contact`, `#fee-calculator`, `#consultation` | Zero per section |
-| A11Y-CON-001..006 | "`<page>` colour contrast (reported; enforced with `E2E_ENFORCE_CONTRAST=1`)" | all six pages | Always passes; records the failing element count and selectors as a test annotation |
+| A11Y-CON-001..007 | "`<page>` colour contrast (reported; enforced with `E2E_ENFORCE_CONTRAST=1`)" | all seven pages | Always passes; records the failing element count and selectors as a test annotation |
 
 ## 4. Test cases — structural sanity
 
@@ -59,7 +60,9 @@ walkthrough by a person.
 | Star-rating `<div aria-label>` with no role (5 nodes on `/`) | `aria-prohibited-attr` | **Fixed** — `role="img"` added in `Stars.tsx` and `ReviewsWidget.tsx` |
 | Horizontally scrollable proof carousel unreachable by keyboard | `scrollable-region-focusable` | **Fixed** — `tabIndex={0}`, `role="region"`, `aria-label` and a focus ring in `ProofCarousel.tsx` |
 | Burger tap target 38 px | (WCAG 2.5.5, caught by `E2E-MOB-006`) | **Fixed** — `p-3` in `FloatingHeader.tsx` |
-| Brand accent `#7D6B5D` on `#F9F7F2` ≈ 4.4:1 — under the 4.5:1 AA floor; 41 nodes on `/`, plus footer greys | `color-contrast` | **Open** — palette decision, tracked in [10-known-issues](10-known-issues.md) |
+| Bronze used as type — `--highlight-muted` 2.07:1 on the case-study figures, `--highlight-strong` 2.73:1 on the calculator | `color-contrast` | **Fixed** (2026-09-22) — `--highlight-ink` at 7.5:1; measured 14 bronze nodes → 0 |
+| Opacity-composited greys (`text-foreground/50`, `text-muted-foreground/60` …), 51 nodes, worst 1.6:1 | `color-contrast` | **Open** — palette decision, tracked in [10-known-issues](10-known-issues.md) |
+| ~~Brand accent `#7D6B5D` ≈ 4.4:1~~ | — | **Not a defect** — the hex was a stale comment; `--accent: 26 14% 39%` renders `#716256` at 5.5:1 and passes |
 
 ## 6. Pass criteria
 
