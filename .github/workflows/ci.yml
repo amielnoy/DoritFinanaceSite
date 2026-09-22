@@ -918,10 +918,10 @@ jobs:
             echo "| Environment | URL | This run |"
             echo "| --- | --- | --- |"
             echo "| **Base44** (app, backend functions, auth) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | ${base44_state} |"
-            echo "| **Vercel** (the built site) | ${vercel_link} | ${vercel_state} |"
-            # Named rather than asserted. Which of the two above is client-facing is a
-            # deployment decision that is in the middle of changing, and a hardcoded
-            # label would have gone stale silently at exactly the wrong moment.
+            # Named rather than asserted. Which of Base44 and Vercel is client-facing
+            # is a deployment decision that is in the middle of changing, and a
+            # hardcoded label would have gone stale silently at exactly the wrong
+            # moment. ("the two above" until the staging row moved below this one.)
             if [ -n "$PRODUCTION_URL" ]; then
               echo "| **Production** (client-facing) | ${PRODUCTION_URL} | smoke-tested after every publish |"
             fi
@@ -946,6 +946,11 @@ jobs:
             else
               echo "| **Allure — test report** | — | not built (${ALLURE_RESULT}) |"
             fi
+            # Staging goes last, under production and the report. It is the row
+            # you reach for once one of those two has told you something is
+            # wrong — and it is the only one here that deploys on a red run, so
+            # putting it above them read like the headline when it never is.
+            echo "| **Vercel** (staging — the built site) | ${vercel_link} | ${vercel_state} |"
             echo
             echo "Unit suites: **${UNIT_RESULT}** · e2e across all four platforms: **${TESTS_RESULT}**"
             echo
