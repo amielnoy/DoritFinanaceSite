@@ -1192,6 +1192,42 @@ jobs:
             echo "::notice::${target} answered an anonymous request with HTTP ${code} and no report content — Access is in front of it."
           done
 
+      # The links, in the job that produced them.
+      #
+      # The report was announced with `::notice::` alone, which lands at the top
+      # of the run and scrolls away behind every other annotation, and the table
+      # that names it properly lives in the `sites` job — which runs on `main`
+      # and nowhere else. So on every other branch the report was deployed and
+      # its address appeared in no place anyone would look for it.
+      - name: Write the report link to the run summary
+        if: always() && steps.cfdeploy.outputs.url != ''
+        env:
+          URL: ${{ steps.cfdeploy.outputs.url }}
+          ALIAS: ${{ steps.cfdeploy.outputs.alias }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          # Derived rather than written out, so renaming the Pages project moves
+          # this link with it instead of leaving one dead one behind. With the
+          # project named `dorit-allure` it resolves to
+          # https://main.dorit-allure.pages.dev — the report to bookmark.
+          main_home="https://main.${PROJECT}.pages.dev"
+          {
+            echo "## Allure — test report"
+            echo
+            echo "| Report | URL |"
+            echo "| --- | --- |"
+            echo "| Latest on \`main\` | ${main_home} |"
+            # Only when it is a different address: on a `main` run the branch
+            # alias *is* the trunk link, and two rows with one URL read like a
+            # mistake.
+            if [ -n "$ALIAS" ] && [ "$ALIAS" != "$main_home" ]; then
+              echo "| Latest on \`${GITHUB_REF_NAME}\` | ${ALIAS} |"
+            fi
+            echo "| This run's copy | ${URL} |"
+            echo
+            echo "> Behind Cloudflare Access — sign in to open it."
+          } >> "$GITHUB_STEP_SUMMARY"
+
 
 
 
