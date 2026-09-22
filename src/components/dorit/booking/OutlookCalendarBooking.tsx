@@ -61,7 +61,7 @@ export default function OutlookCalendarBooking({ data = {} }: OutlookCalendarBoo
     <button
       type="button"
       onClick={openCalendar}
-      className="inline-flex items-center gap-3 px-7 py-4 border border-highlight text-highlight font-heading text-lg hover:bg-highlight hover:text-primary transition-colors"
+      className="inline-flex items-center gap-3 px-7 py-4 border border-highlight text-highlight-ink font-heading text-lg hover:bg-highlight hover:text-primary transition-colors"
     >
       <CalendarClock size={20} />
       קביעת שיחה ב-Outlook

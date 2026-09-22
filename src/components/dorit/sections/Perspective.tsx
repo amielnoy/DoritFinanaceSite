@@ -93,7 +93,7 @@ export default function Perspective() {
                 key={g.n}
                 className="group grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 py-7 transition-colors duration-300 hover:bg-secondary/40 -mx-4 md:-mx-6 px-4 md:px-6"
               >
-                <div className="md:col-span-2 font-heading text-3xl md:text-4xl text-highlight-muted transition-transform duration-300 group-hover:scale-110">
+                <div className="md:col-span-2 font-heading text-3xl md:text-4xl text-highlight-ink transition-transform duration-300 group-hover:scale-110">
                   {g.n}
                 </div>
                 <h3 className="md:col-span-4 font-heading text-xl md:text-2xl self-center">

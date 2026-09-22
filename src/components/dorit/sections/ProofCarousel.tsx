@@ -147,7 +147,7 @@ export default function ProofCarousel() {
               {b.body}
             </p>
             <div className="mt-8 pt-6 border-t border-border/50 flex items-center justify-between">
-              <span className="font-heading text-3xl md:text-4xl text-highlight-muted leading-none">
+              <span className="font-heading text-3xl md:text-4xl text-highlight-ink leading-none">
                 {b.metric}
               </span>
               <span className="text-[10px] tracking-[0.12em] text-muted-foreground">

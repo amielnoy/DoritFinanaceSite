@@ -19,10 +19,15 @@
     --accent: 26 14% 39%;           /* #7D6B5D Deep Taupe */
     --accent-foreground: 36 38% 97%;
     /* Soft Bronze ramp. Every bronze on the site resolves to one of these
-       three; raw hex is banned outside this file (see eslint.config.js). */
+       four; raw hex is banned outside this file (see eslint.config.js). */
     --highlight: 32 33% 65%;          /* #C4A484  base — CTAs, accents      */
     --highlight-strong: 27 34% 58%;   /* #b8916f  hover / pressed           */
     --highlight-muted: 30 26% 68%;    /* #C3AD96  surfaces, borders, rules  */
+    /* The one rung that survives as type. The three above were drawn as
+       fills, and on the parchment they reach only 2.0-2.7:1 — figures set
+       in them were the least legible text on the site, worst of all on a
+       phone outdoors. Same hue as --highlight-strong, taken down to ink. */
+    --highlight-ink: 27 38% 30%;      /* #6A4A2F  figures, type on light    */
     --highlight-foreground: 240 3% 10%;
     /* Third-party brand colour, fixed by WhatsApp — not ours to restyle. */
     --brand-whatsapp: 142 70% 49%;    /* #25D366 */

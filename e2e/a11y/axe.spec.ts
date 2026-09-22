@@ -27,6 +27,9 @@ const PAGES = [
   { path: "/blog", name: "blog list" },
   { path: "/blog/post-1", name: "blog post" },
   { path: "/claims", name: "claims" },
+  // The calculators live here. This page carries every monetary figure on the
+  // site and was the one page the sweep never looked at.
+  { path: "/tools", name: "tools" },
   { path: "/privacy", name: "privacy policy" },
   { path: "/accessibility", name: "accessibility statement" },
 ];

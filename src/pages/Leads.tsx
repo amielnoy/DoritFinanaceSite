@@ -23,7 +23,7 @@ const ANY_STATUS_LABEL: Record<string, string> = {
   partial: "ראיון שלא הושלם",
 };
 const STATUS_COLOR: Record<LeadStatus, string> = {
-  new: "bg-highlight/15 text-highlight-strong",
+  new: "bg-highlight/15 text-highlight-ink",
   contacted: "bg-accent/15 text-accent",
   closed: "bg-muted text-muted-foreground",
 };
@@ -124,8 +124,8 @@ export default function Leads() {
             onClick={() => setFilter("new")}
             className={`text-right p-5 border transition-colors ${filter === "new" ? "border-highlight bg-highlight/10" : "border-border/60 hover:border-highlight/50 bg-card"}`}
           >
-            <p className="text-[11px] tracking-[0.2em] uppercase text-highlight-strong">דורשות טיפול</p>
-            <p className="font-heading text-3xl mt-2 text-highlight-strong">{counts.new || 0}</p>
+            <p className="text-[11px] tracking-[0.2em] uppercase text-highlight-ink">דורשות טיפול</p>
+            <p className="font-heading text-3xl mt-2 text-highlight-ink">{counts.new || 0}</p>
             <p className="text-xs text-foreground/50 mt-1">לקוחות חדשים — ליצור קשר</p>
           </button>
           <button

@@ -116,7 +116,7 @@ export default function ServiceMatrix() {
                     <Icon
                       size={24}
                       className={`transition-colors duration-500 ${
-                        isActive ? "text-highlight-strong" : "text-accent"
+                        isActive ? "text-highlight-ink" : "text-accent"
                       }`}
                       strokeWidth={1.25}
                     />
