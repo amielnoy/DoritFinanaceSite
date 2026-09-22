@@ -453,6 +453,30 @@ function eyebrowFor(source) {
   return source === 'interview' ? 'ראיון היכרות' : 'פנייה מהאתר';
 }
 
+/**
+ * מאיזה מכשיר נשלחה הפנייה.
+ *
+ * נגזר מ-User-Agent של הבקשה, ולא ממשהו שהדפדפן מוסר בגוף הפנייה: זה מגיע
+ * מאותה בקשה שיצרה את הפנייה, ואין טופס שיכול לשקר עליו בטעות.
+ *
+ * תווית ולא המחרוזת המלאה. ל-User-Agent אין מה לחפש במייל שנשמר שנים, והשאלה
+ * שהוא עונה עליה כאן היא "מהטלפון או מהמחשב" — לא איזו גרסת דפדפן.
+ *
+ * iPadOS מדווח על עצמו כ-Macintosh, ולכן אייפד ללא בקשת אתר-שולחן ייספר
+ * כ-Mac. עדיף מלנחש: תווית שגויה גרועה מתווית כללית.
+ */
+function deviceLabel(ua) {
+  const s = String(ua || '');
+  if (!s) return 'לא ידוע';
+  if (/Android/i.test(s)) return 'אנדרואיד';
+  if (/iPhone/i.test(s)) return 'אייפון';
+  if (/iPad/i.test(s)) return 'אייפד';
+  if (/Macintosh|Mac OS X/i.test(s)) return 'מחשב Mac';
+  if (/Windows/i.test(s)) return 'מחשב Windows';
+  if (/Linux/i.test(s)) return 'מחשב Linux';
+  return 'לא ידוע';
+}
+
 function headingFor(source) {
   if (source === 'consultation') return 'בקשת ייעוץ חדשה';
   if (source === 'detailed') return 'פנייה מפורטת מהאתר';
@@ -468,6 +492,7 @@ function buildAgentBody(source, data) {
     `שם: ${data.name}`,
     `טלפון: ${data.phone}`,
     `אימייל: ${data.email || '—'}`,
+    `נשלח מ: ${data.device || 'לא ידוע'}`,
   ];
   if (source === 'consultation') {
     lines.push(`תחום ייעוץ: ${data.topic || '—'}`);
@@ -573,7 +598,8 @@ function buildAgentHtml(source, data, ops) {
   const who = block('מי פנה', [
     detailRow('שם', data.name),
     detailRow('טלפון', data.phone, { link: `tel:${String(data.phone || '').replace(/[^\d+]/g, '')}` }),
-    detailRow('אימייל', data.email, { link: data.email ? `mailto:${data.email}` : '', last: true }),
+    detailRow('אימייל', data.email, { link: data.email ? `mailto:${data.email}` : '' }),
+    detailRow('נשלח מ', data.device || 'לא ידוע', { last: true }),
   ].join(''));
 
   // 2 · מה ביקש. השדות משתנים לפי מקור הפנייה, בדיוק כמו בגרסת הטקסט.
@@ -869,6 +895,7 @@ export default async function(req) {
       name, phone, email, topic: effectiveTopic, timing,
       message: safeMessage, notes, summary: safeSummary,
       profile: safeProfile, trackLabel, completeness,
+      device: deviceLabel(req.headers.get('user-agent')),
     };
     const agentBody = buildAgentBody(source, data);
     const subject = subjectFor(source, data);
