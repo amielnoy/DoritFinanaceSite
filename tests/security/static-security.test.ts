@@ -127,8 +127,9 @@ describe("auth and token handling", () => {
   });
 
   it("pages that consume ?returnTo= go through the shared open-redirect guard", () => {
-    // Login and Register read an attacker-controllable returnTo out of the URL.
-    for (const page of ["src/pages/Login.tsx", "src/pages/Register.tsx"]) {
+    // Login reads an attacker-controllable returnTo out of the URL. Register
+    // did too, until sign-up went with email-and-password.
+    for (const page of ["src/pages/Login.tsx"]) {
       const src = read(join(REPO_ROOT, page));
       expect(src, `${page} must import safeReturnTo`).toMatch(
         /import\s*\{[^}]*safeReturnTo[^}]*\}\s*from\s*["']@\/lib\/authReturnTo["']/
@@ -148,7 +149,13 @@ describe("auth and token handling", () => {
   it("redirects derived from returnTo are assigned from the guarded value", () => {
     const login = read(join(REPO_ROOT, "src/pages/Login.tsx"));
     expect(login).toMatch(/const\s+returnTo\s*=\s*safeReturnTo\(\)/);
-    expect(login).toMatch(/window\.location\.href\s*=\s*returnTo/);
+    // The destination used to be assigned to `window.location.href` by the
+    // password form's success path. That form went with email-and-password
+    // sign-in, and the hand-off then named the SDK directly; it now goes
+    // through the auth port so that switching provider switches where the
+    // visitor actually signs in. Same property throughout — what leaves this
+    // page is the guarded value — asserted at the one place it still leaves.
+    expect(login).toMatch(/services\.auth\.signInWithGoogle\(\s*returnTo\s*\)/);
   });
 
   it("admin routes stay behind a gate that requires both sign-in and the admin role", () => {

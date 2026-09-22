@@ -228,12 +228,20 @@ export interface TestimonialDraft {
  */
 export interface ContentAdminPort {
   listArticles(limit?: number): Promise<Article[]>;
-  createArticle(draft: ArticleDraft): Promise<void>;
+  /**
+   * Returns the new row's id.
+   *
+   * It used to return nothing, which was fine while one store existed. The id
+   * is what ties the two copies together: `contentAdmin` writes Base44 first
+   * and stamps the id it gets back into Supabase's `base44_id`, so a row
+   * created during the migration is one row and not two unrelated ones.
+   */
+  createArticle(draft: ArticleDraft): Promise<string>;
   updateArticle(id: string, draft: Partial<ArticleDraft>): Promise<void>;
   removeArticle(id: string): Promise<void>;
 
   listTestimonials(limit?: number): Promise<Testimonial[]>;
-  createTestimonial(draft: TestimonialDraft): Promise<void>;
+  createTestimonial(draft: TestimonialDraft): Promise<string>;
   removeTestimonial(id: string): Promise<void>;
 }
 
@@ -274,4 +282,26 @@ export interface AuthPort {
   /** Clears the stored token; with a URL, also sends the browser there. */
   logout(redirectUrl?: string): void;
   redirectToLogin(returnUrl: string): void;
+  /**
+   * Start a Google sign-in, returning to `returnUrl`.
+   *
+   * Distinct from `redirectToLogin`, which hands off to whatever sign-in screen
+   * the provider hosts. This is the button on our own login page, and it exists
+   * on the port so that switching provider switches what the button does —
+   * while it called the SDK directly, flipping VITE_AUTH_PROVIDER changed who
+   * answered `me()` and left the visitor signing in to the old system.
+   */
+  signInWithGoogle(returnUrl: string): void;
+  /**
+   * Sign in with an address and a password.
+   *
+   * Rejects with the provider's message so the form can show it. Unlike the
+   * Google path this does not navigate: the caller owns the destination, which
+   * is the guarded `returnTo`, and keeping the redirect in one place keeps the
+   * open-redirect guard covering both routes in.
+   *
+   * There is no sign-up beside it on purpose. Accounts into a system holding
+   * customer enquiries are provisioned, not self-served.
+   */
+  signInWithPassword(email: string, password: string): Promise<void>;
 }

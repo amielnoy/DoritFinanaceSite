@@ -1,4 +1,8 @@
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/api/supabaseClient";
+import { AUTH_PROVIDER } from "@/config/auth-provider";
+import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
+import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
 import { appParams } from "@/lib/app-params";
 import { Base44AgentService } from "./base44/Base44AgentService";
 import { Base44AuthService } from "./base44/Base44AuthService";
@@ -44,15 +48,57 @@ export interface Services {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const client = base44 as any;
 
+/**
+ * Content admin, during the migration.
+ *
+ * With Base44 answering "who is signed in", the browser writes Base44 directly,
+ * exactly as it always has, and Supabase is left alone — an anonymous client
+ * cannot satisfy `is_admin()` and every shadow write would be refused.
+ *
+ * With Supabase answering, the browser cannot write Base44 either: its rules
+ * want a Base44 admin session and a Supabase one is refused with 403, before
+ * the shadow write is even reached. So the writes move to a backend function,
+ * which holds both credentials and needs no browser identity — only proof of
+ * who is asking. Reads stay anonymous on Base44 either way, because posts and
+ * testimonials are public.
+ */
+const contentAdmin: ContentAdminPort = (() => {
+  const base44Admin = new Base44ContentAdminService(client);
+  if (AUTH_PROVIDER !== "supabase") return base44Admin;
+
+  return new FunctionContentAdminService(
+    client as unknown as FunctionsClient,
+    base44Admin,
+    async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
+  );
+})();
+
+/**
+ * Identity, from whichever provider is switched on.
+ *
+ * Falls back to Base44 when Supabase is unconfigured rather than throwing: a
+ * checkout without Supabase credentials should still sign people in, and an
+ * auth provider that fails to construct takes the whole app with it.
+ */
+const authPort: AuthPort =
+  AUTH_PROVIDER === "supabase" && supabase
+    // The cast is narrowing, not widening: `SupabaseAuthClient` describes the
+    // handful of calls this adapter makes, and the real client does satisfy it.
+    // Matching them structurally makes tsc unfold PostgREST's generics until it
+    // gives up (TS2589), so the shape is asserted once here instead of being
+    // re-derived at every call.
+    ? new SupabaseAuthService(supabase as unknown as SupabaseAuthClient)
+    : new Base44AuthService(client, () => !!appParams.token);
+
 export const services: Services = {
   leads: new Base44LeadService(client),
   content: new Base44ContentService(client),
   agents: new Base44AgentService(client),
   uploads: new Base44UploadService(client),
   support: new Base44SupportService(client),
-  auth: new Base44AuthService(client, () => !!appParams.token),
+  auth: authPort,
   leadsAdmin: new Base44LeadAdminService(client),
-  contentAdmin: new Base44ContentAdminService(client),
+  contentAdmin,
 };
 
 export * from "./ports";

@@ -69,7 +69,7 @@ one.
 | ID | Title | Expected result |
 |---|---|---|
 | SEO-IDX-001..006 | "`<route>` is indexable" | `robots` contains `index`, never `noindex` |
-| SEO-IDX-007..010 | "`/login`, `/register`, `/forgot-password`, `/admin/leads` are kept out of the index" | `noindex` present |
+| SEO-IDX-007..008 | "`/login` and `/admin/leads` are kept out of the index" | `noindex` present |
 | SEO-IDX-011 | "a missing blog post is noindex, not a thin indexable page" | Not-found view sends `noindex` |
 | SEO-IDX-012 | "the 404 page is noindex" | `noindex` present |
 
@@ -95,7 +95,7 @@ one.
 
 | ID | Title | Expected result |
 |---|---|---|
-| SEO-CRW-001 | "robots.txt keeps private areas out of crawl budget" | `Disallow` for `/admin/`, `/login`, `/register`, `/oauth/`; public site still allowed; AI crawlers still allowed |
+| SEO-CRW-001 | "robots.txt keeps private areas out of crawl budget" | `Disallow` for `/admin/`, `/login`, `/oauth/`; public site still allowed; AI crawlers still allowed |
 | SEO-CRW-002 | "the sitemap lists every public content route" | `/`, `/blog`, `/claims`, `/faq`, `/privacy`, `/accessibility` |
 | SEO-CRW-003 | "the sitemap lists no route that is marked noindex" | No contradiction between the two signals |
 | SEO-CRW-004 | "sitemap URLs share the canonical origin the pages declare" | One origin across both |

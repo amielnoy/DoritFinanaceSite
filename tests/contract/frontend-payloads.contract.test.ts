@@ -47,7 +47,15 @@ describe("adapter → submitLead", () => {
   // `track` and `profile` are the interview's fixed schema, which no form on the
   // site collects. The test below keeps this list honest by requiring the
   // function to actually destructure every name in it.
-  const AGENT_ONLY = ["summary", "track", "profile", "stage", "meetingTopic"];
+  //
+  // `consent_version` and `consent_at` are agent-only for a reason worth
+  // stating: the chat shows a consent gate before a word is exchanged, so it
+  // knows which notice the visitor accepted and when. The browser forms show no
+  // such gate. A form sending these would be recording a consent nobody was
+  // asked for, which is worse than recording none — the field is evidence under
+  // תיקון 13, and false evidence is the one failure mode not worth trading for
+  // a fuller-looking record.
+  const AGENT_ONLY = ["summary", "track", "profile", "stage", "meetingTopic", "consent_version", "consent_at"];
 
   it("exactly one adapter owns the call", () => {
     // Previously three components each built this payload by hand. The contract

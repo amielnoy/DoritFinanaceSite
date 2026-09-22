@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { services } from "@/services";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,21 +8,46 @@ import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
+/**
+ * Sign in. Google first, with an address and password beside it.
+ *
+ * Google leads because it is the route without a password to lose, and the one
+ * that carries the account's own two-factor. The form stays for the cases it
+ * does not cover.
+ *
+ * There is no "create one" link. Accounts into a system holding customer
+ * enquiries are provisioned rather than self-served, so they are made in the
+ * Supabase dashboard — which also means an account signed up through Google has
+ * no password until somebody sets one, and the form will refuse it.
+ *
+ * Which provider answers is `VITE_AUTH_PROVIDER`'s business, not this page's.
+ * Both routes go through the port, so switching provider switches where the
+ * visitor actually signs in — not just who answers `me()` afterwards.
+ */
 export default function Login() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  // Post-login destination (e.g. the MCP OAuth consent page sends users here
-  // with returnTo so the grant flow can resume). Same-origin paths only.
+  // Post-login destination. Same-origin paths only — `safeReturnTo` is the
+  // shared open-redirect guard, and an attacker controls this query parameter.
   const returnTo = safeReturnTo();
+
+  const handleGoogle = () => {
+    setError("");
+    try {
+      services.auth.signInWithGoogle(returnTo);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start sign-in. Please try again.");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await base44.auth.loginViaEmailPassword(email, password);
+      await services.auth.signInWithPassword(email, password);
       window.location.href = returnTo;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid email or password");
@@ -32,27 +56,8 @@ export default function Login() {
     }
   };
 
-  const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", returnTo);
-  };
-
   return (
-    <AuthLayout
-      icon={LogIn}
-      title="Welcome back"
-      subtitle="Log in to your account"
-      footer={
-        <>
-          Don't have an account?{" "}
-          <Link
-            to={"/register" + (returnTo !== "/" ? "?returnTo=" + encodeURIComponent(returnTo) : "")}
-            className="text-primary font-medium hover:underline"
-          >
-            Create one
-          </Link>
-        </>
-      }
-    >
+    <AuthLayout icon={LogIn} title="Welcome back" subtitle="Log in to your account">
       <Button
         variant="outline"
         className="w-full h-12 text-sm font-medium mb-6"
@@ -72,9 +77,7 @@ export default function Login() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -86,7 +89,6 @@ export default function Login() {
               id="email"
               type="email"
               autoComplete="email"
-              autoFocus
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -96,12 +98,7 @@ export default function Login() {
           </div>
         </div>
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-              Forgot password?
-            </Link>
-          </div>
+          <Label htmlFor="password">Password</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input

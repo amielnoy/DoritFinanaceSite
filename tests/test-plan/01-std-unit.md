@@ -90,7 +90,45 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-CNT-004 | "keeps the display number in sync with the dial number" | Digits of `phoneDisplay` reconstruct `phoneE164` |
 | UNIT-CNT-005 | "exposes a valid contact email" | Matches an email shape |
 
+### 4.5 Supabase auth adapter — `tests/unit/supabase-auth.test.ts`
+
+`AuthPort` over Supabase. The semantics `AuthContext` depends on: the role comes
+from `profiles` rather than the token, and failures carry the reason the context
+distinguishes on.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SBA-001 | "reports the signed-in user with the role from profiles" | id, email, full_name, role |
+| UNIT-SBA-002 | "reads the role from the table, never from the token" | A revoked role cannot survive in a stale JWT |
+| UNIT-SBA-003 | "defaults a null role to user" | `role === "user"` |
+| UNIT-SBA-004 | "asks for sign-in with the reason AuthContext looks for" | 403 + `auth_required` |
+| UNIT-SBA-005 | "separates not-provisioned from not-signed-in" | 403 + `user_not_registered` |
+| UNIT-SBA-006 | "sends the visitor to Google, returning where they started" | `signInWithOAuth` with `redirectTo` |
+| UNIT-SBA-007 | "signs out before redirecting, not after" | `signOut` precedes navigation |
+| UNIT-SBA-008 | "answers hasStoredToken synchronously" | Reflects the injected checker |
+| UNIT-SBA-009 | "routes redirectToLogin through the same Google flow" | Both doors reach Google |
+| UNIT-SBA-010 | "signs in with an address and a password" | Credentials forwarded verbatim |
+| UNIT-SBA-011 | "throws on bad credentials, which Supabase reports without rejecting" | Rejects with the provider's message |
+| UNIT-SBA-012 | "does not navigate: the caller owns the guarded destination" | Resolves without redirecting |
+
+### 4.6 Store reconciliation — `tests/unit/reconcile.test.ts`
+
+The gate phase 4 rests on: the flip is safe once the two stores have agreed for
+a sustained stretch, and "agreed" has to be checkable. Exits non-zero on drift
+so it can gate the cutover rather than merely describe it.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-REC-001 | "is silent when they agree, despite blanks spelled differently" | `""` and NULL are not a disagreement |
+| UNIT-REC-002 | "reports a lead the mirror never copied" | Listed as missing |
+| UNIT-REC-003 | "reports a Supabase row with no counterpart" | Listed as orphaned |
+| UNIT-REC-004 | "reports an update that reached only one store" | Listed as mismatched |
+| UNIT-REC-005 | "names every field that differs, not just the first" | All differing fields |
+| UNIT-REC-006 | "matches contacts on the phone number, however punctuated" | No false drift |
+| UNIT-REC-007 | "compares a rating by value" | `5` equals `"5"` |
+| UNIT-REC-008 | "compares published by truth, not spelling" | Real drift still caught |
+
 ## 5. Pass criteria
 
-All 43 cases pass. Any failure is a functional defect, not an environment issue —
+All 63 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

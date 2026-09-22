@@ -6,7 +6,7 @@ import { useEffect } from "react";
  * Keeps private and non-content routes out of search results.
  *
  * The static <head> in index.html says `index, follow`, so without this the
- * login, registration, password-reset, OAuth-consent and admin screens were all
+ * login, OAuth-consent and admin screens were all
  * indexable — thin, duplicate pages that dilute the site's ranking and can
  * surface an admin URL in results.
  *
@@ -16,9 +16,6 @@ import { useEffect } from "react";
  */
 const NO_INDEX_ROUTES: Array<{ match: RegExp; title: string; description: string }> = [
   { match: /^\/login\/?$/, title: "כניסה | דורית גוב ארי", description: "כניסה לאזור האישי." },
-  { match: /^\/register\/?$/, title: "הרשמה | דורית גוב ארי", description: "יצירת חשבון." },
-  { match: /^\/forgot-password\/?$/, title: "שחזור סיסמה | דורית גוב ארי", description: "איפוס סיסמה." },
-  { match: /^\/reset-password\/?$/, title: "איפוס סיסמה | דורית גוב ארי", description: "בחירת סיסמה חדשה." },
   { match: /^\/oauth\//, title: "אישור גישה | דורית גוב ארי", description: "אישור גישה ליישום." },
   { match: /^\/admin(\/|$)/, title: "ניהול | דורית גוב ארי", description: "אזור ניהול." },
 ];

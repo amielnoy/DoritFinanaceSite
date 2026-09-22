@@ -129,7 +129,7 @@ test.describe("Client-side security posture", () => {
     });
   });
 
-  test("a hostile ?returnTo= cannot bounce the visitor off-site", async ({ page }) => {
+  test("a hostile ?returnTo= cannot bounce the visitor off-site", async ({ page, baseURL }) => {
     for (const hostile of ["https://evil.example", "//evil.example", "/\\evil.example", "/.//evil.example"]) {
       await test_step(`open the login screen with returnTo=${hostile}`, async () => {
         await gotoApp(page, `/login?returnTo=${encodeURIComponent(hostile)}`);
@@ -137,11 +137,11 @@ test.describe("Client-side security posture", () => {
       });
 
       await test_step(`the visitor stays on this origin (${hostile})`, async () => {
-        const registerHref = await page
-          .getByRole("link", { name: /Create one/i })
-          .getAttribute("href");
-        expect(registerHref ?? "/register", hostile).not.toContain("evil.example");
-        expect(new URL(page.url()).host, hostile).toBe(new URL(page.url()).host);
+        // This used to read the href of the "Create one" link, which went with
+        // registration. Its companion assertion compared `page.url()`'s host
+        // with its own, so it could not fail whatever the guard did — the
+        // property is now checked against the origin the suite actually ran on.
+        expect(new URL(page.url()).host, hostile).toBe(new URL(baseURL!).host);
       });
     }
   });
