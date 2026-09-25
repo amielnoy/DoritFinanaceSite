@@ -128,6 +128,22 @@ so it can gate the cutover rather than merely describe it.
 | UNIT-REC-007 | "compares a rating by value" | `5` equals `"5"` |
 | UNIT-REC-008 | "compares published by truth, not spelling" | Real drift still caught |
 
+### 4.7 Vercel preview pruning — `tests/unit/prune-vercel.test.ts`
+
+The one rule in the nightly prune that can destroy something. Age decides what
+goes; two guards decide what never does. Both guards are asserted here rather
+than left to the `target=preview` API filter, so that widening that query later
+cannot quietly turn a janitor into a production reaper.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-PRV-001 | "deletes an unaliased preview past the age limit" | `{ ok: true }` |
+| UNIT-PRV-002 | "keeps a preview that is not yet old enough" | `too-new` |
+| UNIT-PRV-003 | "keeps a preview aged exactly the age limit" | `too-new` — the boundary is kept, not deleted |
+| UNIT-PRV-004 | "keeps an old preview that still has an alias" | `aliased` — an alias is evidence of use |
+| UNIT-PRV-005 | "keeps a production deployment however old" | `not-preview` |
+| UNIT-PRV-006 | "keeps a deployment with no target rather than guessing" | `not-preview` |
+
 ## 5. Pass criteria
 
 All 63 cases pass. Any failure is a functional defect, not an environment issue —

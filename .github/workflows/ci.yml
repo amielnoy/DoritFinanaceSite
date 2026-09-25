@@ -1496,3 +1496,46 @@ jobs:
           # decided to keep.
           retention-days: 90
           if-no-files-found: warn
+
+  prune-vercel:
+    name: Prune old Vercel previews
+    runs-on: ubuntu-latest
+    # The nightly run only — and unlike the archive job beside it, not
+    # `workflow_dispatch`. This one deletes. A manual trigger sitting next to
+    # the "Publish to Base44" button is how someone clears a preview they were
+    # halfway through reading, and there is no undo. The schedule is the whole
+    # interface; to preview what it would do, run `npm run prune:vercel` with
+    # no `--apply` locally.
+    if: ${{ github.event_name == 'schedule' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The same three, checked the same way, as the deploy job.
+      - name: Check Vercel credentials
+        id: creds
+        run: |
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && [ -n "${{ vars.VERCEL_SCOPE }}" ] && [ -n "${{ vars.VERCEL_PROJECT_NAME }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VERCEL_TOKEN secret, or the VERCEL_SCOPE / VERCEL_PROJECT_NAME variables, are unset — nothing was pruned."
+          fi
+
+      - name: Install
+        if: steps.creds.outputs.ready == 'true'
+        run: npm ci --ignore-scripts
+
+      - name: Delete previews older than a month
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_SCOPE: ${{ vars.VERCEL_SCOPE }}
+          VERCEL_PROJECT_NAME: ${{ vars.VERCEL_PROJECT_NAME }}
+        run: npm run prune:vercel -- --apply
