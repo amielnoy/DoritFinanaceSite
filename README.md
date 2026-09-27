@@ -598,15 +598,20 @@ docker compose -f docker-compose.test.yml run --rm e2e-ios
 | Contract | `npm run test:contract` | `tests/contract/` |
 | Integration | `npm run test:integration` | `tests/integration/` |
 | Security (static) | `npm run test:security` | `tests/security/` |
+| Eval (opt-in, needs credentials) | `npm run test:eval` | `tests/eval/` |
 | e2e — UI, API, security, a11y, SEO | `npm run test:e2e` | `e2e/` |
 | SEO only | `npm run test:e2e:seo` | `e2e/seo/` |
 
-`npm test` is `test:vitest` followed by `test:e2e`. The five Vitest suites used
-to run as five separate `vitest run` invocations, which paid the startup cost
-five times — 8.5s against 4.1s for the same 436 cases in one process. The
-per-suite commands remain for running one on its own, and `./scripts/run-tests.sh`
-still invokes them separately so its summary can report each suite's own
-pass/fail.
+`npm test` is `test:vitest` followed by `test:e2e`. The five gated Vitest
+suites used to run as five separate `vitest run` invocations, which paid the
+startup cost five times — 8.5s against 4.1s for the same set of cases (436 of
+them when that was measured; 917 today) in one process. The per-suite commands
+remain for running one on its own, and `./scripts/run-tests.sh` still invokes
+them separately so its summary can report each suite's own pass/fail.
+
+`npm run test:vitest` is a bare `vitest run`, so it also picks up `tests/eval/`.
+That suite skips itself without `EVAL_BASE44_APP_ID` and `EVAL_BASE44_TOKEN`
+and is never gated — see [STD-13](tests/test-plan/13-std-eval.md).
 
 **The integration suite runs the Base44 backend functions for real.** They sit
 outside `tsconfig.json` and execute on Deno inside Base44, so nothing else in
@@ -809,45 +814,31 @@ where users are actually affected.
 everywhere", in Base44's words. Tests never touch it, but anything you do by
 hand in the Builder writes to דורית's real leads.
 
-### Branches
+### The nightly job that deletes
 
-**Today the Base44 Builder syncs straight to `main`**, so its edits land on the
-trunk untested. Nothing reaches the client's site regardless — the Base44
-publish requires a green run — but `main` itself can go red at any time, and
-has.
+Every preview Vercel builds stays there. A branch that saw thirty pushes leaves
+thirty deployments behind it, and the dashboard becomes unreadable long before
+the account notices. `prune-vercel` runs at the end of the nightly build and
+removes preview deployments older than a month.
 
-CI already carries the support for working on a Builder branch, and it is
-**dormant** — everything keyed to `builder` triggers only on pushes to that
-branch, and the Builder isn't pointed at one yet. To switch over (a Base44-side
-setting that costs Builder tokens):
+It is the one job in the pipeline whose effect cannot be undone, so it is set
+up to be hard to fire by accident:
 
-1. In the Builder's branch dropdown, **Create new branch**, named `builder`.
-2. Confirm it appears on GitHub (`git ls-remote --heads origin`).
-
-No workflow change is needed. From then on, every Builder edit gets:
-
-```
-builder ──[unit · component · contract · security · e2e × 4]──┬── Vercel preview URL
-                                                              ├── Allure report
-                                                              └── ✅ / 🛑 safe to merge
-```
-
-The preview is the part worth having: a URL for *that* change, which you open
-and look at before merging, instead of judging a Builder edit from a diff.
-
-**CI does not merge for you, on purpose.** On a branch the Builder replaces its
-Publish button with **Merge to main**, and Base44 keeps each Builder branch as
-a real branch here — so merging is already its job, and a CI job doing it too
-would race and leave the two disagreeing. CI runs everything and posts the
-verdict; you press the button.
-
-That isn't a weaker guarantee than it sounds, because **publishing only ever
-happens from main**, and the publish there requires a green run. The gate sits
-where users are actually affected.
-
-⚠️ Every Builder branch shares the app's **live data** — "the same live records
-everywhere", in Base44's words. Tests never touch it, but anything you do by
-hand in the Builder writes to דורית's real leads.
+- **Schedule only.** Unlike the log-archive job beside it, it has no
+  `workflow_dispatch`. A manual trigger sitting next to *Publish to Base44* is
+  how somebody clears a preview they were halfway through reading.
+- **Two guards, asserted in a unit test.** It deletes only a deployment whose
+  `target` is exactly `preview` and which has no alias — an alias is evidence
+  something points at it. Both are checked in `scripts/prune-vercel-deployments.mjs`
+  rather than left to the `target=preview` query the API is asked with, so
+  widening that query later cannot turn a janitor into a production reaper.
+  `tests/unit/prune-vercel.test.ts` covers the boundary too: a deployment aged
+  *exactly* one month is kept.
+- **A dry run by default.** `npm run prune:vercel` lists what it would delete.
+  Only `--apply` deletes, and only CI passes it.
+- **Off without credentials.** No `VERCEL_TOKEN` secret, or no `VERCEL_SCOPE` /
+  `VERCEL_PROJECT_NAME` variable, and the job posts a notice and prunes
+  nothing.
 
 ### What a red run costs
 
@@ -870,6 +861,24 @@ GitHub integration: [https://docs.base44.com/developers/app-code/local-developme
 Local development: [https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview)
 
 Support: [https://app.base44.com/support](https://app.base44.com/support)
+
+## Page analytics
+
+`src/App.jsx` mounts `<Analytics />` from `@vercel/analytics/react`. The
+`/react` entry is deliberate: Vercel's own docs lead with `@vercel/analytics/next`,
+which imports `next/navigation` and has nothing to bind to in a Vite SPA.
+
+It reports only from a Vercel deployment. The beacon it posts to lives at
+`/_vercel/insights/*`, which the platform answers and nothing else does — so on
+the Base44 production host the component mounts, finds no endpoint, and costs a
+request that 404s. That is worth knowing while production is still on Base44:
+until the [domain move](#moving-production-to-the-custom-domain) puts the
+client-facing site on Vercel, these numbers describe **staging traffic**, which
+is mostly CI and the two of us.
+
+Nothing is configured per-environment and there is no key to set. Vercel
+Analytics has to be enabled once for the project in the dashboard; without it
+the beacon is simply unanswered.
 
 ## Dorit's notifications through Resend
 

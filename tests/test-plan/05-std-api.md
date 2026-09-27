@@ -1,7 +1,7 @@
 # STD-05 — API Tests
 
 **Suite:** `api` · **Runner:** `npm run test:e2e:api` (Playwright)
-**Location:** `e2e/api/` · **Cases:** 11 HTTP-surface + 7 observed-traffic + 4 opt-in live
+**Location:** `e2e/api/` · **Cases:** 11 HTTP-surface + 6 observed-traffic + 4 opt-in live
 
 ---
 
@@ -48,10 +48,16 @@ use the stubbed backend from `e2e/fixtures/app.ts`.
 | API-CTR-001 | "bootstraps through the documented public-settings endpoint" | `GET /api/apps/public/prod/public-settings/by-id/:appId` |
 | API-CTR-002 | "lists testimonials with a bounded, sorted query" | `sort=-created_date`, `0 < limit ≤ 100` |
 | API-CTR-003 | "POSTs a Lead that validates against the Lead entity schema" | JSON content type; `source` is an enum value `Lead.jsonc` declares; no field outside what `submitLead` accepts — `{name,phone,email,source,topic,timing,message,notes,scheduledAt}` |
-| API-CTR-004 | "invokes the consultation function on the documented path and shape" | `POST /api/apps/:id/functions/createConsultationEvent`; body keys exactly `{email,name,notes,phone,scheduledAt,timing,topic}` |
 | API-CTR-005 | "every API call is same-origin and relative to /api" | Every observed request shares the page origin and starts with `/api/` |
 | API-CTR-006 | "never puts personal data or tokens in a query string" | No phone, email, `access_token`, `password` or `api_key` in any query string |
 | API-CTR-007 | "an anonymous visitor never triggers an authenticated user fetch" | Zero requests to `/entities/User/me` |
+
+> `API-CTR-004` observed the consultation function being invoked from the
+> three-step booking wizard. That wizard was removed from the site (see
+> [STD-06 §3.4](06-std-ui-e2e.md)), so there is no longer browser traffic to
+> observe. The function itself is still covered statically by `CTR-FN-*` in
+> [STD-03](03-std-contract.md) and against a live backend by `API-LIV-004`
+> below. Ids are not reused.
 
 ## 5. Test cases — live backend (opt-in)
 

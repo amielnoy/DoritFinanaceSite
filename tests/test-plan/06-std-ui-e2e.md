@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 63 in `e2e/ui`, of 159 across the whole e2e suite, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 66 in `e2e/ui`, of 173 across the whole e2e suite, run on all four platforms
 
 ---
 
@@ -26,7 +26,7 @@ timezone `Asia/Jerusalem`.
 |---|---|---|
 | E2E-HOM-001 | "boots past the auth/bootstrap spinner and renders the page shell" | `#top` and `main` visible; no spinner; no console errors; public-settings requested |
 | E2E-HOM-002 | "has the RTL Hebrew document contract search engines rely on" | `lang=he`, `dir=rtl`, title present, and the description is the home route's own (applied by `useSeo`, not the static one from `index.html`) |
-| E2E-HOM-003 | "renders every top-level section of the landing page" | All 12 section ids present (`top`, `about`, `perspective`, `services`, `fee-calculator`, `quick-contact`, `proof`, `testimonials`, `faq`, `consultation`, `detailed-contact`, `common-questions`) |
+| E2E-HOM-003 | "renders every top-level section of the landing page" | All 8 section ids present (`top`, `about`, `services`, `start`, `quick-contact`, `proof`, `testimonials`, `common-questions`) |
 | E2E-HOM-004 | "exposes exactly one h1 and a sane heading order" | One `h1`; no heading level skipped by more than one |
 | E2E-HOM-005 | "renders the reviews pulled from the backend" | Stubbed testimonial name visible |
 | E2E-HOM-006 | "survives a backend that is completely down" | All entity calls 500 → page still renders, `h1` visible, no `pageerror` |
@@ -74,23 +74,35 @@ being committed.
 | E2E-CAL-005 | "shrugs off absurd input instead of hanging the tab" | 120 years at 99% | No `NaN`; inputs still editable |
 | E2E-CAL-006 | "its CTA points at the contact form" | — | `a[href="#quick-contact"]` visible |
 
-### 3.4 Lead forms — `forms.spec.ts`
+### 3.4 Lead form — `forms.spec.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
 | E2E-FRM-001 | "keeps submit disabled until name and phone are filled" | Enabled only after both |
-| E2E-FRM-002 | "submits, confirms, and sends the payload the backend expects" | Confirmation shown; `SendEmail` carries the name and phone; `Lead.create` gets `source: quick`, `status: new` |
+| E2E-FRM-002 | "submits, confirms, and sends the payload the backend expects" | Confirmation shown; the `submitLead` payload carries the name and phone and `source: quick` |
 | E2E-FRM-003 | "shows a recoverable error and a direct mail fallback when sending fails" | Error message; input preserved; button re-enabled |
-| E2E-FRM-004 | "still records the lead when only the optional secondary copy fails" | Exactly one `POST /entities/Lead` |
-| E2E-FRM-005 | "gates submission on service, message and the consent checkbox" | Submit stays disabled until all three are supplied |
-| E2E-FRM-006 | "marks the chosen service as pressed for assistive tech" | `aria-pressed` flips false → true |
-| E2E-FRM-007 | "sends a detailed lead with topic and timing" | `source: detailed`, `topic`, `timing` present |
-| E2E-FRM-008 | "walks the three steps and books a consultation end to end" | Thank-you shown; `Lead.create` with `source: consultation`; function invoked with the seven documented keys |
-| E2E-FRM-009 | "lets the visitor step back without losing their answers" | "Continue" still enabled after going back |
-| E2E-FRM-010 | "still confirms to the visitor when calendar booking fails" | Function 502 → visitor still sees the thank-you; the lead is still recorded |
-| E2E-FRM-011 | "refuses to submit the wizard without a phone number" | Submit disabled; zero lead requests |
+| E2E-FRM-004 | "still records the lead when only the optional secondary copy fails" | Exactly one lead written |
 
-### 3.5 Blog — `blog.spec.ts`
+**Why this section shrank.** `E2E-FRM-005..011` covered a detailed contact form
+and a three-step consultation builder. Both were deleted from the site: the
+home page offered five separate ways to send the same name and phone number,
+and those were two of them. The interview agent in `#start` does that work now,
+with the short form beside it for anyone who would rather not chat — so the
+cases went with the components, not with a decision to stop testing them. The
+`detailed` and `consultation` values still exist in `src/services/ports.ts`
+because the backend still accepts leads recorded under them.
+
+### 3.5 Claim submission — `claim.spec.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| E2E-CLM-001 | "every control on the form has an accessible name" | Every input, select and file control is reachable by name |
+| E2E-CLM-002 | "refuses to submit without a name and phone" | Submit disabled; nothing sent |
+| E2E-CLM-003 | "reports an event and confirms to the visitor" | `submitClaim` invoked; confirmation shown |
+| E2E-CLM-004 | "keeps the report on screen and offers a fallback when the backend fails" | Typed report preserved; direct contact offered |
+| E2E-CLM-005 | "does not file two reports on a double click" | Exactly one invocation |
+
+### 3.6 Blog — `blog.spec.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -101,14 +113,14 @@ being committed.
 | E2E-BLG-005 | "share buttons point at real share endpoints" | ≥1 wa.me/facebook/linkedin/x link |
 | E2E-BLG-006 | "degrades gracefully when the blog backend errors" | Root non-empty; no `pageerror` |
 
-### 3.6 Desktop chrome — `mobile.spec.ts` (desktop projects only)
+### 3.7 Desktop chrome — `mobile.spec.ts` (desktop projects only)
 
 | ID | Title | Expected result |
 |---|---|---|
 | E2E-DSK-001 | "shows the floating WhatsApp/phone dock and hides the mobile bar" | Dock visible; sticky bar hidden |
 | E2E-DSK-002 | "shows the full desktop nav rather than a burger" | Burger hidden; "שירותים" link visible |
 
-### 3.7 Agent chat — regulatory shell — `agent-compliance.spec.ts`
+### 3.8 Agent chat — regulatory shell — `agent-compliance.spec.ts`
 
 The chat widgets are driven by prompts, and a prompt is a request to a model.
 These eight cases cover only what the shell enforces regardless of what the

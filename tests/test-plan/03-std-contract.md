@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 240
+**Location:** `tests/contract/` · **Cases:** 387
 
 ---
 
@@ -87,7 +87,7 @@ Two helpers do the work:
 Two files here test text rather than shape, and do so on purpose. Both cover
 artefacts that a regulator, not a compiler, is the reader of.
 
-**`agents.contract.test.ts` — `CTR-AGT-001..102`** — the three agent prompts. For each
+**`agents.contract.test.ts` — `CTR-AGT-001..167`** — the three agent prompts. For each
 agent it asserts the eighteen mandatory clauses of the compliance block (bot
 disclosure, licence number `L-00107009`, the marketing-not-advice statement, the
 absolute bans on product recommendation and figures, the privacy-law citation
@@ -184,7 +184,7 @@ number is normalised before it becomes that key, and — the one that matters mo
 policy number or anything medical has no field to land in, so a reworded prompt
 alone cannot start storing them.
 
-**`logging.contract.test.ts` — `CTR-LOG-001..061`** — what the backend is
+**`logging.contract.test.ts` — `CTR-LOG-001..067`** — what the backend is
 allowed to write down. These functions logged nothing until now, so the only
 diagnosis available was the warnings appendix in the operations email — which
 means only an enquiry whose mail went out could be diagnosed, and the failures
@@ -231,7 +231,7 @@ when an SEO test asks for it and is forgotten here because nothing does — and
 that `robots.txt` names each AI crawler explicitly rather than leaving them to
 the wildcard.
 
-**`blog-content.contract.test.ts` — `CTR-ART-001..013`** — the repo-held articles under
+**`blog-content.contract.test.ts` — `CTR-ART-001..019`** — the repo-held articles under
 `content/blog/`. Each must parse, be a real article rather than a stub, carry
 the גילוי נאות block with the licence number and the affiliation, contain no
 promise of a return, map cleanly onto the `BlogPost` entity, and ship as a
@@ -287,7 +287,7 @@ time.
 
 ## 6. Pass criteria
 
-All 347 cases pass. A failure means either the frontend or the backend definition
+All 387 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

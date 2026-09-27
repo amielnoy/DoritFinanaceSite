@@ -7,6 +7,9 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
 import SeoRouteGuard from '@/components/SeoRouteGuard';
+// `/react`, not `/next`: Vercel's docs lead with the Next entry, which pulls
+// `next/navigation` and has nothing to bind to in a Vite SPA.
+import { Analytics } from '@vercel/analytics/react';
 // Add page imports here
 // The home page is the marketing entry point and the LCP path, so it stays in
 // the main chunk. Everything else is split out: mobile-first indexing scores
@@ -92,6 +95,7 @@ function App() {
         <Router>
           <ScrollToTop />
           <SeoRouteGuard />
+          <Analytics />
           <AuthenticatedApp />
         </Router>
         <Toaster />

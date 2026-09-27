@@ -4,7 +4,7 @@
 `npm run test:e2e:security` (runtime, Playwright)
 **Location:** `tests/security/static-security.test.ts`,
 `tests/security/agent-surface.security.test.ts`, `e2e/security/security.spec.ts`
-**Cases:** 68 static (24 site + 44 agent surface) + 15 runtime (× 4 platforms)
+**Cases:** 70 static (24 site + 46 agent surface) + 15 runtime (× 4 platforms)
 
 ---
 
@@ -30,7 +30,7 @@ lead inbox.
 | **A third party's inbox** | **Branded phishing via HTML injection into the confirmation email** | `escapeHtml()` at every binding in `buildClientHtml` | SEC-AGT-XSS-009..016 |
 | Agency's reputation | Off-domain links or a look-alike sender in outbound mail | fixed recipients; template links restricted to the agency domain | SEC-AGT-PHI-001..007 |
 | Agent's instructions | Prompt injection through the chat box | compliance block declared to override; escalate-on-doubt | SEC-AGT-INJ-001..011 |
-| Backend state | Prompt injection through a tool payload the model composes | server-side enum clamping, phone validation, fixed field lists | SEC-AGT-API-001..009 |
+| Backend state | Prompt injection through a tool payload the model composes | server-side enum clamping, phone validation, fixed field lists | SEC-AGT-INJ-011 (no `...body` spread), and the clamps executed in [STD-12](12-std-integration.md) |
 | Personal data | Leaving in a summary, a sheet row, a log or a token | `redact()`, entity schema, column allowlist | SEC-AGT-DLP-001..014 |
 
 ## 3. Static test cases — `tests/security/static-security.test.ts`
@@ -83,17 +83,24 @@ carries a `<script>`, an `<img onerror>`, a `javascript:` markdown link and a
 
 ## 4a. Agent surface — `tests/security/agent-surface.security.test.ts`
 
-57 cases over the four surfaces the agents introduced. A model's behaviour
+46 cases over the four surfaces the agents introduced. A model's behaviour
 cannot be asserted, so none of them try: every case pins something that holds
 whatever the model does.
 
 | Group | Cases | What it holds |
 |---|---|---|
-| `SEC-AGT-XSS-*` | 8 + 8 | The chat renders replies through `react-markdown` with no raw-HTML plugin and no `dangerouslySetInnerHTML`; the confirmation email escapes every visitor-supplied binding. The escaping helper is **lifted out of the Deno source and executed** here, so these assert behaviour rather than the presence of a call. |
-| `SEC-AGT-PHI-*` | 7 | No visitor value reaches an `href`; template links stay on the agency domain; recipients resolve from constants; every `tel:`/`mailto:` target binds from the contact config or the server's escalation receipt; the chat's contact block comes from the backend, not from a reply that merely claims a number. |
-| `SEC-AGT-INJ-*` | 11 | Each prompt declares its compliance block to override any later instruction and routes doubt to `escalateToHuman`; the shell never parses a reply for commands; the consent stamp is the shell's, so a persuaded model cannot backdate what a visitor agreed to. |
-| `SEC-AGT-API-*` | 9 | The reason is clamped with `hasOwnProperty` (so `__proto__` is not a reason); the clamped value is what gets written; phone format, required fields, pinned `status`/`source`, and no `...body` spread into an entity write. |
-| `SEC-AGT-DLP-*` | 14 | `redact()` is **executed against real payloads** — ID numbers, spaced and hyphenated card numbers, an Israeli IBAN, account-length digits — and asserted to leave ordinary prose intact and cap its output. Plus: the `Lead` schema carries no sensitive field, the sheet has no sensitive column, no token is echoed or logged. |
+| `SEC-AGT-XSS-*` | 8 + 6 | The chat renders replies through `react-markdown` with no raw-HTML plugin and no `dangerouslySetInnerHTML`; the confirmation email escapes every visitor-supplied binding. The escaping helper is **lifted out of the Deno source and executed** here, so these assert behaviour rather than the presence of a call. |
+| `SEC-AGT-PHI-*` | 8 | No visitor value reaches an `href`; template links stay on the agency domain; recipients resolve from constants; every `tel:`/`mailto:` target binds from the contact config or the server's escalation receipt; the chat's contact block comes from the backend, not from a reply that merely claims a number; no request body may widen a recipient list. |
+| `SEC-AGT-INJ-*` | 10 + 1 | Each prompt declares its compliance block to override any later instruction and routes doubt to `escalateToHuman`; the shell never parses a reply for commands; the consent stamp is the shell's, so a persuaded model cannot backdate what a visitor agreed to; and no `...body` is spread into an entity write. |
+| `SEC-AGT-DLP-*` | 13 | `redact()` is **executed against real payloads** — ID numbers, spaced and hyphenated card numbers, an Israeli IBAN, account-length digits — and asserted to leave ordinary prose intact and cap its output. Plus: the `Lead` schema carries no sensitive field, the sheet has no sensitive column, no token is echoed or logged, and the consent notice names exactly the fields that are collected. |
+
+> The former `SEC-AGT-API-*` block — the `hasOwnProperty` clamp on the
+> escalation reason, the phone format, the pinned `status`/`source` — was
+> folded into [STD-12](12-std-integration.md), where the function is executed
+> and the written row can be read back. Only the one case that is answerable by
+> reading the source, "never spreads the request body into an entity write",
+> stayed here. A static read cannot tell a clamp that works from a clamp that
+> is merely present.
 
 Two findings came out of writing these, one of them a defect that is now fixed:
 
@@ -117,5 +124,5 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 
 ## 6. Pass criteria
 
-All static cases pass; all runtime cases pass on all four platforms, with
-`SEC-HDR-001` skipped unless explicitly enabled.
+All 70 static cases pass; all 15 runtime cases pass on all four platforms,
+with `SEC-HDR-001` skipped unless explicitly enabled.

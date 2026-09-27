@@ -221,7 +221,7 @@ enforces them only against a real deployment:
 E2E_ENFORCE_SECURITY_HEADERS=1 PLAYWRIGHT_BASE_URL=https://<site> npx playwright test e2e/security
 ```
 
-### B-6 · Display labels are set at 11px on mobile
+### B-9 · Display labels are set at 11px on mobile
 
 Fourteen eyebrow labels and stat captions (`INSURANCE ARCHITECT`, `שנות ניסיון`,
 `LIFE & VITALITY` …) render at 11px uppercase with heavy letter-spacing. Google's
@@ -266,6 +266,37 @@ integration cases. They are dormant, not dead — they exist for a channel that
 delivers a phone number with the message, and re-enabling one means adding a
 separate number, wiring the tool back to the agent, and deciding how the saving
 is disclosed on a channel with no consent screen.
+
+### B-10 · The Resend sending domain has no DNS records, so no mail can leave
+
+`dorit-mailer` sends through Resend from an address on `mail.govari-fin.co.il`.
+That subdomain does not exist. Checked 2026-09-27 against the public resolvers:
+
+| Record | Expected | Found |
+|---|---|---|
+| `mail.govari-fin.co.il` (any) | the sending subdomain | **NXDOMAIN** |
+| `send.mail.govari-fin.co.il` MX | `feedback-smtp.<region>.amazonses.com` | none |
+| `send.mail.govari-fin.co.il` TXT | `v=spf1 include:amazonses.com ~all` | none |
+| `resend._domainkey.mail.govari-fin.co.il` TXT | the DKIM public key | none |
+| `_dmarc.govari-fin.co.il` TXT | a DMARC policy | none |
+
+The apex is configured and unrelated: `govari-fin.co.il` is Microsoft 365
+(`MX → govarifin-co-il01e.mail.protection.outlook.com`, SPF
+`include:spf.protection.outlook.com -all`). That `-all` is why the sender
+cannot simply be moved to the apex — it instructs receivers to reject anything
+Microsoft did not send, which includes everything Resend would.
+
+Until the subdomain is created and Resend marks it verified, every send is
+refused at the API with an unverified-domain error. The functions treat that as
+a delivery warning and keep the enquiry, so **nothing is lost and nothing
+arrives** — the same shape as A-35, one provider along, and the reason B-6's
+second option is not yet closed.
+
+Closing it is a DNS action on `govari-fin.co.il` (nameservers `ns1-3.dtnt.info`),
+not a code change: add the sending domain in Resend, publish the MX, SPF and
+DKIM records it prints, and wait for verification. A DMARC record on the apex
+is worth adding in the same pass — there is none today, on a domain that sends
+invoices and client mail through Microsoft 365.
 
 ## C. Deliberate deviations in the suite
 
