@@ -820,12 +820,36 @@ jobs:
       # job smoke-tests the published *bundle* against a mock and reports green
       # while every call behind it 401s — which is exactly how three dead chats
       # went unnoticed for ten days (A-42).
+      # A skip is a pass, and this job is the one place where that is fatal:
+      # its whole purpose is to answer "does the deployed thing work". Assert
+      # the inputs exist before the suite runs, so a missing variable fails
+      # here — naming itself — instead of quietly reducing the smoke to a
+      # check that the bundle was uploaded.
+      - name: The live backend probes must be able to run
+        env:
+          LIVE_URL: ${{ vars.PRODUCTION_URL }}
+          LIVE_APP_ID: ${{ vars.BASE44_APP_ID }}
+        run: |
+          missing=""
+          [ -n "$LIVE_URL" ]    || missing="$missing vars.PRODUCTION_URL"
+          [ -n "$LIVE_APP_ID" ] || missing="$missing vars.BASE44_APP_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::The live-backend probes would skip silently. Missing:${missing}"
+            exit 1
+          fi
+
       - name: Smoke the deployment
         run: npx playwright test --project=web-chromium e2e/api e2e/ui/home.spec.ts e2e/a11y
         env:
           PLAYWRIGHT_BASE_URL: ${{ vars.PRODUCTION_URL }}
           E2E_ENFORCE_SECURITY_HEADERS: "0"
-          E2E_LIVE_API_URL: ${{ vars.BASE44_URL }}
+          # PRODUCTION_URL, not BASE44_URL. `vars.BASE44_URL` does not exist —
+          # it resolved to empty, the live block's `test.skip(!LIVE_URL || ...)`
+          # skipped all eight cases, and the job went green having tested
+          # nothing against the backend. That is the exact failure these probes
+          # were written to end, one level up, so the guard below now makes a
+          # skip here impossible rather than merely unlikely.
+          E2E_LIVE_API_URL: ${{ vars.PRODUCTION_URL }}
           E2E_LIVE_APP_ID: ${{ vars.BASE44_APP_ID }}
 
       - name: Upload smoke report
