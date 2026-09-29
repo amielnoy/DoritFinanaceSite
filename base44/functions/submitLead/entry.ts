@@ -447,6 +447,45 @@ async function appendEventRow(base44, row) {
   return 'נרשם ✓';
 }
 
+/**
+ * יצירת מסמך סיכום ב-Google Docs. מיטבי, כמו היומן והגיליון.
+ *
+ * המסמך הוא עותק נוסף של הפנייה — אחרי המאגר, המיילים, היומן והגיליון — ונועד
+ * למי שמעדיף לקרוא סיכומים ב-Docs או לשמור אותם לתיק. התוכן זהה למייל שדורית
+ * מקבלת (buildAgentBody), והכותרת זהה לנושא המייל. המסמך נוצר ב-Drive של
+ * החשבון המחובר, והקישור אליו נשלח בנספח התפעולי.
+ *
+ * משוכפלת בכל פונקציה שכותבת ל-Docs בכוונה — אין מודול משותף ב-Base44.
+ * משוכפל זה בסדר, מפוצל זה לא.
+ */
+async function createConsultationDoc(base44, rid, source, data) {
+  const { accessToken } = await base44.asServiceRole.connectors.getConnection('googledocs');
+  if (!accessToken) return 'אין חיבור';
+
+  const title = subjectFor(source, data);
+  const createRes = await fetch('https://docs.googleapis.com/v1/documents', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!createRes.ok) throw new Error(`docs create ${createRes.status}`);
+  const { documentId } = await createRes.json();
+
+  // התוכן המלא של הפנייה — אותו טקסט שיוצא במייל לדורית.
+  const text = buildAgentBody(source, data);
+  const updateRes = await fetch(`https://docs.googleapis.com/v1/documents/${documentId}:batchUpdate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: [{ insertText: { location: { index: 1 }, text } }],
+    }),
+  });
+  if (!updateRes.ok) throw new Error(`docs update ${updateRes.status}`);
+
+  log('info', 'doc.created', { rid, documentId });
+  return `נוצר ✓ — https://docs.google.com/document/d/${documentId}/edit`;
+}
+
 /** סוג האירוע כפי שהוא נרשם בגיליון — הערך שמאפשר לסנן את הגיליון לפי סוג. */
 function eventTypeFor(source) {
   if (source === 'consultation') return 'consultation_request';
@@ -456,7 +495,7 @@ function eventTypeFor(source) {
 }
 
 /** נספח תפעולי — מה עלה בגורלם של השמירה, היומן והמיילים. */
-function buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings }) {
+function buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings }) {
   return [
     `── מצב תפעולי ──`,
     `מקור: ${source || 'quick'}`,
@@ -464,6 +503,7 @@ function buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings }) {
     `מזהה רשומה: ${leadId || '—'}`,
     `יומן: ${calendar}`,
     `גיליון: ${sheet}`,
+    `מסמך: ${doc}`,
     `תקלות: ${warnings.length ? warnings.join(', ') : 'אין'}`,
   ].join('\n');
 }
@@ -859,6 +899,7 @@ function buildAgentHtml(source, data, ops) {
         detailRow('מזהה רשומה', ops.leadId),
         detailRow('יומן', ops.calendar),
         detailRow('גיליון', ops.sheet),
+        detailRow('מסמך', ops.doc),
         detailRow('תקלות', ops.warnings.length ? ops.warnings.join(', ') : 'אין', { last: true }),
       ].join(''), { tone: ops.warnings.length ? 'alert' : 'panel' })
     : '';
@@ -1409,13 +1450,28 @@ export default async function(req) {
       warnings.push('sheet_append_failed');
     }
 
+    // יצירת מסמך סיכום ב-Google Docs — מיטבי, לפני המייל התפעולי כדי שהקישור
+    // אליו ייכנס לנספח. רק לפניות מלאות: ייעוץ וראיון שהושלם (ראיון חלקי חוזר
+    // מוקדם יותר). פנייה מהירה אינה מייצרת מסמך — אין בה תוכן שמצדיק מסמך.
+    let doc = 'לא רלוונטי';
+    const booksDoc = source === 'consultation' || source === 'interview';
+    if (booksDoc) {
+      try {
+        doc = await createConsultationDoc(base44, rid, source, data);
+      } catch (e) {
+        log('warn', 'doc.failed', { rid, err: String(e?.message ?? e).slice(0, 200) });
+        warnings.push('doc_failed');
+        doc = 'לא נוצר';
+      }
+    }
+
     // עותק לצוות התפעול — אותה פנייה מלאה, בתוספת נספח המצב. נשלח אחרון
     // כדי שיוכל לדווח גם על תוצאת היומן והגיליון. ראו ההערה ליד NOTIFY_EMAILS.
     // The same full lead the agent gets, plus the ops appendix — see the note
     // beside NOTIFY_EMAILS, and the consent wording it obliges. Each mailbox is
     // its own attempt: one that bounces must not take the others with it.
-    const opsHtml = buildAgentHtml(source, data, { source, leadId, topic, calendar, sheet, warnings });
-    const opsText = `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, warnings })}`;
+    const opsHtml = buildAgentHtml(source, data, { source, leadId, topic, calendar, sheet, doc, warnings });
+    const opsText = `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings })}`;
     for (const to of NOTIFY_EMAILS) {
       try {
         await sendMail({
