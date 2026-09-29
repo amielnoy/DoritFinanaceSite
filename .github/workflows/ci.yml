@@ -813,11 +813,20 @@ jobs:
 
       # Against a real deployment the API/UI/a11y suites run untouched; the
       # security suite additionally enforces the transport hardening headers.
+      #
+      # E2E_LIVE_* additionally turns on the opt-in "Live Base44 backend" block
+      # in e2e/api/base44-contract.spec.ts, which is the only part of the
+      # battery that talks to the backend rather than to a stub. Without it this
+      # job smoke-tests the published *bundle* against a mock and reports green
+      # while every call behind it 401s — which is exactly how three dead chats
+      # went unnoticed for ten days (A-42).
       - name: Smoke the deployment
         run: npx playwright test --project=web-chromium e2e/api e2e/ui/home.spec.ts e2e/a11y
         env:
           PLAYWRIGHT_BASE_URL: ${{ vars.PRODUCTION_URL }}
           E2E_ENFORCE_SECURITY_HEADERS: "0"
+          E2E_LIVE_API_URL: ${{ vars.BASE44_URL }}
+          E2E_LIVE_APP_ID: ${{ vars.BASE44_APP_ID }}
 
       - name: Upload smoke report
         if: always()

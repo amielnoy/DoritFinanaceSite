@@ -67,7 +67,11 @@ export interface AgentDescriptor {
   };
 }
 
-const LIMIT_COPY: Record<string, string> = {
+// Keyed on the union rather than on `string`: `noUncheckedIndexedAccess` is
+// off, so a `Record<string, string>` hands back `string` for a key that is
+// not there. Add a third reason without its copy and `tsc` stays silent
+// while the visitor reads a bubble saying "undefined".
+const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
   too_long: `ההודעה ארוכה מדי — עד ${MAX_MESSAGE_CHARS} תווים.`,
   too_many_turns: "השיחה הגיעה לאורכה המרבי. אפשר להתחיל שיחה חדשה.",
 };
@@ -110,12 +114,19 @@ export default function AgentChat({
   const [sending, setSending] = useState<boolean>(false);
   const [handingOff, setHandingOff] = useState<boolean>(false);
   /**
-   * The handoff reply, kept separately from `messages`.
+   * The handoff reply, kept separately from `messages` and rendered outside
+   * both branches of the panel.
    *
-   * A visitor may press "talk to a person" before accepting the notice — that
-   * is the whole point of putting the control outside the gate — and at that
-   * moment the transcript is not on screen to answer into. Without this the
-   * request succeeded and the visitor saw nothing.
+   * Two reasons, and the second is the one that was broken. A visitor may press
+   * "talk to a person" before accepting the notice — that is the whole point of
+   * putting the control outside the gate — and at that moment the transcript is
+   * not on screen to answer into. And after consent, `messages` is replaced
+   * wholesale by every server push, so a notice written into the transcript is
+   * erased by the next one. Since the transcript is exactly where the phone
+   * number used to live post-consent, the documented promise — a person who
+   * asked for a person gets one even when the backend is down — quietly did not
+   * hold in the common case. State the panel owns, rendered in both states,
+   * holds it in both.
    */
   const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -154,6 +165,12 @@ export default function AgentChat({
     try {
       await services.agents.send(await ensureConversation(), text);
     } catch (e) {
+      // Put the text back in the box. The visitor's own message reaches the
+      // transcript only by way of the server echoing it, so a failed send
+      // leaves it nowhere at all: cleared from the input, absent from the
+      // conversation, one line of apology in its place. That is the difference
+      // between "try again" and "this site ate what I wrote".
+      setInput(text);
       say(
         e instanceof AgentLimitError
           ? LIMIT_COPY[e.reason]
@@ -195,7 +212,6 @@ export default function AgentChat({
         `✉️ [${email}](mailto:${email})`,
       ].join("\n");
       setHandoffNotice(notice);
-      if (consentAt) say(notice);
     } finally {
       setHandingOff(false);
     }
@@ -303,14 +319,6 @@ export default function AgentChat({
                 <span>{CONSENT.checkboxLabel}</span>
               </label>
 
-              {handoffNotice ? (
-                <div className="mt-6 border border-accent/40 bg-secondary/40 px-5 py-4 text-[14px] leading-relaxed">
-                  <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                    <ReactMarkdown>{handoffNotice}</ReactMarkdown>
-                  </div>
-                </div>
-              ) : null}
-
               <button
                 onClick={acceptConsent}
                 disabled={!consentChecked}
@@ -360,6 +368,16 @@ export default function AgentChat({
               )}
             </div>
           )}
+
+          {handoffNotice ? (
+            <div className="px-5 pb-4 pt-4 border-t border-border/60">
+              <div className="border border-accent/40 bg-secondary/40 px-5 py-4 text-[14px] leading-relaxed">
+                <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                  <ReactMarkdown>{handoffNotice}</ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="px-4 py-4 border-t border-border/60">
             <div className="flex items-end gap-2">

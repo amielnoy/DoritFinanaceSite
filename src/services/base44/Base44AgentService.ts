@@ -1,13 +1,60 @@
 import type { AgentConversation, AgentMessage, AgentPort } from "../ports";
 
+/** All this adapter needs of a conversation, and all the runtime promises. */
+export interface ConversationRef {
+  id: string;
+}
+
+/**
+ * A message as the runtime actually sends it, which is wider than `AgentMessage`
+ * in three ways that matter — see `visibleMessages`.
+ */
+export interface RawAgentMessage {
+  role?: string;
+  content?: unknown;
+  hidden?: boolean;
+}
+
 export interface AgentClient {
   agents: {
     createConversation(input: { agent_name: string; metadata?: Record<string, unknown> }): Promise<{ id: string }>;
-    getConversation(id: string): Promise<unknown>;
-    addMessage(conversation: unknown, message: { role: string; content: string }): Promise<unknown>;
-    subscribeToConversation(id: string, cb: (data: { messages?: AgentMessage[] }) => void): () => void;
+    /** `undefined` when the id no longer resolves — the SDK says so, so do we. */
+    getConversation(id: string): Promise<ConversationRef | undefined>;
+    addMessage(conversation: ConversationRef, message: { role: string; content: string }): Promise<unknown>;
+    subscribeToConversation(id: string, cb: (data: { messages?: RawAgentMessage[] }) => void): () => void;
   };
 }
+
+/**
+ * What the visitor is allowed to see, which is narrower than what arrives.
+ *
+ * The runtime's message type is `role: "user" | "assistant" | "system"`,
+ * `content?: string | Record<string, any>` and `hidden?: boolean`. Passing that
+ * through unfiltered — which is what this adapter used to do — means three
+ * things, in rising order of cost:
+ *
+ *   - `content` as an object reaches `<ReactMarkdown>`, which throws "Objects
+ *     are not valid as a React child". There is no error boundary above this
+ *     chat, so that is a white page.
+ *   - a `system` message fails the `role === "user"` test in the component and
+ *     is rendered in an assistant bubble — the visitor is shown scaffolding as
+ *     though the agent said it.
+ *   - a message the platform marked `hidden` is displayed. On a chat whose tool
+ *     payloads carry a visitor's name, phone and life circumstances, that is the
+ *     one default worth getting right without being asked.
+ *
+ * Translating the vendor's shape into the app's is the whole job of an adapter,
+ * and this is the translation it exists to perform.
+ */
+export const visibleMessages = (messages: RawAgentMessage[]): AgentMessage[] =>
+  messages.flatMap((m) =>
+    (m.role === "user" || m.role === "assistant") &&
+    typeof m.content === "string" &&
+    m.content.length > 0 &&
+    !m.hidden
+      ? [{ role: m.role, content: m.content }]
+      : []
+  );
 
 /**
  * Adapter over the Base44 agent runtime.
@@ -43,15 +90,25 @@ export class Base44AgentService implements AgentPort {
 
     const used = this.turns.get(conversation.id) ?? 0;
     if (used >= MAX_TURNS_PER_CONVERSATION) throw new AgentLimitError("too_many_turns");
-    this.turns.set(conversation.id, used + 1);
 
     const conv = await this.client.agents.getConversation(conversation.id);
+    // The id stopped resolving — a redeploy, an expiry, a tab left open over a
+    // weekend. Say so here rather than hand `undefined` to the SDK and fail
+    // somewhere inside axios with a message nobody sees.
+    if (!conv) throw new Error("agent_conversation_gone");
     await this.client.agents.addMessage(conv, { role: "user", content: text });
+
+    // Counted after the call, not before. The cap exists to bound how many
+    // times a visitor can invoke the model, and a send that threw invoked it
+    // zero times. Charging for it means a backend outage eventually reports
+    // itself as "השיחה הגיעה לאורכה המרבי" — a second, differently wrong
+    // diagnosis, and the one message that would stop them retrying.
+    this.turns.set(conversation.id, used + 1);
   }
 
   subscribe(conversationId: string, onMessages: (messages: AgentMessage[]) => void): () => void {
     return this.client.agents.subscribeToConversation(conversationId, (data) =>
-      onMessages(data.messages ?? [])
+      onMessages(visibleMessages(data.messages ?? []))
     );
   }
 }

@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 223 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 232 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -233,7 +233,25 @@ is the single place that stops one enquiry being filed twice.
 | UNIT-SUB-007 | "clears the previous error when resubmitting" | No stale error on retry |
 | UNIT-SUB-008 | "reset returns it to idle" | `idle` |
 
+### The agent adapter — `agent-service.test.ts`
+
+Nine cases on `Base44AgentService`, all of them failure paths, because the
+failure paths are what was wrong. Nothing in the battery had ever exercised a
+failing `/agents/` call.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AGT-001 | "does not spend a turn on a send that failed" | 45 failed sends all reach the backend; the cap never fires. Counting attempts rather than model invocations meant an outage eventually reported itself as "השיחה הגיעה לאורכה המרבי" |
+| UNIT-AGT-002 | "still refuses once the visitor has actually taken the maximum turns" | `AgentLimitError("too_many_turns")` after 40 successful sends |
+| UNIT-AGT-003 | "refuses an over-long message without calling the backend at all" | `AgentLimitError("too_long")`; `addMessage` never called |
+| UNIT-AGT-004 | "fails with its own error instead of handing undefined to the SDK" | `agent_conversation_gone`; `addMessage` never called |
+| UNIT-AGT-005 | "keeps ordinary user and assistant turns unchanged" | Both pass through |
+| UNIT-AGT-006 | "drops a message the platform marked hidden" | `[]` |
+| UNIT-AGT-007 | "drops a system message rather than dressing it as the agent" | `[]` — `role === "user"` is false for `system`, so it used to render in an assistant bubble |
+| UNIT-AGT-008 | "drops content that is not a non-empty string" | `[]` for an object, a missing `content` and an empty one. An object reaches `<ReactMarkdown>` as a React child and, with no error boundary above the chat, whites out the SPA |
+| UNIT-AGT-009 | "passes the survivors through in order" | Order preserved after filtering |
+
 ## 5. Pass criteria
 
-All 223 cases pass. Any failure is a functional defect, not an environment issue —
+All 232 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

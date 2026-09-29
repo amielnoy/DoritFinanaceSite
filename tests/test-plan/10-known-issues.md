@@ -51,6 +51,10 @@ closing it would take.
 | A-39 | **Four merges have been resolved by keeping both sides.** Each produced something that either does not parse or parses as the wrong thing: two `"instructions"` keys in the agent prompt (JSON keeps the last, so the file visibly contained a scheduling step the parser never saw — it would have published the wrong agent); two `const AGENT_ONLY` declarations, which stopped a whole contract file loading; two `sendMail` bodies with a doc comment's opening `/**` stripped, failing esbuild and taking 121 integration cases down at once; and an unbalanced brace in a test file. | Each resolved by hand to the newer side after checking the older contributed nothing. The pattern is a conflict inside a long comment or a helper, resolved by concatenation — worth disabling whatever resolves them automatically, since a green-looking merge here has twice produced code that would have shipped. |
 | A-40 | **Every route served byte-identical HTML to a crawler that does not run JavaScript**, all of it declaring the home page as canonical. Confirmed against live production, not a local build: `/`, `/faq` and `/claims` returned the same MD5. Google renders JavaScript and recovered; GPTBot, ClaudeBot, PerplexityBot and CCBot do not, so to an AI assistant the entire site was one page and `/faq` — 23 questions and answers, the richest content here — did not exist. This was [B-0](#b-0--routes-are-invisible-to-crawlers-that-do-not-run-javascript), the top open SEO item. | `scripts/prerender.mjs` runs the real app in a real browser at build time and writes each public route's rendered DOM to `dist/<route>.html`. Nothing declares what a route's title should be — it renders and asks — so there is no second copy to drift. `e2e/seo/prerender.spec.ts` asserts on the **served HTML** with `request`, never `page`: nothing there may pass because a browser repaired it afterwards. |
 | A-41 | **The prerender step was wired into the build that CI does not run.** `playwright.config.ts` builds before serving, so the local suite passed; CI's e2e shards run `SKIP_BUILD=1` against the `dist` artifact the `build` job uploads, and that job was still running plain `npm run build`. The first CI run failed on seven of eight routes — the suite was right and the artifact was a step behind. Separately, `vercel.json` called `build:prerender` on a build image with no browser, so Vercel would have hit the graceful skip and shipped the client-rendered bundle without saying anything worth noticing. | The `build` job installs Chromium and runs `build:prerender`; `vercel.json` installs it in its `buildCommand`. The graceful skip stays for hosts that genuinely cannot prerender, but `PRERENDER_REQUIRED=1` in the `build` job turns it into an error in the job that could have installed the browser, instead of nine opaque failures three jobs later. The Base44-builder guard step deliberately stays on plain `npm run build`. |
+| A-42 | **Every chat on the site answered every visitor with a generic error, for ten days.** `POST /api/apps/<id>/agents/conversations` returned `401 User must be authenticated to create a conversation`, because `allow_anonymous_access` was `false` on all three agents. Nobody set it: the field did not exist in `base44/agents/*.jsonc` until `7bce20c` "Update base44 packages", a `base44-builder[bot]` regeneration that wrote the server default into all three at once. `AgentChat.tsx` reports every failure as one line — “לא הצלחתי לשלוח את ההודעה כרגע” — which is also what a network blip says, so a total outage was indistinguishable from a bad moment. Found by reproducing the call against live production. | `allow_anonymous_access: true` in all three agents, pinned by “is reachable by a signed-out visitor” in `agents.contract.test.ts` so the next regeneration fails CI instead of the site. |
+| A-43 | **Every prerendered page shipped a `<script>` for a file that does not exist on the production host.** `<Analytics />` from `@vercel/analytics` appends `/_vercel/insights/script.js` on mount, and `scripts/prerender.mjs` captures the live DOM — so the runtime-injected tag was serialised into all eight route files. Nothing under `/_vercel/` is a build artifact; the path is synthesised by Vercel's edge, and production is Base44, where it falls through to the SPA shell and the browser refuses to execute an HTML document as a script. Found by `API-HTP` “every same-origin file referenced by index.html actually exists”. | `dropVercelBeacon` in `scripts/prerender.mjs`, alongside `restoreAsyncFont`, which undoes the same class of capture artefact. The client bundle still injects the tag at runtime, so nothing is lost on Vercel. |
+| A-44 | **The chat's failure handling made a bad moment and a dead backend look identical, and lost the visitor's words either way.** Three defects in one path, found reviewing A-42. `Base44AgentService.send` incremented the turn counter *before* the awaits, so a failed send spent a turn: during the outage, a visitor who retried enough times was told “השיחה הגיעה לאורכה המרבי” — a second, differently wrong diagnosis, and the one message that stops someone trying again. `AgentChat.send` cleared the input before the await and never restored it, and the visitor's own message reaches the transcript only by way of the server echoing it, so on failure it was nowhere at all. And the handoff notice was rendered only inside the pre-consent branch while `say()`-ing itself into `messages`, which every server push replaces wholesale — so post-consent, the common case, the promise that “a person who asked for a person gets one even when the backend is down” did not hold. | Counter moved past the awaits; `setInput(text)` in the catch; the notice rendered once, from panel state, outside both branches, and no longer duplicated into the transcript. Covered by `UNIT-AGT-001..004`, `E2E-AGT-009..010` and two structural cases in `agents.contract.test.ts`. |
+| A-45 | **The adapter showed the visitor whatever the runtime sent, including what it had marked hidden.** `ports.ts` declared `role: "user" | "assistant"` and `content: string`; the SDK declares `role: "user" | "assistant" | "system"`, `content?: string | Record<string, any>` and `hidden?: boolean`, and `subscribe` passed `data.messages` through unfiltered. So a `system` message rendered in an assistant bubble as though the agent had said it; an object `content` reached `<ReactMarkdown>` as a React child, which throws, and with no error boundary anywhere in `src/` that is a white page; and a message the platform marked hidden was displayed — on a chat whose tool payloads carry a visitor's name, phone and life circumstances. | `visibleMessages` in `Base44AgentService`, and the client interface narrowed to what the SDK actually promises, including the `undefined` from `getConversation` that used to be handed straight to `addMessage`. Covered by `UNIT-AGT-004..009`. |
 
 ## B. Open findings — decisions for the owner
 
@@ -307,3 +311,35 @@ invoices and client mail through Microsoft 365.
 | Third-party requests (GA, Google Fonts, `media.base44.com`) intercepted | Hermetic, offline-capable, deterministic runs |
 | `framer-motion` stubbed in component tests | jsdom has no layout engine; the animation library is not the system under test |
 | e2e runs against `vite preview`, not `vite dev` | The production bundle is what ships; this also proves the build boots |
+
+### B-11 · Nothing rate-limits the agent endpoints, and the pointer to the discussion goes nowhere
+
+`Base44AgentService` caps message length and turns per conversation, and its own
+comment concedes these are "not a substitute for server-side rate limiting — see
+docs". There are no such docs: `rate limit`, `rate-limit` and `rateLimit` have
+no hits anywhere in the repo outside that comment, so the trade-off has never
+been recorded, let alone accepted. That is what makes this a finding rather than
+a documented decision.
+
+The caps are also weaker than they read. `private turns = new Map()` is
+module-instance memory in one browser tab: a reload resets it, and a request
+made outside the browser never sees it at all.
+
+What this does **not** change is reachability. `submitLead` and
+`createConsultationEvent` were already invoked anonymously from the browser by
+`Base44LeadService` and `QuickContact`, `Lead`'s RLS already allows `create`,
+and `API-LIV-004` asserts the consultation function answers anonymous callers by
+design. Re-opening the agents (A-42) added no endpoint that `curl` could not
+already reach; the agent is a slower, more expensive path to the same writes.
+
+What *is* newly live is anonymous model inference on a public endpoint, and the
+6-hour interview dedup is keyed on the phone number, so varying it defeats the
+one limit that exists. The exposure worth pricing is `createConsultationEvent`,
+which writes to a real person's calendar.
+
+Closing it: a `RateLimit` row keyed on a hashed IP and hour, checked in
+`submitLead` and `createConsultationEvent` — roughly twenty lines per function,
+hand-duplicated per the convention in `AGENTS.md` and pinned by
+`agents.contract.test.ts` like every other duplicated helper. If only one gets a
+limit, it is the calendar one. Until then this entry is the record that the
+exposure is known.

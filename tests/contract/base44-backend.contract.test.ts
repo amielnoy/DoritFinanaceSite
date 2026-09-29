@@ -113,3 +113,35 @@ describe("a test run cannot leave behind a bundle that preview will serve", () =
     expect(sh).toMatch(/rm -rf dist/);
   });
 });
+describe("the analytics beacon is mounted only where its endpoint exists", () => {
+  /**
+   * `<Analytics />` posts to `/_vercel/insights/*` — a path Vercel's edge
+   * synthesises and no other host serves. Production is Base44, so for as long
+   * as it stays there the component mounted, found nothing, and spent a failed
+   * request on every page load to report data nobody could read. The
+   * prerenderer made it worse by capturing the injected <script> into all eight
+   * route files, where it resolved to the SPA shell and the browser refused to
+   * execute an HTML document as a script (A-43).
+   *
+   * The flag is derived from `VERCEL`, which Vercel sets itself, rather than
+   * from a `VITE_` variable set per environment. That is the whole point: a
+   * hand-set flag fails by being left on in a Base44 build, which is the state
+   * this replaces, and a clone would have to know to set it at all.
+   */
+  const read = (path: string) => readFileSync(join(REPO_ROOT, path), "utf8");
+
+  it("derives the flag from Vercel's own environment, not a variable someone sets", () => {
+    const config = read("vite.config.js");
+    expect(config).toMatch(
+      /'import\.meta\.env\.VITE_VERCEL_ANALYTICS':\s*JSON\.stringify\(process\.env\.VERCEL === '1'\)/,
+    );
+  });
+
+  it("mounts the component behind that flag rather than unconditionally", () => {
+    const app = read("src/App.jsx");
+    expect(app, "<Analytics /> is still mounted unconditionally").not.toMatch(
+      /^\s*<Analytics \/>/m,
+    );
+    expect(app).toMatch(/import\.meta\.env\.VITE_VERCEL_ANALYTICS \? <Analytics \/> : null/);
+  });
+});

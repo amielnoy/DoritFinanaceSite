@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 387
+**Location:** `tests/contract/` · **Cases:** 405
 
 ---
 
@@ -105,6 +105,22 @@ absent from these files until a Builder "Update base44 packages" commit wrote
 out the full agent schema and stamped the server default, `false`, into all
 three at once, taking every chat on the site down silently. It is pinned here
 because the next regeneration will try the same thing.
+
+A second block, "the configuration nobody typed by hand", pins the *whole*
+non-prompt surface of each agent with `toEqual` against a hand-written literal:
+every key, the tool list, the memory settings, the model. That commit added
+eighteen previously-absent keys in one go and two of them carried behaviour;
+pinning one flag leaves seventeen. The assertion is deliberately not a snapshot
+— `vitest -u` rewrites a snapshot mechanically with nobody reading the delta,
+which reproduces the failure this exists to prevent, one layer up. A literal can
+only be made green by a person opening the file and typing the new value.
+
+Two further cases in the same file cover what the chat shell must keep doing
+when the backend does not: the route to a person is rendered from state the
+panel owns, in one place, outside both branches of the consent gate — the
+transcript is replaced wholesale by every server push, so a phone number written
+into it survives only until the next one — and a failed send hands the visitor
+back what they typed.
 
 It then pins the four places the escalation vocabulary is written down —
 `Lead.escalation_reason`, each prompt, `src/config/compliance.ts` and the
@@ -283,7 +299,11 @@ the environment supplies none, never overriding it; a checkout with no
 `base44/.app.jsonc` stays silent, which is what keeps CI's "build the way the
 Builder does" guard meaningful; and the `/api` preview proxy stays opt-in,
 because `npm run test:e2e` serves the site from that same preview server and is
-hermetic only while every `/api` call is stubbed. Two further cases close the
+hermetic only while every `/api` call is stubbed. Two more cover the analytics
+beacon: `<Analytics />` must be mounted behind a flag `vite.config.js` derives
+from Vercel's own `VERCEL`, not from a variable set per environment — a hand-set
+flag fails by being left on in a Base44 build, which is the state it replaces
+(A-43). Two further cases close the
 other end of that arrangement: the e2e build seals `e2e-sanity-app` into `dist/`,
 and `dist/` is what `vite preview` serves, so `npm run preview` must rebuild
 before serving and `scripts/run-tests.sh` must discard the bundle it built. A
@@ -302,7 +322,7 @@ time.
 
 ## 6. Pass criteria
 
-All 387 cases pass. A failure means either the frontend or the backend definition
+All 405 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

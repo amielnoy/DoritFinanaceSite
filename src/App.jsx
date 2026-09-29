@@ -95,7 +95,14 @@ function App() {
         <Router>
           <ScrollToTop />
           <SeoRouteGuard />
-          <Analytics />
+          {/* Mounted only where its endpoint exists. The beacon posts to
+              `/_vercel/insights/*`, a path Vercel's edge synthesises and no
+              other host serves — so on Base44, which is still production, the
+              component mounted, found nothing, and cost a failed request on
+              every page load while reporting no data at all. The flag is
+              derived from `VERCEL` in `vite.config.js`, so there is nothing to
+              set per environment and nothing to forget. */}
+          {import.meta.env.VITE_VERCEL_ANALYTICS ? <Analytics /> : null}
           <AuthenticatedApp />
         </Router>
         <Toaster />

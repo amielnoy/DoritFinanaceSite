@@ -872,16 +872,37 @@ Support: [https://app.base44.com/support](https://app.base44.com/support)
 which imports `next/navigation` and has nothing to bind to in a Vite SPA.
 
 It reports only from a Vercel deployment. The beacon it posts to lives at
-`/_vercel/insights/*`, which the platform answers and nothing else does — so on
-the Base44 production host the component mounts, finds no endpoint, and costs a
-request that 404s. That is worth knowing while production is still on Base44:
-until the [domain move](#moving-production-to-the-custom-domain) puts the
-client-facing site on Vercel, these numbers describe **staging traffic**, which
-is mostly CI and the two of us.
+`/_vercel/insights/*`, a path the platform synthesises and no other host serves,
+so the component is mounted only on a Vercel build:
 
-Nothing is configured per-environment and there is no key to set. Vercel
-Analytics has to be enabled once for the project in the dashboard; without it
-the beacon is simply unanswered.
+```jsx
+{import.meta.env.VITE_VERCEL_ANALYTICS ? <Analytics /> : null}
+```
+
+That flag is inlined by `vite.config.js` from `VERCEL`, which Vercel sets in
+every build on its own infrastructure — **not** from a variable set per
+environment. A hand-set flag fails by being left on in a Base44 build, which is
+the state this replaces, and a clone would have to know to set it at all. Here
+the default is off and nothing has to be configured anywhere: a clone, `base44
+dev`, `vite preview` and the Base44 production build all read `false`. Because
+the value is a literal, the branch is dead code off Vercel and
+`@vercel/analytics` drops out of the bundle entirely.
+
+Before that gate existed, Base44 production mounted the component, found no
+endpoint, and spent a failed request on every page load reporting data nobody
+could read — and the prerenderer captured the injected `<script>` into all
+eight route files, where it resolved to the SPA shell and the browser refused
+to execute an HTML document as a script (A-42/A-43 in
+`tests/test-plan/10-known-issues.md`). Both halves are now pinned: the mount by
+`base44-backend.contract.test.ts`, the capture by `dropVercelBeacon` in
+`scripts/prerender.mjs`. Both are needed — the Vercel build is the one case
+where the component *does* mount and the prerenderer *does* run.
+
+While production is still on Base44 there is nothing to read anyway: until the
+[domain move](#moving-production-to-the-custom-domain) puts the client-facing
+site on Vercel, these numbers describe **staging traffic**, which is mostly CI
+and the two of us. Vercel Analytics also has to be enabled once for the project
+in the dashboard; without it the beacon is unanswered even on Vercel.
 
 ## Dorit's notifications through Resend
 

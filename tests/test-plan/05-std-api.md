@@ -1,7 +1,7 @@
 # STD-05 — API Tests
 
 **Suite:** `api` · **Runner:** `npm run test:e2e:api` (Playwright)
-**Location:** `e2e/api/` · **Cases:** 11 HTTP-surface + 6 observed-traffic + 4 opt-in live
+**Location:** `e2e/api/` · **Cases:** 11 HTTP-surface + 6 observed-traffic + 7 opt-in live
 
 ---
 
@@ -70,6 +70,19 @@ CI never touches production data.
 | API-LIV-002 | "published blog posts are readable without authentication" | 200, array |
 | API-LIV-003 | "leads are NOT readable without an admin session (RLS)" | 401 or 403 |
 | API-LIV-004 | "the consultation function rejects a body without name/phone" | 400 with an `error` key |
+| API-LIV-005 | "blog_recommender opens a conversation for a signed-out visitor" | 200 with an `id` |
+| API-LIV-006 | "needs_interview opens a conversation for a signed-out visitor" | 200 with an `id` |
+| API-LIV-007 | "support_agent opens a conversation for a signed-out visitor" | 200 with an `id` |
+
+`API-LIV-005..007` are the only checks in the battery that would have caught
+A-42. The static contract tests read the repo, and the repo was correct; what
+was wrong was the value in the running backend. The hermetic e2e suite stubs
+`**/api/**` by design, and the production smoke job reuses those same specs, so
+it verified the *bundle* was published and nothing about whether anything
+behind it answered. CI now sets `E2E_LIVE_API_URL`/`E2E_LIVE_APP_ID` on the
+smoke job, which turns this whole block on against production. Cost: three
+empty conversations per publish — `createConversation` invokes no model and
+stores no message.
 
 ## 6. Pass criteria
 

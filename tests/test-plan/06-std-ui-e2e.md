@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 66 in `e2e/ui`, of 173 across the whole e2e suite, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 68 in `e2e/ui`, of 178 across the whole e2e suite, run on all four platforms
 
 ---
 
@@ -123,7 +123,7 @@ because the backend still accepts leads recorded under them.
 ### 3.8 Agent chat — regulatory shell — `agent-compliance.spec.ts`
 
 The chat widgets are driven by prompts, and a prompt is a request to a model.
-These eight cases cover only what the shell enforces regardless of what the
+These ten cases cover only what the shell enforces regardless of what the
 model does — the part that is a gate rather than an instruction.
 
 | ID | Title | Expected result |
@@ -137,7 +137,18 @@ model does — the part that is a gate rather than an instruction.
 | E2E-AGT-007 | "the notice describes this chat and not the interview" | The support notice states the conversation itself is kept and why; the interview's "נאספים שם וטלפון בלבד" is **absent**; the licence and affiliation still present |
 | E2E-AGT-008 | "the route to a person is here too" | The handoff button on `/faq` POSTs to `escalateToHuman` |
 
-The last two exist because the failure they catch is invisible. A chat that kept
+| E2E-AGT-009 | "a refused conversation gives the visitor their message back" | With `/agents/` stubbed 401 — the exact production failure — the chat reports it, and the typed text is still in the box |
+| E2E-AGT-010 | "the direct channels appear even when the escalation itself fails" | With `escalateToHuman` stubbed 500, the phone and WhatsApp links still render |
+
+E2E-AGT-009 and E2E-AGT-010 are the first cases anywhere to exercise a failing
+`/agents/` call. The `catch` in `AgentChat.send()` had never once executed under
+test — which is how a total backend outage came to be reported in the same words
+as a bad moment on the train (A-42), and how a failed send came to erase what
+the visitor had written: their own message reaches the transcript only by way of
+the server echoing it back, so on failure it was nowhere at all.
+
+E2E-AGT-006 and E2E-AGT-007 exist because the failure they catch is
+invisible. A chat that kept
 its transcript while showing the interview's notice would look entirely correct
 — it is a real consent notice, precisely describing a different chat — and
 consent to processing that does not happen is not consent to the processing that
