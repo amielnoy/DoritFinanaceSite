@@ -890,17 +890,45 @@ function buildAgentHtml(source, data, ops) {
 /**
  * מה שמשתנה בין ההודעות של submitLead — התוכן בלבד. התבנית עצמה משותפת.
  */
+/**
+ * הקישור לייפוי הכוח של המסלקה הפנסיונית, אם הוגדר.
+ *
+ * מבקר שאמר שהוא מעוניין בשליפת נתוני מסלקה צריך לחתום על ייפוי כוח — זה מה
+ * שמקדם את השליפה, ולא מספר זהות שהוקלד בצ׳אט. עד כה המייל אמר לו שדורית
+ * תשלח אותו, כלומר משימה ידנית שתלויה בכך שמישהו ייזכר, בין מבקר שהתלהב
+ * לבין מסמך שמגיע יומיים אחר כך.
+ *
+ * מוגדר בסביבה ולא כאן, ומושמט כשאינו מוגדר: פריסה בלי מסמך חוזרת בדיוק
+ * לנוסח הקודם במקום להבטיח קישור שאינו קיים. זה ההבדל בין תכונה שמושבתת לבין
+ * מייל שמפנה לשום מקום.
+ */
+const POA_URL = (Deno.env.get('POA_URL') || '').trim();
+
 function clientMailFor(source, data) {
   const firstName = (data.name || '').split(' ')[0];
   if (source === 'interview') {
+    // רק למי שאמר שהוא מעוניין. 'לא' או שדה חסר — אין אזכור, ואין מסמך שנשלח
+    // למי שלא ביקש אותו.
+    //
+    // `data.profile` כבר אינו האובייקט הגולמי אלא מערך זוגות [תווית, ערך]
+    // שעבר redact, ולכן הבדיקה היא על התווית. buildInterviewProfile משמיט שדה
+    // ריק, כך שעצם קיומה של השורה אומר שנשאל ונענה.
+    const clearinghouseRow = (Array.isArray(data?.profile) ? data.profile : [])
+      .find(([label]) => String(label).includes('מסלקה'));
+    const wantsClearinghouse = Boolean(clearinghouseRow) &&
+      String(clearinghouseRow[1]).startsWith('מעוניין');
+    const poaOffered = wantsClearinghouse && POA_URL;
     return {
       firstName,
       eyebrow: 'אישור קבלה',
       heading: 'קיבלנו את סיכום השיחה',
-      intro:
-        'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה.',
+      intro: poaOffered
+        ? 'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה. ביקשתם שאשלוף עבורכם תמונת מצב פנסיונית מהמסלקה — לשם כך נדרש ייפוי כוח חתום, והוא מצורף כאן למטה. אפשר לחתום עליו לפני הפגישה, וכך נגיע אליה עם התמונה המלאה.'
+        : 'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה.',
       panelTitle: 'מה נשמר',
-      details: [['נושא מרכזי', data.topic || 'הקשר כללי']],
+      details: poaOffered
+        ? [['נושא מרכזי', data.topic || 'הקשר כללי'], ['ייפוי כוח למסלקה', POA_URL]]
+        : [['נושא מרכזי', data.topic || 'הקשר כללי']],
     };
   }
   const isConsultation = source === 'consultation';
@@ -1021,9 +1049,18 @@ function buildClientText(source, data) {
   const firstName = (data.name || '').split(' ')[0];
   const when = data.timing || 'לפי תיאום';
   if (source === 'interview') {
+    // התאום של גרסת ה-HTML. שתי המחציות של אותו מייל חייבות לומר אותו דבר —
+    // לקוח שאינו מציג HTML מקבל את הטקסט, ואם רק אחת מהן מזכירה את ייפוי הכוח
+    // הוא קיים או לא קיים לפי היכולת של תוכנת הדואר שלו.
+    const chRow = (Array.isArray(data?.profile) ? data.profile : [])
+      .find(([label]) => String(label).includes('מסלקה'));
+    const wantsClearinghouse = Boolean(chRow) && String(chRow[1]).startsWith('מעוניין');
     return [
       `שלום ${firstName}, תודה על השיחה. הסיכום שאישרתם הועבר אליי כפי שהוא.`,
       `נושא מרכזי: ${data.topic || 'הקשר כללי'}`,
+      ...(wantsClearinghouse && POA_URL
+        ? [`ייפוי כוח לשליפת נתוני מסלקה — לחתימה לפני הפגישה: ${POA_URL}`]
+        : []),
       `אחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה.`,
       `לכל שאלה — ניתן להשיב ישירות למייל זה.`,
       `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,
