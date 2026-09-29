@@ -97,6 +97,20 @@ function israelInstant(wall) {
 // כמה תיבות, אותו צוות. הרשימה קיימת כדי שתוספת תיבה תהיה שורה אחת ולא
 // שכפול של הקריאה — וכדי שכשל במסירה לתיבה אחת לא ימנע את השאר.
 /**
+ * מי מוזמן לפגישה, בנוסף לבעל היומן.
+ *
+ * האירוע נוצר ביומן של מי שאישר את המחבר — דורית — ולכן היא המארגנת ואינה
+ * מוזמנת. אלה תיבות הצוות שמתפעל את האתר מטעמה: הן כבר מקבלות את הפנייה
+ * במייל, וההזמנה שמה את אותה פגישה גם ביומן שלהן, במקום שבו מסתכלים עליה.
+ *
+ * חייבת להיות זהה ל-NOTIFY_EMAILS שבפונקציות ששולחות דואר — אותו צוות, אותו
+ * גילוי. tests/contract/agents.contract.test.ts נכשל כשהרשימות מתפצלות, וזו
+ * בדיוק התקלה שאי-אפשר לראות: תיבה שנוספה לאחת ולא לשנייה אינה מרימה שגיאה
+ * בשום מקום — היא פשוט מקבלת פחות.
+ */
+const CALENDAR_ATTENDEES = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
+
+/**
  * שני היומנים, ומה שונה ביניהם.
  *
  * היומן של דורית הוא Outlook — הדומיין `govari-fin.co.il` מפנה ל-Microsoft 365,
@@ -113,6 +127,9 @@ function israelInstant(wall) {
  *   - **תזכורות.** ל-Google אפשר למסור כמה, ולכן יש בו גם תזכורת מייל 12 שעות
  *     לפני. ל-Graph יש שדה אחד בלבד, `reminderMinutesBeforeStart`, ולכן שם
  *     נשארת רק תזכורת השעה. זה הבדל אמיתי בין שני היומנים ולא השמטה.
+ *   - **שליחת הזמנה.** Graph שולח הזמנה למשתתפים מעצמו. Google לא שולח דבר
+ *     אלא אם מבקשים `sendUpdates=all` בכתובת — בלי זה המשתתף נוסף לאירוע,
+ *     ההזמנה לא יוצאת, והיומן שלו נשאר ריק בלי ששום שגיאה נאמרת.
  */
 const CALENDARS = {
   outlook: {
@@ -123,6 +140,10 @@ const CALENDARS = {
       body: { contentType: 'Text', content: description },
       start: { dateTime: startIso, timeZone: 'Israel Standard Time' },
       end: { dateTime: endIso, timeZone: 'Israel Standard Time' },
+      attendees: CALENDAR_ATTENDEES.map((address) => ({
+        emailAddress: { address },
+        type: 'required',
+      })),
       isReminderOn: true,
       reminderMinutesBeforeStart: 60,
     }),
@@ -130,12 +151,13 @@ const CALENDARS = {
   },
   google: {
     connector: 'googlecalendar',
-    url: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+    url: 'https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all',
     body: ({ summary, description, startIso, endIso }) => ({
       summary,
       description,
       start: { dateTime: startIso, timeZone: 'Asia/Jerusalem' },
       end: { dateTime: endIso, timeZone: 'Asia/Jerusalem' },
+      attendees: CALENDAR_ATTENDEES.map((email) => ({ email })),
       reminders: {
         useDefault: false,
         overrides: [

@@ -468,6 +468,54 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   });
 
   /**
+   * And the diary invites the same team the mail does.
+   *
+   * The operations mailboxes now come to the meeting as attendees, so the
+   * appointment lands in their own calendar rather than only in Dorit's. That
+   * is a second list of the same addresses, and AGENTS.md names this exact
+   * hazard: a mailbox added to one place and not another raises no error
+   * anywhere — it simply receives less. Here it would mean someone on the mail
+   * thread with no entry in their diary, which reads as "no meeting was
+   * booked".
+   *
+   * No new disclosure: these addresses already receive the full enquiry by
+   * mail, and `COMPLIANCE.md` §6 says so.
+   */
+  it("invites exactly the mailboxes that receive the mail", () => {
+    const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
+    const addresses = (src: string, decl: string, name: string) => {
+      const i = src.indexOf(decl);
+      expect(i, `${name} declares no ${decl}`).toBeGreaterThan(-1);
+      return (src.slice(i, src.indexOf("];", i)).match(/"[^"]+@[^"]+"/g) ?? []).sort();
+    };
+    const notified = addresses(submitLead, "const NOTIFY_EMAILS = [", "submitLead");
+    for (const [src, name] of [
+      [submitLead, "submitLead"],
+      [consultation, "createConsultationEvent"],
+    ] as const) {
+      expect(
+        addresses(src, "const CALENDAR_ATTENDEES = [", name),
+        `${name}: the diary invites a different set from the mail`
+      ).toEqual(notified);
+    }
+  });
+
+  it("asks Google to actually send the invitations", () => {
+    // Graph sends them itself. Google adds the attendee and stays silent unless
+    // `sendUpdates=all` is on the URL — so without it the invite never arrives
+    // and the diary the person checks stays empty, with no error anywhere.
+    const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
+    for (const [src, name] of [
+      [submitLead, "submitLead"],
+      [consultation, "createConsultationEvent"],
+    ] as const) {
+      expect(src, `${name} adds attendees to Google without asking it to notify them`).toMatch(
+        /googleapis\.com[^']*sendUpdates=all/
+      );
+    }
+  });
+
+  /**
    * The mirror is the fifth duplicated helper, and its drift is the quietest of
    * the lot. It cannot throw — Base44 is authoritative during the migration and
    * a failed shadow write must never cost a visitor their enquiry — so a copy
