@@ -372,11 +372,14 @@ expectation.
 
 ## 6. Known gaps
 
-- **`createConsultationEvent`** is only observed indirectly, through the
-  `Promise.allSettled` the lead adapter fires at it. It now writes to both
-  Outlook and Google from one provider table, which makes the gap wider than it
-  was: nothing executes the Graph branch, and the Graph branch is the one that
-  reaches Dorit's own diary (A-47).
+- **`createConsultationEvent`** is not executed here. It is no longer on the
+  interview agent either — `submitLead` writes the diary itself, in the request
+  that saved the lead, and *that* path **is** covered: `submit-lead.integration.test.ts`
+  drives the provider loop, asserts the agreed hour reaches the calendar, and
+  asserts that a refusal is reported per calendar rather than as one flat
+  failure. What is left uncovered is the function's own HTTP surface, which now
+  has a live caller only if the adapter's `requestConsultationEvent` is wired
+  up; today nothing calls it.
 
 That one belongs in [10-known-issues.md](10-known-issues.md) until it is covered.
 `submitClaim` was on this list and no longer is — §4.10 executes it.

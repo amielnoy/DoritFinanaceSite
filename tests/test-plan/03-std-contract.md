@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 416
+**Location:** `tests/contract/` · **Cases:** 420
 
 ---
 
@@ -89,7 +89,7 @@ Two helpers do the work:
 | CTR-FN-017 | "one calendar failing does not lose the other" | The loop `continue`s; the 502 is conditioned on `created.length === 0` |
 | CTR-FN-018 | "refuses rather than reporting success when no calendar is configured" | `PROVIDERS.length === 0` → 500 |
 
-`CTR-FN-013..018` exist because the two calendars differ in four small,
+`CTR-FN-013..018` exist because the two calendars differ in five small,
 trap-shaped ways, and every one of them fails *silently* when it is wrong: the
 event is accepted, and it is in the wrong place or at the wrong hour. That is
 not hypothetical — A-47 is exactly it. Two functions held the same
@@ -102,7 +102,7 @@ diary Dorit actually reads.
 Two files here test text rather than shape, and do so on purpose. Both cover
 artefacts that a regulator, not a compiler, is the reader of.
 
-**`agents.contract.test.ts` — `CTR-AGT-001..175`** — the three agent prompts. For each
+**`agents.contract.test.ts` — `CTR-AGT-001..179`** — the three agent prompts. For each
 agent it asserts the eighteen mandatory clauses of the compliance block (bot
 disclosure, licence number `L-00107009`, the marketing-not-advice statement, the
 absolute bans on product recommendation and figures, the privacy-law citation
@@ -351,7 +351,7 @@ time.
 
 ## 6. Pass criteria
 
-All 416 cases pass. A failure means either the frontend or the backend definition
+All 420 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

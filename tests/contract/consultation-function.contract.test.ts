@@ -140,7 +140,7 @@ describe("createConsultationEvent — secrets handling", () => {
 });
 
 /**
- * The two calendars differ in four small, trap-shaped ways, and every one of
+ * The two calendars differ in five small, trap-shaped ways, and every one of
  * them fails silently when it is wrong: the event is accepted, and it is wrong.
  */
 describe("createConsultationEvent — both calendars", () => {
@@ -170,6 +170,6 @@ describe("createConsultationEvent — both calendars", () => {
   });
 
   it("refuses rather than reporting success when no calendar is configured", () => {
-    expect(fnSource).toMatch(/PROVIDERS\.length === 0/);
+    expect(fnSource).toMatch(/CALENDAR_PROVIDERS\.length === 0/);
   });
 });

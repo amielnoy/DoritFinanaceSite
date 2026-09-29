@@ -23,11 +23,24 @@ npx skills add base44/skills
 - `src/api/base44Client.js`: frontend Base44 SDK client.
 - `base44/functions/*/entry.ts`: backend functions. Isolated entry points with no
   shared module, so some helpers are duplicated by hand — `redact`, `escapeHtml`,
-  `buildClientHtml`, `SHEET_COLUMNS`, `NOTIFY_EMAILS`. Duplicated is fine;
-  drifted is not, and `tests/contract/agents.contract.test.ts` fails when copies
-  stop matching. `NOTIFY_EMAILS` is the easiest to get wrong: a mailbox added to
-  one function and not another raises no error anywhere — the mail simply
-  reaches one fewer person, and escalations are where that costs most.
+  `buildClientHtml`, `SHEET_COLUMNS`, `NOTIFY_EMAILS`, `wallClock`, and in the
+  two calendar writers `CALENDARS`, `CALENDAR_PROVIDERS` and
+  `CALENDAR_ATTENDEES`. Duplicated is fine; drifted is not, and
+  `tests/contract/agents.contract.test.ts` fails when copies stop matching.
+  Every one of these drifts silently, and two have already cost something:
+  `NOTIFY_EMAILS` is the easiest to get wrong, because a mailbox added to one
+  function and not another raises no error anywhere — the mail simply reaches
+  one fewer person, and escalations are where that costs most. `wallClock` is
+  the one that did: the copy that kept `new Date(x).toISOString()` filed every
+  agreed meeting three hours late, in the only diary anyone reads.
+- `base44/agents/*.jsonc`: agent definitions — prompts, tools, model, memory,
+  and `allow_anonymous_access`. **A publish does not ship these.**
+  `npx base44 agents push --yes` does, as a full sync that deletes any remote
+  agent absent here. A change under this directory is a two-step release, and
+  forgetting the second step looks exactly like nothing being wrong — see A-42
+  in `tests/test-plan/10-known-issues.md`. The whole non-prompt surface is
+  pinned by `toEqual` against a literal, because a Builder regeneration writes
+  the file wholesale and buries behavioural flags in escaped Hebrew.
 - `dorit-mailer/functions/api/send-email.js`: the Cloudflare Pages Function every
   outbound message goes through. The Resend key, the sender and the recipient
   list live in the Pages project's environment, not here — that is why the

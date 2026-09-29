@@ -96,6 +96,92 @@ function israelInstant(wall) {
 // לשני הכיוונים: מי שיצמצם כאן את השליחה חייב להחזיר גם את הנוסח.
 // כמה תיבות, אותו צוות. הרשימה קיימת כדי שתוספת תיבה תהיה שורה אחת ולא
 // שכפול של הקריאה — וכדי שכשל במסירה לתיבה אחת לא ימנע את השאר.
+/**
+ * מי מוזמן לפגישה, בנוסף לבעל היומן.
+ *
+ * האירוע נוצר ביומן של מי שאישר את המחבר — דורית — ולכן היא המארגנת ואינה
+ * מוזמנת. אלה תיבות הצוות שמתפעל את האתר מטעמה: הן כבר מקבלות את הפנייה
+ * במייל, וההזמנה שמה את אותה פגישה גם ביומן שלהן, במקום שבו מסתכלים עליה.
+ *
+ * חייבת להיות זהה ל-NOTIFY_EMAILS שבפונקציות ששולחות דואר — אותו צוות, אותו
+ * גילוי. tests/contract/agents.contract.test.ts נכשל כשהרשימות מתפצלות, וזו
+ * בדיוק התקלה שאי-אפשר לראות: תיבה שנוספה לאחת ולא לשנייה אינה מרימה שגיאה
+ * בשום מקום — היא פשוט מקבלת פחות.
+ */
+const CALENDAR_ATTENDEES = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
+
+/**
+ * שני היומנים, ומה שונה ביניהם.
+ *
+ * היומן של דורית הוא Outlook — הדומיין `govari-fin.co.il` מפנה ל-Microsoft 365,
+ * וזה מה שפתוח מולה ביום העבודה. לכן `outlook` ראשון ברשימה, וכשרק אחד ייכתב
+ * הוא זה. Google נשאר נתמך במלואו: הוא היה היעד היחיד עד כה, ופנייה שכבר יש לה
+ * אירוע שם היא לא פנייה שכדאי להזיז בשקט.
+ *
+ * ההבדלים בין השניים קטנים ומלכודתיים, ולכן הם יושבים כאן ולא פזורים בקוד:
+ *
+ *   - **שם אזור הזמן.** Graph מצפה לשם של Windows (`Israel Standard Time`),
+ *     Google לשם IANA (`Asia/Jerusalem`). כל אחד מהם שקט כשמקבלים את האחר.
+ *   - **שמות השדות.** `subject`/`body` מול `summary`/`description`.
+ *   - **קישור לאירוע.** `webLink` מול `htmlLink`.
+ *   - **תזכורות.** ל-Google אפשר למסור כמה, ולכן יש בו גם תזכורת מייל 12 שעות
+ *     לפני. ל-Graph יש שדה אחד בלבד, `reminderMinutesBeforeStart`, ולכן שם
+ *     נשארת רק תזכורת השעה. זה הבדל אמיתי בין שני היומנים ולא השמטה.
+ *   - **שליחת הזמנה.** Graph שולח הזמנה למשתתפים מעצמו. Google לא שולח דבר
+ *     אלא אם מבקשים `sendUpdates=all` בכתובת — בלי זה המשתתף נוסף לאירוע,
+ *     ההזמנה לא יוצאת, והיומן שלו נשאר ריק בלי ששום שגיאה נאמרת.
+ */
+const CALENDARS = {
+  outlook: {
+    connector: 'outlook',
+    url: 'https://graph.microsoft.com/v1.0/me/events',
+    body: ({ summary, description, startIso, endIso }) => ({
+      subject: summary,
+      body: { contentType: 'Text', content: description },
+      start: { dateTime: startIso, timeZone: 'Israel Standard Time' },
+      end: { dateTime: endIso, timeZone: 'Israel Standard Time' },
+      attendees: CALENDAR_ATTENDEES.map((address) => ({
+        emailAddress: { address },
+        type: 'required',
+      })),
+      isReminderOn: true,
+      reminderMinutesBeforeStart: 60,
+    }),
+    link: (data) => data.webLink,
+  },
+  google: {
+    connector: 'googlecalendar',
+    url: 'https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all',
+    body: ({ summary, description, startIso, endIso }) => ({
+      summary,
+      description,
+      start: { dateTime: startIso, timeZone: 'Asia/Jerusalem' },
+      end: { dateTime: endIso, timeZone: 'Asia/Jerusalem' },
+      attendees: CALENDAR_ATTENDEES.map((email) => ({ email })),
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'popup', minutes: 60 },
+          { method: 'email', minutes: 720 },
+        ],
+      },
+    }),
+    link: (data) => data.htmlLink,
+  },
+};
+
+/**
+ * לאילו יומנים נכתב — ברירת המחדל היא שניהם.
+ *
+ * משוכפלת בכל פונקציה שכותבת ליומן בכוונה — אין מודול משותף ב-Base44.
+ * משוכפל זה בסדר, מפוצל זה לא, ו-agents.contract.test.ts נכשל כששני העותקים
+ * מתפצלים.
+ */
+const CALENDAR_PROVIDERS = (Deno.env.get('CALENDAR_PROVIDERS') || 'outlook,google')
+  .split(',')
+  .map((p) => p.trim().toLowerCase())
+  .filter((p) => p in CALENDARS);
+
 const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
 
 // מי מהם אפשר להגיע אליו דרך Core של Base44.
@@ -1162,36 +1248,58 @@ export default async function(req) {
     // The slot the hold was actually placed on, which is not always the slot
     // that was agreed — it falls back to tomorrow 09:00 when nothing was.
     let calendarStartedAt = null;
-    if (booksCalendar) try {
-      const { accessToken } = await base44.asServiceRole.connectors.getConnection('outlook');
-      if (accessToken) {
-        const calStartIso = wallClock(scheduledAt) ?? `${tomorrowInIsrael()}T09:00:00`;
-        const calEndIso = wallClock(calStartIso, 30);
-        calendarStartedAt = calStartIso;
+    // כל היומנים המוגדרים, ולא רק Graph.
+    //
+    // זה היה כתוב פעם אחת מול Outlook, ופונקציה שנייה כתבה את אותה פגישה
+    // ל-Google — שתי עותקות של אותו קוד, ואחת מהן קיבלה את תיקון אזור הזמן
+    // והשנייה לא (A-47). עכשיו הכתיבה אחת, וטבלת הספקים מחזיקה את מה שבאמת
+    // שונה ביניהם. חשוב מזה: היא רצה כאן, בשרת, בתוך אותה בקשה ששמרה את
+    // הפנייה — ולא כקריאת כלי שנייה שהמודל עשוי לבחור שלא לעשות.
+    if (booksCalendar) {
+      const calStartIso = wallClock(scheduledAt) ?? `${tomorrowInIsrael()}T09:00:00`;
+      const calEndIso = wallClock(calStartIso, 30);
+      calendarStartedAt = calStartIso;
+      const calContent = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
+      const event = { summary: subject, description: calContent, startIso: calStartIso, endIso: calEndIso };
+      const booked = [];
 
-        const calSubject = subject;
-        const calContent = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
-
-        await fetch('https://graph.microsoft.com/v1.0/me/events', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            subject: calSubject,
-            body: { contentType: 'Text', content: calContent },
-            start: { dateTime: calStartIso, timeZone: 'Israel Standard Time' },
-            end: { dateTime: calEndIso, timeZone: 'Israel Standard Time' },
-            isReminderOn: true,
-            reminderMinutesBeforeStart: 60,
-          }),
-        });
-        calendar = `אירוע נוצר ✓ — ${calStartIso.slice(0, 16).replace('T', ' ')}`;
+      for (const provider of CALENDAR_PROVIDERS) {
+        const cal = CALENDARS[provider];
+        try {
+          const { accessToken } = await base44.asServiceRole.connectors.getConnection(cal.connector);
+          if (!accessToken) {
+            // מחובר-למחצה זה מצב אמיתי: המחבר מוגדר במאגר, ואיש לא אישר אותו
+            // מול הספק. זו אזהרה ולא שגיאה — היומן השני עדיין יקבל את הפגישה.
+            log('warn', 'calendar.not_connected', { rid, provider });
+            warnings.push(`calendar_${provider}_not_connected`);
+            continue;
+          }
+          const res = await fetch(cal.url, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(cal.body(event)),
+          });
+          if (!res.ok) {
+            log('error', 'calendar.rejected', { rid, provider, status: res.status });
+            warnings.push(`calendar_${provider}_rejected`);
+            continue;
+          }
+          log('info', 'calendar.created', { rid, provider });
+          booked.push(provider);
+        } catch (e) {
+          log('warn', 'calendar.failed', { rid, provider });
+          warnings.push(`calendar_${provider}_failed`);
+        }
       }
-    } catch (e) {
-      log('warn', 'calendar.failed', { rid });
-      warnings.push('calendar_event_failed');
+
+      // השורה שדורית קוראת במייל. "נוצר" בלי לומר איפה היה מסתיר בדיוק את
+      // המקרה שבו יומן אחד קיבל את הפגישה והשני לא.
+      calendar = booked.length
+        ? `אירוע נוצר ✓ (${booked.join(', ')}) — ${calStartIso.slice(0, 16).replace('T', ' ')}`
+        : 'לא נוצר';
     }
 
     // The outcome, written back onto the booking. `scheduled_at` is what was
