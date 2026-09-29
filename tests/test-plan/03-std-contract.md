@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 421
+**Location:** `tests/contract/` · **Cases:** 422
 
 ---
 
@@ -351,7 +351,7 @@ time.
 
 ## 6. Pass criteria
 
-All 421 cases pass. A failure means either the frontend or the backend definition
+All 422 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight
