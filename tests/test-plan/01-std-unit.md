@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 232 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 230 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -253,5 +253,5 @@ failing `/agents/` call.
 
 ## 5. Pass criteria
 
-All 232 cases pass. Any failure is a functional defect, not an environment issue —
+All 230 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

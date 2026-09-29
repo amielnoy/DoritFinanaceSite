@@ -106,30 +106,52 @@ describe("dependency inversion holds", () => {
   );
 
   /**
-   * Auth screens still talk to the SDK directly — the remaining known boundary.
+   * No carve-out is left. There used to be one.
    *
-   * The admin screens used to be on this list too. They came off it when the ports
-   * grew an owner-only surface (`leadsAdmin`, `contentAdmin`), which is what lets them
-   * be tested against a fake instead of a mocked vendor module.
+   * The admin screens came off it when the ports grew an owner-only surface
+   * (`leadsAdmin`, `contentAdmin`), which is what lets them be tested against a fake
+   * instead of a mocked vendor module. Auth was the last entry, and it came off when
+   * `AuthPort` grew `signInWithPassword` and `signInWithGoogle` — `Login.tsx` has gone
+   * through `@/services` ever since.
    *
-   * What is left is auth, and it is all of what is left: identity is the one thing the
-   * application still takes from Base44 rather than from an interface of its own. These
-   * four cannot come off until that question is answered, so a name added back to this
-   * list should be an auth screen or a mistake.
+   * The list outlived that, naming `Login.tsx`, which no longer imports the SDK, and
+   * three `.tsx` files that do not exist. A list of paths rather than of files is a
+   * permission waiting for someone to create the path, and that is nearly what
+   * happened: A-46 arrived as `src/pages/Register.jsx`, one letter away from being
+   * waved through. Empty is the honest state, so the constant is gone rather than
+   * emptied — the next exception should be argued for, not inherited.
    */
-  const ALLOWED_DIRECT_SDK = [
-    "src/pages/Login.tsx",
-    "src/pages/Register.tsx",
-    "src/pages/ForgotPassword.tsx",
-    "src/pages/ResetPassword.tsx",
-  ];
-
   it("no public-facing component imports the Base44 SDK directly", () => {
     const offenders = uiFiles
       .filter((f) => /from ["']@\/api\/base44Client["']/.test(read(f)))
-      .map(rel)
-      .filter((f) => !ALLOWED_DIRECT_SDK.includes(f));
+      .map(rel);
     expect(offenders, "these should depend on @/services instead").toEqual([]);
+  });
+
+  /**
+   * And no `.jsx` may shadow a `.tsx` of the same name.
+   *
+   * This is the mechanism behind A-46, and it is invisible in a diff: Vite resolves
+   * `.jsx` before `.tsx`, so `src/pages/Login.jsx` became the login page and the real
+   * `src/pages/Login.tsx` — TypeScript, routed through `@/services` — stopped being
+   * imported by anything while still sitting there looking authoritative. Nothing
+   * failed. The file that shipped simply changed.
+   *
+   * Caught here only because the shadowing copy also imported the SDK. A boilerplate
+   * page that happened not to would have replaced a real one in silence.
+   */
+  it("no .jsx shadows a .tsx of the same name", () => {
+    const byStem = new Map<string, string[]>();
+    for (const f of sourceFiles()) {
+      const r = rel(f);
+      const m = r.match(/^(.*)\.(jsx|tsx)$/);
+      if (!m) continue;
+      byStem.set(m[1], [...(byStem.get(m[1]) ?? []), r]);
+    }
+    const shadowed = [...byStem.values()].filter((v) => v.length > 1).flat().sort();
+    expect(shadowed, "Vite resolves .jsx first, so the .tsx here is dead code").toEqual(
+      []
+    );
   });
 
   it("only the composition root names a concrete implementation", () => {
