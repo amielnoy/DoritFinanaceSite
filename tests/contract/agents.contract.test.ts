@@ -449,6 +449,53 @@ describe("who receives a lead, and whether the consent text admits it", () => {
    * not to `escalateToHuman` produces no error anywhere — enquiries arrive, and
    * escalations, the messages that matter most, quietly reach one fewer person.
    */
+  /**
+   * The eighth duplicated helper, and the one that exists because of a silence.
+   *
+   * `dorit-mailer` answers a refusal with the upstream reason — `http_403` from
+   * Resend, say — and the three callers threw on the status before reading the
+   * body. So a failed send reported "the mailer returned 502", which is enough
+   * to know Dorit did not get the summary and not enough to know why. The
+   * difference in practice was a morning.
+   *
+   * The vocabulary is closed on purpose. Only `http_<status>`,
+   * `no_message_id` and `network_error` survive the filter, so this stays a
+   * status code and never becomes a provider's prose or a credential — which
+   * is what the comment above the throw was protecting.
+   */
+  it("keeps the upstream-reason filter identical in every function that mails", () => {
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    const bodyOf = (src: string, name: string) => {
+      const i = src.indexOf("function upstreamReasons");
+      expect(i, `${name} has no upstream-reason filter`).toBeGreaterThan(-1);
+      return src.slice(i, src.indexOf("\n}", i)).replace(/\s+/g, " ").trim();
+    };
+    expect(bodyOf(escalate, "escalateToHuman"), "escalateToHuman drifted").toBe(
+      bodyOf(submitLead, "submitLead")
+    );
+    expect(bodyOf(claim, "submitClaim"), "submitClaim drifted").toBe(bodyOf(submitLead, "submitLead"));
+
+    for (const [src, name] of [
+      [submitLead, "submitLead"],
+      [escalate, "escalateToHuman"],
+      [claim, "submitClaim"],
+    ] as const) {
+      // Read before the status is judged: on a refusal the body is the only
+      // place the cause exists, and throwing first discards it.
+      const readsBody = src.indexOf("const result = await response.json()");
+      const throwsOnStatus = src.indexOf("if (!response.ok) throw");
+      expect(readsBody, `${name} never reads the mailer's answer`).toBeGreaterThan(-1);
+      expect(
+        readsBody,
+        `${name} throws on the status before reading the reason`
+      ).toBeLessThan(throwsOnStatus);
+      // And the reason reaches the warning the operations mail prints.
+      expect(src, `${name} drops the reason it just read`).toMatch(
+        /mailer_http_\$\{response\.status\}\$\{why\}/
+      );
+    }
+  });
+
   it("keeps the operations mailbox list identical in every function that mails", () => {
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
     const listOf = (src: string, name: string) => {

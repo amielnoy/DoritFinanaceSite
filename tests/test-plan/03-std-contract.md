@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 420
+**Location:** `tests/contract/` · **Cases:** 421
 
 ---
 
@@ -102,7 +102,7 @@ diary Dorit actually reads.
 Two files here test text rather than shape, and do so on purpose. Both cover
 artefacts that a regulator, not a compiler, is the reader of.
 
-**`agents.contract.test.ts` — `CTR-AGT-001..179`** — the three agent prompts. For each
+**`agents.contract.test.ts` — `CTR-AGT-001..180`** — the three agent prompts. For each
 agent it asserts the eighteen mandatory clauses of the compliance block (bot
 disclosure, licence number `L-00107009`, the marketing-not-advice statement, the
 absolute bans on product recommendation and figures, the privacy-law citation
@@ -351,7 +351,7 @@ time.
 
 ## 6. Pass criteria
 
-All 420 cases pass. A failure means either the frontend or the backend definition
+All 421 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

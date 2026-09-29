@@ -23,9 +23,9 @@ npx skills add base44/skills
 - `src/api/base44Client.js`: frontend Base44 SDK client.
 - `base44/functions/*/entry.ts`: backend functions. Isolated entry points with no
   shared module, so some helpers are duplicated by hand — `redact`, `escapeHtml`,
-  `buildClientHtml`, `SHEET_COLUMNS`, `NOTIFY_EMAILS`, `wallClock`, and in the
-  two calendar writers `CALENDARS`, `CALENDAR_PROVIDERS` and
-  `CALENDAR_ATTENDEES`. Duplicated is fine; drifted is not, and
+  `buildClientHtml`, `SHEET_COLUMNS`, `NOTIFY_EMAILS`, `wallClock`,
+  `upstreamReasons`, and in the two calendar writers `CALENDARS`,
+  `CALENDAR_PROVIDERS` and `CALENDAR_ATTENDEES`. Duplicated is fine; drifted is not, and
   `tests/contract/agents.contract.test.ts` fails when copies stop matching.
   Every one of these drifts silently, and two have already cost something:
   `NOTIFY_EMAILS` is the easiest to get wrong, because a mailbox added to one
