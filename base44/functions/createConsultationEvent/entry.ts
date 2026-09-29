@@ -112,12 +112,11 @@ const CALENDARS = {
 /**
  * לאילו יומנים נכתב — ברירת המחדל היא שניהם.
  *
- * עד כה זה הושג בשתי פונקציות כמעט זהות ששתי קריאות נפרדות מן המתאם הפעילו.
- * שתי עותקות של אותו קוד הן בדיוק מה ש-AGENTS.md מזהיר מפניו, והמחיר כאן היה
- * שהעותקה של Google קיבלה תיקון אזור זמן שהעותקה של Outlook לא — כלומר פגישה
- * נכנסה ליומן אחד בשעה הנכונה ולשני בשעה אחרת, בלי ששום דבר אמר זאת.
+ * משוכפלת בכל פונקציה שכותבת ליומן בכוונה — אין מודול משותף ב-Base44.
+ * משוכפל זה בסדר, מפוצל זה לא, ו-agents.contract.test.ts נכשל כששני העותקים
+ * מתפצלים.
  */
-const PROVIDERS = (Deno.env.get('CALENDAR_PROVIDERS') || 'outlook,google')
+const CALENDAR_PROVIDERS = (Deno.env.get('CALENDAR_PROVIDERS') || 'outlook,google')
   .split(',')
   .map((p) => p.trim().toLowerCase())
   .filter((p) => p in CALENDARS);
@@ -136,7 +135,7 @@ export default async function(req) {
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
     }
 
-    if (PROVIDERS.length === 0) {
+    if (CALENDAR_PROVIDERS.length === 0) {
       // CALENDAR_PROVIDERS הוגדר ולא נותר בו שם מוכר. שתיקה כאן הייתה מחזירה
       // ok על בקשה שלא נכתבה לשום יומן.
       log('error', 'calendar.no_provider', { rid });
@@ -176,7 +175,7 @@ export default async function(req) {
     // ברצף ולא במקביל. שני היומנים כותבים את אותה פגישה, ושגיאת הרשאה על
     // הראשון היא כמעט תמיד אותה שגיאה על השני — עדיף שורת יומן אחת לכל אחד
     // בסדר קריא מאשר שתיים שנכנסות יחד.
-    for (const provider of PROVIDERS) {
+    for (const provider of CALENDAR_PROVIDERS) {
       const cal = CALENDARS[provider];
       try {
         const { accessToken } = await base44.asServiceRole.connectors.getConnection(cal.connector);

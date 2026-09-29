@@ -170,6 +170,6 @@ describe("createConsultationEvent — both calendars", () => {
   });
 
   it("refuses rather than reporting success when no calendar is configured", () => {
-    expect(fnSource).toMatch(/PROVIDERS\.length === 0/);
+    expect(fnSource).toMatch(/CALENDAR_PROVIDERS\.length === 0/);
   });
 });

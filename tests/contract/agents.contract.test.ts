@@ -535,6 +535,42 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     }
   });
 
+  /**
+   * The provider table is the seventh duplicated helper, and the newest.
+   *
+   * Two calendars differ in four trap-shaped ways — connector, endpoint,
+   * timezone-name dialect, link field — and every one of them fails by being
+   * accepted and wrong. A-47 is what one copy of that knowledge learning
+   * something the other did not costs: meetings three hours out in the only
+   * diary Dorit reads.
+   */
+  it("keeps the calendar provider table identical in both calendar writers", () => {
+    const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
+    const tableOf = (src: string, name: string) => {
+      const i = src.indexOf("const CALENDARS = {");
+      expect(i, `${name} has no calendar provider table`).toBeGreaterThan(-1);
+      return src.slice(i, src.indexOf("\n};", i)).replace(/\s+/g, " ").trim();
+    };
+    expect(tableOf(consultation, "createConsultationEvent"), "the provider tables drifted").toBe(
+      tableOf(submitLead, "submitLead")
+    );
+
+    const listOf = (src: string) => {
+      const i = src.indexOf("const CALENDAR_PROVIDERS =");
+      return src.slice(i, src.indexOf(";", i)).replace(/\s+/g, " ").trim();
+    };
+    expect(listOf(consultation), "the provider lists drifted").toBe(listOf(submitLead));
+
+    for (const [src, name] of [[submitLead, "submitLead"], [consultation, "createConsultationEvent"]] as const) {
+      expect(src, `${name} declares the table but never uses it`).toMatch(/CALENDARS\[provider\]/);
+      // Posting straight at one vendor is how the table gets bypassed without
+      // anyone editing it.
+      expect(src, `${name} calls a calendar API outside the table`).not.toMatch(
+        /fetch\(\s*['"`]https:\/\/(graph\.microsoft|www\.googleapis)/
+      );
+    }
+  });
+
   it("keeps the Supabase mirror identical in every function that captures a lead", () => {
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
     const bodyOf = (src: string, name: string) => {
@@ -644,8 +680,34 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(interview).toMatch(/תיאום הפגישה/);
     expect(interview).toMatch(/meetingTopic/);
     expect(interview).toMatch(/scheduledAt/);
-    expect(interview).toMatch(/createConsultationEvent/);
     expect(interview).toMatch(/אל תפנה את המבקר לצ׳אט אחר/);
+  });
+
+  it("does not ask the model to book the diary as a second step", () => {
+    /**
+     * The prompt used to instruct a `createConsultationEvent` call after
+     * `submitLead`. Two things were wrong with that. `submitLead` already
+     * writes the diary itself, in the same request, so the second call booked
+     * the meeting twice — invisibly while the two functions wrote to different
+     * calendars, and visibly in Dorit's own the moment both learned to write
+     * Outlook (A-47).
+     *
+     * And it put a guarantee in a prompt. This repo's position on that is
+     * settled: the consent gate and the handoff button live in the shell
+     * precisely because a prompt is advisory. A meeting that exists only if the
+     * model remembers a second tool call is the same mistake with a diary
+     * instead of a checkbox.
+     */
+    const interview = loadAgent("needs_interview");
+    expect(interview.instructions, "the prompt books the diary again").not.toMatch(
+      /createConsultationEvent/
+    );
+    const tools = (interview.tool_configs ?? []).map((t) => t.function_name);
+    expect(tools, "the calendar function is wired back onto the agent").not.toContain(
+      "createConsultationEvent"
+    );
+    // And the one field that now matters is still demanded of it.
+    expect(interview.instructions).toMatch(/scheduledAt/);
   });
 
   /**
@@ -1363,9 +1425,11 @@ const TOOL_CONFIGS: Record<string, unknown[]> = {
     { entity_name: "BlogPost", allowed_operations: ["read"] },
     { function_name: "escalateToHuman" },
   ],
+  // No calendar function: `submitLead` writes the diary itself, server-side, in
+  // the request that saved the lead. See "does not ask the model to book the
+  // diary as a second step".
   needs_interview: [
     { function_name: "submitLead" },
-    { function_name: "createConsultationEvent" },
     { function_name: "escalateToHuman" },
   ],
   support_agent: [

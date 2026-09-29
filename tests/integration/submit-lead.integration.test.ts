@@ -83,7 +83,9 @@ describe("submitLead — the enquiry actually lands", () => {
   it("reports the calendar and sheet outcome in that appendix", async () => {
     const r = await invokeFunction("submitLead", consultation);
     const ops = r.mailTo(OPS).text!;
-    expect(ops).toMatch(/יומן: אירוע נוצר/);
+    // "נוצר" now names the calendars it was created in: one diary taking the
+    // meeting and the other not is exactly what a bare "created" would hide.
+    expect(ops).toMatch(/יומן: אירוע נוצר ✓ \([a-z, ]+\)/);
     // No spreadsheet is configured in this repo, so the append is skipped —
     // and says so, rather than reporting a success that never happened.
     expect(ops).toMatch(/גיליון: לא מוגדר/);
@@ -259,14 +261,18 @@ describe("submitLead — what survives a failure", () => {
   it("keeps the enquiry when the calendar refuses", async () => {
     const r = await invokeFunction("submitLead", consultation, { failFetch: true });
     expect(r.status).toBe(200);
-    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("calendar_event_failed")));
+    // Per calendar, not one flat `calendar_event_failed`. Which diary missed
+     // the meeting is the whole question when only one of them did.
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) =>
+      w.some((x) => /^calendar_\w+_(failed|rejected|not_connected)$/.test(x))
+    );
     expect(r.leads).toHaveLength(1);
   });
 
   it("reports the calendar failure in the operations appendix", async () => {
     const r = await invokeFunction("submitLead", consultation, { failCalendar: true });
     expect(r.mailTo(OPS).text).toMatch(/יומן: לא נוצר/);
-    expect(r.mailTo(OPS).text).toMatch(/תקלות:.*calendar_event_failed/);
+    expect(r.mailTo(OPS).text).toMatch(/תקלות:.*calendar_\w+_(failed|rejected)/);
   });
 
   it("does not attempt a calendar event without a connector token", async () => {
@@ -551,7 +557,7 @@ describe("submitLead — a finished introduction interview", () => {
     const [call] = r.callsTo("graph.microsoft.com");
     const event = call.body as { start: { dateTime: string } };
     expect(event.start.dateTime).toBe("2026-09-24T10:00:00");
-    expect(r.mailTo(OPS).text).toMatch(/יומן: אירוע נוצר ✓ — 2026-09-24 10:00/);
+    expect(r.mailTo(OPS).text).toMatch(/יומן: אירוע נוצר ✓ \([a-z, ]+\) — 2026-09-24 10:00/);
   });
 
   it("redacts the profile itself, not only a separate summary", async () => {
