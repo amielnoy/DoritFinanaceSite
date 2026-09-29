@@ -110,6 +110,32 @@ base44 dashboard open
 
 This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
 
+### Agents are not part of a publish
+
+**A publish ships code. It does not ship `base44/agents/`.** That is a separate
+command:
+
+```bash
+npx base44 agents push --yes
+```
+
+It is a **full sync** — an agent on the backend that is not in `base44/agents/`
+is deleted — which is the intended direction, since the repo is the source of
+truth and `tests/contract/agents.contract.test.ts` pins every field of all three
+before anything reaches this point.
+
+Skipping it is expensive and looks like nothing. `allow_anonymous_access: true`
+was once committed, reviewed, merged and published with CI green from end to
+end, while every chat on the site went on answering `401` because the value the
+backend held had never been replaced. Nothing in the pipeline disagreed, because
+nothing in the pipeline was looking (A-42).
+
+Two things now look. `e2e/api/base44-contract.spec.ts` opens an anonymous
+conversation with each agent against the live backend, and the production smoke
+job runs it after every publish. And anything under `base44/agents/` — a prompt
+clause, a tool, a model, a memory setting — needs this command before it is
+true of production, so treat a change there as a two-step release.
+
 CI can do the publish for you instead, from a clean checkout of `main` and only
 when the whole run is green. It is opt-in: set the `BASE44_API_KEY` secret (a
 workspace API key — it starts with `b44k_`) and the `BASE44_APP_ID` variable on
@@ -337,8 +363,9 @@ Two of those guarantees do not depend on the model at all, on purpose:
 
 A finished interview leaves the same way a form does. The agent hands the
 summary the visitor approved to `submitLead`, which mails it to דורית and to the
-team operating the site in the site's own layout, and confirms to the visitor if
-they gave an address. It used to end at `Lead.create` instead — stored, and
+team operating the site in the site's own layout, confirms to the visitor if
+they gave an address, and — when a time was agreed — books it in both calendars
+without a second tool call (see [the meeting](#the-meeting-and-which-diary-it-lands-in)). It used to end at `Lead.create` instead — stored, and
 nobody told, until somebody happened to open the leads screen.
 
 What it hands over is a **fixed schema, not free text**. The agent picks one of
@@ -903,6 +930,49 @@ While production is still on Base44 there is nothing to read anyway: until the
 site on Vercel, these numbers describe **staging traffic**, which is mostly CI
 and the two of us. Vercel Analytics also has to be enabled once for the project
 in the dashboard; without it the beacon is unanswered even on Vercel.
+
+## The meeting, and which diary it lands in
+
+An interview that settles on a time books it. Not as a second step the model has
+to remember — `submitLead` writes the diary itself, inside the request that saved
+the enquiry, because a meeting that exists only when a model chooses to make one
+more tool call is a guarantee living in a prompt, and this repo puts guarantees
+in code.
+
+It writes **both** calendars:
+
+| | Outlook (Microsoft Graph) | Google Calendar |
+| --- | --- | --- |
+| connector | `outlook` | `googlecalendar` |
+| timezone name | `Israel Standard Time` | `Asia/Jerusalem` |
+| invitations | sent by Graph | only with `sendUpdates=all` |
+
+`CALENDAR_PROVIDERS` chooses them and defaults to `outlook,google`. Outlook is
+first because it is the diary דורית actually keeps — `govari-fin.co.il` is
+Microsoft 365 — so if only one is configured, that is the one that gets the
+meeting.
+
+Those differences look cosmetic and are not. **Each API accepts the other's
+timezone name in silence and files the meeting at the wrong hour**, and Google
+accepts an attendee without ever telling them. Every one of them fails by being
+accepted, which is why they live in one provider table rather than at each call
+site, hand-duplicated across the two writers with a contract test that fails the
+moment the copies differ. The bill for learning this: meetings sat three hours
+out in Outlook for as long as two copies of that code existed (A-47).
+
+The mailboxes in `CALENDAR_ATTENDEES` are invited to the event, so the meeting
+appears in their calendar and not only in דורית's. They are the same addresses
+as `NOTIFY_EMAILS`, enforced equal by contract — the same team that already
+receives the enquiry by mail, which is why this adds a channel and not a
+recipient.
+
+A connector that is declared in `base44/connectors/` but never authorised in the
+Base44 dashboard yields no token, and the write is skipped with a warning rather
+than failing the enquiry — the other calendar can still take it. **Declared is
+not connected**, and the operations mail is where you find out: it names the
+calendars the event landed in — `יומן: אירוע נוצר ✓ (outlook, google)` — or,
+when one refused, says which. A bare "created" would have hidden exactly the
+case where one diary took the meeting and the other did not.
 
 ## Dorit's notifications through Resend
 

@@ -586,8 +586,9 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   /**
    * The provider table is the seventh duplicated helper, and the newest.
    *
-   * Two calendars differ in four trap-shaped ways — connector, endpoint,
-   * timezone-name dialect, link field — and every one of them fails by being
+   * Two calendars differ in five trap-shaped ways — connector, endpoint,
+   * timezone-name dialect, link field, and whether an invitation is sent at
+   * all — and every one of them fails by being
    * accepted and wrong. A-47 is what one copy of that knowledge learning
    * something the other did not costs: meetings three hours out in the only
    * diary Dorit reads.

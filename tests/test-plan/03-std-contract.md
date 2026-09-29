@@ -89,7 +89,7 @@ Two helpers do the work:
 | CTR-FN-017 | "one calendar failing does not lose the other" | The loop `continue`s; the 502 is conditioned on `created.length === 0` |
 | CTR-FN-018 | "refuses rather than reporting success when no calendar is configured" | `PROVIDERS.length === 0` → 500 |
 
-`CTR-FN-013..018` exist because the two calendars differ in four small,
+`CTR-FN-013..018` exist because the two calendars differ in five small,
 trap-shaped ways, and every one of them fails *silently* when it is wrong: the
 event is accepted, and it is in the wrong place or at the wrong hour. That is
 not hypothetical — A-47 is exactly it. Two functions held the same
