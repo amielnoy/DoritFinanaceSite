@@ -68,9 +68,12 @@ base44 dev --remote
 
 ## Previewing the Production Build
 
-`npm run preview` serves the real `dist/` bundle, which is the only way to check
-the site the way a visitor gets it. Two things that Base44's hosting supplies are
-missing from a local build, and the repo now fills both in:
+`npm run preview` rebuilds and then serves the real `dist/` bundle, which is the
+only way to check the site the way a visitor gets it. It rebuilds because `dist/`
+is shared with the e2e suite, which seals `VITE_BASE44_APP_ID=e2e-sanity-app`
+into whatever it builds: previewing that bundle 404s every backend call and says
+so on screen in the same words a real outage uses. Two things that Base44's
+hosting supplies are missing from a local build, and the repo now fills both in:
 
 - **The app id.** Base44 injects `VITE_BASE44_APP_ID` into its own builds, and
   Vite inlines it, so a build from a clone used to ship `appId: undefined` and

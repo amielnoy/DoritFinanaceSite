@@ -273,7 +273,12 @@ the environment supplies none, never overriding it; a checkout with no
 `base44/.app.jsonc` stays silent, which is what keeps CI's "build the way the
 Builder does" guard meaningful; and the `/api` preview proxy stays opt-in,
 because `npm run test:e2e` serves the site from that same preview server and is
-hermetic only while every `/api` call is stubbed.
+hermetic only while every `/api` call is stubbed. Two further cases close the
+other end of that arrangement: the e2e build seals `e2e-sanity-app` into `dist/`,
+and `dist/` is what `vite preview` serves, so `npm run preview` must rebuild
+before serving and `scripts/run-tests.sh` must discard the bundle it built. A
+preview left on that artifact 404s every backend call and reports it as the one
+line a real outage produces — "מצטערת, לא הצלחתי לשלוח את ההודעה כרגע".
 
 **`carriers.contract.test.ts`** — every insurer link resolves to a domain that
 exists, and each carrier's name and URL agree.

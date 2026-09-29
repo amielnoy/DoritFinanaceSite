@@ -141,8 +141,19 @@ if has e2e; then
     run_suite "build" npm run build
     # Built here; tell the preview server not to build it again.
     export SKIP_BUILD=1
+    # And remember that what is now in dist/ is wired to an app that does not
+    # exist, so it can be thrown away below.
+    BUILT_SENTINEL_DIST=1
   fi
   run_suite "e2e (web + iOS + Android)" npx playwright test "${EXTRA_ARGS[@]}"
+  # The bundle just tested has `e2e-sanity-app` inlined as the app id — Vite
+  # seals that in at build time. dist/ is also what `vite preview` serves, so
+  # leaving it here hands the next person a site whose every backend call 404s,
+  # reported on screen as the same "try again" line a real outage produces.
+  # Keeping it saves one rebuild and costs an afternoon.
+  if [[ "${BUILT_SENTINEL_DIST:-}" == "1" ]]; then
+    rm -rf dist
+  fi
 fi
 
 # ── Allure report ───────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./tsconfig.json",
     "typecheck:gate": "npm run typecheck",
-    "preview": "vite preview",
+    "preview": "npm run build && vite preview",
     "seed:blog": "node scripts/seed-blog.mjs",
     "logs": "base44 logs --env prod --since 1h",
     "logs:archive": "node scripts/archive-logs.mjs",
