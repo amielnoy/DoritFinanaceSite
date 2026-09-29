@@ -1272,3 +1272,57 @@ describe("submitLead — the clearing-house offer", () => {
     expect(html).toContain("[הושמט");
   });
 });
+
+/**
+ * The power of attorney, which is the only thing that actually moves a
+ * clearing-house pull forward.
+ *
+ * An identity number typed into the chat does not — the מסלקה answers a
+ * licensed agent holding a signed mandate, so the chat records the intent and
+ * the mandate travels by mail. These cases pin that it reaches exactly the
+ * people who asked for it, in both halves of the message, and nobody else.
+ */
+describe("submitLead — the clearing-house mandate", () => {
+  const base = {
+    name: "אורי לוי",
+    phone: "0541112233",
+    email: "uri@example.com",
+    source: "interview",
+    topic: "דמי ניהול בקרן ההשתלמות",
+    track: "pension",
+  };
+  const interested = { ...base, profile: { clearinghouse: "מעוניין/ת" } };
+  const declined = { ...base, profile: { clearinghouse: "לא" } };
+  const env = { MAILER_URL, MAILER_TOKEN: "test-only-token", POA_URL: "https://example.test/poa.pdf" };
+
+  it("sends the mandate to a visitor who asked for the pull", async () => {
+    const r = await invokeFunction("submitLead", interested, { env });
+    const mail = r.mailTo(base.email);
+    expect(mail.html, "the link is missing from the HTML half").toContain("https://example.test/poa.pdf");
+    expect(mail.text, "the link is missing from the plain-text half").toContain("https://example.test/poa.pdf");
+  });
+
+  it("says nothing about it to a visitor who declined", async () => {
+    // A mandate arriving unasked is a document about pension data landing in
+    // the inbox of someone who said no to it.
+    const r = await invokeFunction("submitLead", declined, { env });
+    const mail = r.mailTo(base.email);
+    expect(mail.html).not.toContain("example.test/poa.pdf");
+    expect(mail.text).not.toContain("ייפוי כוח");
+  });
+
+  it("says nothing when the question was never put", async () => {
+    const r = await invokeFunction("submitLead", base, { env });
+    expect(r.mailTo(base.email).text).not.toContain("ייפוי כוח");
+  });
+
+  it("falls back to the old wording when no document is configured", async () => {
+    // A deployment without POA_URL must not promise a link it does not have.
+    const r = await invokeFunction("submitLead", interested, {
+      env: { MAILER_URL, MAILER_TOKEN: "test-only-token" },
+    });
+    const mail = r.mailTo(base.email);
+    expect(mail.text).not.toContain("ייפוי כוח");
+    expect(mail.text, "the confirmation itself went missing").toContain("תודה על השיחה");
+  });
+});
