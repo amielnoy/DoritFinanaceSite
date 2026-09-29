@@ -162,7 +162,7 @@ describe("upsertContact — the contacts sheet", () => {
       "whatsapp",
       "",
     ]);
-    expect(run.json.sheet).toBe("נרשם ✓");
+    expect(run.json.sheet).toMatch(/^נרשם ✓ — https:\/\/docs\.google\.com\/spreadsheets\/d\//);
   });
 
   it("writes the normalised number, the one the entity is keyed on", async () => {

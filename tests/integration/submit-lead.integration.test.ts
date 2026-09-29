@@ -1326,3 +1326,50 @@ describe("submitLead — the clearing-house mandate", () => {
     expect(mail.text, "the confirmation itself went missing").toContain("תודה על השיחה");
   });
 });
+
+/**
+ * Where the copies went, as links rather than as claims.
+ *
+ * The operations appendix used to say "נרשם ✓" and leave finding the row to the
+ * reader. The sheet now carries its address the way the document already did,
+ * and both are clickable in the HTML half — a full URL inside a table cell is a
+ * long line nobody can click, so the cell keeps the short status and takes the
+ * address as its href.
+ */
+describe("submitLead — the operations appendix links to what it wrote", () => {
+  const env = {
+    MAILER_URL,
+    MAILER_TOKEN: "test-only-token",
+    SHEET_ID: "sheet-test-id",
+    SHEET_TAB: "Events",
+  };
+
+  it("gives the sheet row an address, in both halves", async () => {
+    const r = await invokeFunction("submitLead", consultation, { env });
+    const ops = r.mailTo(OPS);
+    const url = "https://docs.google.com/spreadsheets/d/sheet-test-id/edit";
+    expect(ops.text, "the plain-text half has no address to follow").toContain(url);
+    expect(ops.html, "the HTML half does not link the row").toContain(`href="${url}"`);
+  });
+
+  it("keeps the long address out of the visible cell", async () => {
+    // The href carries it; the cell shows the status. A URL rendered as cell
+    // text wraps across three lines and is not clickable.
+    const r = await invokeFunction("submitLead", consultation, { env });
+    const html = r.mailTo(OPS).html!;
+    const cell = html.slice(html.indexOf("גיליון"), html.indexOf("גיליון") + 400);
+    expect(cell).toContain("נרשם ✓");
+    expect(cell.replace(/href="[^"]*"/g, ""), "the URL is printed as text too").not.toContain(
+      "docs.google.com"
+    );
+  });
+
+  it("says so plainly when there is no sheet to link to", async () => {
+    const r = await invokeFunction("submitLead", consultation, {
+      env: { MAILER_URL, MAILER_TOKEN: "test-only-token" },
+    });
+    const ops = r.mailTo(OPS);
+    expect(ops.text).toMatch(/גיליון: לא מוגדר/);
+    expect(ops.html).not.toContain("spreadsheets/d");
+  });
+});

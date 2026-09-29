@@ -234,7 +234,9 @@ async function appendEventRow(base44, row) {
     },
   );
   if (!res.ok) throw new Error(`sheets ${res.status}`);
-  return 'נרשם ✓';
+  // הסטטוס נושא את הקישור, כמו המסמך. עד כה הוא אמר שהשורה נכתבה ולא לאן,
+  // ומי שרצה לראות אותה חיפש את הגיליון לבד.
+  return `נרשם ✓ — https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
 }
 
 /** מספר טלפון ישראלי תקין — אותה בדיקה שהסוכנים מבצעים בשיחה. */
