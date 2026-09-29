@@ -8,29 +8,29 @@
 
 The system under test (SUT) is a Base44 application: a React 18 + Vite
 single-page marketing and lead-generation site for an insurance and financial
-adviser, in Hebrew (RTL), backed by Base44 entities, Core integrations and one
-Deno backend function.
+adviser, in Hebrew (RTL), backed by Base44 entities, Core integrations, eight
+Deno backend functions, and a Cloudflare Pages Function that sends the mail.
 
 In scope:
 
 | Layer | What is tested |
 |---|---|
-| Pure logic | Pension fee maths, URL/class helpers, the open-redirect guard, contact config |
+| Pure logic | Pension fee maths, URL/class helpers, the open-redirect guard, contact config, the submission state machine, the admin data services, published FAQ and self-assessment content, and the two maintenance scripts |
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
 | Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` and `escalateToHuman` functions, RLS rules |
 | Integration | The Base44 functions executed in-process against a recording client — what is stored, who is mailed, what each recipient sees, and what survives a failure |
 | Eval | The deployed interview agent driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md) |
 | Agent compliance | The three agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
-| UI e2e | Landing page, routing, calculator, three lead forms, blog, the agent chat's regulatory shell |
+| UI e2e | Landing page, routing, calculator, the quick contact form and the claim report, blog, the agent chat's regulatory shell |
 | Mobile web | iOS Safari and Android Chrome behaviour and layout |
 | Security | XSS (page and chat), HTML injection into outbound mail, phishing vectors, prompt injection via UI and via tool payloads, DLP, open redirect, token handling, tab-nabbing, secret leakage, RLS |
 | Accessibility | WCAG 2.1 AA via axe-core, plus structural RTL/labelling checks |
 
 Out of scope: native iOS/Android applications (none exist in this repo — the
 "iOS" and "Android" suites are mobile **web**), Base44 platform internals,
-third-party services (Google Calendar, Google Analytics, WhatsApp), visual
-regression, and load/performance testing.
+third-party services (Google Calendar, Resend, Vercel Analytics, WhatsApp),
+visual regression, and load/performance testing.
 
 ## 2. Test levels and strategy
 
@@ -59,7 +59,7 @@ backend when one is available.
 | Item | Version reference |
 |---|---|
 | Application source | `src/**` at the commit under test |
-| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{submitLead,submitClaim,createConsultationEvent,escalateToHuman}`, `base44/agents/*.jsonc` |
+| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{submitLead,submitClaim,createConsultationEvent,createOutlookEvent,escalateToHuman,logSupportChat,upsertContact,contentAdmin}`, `base44/agents/*.jsonc`, `dorit-mailer/functions/api/send-email.js` |
 | Published copy | `content/blog/*.md`, `src/config/compliance.ts` |
 | Static assets | `index.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`, `public/manifest.json` |
 | Build output | `dist/` produced by `npm run build:prerender` — the plain `npm run build` omits the prerendered route files, and the e2e suite tests what is in `dist/` |
@@ -116,10 +116,10 @@ Resume after the environment is corrected; no partial sign-off.
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
 Both runners write Allure results into the same `allure-results/`, so one
-`allure generate` covers the whole battery — 757 Vitest cases (81 unit, 21
-component, 376 contract, 204 integration, 70 security, plus 9 opt-in agent
-evals that skip without credentials) plus 173 e2e cases per
-platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
+`allure generate` covers the whole battery — 953 Vitest cases (232 unit, 24
+component, 405 contract, 213 integration, 70 security, plus 8 opt-in agent
+evals that skip without credentials and the one marker case that reports the
+skip) plus 178 e2e cases per platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
 eleven on the full matrix, two on a feature branch — into a single published
 report; generating per-leg would give a pile of partial reports instead of one
 picture of the run, and sharding only makes that worse. Allure 3 emits the merged report as a single self-contained
@@ -172,13 +172,14 @@ at that branch — see the README. Merging stays the Builder's own action, so th
 enforcement lives at the publish step, which only runs from `main` and only on
 a green run.
 
-Work made in the Base44 Builder currently syncs straight to `main`, so it lands
-untested and `main` can go red without warning. Dormant support for a `builder`
-branch runs the full battery on each Builder push, deploys a preview of it, and
-reports whether it is safe to merge; it activates the day the Builder is pointed
-at that branch — see the README. Merging stays the Builder's own action, so the
-enforcement lives at the publish step, which only runs from `main` and only on
-a green run.
+**One nightly job deletes rather than reports.** `prune-vercel` removes Vercel
+preview deployments older than a month. It runs on the schedule only — no
+`workflow_dispatch`, because a manual trigger beside the publish button is how
+somebody clears a preview they were halfway through reading, and there is no
+undo. Its rule is unit-tested (UNIT-PRV-001..006) rather than trusted to the
+`target=preview` query it filters with, and `npm run prune:vercel` without
+`--apply` prints what it would delete. It is skipped entirely when the Vercel
+credentials are absent.
 
 A red run costs production, not staging. The Vercel staging deployment goes out
 whenever the build succeeds — a failing run is exactly when it helps to open the
@@ -194,4 +195,5 @@ smoke test runs only after that publish succeeds.
 | Stubbed backend drifts from the real one | `tests/contract/` reads the real entity/function definitions; an opt-in live suite re-checks against a running backend |
 | Animation timing flakiness | `framer-motion` is stubbed in component tests; e2e waits on assertions, never on sleeps |
 | Third-party beacons cause noise | Analytics, fonts and media hosts are intercepted in the e2e fixture |
+| A maintenance job deletes something it should have kept | The nightly prune is asserted on the two guards, not on the API filter it asks with (UNIT-PRV-001..006), and has no manual trigger — see §9 |
 | Colour-contrast debt masks new regressions | Contrast is reported on every run and can be enforced with one env var |

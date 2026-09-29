@@ -1,8 +1,9 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { APP_POINTER, base44Backend, readLinkedAppId } from "../../scripts/vite-base44-backend-plugin.mjs";
+import { REPO_ROOT } from "../helpers/entity-schema";
 
 /**
  * A build that cannot reach a backend must not look like one that can.
@@ -84,5 +85,63 @@ describe("the preview proxy is opt-in", () => {
       target: "https://safe-arch-plan.base44.app",
       changeOrigin: true,
     });
+  });
+});
+
+describe("a test run cannot leave behind a bundle that preview will serve", () => {
+  /**
+   * The e2e build inlines `VITE_BASE44_APP_ID=e2e-sanity-app` and leaves the
+   * result in `dist/`, which is the same directory `vite preview` serves. A
+   * preview started after a test run therefore posts every call to
+   * `/api/apps/e2e-sanity-app/...`, and the proxy 404s all of them. On screen
+   * that is one line — "מצטערת, לא הצלחתי לשלוח את ההודעה כרגע" — identical to
+   * the one a real outage produces, which is how it went unnoticed.
+   */
+  const read = (path: string) => readFileSync(join(REPO_ROOT, path), "utf8");
+
+  it("rebuilds before previewing, so a stale bundle is never served", () => {
+    const pkg = JSON.parse(read("package.json"));
+    expect(pkg.scripts.preview).toMatch(/\bnpm run build\b.*&&.*\bvite preview\b/);
+  });
+
+  it("discards the sentinel-id bundle once the e2e suite has run", () => {
+    // Guarded by the same flag that decides whether this script built at all —
+    // a run against PLAYWRIGHT_BASE_URL, or one handed SKIP_BUILD=1, must not
+    // delete a dist it did not write.
+    const sh = read("scripts/run-tests.sh");
+    expect(sh).toMatch(/BUILT_SENTINEL_DIST=1/);
+    expect(sh).toMatch(/rm -rf dist/);
+  });
+});
+describe("the analytics beacon is mounted only where its endpoint exists", () => {
+  /**
+   * `<Analytics />` posts to `/_vercel/insights/*` — a path Vercel's edge
+   * synthesises and no other host serves. Production is Base44, so for as long
+   * as it stays there the component mounted, found nothing, and spent a failed
+   * request on every page load to report data nobody could read. The
+   * prerenderer made it worse by capturing the injected <script> into all eight
+   * route files, where it resolved to the SPA shell and the browser refused to
+   * execute an HTML document as a script (A-43).
+   *
+   * The flag is derived from `VERCEL`, which Vercel sets itself, rather than
+   * from a `VITE_` variable set per environment. That is the whole point: a
+   * hand-set flag fails by being left on in a Base44 build, which is the state
+   * this replaces, and a clone would have to know to set it at all.
+   */
+  const read = (path: string) => readFileSync(join(REPO_ROOT, path), "utf8");
+
+  it("derives the flag from Vercel's own environment, not a variable someone sets", () => {
+    const config = read("vite.config.js");
+    expect(config).toMatch(
+      /'import\.meta\.env\.VITE_VERCEL_ANALYTICS':\s*JSON\.stringify\(process\.env\.VERCEL === '1'\)/,
+    );
+  });
+
+  it("mounts the component behind that flag rather than unconditionally", () => {
+    const app = read("src/App.jsx");
+    expect(app, "<Analytics /> is still mounted unconditionally").not.toMatch(
+      /^\s*<Analytics \/>/m,
+    );
+    expect(app).toMatch(/import\.meta\.env\.VITE_VERCEL_ANALYTICS \? <Analytics \/> : null/);
   });
 });

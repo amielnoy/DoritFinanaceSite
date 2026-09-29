@@ -89,6 +89,30 @@ function restoreAsyncFont(html) {
   )
 }
 
+/**
+ * Drop the beacon `@vercel/analytics` injects into the live DOM.
+ *
+ * `<Analytics />` appends `<script src="/_vercel/insights/script.js">` on
+ * mount, so the captured DOM carries it and every prerendered page ships it as
+ * static markup. Nothing under `/_vercel/` is a file in this build: the path is
+ * synthesised by Vercel's edge, and production is Base44, which has never heard
+ * of it. There the tag resolves to the SPA fallback — `index.html`, 200,
+ * `text/html` — and the browser refuses to execute a document as a script on
+ * every page load, for a beacon that collects nothing on that host anyway.
+ *
+ * Removing it costs nothing on Vercel either: the component re-injects the tag
+ * when React mounts, which is how it works for a client-rendered visit today.
+ *
+ * Matched on the `/_vercel/` prefix rather than the one filename, because
+ * `@vercel/speed-insights` places its beacon there too and would arrive the
+ * same way. `API-SUR-…` in `e2e/api/http-surface.spec.ts` — "every same-origin
+ * file referenced by index.html actually exists" — is what fails if this stops
+ * working.
+ */
+function dropVercelBeacon(html) {
+  return html.replace(/<script\b[^>]*\bsrc="\/_vercel\/[^"]*"[^>]*><\/script>/g, '')
+}
+
 async function main() {
   const { preview } = await import('vite')
   const { chromium } = await import('@playwright/test')
@@ -189,8 +213,8 @@ async function main() {
         // bakes `http://127.0.0.1:4183/assets/…` into the shipped HTML. The
         // hints are worth keeping — they are the route's own chunks — so make
         // them root-relative rather than dropping them.
-        const html = `${MARKER}\n${restoreAsyncFont(
-          (await page.content()).replaceAll(`http://127.0.0.1:${PORT}/`, '/'),
+        const html = `${MARKER}\n${dropVercelBeacon(
+          restoreAsyncFont((await page.content()).replaceAll(`http://127.0.0.1:${PORT}/`, '/')),
         )}`
         if (html.includes(`127.0.0.1:${PORT}`)) {
           throw new Error(`${route}: the preview origin survived into the HTML`)

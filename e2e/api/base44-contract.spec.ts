@@ -245,4 +245,45 @@ test.describe("Live Base44 backend (opt-in)", () => {
 
     await api.dispose();
   });
+
+  /**
+   * The one check that would have seen the outage.
+   *
+   * Every chat on the site answered every visitor with
+   * "\u05dc\u05d0 \u05d4\u05e6\u05dc\u05d7\u05ea\u05d9 \u05dc\u05e9\u05dc\u05d5\u05d7 \u05d0\u05ea \u05d4\u05d4\u05d5\u05d3\u05e2\u05d4 \u05db\u05e8\u05d2\u05e2" for ten days, because
+   * `allow_anonymous_access` was `false` in all three agent configs and this
+   * POST came back 401 (A-42). Nothing in the battery could see it: the static
+   * contract tests read the repo, and the repo was fine once it was fixed —
+   * what was wrong was the value in the running backend. The hermetic e2e suite
+   * stubs `**\/api\/**` by design, and the smoke job reuses those same specs
+   * against a deployment, so it verifies the *bundle* was published, not that
+   * anything behind it answers.
+   *
+   * This asserts the one thing a visitor needs and no other test states: a
+   * signed-out stranger can open a conversation. It catches the whole class —
+   * revoked key, wrong app id, deleted agent, flag flipped by the next Builder
+   * regeneration — rather than the one flag `agents.contract.test.ts` pins.
+   *
+   * Cost: three empty conversations per production publish. `createConversation`
+   * invokes no model and stores no message; the agent only starts costing
+   * anything once a message is added, and none is.
+   */
+  for (const agent of ["blog_recommender", "needs_interview", "support_agent"]) {
+    test(`${agent} opens a conversation for a signed-out visitor`, async ({ playwright }) => {
+      const api = await playwright.request.newContext({ baseURL: LIVE_URL });
+
+      await test_step("an anonymous POST is accepted and returns a conversation", async () => {
+        const res = await api.post(`/api/apps/${LIVE_APP_ID}/agents/conversations`, {
+          data: { agent_name: agent, metadata: { name: "ci-smoke", description: "CI reachability probe" } },
+        });
+        expect(
+          res.status(),
+          `${agent} refused an anonymous visitor: ${res.status()} ${await res.text()}`
+        ).toBe(200);
+        expect(await res.json()).toHaveProperty("id");
+      });
+
+      await api.dispose();
+    });
+  }
 });

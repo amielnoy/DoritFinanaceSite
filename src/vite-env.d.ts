@@ -19,6 +19,11 @@ interface ImportMetaEnv {
   readonly VITE_BASE44_APP_BASE_URL?: string;
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+  /**
+   * A boolean, not a string, and the one name here that never comes from a
+   * `.env` file — `vite.config.js` inlines it from Vercel's own `VERCEL`.
+   */
+  readonly VITE_VERCEL_ANALYTICS?: boolean;
 }
 
 interface ImportMeta {

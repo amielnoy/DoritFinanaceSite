@@ -2,7 +2,7 @@
 
 **Suite:** `seo` · **Runners:** `npm run test:e2e:seo` (Playwright), `npm run test:unit` (helpers)
 **Location:** `e2e/seo/`, `tests/unit/seo.dom.test.ts`
-**Cases:** 19 unit + 47 e2e (× applicable platforms)
+**Cases:** 19 unit + 48 e2e (× applicable platforms)
 
 ---
 
@@ -161,7 +161,7 @@ To reproduce the failure deliberately: `rm -rf dist && npm run build`, then
 
 ## 6. Pass criteria
 
-All 19 unit and 47 e2e cases pass, with SEO-MOB-005 reporting rather than
+All 19 unit and 48 e2e cases pass, with SEO-MOB-005 reporting rather than
 enforcing. SEO-MET-007 and SEO-LD-002 are the two that would fail first if the
 per-route head regressed in the browser; SEO-PRE-009 is the one that fails if it
 regressed in the HTML.

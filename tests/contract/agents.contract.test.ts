@@ -28,6 +28,7 @@ interface AgentDefinition {
     entity_name?: string;
     allowed_operations?: string[];
   }>;
+  allow_anonymous_access?: boolean;
 }
 
 const parseJsonc = (raw: string): unknown =>
@@ -87,6 +88,23 @@ describe("on-site agent definitions", () => {
           expect(agent.instructions).toMatch(new RegExp(needle));
         });
       }
+
+      /**
+       * Every one of these chats sits on a public page, and Base44 refuses
+       * `createConversation` outright for an agent that does not allow
+       * anonymous access: 401, "User must be authenticated to create a
+       * conversation". The visitor is told only "לא הצלחתי לשלוח את ההודעה
+       * כרגע", which is what a network blip says too, so the chat can be dead
+       * for days without anyone hearing about it.
+       *
+       * Nobody here chose `false`. The flag was absent from these files until
+       * a Builder "Update base44 packages" commit wrote out the full agent
+       * schema and stamped the server-side default into all three at once —
+       * precisely the drift a future regeneration will reintroduce.
+       */
+      it("is reachable by a signed-out visitor", () => {
+        expect(agent.allow_anonymous_access).toBe(true);
+      });
 
       it("can reach a human — escalateToHuman is wired as a tool", () => {
         const fns = (agent.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
@@ -245,6 +263,37 @@ describe("the chat shell enforces what a prompt cannot", () => {
 
   it("still shows contact channels when escalation fails", () => {
     expect(chat).toMatch(/HUMAN_HANDOFF\.failure/);
+  });
+
+  it("keeps those channels on screen after consent, not only before it", () => {
+    /**
+     * Structural, because the thing that broke it cannot be reached from a
+     * browser test: `messages` is replaced wholesale by every server push, so
+     * a notice written into the transcript survives only until the next one —
+     * and post-consent the transcript was the *only* place the phone number
+     * lived. The promise three lines up ("a person who asked for a person gets
+     * one even when the backend is down") therefore did not hold in the common
+     * case, and held in the one a visitor rarely takes.
+     *
+     * Two properties keep it holding: the notice is rendered from state the
+     * panel owns, in exactly one place, outside both branches of the consent
+     * gate; and it is not also written into the transcript, which would put it
+     * back where a push can erase it.
+     */
+    expect(chat.match(/\{handoffNotice \? \(/g) ?? [], "rendered in more than one place").toHaveLength(1);
+    expect(
+      chat.indexOf("{handoffNotice ? ("),
+      "the notice is still inside the pre-consent branch"
+    ).toBeGreaterThan(chat.indexOf("</AnimatePresence>"));
+    expect(chat, "the notice is written into the wipeable transcript").not.toMatch(/say\(notice\)/);
+  });
+
+  it("hands the visitor back what they typed when a send fails", () => {
+    // The user's own message reaches the transcript only by way of the server
+    // echoing it, so without this a failed send erases it from both the box and
+    // the conversation. `e2e/ui/agent-compliance.spec.ts` proves the behaviour;
+    // this names the reason next to the code.
+    expect(chat).toMatch(/setInput\(text\);/);
   });
 
   it("shows the standing disclaimer and the bot disclosure", () => {
@@ -1248,4 +1297,108 @@ describe("what the head claims the practice is", () => {
       expect(src, `${name} promises a return`).not.toMatch(/נחסוך לך|תחסכו|מובטח|רווח מובטח/);
     }
   });
+});
+/**
+ * The whole agent configuration except the prose.
+ *
+ * The prompts are pinned clause by clause above, because a reworded paragraph
+ * is the drift everyone expects. This pins everything that is *not* a prompt,
+ * because the drift that actually took the site down came from the other
+ * direction: `7bce20c` — a Builder "Update base44 packages" commit — wrote out
+ * the full agent schema and stamped eighteen previously-absent server defaults
+ * into all three files at once. Two of the eighteen carried behaviour.
+ * `allow_anonymous_access: false` returned 401 on every conversation and killed
+ * every chat on the site for ten days (A-42). `memory_config` decided whether
+ * three agents that anonymous strangers share retain what they are told. The
+ * review that merged it could not have caught either: the diff was seventy
+ * lines of `\uXXXX`-escaped Hebrew with the flags buried in it.
+ *
+ * So the test reads that diff for you. Any key the platform adds, or any value
+ * a regeneration changes, fails here and names itself, and the only way to go
+ * green is for a person to open this file and type the new value on purpose.
+ *
+ * `toEqual` against a literal, deliberately — never `toMatchSnapshot` or
+ * `toMatchInlineSnapshot`. `vitest -u` rewrites a snapshot mechanically, with
+ * nobody reading the delta, which reproduces the exact failure this exists to
+ * prevent, one layer up.
+ */
+const NON_PROMPT_SURFACE = {
+  context_files: [],
+  app_user_connector_configs: [],
+  selected_skill_names: [],
+  selected_workspace_skill_ids: [],
+  // Worth a decision of its own one day: the model behind a compliance-critical
+  // prompt can change without a commit. Pinned here so at least the *setting*
+  // cannot change without one.
+  model: "automatic",
+  whatsapp_greeting: null,
+  telegram_greeting: null,
+  line_greeting: null,
+  // Off, deliberately. `scope: "both"` includes a bucket shared across all end
+  // users, and every one of these chats is reached by anonymous visitors who
+  // are indistinguishable from one another — so "remember across conversations"
+  // and "remember across strangers" are the same setting here. The prompts are
+  // built around collecting the minimum and forgetting it; agent memory is
+  // platform-side, upstream of every guardrail this repo owns, and a
+  // `privacy_request` handoff cannot reach it. The scope is left as-is rather
+  // than tidied: with `enabled: false` it selects nothing, and changing two
+  // fields would make a future diff harder to read than changing one.
+  memory_config: {
+    enabled: false,
+    scope: "both",
+    include_other_conversation_context: false,
+    instructions: null,
+  },
+  voice_config: { voice_id: null },
+  emails_settings: null,
+  // The flag whose silent flip to `false` returned 401 on every conversation.
+  // Also asserted on its own above, where the failure message can say what it
+  // costs a visitor; here it is one field among the eighteen.
+  allow_anonymous_access: true,
+} as const;
+
+/** Capability, per agent. The one place a new tool cannot arrive unnoticed. */
+const TOOL_CONFIGS: Record<string, unknown[]> = {
+  blog_recommender: [
+    { entity_name: "BlogPost", allowed_operations: ["read"] },
+    { function_name: "escalateToHuman" },
+  ],
+  needs_interview: [
+    { function_name: "submitLead" },
+    { function_name: "createConsultationEvent" },
+    { function_name: "escalateToHuman" },
+  ],
+  support_agent: [
+    { entity_name: "BlogPost", allowed_operations: ["read"] },
+    { function_name: "logSupportChat" },
+    { function_name: "escalateToHuman" },
+  ],
+};
+
+/** Everything in the file that is configuration rather than prose. */
+const nonPromptSurface = (name: string): Record<string, unknown> => {
+  const raw = parseJsonc(
+    readFileSync(join(AGENTS_DIR, `${name}.jsonc`), "utf8")
+  ) as Record<string, unknown>;
+  delete raw.instructions;
+  delete raw.description;
+  raw.tool_configs = (raw.tool_configs as Array<Record<string, unknown>>).map((tool) => {
+    const copy = { ...tool };
+    // A tool description is prose too, and is pinned by the compliance block.
+    delete copy.description;
+    return copy;
+  });
+  return raw;
+};
+
+describe("the configuration nobody typed by hand", () => {
+  for (const name of agentNames) {
+    it(`${name} carries exactly the settings someone chose`, () => {
+      expect(nonPromptSurface(name)).toEqual({
+        ...NON_PROMPT_SURFACE,
+        tool_configs: TOOL_CONFIGS[name],
+        name,
+      });
+    });
+  }
 });

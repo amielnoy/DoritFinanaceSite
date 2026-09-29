@@ -24,7 +24,7 @@
   "telegram_greeting": null,
   "line_greeting": null,
   "memory_config": {
-    "enabled": true,
+    "enabled": false,
     "scope": "both",
     "include_other_conversation_context": false,
     "instructions": null
@@ -33,6 +33,6 @@
     "voice_id": null
   },
   "emails_settings": null,
-  "allow_anonymous_access": false,
+  "allow_anonymous_access": true,
   "name": "needs_interview"
 }

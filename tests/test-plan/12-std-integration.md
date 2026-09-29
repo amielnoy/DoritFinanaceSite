@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 168
+**Location:** `tests/integration/` · **Cases:** 213
 
 ---
 
@@ -367,7 +367,7 @@ refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 
 ## 5. Pass criteria
 
-All 200 cases pass. These assert behaviour, not shape — a failure means the
+All 213 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

@@ -1,7 +1,11 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 81 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 232 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+
+`tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
+are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
+with, and are not repeated here.
 
 ---
 
@@ -9,8 +13,11 @@
 
 Verify the repository's pure logic in isolation: the pension fee projection that
 drives the site's headline calculator, the routing/class helpers, the
-security-sensitive `?returnTo=` guard, and the contact configuration that four
-different call-to-action shapes derive from.
+security-sensitive `?returnTo=` guard, the contact configuration that four
+different call-to-action shapes derive from, the admin data services, the
+published FAQ and self-assessment content, the submission state machine every
+form shares, and the two maintenance scripts that can change or delete
+something outside the repository.
 
 ## 2. Test items
 
@@ -21,6 +28,12 @@ different call-to-action shapes derive from.
 | `cn` | `src/lib/utils.js` |
 | `safeReturnTo` | `src/lib/authReturnTo.js` |
 | `CONTACT` | `src/config/contact.js` |
+| `useSubmission`, `submissionErrorMessage` | `src/hooks/useSubmission.ts` |
+| `Base44LeadAdminService`, `Base44ContentAdminService` | `src/services/base44/` |
+| `SupabaseAuthService` | `src/services/supabase/SupabaseAuthService.ts` |
+| FAQ content | `src/content/faq.ts` |
+| Insurance self-assessment | `src/lib/insurance-assessment.ts` |
+| `reconcile-stores`, `prune-vercel-deployments` | `scripts/*.mjs` |
 
 > **Note.** `computePensionFees` was extracted from `PensionFeeCalculator.tsx`
 > during this work so the maths could be exercised without a DOM. The component
@@ -89,6 +102,12 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-CNT-003 | "keeps the wa.me number in sync with the dial number" | `whatsapp === phoneE164.replace("+","")` |
 | UNIT-CNT-004 | "keeps the display number in sync with the dial number" | Digits of `phoneDisplay` reconstruct `phoneE164` |
 | UNIT-CNT-005 | "exposes a valid contact email" | Matches an email shape |
+| UNIT-CNT-006 | "`<file>` does not hardcode the phone number or email" | One case per first-party source file under `src/`, so the count grows with the tree |
+
+> UNIT-CNT-006 is generated from the file list, not written out: a second copy
+> of the number is the failure mode this suite exists to catch, and a copy is
+> only ever added in a file nobody thought to list. The number and the address
+> may appear in `src/config/contact.js` and nowhere else.
 
 ### 4.5 Supabase auth adapter — `tests/unit/supabase-auth.test.ts`
 
@@ -128,7 +147,111 @@ so it can gate the cutover rather than merely describe it.
 | UNIT-REC-007 | "compares a rating by value" | `5` equals `"5"` |
 | UNIT-REC-008 | "compares published by truth, not spelling" | Real drift still caught |
 
+### 4.7 Vercel preview pruning — `tests/unit/prune-vercel.test.ts`
+
+The one rule in the nightly prune that can destroy something. Age decides what
+goes; two guards decide what never does. Both guards are asserted here rather
+than left to the `target=preview` API filter, so that widening that query later
+cannot quietly turn a janitor into a production reaper.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-PRV-001 | "deletes an unaliased preview past the age limit" | `{ ok: true }` |
+| UNIT-PRV-002 | "keeps a preview that is not yet old enough" | `too-new` |
+| UNIT-PRV-003 | "keeps a preview aged exactly the age limit" | `too-new` — the boundary is kept, not deleted |
+| UNIT-PRV-004 | "keeps an old preview that still has an alias" | `aliased` — an alias is evidence of use |
+| UNIT-PRV-005 | "keeps a production deployment however old" | `not-preview` |
+| UNIT-PRV-006 | "keeps a deployment with no target rather than guessing" | `not-preview` |
+
+### 4.8 Admin data services — `tests/unit/admin-services.test.ts`
+
+The two services the admin screens talk to, exercised against a recording
+store. What matters here is the request that leaves: a partial update must stay
+partial, because the admin forms send only the field that changed and anything
+the service adds of its own would overwrite a column nobody edited.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ADM-001 | "asks for leads newest-first" | Sorted descending by creation |
+| UNIT-ADM-002 | "accepts a caller-chosen page size" | Limit forwarded |
+| UNIT-ADM-003 | "returns an array when the store answers with nothing" | `[]`, never `undefined` |
+| UNIT-ADM-004 | "patches only the status when a lead is moved along" | One field in the payload |
+| UNIT-ADM-005 | "deletes by id" | Delete called with the id |
+| UNIT-ADM-006 | "lists every article, drafts included" | No published filter |
+| UNIT-ADM-007 | "creates an article with published coerced to a boolean" | `true`/`false`, not `"on"` |
+| UNIT-ADM-008 | "forwards a partial update without inventing the fields it was not given" | Payload has exactly the edited keys |
+| UNIT-ADM-009 | "defaults a testimonial's rating and source rather than sending empty ones" | Defaults applied |
+| UNIT-ADM-010 | "keeps a rating the visitor actually chose" | Explicit value survives |
+| UNIT-ADM-011 | "removes an article and a testimonial by id" | Delete called on both entities |
+
+### 4.9 FAQ content — `tests/unit/faq-content.test.ts`
+
+`src/content/faq.ts` is published copy that also feeds the `FAQPage` structured
+data (SEO-LD-*), so a duplicate or dangling entry is both a reader-facing and a
+rich-result defect.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-FAQ-001 | "has unique, stable ids" | No duplicate id |
+| UNIT-FAQ-002 | "puts every entry in a declared category, and no category is empty" | Categories and entries agree both ways |
+| UNIT-FAQ-003 | "has a question and an answer of substance on every entry" | No placeholder or stub copy |
+| UNIT-FAQ-004 | "numbers the home-page tips 1..n with no gaps or repeats" | Contiguous from 1 |
+| UNIT-FAQ-005 | "resolves every home-page common question to a real entry, once" | No dangling reference, no repeat |
+| UNIT-FAQ-006 | "does not repeat an answer under two questions" | Distinct answers |
+
+### 4.10 Insurance self-assessment — `tests/unit/insurance-assessment.test.ts`
+
+The questionnaire maps answers to suggested cover. It is guidance on a
+regulated subject, so the rules are asserted individually rather than through
+the rendered result, and the unanswered case is asserted too — a visitor who
+abandons the form halfway still gets a screen.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ASM-001 | "asks four questions, each with a stable id and at least two options" | Shape of the questionnaire |
+| UNIT-ASM-002 | "always suggests supplementary health cover" | Present in every result |
+| UNIT-ASM-003 | "makes life cover a priority for parents, couples and anyone with a mortgage" | Prioritised on those answers |
+| UNIT-ASM-004 | "treats loss of working capacity as critical for the self-employed" | Critical priority |
+| UNIT-ASM-005 | "raises critical-illness cover only on a medical or family history" | Not raised otherwise |
+| UNIT-ASM-006 | "puts pension planning first for someone approaching retirement" | Ranked first |
+| UNIT-ASM-007 | "never returns the same insurance type twice, and gives every result a reason" | Deduplicated; every item carries its reason |
+| UNIT-ASM-008 | "copes with unanswered questions" | A result, not a throw |
+
+### 4.11 Submission state machine — `tests/unit/use-submission.dom.test.ts`
+
+`useSubmission` is what all three lead forms share, so its double-submit guard
+is the single place that stops one enquiry being filed twice.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SUB-001 | "names what failed to send" | Message identifies the form |
+| UNIT-SUB-002 | "takes the fallback address from config, never from the copy" | Reads `CONTACT`, matching UNIT-CNT-006 |
+| UNIT-SUB-003 | "starts idle" | `idle` |
+| UNIT-SUB-004 | "moves idle → sending → sent and reports success" | States in order; success reported |
+| UNIT-SUB-005 | "moves to error with the right copy and reports failure" | `error` + the UNIT-SUB-001 message |
+| UNIT-SUB-006 | "runs the task once when submitted twice concurrently" | One invocation — the double-submit guard |
+| UNIT-SUB-007 | "clears the previous error when resubmitting" | No stale error on retry |
+| UNIT-SUB-008 | "reset returns it to idle" | `idle` |
+
+### The agent adapter — `agent-service.test.ts`
+
+Nine cases on `Base44AgentService`, all of them failure paths, because the
+failure paths are what was wrong. Nothing in the battery had ever exercised a
+failing `/agents/` call.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AGT-001 | "does not spend a turn on a send that failed" | 45 failed sends all reach the backend; the cap never fires. Counting attempts rather than model invocations meant an outage eventually reported itself as "השיחה הגיעה לאורכה המרבי" |
+| UNIT-AGT-002 | "still refuses once the visitor has actually taken the maximum turns" | `AgentLimitError("too_many_turns")` after 40 successful sends |
+| UNIT-AGT-003 | "refuses an over-long message without calling the backend at all" | `AgentLimitError("too_long")`; `addMessage` never called |
+| UNIT-AGT-004 | "fails with its own error instead of handing undefined to the SDK" | `agent_conversation_gone`; `addMessage` never called |
+| UNIT-AGT-005 | "keeps ordinary user and assistant turns unchanged" | Both pass through |
+| UNIT-AGT-006 | "drops a message the platform marked hidden" | `[]` |
+| UNIT-AGT-007 | "drops a system message rather than dressing it as the agent" | `[]` — `role === "user"` is false for `system`, so it used to render in an assistant bubble |
+| UNIT-AGT-008 | "drops content that is not a non-empty string" | `[]` for an object, a missing `content` and an empty one. An object reaches `<ReactMarkdown>` as a React child and, with no error boundary above the chat, whites out the SPA |
+| UNIT-AGT-009 | "passes the survivors through in order" | Order preserved after filtering |
+
 ## 5. Pass criteria
 
-All 63 cases pass. Any failure is a functional defect, not an environment issue —
+All 232 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

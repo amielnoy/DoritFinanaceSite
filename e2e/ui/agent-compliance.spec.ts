@@ -172,3 +172,64 @@ test.describe("Support chat — the open question", () => {
     expect(req.method).toBe("POST");
   });
 });
+/**
+ * What the chat does when the backend says no.
+ *
+ * Nothing in the battery exercised a failing `/agents/` call until these — the
+ * `catch` in `AgentChat.send()` had never once executed under test. That is not
+ * an academic gap: `allow_anonymous_access: false` made every conversation 401
+ * for ten days, and the only thing the visitor got was one line telling them to
+ * try again (A-42).
+ */
+test.describe("Agent chat — when the backend refuses", () => {
+  test("a refused conversation gives the visitor their message back", async ({ page, mockApi }) => {
+    await gotoApp(page, "/");
+    const section = page.locator(INTERVIEW);
+    const box = section.getByLabel("הודעה לסוכן ההיכרות");
+
+    await test_step("accept the notice so the box unlocks", async () => {
+      await section.getByRole("checkbox").check();
+      await section.getByRole("button", { name: "התחלת השיחה" }).click();
+      await expect(box).toBeEnabled();
+    });
+
+    await test_step("the backend refuses the conversation, exactly as production did", async () => {
+      mockApi.failOn("/agents/", 401, {
+        detail: "User must be authenticated to create a conversation",
+      });
+    });
+
+    const typed = "שלום, אני מתלבטת לגבי הפנסיה";
+
+    await test_step("the failure is reported rather than swallowed", async () => {
+      await box.fill(typed);
+      await section.getByRole("button", { name: "שליחה" }).click();
+      await expect(section.getByText(/לא הצלחתי לשלוח את ההודעה כרגע/)).toBeVisible();
+    });
+
+    await test_step("and what the visitor wrote is still where they can send it again", async () => {
+      // The user's own message reaches the transcript only by way of the server
+      // echoing it back, so before this it was nowhere at all: cleared from the
+      // box, absent from the conversation, one apology in its place.
+      await expect(box).toHaveValue(typed);
+    });
+  });
+
+  test("the direct channels appear even when the escalation itself fails", async ({
+    page,
+    mockApi,
+  }) => {
+    await gotoApp(page, "/");
+    const section = page.locator(INTERVIEW);
+
+    await test_step("escalateToHuman is down", async () => {
+      mockApi.failOn("escalateToHuman", 500);
+    });
+
+    await test_step("a visitor who asked for a person still gets one", async () => {
+      await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+      await expect(section.getByRole("link", { name: /050-831-1776/ })).toBeVisible();
+      await expect(section.getByRole("link", { name: "וואטסאפ", exact: true })).toBeVisible();
+    });
+  });
+});

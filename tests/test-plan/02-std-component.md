@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/sanity.test.tsx` · **Cases:** 21 · **Environment:** jsdom
+**Location:** `tests/component/sanity.test.tsx` · **Cases:** 24 · **Environment:** jsdom
 
 ---
 
@@ -14,7 +14,7 @@ on, and calls the Base44 client with the payload the backend contract expects.
 ## 2. Test items
 
 `Stars`, `MobileStickyBar`, `FloatingActions`, `PensionFeeCalculator`,
-`QuickContact`, `FAQ`, `ShareButtons`, `ReviewsWidget` — all in
+`QuickContact`, `ClaimForm`, `FAQ`, `ShareButtons`, `ReviewsWidget` — all in
 `src/components/dorit/`.
 
 ## 3. Approach
@@ -60,12 +60,24 @@ on, and calls the Base44 client with the payload the backend contract expects.
 | ID | Title | Steps | Expected result |
 |---|---|---|---|
 | CMP-QCF-001 | "disables submit until name and phone are present" | type name, then phone | Submit enabled only after both |
-| CMP-QCF-002 | "emails the office and records a Lead with source=quick" | fill + submit | `SendEmail` called with a recipient and the phone in the body; `Lead.create` called with `{name, phone, email, source:"quick", status:"new"}` |
+| CMP-QCF-002 | "hands the lead to the submitLead backend function" | fill + submit | `functions.invoke("submitLead", {name, phone, email, source:"quick"})`; `SendEmail` and `Lead.create` are **not** called — the mail and the write moved into the function |
 | CMP-QCF-003 | "confirms to the visitor and clears the form after a successful send" | submit, then "send another" | Confirmation shown; fields reset |
 | CMP-QCF-004 | "keeps the visitor's input and offers a fallback when sending fails" | `SendEmail` rejects | Error message shown; typed name still present |
-| CMP-QCF-005 | "does not submit twice on a double click" | double-click submit | `Lead.create` called exactly once |
+| CMP-QCF-005 | "does not submit twice on a double click" | double-click submit | The function is invoked exactly once |
 
-### 4.5 `<FAQ />`, `<ShareButtons />`, `<ReviewsWidget />`
+### 4.5 `<ClaimForm />` — the claim report
+
+Two of these three are regressions with a fixed shape: a handler referencing a
+setter that does not exist throws a `ReferenceError` out of an event, which
+React does not surface anywhere a visitor can see. The form simply stops.
+
+| ID | Title | Steps | Expected result |
+|---|---|---|---|
+| CMP-CLM-001 | "hands the report to the submitClaim backend function with uploaded document urls" | fill, attach a file, submit | `functions.invoke("submitClaim", {name, phone, documents:[url]})` |
+| CMP-CLM-002 | "reports a failed upload instead of crashing, and keeps the form usable" | `UploadFile` rejects | Upload error shown; submit still enabled |
+| CMP-CLM-003 | "offers a blank form again after a successful report" | submit, then "send another" | Fields cleared; submit disabled again |
+
+### 4.6 `<FAQ />`, `<ShareButtons />`, `<ReviewsWidget />`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -77,5 +89,6 @@ on, and calls the Base44 client with the payload the backend contract expects.
 
 ## 5. Pass criteria
 
-All 21 cases pass. A `Lead.create` payload assertion failing here is a contract
-break — cross-check [STD-03](03-std-contract.md) before changing the test.
+All 24 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+here is a contract break — cross-check [STD-03](03-std-contract.md) before
+changing the test.

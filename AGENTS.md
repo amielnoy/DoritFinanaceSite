@@ -28,6 +28,15 @@ npx skills add base44/skills
   stop matching. `NOTIFY_EMAILS` is the easiest to get wrong: a mailbox added to
   one function and not another raises no error anywhere — the mail simply
   reaches one fewer person, and escalations are where that costs most.
+- `dorit-mailer/functions/api/send-email.js`: the Cloudflare Pages Function every
+  outbound message goes through. The Resend key, the sender and the recipient
+  list live in the Pages project's environment, not here — that is why the
+  service exists. The sender must be on the Resend-verified subdomain; the apex
+  `govari-fin.co.il` is Microsoft 365 with an SPF that ends `-all`, so mail from
+  it is rejected.
+- `scripts/*.mjs`: maintenance jobs CI runs on a schedule. `prune-vercel-deployments.mjs`
+  deletes, so it is a dry run unless given `--apply` — check its output before
+  adding the flag. `reconcile-stores.mjs` exits non-zero on drift.
 - `vite.config.js`: Vite config and Base44 Vite plugin setup.
 - `.env.local`: local-only environment values; never commit secrets.
 - `tests/test-plan/`: the test plan and one Software Test Description per suite.

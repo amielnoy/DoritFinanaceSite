@@ -1,7 +1,7 @@
 # STD-08 — Accessibility Tests
 
 **Suite:** `a11y` · **Runner:** `npm run test:e2e:a11y` (Playwright + `@axe-core/playwright`)
-**Location:** `e2e/a11y/axe.spec.ts` · **Cases:** 21 per platform · **Standard:** WCAG 2.1 Level AA
+**Location:** `e2e/a11y/axe.spec.ts` · **Cases:** 23 per platform · **Standard:** WCAG 2.1 Level AA
 
 ---
 

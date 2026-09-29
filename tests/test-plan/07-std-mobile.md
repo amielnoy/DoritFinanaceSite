@@ -1,7 +1,8 @@
 # STD-07 — Mobile Web (iOS & Android)
 
 **Suite:** `ui` (mobile block) · **Runners:** `npm run test:e2e:ios`, `npm run test:e2e:android`
-**Location:** `e2e/ui/mobile.spec.ts` · **Cases:** 10 × 2 platforms
+**Location:** `e2e/ui/mobile.spec.ts` · **Cases:** 10 × 2 mobile platforms,
+plus 2 desktop-only counterparts in the same file
 
 ---
 
@@ -40,6 +41,17 @@ the two mobile projects and is skipped on the two desktop ones.
 | E2E-MOB-009 | "the calculator is usable on a narrow screen" | Scroll to `#fee-calculator`, set deposit | Field visible and editable; no `NaN` |
 | E2E-MOB-010 | "the viewport meta allows pinch-zoom" | Load `/` | `width=device-width` present; no `user-scalable=no` or `maximum-scale=1` |
 
+### 2.1 The desktop half of the same switch
+
+`mobile.spec.ts` also holds a `Desktop-only chrome` block, skipped by the same
+`isMobile` fixture from the other side, so the file collects 12 cases per
+project and runs 10 or 2 depending on which project it is. A responsive swap
+has two halves and only one of them is ever asserted by accident: hiding the
+desktop dock on a phone while also hiding it on a desktop passes E2E-MOB-001
+and ships a home page with no call-to-action above the fold. Those two cases
+are specified as `E2E-DSK-001/002` in
+[STD-06 §3.7](06-std-ui-e2e.md), with the rest of the desktop suite.
+
 ## 3. Defect found by this suite
 
 `E2E-MOB-006` failed on first run: the header's burger button was 38 × 38 px
@@ -54,6 +66,6 @@ stores — none of which apply to this codebase today.
 
 ## 5. Pass criteria
 
-All 10 cases pass on both `ios-safari` and `android-chrome`. The mobile
+All 10 mobile cases pass on both `ios-safari` and `android-chrome`. The mobile
 accessibility case (`A11Y-AXE-007`) in [STD-08](08-std-accessibility.md) also
 runs only on these two projects.
