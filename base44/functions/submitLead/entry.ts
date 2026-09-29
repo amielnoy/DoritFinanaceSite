@@ -444,7 +444,9 @@ async function appendEventRow(base44, row) {
     },
   );
   if (!res.ok) throw new Error(`sheets ${res.status}`);
-  return 'נרשם ✓';
+  // הסטטוס נושא את הקישור, כמו המסמך. עד כה הוא אמר שהשורה נכתבה ולא לאן,
+  // ומי שרצה לראות אותה חיפש את הגיליון לבד.
+  return `נרשם ✓ — https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
 }
 
 /**
@@ -800,6 +802,17 @@ const MAIL = {
 };
 
 /** שורת "תווית: ערך" אחת בתוך בלוק. */
+/**
+ * פיצול שורת מצב לכותרת ולקישור.
+ *
+ * שורות המצב של היומן, הגיליון והמסמך נושאות כתובת בתוך הטקסט — הגרסה הטקסטואלית
+ * של המייל צריכה אותה שם, כי אין בה מקום אחר לשים אותה. בגרסת ה-HTML כתובת
+ * מלאה בתוך תא טבלה היא שורה ארוכה שאי-אפשר ללחוץ עליה, ולכן כאן היא נעשית
+ * הקישור של התא והטקסט נשאר קצר.
+ */
+const linkIn = (value) => (String(value || '').match(/https?:\/\/\S+/) || [''])[0];
+const statusOf = (value) => String(value || '').replace(/\s*—\s*https?:\/\/\S+/, '').trim();
+
 function detailRow(label, value, { link = '', last = false } = {}) {
   const shown = escapeHtml(value || '—');
   const cell = link
@@ -898,8 +911,8 @@ function buildAgentHtml(source, data, ops) {
         detailRow('מקור', ops.source || 'quick'),
         detailRow('מזהה רשומה', ops.leadId),
         detailRow('יומן', ops.calendar),
-        detailRow('גיליון', ops.sheet),
-        detailRow('מסמך', ops.doc),
+        detailRow('גיליון', statusOf(ops.sheet), { link: linkIn(ops.sheet) }),
+        detailRow('מסמך', statusOf(ops.doc), { link: linkIn(ops.doc) }),
         detailRow('תקלות', ops.warnings.length ? ops.warnings.join(', ') : 'אין', { last: true }),
       ].join(''), { tone: ops.warnings.length ? 'alert' : 'panel' })
     : '';
