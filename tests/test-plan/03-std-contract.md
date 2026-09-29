@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 406
+**Location:** `tests/contract/` · **Cases:** 416
 
 ---
 
@@ -287,6 +287,20 @@ that "behind the tests" while a red run still reached `--prod`. A companion case
 pins that a red run *does* still deploy, as a preview — staging on red is the
 point of staging, and a later fix must not buy the gate by removing it.
 
+Ten further cases cover the run summary, per writer rather than per file. The
+two writers are split by branch and cannot both fire — "Deployed sites" on
+`main`, "Safe to merge?" on every other ref — which is deliberate, since two
+tables calling one URL different things is worse than one. The cost was that the
+branch half carried a different set of links from the trunk half, and the one it
+omitted was production: the address the verdict exists to protect was the one
+you had to look up. Each writer must now name production (from
+`vars.PRODUCTION_URL`, never written out), the Allure report and the Vercel
+staging build, and must say the links need a sign-in — both answer an anonymous
+request with a redirect, and without the note the first reading is that CI
+published a broken link. Asserted inside each job's own body, because "the
+workflow mentions Allure somewhere" is true of a workflow that prints it in only
+one of them.
+
 **`canonical-host.contract.test.ts`** — one origin, written in one place.
 `VITE_SITE_URL` is the runtime source, and every checked-in file that spells the
 host out must be one the build rewrites. `index.html` was missing from that list,
@@ -322,7 +336,7 @@ time.
 
 ## 6. Pass criteria
 
-All 406 cases pass. A failure means either the frontend or the backend definition
+All 416 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

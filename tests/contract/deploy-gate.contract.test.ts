@@ -163,3 +163,64 @@ describe('production smoke requires the actual production publisher', () => {
     expect(deploy).toMatch(/id: before\n\s+continue-on-error: true/);
   });
 });
+/**
+ * Every run says where to look, and names the same three places.
+ *
+ * The two summary writers are split by branch and cannot both fire: "Deployed
+ * sites" runs on `main` only, "Safe to merge?" on every ref but `main`. That is
+ * deliberate — two tables calling one URL different things is worse than one —
+ * but it meant the branch half quietly carried a different set of links from
+ * the trunk half, and the one it left out was production: the address the
+ * verdict exists to protect was the one you had to go and look up.
+ *
+ * Asserted per writer rather than on the file, because "the workflow mentions
+ * Allure somewhere" is true of a workflow that prints it in only one of them.
+ */
+describe("both run summaries name production, the report and staging", () => {
+  const workflow = read(".github/workflows/ci.yml");
+
+  /** The body of one job, from its key to the next top-level job key. */
+  const job = (name: string) => {
+    const start = workflow.indexOf(`\n  ${name}:\n`);
+    expect(start, `no job named ${name}`).toBeGreaterThan(-1);
+    const rest = workflow.slice(start + 1);
+    const next = rest.slice(1).search(/\n {2}[a-z][a-z0-9-]*:\n/);
+    return next === -1 ? rest : rest.slice(0, next + 1);
+  };
+
+  for (const [jobName, where] of [
+    ["sites", "`main`"],
+    ["merge-readiness", "every other branch"],
+  ] as const) {
+    describe(`${jobName} — ${where}`, () => {
+      const body = job(jobName);
+
+      it("writes to the run summary at all", () => {
+        expect(body).toMatch(/GITHUB_STEP_SUMMARY/);
+      });
+
+      it("names production", () => {
+        // Read from a repository variable, never written out: the address moves
+        // to the custom domain and a literal would go stale silently.
+        expect(body).toMatch(/vars\.PRODUCTION_URL/);
+        expect(body).toMatch(/\$\{PRODUCTION_URL/);
+      });
+
+      it("names the Allure report", () => {
+        expect(body).toMatch(/Allure/);
+        expect(body).toMatch(/ALLURE_URL|ALLURE_HOME|ALLURE_ALIAS/);
+      });
+
+      it("names the Vercel staging build", () => {
+        expect(body).toMatch(/Vercel/);
+        expect(body).toMatch(/VERCEL_URL|PREVIEW_URL/);
+      });
+
+      it("says the links need a sign-in", () => {
+        // Both answer anonymously with a redirect. Without the note the first
+        // reaction to either is that CI published a broken link.
+        expect(body).toMatch(/302|Access|sign in/i);
+      });
+    });
+  }
+});

@@ -1296,6 +1296,12 @@ jobs:
           PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           IS_BUILDER: ${{ github.ref == 'refs/heads/builder' || github.head_ref == 'builder' }}
+          # Production is named here even though this job never moves it. A
+          # branch run's summary used to carry the preview and the report and
+          # nothing else, so the one address the verdict is actually protecting
+          # was the one you had to go and look up.
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+          BASE44_URL: ${{ vars.BASE44_URL }}
         run: |
           # The report's permanent home — the `main` alias, newest trunk report.
           # This job runs on every branch but `main`, and a feature branch never
@@ -1336,31 +1342,38 @@ jobs:
             echo "| Unit · component · contract · security | ${UNIT} |"
             echo "| e2e across four platforms | ${E2E} |"
             echo
-            if [ -n "$PREVIEW_URL" ]; then
-              echo "**Preview of this change:** ${PREVIEW_URL}"
-              echo
-              echo "> Sign in to Vercel to open it — previews answer anonymous requests with a 302."
+            # One table, the same three rows `main` gets from the "Deployed
+            # sites" job, so the answer to "where do I look" does not depend on
+            # which branch the run was on. Ordered by what a red verdict means:
+            # production is what is being protected, the report says what broke,
+            # staging is where you open the broken build next to it.
+            echo "| Where to look | URL | This run |"
+            echo "| --- | --- | --- |"
+
+            echo "| **Base44** (production — client-facing) | ${PRODUCTION_URL:-${BASE44_URL:-https://safe-arch-plan.base44.app}} | unchanged — publishing runs only from a green \`main\` |"
+
+            if [ -n "$ALLURE_URL" ]; then
+              echo "| **Allure — test report** (behind Cloudflare Access) | ${ALLURE_ALIAS:-$ALLURE_URL} | [this run's copy](${ALLURE_URL}) |"
+            elif [ -n "$ALLURE_HOME" ] && [ "$ALLURE_RESULT" = "success" ]; then
+              # A feature branch never publishes to Cloudflare, so the hosted
+              # address shows `main`, not this branch. Say which, or the report
+              # reads as this run's and quietly disagrees with the verdict above.
+              echo "| **Allure — test report** (behind Cloudflare Access) | ${ALLURE_HOME} | latest \`main\`; this branch's is the [\`allure-report\` artifact](${RUN_URL}) |"
+            elif [ "$ALLURE_RESULT" = "success" ]; then
+              echo "| **Allure — test report** | [\`allure-report\` on this run](${RUN_URL}) | one self-contained \`index.html\` |"
             else
-              echo "_No preview was deployed for this run._"
+              echo "| **Allure — test report** | — | not built (${ALLURE_RESULT}) |"
+            fi
+
+            if [ -n "$PREVIEW_URL" ]; then
+              echo "| **Vercel** (staging — this change, built) | ${PREVIEW_URL} | deployed this run |"
+            else
+              echo "| **Vercel** (staging) | — | not deployed; only \`main\` and \`builder\` deploy |"
             fi
             echo
-            if [ -n "$ALLURE_URL" ]; then
-              echo "**Test report:** ${ALLURE_ALIAS:-$ALLURE_URL} (sign in through Cloudflare Access)"
-              echo "— [this run's copy](${ALLURE_URL}) if the branch has moved on since — or the"
-              echo "\`allure-report\` artifact on [this run](${RUN_URL})."
-            elif [ -n "$ALLURE_HOME" ] && [ "$ALLURE_RESULT" = "success" ]; then
-              echo "**Test report:** this run's is the \`allure-report\` artifact on"
-              echo "[this run](${RUN_URL}) — one self-contained \`index.html\`, no server needed."
-              echo
-              echo "The hosted report lives at ${ALLURE_HOME} (sign in through Cloudflare"
-              echo "Access). It shows the latest **\`main\`** run, not this branch: only \`main\`,"
-              echo "\`builder\` and a manual dispatch publish there."
-            elif [ "$ALLURE_RESULT" = "success" ]; then
-              echo "**Test report:** the \`allure-report\` artifact on [this run](${RUN_URL}) — one self-contained"
-              echo "\`index.html\`; unzip and open it, no server needed."
-            else
-              echo "_Test report: not built (${ALLURE_RESULT})._"
-            fi
+            echo "> Both links need a sign-in: Vercel answers anonymous requests with a 302, and the"
+            echo "> report sits behind Cloudflare Access because this repository is private and the"
+            echo "> report carries the client's copy."
             echo
             if [ "$IS_BUILDER" = "true" ]; then
               echo "> Heads-up: every Builder branch shares the app's **live data**. The tests never"
