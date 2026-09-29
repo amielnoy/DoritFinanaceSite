@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 68 in `e2e/ui`, of 178 across the whole e2e suite, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 68 in `e2e/ui`, of 179 across the whole e2e suite, run on all four platforms
 
 ---
 

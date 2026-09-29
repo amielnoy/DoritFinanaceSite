@@ -262,3 +262,70 @@ test.describe("Accessibility — structural sanity", () => {
     });
   });
 });
+
+/**
+ * An article is the one page on this site that asks for sustained reading, and
+ * the people it is written for are often reading it at sixty-five, with
+ * dyslexia, or on a day when holding attention is hard.
+ *
+ * Axe cannot see any of this. Every rule below passes an automated audit at any
+ * value, which is exactly why they need pinning: each one is a legibility
+ * decision that a later styling change would undo without failing anything.
+ * Asserted on computed style rather than on the stylesheet, because what a
+ * reader gets is what the browser resolved.
+ */
+test.describe("Article legibility", () => {
+  test("an article is set for people who find reading hard", async ({ page }) => {
+    await gotoApp(page, "/blog/post-1");
+    const body = page.locator(".blog-body");
+    await expect(body).toBeVisible();
+
+    const m = await body.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const quote = el.querySelector("blockquote");
+      return {
+        width: el.getBoundingClientRect().width,
+        containerWidth: (el.parentElement as HTMLElement).getBoundingClientRect().width,
+        maxWidth: cs.maxWidth,
+        lineHeight: parseFloat(cs.lineHeight) / parseFloat(cs.fontSize),
+        fontSize: parseFloat(cs.fontSize),
+        color: cs.color,
+        quoteStyle: quote ? getComputedStyle(quote).fontStyle : "normal",
+      };
+    });
+
+    await test_step("the line is bounded, not the full width of the page", async () => {
+      /**
+       * A count of characters would be the honest measure — past roughly
+       * seventy the eye loses the line on the return sweep, which is the
+       * failure dyslexic readers report most. It cannot be taken here: this
+       * suite stubs Google Fonts to stay hermetic, so Heebo never loads and any
+       * character probe measures a fallback face with different metrics. It
+       * read 66 against the dev server and 75 here, for identical CSS.
+       *
+       * So assert the thing that survives the missing font: a measure is
+       * applied, and it is materially narrower than the column it sits in. The
+       * character count itself is set in `src/index.css`, against a browser
+       * measurement recorded in the comment there.
+       */
+      expect(m.maxWidth, "the measure was removed").not.toBe("none");
+      expect(m.width).toBeLessThan(m.containerWidth * 0.95);
+    });
+
+    await test_step("the lines are far enough apart to track", async () => {
+      expect(m.lineHeight).toBeGreaterThanOrEqual(1.7);
+    });
+
+    await test_step("the body text is not set at a fraction of the ink", async () => {
+      // `rgba(...)` with an alpha below 1 is a designer's grey, and it costs
+      // contrast exactly where an ageing eye has least to spare.
+      expect(m.color, "body text is dimmed").not.toMatch(/rgba\([^)]*,\s*0?\.\d+\s*\)/);
+    });
+
+    await test_step("nothing long is set in italic", async () => {
+      // Hebrew has no true italic; browsers synthesise it by shearing the
+      // glyphs, and sheared Hebrew is measurably harder to decode.
+      expect(m.quoteStyle).toBe("normal");
+    });
+  });
+});

@@ -17,6 +17,24 @@ Automated scanning catches roughly a third to a half of real WCAG issues. It
 does not replace a screen-reader pass (VoiceOver/NVDA) or a keyboard-only
 walkthrough by a person.
 
+
+## Article legibility
+
+Axe cannot see any of this, which is why it is pinned separately: every rule
+below passes an automated audit at any value, and each is a legibility decision
+a later styling change would undo without failing anything.
+
+| ID | Title | Expected result |
+|---|---|---|
+| A11Y-ART-001 | "an article is set for people who find reading hard" | A measure is applied and is materially narrower than its column; line-height ≥ 1.7; body colour carries no alpha below 1; no `blockquote` set in italic |
+
+The character count itself is **not** asserted here. This suite stubs Google
+Fonts to stay hermetic, so Heebo never loads and a character probe measures a
+fallback face — it read 66 against the dev server and 75 here, for identical
+CSS. The count lives in `src/index.css`, against a browser measurement recorded
+in the comment beside it. Hebrew has no true italic, so a browser synthesises
+one by shearing the glyphs, and sheared Hebrew is measurably harder to decode.
+
 ## 2. Configuration
 
 | | |
