@@ -49,8 +49,7 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `logSupportChat` | the support agent, at the end of every conversation |
 | `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
-`createConsultationEvent` and `createOutlookEvent` are not yet executed here.
-See §6.
+`createConsultationEvent` is not yet executed here. See §6.
 
 ## 4. Test cases
 
@@ -373,8 +372,11 @@ expectation.
 
 ## 6. Known gaps
 
-- **`createConsultationEvent` and `createOutlookEvent`** are only observed
-  indirectly, through the `Promise.allSettled` that `submitLead` fires at them.
+- **`createConsultationEvent`** is only observed indirectly, through the
+  `Promise.allSettled` the lead adapter fires at it. It now writes to both
+  Outlook and Google from one provider table, which makes the gap wider than it
+  was: nothing executes the Graph branch, and the Graph branch is the one that
+  reaches Dorit's own diary (A-47).
 
 That one belongs in [10-known-issues.md](10-known-issues.md) until it is covered.
 `submitClaim` was on this list and no longer is — §4.10 executes it.

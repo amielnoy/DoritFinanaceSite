@@ -50,6 +50,15 @@ export class Base44LeadService implements LeadPort {
    * Calendar holds are decoration on top of a submission that has already
    * succeeded, so a failure is swallowed here rather than surfaced — this is
    * the one place where that is the right call.
+   *
+   * One call, two calendars. This used to invoke `createConsultationEvent` and
+   * `createOutlookEvent` side by side: two backend functions holding the same
+   * event-building code, differing only in which API they posted it to. That is
+   * the duplication `AGENTS.md` warns about, and it had already drifted — the
+   * timezone fix that stopped 10:00 landing at 13:00 went into the Google copy
+   * and not the Outlook one, so one diary held the agreed hour and the other did
+   * not, with nothing anywhere saying so. `createConsultationEvent` now builds
+   * the event once and writes it to every calendar in `CALENDAR_PROVIDERS`.
    */
   async requestConsultationEvent(lead: Lead): Promise<void> {
     const payload = {
@@ -61,9 +70,12 @@ export class Base44LeadService implements LeadPort {
       notes: lead.notes ?? "",
       scheduledAt: lead.scheduledAt ?? "",
     };
+    // `Promise.allSettled` over one call rather than a bare `await`: what is
+    // load-bearing here is that nothing this method does can reject into a
+    // caller whose lead is already saved, and that has to survive the day a
+    // second call comes back.
     await Promise.allSettled([
       this.client.functions.invoke("createConsultationEvent", payload),
-      this.client.functions.invoke("createOutlookEvent", payload),
     ]);
   }
 }
