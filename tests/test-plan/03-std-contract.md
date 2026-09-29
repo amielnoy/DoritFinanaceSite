@@ -87,7 +87,7 @@ Two helpers do the work:
 Two files here test text rather than shape, and do so on purpose. Both cover
 artefacts that a regulator, not a compiler, is the reader of.
 
-**`agents.contract.test.ts` — `CTR-AGT-001..167`** — the three agent prompts. For each
+**`agents.contract.test.ts` — `CTR-AGT-001..170`** — the three agent prompts. For each
 agent it asserts the eighteen mandatory clauses of the compliance block (bot
 disclosure, licence number `L-00107009`, the marketing-not-advice statement, the
 absolute bans on product recommendation and figures, the privacy-law citation
@@ -95,6 +95,16 @@ and data-minimisation rule, the complaint and privacy-request routes, the
 "never guess — escalate" default, and the fallback phone and email), that
 `escalateToHuman` is wired as a tool, that the prompt opens by disclosing it is
 automated, and that no agent is granted an entity operation beyond its job.
+
+One case there is about reachability rather than compliance: every agent must
+carry `allow_anonymous_access: true`. All three sit on public pages, and Base44
+answers `createConversation` for an agent without it with a 401 — "User must be
+authenticated to create a conversation" — which the chat reports as the same
+"לא הצלחתי לשלוח את ההודעה כרגע" line a network blip produces. The flag was
+absent from these files until a Builder "Update base44 packages" commit wrote
+out the full agent schema and stamped the server default, `false`, into all
+three at once, taking every chat on the site down silently. It is pinned here
+because the next regeneration will try the same thing.
 
 It then pins the four places the escalation vocabulary is written down —
 `Lead.escalation_reason`, each prompt, `src/config/compliance.ts` and the

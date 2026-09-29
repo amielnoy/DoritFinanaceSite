@@ -31,6 +31,6 @@
     "voice_id": null
   },
   "emails_settings": null,
-  "allow_anonymous_access": false,
+  "allow_anonymous_access": true,
   "name": "blog_recommender"
 }

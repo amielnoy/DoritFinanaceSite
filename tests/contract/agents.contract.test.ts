@@ -28,6 +28,7 @@ interface AgentDefinition {
     entity_name?: string;
     allowed_operations?: string[];
   }>;
+  allow_anonymous_access?: boolean;
 }
 
 const parseJsonc = (raw: string): unknown =>
@@ -87,6 +88,23 @@ describe("on-site agent definitions", () => {
           expect(agent.instructions).toMatch(new RegExp(needle));
         });
       }
+
+      /**
+       * Every one of these chats sits on a public page, and Base44 refuses
+       * `createConversation` outright for an agent that does not allow
+       * anonymous access: 401, "User must be authenticated to create a
+       * conversation". The visitor is told only "לא הצלחתי לשלוח את ההודעה
+       * כרגע", which is what a network blip says too, so the chat can be dead
+       * for days without anyone hearing about it.
+       *
+       * Nobody here chose `false`. The flag was absent from these files until
+       * a Builder "Update base44 packages" commit wrote out the full agent
+       * schema and stamped the server-side default into all three at once —
+       * precisely the drift a future regeneration will reintroduce.
+       */
+      it("is reachable by a signed-out visitor", () => {
+        expect(agent.allow_anonymous_access).toBe(true);
+      });
 
       it("can reach a human — escalateToHuman is wired as a tool", () => {
         const fns = (agent.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
