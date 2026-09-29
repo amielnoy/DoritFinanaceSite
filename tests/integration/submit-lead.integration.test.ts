@@ -275,6 +275,39 @@ describe("submitLead — what survives a failure", () => {
     expect(r.mailTo(OPS).text).toMatch(/תקלות:.*calendar_\w+_(failed|rejected)/);
   });
 
+  it("names the upstream reason when the mailer refuses", async () => {
+    /**
+     * `mailer_http_502` alone says Dorit did not get the summary. It does not
+     * say why, and the why is in the body the caller used to throw before
+     * reading — `failed: ["http_403"]`, Resend's own status. That gap is what
+     * turned a five-minute fix into a morning of guessing.
+     */
+    const r = await invokeFunction("submitLead", consultation, {
+      resendStatus: 502,
+      resendResponse: { ok: false, error: "send_failed", failed: ["http_403"] },
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.warnings as string[]).toSatisfy((w: string[]) =>
+      w.some((x) => x.includes("mailer_http_502:http_403"))
+    );
+  });
+
+  it("keeps the reason to a closed vocabulary", async () => {
+    // The comment this replaced was right about the danger: a provider's prose
+    // must not reach a warning the operations mail prints. Only a status code
+    // or one of two fixed words survives the filter.
+    const r = await invokeFunction("submitLead", consultation, {
+      resendStatus: 502,
+      resendResponse: {
+        ok: false,
+        failed: ["Invalid API key: re_live_abcdefghijklmnop", "network_error"],
+      },
+    });
+    const warnings = (r.json.warnings as string[]).join(" ");
+    expect(warnings, "a provider's prose reached the warning").not.toMatch(/Invalid API key|re_live/);
+    expect(warnings).toContain("network_error");
+  });
+
   it("does not attempt a calendar event without a connector token", async () => {
     const r = await invokeFunction("submitLead", consultation, {
       connections: { outlook: null },

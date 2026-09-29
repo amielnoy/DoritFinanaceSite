@@ -75,7 +75,10 @@ CI never touches production data.
 | API-LIV-007 | "support_agent opens a conversation for a signed-out visitor" | 200 with an `id` |
 
 `API-LIV-005..007` are the only checks in the battery that would have caught
-A-42. The static contract tests read the repo, and the repo was correct; what
+A-42. They send `x-base44-anonymous-id`, which is how Base44 identifies a
+signed-out person; without it the backend answers 401 with the same message a
+closed agent gives, and the probe cannot tell a refused visitor from no visitor
+at all (A-49). The static contract tests read the repo, and the repo was correct; what
 was wrong was the value in the running backend. The hermetic e2e suite stubs
 `**/api/**` by design, and the production smoke job reuses those same specs, so
 it verified the *bundle* was published and nothing about whether anything

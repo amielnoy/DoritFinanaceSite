@@ -72,6 +72,29 @@ function deliveryWarning(label, error) {
  * What travels is the finished message: these functions own the templates, the
  * escaping and `redact()` on anything a model wrote.
  */
+/**
+ * מה הספק שבקצה אמר, במילון סגור.
+ *
+ * ה-mailer מחזיר סירוב עם `failed: ["http_403"]` — הסיבה האמיתית, מ-Resend.
+ * הקוד כאן זרק לפני שקרא אותה, ולכן כל מה ששרד היה "ה-mailer החזיר 502":
+ * מספיק כדי לדעת שדורית לא קיבלה את הסיכום, לא מספיק כדי לדעת למה. בפועל זה
+ * הבדל בין תיקון של חמש דקות לבין בוקר שלם.
+ *
+ * זה אינו חשיפה של גוף תשובה: הערכים הם אוצר מילים סגור — `http_<status>`,
+ * `no_message_id`, `network_error` — ומה שאינו תואם לו נזרק. אין כאן טקסט
+ * חופשי מהספק ואין אישורי גישה.
+ *
+ * משוכפלת בכל פונקציה ששולחת דואר בכוונה — אין מודול משותף ב-Base44.
+ * משוכפל זה בסדר, מפוצל זה לא.
+ */
+function upstreamReasons(result) {
+  const reasons = Array.isArray(result?.failed) ? result.failed : [];
+  const safe = [...new Set(reasons.filter(
+    (r) => typeof r === 'string' && /^(http_\d{3}|no_message_id|network_error)$/.test(r)
+  ))];
+  return safe.length ? `:${safe.join(',')}` : '';
+}
+
 async function sendMail({ base44, to, subject, html, text, body, rid, role }) {
   // התפקיד ולא הכתובת. אחד הנמענים הוא המבקר עצמו, וכתובתו לא תיכתב ליומן
   // שנשמר לאורך זמן — `role` מספיק כדי לדעת איזה עותק לא יצא.
@@ -114,10 +137,18 @@ async function sendMail({ base44, to, subject, html, text, body, rid, role }) {
   } catch {
     throw new Error('mailer_network_error');
   }
-  // Never surface provider response bodies or credentials in public warnings.
-  if (!response.ok) throw new Error(`mailer_http_${response.status}`);
+  // Never surface provider response bodies or credentials in public warnings —
+  // only the closed vocabulary `upstreamReasons` allows through. The body is
+  // read before the status is judged, because on a refusal it is the only place
+  // the cause exists.
   const result = await response.json().catch(() => null);
-  if (!result?.ok) throw new Error('mailer_rejected');
+  const why = upstreamReasons(result);
+  if (!response.ok) throw new Error(`mailer_http_${response.status}${why}`);
+  if (!result?.ok) throw new Error(`mailer_rejected${why}`);
+  // A 200 can still carry refusals: one recipient was accepted and another was
+  // not. Reporting that as a clean send is how a copy goes missing with every
+  // indicator green.
+  if (why) log('warn', 'mail.partial', { rid, role, transport: 'mailer', why: why.slice(1) });
   log('info', 'mail.sent', { rid, role, transport: 'mailer', ms: Date.now() - started });
 }
 

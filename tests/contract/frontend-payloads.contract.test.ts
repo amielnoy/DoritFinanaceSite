@@ -140,6 +140,28 @@ describe("dependency inversion holds", () => {
    * Caught here only because the shadowing copy also imported the SDK. A boilerplate
    * page that happened not to would have replaced a real one in silence.
    */
+  it("resolves TypeScript ahead of JavaScript, so a collision cannot swap a page", () => {
+    /**
+     * Vite's default order puts `.jsx` before `.tsx`. The case below fails when
+     * a collision exists, but it runs in CI and the swap is silent until then —
+     * and the Base44 Builder re-adds those boilerplate `.jsx` templates on its
+     * own schedule, three times in one day (A-46, A-50). Reordering makes the
+     * collision harmless rather than merely detectable: this repo is
+     * TypeScript, and the TypeScript file is always the one that means
+     * something.
+     */
+    const config = read(join(REPO_ROOT, "vite.config.js"));
+    const order = config.match(/extensions:\s*\[([^\]]*)\]/)?.[1];
+    expect(order, "vite.config.js no longer pins the resolution order").toBeTruthy();
+    const exts = [...order!.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    for (const [ts, js] of [[".ts", ".js"], [".tsx", ".jsx"]] as const) {
+      expect(
+        exts.indexOf(ts),
+        `${ts} must resolve before ${js}`
+      ).toBeLessThan(exts.indexOf(js));
+    }
+  });
+
   it("no .jsx shadows a .tsx of the same name", () => {
     const byStem = new Map<string, string[]>();
     for (const f of sourceFiles()) {

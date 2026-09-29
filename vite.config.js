@@ -25,6 +25,26 @@ export default defineConfig({
     // VITE_SITE_URL names a different origin. See the plugin for why.
     siteUrl(),
   ],
+  /**
+   * TypeScript wins a name collision, which Vite's default order does not do.
+   *
+   * The default is ['.mjs','.js','.mts','.ts','.jsx','.tsx','.json'] — `.jsx`
+   * ahead of `.tsx`. So the day something dropped `src/pages/Login.jsx` beside
+   * the real `src/pages/Login.tsx`, the boilerplate became the login page and
+   * the TypeScript one stopped being imported by anything while still sitting
+   * there looking authoritative (A-46). Nothing failed; the file that shipped
+   * simply changed.
+   *
+   * That keeps happening: the Base44 Builder re-adds those templates on its own
+   * schedule, three times in one day (A-50). A contract test fails on the
+   * duplicate so it gets cleaned up, but the test runs in CI and the swap is
+   * silent in between. Putting `.ts`/`.tsx` first makes the collision harmless
+   * rather than merely detectable — this repo is TypeScript, and the TypeScript
+   * file is always the one that means something.
+   */
+  resolve: {
+    extensions: ['.mjs', '.mts', '.ts', '.tsx', '.js', '.jsx', '.json'],
+  },
   define: {
     /**
      * Whether this build runs on a host that answers `/_vercel/insights/*`.

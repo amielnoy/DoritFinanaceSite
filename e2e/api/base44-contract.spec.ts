@@ -273,7 +273,26 @@ test.describe("Live Base44 backend (opt-in)", () => {
       const api = await playwright.request.newContext({ baseURL: LIVE_URL });
 
       await test_step("an anonymous POST is accepted and returns a conversation", async () => {
+        /**
+         * `x-base44-anonymous-id` is what makes this request *a visitor*.
+         *
+         * Base44 reads it as the identity of a signed-out person, and the SDK
+         * sends it on every call from the browser. Without it the backend sees
+         * no visitor at all and answers 401 — the same status and the same
+         * message as a genuinely closed agent, which is how the first version
+         * of this probe spent a day reporting an outage that had already been
+         * fixed (A-49). The header is the difference between "a visitor was
+         * refused" and "nobody asked".
+         *
+         * The flag this test exists for is checked independently of it: with
+         * the header present and `allow_anonymous_access: false`, the backend
+         * still refuses, so A-42 would still be caught.
+         */
         const res = await api.post(`/api/apps/${LIVE_APP_ID}/agents/conversations`, {
+          headers: {
+            "x-app-id": LIVE_APP_ID!,
+            "x-base44-anonymous-id": `ci-smoke-${Date.now()}`,
+          },
           data: { agent_name: agent, metadata: { name: "ci-smoke", description: "CI reachability probe" } },
         });
         expect(
