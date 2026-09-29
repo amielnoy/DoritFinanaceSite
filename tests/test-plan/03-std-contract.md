@@ -70,24 +70,39 @@ Two helpers do the work:
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-FN-001 | "is invoked from the interview agent" | Called server-side at the end of the scheduling step; the browser wizard that used to call it is deleted |
+| CTR-FN-001 | "is issued by the lead adapter, so components never call it directly" | `invoke("createConsultationEvent"` appears in the adapter and in no component |
 | CTR-FN-002 | "the client sends exactly the fields the function reads" | Client keys ≡ the function's destructured body fields |
 | CTR-FN-003 | "the function's mandatory fields are the same as the Lead entity's" | Guard is on `name` and `phone`, matching `Lead.required` |
 | CTR-FN-004 | "returns 400 with an error message when name or phone is missing" | A 400 `Response.json({error})` exists |
-| CTR-FN-005 | "surfaces an upstream Google Calendar failure as 502" | `if (!res.ok)` → status 502 |
+| CTR-FN-005 | "surfaces an upstream calendar failure as 502, not as a success" | `if (!res.ok)` → status 502 |
 | CTR-FN-006 | "catches unexpected errors as 500" | `catch (error)` → status 500 |
 | CTR-FN-007 | "returns `{ ok, eventId, htmlLink }` on success" | Success literal carries all three keys |
 | CTR-FN-008 | "every error response carries an `error` key" | ≥3 error responses, all with `error` |
-| CTR-FN-009 | "takes the Google token from the connector, never from a literal" | `connectors.getConnection('googlecalendar')`; no secret literals |
+| CTR-FN-009 | "takes every calendar token from a connector, never from a literal" | Both connectors named in the provider table; token read as `getConnection(cal.connector)`; no secret literals |
 | CTR-FN-010 | "does not echo the access token back to the caller" | No `accessToken` in any `Response.json(...)` |
-| CTR-FN-011 | "uses a declared connector that exists in the repo" | `base44/connectors/googlecalendar.jsonc` present |
+| CTR-FN-011 | "uses declared connectors that exist in the repo" | `outlook.jsonc` and `googlecalendar.jsonc` both present |
+| CTR-FN-012 | "asks Outlook for the scope it actually needs" | `outlook.jsonc` carries `Calendars.ReadWrite` |
+| CTR-FN-013 | "both calendars are reached through one function, not two" | One payload; one `invoke`; **no** `invoke("createOutlookEvent"` anywhere in the adapter |
+| CTR-FN-014 | "writes to Outlook and Google, Outlook first" | Default provider list is `outlook,google` |
+| CTR-FN-015 | "gives each calendar the timezone name it understands" | `Israel Standard Time` for Graph, `Asia/Jerusalem` for Google |
+| CTR-FN-016 | "reads the event link under each calendar's own name" | `data.webLink` and `data.htmlLink` |
+| CTR-FN-017 | "one calendar failing does not lose the other" | The loop `continue`s; the 502 is conditioned on `created.length === 0` |
+| CTR-FN-018 | "refuses rather than reporting success when no calendar is configured" | `PROVIDERS.length === 0` → 500 |
+
+`CTR-FN-013..018` exist because the two calendars differ in four small,
+trap-shaped ways, and every one of them fails *silently* when it is wrong: the
+event is accepted, and it is in the wrong place or at the wrong hour. That is
+not hypothetical — A-47 is exactly it. Two functions held the same
+event-building code, one of them got the timezone fix and the other did not, and
+meetings booked from the consultation form sat three hours late in the only
+diary Dorit actually reads.
 
 ## 4a. The compliance contract
 
 Two files here test text rather than shape, and do so on purpose. Both cover
 artefacts that a regulator, not a compiler, is the reader of.
 
-**`agents.contract.test.ts` — `CTR-AGT-001..170`** — the three agent prompts. For each
+**`agents.contract.test.ts` — `CTR-AGT-001..175`** — the three agent prompts. For each
 agent it asserts the eighteen mandatory clauses of the compliance block (bot
 disclosure, licence number `L-00107009`, the marketing-not-advice statement, the
 absolute bans on product recommendation and figures, the privacy-law citation
