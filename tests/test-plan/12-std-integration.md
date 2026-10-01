@@ -241,6 +241,26 @@ configured, that a failed append never costs the enquiry, and that a *partial*
 interview writes no row at all: logging someone who started and left would
 retain their details in the one place a deletion request does not reach.
 
+### 4.11d `submitLead` — the links in the copy Dorit reads — `INT-LEAD-088..093`
+
+The summary document and the sheet row were linked from the operational
+appendix, and the appendix is deliberately suppressed in the agency copy. So the
+operations team had the addresses and the person acting on the enquiry did not —
+she found the document by searching Drive.
+
+The cause was ordering, not the template: her mail went out immediately after
+the save, before the calendar, the sheet row and the document existed, so there
+was no address to put in it. Her send now happens after all three.
+
+These pin both links in both halves of her mail; that they arrive without the
+rest of the appendix, record id included; that the operations copy still prints
+each address exactly once rather than twice; that a missing sheet or a failed
+document omits its row instead of rendering a dead link; and — the case that
+guards the fix itself — that her send really is ordered after both writes. The
+same move is why the sheet, document and calendar fetches each carry an
+`AbortSignal.timeout`: an unresponsive Google used to delay an appendix, and
+would now delay the one message somebody is waiting on.
+
 ### 4.11c `escalateToHuman` — the notification is readable — `INT-ESC-020..028`
 
 The handover went out as plain text only, and clients folded it into one running
@@ -366,7 +386,7 @@ refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 
 ## 5. Pass criteria
 
-All 213 cases pass. These assert behaviour, not shape — a failure means the
+All 228 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

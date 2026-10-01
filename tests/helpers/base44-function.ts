@@ -213,7 +213,11 @@ export async function invokeFunction(
     return {
       ok: status >= 200 && status < 300,
       status,
-      json: async () => ({ id: "remote-1" }),
+      // `id` for the calendar providers, `documentId` for the Docs API. Both,
+      // because one stub serves every upstream — and a doc created here used
+      // to come back without an id, so the summary link in the mail read
+      // `/document/d/undefined/edit` and no assertion could see it.
+      json: async () => ({ id: "remote-1", documentId: "doc-test-id" }),
       text: async () => "",
     };
   };

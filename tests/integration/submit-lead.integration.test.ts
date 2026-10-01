@@ -1373,3 +1373,100 @@ describe("submitLead — the operations appendix links to what it wrote", () => 
     expect(ops.html).not.toContain("spreadsheets/d");
   });
 });
+
+/**
+ * The two links Dorit needs, in the copy she actually reads.
+ *
+ * She had the enquiry and the operations team had the links. Her mail went out
+ * immediately after the save — before the calendar, the sheet row and the
+ * summary document existed — so there was nothing to link to at the time it was
+ * built. The links were in the operational appendix, which is deliberately
+ * suppressed in her copy, and she found the document by searching Drive.
+ *
+ * Her send now happens after all three. That is why the sheet, document and
+ * calendar fetches each carry an `AbortSignal.timeout`: before, an unresponsive
+ * Google delayed an appendix; now it would delay the one message somebody is
+ * waiting on.
+ */
+describe("submitLead — the agency copy carries the links", () => {
+  const env = {
+    MAILER_URL,
+    MAILER_TOKEN: "test-only-token",
+    SHEET_ID: "sheet-test-id",
+    SHEET_TAB: "Events",
+  };
+  const SHEET = "https://docs.google.com/spreadsheets/d/sheet-test-id/edit";
+  const DOC = "https://docs.google.com/document/d/doc-test-id/edit";
+
+  it("links the summary document and the sheet row, in both halves", async () => {
+    const r = await invokeFunction("submitLead", consultation, { env });
+    const mail = r.mailTo(AGENCY);
+    expect(mail.html, "the document is not linked").toContain(`href="${DOC}"`);
+    expect(mail.html, "the sheet row is not linked").toContain(`href="${SHEET}"`);
+    // The text half is not a courtesy: it is what a client that refuses HTML
+    // renders, and a link present in only one half disappears without a sound.
+    expect(mail.text).toContain(DOC);
+    expect(mail.text).toContain(SHEET);
+  });
+
+  it("adds the links without bringing the operational appendix with them", async () => {
+    // The distinction the whole change rests on. She gets two addresses; the
+    // record id, the warning list and the rest of the ops panel stay internal.
+    const r = await invokeFunction("submitLead", consultation, { env });
+    const mail = r.mailTo(AGENCY);
+    expect(mail.html).not.toContain("מצב תפעולי");
+    expect(mail.text).not.toContain("מצב תפעולי");
+    expect(mail.html).not.toContain("LEAD-1");
+  });
+
+  it("does not print either address twice to the operations team", async () => {
+    // They read the appendix, which already carries both. A second copy of the
+    // same two links above it is noise in the mail that is read under pressure.
+    const r = await invokeFunction("submitLead", consultation, { env });
+    const html = r.mailTo(OPS).html!;
+    expect(html.split(`href="${DOC}"`)).toHaveLength(2);
+    expect(html.split(`href="${SHEET}"`)).toHaveLength(2);
+  });
+
+  it("omits a link rather than offering a broken one", async () => {
+    // No SHEET_ID and no document: the block must not appear at all. A row
+    // reading "לפתיחה" over a dead href is worse than an absent row, because
+    // it looks like the thing was written when it was not.
+    const r = await invokeFunction("submitLead", {
+      name: "דנה לוי",
+      phone: "0529876543",
+      message: "שאלה קצרה",
+    }, { env: { MAILER_URL, MAILER_TOKEN: "test-only-token" } });
+    const mail = r.mailTo(AGENCY);
+    expect(mail.html).not.toContain("קישורים");
+    expect(mail.html).not.toContain("docs.google.com");
+    expect(mail.text).not.toContain("── קישורים ──");
+  });
+
+  it("still links the sheet when the document could not be created", async () => {
+    // Partial success is the common case, and the mail should reflect exactly
+    // which of the two exists rather than falling back to neither.
+    const r = await invokeFunction("submitLead", consultation, {
+      env,
+      connections: { googledocs: null },
+    });
+    const mail = r.mailTo(AGENCY);
+    expect(mail.html).toContain(`href="${SHEET}"`);
+    expect(mail.html).not.toContain("/document/d/");
+  });
+
+  it("sends her copy after the sheet and the document, not before", async () => {
+    // The ordering *is* the fix. If her send moves back ahead of these, the
+    // links go empty again and only this assertion would notice.
+    const r = await invokeFunction("submitLead", consultation, { env });
+    const agencySend = r.fetches.findIndex(
+      (f) => f.url === MAILER_URL && (f.body as { to?: string }).to === AGENCY
+    );
+    const sheetWrite = r.fetches.findIndex((f) => f.url.includes("sheets.googleapis.com"));
+    const docWrite = r.fetches.findIndex((f) => f.url.includes("docs.googleapis.com"));
+    expect(sheetWrite).toBeGreaterThanOrEqual(0);
+    expect(docWrite).toBeGreaterThanOrEqual(0);
+    expect(agencySend).toBeGreaterThan(sheetWrite);
+    expect(agencySend).toBeGreaterThan(docWrite);
+  });
+});

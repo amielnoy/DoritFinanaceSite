@@ -216,6 +216,9 @@ export default async function(req) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(cal.body(event)),
+          // מוגבל בזמן, כמו העותק ב-submitLead. ספק שאינו עונה כלל החזיק כאן
+          // את הפונקציה עד לפסק הזמן של הפלטפורמה, והיומן השני לא נכתב בכלל.
+          signal: AbortSignal.timeout(10000),
         });
 
         if (!res.ok) {
