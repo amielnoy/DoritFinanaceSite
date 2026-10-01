@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadEntity, validateAgainstEntity } from "../helpers/entity-schema";
 import { join } from "node:path";
@@ -100,6 +100,69 @@ describe("adapter → submitClaim", () => {
   });
 });
 
+/**
+ * The seven files the platform owns.
+ *
+ * Base44 support, 2026-09-30: *"Base44 apps use login, register,
+ * forgot-password and reset-password pages built as .jsx files… When the
+ * platform starts your app's environment and doesn't find those files, it adds
+ * them back automatically… there is no setting to stop the platform from
+ * restoring the standard files."*
+ *
+ * So they are not ours to delete. We tried five times; the fifth went unnoticed
+ * and left `main` red for two days, which gated the publish and stranded
+ * everything merged behind it (A-51, A-52).
+ *
+ * They are harmless where it matters: `resolve.extensions` in `vite.config.js`
+ * puts `.ts`/`.tsx` first, so our own pages are the ones that load and these
+ * are never imported. The cases below hold that line — they stop enforcing
+ * rules against files we cannot change, and start enforcing the one thing that
+ * keeps them inert.
+ */
+const PLATFORM_AUTH_PAGES = [
+  "src/components/AuthLayout.jsx",
+  "src/components/GoogleIcon.jsx",
+  "src/pages/Login.jsx",
+  "src/pages/Register.jsx",
+  "src/pages/ForgotPassword.jsx",
+  "src/pages/ResetPassword.jsx",
+  "src/pages/OAuthConsent.jsx",
+];
+
+describe("the pages the platform restores", () => {
+  it("is the same list lint ignores", () => {
+    // Two copies of one list. If lint stops ignoring a file this still allows,
+    // the build breaks again for a file nobody is permitted to fix.
+    const config = read(join(REPO_ROOT, "eslint.config.js"));
+    for (const path of PLATFORM_AUTH_PAGES) {
+      expect(config, `eslint does not ignore ${path}`).toContain(`"${path}"`);
+    }
+  });
+
+  it("stays inert because TypeScript resolves first", () => {
+    // The whole accommodation rests on this. Without it these files are not an
+    // untidy extra — they are the login page.
+    const config = read(join(REPO_ROOT, "vite.config.js"));
+    const order = config.match(/extensions:\s*\[([^\]]*)\]/)?.[1] ?? "";
+    const exts = [...order.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    expect(exts.indexOf(".tsx"), ".tsx must resolve before .jsx").toBeLessThan(
+      exts.indexOf(".jsx")
+    );
+  });
+
+  it("has a .tsx of our own behind each one that is a page", () => {
+    // If the platform's copy is the only file at that name, it is not shadowed
+    // — it *is* the page, and the resolution order protects nothing.
+    for (const path of ["src/pages/Login.jsx", "src/components/AuthLayout.jsx", "src/components/GoogleIcon.jsx"]) {
+      const ours = path.replace(/\.jsx$/, ".tsx");
+      expect(
+        existsSync(join(REPO_ROOT, ours)),
+        `${path} has no ${ours} behind it — the platform's copy is what loads`
+      ).toBe(true);
+    }
+  });
+});
+
 describe("dependency inversion holds", () => {
   const uiFiles = sourceFiles().filter(
     (f) => rel(f).startsWith("src/components/") || rel(f).startsWith("src/pages/")
@@ -124,7 +187,9 @@ describe("dependency inversion holds", () => {
   it("no public-facing component imports the Base44 SDK directly", () => {
     const offenders = uiFiles
       .filter((f) => /from ["']@\/api\/base44Client["']/.test(read(f)))
-      .map(rel);
+      .map(rel)
+      // Not ours, not removable, and never loaded — see PLATFORM_AUTH_PAGES.
+      .filter((f) => !PLATFORM_AUTH_PAGES.includes(f));
     expect(offenders, "these should depend on @/services instead").toEqual([]);
   });
 
@@ -170,7 +235,13 @@ describe("dependency inversion holds", () => {
       if (!m) continue;
       byStem.set(m[1], [...(byStem.get(m[1]) ?? []), r]);
     }
-    const shadowed = [...byStem.values()].filter((v) => v.length > 1).flat().sort();
+    const shadowed = [...byStem.values()]
+      .filter((v) => v.length > 1)
+      .flat()
+      // A shadow cast by a file the platform restores is expected and inert.
+      // Any other one is the bug this case was written for.
+      .filter((f) => !PLATFORM_AUTH_PAGES.includes(f) && !PLATFORM_AUTH_PAGES.includes(f.replace(/\.tsx$/, ".jsx")))
+      .sort();
     expect(shadowed, "Vite resolves .jsx first, so the .tsx here is dead code").toEqual(
       []
     );
