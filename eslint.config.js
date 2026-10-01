@@ -70,6 +70,31 @@ export default [
   // a 3-second lint into a 15-minute one that looked for all the world like a hang.
   {
     ignores: [
+      // Restored by the platform, not written by us, and not removable.
+      //
+      // Base44 support, 2026-09-30: "Base44 apps use login, register,
+      // forgot-password and reset-password pages built as .jsx files… When the
+      // platform starts your app's environment and doesn't find those files, it
+      // adds them back automatically… there is no setting to stop the platform
+      // from restoring the standard files… your lint checks will need to ignore
+      // them."
+      //
+      // We deleted them five times; the fifth went unnoticed and left `main`
+      // red for two days, which gated the publish and stranded everything
+      // merged behind it. `resolve.extensions` in vite.config.js already means
+      // our `.tsx` pages are the ones that load, so these are inert — they only
+      // broke the build, and only because we were still linting them.
+      //
+      // The same list is in tests/contract/frontend-payloads.contract.test.ts
+      // as PLATFORM_AUTH_PAGES, and a case there fails if the two drift.
+      "src/components/AuthLayout.jsx",
+      "src/components/GoogleIcon.jsx",
+      "src/pages/Login.jsx",
+      "src/pages/Register.jsx",
+      "src/pages/ForgotPassword.jsx",
+      "src/pages/ResetPassword.jsx",
+      "src/pages/OAuthConsent.jsx",
+
       "src/components/ui/**/*",
       "dist/**",
       "node_modules/**",

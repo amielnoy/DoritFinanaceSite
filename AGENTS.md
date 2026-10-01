@@ -47,6 +47,17 @@ npx skills add base44/skills
   service exists. The sender must be on the Resend-verified subdomain; the apex
   `govari-fin.co.il` is Microsoft 365 with an SPF that ends `-all`, so mail from
   it is rejected.
+- `src/pages/{Login,Register,ForgotPassword,ResetPassword,OAuthConsent}.jsx` and
+  `src/components/{AuthLayout,GoogleIcon}.jsx`: **the platform's, not ours. Do not
+  delete them.** Base44 restores these whenever the app environment starts, and
+  support have confirmed there is no setting to stop it. They were deleted five
+  times; the fifth went unnoticed and left `main` red for two days, which gated
+  the publish and stranded every change merged behind it. They are inert because
+  `resolve.extensions` in `vite.config.js` puts `.ts`/`.tsx` first, so the real
+  pages — `Login.tsx` and the rest — are what load. Lint ignores them and the
+  contract suite allows their shadow; `PLATFORM_AUTH_PAGES` in
+  `tests/contract/frontend-payloads.contract.test.ts` is the list, and a case
+  there fails if it and the eslint ignores drift apart. See A-52.
 - `scripts/*.mjs`: maintenance jobs CI runs on a schedule. `prune-vercel-deployments.mjs`
   deletes, so it is a dry run unless given `--apply` — check its output before
   adding the flag. `reconcile-stores.mjs` exits non-zero on drift.
