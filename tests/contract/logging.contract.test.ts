@@ -192,6 +192,35 @@ describe("the daily archive", () => {
     expect(job).toMatch(/workflow_dispatch/);
   });
 
+  it("archives the draft as well as production", () => {
+    /**
+     * A function called over HTTP logs to `prod`; a function called by an agent
+     * logs to `preview`. So the whole agent-driven half of this system — every
+     * interview, every `submitLead` the model triggers, every calendar write
+     * behind a completed conversation — exists only in the draft's logs.
+     *
+     * The job archived `prod` alone, and the draft's own retention is about a
+     * day. A visitor reported a failed interview, production logs showed
+     * nothing, and the reasonable conclusion was that the function had never
+     * been called; the run was in `preview` the whole time and had aged out
+     * before anyone looked (A-53).
+     */
+    expect(workflow, "the draft is not archived").toMatch(/LOG_ENV:\s*preview/);
+    expect(workflow, "the draft would overwrite production's archive").toMatch(
+      /LOG_DIR:\s*logs\/preview/
+    );
+    // The upload takes `logs/`, so the nested directory rides along with it.
+    expect(workflow).toMatch(/path:\s*logs\//);
+  });
+
+  it("lets the draft archive fail without reddening the run", () => {
+    // Same promise the production step makes: an unarchived day is a gap in an
+    // operational record, not a broken build. A nightly job that reddens the
+    // badge is a job everyone learns to ignore.
+    const step = workflow.slice(workflow.indexOf("Fetch the last 24 hours from the draft"));
+    expect(step.slice(0, 400)).toMatch(/continue-on-error:\s*true/);
+  });
+
   it("keeps the archive out of git", () => {
     // The repository is public. The lines carry no personal data by design,
     // but timings, volumes and escalation reasons for a real agency are not
