@@ -1531,6 +1531,39 @@ jobs:
           fi
           npm run logs:archive
 
+      # The draft, which is where the agents actually run.
+      #
+      # A function called over HTTP logs to `prod`; a function called by an
+      # agent logs to `preview`. So every interview, every submitLead the model
+      # triggers, every calendar write behind a completed conversation — the
+      # whole agent-driven half of this system — is recorded only in the
+      # environment this job was not archiving.
+      #
+      # That cost two investigations in one day. A visitor reported a failed
+      # interview, prod logs showed nothing, and the reasonable conclusion was
+      # that the function had never been called. The run was in `preview` all
+      # along, and by the time anyone looked there it had aged out: Base44's
+      # retention on the draft is roughly a day (A-53).
+      #
+      # Same credentials, same window, its own directory, and the same promise
+      # the step above makes — a missing archive is a gap in a record, never a
+      # red build.
+      - name: Fetch the last 24 hours from the draft
+        if: steps.creds.outputs.ready == 'true'
+        continue-on-error: true
+        env:
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
+          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
+          BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
+          LOG_ENV: preview
+          LOG_DIR: logs/preview
+        run: |
+          if [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
+            unset BASE44_API_KEY
+          fi
+          npm run logs:archive
+
       - name: Keep them
         if: steps.creds.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
