@@ -515,20 +515,28 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   });
 
   /**
-   * And the diary invites the same team the mail does.
+   * And the diary invites everyone the mail reaches.
    *
-   * The operations mailboxes now come to the meeting as attendees, so the
-   * appointment lands in their own calendar rather than only in Dorit's. That
-   * is a second list of the same addresses, and AGENTS.md names this exact
-   * hazard: a mailbox added to one place and not another raises no error
-   * anywhere — it simply receives less. Here it would mean someone on the mail
-   * thread with no entry in their diary, which reads as "no meeting was
-   * booked".
+   * Everyone on the enquiry gets an entry in their own calendar. That is a
+   * second list of the same addresses, and AGENTS.md names this exact hazard:
+   * a mailbox added to one place and not another raises no error anywhere — it
+   * simply receives less. Here it would mean someone on the mail thread with no
+   * entry in their diary, which reads as "no meeting was booked".
    *
-   * No new disclosure: these addresses already receive the full enquiry by
-   * mail, and `COMPLIANCE.md` §6 says so.
+   * It read `toEqual(NOTIFY_EMAILS)` until Dorit turned out not to be in her
+   * own diary. The code claimed she was the organiser, because she had
+   * authorised the `outlook` connector; the invitation Graph actually sent came
+   * from `amielnoy@outlook.com`, so the event was created in *his* calendar and
+   * she was neither organiser nor attendee (A-54). Adding her to the attendees
+   * is the fix, and the old equality forbade it.
+   *
+   * So the invariant is stated as what it was always protecting: **every
+   * attendee receives the enquiry itself by mail**, through `NOTIFY_EMAILS` or
+   * `SECONDARY_EMAIL`, and no operations mailbox is left out of the diary. Not
+   * convenience — disclosure: nobody is invited to a meeting without having
+   * seen the enquiry that produced it. `COMPLIANCE.md` §6 says so.
    */
-  it("invites exactly the mailboxes that receive the mail", () => {
+  it("invites everyone the mail reaches, and nobody it does not", () => {
     const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
     const addresses = (src: string, decl: string, name: string) => {
       const i = src.indexOf(decl);
@@ -536,14 +544,26 @@ describe("who receives a lead, and whether the consent text admits it", () => {
       return (src.slice(i, src.indexOf("];", i)).match(/"[^"]+@[^"]+"/g) ?? []).sort();
     };
     const notified = addresses(submitLead, "const NOTIFY_EMAILS = [", "submitLead");
+    const agency = submitLead.match(/const SECONDARY_EMAIL = ("[^"]+@[^"]+")/)?.[1];
+    expect(agency, "submitLead declares no SECONDARY_EMAIL").toBeTruthy();
+    const mailed = [...notified, agency!].sort();
+
     for (const [src, name] of [
       [submitLead, "submitLead"],
       [consultation, "createConsultationEvent"],
     ] as const) {
+      const invited = addresses(src, "const CALENDAR_ATTENDEES = [", name);
+      // Nobody in the diary who is not on the enquiry.
       expect(
-        addresses(src, "const CALENDAR_ATTENDEES = [", name),
-        `${name}: the diary invites a different set from the mail`
-      ).toEqual(notified);
+        invited.filter((a) => !mailed.includes(a)),
+        `${name}: invited to the meeting without receiving the enquiry`
+      ).toEqual([]);
+      // And nobody on the enquiry who is missing from the diary — the direction
+      // that fails silently, since an absent invitation looks like no meeting.
+      expect(
+        mailed.filter((a) => !invited.includes(a)),
+        `${name}: receives the enquiry but gets no entry in the diary`
+      ).toEqual([]);
     }
   });
 
