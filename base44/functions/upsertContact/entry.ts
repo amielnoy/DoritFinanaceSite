@@ -79,6 +79,7 @@ async function appendEventRow(base44, row) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ values: [row] }),
+      signal: AbortSignal.timeout(10000),
     },
   );
   if (!res.ok) throw new Error(`sheets ${res.status}`);

@@ -441,6 +441,7 @@ async function appendEventRow(base44, row) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ values: [row] }),
+      signal: AbortSignal.timeout(10000),
     },
   );
   if (!res.ok) throw new Error(`sheets ${res.status}`);
@@ -469,6 +470,8 @@ async function createConsultationDoc(base44, rid, source, data) {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
+    // מוגבל בזמן — ראו ההערה ליד ההודעה לדורית.
+    signal: AbortSignal.timeout(10000),
   });
   if (!createRes.ok) throw new Error(`docs create ${createRes.status}`);
   const { documentId } = await createRes.json();
@@ -481,6 +484,8 @@ async function createConsultationDoc(base44, rid, source, data) {
     body: JSON.stringify({
       requests: [{ insertText: { location: { index: 1 }, text } }],
     }),
+    // מוגבל בזמן — ראו ההערה ליד ההודעה לדורית.
+    signal: AbortSignal.timeout(10000),
   });
   if (!updateRes.ok) throw new Error(`docs update ${updateRes.status}`);
 
@@ -497,6 +502,23 @@ function eventTypeFor(source) {
 }
 
 /** נספח תפעולי — מה עלה בגורלם של השמירה, היומן והמיילים. */
+/**
+ * הקישורים לעותקים, בטקסט. התאום של linksBlock, ובדיוק מאותה סיבה שיש תאום
+ * לכל גוף מייל כאן: לקוח דואר שאינו מציג HTML מקבל את אותו תוכן ולא פחות
+ * ממנו — וקישור שקיים רק בגרסת ה-HTML הוא בדיוק מה שנעלם בלי להשמיע קול.
+ *
+ * linkIn מחזיר כלום כששורת המצב אומרת "לא נרשם" או "לא נוצר", ולכן הכשל
+ * נראה כהיעדר הקישור, לא כקישור שבור.
+ */
+function buildLinksFooter({ sheet, doc }) {
+  const rows = [
+    ['סיכום השיחה', doc],
+    ['יומן האירועים', sheet],
+  ].filter(([, v]) => linkIn(v));
+  if (!rows.length) return '';
+  return [`── קישורים ──`, ...rows.map(([label, v]) => `${label}: ${linkIn(v)}`)].join('\n');
+}
+
 function buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings }) {
   return [
     `── מצב תפעולי ──`,
@@ -852,7 +874,7 @@ function proseRow(text) {
  * ההודעה הפנימית כ-HTML. `ops` הוא הנספח התפעולי, ונשלח רק לצוות —
  * דורית מקבלת את אותה הודעה בלעדיו.
  */
-function buildAgentHtml(source, data, ops) {
+function buildAgentHtml(source, data, ops, links = null) {
   const heading = headingFor(source);
 
   // 1 · מי פנה. טלפון ואימייל כקישורים — זו ההודעה שפותחים בטלפון כדי לחייג.
@@ -906,6 +928,20 @@ function buildAgentHtml(source, data, ops) {
 
   // 4 · המצב התפעולי, רק לצוות. מסגרת אדומה כשמשהו נפל, כדי שתקלה תיראה
   //     מהמסך הראשון ולא מהשורה השביעית.
+  // 4a · הקישורים לעותקים, לדורית. הנספח התפעולי כבר נושא אותם לצוות, ולכן
+  //      הבלוק הזה מופיע רק כשאין נספח — אותה הודעה לא צריכה לומר פעמיים איפה
+  //      נשמר הסיכום.
+  const linkRows = links
+    ? [
+        ['סיכום השיחה', links.doc],
+        ['יומן האירועים', links.sheet],
+      ].filter(([, v]) => linkIn(v))
+    : [];
+  const linksBlock = linkRows.length
+    ? block('קישורים', linkRows.map(([label, v], i) =>
+        detailRow(label, 'לפתיחה', { link: linkIn(v), last: i === linkRows.length - 1 })).join(''))
+    : '';
+
   const opsBlock = ops
     ? block('מצב תפעולי', [
         detailRow('מקור', ops.source || 'quick'),
@@ -930,7 +966,7 @@ function buildAgentHtml(source, data, ops) {
           <div style="height:2px; width:44px; background:${MAIL.rule}; margin:18px 0 0;"></div>
           <p style="margin:14px 0 0; font-size:13px; color:${MAIL.muted};">${escapeHtml(new Date().toLocaleString('he-IL'))}</p>
         </td></tr>
-        <tr><td style="padding:26px 40px 10px;">${who}${what}${summary}${opsBlock}</td></tr>
+        <tr><td style="padding:26px 40px 10px;">${who}${what}${summary}${linksBlock}${opsBlock}</td></tr>
         <tr><td style="padding:20px 40px; background:${MAIL.ink}; text-align:center;">
           <p style="margin:0; font-size:11px; color:rgba(249,247,242,0.5);">הודעה אוטומטית מאתר דורית גוב ארי · אין להשיב לכתובת זו</p>
         </td></tr>
@@ -1314,24 +1350,6 @@ export default async function(req) {
       return Response.json({ ok: true, leadId, stage: 'partial', notified: false, warnings });
     }
 
-    // הודעה לדורית — הפנייה המלאה, כולל תקציר השיחה אם הסוכן מסר אחד.
-    // ההודעה התפעולית נשלחת בסוף, אחרי היומן, כדי שתוכל לדווח גם עליו.
-    try {
-      await sendMail({
-        base44,
-        to: SECONDARY_EMAIL,
-        subject,
-        // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
-        html: buildAgentHtml(source, data, null),
-        text: agentBody,
-        rid,
-        role: 'agency',
-      });
-    } catch (e) {
-      log('warn', 'mail.failed', { rid, role: 'agency', err: String(e?.message ?? e).slice(0, 200) });
-      warnings.push(deliveryWarning('secondary_email_failed', e));
-    }
-
     // אישור ללקוח
     if (email) {
       try {
@@ -1403,6 +1421,8 @@ export default async function(req) {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(cal.body(event)),
+            // מוגבל בזמן — ראו ההערה ליד ההודעה לדורית.
+            signal: AbortSignal.timeout(10000),
           });
           if (!res.ok) {
             log('error', 'calendar.rejected', { rid, provider, status: res.status });
@@ -1476,6 +1496,32 @@ export default async function(req) {
         warnings.push('doc_failed');
         doc = 'לא נוצר';
       }
+    }
+
+    // הודעה לדורית — הפנייה המלאה, כולל תקציר השיחה אם הסוכן מסר אחד, ובצידה
+    // הקישורים למסמך הסיכום ולשורה ביומן האירועים.
+    //
+    // ההודעה הזו נשלחה פעם מיד אחרי השמירה, לפני היומן, הגיליון והמסמך. זה
+    // היה מוקדם יותר — ולכן גם לפני שהיה קישור לתת. דורית קיבלה את הפנייה
+    // ואת העותקים מצאה בעצמה. עכשיו היא נשלחת כאן, אחרי שלושת אלה, וזו הסיבה
+    // שלכל אחד מהם יש AbortSignal.timeout: בלעדיו ספק שאינו עונה היה מחזיק
+    // את ההודעה היחידה שמישהו ממתין לה. היא ראשונה בקבוצה הזו, לפני תיבות
+    // התפעול, כי היא זו שפעולה תלויה בה.
+    const links = { sheet, doc };
+    try {
+      await sendMail({
+        base44,
+        to: SECONDARY_EMAIL,
+        subject,
+        // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
+        html: buildAgentHtml(source, data, null, links),
+        text: [agentBody, buildLinksFooter(links)].filter(Boolean).join('\n\n'),
+        rid,
+        role: 'agency',
+      });
+    } catch (e) {
+      log('warn', 'mail.failed', { rid, role: 'agency', err: String(e?.message ?? e).slice(0, 200) });
+      warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
     // עותק לצוות התפעול — אותה פנייה מלאה, בתוספת נספח המצב. נשלח אחרון
