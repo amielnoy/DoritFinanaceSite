@@ -33,6 +33,13 @@ npx skills add base44/skills
   one fewer person, and escalations are where that costs most. `wallClock` is
   the one that did: the copy that kept `new Date(x).toISOString()` filed every
   agreed meeting three hours late, in the only diary anyone reads.
+  `CALENDAR_ATTENDEES` must list every address that receives the enquiry by
+  mail — `NOTIFY_EMAILS` plus `SECONDARY_EMAIL` — and not one address more.
+  It left Dorit out for eleven days on the theory that she owned the `outlook`
+  connector and was therefore the organiser; `amielnoy@outlook.com` owned it,
+  the event went to his diary, and hers stayed empty while both logs read
+  `calendar.created`. See A-54. Who owns an external account is not a fact this
+  repository can assert or test — check it against the account.
 - `base44/agents/*.jsonc`: agent definitions — prompts, tools, model, memory,
   and `allow_anonymous_access`. **A publish does not ship these.**
   `npx base44 agents push --yes` does, as a full sync that deletes any remote
