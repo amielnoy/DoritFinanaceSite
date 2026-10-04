@@ -97,6 +97,54 @@ test.describe("Agent chat — regulatory shell", () => {
     }
   });
 
+  /**
+   * The consent gate is read by scrolling; it is not acted on by scrolling.
+   *
+   * It used to be one column — four paragraphs of regulatory disclosure, a
+   * privacy link, a checkbox and a button — so on a phone the checkbox sat well
+   * below the fold and starting a conversation began with a long scroll past
+   * text most people will not read twice.
+   *
+   * Collapsing the notice would have been the easy fix and the wrong one: the
+   * checkbox says "כמפורט למעלה", which stops being true the moment the detail
+   * is behind a toggle. So the notice still scrolls, in full, and the action
+   * sits in a footer that does not.
+   */
+  test("the consent checkbox is reachable without scrolling", async ({ page }) => {
+    await gotoApp(page, "/");
+    const section = page.locator(INTERVIEW);
+    const box = section.getByRole("checkbox");
+    const start = section.getByRole("button", { name: /התחלת השיחה/ });
+
+    await test_step("the action is on screen whenever the notice is", async () => {
+      // Reaching the chat is one page scroll and always was — `#start` carries
+      // the heading, the boundary card and the contact alternatives above it.
+      // What this pins is what happens *after* that: bring the notice into
+      // view, and the box and the button are there with it. No second scroll
+      // through four paragraphs of disclosure to reach the thing you click.
+      await section.getByText(/לפני שמתחילים/).scrollIntoViewIfNeeded();
+      await expect(box, "the checkbox is below the fold of its own panel").toBeInViewport();
+      await expect(start, "the start button is below the fold of its own panel").toBeInViewport();
+    });
+
+    await test_step("and the notice itself is still all there", async () => {
+      // The point of the change: nothing was hidden to achieve the above.
+      await expect(section.getByText(/רישיון סוכן/)).toBeAttached();
+      await expect(section.getByText(/אין למסור בצ׳אט תעודת זהות/)).toBeAttached();
+      await expect(section.getByRole("link", { name: /מדיניות הפרטיות/ })).toBeAttached();
+    });
+
+    await test_step("the box is a comfortable target", async () => {
+      // A 16px checkbox on a phone is a miss waiting to happen; the label is
+      // the target, so the whole row counts.
+      // The label the box lives in, reached from the box itself — `has:` with a
+      // section-scoped locator matches the handoff form's labels too.
+      const label = box.locator("xpath=ancestor::label[1]");
+      const size = await label.boundingBox();
+      expect(size!.height, "the consent row is too small to hit").toBeGreaterThanOrEqual(44);
+    });
+  });
+
   test("the route to a person works without the model, and before consent", async ({
     page,
     mockApi,

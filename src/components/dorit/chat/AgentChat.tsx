@@ -390,48 +390,77 @@ export default function AgentChat({
           </div>
 
           {!started ? (
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              <div className="flex items-start gap-3">
-                <ShieldCheck size={18} className="text-accent mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-heading text-lg font-bold">{CONSENT.heading}</p>
-                  <p className="text-[13px] text-muted-foreground mt-1">{BOT_DISCLOSURE}</p>
+            /*
+             * The notice scrolls; the thing you do about it does not.
+             *
+             * This was one column: four paragraphs of regulatory disclosure, a
+             * link, a checkbox and a button, all scrolling together. On a phone
+             * the checkbox sat well below the fold, so starting a conversation
+             * began with a long scroll past text most people will not read
+             * twice — and some gave up before reaching it.
+             *
+             * Collapsing the notice would have been the easy fix and the wrong
+             * one: the checkbox says "כמפורט למעלה", which stops being true the
+             * moment the detail is behind a toggle. So every word stays on
+             * screen and scrollable, and the action moves to a footer that is
+             * always reachable. Nothing hidden, nothing to scroll past.
+             */
+            <div className="flex-1 min-h-0 flex flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-4">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck size={18} className="text-accent mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-heading text-lg font-bold">{CONSENT.heading}</p>
+                    <p className="text-[14px] text-muted-foreground mt-1 leading-relaxed">
+                      {BOT_DISCLOSURE}
+                    </p>
+                  </div>
                 </div>
+
+                {/* 15px and a loose leading: this is the one text on the site a
+                    visitor is asked to confirm they have read, and the audience
+                    skews older. It was 13.5px. */}
+                <ul className="mt-5 space-y-3.5 text-[15px] leading-[1.75] text-foreground/80">
+                  {(descriptor.consentPoints ?? CONSENT.points).map((point) => (
+                    <li key={point} className="flex gap-2.5">
+                      <span className="text-accent shrink-0" aria-hidden="true">—</span>
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <a
+                  href={CONSENT.privacyHref}
+                  className="inline-block mt-4 text-[14px] text-accent hover:underline underline-offset-4"
+                >
+                  {CONSENT.privacyLinkLabel}
+                </a>
               </div>
 
-              <ul className="mt-5 space-y-3 text-[13.5px] leading-relaxed text-foreground/75">
-                {(descriptor.consentPoints ?? CONSENT.points).map((point) => (
-                  <li key={point} className="flex gap-2.5">
-                    <span className="text-accent shrink-0">—</span>
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="shrink-0 border-t border-border/60 bg-secondary/30 px-6 py-4">
+                {/* A 44px target, because a 16px checkbox on a phone is a miss
+                    waiting to happen. The whole row is the target, not the box
+                    alone — and the height is stated rather than inherited from
+                    however the label happens to wrap, which on a wide screen is
+                    one line and 32px. */}
+                <label className="flex items-start gap-3 cursor-pointer text-[15px] leading-relaxed py-2 min-h-[44px]">
+                  <input
+                    type="checkbox"
+                    checked={consentChecked}
+                    onChange={(e) => setConsentChecked(e.target.checked)}
+                    className="mt-0.5 w-5 h-5 accent-[var(--accent)] shrink-0"
+                  />
+                  <span>{CONSENT.checkboxLabel}</span>
+                </label>
 
-              <a
-                href={CONSENT.privacyHref}
-                className="inline-block mt-4 text-[13px] text-accent hover:underline underline-offset-4"
-              >
-                {CONSENT.privacyLinkLabel}
-              </a>
-
-              <label className="flex items-start gap-3 mt-6 cursor-pointer text-[14px] leading-relaxed">
-                <input
-                  type="checkbox"
-                  checked={consentChecked}
-                  onChange={(e) => setConsentChecked(e.target.checked)}
-                  className="mt-1 w-4 h-4 accent-[var(--accent)] shrink-0"
-                />
-                <span>{CONSENT.checkboxLabel}</span>
-              </label>
-
-              <button
-                onClick={acceptConsent}
-                disabled={!consentChecked}
-                className="mt-6 px-6 py-3 bg-highlight text-primary hover:bg-highlight-strong disabled:opacity-40 disabled:hover:bg-highlight transition-colors text-[15px]"
-              >
-                {CONSENT.startLabel}
-              </button>
+                <button
+                  onClick={acceptConsent}
+                  disabled={!consentChecked}
+                  className="mt-3 w-full sm:w-auto px-6 py-3.5 bg-highlight text-primary hover:bg-highlight-strong disabled:opacity-40 disabled:hover:bg-highlight transition-colors text-[15px]"
+                >
+                  {CONSENT.startLabel}
+                </button>
+              </div>
             </div>
           ) : (
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-4">
