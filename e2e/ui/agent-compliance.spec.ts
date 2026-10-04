@@ -1,4 +1,16 @@
+import type { Locator } from "@playwright/test";
 import { expect, gotoApp, test, test_step } from "../fixtures/app";
+
+/**
+ * The handoff form, addressed by its accessible name.
+ *
+ * The interview section also carries the quick-contact form, so a bare
+ * `getByLabel("טלפון")` matches two fields and Playwright refuses in strict
+ * mode. Naming the form is the fix on both sides: a screen reader gets a
+ * landmark, and a test gets an unambiguous scope.
+ */
+const handoffForm = (section: Locator) =>
+  section.getByRole("form", { name: "מעבר לטיפול אנושי" });
 
 /**
  * The compliance behaviour of the on-site agents, checked in a real browser.
@@ -96,10 +108,20 @@ test.describe("Agent chat — regulatory shell", () => {
       await expect(section.getByRole("button", { name: "מעבר לטיפול אנושי" })).toBeVisible();
     });
 
-    await test_step("pressing it escalates to the backend", async () => {
+    await test_step("pressing it asks who to call back", async () => {
       await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+      await expect(section.getByText(/איך קוראים לכם, ולאן להתקשר/)).toBeVisible();
+    });
+
+    await test_step("and the details reach the backend with the request", async () => {
+      // The whole point. דורית received three handoffs in one morning reading
+      // `שם: לא נמסר · טלפון: לא נמסר`, which she could do nothing with (A-55).
+      await handoffForm(section).getByLabel("שם").fill("רונית אבני");
+      await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
+      await section.getByRole("button", { name: "שלחו לדורית" }).click();
       const req = await mockApi.waitForRequest("escalateToHuman");
       expect(req.method).toBe("POST");
+      expect(req.body).toMatchObject({ name: "רונית אבני", phone: "052-7654321" });
     });
 
     await test_step("the visitor is given direct channels either way", async () => {
@@ -168,6 +190,8 @@ test.describe("Support chat — the open question", () => {
     const section = page.locator(SUPPORT);
 
     await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+    await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
+    await section.getByRole("button", { name: "שלחו לדורית" }).click();
     const req = await mockApi.waitForRequest("escalateToHuman");
     expect(req.method).toBe("POST");
   });
@@ -228,8 +252,43 @@ test.describe("Agent chat — when the backend refuses", () => {
 
     await test_step("a visitor who asked for a person still gets one", async () => {
       await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+      await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
+      await section.getByRole("button", { name: "שלחו לדורית" }).click();
       await expect(section.getByRole("link", { name: /050-831-1776/ })).toBeVisible();
       await expect(section.getByRole("link", { name: "וואטסאפ", exact: true })).toBeVisible();
     });
+  });
+
+  test("a visitor who will not leave a number still gets hers, and nobody is paged", async ({
+    page,
+    mockApi,
+  }) => {
+    await gotoApp(page, "/");
+    const section = page.locator(INTERVIEW);
+
+    await test_step("the second door is there", async () => {
+      await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+      await section.getByRole("button", { name: "רק הפרטים של דורית" }).click();
+      await expect(section.getByRole("link", { name: /050-831-1776/ })).toBeVisible();
+    });
+
+    await test_step("and it raised no alert she could not act on", async () => {
+      expect(mockApi.requestsTo("escalateToHuman")).toHaveLength(0);
+    });
+  });
+
+  test("sending with no number asks for one instead of paging her empty-handed", async ({
+    page,
+    mockApi,
+  }) => {
+    await gotoApp(page, "/");
+    const section = page.locator(INTERVIEW);
+
+    await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+    await handoffForm(section).getByLabel("שם").fill("רונית אבני");
+    await section.getByRole("button", { name: "שלחו לדורית" }).click();
+
+    await expect(section.getByRole("alert")).toHaveText(/מספר טלפון/);
+    expect(mockApi.requestsTo("escalateToHuman")).toHaveLength(0);
   });
 });
