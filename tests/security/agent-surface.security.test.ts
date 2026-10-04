@@ -257,9 +257,28 @@ describe("Phishing — the site's name on somebody else's message", () => {
 
   it("sources the chat's contact block from the server, not from the model", () => {
     // The handoff notice carries a phone number the visitor is told to trust.
-    // It is destructured from the escalation receipt, which the backend fills
-    // from a constant — a reply that merely claims a number cannot supply it.
-    expect(CHAT).toMatch(/const \{ phoneDisplay, phoneE164, whatsapp, email \} = receipt\.contact;/);
+    // It comes from the escalation receipt, which the backend fills from a
+    // constant — a reply that merely claims a number cannot supply one.
+    //
+    // This pinned the destructuring line until the handoff grew a second route
+    // out: a visitor who declines to leave a number still gets דורית's, and
+    // that path has no receipt to read from. So the assertion moved up one
+    // level, to the only two things the formatter may ever be handed.
+    expect(CHAT, "the contact block is not built in one place").toMatch(
+      /const channelsOf = \(\{ phoneDisplay, phoneE164, whatsapp, email \}: HumanContact\)/,
+    );
+    const sources = [...CHAT.matchAll(/channelsOf\(([^)]*)\)/g)]
+      .map((m) => m[1].trim())
+      .filter((a) => !a.includes(":"));          // drops the declaration itself
+    expect(sources.length, "nothing renders the contact block").toBeGreaterThan(0);
+    for (const arg of sources) {
+      expect(
+        ["receipt.contact", "FALLBACK_CONTACT"].includes(arg),
+        `the chat dials from an untrusted binding: ${arg}`,
+      ).toBe(true);
+    }
+    // And the fallback is the config constant, not a literal typed in here.
+    expect(CHAT).toMatch(/const FALLBACK_CONTACT: HumanContact = CONTACT;/);
     expect(ESCALATE).toMatch(/const HUMAN_CONTACT = \{/);
     expect(ESCALATE).toMatch(/contact: HUMAN_CONTACT/);
   });
