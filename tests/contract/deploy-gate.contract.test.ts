@@ -224,3 +224,62 @@ describe("both run summaries name production, the report and staging", () => {
     });
   }
 });
+
+/**
+ * The HTML must never be cached without something to revalidate against.
+ *
+ * It names the hashed bundles, and those are immutable for a year. So one
+ * stale copy of this one file pins a device to a build that no publish can
+ * reach — silently, because nothing about running old code looks broken.
+ *
+ * On 2026-10-04 interviews from a desktop mailed Dorit and interviews from an
+ * Android phone did not. The phone was running a build whose closing step
+ * called `createConsultationEvent`, which books a calendar entry and sends
+ * nothing; `prod` logs show that call, rejected for missing contact fields,
+ * with no `submitLead` beside it. Production still serves `index.html` with no
+ * `Cache-Control`, no `ETag` and no `Last-Modified` at all. See A-57.
+ */
+describe("the HTML is not cached the way the bundles are", () => {
+  const headers = readFileSync(join(REPO_ROOT, "public/_headers"), "utf8");
+  const vercel = JSON.parse(readFileSync(join(REPO_ROOT, "vercel.json"), "utf8")) as {
+    headers: { source: string; headers: { key: string; value: string }[] }[];
+  };
+  const valueOf = (source: string, key: string) =>
+    vercel.headers
+      .find((h) => h.source === source)
+      ?.headers.find((x) => x.key.toLowerCase() === key)?.value;
+
+  it("asks the edge for no-cache on every document", () => {
+    for (const path of ["/", "/index.html", "/app.html"]) {
+      const section = headers.slice(headers.indexOf(`\n${path}\n`));
+      expect(section, `_headers does not cover ${path}`).not.toBe(headers);
+      expect(
+        section.slice(0, section.indexOf("\n\n")),
+        `${path} may be cached without a validator`,
+      ).toMatch(/Cache-Control:\s*no-cache/);
+    }
+  });
+
+  it("keeps the hashed assets immutable, which is what makes the HTML load-bearing", () => {
+    expect(headers).toMatch(/\/assets\/\*\n\s*Cache-Control:\s*public, max-age=\d+, immutable/);
+  });
+
+  it("says the same thing in the Vercel config, which serves the same app", () => {
+    expect(valueOf("/assets/(.*)", "cache-control")).toMatch(/immutable/);
+    // Everything that is not an asset — the documents — must be revalidated.
+    const docs = vercel.headers.find((h) => /\(\?!assets\//.test(h.source));
+    expect(docs, "no rule covers the documents").toBeDefined();
+    expect(
+      docs!.headers.find((x) => x.key.toLowerCase() === "cache-control")?.value,
+    ).toBe("no-cache");
+  });
+
+  it("orders the asset rule before the document rule", () => {
+    // Vercel applies every matching rule, and a later `no-cache` on the assets
+    // would throw away the immutability the hashes exist to buy.
+    const assetAt = vercel.headers.findIndex((h) => h.source === "/assets/(.*)");
+    const docsAt = vercel.headers.findIndex((h) => /\(\?!assets\//.test(h.source));
+    expect(assetAt).toBeGreaterThanOrEqual(0);
+    expect(assetAt, "the document rule can swallow the asset rule").toBeLessThan(docsAt);
+  });
+});
