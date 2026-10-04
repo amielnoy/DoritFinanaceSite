@@ -1387,6 +1387,57 @@ export default async function(req) {
       }
     }
 
+    // שלוש הכתיבות החיצוניות יוצאות יחד.
+    //
+    // הן רצו בתור: יומן, יומן, גיליון, מסמך, ואז הדואר. אף אחת מהן אינה
+    // זקוקה לתוצאה של השנייה, אבל כל אחת חיכתה לקודמתה, והסכום הוא שהרג את
+    // הדבר היחיד שהמבקר רואה. הקריאה של 4.10 נמשכה 9,989 אלפיות — והסוכן,
+    // שאינו ממתין כל כך, אמר למבקר "לא הצלחתי לשמור ולשלוח את המידע", בזמן
+    // שהפנייה נשמרה, הדואר יצא, שני היומנים נכתבו ו-warnings היה 0. ראו A-56.
+    //
+    // יוצאות כאן, נאספות אחרי היומן. ה-catch מחובר ביצירה ולא בהמתנה, אחרת
+    // דחייה שמגיעה לפני ה-await היא unhandled rejection שמפילה את הבקשה כולה.
+    const sheetPromise = (async () => {
+      try {
+        const status = await appendEventRow(base44, [
+        new Date().toISOString(),
+        eventTypeFor(source),
+        source || 'quick',
+        trackLabel,               // מסלול — רלוונטי רק בראיון
+        '',                       // סוכן — רלוונטי רק בהעברה לאדם
+        // הנושא הנרשם הוא זה שנשלח בפועל: בראיון הוא נגזר מנושא הפגישה או
+        // מהדאגה המרכזית, ו-`topic` הגולמי כבר אינו מגיע מהסוכן.
+        effectiveTopic || '',
+        timing || '',
+        name,
+        phone,
+        email || '',
+        leadId || '',
+        '',                       // סיבת העברה — רלוונטי רק בהעברה לאדם
+        // התקציר של הראיון הוא הפרופיל שהסוכן מסר, לא שדה summary נפרד. בלי
+        // הנפילה הזו שורת הראיון נרשמת ריקה — שם וטלפון בלי מה שנאסף.
+        safeSummary || profileText || safeMessage || '',
+        ]);
+        log('info', 'sheet.appended', { rid, tab: SHEET_TAB, status });
+        return status;
+      } catch (e) {
+        log('warn', 'sheet.append_failed', { rid, tab: SHEET_TAB, err: String(e?.message ?? e).slice(0, 200) });
+        warnings.push('sheet_append_failed');
+        return 'לא נרשם';
+      }
+    })();
+
+    // רק לפניות מלאות: ייעוץ וראיון שהושלם (ראיון חלקי חוזר מוקדם יותר).
+    // פנייה מהירה אינה מייצרת מסמך — אין בה תוכן שמצדיק מסמך.
+    const booksDoc = source === 'consultation' || source === 'interview';
+    const docPromise = booksDoc
+      ? createConsultationDoc(base44, rid, source, data).catch((e) => {
+          log('warn', 'doc.failed', { rid, err: String(e?.message ?? e).slice(0, 200) });
+          warnings.push('doc_failed');
+          return 'לא נוצר';
+        })
+      : Promise.resolve('לא רלוונטי');
+
     // יצירת אירוע תזכורת ביומן Outlook — מיטבי, רק עבור בקשות ייעוץ
     // הראיון מתאם פגישה בעצמו מאז שסוכן התיאום מוזג לתוכו, ולכן הוא מקבל
     // תזכורת ביומן בדיוק כמו בקשת ייעוץ — אבל רק כשבאמת סוכם מועד.
@@ -1412,9 +1463,10 @@ export default async function(req) {
       calendarStartedAt = calStartIso;
       const calContent = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
       const event = { summary: subject, description: calContent, startIso: calStartIso, endIso: calEndIso };
-      const booked = [];
-
-      for (const provider of CALENDAR_PROVIDERS) {
+      // שני היומנים נכתבים יחד. הם אינם תלויים זה בזה, ובתור הם עלו כשנייה
+      // וחצי נוספת על כל פנייה. `booked` נאסף מהתוצאות ולא מתוך הלולאה, כדי
+      // שסדר השורה במייל יישאר סדר הספקים ולא סדר התשובות.
+      const outcomes = await Promise.all(CALENDAR_PROVIDERS.map(async (provider) => {
         const cal = CALENDARS[provider];
         try {
           const { accessToken } = await base44.asServiceRole.connectors.getConnection(cal.connector);
@@ -1423,7 +1475,7 @@ export default async function(req) {
             // מול הספק. זו אזהרה ולא שגיאה — היומן השני עדיין יקבל את הפגישה.
             log('warn', 'calendar.not_connected', { rid, provider });
             warnings.push(`calendar_${provider}_not_connected`);
-            continue;
+            return null;
           }
           const res = await fetch(cal.url, {
             method: 'POST',
@@ -1438,15 +1490,17 @@ export default async function(req) {
           if (!res.ok) {
             log('error', 'calendar.rejected', { rid, provider, status: res.status });
             warnings.push(`calendar_${provider}_rejected`);
-            continue;
+            return null;
           }
           log('info', 'calendar.created', { rid, provider });
-          booked.push(provider);
+          return provider;
         } catch (e) {
           log('warn', 'calendar.failed', { rid, provider });
           warnings.push(`calendar_${provider}_failed`);
+          return null;
         }
-      }
+      }));
+      const booked = outcomes.filter(Boolean);
 
       // השורה שדורית קוראת במייל. "נוצר" בלי לומר איפה היה מסתיר בדיוק את
       // המקרה שבו יומן אחד קיבל את הפגישה והשני לא.
@@ -1465,49 +1519,10 @@ export default async function(req) {
       });
     }
 
-    // רישום ביומן האירועים — מיטבי. הגיליון הוא תצוגה, לא מקור האמת: הרשומה
-    // כבר נשמרה, ולכן כשל כאן מדווח ב-warnings ואינו מפיל את הפנייה.
-    let sheet = 'לא נרשם';
-    try {
-      sheet = await appendEventRow(base44, [
-        new Date().toISOString(),
-        eventTypeFor(source),
-        source || 'quick',
-        trackLabel,               // מסלול — רלוונטי רק בראיון
-        '',                       // סוכן — רלוונטי רק בהעברה לאדם
-        // הנושא הנרשם הוא זה שנשלח בפועל: בראיון הוא נגזר מנושא הפגישה או
-        // מהדאגה המרכזית, ו-`topic` הגולמי כבר אינו מגיע מהסוכן.
-        effectiveTopic || '',
-        timing || '',
-        name,
-        phone,
-        email || '',
-        leadId || '',
-        '',                       // סיבת העברה — רלוונטי רק בהעברה לאדם
-        // התקציר של הראיון הוא הפרופיל שהסוכן מסר, לא שדה summary נפרד. בלי
-        // הנפילה הזו שורת הראיון נרשמת ריקה — שם וטלפון בלי מה שנאסף.
-        safeSummary || profileText || safeMessage || '',
-      ]);
-      log('info', 'sheet.appended', { rid, tab: SHEET_TAB, status: sheet });
-    } catch (e) {
-      log('warn', 'sheet.append_failed', { rid, tab: SHEET_TAB, err: String(e?.message ?? e).slice(0, 200) });
-      warnings.push('sheet_append_failed');
-    }
-
-    // יצירת מסמך סיכום ב-Google Docs — מיטבי, לפני המייל התפעולי כדי שהקישור
-    // אליו ייכנס לנספח. רק לפניות מלאות: ייעוץ וראיון שהושלם (ראיון חלקי חוזר
-    // מוקדם יותר). פנייה מהירה אינה מייצרת מסמך — אין בה תוכן שמצדיק מסמך.
-    let doc = 'לא רלוונטי';
-    const booksDoc = source === 'consultation' || source === 'interview';
-    if (booksDoc) {
-      try {
-        doc = await createConsultationDoc(base44, rid, source, data);
-      } catch (e) {
-        log('warn', 'doc.failed', { rid, err: String(e?.message ?? e).slice(0, 200) });
-        warnings.push('doc_failed');
-        doc = 'לא נוצר';
-      }
-    }
+    // הגיליון והמסמך, שכבר רצים. שניהם מיטביים — הגיליון הוא תצוגה ולא מקור
+    // האמת, והרשומה כבר שמורה — ולכן כשל בהם מדווח ב-warnings ואינו מפיל את
+    // הפנייה. נאספים כאן כי ההודעה לדורית נושאת את הקישורים אליהם.
+    const [sheet, doc] = await Promise.all([sheetPromise, docPromise]);
 
     // הודעה לדורית — הפנייה המלאה, כולל תקציר השיחה אם הסוכן מסר אחד, ובצידה
     // הקישורים למסמך הסיכום ולשורה ביומן האירועים.
@@ -1542,7 +1557,9 @@ export default async function(req) {
     // its own attempt: one that bounces must not take the others with it.
     const opsHtml = buildAgentHtml(source, data, { source, leadId, topic, calendar, sheet, doc, warnings });
     const opsText = `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings })}`;
-    for (const to of NOTIFY_EMAILS) {
+    // יחד, לא בתור. כל תיבה היא עדיין ניסיון נפרד — זו הסיבה שיש כאן catch
+    // לכל אחת ולא catch אחד סביב הכול: תיבה שנכשלת אסור שתיקח איתה את השאר.
+    await Promise.all(NOTIFY_EMAILS.map(async (to) => {
       try {
         await sendMail({
           base44,
@@ -1550,14 +1567,14 @@ export default async function(req) {
           subject,
           html: opsHtml,
           text: opsText,
-                  rid,
+          rid,
           role: 'ops',
         });
       } catch (e) {
         log('warn', 'mail.failed', { rid, role: 'ops', err: String(e?.message ?? e).slice(0, 200) });
         warnings.push(deliveryWarning('notify_email_failed', e));
       }
-    }
+    }));
 
     log('info', 'request.end', { rid, ms: Date.now() - startedAt, leadId, source: source || 'quick', warnings: warnings.length });
     return Response.json({ ok: true, leadId, warnings });
