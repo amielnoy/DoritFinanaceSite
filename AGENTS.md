@@ -40,6 +40,13 @@ npx skills add base44/skills
   the event went to his diary, and hers stayed empty while both logs read
   `calendar.created`. See A-54. Who owns an external account is not a fact this
   repository can assert or test — check it against the account.
+- `src/lib/interview-handoff.ts`: **the page sends the interview's close, not
+  the agent.** Base44 does not execute an agent's tool calls in an anonymous
+  conversation, and every visitor is anonymous — so the agent ends with a fenced
+  ```lead``` block and `AgentChat` submits it through `submitInterview`. Same
+  backend function, same validation; only the caller differs. A workaround for a
+  platform defect, meant to be removed — see A-59, and do not "tidy" it away by
+  putting the final `submitLead` back in the agent's instructions.
 - `base44/agents/*.jsonc`: agent definitions — prompts, tools, model, memory,
   and `allow_anonymous_access`. **A publish does not ship these.**
   `npx base44 agents push --yes` does, as a full sync that deletes any remote

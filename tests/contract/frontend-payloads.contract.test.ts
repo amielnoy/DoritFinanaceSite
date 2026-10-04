@@ -57,15 +57,50 @@ describe("adapter → submitLead", () => {
   // a fuller-looking record.
   const AGENT_ONLY = ["summary", "track", "profile", "stage", "meetingTopic", "consent_version", "consent_at"];
 
-  it("exactly one adapter owns the call", () => {
-    // Previously three components each built this payload by hand. The contract
-    // now has a single place to drift, which is the point of the adapter.
-    expect(calls).toHaveLength(1);
-    expect(calls[0].file).toBe("src/services/base44/Base44LeadService.ts");
+  /**
+   * Two call sites now, and both are the adapter's.
+   *
+   * The browser builds this payload twice because the interview's close is no
+   * longer the agent's to send: its tool calls are not executed in an anonymous
+   * conversation, and every visitor is anonymous (A-59). So the form sends the
+   * form's fields, and `submitInterview` sends the conversation's — the same
+   * function, the same validation, reached by the caller that is actually
+   * allowed to reach it.
+   */
+  it("every payload is built in the adapter and nowhere else", () => {
+    // Previously three components each built this by hand. However many call
+    // sites there are, they belong in one file — that is the point of it.
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) {
+      expect(c.file, "a component is building this payload again").toBe(
+        "src/services/base44/Base44LeadService.ts",
+      );
+    }
   });
 
-  it("sends exactly the fields the function destructures, bar the agent-only ones", () => {
-    expect([...calls[0].keys].sort()).toEqual(accepted.filter((k) => !AGENT_ONLY.includes(k)));
+  it("sends nothing the function does not read", () => {
+    for (const c of calls) {
+      expect(
+        c.keys.filter((k) => !accepted.includes(k)),
+        "a field the backend never destructures",
+      ).toEqual([]);
+    }
+  });
+
+  it("the form's payload is exactly the form's fields", () => {
+    const form = calls.find((c) => !c.keys.includes("stage"));
+    expect(form, "no browser-form payload found").toBeDefined();
+    expect([...form!.keys].sort()).toEqual(accepted.filter((k) => !AGENT_ONLY.includes(k)));
+  });
+
+  it("the interview's payload carries what the summary mail is built from", () => {
+    const interview = calls.find((c) => c.keys.includes("stage"));
+    expect(interview, "no interview payload found").toBeDefined();
+    // Without these the enquiry reaches Dorit as a name and a phone number and
+    // nothing of the conversation that produced them.
+    for (const field of ["name", "phone", "source", "stage", "track", "profile", "summary"]) {
+      expect(interview!.keys, `the interview omits ${field}`).toContain(field);
+    }
   });
 
   it("keeps every agent-only field genuinely accepted by the function", () => {

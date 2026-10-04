@@ -74,7 +74,21 @@ const liftFunction = (src: string, name: string): string => {
 // ───────────────────────────────────────────────────────────────────────────
 describe("XSS — surfaces that render text somebody else wrote", () => {
   it("renders model output through a markdown renderer, never as raw HTML", () => {
-    expect(CHAT).toMatch(/<ReactMarkdown>\{m\.content\}<\/ReactMarkdown>/);
+    // The message is passed through `readHandoff` first, which strips the
+    // closing payload the page submits on the agent's behalf (A-59). That is a
+    // pure string transform — what matters here is unchanged: model output
+    // reaches the DOM only through the markdown renderer, never as raw HTML.
+    expect(CHAT).toMatch(/<ReactMarkdown>\{readHandoff\(m\.content\)\.visible\}<\/ReactMarkdown>/);
+  });
+
+  it("never renders the message text by any other route", () => {
+    // The guard the case above used to provide by pinning one exact expression.
+    // `m.content` may reach JSX only inside the user's own bubble, which is a
+    // plain text node, or through the renderer.
+    // Not `${m.content}`, which is the handoff transcript, a plain string.
+    const raw = [...CHAT.matchAll(/(?<!\$)\{m\.content\}/g)];
+    expect(raw.length, "an extra render path for model text").toBe(1);
+    expect(CHAT).toMatch(/<p className="whitespace-pre-wrap">\{m\.content\}<\/p>/);
   });
 
   it("does not enable a raw-HTML plugin for markdown anywhere", () => {

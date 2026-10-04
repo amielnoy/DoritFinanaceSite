@@ -14,6 +14,7 @@ import {
   HUMAN_HANDOFF,
 } from "@/config/compliance";
 import { CONTACT } from "@/config/contact";
+import { readHandoff } from "@/lib/interview-handoff";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 /** Everything that distinguishes one on-site agent from another. */
@@ -150,6 +151,8 @@ export default function AgentChat({
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [handoffSent, setHandoffSent] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** Set the moment a closing payload is accepted, so it is submitted once. */
+  const submittedRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -158,6 +161,46 @@ export default function AgentChat({
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  /**
+   * The close of the interview, submitted by the page.
+   *
+   * The agent cannot do it: its tool calls are not executed in an anonymous
+   * conversation, and every visitor is anonymous (A-59). It therefore states
+   * the summary in a fenced block and this submits it — the same call the
+   * quick-contact form has always made, which an anonymous visitor is allowed
+   * to make.
+   *
+   * `submittedRef` rather than state: two pushes can arrive in the same tick,
+   * and a second send means Dorit gets the enquiry twice.
+   */
+  useEffect(() => {
+    if (submittedRef.current) return;
+    const last = [...messages].reverse().find((m) => m.role === "assistant");
+    if (!last) return;
+    const { summary, malformed } = readHandoff(last.content);
+
+    if (malformed) {
+      // The block was there and unusable. Saying nothing would repeat the
+      // failure this exists to fix — the visitor believing they were passed on.
+      submittedRef.current = true;
+      console.warn("[interview] closing payload was unreadable; showing direct channels");
+      showChannelsOnly();
+      return;
+    }
+    if (!summary) return;
+
+    submittedRef.current = true;
+    void (async () => {
+      try {
+        const receipt = await services.leads.submitInterview(summary);
+        if (!receipt?.ok) throw new Error("rejected");
+      } catch {
+        console.warn("[interview] submitLead refused the closing payload; showing direct channels");
+        showChannelsOnly();
+      }
+    })();
   }, [messages]);
 
   const ensureConversation = useCallback(async () => {
@@ -286,6 +329,7 @@ export default function AgentChat({
     setHandoffPhone("");
     setHandoffError(null);
     setHandoffSent(false);
+    submittedRef.current = false;
   };
 
   const [line1, line2] = descriptor.heading.split(/<br\s*\/?>/);
@@ -413,7 +457,12 @@ export default function AgentChat({
                           <p className="whitespace-pre-wrap">{m.content}</p>
                         ) : (
                           <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                            {/* The closing payload travels inside the message and
+                                is machinery, not conversation — see
+                                interview-handoff.ts. Stripped here rather than
+                                on arrival so `messages` stays exactly what the
+                                server sent. */}
+                            <ReactMarkdown>{readHandoff(m.content).visible}</ReactMarkdown>
                           </div>
                         )}
                       </div>
