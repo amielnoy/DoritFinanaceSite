@@ -1019,9 +1019,32 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     });
 
     it("does not confirm a save that failed", () => {
-      // Silence here is the bad failure: the visitor is told Dorit has their
+      // Silence here is one bad failure: the visitor is told Dorit has their
       // summary, and she does not.
-      expect(interview.instructions).toMatch(/אם submitLead נכשלה/);
+      expect(interview.instructions).toMatch(/אם submitLead החזירה שגיאה/);
+    });
+
+    it("does not announce a failure it never attempted", () => {
+      // The other bad failure, and the one that actually happened. On
+      // 2026-10-04 an interview on a phone ended with
+      // "לא הצלחתי לשמור את המידע כעת במערכת" — and `submitLead` had not been
+      // called at all, in either environment. The visitor was told the system
+      // was broken; the enquiry simply never existed. A-58.
+      //
+      // Two instructions produced it together: a failure branch that did not
+      // ask whether the call had been made, and a cap phrased as "at most
+      // twice", which reads mid-conversation like a budget that may already be
+      // spent. Both now say what they mean.
+      expect(interview.instructions, "the failure branch takes the model's word for it").toMatch(
+        /אך ורק אם באמת קראת לה וקיבלת שגיאה/,
+      );
+      expect(interview.instructions, "the final save is still optional").toMatch(
+        /אין כאן מכסה שאפשר למצות/,
+      );
+      expect(
+        interview.instructions,
+        "the cap is still phrased as a budget",
+      ).not.toMatch(/פעמיים לכל היותר/);
     });
   });
 });
