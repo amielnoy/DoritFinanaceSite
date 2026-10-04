@@ -64,6 +64,16 @@ const MANDATORY_CLAUSES: Array<[label: string, needle: string]> = [
   ["closes with the transparency line", "אפשר לבקש עיון, תיקון או מחיקה בכל עת"],
 ];
 
+/**
+ * The two shapes a fan-out over `NOTIFY_EMAILS` may take.
+ *
+ * A `for…of` loop and a `Promise.all(... .map(...))` differ in latency and in
+ * nothing else that these cases care about: every mailbox is still reached and
+ * every one still gets its own `try`. Pinning the loop spelling made the move
+ * to concurrency look like a regression in four unrelated assertions.
+ */
+const OPS_FANOUT = /for \(const to of NOTIFY_EMAILS\)|NOTIFY_EMAILS\.map\(/;
+
 describe("on-site agent definitions", () => {
   it("ships exactly the agents the frontend renders", () => {
     // Two, where there were three. `booking_assistant` was merged into
@@ -387,7 +397,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
    * the wrong end of the problem. The two assertions below are what catch it.
    */
   const outsideGetsFullLead =
-    /for \(const to of NOTIFY_EMAILS\)/.test(submitLead) &&
+    OPS_FANOUT.test(submitLead) &&
     (/const opsHtml = buildAgentHtml\(\s*source,\s*data\b/.test(submitLead) ||
       /const opsText = `\$\{agentBody\}/.test(submitLead));
 
@@ -396,7 +406,11 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     // reshaped SendEmail call would quietly turn every check in this block into
     // an assertion about a branch that no longer runs.
     expect(submitLead, "no ops mailbox list found at all").toMatch(/const NOTIFY_EMAILS = \[/);
-    expect(submitLead, "nothing sends to the ops mailboxes").toMatch(/for \(const to of NOTIFY_EMAILS\)/);
+    // Either shape of the same iteration. `submitLead` sends the three copies
+    // concurrently now — in a queue they cost a second of the only latency the
+    // visitor can feel (A-56) — while `submitClaim` still loops. What matters
+    // here is that something walks the list, not how it walks it.
+    expect(submitLead, "nothing sends to the ops mailboxes").toMatch(OPS_FANOUT);
     expect(
       outsideGetsFullLead,
       "a send to NOTIFY_EMAILS exists but carries neither agentBody nor buildAgentHtml — " +
@@ -565,6 +579,59 @@ describe("who receives a lead, and whether the consent text admits it", () => {
         `${name}: receives the enquiry but gets no entry in the diary`
       ).toEqual([]);
     }
+  });
+
+  /**
+   * The work after the save runs together, because the visitor is waiting.
+   *
+   * Everything past `Lead.create` is best-effort by the code's own account, and
+   * it ran in a queue: calendar, calendar, sheet, document, then three mails,
+   * each awaiting the one before. The sum is the only latency anybody
+   * experiences. On 2026-10-04 a submission took **9,989 ms**; the agent, which
+   * does not wait that long for a tool, told the visitor
+   * "לא הצלחתי לשמור ולשלוח את המידע" — while the lead was saved, both diaries
+   * were written, the sheet and the document existed and `warnings` was 0. The
+   * one thing that failed was the only thing the visitor could see. See A-56.
+   *
+   * None of these four wait on each other. The only ordering that survives is
+   * the one that earns its place: the mail to Dorit carries the links, so it
+   * goes after the sheet and the document.
+   */
+  it("runs the work after the save together, not in a queue", () => {
+    const at = (needle: string) => submitLead.indexOf(needle);
+
+    // The two Google writes start before the calendar rather than behind it.
+    expect(at("const sheetPromise ="), "the sheet append is not started early").toBeGreaterThan(-1);
+    expect(at("const docPromise ="), "the document is not started early").toBeGreaterThan(-1);
+    expect(
+      at("const sheetPromise ="),
+      "the sheet append still queues behind the calendar",
+    ).toBeLessThan(at("const booksCalendar ="));
+    expect(at("const docPromise ="), "the document still queues behind the calendar").toBeLessThan(
+      at("const booksCalendar ="),
+    );
+
+    // And they are collected in one place, before the mail that links them.
+    expect(submitLead).toMatch(/await Promise\.all\(\[sheetPromise, docPromise\]\)/);
+    expect(
+      at("Promise.all([sheetPromise, docPromise])"),
+      "the links are read before the writes that produce them",
+    ).toBeLessThan(at("role: 'agency'"));
+
+    // Both diaries at once, not one after the other.
+    expect(submitLead, "the calendars are written in a queue").toMatch(
+      /await Promise\.all\(CALENDAR_PROVIDERS\.map\(/,
+    );
+    // A `continue` cannot leave a `.map` callback; a stale one would silently
+    // become a syntax error rather than a skipped provider, so pin its absence
+    // while the surrounding shape is a map.
+    const calBlock = submitLead.slice(at("CALENDAR_PROVIDERS.map("), at("const booked ="));
+    expect(calBlock, "a provider skip still uses loop control").not.toMatch(/\bcontinue\b/);
+
+    // And the three copies of the notification go out together.
+    expect(submitLead, "the ops mailboxes are served in a queue").toMatch(
+      /await Promise\.all\(NOTIFY_EMAILS\.map\(/,
+    );
   });
 
   it("asks Google to actually send the invitations", () => {
@@ -743,10 +810,10 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     // rest of the list. The catch has to be inside the loop, in each function.
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
     for (const [name, src] of [["submitLead", submitLead], ["submitClaim", claim]] as const) {
-      const i = src.indexOf("for (const to of NOTIFY_EMAILS)");
-      expect(i, `${name} does not loop the mailbox list`).toBeGreaterThan(-1);
+      const i = src.search(OPS_FANOUT);
+      expect(i, `${name} does not iterate the mailbox list`).toBeGreaterThan(-1);
       const loop = src.slice(i, i + 700);
-      expect(loop, `${name} catches outside the loop`).toMatch(/try \{[\s\S]*?catch \(e\) \{/);
+      expect(loop, `${name} catches outside the iteration`).toMatch(/try \{[\s\S]*?catch \(e\) \{/);
     }
   });
 
@@ -1108,7 +1175,14 @@ describe("the event log in Google Sheets", () => {
       const catchBody = src.slice(src.indexOf("catch (e) {", src.indexOf("await appendEventRow(base44")));
       const body = catchBody.slice(0, catchBody.indexOf("\n    }"));
       expect(body, `${name} must record a sheet failure`).toMatch(/sheet_append_failed/);
-      expect(body, `${name} must not throw on a sheet failure`).not.toMatch(/\bthrow\b|\breturn\b/);
+      expect(body, `${name} must not throw on a sheet failure`).not.toMatch(/\bthrow\b/);
+      // `return` was banned outright until the append started running as a
+      // promise alongside the calendar, where returning the sentinel status is
+      // the ordinary shape rather than an escape. What must never appear is a
+      // return that ends the request and skips the notifications.
+      expect(body, `${name} must not end the request on a sheet failure`).not.toMatch(
+        /return\s*;|return\s+Response/,
+      );
     }
     // Same rule, different shape: it has nothing else to report, so it answers
     // `ok: true` and carries the warning rather than collecting it.
