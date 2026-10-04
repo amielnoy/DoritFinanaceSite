@@ -1375,6 +1375,61 @@ describe("submitLead — the operations appendix links to what it wrote", () => 
 });
 
 /**
+ * "No faults" has to mean no faults.
+ *
+ * A connector that was authorised and is no longer returns no token, and the
+ * step that needed it returns a status and exits — no throw, no log, no
+ * warning. On 2026-10-04 at 22:03 that is exactly what happened to the summary
+ * document: it was never created, and the mail Dorit received said
+ * `תקלות: אין`.
+ *
+ * That line is the one somebody reads instead of checking, which is precisely
+ * why it must be true. What is *not* a fault: `לא רלוונטי`, because a quick
+ * enquiry is not supposed to produce a document, and `לא מוגדר`, because an
+ * absent `SHEET_ID` is a decision somebody made and the appendix states it
+ * plainly.
+ */
+describe("submitLead — a step that quietly did not happen says so", () => {
+  const env = { MAILER_URL, MAILER_TOKEN: "test-only-token", SHEET_ID: "sheet-test-id", SHEET_TAB: "Events" };
+
+  it("counts an unauthorised connector as a fault", async () => {
+    const r = await invokeFunction("submitLead", consultation, {
+      env,
+      connections: { googledocs: null },
+    });
+    expect(r.json.warnings).toContain("doc_not_connected");
+    expect(r.mailTo(OPS).text, "the appendix still claims nothing went wrong").not.toMatch(
+      /תקלות: אין/,
+    );
+  });
+
+  it("counts a failed write as a fault", async () => {
+    const r = await invokeFunction("submitLead", consultation, { env, fetchStatus: 500 });
+    expect(r.json.warnings.join(" ")).toMatch(/doc_failed|sheet_append_failed/);
+  });
+
+  it("does not call a quick enquiry's absent document a fault", async () => {
+    // `לא רלוונטי` — there is no conversation to write up, and saying so in
+    // the warnings would train the reader to ignore the line.
+    const r = await invokeFunction(
+      "submitLead",
+      { name: "דנה לוי", phone: "0529876543", message: "שאלה קצרה" },
+      { env },
+    );
+    expect(r.json.warnings).not.toContain("doc_not_connected");
+    expect(r.json.warnings.join(" ")).not.toMatch(/doc_/);
+  });
+
+  it("does not call an unconfigured sheet a fault", async () => {
+    const r = await invokeFunction("submitLead", consultation, {
+      env: { MAILER_URL, MAILER_TOKEN: "test-only-token" },
+    });
+    expect(r.json.warnings.join(" ")).not.toMatch(/sheet_not/);
+    expect(r.mailTo(OPS).text).toMatch(/גיליון: לא מוגדר/);
+  });
+});
+
+/**
  * The two links Dorit needs, in the copy she actually reads.
  *
  * She had the enquiry and the operations team had the links. Her mail went out
