@@ -1,0 +1,17 @@
+# Cloudflare/Netlify-style headers. Base44 hosting may ignore this file; it is
+# here because the header it asks for is the actual fix, and because the day it
+# is honoured the self-check in src/lib/freshness.ts becomes a belt beside a
+# brace rather than the only thing holding the trousers up.
+#
+# The HTML must never be cached without a validator. It names the hashed assets,
+# and those are immutable for a year — so a stale copy of this one file pins a
+# device to a build that no publish can reach. See A-57.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/app.html
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
