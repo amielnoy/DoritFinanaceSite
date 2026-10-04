@@ -918,8 +918,13 @@ describe("who receives a lead, and whether the consent text admits it", () => {
       expect(interview.instructions).toMatch(/source='interview'/);
     });
 
-    it("says in so many words not to write the record directly", () => {
-      expect(interview.instructions).toMatch(/אל תיצור רשומת Lead ישירות/);
+    it("says in so many words that the closing block is what ends an interview", () => {
+      // It used to say "never write the Lead directly; submitLead is the only
+      // way to end an interview". Both halves changed when the page took over
+      // the send (A-59): the agent no longer calls the function at the end, and
+      // the block is now the thing without which nobody hears about the visitor.
+      expect(interview.instructions).toMatch(/```lead/);
+      expect(interview.instructions).toMatch(/בלוק ה-lead הוא הדרך היחידה לסיים ראיון/);
     });
 
     it("carries the same data-minimisation rule as the booking agent", () => {
@@ -1018,13 +1023,21 @@ describe("who receives a lead, and whether the consent text admits it", () => {
       expect(interview.instructions).toMatch(/אל תבטיח שיישלח אישור או עותק למייל/);
     });
 
-    it("does not confirm a save that failed", () => {
-      // Silence here is one bad failure: the visitor is told Dorit has their
-      // summary, and she does not.
-      expect(interview.instructions).toMatch(/אם submitLead החזירה שגיאה/);
+    it("does not report on a send it does not perform", () => {
+      // This asked the agent to announce a failed save. It no longer performs
+      // the save at all — the page does (A-59) — so any such announcement is a
+      // guess, and in practice it guessed wrong: visitors were told the system
+      // was broken while the enquiry had in fact been delivered. The page shows
+      // the direct channels itself when the submission really does fail.
+      expect(interview.instructions).toMatch(/אל תאמר למבקר שלא הצלחת לשמור/);
+      expect(interview.instructions).toMatch(/השליחה אינה בידיך אלא בידי הדף/);
     });
 
-    it("does not announce a failure it never attempted", () => {
+    it.skip("does not announce a failure it never attempted", () => {
+      // Superseded by A-59: the instruction this pinned has been removed along
+      // with the agent's role in sending. Kept, skipped, as the record of why
+      // the wording it checked for is gone.
+
       // The other bad failure, and the one that actually happened. On
       // 2026-10-04 an interview on a phone ended with
       // "לא הצלחתי לשמור את המידע כעת במערכת" — and `submitLead` had not been

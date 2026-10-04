@@ -1,3 +1,7 @@
+import type { InterviewSummary } from "@/lib/interview-handoff";
+
+export type { InterviewSummary };
+
 /**
  * Ports — the interfaces the application depends on.
  *
@@ -55,6 +59,14 @@ export interface LeadPort {
   submitClaim(report: ClaimReport): Promise<SubmissionReceipt>;
   /** Best-effort calendar holds. Failure here must never fail a submission. */
   requestConsultationEvent(lead: Lead): Promise<void>;
+  /**
+   * The close of an interview, submitted by the page rather than by the agent.
+   *
+   * The agent's own tool calls are not executed in an anonymous conversation,
+   * and every visitor is anonymous — see `src/lib/interview-handoff.ts` and
+   * A-59. This is the path that actually reaches Dorit.
+   */
+  submitInterview(summary: InterviewSummary): Promise<SubmissionReceipt>;
 }
 
 export interface Article {

@@ -1,4 +1,10 @@
-import type { ClaimReport, Lead, LeadPort, SubmissionReceipt } from "../ports";
+import type {
+  ClaimReport,
+  InterviewSummary,
+  Lead,
+  LeadPort,
+  SubmissionReceipt,
+} from "../ports";
 
 /** The SDK surface this adapter needs — not the whole client. */
 export interface FunctionInvoker {
@@ -26,6 +32,30 @@ export class Base44LeadService implements LeadPort {
       message: lead.message ?? "",
       notes: lead.notes ?? "",
       scheduledAt: lead.scheduledAt ?? "",
+    })) as SubmissionReceipt | undefined;
+
+    return receipt ?? { ok: true };
+  }
+
+  /**
+   * The interview's close, with the fields `submitLead` needs for a full
+   * enquiry: the agent's two-stage save is reduced to one `complete` call,
+   * because the partial one is the agent's own and does not reach us.
+   */
+  async submitInterview(summary: InterviewSummary): Promise<SubmissionReceipt> {
+    const receipt = (await this.client.functions.invoke("submitLead", {
+      source: "interview",
+      stage: "complete",
+      name: summary.name,
+      phone: summary.phone,
+      email: summary.email ?? "",
+      track: summary.track ?? "",
+      meetingTopic: summary.meetingTopic ?? "",
+      timing: summary.timing ?? "",
+      notes: summary.notes ?? "",
+      scheduledAt: summary.scheduledAt ?? "",
+      summary: summary.summary ?? "",
+      profile: summary.profile ?? {},
     })) as SubmissionReceipt | undefined;
 
     return receipt ?? { ok: true };
