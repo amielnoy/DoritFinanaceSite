@@ -4,7 +4,7 @@ import { Loader2, RotateCcw, Send, ShieldCheck, Sparkles, UserRound } from "luci
 import ReactMarkdown from "react-markdown";
 import { AnimatePresence, motion } from "framer-motion";
 import { services } from "@/services";
-import type { AgentMessage, EscalationReason } from "@/services";
+import type { AgentMessage, EscalationReason, HumanContact } from "@/services";
 import { AgentLimitError, MAX_MESSAGE_CHARS } from "@/services/base44/Base44AgentService";
 import {
   BOT_DISCLOSURE,
@@ -13,6 +13,7 @@ import {
   CONSENT_VERSION,
   HUMAN_HANDOFF,
 } from "@/config/compliance";
+import { CONTACT } from "@/config/contact";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 /** Everything that distinguishes one on-site agent from another. */
@@ -129,6 +130,25 @@ export default function AgentChat({
    * holds it in both.
    */
   const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
+  /**
+   * The handoff asks who to call back before it notifies anyone.
+   *
+   * It used to fire on the press: `escalate` was called with a reason, a
+   * transcript and nothing else, because at that moment the panel holds no name
+   * and no phone — those live in the conversation with the agent, if they were
+   * given at all. On 2026-10-02 a visitor on Android pressed it three times
+   * mid-interview and דורית received three notifications reading
+   * `שם: לא נמסר · טלפון: לא נמסר`. Someone wanted to talk to her and she had
+   * no way to reach them. See A-55.
+   *
+   * `handoffSent` is why the third press now changes nothing: the control
+   * re-enabled itself in `finally`, so each press was another empty mail.
+   */
+  const [handoffOpen, setHandoffOpen] = useState<boolean>(false);
+  const [handoffName, setHandoffName] = useState<string>("");
+  const [handoffPhone, setHandoffPhone] = useState<string>("");
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [handoffSent, setHandoffSent] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -188,8 +208,40 @@ export default function AgentChat({
    * channels either way — a person who asked for a person gets one even when
    * the backend is down.
    */
+  /** The direct channels, formatted once for both routes out. */
+  const FALLBACK_CONTACT: HumanContact = CONTACT;
+
+  const channelsOf = ({ phoneDisplay, phoneE164, whatsapp, email }: HumanContact) =>
+    [
+      `📞 [${phoneDisplay}](tel:${phoneE164})`,
+      `💬 [וואטסאפ](https://wa.me/${whatsapp})`,
+      `✉️ [${email}](mailto:${email})`,
+    ].join("\n");
+
+  /**
+   * The route out that notifies nobody.
+   *
+   * A visitor who will not leave a number still gets דורית's, which was always
+   * the promise. What it no longer does is raise an alert she cannot act on.
+   */
+  const showChannelsOnly = () => {
+    setHandoffOpen(false);
+    setHandoffError(null);
+    setHandoffNotice([HUMAN_HANDOFF.failure, "", channelsOf(FALLBACK_CONTACT)].join("\n"));
+  };
+
   const handOffToHuman = async (reason: EscalationReason = "user_request") => {
-    if (handingOff) return;
+    if (handingOff || handoffSent) return;
+    const name = handoffName.trim();
+    const phone = handoffPhone.trim();
+    // A handoff without a number is the bug, not a lesser version of the
+    // feature: it reaches דורית as someone who wants to talk and cannot be
+    // talked to. The visitor keeps the other door — `showChannelsOnly`.
+    if (!phone) {
+      setHandoffError(HUMAN_HANDOFF.phoneError);
+      return;
+    }
+    setHandoffError(null);
     setHandingOff(true);
     const transcript = messages
       .slice(-6)
@@ -200,18 +252,20 @@ export default function AgentChat({
         reason,
         summary: `בקשה מהאתר למעבר לטיפול אנושי (${descriptor.conversationName}).\n\n${transcript}`,
         agent: descriptor.agent,
+        name,
+        phone,
         consentVersion: CONSENT_VERSION,
         consentAt: consentAt ?? "",
       });
-      const { phoneDisplay, phoneE164, whatsapp, email } = receipt.contact;
-      const notice = [
-        receipt.ok ? HUMAN_HANDOFF.confirmation : HUMAN_HANDOFF.failure,
-        "",
-        `📞 [${phoneDisplay}](tel:${phoneE164})`,
-        `💬 [וואטסאפ](https://wa.me/${whatsapp})`,
-        `✉️ [${email}](mailto:${email})`,
-      ].join("\n");
-      setHandoffNotice(notice);
+      setHandoffSent(true);
+      setHandoffOpen(false);
+      setHandoffNotice(
+        [
+          receipt.ok ? HUMAN_HANDOFF.confirmation : HUMAN_HANDOFF.failure,
+          "",
+          channelsOf(receipt.contact),
+        ].join("\n")
+      );
     } finally {
       setHandingOff(false);
     }
@@ -227,6 +281,11 @@ export default function AgentChat({
     setMessages([{ role: "assistant", content: descriptor.greeting }]);
     setInput("");
     setHandoffNotice(null);
+    setHandoffOpen(false);
+    setHandoffName("");
+    setHandoffPhone("");
+    setHandoffError(null);
+    setHandoffSent(false);
   };
 
   const [line1, line2] = descriptor.heading.split(/<br\s*\/?>/);
@@ -260,8 +319,11 @@ export default function AgentChat({
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button
-                onClick={() => handOffToHuman("user_request")}
-                disabled={handingOff}
+                onClick={() => {
+                  setHandoffError(null);
+                  setHandoffOpen((open) => !open);
+                }}
+                disabled={handingOff || handoffSent}
                 title={HUMAN_HANDOFF.buttonTitle}
                 aria-label={HUMAN_HANDOFF.buttonTitle}
                 className="inline-flex items-center gap-1.5 border border-accent/40 text-accent hover:bg-accent/10 disabled:opacity-40 transition-colors px-3 py-2 text-[13px]"
@@ -368,6 +430,74 @@ export default function AgentChat({
               )}
             </div>
           )}
+
+          {handoffOpen ? (
+            <div className="px-5 pb-4 pt-4 border-t border-border/60">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handOffToHuman("user_request");
+                }}
+                // Named, so it is one landmark a screen reader can jump to —
+                // and so a test can address its "שם"/"טלפון" rather than the
+                // contact form's, which sits in the same section.
+                aria-label={HUMAN_HANDOFF.buttonTitle}
+                className="border border-accent/40 bg-secondary/30 px-5 py-4"
+              >
+                <p className="text-[14px] leading-relaxed mb-3">{HUMAN_HANDOFF.prompt}</p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <label className="flex-1 text-[12px] text-muted-foreground">
+                    {HUMAN_HANDOFF.nameLabel}
+                    <input
+                      value={handoffName}
+                      onChange={(e) => setHandoffName(e.target.value)}
+                      placeholder={HUMAN_HANDOFF.namePlaceholder}
+                      autoComplete="name"
+                      className="mt-1 w-full border border-border bg-background px-3 py-2 text-[15px] text-foreground"
+                    />
+                  </label>
+                  <label className="flex-1 text-[12px] text-muted-foreground">
+                    {HUMAN_HANDOFF.phoneLabel}
+                    {/* `tel` so a phone offers the number pad, and `dir=ltr` so
+                        the digits do not reorder inside an RTL panel. */}
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      dir="ltr"
+                      value={handoffPhone}
+                      onChange={(e) => setHandoffPhone(e.target.value)}
+                      placeholder={HUMAN_HANDOFF.phonePlaceholder}
+                      autoComplete="tel"
+                      aria-invalid={handoffError ? true : undefined}
+                      className="mt-1 w-full border border-border bg-background px-3 py-2 text-[15px] text-foreground text-right"
+                    />
+                  </label>
+                </div>
+                {handoffError ? (
+                  <p role="alert" className="mt-2 text-[13px] text-destructive">
+                    {handoffError}
+                  </p>
+                ) : null}
+                <div className="mt-3 flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={handingOff}
+                    className="inline-flex items-center gap-1.5 bg-accent text-accent-foreground disabled:opacity-40 px-4 py-2 text-[14px]"
+                  >
+                    {handingOff ? <Loader2 size={14} className="animate-spin" /> : null}
+                    {HUMAN_HANDOFF.submitLabel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showChannelsOnly}
+                    className="text-[13px] text-muted-foreground underline hover:text-accent transition-colors"
+                  >
+                    {HUMAN_HANDOFF.skipLabel}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
 
           {handoffNotice ? (
             <div className="px-5 pb-4 pt-4 border-t border-border/60">
