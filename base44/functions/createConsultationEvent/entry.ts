@@ -159,12 +159,37 @@ export default async function(req) {
   const startedAt = Date.now();
   try {
     log('info', 'request.start', { rid });
+
+    // ── מי בכלל קורא לכאן ─────────────────────────────────────────────────
+    //
+    // אף אחד, אמור להיות. `requestConsultationEvent` היא המתודה היחידה
+    // שקוראת לפונקציה הזו, ואין לה קורא בקוד מאז 274347c — בדקנו גם בחבילה
+    // שמוגשת בייצור: השם מופיע בה פעם אחת, כהגדרה בלבד.
+    //
+    // ולמרות זאת היא נקראת. ב-4.10 היא נקראה בשעות 17:31, 18:00 ו-19:22,
+    // ובכל אחת מהן לא היה `submitLead` בשום סביבה — כלומר הראיון הסתיים ולא
+    // נשמר ולא נשלח דבר. הסיבה היא לקוח ישן: `index.html` מוגש בלי
+    // Cache-Control, בלי ETag ובלי Last-Modified, בעוד החבילות לידו תקפות
+    // שבוע ועדיין מוגשות. מכשיר שנתקע על גרסה ישנה ממשיך לקרוא לכאן, ופרסום
+    // אינו מגיע אליו. ראו A-57.
+    //
+    // אי-אפשר לתקן אותו מכאן — הוא לא מוריד קוד חדש, וגם אין לו מה למסור:
+    // הקריאה מגיעה בלי שם ובלי טלפון. מה שכן אפשר הוא להפסיק לקרוא לזה
+    // 'warn' ולהתייחס לזה כמו למה שזה: פנייה שאבדה. שורה אחת ברמת error,
+    // עם מה שמזהה את המכשיר, הופכת חקירה של יומיים לחיפוש אחד.
+    const staleClient = {
+      ua: (req.headers.get('user-agent') || '').slice(0, 160),
+      from: (req.headers.get('referer') || '').slice(0, 160),
+    };
+    log('error', 'client.stale', { rid, ...staleClient });
+
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { name, phone, email, topic, timing, notes, scheduledAt } = body || {};
 
     if (!name || !phone) {
-      log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields' });
+      // פנייה שאבדה, ולא רק בקשה פגומה. מי שהגיע לכאן סיים ראיון שלא נשמר.
+      log('error', 'lead.lost', { rid, reason: 'missing_contact_fields', ...staleClient });
       return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
     }
 

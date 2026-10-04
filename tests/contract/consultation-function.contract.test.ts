@@ -173,3 +173,50 @@ describe("createConsultationEvent — both calendars", () => {
     expect(fnSource).toMatch(/CALENDAR_PROVIDERS\.length === 0/);
   });
 });
+
+/**
+ * Nothing should reach this function, so the day something does, say so.
+ *
+ * `requestConsultationEvent` is its only caller and has had none itself since
+ * `274347c` — confirmed against the bundle production actually serves, where
+ * the name appears once, as a definition. Yet it was called at 17:31, 18:00 and
+ * 19:22 on 2026-10-04, and in each case no `submitLead` ran in either
+ * environment: an interview finished, nothing was saved, nobody was mailed.
+ *
+ * The cause is a device pinned to an old build (A-57), which cannot be fixed
+ * from here — it downloads no new code, and the call arrives with no name and
+ * no phone, so there is nothing to rescue. What can be fixed is that this was
+ * a `warn` reading `missing_contact_fields`, which is how it passed for a
+ * malformed request for two days instead of a lost enquiry.
+ */
+describe("createConsultationEvent — an unreachable function that keeps being reached", () => {
+  const src = readFileSync(
+    join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"),
+    "utf8",
+  );
+
+  it("records every caller as an error, since there should be none", () => {
+    expect(src, "a stale client arrives unannounced").toMatch(
+      /log\('error', 'client\.stale'/,
+    );
+  });
+
+  it("calls a dropped enquiry what it is", () => {
+    expect(src, "a lost lead is still logged as a mere rejection").toMatch(
+      /log\('error', 'lead\.lost'/,
+    );
+    expect(src).not.toMatch(/log\('warn', 'request\.rejected'/);
+  });
+
+  it("carries enough to identify the device, and no more", () => {
+    // The user agent and the referrer name the build and the page. Nothing else
+    // from the request belongs in a log line.
+    expect(src).toMatch(/user-agent/);
+    expect(src).toMatch(/referer/);
+    for (const header of ["cookie", "authorization"]) {
+      expect(src.toLowerCase(), `${header} must not reach the log`).not.toContain(
+        `headers.get('${header}'`,
+      );
+    }
+  });
+});
