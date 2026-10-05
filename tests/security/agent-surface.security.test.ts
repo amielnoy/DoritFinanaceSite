@@ -91,6 +91,20 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
     expect(CHAT).toMatch(/<p className="whitespace-pre-wrap">\{m\.content\}<\/p>/);
   });
 
+  it("widens the markdown link allow-list by exactly one scheme", () => {
+    // react-markdown 9 empties any href outside its own short list, which
+    // silently killed the `tel:` link in the handoff notice — rendered as a
+    // link with `href=""`, on the one device where dialling is the point.
+    //
+    // The text being rendered is model output, so the allow-list is a security
+    // surface: widening it widens what a reply can talk a visitor into opening.
+    // `tel:` and nothing else, and everything else still goes through the
+    // library's own transform.
+    expect(CHAT).toMatch(/url\.startsWith\("tel:"\) \? url : defaultUrlTransform\(url\)/);
+    const extras = [...CHAT.matchAll(/startsWith\("([a-z]+):"\)/g)].map((m) => m[1]);
+    expect(extras, "a scheme beyond tel: was allowed through").toEqual(["tel"]);
+  });
+
   it("does not enable a raw-HTML plugin for markdown anywhere", () => {
     // react-markdown escapes HTML unless rehype-raw is added. Adding it would
     // turn every model reply and every blog post into an injection point.
@@ -107,7 +121,7 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
   it("renders the handoff notice through markdown too", () => {
     // The failure copy is the one path that runs when everything else broke;
     // it must not become the one path that skips escaping.
-    expect(CHAT).toMatch(/<ReactMarkdown>\{handoffNotice\}<\/ReactMarkdown>/);
+    expect(CHAT).toMatch(/<ReactMarkdown urlTransform=\{allowTel\}>\{handoffNotice\}<\/ReactMarkdown>/);
   });
 
   it("keeps innerHTML and document.write out of every first-party source file", () => {
