@@ -121,7 +121,12 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
   it("renders the handoff notice through markdown too", () => {
     // The failure copy is the one path that runs when everything else broke;
     // it must not become the one path that skips escaping.
-    expect(CHAT).toMatch(/<ReactMarkdown urlTransform=\{allowTel\}>\{handoffNotice\}<\/ReactMarkdown>/);
+    // The notice is no longer markdown. Its message is a plain text node and its
+    // channels are `ContactChannels`, which takes a `HumanContact` and builds
+    // every href from it — a stronger version of the same property, since there
+    // is no string for a model's reply to reach at all.
+    expect(CHAT).toMatch(/<ContactChannels contact=\{handoffNotice\.contact\} \/>/);
+    expect(CHAT).toMatch(/\{handoffNotice\.message\}/);
   });
 
   it("keeps innerHTML and document.write out of every first-party source file", () => {
@@ -248,17 +253,22 @@ describe("Phishing — the site's name on somebody else's message", () => {
     // The agent reads these out when everything else failed. A stale number
     // here sends a person who already needs help to a dead line.
     //
-    // `compliance.ts` no longer spells the digits out — it interpolates
-    // `CONTACT.phoneDisplay`. That is the stronger version of this property, not a
-    // weaker one: the two cannot drift, because there is only one of them. So the
-    // assertion follows the binding. Asserting the literal here would now fail on a
-    // file that is *more* correct than the one the test was written against.
+    // This followed the binding once `compliance.ts` stopped spelling the digits
+    // out and interpolated `CONTACT.phoneDisplay` instead. It has now gone one
+    // step further: the file carries no contact details at all and does not
+    // import CONTACT, because the sentence it needed them for named the number
+    // and the address directly above links carrying both.
     //
+    // So the property is stated at its strongest. The copy knows the wording;
+    // `CONTACT` knows how to reach her; nothing holds a second copy of either.
+    expect(COMPLIANCE, "the copy carries a contact detail again").not.toMatch(
+      /\d{2,3}-\d{3}-\d{4}|@govari-fin\.co\.il/,
+    );
+    expect(COMPLIANCE, "the copy reaches for CONTACT again").not.toMatch(/\bCONTACT\./);
+
     // `escalateToHuman` gets no such help: it is a Base44 entry point with no shared
     // module (see AGENTS.md), so its copy is a hand-kept literal and still matches by
     // hand — which is exactly why it keeps its own assertion below.
-    expect(COMPLIANCE).toMatch(/import \{ CONTACT \} from "@\/config\/contact";/);
-    expect(COMPLIANCE).toMatch(/\$\{CONTACT\.phoneDisplay\}/);
     expect(ESCALATE).toMatch(/050-831-1776/);
     expect(CONTACT).toMatch(/050-831-1776/);
   });
@@ -292,13 +302,22 @@ describe("Phishing — the site's name on somebody else's message", () => {
     // out: a visitor who declines to leave a number still gets דורית's, and
     // that path has no receipt to read from. So the assertion moved up one
     // level, to the only two things the formatter may ever be handed.
-    expect(CHAT, "the contact block is not built in one place").toMatch(
-      /const channelsOf = \(\{ phoneDisplay, phoneE164, whatsapp, email \}: HumanContact\)/,
+    // One component owns the rendering, and every href it builds comes from the
+    // `HumanContact` it is handed. So the question is only ever which contact
+    // the chat passes it.
+    const CHANNELS = read(join(REPO_ROOT, "src/components/dorit/chat/ContactChannels.tsx"));
+    for (const href of [
+      /href: `tel:\$\{contact\.phoneE164\}`/,
+      /href: `mailto:\$\{contact\.email\}`/,
+      /href: `https:\/\/wa\.me\/\$\{contact\.whatsapp\}`/,
+    ]) {
+      expect(CHANNELS, "a channel is not built from the contact it was given").toMatch(href);
+    }
+
+    const sources = [...CHAT.matchAll(/setHandoffNotice\(\{[\s\S]*?contact: ([A-Za-z_.]+)/g)].map(
+      (m) => m[1],
     );
-    const sources = [...CHAT.matchAll(/channelsOf\(([^)]*)\)/g)]
-      .map((m) => m[1].trim())
-      .filter((a) => !a.includes(":"));          // drops the declaration itself
-    expect(sources.length, "nothing renders the contact block").toBeGreaterThan(0);
+    expect(sources.length, "nothing shows the contact block").toBeGreaterThan(0);
     for (const arg of sources) {
       expect(
         ["receipt.contact", "FALLBACK_CONTACT"].includes(arg),
