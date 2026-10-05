@@ -110,6 +110,26 @@ base44 dashboard open
 
 This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
 
+### Published is not the same as running
+
+A publish reports success, stores the new source, and may go on running the
+previous build of a function. Measured on 2026-10-04: `createConsultationEvent`
+was changed to log `client.stale`, published, and published twice more over the
+following two hours. Every request still logged the event name from the build
+before it. `base44 functions pull` returned source byte-identical to the commit
+that was published, so the two were genuinely out of step.
+
+Site bundles do not behave this way — a frontend change was verifiable in the
+served bundle by its content hash minutes after the same publish. **It is
+specifically the functions.**
+
+The practical damage is the asymmetry: the two halves of the application can be
+from different commits, and nothing anywhere says so. When a backend change does
+not appear to take effect, confirm which build is answering before assuming the
+change is wrong. The cheapest way is a log line that only the new build emits,
+called with a payload that stops at the function's own guard so nothing is
+created.
+
 ### Agents are not part of a publish
 
 **A publish ships code. It does not ship `base44/agents/`.** That is a separate
@@ -358,15 +378,42 @@ Two of those guarantees do not depend on the model at all, on purpose:
   visitor accepts the notice, and no conversation is opened with the backend
   until then — a prompt can be talked out of asking; this cannot.
 - **The route to a person is a button**, present from the first frame, that
-  calls `escalateToHuman` and renders דורית's phone, WhatsApp and email even
-  when the call fails, and even before consent.
+  renders דורית's phone, WhatsApp and email even when the call fails, and even
+  before consent. It asks for a name and a number before notifying her: it used
+  to fire on the press with empty strings, and she received handoffs reading
+  `שם: לא נמסר · טלפון: לא נמסר` — somebody wanting to speak to her and no way
+  to reach them (A-55). A visitor who will not leave a number still gets her
+  details; what that no longer does is raise an alert she cannot act on.
 
-A finished interview leaves the same way a form does. The agent hands the
-summary the visitor approved to `submitLead`, which mails it to דורית and to the
-team operating the site in the site's own layout, confirms to the visitor if
-they gave an address, and — when a time was agreed — books it in both calendars
-without a second tool call (see [the meeting](#the-meeting-and-which-diary-it-lands-in)). It used to end at `Lead.create` instead — stored, and
-nobody told, until somebody happened to open the leads screen.
+A finished interview reaches `submitLead` the same way a form does — **and that
+is now literally true, because the page sends it rather than the agent.**
+
+Base44 does not execute an agent's tool calls in an anonymous conversation, and
+every visitor is anonymous. Proven by running the same scripted interview twice
+against the same build: signed in, `submitLead` fires and everything lands;
+anonymous, it is never invoked and the agent signs off telling the visitor it
+could not save. For three days every interview completed on a phone was
+discarded while the visitor was told it had reached דורית. See A-59.
+
+So the agent ends its last message with a fenced ```` ```lead ```` block,
+`AgentChat` strips it from the transcript before rendering, validates it, and
+calls `submitLead` itself — the same function, the same validation, reached by
+the caller that is permitted to reach it. A block it cannot read, or a
+submission the backend refuses, shows the visitor דורית's direct channels: the
+failure this exists to fix is a visitor believing they were passed on when they
+were not, and a silent one is no better. `src/lib/interview-handoff.ts` carries
+the detail.
+
+**This is a workaround for a platform defect and is meant to be removed.** Do
+not "tidy" the closing `submitLead` back into the agent's instructions —
+`AGENTS.md` says so beside the file.
+
+Either way the function does the rest: it mails דורית and the team operating the
+site in the site's own layout, confirms to the visitor if they gave an address,
+and — when a time was agreed — books it in both calendars without a second tool
+call (see [the meeting](#the-meeting-and-which-diary-it-lands-in)). It used to
+end at `Lead.create` instead — stored, and nobody told, until somebody happened
+to open the leads screen.
 
 What it hands over is a **fixed schema, not free text**. The agent picks one of
 seven tracks from the visitor's stated goal — pension, insurance, retirement,
@@ -377,9 +424,12 @@ model handed a form from inventing a field called `advice`. Every value passes
 through `redact()`, because a profile is written by a model that just heard the
 visitor type things it was told not to record.
 
-The interview is saved **twice**. Name and phone are asked after the goal and
-before the track questions, and the agent saves a `partial` record the moment it
-has them — silently, mailing nobody. A visitor who answers four questions and
+The interview is saved **twice** — when it can be. Name and phone are asked
+after the goal and before the track questions, and the agent saves a `partial`
+record the moment it has them, silently, mailing nobody. That one is still the
+agent's own tool call, so for an anonymous visitor it does not happen: the
+abandonment row is lost and only the closing call, which the page makes, gets
+through. Another thing the platform fix would restore. A visitor who answers four questions and
 closes the tab used to leave nothing at all; now they leave a row דורית can
 follow up. The closing call updates that same row rather than creating a second,
 keyed on the phone number within a six-hour window, which is also what stops a
@@ -536,6 +586,33 @@ and CCBot used to receive the static `index.html` on every path — so to them
 largest SEO constraint on this site, written up as B-0, and it was measured
 rather than assumed: `/`, `/faq` and `/claims` returned byte-identical HTML from
 live production, all three naming the home page as their canonical.
+
+### And only one of the two hosts actually does it
+
+Measured 2026-10-05 against both live copies:
+
+| | Base44 (production today) | Vercel |
+|---|---|---|
+| HTML served | 25,708 bytes | 109,870 bytes |
+| `rel="canonical"` | `rel="canonical"/` — **no href** | filled |
+| `og:url` | `property="og:url"/` — **no content** | filled |
+| `<h1>` in the HTML | absent | present |
+
+Base44's build command is `npm run build`; Vercel's is `build:prerender`.
+`applySeo` fills the canonical tag and `og:url` **in the browser** — for the
+audience that did not need them. A crawler that does not run JavaScript gets an
+empty canonical element and no content.
+
+The JSON-LD blocks are correct in both, because the build plugin rewrites static
+files. It is precisely the two tags patched at runtime that are empty in the
+document.
+
+So the copy serving production is the one that is bad for search, and the
+staging copy is the good one. Prerendering on Base44 instead would need Chromium
+in its build environment — `scripts/prerender.mjs` launches Playwright and fails
+loudly without it — which puts a browser install in front of the production
+publish for a host we intend to leave. The fix is the move below, and
+`docs/base44-exit/01-hosting.md` records which of its steps are already done.
 
 ### Prerendering closes it
 
