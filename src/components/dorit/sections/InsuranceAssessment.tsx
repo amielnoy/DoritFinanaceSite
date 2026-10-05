@@ -179,7 +179,7 @@ export default function InsuranceAssessment() {
                             <div className="flex items-center gap-2.5 mb-2">
                               <h4 className="font-heading text-xl">{rec.title}</h4>
                               {rec.priority && (
-                                <span className="text-[10px] tracking-[0.2em] uppercase text-highlight-ink border border-highlight/40 px-2 py-0.5 rounded-sm">
+                                <span className="text-[11px] tracking-[0.2em] uppercase text-highlight-ink border border-highlight/40 px-2 py-0.5 rounded-sm">
                                   עדיפות גבוהה
                                 </span>
                               )}
@@ -206,7 +206,7 @@ export default function InsuranceAssessment() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground/70 mt-6 max-w-xl mx-auto leading-relaxed">
+        <p className="text-center text-xs text-muted-foreground mt-6 max-w-xl mx-auto leading-relaxed">
           הכלי נועד להערכה ראשונית בלבד ואינו מהווה ייעוץ פיננסי או המלצה לרכישת
           מוצר. ההמלצות המדויקות ניתנות אך ורק בפגישה אישית.
         </p>

@@ -145,7 +145,7 @@ export default function BlogAdmin() {
       <div className="max-w-[1200px] mx-auto px-6 md:px-10">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-accent transition-colors mb-8"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-8"
         >
           <ArrowRight size={16} /> חזרה לאתר
         </Link>
@@ -294,7 +294,7 @@ export default function BlogAdmin() {
             לא הצלחנו לטעון את המאמרים. ניתן לרענן את הדף.
           </div>
         ) : posts.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-border text-foreground/60">
+          <div className="text-center py-16 border border-dashed border-border text-muted-foreground">
             אין מאמרים עדיין.
           </div>
         ) : (

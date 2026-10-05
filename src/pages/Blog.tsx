@@ -183,14 +183,14 @@ export default function Blog() {
             ) : !posts || posts.length === 0 ? (
               <div className="text-center py-20 border border-dashed border-border">
                 <Newspaper size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
-                <p className="text-foreground/60">
+                <p className="text-muted-foreground">
                   עדיין אין מאמרים — בקרוב יעלו כאן עדכונים חדשים.
                 </p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-20 border border-dashed border-border">
                 <Search size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
-                <p className="text-foreground/60">
+                <p className="text-muted-foreground">
                   לא נמצאו מאמרים התואמים את החיפוש. ניתן לנסות מילים אחרות או נושא אחר.
                 </p>
                 <button
@@ -247,7 +247,7 @@ export default function Blog() {
                             .map((t) => (
                               <span
                                 key={t}
-                                className="text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground"
+                                className="text-[11px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground"
                               >
                                 {t}
                               </span>

@@ -48,11 +48,11 @@ export default function CarrierLogos() {
               aria-label={`אתר ${c.he}`}
               className="group flex flex-col items-center text-center"
             >
-              <span className="font-heading text-lg md:text-xl tracking-tight leading-none text-muted-foreground/55 group-hover:text-foreground transition-colors duration-500">
+              <span className="font-heading text-lg md:text-xl tracking-tight leading-none text-muted-foreground group-hover:text-foreground transition-colors duration-500">
                 {c.he}
               </span>
               {c.en && c.en !== c.he && (
-                <span className="mt-1.5 text-[9px] tracking-[0.3em] uppercase text-muted-foreground/35 group-hover:text-accent/70 transition-colors duration-500">
+                <span className="mt-1.5 text-[11px] tracking-[0.3em] uppercase text-muted-foreground group-hover:text-accent/70 transition-colors duration-500">
                   {c.en}
                 </span>
               )}
@@ -60,7 +60,7 @@ export default function CarrierLogos() {
           ))}
         </div>
 
-        <p className="mt-12 text-center text-sm text-muted-foreground/55 max-w-xl mx-auto leading-relaxed">
+        <p className="mt-12 text-center text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
           גישה בלתי-תלויה לכל שוק הפנסיה והביטוח — ההמלצה נגזרת אך ורק מהצורך שלך,
           לא משייכות מסחרית לחברה כלשהי.
         </p>

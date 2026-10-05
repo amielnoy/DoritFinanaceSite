@@ -120,7 +120,7 @@ export default function Footer() {
             <Link to="/accessibility" className="hover:text-highlight transition-colors">הצהרת נגישות</Link>
           </div>
         </div>
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 pb-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-primary-foreground/40">
+        <div className="max-w-[1400px] mx-auto px-6 md:px-10 pb-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-muted-foreground-on-dark">
           <p>© {new Date().getFullYear()} דורית גוב ארי. כל הזכויות שמורות.</p>
           <p className="tracking-[0.2em] uppercase">Designed with Structural Serenity</p>
         </div>

@@ -60,7 +60,7 @@ export default function PensionFeeCalculator() {
             שקלים מהצבירה שלכם. המחשבון הזה מעניק תמונה כנה — כי ידע הוא הצעד
             הראשון לקראת החלטה מושכלת.
           </p>
-          <div className="mt-10 flex items-center gap-3 text-sm text-foreground/50">
+          <div className="mt-10 flex items-center gap-3 text-sm text-muted-foreground">
             <Calculator size={16} className="text-accent" />
             <span>הערכה כללית בלבד — אינה מחליפה ייעוץ אישי.</span>
           </div>

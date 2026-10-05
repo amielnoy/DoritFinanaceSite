@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Motion is a preference, and the site was not asking.
+ *
+ * Nothing honoured `prefers-reduced-motion` — no media query here, no
+ * `useReducedMotion` anywhere in src. Every entrance, hover and transition ran
+ * regardless of what the visitor had asked their operating system for, on a
+ * site whose audience skews older and which publishes an accessibility
+ * statement.
+ *
+ * It also made the contrast scan unusable. axe reads a static snapshot, so it
+ * caught elements mid-fade and reported ink at 1.1:1 that is perfectly legible
+ * once settled — real findings and animation artefacts in one list, with no way
+ * to tell them apart. That is why contrast could be reported and never
+ * enforced.
+ *
+ * `MotionConfig reducedMotion="user"` in App.jsx covers framer-motion; this
+ * covers CSS transitions and keyframes, which it does not see.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer base {
   :root {
     --background: 36 38% 97%;       /* #F9F7F2 Warm Parchment */
@@ -15,7 +44,11 @@
     --secondary: 36 20% 92%;
     --secondary-foreground: 240 3% 10%;
     --muted: 36 18% 90%;
-    --muted-foreground: 30 10% 40%;
+    /* Raised from 40%. At 40% it measured 4.52:1 against the darkest surface
+       it sits on — a margin of 0.02 over the floor, which is why every faded
+       variant of it failed. 32% measures 6.21:1 at its worst, which leaves room
+       for a hairline border or a hover state without going under. */
+    --muted-foreground: 30 8% 32%;
     --accent: 26 14% 39%;           /* #7D6B5D Deep Taupe */
     --accent-foreground: 36 38% 97%;
     /* Soft Bronze ramp. Every bronze on the site resolves to one of these
@@ -29,6 +62,10 @@
        phone outdoors. Same hue as --highlight-strong, taken down to ink. */
     --highlight-ink: 27 38% 30%;      /* #6A4A2F  figures, type on light    */
     --highlight-foreground: 240 3% 10%;
+    /* Secondary text on the obsidian band and the footer. `--foreground` there
+       measured 3.65:1, because it is the ink for light surfaces and nothing
+       said so. */
+    --muted-foreground-on-dark: 36 20% 78%;
     /* Third-party brand colour, fixed by WhatsApp — not ours to restyle. */
     --brand-whatsapp: 142 70% 49%;    /* #25D366 */
     --destructive: 0 84% 60%;
