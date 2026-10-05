@@ -68,7 +68,9 @@ describe("logSupportChat — the row", () => {
       { env: ENV },
     );
     const [append] = run.callsTo("sheets.googleapis.com");
-    expect((append.body as { values: string[][] }).values[0][2]).toBe("0501234567");
+    // `'` forces Sheets to keep this as text; see the note in `appendEventRow`.
+    // Without it the leading zero is lost to numeric coercion.
+    expect((append.body as { values: string[][] }).values[0][2]).toBe("'0501234567");
   });
 
   it("leaves the number empty for the site chat, which has none", async () => {

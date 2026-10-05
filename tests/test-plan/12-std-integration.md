@@ -261,6 +261,31 @@ same move is why the sheet, document and calendar fetches each carry an
 `AbortSignal.timeout`: an unresponsive Google used to delay an appendix, and
 would now delay the one message somebody is waiting on.
 
+### 4.11d `submitLead` — what an interview puts in the sheet — `INT-LEAD-094..099`
+
+Everything the interview collected landed in `תקציר` as free text: life stage,
+goal, concern, clearinghouse interest, employer, seniority, products, fees —
+eight structured answers flattened into one cell. The sheet could display them
+and do nothing else with them. It could not be asked *who wants a clearinghouse
+pull* or *which interviews finished*, which are the two questions it exists for.
+
+The four fields asked in every interview now have columns, because those are the
+ones comparable across interviews; track-specific fields stay in the summary,
+since a column filled in a third of rows is worse than prose. Two more carry the
+agreed slot — distinct from the free-text `מועד מבוקש`, and the only one that
+sorts — and the completeness count.
+
+These pin each common field in its own cell, the slot in the diary's format,
+the completeness line, that a non-interview leaves the new cells **empty rather
+than absent** (a short row slides every later column under the wrong heading),
+and that the full profile still reaches the summary so nothing was traded away
+for the columns. The row's length is checked against the function's own header
+list rather than a number copied beside it.
+
+Two defects fixed alongside, both in the copy that outlives deleting the Lead:
+a phone number was stored as a number, losing its leading zero, and the
+timestamp was UTC in a sheet read in Israel.
+
 ### 4.11c `escalateToHuman` — the notification is readable — `INT-ESC-020..028`
 
 The handover went out as plain text only, and clients folded it into one running
@@ -386,7 +411,7 @@ refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 
 ## 5. Pass criteria
 
-All 228 cases pass. These assert behaviour, not shape — a failure means the
+All 237 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

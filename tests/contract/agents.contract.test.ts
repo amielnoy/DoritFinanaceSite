@@ -1167,14 +1167,42 @@ describe("the event log in Google Sheets", () => {
     }
   });
 
+  it("asks the profile only for labels the schema defines", () => {
+    const submitLead = writers.submitLead;
+    // The sheet reads the profile by label, because by the time it gets there
+    // `buildInterviewProfile` has returned [label, value] pairs and the field
+    // key is gone. A label renamed in the schema and not here would silently
+    // write an empty column — the quietest kind of wrong, since the row still
+    // appends and still looks complete.
+    const asked = [...submitLead.matchAll(/profileValue\(safeProfile, '([^']+)'\)/g)].map(
+      (m) => m[1],
+    );
+    expect(asked.length, "nothing reads the profile by label any more").toBeGreaterThan(0);
+    const schema = submitLead.slice(
+      submitLead.indexOf("const INTERVIEW_COMMON = ["),
+      submitLead.indexOf("const INTERVIEW_TRACKS ="),
+    );
+    for (const label of asked) {
+      expect(schema, `the sheet asks for "${label}", which the schema does not define`).toContain(
+        `'${label}'`,
+      );
+    }
+  });
+
   it("keeps the column order identical in both writers", () => {
     const columns = Object.entries(writers).map(
       ([, src]) => block(src, "const SHEET_COLUMNS = [", "];"),
     );
     expect(columns[0]).toBe(columns[1]);
-    // And the row every writer builds has to be that long. Counting quoted
-    // headers rather than commas — the list carries a trailing one.
-    expect(columns[0].match(/'[^']+'/g) ?? []).toHaveLength(13);
+    // Counting quoted headers rather than commas — the list carries a trailing
+    // one. Nineteen since the interview's own fields earned columns: the four
+    // asked in every interview, the agreed slot, and the completeness count.
+    //
+    // That a *row* is this long is checked where it can be: the integration
+    // suite reads the body actually posted to Sheets and compares its length
+    // against this list. A source scan cannot count array elements past the
+    // first comment containing a comma.
+    expect(columns[0].match(/'[^']+'/g) ?? []).toHaveLength(19);
   });
 
   it("keeps appendEventRow identical in every writer", () => {

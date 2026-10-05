@@ -352,9 +352,22 @@ const SHEET_TAB = (Deno.env.get('SHEET_TAB') || 'Events').trim();
  * נכשל אם שתי הרשימות מתפצלות — שורה שנכתבת בסדר אחר הורסת את הגיליון בשקט,
  * בלי שדבר ייכשל.
  */
+// ── עמודות גיליון האירועים ────────────────────────────────────────────────
+//
+// שש האחרונות נוספו אחרי שהתברר מה הגיליון לא יכול לענות עליו. ראיון אוסף
+// שמונה שדות מובנים, וכולם נדחסו לתא 'תקציר' אחד — טקסט חופשי שאי אפשר לסנן,
+// למיין או לספור. דורית לא יכלה לשאול "מי מעוניין בשליפה מהמסלקה?" או "כמה
+// ראיונות הושלמו במלואם?", שתי שאלות שהגיליון קיים בשבילן.
+//
+// נוספו בסוף ולא באמצע, כדי ששורות קיימות יישארו מיושרות מול הכותרות.
+//
+// ארבע מהן הן INTERVIEW_COMMON — השדות שנשאלים בכל ראיון ולכן השוואתיים בין
+// ראיונות. שדות ייחודיים למסלול נשארים ב'תקציר': הם שונים ממסלול למסלול,
+// ועמודה שמלאה רק בשליש מהשורות גרועה מטקסט.
 const SHEET_COLUMNS = [
   'מועד', 'סוג האירוע', 'מקור', 'מסלול', 'סוכן', 'נושא', 'מועד מבוקש',
   'שם', 'טלפון', 'אימייל', 'מזהה רשומה', 'סיבת העברה', 'תקציר',
+  'מועד הפגישה', 'שלב חיים', 'יעד עיקרי', 'דאגה מרכזית', 'מסלקה', 'שלמות',
 ];
 
 /**
@@ -441,7 +454,26 @@ async function appendEventRow(base44, row) {
   const { accessToken } = await base44.asServiceRole.connectors.getConnection('googlesheets');
   if (!accessToken) return 'אין חיבור';
 
-  const range = `${SHEET_TAB}!A:${String.fromCharCode(64 + SHEET_COLUMNS.length)}`;
+  // שם העמודה האחרונה. `String.fromCharCode(64 + n)` עבד עד 26 ואז התחיל
+  // לייצר תווים שאינם אותיות — טווח פגום, ובקשה שנדחית. בראיון יש כבר 19
+  // עמודות, וזה קרוב מכדי להשאיר כך.
+  let lastColumn = '';
+  for (let n = SHEET_COLUMNS.length; n > 0; ) {
+    const r = (n - 1) % 26;
+    lastColumn = String.fromCharCode(65 + r) + lastColumn;
+    n = (n - r - 1) / 26;
+  }
+
+  // USER_ENTERED מפרש כל תא כאילו אדם הקליד אותו, ולכן '0549988754' נשמר
+  // כמספר 549988754 — האפס המוביל אובד, והטלפון הופך לבלתי שמיש. בגיליון,
+  // שהוא העותק ששורד מחיקת רשומה, זו אבדת מידע ולא עניין של תצוגה. גרש מוביל
+  // אומר ל-Sheets "זה טקסט" ואינו נראה בתא.
+  const cells = row.map((v) => {
+    const s = v == null ? '' : String(v);
+    return /^0\d+$/.test(s) ? `'${s}` : s;
+  });
+
+  const range = `${SHEET_TAB}!A:${lastColumn}`;
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}` +
       `:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
@@ -451,7 +483,7 @@ async function appendEventRow(base44, row) {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ values: [row] }),
+      body: JSON.stringify({ values: [cells] }),
       signal: AbortSignal.timeout(10000),
     },
   );
@@ -713,6 +745,18 @@ function interviewFields(track) {
  * הסוכן מונחה לא לרשום מזהים, אבל הפרופיל נכתב על ידי מודל ששמע את המבקר
  * מקליד אותם. שדה ריק מושמט ואינו מוצג כמקף.
  */
+/**
+ * ערך שדה מתוך הפרופיל, לפי התווית.
+ *
+ * `buildInterviewProfile` מחזיר זוגות [תווית, ערך] ולא אובייקט — התווית היא
+ * מה ששורד עד לכאן, והמפתח המקורי כבר לא. חיפוש לפי תווית נראה שביר, ולכן
+ * agents.contract.test.ts מוודא שכל תווית שמבוקשת כאן קיימת בסכימה.
+ */
+function profileValue(pairs, label) {
+  const hit = (pairs || []).find(([l]) => l === label);
+  return hit ? hit[1] : '';
+}
+
 function buildInterviewProfile(profile, track) {
   const given = profile && typeof profile === 'object' ? profile : {};
   return interviewFields(track)
@@ -1400,7 +1444,10 @@ export default async function(req) {
     const sheetPromise = (async () => {
       try {
         const status = await appendEventRow(base44, [
-        new Date().toISOString(),
+        // שעון ישראל, לא UTC. העמודה הזו נקראת בידי אדם שיושב כאן, ו-Z
+        // בסופה הציגה כל אירוע שלוש שעות מוקדם מכפי שקרה. 'sv-SE' נותן
+        // YYYY-MM-DD HH:MM:SS, ש-Sheets מזהה כתאריך ולכן גם ממיין נכון.
+        new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jerusalem' }),
         eventTypeFor(source),
         source || 'quick',
         trackLabel,               // מסלול — רלוונטי רק בראיון
@@ -1417,7 +1464,20 @@ export default async function(req) {
         // התקציר של הראיון הוא הפרופיל שהסוכן מסר, לא שדה summary נפרד. בלי
         // הנפילה הזו שורת הראיון נרשמת ריקה — שם וטלפון בלי מה שנאסף.
         safeSummary || profileText || safeMessage || '',
-        ]);
+          // ── ששת שדות הראיון ─────────────────────────────────────────────
+        //
+        // עד כאן הם היו בתוך 'תקציר', כטקסט חופשי. שם אי אפשר לסנן, למיין או
+        // לספור אותם — ובדיוק זה מה שגיליון נועד לאפשר.
+        //
+        // 'מועד הפגישה' הוא מה שנכנס ליומן, לא 'מועד מבוקש' שהוא תיאור
+        // במילים: רק הראשון ניתן למיון, והשאלה "מה יש לי השבוע" נשאלת עליו.
+        wallClock(scheduledAt)?.replace('T', ' ').slice(0, 16) || '',
+        profileValue(safeProfile, 'שלב חיים'),
+        profileValue(safeProfile, 'יעד עיקרי'),
+        profileValue(safeProfile, 'דאגה מרכזית'),
+        profileValue(safeProfile, 'שליפת נתוני מסלקה — מעוניין/ת'),
+        data.completeness ? completenessLine(data.completeness) : '',
+      ]);
         log('info', 'sheet.appended', { rid, tab: SHEET_TAB, status });
         return status;
       } catch (e) {
