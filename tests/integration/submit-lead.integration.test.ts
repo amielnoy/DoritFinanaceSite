@@ -1564,6 +1564,36 @@ describe("submitLead — the agency copy carries the links", () => {
     expect(mail.text).toContain(SHEET);
   });
 
+  it("builds the sheet link from SHEET_ID, not from the append's reply", async () => {
+    // It used to be parsed out of the status string, which made it a hostage to
+    // that string: a build returning a bare `נרשם ✓` left Dorit with no link
+    // and made the whole block vanish — silently, since as far as the code was
+    // concerned there was nothing to link to.
+    //
+    // The address is known from SHEET_ID and does not need the API to say it.
+    const r = await invokeFunction("submitLead", consultation, { env });
+    expect(r.mailTo(AGENCY).html).toContain(`href="${SHEET}"`);
+    expect(r.mailTo(AGENCY).text).toContain(SHEET);
+  });
+
+  it("does not link a sheet the row never reached", async () => {
+    // The risk of deriving the address from a constant: a link that always
+    // works, to a sheet that does not contain this enquiry. The status is still
+    // asked whether the row arrived — that is the one thing it is good for.
+    const r = await invokeFunction("submitLead", consultation, { env, fetchStatus: 500 });
+    expect(r.json.warnings.join(" ")).toMatch(/sheet/);
+    expect(r.mailTo(AGENCY).html, "linked a sheet the append never wrote to").not.toContain(
+      "spreadsheets/d",
+    );
+  });
+
+  it("does not link a sheet the row never reached", async () => {
+    const r = await invokeFunction("submitLead", consultation, {
+      env: { ...env, SHEET_ID: "" },
+    });
+    expect(r.mailTo(AGENCY).html).not.toContain("spreadsheets/d");
+  });
+
   it("adds the links without bringing the operational appendix with them", async () => {
     // The distinction the whole change rests on. She gets two addresses; the
     // record id, the warning list and the rest of the ops panel stay internal.
