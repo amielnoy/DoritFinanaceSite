@@ -16,8 +16,13 @@ import { CONTACT } from "@/config/contact";
  * It is stored on every Lead the agents create, so a record can always be tied
  * to the exact text the visitor was shown — the evidentiary half of the duty to
  * inform under חוק הגנת הפרטיות (as amended by תיקון 13).
+ *
+ * v3 adds `PROCEDURES_CONSENT_POINTS`. It changes no existing sentence, which
+ * is exactly why it needs a version: a stamp has to resolve to one set of
+ * copy, and without a bump "v2" would mean a different set before this release
+ * than after it.
  */
-export const CONSENT_VERSION = "2026-09-agents-v2";
+export const CONSENT_VERSION = "2026-10-agents-v3";
 
 /** Licence details the agency must disclose. */
 export const LICENCE = {
@@ -62,6 +67,28 @@ export const SUPPORT_CONSENT_POINTS = [
   "השיחה מתנהלת מול עוזר אוטומטי שעונה על שאלות כלליות מתוך התוכן שפורסם באתר. הוא אינו נותן ייעוץ, אינו ממליץ על מוצר ואינו מבצע חישוב.",
   `${LICENCE.entity} בעלת רישיון סוכן מ${LICENCE.regulator} מס' ${LICENCE.number}, ולה זיקה לגופים מוסדיים. הפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.`,
   "אין צורך למסור פרטים אישיים כדי לשוחח כאן, ואינך מתבקש/ת למסור אותם. אין למסור בצ׳אט תעודת זהות, מספרי חשבון או פוליסה, נתוני שכר או מידע רפואי.",
+  "תוכן השיחה נשמר אצל דורית ואצל הצוות שמתפעל את האתר מטעמה, כדי לדעת מה נשאל ולשפר את המענה. מזהים שנמסרו בטעות מושמטים לפני השמירה. אפשר לבקש עיון, תיקון או מחיקה בכל עת.",
+] as const;
+
+/**
+ * The gate for the procedures chat.
+ *
+ * Close to the support agent's, and deliberately not identical: this one names
+ * what it is for, because "explains how a procedure is carried out" and
+ * "answers questions from the blog" are different promises, and a notice
+ * describing the wrong one is worse than a generic notice.
+ *
+ * The third point carries more weight here than anywhere else on the site. This
+ * is the chat a visitor reaches while holding their own pension numbers and
+ * their own paperwork, and the one most likely to be handed an identity number
+ * unprompted. It also, unlike the support chat's, says what the handoff asks
+ * for — the prompt instructs the agent to collect a name and a phone number
+ * there, so the notice has to admit it.
+ */
+export const PROCEDURES_CONSENT_POINTS = [
+  "השיחה מתנהלת מול עוזר אוטומטי שמסביר איך מבצעים תהליכים בפנסיה, בגמל ובביטוח — אילו שלבים יש, אילו סוגי מסמכים נדרשים וכמה זמן זה לוקח — וכן איך קוראים את גמל נט ואת פנסיה נט. הוא מסביר תהליך בלבד — אינו מפרש נתונים, אינו משווה בין גופים, אינו ממליץ ואינו מבצע חישוב.",
+  `${LICENCE.entity} בעלת רישיון סוכן מ${LICENCE.regulator} מס' ${LICENCE.number}, ולה זיקה לגופים מוסדיים. הפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.`,
+  "אין צורך למסור פרטים אישיים כדי לשאול כאן. אם תבחרו לעבור לדורית, תתבקשו שם וטלפון בלבד כדי שתהיה דרך לחזור אליכם. אין למסור בצ׳אט תעודת זהות, מספרי חשבון, פוליסה או קרן, יתרות, נתוני שכר או מידע רפואי — שליפה מהמסלקה נעשית בייפוי כוח חתום מול דורית, ולא כאן.",
   "תוכן השיחה נשמר אצל דורית ואצל הצוות שמתפעל את האתר מטעמה, כדי לדעת מה נשאל ולשפר את המענה. מזהים שנמסרו בטעות מושמטים לפני השמירה. אפשר לבקש עיון, תיקון או מחיקה בכל עת.",
 ] as const;
 

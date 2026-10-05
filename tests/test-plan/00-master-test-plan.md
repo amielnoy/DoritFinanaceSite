@@ -19,7 +19,7 @@ In scope:
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
 | Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` and `escalateToHuman` functions, RLS rules |
 | Integration | The Base44 functions executed in-process against a recording client — what is stored, who is mailed, what each recipient sees, and what survives a failure |
-| Eval | The deployed interview agent driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md) |
+| Eval | The deployed interview and procedures agents driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank the procedures cases come from |
 | Agent compliance | The three agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
 | UI e2e | Landing page, routing, calculator, the quick contact form and the claim report, blog, the agent chat's regulatory shell |

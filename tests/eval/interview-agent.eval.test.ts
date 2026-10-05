@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createClient } from "@base44/sdk";
+import { evalEnabled as enabled, openConversation, questionCount } from "../helpers/eval-conversation";
 
 /**
  * Does the model actually follow the prompt?
@@ -37,73 +37,6 @@ import { createClient } from "@base44/sdk";
  * about exact wording. A failure means "the agent stopped behaving this way",
  * which is worth a human reading the transcript rather than an automatic retry.
  */
-
-const APP_ID = process.env.EVAL_BASE44_APP_ID;
-const TOKEN = process.env.EVAL_BASE44_TOKEN;
-const enabled = Boolean(APP_ID && TOKEN);
-
-/** How long to let the agent think before giving up on a turn. */
-const REPLY_TIMEOUT_MS = 60_000;
-
-interface Message {
-  role: string;
-  content?: string;
-}
-
-/**
- * One conversation with the agent, driven turn by turn.
- *
- * `send` resolves once the agent has produced a new assistant message, so a
- * scenario reads as a dialogue rather than as polling.
- */
-async function openConversation(agentName: string) {
-  const client = createClient({ appId: APP_ID!, requiresAuth: true });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK auth shape
-  (client as any).auth?.setToken?.(TOKEN);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK surface
-  const agents = (client as any).agents;
-  const conv = await agents.createConversation({
-    agent_name: agentName,
-    metadata: { name: "eval", description: "automated prompt-adherence run" },
-  });
-
-  let messages: Message[] = [];
-  agents.subscribeToConversation(conv.id, (data: { messages?: Message[] }) => {
-    if (data.messages) messages = data.messages;
-  });
-
-  const assistantCount = () => messages.filter((m) => m.role === "assistant").length;
-
-  const waitForReply = async (before: number) => {
-    const deadline = Date.now() + REPLY_TIMEOUT_MS;
-    while (Date.now() < deadline) {
-      if (assistantCount() > before) {
-        const last = [...messages].reverse().find((m) => m.role === "assistant");
-        return last?.content ?? "";
-      }
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    throw new Error(`agent did not reply within ${REPLY_TIMEOUT_MS}ms`);
-  };
-
-  return {
-    /** The greeting, before anything is sent. */
-    opening: () => waitForReply(0),
-    async send(text: string) {
-      const before = assistantCount();
-      const full = await agents.getConversation(conv.id);
-      await agents.addMessage(full, { role: "user", content: text });
-      return waitForReply(before);
-    },
-    transcript: () => messages.map((m) => `${m.role}: ${m.content ?? ""}`).join("\n"),
-  };
-}
-
-/** Roughly: did it ask one thing, rather than hand over a form? */
-function questionCount(reply: string): number {
-  return (reply.match(/\?/g) ?? []).length;
-}
 
 describe.skipIf(!enabled)("interview agent — prompt adherence (opt-in)", () => {
   it("opens by disclosing that it is automated, and declares what it is for", async () => {

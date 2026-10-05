@@ -340,3 +340,98 @@ test.describe("Agent chat — when the backend refuses", () => {
     expect(mockApi.requestsTo("escalateToHuman")).toHaveLength(0);
   });
 });
+
+/**
+ * The procedures chat, which is the shell around the narrowest promise of all.
+ *
+ * It sits at the bottom of `/tools`, under the two self-assessment tools, and
+ * it is the only chat on the site pointed at the regulator's return tables. Its
+ * notice is therefore the one that has to say what it will *not* do — explain
+ * the method, never compare the institutions — and the support chat's notice
+ * would read as perfectly plausible in its place while promising something
+ * else entirely.
+ *
+ * `base44/agents/procedures_agent.jsonc` carries the same distinction for the
+ * model. These cases cover the half of it the shell can actually enforce.
+ */
+test.describe("Procedures chat — reading the regulator's data", () => {
+  const PROCEDURES = "#procedures-chat";
+
+  test("a visitor cannot type before accepting the notice", async ({ page, mockApi }) => {
+    await test_step("open the tools page and find the procedures agent", async () => {
+      await gotoApp(page, "/tools");
+    });
+
+    const section = page.locator(PROCEDURES);
+    const box = section.getByLabel("שאלה על התהליך");
+
+    await test_step("the message box is disabled until the notice is accepted", async () => {
+      await expect(box).toBeDisabled();
+      expect(mockApi.requestsTo("/agents/")).toHaveLength(0);
+    });
+
+    await test_step("accepting it unlocks the box", async () => {
+      await section.getByRole("checkbox").check();
+      await section.getByRole("button", { name: "התחלת השיחה" }).click();
+      await expect(box).toBeEnabled();
+    });
+  });
+
+  test("the notice promises process only, and no comparison", async ({ page }) => {
+    await gotoApp(page, "/tools");
+    const section = page.locator(PROCEDURES);
+
+    await test_step("it scopes the chat to how, not to which", async () => {
+      await expect(section.getByText(/מסביר תהליך בלבד/)).toBeVisible();
+      await expect(section.getByText(/אינו משווה בין גופים/)).toBeVisible();
+    });
+
+    await test_step("it says where a signature is actually collected", async () => {
+      // The clearinghouse is the subject that makes someone type their ת״ז
+      // unprompted, so the notice has to say both halves: not here, and where.
+      await expect(section.getByText(/אין למסור בצ׳אט תעודת זהות/)).toBeVisible();
+      await expect(section.getByText(/בייפוי כוח חתום מול דורית, ולא כאן/)).toBeVisible();
+    });
+
+    await test_step("it says what the handoff asks for, and only that", async () => {
+      // Not the interview's wording, which promises collection up front: here
+      // nothing is asked for in order to ask a question, and a name and a
+      // phone number are requested only if the visitor chooses a person.
+      await expect(section.getByText(/נאספים שם וטלפון בלבד/)).toHaveCount(0);
+      await expect(section.getByText(/אין צורך למסור פרטים אישיים כדי לשאול כאן/)).toBeVisible();
+      await expect(section.getByText(/תתבקשו שם וטלפון בלבד/)).toBeVisible();
+    });
+
+    await test_step("it still carries the licence and the affiliation", async () => {
+      await expect(section.getByText(/L-00107009/)).toBeVisible();
+      await expect(section.getByText(/שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי/)).toBeVisible();
+    });
+  });
+
+  test("the fence is published beside it, in the visitor's words", async ({ page }) => {
+    await gotoApp(page, "/tools");
+    const section = page.locator(PROCEDURES);
+
+    await test_step("the three guardrail headings are on the page", async () => {
+      await expect(section.getByText("כללי הגדר")).toBeVisible();
+      await expect(section.getByText("מה הוא לא עושה")).toBeVisible();
+      await expect(section.getByText("מתי עובר לאדם")).toBeVisible();
+    });
+
+    await test_step("including the claim this chat exists to keep", async () => {
+      await expect(section.getByText(/לא אומר איזו קופה, קרן או מסלול עדיפים/)).toBeVisible();
+      await expect(section.getByText(/לא מפרש מספר שמסרתם/)).toBeVisible();
+    });
+  });
+
+  test("the route to a person is here too", async ({ page, mockApi }) => {
+    await gotoApp(page, "/tools");
+    const section = page.locator(PROCEDURES);
+
+    await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+    await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
+    await section.getByRole("button", { name: "שלחו לדורית" }).click();
+    const req = await mockApi.waitForRequest("escalateToHuman");
+    expect(req.method).toBe("POST");
+  });
+});

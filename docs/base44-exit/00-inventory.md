@@ -116,6 +116,7 @@ self-contained and could move one at a time.
 | `needs_interview` | automatic | `submitLead`, `escalateToHuman` | true |
 | `support_agent` | automatic | `logSupportChat`, `escalateToHuman`, BlogPost read | true |
 | `blog_recommender` | automatic | `escalateToHuman`, BlogPost read | true |
+| `procedures_agent` | automatic | `logSupportChat`, `escalateToHuman`, BlogPost read | true |
 
 This is where the pain is, and it is worth being precise about why rather than
 saying "the agents are hard".

@@ -5,13 +5,13 @@ import { REPO_ROOT, loadEntity } from "../helpers/entity-schema";
 import { read } from "../helpers/source-scan";
 
 /**
- * The compliance contract of the three on-site agents.
+ * The compliance contract of the four on-site agents.
  *
  * A prompt is the only thing standing between a visitor and an unlicensed
  * financial recommendation, and it is the easiest artefact in the repo to edit
  * casually — a Builder session, a reworded paragraph, and a mandatory clause is
  * gone with nothing failing. These tests pin the clauses that exist for legal
- * reasons rather than product ones, in all three prompts at once.
+ * reasons rather than product ones, in every prompt at once.
  *
  * They deliberately assert on text. That is the point: the wording is what a
  * compliance review approved, so the wording is what must not drift silently.
@@ -76,11 +76,21 @@ const OPS_FANOUT = /for \(const to of NOTIFY_EMAILS\)|NOTIFY_EMAILS\.map\(/;
 
 describe("on-site agent definitions", () => {
   it("ships exactly the agents the frontend renders", () => {
-    // Two, where there were three. `booking_assistant` was merged into
-    // `needs_interview`: booking a first meeting was never a separate errand
-    // from being interviewed for one, and the visitor met a second chat that
-    // asked for their name again after answering six questions.
-    expect(agentNames).toEqual(["blog_recommender", "needs_interview", "support_agent"]);
+    // `booking_assistant` was merged into `needs_interview`: booking a first
+    // meeting was never a separate errand from being interviewed for one, and
+    // the visitor met a second chat that asked for their name again after
+    // answering six questions.
+    //
+    // `procedures_agent` is a fourth because it is a different job, not a
+    // different subject: it explains how to read גמל נט and פנסיה נט and what
+    // the clearinghouse requires. It teaches a method and never states a
+    // conclusion, which is the line that keeps it on the right side of §2.
+    expect(agentNames).toEqual([
+      "blog_recommender",
+      "needs_interview",
+      "procedures_agent",
+      "support_agent",
+    ]);
   });
 
   for (const name of agentNames) {
@@ -221,6 +231,268 @@ describe("the support agent", () => {
     // is not wired. Re-wiring it is the deliberate act of enabling a channel.
     const fns = (support.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
     expect(fns).not.toContain("upsertContact");
+  });
+});
+
+/**
+ * The procedures agent, and the one sentence it must never complete.
+ *
+ * Every other agent here is kept away from the regulator's return tables.
+ * This one is pointed straight at them, which makes it the only prompt in the
+ * repo whose job sits a single sentence away from what §2 forbids: it explains
+ * how to compare קופות without ever saying which one won.
+ *
+ * That line is held by wording, not by a capability — the model is perfectly
+ * able to read a number and judge it, and nothing but the prompt stops it. So
+ * these cases pin the distinction itself, and not merely the subject matter.
+ * An edit that reworded §2's neighbourhood and left the two clauses in plain
+ * contradiction would leave the model to choose between them.
+ */
+describe("the procedures agent", () => {
+  const procedures = loadAgent("procedures_agent");
+  const prompt = procedures.instructions;
+
+  it("points at the regulator's own sites, by name", () => {
+    // Free, ad-free and authoritative. A commercial comparison site in their
+    // place would make the same explanation a referral.
+    expect(prompt).toMatch(/gemelnet\.cma\.gov\.il/);
+    expect(prompt).toMatch(/pensyanet\.cma\.gov\.il/);
+    expect(prompt).toMatch(/המסלקה הפנסיונית/);
+  });
+
+  it("reconciles its own job with the clause that forbids comparing", () => {
+    // Without this bridge the prompt reads as two rules in conflict: "explain
+    // how to compare funds" above, "never compare funds" in §2.
+    expect(prompt).toMatch(/סעיף 2 אוסר עליך לדרג או להשוות בין גופים/);
+    expect(prompt).toMatch(/אתה מלמד \*\*שיטה\*\*/);
+    expect(prompt).toMatch(/אינך אומר \*\*מסקנה\*\*/);
+  });
+
+  it("refuses to interpret a number the visitor supplied", () => {
+    // The likeliest slide from procedure into advice, and it arrives as a
+    // question the visitor thinks is simple: "my fee is 0.8%, is that high?"
+    expect(prompt).toMatch(/אל תפרש מספר שהמבקר מסר לך/);
+    expect(prompt).toMatch(/אל תאמר על גוף, קרן או מסלול שהוא טוב, עדיף, גבוה או נמוך/);
+    expect(prompt).toMatch(/אל תאמר אם כדאי לעבור, למשוך, להצטרף או לשנות דבר/);
+  });
+
+  it("turns away an ID number instead of only not asking for one", () => {
+    // The clearinghouse is the one subject on the site that makes a visitor
+    // volunteer their ת״ז unprompted. The generic clause covers not asking;
+    // this covers what the agent does when it arrives anyway, which is the
+    // case that actually happens.
+    expect(prompt).toMatch(/\*\*אל תבקש מספר תעודת זהות ואל תקבל אותו\.\*\*/);
+    expect(prompt).toMatch(/אם מבקר מקליד ת״ז, אל תחזור עליה/);
+  });
+
+  it("states the limits of the power of attorney it describes", () => {
+    // A visitor is being told what a document they will sign does. Getting
+    // that wrong is a misrepresentation about a mandate over their savings,
+    // so the scope limit is pinned alongside the law it comes from.
+    expect(prompt).toMatch(/התשס״ה-2005/);
+    expect(prompt).toMatch(/ייפוי הכוח הוא לשליפת מידע בלבד/);
+    expect(prompt).toMatch(/אינו מסמיך לבצע שום פעולה בחיסכון/);
+  });
+
+  it("volunteers the four traps before explaining the mechanics", () => {
+    // Teaching someone to read a league table without these is teaching them
+    // to misread it. They are the reason the method-only scope is honest.
+    expect(prompt).toMatch(/להשוות מסלולים שונים/);
+    expect(prompt).toMatch(/התשואה המוצגת אינה התשואה שהגיעה למבקר/);
+    expect(prompt).toMatch(/שנה אחת היא רעש/);
+    expect(prompt).toMatch(/רדיפה אחרי המקום הראשון/);
+    expect(prompt).toMatch(/תשואות עבר אינן מעידות על תשואות עתידיות/);
+  });
+
+  it("names what the tables leave out", () => {
+    expect(prompt).toMatch(/אובדן כושר עבודה ושאירים/);
+    expect(prompt).toMatch(/מקדם קצבה מובטח/);
+  });
+
+  it("asks for no contact detail, having a different chat for that", () => {
+    expect(prompt).toMatch(/אין בידך שום פרט מזהה עליו/);
+    const fns = (procedures.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
+    expect(fns).not.toContain("upsertContact");
+    expect(fns).not.toContain("submitLead");
+  });
+
+  it("is reachable: the page mounts it", () => {
+    // A descriptor with nothing rendering it is a prompt nobody can reach, and
+    // every assertion above would still pass.
+    const page = read(join(REPO_ROOT, "src/pages/Tools.tsx"));
+    expect(page).toMatch(/descriptor=\{AGENTS\.procedures\}/);
+  });
+
+  it("the consent notice beside it promises the same narrow scope", () => {
+    const config = read(join(REPO_ROOT, "src/config/compliance.ts"));
+    const points = config.match(
+      /export const PROCEDURES_CONSENT_POINTS = \[([\s\S]*?)\] as const;/
+    )?.[1];
+    expect(points, "no PROCEDURES_CONSENT_POINTS").toBeDefined();
+    expect(points).toMatch(/מסביר תהליך בלבד/);
+    expect(points).toMatch(/אינו משווה בין גופים/);
+    expect(points).toMatch(/אין למסור בצ׳אט תעודת זהות/);
+    expect(points).toMatch(/שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי/);
+  });
+
+  it("the published guardrails match what the prompt actually forbids", () => {
+    const config = read(join(REPO_ROOT, "src/config/agents.ts"));
+    const descriptor = config.match(/\n  procedures: \{([\s\S]*?)\n  \},\n/)?.[1];
+    expect(descriptor, "no procedures descriptor").toBeDefined();
+    // Each claim the page makes, against the clause that has to keep it true.
+    expect(descriptor).toMatch(/לא אומר איזו קופה, קרן או מסלול עדיפים/);
+    expect(prompt).toMatch(/להמליץ על מוצר או גוף מוסדי ספציפי/);
+    expect(descriptor).toMatch(/לא מפרש מספר שמסרתם/);
+    expect(prompt).toMatch(/אל תפרש מספר שהמבקר מסר לך/);
+    expect(descriptor).toMatch(/ולא מבקש תעודת זהות/);
+    expect(prompt).toMatch(/אל תבקש מספר תעודת זהות/);
+  });
+});
+
+/**
+ * The four zones, and the rule that decides them.
+ *
+ * The zoning is the prompt's answer to a statutory question: שיווק פנסיוני is a
+ * recommendation that takes the client's own data into account, and it needs a
+ * licence. So the prompt sorts a message by one test before it sorts it by
+ * subject — *would the answer change depending on who is asking?* — and the
+ * lists are that test applied to the cases that arrive.
+ *
+ * Which is why the test comes first here too. A later edit that trimmed the
+ * lists would be survivable; one that dropped the rule they came from would
+ * leave the model with examples and no way to classify anything else, and the
+ * prompt would still look complete.
+ *
+ * The bank these were written against is `tests/test-plan/14-procedures-zones.md`,
+ * and `tests/eval/procedures-agent.eval.test.ts` runs its load-bearing rows
+ * against the deployed agent. This file only proves the prompt still says it.
+ */
+describe("the procedures agent sorts by one test, then by four zones", () => {
+  const prompt = loadAgent("procedures_agent").instructions;
+
+  it("states the test the zones are derived from", () => {
+    expect(prompt).toMatch(/האם התשובה הייתה משתנה לפי מי ששואל\?/);
+    expect(prompt).toMatch(/האם התשובה דוחפת לפעולה מסוימת או למוצר מסוים\?/);
+    expect(prompt).toMatch(/גיל, שכר, יתרה, מצב משפחתי או מצב בריאותי/);
+  });
+
+  it("says the lists are not the rule, so an unlisted case is still decided", () => {
+    // Without this the prompt reads as an allowlist, and anything absent from
+    // it becomes a judgement call made in the moment.
+    expect(prompt).toMatch(/ולא רשימה סגורה/);
+    expect(prompt).toMatch(/כשמקרה אינו מופיע באף רשימה, המבחן קובע/);
+  });
+
+  it("declares all four zones", () => {
+    for (const [zone, label] of [
+      ["🟢", "ירוק"],
+      ["🟡", "צהוב"],
+      ["🔴", "אדום"],
+      ["⚫", "מעבר מיידי לאדם"],
+    ] as const) {
+      expect(prompt, zone).toContain(zone);
+      expect(prompt, label).toContain(label);
+    }
+  });
+
+  it("green stops short of a form number it has no source for", () => {
+    // The agent holds `BlogPost.read` and nothing else — no CRM, no document
+    // store. "Which form, which documents, where to send" is the exact shape a
+    // model invents, and an invented form number is worse than a handoff
+    // because somebody fills it in.
+    expect(prompt).toMatch(/אל תמציא פרטי טופס/);
+    expect(prompt).toMatch(/אל תנקוב במספר טופס/);
+    expect(prompt).toMatch(/מספר טופס שהומצא מזיק יותר מהעברה לאדם/);
+  });
+
+  it("green excludes the status of a request, which it cannot see", () => {
+    // Green *if the agent has system access*. This one has none, and no
+    // identifying detail about the visitor either.
+    expect(prompt).toMatch(/סטטוס של בקשה אינו ירוק/);
+    expect(prompt).toMatch(/אין לך גישה לשום מערכת, תיק או רשומה/);
+  });
+
+  it("yellow gives the process to someone who has already decided", () => {
+    // Refusing here does not protect anyone: they will do it without the
+    // warning instead of with it.
+    expect(prompt).toMatch(/המבקר כבר החליט וביקש רק את התהליך/);
+    expect(prompt).toMatch(/אל תחסום, אל תתווכח/);
+    expect(prompt).toMatch(/ביטול עלול להשאיר אותך בלי כיסוי/);
+    // And the warning is a fact about the action, not a view on it — which is
+    // the distinction that lets it be said at all under §2.
+    expect(prompt).toMatch(/עובדה על אופי הפעולה ולא דעה על כדאיותה/);
+  });
+
+  it("red forbids the partial answer, which is how red actually fails", () => {
+    expect(prompt).toMatch(/אל תתחיל לענות ואז תעצור/);
+    expect(prompt).toMatch(/באופן כללי אנשים בגילך/);
+    expect(prompt).toMatch(/המלצה שנאמרה בקול שקט/);
+  });
+
+  it("red survives every framing that invites a quiet recommendation", () => {
+    for (const framing of [
+      "רק דעה כללית",
+      "מה אתה היית עושה",
+      "בלי שמות",
+      "רק תיאורטית",
+      "אני מבטיח לא להסתמך על זה",
+    ]) {
+      expect(prompt, framing).toContain(framing);
+    }
+  });
+
+  it("black covers the cases that are about care rather than licensing", () => {
+    expect(prompt).toMatch(/פטירה של עמית או מבוטח/);
+    expect(prompt).toMatch(/מצוקה כלכלית או רגשית/);
+    // Explaining a withdrawal to someone in distress is the failure worth
+    // naming, because it is the helpful-looking one.
+    expect(prompt).toMatch(/אל תסביר תהליך משיכה לאדם במצב כזה/);
+    expect(prompt).toMatch(/איום בפנייה לרשות שוק ההון|תלונה, כעס/);
+    expect(prompt).toMatch(/מי שפונה בשם אדם אחר/);
+    expect(prompt).toMatch(/נדרש ייפוי כוח/);
+  });
+
+  it("the handoff is phrased as a reason, not as a refusal", () => {
+    expect(prompt).toMatch(/לא "אני לא יכול לעזור"/);
+    expect(prompt).toMatch(/כי התשובה תלויה בנתונים שלך/);
+    // What דורית needs in order to arrive prepared.
+    expect(prompt).toMatch(/שם, טלפון, מה הנושא, האם זה דחוף, ומתי נוח לחזור/);
+  });
+
+  it("stops deferring when a visitor asks it to, without moving the fence", () => {
+    // The opposite failure, and the one an agent tuned away from the red zone
+    // drifts into: pressing until the visitor leaves and acts with no human.
+    expect(prompt).toMatch(/מבקר שמבקש להפסיק להפנות אותו/);
+    expect(prompt).toMatch(/הפצרה חוזרת אינה זהירות/);
+    expect(prompt).toMatch(/שאלה אדומה נשארת אדומה גם אחרי בקשה כזו/);
+  });
+
+  it("the scenario bank is written down, in full, with somewhere to record a round", () => {
+    const bank = read(join(REPO_ROOT, "tests/test-plan/14-procedures-zones.md"));
+
+    // 24 rows, so a row deleted during an edit is visible rather than quiet.
+    // Only §3 — §4's round template is an empty table with the same shape.
+    const table = bank.slice(bank.indexOf("## 3."), bank.indexOf("## 4."));
+    const rows = [...table.matchAll(/^\| (\d+) \| /gm)].map((m) => Number(m[1]));
+    expect(rows).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
+
+    // The two rows the whole bank exists for.
+    expect(bank).toMatch(/23 and 24 are the two that matter most/);
+    // And the deviations from the zoning as drafted, each with its reason.
+    expect(bank).toMatch(/Green does not name a form/);
+    expect(bank).toMatch(/Scenario 17 \(status of my request\) is not green/);
+    expect(bank).toMatch(/Scenario 9 \(a death\) is black/);
+    // Somewhere to put what the agent actually answered.
+    expect(bank).toMatch(/What the agent actually answered/);
+  });
+
+  it("and something runs the bank against the deployed agent", () => {
+    // The prompt saying it and the model doing it are different claims, and
+    // this file can only make the first one.
+    const evals = read(join(REPO_ROOT, "tests/eval/procedures-agent.eval.test.ts"));
+    expect(evals).toMatch(/openConversation\("procedures_agent"\)/);
+    expect(evals).toMatch(/gives no opinion under pressure/);
+    expect(evals).toMatch(/stops offering דורית when asked to/);
   });
 });
 
@@ -449,7 +721,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     // A record is tied to the text its visitor saw. Changing the text without
     // changing the version makes that link a lie.
     expect(consent).not.toMatch(/CONSENT_VERSION = "2026-09-agents-v1"/);
-    expect(consent).toMatch(/CONSENT_VERSION = "2026-09-agents-v\d+"/);
+    expect(consent).toMatch(/CONSENT_VERSION = "20\d\d-\d\d-agents-v\d+"/);
   });
 
 
@@ -1687,6 +1959,15 @@ const TOOL_CONFIGS: Record<string, unknown[]> = {
     { function_name: "escalateToHuman" },
   ],
   support_agent: [
+    { entity_name: "BlogPost", allowed_operations: ["read"] },
+    { function_name: "logSupportChat" },
+    { function_name: "escalateToHuman" },
+  ],
+  // Same capability as the support agent, and deliberately no more. It answers
+  // from published content and the regulator's own sites; it writes nothing,
+  // books nothing, and collects nothing — a visitor who wants to be called back
+  // is sent to the interview, which is built to ask for that.
+  procedures_agent: [
     { entity_name: "BlogPost", allowed_operations: ["read"] },
     { function_name: "logSupportChat" },
     { function_name: "escalateToHuman" },
