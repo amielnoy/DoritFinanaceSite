@@ -194,7 +194,7 @@ export default function Testimonials() {
         ) : !items || items.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-border">
             <Quote size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
-            <p className="text-foreground/60">
+            <p className="text-muted-foreground">
               {isAuthenticated ? "עדיין אין המלצות — הוספ/י את הראשונה." : "בקרוב יעלו כאן המלצות הלקוחות."}
             </p>
           </div>
@@ -227,7 +227,7 @@ export default function Testimonials() {
                     <div className="flex items-center gap-2 mt-2">
                       {t.rating ? <Stars value={t.rating} /> : null}
                       {t.source && (
-                        <span className="text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground">
+                        <span className="text-[11px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground">
                           {t.source === "google" ? "Google" : "Midrag"}
                         </span>
                       )}

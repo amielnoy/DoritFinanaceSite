@@ -121,7 +121,7 @@ export default function ServiceMatrix() {
                       strokeWidth={1.25}
                     />
                   </div>
-                  <span className="text-[10px] tracking-[0.12em] text-muted-foreground">
+                  <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
                     0{i + 1}
                   </span>
                 </div>
@@ -131,9 +131,12 @@ export default function ServiceMatrix() {
                 <p className="text-[11px] tracking-[0.12em] text-accent mb-5">
                   {p.sub}
                 </p>
+                {/* The height animates; the ink does not. `text-foreground/70`
+                    under `opacity-80` was a fade on top of a fade — it measured
+                    3.98:1, and neither class looked wrong on its own. */}
                 <p
-                  className={`text-foreground/70 leading-relaxed transition-all duration-500 ${
-                    isActive ? "max-h-40 opacity-100" : "max-h-20 opacity-80"
+                  className={`text-muted-foreground leading-relaxed transition-all duration-500 ${
+                    isActive ? "max-h-40" : "max-h-20"
                   } overflow-hidden`}
                 >
                   {p.desc}

@@ -102,7 +102,7 @@ export default function Leads() {
           </div>
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-accent transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"
           >
             חזרה לאתר <ArrowRight size={16} />
           </Link>
@@ -118,7 +118,7 @@ export default function Leads() {
           >
             <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">סה״כ פניות</p>
             <p className="font-heading text-3xl mt-2">{leads.length}</p>
-            <p className="text-xs text-foreground/50 mt-1">כל הרשומות במערכת</p>
+            <p className="text-xs text-muted-foreground mt-1">כל הרשומות במערכת</p>
           </button>
           <button
             onClick={() => setFilter("new")}
@@ -126,7 +126,7 @@ export default function Leads() {
           >
             <p className="text-[11px] tracking-[0.2em] uppercase text-highlight-ink">דורשות טיפול</p>
             <p className="font-heading text-3xl mt-2 text-highlight-ink">{counts.new || 0}</p>
-            <p className="text-xs text-foreground/50 mt-1">לקוחות חדשים — ליצור קשר</p>
+            <p className="text-xs text-muted-foreground mt-1">לקוחות חדשים — ליצור קשר</p>
           </button>
           <button
             onClick={() => setFilter("contacted")}
@@ -134,7 +134,7 @@ export default function Leads() {
           >
             <p className="text-[11px] tracking-[0.2em] uppercase text-accent">בתהליך</p>
             <p className="font-heading text-3xl mt-2 text-accent">{counts.contacted || 0}</p>
-            <p className="text-xs text-foreground/50 mt-1">נוצר קשר — להמשיך במכירה</p>
+            <p className="text-xs text-muted-foreground mt-1">נוצר קשר — להמשיך במכירה</p>
           </button>
           <button
             onClick={() => setFilter("closed")}
@@ -142,7 +142,7 @@ export default function Leads() {
           >
             <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">נסגרו</p>
             <p className="font-heading text-3xl mt-2 text-muted-foreground">{counts.closed || 0}</p>
-            <p className="text-xs text-foreground/50 mt-1">טופלו והסתיימו</p>
+            <p className="text-xs text-muted-foreground mt-1">טופלו והסתיימו</p>
           </button>
         </div>
 
@@ -201,7 +201,7 @@ export default function Leads() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-border">
-            <p className="text-foreground/60">אין פניות להצגה.</p>
+            <p className="text-muted-foreground">אין פניות להצגה.</p>
           </div>
         ) : (
           <div className="overflow-x-auto border border-border/60">
@@ -221,7 +221,7 @@ export default function Leads() {
               <tbody>
                 {filtered.map((l) => (
                   <tr key={l.id} className="border-t border-border/60 align-top">
-                    <td className="px-4 py-3 text-foreground/60 whitespace-nowrap">
+                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                       {l.created_date ? new Date(l.created_date).toLocaleDateString("he-IL") : "—"}
                     </td>
                     <td className="px-4 py-3 font-medium">{l.name}</td>
@@ -251,7 +251,7 @@ export default function Leads() {
                         <button
                           onClick={() => remove(l.id)}
                           disabled={busy}
-                          className="text-foreground/40 hover:text-destructive transition-colors disabled:opacity-30"
+                          className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30"
                           aria-label="מחיקה"
                         >
                           <Trash2 size={15} />

@@ -72,9 +72,38 @@ test.describe("Accessibility — axe (WCAG 2.1 AA)", () => {
   }
 
   for (const { path, name } of PAGES) {
-    test(`${name} colour contrast (reported; enforced with E2E_ENFORCE_CONTRAST=1)`, async ({ page }) => {
-      await test_step(`open the ${name} page`, async () => {
+    test(`${name} colour contrast`, async ({ page }, testInfo) => {
+      // Enforced on desktop, reported on mobile — see docs/design-system.md.
+      // Not a double standard about who deserves legible text: on mobile
+      // viewports the scan still returns a continuum of intermediate shades,
+      // which is the signature of sampling an element part-way through an
+      // entrance rather than of a palette with bad values. Enforcing a reading
+      // that cannot be trusted trains everyone to ignore it. The palette is
+      // viewport-independent, so the desktop gate catches token regressions
+      // wherever they are introduced.
+      const enforced =
+        process.env.E2E_ENFORCE_CONTRAST === "1" || testInfo.project.name.startsWith("web-");
+      await test_step(`open the ${name} page, with motion settled`, async () => {
+        // axe reads a static snapshot. Without this it catches entrances
+        // mid-fade and reports ink at 1.1:1 that is perfectly legible once
+        // settled — which put real findings and animation artefacts in one
+        // list, and is why this could be reported and never enforced.
+        //
+        // It is also the honest thing to measure: a visitor who asks for
+        // reduced motion sees exactly this, and now gets it (MotionConfig in
+        // App.jsx, plus the media query in index.css).
+        await page.emulateMedia({ reducedMotion: "reduce" });
         await gotoApp(page, path);
+        // And let the fades finish. `reducedMotion` is not enough on its own:
+        // framer-motion deliberately keeps opacity animations under it, because
+        // a fade is not a vestibular trigger the way a transform is. Entrances
+        // therefore still run, and a snapshot taken during one reports ink that
+        // does not exist by the time anybody reads it.
+        //
+        // A fixed settle rather than "wait until nothing is translucent" —
+        // several elements sit at a fractional opacity permanently by design,
+        // so that condition never becomes true.
+        await page.waitForTimeout(1200);
       });
 
       const violations = await test_step("scan for colour-contrast findings only", async () =>
@@ -99,7 +128,7 @@ test.describe("Accessibility — axe (WCAG 2.1 AA)", () => {
         });
       });
 
-      if (enforceContrast) {
+      if (enforced) {
         await test_step("contrast is enforced: every element clears 4.5:1", async () => {
           expect(violations, summarise(violations)).toEqual([]);
         });

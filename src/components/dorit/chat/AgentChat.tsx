@@ -660,7 +660,7 @@ export default function AgentChat({
             ) : null}
           </h2>
           <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">{descriptor.blurb}</p>
-          <div className="mt-8 flex items-start gap-3 text-sm text-foreground/60">
+          <div className="mt-8 flex items-start gap-3 text-sm text-muted-foreground">
             <Sparkles size={18} className="text-highlight mt-0.5 shrink-0" />
             <p className="leading-relaxed">{descriptor.note}</p>
           </div>
@@ -676,19 +676,19 @@ export default function AgentChat({
               <p className="text-[11px] tracking-[0.12em] text-accent">כללי הגדר</p>
               <dl className="mt-4 space-y-3.5 text-[13.5px] leading-relaxed">
                 <div>
-                  <dt className="text-foreground/50">מה הוא עושה</dt>
+                  <dt className="text-muted-foreground">מה הוא עושה</dt>
                   <dd className="text-foreground/80">
                     {descriptor.guardrails.allowed.join(" · ")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-foreground/50">מה הוא לא עושה</dt>
+                  <dt className="text-muted-foreground">מה הוא לא עושה</dt>
                   <dd className="text-foreground/80">
                     {descriptor.guardrails.forbidden.join(" · ")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-foreground/50">מתי עובר לאדם</dt>
+                  <dt className="text-muted-foreground">מתי עובר לאדם</dt>
                   <dd className="text-foreground/80">{descriptor.guardrails.handoff}</dd>
                 </div>
               </dl>

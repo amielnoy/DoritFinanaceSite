@@ -126,10 +126,10 @@ export default function Hero() {
           {[...TICKER, ...TICKER, ...TICKER, ...TICKER].map((t, i) => (
             <span
               key={i}
-              className="mx-8 text-xs tracking-[0.08em] text-muted-foreground/80 flex items-center gap-8"
+              className="mx-8 text-xs tracking-[0.08em] text-muted-foreground flex items-center gap-8"
             >
               {t}
-              <span className="text-highlight text-[8px]">◆</span>
+              <span className="text-highlight text-[11px]">◆</span>
             </span>
           ))}
         </div>

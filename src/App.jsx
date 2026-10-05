@@ -1,4 +1,5 @@
 import { Suspense, lazy } from 'react';
+import { MotionConfig } from 'framer-motion';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -91,6 +92,9 @@ function App() {
 
   return (
     <AuthProvider>
+      {/* One switch for every motion component on the site. `user` means the
+          operating system decides, which is the only party that knows. */}
+      <MotionConfig reducedMotion="user">
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
@@ -107,6 +111,7 @@ function App() {
         </Router>
         <Toaster />
       </QueryClientProvider>
+      </MotionConfig>
     </AuthProvider>
   )
 }

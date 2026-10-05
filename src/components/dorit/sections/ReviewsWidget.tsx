@@ -104,7 +104,7 @@ export default function ReviewsWidget() {
         ) : top.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-border">
             <Quote size={26} className="mx-auto text-highlight mb-3" strokeWidth={1.25} />
-            <p className="text-foreground/60">
+            <p className="text-muted-foreground">
               חוות הדעת המקוריות מופיעות ב-Google וב-Midrag. ניתן לקרוא אותן דרך הקישורים.
             </p>
           </div>
@@ -117,7 +117,7 @@ export default function ReviewsWidget() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <Stars n={t.rating || 0} />
-                  <span className="text-[10px] tracking-[0.12em] text-muted-foreground">
+                  <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
                     {t.source ? SOURCE_LABEL[t.source] || "לקוח/ה" : "לקוח/ה"}
                   </span>
                 </div>

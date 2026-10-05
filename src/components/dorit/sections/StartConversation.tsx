@@ -51,19 +51,19 @@ export default function StartConversation() {
               <p className="text-[11px] tracking-[0.12em] text-accent">כללי הגדר</p>
               <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-[13.5px] leading-relaxed">
                 <div>
-                  <dt className="text-foreground/50">מה הוא עושה</dt>
+                  <dt className="text-muted-foreground">מה הוא עושה</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.allowed.join(" · ")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-foreground/50">מה הוא לא עושה</dt>
+                  <dt className="text-muted-foreground">מה הוא לא עושה</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.forbidden.join(" · ")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-foreground/50">מתי עובר לאדם</dt>
+                  <dt className="text-muted-foreground">מתי עובר לאדם</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.handoff}
                   </dd>

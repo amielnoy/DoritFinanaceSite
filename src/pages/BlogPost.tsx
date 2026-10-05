@@ -118,7 +118,7 @@ export default function BlogPost() {
         <div className="max-w-3xl mx-auto px-6 md:px-10">
           <Link
             to="/blog"
-            className="inline-flex items-center gap-2 text-sm text-foreground/60 hover:text-accent transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"
           >
             <ArrowRight size={16} /> חזרה לבלוג
           </Link>
@@ -144,7 +144,7 @@ export default function BlogPost() {
                   .map((t) => (
                     <span
                       key={t}
-                      className="text-[10px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground"
+                      className="text-[11px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground"
                     >
                       {t}
                     </span>

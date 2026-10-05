@@ -89,7 +89,7 @@ export default function FloatingHeader() {
             <span className="font-heading text-xl md:text-2xl font-bold tracking-tight">
               דורית גוב ארי
             </span>
-            <span className="text-[10px] md:text-[11px] tracking-[0.3em] uppercase text-muted-foreground mt-1">
+            <span className="text-[11px] md:text-[11px] tracking-[0.3em] uppercase text-muted-foreground mt-1">
               התכנון שלי — הרווח שלך
             </span>
           </span>

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /** The text-control styling shared by every form on the site. */
 export const inputClass = (className?: string) =>
   cn(
-    "w-full bg-background border border-border px-4 py-3 text-base text-foreground placeholder:text-muted-foreground/60",
+    "w-full bg-background border border-border px-4 py-3 text-base text-foreground placeholder:text-muted-foreground",
     "focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors",
     className
   );

@@ -31,7 +31,10 @@ module.exports = {
   			},
   			muted: {
   				DEFAULT: 'hsl(var(--muted))',
-  				foreground: 'hsl(var(--muted-foreground))'
+  				foreground: 'hsl(var(--muted-foreground))',
+  				// Secondary text on the obsidian band and the footer. `muted-foreground`
+  				// is the ink for light surfaces; using it on dark measured 3.65:1.
+  				'foreground-on-dark': 'hsl(var(--muted-foreground-on-dark))'
   			},
   			accent: {
   				DEFAULT: 'hsl(var(--accent))',
