@@ -83,6 +83,16 @@ npx skills add base44/skills
   contract suite allows their shadow; `PLATFORM_AUTH_PAGES` in
   `tests/contract/frontend-payloads.contract.test.ts` is the list, and a case
   there fails if it and the eslint ignores drift apart. See A-52.
+- **Every answer carries `rid`, and no answer carries an error message.** The
+  id names every log line the request produced, so a visitor can quote it and
+  one search finds everything. It was generated, stamped on every log line and
+  then dropped — which is why diagnosing meant inferring from timestamps and
+  absences, and why the one genuine outage here took three days. `error.message`
+  used to be returned as `error` or `details`: it told the visitor nothing they
+  could use and told anyone reading it the shape of our internals. Log the
+  message, return the id. `contentAdmin` does this through a `json()` helper, so
+  it cannot be forgotten; that shape is the one to copy when the others are next
+  touched.
 - `scripts/*.mjs`: maintenance jobs CI runs on a schedule. `prune-vercel-deployments.mjs`
   deletes, so it is a dry run unless given `--apply` — check its output before
   adding the flag. `reconcile-stores.mjs` exits non-zero on drift.

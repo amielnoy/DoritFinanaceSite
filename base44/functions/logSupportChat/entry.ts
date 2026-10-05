@@ -147,14 +147,14 @@ export default async function(req) {
     // כל שיחה, וסביבה בלי גיליון עדיין צריכה לענות על שאלות.
     if (!SHEET_ID) {
       log('info', 'request.end', { rid, ms: Date.now() - startedAt, sheet: 'unconfigured' });
-      return Response.json({ ok: true, sheet: 'לא מוגדר' });
+      return Response.json({ ok: true, rid, sheet: 'לא מוגדר' });
     }
 
     const safeTranscript = redact(transcript);
     const safeTopic = redact(topic).slice(0, 200);
     if (!safeTranscript && !safeTopic) {
       log('warn', 'support.empty', { rid });
-      return Response.json({ error: 'אין מה לרשום' }, { status: 400 });
+      return Response.json({ error: 'אין מה לרשום', rid }, { status: 400 });
     }
 
     const row = [
@@ -174,13 +174,17 @@ export default async function(req) {
       const sheet = await appendEventRow(base44, row);
       // התוצאה והערוץ בלבד. הנושא והתמלול הם מה שהמבקר אמר, והם נשארים בגיליון.
       log('info', 'support.logged', { rid, ms: Date.now() - startedAt, channel: row[1], outcome: row[4], status: sheet });
-      return Response.json({ ok: true, sheet });
+      return Response.json({ ok: true, rid, sheet });
     } catch (e) {
       log('warn', 'sheet.append_failed', { rid, tab: SHEET_TAB, err: String(e?.message ?? e).slice(0, 200) });
-      return Response.json({ ok: true, sheet: 'נכשל', warnings: [deliveryWarning('sheet_append_failed', e)] });
+      return Response.json({ ok: true, rid, sheet: 'נכשל', warnings: [deliveryWarning('sheet_append_failed', e)] });
     }
   } catch (error) {
     log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(error?.message ?? error).slice(0, 200) });
-    return Response.json({ error: error.message }, { status: 500 });
+    // The id, not the message. `error.message` reached the browser as-is: it
+    // told the visitor nothing they could use, and told anyone reading it the
+    // shape of our internals. The id is the one thing that is useful to both —
+    // they can quote it, and it finds the request in one search.
+    return Response.json({ error: 'השמירה נכשלה. אפשר לנסות שוב, או לפנות לדורית ישירות.', rid }, { status: 500 });
   }
 }

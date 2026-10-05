@@ -185,7 +185,7 @@ export default async function(req) {
       // הטלפון עצמו אינו נרשם — רק שנדחה, וזה מה שצריך כדי לאבחן ערוץ
       // שמוסר מספרים בפורמט שלא ציפינו לו.
       log('warn', 'contact.rejected', { rid, reason: 'invalid_phone' });
-      return Response.json({ error: 'נדרש מספר טלפון תקין' }, { status: 400 });
+      return Response.json({ error: 'נדרש מספר טלפון תקין', rid }, { status: 400 });
     }
 
     // ההערות נכתבות על ידי מודל ששמע אדם מקליד לוואטסאפ, שם אנשים שולחים
@@ -222,7 +222,7 @@ export default async function(req) {
       } catch (e) {
         log('error', 'contact.update_failed', { rid, contactId: existing.id, err: String(e?.message ?? e).slice(0, 200) });
         return Response.json(
-          { error: 'לא הצלחנו לעדכן את איש הקשר.', details: e?.message },
+          { error: 'לא הצלחנו לעדכן את איש הקשר.', rid },
           { status: 500 },
         );
       }
@@ -242,7 +242,7 @@ export default async function(req) {
       } catch (e) {
         log('error', 'contact.create_failed', { rid, err: String(e?.message ?? e).slice(0, 200) });
         return Response.json(
-          { error: 'לא הצלחנו לשמור את איש הקשר.', details: e?.message },
+          { error: 'לא הצלחנו לשמור את איש הקשר.', rid },
           { status: 500 },
         );
       }
@@ -284,6 +284,7 @@ export default async function(req) {
     log('info', 'request.end', { rid, ms: Date.now() - startedAt, created, warnings: warnings.length });
     return Response.json({
       ok: true,
+      rid,
       contactId,
       created,
       saved: { phone: key, name: name || '', email: email || '' },
@@ -292,6 +293,10 @@ export default async function(req) {
     });
   } catch (error) {
     log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(error?.message ?? error).slice(0, 200) });
-    return Response.json({ error: error.message }, { status: 500 });
+    // The id, not the message. `error.message` reached the browser as-is: it
+    // told the visitor nothing they could use, and told anyone reading it the
+    // shape of our internals. The id is the one thing that is useful to both —
+    // they can quote it, and it finds the request in one search.
+    return Response.json({ error: 'השמירה נכשלה. אפשר לנסות שוב, או לפנות לדורית ישירות.', rid }, { status: 500 });
   }
 }

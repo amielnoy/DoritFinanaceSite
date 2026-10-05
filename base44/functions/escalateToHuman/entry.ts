@@ -614,6 +614,7 @@ export default async function(req) {
     log('info', 'request.end', { rid, ms: Date.now() - startedAt, reason: safeReason, notified, recorded: leadId !== null, warnings: warnings.length });
     return Response.json({
       ok: true,
+      rid,
       leadId,
       recorded: leadId !== null,
       notified,
@@ -629,7 +630,7 @@ export default async function(req) {
     return Response.json(
       {
         ok: false,
-        error: error.message,
+        rid,
         contact: HUMAN_CONTACT,
         acknowledgement: 'אפשר לפנות לדורית ישירות בטלפון או בוואטסאפ.',
       },

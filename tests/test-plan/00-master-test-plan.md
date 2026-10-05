@@ -116,8 +116,8 @@ Resume after the environment is corrected; no partial sign-off.
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
 Both runners write Allure results into the same `allure-results/`, so one
-`allure generate` covers the whole battery — 1041 Vitest cases (252 unit, 24
-component, 444 contract, 240 integration, 71 security, plus 8 opt-in agent
+`allure generate` covers the whole battery — 1052 Vitest cases (252 unit, 30
+component, 448 contract, 240 integration, 72 security, plus 8 opt-in agent
 `allure generate` covers the whole battery — 1046 Vitest cases (252 unit, 30
 component, 445 contract, 237 integration, 72 security, plus 8 opt-in agent
 evals that skip without credentials and the one marker case that reports the
