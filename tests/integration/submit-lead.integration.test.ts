@@ -1122,6 +1122,13 @@ describe("submitLead — the topic the interview no longer asks for", () => {
  * itself missing.
  */
 describe("submitLead — the row it appends to the sheet", () => {
+  /** The headers the function declares, read from it rather than repeated here. */
+  const SHEET_COLUMNS = (() => {
+    const src = readFileSync(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"), "utf8");
+    const i = src.indexOf("const SHEET_COLUMNS = [");
+    return src.slice(i, src.indexOf("];", i)).match(/'[^']+'/g)!.map((q) => q.slice(1, -1));
+  })();
+
   const SHEET = { SHEET_ID: "sheet-test-id", MAILER_URL, MAILER_TOKEN: "test-only-token" };
 
   /** The single row appended, as the Sheets API received it. */
@@ -1131,6 +1138,92 @@ describe("submitLead — the row it appends to the sheet", () => {
     return (call.body as { values: string[][] }).values[0];
   };
 
+  /**
+   * What an interview puts in the sheet, and why it is six cells rather than one.
+   *
+   * Everything the interview collected used to land in `תקציר` as free text:
+   * life stage, goal, concern, clearinghouse interest, employer, seniority,
+   * products, fees — eight structured answers flattened into one cell. The
+   * sheet could show them and nothing else. It could not be asked "who wants a
+   * clearinghouse pull?" or "which interviews finished?", which are the two
+   * questions it exists to answer.
+   *
+   * The four asked in every interview get columns because they are comparable
+   * across interviews. Track-specific fields stay in the summary: they differ
+   * per track, and a column filled in a third of rows is worse than prose.
+   */
+  describe("the interview's own columns", () => {
+    const INTERVIEW = {
+      name: "אורי לוי",
+      phone: "0541112233",
+      source: "interview",
+      track: "pension",
+      meetingTopic: "גמל, השתלמות ופנסיה",
+      timing: "חמישי השבוע, בוקר",
+      scheduledAt: "2026-09-24T10:00:00",
+      completeness: { answered: 8, total: 8, unknown: 1 },
+      profile: {
+        life_stage: "שכיר, גרוש עם ארבעה ילדים",
+        goal: "שיפור צבירה",
+        concern: "דמי ניהול",
+        clearinghouse: "מעוניין/ת",
+        employer: "משרד החינוך",
+        seniority: "שנה",
+        products: "פנסיה, גמל, השתלמות",
+        fees: "לא ידוע למבקר",
+      },
+    };
+    const at = (label: string) => SHEET_COLUMNS.indexOf(label);
+
+    it("gives each common field its own cell", async () => {
+      const row = rowFrom(await invokeFunction("submitLead", INTERVIEW, { env: SHEET }));
+      expect(row[at("שלב חיים")]).toBe("שכיר, גרוש עם ארבעה ילדים");
+      expect(row[at("יעד עיקרי")]).toBe("שיפור צבירה");
+      expect(row[at("דאגה מרכזית")]).toBe("דמי ניהול");
+      expect(row[at("מסלקה")]).toBe("מעוניין/ת");
+    });
+
+    it("writes the agreed slot, not the words around it", async () => {
+      // `מועד מבוקש` is what the visitor said; `מועד הפגישה` is what the diary
+      // took. Only the second sorts, and "what have I got this week" is asked
+      // of the second.
+      const row = rowFrom(await invokeFunction("submitLead", INTERVIEW, { env: SHEET }));
+      expect(row[at("מועד הפגישה")]).toBe("2026-09-24 10:00");
+      expect(row[at("מועד מבוקש")]).toBe("חמישי השבוע, בוקר");
+    });
+
+    it("records how complete the interview was", async () => {
+      const row = rowFrom(await invokeFunction("submitLead", INTERVIEW, { env: SHEET }));
+      expect(row[at("שלמות")]).toMatch(/8 מתוך 8/);
+    });
+
+    it("leaves the new cells empty for everything that is not an interview", async () => {
+      // A consultation has no profile and no track. Empty, not absent — a
+      // shorter row slides every later column under the wrong heading.
+      const row = rowFrom(
+        await invokeFunction(
+          "submitLead",
+          { name: "יעל", phone: "0521234567", source: "consultation", topic: "פנסיה" },
+          { env: SHEET },
+        ),
+      );
+      expect(row).toHaveLength(SHEET_COLUMNS.length);
+      for (const label of ["שלב חיים", "יעד עיקרי", "דאגה מרכזית", "מסלקה", "שלמות"]) {
+        expect(row[at(label)], label).toBe("");
+      }
+    });
+
+    it("still carries the whole profile in the summary cell", async () => {
+      // The columns are for filtering, not a replacement. Employer, seniority,
+      // products and fees have no column and must not be lost with the change.
+      const row = rowFrom(await invokeFunction("submitLead", INTERVIEW, { env: SHEET }));
+      const summary = row[at("תקציר")];
+      for (const value of ["משרד החינוך", "שנה", "פנסיה, גמל, השתלמות", "לא ידוע למבקר"]) {
+        expect(summary, value).toContain(value);
+      }
+    });
+  });
+
   it("appends one row, in the column order the contract pins", async () => {
     const r = await invokeFunction("submitLead", {
       name: "יעל כהן", phone: "0521234567", email: "yael@example.com",
@@ -1139,13 +1232,20 @@ describe("submitLead — the row it appends to the sheet", () => {
 
     expect(r.callsTo("sheets.googleapis.com")).toHaveLength(1);
     const row = rowFrom(r);
-    expect(row).toHaveLength(13);
+    // Against the header list itself, not a number copied beside it. A row and
+    // its headers drifting apart is the failure that makes every other column
+    // in the sheet wrong, and it is invisible until somebody reads it.
+    expect(row).toHaveLength(SHEET_COLUMNS.length);
     expect(row[1]).toBe("consultation_request");
     expect(row[2]).toBe("consultation");
     expect(row[5]).toBe("פנסיה");
     expect(row[6]).toBe("השבוע");
     expect(row[7]).toBe("יעל כהן");
-    expect(row[8]).toBe("0521234567");
+    // Leading apostrophe, which Sheets reads as "this is text" and does not
+    // display. Without it `valueInputOption=USER_ENTERED` stores 0521234567 as
+    // the number 521234567 — the leading zero gone, in the one copy that
+    // outlives deleting the Lead.
+    expect(row[8]).toBe("'0521234567");
   });
 
   it("writes the interview's profile, not an empty summary column", async () => {

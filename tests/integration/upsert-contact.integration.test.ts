@@ -155,8 +155,10 @@ describe("upsertContact — the contacts sheet", () => {
     const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV });
     const [append] = run.callsTo("sheets.googleapis.com");
     expect(decodeURIComponent(append.url)).toContain("Contacts!A:F");
+    // `'` forces Sheets to keep this as text; see the note in `appendEventRow`.
+    // Without it the leading zero is lost to numeric coercion.
     expect((append.body as { values: string[][] }).values[0].slice(1)).toEqual([
-      "0501234567",
+      "'0501234567",
       "יעל",
       "",
       "whatsapp",
@@ -168,7 +170,9 @@ describe("upsertContact — the contacts sheet", () => {
   it("writes the normalised number, the one the entity is keyed on", async () => {
     const run = await invokeFunction("upsertContact", whatsapp(), { env: ENV });
     const [append] = run.callsTo("sheets.googleapis.com");
-    expect((append.body as { values: string[][] }).values[0][1]).toBe("0501234567");
+    // `'` forces Sheets to keep this as text; see the note in `appendEventRow`.
+    // Without it the leading zero is lost to numeric coercion.
+    expect((append.body as { values: string[][] }).values[0][1]).toBe("'0501234567");
   });
 
   it("does not add a row when a known contact sends another message", async () => {

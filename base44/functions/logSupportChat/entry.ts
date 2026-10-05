@@ -70,7 +70,26 @@ async function appendEventRow(base44, row) {
   const { accessToken } = await base44.asServiceRole.connectors.getConnection('googlesheets');
   if (!accessToken) return 'אין חיבור';
 
-  const range = `${SHEET_TAB}!A:${String.fromCharCode(64 + SHEET_COLUMNS.length)}`;
+  // שם העמודה האחרונה. `String.fromCharCode(64 + n)` עבד עד 26 ואז התחיל
+  // לייצר תווים שאינם אותיות — טווח פגום, ובקשה שנדחית. בראיון יש כבר 19
+  // עמודות, וזה קרוב מכדי להשאיר כך.
+  let lastColumn = '';
+  for (let n = SHEET_COLUMNS.length; n > 0; ) {
+    const r = (n - 1) % 26;
+    lastColumn = String.fromCharCode(65 + r) + lastColumn;
+    n = (n - r - 1) / 26;
+  }
+
+  // USER_ENTERED מפרש כל תא כאילו אדם הקליד אותו, ולכן '0549988754' נשמר
+  // כמספר 549988754 — האפס המוביל אובד, והטלפון הופך לבלתי שמיש. בגיליון,
+  // שהוא העותק ששורד מחיקת רשומה, זו אבדת מידע ולא עניין של תצוגה. גרש מוביל
+  // אומר ל-Sheets "זה טקסט" ואינו נראה בתא.
+  const cells = row.map((v) => {
+    const s = v == null ? '' : String(v);
+    return /^0\d+$/.test(s) ? `'${s}` : s;
+  });
+
+  const range = `${SHEET_TAB}!A:${lastColumn}`;
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}` +
       `:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
@@ -80,7 +99,7 @@ async function appendEventRow(base44, row) {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ values: [row] }),
+      body: JSON.stringify({ values: [cells] }),
       signal: AbortSignal.timeout(10000),
     },
   );
