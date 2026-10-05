@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { REPO_ROOT } from "../helpers/entity-schema";
-import { read } from "../helpers/source-scan";
+import { backendFiles, read, rel } from "../helpers/source-scan";
 
 /**
  * What the backend is allowed to write down about a request.
@@ -374,6 +374,59 @@ describe("the publish gate chooses a credential", () => {
     // rest on an implementation detail of a package installed at `@latest`.
     for (const step of ["Publish", "Fetch the last 24 hours"]) {
       expect(gateScript(step), step).toMatch(/unset BASE44_API_KEY/);
+    }
+  });
+});
+
+/**
+ * Every answer carries the number that finds its logs.
+ *
+ * `rid` was generated at the top of each function, stamped on every log line,
+ * and then dropped: no response returned it. A visitor reporting a failure had
+ * nothing to quote and we had nothing to search, so diagnosis meant inferring
+ * from timestamps and absences. That is how three days went on the one genuine
+ * outage this site has had — every instrument could only show what had *not*
+ * happened.
+ *
+ * Eight characters turn that into one search.
+ */
+describe("a failure you can look up", () => {
+  const fns = backendFiles();
+
+  it("returns the request id with every answer", () => {
+    for (const f of fns) {
+      const src = read(f);
+      // Each `return Response.json(` with its body, however it is wrapped.
+      // A function may answer through a helper instead, which is the better
+      // shape — one place that cannot forget. `contentAdmin` does.
+      const viaHelper = /Response\.json\(\{ \.\.\.body, rid \}/.test(src);
+      if (viaHelper) continue;
+      const bodies = [...src.matchAll(/return Response\.json\(\s*(\{[\s\S]*?\n\s*\}|\{[^}]*\})/g)];
+      expect(bodies.length, `${rel(f)} answers nothing`).toBeGreaterThan(0);
+      for (const [, body] of bodies) {
+        expect(body, `${rel(f)} answers without an rid: ${body.slice(0, 60)}`).toMatch(/\brid\b/);
+      }
+    }
+  });
+
+  it("never returns the raw error text to the caller", () => {
+    // `error.message` told the visitor nothing they could use and told anyone
+    // reading it the shape of our internals. The id is useful to both.
+    for (const f of fns) {
+      const src = read(f);
+      expect(src, `${rel(f)} returns a raw message`).not.toMatch(/error:\s*error\.message/);
+      expect(src, `${rel(f)} returns a raw message as details`).not.toMatch(
+        /details:\s*e\??\.message/,
+      );
+    }
+  });
+
+  it("puts ok before rid, so a response still reads as one", () => {
+    for (const f of fns) {
+      const src = read(f);
+      expect(src, `${rel(f)} leads with the id rather than the outcome`).not.toMatch(
+        /Response\.json\(\{\s*\n\s*rid,\s*\n\s*ok:/,
+      );
     }
   });
 });

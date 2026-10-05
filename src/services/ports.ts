@@ -49,6 +49,16 @@ export interface ClaimReport {
 export interface SubmissionReceipt {
   ok: boolean;
   leadId?: string | null;
+  /**
+   * The request id, which names every log line the submission produced.
+   *
+   * It was logged and never returned, so a visitor reporting a failure had
+   * nothing to quote and we had nothing to search. Diagnosing meant inferring
+   * from timestamps and absences — which is how three days went on the one
+   * genuine outage this site has had. Eight characters turn that into one
+   * search.
+   */
+  rid?: string;
   /** Non-fatal problems the backend reported, e.g. a notification that failed. */
   warnings?: string[];
 }

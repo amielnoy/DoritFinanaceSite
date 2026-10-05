@@ -215,9 +215,12 @@ export default function AgentChat({
     void (async () => {
       try {
         const receipt = await services.leads.submitInterview(summary);
-        if (!receipt?.ok) throw new Error("rejected");
-      } catch {
-        console.warn("[interview] submitLead refused the closing payload; showing direct channels");
+        if (!receipt?.ok) throw new Error(`rejected${receipt?.rid ? ` rid=${receipt.rid}` : ""}`);
+      } catch (e) {
+        // The id, where anyone can find it. It names every log line the
+        // submission produced, and it is the difference between "a visitor says
+        // it did not work" and one search.
+        console.warn("[interview] the close was refused — showing direct channels", String(e));
         showChannelsOnly();
       }
     })();

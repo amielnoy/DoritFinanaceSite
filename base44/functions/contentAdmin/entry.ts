@@ -122,7 +122,10 @@ async function mirror(rid, op, table, body, query = '') {
 export default async function(req) {
   const rid = newRequestId();
   const startedAt = Date.now();
-  const json = (body, status = 200) => Response.json(body, { status });
+  // One place, so no answer can leave without the id that names its logs.
+  // The other functions build each response by hand; this shape is the one
+  // worth copying when they are next touched.
+  const json = (body, status = 200) => Response.json({ ...body, rid }, { status });
 
   log('info', 'request.start', { rid });
 
@@ -184,6 +187,6 @@ export default async function(req) {
     return json(result);
   } catch (e) {
     log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(e?.message ?? e).slice(0, 200) });
-    return json({ error: 'הפעולה נכשלה.', details: e?.message }, 500);
+    return json({ error: 'הפעולה נכשלה.', rid }, 500);
   }
 }

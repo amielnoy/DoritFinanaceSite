@@ -190,14 +190,14 @@ export default async function(req) {
     if (!name || !phone) {
       // פנייה שאבדה, ולא רק בקשה פגומה. מי שהגיע לכאן סיים ראיון שלא נשמר.
       log('error', 'lead.lost', { rid, reason: 'missing_contact_fields', ...staleClient });
-      return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
+      return Response.json({ error: 'נדרשים שם וטלפון', rid }, { status: 400 });
     }
 
     if (CALENDAR_PROVIDERS.length === 0) {
       // CALENDAR_PROVIDERS הוגדר ולא נותר בו שם מוכר. שתיקה כאן הייתה מחזירה
       // ok על בקשה שלא נכתבה לשום יומן.
       log('error', 'calendar.no_provider', { rid });
-      return Response.json({ error: 'לא מוגדר יומן יעד' }, { status: 500 });
+      return Response.json({ error: 'לא מוגדר יומן יעד', rid }, { status: 500 });
     }
 
     // תזמון האירוע — לפי המועד שסוכם, או תזכורת למחר ב-09:00 כשלא סוכם מועד.
@@ -284,7 +284,7 @@ export default async function(req) {
       // בפנייה שנשכחת.
       log('error', 'calendar.none_created', { rid, ms: Date.now() - startedAt, warnings });
       const details = events.map((e) => e.details).filter(Boolean).join(' | ');
-      return Response.json({ error: 'שגיאת יומן', details, warnings }, { status: 502 });
+      return Response.json({ error: 'שגיאת יומן', rid, warnings }, { status: 502 });
     }
 
     log('info', 'request.end', {
@@ -298,6 +298,7 @@ export default async function(req) {
     // שנכתב מול התשובה הקודמת ימשיך לעבוד. הפירוט המלא יושב ב-events.
     return Response.json({
       ok: true,
+      rid,
       eventId: created[0].eventId,
       htmlLink: created[0].link,
       events,
@@ -305,6 +306,10 @@ export default async function(req) {
     });
   } catch (error) {
     log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(error?.message ?? error).slice(0, 200) });
-    return Response.json({ error: error.message }, { status: 500 });
+    // The id, not the message. `error.message` reached the browser as-is: it
+    // told the visitor nothing they could use, and told anyone reading it the
+    // shape of our internals. The id is the one thing that is useful to both —
+    // they can quote it, and it finds the request in one search.
+    return Response.json({ error: 'השמירה נכשלה. אפשר לנסות שוב, או לפנות לדורית ישירות.', rid }, { status: 500 });
   }
 }

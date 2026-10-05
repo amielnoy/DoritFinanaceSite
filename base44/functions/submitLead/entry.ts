@@ -1246,7 +1246,7 @@ export default async function(req) {
 
     if (!name || !phone) {
       log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields', source: source || 'quick' });
-      return Response.json({ error: 'נדרשים שם וטלפון' }, { status: 400 });
+      return Response.json({ error: 'נדרשים שם וטלפון', rid }, { status: 400 });
     }
 
     // התקציר נכתב על ידי מודל, ולכן עובר סינון לפני שהוא נשלח לאן שהוא.
@@ -1323,7 +1323,7 @@ export default async function(req) {
       } catch (e) {
         log('error', 'lead.update_failed', { rid, leadId: openInterview.id, err: String(e?.message ?? e).slice(0, 200) });
         return Response.json(
-          { error: 'לא הצלחנו לעדכן את הפנייה. נסו שוב או צרו קשר ישירות.', details: e?.message },
+          { error: 'לא הצלחנו לעדכן את הפנייה. נסו שוב או צרו קשר ישירות.', rid },
           { status: 500 }
         );
       }
@@ -1350,7 +1350,7 @@ export default async function(req) {
       log('error', 'lead.create_failed', { rid, source: source || 'quick', err: String(e?.message ?? e).slice(0, 200) });
       // אין ערוץ גיבוי — הפנייה תאבד. זהו הכשל היחיד שחייב להיכשל בקול.
       return Response.json(
-        { error: 'לא הצלחנו לשמור את הפנייה. נסו שוב או צרו קשר ישירות.', details: e?.message },
+        { error: 'לא הצלחנו לשמור את הפנייה. נסו שוב או צרו קשר ישירות.', rid },
         { status: 500 }
       );
     }
@@ -1402,7 +1402,7 @@ export default async function(req) {
     // לנוטש שאפשר לחזור אליו.
     if (partial) {
       log('info', 'request.end', { rid, ms: Date.now() - startedAt, leadId, stage: 'partial', notified: false });
-      return Response.json({ ok: true, leadId, stage: 'partial', notified: false, warnings });
+      return Response.json({ ok: true, rid, leadId, stage: 'partial', notified: false, warnings });
     }
 
     // אישור ללקוח
@@ -1674,9 +1674,13 @@ export default async function(req) {
     }));
 
     log('info', 'request.end', { rid, ms: Date.now() - startedAt, leadId, source: source || 'quick', warnings: warnings.length });
-    return Response.json({ ok: true, leadId, warnings });
+    return Response.json({ ok: true, rid, leadId, warnings });
   } catch (error) {
     log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String(error?.message ?? error).slice(0, 200) });
-    return Response.json({ error: error.message }, { status: 500 });
+    // The id, not the message. `error.message` reached the browser as-is: it
+    // told the visitor nothing they could use, and told anyone reading it the
+    // shape of our internals. The id is the one thing that is useful to both —
+    // they can quote it, and it finds the request in one search.
+    return Response.json({ error: 'השמירה נכשלה. אפשר לנסות שוב, או לפנות לדורית ישירות.', rid }, { status: 500 });
   }
 }
