@@ -15,6 +15,7 @@ import {
 } from "@/config/compliance";
 import { CONTACT } from "@/config/contact";
 import { readHandoff } from "@/lib/interview-handoff";
+import ContactChannels from "./ContactChannels";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 /**
@@ -150,7 +151,9 @@ export default function AgentChat({
    * hold in the common case. State the panel owns, rendered in both states,
    * holds it in both.
    */
-  const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
+  const [handoffNotice, setHandoffNotice] = useState<
+    { message: string; contact: HumanContact } | null
+  >(null);
   /**
    * The handoff asks who to call back before it notifies anyone.
    *
@@ -274,15 +277,15 @@ export default function AgentChat({
    * channels either way — a person who asked for a person gets one even when
    * the backend is down.
    */
-  /** The direct channels, formatted once for both routes out. */
+  /**
+   * Whose details to show when the automation stops being useful.
+   *
+   * The rendering belongs to `ContactChannels`. It was three markdown links
+   * joined by newlines, which markdown collapses into a soft break — on a
+   * phone all three came out as one cramped line, under a sentence that had
+   * already named the number and the address.
+   */
   const FALLBACK_CONTACT: HumanContact = CONTACT;
-
-  const channelsOf = ({ phoneDisplay, phoneE164, whatsapp, email }: HumanContact) =>
-    [
-      `📞 [${phoneDisplay}](tel:${phoneE164})`,
-      `💬 [וואטסאפ](https://wa.me/${whatsapp})`,
-      `✉️ [${email}](mailto:${email})`,
-    ].join("\n");
 
   /**
    * The route out that notifies nobody.
@@ -293,7 +296,7 @@ export default function AgentChat({
   const showChannelsOnly = () => {
     setHandoffOpen(false);
     setHandoffError(null);
-    setHandoffNotice([HUMAN_HANDOFF.failure, "", channelsOf(FALLBACK_CONTACT)].join("\n"));
+    setHandoffNotice({ message: HUMAN_HANDOFF.failure, contact: FALLBACK_CONTACT });
   };
 
   const handOffToHuman = async (reason: EscalationReason = "user_request") => {
@@ -325,13 +328,10 @@ export default function AgentChat({
       });
       setHandoffSent(true);
       setHandoffOpen(false);
-      setHandoffNotice(
-        [
-          receipt.ok ? HUMAN_HANDOFF.confirmation : HUMAN_HANDOFF.failure,
-          "",
-          channelsOf(receipt.contact),
-        ].join("\n")
-      );
+      setHandoffNotice({
+        message: receipt.ok ? HUMAN_HANDOFF.confirmation : HUMAN_HANDOFF.failure,
+        contact: receipt.contact,
+      });
     } finally {
       setHandingOff(false);
     }
@@ -603,9 +603,11 @@ export default function AgentChat({
           {handoffNotice ? (
             <div className="px-5 pb-4 pt-4 border-t border-border/60">
               <div className="border border-accent/40 bg-secondary/40 px-5 py-4 text-[14px] leading-relaxed">
-                <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <ReactMarkdown urlTransform={allowTel}>{handoffNotice}</ReactMarkdown>
-                </div>
+                <p className="text-[15px] leading-relaxed text-foreground mb-3">
+                  {handoffNotice.message}
+                </p>
+                {/* Rows, not markdown — see ContactChannels. */}
+                <ContactChannels contact={handoffNotice.contact} />
               </div>
             </div>
           ) : null}
