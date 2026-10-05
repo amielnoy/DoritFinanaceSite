@@ -75,26 +75,44 @@ test.describe("Agent chat — regulatory shell", () => {
   });
 
   test("the fence is published beside the interview agent", async ({ page }) => {
-    await gotoApp(page, "/");
     const section = page.locator(INTERVIEW);
+    await test_step("open the home page, where the interview lives", async () => {
+      await gotoApp(page, "/");
+    });
 
-    await expect(
-      section.getByText(
-        "בינה מלאכותית שמשרתת את הלקוח עד לרגע שבו נדרש בעל רישיון — ואז מעבירה לסוכן."
-      )
-    ).toBeVisible();
-    await expect(section.getByText("כללי הגדר")).toBeVisible();
-    await expect(section.getByText("מה הוא לא עושה")).toBeVisible();
-    await expect(section.getByText("מתי עובר לאדם")).toBeVisible();
+    await test_step("the one-line claim about where the automation stops is on screen", async () => {
+      // Publishing the boundary is half of honouring it: a visitor who can see
+      // what the agent will not do knows to ask for a person.
+      await expect(
+        section.getByText(
+          "בינה מלאכותית שמשרתת את הלקוח עד לרגע שבו נדרש בעל רישיון — ואז מעבירה לסוכן."
+        )
+      ).toBeVisible();
+    });
+
+    await test_step("and so are the three headings that spell it out", async () => {
+      // Not decoration. A reviewer checks these against the prompts, so they
+      // have to be present for a visitor, not only in the repo.
+      await expect(section.getByText("כללי הגדר")).toBeVisible();
+      await expect(section.getByText("מה הוא לא עושה")).toBeVisible();
+      await expect(section.getByText("מתי עובר לאדם")).toBeVisible();
+    });
   });
 
   test("a standing disclaimer sits under every message box", async ({ page }) => {
-    await gotoApp(page, "/");
-    for (const id of ["#start"]) {
-      await expect(
-        page.locator(id).getByText(/אינו ייעוץ, שיווק פנסיוני או המלצה אישית/)
-      ).toBeVisible();
-    }
+    await test_step("open the home page", async () => {
+      await gotoApp(page, "/");
+    });
+
+    await test_step("every chat says it is not advice, where the typing happens", async () => {
+      // Under the box rather than in the gate: the gate is read once, and this
+      // has to be true of every message sent after it.
+      for (const id of ["#start"]) {
+        await expect(
+          page.locator(id).getByText(/אינו ייעוץ, שיווק פנסיוני או המלצה אישית/)
+        ).toBeVisible();
+      }
+    });
   });
 
   /**
@@ -234,14 +252,23 @@ test.describe("Support chat — the open question", () => {
   });
 
   test("the route to a person is here too", async ({ page, mockApi }) => {
-    await gotoApp(page, "/faq");
     const section = page.locator(SUPPORT);
+    await test_step("open the support chat, which is a different agent", async () => {
+      // The promise is the agent's, not the interview's — so it has to hold on
+      // every chat, not only the one it was built for.
+      await gotoApp(page, "/faq");
+    });
 
-    await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
-    await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
-    await section.getByRole("button", { name: "שלחו לדורית" }).click();
-    const req = await mockApi.waitForRequest("escalateToHuman");
-    expect(req.method).toBe("POST");
+    await test_step("ask for a person and leave a number", async () => {
+      await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+      await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
+      await section.getByRole("button", { name: "שלחו לדורית" }).click();
+    });
+
+    await test_step("Dorit is told, from here as well", async () => {
+      const req = await mockApi.waitForRequest("escalateToHuman");
+      expect(req.method).toBe("POST");
+    });
   });
 });
 /**
@@ -332,11 +359,19 @@ test.describe("Agent chat — when the backend refuses", () => {
     await gotoApp(page, "/");
     const section = page.locator(INTERVIEW);
 
-    await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
-    await handoffForm(section).getByLabel("שם").fill("רונית אבני");
-    await section.getByRole("button", { name: "שלחו לדורית" }).click();
+    await test_step("give a name and no number, then send", async () => {
+      await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
+      await handoffForm(section).getByLabel("שם").fill("רונית אבני");
+      await section.getByRole("button", { name: "שלחו לדורית" }).click();
+    });
 
-    await expect(section.getByRole("alert")).toHaveText(/מספר טלפון/);
-    expect(mockApi.requestsTo("escalateToHuman")).toHaveLength(0);
+    await test_step("it asks for the number instead of sending", async () => {
+      await expect(section.getByRole("alert")).toHaveText(/מספר טלפון/);
+    });
+
+    await test_step("and Dorit is not paged with someone she cannot reach", async () => {
+      // The whole point. She received three of those in one morning (A-55).
+      expect(mockApi.requestsTo("escalateToHuman")).toHaveLength(0);
+    });
   });
 });

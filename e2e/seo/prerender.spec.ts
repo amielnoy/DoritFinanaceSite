@@ -104,10 +104,14 @@ test.describe("Prerendered HTML — what a crawler that does not run JavaScript 
     // `modulepreload` hints arrive absolute. Shipping them would point every
     // page at 127.0.0.1.
     for (const route of PRERENDERED) {
-      const html = await (await request.get(route.path)).text();
-      expect(html, `${route.path} leaks a localhost URL`).not.toMatch(
-        /https?:\/\/(127\.0\.0\.1|localhost)/
-      );
+      await test_step(`${route.path} names no build host`, async () => {
+        // Per route rather than in one loop, so a failure says which page
+        // leaked rather than only that one did.
+        const html = await (await request.get(route.path)).text();
+        expect(html, `${route.path} leaks a localhost URL`).not.toMatch(
+          /https?:\/\/(127\.0\.0\.1|localhost)/
+        );
+      });
     }
   });
 });
