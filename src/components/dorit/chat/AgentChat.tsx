@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Loader2, RotateCcw, Send, ShieldCheck, Sparkles, UserRound } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { AnimatePresence, motion } from "framer-motion";
 import { services } from "@/services";
 import type { AgentMessage, EscalationReason, HumanContact } from "@/services";
@@ -16,6 +16,26 @@ import {
 import { CONTACT } from "@/config/contact";
 import { readHandoff } from "@/lib/interview-handoff";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+
+/**
+ * Keeps `tel:` dialable.
+ *
+ * react-markdown 9 sanitises hrefs against a short allow-list — http, https,
+ * mailto and a few others — and silently empties everything else. The handoff
+ * notice is written as markdown and offers three ways to reach Dorit; the
+ * WhatsApp link is https and the mail link is mailto, so both survived, and the
+ * phone number rendered as a link with `href=""`.
+ *
+ * On a phone that is the one that matters, and it is the whole promise of the
+ * control: a person who asks for a person gets one. Found by a component test
+ * asserting the href rather than the text.
+ *
+ * Deliberately narrow — `tel:` and nothing else beyond the library's own list.
+ * The text being rendered is model output, so widening this is widening what a
+ * reply can talk a visitor into opening.
+ */
+const allowTel = (url: string): string =>
+  url.startsWith("tel:") ? url : defaultUrlTransform(url);
 
 /** Everything that distinguishes one on-site agent from another. */
 export interface AgentDescriptor {
@@ -581,7 +601,7 @@ export default function AgentChat({
             <div className="px-5 pb-4 pt-4 border-t border-border/60">
               <div className="border border-accent/40 bg-secondary/40 px-5 py-4 text-[14px] leading-relaxed">
                 <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <ReactMarkdown>{handoffNotice}</ReactMarkdown>
+                  <ReactMarkdown urlTransform={allowTel}>{handoffNotice}</ReactMarkdown>
                 </div>
               </div>
             </div>

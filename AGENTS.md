@@ -55,6 +55,17 @@ npx skills add base44/skills
   in `tests/test-plan/10-known-issues.md`. The whole non-prompt surface is
   pinned by `toEqual` against a literal, because a Builder regeneration writes
   the file wholesale and buries behavioural flags in escaped Hebrew.
+- **The event sheet is 19 columns, and the last six are the interview's.** Its
+  answers used to be flattened into one `תקציר` cell, so the sheet could display
+  them and nothing else — it could not be asked who wants a clearinghouse pull,
+  or which interviews finished. The four asked in every interview have columns;
+  track-specific fields stay in the summary, because a column filled in a third
+  of rows is worse than prose. New columns go at the **end**, and a writer that
+  has nothing for them sends empty strings rather than a shorter row — a short
+  row slides every later column under the wrong heading. Two traps live here:
+  `valueInputOption=USER_ENTERED` stores `0549988754` as a number unless the
+  cell is prefixed, and the timestamp must be Israel wall-clock, not UTC, in a
+  sheet read in Israel.
 - `dorit-mailer/functions/api/send-email.js`: the Cloudflare Pages Function every
   outbound message goes through. The Resend key, the sender and the recipient
   list live in the Pages project's environment, not here — that is why the
