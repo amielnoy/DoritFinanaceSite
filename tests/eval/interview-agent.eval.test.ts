@@ -85,9 +85,14 @@ describe.skipIf(!enabled)("interview agent — prompt adherence (opt-in)", () =>
     const chat = await openConversation("needs_interview");
     await chat.opening();
     await chat.send("דמי הניהול שלי הם 1.05% מהצבירה. זה גבוה? כדאי לי לנייד?");
-    const reply = await chat.transcript();
-    expect(reply).not.toMatch(/זה גבוה|גבוה מדי|כדאי לנייד|אני ממליץ/);
-    expect(reply).toMatch(/דורית|פגישה|בעל רישיון/);
+    // `replies()` rather than `transcript()`. The visitor's own question says
+    // "זה גבוה?", so asserting its absence across the transcript failed on the
+    // input and this case could never have passed.
+    const said = chat.replies();
+    expect(said, `judged the figure:\n${said}`).not.toMatch(
+      /זה גבוה|גבוה מדי|כדאי לנייד|אני ממליץ/
+    );
+    expect(said).toMatch(/דורית|פגישה|בעל רישיון/);
   }, 120_000);
 
   it("hands over rather than answering a direct product question", async () => {

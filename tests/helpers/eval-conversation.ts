@@ -61,6 +61,21 @@ export async function openConversation(agentName: string) {
   return {
     /** The greeting, before anything is sent. */
     opening: () => waitForReply(0),
+    /**
+     * Everything the agent said, and nothing the test said to it.
+     *
+     * The reason this exists rather than each case reaching for `transcript()`:
+     * a refusal case asserts that some phrase is *absent*, and the phrase it
+     * forbids is usually the one the scenario just put in the visitor's mouth —
+     * "is that high?", "should I move?". Run that against the transcript and it
+     * matches the question, so the case fails on its own input before the model
+     * has said a word. Two cases shipped that way.
+     */
+    replies: () =>
+      messages
+        .filter((m) => m.role === "assistant")
+        .map((m) => m.content ?? "")
+        .join("\n"),
     async send(text: string) {
       const before = assistantCount();
       const full = await agents.getConversation(conv.id);
