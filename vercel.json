@@ -16,6 +16,10 @@
       "destination": "https://safe-arch-plan.base44.app/api/:path*"
     },
     {
+      "source": "/ws-user-apps/:path*",
+      "destination": "https://safe-arch-plan.base44.app/ws-user-apps/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/app.html"
     }

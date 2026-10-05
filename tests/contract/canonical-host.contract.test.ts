@@ -99,6 +99,31 @@ describe("the canonical host has a single source", () => {
     ).toEqual([]);
   });
 
+  it("proxies the agent socket to Base44 rather than serving it the app", () => {
+    // `/ws-user-apps/*` is how the chat receives its transcript. It is a
+    // backend path, and without a rewrite the catch-all answers it with the
+    // SPA shell — socket.io asks for an engine.io handshake and is handed
+    // `<!doctype html>` with a 200, so the subscription can never connect.
+    //
+    // Measured on the deployed site before this existed. The chat on the Vercel
+    // copy could not send, while the same calls made directly to Base44
+    // succeeded — the HTTP half of the transport was fine all along.
+    const rewrites = JSON.parse(read("vercel.json")).rewrites as {
+      source: string;
+      destination: string;
+    }[];
+    const ws = rewrites.find((r) => r.source.startsWith("/ws-user-apps"));
+    expect(ws, "nothing proxies the agent socket").toBeDefined();
+    expect(ws!.destination).toContain("base44.app");
+
+    // Before the catch-all, or it never matches.
+    const at = (pred: (r: { source: string }) => boolean) => rewrites.findIndex(pred);
+    expect(
+      at((r) => r.source.startsWith("/ws-user-apps")),
+      "the catch-all swallows the socket path",
+    ).toBeLessThan(at((r) => r.source === "/(.*)"));
+  });
+
   it("still points the API rewrite at Base44, which is a backend address and not the canonical host", () => {
     /* vercel.json forwards /api to Base44. That destination is deliberately *not*
        governed by VITE_SITE_URL: it names where the backend lives, which is a
