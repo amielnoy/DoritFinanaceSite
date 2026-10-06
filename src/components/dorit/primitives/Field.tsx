@@ -1,24 +1,16 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
-/** The text-control styling shared by every form on the site. */
+/** The text-control styling shared by every form on the site — 48px, transparent, hairline, gold focus. */
 export const inputClass = (className?: string) =>
   cn(
-    "w-full bg-background border border-border px-4 py-3 text-base text-foreground placeholder:text-muted-foreground",
-    "focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors",
+    "w-full min-h-12 rounded-md bg-transparent border border-input px-3.5 py-2.5 text-[17px] text-foreground placeholder:text-muted-foreground caret-highlight",
+    "hover:border-foreground/45 focus:outline-none focus:border-highlight focus:ring-[3px] focus:ring-highlight/20 transition-colors",
+    "aria-[invalid=true]:border-destructive",
     className
   );
 
-/**
- * A labelled form control.
- *
- * The control is passed in as a child, so the id is generated here and cloned
- * on — unless the child brings its own, which the e2e page objects rely on
- * (`#qc-name` and friends). Without an id the <label> is associated with
- * nothing and screen readers announce the field as unlabelled (axe: label /
- * select-name, critical). ClaimForm had this; QuickContact hand-wrote four
- * id/htmlFor pairs instead.
- */
+/** A labelled form control. (Id-cloning behaviour unchanged.) */
 export function Field({
   label,
   children,
@@ -37,7 +29,7 @@ export function Field({
 
   return (
     <div className={className}>
-      <label htmlFor={id} className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+      <label htmlFor={id} className="block text-[15px] text-foreground/80 mb-1.5">
         {label}
       </label>
       {control}

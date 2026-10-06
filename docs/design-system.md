@@ -28,50 +28,70 @@ ratio.
 
 ---
 
+## Classical v2
+
+Editorial: colour goes into strokes, not fills. One gold for lines, one gold
+ink for text. Token names are unchanged from the parchment/bronze system; only
+the values moved (`src/index.css`, `:root`).
+
 ## Inks
 
-| Token | Value | Worst case | Use |
+| Token | Value | Ratio (handoff) | Use |
 |---|---|---|---|
-| `--foreground` | `240 3% 10%` · `#19191a` | **14.14** | body copy, headings |
-| `--muted-foreground` | `30 8% 32%` · `#58524b` | **6.21** | captions, labels, meta — everything secondary |
-| `--accent` | `26 14% 39%` · `#716256` | **4.72** | eyebrows and small accents only |
-| `--highlight-ink` | `27 38% 30%` · `#6a4a2f` | **6.42** | figures and type on highlight surfaces |
-| `--muted-foreground-on-dark` | `36 20% 78%` · `#d2c9bc` | **10.73** on `#19191a` | secondary text on the obsidian band and footer |
+| `--foreground` | `40 5% 12%` · `#201f1d` | body copy, headings |
+| `--muted-foreground` | `0 2% 37%` · `#605d5d` | 6.0 on the ground | captions, labels, meta |
+| `--accent` / `--highlight-ink` / `--highlight-foreground` | `37 76% 28%` · `#7d5411` | 6.9 | **any text in gold**, eyebrows, figures, label on an outlined CTA |
+| `--highlight-on-dark` | `35 67% 64%` · `#e1ad66` | | gold text and strokes on the colophon band (`text-highlight-on-dark`) |
+| `--muted-foreground-on-dark` | `0 3% 72%` · `#bab6b6` | | secondary text on the colophon band |
 
-`--muted-foreground` was `30 10% 40%`. It measured **4.52** against the darkest
-surface it sits on — a margin of 0.02 over the floor, which is why every faded
-variant of it failed and why it could not safely carry a hover state or sit on a
-tinted card. At 32% it has room.
+`--highlight` (`36 55% 46%` · `#b68235`) is **strokes only**: borders, rules,
+icons, the focus ring. It is too light to carry text. `--highlight-strong`
+(`#a06f24`) is the pressed stroke; `--highlight-muted` (`#facb8d`) is for
+subtle borders and tints.
 
-`--accent` at 4.72 is the tightest ink in the system. It passes, and it has
-nothing spare: use it for short accents, never for a paragraph, and never on
-anything but the standard surfaces.
-
-**There is no ink for "a bit lighter than muted".** If a design seems to need
-one, the answer is smaller or lighter weight, not fainter.
+Never fade text with an opacity modifier (the one rule above still applies).
 
 ## Surfaces
 
 | Token | Value | |
 |---|---|---|
-| `--card` | `#fcfaf8` | lightest |
-| `--background` | `#faf8f4` | the page |
-| `--secondary` | `#eae6e1` | panels |
-| `--muted` | `#e8e3dc` | darkest light surface — **the one every ink is measured against** |
-| `--primary` | `#19191a` | the obsidian band and footer; use `--primary-foreground` and `--muted-foreground-on-dark` |
+| `--background`, `--card` | `0 4% 95%` · `#f3f2f2` | the ground; cards are unfilled |
+| `--secondary`, `--muted`, `--popover` | `0 3% 91%` · `#eae9e9` | quiet bands, plate mats |
+| `--primary` | `20 6% 10%` · `#1c1a19` | the colophon (footer), user chat bubble |
+| `--border` / `--input` | `40 4% 82%` / `40 4% 78%` | hairline |
 
-On dark, `--primary-foreground` faded to `/50` still measures 5.03 and is
-acceptable. Below `/50` it is not — `/40` measured **3.65**, which is where the
-footer's copyright line was.
+Radius is 4px (`--radius`) on controls and cards, 0 on plates and bands.
+
+Raw hex stays banned outside `index.css` (eslint). `.plate-dark` uses
+`hsl(20 5% 17%)` for its border for that reason.
 
 ## Type
 
-**11px is the floor.** The site previously carried 8px, 9px and 10px labels. At
-those sizes Hebrew loses its distinguishing marks regardless of contrast, and
-the audience skews older.
+Headings: Cormorant Garamond (Latin) falling through to Frank Ruhl Libre
+(Hebrew), weight **400**, `letter-spacing: -0.01em`; use `font-medium` (500)
+for h3/h4-size titles. Body: Lora falling through to Noto Serif Hebrew,
+18px / line-height 1.75. Cormorant and Lora have no Hebrew glyphs, so Hebrew
+and Latin render in different faces by design.
+
+**Labels are 14px (`text-sm`) with no letter-spacing and no `uppercase`** —
+Hebrew has no capitals to track, and the old 11px tracked labels lost the
+letters' distinguishing marks. Above a heading use `<Eyebrow>` (tabular index,
+short gold rule, label). 13px is the floor, for the header tagline only.
 
 Anything a visitor is asked to read and confirm — the consent notice above all —
 is 15px with loose leading. See `AgentChat`'s gate.
+
+## Components
+
+- **Call to action**: always `ctaClass()` / `CtaLink` / `CtaButton`
+  (`primitives/Cta.tsx`). An outline in gold, never a fill; `size="lg"` for the
+  hero, `onDark` for the colophon. Hover is a 12% gold tint, pressed 22%,
+  disabled 45% opacity, 200ms colour-only transitions.
+- **Inputs**: `inputClass()` / `Field` (`primitives/Field.tsx`) - 48px,
+  transparent, hairline; focus border gold plus a 3px 20% halo.
+- **Plates**: `.plate` (6px `--secondary` mat, 1px outline, slight sepia on the
+  image), `.plate-dark` on the colophon. Plates do not zoom (`.lens-hover` is
+  gone), and the header is opaque (`.glass` no longer blurs).
 
 ## Motion
 

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { Link } from "react-router-dom";
 import {
   Accordion,
@@ -95,7 +96,7 @@ export default function FAQPage() {
             {/* Sidebar */}
             <aside className="lg:col-span-4">
               <div className="lg:sticky lg:top-32">
-                <p className="text-[11px] tracking-[0.12em] text-muted-foreground mb-5">
+                <p className="text-sm text-muted-foreground mb-5">
                   ניווט לפי נושא
                 </p>
                 <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
@@ -125,7 +126,7 @@ export default function FAQPage() {
                   </p>
                   <a
                     href="/#start"
-                    className="inline-flex items-center gap-2 px-5 py-3 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors w-full justify-center"
+                    className={ctaClass("w-full")}
                   >
                     יצירת קשר
                   </a>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Loader2, RotateCcw, Send, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { Loader2, RotateCcw, Send, Sparkles, UserRound } from "lucide-react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { AnimatePresence, motion } from "framer-motion";
 import { services } from "@/services";
@@ -18,6 +18,8 @@ import { readHandoff } from "@/lib/interview-handoff";
 import { leadEvents, type ChatMethod } from "@/lib/analytics";
 import ContactChannels from "./ContactChannels";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
+import { inputClass } from "@/components/dorit/primitives/Field";
 
 /**
  * Keeps `tel:` dialable.
@@ -376,14 +378,14 @@ export default function AgentChat({
   // The chat itself. Rendered alone when embedded, or beside the heading
   // column below when the agent is the whole section.
   const panel = (
-    <div className={`${embedded ? "w-full" : "lg:col-span-7"} bg-card border border-border/60 flex flex-col h-[560px]`}>
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border/60 gap-3">
+    <div className={`${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px]`}>
+          <div className="flex items-center justify-between px-6 py-[18px] border-b border-border gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="w-9 h-9 flex items-center justify-center border border-accent/40 text-accent shrink-0">
+              <span className="w-9 h-9 flex items-center justify-center border border-highlight text-accent shrink-0">
                 <Icon size={18} aria-hidden="true" />
               </span>
               <div className="leading-tight min-w-0">
-                <p className="font-heading text-base font-bold truncate">{descriptor.panelTitle}</p>
+                <p className="font-heading text-[22px] font-medium truncate">{descriptor.panelTitle}</p>
                 {/* Wraps rather than truncates. At 390px this was cut to about
                     a third of its width — "עם הסוכן…" — which loses the
                     "עוזר אוטומטי" half, and that half is the disclosure that
@@ -392,7 +394,7 @@ export default function AgentChat({
 
                     The uppercase/letterspacing went with it: neither does
                     anything for Hebrew except loosen it. */}
-                <p className="text-[11px] text-muted-foreground leading-snug">
+                <p className="text-sm text-muted-foreground leading-snug">
                   {descriptor.panelSubtitle} · עוזר אוטומטי
                 </p>
               </div>
@@ -407,19 +409,19 @@ export default function AgentChat({
                 disabled={handingOff || handoffSent}
                 title={HUMAN_HANDOFF.buttonTitle}
                 aria-label={HUMAN_HANDOFF.buttonTitle}
-                className="inline-flex items-center gap-1.5 border border-accent/40 text-accent hover:bg-accent/10 disabled:opacity-40 transition-colors px-3 py-2 text-[13px]"
+                className="inline-flex items-center gap-2 min-h-11 border border-border rounded-md text-foreground hover:border-highlight hover:text-accent disabled:opacity-45 transition-colors duration-200 px-4 text-[15px]"
               >
                 {handingOff ? (
-                  <Loader2 size={14} className="animate-spin" />
+                  <Loader2 size={15} className="animate-spin" />
                 ) : (
-                  <UserRound size={14} />
+                  <UserRound size={15} className="text-accent" />
                 )}
                 {HUMAN_HANDOFF.buttonLabel}
               </button>
               <button
                 onClick={reset}
                 aria-label="התחלה מחדש"
-                className="text-muted-foreground hover:text-accent transition-colors p-2"
+                className="w-11 h-11 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-accent transition-colors duration-200"
               >
                 <RotateCcw size={16} />
               </button>
@@ -443,38 +445,40 @@ export default function AgentChat({
              * always reachable. Nothing hidden, nothing to scroll past.
              */
             <div className="flex-1 min-h-0 flex flex-col">
-              <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-4">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck size={18} className="text-accent mt-0.5 shrink-0" />
-                  <div>
-                    <p className="font-heading text-lg font-bold">{CONSENT.heading}</p>
-                    <p className="text-[14px] text-muted-foreground mt-1 leading-relaxed">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-7 pb-5">
+                <div className="max-w-[820px] flex flex-col gap-[18px]">
+                  <div className="flex flex-col gap-1">
+                    <p className="font-heading text-[22px] font-medium">{CONSENT.heading}</p>
+                    <p className="text-[15px] text-muted-foreground leading-[1.6]">
                       {BOT_DISCLOSURE}
                     </p>
                   </div>
+
+                  {/* 16px and a loose leading: this is the one text on the site a
+                      visitor is asked to confirm they have read, and the audience
+                      skews older. It was 13.5px. The points are numbered, not
+                      dashed — they are four things, in order. */}
+                  <ol className="m-0 p-0 list-none flex flex-col gap-3.5 text-base leading-[1.75] text-foreground/80">
+                    {(descriptor.consentPoints ?? CONSENT.points).map((point, i) => (
+                      <li key={point} className="grid grid-cols-[28px_minmax(0,1fr)] gap-2">
+                        <span className="font-heading text-[19px] text-accent tabular-nums" aria-hidden="true">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ol>
+
+                  <a
+                    href={CONSENT.privacyHref}
+                    className="self-start text-[15px] text-accent underline decoration-highlight/50 underline-offset-4 hover:decoration-highlight"
+                  >
+                    {CONSENT.privacyLinkLabel}
+                  </a>
                 </div>
-
-                {/* 15px and a loose leading: this is the one text on the site a
-                    visitor is asked to confirm they have read, and the audience
-                    skews older. It was 13.5px. */}
-                <ul className="mt-5 space-y-3.5 text-[15px] leading-[1.75] text-foreground/80">
-                  {(descriptor.consentPoints ?? CONSENT.points).map((point) => (
-                    <li key={point} className="flex gap-2.5">
-                      <span className="text-accent shrink-0" aria-hidden="true">—</span>
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <a
-                  href={CONSENT.privacyHref}
-                  className="inline-block mt-4 text-[14px] text-accent hover:underline underline-offset-4"
-                >
-                  {CONSENT.privacyLinkLabel}
-                </a>
               </div>
 
-              <div className="shrink-0 border-t border-border/60 bg-secondary/30 px-6 py-4">
+              <div className="shrink-0 border-t border-border px-6 py-[18px] flex flex-wrap items-center justify-between gap-4">
                 {/* A 44px target, because a 16px checkbox on a phone is a miss
                     waiting to happen. The whole row is the target, not the box
                     alone — and the height is stated rather than inherited from
@@ -485,7 +489,7 @@ export default function AgentChat({
                     type="checkbox"
                     checked={consentChecked}
                     onChange={(e) => setConsentChecked(e.target.checked)}
-                    className="mt-0.5 w-5 h-5 accent-[var(--accent)] shrink-0"
+                    className="mt-0.5 w-5 h-5 accent-highlight shrink-0"
                   />
                   <span>{CONSENT.checkboxLabel}</span>
                 </label>
@@ -493,14 +497,14 @@ export default function AgentChat({
                 <button
                   onClick={acceptConsent}
                   disabled={!consentChecked}
-                  className="mt-3 w-full sm:w-auto px-6 py-3.5 bg-highlight text-primary hover:bg-highlight-strong disabled:opacity-40 disabled:hover:bg-highlight transition-colors text-[15px]"
+                  className={ctaClass("w-full sm:w-auto")}
                 >
                   {CONSENT.startLabel}
                 </button>
               </div>
             </div>
           ) : (
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-4">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-3.5">
               <AnimatePresence initial={false}>
                 {messages.map((m, i) => {
                   const isUser = m.role === "user";
@@ -513,10 +517,10 @@ export default function AgentChat({
                       className={`flex ${isUser ? "justify-start" : "justify-end"}`}
                     >
                       <div
-                        className={`max-w-[85%] px-5 py-3.5 text-[15px] leading-relaxed ${
+                        className={`max-w-[min(85%,640px)] px-[18px] py-3.5 text-base leading-[1.75] rounded-md ${
                           isUser
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary/60 text-foreground border border-border/60"
+                            ? "bg-primary text-primary-foreground rounded-br-none"
+                            : "text-foreground border border-border rounded-bl-none"
                         }`}
                       >
                         {isUser ? (
@@ -538,7 +542,7 @@ export default function AgentChat({
               </AnimatePresence>
               {sending && (
                 <div className="flex justify-end">
-                  <div className="bg-secondary/60 border border-border/60 px-5 py-3.5">
+                  <div className="border border-border rounded-md rounded-bl-none px-[18px] py-3.5">
                     <Loader2 size={16} className="animate-spin text-muted-foreground" />
                   </div>
                 </div>
@@ -547,7 +551,7 @@ export default function AgentChat({
           )}
 
           {handoffOpen ? (
-            <div className="px-5 pb-4 pt-4 border-t border-border/60">
+            <div className="px-5 pb-4 pt-4 border-t border-border">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -557,7 +561,7 @@ export default function AgentChat({
                 // and so a test can address its "שם"/"טלפון" rather than the
                 // contact form's, which sits in the same section.
                 aria-label={HUMAN_HANDOFF.buttonTitle}
-                className="border border-accent/40 bg-secondary/30 px-5 py-4"
+                className="border border-border rounded-md px-5 py-4"
               >
                 <p className="text-[14px] leading-relaxed mb-3">{HUMAN_HANDOFF.prompt}</p>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -568,7 +572,7 @@ export default function AgentChat({
                       onChange={(e) => setHandoffName(e.target.value)}
                       placeholder={HUMAN_HANDOFF.namePlaceholder}
                       autoComplete="name"
-                      className="mt-1 w-full border border-border bg-background px-3 py-2 text-[15px] text-foreground"
+                      className={inputClass("mt-1 min-h-11 px-3 py-2 text-[15px]")}
                     />
                   </label>
                   <label className="flex-1 text-[12px] text-muted-foreground">
@@ -584,7 +588,7 @@ export default function AgentChat({
                       placeholder={HUMAN_HANDOFF.phonePlaceholder}
                       autoComplete="tel"
                       aria-invalid={handoffError ? true : undefined}
-                      className="mt-1 w-full border border-border bg-background px-3 py-2 text-[15px] text-foreground text-right"
+                      className={inputClass("mt-1 min-h-11 px-3 py-2 text-[15px] text-right")}
                     />
                   </label>
                 </div>
@@ -597,7 +601,7 @@ export default function AgentChat({
                   <button
                     type="submit"
                     disabled={handingOff}
-                    className="inline-flex items-center gap-1.5 bg-accent text-accent-foreground disabled:opacity-40 px-4 py-2 text-[14px]"
+                    className={ctaClass("gap-1.5 min-h-0 px-4 py-2 text-[14px]")}
                   >
                     {handingOff ? <Loader2 size={14} className="animate-spin" /> : null}
                     {HUMAN_HANDOFF.submitLabel}
@@ -615,8 +619,8 @@ export default function AgentChat({
           ) : null}
 
           {handoffNotice ? (
-            <div className="px-5 pb-4 pt-4 border-t border-border/60">
-              <div className="border border-accent/40 bg-secondary/40 px-5 py-4 text-[14px] leading-relaxed">
+            <div className="px-5 pb-4 pt-4 border-t border-border">
+              <div className="border border-border rounded-md px-5 py-4 text-[14px] leading-relaxed">
                 <p className="text-[15px] leading-relaxed text-foreground mb-3">
                   {handoffNotice.message}
                 </p>
@@ -626,7 +630,7 @@ export default function AgentChat({
             </div>
           ) : null}
 
-          <div className="px-4 py-4 border-t border-border/60">
+          <div className="px-5 py-4 border-t border-border">
             <div className="flex items-end gap-2">
               <textarea
                 aria-label={descriptor.inputLabel}
@@ -642,18 +646,18 @@ export default function AgentChat({
                 maxLength={MAX_MESSAGE_CHARS}
                 disabled={!started}
                 placeholder={started ? "כתבו כאן…" : "יש לאשר את ההסכמה כדי להתחיל"}
-                className="flex-1 bg-background border border-border px-4 py-3 text-base resize-none focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors max-h-32 disabled:opacity-50"
+                className={inputClass("flex-1 w-auto text-[17px] resize-none max-h-32 disabled:opacity-45")}
               />
               <button
                 onClick={send}
                 disabled={!started || !input.trim() || sending}
-                className="inline-flex items-center justify-center w-12 h-12 bg-highlight text-primary hover:bg-highlight-strong disabled:opacity-40 disabled:hover:bg-highlight transition-colors shrink-0"
+                className={ctaClass("w-12 h-12 min-h-0 px-0 shrink-0 text-accent")}
                 aria-label="שליחה"
               >
                 <Send size={18} />
               </button>
             </div>
-            <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
+            <p className="mt-2.5 text-sm leading-[1.6] text-muted-foreground">
               {CHAT_DISCLAIMER}
             </p>
           </div>
@@ -669,7 +673,7 @@ export default function AgentChat({
           <Eyebrow>
             {descriptor.eyebrow}
           </Eyebrow>
-          <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
+          <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-5 leading-[1.12]">
             {line1?.trim()}
             {line2 ? (
               <>
@@ -680,34 +684,34 @@ export default function AgentChat({
           </h2>
           <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">{descriptor.blurb}</p>
           <div className="mt-8 flex items-start gap-3 text-sm text-muted-foreground">
-            <Sparkles size={18} className="text-highlight mt-0.5 shrink-0" />
+            <Sparkles size={18} strokeWidth={1.5} className="text-highlight mt-0.5 shrink-0" />
             <p className="leading-relaxed">{descriptor.note}</p>
           </div>
 
           {descriptor.tagline ? (
-            <p className="mt-8 border-r-2 border-accent pr-4 font-heading text-[17px] leading-relaxed text-foreground/85">
+            <p className="mt-8 border-r border-highlight pr-[18px] font-heading text-[21px] leading-[1.6]">
               {descriptor.tagline}
             </p>
           ) : null}
 
           {descriptor.guardrails ? (
-            <div className="mt-6 border border-border/60 bg-secondary/30 px-5 py-5">
-              <p className="text-[11px] tracking-[0.12em] text-accent">כללי הגדר</p>
-              <dl className="mt-4 space-y-3.5 text-[13.5px] leading-relaxed">
+            <div className="mt-6 border-t border-border pt-[18px]">
+              <p className="text-sm text-accent">כללי הגדר</p>
+              <dl className="mt-4 space-y-3.5 text-[15px] leading-[1.7]">
                 <div>
-                  <dt className="text-muted-foreground">מה הוא עושה</dt>
+                  <dt className="text-sm text-accent">מה הוא עושה</dt>
                   <dd className="text-foreground/80">
                     {descriptor.guardrails.allowed.join(" · ")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">מה הוא לא עושה</dt>
+                  <dt className="text-sm text-accent">מה הוא לא עושה</dt>
                   <dd className="text-foreground/80">
                     {descriptor.guardrails.forbidden.join(" · ")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">מתי עובר לאדם</dt>
+                  <dt className="text-sm text-accent">מתי עובר לאדם</dt>
                   <dd className="text-foreground/80">{descriptor.guardrails.handoff}</dd>
                 </div>
               </dl>

@@ -208,7 +208,7 @@ export default function Blog() {
                     to={`/blog/${p.id}`}
                     className="group flex flex-col bg-card border border-border/60 overflow-hidden hover:border-accent transition-colors"
                   >
-                    <div className="h-48 overflow-hidden lens-hover bg-secondary">
+                    <div className="h-48 overflow-hidden bg-secondary">
                       {p.image_url ? (
                         <Image
                           src={p.image_url}
@@ -223,7 +223,7 @@ export default function Blog() {
                       )}
                     </div>
                     <div className="p-6 flex flex-col flex-1">
-                      <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {new Date(p.created_date).toLocaleDateString("he-IL", {
                           day: "numeric",
                           month: "long",
@@ -247,7 +247,7 @@ export default function Blog() {
                             .map((t) => (
                               <span
                                 key={t}
-                                className="text-[11px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground"
+                                className="text-sm px-2 py-0.5 border border-border text-muted-foreground"
                               >
                                 {t}
                               </span>

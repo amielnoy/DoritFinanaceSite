@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
 import { useAuth } from "@/lib/AuthContext";
 import { useSectionNav } from "@/hooks/useSectionNav";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 
 interface NavItem {
   label: string;
@@ -37,8 +38,10 @@ const NAV: NavItem[] = [
   { label: "שאלות ותשובות", href: "/faq", route: true },
 ];
 
+const NAV_LINK =
+  "text-[15px] py-2.5 text-foreground border-b border-transparent hover:text-accent hover:border-highlight transition-colors duration-200";
+
 export default function FloatingHeader() {
-  const [scrolled, setScrolled] = useState<boolean>(false);
   const [open, setOpen] = useState<boolean>(false);
   const navigateToSection = useSectionNav();
   const { isAuthenticated, user, logout } = useAuth();
@@ -63,12 +66,6 @@ export default function FloatingHeader() {
   };
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
       const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -81,74 +78,31 @@ export default function FloatingHeader() {
   }, [open]);
 
   return (
-    <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
-        scrolled ? "glass border-b border-border/60 py-3" : "py-6 bg-transparent"
-      }`}
-    >
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 flex items-center justify-between">
+    <header className="fixed top-0 inset-x-0 z-50 bg-background border-b border-border">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-4 flex items-center justify-between gap-6">
         <a
           href="/#top"
           onClick={(e) => goToSection(e, "#top")}
           className="flex items-center gap-3 leading-none"
         >
-          <span className="hidden sm:flex w-9 h-9 items-center justify-center border border-accent/40 font-heading text-base text-accent">
+          <span className="hidden sm:flex w-[38px] h-[38px] shrink-0 items-center justify-center border border-highlight font-heading text-[19px] text-accent">
             ד
           </span>
           <span className="flex flex-col leading-none">
-            <span className="font-heading text-xl md:text-2xl font-bold tracking-tight">
+            <span className="font-heading text-xl md:text-[23px] font-medium">
               דורית גוב ארי
             </span>
-            <span className="text-[11px] md:text-[11px] tracking-[0.3em] uppercase text-muted-foreground mt-1">
+            <span className="text-[13px] text-muted-foreground mt-1">
               התכנון שלי — השקט שלך
             </span>
           </span>
         </a>
 
-        <nav className="hidden md:flex items-center gap-7 lg:gap-9 whitespace-nowrap">
-          {NAV.map((n) =>
-            n.route ? (
-              <Link
-                key={n.href}
-                to={n.href}
-                className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 relative group py-1"
-              >
-                {n.label}
-                <span className="absolute -bottom-0.5 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
-              </Link>
-            ) : (
-              <a
-                key={n.href}
-                href={`/${n.href}`}
-                onClick={(e) => goToSection(e, n.href)}
-                className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 relative group py-1"
-              >
-                {n.label}
-                <span className="absolute -bottom-0.5 right-0 w-0 h-px bg-accent group-hover:w-full transition-all duration-300" />
-              </a>
-            )
-          )}
-          {isAuthenticated ? (
-            <Link to="/account" className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">האזור שלי</Link>
-          ) : null}
-          {isAuthenticated && user?.role === "admin" ? (
-            <>
-              <Link to="/admin/leads" className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">ניהול פניות</Link>
-              <Link to="/admin/blog" className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">ניהול בלוג</Link>
-            </>
-          ) : null}
-          {isAuthenticated ? (
-            <button type="button" onClick={signOut} className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">
-              יציאה
-            </button>
-          ) : null}
-        </nav>
-
         <div className="flex items-center gap-2.5">
           <a
             href="/#start"
             onClick={(e) => goToSection(e, "#start")}
-            className="hidden md:inline-flex items-center px-5 py-2.5 bg-highlight-muted text-primary text-[13px] font-medium tracking-wide hover:bg-highlight-strong transition-colors duration-300"
+            className={ctaClass("hidden md:inline-flex min-h-11 px-5 text-[17px]")}
           >
             לשיחה קצרה עם דורית
           </a>
@@ -160,9 +114,9 @@ export default function FloatingHeader() {
           <a
             href={`tel:${CONTACT.phoneE164}`}
             aria-label="התקשרות לדורית גוב ארי"
-            className="hidden md:inline-flex items-center gap-2 px-4 py-2.5 border border-muted-foreground/60 text-[13px] font-medium hover:border-accent hover:text-accent transition-colors duration-300"
+            className="hidden md:inline-flex items-center gap-2 min-h-11 px-4 border border-border rounded-md text-[15px] text-foreground hover:bg-foreground/[0.06] transition-colors duration-200"
           >
-            <Phone size={15} className="text-muted-foreground" />
+            <Phone size={15} className="text-accent" />
             <span dir="ltr">{CONTACT.phoneDisplay}</span>
           </a>
           <button
@@ -176,11 +130,47 @@ export default function FloatingHeader() {
         </div>
       </div>
 
+      {/* Second masthead row: the navigation. Links underline in gold on hover. */}
+      <nav className="hidden md:block border-t border-border/60">
+        <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] flex flex-wrap items-center gap-x-7 whitespace-nowrap">
+          {NAV.map((n) =>
+            n.route ? (
+              <Link key={n.href} to={n.href} className={NAV_LINK}>
+                {n.label}
+              </Link>
+            ) : (
+              <a
+                key={n.href}
+                href={`/${n.href}`}
+                onClick={(e) => goToSection(e, n.href)}
+                className={NAV_LINK}
+              >
+                {n.label}
+              </a>
+            )
+          )}
+          {isAuthenticated ? (
+            <Link to="/account" className={NAV_LINK}>האזור שלי</Link>
+          ) : null}
+          {isAuthenticated && user?.role === "admin" ? (
+            <>
+              <Link to="/admin/leads" className={NAV_LINK}>ניהול פניות</Link>
+              <Link to="/admin/blog" className={NAV_LINK}>ניהול בלוג</Link>
+            </>
+          ) : null}
+          {isAuthenticated ? (
+            <button type="button" onClick={signOut} className={NAV_LINK}>
+              יציאה
+            </button>
+          ) : null}
+        </div>
+      </nav>
+
       <AnimatePresence>
         {open && (
           <>
             <motion.div
-              className="md:hidden fixed inset-0 z-[60] bg-primary/40 backdrop-blur-sm"
+              className="md:hidden fixed inset-0 z-[60] bg-primary/40"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -188,18 +178,18 @@ export default function FloatingHeader() {
               onClick={() => setOpen(false)}
             />
             <motion.div
-              className="md:hidden fixed top-0 right-0 bottom-0 z-[70] w-[86%] max-w-sm bg-background shadow-2xl flex flex-col"
+              className="md:hidden fixed top-0 right-0 bottom-0 z-[70] w-[86%] max-w-sm bg-background border-l border-border flex flex-col"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="flex items-center justify-between px-6 py-5 border-b border-border/60">
-                <span className="font-heading text-lg font-bold">תפריט</span>
+                <span className="font-heading text-lg font-medium">תפריט</span>
                 <button
                   onClick={() => setOpen(false)}
                   aria-label="סגירת תפריט"
-                  className="w-10 h-10 flex items-center justify-center border border-border hover:border-accent hover:text-accent transition-colors"
+                  className="w-11 h-11 flex items-center justify-center border border-border rounded-md hover:border-highlight hover:text-accent transition-colors duration-200"
                 >
                   <X size={20} />
                 </button>
@@ -212,7 +202,7 @@ export default function FloatingHeader() {
                       key={n.href}
                       to={n.href}
                       onClick={() => setOpen(false)}
-                      className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors"
+                      className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"
                     >
                       <span>{n.label}</span>
                       <ChevronLeft size={18} className="text-muted-foreground" />
@@ -222,7 +212,7 @@ export default function FloatingHeader() {
                       key={n.href}
                       href={`/${n.href}`}
                       onClick={(e) => goToSection(e, n.href)}
-                      className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors"
+                      className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"
                     >
                       <span>{n.label}</span>
                       <ChevronLeft size={18} className="text-muted-foreground" />
@@ -230,16 +220,16 @@ export default function FloatingHeader() {
                   )
                 )}
           {isAuthenticated ? (
-            <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors" onClick={() => setOpen(false)}><span>האזור שלי</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+            <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>האזור שלי</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
           ) : null}
           {isAuthenticated && user?.role === "admin" ? (
             <>
-              <Link to="/admin/leads" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors" onClick={() => setOpen(false)}><span>ניהול פניות</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
-              <Link to="/admin/blog" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors" onClick={() => setOpen(false)}><span>ניהול בלוג</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+              <Link to="/admin/leads" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול פניות</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+              <Link to="/admin/blog" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול בלוג</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
             </>
           ) : null}
           {isAuthenticated ? (
-            <button type="button" onClick={signOut} className="w-full flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors text-start">
+            <button type="button" onClick={signOut} className="w-full flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200 text-start">
               <span>יציאה</span>
             </button>
           ) : null}
@@ -249,7 +239,7 @@ export default function FloatingHeader() {
                 <a
                   href="/#start"
                   onClick={(e) => goToSection(e, "#start")}
-                  className="flex items-center justify-center gap-2 w-full py-3.5 bg-highlight text-primary font-medium"
+                  className={ctaClass("flex w-full")}
                 >
                   <Calendar size={18} />
                   לשיחה קצרה עם דורית
@@ -257,7 +247,7 @@ export default function FloatingHeader() {
                 <div className="grid grid-cols-2 gap-3">
                   <a
                     href={`tel:${CONTACT.phoneE164}`}
-                    className="flex items-center justify-center gap-2 py-3 border border-border text-sm font-medium hover:border-accent hover:text-accent transition-colors"
+                    className="flex items-center justify-center gap-2 min-h-12 border border-border rounded-md text-[15px] hover:border-highlight hover:bg-highlight/5 transition-colors duration-200"
                   >
                     <Phone size={16} />
                     חייגו
@@ -266,7 +256,7 @@ export default function FloatingHeader() {
                     href={`https://wa.me/${CONTACT.whatsapp}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 py-3 border border-border text-sm font-medium hover:border-accent hover:text-accent transition-colors"
+                    className="flex items-center justify-center gap-2 min-h-12 border border-border rounded-md text-[15px] hover:border-highlight hover:bg-highlight/5 transition-colors duration-200"
                   >
                     <MessageCircle size={16} />
                     WhatsApp

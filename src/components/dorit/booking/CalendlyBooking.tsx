@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { CalendarClock, Loader2 } from "lucide-react";
 
 // החלף/י בכתובת השיבוץ שלך ב-Calendly (לדוגמה: https://calendly.com/dorit-gov-ari/30min)
@@ -46,7 +47,7 @@ export default function CalendlyBooking() {
   return (
     <button
       onClick={open}
-      className="inline-flex items-center gap-3 px-7 py-4 bg-highlight text-primary font-heading text-lg hover:bg-highlight-strong transition-colors"
+      className={ctaClass("gap-3")}
     >
       {ready ? <CalendarClock size={20} /> : <Loader2 size={20} className="animate-spin" />}
       קביעת שיחה ביומן

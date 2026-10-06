@@ -81,39 +81,37 @@ export default function ProofCarousel() {
   };
 
   return (
-    <section id="proof" className="relative py-24 md:py-32 overflow-hidden">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-          <div>
-            <Reveal>
-              <Eyebrow>
-                04 · מקרים מהשטח
-              </Eyebrow>
-              <h2 className="font-heading text-5xl md:text-6xl mt-4">
-                תיקי הצלחה
-              </h2>
-              <p className="mt-5 text-sm text-foreground/70 max-w-xl">
-                תוצאות עבר אינן מבטיחות תוצאות דומות — כל מקרה תלוי בנתונים
-                האישיים.
-              </p>
-            </Reveal>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scroll(1)}
-              className="w-11 h-11 border border-border/60 flex items-center justify-center hover:border-highlight-muted hover:text-accent transition-colors duration-300"
-              aria-label="הבא"
-            >
-              <ArrowRight size={18} />
-            </button>
-            <button
-              onClick={() => scroll(-1)}
-              className="w-11 h-11 border border-border/60 flex items-center justify-center hover:border-highlight-muted hover:text-accent transition-colors duration-300"
-              aria-label="הקודם"
-            >
-              <ArrowLeft size={18} />
-            </button>
-          </div>
+    <section id="proof" className="relative border-b border-border overflow-hidden">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] pt-[clamp(72px,9vw,120px)] pb-10 flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <Reveal>
+            <Eyebrow>
+              04 · מקרים מהשטח
+            </Eyebrow>
+            <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px]">
+              תיקי הצלחה
+            </h2>
+            <p className="mt-[18px] text-[15px] text-muted-foreground max-w-xl">
+              תוצאות עבר אינן מבטיחות תוצאות דומות — כל מקרה תלוי בנתונים
+              האישיים.
+            </p>
+          </Reveal>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => scroll(1)}
+            className={ARROW}
+            aria-label="הבא"
+          >
+            <ArrowRight size={18} strokeWidth={1.5} />
+          </button>
+          <button
+            onClick={() => scroll(-1)}
+            className={ARROW}
+            aria-label="הקודם"
+          >
+            <ArrowLeft size={18} strokeWidth={1.5} />
+          </button>
         </div>
       </div>
 
@@ -124,46 +122,47 @@ export default function ProofCarousel() {
         tabIndex={0}
         role="region"
         aria-label="תיקי הצלחה — גלילה אופקית"
-        className="flex gap-6 overflow-x-auto px-6 md:px-10 pb-6 snap-x snap-mandatory scroll-pl-6 [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex gap-5 overflow-x-auto px-[clamp(20px,4vw,40px)] pb-[clamp(72px,9vw,120px)] snap-x snap-mandatory [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight"
         style={{ scrollbarWidth: "none" }}
       >
-        <div className="shrink-0 w-4 md:w-10" />
         {BRIEFS.map((b, i) => (
           <article
             key={i}
-            className="snap-start shrink-0 w-[340px] md:w-[400px] bg-card border border-border/50 p-8 md:p-10 flex flex-col group hover:border-highlight-muted/40 transition-colors duration-300"
+            className="snap-start shrink-0 w-[min(84vw,400px)] rounded-md border border-border hover:border-highlight p-8 flex flex-col gap-4 transition-colors duration-200"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] tracking-[0.12em] text-accent">
+              <span className="text-sm px-2.5 py-0.5 rounded-sm bg-[hsl(33_100%_95%)] text-[hsl(37_80%_20%)]">
                 {b.tag}
               </span>
-              <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
+              <span className="font-heading text-xl tabular-nums text-muted-foreground">
                 0{i + 1}
               </span>
             </div>
-            <h3 className="font-heading text-2xl md:text-3xl mt-4 leading-snug">
+            <h3 className="font-heading font-medium text-[26px] leading-[1.3]">
               {b.title}
             </h3>
-            <p className="mt-5 text-foreground/70 leading-relaxed flex-1">
+            <p className="text-base leading-[1.75] text-foreground/80 flex-1">
               {b.body}
             </p>
-            <div className="mt-8 pt-6 border-t border-border/50 flex items-center justify-between">
-              <span>
-                <span className="block font-heading text-3xl md:text-4xl text-highlight-ink leading-none">
+            <div className="pt-[18px] border-t border-border flex items-center justify-between">
+              <span className="flex flex-col gap-1.5">
+                <span className="block font-heading text-[32px] text-accent leading-[1.1]">
                   {b.metric}
                 </span>
                 {b.basis ? (
-                  <span className="block mt-2 text-[12px] text-muted-foreground">{b.basis}</span>
+                  <span className="block text-[13px] text-muted-foreground">{b.basis}</span>
                 ) : null}
               </span>
-              <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 מקרה 0{i + 1}
               </span>
             </div>
           </article>
         ))}
-        <div className="shrink-0 w-4 md:w-10" />
       </div>
     </section>
   );
 }
+
+const ARROW =
+  "w-12 h-12 rounded-md border border-border flex items-center justify-center text-foreground hover:border-highlight hover:text-accent transition-colors duration-200";

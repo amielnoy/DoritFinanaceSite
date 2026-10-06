@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Calculator, Heart, Landmark, HeartHandshake, TrendingDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
@@ -64,88 +64,54 @@ const PILLARS: Pillar[] = [
 ];
 
 export default function ServiceMatrix() {
-  const [active, setActive] = useState<number | null>(null);
-
   return (
-    <section
-      id="services"
-      className="relative py-24 md:py-32 transition-colors duration-500"
-      style={{
-        backgroundColor:
-          active !== null ? "hsl(30 30% 94%)" : undefined,
-      }}
-    >
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
+    <section id="services" className="relative border-b border-border">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-14">
+        <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <Reveal>
               <Eyebrow>
                 02 · תחומי הליווי
               </Eyebrow>
-              <h2 className="font-heading text-5xl md:text-6xl mt-4 max-w-xl">
+              <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px] max-w-xl">
                 חמישה עמודי התכנון
               </h2>
             </Reveal>
           </div>
-          <p className="max-w-sm text-foreground/70">
+          <p className="max-w-[420px] text-lg leading-[1.75] text-muted-foreground">
             רוב הכסף שלכם כבר מופקד במקום כלשהו — פנסיה, גמל, השתלמות. כאן בודקים
             מה יש, מה הוא עולה, ומה הוא אמור לעשות עבורכם.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-border/50 border border-border/50">
+        <div className="border-t border-foreground">
           {PILLARS.map((p, i) => {
             const Icon = p.icon;
-            const isActive = active === i;
             return (
               <div
                 key={i}
-                onMouseEnter={() => setActive(i)}
-                onMouseLeave={() => setActive(null)}
-                className={`group relative bg-background p-10 md:p-12 transition-all duration-500 cursor-default overflow-hidden ${
-                  isActive ? "bg-secondary/50" : ""
-                }`}
+                className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-x-12 gap-y-3 py-8 border-b border-border transition-colors duration-200 hover:bg-highlight/5"
               >
-                {isActive && (
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-highlight-muted/5 rounded-bl-full pointer-events-none" />
-                )}
-                <div className="flex items-start justify-between mb-8">
-                  <div className={`w-12 h-12 flex items-center justify-center border transition-all duration-500 ${
-                    isActive ? "border-highlight-muted bg-highlight-muted/10" : "border-border/60 bg-secondary/40"
-                  }`}>
-                    <Icon
-                      size={24}
-                      className={`transition-colors duration-500 ${
-                        isActive ? "text-highlight-ink" : "text-accent"
-                      }`}
-                      strokeWidth={1.25}
-                    />
-                  </div>
-                  <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
-                    0{i + 1}
+                <div className="flex items-start gap-6">
+                  <span className="font-heading text-[32px] leading-none text-accent tabular-nums w-10 shrink-0">
+                    {String(i + 1).padStart(2, "0")}
                   </span>
+                  <Icon size={26} strokeWidth={1.25} className="text-highlight shrink-0 mt-0.5" aria-hidden="true" />
+                  <div className="flex flex-col gap-1">
+                    <h3 className="font-heading font-medium text-[clamp(24px,2.4vw,30px)] leading-[1.2]">
+                      {p.title}
+                    </h3>
+                    <p dir="ltr" className="self-start font-heading italic text-lg text-muted-foreground">
+                      {p.sub}
+                    </p>
+                  </div>
                 </div>
-                <h3 className="font-heading text-2xl md:text-3xl mb-2">
-                  {p.title}
-                </h3>
-                <p className="text-[11px] tracking-[0.12em] text-accent mb-5">
-                  {p.sub}
-                </p>
-                {/* The height animates; the ink does not. `text-foreground/70`
-                    under `opacity-80` was a fade on top of a fade — it measured
-                    3.98:1, and neither class looked wrong on its own. */}
-                <p
-                  className={`text-muted-foreground leading-relaxed transition-all duration-500 ${
-                    isActive ? "max-h-40" : "max-h-20"
-                  } overflow-hidden`}
-                >
+                {/* Always visible. The ink is `text-foreground/80`, set once and
+                    left alone: a fade stacked on a fade measured 3.98:1 here
+                    once, and neither class looked wrong on its own. */}
+                <p className="max-w-[560px] text-lg leading-[1.75] text-foreground/80">
                   {p.desc}
                 </p>
-                <div
-                  className={`mt-8 h-px bg-highlight-muted transition-all duration-500 ${
-                    isActive ? "w-16" : "w-0"
-                  }`}
-                />
               </div>
             );
           })}
