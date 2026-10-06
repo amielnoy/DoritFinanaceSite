@@ -87,6 +87,24 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-RVW-002 | "renders without crashing when the backend returns nothing" | No throw on an empty list |
 | CMP-RVW-003 | "survives a backend error without throwing" | No throw when `list` rejects |
 
+### 4.7 `<Account />` — the personal area
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ACC-001 | "shows who is signed in" | Name and email of the signed-in user appear |
+| CMP-ACC-002 | "says so when there are no enquiries, and why some may be missing" | One "עוד אין כאן פניות" and the note on mail-less or other-address enquiries |
+| CMP-ACC-003 | "shows a meeting with its status" | "ביומן" for an entry in the calendar, "ממתינה לאישור דורית" for one not yet |
+| CMP-ACC-004 | "shows the interview's answers with the mail's labels" | Profile labels and values rendered as text |
+| CMP-ACC-005 | "marks a partial interview as not finished" | "לא הושלם" shown |
+| CMP-ACC-006 | "renders an old enquiry with no stored answers" | The summary-not-saved note instead of an empty block |
+| CMP-ACC-007 | "explains an unverified address instead of an empty list" | The unverified-address explanation, no lists |
+| CMP-ACC-008 | "shows the rid when loading fails, and keeps the rest of the page" | The rid is shown; the signed-in details remain |
+| CMP-ACC-009 | "sends a visitor whose session ended back to sign in" | The login screen is rendered; the page is gone |
+| CMP-ACC-010 | "renders an enquiry with no stored date without printing an invalid date" | `createdAt: ""` prints no "Invalid Date" |
+| CMP-ACC-011 | "gives an interview-only visitor an empty meetings line, not a second empty-page notice" | "אין כאן פגישות" shown; "עוד אין כאן פניות" absent |
+| CMP-ACC-012 | "gives a meeting-only visitor an empty interviews line" | "אין כאן סיכומי היכרות" shown |
+| CMP-ACC-013 | "links to the privacy rights" | Link to `/privacy` for access, correction or deletion |
+
 ## 5. Pass criteria
 
 All 24 cases pass. A `submitLead` or `submitClaim` payload assertion failing

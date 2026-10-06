@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
+import { useAuth } from "@/lib/AuthContext";
 import { useSectionNav } from "@/hooks/useSectionNav";
 
 interface NavItem {
@@ -40,6 +41,7 @@ export default function FloatingHeader() {
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [open, setOpen] = useState<boolean>(false);
   const navigateToSection = useSectionNav();
+  const { isAuthenticated, user } = useAuth();
 
   /**
    * Anchors here name sections that live only on the home page, and this header
@@ -120,6 +122,12 @@ export default function FloatingHeader() {
               </a>
             )
           )}
+          {isAuthenticated ? (
+            <Link to="/account" className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">האזור שלי</Link>
+          ) : null}
+          {isAuthenticated && user?.role === "admin" ? (
+            <Link to="/admin/leads" className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">ניהול</Link>
+          ) : null}
         </nav>
 
         <div className="flex items-center gap-2.5">
@@ -207,6 +215,12 @@ export default function FloatingHeader() {
                     </a>
                   )
                 )}
+          {isAuthenticated ? (
+            <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors" onClick={() => setOpen(false)}><span>האזור שלי</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+          ) : null}
+          {isAuthenticated && user?.role === "admin" ? (
+            <Link to="/admin/leads" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors" onClick={() => setOpen(false)}><span>ניהול</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+          ) : null}
               </nav>
 
               <div className="px-6 py-5 border-t border-border/60 space-y-3">

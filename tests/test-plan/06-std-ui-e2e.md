@@ -154,6 +154,16 @@ its transcript while showing the interview's notice would look entirely correct
 consent to processing that does not happen is not consent to the processing that
 does.
 
+### 3.9 Personal area — `account.spec.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| E2E-ACC-001 | "bounces an anonymous visitor to login, and back afterwards" | `/account` without a session ends on `/login` |
+
+The signed-in path is covered by the component cases CMP-ACC-*: the e2e fixture
+answers `/entities/User/me` with 401 unconditionally and has no session path.
+Giving it one is a separate change.
+
 ## 4. Pass criteria
 
 Every case passes on all four platforms. `E2E-DSK-*` runs only on the two
