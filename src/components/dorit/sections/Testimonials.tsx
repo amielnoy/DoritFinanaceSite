@@ -9,6 +9,7 @@ import Reveal from "@/components/dorit/primitives/Reveal";
 import Stars from "@/components/dorit/primitives/Stars";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
+import { inputClass } from "@/components/dorit/primitives/Field";
 
 type TestimonialItem = Testimonial;
 
@@ -80,21 +81,21 @@ export default function Testimonials() {
   const remove = (id: string) => removeTestimonial.mutate(id);
 
   return (
-    <section id="testimonials" className="relative py-24 md:py-32 border-t border-border/50 bg-secondary/30">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
+    <section id="testimonials" className="relative bg-secondary border-b border-border">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-10">
+        <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <Reveal>
               <Eyebrow>
                 05 · לקוחות מספרים
               </Eyebrow>
-              <h2 className="font-heading text-5xl md:text-6xl mt-4">לקוחות מספרים</h2>
+              <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px]">לקוחות מספרים</h2>
             </Reveal>
           </div>
           {isAuthenticated && (
             <button
               onClick={() => setOpen((v) => !v)}
-              className="inline-flex items-center gap-2 px-6 py-3 border border-border hover:bg-primary hover:text-primary-foreground transition-colors text-sm"
+              className={ctaClass("text-[15px]", { muted: true })}
             >
               {open ? <X size={16} /> : <Plus size={16} />}
               {open ? "סגירת טופס" : "הוספת המלצה"}
@@ -104,19 +105,19 @@ export default function Testimonials() {
 
         {/* Add form */}
         {isAuthenticated && open && (
-          <div className="mb-12 bg-card border border-border/60 p-6 md:p-8">
+          <div className="border border-border rounded-md p-6 md:p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="md:col-span-1">
-                <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+                <label className="block text-[15px] text-foreground/80 mb-1.5">
                   תמונת הממליץ/ה
                 </label>
-                <label className="relative flex items-center justify-center h-44 border border-dashed border-border cursor-pointer hover:border-accent transition-colors overflow-hidden">
+                <label className="relative flex items-center justify-center h-44 border border-dashed border-border cursor-pointer rounded-md hover:border-highlight transition-colors duration-200 overflow-hidden">
                   {preview ? (
                     <img src={preview} alt="תצוגה מקדימה" className="w-full h-full object-cover" />
                   ) : (
                     <span className="flex flex-col items-center gap-2 text-muted-foreground">
                       <Upload size={22} />
-                      <span className="text-xs">בחר/י תמונה</span>
+                      <span className="text-sm">בחר/י תמונה</span>
                     </span>
                   )}
                   <input type="file" accept="image/*" onChange={onFile} className="absolute inset-0 opacity-0 cursor-pointer" />
@@ -124,37 +125,37 @@ export default function Testimonials() {
               </div>
               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5 content-start">
                 <div>
-                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">שם מלא *</label>
+                  <label className="block text-[15px] text-foreground/80 mb-1.5">שם מלא *</label>
                   <input
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors"
+                    className={inputClass()}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">הקשר</label>
+                  <label className="block text-[15px] text-foreground/80 mb-1.5">הקשר</label>
                   <input
                     value={form.role}
                     onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
                     placeholder="לקוחה מאז 2019"
-                    className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors"
+                    className={inputClass()}
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">ציטוט *</label>
+                  <label className="block text-[15px] text-foreground/80 mb-1.5">ציטוט *</label>
                   <textarea
                     value={form.quote}
                     onChange={(e) => setForm((f) => ({ ...f, quote: e.target.value }))}
                     rows={3}
-                    className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors resize-none"
+                    className={inputClass("resize-none")}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">דירוג</label>
+                  <label className="block text-[15px] text-foreground/80 mb-1.5">דירוג</label>
                   <select
                     value={form.rating}
                     onChange={(e) => setForm((f) => ({ ...f, rating: Number(e.target.value) }))}
-                    className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors"
+                    className={inputClass()}
                   >
                     {[5, 4, 3, 2, 1].map((r) => (
                       <option key={r} value={r}>{r} כוכבים</option>
@@ -162,11 +163,11 @@ export default function Testimonials() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">מקור חוות דעת</label>
+                  <label className="block text-[15px] text-foreground/80 mb-1.5">מקור חוות דעת</label>
                   <select
                     value={form.source}
                     onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
-                    className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors"
+                    className={inputClass()}
                   >
                     <option value="google">Google</option>
                     <option value="midrag">Midrag</option>
@@ -193,16 +194,16 @@ export default function Testimonials() {
             <Loader2 className="animate-spin text-accent" />
           </div>
         ) : !items || items.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-border">
-            <Quote size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
-            <p className="text-muted-foreground">
+          <div className="border-y border-border py-14 px-6 flex flex-col items-center gap-3 text-center">
+            <span aria-hidden="true" className="font-heading text-[64px] leading-[0.6] text-highlight">”</span>
+            <p className="text-[17px] text-muted-foreground">
               {isAuthenticated ? "עדיין אין המלצות — הוספ/י את הראשונה." : "בקרוב יעלו כאן המלצות הלקוחות."}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {items.map((t) => (
-              <article key={t.id} className="group relative bg-card border border-border/60 p-7 flex flex-col">
+              <article key={t.id} className="group relative rounded-md border border-border p-7 flex flex-col">
                 {isAuthenticated && (
                   <button
                     onClick={() => remove(t.id)}
@@ -224,7 +225,7 @@ export default function Testimonials() {
                   </div>
                   <div>
                     <p className="font-heading text-lg leading-tight">{t.name}</p>
-                    {t.role && <p className="text-xs tracking-[0.1em] uppercase text-muted-foreground mt-1">{t.role}</p>}
+                    {t.role && <p className="text-sm text-muted-foreground mt-1">{t.role}</p>}
                     <div className="flex items-center gap-2 mt-2">
                       {t.rating ? <Stars value={t.rating} /> : null}
                       {t.source && (

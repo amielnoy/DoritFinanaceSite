@@ -9,8 +9,10 @@ export const AccordionItem: React.ForwardRefExoticComponent<
 >;
 
 export const AccordionTrigger: React.ForwardRefExoticComponent<
-  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> &
-    React.RefAttributes<React.ElementRef<typeof AccordionPrimitive.Trigger>>
+  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> & {
+    /** Replaces the default chevron. */
+    icon?: React.ReactNode;
+  } & React.RefAttributes<React.ElementRef<typeof AccordionPrimitive.Trigger>>
 >;
 
 export const AccordionContent: React.ForwardRefExoticComponent<

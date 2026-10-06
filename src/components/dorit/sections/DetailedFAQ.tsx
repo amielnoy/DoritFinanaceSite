@@ -1,4 +1,5 @@
 import React from "react";
+import { Minus, Plus } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -16,44 +17,55 @@ export default function DetailedFAQ() {
   return (
     <section
       id="common-questions"
-      className="relative py-24 md:py-32 border-t border-border/60 bg-secondary/40"
+      className="relative border-b border-border"
     >
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
-        <div className="lg:col-span-4">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] grid grid-cols-1 lg:grid-cols-3 gap-x-24 gap-y-12 items-start">
+        <div>
           <Reveal>
             <Eyebrow>
               06 · שאלות ותשובות
             </Eyebrow>
-            <h2 className="font-heading text-4xl md:text-5xl mt-5 leading-tight">
+            <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-[22px] leading-[1.12]">
               שאלות
               <br />
               נפוצות
             </h2>
-            <p className="mt-8 text-foreground/70 leading-relaxed max-w-sm">
+            <p className="mt-[22px] text-lg leading-[1.75] text-muted-foreground max-w-[380px]">
               התשובות לשאלות שלקוחות שואלים אותי לעיתים קרובות — לפני פגישת
               הראשונה. אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.
             </p>
             <a
               href="#start"
-              className={ctaClass("mt-8")}
+              className={ctaClass("mt-[22px]")}
             >
               לשיחה קצרה עם דורית
             </a>
           </Reveal>
         </div>
 
-        <div className="lg:col-span-8">
-          <Accordion type="single" collapsible className="border-t border-border/60">
+        <div className="lg:col-span-2 min-w-0">
+          <Accordion type="single" collapsible className="border-t border-foreground">
             {QA.map((item) => (
               <AccordionItem
                 key={item.id}
                 value={`cq-${item.id}`}
-                className="border-b border-border/60"
+                className="border-b border-border"
               >
-                <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
+                <AccordionTrigger
+                  className="group gap-5 text-right text-[clamp(20px,2vw,24px)] leading-[1.35] font-heading font-normal py-6 hover:no-underline hover:text-accent transition-colors duration-200"
+                  icon={
+                    <span
+                      aria-hidden="true"
+                      className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full border border-highlight text-accent"
+                    >
+                      <Plus size={16} strokeWidth={1.5} className="group-data-[state=open]:hidden" />
+                      <Minus size={16} strokeWidth={1.5} className="hidden group-data-[state=open]:block" />
+                    </span>
+                  }
+                >
                   {item.q}
                 </AccordionTrigger>
-                <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
+                <AccordionContent className="max-w-[680px] text-foreground/80 leading-[1.8] text-lg pb-7">
                   {item.a}
                 </AccordionContent>
               </AccordionItem>
