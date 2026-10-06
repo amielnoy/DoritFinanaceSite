@@ -224,6 +224,16 @@ does not resolve is worse than one pointing at the old site.
    Vercel project, then set the records the dashboard shows at the registrar. Pick one
    as canonical — `www` or the apex — and let Vercel redirect the other. Wait for both
    to resolve before continuing.
+
+   *Status, 2026-10-06:* both domains are added and verified in the Vercel project
+   (the apex is canonical; `www` answers `308` to it). The records are **not yet
+   applied**: DTNT (ticket 84851895) was asked to add `A 216.198.79.1`,
+   `A 64.29.17.1` and `CNAME www → 30fa16059da418c7.vercel-dns-017.com.`. Two
+   oddities on the Vercel project still need resolving:
+   `mail.govari-fin.co.il` (meant for Resend sending, not the site) and
+   `dorit-govari-fin.co.il` (Dorit asked DTNT for `govari.co.il` and
+   `dorit-govari.co.il`, which are not registered). See
+   `docs/base44-exit/01-hosting.md`.
 2. **Take the production deployment out from behind login.** Vercel → Settings →
    Deployment Protection. Staging is protected on purpose; production cannot be, or the
    site is unreachable. Leave preview protection alone.
@@ -597,6 +607,46 @@ production BEFORE merging. CI deploys `submitLead` and `myAccount` on merge, and
 rejects every lead row until those columns exist. Enquiries from before
 summaries were recorded have no summary, and the page says so.
 
+What the page shows, in order (#115):
+
+- **Meetings** upcoming first, soonest first; then past ones, most recent first;
+  then those with no date ("המועד טרם נקבע"). Times are compared as UTC instants,
+  and an invalid date counts as undated.
+- **"פניות נוספות"** lists enquiries that are neither an interview nor a
+  meeting, such as the quick contact form, each with a Hebrew source label.
+  Before that they appeared nowhere on the page.
+- **The query cache is per user**: the key is `["account", "enquiries", <user id
+  or email>]`, so switching session without a reload cannot show the previous
+  user's rows. Only a `failed` load is retried, once; `signed_out` and
+  `unverified` are not.
+- **Admins see both admin links** in the header, "ניהול פניות" and "ניהול בלוג"
+  (desktop bar and drawer); everyone signed in sees "האזור שלי".
+- **A disabled Base44 account** gets its own answer from `myAccount`, "החשבון אינו
+  פעיל.", instead of the unverified-email message.
+
+"ביומן" is not shown for consultation-form bookings: that form was removed from
+the site, and only stale clients still reach `createConsultationEvent`.
+
+### Signing in, and out
+
+Sign-in goes through `AuthPort`; `VITE_AUTH_PROVIDER` picks Base44 or Supabase.
+A signed-in visitor can leave in two ways:
+
+- **"יציאה" in the header** (desktop bar and drawer), shown only when signed in.
+  It signs out and goes **home**, not back to the current page: on `/account` or
+  `/admin/*` the route guard would bounce a signed-out visitor straight to the
+  login screen.
+- **"יציאה והתחברות עם חשבון אחר" on `/account`.** It signs out and opens
+  `/login?returnTo=/account`, where "Sign in with Google" asks which account.
+
+Google always shows its account chooser. Base44's sign-in already sends
+`prompt=select_account` (checked against the live redirect, `…/api/apps/auth/login`
+→ `accounts.google.com/…&prompt=select_account`); the Supabase adapter now passes
+`prompt: "select_account"` too. Without it, signing out of Supabase would not be
+enough: Google signs the browser straight back into the account it remembers.
+`AuthContext.logout(shouldRedirect, redirectTo?)` takes the optional destination;
+existing callers are unchanged.
+
 ## What the backend writes down
 
 Until recently these functions logged nothing at all. The only diagnosis
@@ -842,6 +892,18 @@ Base44 `/api` surface plus third-party beacons, so they need no credentials, no
 `base44 link`, and can never write to production data. They run against the
 production build served by `vite preview` — point `PLAYWRIGHT_BASE_URL` at a
 deployment to smoke-test it instead.
+
+**Device-specific e2e blocks are chosen by tag, never by a skip callback.** A
+`describe` that only makes sense on a phone is tagged `{ tag: "@mobile-only" }`;
+one for desktop, `{ tag: "@desktop-only" }`. `playwright.config.ts` gives the two desktop projects
+`grepInvert: /@mobile-only/` and the two phone projects `grepInvert: /@desktop-only/`,
+so each project collects only its own half. Do not open a block with
+`test.skip(({ isMobile }) => …)`: Playwright runs a callback skip as a hook, and
+allure-playwright turns an errored hook into a "Global Errors" entry
+(`skip modifier failed: …`) on runs where nothing failed. A skip inside a test
+body, such as `test.skip(!isMobile)` in `axe.spec.ts`, is not a hook and is fine.
+`tests/contract/e2e-selection.contract.test.ts` fails on a callback `test.skip((…)`
+in any spec, and if either filter goes missing from the projects.
 
 ### The report
 
@@ -1117,6 +1179,41 @@ While production is still on Base44 there is nothing to read anyway: until the
 site on Vercel, these numbers describe **staging traffic**, which is mostly CI
 and the two of us. Vercel Analytics also has to be enabled once for the project
 in the dashboard; without it the beacon is unanswered even on Vercel.
+
+## Reporting leads to GA4
+
+Beyond page views, the site tells Google Analytics (property `G-LLSYPMGV58`, the
+tag in `index.html`) which part of it produced a call, a message or a saved
+enquiry. Everything goes through `src/lib/analytics.ts`:
+
+| Event | When | Parameters |
+|---|---|---|
+| `click_phone`, `click_whatsapp`, `click_email` | any matching link, through one capture-phase listener | `location` |
+| `cta_click` | any link to `#start` | `location`, `cta: start_conversation` |
+| `generate_lead` | the contact form **after the save succeeds**; an interview's summary after the page's submit succeeds | `method: contact_form \| ai_interview` |
+| `chat_start` | consent accepted and "התחלת השיחה" pressed | `method`: which chat |
+| `chat_handoff` | "מעבר לדורית" opened | `method`: which chat |
+
+`location` comes from `data-track-location`, otherwise the nearest `section[id]`,
+`header`, `footer` or `nav`; `mobile_sticky_bar`, `floating_dock` and `faq` are
+set explicitly. `track` passes on only `location`, `cta`, `method` and `channel`,
+so personal data cannot leak through a parameter added later. A blocked or
+throwing `gtag` does not throw.
+
+`?internal=1` marks a browser as the agency's own (`traffic_type: internal`,
+kept in `localStorage`); `?internal=0` clears it.
+
+**Admins can see what is reported.** The top of `/admin/leads` has "מעקב לידים
+ב-Google Analytics" (`LeadTrackingPanel`): whether the tag runs in this browser
+(an ad blocker shows ✗), whether this browser is marked internal, with a toggle,
+the property ID with a link to the reports, and a table of every event — what it
+means, when it is sent, and whether it is recommended as a Key Event. The table
+is `LEAD_EVENTS` from the same module, and a unit test fails if the code sends an
+event that is not in it.
+
+**Open:** the privacy policy does not mention Google Analytics or cookies, and
+there is no consent banner. That is a question for Dorit's compliance adviser
+(`base44/agents/COMPLIANCE.md`, section 8), not something the code decides.
 
 ## The meeting, and which diary it lands in
 
