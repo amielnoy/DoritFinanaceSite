@@ -6,10 +6,9 @@ import type {
   SubmissionReceipt,
 } from "../ports";
 
-/** The SDK surface this adapter needs — not the whole client. */
-export interface FunctionInvoker {
-  functions: { invoke(name: string, payload: unknown): Promise<unknown> };
-}
+import { invokeFunction, type FunctionInvoker } from "./invoke";
+
+export type { FunctionInvoker };
 
 /**
  * Adapter over the Base44 backend functions.
@@ -22,7 +21,7 @@ export class Base44LeadService implements LeadPort {
   constructor(private readonly client: FunctionInvoker) {}
 
   async submitLead(lead: Lead): Promise<SubmissionReceipt> {
-    const receipt = (await this.client.functions.invoke("submitLead", {
+    const receipt = await invokeFunction<SubmissionReceipt>(this.client, "submitLead", {
       name: lead.name,
       phone: lead.phone,
       email: lead.email ?? "",
@@ -32,7 +31,7 @@ export class Base44LeadService implements LeadPort {
       message: lead.message ?? "",
       notes: lead.notes ?? "",
       scheduledAt: lead.scheduledAt ?? "",
-    })) as SubmissionReceipt | undefined;
+    });
 
     return receipt ?? { ok: true };
   }
@@ -43,7 +42,7 @@ export class Base44LeadService implements LeadPort {
    * because the partial one is the agent's own and does not reach us.
    */
   async submitInterview(summary: InterviewSummary): Promise<SubmissionReceipt> {
-    const receipt = (await this.client.functions.invoke("submitLead", {
+    const receipt = await invokeFunction<SubmissionReceipt>(this.client, "submitLead", {
       source: "interview",
       stage: "complete",
       name: summary.name,
@@ -56,13 +55,13 @@ export class Base44LeadService implements LeadPort {
       scheduledAt: summary.scheduledAt ?? "",
       summary: summary.summary ?? "",
       profile: summary.profile ?? {},
-    })) as SubmissionReceipt | undefined;
+    });
 
     return receipt ?? { ok: true };
   }
 
   async submitClaim(report: ClaimReport): Promise<SubmissionReceipt> {
-    const receipt = (await this.client.functions.invoke("submitClaim", {
+    const receipt = await invokeFunction<SubmissionReceipt>(this.client, "submitClaim", {
       name: report.name,
       phone: report.phone,
       email: report.email ?? "",
@@ -71,7 +70,7 @@ export class Base44LeadService implements LeadPort {
       policyNumber: report.policyNumber ?? "",
       description: report.description ?? "",
       documents: report.documents ?? [],
-    })) as SubmissionReceipt | undefined;
+    });
 
     return receipt ?? { ok: true };
   }
