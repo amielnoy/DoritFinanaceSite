@@ -56,7 +56,7 @@ export default async function(req) {
   const email = String(me?.email ?? '').trim().toLowerCase();
   if (!email || me?.is_verified !== true || me?.disabled) {
     log('warn', 'auth.not_eligible', { rid, verified: me?.is_verified === true, disabled: Boolean(me?.disabled) });
-    return json({ error: 'כתובת המייל בחשבון עדיין לא אומתה.' }, 403);
+    return json({ error: me?.disabled ? 'החשבון אינו פעיל.' : 'כתובת המייל בחשבון עדיין לא אומתה.' }, 403);
   }
 
   const url = (Deno.env.get('SUPABASE_URL') || '').trim();

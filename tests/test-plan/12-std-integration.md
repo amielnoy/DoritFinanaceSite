@@ -431,10 +431,13 @@ widen what leaves.
 `INT-ACC-001` pins the call: the address arrives trimmed and lower-cased, and the
 service key travels as the bearer. `INT-ACC-002` returns the rows with the
 request id. `INT-ACC-003` to `005` are the refusals — nobody signed in is `401`,
-an unverified address and a disabled account are `403` — and all three
+an unverified address and a disabled account are `403`, each with its own
+message ("כתובת המייל בחשבון עדיין לא אומתה." and "החשבון אינו פעיל.") — and all three
 assert that Supabase is never reached. `INT-ACC-006` and `007` are failure:
 Supabase refusing, and Supabase not configured, both answer `500` with a fixed
-message and the request id and nothing that names the host, the key or the status.
+message and the request id and nothing that names the host, the key or the status;
+the unconfigured case also asserts the answer carries exactly `error` and `rid`
+and that no RPC call was made.
 `INT-ACC-008` feeds a row carrying a phone number, a status and an escalation
 reason and expects none of them back.
 
@@ -445,7 +448,7 @@ read as signed out. Only `401` and `403` mean the visitor is not signed in.
 
 ## 5. Pass criteria
 
-All 240 cases pass. These assert behaviour, not shape — a failure means the
+All 253 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

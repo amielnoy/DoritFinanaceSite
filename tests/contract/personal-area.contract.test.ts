@@ -50,6 +50,10 @@ describe("personal area — the migration", () => {
         .split(",")
         .map((c) => c.trim().split(/\s+/)[0]);
       expect(cols.length, `${name} declares no output columns`).toBe(11);
+      expect(cols, `${name} output columns`).toEqual([
+        "created_at", "source", "track", "track_label", "meeting_topic", "timing",
+        "scheduled_at", "summary", "profile", "completed", "in_calendar",
+      ]);
       for (const col of NEVER) expect(cols, `${name} returns ${col}`).not.toContain(col);
     }
   });
