@@ -458,7 +458,9 @@ describe("submitLead — what it stores about the meeting", () => {
       { env }
     );
     const [lead] = bodyOf(r, "leads");
+    expect(lead.profile).not.toBeNull();
     expect(JSON.stringify(lead.profile)).not.toContain("123456782");
+    expect(JSON.stringify(lead.profile)).toContain("הורדת עלויות");
   });
 
   it("stores no profile for a form that is not an interview", async () => {
