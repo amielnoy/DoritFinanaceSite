@@ -20,12 +20,15 @@
  * is exactly why it needs a version: a stamp has to resolve to one set of
  * copy, and without a bump "v2" would mean a different set before this release
  * than after it.
+ *
+ * v4 drops "בע״מ" from `LICENCE.entity`, which every notice interpolates. The
+ * agency is not a company, so the name a visitor consented under changed.
  */
-export const CONSENT_VERSION = "2026-10-agents-v3";
+export const CONSENT_VERSION = "2026-10-agents-v4";
 
 /** Licence details the agency must disclose. */
 export const LICENCE = {
-  entity: "דורית גוב ארי — סוכנות ביטוח בע״מ",
+  entity: "דורית גוב ארי — סוכנות ביטוח",
   number: "L-00107009",
   regulator: "רשות שוק ההון, ביטוח וחיסכון",
 } as const;
