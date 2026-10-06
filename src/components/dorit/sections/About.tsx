@@ -36,10 +36,10 @@ const STATS: Stat[] = [
 export default function About({ variant = "full" }: { variant?: "full" | "brief" }) {
   const brief = variant === "brief";
   return (
-    <section id="about" className="relative py-24 md:py-32 border-y border-border/50">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
-        <div className="lg:col-span-5 grid grid-cols-2 gap-3 self-start">
-          <div className="overflow-hidden h-64 md:h-80 col-span-2 border border-border/40">
+    <section id="about" className="relative border-b border-border">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] grid grid-cols-1 lg:grid-cols-2 gap-[clamp(40px,6vw,96px)] items-center">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="plate h-[300px] col-span-2">
             <Image
               src={ATMOS}
               alt="פרט אדריכלי — אור על זכוכית"
@@ -47,7 +47,7 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
               fittingType="fill"
             />
           </div>
-          <div className="overflow-hidden h-48 md:h-56 border border-border/40">
+          <div className="plate h-[210px]">
             <Image
               src={PEN}
               alt="עט נוצה על משטח אבן"
@@ -55,26 +55,26 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
               fittingType="fill"
             />
           </div>
-          <div className="flex flex-col justify-end bg-primary text-primary-foreground p-6 h-48 md:h-56 border border-primary">
-            <p className="font-heading text-3xl leading-none">30</p>
-            <p className="text-xs tracking-[0.2em] uppercase opacity-80 mt-2">
+          <div className="flex flex-col justify-end gap-1.5 border border-highlight p-6 h-[210px]">
+            <p className="font-heading text-[64px] leading-[0.9] text-accent tabular-nums">30</p>
+            <p className="text-[15px] text-muted-foreground">
               שנות ניסיון
             </p>
           </div>
         </div>
 
-        <div className="lg:col-span-7 flex flex-col justify-center">
+        <div className="flex flex-col justify-center">
           <Reveal>
             <Eyebrow>
               01 · מתכננת פיננסית וסוכנת ביטוח
             </Eyebrow>
-            <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
+            <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-5 leading-[1.12]">
               מתכננת פיננסית
               <br />
               וסוכנת ביטוח.
             </h2>
           </Reveal>
-          <div className="mt-8 space-y-5 text-foreground/75 max-w-2xl leading-relaxed">
+          <div className="mt-6 space-y-5 text-foreground/80 max-w-[600px] text-justify text-[19px] leading-[1.8] hyphens-none">
             <p>
               שמי דורית גוב ארי, נשואה לניב ואמא לשגיא, עדן וירין. ותיקה בתחומי
               הפיננסים והביטוח, בעלת רישיון סוכן ותואר אקדמאי
@@ -106,14 +106,16 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
             </p>
           )}
 
-          <div className="mt-12 grid grid-cols-3 gap-px bg-border/50 border border-border/50">
+          <div className="mt-8 grid grid-cols-3 border-y border-border">
             {STATS.map((s, i) => (
-              <div key={i} className="bg-background p-6 md:p-8 text-center group transition-colors duration-300 hover:bg-secondary/40">
-                <p className="font-heading text-4xl md:text-5xl text-accent leading-none transition-transform duration-300 group-hover:scale-105">
+              <div
+                key={i}
+                className={`px-2 py-6 flex flex-col items-center gap-2 text-center ${i > 0 ? "border-s border-border" : ""}`}
+              >
+                <p className="font-heading text-[clamp(36px,4vw,52px)] text-accent leading-none tabular-nums">
                   {s.num}
                 </p>
-                <div className="mx-auto mt-4 h-px w-8 bg-highlight-muted/60 transition-all duration-300 group-hover:w-12" />
-                <p className="text-[15px] text-muted-foreground mt-3">
+                <p className="text-[15px] text-muted-foreground">
                   {s.label}
                 </p>
               </div>
