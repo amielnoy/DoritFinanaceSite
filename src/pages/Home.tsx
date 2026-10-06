@@ -32,9 +32,9 @@ import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
  */
 export default function Home() {
   useSeo({
-    title: "דורית גוב ארי | ייעוץ ביטוחי ופיננסי — אדריכלות של ביטחון",
+    title: "דורית גוב ארי | מתכננת פיננסית וסוכנת ביטוח",
     description:
-      "יועצת ביטוחית ופיננסית עם 30 שנות ניסיון. ייעוץ פנסיוני, ביטוח חיים ובריאות וליווי תביעות — אישי, שקוף ובגובה העיניים. מחשבון דמי ניהול חינם.",
+      "מתכננת פיננסית וסוכנת ביטוח עם 30 שנות ניסיון. תכנון פנסיה, גמל והשתלמות, ביטוח חיים ובריאות וליווי תביעות — אישי, שקוף ובגובה העיניים. מחשבון דמי ניהול חינם.",
     path: "/",
     // No FAQPage block here. A `HOME_FAQ_LD` constant once carried six pension questions
     // that `/faq` renders in full — the home page never displayed them, it

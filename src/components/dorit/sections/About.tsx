@@ -66,18 +66,18 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
         <div className="lg:col-span-7 flex flex-col justify-center">
           <Reveal>
             <Eyebrow>
-              01 · מתכננת פיננסית בכירה
+              01 · מתכננת פיננסית וסוכנת ביטוח
             </Eyebrow>
             <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
-              אני לא סוכנת.
+              מתכננת פיננסית
               <br />
-              אני המתכננת שלכם.
+              וסוכנת ביטוח.
             </h2>
           </Reveal>
           <div className="mt-8 space-y-5 text-foreground/75 max-w-2xl leading-relaxed">
             <p>
-              שמי דורית גוב ארי, נשואה לניב ואמא לשגיא, עדן וירין. עם ניסיון של
-              30 שנה בתחומי הפיננסים והביטוח, בעלת רישיון פנסיוני ותואר אקדמאי
+              שמי דורית גוב ארי, נשואה לניב ואמא לשגיא, עדן וירין. ותיקה בתחומי
+              הפיננסים והביטוח, בעלת רישיון סוכן ותואר אקדמאי
               במדעי ההתנהגות, ניהול וכלכלה.
             </p>
             {brief ? null : <p>

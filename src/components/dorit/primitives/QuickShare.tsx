@@ -4,7 +4,7 @@ import { SITE_URL } from "@/lib/seo";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 const SHARE_TEXT =
-  "ממליצים בחום על דורית גוב ארי — ייעוץ פיננסי וביטוחי אישי, מקצועי ואנושי. מומלץ ביותר.";
+  "ממליצים בחום על דורית גוב ארי — תכנון פיננסי וביטוחי אישי, מקצועי ואנושי.";
 /* The canonical origin, not a second copy of it. A share link that outlived a host
    change would send every recommendation to the old site. */
 const SHARE_URL = SITE_URL;
@@ -32,7 +32,7 @@ export default function QuickShare() {
           שיתוף
         </Eyebrow>
         <h2 className="font-heading text-3xl md:text-4xl mt-4 leading-tight">
-          מכירים מישהו שזקוק לייעוץ?
+          מכירים מישהו שזקוק לתכנון פיננסי?
         </h2>
         <p className="mt-5 text-foreground/70 leading-relaxed">
           שיתוף אחד קטן יכול לעשות סדר בחיים של מישהו. שלחו את ההמלצה בקלות —

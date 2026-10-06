@@ -355,7 +355,7 @@ export default function Claims() {
                 {/* `#start` is a home-page section, and this is /claims —
                     as a bare hash it did nothing at all. */}
                 <CtaLink href="/#start" onClick={(e) => goToSection(e, "#start")}>
-                  ייעוץ מקדים
+                  שיחה מקדימה
                 </CtaLink>
               </div>
               <Link

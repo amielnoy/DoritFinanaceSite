@@ -18,7 +18,7 @@ const HERO_IMG = "/images/dorit-office-portrait.png";
  */
 const TICKER: string[] = [
   "תכנון לטווח ארוך",
-  "העברה בין-דורית",
+  "העברת עושר בין דורות",
   "ליווי אישי",
   "כיסוי מותאם",
   "ליווי בתביעות",
@@ -69,7 +69,7 @@ export default function Hero() {
           <div className="absolute bottom-6 right-6 glass px-5 py-3.5 border border-border/50 shadow-sm">
             <p className="font-heading text-sm leading-tight">דורית גוב ארי</p>
             <p className="text-[11px] text-muted-foreground mt-1">
-              מתכננת פיננסית בכירה
+              מתכננת פיננסית וסוכנת ביטוח
             </p>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function Hero() {
         {/* Headline */}
         <div className="order-1 md:order-2 md:col-span-7 flex flex-col justify-center pr-0 md:pr-14 pb-10 md:pb-0">
           <span className="text-[11px] tracking-[0.35em] uppercase text-accent mb-6 animate-fade-up">
-            דורית גוב ארי · מתכננת פיננסית בכירה
+            דורית גוב ארי · מתכננת פיננסית וסוכנת ביטוח
           </span>
           <ArchStatement />
           {/* Claims of equal weight. Wrapping left the last one alone on its own
@@ -88,7 +88,7 @@ export default function Hero() {
               licensed agent quoting a performance figure is a regulated claim,
               and nothing here could substantiate it. */}
           <div className="mt-7 flex flex-col items-start gap-y-1.5 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-2 text-sm text-foreground/70 animate-fade-up">
-            <span className="font-heading text-base text-accent">30 שנות ניסיון</span>
+            <span className="font-heading text-base text-accent">בעלת רישיון סוכן</span>
             <span className="hidden md:block w-1 h-1 rounded-full bg-highlight" />
             <span className="font-heading text-base text-accent">ליווי אישי 1:1</span>
           </div>
@@ -98,7 +98,7 @@ export default function Hero() {
               the conversation. Still no figure and no promise — §2 binds this
               copy as it binds the agents. */}
           <p className="mt-7 max-w-md text-lg text-foreground/75 leading-relaxed animate-fade-up">
-            אני לא מוכרת פוליסות — אני מתכננת עתיד. פנסיה, גמל והשתלמות, מיסוי
+            תכנון פיננסי וביטוחי שמתחיל בתמונה המלאה. פנסיה, גמל והשתלמות, מיסוי
             וקיבוע זכויות, ודמי הניהול שנגבים מהחיסכון לאורך השנים: מה שיש לכם,
             מה הוא עולה, ומה הוא אמור לעשות עבורכם.
           </p>

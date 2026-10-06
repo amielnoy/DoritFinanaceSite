@@ -69,7 +69,7 @@ export default function BlogPost() {
               author: {
                 "@type": "Person",
                 name: "דורית גוב ארי",
-                jobTitle: "מתכננת פיננסית בכירה",
+                jobTitle: "מתכננת פיננסית וסוכנת ביטוח",
                 url: absoluteUrl("/"),
               },
               publisher: { "@type": "Organization", name: SITE_NAME, url: absoluteUrl("/") },

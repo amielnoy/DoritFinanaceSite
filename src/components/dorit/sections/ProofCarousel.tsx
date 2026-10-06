@@ -1,7 +1,6 @@
 import React, { useRef } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
-import Stars from "@/components/dorit/primitives/Stars";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
 interface Brief {
@@ -9,8 +8,20 @@ interface Brief {
   title: string;
   body: string;
   metric: string;
-  rating: number;
+  /** Under the figure, when the figure is a projection rather than a fact. */
+  basis?: string;
 }
+
+/**
+ * Cases, not promises.
+ *
+ * A licensed agent publishing an outcome is making a regulated claim, so each
+ * figure here is either something that happened or labelled as an estimate,
+ * with what it rests on. "100% הגנה" is gone: no insurance protects fully, and
+ * saying so misleads whatever the case. So are the per-case five stars and the
+ * "5.0 · שביעות רצון מלאה" line, which rated the cases on Dorit's own say and
+ * named no source.
+ */
 
 const BRIEFS: Brief[] = [
   {
@@ -18,49 +29,44 @@ const BRIEFS: Brief[] = [
     title: "מ-דחייה לאישור מלא תוך 11 ימים",
     body: "משפחה שנתקלה בסירוב ראשוני לתביעת חיים. ניהלתי את ההליך מול החברה, השלמתי תיעוד והבאתי את הכיסוי המלא — בלי שהמשפחה נאלצה להרים טלפון.",
     metric: "₪850K שולמו",
-    rating: 5,
   },
   {
     tag: "תכנון פנסיה",
-    title: "מסלול שכפל את ההכנסה הצפויה",
-    body: "לקוח עצמאי בן 47 עם תיק מפוזר. איחדתי מוצרים, בניתי מסלול מסלק והתאמתי את החשיפה — התוצאה: הכנסה חודשית צפויה כפולה בפרישה.",
-    metric: "x2 הכנסה צפויה",
-    rating: 5,
+    title: "תכנון שהכפיל את ההכנסה הצפויה בפרישה",
+    body: "לקוח עצמאי בן 47 עם תיק מפוזר. איחדתי מוצרים, בניתי מסלול מותאם והתאמתי את החשיפה — לפי התחזית, הכנסה חודשית בפרישה גבוהה פי שניים מזו שבתיק המקורי.",
+    metric: "פי 2 בתחזית",
+    basis: "הערכה המבוססת על הנחות של תשואה ודמי ניהול",
   },
   {
     tag: "ביטוח משכנתא",
     title: "חיסכון של 38% בפרמיה",
     body: "זוג עם משכנתא חדשה קיבל הצעה סטנדרטית. בדקתי את הכיסויים מול פרופיל הסיכון האמיתי, הסרתי כפילויות והוזלתי את העלות משמעותית.",
-    metric: "38% חיסכון",
-    rating: 5,
+    metric: "38% פחות בפרמיה",
   },
   {
     tag: "בריאות",
     title: "כיסוי ניתוח שאושר תוך 48 שעות",
     body: "לקוחה שנזקקה לניתוח דחוף ונדחתה פעמיים. התערבתי ישירות מול מחלקת האישורים, והכיסוי אושר בטרם הניתוח.",
     metric: "48 שעות",
-    rating: 5,
   },
   {
     tag: "עסק",
-    title: "הגנת הון לבעלי עסק",
-    body: "שותפים בעסק בינוני ללא הסכם שותפים. בניתי מערך כיסויים שמבטיח המשכיות עסקית והגנת משפחות במקרה של אובדן כושר או פטירה.",
-    metric: "100% הגנה",
-    rating: 5,
+    title: "כיסוי לשותפים בעסק",
+    body: "שותפים בעסק בינוני ללא הסכם שותפים. בניתי מערך כיסויים שנועד לתמוך בהמשכיות העסק ובמשפחות במקרה של אובדן כושר עבודה או פטירה.",
+    metric: "המשכיות עסקית",
   },
   {
     tag: "חיסכון פנסיוני",
-    title: "חיסכון של ₪420K בעמלות ודמי ניהול",
-    body: "שכירה בת 39 שהפרישה לארבעה מוצרים שונים עם דמי ניהול גבוהים. איחדתי לשני מסלולים ממוקדים, מיקחתי מול הגופים המוסדיים והורדתי את העמלות — החיסכון המצטבר עד הפרישה מוערך ב-₪420 אלף.",
-    metric: "₪420K חיסכון",
-    rating: 5,
+    title: "חיסכון מוערך של ₪420K בדמי ניהול",
+    body: "שכירה בת 39 שהפקידה לארבעה מוצרים שונים עם דמי ניהול גבוהים. איחדתי לשני מסלולים ממוקדים, ניהלתי משא ומתן מול הגופים המוסדיים והורדתי את דמי הניהול — החיסכון המצטבר עד הפרישה מוערך ב-₪420 אלף.",
+    metric: "₪420K בהערכה",
+    basis: "הערכה המבוססת על הנחות של תשואה ודמי ניהול",
   },
   {
     tag: "תכנון פיננסי",
     title: "יציאה לעצמאות עם כרית ביטחון בת 3 שנים",
     body: "זוג בשנות ה-40 שרצה לעבור לעצמאות אך חשש מאי-הוודאות. בניתי תכנון פיננסי רב-שנתי: קרן חירום, מיפוי סיכונים ומסלול השקעה מדורג. כעבור שלוש שנים יצאו לעצמאות עם כרית ביטחון מלאה.",
     metric: "3 שנים לעצמאות",
-    rating: 5,
   },
 ];
 
@@ -86,12 +92,10 @@ export default function ProofCarousel() {
               <h2 className="font-heading text-5xl md:text-6xl mt-4">
                 תיקי הצלחה
               </h2>
-              <div className="mt-5 flex items-center gap-3">
-                <Stars value={5} size={20} />
-                <span className="text-sm text-foreground/70">
-                  <span className="font-heading text-lg text-foreground">5.0</span> · שביעות רצון מלאה בקרב לקוחות
-                </span>
-              </div>
+              <p className="mt-5 text-sm text-foreground/70 max-w-xl">
+                תוצאות עבר אינן מבטיחות תוצאות דומות — כל מקרה תלוי בנתונים
+                האישיים.
+              </p>
             </Reveal>
           </div>
           <div className="flex items-center gap-2">
@@ -137,18 +141,20 @@ export default function ProofCarousel() {
                 0{i + 1}
               </span>
             </div>
-            <div className="mt-3">
-              <Stars value={b.rating} size={16} />
-            </div>
-            <h3 className="font-heading text-2xl md:text-3xl mt-3 leading-snug">
+            <h3 className="font-heading text-2xl md:text-3xl mt-4 leading-snug">
               {b.title}
             </h3>
             <p className="mt-5 text-foreground/70 leading-relaxed flex-1">
               {b.body}
             </p>
             <div className="mt-8 pt-6 border-t border-border/50 flex items-center justify-between">
-              <span className="font-heading text-3xl md:text-4xl text-highlight-ink leading-none">
-                {b.metric}
+              <span>
+                <span className="block font-heading text-3xl md:text-4xl text-highlight-ink leading-none">
+                  {b.metric}
+                </span>
+                {b.basis ? (
+                  <span className="block mt-2 text-[12px] text-muted-foreground">{b.basis}</span>
+                ) : null}
               </span>
               <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
                 מקרה 0{i + 1}
