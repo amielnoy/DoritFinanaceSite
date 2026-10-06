@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -8,7 +8,7 @@ import { base44Mock } from "./base44-mock";
 vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
 vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
-const auth = vi.hoisted(() => ({ value: { user: null, isAuthenticated: false } as { user: Record<string, unknown> | null; isAuthenticated: boolean } }));
+const auth = vi.hoisted(() => ({ value: { user: null, isAuthenticated: false } as { user: Record<string, unknown> | null; isAuthenticated: boolean; logout?: (...a: unknown[]) => void } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));
 
 // framer-motion's layout animations need APIs jsdom does not implement.
@@ -54,5 +54,17 @@ describe("<FloatingHeader /> account links", () => {
     linksNamed("ניהול בלוג").forEach((l) => expect(l).toHaveAttribute("href", "/admin/blog"));
     expect(linksNamed("ניהול פניות").length).toBeGreaterThan(0);
     expect(linksNamed("ניהול בלוג").length).toBeGreaterThan(0);
+  });
+
+  it("offers no sign-out to a signed-out visitor", () => {
+    renderHeader({ user: null, isAuthenticated: false });
+    expect(screen.queryAllByRole("button", { name: "יציאה" })).toHaveLength(0);
+  });
+
+  it("signs a visitor out and sends them home", () => {
+    const logout = vi.fn();
+    renderHeader({ user: { email: "a@example.com", role: "user" }, isAuthenticated: true, logout });
+    fireEvent.click(screen.getAllByRole("button", { name: "יציאה" })[0]);
+    expect(logout).toHaveBeenCalledWith(true, `${window.location.origin}/`);
   });
 });

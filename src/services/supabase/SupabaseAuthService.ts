@@ -22,7 +22,7 @@ export interface SupabaseAuthClient {
     signOut(): Promise<{ error: SupabaseError | null }>;
     signInWithOAuth(args: {
       provider: "google";
-      options?: { redirectTo?: string };
+      options?: { redirectTo?: string; queryParams?: Record<string, string> };
     }): Promise<{ error: SupabaseError | null }>;
     signInWithPassword(credentials: {
       email: string;
@@ -153,7 +153,11 @@ export class SupabaseAuthService implements AuthPort {
   signInWithGoogle(returnUrl: string): void {
     void this.client.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: absoluteOnThisOrigin(returnUrl) },
+      // Always ask which Google account. Without it Google signs the browser
+      // straight back into the account it remembers, so signing out to switch
+      // accounts lands the visitor in the same one again. Base44's Google
+      // sign-in already sends this.
+      options: { redirectTo: absoluteOnThisOrigin(returnUrl), queryParams: { prompt: "select_account" } },
     });
   }
 

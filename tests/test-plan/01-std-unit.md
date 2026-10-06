@@ -127,7 +127,7 @@ distinguishes on.
 | UNIT-SBA-006 | "sends the visitor to Google, returning where they started" | `signInWithOAuth` with `redirectTo` |
 | UNIT-SBA-007 | "signs out before redirecting, not after" | `signOut` precedes navigation |
 | UNIT-SBA-008 | "answers hasStoredToken synchronously" | Reflects the injected checker |
-| UNIT-SBA-009 | "routes redirectToLogin through the same Google flow" | Both doors reach Google |
+| UNIT-SBA-009 | "routes redirectToLogin through the same Google flow" | Both doors reach Google, with `prompt: select_account` so the visitor always chooses the account |
 | UNIT-SBA-010 | "signs in with an address and a password" | Credentials forwarded verbatim |
 | UNIT-SBA-011 | "throws on bad credentials, which Supabase reports without rejecting" | Rejects with the provider's message |
 | UNIT-SBA-012 | "does not navigate: the caller owns the guarded destination" | Resolves without redirecting |

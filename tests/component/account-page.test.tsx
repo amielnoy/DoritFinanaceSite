@@ -12,8 +12,9 @@ vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
 vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
 const auth = vi.hoisted(() => ({ user: { full_name: "רונית אבני", email: "ronit@example.com" } as Record<string, unknown> }));
+const logoutSpy = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/AuthContext", () => ({
-  useAuth: () => ({ user: auth.user, isAuthenticated: true }),
+  useAuth: () => ({ user: auth.user, isAuthenticated: true, logout: logoutSpy }),
 }));
 
 import Account from "@/pages/Account";
@@ -198,5 +199,12 @@ describe("<Account />", () => {
   it("announces loading as a status", async () => {
     renderWith(() => new Promise(() => {}));
     expect(await screen.findByRole("status")).toHaveTextContent("טוען");
+  });
+
+  it("signs out and goes to sign in again, to switch to another Google account", async () => {
+    renderWith(async () => []);
+    const button = await screen.findByRole("button", { name: "יציאה והתחברות עם חשבון אחר" });
+    button.click();
+    expect(logoutSpy).toHaveBeenCalledWith(true, `${window.location.origin}/login?returnTo=/account`);
   });
 });

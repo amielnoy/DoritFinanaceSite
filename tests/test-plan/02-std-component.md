@@ -119,6 +119,7 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-ACC-020 | "does not show the previous user's rows after the session changes without a reload" | After the signed-in user changes, the loader runs again and the first user's meeting is gone |
 | CMP-ACC-021 | "does not retry a signed-out load" | A `signed_out` rejection calls the loader exactly once and lands on the login screen |
 | CMP-ACC-022 | "announces loading as a status" | The loading line has `role="status"` |
+| CMP-ACC-023 | "signs out and goes to sign in again, to switch to another Google account" | "יציאה והתחברות עם חשבון אחר" calls `logout(true, <origin>/login?returnTo=/account)` |
 
 ### 4.8 `<FloatingHeader />` — account and admin links
 
@@ -127,6 +128,8 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-HDR-001 | "shows no personal-area link to a signed-out visitor" | No "האזור שלי" link |
 | CMP-HDR-002 | "links a signed-in visitor to /account, with no admin links" | "האזור שלי" points to `/account`; no "ניהול פניות" or "ניהול בלוג" |
 | CMP-HDR-003 | "gives an admin both admin pages" | "ניהול פניות" points to `/admin/leads` and "ניהול בלוג" to `/admin/blog` |
+| CMP-HDR-004 | "offers no sign-out to a signed-out visitor" | No "יציאה" button |
+| CMP-HDR-005 | "signs a visitor out and sends them home" | "יציאה" calls `logout(true, <origin>/)` |
 
 ### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
@@ -145,6 +148,6 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 
 ## 5. Pass criteria
 
-All 63 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 66 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
