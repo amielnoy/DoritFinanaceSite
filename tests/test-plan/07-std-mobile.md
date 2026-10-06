@@ -23,8 +23,13 @@ a WebKit run is a faithful check of iOS rendering and JS behaviour. It is **not*
 a substitute for a real-device pass on installability, push, or Safari UI chrome
 (address-bar resize, safe-area insets) — those need a device lab.
 
-The block is selected by Playwright's `isMobile` fixture, so it runs on exactly
-the two mobile projects and is skipped on the two desktop ones.
+The block is tagged `@mobile-only`, and the two desktop projects carry
+`grepInvert: /@mobile-only/` in `playwright.config.ts`, so it runs on exactly the
+two mobile projects and the desktop ones never collect it. It used to be a
+`test.skip(({ isMobile }) => !isMobile)` at the top of the describe. Playwright
+runs that as a hook, allure-playwright reports every such skip as a failed hook,
+and the Allure report carried 38 "Global Errors" reading "skip modifier failed:
+Test is skipped: mobile projects only".
 
 ## 2. Test cases
 
@@ -43,9 +48,9 @@ the two mobile projects and is skipped on the two desktop ones.
 
 ### 2.1 The desktop half of the same switch
 
-`mobile.spec.ts` also holds a `Desktop-only chrome` block, skipped by the same
-`isMobile` fixture from the other side, so the file collects 12 cases per
-project and runs 10 or 2 depending on which project it is. A responsive swap
+`mobile.spec.ts` also holds a `Desktop-only chrome` block, tagged
+`@desktop-only` and filtered out of the two mobile projects the same way, so
+each project collects only its own half: 10 cases on a phone, 2 on a desktop. A responsive swap
 has two halves and only one of them is ever asserted by accident: hiding the
 desktop dock on a phone while also hiding it on a desktop passes E2E-MOB-001
 and ships a home page with no call-to-action above the fold. Those two cases

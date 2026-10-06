@@ -3,7 +3,8 @@ import { expect, gotoApp, test, test_step } from "../fixtures/app";
 /**
  * Mobile-web sanity for the two platforms that matter to this site's traffic:
  * iOS Safari (WebKit / iPhone 14) and Android Chrome (Chromium / Pixel 7).
- * The desktop projects skip this file.
+ * Tagged `@mobile-only` and `@desktop-only`, so each project collects only
+ * its half — see the `grepInvert` on the projects in playwright.config.ts.
  */
 
 /**
@@ -13,11 +14,7 @@ import { expect, gotoApp, test, test_step } from "../fixtures/app";
 const stickyBar = (page: import("@playwright/test").Page) =>
   page.locator("div.md\\:hidden.fixed.bottom-0");
 
-test.describe("Mobile web (iOS + Android)", () => {
-  // `isMobile` comes from the device descriptor, so this runs only on the
-  // ios-safari and android-chrome projects.
-  test.skip(({ isMobile }) => !isMobile, "mobile projects only");
-
+test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
   test("renders the sticky call/consult bar instead of the desktop dock", async ({ page }) => {
     await test_step("open the home page on a phone viewport", async () => {
       await gotoApp(page);
@@ -185,8 +182,7 @@ test.describe("Mobile web (iOS + Android)", () => {
   });
 });
 
-test.describe("Desktop-only chrome", () => {
-  test.skip(({ isMobile }) => !!isMobile, "desktop projects only");
+test.describe("Desktop-only chrome", { tag: "@desktop-only" }, () => {
 
   test("shows the floating WhatsApp/phone dock and hides the mobile bar", async ({ page }) => {
     await test_step("open the home page on a desktop viewport", async () => {
