@@ -30,7 +30,8 @@ export interface AuthContextValue {
   /** True once the first auth check has settled, either way. */
   authChecked: boolean;
   authError: AuthError | null;
-  logout: (shouldRedirect?: boolean) => void;
+  /** Signs out; with a redirect, sends the browser to `redirectTo` (default: this page). */
+  logout: (shouldRedirect?: boolean, redirectTo?: string) => void;
   navigateToLogin: () => void;
   checkUserAuth: () => Promise<void>;
 }
@@ -99,11 +100,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [checkUserAuth]);
 
-  const logout = (shouldRedirect = true) => {
+  const logout = (shouldRedirect = true, redirectTo?: string) => {
     setUser(null);
     setIsAuthenticated(false);
     // With a URL the SDK clears the token and sends the browser there.
-    services.auth.logout(shouldRedirect ? window.location.href : undefined);
+    services.auth.logout(shouldRedirect ? redirectTo ?? window.location.href : undefined);
   };
 
   const navigateToLogin = () => {

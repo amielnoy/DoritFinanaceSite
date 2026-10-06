@@ -127,7 +127,7 @@ describe("SupabaseAuthService", () => {
 
     expect(signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/admin` },
+      options: { redirectTo: `${window.location.origin}/admin`, queryParams: { prompt: "select_account" } },
     });
   });
 
@@ -144,7 +144,7 @@ describe("SupabaseAuthService", () => {
 
     expect(signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/admin/leads` },
+      options: { redirectTo: `${window.location.origin}/admin/leads`, queryParams: { prompt: "select_account" } },
     });
   });
 

@@ -49,7 +49,7 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
   loadEnquiries?: () => Promise<Enquiry[]>;
   now?: Date;
 }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const query = useQuery<Enquiry[], unknown>({
     // Keyed by the signed-in user, so a session switch cannot show the previous user's rows.
     queryKey: ["account", "enquiries", user?.id ?? user?.email ?? "anonymous"],
@@ -76,6 +76,15 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
           <h2 id="details" className="font-heading text-2xl mb-3">הפרטים שלי</h2>
           <p>{String(user?.full_name ?? "")}</p>
           <p dir="ltr" className="text-start text-muted-foreground">{String(user?.email ?? "")}</p>
+          {/* Google remembers the account; the sign-in that follows asks which
+              one (prompt=select_account), so this is how a visitor switches. */}
+          <button
+            type="button"
+            onClick={() => logout(true, `${window.location.origin}/login?returnTo=/account`)}
+            className="mt-3 text-sm border border-accent/40 text-accent hover:bg-accent/10 px-3 py-1.5 transition-colors"
+          >
+            יציאה והתחברות עם חשבון אחר
+          </button>
         </section>
 
         {query.isPending ? <p role="status" className="text-muted-foreground">טוען…</p> : null}

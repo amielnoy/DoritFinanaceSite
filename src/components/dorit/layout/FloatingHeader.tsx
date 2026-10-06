@@ -41,7 +41,13 @@ export default function FloatingHeader() {
   const [scrolled, setScrolled] = useState<boolean>(false);
   const [open, setOpen] = useState<boolean>(false);
   const navigateToSection = useSectionNav();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
+  // Home rather than this page: on /account or /admin/* the guard would bounce a
+  // signed-out visitor straight to the login screen.
+  const signOut = () => {
+    setOpen(false);
+    logout(true, `${window.location.origin}/`);
+  };
 
   /**
    * Anchors here name sections that live only on the home page, and this header
@@ -130,6 +136,11 @@ export default function FloatingHeader() {
               <Link to="/admin/leads" className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">ניהול פניות</Link>
               <Link to="/admin/blog" className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">ניהול בלוג</Link>
             </>
+          ) : null}
+          {isAuthenticated ? (
+            <button type="button" onClick={signOut} className="text-[13px] tracking-[0.04em] text-foreground/75 hover:text-accent transition-colors duration-300 py-1">
+              יציאה
+            </button>
           ) : null}
         </nav>
 
@@ -226,6 +237,11 @@ export default function FloatingHeader() {
               <Link to="/admin/leads" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors" onClick={() => setOpen(false)}><span>ניהול פניות</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
               <Link to="/admin/blog" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors" onClick={() => setOpen(false)}><span>ניהול בלוג</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
             </>
+          ) : null}
+          {isAuthenticated ? (
+            <button type="button" onClick={signOut} className="w-full flex items-center justify-between px-4 py-4 text-lg border-b border-border/40 hover:bg-secondary/60 hover:text-accent transition-colors text-start">
+              <span>יציאה</span>
+            </button>
           ) : null}
               </nav>
 
