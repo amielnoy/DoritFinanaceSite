@@ -2,32 +2,34 @@ import React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The bronze call-to-action, as a link or a button.
- *
- * The class string behind it had been pasted into ten places across nine
- * files and had already forked: two of them set `text-primary-foreground`
- * (parchment on bronze) where the rest set `text-primary` (obsidian on
- * bronze). The design token for text on the highlight colour is
- * `--highlight-foreground`, which is the dark one, so that is what both
- * variants now use.
+ * The gold call-to-action — an outline, never a fill (Classical).
+ * `muted` is kept for API compatibility and now renders the secondary
+ * (hairline) variant. `onDark` is for the footer / colophon band.
  */
-export const ctaClass = (className?: string, opts: { muted?: boolean } = {}) =>
+export const ctaClass = (
+  className?: string,
+  opts: { muted?: boolean; onDark?: boolean; size?: "md" | "lg" } = {}
+) =>
   cn(
-    "inline-flex items-center gap-2 px-7 py-3.5 font-medium transition-colors duration-300 shadow-sm",
-    opts.muted ? "bg-highlight-muted" : "bg-highlight",
-    "text-highlight-foreground hover:bg-highlight-strong",
-    "disabled:opacity-40 disabled:hover:bg-highlight",
+    "inline-flex items-center justify-center gap-2 rounded-md border bg-transparent font-heading font-medium transition-colors duration-200",
+    opts.size === "lg" ? "min-h-[54px] px-[30px] text-xl" : "min-h-12 px-[26px] text-lg",
+    opts.onDark
+      ? "border-highlight-on-dark text-highlight-on-dark hover:bg-highlight-on-dark/15"
+      : opts.muted
+        ? "border-border text-foreground hover:bg-foreground/[0.06]"
+        : "border-highlight text-highlight-foreground hover:bg-highlight/[0.12] active:bg-highlight/[0.22]",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight",
+    "disabled:opacity-45 disabled:hover:bg-transparent",
     className
   );
 
-type CtaLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & { muted?: boolean };
-
-export function CtaLink({ className, muted, ...props }: CtaLinkProps) {
-  return <a className={ctaClass(className, { muted })} {...props} />;
+type Opts = { muted?: boolean; onDark?: boolean; size?: "md" | "lg" };
+type CtaLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & Opts;
+export function CtaLink({ className, muted, onDark, size, ...props }: CtaLinkProps) {
+  return <a className={ctaClass(className, { muted, onDark, size })} {...props} />;
 }
 
-type CtaButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { muted?: boolean };
-
-export function CtaButton({ className, muted, type = "button", ...props }: CtaButtonProps) {
-  return <button type={type} className={ctaClass(className, { muted })} {...props} />;
+type CtaButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & Opts;
+export function CtaButton({ className, muted, onDark, size, type = "button", ...props }: CtaButtonProps) {
+  return <button type={type} className={ctaClass(className, { muted, onDark, size })} {...props} />;
 }
