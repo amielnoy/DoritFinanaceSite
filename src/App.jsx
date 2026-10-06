@@ -4,7 +4,7 @@ import { MotionConfig } from 'framer-motion';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -64,10 +64,11 @@ const RouteFallback = () => (
 // E2E-HOM-001 and E2E-HOM-006 assert the home page renders with the backend
 // dead, which is exactly the case this used to fail.
 const AuthenticatedApp = () => {
+  const { pathname } = useLocation();
   return (
     <>
       <Suspense fallback={<RouteFallback />}>
-      <ErrorBoundary scope="page">
+      <ErrorBoundary scope="page" resetKey={pathname}>
       <Routes>
         {/* Add your page Route elements here */}
         <Route path="/" element={<Home />} />

@@ -5,6 +5,13 @@ type Props = {
   children: React.ReactNode;
   /** "section" (default) for one home-page section, "page" for the whole app. */
   scope?: "section" | "page";
+  /**
+   * When this changes, a caught failure is forgotten and the children render
+   * again. The app-level boundary passes the path, so leaving a broken page by
+   * any link (header, footer, back button) recovers instead of keeping the
+   * fallback on every page after it.
+   */
+  resetKey?: unknown;
 };
 
 type State = { failed: boolean };
@@ -18,6 +25,10 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   static getDerivedStateFromError(): State {
     return { failed: true };
+  }
+
+  componentDidUpdate(prev: Props) {
+    if (this.state.failed && prev.resetKey !== this.props.resetKey) this.setState({ failed: false });
   }
 
   componentDidCatch(error: Error) {

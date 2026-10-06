@@ -59,4 +59,22 @@ describe("ErrorBoundary", () => {
     );
     expect(screen.getByRole("alert").textContent).toContain("הדף");
   });
+
+  it("recovers when its resetKey changes, so leaving a broken page is not a dead end", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const Page = ({ broken }: { broken: boolean }) => (broken ? <Boom /> : <p>next page</p>);
+    const { rerender } = render(
+      <ErrorBoundary scope="page" resetKey="/broken">
+        <Page broken />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole("alert")).toBeTruthy();
+    rerender(
+      <ErrorBoundary scope="page" resetKey="/faq">
+        <Page broken={false} />
+      </ErrorBoundary>,
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("next page")).toBeTruthy();
+  });
 });

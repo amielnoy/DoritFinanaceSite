@@ -154,9 +154,10 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 | CMP-ERB-002 | "shows the fallback with all three contact links when a child throws, and logs without personal data" | `role="alert"` message; `tel:`, `wa.me` and `mailto:` links from `CONTACT`; `console.error` called |
 | CMP-ERB-003 | "isolates the failure: sibling trees still render" | Sibling text present; section wording ("החלק הזה") |
 | CMP-ERB-004 | "uses page wording for the app-level boundary" | `scope="page"` message says "הדף" |
+| CMP-ERB-005 | "recovers when its resetKey changes, so leaving a broken page is not a dead end" | After `resetKey` changes (the app passes the path), the fallback is gone and the new children render |
 
 ## 5. Pass criteria
 
-All 70 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 71 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
