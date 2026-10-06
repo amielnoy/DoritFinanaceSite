@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 213
+**Location:** `tests/integration/` · **Cases:** 216
 
 ---
 
@@ -145,6 +145,16 @@ three-hour shift as §4.5 — except stored, and with no log line to catch it.
 These are also the first tests in the repo to exercise the Supabase mirror at
 all. It short-circuits unless `SUPABASE_URL` and the service key are set, and no
 test had ever set them, so every earlier case ran with mirroring silently off.
+
+### 4.6b `submitLead` — the personal area's view — `INT-LEAD-090..092`
+
+Task 2 adds three nullable columns to `leads`: `summary text`, `profile jsonb`,
+and `track_label text`, populated from the interview's redacted summary and
+structured answers. These cases pin that the summary the mail showed is stored
+unchanged; that the profile, like the mail's text, is never more than what was
+redacted and never less; that non-interviews store no profile at all, leaving the
+fields null rather than present-but-empty; and that a 9-digit Israeli ID number
+in the profile does not survive redaction.
 
 ### 4.7 `submitLead` — the interview schema — `INT-LEAD-039..048`
 

@@ -1376,6 +1376,13 @@ export default async function(req) {
       meeting_topic: meetingTopic || '',
       notes: notes || '',
       track: track || '',
+      // What the personal area shows. The redacted copies the mail already
+      // carries — never the raw payload — so the stored version is never more
+      // than what was mailed. `profile` keeps the mail's labels, so the page
+      // needs no copy of the schema.
+      summary: safeSummary || null,
+      profile: safeProfile.length ? safeProfile : null,
+      track_label: trackLabel || null,
     });
 
     // And the booking as its own row, when there is a booking to speak of. A
