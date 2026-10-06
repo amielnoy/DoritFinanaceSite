@@ -2,6 +2,8 @@ import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
 import { AUTH_PROVIDER } from "@/config/auth-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
+import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
+import { Base44AccountService } from "./base44/Base44AccountService";
 import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
 import { appParams } from "@/lib/app-params";
 import { Base44AgentService } from "./base44/Base44AgentService";
@@ -13,6 +15,7 @@ import { Base44LeadService } from "./base44/Base44LeadService";
 import { Base44SupportService } from "./base44/Base44SupportService";
 import { Base44UploadService } from "./base44/Base44UploadService";
 import type {
+  AccountPort,
   AgentPort,
   AuthPort,
   ContentAdminPort,
@@ -43,6 +46,8 @@ export interface Services {
    *  backend behind them can be replaced without touching a component. */
   leadsAdmin: LeadAdminPort;
   contentAdmin: ContentAdminPort;
+  /** The signed-in visitor's own enquiries — the personal area. */
+  account: AccountPort;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,6 +95,15 @@ const authPort: AuthPort =
     ? new SupabaseAuthService(supabase as unknown as SupabaseAuthClient)
     : new Base44AuthService(client, () => !!appParams.token);
 
+/**
+ * The personal area, from whichever sign-in is switched on — the same rule as
+ * `authPort`, so the page asks the system that knows who the visitor is.
+ */
+const accountPort: AccountPort =
+  AUTH_PROVIDER === "supabase" && supabase
+    ? new SupabaseAccountService(supabase as unknown as SupabaseRpcClient)
+    : new Base44AccountService(client);
+
 export const services: Services = {
   leads: new Base44LeadService(client),
   content: new Base44ContentService(client),
@@ -99,6 +113,7 @@ export const services: Services = {
   auth: authPort,
   leadsAdmin: new Base44LeadAdminService(client),
   contentAdmin,
+  account: accountPort,
 };
 
 export * from "./ports";

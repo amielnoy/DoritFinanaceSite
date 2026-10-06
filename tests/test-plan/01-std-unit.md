@@ -233,6 +233,22 @@ is the single place that stops one enquiry being filed twice.
 | UNIT-SUB-007 | "clears the previous error when resubmitting" | No stale error on retry |
 | UNIT-SUB-008 | "reset returns it to idle" | `idle` |
 
+### 4.14 Personal area adapters — `account-services.test.ts`
+
+One mapper and two adapters behind `AccountPort`. The Base44 cases are fed the
+SDK's real axios-wrapped response and a rejection carrying `.status` and
+`.data`, not a bare body, because a bare body is what hid the wrapper before.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ACC-001 | "maps a row to the page's shape" | snake_case columns become the camelCase `Enquiry` |
+| UNIT-ACC-002 | "survives an old enquiry with no profile" | `profile` is `[]` for a null profile and a null summary |
+| UNIT-ACC-003 | "drops a profile that is not label/value pairs rather than crashing" | An object gives `[]`; malformed pairs are filtered out and valid ones kept |
+| UNIT-ACC-004 | "reads my_enquiries over RPC" | `rpc("my_enquiries")` called; rows mapped |
+| UNIT-ACC-005 | "turns an RPC error into AccountLoadError" | Rejects with `AccountLoadError` |
+| UNIT-ACC-006 | "reads the body out of the axios wrapper" | `invoke("myAccount", {})`; one enquiry returned |
+| UNIT-ACC-007 | "names a 401 as signed out and a 403 as unverified, keeping the rid" | `signed_out`, `unverified`, and `failed` for 500, each with the rid |
+
 ### The agent adapter — `agent-service.test.ts`
 
 Nine cases on `Base44AgentService`, all of them failure paths, because the
@@ -253,5 +269,5 @@ failing `/agents/` call.
 
 ## 5. Pass criteria
 
-All 237 cases pass. Any failure is a functional defect, not an environment issue —
+All 244 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
