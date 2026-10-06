@@ -373,6 +373,15 @@ functions through `invokeFunction(this.client, "submitLead", {…})` since A-67;
 `functions.invoke(…)`, so the payload is still read from the one place it is
 built.
 
+**`e2e-selection.contract.test.ts`** — that a block for one kind of device is
+selected by tag, not skipped by a condition callback (A-68).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-SEL-001 | "finds the specs to check" | More than five specs scanned |
+| CTR-SEL-002 | "never skips by a condition callback, which Allure reports as a failed hook" | No `test.skip((` in any spec |
+| CTR-SEL-003 | "filters each tag out of the projects it does not belong to" | Two `grepInvert` filters of each kind |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed

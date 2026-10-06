@@ -128,6 +128,21 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-HDR-002 | "links a signed-in visitor to /account, with no admin links" | "האזור שלי" points to `/account`; no "ניהול פניות" or "ניהול בלוג" |
 | CMP-HDR-003 | "gives an admin both admin pages" | "ניהול פניות" points to `/admin/leads` and "ניהול בלוג" to `/admin/blog` |
 
+### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
+
+The admins' view of GA4 lead tracking, at the top of `/admin/leads`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-GA4-001 | "lists every event the site sends" | Every `LEAD_EVENTS` name shown |
+| CMP-GA4-002 | "says when the tag is blocked in this browser" | "כנראה חוסם פרסומות" |
+| CMP-GA4-003 | "says when the tag is running" | "אירועים נשלחים" |
+| CMP-GA4-004 | "marks this browser as internal, and unmarks it" | Label and storage flip both ways |
+| CMP-GA4-005 | "links to the GA4 reports in a new tab" | `analytics.google.com`, `rel` contains `noopener` |
+
+`sanity.test.tsx` also pins the rule that a lead counts only once saved:
+CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a failed one".
+
 ## 5. Pass criteria
 
 All 63 cases pass. A `submitLead` or `submitClaim` payload assertion failing

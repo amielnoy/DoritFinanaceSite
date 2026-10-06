@@ -235,35 +235,6 @@ is the single place that stops one enquiry being filed twice.
 | UNIT-SUB-007 | "clears the previous error when resubmitting" | No stale error on retry |
 | UNIT-SUB-008 | "reset returns it to idle" | `idle` |
 
-### 4.14 Personal area adapters — `account-services.test.ts`
-
-One mapper and two adapters behind `AccountPort`. The Base44 cases are fed the
-SDK's real axios-wrapped response and the rejection the SDK really throws — an
-AxiosError with `.status` and the body under `.response.data`, because the SDK
-builds its functions client with `interceptResponses: false` — not a bare body,
-because a bare body is what hid the wrapper before. One case keeps the
-Base44Error shape (`.status`, `.data`) so both work.
-
-| ID | Title | Expected result |
-|---|---|---|
-| UNIT-ACC-001 | "maps a row to the page's shape" | snake_case columns become the camelCase `Enquiry` |
-| UNIT-ACC-002 | "survives an old enquiry with no profile" | `profile` is `[]` for a null profile and a null summary |
-| UNIT-ACC-003 | "drops a profile that is not label/value pairs rather than crashing" | An object gives `[]`; malformed pairs are filtered out and valid ones kept |
-| UNIT-ACC-004 | "reads my_enquiries over RPC" | `rpc("my_enquiries")` called; rows mapped |
-| UNIT-ACC-005 | "turns an RPC error into AccountLoadError" | Rejects with `AccountLoadError` |
-| UNIT-ACC-006 | "reads the body out of the axios wrapper" | `invoke("myAccount", {})`; one enquiry returned |
-| UNIT-ACC-007 | "names a 401 as signed out, a 403 as unverified, else failed — keeping the rid, off the AxiosError the SDK throws" | `signed_out`, `unverified`, and `failed` for 500, each with the rid read from `response.data` |
-| UNIT-ACC-008 | "names RPC error 42501 as signed out" | `AccountLoadError("signed_out")` — `my_enquiries` is revoked from anon |
-| UNIT-ACC-009 | "names RPC error PGRST301 as signed out" | `signed_out` — JWT missing, expired or invalid |
-| UNIT-ACC-010 | "names an unrecognised RPC error code as failed" | `failed`; Supabase never yields `unverified` |
-| UNIT-ACC-011 | "fails with the rid when the body says ok:false" | `failed` with the rid |
-| UNIT-ACC-012 | "fails with the rid when ok:true carries no enquiries array" | `failed` with the rid, not an empty list |
-| UNIT-ACC-013 | "also reads a Base44Error-shaped rejection (status and data on the error)" | 403 with `data.rid` gives `unverified` and the rid |
-| UNIT-ACC-014 | "failureOf: reads an AxiosError: status and body under response" | `{ status: 500, body: { rid } }` |
-| UNIT-ACC-015 | "failureOf: prefers the response status when the error has none of its own" | Status and body taken from `response` |
-| UNIT-ACC-016 | "failureOf: reads a Base44Error: status and data on the error" | Status and body taken from the error itself |
-| UNIT-ACC-017 | "failureOf: gives nothing for a body that is not an object, or a non-error" | `body` is undefined for an HTML string, `undefined` or a string rejection |
-
 ### The agent adapter — `agent-service.test.ts`
 
 Nine cases on `Base44AgentService`, all of them failure paths, because the
@@ -312,7 +283,59 @@ every other fake returns a bare body, which is how A-67 went unseen.
 | UNIT-RCP-003 | "still accepts a bare body, as the in-memory fakes return" | `ok: true` |
 | UNIT-RCP-004 | "reports a handoff that reached Dorit as one that did" | `ok: true`, `contact` from the body — not the fallback |
 
+### 4.14 Personal area adapters — `account-services.test.ts`
+
+One mapper and two adapters behind `AccountPort`. The Base44 cases are fed the
+SDK's real axios-wrapped response and the rejection the SDK really throws — an
+AxiosError with `.status` and the body under `.response.data`, because the SDK
+builds its functions client with `interceptResponses: false` — not a bare body,
+because a bare body is what hid the wrapper before. One case keeps the
+Base44Error shape (`.status`, `.data`) so both work.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ACC-001 | "maps a row to the page's shape" | snake_case columns become the camelCase `Enquiry` |
+| UNIT-ACC-002 | "survives an old enquiry with no profile" | `profile` is `[]` for a null profile and a null summary |
+| UNIT-ACC-003 | "drops a profile that is not label/value pairs rather than crashing" | An object gives `[]`; malformed pairs are filtered out and valid ones kept |
+| UNIT-ACC-004 | "reads my_enquiries over RPC" | `rpc("my_enquiries")` called; rows mapped |
+| UNIT-ACC-005 | "turns an RPC error into AccountLoadError" | Rejects with `AccountLoadError` |
+| UNIT-ACC-006 | "reads the body out of the axios wrapper" | `invoke("myAccount", {})`; one enquiry returned |
+| UNIT-ACC-007 | "names a 401 as signed out, a 403 as unverified, else failed — keeping the rid, off the AxiosError the SDK throws" | `signed_out`, `unverified`, and `failed` for 500, each with the rid read from `response.data` |
+| UNIT-ACC-008 | "names RPC error 42501 as signed out" | `AccountLoadError("signed_out")` — `my_enquiries` is revoked from anon |
+| UNIT-ACC-009 | "names RPC error PGRST301 as signed out" | `signed_out` — JWT missing, expired or invalid |
+| UNIT-ACC-010 | "names an unrecognised RPC error code as failed" | `failed`; Supabase never yields `unverified` |
+| UNIT-ACC-011 | "fails with the rid when the body says ok:false" | `failed` with the rid |
+| UNIT-ACC-012 | "fails with the rid when ok:true carries no enquiries array" | `failed` with the rid, not an empty list |
+| UNIT-ACC-013 | "also reads a Base44Error-shaped rejection (status and data on the error)" | 403 with `data.rid` gives `unverified` and the rid |
+| UNIT-ACC-014 | "failureOf: reads an AxiosError: status and body under response" | `{ status: 500, body: { rid } }` |
+| UNIT-ACC-015 | "failureOf: prefers the response status when the error has none of its own" | Status and body taken from `response` |
+| UNIT-ACC-016 | "failureOf: reads a Base44Error: status and data on the error" | Status and body taken from the error itself |
+| UNIT-ACC-017 | "failureOf: gives nothing for a body that is not an object, or a non-error" | `body` is undefined for an HTML string, `undefined` or a string rejection |
+
+### 4.15 Lead events for GA4 — `tests/unit/analytics.dom.test.ts`
+
+What a visitor did, never who they are. `track` passes on only the parameters
+it knows, so a name, phone or email cannot reach Google even if a caller adds
+one; a blocked or throwing tag never breaks the page.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-GA4-001 | "sends the event and its parameters to gtag" | `gtag("event", name, params)` |
+| UNIT-GA4-002 | "drops any parameter it does not know, so personal data cannot ride along" | `email`, `phone`, `name` removed |
+| UNIT-GA4-003 | "does nothing when the tag is blocked" | No throw without `gtag` |
+| UNIT-GA4-004 | "never throws, even when gtag does" | No throw |
+| UNIT-GA4-005 | "marks the agency's own browsing as internal" | `traffic_type: internal` added |
+| UNIT-GA4-006 | "is set by ?internal=1 and cleared by ?internal=0" | Flag toggles |
+| UNIT-GA4-007 | "counts a submitted form as a lead" | `generate_lead {method: contact_form}` |
+| UNIT-GA4-008 | "names the chat that started and the one that asked for a person" | `chat_start` / `chat_handoff` carry `method` |
+| UNIT-GA4-009 | "every event it sends is in the catalogue the admin panel shows" | Every sent name is in `LEAD_EVENTS` |
+| UNIT-GA4-010 | "reports a phone link with the section it sits in" | `click_phone {location: <section id>}` |
+| UNIT-GA4-011 | "prefers an explicit data-track-location" | `data-track-location` wins |
+| UNIT-GA4-012 | "reports mail links and the start-conversation call to action" | `click_email`, `cta_click` |
+| UNIT-GA4-013 | "ignores every other link" | Nothing sent |
+| UNIT-GA4-014 | "registers once, however often it is called" | One listener |
+
 ## 5. Pass criteria
 
-All 266 cases pass. Any failure is a functional defect, not an environment issue —
+All 303 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
