@@ -59,6 +59,10 @@ on:
     # trigger the push event above, and checks attach to the commit either
     # way, so reacting to `synchronize` as well would run the whole matrix
     # twice for every push to an open PR.
+    #
+    # Opening a PR still fires both events for one commit — the push that
+    # created the branch, and this. The concurrency group above is what makes
+    # that one run rather than two.
     types: [opened, reopened]
   schedule:
     # 19:00 UTC — **22:00 in Israel while IDT is in force** (UTC+3, late March
@@ -80,7 +84,24 @@ on:
         default: false
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Keyed on the branch name, not on `github.ref`, because the two are not the
+  # same string across the two events that fire when a PR is opened: the push
+  # carries `refs/heads/<branch>`, the `opened` carries `refs/pull/<n>/merge`.
+  # That put the same commit in two groups, so neither cancelled the other and
+  # the whole matrix ran twice at once. Both runs then queued behind each other
+  # for runner slots until the jobs that come last — e2e, the Allure publish,
+  # the verdict — hit `timeout-minutes` and were killed at 15:01. The suite was
+  # green; the pipeline reported red.
+  #
+  # The trigger below already declines `synchronize` so that a push to an open
+  # PR runs once. This is the same intent applied to the one moment that
+  # escaped it: the moment the PR is opened.
+  #
+  # Collapsing them keeps the property the ref-keyed group was there for — a
+  # newer push supersedes an older run on the same branch — and `merge-readiness`
+  # already declines to speak for a superseded run (`!cancelled()`), so the
+  # cancelled half posts no verdict.
+  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 env:

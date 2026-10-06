@@ -29,7 +29,7 @@ const escalation = {
   email: "dani@example.com",
   agent: "needs_interview",
   topic: "גמל",
-  consentVersion: "2026-09-agents-v2",
+  consentVersion: "2026-10-agents-v3",
   consentAt: "2026-09-13T10:00:00.000Z",
 };
 
@@ -51,7 +51,7 @@ describe("escalateToHuman — handing a conversation to a person", () => {
   it("stores the consent the visitor was shown, so a record ties to its wording", async () => {
     const r = await invokeFunction("escalateToHuman", escalation);
     expect(r.leads[0]).toMatchObject({
-      consent_version: "2026-09-agents-v2",
+      consent_version: "2026-10-agents-v3",
       consent_at: "2026-09-13T10:00:00.000Z",
     });
   });

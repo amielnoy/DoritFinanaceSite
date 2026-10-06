@@ -141,7 +141,7 @@ npx base44 agents push --yes
 
 It is a **full sync** — an agent on the backend that is not in `base44/agents/`
 is deleted — which is the intended direction, since the repo is the source of
-truth and `tests/contract/agents.contract.test.ts` pins every field of all three
+truth and `tests/contract/agents.contract.test.ts` pins every field of all four
 before anything reaches this point.
 
 Skipping it is expensive and looks like nothing. `allow_anonymous_access: true`
@@ -365,8 +365,8 @@ the Core integration.
 
 ## The agents, and where they stop
 
-Three LLM agents run on the site — `needs_interview`, `blog_recommender` and
-`support_agent` (`base44/agents/`). They belong to a licensed insurance
+Four LLM agents run on the site — `needs_interview`, `blog_recommender`,
+`support_agent` and `procedures_agent` (`base44/agents/`). They belong to a licensed insurance
 agency, which makes most of what a visitor would like to ask them off-limits:
 no product recommendation, no figures, no view on whether to move, withdraw or
 cancel anything. Every one of those ends in a handoff to דורית rather than a
@@ -448,6 +448,66 @@ fails if a mandatory clause disappears from any of them.
 
 Full description of the layer, what is enforced where, and one open question
 for דורית's compliance adviser: [`base44/agents/COMPLIANCE.md`](base44/agents/COMPLIANCE.md).
+
+## How do I actually do this?
+
+`procedures_agent` answers at the bottom of `/tools`, under the two
+self-assessment tools. Support answers *what a קרן השתלמות is*, from what has
+been published; this one answers *how you do it* — which steps, which kinds of
+document, roughly how long, and how to read גמל נט, פנסיה נט and the
+clearinghouse.
+
+It sorts a question by one test before it sorts it by subject, and the test
+comes from the statute rather than from product sense: שיווק or ייעוץ פנסיוני
+is a recommendation that takes the client's own data and needs into account,
+and it requires a licence. So:
+
+> **Would the answer change depending on who is asking?** If age, salary,
+> balance, family situation or health would change it, it is a personal
+> recommendation and it is דורית's. **Does it push toward a particular action
+> or product?** Same answer.
+
+Both "no" and the agent answers. Either one "yes" and it hands over. The four
+zones in the prompt — green, yellow, red, and a black track for a death, a
+complaint, someone in distress or a question asked on another person's behalf —
+are that test applied to the cases that actually arrive, and the prompt says so
+explicitly, because a list read as an allowlist decides nothing about the case
+that is not on it.
+
+Three things in there are worth knowing about, because each is a place the
+obvious implementation is wrong:
+
+- **The red zone fails by starting, not by refusing.** "בדרך כלל אנשים
+  בגילך…", "יש כאלה שבוחרים…", "אני לא יכול להמליץ אבל שווה לדעת ש…" are each a
+  recommendation said quietly. So are the framings that invite them — *just
+  generally*, *what would you do*, *no names*, *purely theoretically*. All of
+  them get the same handoff.
+- **The opposite failure is real too.** An agent that keeps offering דורית
+  after being told to stop is why someone abandons a process and carries it out
+  with no human at all. If the visitor says they have decided, the prompt gives
+  them the operational information, says the irreversibility warning once, and
+  does not raise it again — while a red question stays red.
+- **Green names no form.** The agent holds `BlogPost.read` and nothing else: no
+  CRM, no document store, no file on anybody. "Which form, which documents,
+  where to send, how long" is the exact shape of answer a model invents, and an
+  invented form number is worse than a handoff because somebody will fill it
+  in. It gives the step and the kind of document, and says the form itself
+  comes from דורית in the issuing body's current wording. For the same reason
+  "what is the status of my request" is not green either — it has no system to
+  look in and no detail about the person asking.
+
+The clearinghouse is the subject that makes people volunteer an ID number
+unprompted, so the agent is instructed to turn one away rather than merely not
+ask: a ת״ז typed into a chat advances nothing, and the signature is collected by
+דורית on a signed power of attorney — which authorises retrieval of information
+and no action on the savings at all.
+
+The 24-scenario bank the zones were written against, with the three places the
+implementation deliberately departs from the drafted zoning, is
+[`tests/test-plan/14-procedures-zones.md`](tests/test-plan/14-procedures-zones.md).
+`tests/contract/agents.contract.test.ts` fails if the prompt stops saying any of
+it; `tests/eval/procedures-agent.eval.test.ts` drives the deployed agent through
+the rows that matter, because those are two different claims.
 
 ## The open question, and the record it leaves
 

@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Map</title>
+<meta name="description" content="Every block in the Dorit Gov-Ari site and every service and store it talks to, by layer and by owner.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Rubik:wght@300;400;500;600;700&display=swap">
+
+<style>
+  /* ═══════════════════════════════════════════════════════════════════════
+     Type and colour borrowed from your-echoes.com: Rubik, and the emerald →
+     teal gradient family. Rubik is the right loan rather than a cosmetic one —
+     it carries Hebrew properly, which matters in a document whose subject is a
+     Hebrew site, and its 700 weight with negative tracking is what gives the
+     headings their edge.
+
+     The gradients are used where a gradient says something — direction of flow,
+     the start of a section, the brand surface at the top — and nowhere that a
+     colour already carries meaning. The ownership stripe down the left of every
+     block stays flat, because the legend promises that one colour equals one
+     owner, and a gradient would quietly break that promise.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  :root {
+    /* Surfaces */
+    --ground:      #F4F8F7;
+    --surface:     #FFFFFF;
+    --surface-2:   #EFF6F4;
+    /* Ink. --ink-3 is 4.8:1 on white: the small uppercase labels are still
+       text, and the project's own design system forbids ink chosen by eye. */
+    --ink:         #10221F;
+    --ink-2:       #41524E;
+    --ink-3:       #64756F;
+    --rule:        #DCE7E3;
+    --rule-strong: #B9CBC5;
+    /* Brand, from the Echoes palette */
+    --brand:       #0F766E;
+    --brand-ink:   #0B5853;
+    --brand-from:  #10B981;
+    --brand-to:    #047857;
+    --brand-soft:  #F0FDFA;
+    --wash:        linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 52%, #A7F3D0 100%);
+    --wash-ink:    #0B3D36;
+    --dot:         rgba(255, 255, 255, .55);
+    /* Ownership. Five hues that stay apart from each other and from the
+       brand — the one axis the whole drawing is coloured by. */
+    --own-repo:    #0F766E;
+    --own-b44:     #B45309;
+    --own-sup:     #4338CA;
+    --own-ext:     #5B6B75;
+    --own-dead:    #BE123C;
+    --dead-soft:   #FFF1F3;
+    --warn:        #B45309;
+    --crit:        #BE123C;
+    --ok:          #047857;
+    --shadow:      0 1px 2px rgba(16, 34, 31, .05), 0 10px 26px -14px rgba(16, 34, 31, .20);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0A1413;
+      --surface:     #11201E;
+      --surface-2:   #162A27;
+      --ink:         #E4EFEC;
+      --ink-2:       #A3B5B1;
+      --ink-3:       #7E918C;
+      --rule:        #223834;
+      --rule-strong: #35514B;
+      --brand:       #5EEAD4;
+      --brand-ink:   #99F6E4;
+      --brand-from:  #34D399;
+      --brand-to:    #0F766E;
+      --brand-soft:  #0D2724;
+      --wash:        linear-gradient(135deg, #0B2B27 0%, #0F3B35 52%, #115E59 100%);
+      --wash-ink:    #CCFBF1;
+      --dot:         rgba(153, 246, 228, .10);
+      --own-repo:    #5EEAD4;
+      --own-b44:     #F0B458;
+      --own-sup:     #A5B4FC;
+      --own-ext:     #93A6AF;
+      --own-dead:    #FDA4AF;
+      --dead-soft:   #2A1419;
+      --warn:        #F0B458;
+      --crit:        #FDA4AF;
+      --ok:          #6EE7B7;
+      --shadow:      0 1px 2px rgba(0, 0, 0, .45), 0 10px 26px -14px rgba(0, 0, 0, .75);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0A1413;
+    --surface:     #11201E;
+    --surface-2:   #162A27;
+    --ink:         #E4EFEC;
+    --ink-2:       #A3B5B1;
+    --ink-3:       #7E918C;
+    --rule:        #223834;
+    --rule-strong: #35514B;
+    --brand:       #5EEAD4;
+    --brand-ink:   #99F6E4;
+    --brand-from:  #34D399;
+    --brand-to:    #0F766E;
+    --brand-soft:  #0D2724;
+    --wash:        linear-gradient(135deg, #0B2B27 0%, #0F3B35 52%, #115E59 100%);
+    --wash-ink:    #CCFBF1;
+    --dot:         rgba(153, 246, 228, .10);
+    --own-repo:    #5EEAD4;
+    --own-b44:     #F0B458;
+    --own-sup:     #A5B4FC;
+    --own-ext:     #93A6AF;
+    --own-dead:    #FDA4AF;
+    --dead-soft:   #2A1419;
+    --warn:        #F0B458;
+    --crit:        #FDA4AF;
+    --ok:          #6EE7B7;
+    --shadow:      0 1px 2px rgba(0, 0, 0, .45), 0 10px 26px -14px rgba(0, 0, 0, .75);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: Rubik, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Rubik's own negative tracking at display sizes is the thing that makes the
+     Echoes headings look set rather than typed. */
+  h1, h2, h3, h4 { font-family: Rubik, system-ui, sans-serif; letter-spacing: -.01em; }
+  code, kbd, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .page { max-width: 1240px; margin: 0 auto; padding: 0 16px 120px; }
+  @media (min-width: 680px) { .page { padding: 0 28px 120px; } }
+
+  /* ── Masthead: the one full-bleed brand surface in the document ───────── */
+  .masthead {
+    position: relative; overflow: hidden;
+    background: var(--wash);
+    color: var(--wash-ink);
+    border: 1px solid var(--rule);
+    padding: 44px 24px 32px;
+    margin: 28px 0 40px;
+  }
+  @media (min-width: 680px) { .masthead { padding: 60px 44px 40px; } }
+  /* The dot grid from Echoes, which keeps a large flat wash from reading as
+     an empty panel. Purely texture, so it is hidden from assistive tech by
+     being a background rather than an element. */
+  .masthead::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0);
+    background-size: 20px 20px;
+  }
+  .masthead > * { position: relative; z-index: 1; }
+  .stamp {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: #fff; background: linear-gradient(to right, var(--brand-from), var(--brand-to));
+    padding: 6px 12px; margin-bottom: 22px; border-radius: 2px;
+  }
+  .stamp::before { content: ""; width: 6px; height: 6px; background: #fff; border-radius: 50%; }
+  h1 {
+    font-size: clamp(2.3rem, 5.4vw, 4rem); line-height: 1.0;
+    letter-spacing: -.028em; font-weight: 700; margin: 0 0 18px; text-wrap: balance;
+    color: var(--ink);
+  }
+  .standfirst { font-size: clamp(1.02rem, 1.5vw, 1.16rem); color: var(--wash-ink); max-width: 64ch; margin: 0 0 30px; font-weight: 400; }
+  /* A grid rather than a wrapping flex row: eight counts at eight different
+     widths left a dangling divider and a hole on the second line. */
+  .facts {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    border-top: 1px solid rgba(15, 118, 110, .22); margin: 0;
+  }
+  .fact { padding: 13px 18px 13px 0; border-right: 1px solid rgba(15, 118, 110, .18); }
+  .fact:last-child { border-right: 0; }
+  .fact dt { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--wash-ink); opacity: .72; margin: 0 0 3px; font-weight: 500; }
+  .fact dd { margin: 0; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+  /* ── Legend ───────────────────────────────────────────────────────────── */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 9px 22px;
+    font-size: 13.5px; padding: 17px 19px; margin: 0 0 48px;
+    background: var(--brand-soft); border: 1px solid var(--rule);
+    border-left: 3px solid transparent;
+    border-image: linear-gradient(to bottom, var(--brand-from), var(--brand-to)) 1;
+  }
+  .legend b { font-weight: 600; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); width: 100%; }
+  .key { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); }
+  .key::before { content: ""; width: 14px; height: 14px; border-left: 3px solid var(--rule-strong); background: var(--surface); }
+  .key.repo::before { border-left-color: var(--own-repo); }
+  .key.b44::before  { border-left-color: var(--own-b44); }
+  .key.sup::before  { border-left-color: var(--own-sup); }
+  .key.ext::before  { border-left-color: var(--own-ext); }
+  .key.dead::before { border-left-color: var(--own-dead); }
+
+  /* ── Layer band ───────────────────────────────────────────────────────── */
+  .layer { margin: 0 0 28px; }
+  .layer > h2 {
+    font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600;
+    margin: 0 0 12px; padding: 0 0 9px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  }
+  .layer > h2 span {
+    font-size: 13.5px; letter-spacing: 0; text-transform: none;
+    color: var(--ink-2); font-weight: 400;
+  }
+
+  .grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
+  @media (min-width: 560px)  { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 900px)  { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 1140px) { .grid.c4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .grid.c2 { grid-template-columns: 1fr; }
+  @media (min-width: 900px)  { .grid.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* ── Block. The left stripe is flat on purpose — see the note at the top. ── */
+  .block {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-strong);
+    padding: 14px 16px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  }
+  .block.repo { border-left-color: var(--own-repo); }
+  .block.b44  { border-left-color: var(--own-b44); }
+  .block.sup  { border-left-color: var(--own-sup); }
+  .block.ext  { border-left-color: var(--own-ext); }
+  .block.dead { border-left-color: var(--own-dead); background: var(--dead-soft); }
+
+  .block h3 {
+    margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.012em;
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .block p { margin: 0; font-size: 13.5px; line-height: 1.52; color: var(--ink-2); }
+  .block .path {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+    color: var(--ink-3); word-break: break-word; overflow-wrap: anywhere;
+  }
+  .block ul { margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+  .block ul li {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    background: var(--surface-2); border: 1px solid var(--rule);
+    padding: 2px 7px; color: var(--ink-2); white-space: nowrap; border-radius: 2px;
+  }
+  .tag {
+    font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+    padding: 2px 7px; border: 1px solid currentColor; white-space: nowrap; border-radius: 2px;
+  }
+  .tag.t-dead { color: var(--crit); }
+  .tag.t-new  { color: #fff; border-color: transparent; background: linear-gradient(to right, var(--brand-from), var(--brand-to)); }
+  .tag.t-flag { color: var(--warn); }
+  .n { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-3); font-weight: 400; margin-left: auto; }
+
+  /* ── Flow. A gradient that fades out in the direction of travel is the one
+        place a gradient carries information rather than decoration. ──────── */
+  .flow {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 18px 0 20px; font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2);
+  }
+  .flow::before, .flow::after { content: ""; height: 2px; flex: 1; max-width: 260px; }
+  .flow::before { background: linear-gradient(to right, transparent, var(--brand)); }
+  .flow::after  { background: linear-gradient(to left,  transparent, var(--brand)); }
+  .flow b { font-weight: 500; text-align: center; }
+
+  /* ── Matrix ───────────────────────────────────────────────────────────── */
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); margin: 0 0 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 620px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-size: 11px; letter-spacing: .11em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600;
+    background: linear-gradient(to bottom, var(--brand-soft), var(--surface-2));
+    border-bottom: 2px solid var(--brand); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.c { text-align: center; font-family: "IBM Plex Mono", monospace; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; color: var(--ink-2); }
+  .yes { color: var(--ok); font-weight: 600; }
+  .no  { color: var(--ink-3); }
+  caption { caption-side: bottom; text-align: left; padding: 12px 14px; font-size: 13.5px; color: var(--ink-2); border-top: 1px solid var(--rule); }
+
+  /* ── Notes. Flat, because the colour is the severity. ─────────────────── */
+  .note {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-left: 3px solid var(--warn); padding: 15px 18px; margin: 22px 0 0;
+    font-size: 14.5px; line-height: 1.58;
+  }
+  .note.crit { border-left-color: var(--crit); }
+  .note h4 {
+    margin: 0 0 7px; font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--warn); font-weight: 600;
+  }
+  .note.crit h4 { color: var(--crit); }
+  .note p { margin: 0 0 8px; }
+  .note p:last-child { margin-bottom: 0; }
+  .note code { font-size: .88em; background: var(--surface-2); border: 1px solid var(--rule); padding: 0 4px; border-radius: 2px; }
+
+  /* ── Section head: the gradient rule marks where a section begins. ────── */
+  .section-head { margin: 58px 0 24px; padding-top: 24px; position: relative; }
+  .section-head::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(to right, var(--brand-from), var(--brand-to) 55%, transparent);
+  }
+  .section-head h2 {
+    margin: 0 0 9px; font-size: clamp(1.45rem, 3vw, 2.05rem);
+    font-weight: 700; letter-spacing: -.022em; text-transform: none;
+    color: var(--ink); border: 0; padding: 0; display: block;
+  }
+  .section-head p { margin: 0; color: var(--ink-2); font-size: 1.01rem; max-width: 68ch; }
+
+  .colophon {
+    margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--rule);
+    font-size: 13.5px; color: var(--ink-3);
+  }
+  .colophon code { font-size: .92em; }
+  a { color: var(--brand-ink); }
+
+  @media print {
+    body { background: #fff; font-size: 11pt; }
+    .masthead { background: #fff; color: #000; }
+    .masthead::after { display: none; }
+    .block, .scroll, .legend { box-shadow: none; }
+    .section-head { break-before: page; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <div class="stamp">Block diagram</div>
+    <h1>System map</h1>
+    <p class="standfirst">
+      Every block the site is built from, and every service and store it talks
+      to — arranged by layer, coloured by who owns the thing rather than by what
+      it does. Ownership is the axis that matters here, because the whole
+      migration question is which blocks are ours and which are rented.
+    </p>
+    <dl class="facts">
+      <div class="fact"><dt>Routes</dt><dd>13</dd></div>
+      <div class="fact"><dt>Page modules</dt><dd>12 live · 5 unreachable</dd></div>
+      <div class="fact"><dt>Components</dt><dd>33 live · 5 orphaned</dd></div>
+      <div class="fact"><dt>Ports</dt><dd>8</dd></div>
+      <div class="fact"><dt>Backend functions</dt><dd>7</dd></div>
+      <div class="fact"><dt>Agents</dt><dd>4</dd></div>
+      <div class="fact"><dt>Stores</dt><dd>2</dd></div>
+      <div class="fact"><dt>Third parties</dt><dd>6</dd></div>
+    </dl>
+  </header>
+
+  <div class="legend">
+    <b>Who owns the block</b>
+    <span class="key repo">In this repository</span>
+    <span class="key b44">Base44 platform</span>
+    <span class="key sup">Supabase</span>
+    <span class="key ext">Third-party API</span>
+    <span class="key dead">Present but unreachable</span>
+  </div>
+
+  <!-- ══ 1 · Delivery ══════════════════════════════════════════════════ -->
+  <div class="section-head">
+    <h2>1 · Delivery</h2>
+    <p>
+      The same commit is built twice by two hosts with different commands, which
+      is the one piece of the picture that surprises everybody: the production
+      copy a visitor gets and the copy CI tests are not byte-identical.
+    </p>
+  </div>
+
+  <div class="layer">
+    <h2>Hosts <span>same repo, two build commands</span></h2>
+    <div class="grid c4">
+      <div class="block ext">
+        <h3>Base44 hosting</h3>
+        <p>Production today. Runs <code>npm run build</code> — no prerender, so every route ships the same <code>index.html</code>.</p>
+        <div class="path">safe-arch-plan.base44.app</div>
+      </div>
+      <div class="block repo">
+        <h3>Vercel</h3>
+        <p>Staging, and the intended destination. Runs <code>npm run build:prerender</code>, so each route gets its own title, description and canonical.</p>
+        <div class="path">vercel.json · build:prerender</div>
+      </div>
+      <div class="block ext">
+        <h3>Cloudflare Pages</h3>
+        <p>Two projects: <code>dorit-mailer</code> (a Pages Function, below) and <code>dorit-allure</code>, the test report, behind Access.</p>
+        <div class="path">dorit-mailer · dorit-allure</div>
+      </div>
+      <div class="block repo">
+        <h3>GitHub Actions</h3>
+        <p>Lint, typecheck, build, the Vitest suites, then the e2e matrix across web, iOS and Android profiles.</p>
+        <div class="path">.github/workflows/ci.yml</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Not in the pipeline</h4>
+    <p>
+      <code>npx base44 agents push</code> and <code>npx base44 functions deploy</code>
+      are manual steps. CI never performs either, so a merged change to a prompt
+      in <code>base44/agents/</code> or a function in <code>base44/functions/</code>
+      is <em>in the repository</em> and not yet <em>running</em>. Every green build
+      on a prompt change means the file is correct, not that it is live.
+    </p>
+  </div>
+
+  <!-- ══ 2 · Browser ═══════════════════════════════════════════════════ -->
+  <div class="section-head">
+    <h2>2 · The browser app</h2>
+    <p>
+      React 19 and Vite. One eagerly-loaded route (the home page) and the rest
+      lazy, behind a <code>Suspense</code> fallback.
+    </p>
+  </div>
+
+  <div class="layer">
+    <h2>Pages <span>13 routes over 12 modules</span></h2>
+    <div class="grid c4">
+      <div class="block repo">
+        <h3>Public <span class="n">8</span></h3>
+        <ul>
+          <li>/</li><li>/blog</li><li>/blog/:id</li><li>/claims</li>
+          <li>/faq</li><li>/tools</li><li>/perspective</li><li>/privacy</li>
+        </ul>
+        <div class="path">src/pages/*.tsx</div>
+      </div>
+      <div class="block repo">
+        <h3>Statement <span class="n">1</span></h3>
+        <p>Accessibility statement, required alongside the privacy policy.</p>
+        <ul><li>/accessibility</li></ul>
+      </div>
+      <div class="block repo">
+        <h3>Admin <span class="n">2</span></h3>
+        <p>Behind <code>AdminRoute</code>, which checks the role itself rather than trusting a layout gate.</p>
+        <ul><li>/admin/leads</li><li>/admin/blog</li></ul>
+      </div>
+      <div class="block repo">
+        <h3>Auth <span class="n">2</span></h3>
+        <p>One route, plus the catch-all 404.</p>
+        <ul><li>/login</li><li>*</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow"><b>composed from</b></div>
+
+  <div class="layer">
+    <h2>Components <span>src/components/dorit/</span></h2>
+    <div class="grid c4">
+      <div class="block repo">
+        <h3>sections <span class="n">12 live</span></h3>
+        <ul>
+          <li>Hero</li><li>About</li><li>ServiceMatrix</li><li>ProofCarousel</li>
+          <li>Testimonials</li><li>FAQ</li><li>DetailedFAQ</li><li>Perspective</li>
+          <li>ArchStatement</li><li>StartConversation</li><li>InsuranceAssessment</li>
+          <li>PensionFeeCalculator</li>
+        </ul>
+      </div>
+      <div class="block repo">
+        <h3>primitives <span class="n">8 live</span></h3>
+        <ul>
+          <li>Cta</li><li>Eyebrow</li><li>Field</li><li>Reveal</li>
+          <li>Stars</li><li>ShareButtons</li><li>CarrierLogos</li><li>CredentialsStrip</li>
+        </ul>
+      </div>
+      <div class="block repo">
+        <h3>layout <span class="n">5</span></h3>
+        <ul>
+          <li>FloatingHeader</li><li>Footer</li><li>FloatingActions</li>
+          <li>MobileStickyBar</li><li>SecurityScroll</li>
+        </ul>
+      </div>
+      <div class="block repo">
+        <h3>forms + chat <span class="n">3</span></h3>
+        <p>One chat shell serves all four agents; the descriptor is the only difference between them.</p>
+        <ul><li>AgentChat</li><li>QuickContact</li><li>ClaimForm</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <h2>Configuration and logic <span>declared once, asserted by tests</span></h2>
+    <div class="grid c4">
+      <div class="block repo">
+        <h3>config/</h3>
+        <p>The regulated copy and the agent table. A compliance review reads these files, not the components.</p>
+        <ul><li>agents.ts</li><li>compliance.ts</li><li>contact.ts</li><li>auth-provider.ts</li></ul>
+      </div>
+      <div class="block repo">
+        <h3>lib/ — domain</h3>
+        <p>The two calculators and the parser for the agent's closing block.</p>
+        <ul><li>pension-fee.ts</li><li>insurance-assessment.ts</li><li>interview-handoff.ts</li></ul>
+      </div>
+      <div class="block repo">
+        <h3>lib/ — platform</h3>
+        <p><code>freshness.ts</code> detects a stale bundle and reloads past the cache.</p>
+        <ul><li>seo.ts</li><li>structured-data.ts</li><li>freshness.ts</li><li>AuthContext.tsx</li></ul>
+      </div>
+      <div class="block repo">
+        <h3>content/</h3>
+        <p>The FAQ library as data, so the page and the agent answer from one source.</p>
+        <ul><li>faq.ts</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="note crit">
+    <h4>Five components and five page modules nothing can reach</h4>
+    <p>
+      The whole <code>booking/</code> directory — <code>CalendlyBooking</code>,
+      <code>GoogleCalendarBooking</code>, <code>OutlookCalendarBooking</code> —
+      has no importer. That is the residue of a real decision: booking a first
+      meeting stopped being a separate errand from being interviewed for one, and
+      the interview now closes the meeting itself. <code>ReviewsWidget</code> and
+      <code>QuickShare</code> are orphaned too.
+    </p>
+    <p>
+      Among the pages, <code>Register.jsx</code>, <code>ForgotPassword.jsx</code>,
+      <code>ResetPassword.jsx</code> and <code>OAuthConsent.jsx</code> are in no
+      route. And <code>Login.tsx</code> and <code>Login.jsx</code> both exist, so
+      <code>@/pages/Login</code> is ambiguous — Vite's default extension order
+      puts <code>.jsx</code> ahead of <code>.tsx</code>, which means the
+      JavaScript copy is the one that ships and the TypeScript copy is dead
+      code that still typechecks. Worth resolving deliberately rather than by
+      resolver order.
+    </p>
+  </div>
+
+  <!-- ══ 3 · Ports ═════════════════════════════════════════════════════ -->
+  <div class="section-head">
+    <h2>3 · Ports and adapters — the seam</h2>
+    <p>
+      No component imports a backend SDK. Eight interfaces in
+      <code>src/services/ports.ts</code> stand between the app and whoever is
+      serving it, and <code>src/services/index.ts</code> is the single place that
+      decides which adapter satisfies each one. This is the layer the Base44 exit
+      is executed through: one port at a time, with the components untouched.
+    </p>
+  </div>
+
+  <div class="layer">
+    <h2>Ports <span>and what currently implements them</span></h2>
+    <div class="grid c4">
+      <div class="block b44">
+        <h3>LeadPort</h3>
+        <p>Lead, claim, interview summary, meeting request.</p>
+        <div class="path">Base44LeadService</div>
+      </div>
+      <div class="block b44">
+        <h3>ContentPort</h3>
+        <p>Articles and testimonials, read.</p>
+        <div class="path">Base44ContentService</div>
+      </div>
+      <div class="block b44">
+        <h3>AgentPort</h3>
+        <p>Conversation lifecycle over socket.io.</p>
+        <div class="path">Base44AgentService</div>
+      </div>
+      <div class="block b44">
+        <h3>SupportPort</h3>
+        <p>Escalation to a person, and the channels it returns.</p>
+        <div class="path">Base44SupportService</div>
+      </div>
+      <div class="block b44">
+        <h3>UploadPort</h3>
+        <p>File upload for the blog editor.</p>
+        <div class="path">Base44UploadService</div>
+      </div>
+      <div class="block b44">
+        <h3>LeadAdminPort</h3>
+        <p>List, set status, remove.</p>
+        <div class="path">Base44LeadAdminService</div>
+      </div>
+      <div class="block b44">
+        <h3>ContentAdminPort</h3>
+        <p>Writes go through a function, not the entity, so one place can check the role.</p>
+        <div class="path">FunctionContentAdminService</div>
+      </div>
+      <div class="block sup">
+        <h3>AuthPort <span class="tag t-new">dual</span></h3>
+        <p>The one port with two live adapters, selected by <code>VITE_AUTH_PROVIDER</code>. The pattern the rest will follow.</p>
+        <div class="path">SupabaseAuthService · Base44AuthService</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 4 · Backend ═══════════════════════════════════════════════════ -->
+  <div class="section-head">
+    <h2>4 · Base44 backend</h2>
+    <p>
+      Seven Deno functions, each a self-contained entry point with no shared
+      module — Base44 provides none. Helpers are therefore hand-duplicated
+      across files, and <code>tests/contract/agents.contract.test.ts</code> holds
+      the copies byte-identical. Duplicated is fine here; divergent is not.
+    </p>
+  </div>
+
+  <div class="layer">
+    <h2>Functions <span>base44/functions/</span></h2>
+    <div class="grid">
+      <div class="block b44">
+        <h3>submitLead <span class="n">1605</span></h3>
+        <p>The big one. Writes the lead, books the meeting on two calendars, appends the sheet row, creates the brief, and mails everybody.</p>
+        <ul><li>connectors</li><li>entities</li><li>supabase</li><li>mailer</li><li>Core mail</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>escalateToHuman <span class="n">616</span></h3>
+        <p>Records why an agent stopped, pages Dorit, and returns the contact channels the chat then shows.</p>
+        <ul><li>connectors</li><li>entities</li><li>supabase</li><li>mailer</li><li>Core mail</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>submitClaim <span class="n">491</span></h3>
+        <p>The claims form. No connector — it only records and mails.</p>
+        <ul><li>entities</li><li>supabase</li><li>mailer</li><li>Core mail</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>createConsultationEvent <span class="n">310</span></h3>
+        <p>Calendar only. The one function that touches no store at all.</p>
+        <ul><li>connectors</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>upsertContact <span class="n">278</span></h3>
+        <p>Built and dormant: no agent is wired to it, which is the deliberate act of not enabling a channel.</p>
+        <ul><li>connectors</li><li>entities</li><li>supabase</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>contentAdmin <span class="n">189</span></h3>
+        <p>Writes as service role, so it verifies the Supabase token and reads the role from <code>profiles</code> before anything else.</p>
+        <ul><li>entities</li><li>supabase</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>logSupportChat <span class="n">167</span></h3>
+        <p>One call at the end of a support or procedures conversation: topic, outcome, filtered transcript, to a sheet.</p>
+        <ul><li>connectors</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow"><b>four prompts · one chat shell</b></div>
+
+  <div class="layer">
+    <h2>Agents <span>base44/agents/ — anonymous access, memory off</span></h2>
+    <div class="grid c4">
+      <div class="block b44">
+        <h3>needs_interview</h3>
+        <p>Interviews a visitor and closes the meeting itself.</p>
+        <ul><li>submitLead</li><li>createConsultationEvent</li><li>escalateToHuman</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>support_agent</h3>
+        <p>General questions, from published content only.</p>
+        <ul><li>BlogPost.read</li><li>logSupportChat</li><li>escalateToHuman</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>procedures_agent <span class="tag t-new">new</span></h3>
+        <p>How a procedure is carried out. Sorts by one test, then by four zones.</p>
+        <ul><li>BlogPost.read</li><li>logSupportChat</li><li>escalateToHuman</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>blog_recommender</h3>
+        <p>Points a reader at the right article.</p>
+        <ul><li>BlogPost.read</li><li>escalateToHuman</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <h4>Two properties nobody typed by hand, and both have broken production</h4>
+    <p>
+      <code>allow_anonymous_access</code> must be <code>true</code> or every
+      conversation on a public page returns 401 — which it did, for ten days,
+      while the visitor saw only "I couldn't send that just now".
+      <code>memory_config.enabled</code> must be <code>false</code>, because the
+      platform default shares a global half between all users and every one of
+      these chats is reached by anonymous strangers. Both flags were written by a
+      Builder regeneration, not by a person, and the contract suite now pins the
+      whole configuration for that reason.
+    </p>
+  </div>
+
+  <!-- ══ 5 · Stores ════════════════════════════════════════════════════ -->
+  <div class="section-head">
+    <h2>5 · Where the data actually lives</h2>
+    <p>
+      Two stores, deliberately. Base44 entities are the authority today; every
+      write is mirrored into Supabase so that the second store is warm and
+      current before any read is moved across. A mirror failure is logged and
+      swallowed — the authority must not fail because the copy did.
+    </p>
+  </div>
+
+  <div class="layer">
+    <h2>Stores <span>authority, then mirror</span></h2>
+    <div class="grid c2">
+      <div class="block b44">
+        <h3>Base44 entities <span class="n">5</span></h3>
+        <p>
+          Declared in <code>base44/entities/*.jsonc</code> with row-level
+          security. The authority for everything except authentication.
+        </p>
+        <ul><li>Lead</li><li>Contact</li><li>BlogPost</li><li>Testimonial</li><li>User</li></ul>
+      </div>
+      <div class="block sup">
+        <h3>Supabase (Postgres) <span class="n">6</span></h3>
+        <p>
+          Four migrations. <code>profiles.role</code> is the sole authority on who
+          is an admin — the function reads it there, not from a claim in a token.
+        </p>
+        <ul><li>profiles</li><li>leads</li><li>contacts</li><li>meetings</li><li>blog_posts</li><li>testimonials</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <caption>
+        Which function reaches which dependency. The <code>connectors</code>
+        column is the hard one: Base44 holds the Google and Microsoft OAuth
+        refresh tokens, and nothing in this repository can mint them.
+      </caption>
+      <thead>
+        <tr>
+          <th>Function</th><th class="num">Lines</th>
+          <th>connectors</th><th>entities</th><th>supabase</th>
+          <th>dorit-mailer</th><th>Core mail</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>submitLead</code></td><td class="num">1605</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td></tr>
+        <tr><td><code>escalateToHuman</code></td><td class="num">616</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td></tr>
+        <tr><td><code>submitClaim</code></td><td class="num">491</td><td class="c no">·</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td></tr>
+        <tr><td><code>createConsultationEvent</code></td><td class="num">310</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+        <tr><td><code>upsertContact</code></td><td class="num">278</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+        <tr><td><code>contentAdmin</code></td><td class="num">189</td><td class="c no">·</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+        <tr><td><code>logSupportChat</code></td><td class="num">167</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══ 6 · Third parties ═════════════════════════════════════════════ -->
+  <div class="section-head">
+    <h2>6 · What the system talks to outside itself</h2>
+    <p>
+      Six services. Five are reached through a Base44 connector holding an OAuth
+      refresh token, which is why hosting is the easy half of leaving the
+      platform and credentials are the hard half.
+    </p>
+  </div>
+
+  <div class="layer">
+    <h2>Calendars and documents <span>via connectors.getConnection</span></h2>
+    <div class="grid c4">
+      <div class="block ext">
+        <h3>Microsoft Graph</h3>
+        <p>The meeting, with Dorit and the operations mailboxes as required attendees and a 60-minute reminder.</p>
+        <div class="path">graph.microsoft.com/v1.0/me/events · connector: outlook</div>
+      </div>
+      <div class="block ext">
+        <h3>Google Calendar</h3>
+        <p>The same meeting again, written in parallel rather than as a fallback.</p>
+        <div class="path">calendar/v3 · connector: googlecalendar</div>
+      </div>
+      <div class="block ext">
+        <h3>Google Sheets</h3>
+        <p>One row per event, 19 columns, written as text so leading zeros on a phone number survive.</p>
+        <div class="path">sheets/v4 · connector: googlesheets</div>
+      </div>
+      <div class="block ext">
+        <h3>Google Docs</h3>
+        <p>The meeting brief, linked from the summary mail.</p>
+        <div class="path">docs/v1 · connector: googledocs</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <h2>Mail <span>one path migrated, one leftover</span></h2>
+    <div class="grid c2">
+      <div class="block repo">
+        <h3>dorit-mailer → Resend</h3>
+        <p>
+          A Cloudflare Pages Function in this repository that holds the Resend
+          key, the sender identity and the recipient list in its own environment.
+          Functions call it with a token; it is already the main mail path.
+        </p>
+        <div class="path">dorit-mailer/functions · MAILER_URL · MAILER_TOKEN</div>
+      </div>
+      <div class="block b44">
+        <h3>Base44 Core SendEmail</h3>
+        <p>
+          Three call sites, one address. Core delivers only to a registered user
+          of the app, which is not something that can be granted from outside —
+          so this list is "whom the platform can reach", and it is meant to
+          shrink to zero.
+        </p>
+        <div class="path">integrations.Core.SendEmail</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 7 · Verification ══════════════════════════════════════════════ -->
+  <div class="section-head">
+    <h2>7 · What holds it together</h2>
+    <p>
+      <code>scripts/run-tests.sh</code> runs nine in order and stops at the
+      first red one: lint, typecheck, unit, component, contract, integration,
+      security, build, e2e. Two more sit outside it — the evals, which need
+      credentials, and the report. The split that matters is the last one: a
+      contract test proves a prompt <em>says</em> something; only an eval shows
+      the model <em>does</em> it.
+    </p>
+  </div>
+
+  <div class="layer">
+    <h2>Suites <span>nine in the gate, two beside it</span></h2>
+    <div class="grid c4">
+      <div class="block repo">
+        <h3>unit · component</h3>
+        <p>Calculators, redaction, SEO helpers, and the chat shell in isolation.</p>
+        <div class="path">tests/unit · tests/component</div>
+      </div>
+      <div class="block repo">
+        <h3>contract</h3>
+        <p>The agent definitions, the compliance clauses, the duplicated helpers, the consent copy.</p>
+        <div class="path">tests/contract</div>
+      </div>
+      <div class="block repo">
+        <h3>integration · security</h3>
+        <p>The functions in-process, and a static scan for a widened write or a leaked identifier.</p>
+        <div class="path">tests/integration · tests/security</div>
+      </div>
+      <div class="block repo">
+        <h3>e2e · a11y · seo</h3>
+        <p>Playwright across web, iOS and Android profiles, with axe at WCAG AA.</p>
+        <div class="path">e2e/</div>
+      </div>
+      <div class="block repo">
+        <h3>eval <span class="tag t-flag">opt-in</span></h3>
+        <p>
+          Drives the <em>deployed</em> agents over the real conversation API.
+          Skips without credentials, and the skip is printed rather than inferred
+          from an absence.
+        </p>
+        <div class="path">tests/eval · EVAL_BASE44_TOKEN</div>
+      </div>
+      <div class="block ext">
+        <h3>Allure</h3>
+        <p>The report, published to Cloudflare Pages behind Access.</p>
+        <div class="path">dorit-allure</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="colophon">
+    <p>
+      Companion to <code>Architecture.html</code>, which covers the same system
+      in prose. Counts here were read from the tree rather than remembered:
+      routes from <code>src/App.jsx</code>, orphans from a reverse-import scan,
+      function line counts and the dependency matrix from
+      <code>docs/base44-exit/00-inventory.md</code>. Anything marked unreachable
+      was verified by finding no importer.
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>
