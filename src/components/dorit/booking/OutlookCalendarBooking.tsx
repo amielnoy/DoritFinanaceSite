@@ -21,13 +21,13 @@ export default function OutlookCalendarBooking({ data = {} }: OutlookCalendarBoo
   const openCalendar = () => {
     const topic = data.topic ? ` — ${data.topic}` : "";
     const name = data.name ? ` · ${data.name}` : "";
-    const subject = `ייעוץ עם דורית גוב ארי${topic}${name}`;
+    const subject = `פגישה עם דורית גוב ארי${topic}${name}`;
 
     const lines = [
       data.name ? `שם: ${data.name}` : "",
       data.phone ? `טלפון: ${data.phone}` : "",
       data.email ? `אימייל: ${data.email}` : "",
-      data.topic ? `תחום ייעוץ: ${data.topic}` : "",
+      data.topic ? `נושא הפגישה: ${data.topic}` : "",
       data.timing ? `עיתוי מבוקש: ${data.timing}` : "",
       data.notes ? `הערות: ${data.notes}` : "",
       `מתוכננת עבור: ${ORGANIZER_EMAIL}`,
@@ -48,7 +48,7 @@ export default function OutlookCalendarBooking({ data = {} }: OutlookCalendarBoo
       enddt: fmt(end),
       subject,
       body,
-      location: "פגישת ייעוץ · טלפון או זום",
+      location: "פגישה · טלפון או זום",
     });
     window.open(
       `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`,

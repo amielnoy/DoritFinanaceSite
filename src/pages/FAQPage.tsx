@@ -187,7 +187,7 @@ export default function FAQPage() {
                 כל שאלה ראויה לתשובה אישי. נשוחח — ונבנה יחד את התכנון הנכון עבורכם.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <CtaLink href="/#start">קביעת פגישת ייעוץ</CtaLink>
+                <CtaLink href="/#start">קביעת פגישה</CtaLink>
                 <a
                   href={`tel:${CONTACT.phoneE164}`}
                   className="inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors"

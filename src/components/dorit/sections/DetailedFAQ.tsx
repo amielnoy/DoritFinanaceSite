@@ -30,7 +30,7 @@ export default function DetailedFAQ() {
             </h2>
             <p className="mt-8 text-foreground/70 leading-relaxed max-w-sm">
               התשובות לשאלות שלקוחות שואלים אותי לעיתים קרובות — לפני פגישת
-              הייעוץ הראשונה. אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.
+              הראשונה. אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.
             </p>
             <a
               href="#start"
