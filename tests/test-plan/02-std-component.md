@@ -42,9 +42,15 @@ on, and calls the Base44 client with the payload the backend contract expects.
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-BAR-001 | "offers a dial link and a consultation anchor" | `tel:+972508311776` and `#consultation` |
+| CMP-BAR-001 | "offers a dial link and a consultation anchor" | `tel:+972508311776` and `#start` |
 | CMP-FLA-001 | "links to WhatsApp with a prefilled Hebrew message and a safe rel" | `wa.me/<number>`, `target=_blank`, `rel` contains `noopener`, message decodes to Hebrew |
 | CMP-FLA-002 | "links to the phone number in E.164 form" | `href === tel:${CONTACT.phoneE164}` |
+| CMP-BAR-002 | "offers a way to the support chat" | "תמיכה" → `/faq#support-chat` |
+| CMP-FLA-003 | "links to the support chat" | "תמיכה — …" → `/faq#support-chat` |
+
+Both components now hold a router link, so every case renders them inside
+`MemoryRouter`, as the app does. Rendered bare, all three earlier cases threw
+before asserting anything.
 
 ### 4.3 `<PensionFeeCalculator />`
 
@@ -89,6 +95,6 @@ React does not surface anywhere a visitor can see. The form simply stops.
 
 ## 5. Pass criteria
 
-All 24 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 32 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

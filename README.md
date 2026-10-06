@@ -726,16 +726,27 @@ saying how to opt out of training while staying answerable in AI search.
 
 Articles under [`content/blog/`](content/blog/) are Markdown with front matter.
 They live here rather than only in the Builder because a post published by a
-licensed agency carries a mandatory גילוי נאות block, and a disclosure that
+licensed agent carries a mandatory גילוי נאות block, and a disclosure that
 exists only as a database row is one nobody reviews.
 
 ```bash
-npm run seed:blog                    # dry run — lists what would be written
-node scripts/seed-blog.mjs --apply   # writes, needs an admin sign-in
+npm run seed:blog                                         # dry run — lists what would be written
+node --env-file=.env.local scripts/seed-blog.mjs --apply  # writes both stores
 ```
 
-Posts are matched by title (update if present, create if not) and ship as
-**drafts** — publishing stays a decision made from `/admin/blog`.
+`--apply` writes each post to **Base44 first** — the site and the blog
+recommender still read it — through `base44 exec --privileged --data-env prod`,
+as whoever the CLI is signed in as (`base44 login` once, as the app owner; no
+admin password is kept anywhere). It then mirrors the post into Supabase's
+`blog_posts`, keyed on `base44_id`, the same contract `contentAdmin` keeps for
+edits from `/admin/blog`. It refuses to start without `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY`, which live in `.env.local` (no `VITE_` prefix, so
+neither reaches the bundle).
+
+Posts are matched by title (update if present, create if not). New posts are
+**drafts** — publishing stays a decision made from `/admin/blog` — and a re-run
+never touches `published` on a post that exists, so correcting an article cannot
+take down one that is live.
 
 ## Tests
 

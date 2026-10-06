@@ -411,7 +411,7 @@ refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 
 ## 5. Pass criteria
 
-All 237 cases pass. These assert behaviour, not shape — a failure means the
+All 240 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

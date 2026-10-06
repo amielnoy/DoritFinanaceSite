@@ -708,10 +708,14 @@
         through the ports in <code>src/services/ports.ts</code> —
         <code>LeadPort</code> is explicit that submitting an enquiry is
         <em>"the only write path the public site has"</em> — implemented by the
-        <code>Base44*Service</code> adapters, which call
-        <code>functions.invoke(…)</code> and hand back a
-        <code>SubmissionReceipt</code> carrying <code>ok</code>,
-        <code>leadId</code> and those <code>warnings</code>.
+        <code>Base44*Service</code> adapters, which call a function through
+        <code>invokeFunction(…)</code> (<code>src/services/base44/invoke.ts</code>)
+        and hand back a <code>SubmissionReceipt</code> carrying
+        <code>ok</code>, <code>leadId</code> and those <code>warnings</code>.
+        The helper is not decoration: the SDK's functions client resolves to the
+        whole axios response, and reading <code>ok</code> off that wrapper is how
+        every successful interview close and handoff was once reported to the
+        visitor as a failure (A-67).
       </p>
       <p>
         The agents reach the same functions as declared tools, and the wiring is

@@ -40,10 +40,10 @@ with one adapter:
 
 | Port | Adapter | Base44 API behind it |
 |---|---|---|
-| `LeadPort` | `Base44LeadService` | `functions.invoke` |
+| `LeadPort` | `Base44LeadService` | `functions.invoke`, via `invokeFunction` |
 | `ContentPort` | `Base44ContentService` | `entities.BlogPost`, `entities.Testimonial` |
 | `AgentPort` | `Base44AgentService` | `agents.*` |
-| `SupportPort` | `Base44SupportService` | `functions.invoke` |
+| `SupportPort` | `Base44SupportService` | `functions.invoke`, via `invokeFunction` |
 | `UploadPort` | `Base44UploadService` | `integrations.Core` |
 | `LeadAdminPort` | `Base44LeadAdminService` | `entities.Lead` |
 | `ContentAdminPort` | `Base44ContentAdminService` | `entities.*` |
@@ -53,16 +53,20 @@ The last row is the proof of concept: **`AuthPort` already has two adapters**,
 chosen at runtime by `VITE_AUTH_PROVIDER`. The pattern that would carry a
 migration is not hypothetical here — it is in use.
 
+`invokeFunction` (`src/services/base44/invoke.ts`) is the one place that knows
+the SDK resolves `invoke` to an axios response rather than the body. A
+replacement backend that returns the body directly passes through it unchanged.
+
 Raw SDK surface, counted across `src/`:
 
 ```
- 6  client.entities.BlogPost      5  client.functions.invoke
+ 6  client.entities.BlogPost      2  client.functions.invoke
  4  client.entities.Testimonial   4  client.agents.*
  3  client.entities.Lead          9  client.auth.*  (two adapters)
  1  client.integrations.Core      1  client.functions.fetch
 ```
 
-Twenty-odd call sites, all inside eight files that nothing else imports.
+About thirty call sites, all inside nine files that nothing else imports.
 
 ---
 

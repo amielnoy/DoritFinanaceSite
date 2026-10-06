@@ -93,9 +93,35 @@ npx skills add base44/skills
   message, return the id. `contentAdmin` does this through a `json()` helper, so
   it cannot be forgotten; that shape is the one to copy when the others are next
   touched.
+- `src/services/base44/invoke.ts`: **call a backend function through
+  `invokeFunction`, never by casting `functions.invoke`.** The SDK builds its
+  functions client with `interceptResponses: false`, so `invoke` resolves to the
+  whole axios response and the body is its `data`. Reading `.ok` off the wrapper
+  finds nothing — which is how every interview the page closed, and every
+  handoff that reached Dorit, told the visitor it had failed while the logs read
+  `warnings: 0`. Fakes that return a bare body hide it; give a new adapter test
+  the `{ data, status, headers }` shape. See A-67.
+- **A time a person reads is Israel time.** The functions run in UTC, and
+  `toLocaleString("he-IL")` takes its zone from the runtime, so every stamp in a
+  mail was three hours early. Name `timeZone: 'Asia/Jerusalem'` on every date a
+  function formats; `function-clock.contract.test.ts` fails on one that does
+  not. See A-63.
+- **Who she is: "דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח".** An individual
+  agent — not a company and not an agency, so no "בע״מ", no ח.פ, and visitor
+  copy names her rather than "הסוכנות". `LICENCE.entity` in
+  `src/config/compliance.ts` is the source the notices interpolate; changing it
+  changes what a visitor consents under, so it bumps `CONSENT_VERSION`. The
+  same string is spelled out in the legal pages, `index.html` JSON-LD,
+  `llms.txt`, every article's disclosure, the agents' instructions (escaped) and
+  `public/poa.html`. See A-66.
 - `scripts/*.mjs`: maintenance jobs CI runs on a schedule. `prune-vercel-deployments.mjs`
   deletes, so it is a dry run unless given `--apply` — check its output before
   adding the flag. `reconcile-stores.mjs` exits non-zero on drift.
+  `seed-blog.mjs --apply` writes `content/blog/` to Base44 through `base44 exec
+  --privileged --data-env prod` (the CLI's signed-in owner, no password) and
+  mirrors each post to Supabase on `base44_id`; it needs `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` and never changes `published` on a
+  post that exists. See A-65.
 - `vite.config.js`: Vite config and Base44 Vite plugin setup.
 - `.env.local`: local-only environment values; never commit secrets.
 - `tests/test-plan/`: the test plan and one Software Test Description per suite.
