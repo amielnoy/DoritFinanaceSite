@@ -1,4 +1,3 @@
-import { CONTACT } from "@/config/contact";
 
 /**
  * Compliance copy and constants for the on-site agents.
@@ -118,7 +117,25 @@ export const HUMAN_HANDOFF = {
   buttonTitle: "מעבר לטיפול אנושי",
   confirmation:
     "העברתי את הפנייה לדורית. אפשר גם לפנות אליה ישירות — היא חוזרת תוך יום עסקים אחד.",
-  failure: `אפשר לפנות לדורית ישירות בטלפון ${CONTACT.phoneDisplay}, בוואטסאפ, או במייל ${CONTACT.email}.`,
+  /**
+   * The sentence above the channels, and it no longer names them.
+   *
+   * It used to spell the number and the address into the sentence, directly
+   * above three links carrying the same two values. The visitor read both
+   * twice, in the one moment they have just been told the automation could not
+   * help them — and this file had to import CONTACT to do it, so the wording
+   * and the details could drift apart.
+   *
+   * The channels are rows now; this only has to hand over to them.
+   */
+  failure: "לא הצלחתי לשמור את הפרטים. אפשר לפנות לדורית ישירות:",
+  /** The same hand-off, when the summary did reach her. */
+  reachHer: "אפשר גם לפנות אליה ישירות:",
+  channels: {
+    phone: { label: "לחיצה מחייגת" },
+    email: { label: "פתיחת המייל" },
+    whatsapp: { title: "וואטסאפ", label: "הודעה מיידית" },
+  },
 
   /**
    * The two fields asked for before the handoff is sent.
