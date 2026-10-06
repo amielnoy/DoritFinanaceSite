@@ -6,7 +6,7 @@ not establish.
 
 | | |
 |---|---|
-| [`00-inventory.md`](00-inventory.md) | What Base44 actually holds: 47 rows, eight ports, `Deno.env.get` as the whole runtime surface — and §8, which is the one worth reading twice. |
+| [`00-inventory.md`](00-inventory.md) | What Base44 actually holds: 47 rows, nine ports, `Deno.env.get` as the whole runtime surface — and §8, which is the one worth reading twice. |
 | [`01-hosting.md`](01-hosting.md) | Step 1 measured: two of five runbook steps already done, and a second reason to do it that was not known when it was planned. |
 
 ## The shape of the argument

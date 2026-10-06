@@ -296,7 +296,7 @@
     </p>
     <dl class="facts">
       <div class="fact"><dt>Type</dt><dd>Base44 app · React SPA</dd></div>
-      <div class="fact"><dt>Surface</dt><dd>13 routes · 2 admin</dd></div>
+      <div class="fact"><dt>Surface</dt><dd>14 routes · 2 admin</dd></div>
       <div class="fact"><dt>Entities</dt><dd>4</dd></div>
       <div class="fact"><dt>Bundle</dt><dd>790 KB · 242 KB gz</dd></div>
       <div class="fact"><dt>Locale</dt><dd>he-IL · RTL</dd></div>
@@ -455,8 +455,11 @@
 
       <h3>Routing</h3>
       <p>
-        All thirteen routes are declared in <code>src/App.jsx</code>. Eleven are
-        public; <code>/admin/leads</code> and <code>/admin/blog</code> sit
+        All fourteen routes are declared in <code>src/App.jsx</code>. Eleven are
+        public; <code>/account</code>, the signed-in visitor's personal area,
+        sits inside a <code>&lt;ProtectedRoute&gt;</code> that sends a signed-out
+        visitor to <code>/login?returnTo=/account</code> (read-only, noindex);
+        <code>/admin/leads</code> and <code>/admin/blog</code> sit
         inside an <code>&lt;AdminRoute&gt;</code>, which delegates to
         <code>&lt;ProtectedRoute&gt;</code> when the visitor is signed out —
         redirecting to <code>/login</code> — and additionally sends anyone whose
@@ -465,6 +468,19 @@
         Every page module is imported eagerly at the top of the file, so the
         router does no code splitting — see finding
         <span class="ref">R-05</span>.
+      </p>
+
+      <h3>Measurement</h3>
+      <p>
+        <code>src/lib/analytics.ts</code> is the one place that talks to GA4. It
+        sends phone, WhatsApp and email clicks, <code>#start</code> clicks, chat
+        starts and handoffs, and <code>generate_lead</code> — the last only after
+        a save succeeds. <code>track</code> passes on just
+        <code>location</code>, <code>cta</code>, <code>method</code> and
+        <code>channel</code>, so personal data cannot ride along in a parameter.
+        <code>LEAD_EVENTS</code>, the catalogue of what is sent, also feeds the
+        <code>LeadTrackingPanel</code> at the top of <code>/admin/leads</code>,
+        and a test fails if the code sends an event the catalogue lacks.
       </p>
 
       <h3>Composition</h3>
@@ -517,7 +533,7 @@
       <h2><span class="num">04</span> Backend</h2>
       <p class="lede">
         Declarative, and still legible. The backend is <b>five</b> JSON entity
-        definitions, <b>seven Deno functions</b> (~2,550 lines in total), three
+        definitions, <b>eight Deno functions</b> (~3,900 lines in total), three
         OAuth connectors (<code>googlecalendar</code>, <code>outlook</code>,
         <code>googlesheets</code>) and three agent definitions — all in
         <code>base44/</code>, all in version control. There is no server to
@@ -555,7 +571,7 @@
         directions.
       </p>
 
-      <h3>4.2 · The seven functions</h3>
+      <h3>4.2 · The eight functions</h3>
       <div class="scroll">
         <table>
           <thead>
@@ -569,6 +585,7 @@
             <tr><td><code>logSupportChat</code></td><td class="sans">~165</td><td>Files a finished support conversation — topic, outcome, redacted transcript</td><td>sheet row; nothing else</td><td class="sans">400 · 500</td></tr>
             <tr><td><code>createConsultationEvent</code></td><td class="sans">~115</td><td>Books the follow-up in Google Calendar</td><td><code>googlecalendar</code> connector</td><td class="sans">400 · 500 · 502</td></tr>
             <tr><td><code>createOutlookEvent</code></td><td class="sans">~110</td><td>The same, in Outlook</td><td><code>outlook</code> connector</td><td class="sans">400 · 500 · 502</td></tr>
+            <tr><td><code>myAccount</code></td><td class="sans">~85</td><td>The personal area for a visitor signed in through Base44: requires a verified, enabled caller, asks Supabase's <code>enquiries_for</code> for that verified email with the service key, and filters the columns again</td><td>reads Supabase; writes nothing; every answer carries a <code>rid</code>, and none carries the underlying error</td><td class="sans">401 · 403 · 500</td></tr>
           </tbody>
         </table>
       </div>
@@ -584,7 +601,7 @@
 
       <h3>4.3 · The shape of a request</h3>
       <p>
-        All seven are written to the same spine, and reading
+        All eight are written to the same spine, and reading
         <code>createConsultationEvent</code> first is the cheapest way to learn
         it — it is 116 lines and has one side effect:
       </p>
@@ -615,7 +632,7 @@
       </p>
       <p>
         Logs are single-line JSON — <code>{t, level, fn, event, …fields}</code>
-        — written through one <code>log()</code> helper present in all seven
+        — written through one <code>log()</code> helper present in all eight
         functions. Access tokens never enter a response, and the security suite
         greps for a <code>console.*</code> call carrying a token or a phone
         number. <code>createConsultationEvent</code>'s request shape and every
@@ -716,6 +733,15 @@
         whole axios response, and reading <code>ok</code> off that wrapper is how
         every successful interview close and handoff was once reported to the
         visitor as a failure (A-67).
+      </p>
+      <p>
+        The personal area follows the same pattern. <code>AccountPort</code>
+        has two adapters, picked by <code>AUTH_PROVIDER</code> like
+        <code>AuthPort</code>: <code>Base44AccountService</code> calls the
+        <code>myAccount</code> function through <code>invokeFunction</code>, and
+        <code>SupabaseAccountService</code> calls the <code>my_enquiries()</code>
+        RPC. Both end in <code>enquiries_for</code>, the only door to a visitor's
+        own data, and <code>src/pages/Account.tsx</code> sees neither.
       </p>
       <p>
         The agents reach the same functions as declared tools, and the wiring is

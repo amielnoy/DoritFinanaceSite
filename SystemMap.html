@@ -344,11 +344,11 @@
       migration question is which blocks are ours and which are rented.
     </p>
     <dl class="facts">
-      <div class="fact"><dt>Routes</dt><dd>13</dd></div>
-      <div class="fact"><dt>Page modules</dt><dd>12 live · 5 unreachable</dd></div>
+      <div class="fact"><dt>Routes</dt><dd>14</dd></div>
+      <div class="fact"><dt>Page modules</dt><dd>13 live · 5 unreachable</dd></div>
       <div class="fact"><dt>Components</dt><dd>33 live · 5 orphaned</dd></div>
-      <div class="fact"><dt>Ports</dt><dd>8</dd></div>
-      <div class="fact"><dt>Backend functions</dt><dd>7</dd></div>
+      <div class="fact"><dt>Ports</dt><dd>9</dd></div>
+      <div class="fact"><dt>Backend functions</dt><dd>8</dd></div>
       <div class="fact"><dt>Agents</dt><dd>4</dd></div>
       <div class="fact"><dt>Stores</dt><dd>2</dd></div>
       <div class="fact"><dt>Third parties</dt><dd>6</dd></div>
@@ -421,7 +421,7 @@
   </div>
 
   <div class="layer">
-    <h2>Pages <span>13 routes over 12 modules</span></h2>
+    <h2>Pages <span>14 routes over 13 modules</span></h2>
     <div class="grid c4">
       <div class="block repo">
         <h3>Public <span class="n">8</span></h3>
@@ -438,13 +438,13 @@
       </div>
       <div class="block repo">
         <h3>Admin <span class="n">2</span></h3>
-        <p>Behind <code>AdminRoute</code>, which checks the role itself rather than trusting a layout gate.</p>
+        <p>Behind <code>AdminRoute</code>, which checks the role itself rather than trusting a layout gate. <code>/admin/leads</code> opens with <code>LeadTrackingPanel</code>: what is reported to GA4, and whether this browser is marked internal.</p>
         <ul><li>/admin/leads</li><li>/admin/blog</li></ul>
       </div>
       <div class="block repo">
-        <h3>Auth <span class="n">2</span></h3>
-        <p>One route, plus the catch-all 404.</p>
-        <ul><li>/login</li><li>*</li></ul>
+        <h3>Auth and account <span class="n">3</span></h3>
+        <p><code>/account</code> is the signed-in visitor's own enquiries, read-only and noindex; a signed-out visitor is sent to <code>/login?returnTo=/account</code>. Plus the catch-all 404.</p>
+        <ul><li>/login</li><li>/account</li><li>*</li></ul>
       </div>
     </div>
   </div>
@@ -501,7 +501,8 @@
       <div class="block repo">
         <h3>lib/ — platform</h3>
         <p><code>freshness.ts</code> detects a stale bundle and reloads past the cache.</p>
-        <ul><li>seo.ts</li><li>structured-data.ts</li><li>freshness.ts</li><li>AuthContext.tsx</li></ul>
+        <p>Also <code>analytics.ts</code>, the one sender of GA4 events: it keeps only four parameters, and <code>LEAD_EVENTS</code> is its catalogue.</p>
+        <ul><li>seo.ts</li><li>structured-data.ts</li><li>freshness.ts</li><li>analytics.ts</li><li>AuthContext.tsx</li></ul>
       </div>
       <div class="block repo">
         <h3>content/</h3>
@@ -537,7 +538,7 @@
   <div class="section-head">
     <h2>3 · Ports and adapters — the seam</h2>
     <p>
-      No component imports a backend SDK. Eight interfaces in
+      No component imports a backend SDK. Nine interfaces in
       <code>src/services/ports.ts</code> stand between the app and whoever is
       serving it, and <code>src/services/index.ts</code> is the single place that
       decides which adapter satisfies each one. This is the layer the Base44 exit
@@ -585,8 +586,13 @@
       </div>
       <div class="block sup">
         <h3>AuthPort <span class="tag t-new">dual</span></h3>
-        <p>The one port with two live adapters, selected by <code>VITE_AUTH_PROVIDER</code>. The pattern the rest will follow.</p>
+        <p>Two live adapters, selected by <code>VITE_AUTH_PROVIDER</code>. The pattern the rest will follow; <code>AccountPort</code> already does.</p>
         <div class="path">SupabaseAuthService · Base44AuthService</div>
+      </div>
+      <div class="block sup">
+        <h3>AccountPort <span class="tag t-new">dual</span></h3>
+        <p>A visitor's own enquiries, for <code>/account</code>. Two adapters, selected like <code>AuthPort</code>: one calls the <code>myAccount</code> function, the other the <code>my_enquiries()</code> RPC. Both end in <code>enquiries_for</code>.</p>
+        <div class="path">SupabaseAccountService · Base44AccountService</div>
       </div>
     </div>
   </div>
@@ -595,7 +601,7 @@
   <div class="section-head">
     <h2>4 · Base44 backend</h2>
     <p>
-      Seven Deno functions, each a self-contained entry point with no shared
+      Eight Deno functions, each a self-contained entry point with no shared
       module — Base44 provides none. Helpers are therefore hand-duplicated
       across files, and <code>tests/contract/agents.contract.test.ts</code> holds
       the copies byte-identical. Duplicated is fine here; divergent is not.
@@ -634,6 +640,11 @@
         <h3>contentAdmin <span class="n">189</span></h3>
         <p>Writes as service role, so it verifies the Supabase token and reads the role from <code>profiles</code> before anything else.</p>
         <ul><li>entities</li><li>supabase</li></ul>
+      </div>
+      <div class="block b44">
+        <h3>myAccount <span class="n">84</span></h3>
+        <p>The personal area for a Base44 sign-in: verified and enabled callers only, the verified email matched with <code>enquiries_for</code> using the service key, the columns filtered again.</p>
+        <ul><li>supabase</li></ul>
       </div>
       <div class="block b44">
         <h3>logSupportChat <span class="n">167</span></h3>
@@ -739,6 +750,7 @@
         <tr><td><code>createConsultationEvent</code></td><td class="num">310</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
         <tr><td><code>upsertContact</code></td><td class="num">278</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
         <tr><td><code>contentAdmin</code></td><td class="num">189</td><td class="c no">·</td><td class="c yes">✓</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+        <tr><td><code>myAccount</code></td><td class="num">84</td><td class="c no">·</td><td class="c no">·</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
         <tr><td><code>logSupportChat</code></td><td class="num">167</td><td class="c yes">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
       </tbody>
     </table>
@@ -748,7 +760,7 @@
   <div class="section-head">
     <h2>6 · What the system talks to outside itself</h2>
     <p>
-      Six services. Five are reached through a Base44 connector holding an OAuth
+      Six services, plus Google Analytics in the visitor's browser (below). Five are reached through a Base44 connector holding an OAuth
       refresh token, which is why hosting is the easy half of leaving the
       platform and credentials are the hard half.
     </p>
@@ -776,6 +788,19 @@
         <h3>Google Docs</h3>
         <p>The meeting brief, linked from the summary mail.</p>
         <div class="path">docs/v1 · connector: googledocs</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <h2>Measurement <span>in the visitor's browser, not through a connector</span></h2>
+    <div class="grid c2">
+      <div class="block ext">
+        <h3>Google Analytics 4</h3>
+        <p>
+          Clicks to call, WhatsApp and email, <code>#start</code> clicks, chat starts and handoffs, and <code>generate_lead</code> after a successful save. Only <code>location</code>, <code>cta</code>, <code>method</code> and <code>channel</code> are sent. The privacy policy does not yet mention it and there is no consent banner: an open question for Dorit's compliance adviser.
+        </p>
+        <div class="path">src/lib/analytics.ts · property G-LLSYPMGV58 · ?internal=1</div>
       </div>
     </div>
   </div>
