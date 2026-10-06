@@ -10,6 +10,7 @@ import StartConversation from "@/components/dorit/sections/StartConversation";
 import ProofCarousel from "@/components/dorit/sections/ProofCarousel";
 import Testimonials from "@/components/dorit/sections/Testimonials";
 import DetailedFAQ from "@/components/dorit/sections/DetailedFAQ";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Footer from "@/components/dorit/layout/Footer";
 import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
 
@@ -46,20 +47,20 @@ export default function Home() {
 
   return (
     <div className="relative bg-background pb-14 md:pb-0">
-      <SecurityScroll />
-      <FloatingHeader />
+      <ErrorBoundary><SecurityScroll /></ErrorBoundary>
+      <ErrorBoundary><FloatingHeader /></ErrorBoundary>
       <main>
-        <Hero />
-        <CarrierLogos />
-        <About variant="brief" />
-        <ServiceMatrix />
-        <StartConversation />
-        <ProofCarousel />
-        <Testimonials />
-        <DetailedFAQ />
+        <ErrorBoundary><Hero /></ErrorBoundary>
+        <ErrorBoundary><CarrierLogos /></ErrorBoundary>
+        <ErrorBoundary><About variant="brief" /></ErrorBoundary>
+        <ErrorBoundary><ServiceMatrix /></ErrorBoundary>
+        <ErrorBoundary><StartConversation /></ErrorBoundary>
+        <ErrorBoundary><ProofCarousel /></ErrorBoundary>
+        <ErrorBoundary><Testimonials /></ErrorBoundary>
+        <ErrorBoundary><DetailedFAQ /></ErrorBoundary>
       </main>
-      <MobileStickyBar />
-      <Footer />
+      <ErrorBoundary><MobileStickyBar /></ErrorBoundary>
+      <ErrorBoundary><Footer /></ErrorBoundary>
     </div>
   );
 }

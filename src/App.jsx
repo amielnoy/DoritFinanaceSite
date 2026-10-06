@@ -7,6 +7,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import SeoRouteGuard from '@/components/SeoRouteGuard';
@@ -66,6 +67,7 @@ const AuthenticatedApp = () => {
   return (
     <>
       <Suspense fallback={<RouteFallback />}>
+      <ErrorBoundary scope="page">
       <Routes>
         {/* Add your page Route elements here */}
         <Route path="/" element={<Home />} />
@@ -87,6 +89,7 @@ const AuthenticatedApp = () => {
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>
+      </ErrorBoundary>
       </Suspense>
       <FloatingActions />
     </>

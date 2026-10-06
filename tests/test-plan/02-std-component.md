@@ -146,8 +146,17 @@ The admins' view of GA4 lead tracking, at the top of `/admin/leads`.
 `sanity.test.tsx` also pins the rule that a lead counts only once saved:
 CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a failed one".
 
+### 4.10 `<ErrorBoundary />` — `tests/component/error-boundary.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ERB-001 | "renders children normally when nothing throws" | Child visible, no `role="alert"` |
+| CMP-ERB-002 | "shows the fallback with all three contact links when a child throws, and logs without personal data" | `role="alert"` message; `tel:`, `wa.me` and `mailto:` links from `CONTACT`; `console.error` called |
+| CMP-ERB-003 | "isolates the failure: sibling trees still render" | Sibling text present; section wording ("החלק הזה") |
+| CMP-ERB-004 | "uses page wording for the app-level boundary" | `scope="page"` message says "הדף" |
+
 ## 5. Pass criteria
 
-All 66 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 70 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
