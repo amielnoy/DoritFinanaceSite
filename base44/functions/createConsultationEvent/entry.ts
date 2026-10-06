@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
 
 /** שם הפונקציה כפי שהוא מופיע בכל שורת יומן שלה. */
 const FN = 'createConsultationEvent';

@@ -382,6 +382,13 @@ selected by tag, not skipped by a condition callback (A-68).
 | CTR-SEL-002 | "never skips by a condition callback, which Allure reports as a failed hook" | No `test.skip((` in any spec |
 | CTR-SEL-003 | "filters each tag out of the projects it does not belong to" | Two `grepInvert` filters of each kind |
 
+### 4.5 Base44 SDK parity — `sdk-version.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-SDK-001 | "finds at least one function pin" | At least one `npm:@base44/sdk@<version>` import under `base44/functions` |
+| CTR-SDK-002 | "`<function>` pins the SDK version the frontend has installed" (one per function) | Pinned version equals `node_modules/@base44/sdk` version. Functions pick up a bump only on the next Base44 publish. |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
