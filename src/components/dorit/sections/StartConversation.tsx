@@ -24,45 +24,43 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
  */
 export default function StartConversation() {
   return (
-    <section id="start" className="py-24 md:py-32 border-t border-border/60">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10">
+    <section id="start" className="border-b border-border">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-10">
         <Reveal>
           <Eyebrow>03 · ההקשבה</Eyebrow>
-          <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight max-w-4xl">
+          <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-[18px] leading-[1.12] max-w-[880px] [text-wrap:balance]">
             נתחיל בשיחה קצרה — כדי שדורית תגיע מוכנה
           </h2>
         </Reveal>
 
         {/* The chat, at the width of the page. */}
-        <div className="mt-12">
-          <AgentChat descriptor={AGENTS.needsInterview} embedded />
-        </div>
+        <AgentChat descriptor={AGENTS.needsInterview} embedded />
 
         {/* The fence, published beside the chat.
             It used to render in AgentChat's heading column, which the embedded
             layout does not draw — and the boundary a visitor can read is half of
             honouring it. Same markup, moved rather than dropped. */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <p className="lg:col-span-5 border-r-2 border-accent pr-4 font-heading text-[17px] leading-relaxed text-foreground/85">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-8">
+          <p className="m-0 border-r border-highlight pr-[18px] font-heading text-[21px] leading-[1.6]">
             {AGENTS.needsInterview.tagline}
           </p>
           {AGENTS.needsInterview.guardrails ? (
-            <div className="lg:col-span-7 border border-border/60 bg-secondary/30 px-5 py-5">
+            <div className="border-t border-border pt-[18px]">
               <p className="text-sm text-accent">כללי הגדר</p>
-              <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-[13.5px] leading-relaxed">
-                <div>
+              <dl className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-5 text-[15px] leading-[1.7]">
+                <div className="flex flex-col gap-1.5">
                   <dt className="text-sm text-accent">מה הוא עושה</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.allowed.join(" · ")}
                   </dd>
                 </div>
-                <div>
+                <div className="flex flex-col gap-1.5">
                   <dt className="text-sm text-accent">מה הוא לא עושה</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.forbidden.join(" · ")}
                   </dd>
                 </div>
-                <div>
+                <div className="flex flex-col gap-1.5">
                   <dt className="text-sm text-accent">מתי עובר לאדם</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.handoff}
@@ -73,41 +71,37 @@ export default function StartConversation() {
           ) : null}
         </div>
 
-        <p className="mt-8 text-[13px] leading-relaxed text-muted-foreground max-w-3xl">
+        <p className="m-0 max-w-[760px] text-[15px] leading-[1.7] text-muted-foreground">
           הסוכן אוסף מידע לקראת הפגישה ואינו נותן ייעוץ. הפרטים נשמרים אצל דורית
           ואצל הצוות שמתפעל את האתר מטעמה.
         </p>
 
         {/* Two ways out of the chat, for a visitor who would rather not use it. */}
-        <div className="mt-10 flex flex-col sm:flex-row gap-4">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
           <a
             href={`https://wa.me/${CONTACT.whatsapp}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 inline-flex items-center justify-center gap-3 border border-border/60 bg-card hover:bg-secondary/40 transition-colors px-6 py-5 text-[15px]"
+            className={TILE}
           >
-            <MessageCircle size={18} className="text-accent shrink-0" aria-hidden="true" />
+            <MessageCircle size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
             עדיף לי בוואטסאפ
           </a>
           <a
             href={`tel:${CONTACT.phoneE164}`}
-            className="flex-1 inline-flex items-center justify-center gap-3 border border-border/60 bg-card hover:bg-secondary/40 transition-colors px-6 py-5 text-[15px]"
+            className={TILE}
           >
-            <Phone size={18} className="text-accent shrink-0" aria-hidden="true" />
+            <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
             עדיף לי בטלפון
           </a>
         </div>
 
-        {/* And the short form, as a secondary card rather than its own section. */}
-        <div className="mt-16 border-t border-border/60 pt-16">
-          <h3 className="font-heading text-2xl md:text-3xl leading-tight">
-            מעדיפים להשאיר פרטים?
-          </h3>
-          <div className="mt-8">
-            <QuickContact embedded />
-          </div>
-        </div>
+        {/* And the short form: heading and form side by side, on the ground. */}
+        <QuickContact embedded />
       </div>
     </section>
   );
 }
+
+const TILE =
+  "flex items-center justify-center gap-3 min-h-16 rounded-md border border-border text-[17px] text-foreground hover:border-highlight hover:bg-highlight/5 transition-colors duration-200";
