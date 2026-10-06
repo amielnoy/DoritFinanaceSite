@@ -33,7 +33,7 @@ const ADAPTERS = [
 
 describe("adapter → submitLead", () => {
   const calls = findObjectLiteralCalls(
-    /functions\.invoke\(\s*["']submitLead["']\s*,\s*/,
+    /(?:functions\.invoke\(|invokeFunction(?:<\w+>)?\(\s*this\.client\s*,)\s*["']submitLead["']\s*,\s*/,
     ADAPTERS
   );
   const accepted = destructuredBody(backendSource("submitLead"));
@@ -118,7 +118,7 @@ describe("adapter → submitLead", () => {
 
 describe("adapter → submitClaim", () => {
   const calls = findObjectLiteralCalls(
-    /functions\.invoke\(\s*["']submitClaim["']\s*,\s*/,
+    /(?:functions\.invoke\(|invokeFunction(?:<\w+>)?\(\s*this\.client\s*,)\s*["']submitClaim["']\s*,\s*/,
     ADAPTERS
   );
   const accepted = destructuredBody(backendSource("submitClaim"));

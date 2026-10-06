@@ -5,11 +5,9 @@ import type {
   HumanContact,
   SupportPort,
 } from "../ports";
+import { invokeFunction, type FunctionInvoker } from "./invoke";
 
-/** The SDK surface this adapter needs — not the whole client. */
-export interface FunctionInvoker {
-  functions: { invoke(name: string, payload: unknown): Promise<unknown> };
-}
+export type { FunctionInvoker };
 
 /**
  * The contact details the visitor falls back to when the backend cannot be
@@ -37,7 +35,7 @@ export class Base44SupportService implements SupportPort {
 
   async escalate(request: EscalationRequest): Promise<EscalationReceipt> {
     try {
-      const receipt = (await this.client.functions.invoke("escalateToHuman", {
+      const receipt = await invokeFunction<EscalationReceipt>(this.client, "escalateToHuman", {
         reason: request.reason,
         summary: request.summary,
         agent: request.agent ?? "",
@@ -47,7 +45,7 @@ export class Base44SupportService implements SupportPort {
         topic: "",
         consentVersion: request.consentVersion ?? "",
         consentAt: request.consentAt ?? "",
-      })) as EscalationReceipt | undefined;
+      });
 
       if (!receipt?.contact) {
         return {
