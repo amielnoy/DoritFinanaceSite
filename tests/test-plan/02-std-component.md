@@ -114,8 +114,23 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-ACC-015 | "says the time is not set when a meeting has neither a date nor a timing" | "המועד טרם נקבע" shown |
 | CMP-ACC-016 | "offers a retry after a failed load, and shows the enquiries when it succeeds" | "ניסיון נוסף" refetches; the second load's meeting appears |
 
+### 4.8 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
+
+The admins' view of GA4 lead tracking, at the top of `/admin/leads`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-GA4-001 | "lists every event the site sends" | Every `LEAD_EVENTS` name shown |
+| CMP-GA4-002 | "says when the tag is blocked in this browser" | "כנראה חוסם פרסומות" |
+| CMP-GA4-003 | "says when the tag is running" | "אירועים נשלחים" |
+| CMP-GA4-004 | "marks this browser as internal, and unmarks it" | Label and storage flip both ways |
+| CMP-GA4-005 | "links to the GA4 reports in a new tab" | `analytics.google.com`, `rel` contains `noopener` |
+
+`sanity.test.tsx` also pins the rule that a lead counts only once saved:
+CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a failed one".
+
 ## 5. Pass criteria
 
-All 32 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 54 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

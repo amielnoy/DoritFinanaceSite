@@ -445,7 +445,7 @@ read as signed out. Only `401` and `403` mean the visitor is not signed in.
 
 ## 5. Pass criteria
 
-All 240 cases pass. These assert behaviour, not shape — a failure means the
+All 253 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
