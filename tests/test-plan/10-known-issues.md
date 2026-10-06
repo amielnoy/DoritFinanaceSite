@@ -264,13 +264,11 @@ reported rather than enforced (`SEO-MOB-005`), because moving the type scale is 
 design decision in the same class as the contrast finding in B-1, not an SEO fix.
 Raising them to 12px would close it.
 
-### B-7 · `src/lib/utils.js` touches `window` at module scope
+### B-7 · ~~`src/lib/utils.js` touches `window` at module scope~~ — closed
 
-`export const isIframe = window.self !== window.top` runs on import, so the
-module cannot be loaded in any non-browser context. It forces `cn()`'s unit
-tests into jsdom (`tests/unit/utils.dom.test.ts`) and would break SSR or any
-future prerender step. A one-line guard (`typeof window !== "undefined"`) would
-close it; left alone as it is outside the scope of this work.
+`isIframe` is now `typeof window !== "undefined" && window.self !== window.top`,
+so the module loads in node; `tests/unit/utils.node.test.ts` imports it and
+calls `cn()` without jsdom. `tests/unit/utils.dom.test.ts` is left as it was.
 
 ### B-8 · ~~The support agent must not sit on the published WhatsApp number~~ — closed by decision
 

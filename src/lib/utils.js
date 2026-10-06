@@ -6,4 +6,5 @@ export function cn(...inputs) {
 } 
 
 
-export const isIframe = window.self !== window.top;
+// Guarded so the module loads outside a browser (SSR, prerender, node tests).
+export const isIframe = typeof window !== "undefined" && window.self !== window.top;
