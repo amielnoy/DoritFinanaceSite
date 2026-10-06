@@ -35,18 +35,25 @@ conversation history; managing admins or roles; any change to what admins see.
 
 | Decision | Choice | Why |
 |---|---|---|
-| How an enquiry belongs to a user | **Verified email equals the enquiry's email** (option 1) | Works for every past and future enquiry. Exposes nothing new: the confirmation mail already sent these details to that address. |
+| How an enquiry belongs to a user | **Verified email equals the enquiry's email** (option 1) | Works for every past and future enquiry. It does expose more than the mail did: the confirmation mail carries only the topic (and the power-of-attorney link), while the page shows the summary, answers and meeting time, also for a partial interview that got no mail. Accepted by the operator, 2026-10-06. |
 | Where the data is read from | **Supabase** | Meetings exist only there (`meetings`); the migration is heading there. One source, not two. |
 | Which sign-ins it serves | **Both**, behind one `AccountPort` | Production signs in through Base44 today. A Supabase-only page would ship to nobody until the auth flip. |
 | What the user can do | **Read only** | Changing a booking is Dorit's conversation to have, not a form. |
 
 ### The risk the email rule accepts
 
-If a visitor types someone else's address, that person — once signed in —
-sees the enquiry. They have already received it: the confirmation mail goes to
-the same address with the same details. The page adds a place to see it again,
-not a new recipient. Accepted on that basis; option 2 (a claim link in the
-confirmation mail) remains available if it ever stops being true.
+If a visitor types someone else's address and it is that person's real,
+verified one, that person — once signed in — sees the enquiry, including the
+interview summary, the answers and the meeting time. The confirmation mail does
+not carry those (only the topic and the power-of-attorney link), and a partial
+interview gets no mail at all, so the page is a new disclosure, not a second
+copy of one already made.
+
+The first draft of this spec said the opposite ("they have already received
+it"). That premise was found false in the final review, and the operator
+re-accepted the real risk on 2026-10-06. The privacy policy states it, and the
+wording awaits Dorit's and her compliance adviser's approval. Option 2 (a claim
+link in the confirmation mail) remains available.
 
 ## What exists today
 

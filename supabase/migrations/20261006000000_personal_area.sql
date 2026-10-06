@@ -1,9 +1,8 @@
 -- A personal area for signed-in visitors.
 --
 -- An enquiry belongs to the user whose verified email equals the enquiry's
--- email. Nothing new is exposed by that: the confirmation mail already sent
--- these details to that address. See
--- docs/superpowers/specs/2026-10-06-personal-area-design.md.
+-- email. The risk that accepts is recorded in base44/agents/COMPLIANCE.md §6;
+-- design in docs/superpowers/specs/2026-10-06-personal-area-design.md.
 --
 -- The tables gain no policy. `enquiries_for` is the only door, and it names
 -- every column that leaves — a column added to `leads` later is invisible to
