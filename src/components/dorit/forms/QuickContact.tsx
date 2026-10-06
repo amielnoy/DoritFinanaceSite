@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { services } from "@/services";
 import { useSubmission } from "@/hooks/useSubmission";
+import { leadEvents } from "@/lib/analytics";
 import { CONTACT } from "@/config/contact";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
@@ -31,7 +32,11 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
         message: form.message,
       })
     );
-    if (ok) setForm({ name: "", phone: "", email: "", message: "" });
+    if (ok) {
+      // A lead once it is saved — never on the click.
+      leadEvents.formSubmitted();
+      setForm({ name: "", phone: "", email: "", message: "" });
+    }
   };
 
   // The form itself. On the home page it sits inside "נתחיל בשיחה קצרה" as

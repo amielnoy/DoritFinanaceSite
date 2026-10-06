@@ -15,6 +15,7 @@ import {
 } from "@/config/compliance";
 import { CONTACT } from "@/config/contact";
 import { readHandoff } from "@/lib/interview-handoff";
+import { leadEvents, type ChatMethod } from "@/lib/analytics";
 import ContactChannels from "./ContactChannels";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
@@ -37,6 +38,14 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
  */
 const allowTel = (url: string): string =>
   url.startsWith("tel:") ? url : defaultUrlTransform(url);
+
+/** GA4's name for each chat — a technical label, never what was said in it. */
+const CHAT_METHOD: Record<string, ChatMethod> = {
+  needs_interview: "ai_interview",
+  support_agent: "ai_support",
+  procedures_agent: "ai_procedures",
+  blog_recommender: "ai_blog",
+};
 
 /** Everything that distinguishes one on-site agent from another. */
 export interface AgentDescriptor {
@@ -176,6 +185,8 @@ export default function AgentChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   /** Set the moment a closing payload is accepted, so it is submitted once. */
   const submittedRef = useRef<boolean>(false);
+  /** Which chat GA4 events name, by agent. */
+  const chatMethod: ChatMethod = CHAT_METHOD[descriptor.agent] ?? "ai_interview";
 
   useEffect(() => {
     if (!conversationId) return;
@@ -219,6 +230,7 @@ export default function AgentChat({
       try {
         const receipt = await services.leads.submitInterview(summary);
         if (!receipt?.ok) throw new Error(`rejected${receipt?.rid ? ` rid=${receipt.rid}` : ""}`);
+        leadEvents.interviewCompleted();
       } catch (e) {
         // The id, where anyone can find it. It names every log line the
         // submission produced, and it is the difference between "a visitor says
@@ -340,6 +352,7 @@ export default function AgentChat({
   const acceptConsent = () => {
     if (!consentChecked) return;
     setConsentAt(new Date().toISOString());
+    leadEvents.chatStarted(chatMethod);
   };
 
   const reset = () => {
@@ -388,6 +401,7 @@ export default function AgentChat({
               <button
                 onClick={() => {
                   setHandoffError(null);
+                  if (!handoffOpen) leadEvents.chatHandoff(chatMethod);
                   setHandoffOpen((open) => !open);
                 }}
                 disabled={handingOff || handoffSent}

@@ -177,7 +177,7 @@ export default function FAQPage() {
         <AgentChat descriptor={AGENTS.support} />
 
         {/* CTA */}
-        <section className="relative py-24 md:py-32 border-t border-border/60 bg-primary text-primary-foreground">
+        <section data-track-location="faq" className="relative py-24 md:py-32 border-t border-border/60 bg-primary text-primary-foreground">
           <div className="max-w-3xl mx-auto px-6 text-center">
             <Reveal>
               <h2 className="font-heading text-4xl md:text-5xl leading-tight">

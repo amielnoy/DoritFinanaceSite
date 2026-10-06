@@ -246,6 +246,30 @@ describe("<QuickContact />", () => {
     expect(screen.getByLabelText(/שם מלא/)).toHaveValue("ישראלה");
   });
 
+  // GA4 counts a lead only once it is saved: a click that ends in an error is
+  // not one, and counting it would make the report claim leads Dorit never got.
+  it("reports a lead to GA4 after a successful send, and not after a failed one", async () => {
+    const gtag = vi.fn();
+    (window as any).gtag = gtag;
+    const user = userEvent.setup();
+    try {
+      base44Mock.functions.invoke.mockRejectedValueOnce(new Error("backend down"));
+      render(<QuickContact />);
+      await user.type(screen.getByLabelText(/שם מלא/), "ישראלה");
+      await user.type(screen.getByLabelText(/טלפון/), "050-1234567");
+      await user.click(screen.getByRole("button", { name: /שליחת הודעה/ }));
+      await screen.findByText(/לא הצלחנו לשלוח/);
+      expect(gtag).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: /שליחת הודעה/ }));
+      await screen.findByText("ההודעה נשלחה. תודה.");
+      expect(gtag).toHaveBeenCalledTimes(1);
+      expect(gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "contact_form" });
+    } finally {
+      delete (window as any).gtag;
+    }
+  });
+
   it("does not submit twice on a double click", async () => {
     const user = userEvent.setup();
     render(<QuickContact />);
