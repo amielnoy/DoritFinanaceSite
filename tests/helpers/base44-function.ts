@@ -67,8 +67,8 @@ export interface HarnessOptions {
   env?: Record<string, string>;
   resendStatus?: number;
   resendResponse?: unknown;
-  /** The signed-in caller `base44.auth.me()` returns, or `null` for nobody. */
-  user?: Record<string, unknown> | null;
+  /** The signed-in caller `base44.auth.me()` returns, `null` for nobody, or an `Error` thrown as-is. */
+  user?: Record<string, unknown> | Error | null;
   /** JSON returned by a Supabase RPC, keyed by function name. */
   rpc?: Record<string, unknown>;
 }
@@ -187,6 +187,7 @@ export async function invokeFunction(
     entities,
     auth: {
       me: async () => {
+        if (options.user instanceof Error) throw options.user;
         if (!options.user) throw Object.assign(new Error("not authenticated"), { status: 401 });
         return options.user;
       },

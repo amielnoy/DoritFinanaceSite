@@ -49,6 +49,21 @@ describe("myAccount — a Base44 user's own enquiries", () => {
   it("refuses a disabled account", async () => {
     const r = await invokeFunction("myAccount", {}, { env, user: { ...verified, disabled: true } });
     expect(r.status).toBe(403);
+    expect(r.callsTo("/rest/v1/rpc/")).toHaveLength(0);
+  });
+
+  it("answers 500, not 'signed out', when Base44 itself fails", async () => {
+    const outage = Object.assign(new Error("upstream unavailable"), { status: 503 });
+    const r = await invokeFunction("myAccount", {}, { env, user: outage });
+    expect(r.status).toBe(500);
+    expect(typeof r.json.rid).toBe("string");
+    expect(r.callsTo("/rest/v1/rpc/")).toHaveLength(0);
+  });
+
+  it("still reads a 401 off an axios-shaped auth failure as signed out", async () => {
+    const axiosish = Object.assign(new Error("x"), { response: { status: 401 } });
+    const r = await invokeFunction("myAccount", {}, { env, user: axiosish });
+    expect(r.status).toBe(401);
   });
 
   it("answers with the rid and no error detail when Supabase fails", async () => {

@@ -1,6 +1,6 @@
 import { toEnquiry } from "../account-mapping";
 import { AccountLoadError, type AccountPort, type Enquiry } from "../ports";
-import { invokeFunction, type FunctionInvoker } from "./invoke";
+import { failureOf, invokeFunction, type FunctionInvoker } from "./invoke";
 
 interface MyAccountBody {
   ok?: boolean;
@@ -17,9 +17,9 @@ export class Base44AccountService implements AccountPort {
     try {
       body = await invokeFunction<MyAccountBody>(this.client, "myAccount", {});
     } catch (e) {
-      const err = e as { status?: number; data?: { rid?: string } };
-      const reason = err.status === 401 ? "signed_out" : err.status === 403 ? "unverified" : "failed";
-      throw new AccountLoadError(reason, err.data?.rid);
+      const { status, body: failed } = failureOf(e);
+      const reason = status === 401 ? "signed_out" : status === 403 ? "unverified" : "failed";
+      throw new AccountLoadError(reason, typeof failed?.rid === "string" ? failed.rid : undefined);
     }
     if (!body?.ok || !Array.isArray(body.enquiries)) throw new AccountLoadError("failed", body?.rid);
     return body.enquiries.map(toEnquiry);

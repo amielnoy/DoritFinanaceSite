@@ -3,6 +3,7 @@ import { toEnquiry } from "@/services/account-mapping";
 import { SupabaseAccountService } from "@/services/supabase/SupabaseAccountService";
 import { Base44AccountService } from "@/services/base44/Base44AccountService";
 import { AccountLoadError } from "@/services/ports";
+import { failureOf } from "@/services/base44/invoke";
 
 const row = {
   created_at: "2026-10-06T07:55:18Z", source: "interview", track: "pension", track_label: "פנסיה, גמל והשתלמות",
@@ -63,15 +64,23 @@ describe("Base44AccountService — fed the SDK's real response shape (A-67)", ()
     expect(out).toHaveLength(1);
   });
 
-  it("names a 401 as signed out and a 403 as unverified, keeping the rid", async () => {
+  it("names a 401 as signed out, a 403 as unverified, else failed — keeping the rid, off the AxiosError the SDK throws", async () => {
     const reject = (status: number) =>
-      vi.fn().mockRejectedValue(Object.assign(new Error("x"), { status, data: { rid: "r9" } }));
+      vi.fn().mockRejectedValue(
+        Object.assign(new Error("Request failed"), { status, response: { status, data: { rid: "r9" } } })
+      );
     await expect(new Base44AccountService({ functions: { invoke: reject(401) } }).myEnquiries())
       .rejects.toMatchObject({ reason: "signed_out", rid: "r9" });
     await expect(new Base44AccountService({ functions: { invoke: reject(403) } }).myEnquiries())
       .rejects.toMatchObject({ reason: "unverified", rid: "r9" });
     await expect(new Base44AccountService({ functions: { invoke: reject(500) } }).myEnquiries())
       .rejects.toMatchObject({ reason: "failed", rid: "r9" });
+  });
+
+  it("also reads a Base44Error-shaped rejection (status and data on the error)", async () => {
+    const invoke = vi.fn().mockRejectedValue(Object.assign(new Error("x"), { status: 403, data: { rid: "r7" } }));
+    await expect(new Base44AccountService({ functions: { invoke } }).myEnquiries())
+      .rejects.toMatchObject({ reason: "unverified", rid: "r7" });
   });
 
   it("fails with the rid when the body says ok:false", async () => {
@@ -84,5 +93,23 @@ describe("Base44AccountService — fed the SDK's real response shape (A-67)", ()
     const invoke = vi.fn().mockResolvedValue(axios({ ok: true, rid: "r3" }));
     await expect(new Base44AccountService({ functions: { invoke } }).myEnquiries())
       .rejects.toMatchObject({ reason: "failed", rid: "r3" });
+  });
+});
+
+describe("failureOf", () => {
+  it("reads an AxiosError: status and body under response", () => {
+    expect(failureOf({ status: 500, response: { status: 500, data: { rid: "a" } } }))
+      .toEqual({ status: 500, body: { rid: "a" } });
+  });
+  it("prefers the response status when the error has none of its own", () => {
+    expect(failureOf({ response: { status: 403, data: { rid: "b" } } })).toEqual({ status: 403, body: { rid: "b" } });
+  });
+  it("reads a Base44Error: status and data on the error", () => {
+    expect(failureOf({ status: 401, data: { rid: "c" } })).toEqual({ status: 401, body: { rid: "c" } });
+  });
+  it("gives nothing for a body that is not an object, or a non-error", () => {
+    expect(failureOf({ status: 502, response: { data: "<html>" } })).toEqual({ status: 502, body: undefined });
+    expect(failureOf(undefined)).toEqual({ status: undefined, body: undefined });
+    expect(failureOf("boom")).toEqual({ status: undefined, body: undefined });
   });
 });

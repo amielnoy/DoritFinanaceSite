@@ -236,8 +236,11 @@ is the single place that stops one enquiry being filed twice.
 ### 4.14 Personal area adapters — `account-services.test.ts`
 
 One mapper and two adapters behind `AccountPort`. The Base44 cases are fed the
-SDK's real axios-wrapped response and a rejection carrying `.status` and
-`.data`, not a bare body, because a bare body is what hid the wrapper before.
+SDK's real axios-wrapped response and the rejection the SDK really throws — an
+AxiosError with `.status` and the body under `.response.data`, because the SDK
+builds its functions client with `interceptResponses: false` — not a bare body,
+because a bare body is what hid the wrapper before. One case keeps the
+Base44Error shape (`.status`, `.data`) so both work.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -247,12 +250,17 @@ SDK's real axios-wrapped response and a rejection carrying `.status` and
 | UNIT-ACC-004 | "reads my_enquiries over RPC" | `rpc("my_enquiries")` called; rows mapped |
 | UNIT-ACC-005 | "turns an RPC error into AccountLoadError" | Rejects with `AccountLoadError` |
 | UNIT-ACC-006 | "reads the body out of the axios wrapper" | `invoke("myAccount", {})`; one enquiry returned |
-| UNIT-ACC-007 | "names a 401 as signed out and a 403 as unverified, keeping the rid" | `signed_out`, `unverified`, and `failed` for 500, each with the rid |
+| UNIT-ACC-007 | "names a 401 as signed out, a 403 as unverified, else failed — keeping the rid, off the AxiosError the SDK throws" | `signed_out`, `unverified`, and `failed` for 500, each with the rid read from `response.data` |
 | UNIT-ACC-008 | "names RPC error 42501 as signed out" | `AccountLoadError("signed_out")` — `my_enquiries` is revoked from anon |
 | UNIT-ACC-009 | "names RPC error PGRST301 as signed out" | `signed_out` — JWT missing, expired or invalid |
 | UNIT-ACC-010 | "names an unrecognised RPC error code as failed" | `failed`; Supabase never yields `unverified` |
 | UNIT-ACC-011 | "fails with the rid when the body says ok:false" | `failed` with the rid |
 | UNIT-ACC-012 | "fails with the rid when ok:true carries no enquiries array" | `failed` with the rid, not an empty list |
+| UNIT-ACC-013 | "also reads a Base44Error-shaped rejection (status and data on the error)" | 403 with `data.rid` gives `unverified` and the rid |
+| UNIT-ACC-014 | "failureOf: reads an AxiosError: status and body under response" | `{ status: 500, body: { rid } }` |
+| UNIT-ACC-015 | "failureOf: prefers the response status when the error has none of its own" | Status and body taken from `response` |
+| UNIT-ACC-016 | "failureOf: reads a Base44Error: status and data on the error" | Status and body taken from the error itself |
+| UNIT-ACC-017 | "failureOf: gives nothing for a body that is not an object, or a non-error" | `body` is undefined for an HTML string, `undefined` or a string rejection |
 
 ### The agent adapter — `agent-service.test.ts`
 

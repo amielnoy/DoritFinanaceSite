@@ -43,9 +43,14 @@ export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     me = await base44.auth.me();
-  } catch {
-    log('warn', 'auth.anonymous', { rid });
-    return json({ error: 'נדרשת התחברות.' }, 401);
+  } catch (e) {
+    const status = e?.status ?? e?.response?.status;
+    if (status === 401 || status === 403) {
+      log('warn', 'auth.anonymous', { rid });
+      return json({ error: 'נדרשת התחברות.' }, 401);
+    }
+    log('error', 'auth.failed', { rid, status: status ?? null, err: String(e?.message ?? e).slice(0, 200) });
+    return json({ error: 'לא הצלחנו לטעון את הפרטים. אפשר לנסות שוב.' }, 500);
   }
 
   const email = String(me?.email ?? '').trim().toLowerCase();
