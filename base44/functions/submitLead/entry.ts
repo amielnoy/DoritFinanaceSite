@@ -1160,7 +1160,7 @@ function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, detai
         <!-- Header -->
         <tr><td style="padding:40px 48px 30px; border-bottom:1px solid #E5DDD0; text-align:center;">
           <p style="margin:0 0 6px; font-family:Georgia,serif; font-size:24px; font-weight:bold; color:#1A1A1B; letter-spacing:-0.02em;">דורית גוב ארי</p>
-          <p style="margin:0; font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">התכנון שלי — הרווח שלך</p>
+          <p style="margin:0; font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">התכנון שלי — השקט שלך</p>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:44px 48px 36px; text-align:right;">
