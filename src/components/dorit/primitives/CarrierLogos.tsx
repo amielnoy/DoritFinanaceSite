@@ -27,18 +27,13 @@ const CARRIERS: Carrier[] = [
 
 export default function CarrierLogos() {
   return (
-    <section className="relative py-16 md:py-20 border-y border-border/50 bg-secondary/30 overflow-hidden">
-      {/* subtle architectural accent line */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-accent/25 to-transparent" />
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10">
-        <div className="text-center mb-10 md:mb-12">
-          <p className="font-heading italic text-[15px] normal-case text-accent">
-            עובדת מול מיטב חברות הפנסיה והביטוח בישראל
-          </p>
-          <div className="mt-4 mx-auto w-10 h-px bg-highlight-muted/60" />
-        </div>
+    <section className="bg-secondary border-b border-border">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-14 flex flex-col items-center gap-8">
+        <p className="text-center font-heading italic text-[15px] normal-case text-accent">
+          עובדת מול מיטב חברות הפנסיה והביטוח בישראל
+        </p>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-x-2 gap-y-8 md:gap-y-10 items-center">
+        <div className="w-full grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] border-y border-border">
           {CARRIERS.map((c) => (
             <a
               key={c.en}
@@ -46,13 +41,13 @@ export default function CarrierLogos() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`אתר ${c.he}`}
-              className="group flex flex-col items-center text-center"
+              className="group flex flex-col items-center gap-1 px-2 py-[22px] text-center text-foreground/80 hover:text-foreground hover:bg-highlight/5 transition-colors duration-200"
             >
-              <span className="font-heading text-lg md:text-xl tracking-tight leading-none text-muted-foreground group-hover:text-foreground transition-colors duration-500">
+              <span className="font-heading text-[21px] leading-[1.1]">
                 {c.he}
               </span>
               {c.en && c.en !== c.he && (
-                <span className="mt-1.5 font-heading italic text-[15px] normal-case text-muted-foreground group-hover:text-accent/70 transition-colors duration-500">
+                <span dir="ltr" className="font-heading italic text-[15px] normal-case text-muted-foreground">
                   {c.en}
                 </span>
               )}
@@ -60,7 +55,7 @@ export default function CarrierLogos() {
           ))}
         </div>
 
-        <p className="mt-12 text-center text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
+        <p className="m-0 text-center text-[15px] text-muted-foreground max-w-[580px] leading-[1.7]">
           עובדת מול מגוון חברות ביטוח ופנסיה כדי להתאים פתרון לצורך שלך. כסוכנת
           ביטוח, יש לי זיקה לגופים מוסדיים — כמפורט בגילוי הנאות.
         </p>
