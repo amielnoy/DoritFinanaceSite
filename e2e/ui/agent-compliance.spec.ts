@@ -174,9 +174,10 @@ test.describe("Agent chat — regulatory shell", () => {
 
     await test_step("the visitor is given direct channels either way", async () => {
       await expect(section.getByRole("link", { name: /050-831-1776/ })).toBeVisible();
-      // Exact: the section also carries an "עדיף לי בוואטסאפ" alternative, and
-      // Playwright matches accessible names by substring unless told otherwise.
-      await expect(section.getByRole("link", { name: "וואטסאפ", exact: true })).toBeVisible();
+      // Anchored: the row's name is its title then its label ("וואטסאפ הודעה
+      // מיידית"), and the section also carries an "עדיף לי בוואטסאפ"
+      // alternative that a bare substring match would find instead.
+      await expect(section.getByRole("link", { name: /^וואטסאפ/ })).toBeVisible();
     });
   });
 });
@@ -303,7 +304,7 @@ test.describe("Agent chat — when the backend refuses", () => {
       await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
       await section.getByRole("button", { name: "שלחו לדורית" }).click();
       await expect(section.getByRole("link", { name: /050-831-1776/ })).toBeVisible();
-      await expect(section.getByRole("link", { name: "וואטסאפ", exact: true })).toBeVisible();
+      await expect(section.getByRole("link", { name: /^וואטסאפ/ })).toBeVisible();
     });
   });
 
