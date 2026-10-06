@@ -33,50 +33,37 @@
 
 @layer base {
   :root {
-    --background: 36 38% 97%;       /* #F9F7F2 Warm Parchment */
-    --foreground: 240 3% 10%;       /* #1A1A1B Obsidian Matte */
-    --card: 36 38% 98%;
-    --card-foreground: 240 3% 10%;
-    --popover: 36 38% 98%;
-    --popover-foreground: 240 3% 10%;
-    --primary: 240 3% 10%;          /* Obsidian */
-    --primary-foreground: 36 38% 97%;
-    --secondary: 36 20% 92%;
-    --secondary-foreground: 240 3% 10%;
-    --muted: 36 18% 90%;
-    /* Raised from 40%. At 40% it measured 4.52:1 against the darkest surface
-       it sits on — a margin of 0.02 over the floor, which is why every faded
-       variant of it failed. 32% measures 6.21:1 at its worst, which leaves room
-       for a hairline border or a hover state without going under. */
-    --muted-foreground: 30 8% 32%;
-    --accent: 26 14% 39%;           /* #7D6B5D Deep Taupe */
-    --accent-foreground: 36 38% 97%;
-    /* Soft Bronze ramp. Every bronze on the site resolves to one of these
-       four; raw hex is banned outside this file (see eslint.config.js). */
-    --highlight: 32 33% 65%;          /* #C4A484  base — CTAs, accents      */
-    --highlight-strong: 27 34% 58%;   /* #b8916f  hover / pressed           */
-    --highlight-muted: 30 26% 68%;    /* #C3AD96  surfaces, borders, rules  */
-    /* The one rung that survives as type. The three above were drawn as
-       fills, and on the parchment they reach only 2.0-2.7:1 — figures set
-       in them were the least legible text on the site, worst of all on a
-       phone outdoors. Same hue as --highlight-strong, taken down to ink. */
-    --highlight-ink: 27 38% 30%;      /* #6A4A2F  figures, type on light    */
-    --highlight-foreground: 240 3% 10%;
-    /* Secondary text on the obsidian band and the footer. `--foreground` there
-       measured 3.65:1, because it is the ink for light surfaces and nothing
-       said so. */
-    --muted-foreground-on-dark: 36 20% 78%;
-    /* Third-party brand colour, fixed by WhatsApp — not ours to restyle. */
-    --brand-whatsapp: 142 70% 49%;    /* #25D366 */
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 30 10% 85%;
-    --input: 30 10% 85%;
-    --ring: 26 14% 39%;
+    --background: 0 4% 95%;           /* #f3f2f2 Classical ground (was #F9F7F2 parchment) */
+    --foreground: 40 5% 12%;          /* #201f1d ink */
+    --card: 0 4% 95%;                 /* cards are unfilled: same as ground */
+    --card-foreground: 40 5% 12%;
+    --popover: 0 3% 91%;
+    --popover-foreground: 40 5% 12%;
+    --primary: 20 6% 10%;             /* #1c1a19 colophon — footer band, user chat bubble */
+    --primary-foreground: 0 4% 95%;
+    --secondary: 0 3% 91%;            /* #eae9e9 surface — plate mats, quiet bands */
+    --secondary-foreground: 40 5% 12%;
+    --muted: 0 3% 91%;
+    --muted-foreground: 0 2% 37%;     /* #605d5d — 6.0:1 on ground */
+    --accent: 37 76% 28%;             /* #7d5411 gold ink — ANY text in gold. 6.9:1 */
+    --accent-foreground: 0 4% 95%;
+    --highlight: 36 55% 46%;          /* #b68235 gold — strokes only: borders, rules, icons, ring */
+    --highlight-strong: 36 63% 38%;   /* #a06f24 pressed */
+    --highlight-muted: 34 92% 77%;    /* #facb8d light gold — subtle borders, hover tints */
+    --highlight-ink: 37 76% 28%;      /* #7d5411 = accent; figures */
+    --highlight-foreground: 37 76% 28%; /* label colour on an outlined gold CTA */
+    --highlight-on-dark: 35 67% 64%;  /* #e1ad66 gold on the colophon band (NEW) */
+    --muted-foreground-on-dark: 0 3% 72%; /* #bab6b6 */
+    --brand-whatsapp: 142 70% 49%;
+    --destructive: 9 59% 40%;         /* #a23b2a — warmer, 6.2:1 */
+    --destructive-foreground: 0 4% 95%;
+    --border: 40 4% 82%;              /* ≈ ink @16% on ground — the hairline */
+    --input: 40 4% 78%;
+    --ring: 36 55% 46%;
     --radius: 0.25rem;
-    --font-heading: "Frank Ruhl Libre", ui-serif, Georgia, serif;
-    --font-body: "Heebo", ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Frank Ruhl Libre", ui-serif, Georgia, serif;
+    --font-heading: "Cormorant Garamond", "Frank Ruhl Libre", ui-serif, Georgia, serif;
+    --font-body: "Lora", "Noto Serif Hebrew", ui-serif, Georgia, serif;
+    --font-display: "Cormorant Garamond", "Frank Ruhl Libre", ui-serif, Georgia, serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 }
@@ -94,20 +81,20 @@
     @apply bg-background text-foreground;
     font-family: var(--font-body);
     font-size: 1.125rem;
-    line-height: 1.7;
+    line-height: 1.75;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
   h1, h2, h3, h4 {
     font-family: var(--font-heading);
-    letter-spacing: -0.025em;
-    font-weight: 700;
+    letter-spacing: -0.01em;
+    font-weight: 400;
     text-wrap: balance;
   }
 
   ::selection {
-    background: hsl(var(--accent) / 0.16);
+    background: hsl(var(--highlight) / 0.28);
     color: hsl(var(--foreground));
   }
 }
@@ -118,47 +105,18 @@
 
   .text-balance { text-wrap: balance; }
 
-  /* The opaque background is the base, and the blur is the enhancement on top
-     of it — not the other way round.
-
-     At 0.72 alone the header is simply 28% transparent, and Hebrew scrolling
-     underneath reads straight through it into the wordmark. That is what every
-     browser without backdrop-filter sees, and there was nothing behind it. */
+  /* Opaque: the header no longer blurs what scrolls under it. */
   .glass {
-    background: rgba(249, 247, 242, 0.97);
-    backdrop-filter: blur(16px) saturate(140%);
-    -webkit-backdrop-filter: blur(16px) saturate(140%);
-  }
-
-  /* 0.90, not 0.72, even where the filter is supported.
-     `@supports` answers whether the declaration is understood — not whether it
-     is actually composited. Headless Chromium says yes and then paints no blur,
-     and a browser in a reduced-transparency or low-power mode does the same. At
-     0.72 with no blur behind it, Hebrew reads straight through the wordmark; at
-     0.90 the worst case is a faint ghost, and the blur still does its work on
-     top where it exists. */
-  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .glass { background: rgba(249, 247, 242, 0.90); }
+    background: hsl(var(--background));
   }
 
   .rule-x { border-top: 0.5px solid hsl(var(--border)); }
   .rule-y { border-right: 0.5px solid hsl(var(--border)); }
 
-  .lens-hover img {
-    transition: filter 0.7s ease, transform 0.9s ease;
-  }
-  .lens-hover:hover img {
-    filter: blur(0px);
-    transform: scale(1.04);
-  }
-
-  @keyframes ticker {
-    0% { transform: translateX(0); }
-    100% { transform: translateX(50%); }
-  }
-  .animate-ticker {
-    animation: ticker 30s linear infinite;
-  }
+  /* Photos sit in a matted plate frame; plates do not zoom. */
+  .plate { border: 6px solid hsl(var(--secondary)); outline: 1px solid hsl(var(--border)); overflow: hidden; }
+  .plate img { filter: sepia(0.22) saturate(0.82) contrast(1.05); }
+  .plate-dark { border-color: hsl(20 5% 17%); outline-color: hsl(var(--primary-foreground) / 0.14); }
 
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(24px); }
@@ -204,8 +162,8 @@
   .blog-body ol { list-style: decimal; padding-right: 1.5rem; margin: 1.5rem 0; }
   .blog-body li { margin: 0.6rem 0; padding-right: 0.25rem; }
   /* Thick enough to see, offset enough not to cut the descenders of ק and ן. */
-  .blog-body a { color: hsl(var(--accent)); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
-  .blog-body blockquote { border-right: 3px solid #C4A484; padding-right: 1.25rem; margin: 2rem 0; color: hsl(var(--foreground)); }
+  .blog-body a { color: hsl(var(--accent)); text-decoration: underline; text-decoration-color: hsl(var(--highlight) / 0.5); text-decoration-thickness: 1px; text-underline-offset: 5px; }
+  .blog-body blockquote { border-right: 1px solid hsl(var(--highlight)); padding-right: 1.25rem; margin: 2rem 0; color: hsl(var(--foreground)); }
   .blog-body strong { font-weight: 700; color: hsl(var(--foreground)); }
   .blog-body hr { margin: 3rem 0; border: 0; border-top: 1px solid hsl(var(--border)); }
 
