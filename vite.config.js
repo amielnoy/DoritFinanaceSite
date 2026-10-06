@@ -45,6 +45,27 @@ export default defineConfig({
   resolve: {
     extensions: ['.mjs', '.mts', '.ts', '.tsx', '.js', '.jsx', '.json'],
   },
+  /**
+   * Stable vendor code gets its own chunks, so a deploy that only touches site
+   * code does not invalidate them in the browser cache, and no single chunk
+   * crosses the 500 kB warning line as the app grows. Vite 8 bundles with
+   * rolldown, which replaced `manualChunks` with `codeSplitting.groups`.
+   */
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|@remix-run)[\\/]/, priority: 50 },
+            { name: 'vendor-motion', test: /node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/, priority: 40 },
+            { name: 'vendor-supabase', test: /node_modules[\\/]@supabase[\\/]/, priority: 30 },
+            { name: 'vendor-base44', test: /node_modules[\\/]@base44[\\/]/, priority: 30 },
+            { name: 'vendor-radix', test: /node_modules[\\/]@radix-ui[\\/]/, priority: 20 },
+          ],
+        },
+      },
+    },
+  },
   define: {
     /**
      * Whether this build runs on a host that answers `/_vercel/insights/*`.

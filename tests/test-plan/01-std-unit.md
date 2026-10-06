@@ -79,8 +79,13 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-UTL-005 | "lets the later Tailwind class win a conflict" | `cn("px-2","px-4") === "px-4"` |
 | UNIT-UTL-006 | "returns an empty string for no input" | `cn() === ""` |
 
-> jsdom is required only because `src/lib/utils.js` reads `window` at module
-> scope (`isIframe`); see [10-known-issues](10-known-issues.md).
+`tests/unit/utils.node.test.ts` runs in the node environment (no jsdom):
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-UTL-007 | "has no window in this environment" | `typeof window === "undefined"` |
+| UNIT-UTL-008 | "loads and cn() merges classes" | Module imports; `cn("px-2","px-4") === "px-4"` |
+| UNIT-UTL-009 | "reports isIframe as false when there is no window" | `isIframe === false` |
 
 ### 4.3 Open-redirect guard — `tests/unit/auth-return-to.dom.test.ts`
 
