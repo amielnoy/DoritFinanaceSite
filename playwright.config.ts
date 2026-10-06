@@ -99,24 +99,33 @@ export default defineConfig({
     timezoneId: "Asia/Jerusalem",
   },
 
+  // A block that belongs to one kind of device is tagged, and the other kind
+  // never collects it. It used to be `test.skip(({ isMobile }) => …)` at the top
+  // of the describe, which Playwright runs as a hook: allure-playwright reports
+  // every such skip as a failed hook, and the report carried 38 "Global Errors"
+  // reading "skip modifier failed: Test is skipped: mobile projects only".
   projects: [
     {
       name: "web-chromium",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+      grepInvert: /@mobile-only/,
     },
     {
       name: "web-webkit",
       use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 } },
+      grepInvert: /@mobile-only/,
     },
     {
       // iOS Safari — WebKit with the iPhone 14 device descriptor.
       name: "ios-safari",
       use: { ...devices["iPhone 14"] },
+      grepInvert: /@desktop-only/,
     },
     {
       // Android Chrome — Chromium with the Pixel 7 device descriptor.
       name: "android-chrome",
       use: { ...devices["Pixel 7"] },
+      grepInvert: /@desktop-only/,
     },
   ],
 

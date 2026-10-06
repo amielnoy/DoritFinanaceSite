@@ -9,9 +9,8 @@ import { expect, test, test_step } from "../fixtures/app";
  * This spec drives one desktop context and one phone context in the same test
  * and compares them, so it runs once rather than per project.
  */
-test.describe("Mobile-first indexing parity", () => {
-  test.skip(({ isMobile }) => !!isMobile, "opens its own contexts; runs once from a desktop project");
-
+// Desktop projects only: it opens its own phone and desktop contexts.
+test.describe("Mobile-first indexing parity", { tag: "@desktop-only" }, () => {
   const ROUTES = ["/", "/blog", "/claims", "/privacy", "/accessibility"];
 
   async function snapshot(browser: import("@playwright/test").Browser, mobile: boolean, baseURL: string) {
@@ -115,9 +114,7 @@ test.describe("Mobile-first indexing parity", () => {
   });
 });
 
-test.describe("Mobile crawlability", () => {
-  test.skip(({ isMobile }) => !isMobile, "mobile projects only");
-
+test.describe("Mobile crawlability", { tag: "@mobile-only" }, () => {
   test("declares a responsive viewport that permits zoom", async ({ page }) => {
     const viewport = await test_step("read the viewport meta the phone receives", async () => {
       await page.goto("/");
