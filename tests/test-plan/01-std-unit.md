@@ -34,6 +34,8 @@ something outside the repository.
 | FAQ content | `src/content/faq.ts` |
 | Insurance self-assessment | `src/lib/insurance-assessment.ts` |
 | `reconcile-stores`, `prune-vercel-deployments` | `scripts/*.mjs` |
+| `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
+| `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
 > **Note.** `computePensionFees` was extracted from `PensionFeeCalculator.tsx`
 > during this work so the maths could be exercised without a DOM. The component
@@ -280,7 +282,37 @@ failing `/agents/` call.
 | UNIT-AGT-008 | "drops content that is not a non-empty string" | `[]` for an object, a missing `content` and an empty one. An object reaches `<ReactMarkdown>` as a React child and, with no error boundary above the chat, whites out the SPA |
 | UNIT-AGT-009 | "passes the survivors through in order" | Order preserved after filtering |
 
+### 4.12 Seeding the articles into both stores — `tests/unit/seed-blog.test.ts`
+
+The repo's articles are written to Base44 first — the site and the blog
+recommender still read it — and mirrored to Supabase on `base44_id`. The case
+worth pinning is what a re-run must not do: take down a post Dorit has
+published. See [A-65](10-known-issues.md).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SEED-001 | "creates an article Base44 has never seen, as a draft" | `op: create`, `published: false` |
+| UNIT-SEED-002 | "updates the post with the same title instead of adding a second one" | `op: update` on the matched id |
+| UNIT-SEED-003 | "leaves a published post published when the content is re-seeded" | The update payload carries no `published` |
+| UNIT-SEED-004 | "carries the Base44 id, so the two copies are one row" | Mirror row has `base44_id` |
+| UNIT-SEED-005 | "mirrors the published state Base44 actually holds" | Mirror `published` follows Base44, not the file |
+| UNIT-SEED-006 | "finds the marked result among the CLI's own output" | Parsed past npm notices and the update banner |
+| UNIT-SEED-007 | "says the CLI may be signed out rather than parsing nothing" | Throws naming `base44 login` |
+
+### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
+
+`functions.invoke` resolves to the whole axios response, not the body
+(`interceptResponses: false` in the SDK). These feed the adapters that shape —
+every other fake returns a bare body, which is how A-67 went unseen.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-RCP-001 | "reports an interview that saved as saved" | `ok: true`, `rid` read from the body |
+| UNIT-RCP-002 | "reports a lead that saved as saved" | `ok: true` |
+| UNIT-RCP-003 | "still accepts a bare body, as the in-memory fakes return" | `ok: true` |
+| UNIT-RCP-004 | "reports a handoff that reached Dorit as one that did" | `ok: true`, `contact` from the body — not the fallback |
+
 ## 5. Pass criteria
 
-All 249 cases pass. Any failure is a functional defect, not an environment issue —
+All 266 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

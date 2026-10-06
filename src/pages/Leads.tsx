@@ -3,6 +3,7 @@ import { type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
 import { useLeads, useRemoveLead, useSetLeadStatus } from "@/hooks/useAdmin";
 import { Link } from "react-router-dom";
 import { Loader2, Download, Trash2, ArrowRight } from "lucide-react";
+import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
 
 type LeadItem = LeadRecord;
 
@@ -110,6 +111,8 @@ export default function Leads() {
       </header>
 
       <main className="max-w-[1200px] mx-auto px-6 py-8">
+        <LeadTrackingPanel />
+
         {/* תצוגת סיכום סטטוסים */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <button

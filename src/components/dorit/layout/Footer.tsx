@@ -32,7 +32,7 @@ export default function Footer() {
         </div>
         <div className="flex flex-col justify-center px-8 md:px-16 bg-primary">
           <p className="font-heading text-3xl md:text-4xl leading-tight">
-            "ביטחון אמיתי מתחיל
+            "ביטחון אמיתי מתחיל{" "}
             <br />
             בשיחה אחת כנה."
           </p>
@@ -44,10 +44,10 @@ export default function Footer() {
         <div>
           <p className="font-heading text-2xl mb-2">דורית גוב ארי</p>
           <p className="text-[11px] tracking-[0.3em] uppercase text-primary-foreground/50">
-            התכנון שלי — הרווח שלך
+            התכנון שלי — השקט שלך
           </p>
           <p className="mt-6 text-primary-foreground/70 leading-relaxed max-w-xs">
-            ייעוץ פיננסי וביטוחי אישי. ליווי לקוחות לאורך כל החיים.
+            שיווק פנסיוני ותכנון פיננסי. ליווי לקוחות לאורך כל החיים.
           </p>
         </div>
 
@@ -122,7 +122,6 @@ export default function Footer() {
         </div>
         <div className="max-w-[1400px] mx-auto px-6 md:px-10 pb-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-muted-foreground-on-dark">
           <p>© {new Date().getFullYear()} דורית גוב ארי. כל הזכויות שמורות.</p>
-          <p className="tracking-[0.2em] uppercase">Designed with Structural Serenity</p>
         </div>
       </div>
     </footer>

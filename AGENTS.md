@@ -58,11 +58,16 @@ npx skills add base44/skills
   platform defect, meant to be removed — see A-59, and do not "tidy" it away by
   putting the final `submitLead` back in the agent's instructions.
 - `base44/agents/*.jsonc`: agent definitions — prompts, tools, model, memory,
-  and `allow_anonymous_access`. **A publish does not ship these.**
-  `npx base44 agents push --yes` does, as a full sync that deletes any remote
-  agent absent here. A change under this directory is a two-step release, and
-  forgetting the second step looks exactly like nothing being wrong — see A-42
-  in `tests/test-plan/10-known-issues.md`. The whole non-prompt surface is
+  and `allow_anonymous_access`. **`base44 deploy` ships these; narrower
+  commands do not.** CI's publish runs `base44 deploy --yes --build`, and its log
+  lists `4 agents` — confirmed 2026-10-06 by pulling the live definitions, which
+  matched the repo. A site-only or functions-only deploy, or a Builder publish,
+  leaves them as they were; outside CI, `npx base44 agents push --yes` is the
+  agent-only step, a full sync that deletes any remote agent absent here. A
+  release that skips the agents looks exactly like nothing being wrong — see
+  A-42 in `tests/test-plan/10-known-issues.md`. To check what is live, pull into a
+  scratch worktree, never this checkout (README, "Which releases ship the
+  agents"). The whole non-prompt surface is
   pinned by `toEqual` against a literal, because a Builder regeneration writes
   the file wholesale and buries behavioural flags in escaped Hebrew.
 - **The event sheet is 19 columns, and the last six are the interview's.** Its
@@ -103,9 +108,35 @@ npx skills add base44/skills
   message, return the id. `contentAdmin` does this through a `json()` helper, so
   it cannot be forgotten; that shape is the one to copy when the others are next
   touched.
+- `src/services/base44/invoke.ts`: **call a backend function through
+  `invokeFunction`, never by casting `functions.invoke`.** The SDK builds its
+  functions client with `interceptResponses: false`, so `invoke` resolves to the
+  whole axios response and the body is its `data`. Reading `.ok` off the wrapper
+  finds nothing — which is how every interview the page closed, and every
+  handoff that reached Dorit, told the visitor it had failed while the logs read
+  `warnings: 0`. Fakes that return a bare body hide it; give a new adapter test
+  the `{ data, status, headers }` shape. See A-67.
+- **A time a person reads is Israel time.** The functions run in UTC, and
+  `toLocaleString("he-IL")` takes its zone from the runtime, so every stamp in a
+  mail was three hours early. Name `timeZone: 'Asia/Jerusalem'` on every date a
+  function formats; `function-clock.contract.test.ts` fails on one that does
+  not. See A-63.
+- **Who she is: "דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח".** An individual
+  agent — not a company and not an agency, so no "בע״מ", no ח.פ, and visitor
+  copy names her rather than "הסוכנות". `LICENCE.entity` in
+  `src/config/compliance.ts` is the source the notices interpolate; changing it
+  changes what a visitor consents under, so it bumps `CONSENT_VERSION`. The
+  same string is spelled out in the legal pages, `index.html` JSON-LD,
+  `llms.txt`, every article's disclosure, the agents' instructions (escaped) and
+  `public/poa.html`. See A-66.
 - `scripts/*.mjs`: maintenance jobs CI runs on a schedule. `prune-vercel-deployments.mjs`
   deletes, so it is a dry run unless given `--apply` — check its output before
   adding the flag. `reconcile-stores.mjs` exits non-zero on drift.
+  `seed-blog.mjs --apply` writes `content/blog/` to Base44 through `base44 exec
+  --privileged --data-env prod` (the CLI's signed-in owner, no password) and
+  mirrors each post to Supabase on `base44_id`; it needs `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` and never changes `published` on a
+  post that exists. See A-65.
 - `vite.config.js`: Vite config and Base44 Vite plugin setup.
 - `.env.local`: local-only environment values; never commit secrets.
 - `tests/test-plan/`: the test plan and one Software Test Description per suite.

@@ -15,10 +15,11 @@ export const SITE_URL: string = (
   viteEnv?.VITE_SITE_URL ?? "https://safe-arch-plan.base44.app"
 ).replace(/\/+$/, "");
 
-export const SITE_NAME = "דורית גוב ארי — אדריכלות של ביטחון";
+export const SITE_NAME = "דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח";
 
-export const DEFAULT_OG_IMAGE =
-  "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/589e9d0cd_generated_11fed895.jpg";
+// A photograph of Dorit, not the generated stock image it used to be: the
+// card a shared link unfurls into is the first face of the business.
+export const DEFAULT_OG_IMAGE = absoluteUrl("/images/dorit-office-portrait.png");
 
 /** Resolve a path or absolute URL to an absolute, canonical URL. */
 export function absoluteUrl(pathOrUrl: string): string {

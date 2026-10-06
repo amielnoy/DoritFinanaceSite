@@ -117,7 +117,7 @@ because the backend still accepts leads recorded under them.
 
 | ID | Title | Expected result |
 |---|---|---|
-| E2E-DSK-001 | "shows the floating WhatsApp/phone dock and hides the mobile bar" | Dock visible; sticky bar hidden |
+| E2E-DSK-001 | "shows the floating WhatsApp/phone dock and hides the mobile bar" | Dock visible; sticky bar hidden. The dock holds a third button since A-64, support — see §3.9 |
 | E2E-DSK-002 | "shows the full desktop nav rather than a burger" | Burger hidden; "שירותים" link visible |
 
 ### 3.8 Agent chat — regulatory shell — `agent-compliance.spec.ts`

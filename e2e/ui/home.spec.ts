@@ -39,7 +39,7 @@ test.describe("Home — sanity", () => {
       // route's own description — not the static one index.html shipped with.
       await expect(page.locator('meta[name="description"]')).toHaveAttribute(
         "content",
-        /יועצת ביטוחית ופיננסית/
+        /מתכננת פיננסית וסוכנת ביטוח/
       );
     });
   });

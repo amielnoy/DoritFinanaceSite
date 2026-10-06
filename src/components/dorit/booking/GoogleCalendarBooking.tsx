@@ -18,20 +18,20 @@ export default function GoogleCalendarBooking({ data = {} }: GoogleCalendarBooki
   const openCalendar = () => {
     const topic = data.topic ? ` — ${data.topic}` : "";
     const name = data.name ? ` · ${data.name}` : "";
-    const text = `ייעוץ עם דורית גוב ארי${topic}${name}`;
+    const text = `פגישה עם דורית גוב ארי${topic}${name}`;
 
     const lines = [
       data.name ? `שם: ${data.name}` : "",
       data.phone ? `טלפון: ${data.phone}` : "",
       data.email ? `אימייל: ${data.email}` : "",
-      data.topic ? `תחום ייעוץ: ${data.topic}` : "",
+      data.topic ? `נושא הפגישה: ${data.topic}` : "",
       data.timing ? `עיתוי מבוקש: ${data.timing}` : "",
       data.notes ? `הערות: ${data.notes}` : "",
     ].filter(Boolean);
     const details =
       lines.length > 0
         ? lines.join("\n")
-        : "ייעוץ פיננסי וביטוחי אישי עם דורית גוב ארי.";
+        : "פגישה לתכנון פיננסי וביטוחי עם דורית גוב ארי.";
 
     const start = new Date();
     start.setDate(start.getDate() + 1);
@@ -44,7 +44,7 @@ export default function GoogleCalendarBooking({ data = {} }: GoogleCalendarBooki
       text,
       dates: `${fmt(start)}/${fmt(end)}`,
       details,
-      location: "פגישת ייעוץ · טלפון או זום",
+      location: "פגישה · טלפון או זום",
     });
     window.open(
       `https://calendar.google.com/calendar/render?${params.toString()}`,

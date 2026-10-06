@@ -130,10 +130,19 @@ change is wrong. The cheapest way is a log line that only the new build emits,
 called with a payload that stops at the function's own guard so nothing is
 created.
 
-### Agents are not part of a publish
+### Which releases ship the agents
 
-**A publish ships code. It does not ship `base44/agents/`.** That is a separate
-command:
+**`base44 deploy` ships `base44/agents/`; narrower commands do not.** CI's
+"Publish to Base44" job runs `base44 deploy --yes --build`, which deploys
+entities, functions, agents and the site together. Verified 2026-10-06: the
+job's log reads `Deploying: 5 entities · 7 functions · 4 agents · Site`, and a
+fresh `base44 agents pull` of the live definitions matched `base44/agents/`
+field for field — the only difference was `emails_settings: null`, which the
+CLI drops on a pull.
+
+Anything that deploys less — `base44 site deploy`, `base44 functions deploy`, a
+publish from the Builder — leaves the agents as they were. For an agent change
+made outside CI, the agent-only command is:
 
 ```bash
 npx base44 agents push --yes
@@ -144,17 +153,23 @@ is deleted — which is the intended direction, since the repo is the source of
 truth and `tests/contract/agents.contract.test.ts` pins every field of all four
 before anything reaches this point.
 
-Skipping it is expensive and looks like nothing. `allow_anonymous_access: true`
-was once committed, reviewed, merged and published with CI green from end to
-end, while every chat on the site went on answering `401` because the value the
-backend held had never been replaced. Nothing in the pipeline disagreed, because
-nothing in the pipeline was looking (A-42).
+Getting this wrong is expensive and looks like nothing. `allow_anonymous_access:
+true` was once committed, reviewed, merged and published with CI green from end
+to end, while every chat on the site went on answering `401` because the value
+the backend held had never been replaced (A-42). Whatever path that release
+took, it did not include the agents.
 
 Two things now look. `e2e/api/base44-contract.spec.ts` opens an anonymous
 conversation with each agent against the live backend, and the production smoke
-job runs it after every publish. And anything under `base44/agents/` — a prompt
-clause, a tool, a model, a memory setting — needs this command before it is
-true of production, so treat a change there as a two-step release.
+job runs it after every publish. And to see what the backend actually holds,
+pull into a scratch checkout — never this one, since a pull overwrites
+`base44/agents/` — and compare:
+
+```bash
+git worktree add --detach /tmp/agents-check origin/main
+cp base44/.app.jsonc /tmp/agents-check/base44/
+(cd /tmp/agents-check && npx base44 agents pull && git diff --stat)
+```
 
 CI can do the publish for you instead, from a clean checkout of `main` and only
 when the whole run is green. It is opt-in: set the `BASE44_API_KEY` secret (a
@@ -750,16 +765,27 @@ saying how to opt out of training while staying answerable in AI search.
 
 Articles under [`content/blog/`](content/blog/) are Markdown with front matter.
 They live here rather than only in the Builder because a post published by a
-licensed agency carries a mandatory גילוי נאות block, and a disclosure that
+licensed agent carries a mandatory גילוי נאות block, and a disclosure that
 exists only as a database row is one nobody reviews.
 
 ```bash
-npm run seed:blog                    # dry run — lists what would be written
-node scripts/seed-blog.mjs --apply   # writes, needs an admin sign-in
+npm run seed:blog                                         # dry run — lists what would be written
+node --env-file=.env.local scripts/seed-blog.mjs --apply  # writes both stores
 ```
 
-Posts are matched by title (update if present, create if not) and ship as
-**drafts** — publishing stays a decision made from `/admin/blog`.
+`--apply` writes each post to **Base44 first** — the site and the blog
+recommender still read it — through `base44 exec --privileged --data-env prod`,
+as whoever the CLI is signed in as (`base44 login` once, as the app owner; no
+admin password is kept anywhere). It then mirrors the post into Supabase's
+`blog_posts`, keyed on `base44_id`, the same contract `contentAdmin` keeps for
+edits from `/admin/blog`. It refuses to start without `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY`, which live in `.env.local` (no `VITE_` prefix, so
+neither reaches the bundle).
+
+Posts are matched by title (update if present, create if not). New posts are
+**drafts** — publishing stays a decision made from `/admin/blog` — and a re-run
+never touches `published` on a post that exists, so correcting an article cannot
+take down one that is live.
 
 ## Tests
 

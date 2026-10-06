@@ -61,8 +61,8 @@ export default function CarrierLogos() {
         </div>
 
         <p className="mt-12 text-center text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
-          גישה בלתי-תלויה לכל שוק הפנסיה והביטוח — ההמלצה נגזרת אך ורק מהצורך שלך,
-          לא משייכות מסחרית לחברה כלשהי.
+          עובדת מול מגוון חברות ביטוח ופנסיה כדי להתאים פתרון לצורך שלך. כסוכנת
+          ביטוח, יש לי זיקה לגופים מוסדיים — כמפורט בגילוי הנאות.
         </p>
       </div>
     </section>

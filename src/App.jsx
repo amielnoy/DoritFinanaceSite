@@ -1,4 +1,5 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
+import { initClickTracking, initInternalFlag } from '@/lib/analytics';
 import { MotionConfig } from 'framer-motion';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -94,6 +95,12 @@ const AuthenticatedApp = () => {
 
 
 function App() {
+  // GA4 lead events: one click listener for the whole site, and the
+  // ?internal=1 marker for the agency's own browsers. See src/lib/analytics.ts.
+  useEffect(() => {
+    initInternalFlag();
+    initClickTracking();
+  }, []);
 
   return (
     <AuthProvider>
