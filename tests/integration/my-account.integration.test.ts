@@ -43,12 +43,14 @@ describe("myAccount — a Base44 user's own enquiries", () => {
   it("refuses an unverified address", async () => {
     const r = await invokeFunction("myAccount", {}, { env, user: { ...verified, is_verified: false } });
     expect(r.status).toBe(403);
+    expect(r.json.error).toBe("כתובת המייל בחשבון עדיין לא אומתה.");
     expect(r.callsTo("/rest/v1/rpc/")).toHaveLength(0);
   });
 
   it("refuses a disabled account", async () => {
     const r = await invokeFunction("myAccount", {}, { env, user: { ...verified, disabled: true } });
     expect(r.status).toBe(403);
+    expect(r.json.error).toBe("החשבון אינו פעיל.");
     expect(r.callsTo("/rest/v1/rpc/")).toHaveLength(0);
   });
 
@@ -77,6 +79,8 @@ describe("myAccount — a Base44 user's own enquiries", () => {
   it("does not answer when Supabase is not configured", async () => {
     const r = await invokeFunction("myAccount", {}, { env: {}, user: verified });
     expect(r.status).toBe(500);
+    expect(Object.keys(r.json).sort()).toEqual(["error", "rid"]);
+    expect(r.callsTo("/rest/v1/rpc/")).toHaveLength(0);
   });
 
   it("passes on no column outside the visitor's list, even if the SQL ever did", async () => {

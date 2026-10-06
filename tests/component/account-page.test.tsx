@@ -11,8 +11,9 @@ vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
 // The page imports the composition root, which reads the stored-token flag.
 vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
+const auth = vi.hoisted(() => ({ user: { full_name: "רונית אבני", email: "ronit@example.com" } as Record<string, unknown> }));
 vi.mock("@/lib/AuthContext", () => ({
-  useAuth: () => ({ user: { full_name: "רונית אבני", email: "ronit@example.com" }, isAuthenticated: true }),
+  useAuth: () => ({ user: auth.user, isAuthenticated: true }),
 }));
 
 import Account from "@/pages/Account";
@@ -24,12 +25,14 @@ const base: Enquiry = {
   summary: "סיכום", profile: [["יעד עיקרי", "פרישה"]], completed: true, inCalendar: true,
 };
 
-const renderWith = (load: () => Promise<Enquiry[]>) =>
+const NOW = new Date("2026-10-06T12:00:00Z");
+
+const renderWith = (load: () => Promise<Enquiry[]>, client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } })) =>
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <MemoryRouter>
         <Routes>
-          <Route path="/" element={<Account loadEnquiries={load} />} />
+          <Route path="/" element={<Account loadEnquiries={load} now={NOW} />} />
           <Route path="/login" element={<p>מסך הכניסה</p>} />
         </Routes>
       </MemoryRouter>
@@ -121,16 +124,79 @@ describe("<Account />", () => {
 
   it("offers a retry after a failed load, and shows the enquiries when it succeeds", async () => {
     const load = vi.fn<() => Promise<Enquiry[]>>()
+      // a failed load is retried once by the page, so it has to fail twice to reach the button
+      .mockRejectedValueOnce(new AccountLoadError("failed", "x1"))
       .mockRejectedValueOnce(new AccountLoadError("failed", "x1"))
       .mockResolvedValueOnce([base]);
     renderWith(load);
     await userEvent.click(await screen.findByRole("button", { name: "ניסיון נוסף" }));
     expect(await screen.findByText("ביומן")).toBeInTheDocument();
-    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(3);
   });
 
   it("links to the privacy rights", async () => {
     renderWith(async () => []);
     expect(await screen.findByRole("link", { name: /עיון, תיקון או מחיקה/ })).toHaveAttribute("href", "/privacy");
+  });
+
+  it("orders meetings: upcoming soonest first, then past most recent first, then undated", async () => {
+    const m = (topic: string, scheduledAt?: string) => ({ ...base, source: "contact", meetingTopic: topic, scheduledAt, timing: undefined });
+    renderWith(async () => [
+      m("ללא מועד"), m("עבר ישן", "2026-09-01T07:00:00Z"), m("עתיד רחוק", "2026-10-30T07:00:00Z"),
+      m("עבר קרוב", "2026-10-05T07:00:00Z"), m("עתיד קרוב", "2026-10-08T07:00:00Z"),
+    ]);
+    await screen.findByText("עתיד קרוב");
+    const titles = screen.getAllByText(/^(עתיד|עבר|ללא)/).map((n) => n.textContent);
+    expect(titles).toEqual(["עתיד קרוב", "עתיד רחוק", "עבר קרוב", "עבר ישן", "ללא מועד"]);
+  });
+
+  it("lists enquiries that are neither interviews nor meetings, with a source label", async () => {
+    const other = (source: string, createdAt: string) => ({ ...base, source, meetingTopic: undefined, scheduledAt: undefined, summary: undefined, profile: [], createdAt });
+    renderWith(async () => [
+      other("quick", "2026-10-01T07:00:00Z"), other("detailed", "2026-10-02T07:00:00Z"), other("consultation", "2026-10-03T07:00:00Z"),
+      other("claim", "2026-10-04T07:00:00Z"), other("escalation", "2026-10-05T07:00:00Z"), other("zzz", "2026-10-05T08:00:00Z"),
+    ].map((e) => ({ ...e, source: e.source })) as Enquiry[]);
+    expect(await screen.findByRole("heading", { name: "פניות נוספות" })).toBeInTheDocument();
+    for (const label of ["טופס יצירת קשר", "פנייה מפורטת", "בקשת פגישה", "דיווח על תביעה", "בקשה לשיחה עם דורית", "פנייה"]) {
+      expect(screen.getByText(new RegExp(`^${label} ·`))).toBeInTheDocument();
+    }
+  });
+
+  it("hides the other-enquiries section when there is nothing for it", async () => {
+    renderWith(async () => [base]);
+    await screen.findByText("ביומן");
+    expect(screen.queryByRole("heading", { name: "פניות נוספות" })).toBeNull();
+  });
+
+  it("does not show the previous user's rows after the session changes without a reload", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
+    const load = vi.fn<() => Promise<Enquiry[]>>().mockResolvedValueOnce([base]).mockResolvedValueOnce([]);
+    auth.user = { id: "u1", full_name: "א", email: "a@example.com" };
+    const view = renderWith(load, client);
+    expect(await screen.findByText("ביומן")).toBeInTheDocument();
+    auth.user = { id: "u2", full_name: "ב", email: "b@example.com" };
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <MemoryRouter><Routes><Route path="/" element={<Account loadEnquiries={load} now={NOW} />} /></Routes></MemoryRouter>
+      </QueryClientProvider>
+    );
+    expect(await screen.findByText("עוד אין כאן פניות")).toBeInTheDocument();
+    expect(screen.queryByText("ביומן")).toBeNull();
+    expect(load).toHaveBeenCalledTimes(2);
+    auth.user = { full_name: "רונית אבני", email: "ronit@example.com" };
+  });
+
+  it("does not retry a signed-out load", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
+    const out = vi.fn<() => Promise<Enquiry[]>>(() => Promise.reject(new AccountLoadError("signed_out")));
+    renderWith(out, client);
+    await screen.findByText("מסך הכניסה");
+    await new Promise((r) => setTimeout(r, 200));
+    expect(out).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces loading as a status", async () => {
+    renderWith(() => new Promise(() => {}));
+    expect(await screen.findByRole("status")).toHaveTextContent("טוען");
   });
 });

@@ -158,7 +158,7 @@ does.
 
 | ID | Title | Expected result |
 |---|---|---|
-| E2E-ACC-001 | "bounces an anonymous visitor to login, and back afterwards" | `/account` without a session ends on `/login` |
+| E2E-ACC-001 | "bounces an anonymous visitor to login, remembering /account as the return target" | `/account` without a session ends on `/login?returnTo=/account` |
 
 The signed-in path is covered by the component cases CMP-ACC-*: the e2e fixture
 answers `/entities/User/me` with 401 unconditionally and has no session path.

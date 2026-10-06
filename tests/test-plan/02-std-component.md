@@ -112,9 +112,23 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-ACC-013 | "links to the privacy rights" | Link to `/privacy` for access, correction or deletion |
 | CMP-ACC-014 | "renders a repeated answer label twice without a React key warning" | Both values shown; no duplicate-key console error |
 | CMP-ACC-015 | "says the time is not set when a meeting has neither a date nor a timing" | "המועד טרם נקבע" shown |
-| CMP-ACC-016 | "offers a retry after a failed load, and shows the enquiries when it succeeds" | "ניסיון נוסף" refetches; the second load's meeting appears |
+| CMP-ACC-016 | "offers a retry after a failed load, and shows the enquiries when it succeeds" | A failed load is retried once by the page, so it fails twice before "ניסיון נוסף" appears; the button then refetches and the third load's meeting appears |
+| CMP-ACC-017 | "orders meetings: upcoming soonest first, then past most recent first, then undated" | With a fixed `now`, the titles read upcoming (soonest first), past (most recent first), then the one with no date |
+| CMP-ACC-018 | "lists enquiries that are neither interviews nor meetings, with a source label" | Section "פניות נוספות"; labels "טופס יצירת קשר", "פנייה מפורטת", "בקשת פגישה", "דיווח על תביעה", "בקשה לשיחה עם דורית", and "פנייה" for an unknown source, each with its date |
+| CMP-ACC-019 | "hides the other-enquiries section when there is nothing for it" | No "פניות נוספות" heading when every enquiry is an interview or meeting |
+| CMP-ACC-020 | "does not show the previous user's rows after the session changes without a reload" | After the signed-in user changes, the loader runs again and the first user's meeting is gone |
+| CMP-ACC-021 | "does not retry a signed-out load" | A `signed_out` rejection calls the loader exactly once and lands on the login screen |
+| CMP-ACC-022 | "announces loading as a status" | The loading line has `role="status"` |
 
-### 4.8 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
+### 4.8 `<FloatingHeader />` — account and admin links
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-HDR-001 | "shows no personal-area link to a signed-out visitor" | No "האזור שלי" link |
+| CMP-HDR-002 | "links a signed-in visitor to /account, with no admin links" | "האזור שלי" points to `/account`; no "ניהול פניות" or "ניהול בלוג" |
+| CMP-HDR-003 | "gives an admin both admin pages" | "ניהול פניות" points to `/admin/leads` and "ניהול בלוג" to `/admin/blog` |
+
+### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
 The admins' view of GA4 lead tracking, at the top of `/admin/leads`.
 
@@ -131,6 +145,6 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 
 ## 5. Pass criteria
 
-All 54 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 63 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

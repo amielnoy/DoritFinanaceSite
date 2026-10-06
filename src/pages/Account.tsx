@@ -14,6 +14,29 @@ const fmt = (iso?: string) => {
     : d.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem", dateStyle: "medium", timeStyle: "short" });
 };
 
+const SOURCE_LABELS: Record<string, string> = {
+  quick: "טופס יצירת קשר",
+  detailed: "פנייה מפורטת",
+  consultation: "בקשת פגישה",
+  claim: "דיווח על תביעה",
+  escalation: "בקשה לשיחה עם דורית",
+};
+
+const time = (iso?: string) => {
+  const t = iso ? new Date(iso).getTime() : NaN;
+  return Number.isNaN(t) ? null : t;
+};
+
+// Upcoming (soonest first), then past (most recent first), then undated (as given).
+function orderMeetings(list: Enquiry[], now: Date): Enquiry[] {
+  const at = now.getTime();
+  const dated = list.filter((e) => time(e.scheduledAt) !== null);
+  const undated = list.filter((e) => time(e.scheduledAt) === null);
+  const upcoming = dated.filter((e) => time(e.scheduledAt)! >= at).sort((a, b) => time(a.scheduledAt)! - time(b.scheduledAt)!);
+  const past = dated.filter((e) => time(e.scheduledAt)! < at).sort((a, b) => time(b.scheduledAt)! - time(a.scheduledAt)!);
+  return [...upcoming, ...past, ...undated];
+}
+
 /**
  * האזור האישי — מה שהמבקר מסר, ומתי הוא נפגש עם דורית.
  *
@@ -22,13 +45,21 @@ const fmt = (iso?: string) => {
  * Everything is rendered as text — never markdown or HTML — so nothing stored
  * can turn into markup on this page.
  */
-export default function Account({ loadEnquiries = () => services.account.myEnquiries() }: {
+export default function Account({ loadEnquiries = () => services.account.myEnquiries(), now = new Date() }: {
   loadEnquiries?: () => Promise<Enquiry[]>;
+  now?: Date;
 }) {
   const { user } = useAuth();
-  const query = useQuery<Enquiry[], unknown>({ queryKey: ["account", "enquiries"], queryFn: loadEnquiries });
+  const query = useQuery<Enquiry[], unknown>({
+    // Keyed by the signed-in user, so a session switch cannot show the previous user's rows.
+    queryKey: ["account", "enquiries", user?.id ?? user?.email ?? "anonymous"],
+    queryFn: loadEnquiries,
+    // Only a "failed" load is worth retrying (once); signed-out and unverified will not change.
+    retry: (count, err) => !(err instanceof AccountLoadError && err.reason !== "failed") && count < 1,
+  });
   const enquiries = query.data ?? [];
-  const meetings = enquiries.filter((e) => e.scheduledAt || e.meetingTopic);
+  const meetings = orderMeetings(enquiries.filter((e) => e.scheduledAt || e.meetingTopic), now);
+  const others = enquiries.filter((e) => e.source !== "interview" && !e.scheduledAt && !e.meetingTopic);
   const interviews = enquiries.filter((e) => e.source === "interview");
   const error = query.error instanceof AccountLoadError ? query.error : query.error ? new AccountLoadError("failed") : null;
   // The session ended between the route guard and the request: sign in again.
@@ -47,7 +78,7 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
           <p dir="ltr" className="text-start text-muted-foreground">{String(user?.email ?? "")}</p>
         </section>
 
-        {query.isPending ? <p className="text-muted-foreground">טוען…</p> : null}
+        {query.isPending ? <p role="status" className="text-muted-foreground">טוען…</p> : null}
 
         {error?.reason === "unverified" ? (
           <p role="status">כתובת המייל בחשבון עדיין לא אומתה. אחרי האימות יופיעו כאן הפניות שנשלחו ממנה.</p>
@@ -106,6 +137,19 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
                 </ul>
               )}
             </section>
+
+            {others.length > 0 ? (
+              <section aria-labelledby="others">
+                <h2 id="others" className="font-heading text-2xl mb-3">פניות נוספות</h2>
+                <ul className="space-y-3">
+                  {others.map((e, i) => (
+                    <li key={`o-${i}`} className="border border-border/60 p-4">
+                      <p>{[SOURCE_LABELS[e.source] ?? "פנייה", fmt(e.createdAt)].filter(Boolean).join(" · ")}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
           </>
         ) : null}
 

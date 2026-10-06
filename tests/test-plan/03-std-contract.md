@@ -290,7 +290,7 @@ whitespace-tolerantly — the test pins grants, not alignment.
 | CTR-ACC-001 | "adds the columns the page shows" | `summary`, `profile`, `track_label` are added to `leads` |
 | CTR-ACC-002 | "only service_role may call enquiries_for" | Revoked from `public`; granted to `service_role`; never granted to `authenticated` or `anon` |
 | CTR-ACC-003 | "signed-in users may call my_enquiries, anonymous visitors may not" | Granted to `authenticated`; revoked from `public`; no grant to `anon` |
-| CTR-ACC-004 | "returns no column outside the visitor's list" | Both functions declare exactly 11 output columns, none of `base44_id`, `name`, `phone`, `email`, `status`, `calendar_status`, … |
+| CTR-ACC-004 | "returns no column outside the visitor's list" | Both functions declare exactly 11 output columns, in the order `created_at`, `source`, `track`, `track_label`, `meeting_topic`, `timing`, `scheduled_at`, `summary`, `profile`, `completed`, `in_calendar`; none of `base44_id`, `name`, `phone`, `email`, `status`, `calendar_status`, … |
 | CTR-ACC-005 | "matches only a verified address" | `my_email` requires `email_confirmed_at is not null` |
 | CTR-ACC-006 | "opens no table to ordinary users" | The migration creates no policy on `leads` or `meetings` |
 
