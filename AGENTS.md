@@ -48,11 +48,16 @@ npx skills add base44/skills
   platform defect, meant to be removed — see A-59, and do not "tidy" it away by
   putting the final `submitLead` back in the agent's instructions.
 - `base44/agents/*.jsonc`: agent definitions — prompts, tools, model, memory,
-  and `allow_anonymous_access`. **A publish does not ship these.**
-  `npx base44 agents push --yes` does, as a full sync that deletes any remote
-  agent absent here. A change under this directory is a two-step release, and
-  forgetting the second step looks exactly like nothing being wrong — see A-42
-  in `tests/test-plan/10-known-issues.md`. The whole non-prompt surface is
+  and `allow_anonymous_access`. **`base44 deploy` ships these; narrower
+  commands do not.** CI's publish runs `base44 deploy --yes --build`, and its log
+  lists `4 agents` — confirmed 2026-10-06 by pulling the live definitions, which
+  matched the repo. A site-only or functions-only deploy, or a Builder publish,
+  leaves them as they were; outside CI, `npx base44 agents push --yes` is the
+  agent-only step, a full sync that deletes any remote agent absent here. A
+  release that skips the agents looks exactly like nothing being wrong — see
+  A-42 in `tests/test-plan/10-known-issues.md`. To check what is live, pull into a
+  scratch worktree, never this checkout (README, "Which releases ship the
+  agents"). The whole non-prompt surface is
   pinned by `toEqual` against a literal, because a Builder regeneration writes
   the file wholesale and buries behavioural flags in escaped Hebrew.
 - **The event sheet is 19 columns, and the last six are the interview's.** Its

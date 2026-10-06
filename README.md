@@ -130,10 +130,19 @@ change is wrong. The cheapest way is a log line that only the new build emits,
 called with a payload that stops at the function's own guard so nothing is
 created.
 
-### Agents are not part of a publish
+### Which releases ship the agents
 
-**A publish ships code. It does not ship `base44/agents/`.** That is a separate
-command:
+**`base44 deploy` ships `base44/agents/`; narrower commands do not.** CI's
+"Publish to Base44" job runs `base44 deploy --yes --build`, which deploys
+entities, functions, agents and the site together. Verified 2026-10-06: the
+job's log reads `Deploying: 5 entities · 7 functions · 4 agents · Site`, and a
+fresh `base44 agents pull` of the live definitions matched `base44/agents/`
+field for field — the only difference was `emails_settings: null`, which the
+CLI drops on a pull.
+
+Anything that deploys less — `base44 site deploy`, `base44 functions deploy`, a
+publish from the Builder — leaves the agents as they were. For an agent change
+made outside CI, the agent-only command is:
 
 ```bash
 npx base44 agents push --yes
@@ -144,17 +153,23 @@ is deleted — which is the intended direction, since the repo is the source of
 truth and `tests/contract/agents.contract.test.ts` pins every field of all four
 before anything reaches this point.
 
-Skipping it is expensive and looks like nothing. `allow_anonymous_access: true`
-was once committed, reviewed, merged and published with CI green from end to
-end, while every chat on the site went on answering `401` because the value the
-backend held had never been replaced. Nothing in the pipeline disagreed, because
-nothing in the pipeline was looking (A-42).
+Getting this wrong is expensive and looks like nothing. `allow_anonymous_access:
+true` was once committed, reviewed, merged and published with CI green from end
+to end, while every chat on the site went on answering `401` because the value
+the backend held had never been replaced (A-42). Whatever path that release
+took, it did not include the agents.
 
 Two things now look. `e2e/api/base44-contract.spec.ts` opens an anonymous
 conversation with each agent against the live backend, and the production smoke
-job runs it after every publish. And anything under `base44/agents/` — a prompt
-clause, a tool, a model, a memory setting — needs this command before it is
-true of production, so treat a change there as a two-step release.
+job runs it after every publish. And to see what the backend actually holds,
+pull into a scratch checkout — never this one, since a pull overwrites
+`base44/agents/` — and compare:
+
+```bash
+git worktree add --detach /tmp/agents-check origin/main
+cp base44/.app.jsonc /tmp/agents-check/base44/
+(cd /tmp/agents-check && npx base44 agents pull && git diff --stat)
+```
 
 CI can do the publish for you instead, from a clean checkout of `main` and only
 when the whole run is green. It is opt-in: set the `BASE44_API_KEY` secret (a
