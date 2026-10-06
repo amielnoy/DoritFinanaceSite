@@ -558,6 +558,20 @@ selects the spreadsheet and `SHEET_TAB`, `SHEET_TAB_CONTACTS` and
 `SHEET_TAB_SUPPORT` name the tabs. No `SHEET_ID`, and every writer skips
 silently — a deployment without a spreadsheet still takes enquiries.
 
+## The personal area
+
+`/account` shows a signed-in visitor their own enquiries: meeting times, topic
+and the interview summary that was mailed to them. It is read-only. An enquiry
+belongs to the user whose *verified* email equals the enquiry's, compared as
+`lower(trim)`. The accepted risk is that a visitor who typed someone else's
+address lets that person see the enquiry once signed in; the confirmation mail
+already went there with the same details. Data is reached only through
+`enquiries_for` in Supabase (migration `20261006000000_personal_area.sql`), via
+the Base44 function `myAccount` or `my_enquiries()` for Supabase sign-in; phone,
+name, notes and handling status are never returned. Apply the migration before
+releasing `myAccount`. Enquiries from before it have no summary, and the page
+says so.
+
 ## What the backend writes down
 
 Until recently these functions logged nothing at all. The only diagnosis

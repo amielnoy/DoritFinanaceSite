@@ -40,6 +40,16 @@ npx skills add base44/skills
   the event went to his diary, and hers stayed empty while both logs read
   `calendar.created`. See A-54. Who owns an external account is not a fact this
   repository can assert or test — check it against the account.
+- `supabase/migrations/20261006000000_personal_area.sql`: `enquiries_for` is the
+  only door to a visitor's own data (service_role only, exactly 11 columns). Add a
+  column to it deliberately, never by opening `leads`. The revokes name `anon` and
+  `authenticated` because Supabase's default privileges grant EXECUTE to them by
+  name; a bare `from public` leaves the functions open.
+- `base44/functions/myAccount`: the same rule on the Base44 side. It requires a
+  verified, enabled caller, matches on the verified email (`lower(trim)`), and
+  filters the columns again through `VISIBLE`. Answers carry a `rid`, never an
+  error message. `src/pages/Account.tsx` reads through `AccountPort`, one adapter
+  per sign-in.
 - `src/lib/interview-handoff.ts`: **the page sends the interview's close, not
   the agent.** Base44 does not execute an agent's tool calls in an anonymous
   conversation, and every visitor is anonymous — so the agent ends with a fenced
