@@ -5,7 +5,7 @@ import SupportLink from "./SupportLink";
 
 export default function MobileStickyBar() {
   return (
-    <div className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border">
+    <div data-track-location="mobile_sticky_bar" className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border">
       {/* The consultation keeps the widest cell: it is the one the page is for. */}
       <div className="grid grid-cols-[1fr_1.5fr_1fr]">
         <a
