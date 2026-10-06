@@ -104,6 +104,9 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-ACC-011 | "gives an interview-only visitor an empty meetings line, not a second empty-page notice" | "אין כאן פגישות" shown; "עוד אין כאן פניות" absent |
 | CMP-ACC-012 | "gives a meeting-only visitor an empty interviews line" | "אין כאן סיכומי היכרות" shown |
 | CMP-ACC-013 | "links to the privacy rights" | Link to `/privacy` for access, correction or deletion |
+| CMP-ACC-014 | "renders a repeated answer label twice without a React key warning" | Both values shown; no duplicate-key console error |
+| CMP-ACC-015 | "says the time is not set when a meeting has neither a date nor a timing" | "המועד טרם נקבע" shown |
+| CMP-ACC-016 | "offers a retry after a failed load, and shows the enquiries when it succeeds" | "ניסיון נוסף" refetches; the second load's meeting appears |
 
 ## 5. Pass criteria
 

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -102,6 +103,30 @@ describe("<Account />", () => {
   it("gives a meeting-only visitor an empty interviews line", async () => {
     renderWith(async () => [{ ...base, source: "contact", summary: undefined, profile: [] }]);
     expect(await screen.findByText("אין כאן סיכומי היכרות")).toBeInTheDocument();
+  });
+
+  it("renders a repeated answer label twice without a React key warning", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderWith(async () => [{ ...base, profile: [["ילדים", "שניים"], ["ילדים", "שלושה"]] }]);
+    expect(await screen.findByText("שניים")).toBeInTheDocument();
+    expect(screen.getByText("שלושה")).toBeInTheDocument();
+    expect(spy.mock.calls.some((c) => String(c[0]).includes("same key"))).toBe(false);
+    spy.mockRestore();
+  });
+
+  it("says the time is not set when a meeting has neither a date nor a timing", async () => {
+    renderWith(async () => [{ ...base, scheduledAt: undefined, timing: undefined }]);
+    expect(await screen.findByText("המועד טרם נקבע")).toBeInTheDocument();
+  });
+
+  it("offers a retry after a failed load, and shows the enquiries when it succeeds", async () => {
+    const load = vi.fn<() => Promise<Enquiry[]>>()
+      .mockRejectedValueOnce(new AccountLoadError("failed", "x1"))
+      .mockResolvedValueOnce([base]);
+    renderWith(load);
+    await userEvent.click(await screen.findByRole("button", { name: "ניסיון נוסף" }));
+    expect(await screen.findByText("ביומן")).toBeInTheDocument();
+    expect(load).toHaveBeenCalledTimes(2);
   });
 
   it("links to the privacy rights", async () => {

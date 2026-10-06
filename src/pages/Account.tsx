@@ -52,10 +52,13 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
         {error?.reason === "unverified" ? (
           <p role="status">כתובת המייל בחשבון עדיין לא אומתה. אחרי האימות יופיעו כאן הפניות שנשלחו ממנה.</p>
         ) : error ? (
-          <p role="alert">
+          <div role="alert">
             לא הצלחנו לטעון את הפרטים. אפשר לנסות שוב.
             {error.rid ? <> מזהה לבירור: <span dir="ltr">{error.rid}</span></> : null}
-          </p>
+          
+            {" "}
+            <button type="button" className="underline" onClick={() => void query.refetch()}>ניסיון נוסף</button>
+          </div>
         ) : null}
 
         {!query.isPending && !error && enquiries.length === 0 ? <p>עוד אין כאן פניות</p> : null}
@@ -69,7 +72,7 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
                   {meetings.map((e, i) => (
                     <li key={`m-${i}`} className="border border-border/60 p-4">
                       <p className="font-medium">{e.meetingTopic ?? e.trackLabel ?? "פגישה"}</p>
-                      <p className="text-sm text-muted-foreground">{e.scheduledAt ? fmt(e.scheduledAt) : e.timing}</p>
+                      <p className="text-sm text-muted-foreground">{(e.scheduledAt ? fmt(e.scheduledAt) : e.timing) || "המועד טרם נקבע"}</p>
                       <p className="text-sm mt-1">{e.inCalendar ? "ביומן" : "ממתינה לאישור דורית"}</p>
                     </li>
                   ))}
@@ -88,8 +91,8 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
                       {e.summary ? <p className="mt-2">{e.summary}</p> : null}
                       {e.profile.length ? (
                         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                          {e.profile.map(([label, value]) => (
-                            <React.Fragment key={label}>
+                          {e.profile.map(([label, value], n) => (
+                            <React.Fragment key={`${label}-${n}`}>
                               <dt className="text-muted-foreground">{label}</dt>
                               <dd>{value}</dd>
                             </React.Fragment>
