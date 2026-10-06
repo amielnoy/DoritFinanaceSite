@@ -19,10 +19,22 @@ export default function ScrollToTop() {
     if (navigationType === "POP") return;
 
     if (hash) {
+      // Most pages are lazy, so the target may not exist yet. One fixed delay
+      // fired before /faq's chunk arrived and left the visitor at the top, a
+      // page of answers away from the support chat. Keep looking until it
+      // mounts, and give up quietly after a few seconds.
       const id = getHashId(hash);
-      const timer = window.setTimeout(() => {
-        document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-      }, 50);
+      const deadline = Date.now() + 3000;
+      let timer;
+      const tryScroll = () => {
+        const target = document.getElementById(id);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth" });
+          return;
+        }
+        if (Date.now() < deadline) timer = window.setTimeout(tryScroll, 50);
+      };
+      timer = window.setTimeout(tryScroll, 50);
       return () => window.clearTimeout(timer);
     }
 
