@@ -438,6 +438,36 @@ describe("submitLead — what it stores about the meeting", () => {
     );
     expect(r.callsTo("/rest/v1/meetings")).toEqual([]);
   });
+
+  it("stores the summary and the answers, as the mail shows them", async () => {
+    const r = await invokeFunction(
+      "submitLead",
+      { ...booked, summary: "לקוח שמעוניין לבדוק דמי ניהול", profile: { goal: "הורדת עלויות", life_stage: "נשוי +2" } },
+      { env }
+    );
+    const [lead] = bodyOf(r, "leads");
+    expect(lead.summary).toBe("לקוח שמעוניין לבדוק דמי ניהול");
+    expect(lead.track_label).toBe("פנסיה, גמל והשתלמות");
+    expect(lead.profile).toEqual(expect.arrayContaining([["יעד עיקרי", "הורדת עלויות"]]));
+  });
+
+  it("stores the answers only after redaction", async () => {
+    const r = await invokeFunction(
+      "submitLead",
+      { ...booked, profile: { goal: "ת.ז. 123456782 — הורדת עלויות" } },
+      { env }
+    );
+    const [lead] = bodyOf(r, "leads");
+    expect(lead.profile).not.toBeNull();
+    expect(JSON.stringify(lead.profile)).not.toContain("123456782");
+    expect(JSON.stringify(lead.profile)).toContain("הורדת עלויות");
+  });
+
+  it("stores no profile for a form that is not an interview", async () => {
+    const r = await invokeFunction("submitLead", { name: "דן", phone: "0501112233", source: "quick" }, { env });
+    const [lead] = bodyOf(r, "leads");
+    expect(lead.profile).toBeNull();
+  });
 });
 
 describe("submitLead — the calendar event it books", () => {

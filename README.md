@@ -573,6 +573,30 @@ selects the spreadsheet and `SHEET_TAB`, `SHEET_TAB_CONTACTS` and
 `SHEET_TAB_SUPPORT` name the tabs. No `SHEET_ID`, and every writer skips
 silently — a deployment without a spreadsheet still takes enquiries.
 
+## The personal area
+
+`/account` shows a signed-in visitor their own enquiries: meeting times, topic
+and, for an interview, its summary and answers. It is read-only. An enquiry
+belongs to the user whose *verified* email equals the enquiry's, compared as
+`lower(trim)`. The confirmation mail carries only the topic (and the
+power-of-attorney link, when offered); the page shows more — the summary, the
+answers and the meeting time — including for a partial interview that got no
+mail at all. The accepted risk: a visitor who mistyped an address that is
+another person's real, verified one exposes the enquiry to that person once
+they sign in. Decided 2026-10-06 by the site operator; the privacy policy says
+so, and the wording needs Dorit's and her compliance adviser's approval (see
+`base44/agents/COMPLIANCE.md` section 6). Data is reached only through
+`enquiries_for` in Supabase (migration `20261006000000_personal_area.sql`), via
+the Base44 function `myAccount`, or `my_enquiries()` for Supabase sign-in —
+a wrapper that calls `enquiries_for(my_email())`. Phone, name, notes and
+handling status are never returned.
+
+Release order: apply `supabase/migrations/20261006000000_personal_area.sql` to
+production BEFORE merging. CI deploys `submitLead` and `myAccount` on merge, and
+`submitLead` now sends summary, profile and track label, so the Supabase mirror
+rejects every lead row until those columns exist. Enquiries from before
+summaries were recorded have no summary, and the page says so.
+
 ## What the backend writes down
 
 Until recently these functions logged nothing at all. The only diagnosis

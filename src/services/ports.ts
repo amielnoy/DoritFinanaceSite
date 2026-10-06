@@ -327,3 +327,29 @@ export interface AuthPort {
    */
   signInWithPassword(email: string, password: string): Promise<void>;
 }
+
+export interface Enquiry {
+  createdAt: string;
+  source: string;
+  track?: string;
+  trackLabel?: string;
+  meetingTopic?: string;
+  timing?: string;
+  scheduledAt?: string;
+  summary?: string;
+  /** `[label, value]` pairs as the summary mail shows them; empty when none was stored. */
+  profile: Array<[string, string]>;
+  completed: boolean;
+  inCalendar: boolean;
+}
+
+export interface AccountPort {
+  /** The signed-in user's enquiries, newest first. Rejects with `AccountLoadError`. */
+  myEnquiries(): Promise<Enquiry[]>;
+}
+
+export class AccountLoadError extends Error {
+  constructor(readonly reason: "signed_out" | "unverified" | "failed", readonly rid?: string) {
+    super(reason);
+  }
+}

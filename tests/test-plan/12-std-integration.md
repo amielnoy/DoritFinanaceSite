@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 213
+**Location:** `tests/integration/` · **Cases:** 216
 
 ---
 
@@ -47,6 +47,7 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `submitClaim` | the claims form |
 | `upsertContact` | no caller yet — built for a channel that supplies a phone number, dormant per B-8 |
 | `logSupportChat` | the support agent, at the end of every conversation |
+| `myAccount` | the personal area, for a visitor signed in through Base44 |
 | `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
 `createConsultationEvent` is not yet executed here. See §6.
@@ -145,6 +146,16 @@ three-hour shift as §4.5 — except stored, and with no log line to catch it.
 These are also the first tests in the repo to exercise the Supabase mirror at
 all. It short-circuits unless `SUPABASE_URL` and the service key are set, and no
 test had ever set them, so every earlier case ran with mirroring silently off.
+
+### 4.6b `submitLead` — the personal area's view — `INT-LEAD-090..092`
+
+Task 2 adds three nullable columns to `leads`: `summary text`, `profile jsonb`,
+and `track_label text`, populated from the interview's redacted summary and
+structured answers. These cases pin that the summary the mail showed is stored
+unchanged; that the profile, like the mail's text, is never more than what was
+redacted and never less; that non-interviews store no profile at all, leaving the
+fields null rather than present-but-empty; and that a 9-digit Israeli ID number
+in the profile does not survive redaction.
 
 ### 4.7 `submitLead` — the interview schema — `INT-LEAD-039..048`
 
@@ -408,6 +419,29 @@ Failure is the point of the last three. The agent is told not to report this
 call to the visitor, so the function has to leave it nothing to report: a
 refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 `200`, and the conversation the visitor already had is unaffected.
+
+### 4.20 `myAccount` — a Base44 user's own enquiries — `INT-ACC-001..010`
+
+The personal area for a visitor signed in through Base44. The function takes the
+caller's address from the session, never from the request, and asks Supabase for
+what `enquiries_for` lets out. It does not decide the columns itself: the SQL
+does, and the function repeats the list so a future change to the SQL cannot
+widen what leaves.
+
+`INT-ACC-001` pins the call: the address arrives trimmed and lower-cased, and the
+service key travels as the bearer. `INT-ACC-002` returns the rows with the
+request id. `INT-ACC-003` to `005` are the refusals — nobody signed in is `401`,
+an unverified address and a disabled account are `403` — and all three
+assert that Supabase is never reached. `INT-ACC-006` and `007` are failure:
+Supabase refusing, and Supabase not configured, both answer `500` with a fixed
+message and the request id and nothing that names the host, the key or the status.
+`INT-ACC-008` feeds a row carrying a phone number, a status and an escalation
+reason and expects none of them back.
+
+`INT-ACC-009` and `010` separate a Base44 outage from a signed-out visitor: an
+`auth.me()` failure carrying status `503` answers `500` with the request id and
+never reaches Supabase, while an axios-shaped `response.status` of `401` is still
+read as signed out. Only `401` and `403` mean the visitor is not signed in.
 
 ## 5. Pass criteria
 

@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 433
+**Location:** `tests/contract/` · **Cases:** 439
 
 ---
 
@@ -277,6 +277,22 @@ the wildcard.
 the גילוי נאות block with the licence number and the affiliation, contain no
 promise of a return, map cleanly onto the `BlogPost` entity, and ship as a
 draft: publishing stays a human decision.
+
+**`personal-area.contract.test.ts` — `CTR-ACC-001..006`** — what a signed-in
+visitor may read of their own enquiries. CI does not run
+`supabase/tests/account_check.sql`, so this block reads the migration
+statically and pins what a careless edit would break silently: who may call
+which function, and which columns leave. The grant and revoke lines are matched
+whitespace-tolerantly — the test pins grants, not alignment.
+
+| ID | `it` title | Asserts |
+|---|---|---|
+| CTR-ACC-001 | "adds the columns the page shows" | `summary`, `profile`, `track_label` are added to `leads` |
+| CTR-ACC-002 | "only service_role may call enquiries_for" | Revoked from `public`; granted to `service_role`; never granted to `authenticated` or `anon` |
+| CTR-ACC-003 | "signed-in users may call my_enquiries, anonymous visitors may not" | Granted to `authenticated`; revoked from `public`; no grant to `anon` |
+| CTR-ACC-004 | "returns no column outside the visitor's list" | Both functions declare exactly 11 output columns, none of `base44_id`, `name`, `phone`, `email`, `status`, `calendar_status`, … |
+| CTR-ACC-005 | "matches only a verified address" | `my_email` requires `email_confirmed_at is not null` |
+| CTR-ACC-006 | "opens no table to ordinary users" | The migration creates no policy on `leads` or `meetings` |
 
 ### 4.4 The repository as a contract
 

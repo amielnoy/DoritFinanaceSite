@@ -67,6 +67,10 @@ export interface HarnessOptions {
   env?: Record<string, string>;
   resendStatus?: number;
   resendResponse?: unknown;
+  /** The signed-in caller `base44.auth.me()` returns, `null` for nobody, or an `Error` thrown as-is. */
+  user?: Record<string, unknown> | Error | null;
+  /** JSON returned by a Supabase RPC, keyed by function name. */
+  rpc?: Record<string, unknown>;
 }
 
 export interface Invocation {
@@ -181,6 +185,13 @@ export async function invokeFunction(
 
   const client = {
     entities,
+    auth: {
+      me: async () => {
+        if (options.user instanceof Error) throw options.user;
+        if (!options.user) throw Object.assign(new Error("not authenticated"), { status: 401 });
+        return options.user;
+      },
+    },
     asServiceRole: {
       entities,
       integrations: { Core: { SendEmail: sendEmail } },
@@ -209,6 +220,11 @@ export async function invokeFunction(
         json: async () => options.resendResponse ?? { ok: status >= 200 && status < 300, ids: ["mailer-test-id"] } };
     }
     if (options.failFetch || options.failCalendar) throw new Error("simulated network failure");
+    const rpc = String(url).match(/\/rest\/v1\/rpc\/(\w+)/);
+    if (rpc && options.rpc && rpc[1] in options.rpc) {
+      const status = options.fetchStatus ?? 200;
+      return { ok: status >= 200 && status < 300, status, json: async () => options.rpc![rpc[1]], text: async () => "" };
+    }
     const status = options.fetchStatus ?? 200;
     return {
       ok: status >= 200 && status < 300,

@@ -30,3 +30,10 @@ export async function invokeFunction<T>(
 ): Promise<T | undefined> {
   return responseBody(await client.functions.invoke(name, payload)) as T | undefined;
 }
+
+/** Status and body of a failed function call — AxiosError (`response`) or Base44Error (`status`/`data`). */
+export function failureOf(e: unknown): { status?: number; body?: Record<string, unknown> } {
+  const err = e as { status?: number; data?: unknown; response?: { status?: number; data?: unknown } };
+  const body = (err?.response?.data ?? err?.data) as Record<string, unknown> | undefined;
+  return { status: err?.response?.status ?? err?.status, body: body && typeof body === "object" ? body : undefined };
+}

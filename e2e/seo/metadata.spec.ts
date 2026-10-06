@@ -18,7 +18,7 @@ const PUBLIC_ROUTES = [
   { path: "/accessibility", name: "accessibility", titleContains: "נגישות" },
 ];
 
-const PRIVATE_ROUTES = ["/login", "/admin/leads"];
+const PRIVATE_ROUTES = ["/login", "/account", "/admin/leads"];
 
 const head = {
   title: (p: Page) => p.title(),

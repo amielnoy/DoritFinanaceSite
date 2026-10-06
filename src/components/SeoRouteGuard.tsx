@@ -17,6 +17,7 @@ import { useEffect } from "react";
 const NO_INDEX_ROUTES: Array<{ match: RegExp; title: string; description: string }> = [
   { match: /^\/login\/?$/, title: "כניסה | דורית גוב ארי", description: "כניסה לאזור האישי." },
   { match: /^\/oauth\//, title: "אישור גישה | דורית גוב ארי", description: "אישור גישה ליישום." },
+  { match: /^\/account\/?$/, title: "האזור שלי | דורית גוב ארי", description: "האזור האישי." },
   { match: /^\/admin(\/|$)/, title: "ניהול | דורית גוב ארי", description: "אזור ניהול." },
 ];
 

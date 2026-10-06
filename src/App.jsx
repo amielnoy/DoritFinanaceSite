@@ -8,6 +8,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import SeoRouteGuard from '@/components/SeoRouteGuard';
 // `/react`, not `/next`: Vercel's docs lead with the Next entry, which pulls
 // `next/navigation` and has nothing to bind to in a Vite SPA.
@@ -23,6 +24,7 @@ import AdminRoute from '@/components/AdminRoute';
 
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const Accessibility = lazy(() => import('@/pages/Accessibility'));
+const Account = lazy(() => import('@/pages/Account'));
 const Login = lazy(() => import('@/pages/Login'));
 const Leads = lazy(() => import('@/pages/Leads'));
 const Blog = lazy(() => import('@/pages/Blog'));
@@ -76,6 +78,9 @@ const AuthenticatedApp = () => {
         <Route path="/tools" element={<Tools />} />
         <Route path="/perspective" element={<Perspective />} />
         <Route path="/login" element={<Login />} />
+        <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login?returnTo=/account" replace />} />}>
+          <Route path="/account" element={<Account />} />
+        </Route>
         <Route element={<AdminRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
           <Route path="/admin/leads" element={<Leads />} />
           <Route path="/admin/blog" element={<BlogAdmin />} />
