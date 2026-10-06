@@ -22,8 +22,9 @@ interface NavItem {
  *
  * Nothing was deleted from the page. Those sections are still there and still
  * reached by scrolling; they simply no longer each claim a slot in the bar.
- * `שאלות ותשובות` moved to the footer, which is where a reader looks for it
- * once they have not found an answer above.
+ * `שאלות ותשובות` moved to the footer for a while, and came back: the support
+ * chat lives at the bottom of /faq, and with the only links to it in the
+ * footer, nobody found it — Dorit included, on a phone and on a desktop.
  */
 const NAV: NavItem[] = [
   { label: "אודות", href: "#about" },
@@ -32,6 +33,7 @@ const NAV: NavItem[] = [
   { label: "כלים", href: "/tools", route: true },
   { label: "תביעות", href: "/claims", route: true },
   { label: "בלוג", href: "/blog", route: true },
+  { label: "שאלות ותשובות", href: "/faq", route: true },
 ];
 
 export default function FloatingHeader() {

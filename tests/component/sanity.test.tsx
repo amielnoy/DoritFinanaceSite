@@ -90,8 +90,10 @@ describe("<Stars />", () => {
 });
 
 describe("<MobileStickyBar />", () => {
+  // Inside a router, as the app always renders it: the support cell is a
+  // router link to the chat on /faq.
   it("offers a dial link and a consultation anchor", () => {
-    render(<MobileStickyBar />);
+    withProviders(<MobileStickyBar />);
 
     expect(screen.getByRole("link", { name: /חייגו עכשיו/ })).toHaveAttribute(
       "href",
@@ -99,11 +101,16 @@ describe("<MobileStickyBar />", () => {
     );
     expect(screen.getByRole("link", { name: /לשיחה קצרה עם דורית/ })).toHaveAttribute("href", "#start");
   });
+
+  it("offers a way to the support chat", () => {
+    withProviders(<MobileStickyBar />);
+    expect(screen.getByRole("link", { name: /תמיכה/ })).toHaveAttribute("href", "/faq#support-chat");
+  });
 });
 
 describe("<FloatingActions />", () => {
   it("links to WhatsApp with a prefilled Hebrew message and a safe rel", () => {
-    render(<FloatingActions />);
+    withProviders(<FloatingActions />);
 
     const wa = screen.getByRole("link", { name: "פתיחת שיחה בוואטסאפ" });
     expect(wa).toHaveAttribute("href", expect.stringContaining(`wa.me/${CONTACT.whatsapp}`));
@@ -113,11 +120,16 @@ describe("<FloatingActions />", () => {
   });
 
   it("links to the phone number in E.164 form", () => {
-    render(<FloatingActions />);
+    withProviders(<FloatingActions />);
     expect(screen.getByRole("link", { name: /התקשרות/ })).toHaveAttribute(
       "href",
       `tel:${CONTACT.phoneE164}`
     );
+  });
+
+  it("links to the support chat", () => {
+    withProviders(<FloatingActions />);
+    expect(screen.getByRole("link", { name: /^תמיכה/ })).toHaveAttribute("href", "/faq#support-chat");
   });
 });
 

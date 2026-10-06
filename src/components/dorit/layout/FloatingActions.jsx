@@ -1,6 +1,7 @@
 import React from "react";
-import { Phone, MessageCircle } from "lucide-react";
+import { Phone, MessageCircle, LifeBuoy } from "lucide-react";
 import { CONTACT } from "@/config/contact";
+import SupportLink from "./SupportLink";
 
 export default function FloatingActions() {
   return (
@@ -21,6 +22,15 @@ export default function FloatingActions() {
       >
         <Phone size={24} className="group-hover:rotate-6 transition-transform" />
       </a>
+      {/* The support chat is at the bottom of /faq, and nothing pointed at it
+          but the footer. This puts it with the other ways to reach her. */}
+      <SupportLink
+        aria-label="תמיכה — שאלה לעוזר של דורית"
+        title="תמיכה — שאלה לעוזר של דורית"
+        className="group w-14 h-14 rounded-full bg-card text-accent border border-accent/40 flex items-center justify-center shadow-lg hover:scale-105 transition-transform duration-300"
+      >
+        <LifeBuoy size={24} className="group-hover:rotate-6 transition-transform" />
+      </SupportLink>
     </div>
   );
 }
