@@ -32,7 +32,7 @@ gap is visible and a failure points at a feature.
 | F-26 | Visitor runs the insurance self-assessment (/tools) | UNIT-ASM-001..008 | — | — | — | — | — | — | — | — | A11Y-AXE-009 |
 | F-27 | Visitor reads the FAQ library and asks the support chat (/faq) | UNIT-FAQ-001..006 | CMP-FAQ-001 | CTR-AGT-* | INT-SUPPORT-001..012 | — | API-HTP-008 | E2E-NAV-004, E2E-AGT-006..008 | — | — | A11Y-AXE-001 |
 | F-28 | Visitor asks how a procedure is carried out, in the procedures chat (/tools) | — | — | CTR-AGT-* | — | EVAL-PRC-001..008 | — | E2E-AGT-009..012 | — | — | A11Y-AXE-008 |
-| F-29 | Signed-in visitor sees their own enquiries (/account) | UNIT-ACC-001..007 | — | CTR-ACC-001..006 | INT-ACC-001..008 | — | — | — | — | — | — |
+| F-29 | Signed-in visitor sees their own enquiries (/account) | UNIT-ACC-001..012 | — | CTR-ACC-001..006 | INT-ACC-001..008 | — | — | — | — | — | — |
 
 ## Coverage gaps (accepted)
 

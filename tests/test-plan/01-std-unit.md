@@ -248,6 +248,11 @@ SDK's real axios-wrapped response and a rejection carrying `.status` and
 | UNIT-ACC-005 | "turns an RPC error into AccountLoadError" | Rejects with `AccountLoadError` |
 | UNIT-ACC-006 | "reads the body out of the axios wrapper" | `invoke("myAccount", {})`; one enquiry returned |
 | UNIT-ACC-007 | "names a 401 as signed out and a 403 as unverified, keeping the rid" | `signed_out`, `unverified`, and `failed` for 500, each with the rid |
+| UNIT-ACC-008 | "names RPC error 42501 as signed out" | `AccountLoadError("signed_out")` — `my_enquiries` is revoked from anon |
+| UNIT-ACC-009 | "names RPC error PGRST301 as signed out" | `signed_out` — JWT missing, expired or invalid |
+| UNIT-ACC-010 | "names an unrecognised RPC error code as failed" | `failed`; Supabase never yields `unverified` |
+| UNIT-ACC-011 | "fails with the rid when the body says ok:false" | `failed` with the rid |
+| UNIT-ACC-012 | "fails with the rid when ok:true carries no enquiries array" | `failed` with the rid, not an empty list |
 
 ### The agent adapter — `agent-service.test.ts`
 
@@ -269,5 +274,5 @@ failing `/agents/` call.
 
 ## 5. Pass criteria
 
-All 244 cases pass. Any failure is a functional defect, not an environment issue —
+All 249 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

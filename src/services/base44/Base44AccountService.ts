@@ -21,7 +21,7 @@ export class Base44AccountService implements AccountPort {
       const reason = err.status === 401 ? "signed_out" : err.status === 403 ? "unverified" : "failed";
       throw new AccountLoadError(reason, err.data?.rid);
     }
-    if (!body?.ok) throw new AccountLoadError("failed", body?.rid);
-    return (body.enquiries ?? []).map(toEnquiry);
+    if (!body?.ok || !Array.isArray(body.enquiries)) throw new AccountLoadError("failed", body?.rid);
+    return body.enquiries.map(toEnquiry);
   }
 }

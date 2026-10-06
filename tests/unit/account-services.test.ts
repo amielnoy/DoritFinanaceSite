@@ -41,6 +41,16 @@ describe("SupabaseAccountService", () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } });
     await expect(new SupabaseAccountService({ rpc }).myEnquiries()).rejects.toBeInstanceOf(AccountLoadError);
   });
+
+  it.each(["42501", "PGRST301"])("names RPC error %s as signed out", async (code) => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "x", code } });
+    await expect(new SupabaseAccountService({ rpc }).myEnquiries()).rejects.toMatchObject({ reason: "signed_out" });
+  });
+
+  it("names an unrecognised RPC error code as failed", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "x", code: "XX000" } });
+    await expect(new SupabaseAccountService({ rpc }).myEnquiries()).rejects.toMatchObject({ reason: "failed" });
+  });
 });
 
 describe("Base44AccountService — fed the SDK's real response shape (A-67)", () => {
@@ -62,5 +72,17 @@ describe("Base44AccountService — fed the SDK's real response shape (A-67)", ()
       .rejects.toMatchObject({ reason: "unverified", rid: "r9" });
     await expect(new Base44AccountService({ functions: { invoke: reject(500) } }).myEnquiries())
       .rejects.toMatchObject({ reason: "failed", rid: "r9" });
+  });
+
+  it("fails with the rid when the body says ok:false", async () => {
+    const invoke = vi.fn().mockResolvedValue(axios({ ok: false, rid: "r2" }));
+    await expect(new Base44AccountService({ functions: { invoke } }).myEnquiries())
+      .rejects.toMatchObject({ reason: "failed", rid: "r2" });
+  });
+
+  it("fails with the rid when ok:true carries no enquiries array", async () => {
+    const invoke = vi.fn().mockResolvedValue(axios({ ok: true, rid: "r3" }));
+    await expect(new Base44AccountService({ functions: { invoke } }).myEnquiries())
+      .rejects.toMatchObject({ reason: "failed", rid: "r3" });
   });
 });
