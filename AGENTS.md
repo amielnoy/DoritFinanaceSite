@@ -50,6 +50,19 @@ npx skills add base44/skills
   filters the columns again through `VISIBLE`. Answers carry a `rid`, never an
   error message. `src/pages/Account.tsx` reads through `AccountPort`, one adapter
   per sign-in.
+- `src/lib/analytics.ts`: every event the site sends to GA4, and the one place
+  that sends it. Three rules. **Never send personal data:** `track` keeps only
+  `location`, `cta`, `method` and `channel` and drops every other parameter, so a
+  name, phone or email cannot leak through one added later — do not widen the
+  allow-list for convenience. **A lead counts only after a successful save:**
+  `generate_lead` fires from the form's and the interview's success path
+  (`leadEvents`), never on the click, or a failed send is reported as a lead.
+  **Add every new event to `LEAD_EVENTS`:** it is also the table in the admin
+  "מעקב לידים" panel on `/admin/leads`, and `analytics.dom.test.ts` fails when the
+  code sends an event the list lacks. `?internal=1` marks a browser as the
+  agency's own (`traffic_type: internal`), `?internal=0` clears it. The
+  privacy policy does not mention GA4 or cookies and there is no consent banner —
+  an open question for Dorit's compliance adviser (`COMPLIANCE.md` section 8).
 - `src/lib/interview-handoff.ts`: **the page sends the interview's close, not
   the agent.** Base44 does not execute an agent's tool calls in an anonymous
   conversation, and every visitor is anonymous — so the agent ends with a fenced

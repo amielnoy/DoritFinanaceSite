@@ -14,7 +14,7 @@ was not known when the step was planned.
 | README step | State | Who |
 |---|---|---|
 | 0 · only CI promotes production | `vercel.json` sets `git.deploymentEnabled.main: false`; needs one dashboard confirmation | you |
-| 1 · point DNS at Vercel | **not done** — `govari-fin.co.il` and `www` do not resolve | you |
+| 1 · point DNS at Vercel | **half done** (2026-10-06) — both domains are added and verified in Vercel; the DNS records are requested from DTNT and not yet applied, so the names still do not resolve | DTNT |
 | 2 · production out from behind login | **done** — the Vercel production URL answers `200` anonymously | — |
 | 3 · the site answers, including `/api/*` | **verified** on `dorit-finance-site.vercel.app` | — |
 | 4 · set `VITE_SITE_URL` in both builders | **not done**, correctly — see below | you |
@@ -83,13 +83,42 @@ The fix is step 1.
 
 ---
 
+## Step 1, as of 2026-10-06
+
+The Vercel side is done: `govari-fin.co.il` and `www.govari-fin.co.il` are added
+to the project and verified. The apex is canonical and `www` answers `308` to it.
+
+The registrar side is not. DTNT (the registrar, ticket 84851895) was asked on
+2026-10-06 to add:
+
+```
+A      @    216.198.79.1
+A      @    64.29.17.1
+CNAME  www  30fa16059da418c7.vercel-dns-017.com.
+```
+
+Not yet applied, so the measurement above (`ENOTFOUND`) still stands. Re-run it
+once DTNT confirms, and only then move to step 2's check and step 4.
+
+**Two oddities on the Vercel project to resolve:**
+
+- `mail.govari-fin.co.il` is attached to it. It was meant for Resend sending, not
+  for the website; a web project should not answer on a mail subdomain, and the
+  Resend records belong at the registrar, not here.
+- `dorit-govari-fin.co.il` is attached to it. Dorit asked DTNT for `govari.co.il`
+  and `dorit-govari.co.il`, and neither is registered, so this is not a domain
+  she asked for. Find out where it came from before keeping it.
+
+---
+
 ## What only you can do
 
 1. **Confirm in the Vercel dashboard** that a push to `main` produces exactly one
    deployment, and that it is the workflow's. `vercel.json` already disables the
    Git integration for `main` and `builder`; this is confirming it took effect.
 2. **Add `govari-fin.co.il` and `www` to the Vercel project** and set the records
-   at the registrar. The domain exists — it has MX records pointing at Microsoft
+   at the registrar. (Added and verified on 2026-10-06; the records are with DTNT,
+   see above.) The domain exists — it has MX records pointing at Microsoft
    365 — so this is adding web records beside mail, not registering anything.
    Wait for both to resolve.
 3. **Set `VITE_SITE_URL`** to the canonical origin, in **both** builders: the

@@ -35,8 +35,8 @@ protect.
 
 ## 2. What the frontend actually calls
 
-Every screen imports `src/services/ports.ts`, never the SDK. Eight ports, each
-with one adapter:
+Every screen imports `src/services/ports.ts`, never the SDK. Nine ports, each
+with one adapter — two for `AuthPort` and `AccountPort`:
 
 | Port | Adapter | Base44 API behind it |
 |---|---|---|
@@ -48,9 +48,11 @@ with one adapter:
 | `LeadAdminPort` | `Base44LeadAdminService` | `entities.Lead` |
 | `ContentAdminPort` | `Base44ContentAdminService` | `entities.*` |
 | `AuthPort` | `Base44AuthService` **/ `SupabaseAuthService`** | `auth.*` |
+| `AccountPort` | `Base44AccountService` **/ `SupabaseAccountService`** | `functions.invoke` (`myAccount`), via `invokeFunction` / Supabase `rpc("my_enquiries")` |
 
-The last row is the proof of concept: **`AuthPort` already has two adapters**,
-chosen at runtime by `VITE_AUTH_PROVIDER`. The pattern that would carry a
+The last two rows are the proof of concept: **`AuthPort` and `AccountPort` each
+have two adapters**, chosen at runtime by `VITE_AUTH_PROVIDER` (`AccountPort`
+serves the `/account` personal area and follows the sign-in). The pattern that would carry a
 migration is not hypothetical here — it is in use.
 
 `invokeFunction` (`src/services/base44/invoke.ts`) is the one place that knows
@@ -62,20 +64,24 @@ Raw SDK surface, counted across `src/`:
 ```
  6  client.entities.BlogPost      2  client.functions.invoke
  4  client.entities.Testimonial   4  client.agents.*
- 3  client.entities.Lead          9  client.auth.*  (two adapters)
+ 3  client.entities.Lead         10  client.auth.*  (two adapters)
  1  client.integrations.Core      1  client.functions.fetch
 ```
 
-About thirty call sites, all inside nine files that nothing else imports.
+About thirty call sites (recounted 2026-10-06: 31, the one change being `auth.*`
+9 → 10), all inside nine Base44 files that nothing else imports plus
+`SupabaseAuthService`. `AccountPort` adds none: `Base44AccountService` reaches
+`myAccount` through `invokeFunction`, which was already counted, and
+`SupabaseAccountService` calls the Supabase client, not Base44's.
 
 ---
 
 ## 3. What the backend actually uses
 
-Seven functions, 3,656 lines. The Deno-specific surface is **one API**:
+Eight functions, 3,910 lines (recounted 2026-10-06; `myAccount` is the eighth). The Deno-specific surface is **one API**:
 
 ```
-31  Deno.env.get      → process.env
+33  Deno.env.get      → process.env
 ```
 
 That is the whole of it. No Deno file system, no Deno KV, no Deno-only imports.
@@ -84,13 +90,14 @@ What is genuinely Base44, per function:
 
 | Function | Lines | connectors | Core mail | entities | supabase | mailer |
 |---|---:|:-:|:-:|:-:|:-:|:-:|
-| `submitLead` | 1605 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `escalateToHuman` | 616 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `submitClaim` | 491 | | ✓ | ✓ | ✓ | ✓ |
-| `createConsultationEvent` | 310 | ✓ | | | | |
-| `upsertContact` | 278 | ✓ | | ✓ | ✓ | |
-| `contentAdmin` | 189 | | | ✓ | ✓ | |
-| `logSupportChat` | 167 | ✓ | | | | |
+| `submitLead` | 1692 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `escalateToHuman` | 640 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `submitClaim` | 495 | | ✓ | ✓ | ✓ | ✓ |
+| `createConsultationEvent` | 315 | ✓ | | | | |
+| `upsertContact` | 302 | ✓ | | ✓ | ✓ | |
+| `contentAdmin` | 192 | | | ✓ | ✓ | |
+| `logSupportChat` | 190 | ✓ | | | | |
+| `myAccount` | 84 | | | | ✓ | |
 
 Three dependencies, in descending order of difficulty:
 
@@ -220,7 +227,7 @@ reading an error. That is the cost being weighed, more than any single outage.
 ## 9. What this means for the plan
 
 - **Data is not the obstacle.** 47 rows, the growing table already mirrored.
-- **The frontend is already abstracted.** Eight ports, one dual-adapter precedent.
+- **The frontend is already abstracted.** Nine ports, two of them dual-adapter (`AuthPort`, `AccountPort`).
 - **The functions are nearly portable.** `Deno.env.get` is the whole runtime
   surface; mail is already external; the files are already independent.
 - **Two things are genuinely hard:** connector OAuth (§5) and the agent runtime
