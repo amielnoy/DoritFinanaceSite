@@ -1858,7 +1858,7 @@ describe("what the head claims the practice is", () => {
   });
 
   it("names the organisation as the entity that holds the licence", () => {
-    expect(html).toContain("דורית גוב ארי — סוכנות ביטוח בע״מ");
+    expect(html).toContain("דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח");
   });
 
   it("describes the same five pillars the site displays", () => {
