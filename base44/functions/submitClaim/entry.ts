@@ -358,7 +358,7 @@ export default async function(req) {
       : ['', 'מסמכים מצורפים: אין'];
 
     const agentBody = [
-      `דיווח אירוע ביטוחי חדש — ${new Date().toLocaleString("he-IL")}`,
+      `דיווח אירוע ביטוחי חדש — ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}`,
       ``,
       `שם: ${name}`,
       `טלפון: ${phone}`,

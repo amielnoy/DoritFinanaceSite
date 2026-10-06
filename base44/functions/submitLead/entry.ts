@@ -814,7 +814,7 @@ function headingFor(source) {
 function buildAgentBody(source, data) {
   const header = headingFor(source);
   const lines = [
-    `${header} — ${new Date().toLocaleString("he-IL")}`,
+    `${header} — ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}`,
     ``,
     `שם: ${data.name}`,
     `טלפון: ${data.phone}`,
@@ -1019,7 +1019,7 @@ function buildAgentHtml(source, data, ops, links = null) {
           <p style="margin:0 0 10px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:${MAIL.muted};">${escapeHtml(eyebrowFor(source))}</p>
           <h1 style="margin:0; font-family:Georgia,serif; font-size:26px; font-weight:bold; color:${MAIL.ink}; line-height:1.3; letter-spacing:-0.02em;">${escapeHtml(heading)}</h1>
           <div style="height:2px; width:44px; background:${MAIL.rule}; margin:18px 0 0;"></div>
-          <p style="margin:14px 0 0; font-size:13px; color:${MAIL.muted};">${escapeHtml(new Date().toLocaleString('he-IL'))}</p>
+          <p style="margin:14px 0 0; font-size:13px; color:${MAIL.muted};">${escapeHtml(new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' }))}</p>
         </td></tr>
         <tr><td style="padding:26px 40px 10px;">${who}${what}${summary}${linksBlock}${opsBlock}</td></tr>
         <tr><td style="padding:20px 40px; background:${MAIL.ink}; text-align:center;">
