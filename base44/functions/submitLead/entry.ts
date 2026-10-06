@@ -1180,7 +1180,7 @@ function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, detai
         </td></tr>
         <!-- Footer -->
         <tr><td style="padding:26px 48px; background:#1A1A1B; text-align:center;">
-          <p style="margin:0 0 4px; font-size:11px; color:rgba(249,247,242,0.5); line-height:1.6;">דורית גוב ארי — סוכנות ביטוח · רישיון סוכן מרשות שוק ההון מספר L-00107009</p>
+          <p style="margin:0 0 4px; font-size:11px; color:rgba(249,247,242,0.5); line-height:1.6;">דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח · רישיון סוכן מרשות שוק ההון מספר L-00107009</p>
           <p style="margin:0; font-size:10px; color:rgba(249,247,242,0.35); letter-spacing:0.15em; text-transform:uppercase;">Designed with Structural Serenity</p>
         </td></tr>
       </table>

@@ -21,21 +21,23 @@
  * copy, and without a bump "v2" would mean a different set before this release
  * than after it.
  *
- * v4 drops "בע״מ" from `LICENCE.entity`, which every notice interpolates. The
- * agency is not a company, so the name a visitor consented under changed.
+ * v4 renames `LICENCE.entity`, which every notice interpolates, from
+ * "סוכנות ביטוח בע״מ" to "מתכננת פיננסית וסוכנת ביטוח": she is an individual
+ * agent, not a company. The bot disclosure names her rather than "the agency"
+ * for the same reason. The name a visitor consented under changed.
  */
 export const CONSENT_VERSION = "2026-10-agents-v4";
 
 /** Licence details the agency must disclose. */
 export const LICENCE = {
-  entity: "דורית גוב ארי — סוכנות ביטוח",
+  entity: "דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח",
   number: "L-00107009",
   regulator: "רשות שוק ההון, ביטוח וחיסכון",
 } as const;
 
 /** Shown before a conversation may start. */
 export const BOT_DISCLOSURE =
-  "זהו עוזר אוטומטי (בינה מלאכותית) של הסוכנות — לא דורית ולא בעל רישיון.";
+  "זהו עוזר אוטומטי (בינה מלאכותית) של דורית גוב ארי — לא דורית עצמה ולא בעל רישיון.";
 
 /** The consent gate. The visitor cannot send a message before accepting it. */
 export const CONSENT = {
