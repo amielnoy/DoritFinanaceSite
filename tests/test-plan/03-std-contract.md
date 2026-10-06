@@ -342,6 +342,21 @@ line a real outage produces — "מצטערת, לא הצלחתי לשלוח את
 **`carriers.contract.test.ts`** — every insurer link resolves to a domain that
 exists, and each carrier's name and URL agree.
 
+**`function-clock.contract.test.ts`** — that a time a person reads is Israel
+time. The functions run in UTC and `toLocaleString("he-IL")` takes the zone from
+the runtime, which put every interview summary three hours early (A-63).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CLK-001 | "finds the functions to check" | More than five `entry.ts` scanned — an empty scan would pass everything |
+| CTR-CLK-002 | "names the zone on every date it formats" | Every `toLocale(Date\|Time)?String(…)` in `base44/functions/*/entry.ts` carries `timeZone: 'Asia/Jerusalem'` |
+
+**`frontend-payloads.contract.test.ts`, the call shape.** The adapters call
+functions through `invokeFunction(this.client, "submitLead", {…})` since A-67;
+`CTR-LED-*` and the `submitClaim` cases recognise that form as well as the bare
+`functions.invoke(…)`, so the payload is still read from the one place it is
+built.
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -351,7 +366,7 @@ time.
 
 ## 6. Pass criteria
 
-All 433 cases pass. A failure means either the frontend or the backend definition
+All 499 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

@@ -124,5 +124,5 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 
 ## 6. Pass criteria
 
-All 70 static cases pass; all 15 runtime cases pass on all four platforms,
+All 72 static cases pass; all 15 runtime cases pass on all four platforms,
 with `SEC-HDR-001` skipped unless explicitly enabled.

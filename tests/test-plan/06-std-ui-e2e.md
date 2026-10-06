@@ -117,7 +117,7 @@ because the backend still accepts leads recorded under them.
 
 | ID | Title | Expected result |
 |---|---|---|
-| E2E-DSK-001 | "shows the floating WhatsApp/phone dock and hides the mobile bar" | Dock visible; sticky bar hidden |
+| E2E-DSK-001 | "shows the floating WhatsApp/phone dock and hides the mobile bar" | Dock visible; sticky bar hidden. The dock holds a third button since A-64, support — see §3.9 |
 | E2E-DSK-002 | "shows the full desktop nav rather than a burger" | Burger hidden; "שירותים" link visible |
 
 ### 3.8 Agent chat — regulatory shell — `agent-compliance.spec.ts`
@@ -153,6 +153,28 @@ its transcript while showing the interview's notice would look entirely correct
 — it is a real consent notice, precisely describing a different chat — and
 consent to processing that does not happen is not consent to the processing that
 does.
+
+Both channel cases locate the WhatsApp row by `/^וואטסאפ/`. Since #98 each
+channel is a row named by its title and its label ("וואטסאפ הודעה מיידית"), so an
+exact match found nothing and both cases went red on every project (A-62). The
+anchor keeps what `exact` was there for: the section's "עדיף לי בוואטסאפ"
+alternative cannot satisfy it.
+
+### 3.9 Ways in to the support chat — `support-entry.spec.ts`
+
+The support chat sits at the bottom of `/faq`, and the footer held the only links
+there (A-64). These pin the two ways in that are on screen without scrolling.
+
+| ID | Title | Expected result |
+|---|---|---|
+| E2E-SUP-001 | "the header menu lists שאלות ותשובות and it opens the page" | From `/blog`: the desktop bar, or the drawer behind the burger on a phone, links to `/faq` |
+| E2E-SUP-002 | "the support button lands on the chat, not the top of the page" | From `/`: the dock button (desktop) or the sticky-bar cell (phone) reaches `/faq#support-chat` with the chat's heading in the viewport |
+| E2E-SUP-003 | "pressed again on /faq, it still brings the chat back into view" | Desktop only. After scrolling away, a second press scrolls back although the URL does not change |
+
+E2E-SUP-002 failed on web-chromium and android-chrome before `ScrollToTop`
+waited for its target: the hash scroll fired once, after 50 ms, and `/faq` is
+lazy, so the section did not exist yet. It now retries until the target mounts,
+for up to 3 s — which fixes every hash link into a lazy route, not this one.
 
 ## 4. Pass criteria
 

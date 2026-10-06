@@ -35,7 +35,7 @@ Test is skipped: mobile projects only".
 
 | ID | Title | Steps | Expected result |
 |---|---|---|---|
-| E2E-MOB-001 | "renders the sticky call/consult bar instead of the desktop dock" | Load `/` | Sticky bar shows `tel:+972508311776` and `#consultation`; desktop WhatsApp dock hidden |
+| E2E-MOB-001 | "renders the sticky call/consult bar instead of the desktop dock" | Load `/` | Sticky bar shows `tel:+972508311776` and `#start`; desktop WhatsApp dock hidden |
 | E2E-MOB-002 | "the sticky bar stays pinned while scrolling" | Scroll to `#testimonials` | Call link still in viewport |
 | E2E-MOB-003 | "opens and closes the burger menu and navigates from it" | Tap burger → tap "בלוג" | Drawer opens with a close button; navigation lands on `/blog` |
 | E2E-MOB-004 | "the burger menu closes on Escape and on backdrop tap" | Tap burger, press Escape | Close button gone |
@@ -45,6 +45,11 @@ Test is skipped: mobile projects only".
 | E2E-MOB-008 | "a visitor can submit the quick contact form by touch" | Tap and fill, tap submit | Confirmation shown; `Lead.create` with `source: quick` |
 | E2E-MOB-009 | "the calculator is usable on a narrow screen" | Scroll to `#fee-calculator`, set deposit | Field visible and editable; no `NaN` |
 | E2E-MOB-010 | "the viewport meta allows pinch-zoom" | Load `/` | `width=device-width` present; no `user-scalable=no` or `maximum-scale=1` |
+
+The sticky bar has a third cell since A-64, "תמיכה", which goes to the support
+chat on `/faq`. It is exercised on the phone projects by `E2E-SUP-002` in
+[STD-06 §3.9](06-std-ui-e2e.md), and the consultation keeps the widest column
+(`1fr 1.5fr 1fr`).
 
 ### 2.1 The desktop half of the same switch
 

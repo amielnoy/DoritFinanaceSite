@@ -119,8 +119,8 @@ Copy this block, date it, and fill the rows that were run.
 
 ### Round — not yet run
 
-The prompt has not been pushed to Base44 (`npx base44 agents push`), so no
-round exists. The bank is written and the contract cases pin the prompt;
+The prompt is live: CI's `base44 deploy` shipped it with #100, and a pull of the
+live definition on 2026-10-06 matched the repo. No round has been recorded yet. The bank is written and the contract cases pin the prompt;
 nothing yet observes the model. That gap is the point of §4 and of
 `tests/eval/procedures-agent.eval.test.ts`, which runs the load-bearing rows
 against the deployed agent once it is live.
