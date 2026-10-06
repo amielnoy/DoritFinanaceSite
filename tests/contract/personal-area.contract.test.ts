@@ -31,14 +31,14 @@ describe("personal area — the migration", () => {
   });
 
   it("only service_role may call enquiries_for", () => {
-    expect(SQL).toMatch(/revoke all on function public\.enquiries_for\(text\)\s+from public/i);
+    expect(SQL).toMatch(/revoke all on function public\.enquiries_for\(text\)\s+from public,\s*anon,\s*authenticated\b/i);
     expect(SQL).toMatch(/grant execute on function public\.enquiries_for\(text\)\s+to service_role/i);
     expect(SQL).not.toMatch(/grant execute on function public\.enquiries_for\(text\)\s+to (authenticated|anon)/i);
   });
 
   it("signed-in users may call my_enquiries, anonymous visitors may not", () => {
     expect(SQL).toMatch(/grant execute on function public\.my_enquiries\(\)\s+to authenticated/i);
-    expect(SQL).toMatch(/revoke all on function public\.my_enquiries\(\)\s+from public/i);
+    expect(SQL).toMatch(/revoke all on function public\.my_enquiries\(\)\s+from public,\s*anon,\s*authenticated\b/i);
     expect(SQL).not.toMatch(/my_enquiries\(\)\s+to anon/i);
   });
 
@@ -55,6 +55,9 @@ describe("personal area — the migration", () => {
   });
 
   it("matches only a verified address", () => {
+    // Supabase grants EXECUTE to anon and authenticated by name, so revoking
+    // from `public` alone closes nothing: every function must name them.
+    expect(SQL).toMatch(/revoke all on function public\.my_email\(\)\s+from public,\s*anon,\s*authenticated\b/i);
     expect(fnBody("my_email")).toMatch(/email_confirmed_at is not null/i);
   });
 
