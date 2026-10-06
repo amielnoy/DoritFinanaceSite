@@ -47,6 +47,7 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `submitClaim` | the claims form |
 | `upsertContact` | no caller yet — built for a channel that supplies a phone number, dormant per B-8 |
 | `logSupportChat` | the support agent, at the end of every conversation |
+| `myAccount` | the personal area, for a visitor signed in through Base44 |
 | `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
 `createConsultationEvent` is not yet executed here. See §6.
@@ -418,6 +419,24 @@ Failure is the point of the last three. The agent is told not to report this
 call to the visitor, so the function has to leave it nothing to report: a
 refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 `200`, and the conversation the visitor already had is unaffected.
+
+### 4.20 `myAccount` — a Base44 user's own enquiries — `INT-ACC-001..008`
+
+The personal area for a visitor signed in through Base44. The function takes the
+caller's address from the session, never from the request, and asks Supabase for
+what `enquiries_for` lets out. It does not decide the columns itself: the SQL
+does, and the function repeats the list so a future change to the SQL cannot
+widen what leaves.
+
+`INT-ACC-001` pins the call: the address arrives trimmed and lower-cased, and the
+service key travels as the bearer. `INT-ACC-002` returns the rows with the
+request id. `INT-ACC-003` to `005` are the refusals — nobody signed in is `401`,
+an unverified address and a disabled account are `403` — and the first two
+assert that Supabase is never reached. `INT-ACC-006` and `007` are failure:
+Supabase refusing, and Supabase not configured, both answer `500` with a fixed
+message and the request id and nothing that names the host, the key or the status.
+`INT-ACC-008` feeds a row carrying a phone number, a status and an escalation
+reason and expects none of them back.
 
 ## 5. Pass criteria
 
