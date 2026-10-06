@@ -8,6 +8,7 @@ import { Plus, X, Quote, Trash2, Loader2, Upload } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Stars from "@/components/dorit/primitives/Stars";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 
 type TestimonialItem = Testimonial;
 
@@ -175,7 +176,7 @@ export default function Testimonials() {
                   <button
                     onClick={submit}
                     disabled={busy || !form.name || !form.quote}
-                    className="inline-flex items-center gap-2 px-7 py-3 bg-primary text-primary-foreground hover:bg-accent disabled:opacity-40 disabled:hover:bg-primary transition-colors"
+                    className={ctaClass()}
                   >
                     {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                     פרסום המלצה
@@ -227,7 +228,7 @@ export default function Testimonials() {
                     <div className="flex items-center gap-2 mt-2">
                       {t.rating ? <Stars value={t.rating} /> : null}
                       {t.source && (
-                        <span className="text-[11px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground">
+                        <span className="text-sm px-2 py-0.5 border border-border text-muted-foreground">
                           {t.source === "google" ? "Google" : "Midrag"}
                         </span>
                       )}

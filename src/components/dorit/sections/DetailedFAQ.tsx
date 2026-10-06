@@ -8,6 +8,7 @@ import {
 import Reveal from "@/components/dorit/primitives/Reveal";
 import { HOME_COMMON_QUESTION_IDS, faqByIds } from "@/content/faq";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 
 const QA = faqByIds(HOME_COMMON_QUESTION_IDS);
 
@@ -34,7 +35,7 @@ export default function DetailedFAQ() {
             </p>
             <a
               href="#start"
-              className="mt-8 inline-flex items-center px-6 py-3 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors duration-300"
+              className={ctaClass("mt-8")}
             >
               לשיחה קצרה עם דורית
             </a>

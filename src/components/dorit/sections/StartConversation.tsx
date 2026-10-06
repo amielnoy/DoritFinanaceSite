@@ -48,22 +48,22 @@ export default function StartConversation() {
           </p>
           {AGENTS.needsInterview.guardrails ? (
             <div className="lg:col-span-7 border border-border/60 bg-secondary/30 px-5 py-5">
-              <p className="text-[11px] tracking-[0.12em] text-accent">כללי הגדר</p>
+              <p className="text-sm text-accent">כללי הגדר</p>
               <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-[13.5px] leading-relaxed">
                 <div>
-                  <dt className="text-muted-foreground">מה הוא עושה</dt>
+                  <dt className="text-sm text-accent">מה הוא עושה</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.allowed.join(" · ")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">מה הוא לא עושה</dt>
+                  <dt className="text-sm text-accent">מה הוא לא עושה</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.forbidden.join(" · ")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">מתי עובר לאדם</dt>
+                  <dt className="text-sm text-accent">מתי עובר לאדם</dt>
                   <dd className="text-foreground/80">
                     {AGENTS.needsInterview.guardrails.handoff}
                   </dd>

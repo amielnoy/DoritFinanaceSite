@@ -124,7 +124,7 @@ export default function BlogPost() {
           </Link>
 
           <div className="mt-8">
-            <div className="flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar size={13} />
               {new Date(post.created_date).toLocaleDateString("he-IL", {
                 day: "numeric",
@@ -144,7 +144,7 @@ export default function BlogPost() {
                   .map((t) => (
                     <span
                       key={t}
-                      className="text-[11px] tracking-[0.15em] uppercase px-2 py-0.5 border border-border text-muted-foreground"
+                      className="text-sm px-2 py-0.5 border border-border text-muted-foreground"
                     >
                       {t}
                     </span>

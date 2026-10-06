@@ -1,4 +1,5 @@
 import React from "react";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { Phone, Calendar, LifeBuoy } from "lucide-react";
 import { CONTACT } from "@/config/contact";
 import SupportLink from "./SupportLink";
@@ -17,7 +18,7 @@ export default function MobileStickyBar() {
         </a>
         <a
           href="#start"
-          className="flex items-center justify-center gap-2 py-3.5 text-sm font-medium bg-highlight text-primary"
+          className={ctaClass("flex min-h-0 py-3.5 text-sm")}
         >
           <Calendar size={18} />
           לשיחה קצרה עם דורית

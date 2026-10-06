@@ -1,4 +1,5 @@
 import React from "react";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { CONTACT } from "@/config/contact";
 import { CalendarClock } from "lucide-react";
 
@@ -61,7 +62,7 @@ export default function OutlookCalendarBooking({ data = {} }: OutlookCalendarBoo
     <button
       type="button"
       onClick={openCalendar}
-      className="inline-flex items-center gap-3 px-7 py-4 border border-highlight text-highlight-ink font-heading text-lg hover:bg-highlight hover:text-primary transition-colors"
+      className={ctaClass("gap-3")}
     >
       <CalendarClock size={20} />
       קביעת שיחה ב-Outlook

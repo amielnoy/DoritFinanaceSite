@@ -22,7 +22,7 @@ export default function Footer() {
   return (
     <footer className="relative bg-primary text-primary-foreground">
       <div className="grid grid-cols-1 md:grid-cols-2 h-64 md:h-80">
-        <div className="lens-hover overflow-hidden h-full">
+        <div className="overflow-hidden h-full">
           <Image
             src={HANDSHAKE}
             alt="לחיצת יד באור טבעי"
@@ -43,7 +43,7 @@ export default function Footer() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-14 grid grid-cols-1 md:grid-cols-3 gap-10 border-t border-primary-foreground/15">
         <div>
           <p className="font-heading text-2xl mb-2">דורית גוב ארי</p>
-          <p className="text-[11px] tracking-[0.3em] uppercase text-primary-foreground/50">
+          <p className="text-sm text-primary-foreground/50">
             התכנון שלי — השקט שלך
           </p>
           <p className="mt-6 text-primary-foreground/70 leading-relaxed max-w-xs">
@@ -52,7 +52,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <p className="text-[11px] tracking-[0.25em] uppercase text-primary-foreground/50 mb-5">
+          <p className="text-sm text-highlight-on-dark mb-5">
             ניווט
           </p>
           <ul className="space-y-3 text-primary-foreground/80">
@@ -85,7 +85,7 @@ export default function Footer() {
         </div>
 
         <div>
-          <p className="text-[11px] tracking-[0.25em] uppercase text-primary-foreground/50 mb-5">
+          <p className="text-sm text-highlight-on-dark mb-5">
             צרו קשר
           </p>
           <ul className="space-y-4 text-primary-foreground/80">

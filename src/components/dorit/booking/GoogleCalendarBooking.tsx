@@ -1,4 +1,5 @@
 import React from "react";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { CalendarClock } from "lucide-react";
 
 interface BookingData {
@@ -57,7 +58,7 @@ export default function GoogleCalendarBooking({ data = {} }: GoogleCalendarBooki
     <button
       type="button"
       onClick={openCalendar}
-      className="inline-flex items-center gap-3 px-7 py-4 bg-highlight text-primary font-heading text-lg hover:bg-highlight-strong transition-colors"
+      className={ctaClass("gap-3")}
     >
       <CalendarClock size={20} />
       קביעת שיחה ביומן

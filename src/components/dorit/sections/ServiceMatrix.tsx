@@ -121,14 +121,14 @@ export default function ServiceMatrix() {
                       strokeWidth={1.25}
                     />
                   </div>
-                  <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     0{i + 1}
                   </span>
                 </div>
                 <h3 className="font-heading text-2xl md:text-3xl mb-2">
                   {p.title}
                 </h3>
-                <p className="text-[11px] tracking-[0.12em] text-accent mb-5">
+                <p dir="ltr" className="font-heading italic text-lg text-muted-foreground mb-5">
                   {p.sub}
                 </p>
                 {/* The height animates; the ink does not. `text-foreground/70`

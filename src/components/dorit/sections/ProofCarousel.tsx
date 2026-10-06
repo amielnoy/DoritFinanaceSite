@@ -134,10 +134,10 @@ export default function ProofCarousel() {
             className="snap-start shrink-0 w-[340px] md:w-[400px] bg-card border border-border/50 p-8 md:p-10 flex flex-col group hover:border-highlight-muted/40 transition-colors duration-300"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[11px] tracking-[0.12em] text-accent">
+              <span className="text-sm px-2.5 py-0.5 rounded-sm bg-[hsl(33_100%_95%)] text-[hsl(37_80%_20%)]">
                 {b.tag}
               </span>
-              <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
+              <span className="font-heading text-xl tabular-nums text-muted-foreground">
                 0{i + 1}
               </span>
             </div>
@@ -156,7 +156,7 @@ export default function ProofCarousel() {
                   <span className="block mt-2 text-[12px] text-muted-foreground">{b.basis}</span>
                 ) : null}
               </span>
-              <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 מקרה 0{i + 1}
               </span>
             </div>

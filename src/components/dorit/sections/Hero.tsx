@@ -2,6 +2,7 @@ import React from "react";
 import { Image } from "@/components/ui/image";
 import { ArrowDown } from "lucide-react";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 
 const HERO_IMG = "/images/dorit-office-portrait.png";
 
@@ -38,7 +39,7 @@ export default function Hero() {
       <div className="flex-1 grid grid-cols-1 md:grid-cols-12 max-w-[1400px] mx-auto w-full px-6 md:px-10 pt-28 md:pt-24">
         {/* Portrait */}
         <div className="relative order-2 md:order-1 md:col-span-5 flex items-end">
-          <div className="relative w-full h-[55vh] md:h-[80vh] overflow-hidden lens-hover bg-primary">
+          <div className="relative w-full h-[55vh] md:h-[80vh] overflow-hidden bg-primary">
             <Image
               src={HERO_IMG}
               alt="דורית גוב ארי — דיוקן מקצועי"
@@ -68,7 +69,7 @@ export default function Hero() {
           </div>
           <div className="absolute bottom-6 right-6 glass px-5 py-3.5 border border-border/50 shadow-sm">
             <p className="font-heading text-sm leading-tight">דורית גוב ארי</p>
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               מתכננת פיננסית וסוכנת ביטוח
             </p>
           </div>
@@ -76,7 +77,7 @@ export default function Hero() {
 
         {/* Headline */}
         <div className="order-1 md:order-2 md:col-span-7 flex flex-col justify-center pr-0 md:pr-14 pb-10 md:pb-0">
-          <span className="text-[11px] tracking-[0.35em] uppercase text-accent mb-6 animate-fade-up">
+          <span className="text-sm text-accent mb-6 animate-fade-up">
             דורית גוב ארי · מתכננת פיננסית וסוכנת ביטוח
           </span>
           <ArchStatement />
@@ -105,7 +106,7 @@ export default function Hero() {
           <div className="mt-10 flex flex-wrap items-center gap-5 animate-fade-up">
             <a
               href="#start"
-              className="inline-flex items-center px-8 py-4 bg-highlight-muted text-primary font-medium hover:bg-highlight-strong transition-colors duration-300 shadow-sm"
+              className={ctaClass(undefined, { size: "lg" })}
             >
               לשיחה קצרה עם דורית
             </a>
@@ -122,7 +123,7 @@ export default function Hero() {
 
       {/* Live Assurance ticker */}
       <div className="relative border-t border-border/40 overflow-hidden bg-secondary/30">
-        <div className="flex whitespace-nowrap animate-ticker py-3.5">
+        <div className="flex whitespace-nowrap py-3.5">
           {[...TICKER, ...TICKER, ...TICKER, ...TICKER].map((t, i) => (
             <span
               key={i}

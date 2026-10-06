@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { Link } from "react-router-dom";
 import { services, type Article } from "@/services";
 import {
@@ -152,14 +153,14 @@ export default function BlogAdmin() {
 
         <div className="flex items-center justify-between mb-10">
           <div>
-            <span className="text-[11px] tracking-[0.35em] uppercase text-accent">
+            <span className="text-sm text-accent">
               Admin
             </span>
             <h1 className="font-heading text-4xl md:text-5xl mt-3">ניהול בלוג</h1>
           </div>
           <button
             onClick={startNew}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-highlight text-primary font-medium hover:bg-highlight-strong transition-colors"
+            className={ctaClass()}
           >
             <Plus size={18} /> מאמר חדש
           </button>
@@ -265,7 +266,7 @@ export default function BlogAdmin() {
                 <button
                   onClick={save}
                   disabled={busy || !editing.title || !editing.body}
-                  className="inline-flex items-center gap-2 px-7 py-2.5 bg-highlight text-primary font-medium hover:bg-highlight-strong disabled:opacity-40 transition-colors"
+                  className={ctaClass()}
                 >
                   {busy ? (
                     <Loader2 size={16} className="animate-spin" />

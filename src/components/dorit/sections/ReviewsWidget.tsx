@@ -71,7 +71,7 @@ export default function ReviewsWidget() {
                   </span>
                   <Stars n={avg} />
                 </div>
-                <p className="mt-1 text-[11px] tracking-[0.2em] uppercase text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   על סמך {rated.length} חוות דעת
                 </p>
               </div>
@@ -117,7 +117,7 @@ export default function ReviewsWidget() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <Stars n={t.rating || 0} />
-                  <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     {t.source ? SOURCE_LABEL[t.source] || "לקוח/ה" : "לקוח/ה"}
                   </span>
                 </div>

@@ -18,6 +18,7 @@ import { readHandoff } from "@/lib/interview-handoff";
 import { leadEvents, type ChatMethod } from "@/lib/analytics";
 import ContactChannels from "./ContactChannels";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 
 /**
  * Keeps `tel:` dialable.
@@ -392,7 +393,7 @@ export default function AgentChat({
 
                     The uppercase/letterspacing went with it: neither does
                     anything for Hebrew except loosen it. */}
-                <p className="text-[11px] text-muted-foreground leading-snug">
+                <p className="text-sm text-muted-foreground leading-snug">
                   {descriptor.panelSubtitle} · עוזר אוטומטי
                 </p>
               </div>
@@ -493,7 +494,7 @@ export default function AgentChat({
                 <button
                   onClick={acceptConsent}
                   disabled={!consentChecked}
-                  className="mt-3 w-full sm:w-auto px-6 py-3.5 bg-highlight text-primary hover:bg-highlight-strong disabled:opacity-40 disabled:hover:bg-highlight transition-colors text-[15px]"
+                  className={ctaClass("mt-3 w-full sm:w-auto")}
                 >
                   {CONSENT.startLabel}
                 </button>
@@ -597,7 +598,7 @@ export default function AgentChat({
                   <button
                     type="submit"
                     disabled={handingOff}
-                    className="inline-flex items-center gap-1.5 bg-accent text-accent-foreground disabled:opacity-40 px-4 py-2 text-[14px]"
+                    className={ctaClass("gap-1.5 min-h-0 px-4 py-2 text-[14px]")}
                   >
                     {handingOff ? <Loader2 size={14} className="animate-spin" /> : null}
                     {HUMAN_HANDOFF.submitLabel}
@@ -647,7 +648,7 @@ export default function AgentChat({
               <button
                 onClick={send}
                 disabled={!started || !input.trim() || sending}
-                className="inline-flex items-center justify-center w-12 h-12 bg-highlight text-primary hover:bg-highlight-strong disabled:opacity-40 disabled:hover:bg-highlight transition-colors shrink-0"
+                className={ctaClass("w-12 h-12 min-h-0 px-0 shrink-0 text-accent")}
                 aria-label="שליחה"
               >
                 <Send size={18} />
@@ -692,7 +693,7 @@ export default function AgentChat({
 
           {descriptor.guardrails ? (
             <div className="mt-6 border border-border/60 bg-secondary/30 px-5 py-5">
-              <p className="text-[11px] tracking-[0.12em] text-accent">כללי הגדר</p>
+              <p className="text-sm text-accent">כללי הגדר</p>
               <dl className="mt-4 space-y-3.5 text-[13.5px] leading-relaxed">
                 <div>
                   <dt className="text-muted-foreground">מה הוא עושה</dt>

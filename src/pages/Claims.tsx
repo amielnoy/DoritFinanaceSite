@@ -272,7 +272,7 @@ export default function Claims() {
           <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
             <div className="lg:col-span-5">
               <Reveal>
-                <span className="text-[11px] tracking-[0.12em] text-highlight">
+                <span className="text-sm text-highlight">
                   03 · Checklist
                 </span>
                 <h2 className="font-heading text-4xl md:text-5xl mt-4 leading-tight">

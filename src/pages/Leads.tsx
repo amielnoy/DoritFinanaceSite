@@ -98,7 +98,7 @@ export default function Leads() {
       <header className="border-b border-border/60 bg-card">
         <div className="max-w-[1200px] mx-auto px-6 py-5 flex items-center justify-between">
           <div>
-            <p className="text-[11px] tracking-[0.3em] uppercase text-accent">Admin</p>
+            <p className="text-sm text-accent">Admin</p>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">ניהול פניות</h1>
           </div>
           <Link
@@ -119,7 +119,7 @@ export default function Leads() {
             onClick={() => setFilter("all")}
             className={`text-right p-5 border transition-colors ${filter === "all" ? "border-primary bg-primary/[0.03]" : "border-border/60 hover:border-accent/50 bg-card"}`}
           >
-            <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">סה״כ פניות</p>
+            <p className="text-sm text-muted-foreground">סה״כ פניות</p>
             <p className="font-heading text-3xl mt-2">{leads.length}</p>
             <p className="text-xs text-muted-foreground mt-1">כל הרשומות במערכת</p>
           </button>
@@ -127,7 +127,7 @@ export default function Leads() {
             onClick={() => setFilter("new")}
             className={`text-right p-5 border transition-colors ${filter === "new" ? "border-highlight bg-highlight/10" : "border-border/60 hover:border-highlight/50 bg-card"}`}
           >
-            <p className="text-[11px] tracking-[0.2em] uppercase text-highlight-ink">דורשות טיפול</p>
+            <p className="text-sm text-highlight-ink">דורשות טיפול</p>
             <p className="font-heading text-3xl mt-2 text-highlight-ink">{counts.new || 0}</p>
             <p className="text-xs text-muted-foreground mt-1">לקוחות חדשים — ליצור קשר</p>
           </button>
@@ -135,7 +135,7 @@ export default function Leads() {
             onClick={() => setFilter("contacted")}
             className={`text-right p-5 border transition-colors ${filter === "contacted" ? "border-accent bg-accent/10" : "border-border/60 hover:border-accent/50 bg-card"}`}
           >
-            <p className="text-[11px] tracking-[0.2em] uppercase text-accent">בתהליך</p>
+            <p className="text-sm text-accent">בתהליך</p>
             <p className="font-heading text-3xl mt-2 text-accent">{counts.contacted || 0}</p>
             <p className="text-xs text-muted-foreground mt-1">נוצר קשר — להמשיך במכירה</p>
           </button>
@@ -143,7 +143,7 @@ export default function Leads() {
             onClick={() => setFilter("closed")}
             className={`text-right p-5 border transition-colors ${filter === "closed" ? "border-primary bg-primary/[0.03]" : "border-border/60 hover:border-accent/50 bg-card"}`}
           >
-            <p className="text-[11px] tracking-[0.2em] uppercase text-muted-foreground">נסגרו</p>
+            <p className="text-sm text-muted-foreground">נסגרו</p>
             <p className="font-heading text-3xl mt-2 text-muted-foreground">{counts.closed || 0}</p>
             <p className="text-xs text-muted-foreground mt-1">טופלו והסתיימו</p>
           </button>

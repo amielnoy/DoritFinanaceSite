@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
 import { useAuth } from "@/lib/AuthContext";
 import { useSectionNav } from "@/hooks/useSectionNav";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 
 interface NavItem {
   label: string;
@@ -99,7 +100,7 @@ export default function FloatingHeader() {
             <span className="font-heading text-xl md:text-2xl font-bold tracking-tight">
               דורית גוב ארי
             </span>
-            <span className="text-[11px] md:text-[11px] tracking-[0.3em] uppercase text-muted-foreground mt-1">
+            <span className="text-[13px] text-muted-foreground mt-1">
               התכנון שלי — השקט שלך
             </span>
           </span>
@@ -148,7 +149,7 @@ export default function FloatingHeader() {
           <a
             href="/#start"
             onClick={(e) => goToSection(e, "#start")}
-            className="hidden md:inline-flex items-center px-5 py-2.5 bg-highlight-muted text-primary text-[13px] font-medium tracking-wide hover:bg-highlight-strong transition-colors duration-300"
+            className={ctaClass("hidden md:inline-flex min-h-11 px-5 text-[17px]")}
           >
             לשיחה קצרה עם דורית
           </a>
@@ -249,7 +250,7 @@ export default function FloatingHeader() {
                 <a
                   href="/#start"
                   onClick={(e) => goToSection(e, "#start")}
-                  className="flex items-center justify-center gap-2 w-full py-3.5 bg-highlight text-primary font-medium"
+                  className={ctaClass("flex w-full")}
                 >
                   <Calendar size={18} />
                   לשיחה קצרה עם דורית

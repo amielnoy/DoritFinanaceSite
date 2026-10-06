@@ -68,7 +68,7 @@ export default function ShareButtons({ title, url }: ShareButtonsProps) {
 
   return (
     <div className="mt-12 pt-8 border-t border-border/60">
-      <p className="text-[11px] tracking-[0.25em] uppercase text-muted-foreground mb-4">
+      <p className="text-sm text-muted-foreground mb-4">
         שיתוף המאמר
       </p>
       <div className="flex flex-wrap items-center gap-3">

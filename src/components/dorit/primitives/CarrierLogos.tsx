@@ -32,7 +32,7 @@ export default function CarrierLogos() {
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-accent/25 to-transparent" />
       <div className="max-w-[1400px] mx-auto px-6 md:px-10">
         <div className="text-center mb-10 md:mb-12">
-          <p className="text-[11px] tracking-[0.35em] uppercase text-accent">
+          <p className="font-heading italic text-[15px] normal-case text-accent">
             עובדת מול מיטב חברות הפנסיה והביטוח בישראל
           </p>
           <div className="mt-4 mx-auto w-10 h-px bg-highlight-muted/60" />
@@ -52,7 +52,7 @@ export default function CarrierLogos() {
                 {c.he}
               </span>
               {c.en && c.en !== c.he && (
-                <span className="mt-1.5 text-[11px] tracking-[0.3em] uppercase text-muted-foreground group-hover:text-accent/70 transition-colors duration-500">
+                <span className="mt-1.5 font-heading italic text-[15px] normal-case text-muted-foreground group-hover:text-accent/70 transition-colors duration-500">
                   {c.en}
                 </span>
               )}

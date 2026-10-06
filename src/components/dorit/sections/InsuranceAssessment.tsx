@@ -75,7 +75,7 @@ export default function InsuranceAssessment() {
                   transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-center justify-between mb-8">
-                    <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
+                    <span className="text-sm text-muted-foreground">
                       שאלה {step + 1} מתוך {QUESTIONS.length}
                     </span>
                     {step > 0 && (
@@ -132,7 +132,7 @@ export default function InsuranceAssessment() {
                   transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-center justify-between mb-8">
-                    <span className="text-[11px] tracking-[0.12em] text-muted-foreground">
+                    <span className="text-sm text-muted-foreground">
                       התוצאה שלך
                     </span>
                     <button
@@ -179,7 +179,7 @@ export default function InsuranceAssessment() {
                             <div className="flex items-center gap-2.5 mb-2">
                               <h4 className="font-heading text-xl">{rec.title}</h4>
                               {rec.priority && (
-                                <span className="text-[11px] tracking-[0.2em] uppercase text-highlight-ink border border-highlight/40 px-2 py-0.5 rounded-sm">
+                                <span className="text-sm text-highlight-ink border border-highlight/40 px-2 py-0.5 rounded-sm">
                                   עדיפות גבוהה
                                 </span>
                               )}
