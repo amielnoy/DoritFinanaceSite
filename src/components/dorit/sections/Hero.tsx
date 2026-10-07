@@ -47,7 +47,7 @@ export default function Hero() {
               number at its hyphen ("L-" / "00107009"). The number never wraps. */}
           <figcaption className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3 text-sm leading-relaxed text-muted-foreground">
             <span>דורית גוב ארי · מתכננת פיננסית וסוכנת ביטוח</span>
-            <span dir="ltr" className="self-start sm:self-auto whitespace-nowrap tabular-nums">L-00107009</span>
+            <bdi dir="ltr" className="self-start sm:self-auto whitespace-nowrap lining-nums tabular-nums">L-00107009</bdi>
           </figcaption>
         </figure>
 

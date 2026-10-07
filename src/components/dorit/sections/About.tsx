@@ -38,8 +38,8 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
   return (
     <section id="about" className="relative border-b border-border">
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] grid grid-cols-1 lg:grid-cols-2 gap-[clamp(40px,6vw,96px)] items-center">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="plate h-[300px] col-span-2">
+        <div className="order-2 lg:order-1 grid grid-cols-[3fr_2fr] gap-4">
+          <div className="plate h-[clamp(220px,28vw,360px)]">
             <Image
               src={ATMOS}
               alt="פרט אדריכלי — אור על זכוכית"
@@ -47,7 +47,7 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
               fittingType="fill"
             />
           </div>
-          <div className="plate h-[210px]">
+          <div className="plate h-[clamp(220px,28vw,360px)]">
             <Image
               src={PEN}
               alt="עט נוצה על משטח אבן"
@@ -55,15 +55,9 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
               fittingType="fill"
             />
           </div>
-          <div className="flex flex-col justify-end gap-1.5 border border-highlight p-6 h-[210px]">
-            <p className="font-heading text-[64px] leading-[0.9] text-accent tabular-nums">30</p>
-            <p className="text-[15px] text-muted-foreground">
-              שנות ניסיון
-            </p>
-          </div>
         </div>
 
-        <div className="flex flex-col justify-center">
+        <div className="order-1 lg:order-2 flex flex-col justify-center">
           <Reveal>
             <Eyebrow>
               01 · מתכננת פיננסית וסוכנת ביטוח
@@ -112,7 +106,7 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
                 key={i}
                 className={`px-2 py-6 flex flex-col items-center gap-2 text-center ${i > 0 ? "border-s border-border" : ""}`}
               >
-                <p className="font-heading text-[clamp(36px,4vw,52px)] text-accent leading-none tabular-nums">
+                <p className="font-heading text-[clamp(36px,4vw,52px)] text-accent leading-none lining-nums tabular-nums">
                   {s.num}
                 </p>
                 <p className="text-[15px] text-muted-foreground">

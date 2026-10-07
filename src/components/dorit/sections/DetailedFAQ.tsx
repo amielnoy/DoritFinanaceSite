@@ -26,20 +26,12 @@ export default function DetailedFAQ() {
               06 · שאלות ותשובות
             </Eyebrow>
             <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-[22px] leading-[1.12]">
-              שאלות
-              <br />
-              נפוצות
+              שאלות נפוצות
             </h2>
-            <p className="mt-[22px] text-lg leading-[1.75] text-muted-foreground max-w-[380px]">
+            <p className="mt-[22px] text-[17px] leading-[1.75] text-muted-foreground max-w-[380px]">
               התשובות לשאלות שלקוחות שואלים אותי לעיתים קרובות — לפני פגישת
               הראשונה. אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.
             </p>
-            <a
-              href="#start"
-              className={ctaClass("mt-[22px]")}
-            >
-              לשיחה קצרה עם דורית
-            </a>
           </Reveal>
         </div>
 
@@ -71,6 +63,9 @@ export default function DetailedFAQ() {
               </AccordionItem>
             ))}
           </Accordion>
+          <a href="#start" className={ctaClass("mt-9")}>
+            לשיחה קצרה עם דורית
+          </a>
         </div>
       </div>
     </section>

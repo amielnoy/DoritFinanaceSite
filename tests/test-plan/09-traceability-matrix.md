@@ -6,7 +6,7 @@ gap is visible and a failure points at a feature.
 | # | Capability | Unit | Component | Contract | Integration | Eval | API | UI e2e | Mobile | Security | a11y |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | F-01 | Landing page renders in Hebrew RTL | — | — | — | — | — | API-HTP-001/002 | E2E-HOM-001..004 | E2E-MOB-005 | — | A11Y-AXE-001, A11Y-STR-001 |
-| F-02 | Visitor reads adviser profile, services, proof, testimonials | — | CMP-RVW-001..003 | CTR-TST-001..003 | — | — | API-CTR-002 | E2E-HOM-003/005 | — | SEC-XSS-005 | A11Y-AXE-001 |
+| F-02 | Visitor reads adviser profile, services, proof, testimonials | — | CMP-RVW-001..003, CMP-TST-001..003 | CTR-TST-001..003 | — | — | API-CTR-002 | E2E-HOM-003/005/008 | — | SEC-XSS-005 | A11Y-AXE-001 |
 | F-03 | Visitor models pension management fees (/tools) | UNIT-PFC-001..012 | CMP-PFC-001..004 | — | — | — | — | E2E-CAL-001..006 | E2E-MOB-009 | — | A11Y-AXE-008 |
 | F-04 | Visitor submits the quick contact form, beside the chat in `#start` | UNIT-SUB-001..008 | CMP-QCF-001..005 | CTR-LED-001..013, CTR-EML-001/002 | INT-LEAD-001..024 | — | API-CTR-003/005/006 | E2E-FRM-001..004 | E2E-MOB-008 | SEC-RLS-001 | A11Y-AXE-008, A11Y-STR-002 |
 | F-06 | Visitor books the first meeting inside the interview chat | UNIT-RCP-001..003 | — | CTR-FN-001..011 | INT-LEAD-025..030, INT-LEAD-080..087 | — | API-LIV-004 | E2E-AGT-001..005 | — | — | A11Y-AXE-008 |

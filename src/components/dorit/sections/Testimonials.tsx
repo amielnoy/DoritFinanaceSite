@@ -23,7 +23,11 @@ interface TestimonialForm {
 }
 
 export default function Testimonials() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  // Adding and deleting are Dorit's. Since the personal area, ordinary visitors
+  // sign in too, and "signed in" no longer means "owner" — the writes were
+  // refused server-side, but the controls were on show.
+  const isAdmin = isAuthenticated && user?.role === "admin";
   const { data, isPending: loading } = useTestimonials();
   const createTestimonial = useCreateTestimonial();
   const removeTestimonial = useRemoveTestimonial();
@@ -80,6 +84,13 @@ export default function Testimonials() {
 
   const remove = (id: string) => removeTestimonial.mutate(id);
 
+  // The section exists only when there is something to show. Nothing while the
+  // list loads (so it cannot flash in and out) and nothing when it is empty —
+  // the home page carries no "coming soon" placeholder. An admin is the
+  // exception once loaded: the add form lives here, and without the section
+  // the first testimonial could never be added.
+  if (loading || (items.length === 0 && !isAdmin)) return null;
+
   return (
     <section id="testimonials" className="relative bg-secondary border-b border-border">
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-10">
@@ -92,7 +103,7 @@ export default function Testimonials() {
               <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px]">לקוחות מספרים</h2>
             </Reveal>
           </div>
-          {isAuthenticated && (
+          {isAdmin && (
             <button
               onClick={() => setOpen((v) => !v)}
               className={ctaClass("text-[15px]", { muted: true })}
@@ -104,7 +115,7 @@ export default function Testimonials() {
         </div>
 
         {/* Add form */}
-        {isAuthenticated && open && (
+        {isAdmin && open && (
           <div className="border border-border rounded-md p-6 md:p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="md:col-span-1">
@@ -189,22 +200,18 @@ export default function Testimonials() {
         )}
 
         {/* Grid */}
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="animate-spin text-accent" />
-          </div>
-        ) : !items || items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="border-y border-border py-14 px-6 flex flex-col items-center gap-3 text-center">
             <span aria-hidden="true" className="font-heading text-[64px] leading-[0.6] text-highlight">”</span>
             <p className="text-[17px] text-muted-foreground">
-              {isAuthenticated ? "עדיין אין המלצות — הוספ/י את הראשונה." : "בקרוב יעלו כאן המלצות הלקוחות."}
+              עדיין אין המלצות — הוספ/י את הראשונה.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {items.map((t) => (
               <article key={t.id} className="group relative rounded-md border border-border p-7 flex flex-col">
-                {isAuthenticated && (
+                {isAdmin && (
                   <button
                     onClick={() => remove(t.id)}
                     className="absolute top-4 left-4 text-muted-foreground hover:text-destructive transition-colors"

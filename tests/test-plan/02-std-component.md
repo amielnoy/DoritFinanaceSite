@@ -14,7 +14,7 @@ on, and calls the Base44 client with the payload the backend contract expects.
 ## 2. Test items
 
 `Stars`, `MobileStickyBar`, `FloatingActions`, `PensionFeeCalculator`,
-`QuickContact`, `ClaimForm`, `FAQ`, `ShareButtons`, `ReviewsWidget` — all in
+`QuickContact`, `ClaimForm`, `FAQ`, `ShareButtons`, `ReviewsWidget`, `Testimonials` — all in
 `src/components/dorit/`.
 
 ## 3. Approach
@@ -156,8 +156,18 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 | CMP-ERB-004 | "uses page wording for the app-level boundary" | `scope="page"` message says "הדף" |
 | CMP-ERB-005 | "recovers when its resetKey changes, so leaving a broken page is not a dead end" | After `resetKey` changes (the app passes the path), the fallback is gone and the new children render |
 
+### 4.11 `<Testimonials />` — `tests/component/testimonials.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-TST-001 | "renders nothing while loading and nothing when there are no testimonials" | No `#testimonials`, no "לקוחות מספרים" heading, no placeholder text |
+| CMP-TST-002 | "renders the section and its heading when there are testimonials" | `section#testimonials`, the heading and the quote are present |
+| CMP-TST-003 | "keeps the section for an admin when empty, so the first one can be added" | The "הוספת המלצה" button is present |
+| CMP-TST-004 | "shows a signed-in visitor who is not an admin no add or delete controls" | Since the personal area, ordinary visitors sign in: the quote shows, no "הוספת המלצה" and no delete button |
+| CMP-TST-005 | "hides the empty section from a signed-in visitor who is not an admin" | No `#testimonials` |
+
 ## 5. Pass criteria
 
-All 71 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 76 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
