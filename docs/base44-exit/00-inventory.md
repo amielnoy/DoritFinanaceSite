@@ -78,7 +78,7 @@ About thirty call sites (recounted 2026-10-06: 31, the one change being `auth.*`
 
 ## 3. What the backend actually uses
 
-Eight functions, 3,910 lines (recounted 2026-10-06; `myAccount` is the eighth). The Deno-specific surface is **one API**:
+Nine functions, 4,029 lines (recounted 2026-10-07; `adminLead` is the ninth). The Deno-specific surface is **one API**:
 
 ```
 33  Deno.env.get      → process.env
@@ -98,6 +98,7 @@ What is genuinely Base44, per function:
 | `contentAdmin` | 192 | | | ✓ | ✓ | |
 | `logSupportChat` | 190 | ✓ | | | | |
 | `myAccount` | 84 | | | | ✓ | |
+| `adminLead` | 119 | | | ✓ | ✓ | |
 
 Three dependencies, in descending order of difficulty:
 

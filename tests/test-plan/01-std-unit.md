@@ -35,6 +35,7 @@ something outside the repository.
 | Insurance self-assessment | `src/lib/insurance-assessment.ts` |
 | `reconcile-stores`, `prune-vercel-deployments` | `scripts/*.mjs` |
 | `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
+| `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
 | `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
 > **Note.** `computePensionFees` was extracted from `PensionFeeCalculator.tsx`
@@ -182,8 +183,10 @@ the service adds of its own would overwrite a column nobody edited.
 | UNIT-ADM-001 | "asks for leads newest-first" | Sorted descending by creation |
 | UNIT-ADM-002 | "accepts a caller-chosen page size" | Limit forwarded |
 | UNIT-ADM-003 | "returns an array when the store answers with nothing" | `[]`, never `undefined` |
-| UNIT-ADM-004 | "patches only the status when a lead is moved along" | One field in the payload |
-| UNIT-ADM-005 | "deletes by id" | Delete called with the id |
+| UNIT-ADM-004 | "moves a lead along through the adminLead function, not the entity" | `invoke("adminLead", { action: "status", id, status })`; no entity update |
+| UNIT-ADM-005 | "deletes through the adminLead function, not the entity" | `invoke("adminLead", { action: "delete", id })`; no entity delete |
+| UNIT-ADM-010 | "rejects when the function call fails, so the screen shows its write error" | `setStatus` and `remove` both reject |
+| UNIT-ADM-011 | "rejects when the function answers with an error body and no throw" | A body without `ok: true` rejects |
 | UNIT-ADM-006 | "lists every article, drafts included" | No published filter |
 | UNIT-ADM-007 | "creates an article with published coerced to a boolean" | `true`/`false`, not `"on"` |
 | UNIT-ADM-008 | "forwards a partial update without inventing the fields it was not given" | Payload has exactly the edited keys |
@@ -340,7 +343,24 @@ one; a blocked or throwing tag never breaks the page.
 | UNIT-GA4-013 | "ignores every other link" | Nothing sent |
 | UNIT-GA4-014 | "registers once, however often it is called" | One listener |
 
+### 4.16 Reconciling the lead mirror — `tests/unit/reconcile-leads.test.ts`
+
+The planning step of `scripts/reconcile-leads.mjs`, which finds Supabase `leads`
+rows whose lead Base44 no longer holds, and rows whose status differs. The script
+is a dry run unless given `--apply`; what is pinned here is what it would do.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-REC-001 | "deletes the Supabase rows whose lead is gone from Base44" | `toDelete` holds the orphan's `base44_id` |
+| UNIT-REC-002 | "updates a row whose status differs, to Base44's value" | `toUpdate` carries id, from, to |
+| UNIT-REC-003 | "plans nothing when the stores agree" | Both lists empty |
+| UNIT-REC-004 | "leaves alone a Supabase row with no base44_id and a Base44 lead Supabase never got" | Both lists empty |
+| UNIT-REC-005 | "treats a Base44 lead without a status as the default, new" | No update |
+| UNIT-REC-006 | "carries ids and statuses only" | No name or phone in the plan |
+| UNIT-REC-007 | "finds the marked line among the CLI's other output" | The JSON after the marker |
+| UNIT-REC-008 | "says so when the CLI printed no result" | Throws, naming `base44 login` |
+
 ## 5. Pass criteria
 
-All 303 cases pass. Any failure is a functional defect, not an environment issue —
+All 317 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

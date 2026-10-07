@@ -48,6 +48,7 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `upsertContact` | no caller yet — built for a channel that supplies a phone number, dormant per B-8 |
 | `logSupportChat` | the support agent, at the end of every conversation |
 | `myAccount` | the personal area, for a visitor signed in through Base44 |
+| `adminLead` | `/admin/leads` — an admin's status change and delete, written to Supabase and then Base44 |
 | `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
 `createConsultationEvent` is not yet executed here. See §6.
@@ -446,9 +447,36 @@ reason and expects none of them back.
 never reaches Supabase, while an axios-shaped `response.status` of `401` is still
 read as signed out. Only `401` and `403` mean the visitor is not signed in.
 
+### 4.21 `adminLead` — an admin's writes to a lead — `INT-ADL-001..031`
+
+An admin's status change and delete used to reach Base44 only, so Supabase kept
+every status at "new" and kept a lead Dorit had deleted — which the visitor's
+personal area still showed. The function writes Supabase first and Base44
+second: both writes are idempotent, so a failure part-way leaves the lead in the
+admin list and the retry completes it. The other order would drop the lead from
+the list and leave its Supabase copy with no way back to it.
+
+`INT-ADL-001` to `004` are who may call: nobody signed in (and a `403` from the
+SDK) is `401`, a Base44 outage is `500`, a signed-in non-admin is `403` — each
+with the request id and no write anywhere. `INT-ADL-005` to `020` are the strict
+validation: an unknown or missing action, a status outside the five the entity
+declares, and a missing, blank, numeric, over-long or filter-widening id are all
+`400` with nothing written; each of the five statuses is accepted.
+`INT-ADL-021` and `022` pin the status write (`PATCH leads?base44_id=eq.<id>`
+with only `{status}`, then `Lead.update`) and its order. `INT-ADL-023` pins the
+delete (`DELETE`, then `Lead.delete`; the `meetings` row goes by `on delete
+cascade`). `INT-ADL-024` to `030` are failure: Supabase refusing or unreachable
+is `502` with `error` and `rid` only, and Base44 is never called; Base44
+refusing after Supabase succeeded is `502` with no internal message; Supabase
+not configured still writes Base44; and every refusal carries exactly `error`
+and `rid`. `INT-ADL-031` is a retried delete: when Base44 answers `404` because
+an earlier delete went through and only its response was lost, the function
+answers `200` — the lead is gone from both stores, and an error there would
+leave the admin stuck on one that no retry could clear.
+
 ## 5. Pass criteria
 
-All 253 cases pass. These assert behaviour, not shape — a failure means the
+All 284 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

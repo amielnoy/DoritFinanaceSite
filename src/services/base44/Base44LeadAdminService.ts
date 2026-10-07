@@ -1,12 +1,11 @@
+import { invokeFunction, type FunctionInvoker } from "./invoke";
 import type { LeadAdminPort, LeadRecord, LeadStatus } from "../ports";
 
-/** The entity surface this adapter needs — list, update and delete on Lead. */
-export interface LeadAdminClient {
+/** What this adapter needs: Lead reads through the entity, writes through the `adminLead` function. */
+export interface LeadAdminClient extends FunctionInvoker {
   entities: {
     Lead: {
       list(sort?: string, limit?: number): Promise<unknown[]>;
-      update(id: string, patch: Record<string, unknown>): Promise<unknown>;
-      delete(id: string): Promise<unknown>;
     };
   };
 }
@@ -26,11 +25,28 @@ export class Base44LeadAdminService implements LeadAdminPort {
     return (rows ?? []) as LeadRecord[];
   }
 
+  /**
+   * Writes go through `adminLead`, not the entity: the function updates the
+   * Supabase copy as well, which the visitor's personal area reads. A direct
+   * entity write left every status at "new" there and kept deleted enquiries.
+   */
   async setStatus(id: string, status: LeadStatus): Promise<void> {
-    await this.client.entities.Lead.update(id, { status });
+    await this.write({ action: "status", id, status });
   }
 
   async remove(id: string): Promise<void> {
-    await this.client.entities.Lead.delete(id);
+    await this.write({ action: "delete", id });
+  }
+
+  private async write(payload: Record<string, unknown>): Promise<void> {
+    const receipt = await invokeFunction<{ ok?: boolean; error?: string; rid?: string }>(
+      this.client,
+      "adminLead",
+      payload
+    );
+    // A rejected call throws in the SDK; an answer that says it did not save must not read as success.
+    if (receipt?.ok !== true) {
+      throw new Error(`adminLead did not confirm the write${receipt?.rid ? ` (rid ${receipt.rid})` : ""}`);
+    }
   }
 }

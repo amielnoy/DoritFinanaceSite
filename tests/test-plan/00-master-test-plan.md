@@ -59,7 +59,7 @@ backend when one is available.
 | Item | Version reference |
 |---|---|
 | Application source | `src/**` at the commit under test |
-| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{submitLead,submitClaim,createConsultationEvent,escalateToHuman,logSupportChat,upsertContact,contentAdmin}`, `base44/agents/*.jsonc`, `dorit-mailer/functions/api/send-email.js` |
+| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{submitLead,submitClaim,createConsultationEvent,escalateToHuman,logSupportChat,upsertContact,contentAdmin,myAccount,adminLead}`, `base44/agents/*.jsonc`, `dorit-mailer/functions/api/send-email.js` |
 | Published copy | `content/blog/*.md`, `src/config/compliance.ts` |
 | Static assets | `index.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`, `public/manifest.json` |
 | Build output | `dist/` produced by `npm run build:prerender` — the plain `npm run build` omits the prerendered route files, and the e2e suite tests what is in `dist/` |

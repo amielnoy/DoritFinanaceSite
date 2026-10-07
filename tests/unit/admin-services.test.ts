@@ -20,6 +20,10 @@ const leadClient = () => ({
       delete: vi.fn(async () => ({ ok: true })),
     },
   },
+  // `invoke` resolves to the whole axios response, as the SDK's does — see invoke.ts.
+  functions: {
+    invoke: vi.fn(async (_name: string, _payload: unknown) => ({ data: { ok: true, rid: "r1" }, status: 200, headers: {} })),
+  },
 });
 
 const contentClient = () => ({
@@ -59,18 +63,34 @@ describe("Base44LeadAdminService", () => {
     await expect(new Base44LeadAdminService(client).list()).resolves.toEqual([]);
   });
 
-  it("patches only the status when a lead is moved along", async () => {
-    // A patch that carried the whole row would let a stale screen overwrite a field
-    // somebody else had just changed.
+  it("moves a lead along through the adminLead function, not the entity", async () => {
+    // The entity write reached Base44 only, so Supabase kept "new" for ever and the
+    // visitor's personal area read it. The function writes both, Supabase first.
     const client = leadClient();
     await new Base44LeadAdminService(client).setStatus("l1", "contacted");
-    expect(client.entities.Lead.update).toHaveBeenCalledWith("l1", { status: "contacted" });
+    expect(client.functions.invoke).toHaveBeenCalledWith("adminLead", { action: "status", id: "l1", status: "contacted" });
+    expect(client.entities.Lead.update).not.toHaveBeenCalled();
   });
 
-  it("deletes by id", async () => {
+  it("deletes through the adminLead function, not the entity", async () => {
     const client = leadClient();
     await new Base44LeadAdminService(client).remove("l1");
-    expect(client.entities.Lead.delete).toHaveBeenCalledWith("l1");
+    expect(client.functions.invoke).toHaveBeenCalledWith("adminLead", { action: "delete", id: "l1" });
+    expect(client.entities.Lead.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the function call fails, so the screen shows its write error", async () => {
+    const client = leadClient();
+    client.functions.invoke = vi.fn(async () => { throw Object.assign(new Error("502"), { response: { status: 502 } }); });
+    const svc = new Base44LeadAdminService(client);
+    await expect(svc.setStatus("l1", "closed")).rejects.toThrow();
+    await expect(svc.remove("l1")).rejects.toThrow();
+  });
+
+  it("rejects when the function answers with an error body and no throw", async () => {
+    const client = leadClient();
+    client.functions.invoke = vi.fn(async () => ({ data: { error: "x", rid: "r2" }, status: 200, headers: {} }));
+    await expect(new Base44LeadAdminService(client).remove("l1")).rejects.toThrow();
   });
 });
 
