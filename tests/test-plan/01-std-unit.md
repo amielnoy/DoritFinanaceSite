@@ -371,5 +371,5 @@ it would write.
 
 ## 5. Pass criteria
 
-All 0 cases pass. Any failure is a functional defect, not an environment issue —
+All 323 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
