@@ -23,7 +23,11 @@ interface TestimonialForm {
 }
 
 export default function Testimonials() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  // Adding and deleting are Dorit's. Since the personal area, ordinary visitors
+  // sign in too, and "signed in" no longer means "owner" — the writes were
+  // refused server-side, but the controls were on show.
+  const isAdmin = isAuthenticated && user?.role === "admin";
   const { data, isPending: loading } = useTestimonials();
   const createTestimonial = useCreateTestimonial();
   const removeTestimonial = useRemoveTestimonial();
@@ -82,10 +86,10 @@ export default function Testimonials() {
 
   // The section exists only when there is something to show. Nothing while the
   // list loads (so it cannot flash in and out) and nothing when it is empty —
-  // the home page carries no "coming soon" placeholder. The signed-in owner is
-  // the exception once loaded: the add form lives here, and without the section
+  // the home page carries no "coming soon" placeholder. An admin is the
+  // exception once loaded: the add form lives here, and without the section
   // the first testimonial could never be added.
-  if (loading || (items.length === 0 && !isAuthenticated)) return null;
+  if (loading || (items.length === 0 && !isAdmin)) return null;
 
   return (
     <section id="testimonials" className="relative bg-secondary border-b border-border">
@@ -99,7 +103,7 @@ export default function Testimonials() {
               <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px]">לקוחות מספרים</h2>
             </Reveal>
           </div>
-          {isAuthenticated && (
+          {isAdmin && (
             <button
               onClick={() => setOpen((v) => !v)}
               className={ctaClass("text-[15px]", { muted: true })}
@@ -111,7 +115,7 @@ export default function Testimonials() {
         </div>
 
         {/* Add form */}
-        {isAuthenticated && open && (
+        {isAdmin && open && (
           <div className="border border-border rounded-md p-6 md:p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="md:col-span-1">
@@ -207,7 +211,7 @@ export default function Testimonials() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {items.map((t) => (
               <article key={t.id} className="group relative rounded-md border border-border p-7 flex flex-col">
-                {isAuthenticated && (
+                {isAdmin && (
                   <button
                     onClick={() => remove(t.id)}
                     className="absolute top-4 left-4 text-muted-foreground hover:text-destructive transition-colors"

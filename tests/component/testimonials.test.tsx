@@ -28,7 +28,7 @@ vi.mock("framer-motion", async () => {
   };
 });
 
-const auth = vi.hoisted(() => ({ isAuthenticated: false }));
+const auth = vi.hoisted(() => ({ isAuthenticated: false, user: null as null | { role: string } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth }));
 
 import Testimonials from "@/components/dorit/sections/Testimonials";
@@ -47,6 +47,7 @@ const render_ = () => {
 beforeEach(() => {
   resetBase44Mock();
   auth.isAuthenticated = false;
+  auth.user = null;
 });
 
 describe("<Testimonials />", () => {
@@ -71,10 +72,34 @@ describe("<Testimonials />", () => {
     expect(screen.getByText("ליווי מקצועי")).toBeTruthy();
   });
 
-  it("keeps the section for the signed-in owner when empty, so the first one can be added", async () => {
+  it("keeps the section for an admin when empty, so the first one can be added", async () => {
     auth.isAuthenticated = true;
+    auth.user = { role: "admin" };
     base44Mock.entities.Testimonial.list.mockResolvedValueOnce([]);
     render_();
     expect(await screen.findByRole("button", { name: /הוספת המלצה/ })).toBeTruthy();
+  });
+
+  it("shows a signed-in visitor who is not an admin no add or delete controls", async () => {
+    // Ordinary visitors sign in for the personal area; Dorit's controls are not theirs.
+    auth.isAuthenticated = true;
+    auth.user = { role: "user" };
+    base44Mock.entities.Testimonial.list.mockResolvedValueOnce([
+      { id: "t1", name: "רונית לוי", quote: "ליווי מקצועי", rating: 5, source: "google" },
+    ]);
+    const { container } = render_();
+    expect(await screen.findByText("ליווי מקצועי")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /הוספת המלצה/ })).toBeNull();
+    expect(container.querySelectorAll("button").length).toBe(0);
+  });
+
+  it("hides the empty section from a signed-in visitor who is not an admin", async () => {
+    auth.isAuthenticated = true;
+    auth.user = { role: "user" };
+    base44Mock.entities.Testimonial.list.mockResolvedValueOnce([]);
+    const { container } = render_();
+    await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(container.querySelector("#testimonials")).toBeNull();
   });
 });
