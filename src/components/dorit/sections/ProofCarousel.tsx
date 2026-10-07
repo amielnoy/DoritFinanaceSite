@@ -134,7 +134,7 @@ export default function ProofCarousel() {
               <span className="text-sm px-2.5 py-0.5 rounded-sm bg-[hsl(33_100%_95%)] text-[hsl(37_80%_20%)]">
                 {b.tag}
               </span>
-              <span className="font-heading text-xl tabular-nums text-muted-foreground">
+              <span className="font-heading text-xl lining-nums tabular-nums text-muted-foreground">
                 0{i + 1}
               </span>
             </div>

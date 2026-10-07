@@ -68,7 +68,7 @@ export default function Footer() {
               { l: "בלוג", h: "/blog", route: true },
               { l: "כלים", h: "/tools", route: true },
               { l: "נקודת מבט", h: "/perspective", route: true },
-              { l: "לשיחה קצרה עם דורית", h: "#start" },
+              { l: "לשיחה קצרה", h: "#start" },
             ] as FooterLink[]).map((n) => (
               <li key={n.h}>
                 {n.route ? (
@@ -117,7 +117,8 @@ export default function Footer() {
       <div className="border-t border-primary-foreground/[0.14]">
         <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-sm text-muted-foreground-on-dark">
           <p>
-            דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח · רישיון סוכן מרשות שוק ההון מספר L-00107009
+            דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח · רישיון סוכן מרשות שוק ההון מספר{" "}
+            <bdi className="whitespace-nowrap lining-nums tabular-nums">L-00107009</bdi>
           </p>
           <div className="flex items-center gap-5">
             <Link to="/faq" className={FOOT_LINK}>שאלות ותשובות</Link>

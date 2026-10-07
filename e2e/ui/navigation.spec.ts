@@ -185,7 +185,7 @@ test.describe("Routing — sanity", () => {
       ["שאלות ותשובות", /\/faq$/],
       ["תיקי הצלחה", /\/#proof$/],
       ["בלוג", /\/blog$/],
-      ["לשיחה קצרה עם דורית", /\/#start$/],
+      ["לשיחה קצרה", /\/#start$/],
     ];
 
     for (const [label, url] of EXPECTED) {

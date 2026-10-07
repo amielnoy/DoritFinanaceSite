@@ -461,7 +461,7 @@ export default function AgentChat({
                   <ol className="m-0 p-0 list-none flex flex-col gap-3.5 text-base leading-[1.75] text-foreground/80">
                     {(descriptor.consentPoints ?? CONSENT.points).map((point, i) => (
                       <li key={point} className="grid grid-cols-[28px_minmax(0,1fr)] gap-2">
-                        <span className="font-heading text-[19px] text-accent tabular-nums" aria-hidden="true">
+                        <span className="font-heading text-[19px] text-accent lining-nums tabular-nums" aria-hidden="true">
                           {String(i + 1).padStart(2, "0")}
                         </span>
                         <span>{point}</span>

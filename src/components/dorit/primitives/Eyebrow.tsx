@@ -24,7 +24,7 @@ export default function Eyebrow({
     <span className={cn("inline-flex items-center gap-3 text-sm text-accent", className)} {...props}>
       {idx ? (
         <>
-          <span className="font-heading text-xl leading-none tabular-nums">{idx}</span>
+          <span className="font-heading text-xl leading-none lining-nums tabular-nums">{idx}</span>
           <span aria-hidden="true" className="w-7 h-px bg-highlight" />
         </>
       ) : null}

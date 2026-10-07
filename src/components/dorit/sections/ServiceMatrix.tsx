@@ -93,7 +93,7 @@ export default function ServiceMatrix() {
                 className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-x-12 gap-y-3 py-8 border-b border-border transition-colors duration-200 hover:bg-highlight/5"
               >
                 <div className="flex items-start gap-6">
-                  <span className="font-heading text-[32px] leading-none text-accent tabular-nums w-10 shrink-0">
+                  <span className="font-heading text-[32px] leading-none text-accent lining-nums tabular-nums w-10 shrink-0">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <Icon size={26} strokeWidth={1.25} className="text-highlight shrink-0 mt-0.5" aria-hidden="true" />
