@@ -22,7 +22,7 @@ test.describe("Mobile-first indexing parity", { tag: "@desktop-only" }, () => {
     const page = await context.newPage();
 
     // The suite's API stubs live on the fixture's page, so stub here too.
-    await page.route(/googletagmanager\.com|google-analytics\.com|fonts\.gstatic\.com/, (r) => r.abort());
+    await page.route(/googletagmanager\.com|google-analytics\.com/, (r) => r.abort());
     await page.route("**/api/**", (route) => {
       const path = new URL(route.request().url()).pathname;
       if (path.includes("/public-settings/")) {
@@ -205,32 +205,40 @@ test.describe("Mobile crawlability", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("fonts do not block the first paint", async ({ request }) => {
-    // Asserted against the served HTML, not the live DOM: the preload promotes
-    // itself to rel="stylesheet" once loaded, which is the point of the pattern.
+  test("fonts are self-hosted and do not block the first paint", async ({ request }) => {
+    // Asserted against the served HTML: what a crawler and the first paint see.
     const html = await test_step("fetch the served HTML", async () =>
       (await request.get("/")).text()
     );
 
-    const fontLinks = await test_step("find the Google Fonts links in the head", async () => {
-      const found = [...html.matchAll(/<link\b[^>]*fonts\.googleapis\.com[^>]*>/g)].map((m) => m[0]);
-      expect(found.length, "no Google Fonts link found").toBeGreaterThan(0);
-      return found;
+    await test_step("nothing in the page asks Google for fonts", async () => {
+      // A request to Google Fonts hands every visitor's IP address to Google.
+      expect(html).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
     });
 
-    await test_step("the only render-blocking font link is the <noscript> fallback", async () => {
-      const renderBlocking = fontLinks.filter(
-        (tag) => /rel=["']stylesheet["']/.test(tag) && !/rel=["']preload["']/.test(tag)
-      );
-      for (const tag of renderBlocking) {
-        const idx = html.indexOf(tag);
-        const before = html.slice(Math.max(0, idx - 200), idx);
-        expect(before, `render-blocking font link: ${tag}`).toContain("<noscript>");
+    await test_step("no font stylesheet blocks rendering", async () => {
+      // The faces are declared in the bundled CSS; the head links only
+      // preload the font files, which never blocks the first paint.
+      expect(html).not.toMatch(/<link\b[^>]*rel=["']stylesheet["'][^>]*font/i);
+    });
+
+    const preloads = await test_step("the critical Hebrew faces are preloaded", async () => {
+      const found = [...html.matchAll(/<link\b[^>]*rel="preload"[^>]*as="font"[^>]*>/g)].map((m) => m[0]);
+      expect(found.length, "no font preload in the head").toBeGreaterThan(0);
+      for (const tag of found) {
+        expect(tag, "a font preload without crossorigin is fetched twice").toMatch(/\bcrossorigin\b/);
+        expect(tag).toMatch(/type="font\/woff2"/);
       }
+      return found.map((tag) => /href="([^"]+)"/.exec(tag)![1]);
     });
 
-    await test_step("the fonts are fetched through a preload instead", async () => {
-      expect(html).toMatch(/rel="preload"\s+as="style"/);
+    await test_step("every preloaded font is served from our own origin", async () => {
+      for (const href of preloads) {
+        expect(href, href).toMatch(/^\/fonts\//);
+        const res = await request.get(href);
+        expect(res.status(), href).toBe(200);
+        expect((await res.body()).subarray(0, 4).toString("latin1"), `${href} is woff2`).toBe("wOF2");
+      }
     });
   });
 });

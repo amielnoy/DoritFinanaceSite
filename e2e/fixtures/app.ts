@@ -57,10 +57,7 @@ export const test = base.extend<{ mockApi: MockApi }>({
 
     // --- third-party: keep the run hermetic -------------------------------
     await page.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort());
-    await page.route(/fonts\.googleapis\.com/, (route) =>
-      route.fulfill({ status: 200, contentType: "text/css", body: "" })
-    );
-    await page.route(/fonts\.gstatic\.com/, (route) => route.abort());
+    // Fonts are self-hosted (public/fonts), so the tests render in the real ones.
     await page.route(/media\.base44\.com|base44\.com\/logo/, (route) =>
       route.fulfill({ status: 200, contentType: "image/png", body: TRANSPARENT_PNG })
     );

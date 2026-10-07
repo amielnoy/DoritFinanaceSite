@@ -1147,6 +1147,23 @@ Local development: [https://docs.base44.com/developers/backend/overview/local-de
 
 Support: [https://app.base44.com/support](https://app.base44.com/support)
 
+## The fonts are ours
+
+The site's fonts — Cormorant Garamond, Frank Ruhl Libre, Lora, Noto Serif
+Hebrew, and Heebo on the POA form — are served from `public/fonts`, not from
+Google Fonts. Loading them from Google sent every visitor's IP address to
+Google on every page, which the privacy policy never mentioned; it also meant
+the e2e suite, which blocks Google to stay hermetic, rendered in CI's fallback
+faces rather than the ones visitors see (A-74).
+
+`scripts/self-host-fonts.mjs` regenerates everything: it fetches the
+`@fontsource` packages with `npm pack` (they are not dependencies), copies only
+the Hebrew and basic Latin woff2 subsets with their OFL licences, and writes
+`src/fonts.css` (imported by `src/main.jsx`) and `public/fonts/poa.css`. Edit the
+lists at the top of the script, never the generated CSS. `index.html` preloads
+the two Hebrew faces almost every line uses; `/fonts/*` is cached for a month.
+`fonts.contract.test.ts` keeps any Google Fonts reference out of what ships.
+
 ## Page analytics
 
 `src/App.jsx` mounts `<Analytics />` from `@vercel/analytics/react`. The
