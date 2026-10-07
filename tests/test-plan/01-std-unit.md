@@ -346,21 +346,30 @@ one; a blocked or throwing tag never breaks the page.
 ### 4.16 Reconciling the lead mirror — `tests/unit/reconcile-leads.test.ts`
 
 The planning step of `scripts/reconcile-leads.mjs`, which finds Supabase `leads`
-rows whose lead Base44 no longer holds, and rows whose status differs. The script
-is a dry run unless given `--apply`; what is pinned here is what it would do.
+rows whose lead Base44 no longer holds, rows whose status differs, and Base44
+leads with no Supabase row at all (a failed create-time mirror). The script is a
+dry run unless given `--apply`, and creates missing copies only with
+`--create-missing` as well; what is pinned here is what it would do, and the row
+it would write.
 
 | ID | Title | Expected result |
 |---|---|---|
 | UNIT-REC-001 | "deletes the Supabase rows whose lead is gone from Base44" | `toDelete` holds the orphan's `base44_id` |
 | UNIT-REC-002 | "updates a row whose status differs, to Base44's value" | `toUpdate` carries id, from, to |
-| UNIT-REC-003 | "plans nothing when the stores agree" | Both lists empty |
-| UNIT-REC-004 | "leaves alone a Supabase row with no base44_id and a Base44 lead Supabase never got" | Both lists empty |
+| UNIT-REC-003 | "plans nothing when the stores agree" | All three lists empty |
+| UNIT-REC-004 | "leaves alone a Supabase row with no base44_id" | All three lists empty |
 | UNIT-REC-005 | "treats a Base44 lead without a status as the default, new" | No update |
 | UNIT-REC-006 | "carries ids and statuses only" | No name or phone in the plan |
 | UNIT-REC-007 | "finds the marked line among the CLI's other output" | The JSON after the marker |
 | UNIT-REC-008 | "says so when the CLI printed no result" | Throws, naming `base44 login` |
+| UNIT-REC-009 | "lists the Base44 leads Supabase never got, as ids only" | `toCreate` holds the id; no name or phone in the plan |
+| UNIT-REC-010 | "maps the Base44 lead onto the Supabase columns, keyed by base44_id" | Exactly the shared columns; Base44's own fields (`created_by`, `is_sample`) dropped |
+| UNIT-REC-011 | "keeps the original date, so ordering and the 24-month retention stay right" | `created_at` = Base44 `created_date` |
+| UNIT-REC-012 | "defaults a missing status to new and an empty constrained value to null" | `status: "new"`, `source: null` |
+| UNIT-REC-013 | "drops a value the Supabase check constraint would refuse, rather than failing the row" | Unknown `source` → null; unknown `status` → `"new"` |
+| UNIT-REC-014 | "refuses a lead without the two columns Supabase requires" | `null` without a name or a phone |
 
 ## 5. Pass criteria
 
-All 317 cases pass. Any failure is a functional defect, not an environment issue —
+All 323 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

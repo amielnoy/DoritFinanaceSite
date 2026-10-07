@@ -626,7 +626,10 @@ What the page shows, in order (#115):
   Supabase copy first and Base44 second, so a lead Dorit deletes also leaves the
   visitor's personal area. A direct entity write leaves Supabase stale. To repair
   rows written before it existed, run `node --env-file=.env.local
-  scripts/reconcile-leads.mjs` (a dry run; `--apply` writes).
+  scripts/reconcile-leads.mjs` (a dry run; `--apply` writes). Add
+  `--create-missing` to also rebuild the Supabase copy of a lead whose
+  create-time mirror failed — from what Base44 stores, with its original date;
+  it cannot recover the interview summary or profile, which only the mirror held.
 - **A disabled Base44 account** gets its own answer from `myAccount`, "החשבון אינו
   פעיל.", instead of the unverified-email message.
 
