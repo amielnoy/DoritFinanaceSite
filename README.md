@@ -1154,7 +1154,7 @@ Hebrew, and Heebo on the POA form — are served from `public/fonts`, not from
 Google Fonts. Loading them from Google sent every visitor's IP address to
 Google on every page, which the privacy policy never mentioned; it also meant
 the e2e suite, which blocks Google to stay hermetic, rendered in CI's fallback
-faces rather than the ones visitors see (A-73).
+faces rather than the ones visitors see (A-74).
 
 `scripts/self-host-fonts.mjs` regenerates everything: it fetches the
 `@fontsource` packages with `npm pack` (they are not dependencies), copies only

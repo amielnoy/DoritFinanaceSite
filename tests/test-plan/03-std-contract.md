@@ -393,7 +393,7 @@ selected by tag, not skipped by a condition callback (A-68).
 
 The fonts used to come from Google Fonts: every visitor's IP address went to
 Google, and the e2e suite (which blocked Google Fonts to stay hermetic)
-rendered in CI's fallback faces instead of the real ones. See A-73.
+rendered in CI's fallback faces instead of the real ones. See A-74.
 
 | ID | Title | Expected result |
 |---|---|---|
