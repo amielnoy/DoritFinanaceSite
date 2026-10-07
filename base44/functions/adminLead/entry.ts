@@ -110,6 +110,14 @@ export default async function(req) {
     if (action === 'delete') await base44.asServiceRole.entities.Lead.delete(id);
     else await base44.asServiceRole.entities.Lead.update(id, { status });
   } catch (e) {
+    // מחיקה שמקבלת 404: הפנייה כבר לא קיימת ב-Base44 — תשובה שאבדה בדרך וניסיון
+    // חוזר. המטרה הושגה, ו-Supabase כבר נמחק למעלה; כישלון כאן היה תוקע את
+    // המנהל על שגיאה שאין לה תיקון.
+    const gone = action === 'delete' && (e?.status ?? e?.response?.status) === 404;
+    if (gone) {
+      log('info', 'lead.already_deleted', { rid, id });
+      return json({ ok: true });
+    }
     log('error', 'lead.write_failed', { rid, action, id, err: String(e?.message ?? e).slice(0, 200) });
     return json({ error: 'לא הצלחנו לשמור את השינוי. אפשר לנסות שוב.' }, 502);
   }

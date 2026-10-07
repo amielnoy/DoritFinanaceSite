@@ -46,6 +46,8 @@ export interface HarnessOptions {
   connections?: Record<string, string | null>;
   /** Make the entity write fail, as a database outage would. */
   failLeadWrite?: boolean;
+  /** Lead.delete rejects with a 404, as Base44 does for a record already gone. */
+  leadAlreadyDeleted?: boolean;
   /** Rows the function can find before it writes — see `stored` in the harness. */
   existingLeads?: Record<string, unknown>[];
   /** Make the entity lookup fail, leaving the function to create rather than update. */
@@ -175,6 +177,10 @@ export async function invokeFunction(
 
   const deleteLead = async (id: string) => {
     if (options.failLeadWrite) throw new Error("simulated database outage");
+    if (options.leadAlreadyDeleted) {
+      sequence.push(`Lead.delete ${id} (404)`);
+      throw Object.assign(new Error("Entity not found"), { status: 404 });
+    }
     leadDeletes.push(id);
     sequence.push(`Lead.delete ${id}`);
     return { ok: true };

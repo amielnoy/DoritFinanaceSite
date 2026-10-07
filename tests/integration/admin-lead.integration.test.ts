@@ -113,6 +113,14 @@ describe("adminLead — delete", () => {
   });
 });
 
+describe("adminLead — a retried delete", () => {
+  it("succeeds when Base44 already deleted the lead (a lost response, then a retry)", async () => {
+    const r = await invokeFunction("adminLead", del, { env, user: admin, leadAlreadyDeleted: true });
+    expect(r.status).toBe(200);
+    expect(r.sequence).toEqual([`fetch DELETE ${leadUrl}`, "Lead.delete lead-1 (404)"]);
+  });
+});
+
 describe("adminLead — when something fails", () => {
   it.each([status, del])("answers 502 with the rid and leaves Base44 alone when Supabase refuses (%o)", async (body) => {
     const r = await invokeFunction("adminLead", body, { env, user: admin, fetchStatus: 500 });

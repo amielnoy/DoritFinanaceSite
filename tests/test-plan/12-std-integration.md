@@ -447,7 +447,7 @@ reason and expects none of them back.
 never reaches Supabase, while an axios-shaped `response.status` of `401` is still
 read as signed out. Only `401` and `403` mean the visitor is not signed in.
 
-### 4.21 `adminLead` — an admin's writes to a lead — `INT-ADL-001..030`
+### 4.21 `adminLead` — an admin's writes to a lead — `INT-ADL-001..031`
 
 An admin's status change and delete used to reach Base44 only, so Supabase kept
 every status at "new" and kept a lead Dorit had deleted — which the visitor's
@@ -469,11 +469,14 @@ cascade`). `INT-ADL-024` to `030` are failure: Supabase refusing or unreachable
 is `502` with `error` and `rid` only, and Base44 is never called; Base44
 refusing after Supabase succeeded is `502` with no internal message; Supabase
 not configured still writes Base44; and every refusal carries exactly `error`
-and `rid`.
+and `rid`. `INT-ADL-031` is a retried delete: when Base44 answers `404` because
+an earlier delete went through and only its response was lost, the function
+answers `200` — the lead is gone from both stores, and an error there would
+leave the admin stuck on one that no retry could clear.
 
 ## 5. Pass criteria
 
-All 283 cases pass. These assert behaviour, not shape — a failure means the
+All 284 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

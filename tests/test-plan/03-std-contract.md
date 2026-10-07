@@ -387,7 +387,7 @@ selected by tag, not skipped by a condition callback (A-68).
 | ID | Title | Expected result |
 |---|---|---|
 | CTR-SDK-001 | "finds at least one function pin" | At least one `npm:@base44/sdk@<version>` import under `base44/functions` |
-| CTR-SDK-002 | "`<function>` pins the SDK version the frontend has installed" (one per function) | Pinned version equals `node_modules/@base44/sdk` version. Functions pick up a bump only on the next Base44 publish. |
+| CTR-SDK-002 | "`<function>` pins the SDK version the lockfile installs" (one per function) | Pinned version equals `package-lock.json`'s `node_modules/@base44/sdk` version — what `npm ci` installs, unlike a local `node_modules` an earlier install may have left. Functions pick up a bump only on the next Base44 publish. |
 
 ## 5. Runtime counterpart
 
