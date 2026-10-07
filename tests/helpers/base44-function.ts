@@ -79,6 +79,10 @@ export interface Invocation {
   leads: Record<string, unknown>[];
   /** Updates applied to rows that already existed, in order. */
   leadUpdates: { id: string; fields: Record<string, unknown> }[];
+  /** Ids passed to an entity delete, in order. */
+  leadDeletes: string[];
+  /** Every outbound call and entity write in the order it happened, e.g. `fetch PATCH <url>`, `Lead.delete l1`. */
+  sequence: string[];
   emails: EmailCall[];
   fetches: FetchCall[];
   /** The single email sent to this address, asserted to exist exactly once. */
@@ -131,6 +135,8 @@ export async function invokeFunction(
 
   const leads: Record<string, unknown>[] = [];
   const leadUpdates: { id: string; fields: Record<string, unknown> }[] = [];
+  const leadDeletes: string[] = [];
+  const sequence: string[] = [];
   const emails: EmailCall[] = [];
   const fetches: FetchCall[] = [];
 
@@ -163,7 +169,15 @@ export async function invokeFunction(
     const row = stored.find((r) => r.id === id);
     if (row) Object.assign(row, fields);
     leadUpdates.push({ id, fields });
+    sequence.push(`Lead.update ${id}`);
     return { id, ...fields };
+  };
+
+  const deleteLead = async (id: string) => {
+    if (options.failLeadWrite) throw new Error("simulated database outage");
+    leadDeletes.push(id);
+    sequence.push(`Lead.delete ${id}`);
+    return { ok: true };
   };
 
   const sendEmail = async (call: EmailCall) => {
@@ -180,7 +194,7 @@ export async function invokeFunction(
 
   const entities = new Proxy(
     {},
-    { get: () => ({ create: createLead, filter: filterLeads, update: updateLead }) },
+    { get: () => ({ create: createLead, filter: filterLeads, update: updateLead, delete: deleteLead }) },
   ) as Record<string, unknown>;
 
   const client = {
@@ -200,6 +214,7 @@ export async function invokeFunction(
   };
 
   const fetchImpl = async (url: string, init: Record<string, unknown> = {}) => {
+    sequence.push(`fetch ${String(init.method ?? "GET")} ${String(url)}`);
     fetches.push({
       url: String(url),
       method: String(init.method ?? "GET"),
@@ -255,6 +270,8 @@ export async function invokeFunction(
     json,
     leads,
     leadUpdates,
+    leadDeletes,
+    sequence,
     emails,
     fetches,
     mailTo(address) {

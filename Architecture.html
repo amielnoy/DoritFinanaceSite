@@ -586,6 +586,7 @@
             <tr><td><code>createConsultationEvent</code></td><td class="sans">~115</td><td>Books the follow-up in Google Calendar</td><td><code>googlecalendar</code> connector</td><td class="sans">400 · 500 · 502</td></tr>
             <tr><td><code>createOutlookEvent</code></td><td class="sans">~110</td><td>The same, in Outlook</td><td><code>outlook</code> connector</td><td class="sans">400 · 500 · 502</td></tr>
             <tr><td><code>myAccount</code></td><td class="sans">~85</td><td>The personal area for a visitor signed in through Base44: requires a verified, enabled caller, asks Supabase's <code>enquiries_for</code> for that verified email with the service key, and filters the columns again</td><td>reads Supabase; writes nothing; every answer carries a <code>rid</code>, and none carries the underlying error</td><td class="sans">401 · 403 · 500</td></tr>
+            <tr><td><code>adminLead</code></td><td class="sans">~120</td><td>An admin's status change and delete on a lead: requires a signed-in admin, writes Supabase first and then Base44, so the personal area never shows a lead Dorit deleted</td><td>writes Supabase <code>leads</code> and the <code>Lead</code> entity; every answer carries a <code>rid</code>, and none carries the underlying error</td><td class="sans">400 · 401 · 403 · 500 · 502</td></tr>
           </tbody>
         </table>
       </div>

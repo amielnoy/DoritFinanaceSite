@@ -50,6 +50,11 @@ npx skills add base44/skills
   filters the columns again through `VISIBLE`. Answers carry a `rid`, never an
   error message. `src/pages/Account.tsx` reads through `AccountPort`, one adapter
   per sign-in.
+- `base44/functions/adminLead`: an admin's status change and delete on a lead.
+  Writes Supabase first, then Base44, because both are idempotent and a failure
+  part-way must leave the lead in the admin list for the retry to finish. The
+  browser must not write the `Lead` entity directly — Supabase would keep the old
+  status and the deleted enquiry, and the personal area reads Supabase. See A-73.
 - `src/lib/analytics.ts`: every event the site sends to GA4, and the one place
   that sends it. Three rules. **Never send personal data:** `track` keeps only
   `location`, `cta`, `method` and `channel` and drops every other parameter, so a
@@ -144,7 +149,8 @@ npx skills add base44/skills
   `public/poa.html`. See A-66.
 - `scripts/*.mjs`: maintenance jobs CI runs on a schedule. `prune-vercel-deployments.mjs`
   deletes, so it is a dry run unless given `--apply` — check its output before
-  adding the flag. `reconcile-stores.mjs` exits non-zero on drift.
+  adding the flag. `reconcile-stores.mjs` exits non-zero on drift. `reconcile-leads.mjs` is a dry run
+  unless given `--apply` and deletes Supabase leads Base44 no longer has.
   `seed-blog.mjs --apply` writes `content/blog/` to Base44 through `base44 exec
   --privileged --data-env prod` (the CLI's signed-in owner, no password) and
   mirrors each post to Supabase on `base44_id`; it needs `SUPABASE_URL` and

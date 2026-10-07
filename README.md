@@ -621,6 +621,12 @@ What the page shows, in order (#115):
   `unverified` are not.
 - **Admins see both admin links** in the header, "ניהול פניות" and "ניהול בלוג"
   (desktop bar and drawer); everyone signed in sees "האזור שלי".
+- **`adminLead` is the only way an admin changes a lead.** `/admin/leads` status
+  changes and deletes go through it, not through the `Lead` entity: it writes the
+  Supabase copy first and Base44 second, so a lead Dorit deletes also leaves the
+  visitor's personal area. A direct entity write leaves Supabase stale. To repair
+  rows written before it existed, run `node --env-file=.env.local
+  scripts/reconcile-leads.mjs` (a dry run; `--apply` writes).
 - **A disabled Base44 account** gets its own answer from `myAccount`, "החשבון אינו
   פעיל.", instead of the unverified-email message.
 
