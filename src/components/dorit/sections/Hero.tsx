@@ -6,33 +6,13 @@ import { ctaClass } from "@/components/dorit/primitives/Cta";
 
 const HERO_IMG = "/images/dorit-office-portrait.png";
 
-/**
- * Hebrew, because the reader is.
- *
- * These ran in English under a right-to-left Hebrew hero, which asks someone
- * comparing pension options to switch alphabet and direction for a phrase
- * carrying nothing the Hebrew beside it did not already say.
- *
- * None of them uses the word ייעוץ: the licence here is a סוכן licence, and
- * base44/agents/COMPLIANCE.md §7 already flags the marketing copy that blurs
- * the two. No reason to add more of it in a decorative strip.
- */
-const TICKER: string[] = [
-  "תכנון לטווח ארוך",
-  "העברת עושר בין דורות",
-  "ליווי אישי",
-  "כיסוי מותאם",
-  "ליווי בתביעות",
-  "שקיפות מלאה",
-];
-
 export default function Hero() {
   return (
     <section id="top" className="relative border-b border-border pt-[80px] md:pt-[127px]">
-      <div className="max-w-[1400px] mx-auto w-full px-[clamp(20px,4vw,40px)] py-[clamp(40px,6vw,88px)] grid grid-cols-1 lg:grid-cols-2 gap-[clamp(40px,6vw,96px)] items-center">
+      <div className="max-w-[1200px] mx-auto w-full px-[clamp(20px,4vw,40px)] py-[clamp(32px,5vw,64px)] grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-[clamp(32px,4vw,56px)] items-center">
         {/* Portrait, in a matted plate. The name sits under it as a caption. */}
         <figure className="order-2 lg:order-1 m-0 flex flex-col gap-3">
-          <div className="plate h-[clamp(440px,68vh,720px)]">
+          <div className="plate h-[clamp(320px,46vh,440px)]">
             <Image
               src={HERO_IMG}
               alt="דורית גוב ארי — דיוקן מקצועי"
@@ -52,7 +32,7 @@ export default function Hero() {
         </figure>
 
         {/* Headline */}
-        <div className="order-1 lg:order-2 flex flex-col gap-7">
+        <div className="order-1 lg:order-2 flex flex-col gap-5">
           <span className="text-sm text-accent animate-fade-up">
             דורית גוב ארי · מתכננת פיננסית וסוכנת ביטוח
           </span>
@@ -71,12 +51,11 @@ export default function Hero() {
               gemel fund and a study fund they have never looked at, and that is
               the conversation. Still no figure and no promise — §2 binds this
               copy as it binds the agents. */}
-          <p className="max-w-[520px] text-xl leading-[1.7] text-foreground/80 [text-wrap:pretty] animate-fade-up">
-            תכנון פיננסי וביטוחי שמתחיל בתמונה המלאה. פנסיה, גמל והשתלמות, מיסוי
-            וקיבוע זכויות, ודמי הניהול שנגבים מהחיסכון לאורך השנים: מה שיש לכם,
-            מה הוא עולה, ומה הוא אמור לעשות עבורכם.
+          <p className="max-w-[480px] text-lg leading-[1.6] text-foreground/80 [text-wrap:pretty] animate-fade-up">
+            תכנון פיננסי וביטוחי שמתחיל בתמונה המלאה — פנסיה, גמל והשתלמות,
+            מיסוי וקיבוע זכויות, ודמי הניהול שנגבים מהחיסכון לאורך השנים.
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-5 animate-fade-up">
+          <div className="mt-1 flex flex-wrap items-center gap-5 animate-fade-up">
             <a
               href="#start"
               className={ctaClass(undefined, { size: "lg" })}
@@ -92,22 +71,6 @@ export default function Hero() {
             </a>
           </div>
         </div>
-      </div>
-
-      {/* The six phrases, as a list. Each carries its own diamond at the start,
-          so wrapping cannot strand a separator at a line end or leave the last
-          phrase without one. Two columns on a phone, three on a tablet, one
-          justified row on a wide screen; every item starts on the same edge as
-          the item above it, at any text size. */}
-      <div className="border-t border-border">
-        <ul className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-4 m-0 list-none grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 lg:flex lg:flex-wrap lg:justify-between text-[15px] leading-snug text-muted-foreground">
-          {TICKER.map((t) => (
-            <li key={t} className="flex items-baseline gap-2.5 min-w-0">
-              <span aria-hidden="true" className="shrink-0 w-[5px] h-[5px] rotate-45 bg-highlight translate-y-[-2px]" />
-              <span>{t}</span>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );
