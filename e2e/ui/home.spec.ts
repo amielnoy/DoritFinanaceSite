@@ -107,6 +107,24 @@ test.describe("Home — sanity", () => {
     });
   });
 
+  test("leaves the testimonials section out when there are none", async ({ page, mockApi }) => {
+    await test_step("the backend has no testimonials", async () => {
+      mockApi.setEntity("Testimonial", []);
+    });
+
+    await test_step("open the home page", async () => {
+      await gotoApp(page);
+      await mockApi.waitForRequest("/entities/Testimonial");
+    });
+
+    await test_step("no section, no heading and no link to it", async () => {
+      await expect(page.locator("#testimonials")).toHaveCount(0);
+      await expect(page.getByRole("heading", { name: "לקוחות מספרים" })).toHaveCount(0);
+      await expect(page.locator('a[href$="#testimonials"]')).toHaveCount(0);
+      await expect(page.locator("#common-questions")).toHaveCount(1);
+    });
+  });
+
   test("survives a backend that is completely down", async ({ page, mockApi }) => {
     const { errors } = collectPageErrors(page);
 

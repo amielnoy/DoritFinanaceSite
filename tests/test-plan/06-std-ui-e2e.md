@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 68 in `e2e/ui`, of 179 across the whole e2e suite, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 69 in `e2e/ui`, of 180 across the whole e2e suite, run on all four platforms
 
 ---
 
@@ -26,9 +26,10 @@ timezone `Asia/Jerusalem`.
 |---|---|---|
 | E2E-HOM-001 | "boots past the auth/bootstrap spinner and renders the page shell" | `#top` and `main` visible; no spinner; no console errors; public-settings requested |
 | E2E-HOM-002 | "has the RTL Hebrew document contract search engines rely on" | `lang=he`, `dir=rtl`, title present, and the description is the home route's own (applied by `useSeo`, not the static one from `index.html`) |
-| E2E-HOM-003 | "renders every top-level section of the landing page" | All 8 section ids present (`top`, `about`, `services`, `start`, `quick-contact`, `proof`, `testimonials`, `common-questions`) |
+| E2E-HOM-003 | "renders every top-level section of the landing page" | All 8 section ids present (the default fixture carries testimonials, so `testimonials` is among them) (`top`, `about`, `services`, `start`, `quick-contact`, `proof`, `testimonials`, `common-questions`) |
 | E2E-HOM-004 | "exposes exactly one h1 and a sane heading order" | One `h1`; no heading level skipped by more than one |
 | E2E-HOM-005 | "renders the reviews pulled from the backend" | Stubbed testimonial name visible |
+| E2E-HOM-008 | "leaves the testimonials section out when there are none" | Empty `Testimonial` list → no `#testimonials`, no "לקוחות מספרים" heading, no `a[href$="#testimonials"]`; `#common-questions` still present |
 | E2E-HOM-006 | "survives a backend that is completely down" | All entity calls 500 → page still renders, `h1` visible, no `pageerror` |
 | E2E-HOM-007 | "wires the primary CTAs to real targets" | Visible `#consultation` CTA; visible `tel:+972508311776` link |
 
@@ -44,7 +45,7 @@ timezone `Asia/Jerusalem`.
 | E2E-NAV-012 | "the footer reaches a home section from another route" | From `/blog`, the footer's `אודות` lands on `/#about` with the section in view |
 | E2E-NAV-013 | "no link anywhere points at a section the page does not have" | On every public route, every `a[href^="#"]` resolves to an element on that route |
 | E2E-NAV-014 | "every internal link lands on a real route, not the not-found page" | Every internal `href` collected from the home page renders without the 404 heading |
-| E2E-NAV-015 | "every link in the footer menu goes where its label says" | All seven footer nav links, clicked from `/blog`, reach their documented URL |
+| E2E-NAV-015 | "every link in the footer menu goes where its label says" | All seven footer nav links, clicked from `/blog`, reach their documented URL (the `#start` link reads "לשיחה קצרה") |
 | E2E-NAV-016 | "navigating between routes scrolls back to the top" | `scrollY < 50` after a route change (verifies `ScrollToTop`) |
 | E2E-NAV-017 | "browser back returns to the previous route" | Back from `/blog` lands on `/` with `#top` visible |
 | E2E-NAV-018 | "admin routes bounce an anonymous visitor to login" | `/admin/leads` → `/login` |

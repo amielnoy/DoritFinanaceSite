@@ -80,6 +80,13 @@ export default function Testimonials() {
 
   const remove = (id: string) => removeTestimonial.mutate(id);
 
+  // The section exists only when there is something to show. Nothing while the
+  // list loads (so it cannot flash in and out) and nothing when it is empty —
+  // the home page carries no "coming soon" placeholder. The signed-in owner is
+  // the exception once loaded: the add form lives here, and without the section
+  // the first testimonial could never be added.
+  if (loading || (items.length === 0 && !isAuthenticated)) return null;
+
   return (
     <section id="testimonials" className="relative bg-secondary border-b border-border">
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-10">
@@ -189,15 +196,11 @@ export default function Testimonials() {
         )}
 
         {/* Grid */}
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="animate-spin text-accent" />
-          </div>
-        ) : !items || items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="border-y border-border py-14 px-6 flex flex-col items-center gap-3 text-center">
             <span aria-hidden="true" className="font-heading text-[64px] leading-[0.6] text-highlight">”</span>
             <p className="text-[17px] text-muted-foreground">
-              {isAuthenticated ? "עדיין אין המלצות — הוספ/י את הראשונה." : "בקרוב יעלו כאן המלצות הלקוחות."}
+              עדיין אין המלצות — הוספ/י את הראשונה.
             </p>
           </div>
         ) : (
