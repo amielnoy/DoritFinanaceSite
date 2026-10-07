@@ -113,11 +113,11 @@ less content than the desktop one loses the desktop version's rankings.
 | SEO-MOB-004 | "body copy is legible without pinch-zooming" | Sentence-length prose only (≥60 chars) | No body copy under 12px |
 | SEO-MOB-005 | "reports sub-12px display labels (informational)" | All short labels | Always passes; records the count as an annotation — see [10-known-issues](10-known-issues.md) |
 | SEO-MOB-006 | "the LCP hero image is preloaded and eagerly fetched" | Mobile projects | One `link[rel=preload][as=image]` with `fetchpriority=high` |
-| SEO-MOB-007 | "fonts do not block the first paint" | Asserts on the **served HTML**, not the post-load DOM | The only plain font stylesheet link is inside `<noscript>`; a `rel=preload as=style` is present |
+| SEO-MOB-007 | "fonts are self-hosted and do not block the first paint" | Asserts on the **served HTML** | No `fonts.googleapis.com`/`fonts.gstatic.com`; no font stylesheet link; at least one `rel=preload as=font type=font/woff2` with `crossorigin`; each preloaded `/fonts/…` file answers 200 and starts with `wOF2` |
 
-> SEO-MOB-007 asserts on the HTML source deliberately: the async pattern
-> promotes its own `preload` to `rel="stylesheet"` once loaded, so a post-load
-> DOM check would always see a "render-blocking" link that never blocked.
+> SEO-MOB-007 asserts on the HTML source deliberately: that is what a crawler
+> and the first paint see. The fonts are self-hosted since A-73, so the check
+> is that nothing leaves for Google and the critical faces are preloaded.
 
 ## 5a. Prerender cases — `e2e/seo/prerender.spec.ts`
 

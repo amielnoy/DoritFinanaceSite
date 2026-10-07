@@ -389,6 +389,26 @@ selected by tag, not skipped by a condition callback (A-68).
 | CTR-SDK-001 | "finds at least one function pin" | At least one `npm:@base44/sdk@<version>` import under `base44/functions` |
 | CTR-SDK-002 | "`<function>` pins the SDK version the lockfile installs" (one per function) | Pinned version equals `package-lock.json`'s `node_modules/@base44/sdk` version — what `npm ci` installs, unlike a local `node_modules` an earlier install may have left. Functions pick up a bump only on the next Base44 publish. |
 
+### 4.6 Self-hosted fonts — `fonts.contract.test.ts`
+
+The fonts used to come from Google Fonts: every visitor's IP address went to
+Google, and the e2e suite (which blocked Google Fonts to stay hermetic)
+rendered in CI's fallback faces instead of the real ones. See A-73.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-FNT-001 | "nothing that ships asks Google for fonts" | No `fonts.googleapis.com` / `fonts.gstatic.com` in `index.html`, `src/` or `public/` |
+| CTR-FNT-002 | "every face in the site sheet points at a file that exists" | Each `url(/fonts/…)` in `src/fonts.css` is a file in `public/fonts` |
+| CTR-FNT-003 | "every face in the poa sheet points at a file that exists" | The same for `public/fonts/poa.css` |
+| CTR-FNT-004 | "declares every named family the site's font stacks use" | Every quoted family in the `--font-*` stacks of `src/index.css` has an `@font-face` |
+| CTR-FNT-005 | "covers Hebrew in the faces Hebrew text falls through to" | Frank Ruhl Libre and Noto Serif Hebrew each declare a face with `U+0590-05FF` |
+| CTR-FNT-006 | "preloads only files it serves and declares, with crossorigin" | Every `<link rel=preload as=font>` has `crossorigin`, exists, and is declared in `src/fonts.css` |
+| CTR-FNT-007 | "ships the OFL licence beside the files" | A `LICENSE-<package>.txt` naming the SIL Open Font License for every font package |
+| CTR-FNT-008 | "caches the font files without letting the document rule swallow them" | `/fonts/(.*)` has a `max-age` in `vercel.json`, the `no-cache` rule skips `fonts/`, and `public/_headers` matches |
+
+Regenerate the files with `node scripts/self-host-fonts.mjs`; never edit
+`src/fonts.css` or `public/fonts/poa.css` by hand.
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -398,7 +418,7 @@ time.
 
 ## 6. Pass criteria
 
-All 514 cases pass. A failure means either the frontend or the backend definition
+All 533 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

@@ -15,3 +15,8 @@
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Self-hosted fonts (scripts/self-host-fonts.mjs). Not hashed, so cached for a
+# month rather than a year: a regenerated face reaches every visitor in weeks.
+/fonts/*
+  Cache-Control: public, max-age=2592000

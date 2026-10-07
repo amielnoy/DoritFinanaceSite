@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import { watchFreshness } from '@/lib/freshness'
+import '@/fonts.css'
 import '@/index.css'
 
 // Before anything renders: is this the build the server is still serving? A
