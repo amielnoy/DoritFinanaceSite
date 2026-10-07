@@ -33,7 +33,7 @@ export default function CarrierLogos() {
           עובדת מול מיטב חברות הפנסיה והביטוח בישראל
         </p>
 
-        <div className="w-full grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] border-y border-border">
+        <div className="w-full grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 border-y border-border">
           {CARRIERS.map((c) => (
             <a
               key={c.en}
@@ -55,7 +55,7 @@ export default function CarrierLogos() {
           ))}
         </div>
 
-        <p className="m-0 text-center text-[15px] text-muted-foreground max-w-[580px] leading-[1.7]">
+        <p className="m-0 text-center text-[15px] text-muted-foreground max-w-[480px] leading-[1.85] [text-wrap:pretty]">
           עובדת מול מגוון חברות ביטוח ופנסיה כדי להתאים פתרון לצורך שלך. כסוכנת
           ביטוח, יש לי זיקה לגופים מוסדיים — כמפורט בגילוי הנאות.
         </p>
