@@ -202,6 +202,38 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     }
   });
 
+  test("every sticky-bar label fits on one line, even with enlarged text", async ({ page }) => {
+    await test_step("open the home page on a phone viewport", async () => {
+      await gotoApp(page);
+    });
+
+    // 1.3 stands in for a phone's large-text setting, which scales px sizes too.
+    for (const zoom of [1, 1.3]) {
+      await test_step(`at ${zoom}x text`, async () => {
+        await page.evaluate((z) => {
+          (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(z);
+        }, zoom);
+        const links = stickyBar(page).getByRole("link");
+        await expect(links).toHaveCount(3);
+        const lines = await links.evaluateAll((els) =>
+          els.map((el) => {
+            // Count the distinct line tops the label's text actually occupies.
+            const tops = new Set<number>();
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+              if (!n.textContent?.trim()) continue;
+              const range = document.createRange();
+              range.selectNodeContents(n);
+              for (const r of Array.from(range.getClientRects())) if (r.width > 0) tops.add(Math.round(r.top));
+            }
+            return `${el.textContent?.trim()}: ${tops.size}`;
+          }),
+        );
+        for (const line of lines) expect(line, "one line per label").toMatch(/: 1$/);
+      });
+    }
+  });
+
   test("the viewport meta allows pinch-zoom (no user-scalable=no)", async ({ page }) => {
     await test_step("open the home page", async () => {
       await gotoApp(page);
