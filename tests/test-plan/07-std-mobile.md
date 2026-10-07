@@ -44,6 +44,7 @@ Test is skipped: mobile projects only".
 | E2E-MOB-007 | "the phone keyboard gets the right input types" | Scroll to `#quick-contact` | Phone field `type=tel`, email field `type=email` |
 | E2E-MOB-008 | "a visitor can submit the quick contact form by touch" | Tap and fill, tap submit | Confirmation shown; `Lead.create` with `source: quick` |
 | E2E-MOB-009 | "the calculator is usable on a narrow screen" | Scroll to `#fee-calculator`, set deposit | Field visible and editable; no `NaN` |
+| E2E-MOB-009a | "the hero caption and phrase list stay aligned, even with enlarged text" | Load `/`; repeat at body zoom 1 and 1.3 (a phone's large-text setting) | `L-00107009` on one line; the six phrases are a list of 6 items, each with its own diamond, starting at exactly two right edges (two aligned columns) |
 | E2E-MOB-010 | "the viewport meta allows pinch-zoom" | Load `/` | `width=device-width` present; no `user-scalable=no` or `maximum-scale=1` |
 
 The sticky bar has a third cell since A-64, "תמיכה", which goes to the support
@@ -55,7 +56,7 @@ chat on `/faq`. It is exercised on the phone projects by `E2E-SUP-002` in
 
 `mobile.spec.ts` also holds a `Desktop-only chrome` block, tagged
 `@desktop-only` and filtered out of the two mobile projects the same way, so
-each project collects only its own half: 10 cases on a phone, 2 on a desktop. A responsive swap
+each project collects only its own half: 11 cases on a phone, 2 on a desktop. A responsive swap
 has two halves and only one of them is ever asserted by accident: hiding the
 desktop dock on a phone while also hiding it on a desktop passes E2E-MOB-001
 and ships a home page with no call-to-action above the fold. Those two cases

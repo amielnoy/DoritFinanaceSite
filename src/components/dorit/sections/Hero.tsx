@@ -42,9 +42,12 @@ export default function Hero() {
               fetchPriority="high"
             />
           </div>
-          <figcaption className="flex justify-between gap-3 text-sm text-muted-foreground">
+          {/* Stacked on a phone, side by side from sm. Side by side at 390px
+              squeezed the title onto two ragged lines and broke the licence
+              number at its hyphen ("L-" / "00107009"). The number never wraps. */}
+          <figcaption className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3 text-sm leading-relaxed text-muted-foreground">
             <span>דורית גוב ארי · מתכננת פיננסית וסוכנת ביטוח</span>
-            <span dir="ltr" className="tabular-nums">L-00107009</span>
+            <span dir="ltr" className="self-start sm:self-auto whitespace-nowrap tabular-nums">L-00107009</span>
           </figcaption>
         </figure>
 
@@ -91,18 +94,20 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* The six phrases, as a static justified row. */}
+      {/* The six phrases, as a list. Each carries its own diamond at the start,
+          so wrapping cannot strand a separator at a line end or leave the last
+          phrase without one. Two columns on a phone, three on a tablet, one
+          justified row on a wide screen; every item starts on the same edge as
+          the item above it, at any text size. */}
       <div className="border-t border-border">
-        <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-4 flex flex-wrap justify-between gap-x-6 gap-y-2.5 text-[15px] text-muted-foreground">
-          {TICKER.map((t, i) => (
-            <span key={t} className="flex items-center gap-6">
-              {t}
-              {i < TICKER.length - 1 ? (
-                <span aria-hidden="true" className="w-[5px] h-[5px] rotate-45 bg-highlight" />
-              ) : null}
-            </span>
+        <ul className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-4 m-0 list-none grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 lg:flex lg:flex-wrap lg:justify-between text-[15px] leading-snug text-muted-foreground">
+          {TICKER.map((t) => (
+            <li key={t} className="flex items-baseline gap-2.5 min-w-0">
+              <span aria-hidden="true" className="shrink-0 w-[5px] h-[5px] rotate-45 bg-highlight translate-y-[-2px]" />
+              <span>{t}</span>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

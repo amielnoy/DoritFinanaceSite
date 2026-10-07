@@ -169,6 +169,39 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     });
   });
 
+  test("the hero caption and phrase list stay aligned, even with enlarged text", async ({ page }) => {
+    await test_step("open the home page on a phone viewport", async () => {
+      await gotoApp(page);
+    });
+
+    // 1.3 stands in for a phone's large-text setting, which scales px sizes too.
+    for (const zoom of [1, 1.3]) {
+      await test_step(`at ${zoom}x text`, async () => {
+        await page.evaluate((z) => {
+          (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(z);
+        }, zoom);
+
+        const licence = page.locator("#top figcaption").getByText("L-00107009");
+        await expect(licence).toBeVisible();
+        const lines = await licence.evaluate((el) => {
+          const lh = parseFloat(getComputedStyle(el).lineHeight);
+          return Math.round(el.getBoundingClientRect().height / (lh * (parseFloat(document.body.style.zoom) || 1)));
+        });
+        expect(lines, "the licence number sits on one line").toBe(1);
+
+        const items = page.locator("#top ul > li");
+        await expect(items).toHaveCount(6);
+        const starts = await items.evaluateAll((lis) =>
+          lis.map((li) => Math.round(li.getBoundingClientRect().right)),
+        );
+        // RTL: every item starts at its column's right edge, so two columns
+        // give exactly two distinct start positions.
+        expect(new Set(starts).size, `item starts ${starts.join(",")}`).toBe(2);
+        await expect(page.locator("#top ul > li > span[aria-hidden]")).toHaveCount(6);
+      });
+    }
+  });
+
   test("the viewport meta allows pinch-zoom (no user-scalable=no)", async ({ page }) => {
     await test_step("open the home page", async () => {
       await gotoApp(page);
