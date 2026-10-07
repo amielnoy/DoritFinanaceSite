@@ -45,7 +45,7 @@ Test is skipped: mobile projects only".
 | E2E-MOB-008 | "a visitor can submit the quick contact form by touch" | Tap and fill, tap submit | Confirmation shown; `Lead.create` with `source: quick` |
 | E2E-MOB-009 | "the calculator is usable on a narrow screen" | Scroll to `#fee-calculator`, set deposit | Field visible and editable; no `NaN` |
 | E2E-MOB-009a | "the hero caption and phrase list stay aligned, even with enlarged text" | Load `/`; repeat at body zoom 1 and 1.3 (a phone's large-text setting) | `L-00107009` on one line; the six phrases are a list of 6 items, each with its own diamond, starting at exactly two right edges (two aligned columns) |
-| E2E-MOB-009b | "every sticky-bar label fits on one line, even with enlarged text" | Load `/`; repeat at body zoom 1 and 1.3 | The bar has 3 links; each label's text occupies exactly one line (distinct line tops of its text nodes = 1) |
+| E2E-MOB-009b | "every sticky-bar label fits on one line" | Load `/` at the default text size | The bar has 3 links; each label's text occupies exactly one line (distinct line tops of its text nodes = 1). The 1.3x step is held back until the fonts are self-hosted: the fixture blocks Google Fonts, and CI's Linux fallback font is wider than the real one |
 | E2E-MOB-010 | "the viewport meta allows pinch-zoom" | Load `/` | `width=device-width` present; no `user-scalable=no` or `maximum-scale=1` |
 
 The sticky bar has a third cell since A-64, "תמיכה", which goes to the support
