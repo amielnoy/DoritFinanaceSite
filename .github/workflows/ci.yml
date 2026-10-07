@@ -728,9 +728,20 @@ jobs:
           SCOPE: ${{ vars.VERCEL_SCOPE }}
           PROJECT: ${{ vars.VERCEL_PROJECT_NAME }}
         run: |
+          # The workflow-wide VITE_BASE44_APP_ID is the e2e placeholder, and a
+          # process variable outranks what `vercel pull` writes — so without
+          # this every Vercel deploy shipped a bundle posting to
+          # /api/apps/e2e-sanity-app/... ("App not found"). Drop it and let the
+          # project's own value, pulled below, through (A-76).
+          unset VITE_BASE44_APP_ID
           npx vercel link --yes --project "$PROJECT" --scope "$SCOPE" --token "$VERCEL_TOKEN"
           npx vercel pull --yes --environment=${{ steps.target.outputs.env }} --scope "$SCOPE" --token "$VERCEL_TOKEN"
           npx vercel build ${{ steps.target.outputs.prod }} --token "$VERCEL_TOKEN"
+          # Belt and braces: a bundle that still names the placeholder never ships.
+          if grep -rlq "e2e-sanity-app" .vercel/output/static; then
+            echo "::error::The Vercel bundle still carries the e2e app id (e2e-sanity-app) — refusing to deploy it."
+            exit 1
+          fi
 
       - name: Deploy
         id: deploy

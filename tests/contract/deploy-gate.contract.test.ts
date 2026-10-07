@@ -283,3 +283,33 @@ describe("the HTML is not cached the way the bundles are", () => {
     expect(assetAt, "the document rule can swallow the asset rule").toBeLessThan(docsAt);
   });
 });
+
+/**
+ * The Vercel build must use the project's own app id, not the test placeholder.
+ *
+ * The workflow sets VITE_BASE44_APP_ID=e2e-sanity-app globally so the e2e bundle
+ * never talks to the real app. `vercel build` runs in the same job environment,
+ * and a process variable outranks what `vercel pull` writes, so every Vercel
+ * deploy — production included — inlined the placeholder: every form posted to
+ * `/api/apps/e2e-sanity-app/...` and got "App not found". The Base44-hosted site
+ * was unaffected, and the smoke test only looks at that one. Found when the quick
+ * contact form failed on dorit-finance-site.vercel.app (A-76).
+ */
+describe("the Vercel build gets the real app id", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const step = workflow.slice(
+    workflow.indexOf("- name: Build for Vercel"),
+    workflow.indexOf("- name: Deploy", workflow.indexOf("- name: Build for Vercel")),
+  );
+
+  it("drops the e2e placeholder before `vercel build`", () => {
+    expect(step, "the Vercel build step has moved or been renamed").toContain("vercel build");
+    const unset = step.search(/unset VITE_BASE44_APP_ID|env -u VITE_BASE44_APP_ID/);
+    expect(unset, "VITE_BASE44_APP_ID is inherited from the workflow env").toBeGreaterThan(-1);
+    expect(unset, "the placeholder must be dropped before the build, not after").toBeLessThan(step.indexOf("vercel build"));
+  });
+
+  it("refuses to deploy a bundle that still names the placeholder", () => {
+    expect(step).toMatch(/grep[^\n]*e2e-sanity-app[^\n]*\.vercel\/output/);
+  });
+});

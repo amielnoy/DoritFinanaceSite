@@ -318,6 +318,14 @@ that "behind the tests" while a red run still reached `--prod`. A companion case
 pins that a red run *does* still deploy, as a preview — staging on red is the
 point of staging, and a later fix must not buy the gate by removing it.
 
+Two cases pin that the Vercel build gets the project's own app id (A-76). The
+workflow sets `VITE_BASE44_APP_ID=e2e-sanity-app` globally for the e2e bundle,
+and a process variable outranks what `vercel pull` writes, so every Vercel
+deploy shipped a bundle posting to `/api/apps/e2e-sanity-app/...`. One case
+requires the "Build for Vercel" step to drop the variable before `vercel build`;
+the other requires the step to refuse a bundle under `.vercel/output` that still
+names the placeholder.
+
 Ten further cases cover the run summary, per writer rather than per file. The
 two writers are split by branch and cannot both fire — "Deployed sites" on
 `main`, "Safe to merge?" on every other ref — which is deliberate, since two
@@ -418,7 +426,7 @@ time.
 
 ## 6. Pass criteria
 
-All 533 cases pass. A failure means either the frontend or the backend definition
+All 542 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight
