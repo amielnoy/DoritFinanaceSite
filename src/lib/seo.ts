@@ -175,6 +175,28 @@ function escapeHtmlAttr(s: string): string {
 }
 
 /**
+ * A JSON-LD block serialized for a `<script>` element's text content.
+ *
+ * `JSON.stringify` alone is not safe to inline there: a post's own body can
+ * legitimately contain the substring `</script>` (a code sample, a quoted
+ * snippet), and the HTML parser closes the script element the moment it sees
+ * that sequence — whatever text follows in the document then renders as raw
+ * markup. `<`, `>` and `&` are escaped as their Unicode equivalents (valid
+ * inside a JSON string, invisible to `JSON.parse`) rather than as HTML
+ * entities, which would corrupt the JSON itself. U+2028/U+2029 are escaped
+ * too — valid in a JSON string but treated as line terminators by some JS
+ * parsers, which has broken inline JSON elsewhere on the web.
+ */
+function jsonLdScript(block: Record<string, unknown>): string {
+  return JSON.stringify(block)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+/**
  * `applySeo`'s server-side twin: the same `SeoConfig` in, but patches a raw
  * HTML document string instead of `document.head` — for the one context
  * `applySeo` cannot reach, a server response to a crawler that never runs the
@@ -207,22 +229,29 @@ export function renderSeoHtml(html: string, config: SeoConfig): string {
   const u = escapeHtmlAttr(url);
   const img = escapeHtmlAttr(image);
 
+  // A replacer *function* is required, not a template string: a title or
+  // description is free text (plausibly "השקיעי $200 בחודש" on this site), and
+  // a literal `$1`, `$&`, `` $` `` or `$'` in a string replacement is
+  // special-cased by `String.replace` as a backreference or match-insertion —
+  // which can itself corrupt the surrounding tag. A function's return value is
+  // always inserted literally.
+  const robots = noIndex
+    ? "noindex, nofollow"
+    : "index, follow, max-image-preview:large, max-snippet:-1";
+
   let out = html;
-  out = out.replace(/<title>.*?<\/title>/s, `<title>${t}</title>`);
-  out = out.replace(/(<meta name="description" content=")[^"]*(")/, `$1${d}$2`);
-  out = out.replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${u}$2`);
-  out = out.replace(
-    /(<meta name="robots" content=")[^"]*(")/,
-    `$1${noIndex ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1"}$2`
-  );
-  out = out.replace(/(<meta property="og:type" content=")[^"]*(")/, `$1${type}$2`);
-  out = out.replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${t}$2`);
-  out = out.replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${d}$2`);
-  out = out.replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${u}$2`);
-  out = out.replace(/(<meta property="og:image" content=")[^"]*(")/, `$1${img}$2`);
-  out = out.replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${t}$2`);
-  out = out.replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${d}$2`);
-  out = out.replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${img}$2`);
+  out = out.replace(/<title>.*?<\/title>/s, () => `<title>${t}</title>`);
+  out = out.replace(/(<meta name="description" content=")[^"]*(")/, (_m, a, b) => `${a}${d}${b}`);
+  out = out.replace(/(<link rel="canonical" href=")[^"]*(")/, (_m, a, b) => `${a}${u}${b}`);
+  out = out.replace(/(<meta name="robots" content=")[^"]*(")/, (_m, a, b) => `${a}${robots}${b}`);
+  out = out.replace(/(<meta property="og:type" content=")[^"]*(")/, (_m, a, b) => `${a}${type}${b}`);
+  out = out.replace(/(<meta property="og:title" content=")[^"]*(")/, (_m, a, b) => `${a}${t}${b}`);
+  out = out.replace(/(<meta property="og:description" content=")[^"]*(")/, (_m, a, b) => `${a}${d}${b}`);
+  out = out.replace(/(<meta property="og:url" content=")[^"]*(")/, (_m, a, b) => `${a}${u}${b}`);
+  out = out.replace(/(<meta property="og:image" content=")[^"]*(")/, (_m, a, b) => `${a}${img}${b}`);
+  out = out.replace(/(<meta name="twitter:title" content=")[^"]*(")/, (_m, a, b) => `${a}${t}${b}`);
+  out = out.replace(/(<meta name="twitter:description" content=")[^"]*(")/, (_m, a, b) => `${a}${d}${b}`);
+  out = out.replace(/(<meta name="twitter:image" content=")[^"]*(")/, (_m, a, b) => `${a}${img}${b}`);
 
   const extra: string[] = [`<meta property="og:image:alt" content="${escapeHtmlAttr(imageAlt)}" />`];
   if (publishedTime) {
@@ -232,9 +261,9 @@ export function renderSeoHtml(html: string, config: SeoConfig): string {
     extra.push(`<meta property="article:tag" content="${escapeHtmlAttr(tag)}" />`);
   }
   for (const block of jsonLd ?? []) {
-    extra.push(`<script type="application/ld+json">${JSON.stringify(block)}</script>`);
+    extra.push(`<script type="application/ld+json">${jsonLdScript(block)}</script>`);
   }
-  out = out.replace("</head>", `${extra.join("\n")}\n</head>`);
+  out = out.replace("</head>", () => `${extra.join("\n")}\n</head>`);
 
   return out;
 }

@@ -75,6 +75,28 @@ describe("renderSeoHtml", () => {
     );
   });
 
+  it("escapes a script-closing tag inside JSON-LD so it cannot break out of the <script> element", () => {
+    const out = renderSeoHtml(SHELL, {
+      ...articleConfig,
+      jsonLd: [{ "@type": "BlogPosting", description: `code sample: </script><script>alert(1)</script>` }],
+    });
+    expect(out).not.toContain("</script><script>alert(1)</script>");
+    expect(out).toContain("\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e");
+    // What the browser parser sees is still exactly one <script> element.
+    expect(out.match(/<script\b[^>]*>/g)).toHaveLength(1);
+  });
+
+  it("does not corrupt the page when a title or description contains a replace() special sequence", () => {
+    const out = renderSeoHtml(SHELL, {
+      title: `השקיעי $200 בחודש`,
+      description: `תשואה של $& ו-$' וגם $\`.`,
+      path: "/blog/dollar-post",
+    });
+    expect(out).toContain("<title>השקיעי $200 בחודש</title>");
+    expect(out).toContain('content="תשואה של $&amp; ו-$\' וגם $`."');
+    expect(out).toContain(`href="${SITE_URL}/blog/dollar-post"`);
+  });
+
   it("marks a not-found page noindex and never emits article-only tags", () => {
     const out = renderSeoHtml(SHELL, {
       title: "המאמר לא נמצא",

@@ -10,11 +10,6 @@
       "builder": false
     }
   },
-  "functions": {
-    "api/og/blog/[id].ts": {
-      "includeFiles": "dist/app.html"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/:path*",

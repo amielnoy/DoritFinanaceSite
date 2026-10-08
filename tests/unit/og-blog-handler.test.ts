@@ -23,7 +23,13 @@ let getImpl: (id: string) => Promise<unknown> = async () => {
   throw new Error("getImpl not configured for this test");
 };
 
-vi.mock("node:fs", () => ({ readFileSync: vi.fn(() => SHELL) }));
+vi.stubGlobal(
+  "fetch",
+  vi.fn(async (url: string) => {
+    if (!url.endsWith("/app.html")) throw new Error(`unexpected fetch: ${url}`);
+    return { ok: true, status: 200, text: async () => SHELL } as Response;
+  })
+);
 vi.mock("@base44/sdk", () => ({
   createClient: vi.fn(() => ({
     entities: { BlogPost: { get: (id: string) => getImpl(id) } },
@@ -77,7 +83,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: { id: "post-1" } }, res);
+    await handler({ method: "GET", query: { id: "post-1" }, headers: { host: "example.test" } }, res);
 
     expect(state.status).toBe(200);
     expect(state.headers["Content-Type"]).toContain("text/html");
@@ -93,7 +99,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: { id: "missing" } }, res);
+    await handler({ method: "GET", query: { id: "missing" }, headers: { host: "example.test" } }, res);
 
     expect(state.status).toBe(404);
     expect(state.headers["X-Robots-Tag"]).toBe("noindex");
@@ -107,7 +113,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: { id: "post-1" } }, res);
+    await handler({ method: "GET", query: { id: "post-1" }, headers: { host: "example.test" } }, res);
 
     expect(state.status).toBe(502);
     expect(state.headers["X-Robots-Tag"]).toBe("noindex");
@@ -121,7 +127,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: { id: "post-1" } }, res);
+    await handler({ method: "GET", query: { id: "post-1" }, headers: { host: "example.test" } }, res);
 
     expect(state.status).toBe(500);
     expect(state.headers["Cache-Control"]).toBe("no-store");
@@ -131,7 +137,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: {} }, res);
+    await handler({ method: "GET", query: {}, headers: { host: "example.test" } }, res);
 
     expect(state.status).toBe(500);
   });
@@ -140,7 +146,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "POST", query: { id: "post-1" } }, res);
+    await handler({ method: "POST", query: { id: "post-1" }, headers: { host: "example.test" } }, res);
 
     expect(state.status).toBe(405);
   });

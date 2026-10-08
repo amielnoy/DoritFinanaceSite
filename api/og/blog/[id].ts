@@ -10,8 +10,6 @@
 // route uses (via `useSeo`), so this can never describe a post differently
 // than the page a visitor who followed the link actually sees.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { createClient } from "@base44/sdk";
 import { renderSeoHtml, SITE_URL } from "../../../src/lib/seo";
 import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "../../../src/lib/blogSeo";
@@ -22,6 +20,7 @@ import type { Article } from "../../../src/services/ports";
 interface OgRequest {
   method?: string;
   query: Record<string, string | string[] | undefined>;
+  headers: Record<string, string | string[] | undefined>;
 }
 interface OgResponse {
   status(code: number): OgResponse;
@@ -47,13 +46,23 @@ const client: EntityReader | null = APP_ID
 
 let shellHtml: string | null = null;
 
-/** The untouched SPA shell `scripts/prerender.mjs` writes alongside the
- *  prerendered static routes — bundled into this function via `vercel.json`'s
- *  `functions.includeFiles`, read once per cold start. */
-function loadShell(): string {
-  if (shellHtml === null) {
-    shellHtml = readFileSync(join(process.cwd(), "dist/app.html"), "utf8");
-  }
+/**
+ * The untouched SPA shell `scripts/prerender.mjs` writes alongside the
+ * prerendered static routes — the same file every unrecognised path already
+ * falls back to via `vercel.json`'s catch-all rewrite. Fetched from this
+ * deployment's own origin rather than bundled in: bundling it required
+ * `vercel.json`'s `functions.includeFiles`, which points at a path
+ * (`dist/app.html`) that does not survive from `vercel build` into
+ * `vercel deploy --prebuilt` — the deploy step tried to `readlink` it and
+ * failed with ENOENT. A same-origin fetch has no such handoff to get wrong:
+ * if `/app.html` were missing, every other route on the site would already be
+ * broken too.
+ */
+async function loadShell(host: string | undefined): Promise<string> {
+  if (shellHtml !== null) return shellHtml;
+  const res = await fetch(`https://${host}/app.html`);
+  if (!res.ok) throw new Error(`fetching /app.html: ${res.status}`);
+  shellHtml = await res.text();
   return shellHtml;
 }
 
@@ -64,24 +73,26 @@ export default async function handler(req: OgRequest, res: OgResponse): Promise<
   }
 
   const id = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id;
+  const host = Array.isArray(req.headers.host) ? req.headers.host[0] : req.headers.host;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
 
   if (!id || !client) {
     if (!client) console.error("[api/og/blog] VITE_BASE44_APP_ID is not set");
     res.setHeader("Cache-Control", "no-store");
-    res.status(500).send(renderSeoHtml(loadShell(), BLOG_POST_NOT_FOUND_SEO));
+    res.status(500).send(renderSeoHtml(await loadShell(host), BLOG_POST_NOT_FOUND_SEO));
     return;
   }
 
   try {
     const post = (await client.entities.BlogPost.get(id)) as Article;
+    const shell = await loadShell(host);
     res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
-    res.status(200).send(renderSeoHtml(loadShell(), computeBlogSeoConfig(post)));
+    res.status(200).send(renderSeoHtml(shell, computeBlogSeoConfig(post)));
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status !== 404) console.error("[api/og/blog] failed to load post", id, err);
     res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
     res.setHeader("X-Robots-Tag", "noindex");
-    res.status(status === 404 ? 404 : 502).send(renderSeoHtml(loadShell(), BLOG_POST_NOT_FOUND_SEO));
+    res.status(status === 404 ? 404 : 502).send(renderSeoHtml(await loadShell(host), BLOG_POST_NOT_FOUND_SEO));
   }
 }
