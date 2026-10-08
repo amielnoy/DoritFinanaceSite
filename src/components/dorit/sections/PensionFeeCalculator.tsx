@@ -1,13 +1,30 @@
 import React, { useMemo, useState } from "react";
 import { Calculator, TrendingDown, Wallet, PiggyBank } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { CtaLink } from "@/components/dorit/primitives/Cta";
+import { CtaLink, ctaClass } from "@/components/dorit/primitives/Cta";
 import {
   computePensionFees,
   formatIls as fmtCurrency,
   type PensionFeeResult,
 } from "@/lib/pension-fee";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { CONTACT } from "@/config/contact.js";
+
+/**
+ * A WhatsApp message carrying only what the visitor typed into the
+ * calculator and what it computed — no name, phone or other identifier.
+ * `initClickTracking` in `src/lib/analytics.ts` already fires `click_whatsapp`
+ * for any `wa.me` link, so this needs no tracking call of its own.
+ */
+function whatsappMessage(monthlyDeposit: number | string, years: number | string, result: PensionFeeResult): string {
+  const deposit = Number(monthlyDeposit) || 0;
+  const span = Number(years) || 0;
+  return (
+    `שלום דורית, השתמשתי במחשבון דמי הניהול באתר: הפקדה חודשית ${fmtCurrency(deposit)}, ` +
+    `${span} שנות חיסכון. לפי החישוב אני עשוי/ה לשלם כ-${fmtCurrency(result.totalFees)} בדמי ניהול. ` +
+    `אשמח שתבדקי את המספרים האמיתיים שלי.`
+  );
+}
 
 interface NumFieldProps {
   label: string;
@@ -149,9 +166,22 @@ export default function PensionFeeCalculator() {
             </p>
           </div>
 
-          <CtaLink muted href="/#start" className="mt-8">
-            רוצים לדעת אם אפשר לחסוך? שאלו אותי
-          </CtaLink>
+          <div className="mt-8 flex flex-wrap gap-4">
+            <CtaLink muted href="/#start">
+              רוצים לדעת אם אפשר לחסוך? שאלו אותי
+            </CtaLink>
+            <a
+              href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(
+                whatsappMessage(monthlyDeposit, years, result)
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-track-location="fee_calculator_whatsapp"
+              className={ctaClass(undefined, { muted: true })}
+            >
+              רוצים שדורית תבדוק את המספרים האמיתיים שלכם? לוואטסאפ
+            </a>
+          </div>
         </div>
       </div>
     </section>

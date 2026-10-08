@@ -60,9 +60,14 @@ export default function Hero() {
             מיסוי וקיבוע זכויות, ודמי הניהול שנגבים מהחיסכון לאורך השנים.
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-5 animate-fade-up">
+            {/* `ctaClass`'s own comment is explicit: "an outline, never a
+                fill" — a deliberate system rule, not an oversight, so this
+                does not go solid. A heavier border and a translucent tint
+                (no opaque fill) is the compromise: more weight than every
+                other outline CTA on the site without breaking the rule. */}
             <a
               href="#start"
-              className={ctaClass(undefined, { size: "lg" })}
+              className={ctaClass("border-2 bg-highlight/[0.08] hover:bg-highlight/[0.18]", { size: "lg" })}
             >
               לשיחה קצרה עם דורית
             </a>

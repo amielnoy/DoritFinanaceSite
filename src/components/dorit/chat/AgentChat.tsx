@@ -385,7 +385,11 @@ export default function AgentChat({
                 <Icon size={18} aria-hidden="true" />
               </span>
               <div className="leading-tight min-w-0">
-                <p className="font-heading text-[22px] font-medium truncate">{descriptor.panelTitle}</p>
+                {/* Wraps rather than truncates, for the same reason as the
+                    subtitle below: the handoff and reset buttons leave this
+                    column under 150px wide at 390px, where `truncate` cut
+                    "ראיון היכרות" to "רא…" — unreadable, not just tight. */}
+                <p className="font-heading text-[22px] font-medium">{descriptor.panelTitle}</p>
                 {/* Wraps rather than truncates. At 390px this was cut to about
                     a third of its width — "עם הסוכן…" — which loses the
                     "עוזר אוטומטי" half, and that half is the disclosure that
