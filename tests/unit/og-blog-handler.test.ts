@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SITE_URL } from "@/lib/seo";
 
 // A trimmed stand-in for the bundled `dist/app.html` — enough tags for
 // `renderSeoHtml` to patch, so the handler's output is inspectable without a
@@ -83,13 +84,35 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: { id: "post-1" }, headers: { host: "example.test" } }, res);
+    await handler({ method: "GET", query: { id: "post-1" } }, res);
 
     expect(state.status).toBe(200);
     expect(state.headers["Content-Type"]).toContain("text/html");
     expect(state.headers["Cache-Control"]).toContain("s-maxage=600");
     expect(state.body).toContain("איך לבחור קרן פנסיה");
     expect(state.body).toContain("https://cdn.example/post-1.jpg");
+  });
+
+  it("fetches the shell from a fixed, trusted origin, never from the request's own headers", async () => {
+    getImpl = async (id) => ({
+      id,
+      title: "בדיקת מקור",
+      body: "",
+      created_date: "2026-01-01T00:00:00Z",
+    });
+    const handler = await loadHandler();
+    const { res } = makeRes();
+
+    // Vercel always gives the function a `headers` object, so a malicious
+    // or forwarded Host must not change where the shell is fetched from —
+    // this is the regression test for exactly that (CWE-918 / SSRF).
+    await handler(
+      { method: "GET", query: { id: "post-1" }, headers: { host: "attacker.example" } } as never,
+      res
+    );
+
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
+    expect(fetchMock).toHaveBeenCalledWith(`${SITE_URL}/app.html`, { redirect: "error" });
   });
 
   it("returns 404 and noindex when Base44 has no such post", async () => {
@@ -99,7 +122,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: { id: "missing" }, headers: { host: "example.test" } }, res);
+    await handler({ method: "GET", query: { id: "missing" } }, res);
 
     expect(state.status).toBe(404);
     expect(state.headers["X-Robots-Tag"]).toBe("noindex");
@@ -113,7 +136,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: { id: "post-1" }, headers: { host: "example.test" } }, res);
+    await handler({ method: "GET", query: { id: "post-1" } }, res);
 
     expect(state.status).toBe(502);
     expect(state.headers["X-Robots-Tag"]).toBe("noindex");
@@ -127,7 +150,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: { id: "post-1" }, headers: { host: "example.test" } }, res);
+    await handler({ method: "GET", query: { id: "post-1" } }, res);
 
     expect(state.status).toBe(500);
     expect(state.headers["Cache-Control"]).toBe("no-store");
@@ -137,7 +160,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "GET", query: {}, headers: { host: "example.test" } }, res);
+    await handler({ method: "GET", query: {} }, res);
 
     expect(state.status).toBe(500);
   });
@@ -146,7 +169,7 @@ describe("api/og/blog/[id] handler", () => {
     const handler = await loadHandler();
     const { res, state } = makeRes();
 
-    await handler({ method: "POST", query: { id: "post-1" }, headers: { host: "example.test" } }, res);
+    await handler({ method: "POST", query: { id: "post-1" } }, res);
 
     expect(state.status).toBe(405);
   });

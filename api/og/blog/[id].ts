@@ -20,7 +20,6 @@ import type { Article } from "../../../src/services/ports";
 interface OgRequest {
   method?: string;
   query: Record<string, string | string[] | undefined>;
-  headers: Record<string, string | string[] | undefined>;
 }
 interface OgResponse {
   status(code: number): OgResponse;
@@ -44,6 +43,13 @@ const client: EntityReader | null = APP_ID
   ? (createClient({ appId: APP_ID, serverUrl: BASE44_ORIGIN }) as unknown as EntityReader)
   : null;
 
+// `VERCEL_URL` — the platform-assigned hostname of *this* deployment, never a
+// client-supplied value — not `req.headers.host`: a request can carry any
+// Host header it likes, and fetching whatever that names would let a visitor
+// point this function's outbound request (and the shell it then caches for
+// every later request on this warm instance) at a server they control.
+const SELF_ORIGIN = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : SITE_URL;
+
 let shellHtml: string | null = null;
 
 /**
@@ -58,9 +64,9 @@ let shellHtml: string | null = null;
  * if `/app.html` were missing, every other route on the site would already be
  * broken too.
  */
-async function loadShell(host: string | undefined): Promise<string> {
+async function loadShell(): Promise<string> {
   if (shellHtml !== null) return shellHtml;
-  const res = await fetch(`https://${host}/app.html`);
+  const res = await fetch(`${SELF_ORIGIN}/app.html`, { redirect: "error" });
   if (!res.ok) throw new Error(`fetching /app.html: ${res.status}`);
   shellHtml = await res.text();
   return shellHtml;
@@ -73,19 +79,18 @@ export default async function handler(req: OgRequest, res: OgResponse): Promise<
   }
 
   const id = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id;
-  const host = Array.isArray(req.headers.host) ? req.headers.host[0] : req.headers.host;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
 
   if (!id || !client) {
     if (!client) console.error("[api/og/blog] VITE_BASE44_APP_ID is not set");
     res.setHeader("Cache-Control", "no-store");
-    res.status(500).send(renderSeoHtml(await loadShell(host), BLOG_POST_NOT_FOUND_SEO));
+    res.status(500).send(renderSeoHtml(await loadShell(), BLOG_POST_NOT_FOUND_SEO));
     return;
   }
 
   try {
     const post = (await client.entities.BlogPost.get(id)) as Article;
-    const shell = await loadShell(host);
+    const shell = await loadShell();
     res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
     res.status(200).send(renderSeoHtml(shell, computeBlogSeoConfig(post)));
   } catch (err) {
@@ -93,6 +98,6 @@ export default async function handler(req: OgRequest, res: OgResponse): Promise<
     if (status !== 404) console.error("[api/og/blog] failed to load post", id, err);
     res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
     res.setHeader("X-Robots-Tag", "noindex");
-    res.status(status === 404 ? 404 : 502).send(renderSeoHtml(await loadShell(host), BLOG_POST_NOT_FOUND_SEO));
+    res.status(status === 404 ? 404 : 502).send(renderSeoHtml(await loadShell(), BLOG_POST_NOT_FOUND_SEO));
   }
 }
