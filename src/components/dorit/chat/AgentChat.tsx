@@ -381,7 +381,16 @@ export default function AgentChat({
   // The chat itself. Rendered alone when embedded, or beside the heading
   // column below when the agent is the whole section.
   const panel = (
-    <div className={`${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px]`}>
+    // `overflow-y-auto`: the box is a fixed 560px, but a visitor can open the
+    // hand-off panel before accepting the consent notice — "בלי שאלות סינון"
+    // (compliance §5) means that button is never gated on it. Header + the
+    // full notice + the hand-off form + the standing disclaimer together
+    // overflow 560px, and without this the notice's own flex-1 region was
+    // squeezed to zero height by the sibling it had no room left for, its
+    // text rendering on top of the hand-off form's instead of being cut off
+    // or scrollable. A fixed box that cannot fit everything scrolls now,
+    // rather than silently losing the "everything" part.
+    <div className={`${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px] overflow-y-auto`}>
           <div className="flex items-center justify-between px-6 py-[18px] border-b border-border gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="w-9 h-9 flex items-center justify-center border border-highlight text-accent shrink-0">
@@ -451,7 +460,17 @@ export default function AgentChat({
              * screen and scrollable, and the action moves to a footer that is
              * always reachable. Nothing hidden, nothing to scroll past.
              */
-            <div className="flex-1 min-h-0 flex flex-col">
+            /* `min-h-[170px]`, not `min-h-0`: with the hand-off form also open
+             * (open before consent is possible — see the panel's own
+             * `overflow-y-auto`), flex-shrink had nowhere left to take space
+             * from and squeezed this to literally zero, so its content
+             * overflowed over the hand-off form's instead of being clipped or
+             * scrolled. 170px is enough to keep the heading, checkbox and
+             * start button on screen even at its most squeezed; the numbered
+             * notice below them scrolls out of view first, in its own
+             * overflow-y-auto, rather than the footer disappearing.
+             */
+            <div className="flex-1 min-h-[170px] flex flex-col">
               <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-7 pb-5">
                 <div className="max-w-[820px] flex flex-col gap-[18px]">
                   <div className="flex flex-col gap-1">

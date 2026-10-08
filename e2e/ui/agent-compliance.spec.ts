@@ -179,6 +179,20 @@ test.describe("Agent chat — regulatory shell", () => {
       await expect(section.getByText(/איך קוראים לכם, ולאן להתקשר/)).toBeVisible();
     });
 
+    await test_step("the still-unaccepted consent notice does not overlap the handoff form", async () => {
+      // The panel is a fixed height, and opening the handoff form before
+      // accepting consent adds a block nothing had budgeted room for. Once,
+      // that squeezed the notice's own flex region to zero height and its
+      // text rendered on top of the handoff form's instead of being clipped
+      // or scrolled — functionally submittable either way, which is exactly
+      // why nothing above this line would have caught it.
+      const consentBox = (await section.getByRole("checkbox").boundingBox())!;
+      const formBox = (await handoffForm(section).boundingBox())!;
+      expect(consentBox.y + consentBox.height, "consent checkbox overlaps the handoff form").toBeLessThanOrEqual(
+        formBox.y
+      );
+    });
+
     await test_step("and the details reach the backend with the request", async () => {
       // The whole point. דורית received three handoffs in one morning reading
       // `שם: לא נמסר · טלפון: לא נמסר`, which she could do nothing with (A-55).
