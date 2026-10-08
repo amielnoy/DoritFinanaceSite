@@ -125,7 +125,10 @@ export const leadEvents = {
   /** The interview's summary, once the page has submitted it and it saved. */
   interviewCompleted: () => track("generate_lead", { method: "ai_interview" }),
   chatStarted: (method: ChatMethod) => track("chat_start", { method }),
+  /** Opening the hand-off panel — a request, not yet a lead. See `handoffCompleted`. */
   chatHandoff: (method: ChatMethod) => track("chat_handoff", { method }),
+  /** The hand-off form, once `escalateToHuman` has actually reached דורית. */
+  handoffCompleted: (method: ChatMethod) => track("generate_lead", { method }),
   preferredChannel: (channel: "whatsapp" | "phone") => track("preferred_channel_click", { channel }),
 };
 
@@ -139,7 +142,7 @@ export const LEAD_EVENTS: ReadonlyArray<{
   when: string;
   keyEvent: boolean;
 }> = [
-  { name: "generate_lead", meaning: "ליד שנשמר", when: "טופס יצירת קשר או סיכום ראיון שנשמרו בהצלחה (method מבחין ביניהם)", keyEvent: true },
+  { name: "generate_lead", meaning: "ליד שנשמר", when: "טופס יצירת קשר, סיכום ראיון או בקשת מעבר לדורית בצ׳אט שנשמרו בהצלחה (method מבחין ביניהם)", keyEvent: true },
   { name: "click_phone", meaning: "לחיצה על טלפון", when: "כל קישור חיוג באתר (location אומר מאיפה)", keyEvent: true },
   { name: "click_whatsapp", meaning: "לחיצה על וואטסאפ", when: "כל קישור וואטסאפ באתר", keyEvent: true },
   { name: "click_email", meaning: "לחיצה על מייל", when: "כל קישור מייל באתר", keyEvent: false },

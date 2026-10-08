@@ -44,22 +44,25 @@ class QuickContactForm {
 // for anyone who would rather not chat. See src/pages/Home.tsx.
 
 test.describe("Quick contact form", () => {
-  test("keeps submit disabled until name and phone are filled", async ({ page }) => {
+  test("names what's missing instead of silently disabling submit", async ({ page }) => {
     const form = new QuickContactForm(page);
     await form.open();
 
-    await test_step("the empty form cannot be submitted", async () => {
-      await expect(form.submit).toBeDisabled();
+    await test_step("submitting the empty form names both missing fields", async () => {
+      await expect(form.submit).toBeEnabled();
+      await form.send();
+      await expect(form.root.getByRole("alert")).toHaveText("נא למלא שם וטלפון.");
     });
 
     await form.fill({ name: LEAD.name });
-    await test_step("a name alone is still not enough", async () => {
-      await expect(form.submit).toBeDisabled();
+    await test_step("a name alone still names the missing phone", async () => {
+      await form.send();
+      await expect(form.root.getByRole("alert")).toHaveText("נא למלא מספר טלפון.");
     });
 
     await form.fill({ phone: LEAD.phone });
-    await test_step("with a phone number the form unlocks", async () => {
-      await expect(form.submit).toBeEnabled();
+    await test_step("with both filled the message clears on the next keystroke", async () => {
+      await expect(form.root.getByRole("alert")).toBeHidden();
     });
   });
 

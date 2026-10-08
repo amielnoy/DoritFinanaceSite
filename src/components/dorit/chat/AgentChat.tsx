@@ -346,6 +346,9 @@ export default function AgentChat({
         message: receipt.ok ? HUMAN_HANDOFF.confirmation : HUMAN_HANDOFF.failure,
         contact: receipt.contact,
       });
+      // A lead once the request has actually reached דורית — not on opening
+      // the panel (`chatHandoff`, above) and not when `escalate` itself failed.
+      if (receipt.ok) leadEvents.handoffCompleted(chatMethod);
     } finally {
       setHandingOff(false);
     }
@@ -378,7 +381,10 @@ export default function AgentChat({
   // The chat itself. Rendered alone when embedded, or beside the heading
   // column below when the agent is the whole section.
   const panel = (
-    <div className={`${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px]`}>
+    <div
+      id={descriptor.sectionId}
+      className={`${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px]`}
+    >
           <div className="flex items-center justify-between px-6 py-[18px] border-b border-border gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="w-9 h-9 flex items-center justify-center border border-highlight text-accent shrink-0">
@@ -671,8 +677,11 @@ export default function AgentChat({
   if (embedded) return panel;
 
   return (
-    <section id={descriptor.sectionId} className={descriptor.sectionClassName}>
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+    <section data-track-location={descriptor.sectionId} className={descriptor.sectionClassName}>
+      {/* `md:pl-20`: `FloatingActions` is a fixed dock at `left-4` (desktop
+          only), and without this reserved clearance its top button clips the
+          chat panel's own left border at common desktop widths. */}
+      <div className="max-w-[1400px] mx-auto px-6 md:px-10 md:pl-20 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
           <Eyebrow>
             {descriptor.eyebrow}

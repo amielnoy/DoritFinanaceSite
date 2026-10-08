@@ -8,25 +8,28 @@ import { expect, gotoApp, test, test_step } from "../fixtures/app";
  */
 
 /**
- * The sticky bar's two links duplicate labels used in the footer and the
+ * The sticky bar's links duplicate labels used in the footer and the
  * section nav, so scope to the bar itself (MobileStickyBar's root classes).
  */
 const stickyBar = (page: import("@playwright/test").Page) =>
   page.locator("div.md\\:hidden.fixed.bottom-0");
 
 test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
-  test("renders the sticky call/consult bar instead of the desktop dock", async ({ page }) => {
+  test("renders the sticky WhatsApp/call/contact bar instead of the desktop dock", async ({ page }) => {
     await test_step("open the home page on a phone viewport", async () => {
       await gotoApp(page);
     });
 
-    await test_step("the sticky bar offers a call and a consultation link", async () => {
-      const stickyCall = stickyBar(page).getByRole("link", { name: /חייגו עכשיו/ });
-      const stickyBook = stickyBar(page).getByRole("link", { name: /לשיחה קצרה עם דורית/ });
+    await test_step("the sticky bar offers WhatsApp, a call and the short contact form", async () => {
+      const stickyWhatsapp = stickyBar(page).getByRole("link", { name: /וואטסאפ/ });
+      const stickyCall = stickyBar(page).getByRole("link", { name: /חייגו/ });
+      const stickyForm = stickyBar(page).getByRole("link", { name: /השאירו פרטים/ });
+      await expect(stickyWhatsapp).toBeVisible();
       await expect(stickyCall).toBeVisible();
-      await expect(stickyBook).toBeVisible();
+      await expect(stickyForm).toBeVisible();
+      await expect(stickyWhatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776\?text=/);
       await expect(stickyCall).toHaveAttribute("href", "tel:+972508311776");
-      await expect(stickyBook).toHaveAttribute("href", "#start");
+      await expect(stickyForm).toHaveAttribute("href", "#quick-contact");
     });
 
     await test_step("the desktop floating dock is hidden below md", async () => {
@@ -41,7 +44,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     });
 
     await test_step("the call button is still on screen", async () => {
-      await expect(stickyBar(page).getByRole("link", { name: /חייגו עכשיו/ })).toBeInViewport();
+      await expect(stickyBar(page).getByRole("link", { name: /חייגו/ })).toBeInViewport();
     });
   });
 
@@ -103,8 +106,9 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
 
     await test_step("every primary control is big enough to hit with a thumb", async () => {
       const targets = [
-        stickyBar(page).getByRole("link", { name: /חייגו עכשיו/ }),
-        stickyBar(page).getByRole("link", { name: /לשיחה קצרה עם דורית/ }),
+        stickyBar(page).getByRole("link", { name: /וואטסאפ/ }),
+        stickyBar(page).getByRole("link", { name: /חייגו/ }),
+        stickyBar(page).getByRole("link", { name: /השאירו פרטים/ }),
         page.getByRole("button", { name: "תפריט" }),
       ];
 
@@ -249,7 +253,7 @@ test.describe("Desktop-only chrome", { tag: "@desktop-only" }, () => {
 
     await test_step("the desktop dock is shown and the mobile bar is not", async () => {
       await expect(page.getByRole("link", { name: "פתיחת שיחה בוואטסאפ" })).toBeVisible();
-      await expect(stickyBar(page).getByRole("link", { name: /חייגו עכשיו/ })).toBeHidden();
+      await expect(stickyBar(page).getByRole("link", { name: /חייגו/ })).toBeHidden();
     });
   });
 

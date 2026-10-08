@@ -100,11 +100,18 @@ describe("leadEvents", () => {
     expect(w.gtag).toHaveBeenCalledWith("event", "chat_handoff", { method: "ai_support" });
   });
 
+  it("counts a completed hand-off as a lead, distinctly from opening the panel", () => {
+    leadEvents.handoffCompleted("ai_support");
+    expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "ai_support" });
+    expect(w.gtag).not.toHaveBeenCalledWith("event", "chat_handoff", expect.anything());
+  });
+
   it("every event it sends is in the catalogue the admin panel shows", () => {
     leadEvents.formSubmitted();
     leadEvents.interviewCompleted();
     leadEvents.chatStarted("ai_interview");
     leadEvents.chatHandoff("ai_interview");
+    leadEvents.handoffCompleted("ai_interview");
     leadEvents.preferredChannel("whatsapp");
     const names = new Set(LEAD_EVENTS.map((e) => e.name));
     for (const [, event] of w.gtag!.mock.calls) expect(names.has(event)).toBe(true);

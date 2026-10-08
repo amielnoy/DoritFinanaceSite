@@ -90,21 +90,24 @@ describe("<Stars />", () => {
 });
 
 describe("<MobileStickyBar />", () => {
-  // Inside a router, as the app always renders it: the support cell is a
-  // router link to the chat on /faq.
-  it("offers a dial link and a consultation anchor", () => {
+  it("offers WhatsApp with a prefilled Hebrew message and a safe rel", () => {
     withProviders(<MobileStickyBar />);
 
-    expect(screen.getByRole("link", { name: /חייגו עכשיו/ })).toHaveAttribute(
+    const wa = screen.getByRole("link", { name: /וואטסאפ/ });
+    expect(wa).toHaveAttribute("href", expect.stringContaining(`wa.me/${CONTACT.whatsapp}`));
+    expect(wa).toHaveAttribute("target", "_blank");
+    expect(wa.getAttribute("rel")).toContain("noopener");
+    expect(decodeURIComponent(wa.getAttribute("href") ?? "")).toContain("שלום דורית");
+  });
+
+  it("offers a dial link and the short contact form", () => {
+    withProviders(<MobileStickyBar />);
+
+    expect(screen.getByRole("link", { name: /חייגו/ })).toHaveAttribute(
       "href",
       `tel:${CONTACT.phoneE164}`
     );
-    expect(screen.getByRole("link", { name: /לשיחה קצרה עם דורית/ })).toHaveAttribute("href", "#start");
-  });
-
-  it("offers a way to the support chat", () => {
-    withProviders(<MobileStickyBar />);
-    expect(screen.getByRole("link", { name: /תמיכה/ })).toHaveAttribute("href", "/faq#support-chat");
+    expect(screen.getByRole("link", { name: /השאירו פרטים/ })).toHaveAttribute("href", "#quick-contact");
   });
 });
 
@@ -182,18 +185,22 @@ describe("<PensionFeeCalculator />", () => {
 });
 
 describe("<QuickContact />", () => {
-  it("disables submit until name and phone are present", async () => {
+  it("names what's missing instead of silently disabling submit", async () => {
     const user = userEvent.setup();
     render(<QuickContact />);
 
     const submit = screen.getByRole("button", { name: /שליחת הודעה/ });
-    expect(submit).toBeDisabled();
+    expect(submit).toBeEnabled();
+
+    await user.click(submit);
+    expect(await screen.findByRole("alert")).toHaveTextContent("נא למלא שם וטלפון.");
 
     await user.type(screen.getByLabelText(/שם מלא/), "ישראלה");
-    expect(submit).toBeDisabled();
+    await user.click(submit);
+    expect(await screen.findByRole("alert")).toHaveTextContent("נא למלא מספר טלפון.");
 
     await user.type(screen.getByLabelText(/טלפון/), "050-1234567");
-    expect(submit).toBeEnabled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("hands the lead to the submitLead backend function", async () => {

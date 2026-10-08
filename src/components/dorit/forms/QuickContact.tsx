@@ -3,6 +3,7 @@ import { services } from "@/services";
 import { useSubmission } from "@/hooks/useSubmission";
 import { leadEvents } from "@/lib/analytics";
 import { CONTACT } from "@/config/contact";
+import { HUMAN_HANDOFF } from "@/config/compliance";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
 import { Send, Loader2, Check, Mail, MessageCircle } from "lucide-react";
@@ -15,14 +16,28 @@ interface QuickContactForm {
   message: string;
 }
 
+/** What's missing, named rather than left to a greyed-out button to imply. */
+function missingFieldsMessage(form: QuickContactForm): string | null {
+  const missingName = !form.name.trim();
+  const missingPhone = !form.phone.trim();
+  if (missingName && missingPhone) return "נא למלא שם וטלפון.";
+  if (missingName) return "נא למלא שם מלא.";
+  if (missingPhone) return "נא למלא מספר טלפון.";
+  return null;
+}
+
 export default function QuickContact({ embedded = false }: { embedded?: boolean }) {
   const [form, setForm] = useState<QuickContactForm>({ name: "", phone: "", email: "", message: "" });
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { sending: busy, sent, error, submit, reset } = useSubmission("message");
 
-  const valid = form.name.trim() && form.phone.trim();
-
   const send = async () => {
-    if (!valid) return;
+    const missing = missingFieldsMessage(form);
+    if (missing) {
+      setValidationError(missing);
+      return;
+    }
+    setValidationError(null);
     const ok = await submit(() =>
       services.leads.submitLead({
         name: form.name,
@@ -65,7 +80,11 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
                   <input
                     id="qc-name"
                     value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, name: e.target.value }));
+                      setValidationError(null);
+                    }}
+                    autoComplete="name"
                     className={inputClass()}
                   />
                 </Field>
@@ -73,9 +92,14 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
                   <input
                     id="qc-phone"
                     type="tel"
+                    inputMode="tel"
                     value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                    placeholder={CONTACT.phoneDisplay}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, phone: e.target.value }));
+                      setValidationError(null);
+                    }}
+                    placeholder={HUMAN_HANDOFF.phonePlaceholder}
+                    autoComplete="tel"
                     className={inputClass()}
                   />
                 </Field>
@@ -87,6 +111,7 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   placeholder="you@example.com"
+                  autoComplete="email"
                   className={inputClass()}
                 />
               </Field>
@@ -101,10 +126,14 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
                 />
               </Field>
 
-              {error && <p className="mt-5 text-sm text-destructive">{error}</p>}
+              {(validationError || error) && (
+                <p role="alert" className="mt-5 text-sm text-destructive">
+                  {validationError || error}
+                </p>
+              )}
 
               <div className="mt-7 flex justify-end">
-                <CtaButton onClick={send} disabled={!valid || busy}>
+                <CtaButton onClick={send} disabled={busy}>
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   שליחת הודעה
                 </CtaButton>

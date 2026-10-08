@@ -25,7 +25,12 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 export default function StartConversation() {
   return (
     <section id="start" className="border-b border-border">
-      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-10">
+      {/* `md:pl-20`: `FloatingActions` is a fixed dock at `left-4` (desktop only),
+          and without this reserved clearance its top button clips the chat
+          panel's own left border at common desktop widths — worse the
+          narrower the viewport, since centering stops adding its own margin
+          below the 1400px breakpoint. */}
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] md:pl-20 py-[clamp(72px,9vw,120px)] flex flex-col gap-10">
         <Reveal>
           <Eyebrow>03 · ההקשבה</Eyebrow>
           <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-[18px] leading-[1.12] max-w-[880px] [text-wrap:balance]">
