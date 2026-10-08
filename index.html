@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- No dark theme exists on this site — every colour in src/index.css is a
+         single light palette, with no `prefers-color-scheme: dark` override
+         anywhere. Without this, Android Chrome's "Dark theme for web content"
+         auto-inverts the page's colours for a visitor who has that on, and the
+         inversion heuristic can ghost text onto itself when it does — not a
+         theme the browser fell back to, but one it invented. Declaring the
+         page light-only turns the heuristic off instead of fighting its output. -->
+    <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#f3f2f2" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#f3f2f2" media="(prefers-color-scheme: dark)" />
     <meta name="format-detection" content="telephone=no" />
