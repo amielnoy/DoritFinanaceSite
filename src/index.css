@@ -34,11 +34,12 @@
 @layer base {
   :root {
     /* Belt-and-suspenders with the <meta name="color-scheme"> in index.html:
-       this is the property Chromium's own force-dark heuristic actually
+       this is the property a browser's own force-dark heuristic actually
        checks on the root element. No dark palette is defined below — this
        page has never had one — so it would otherwise read as "unopinionated"
-       and become a candidate for auto-inversion. */
-    color-scheme: light;
+       and become a candidate for auto-inversion. `only` — see index.html for
+       why plain `light` was not enough on its own. */
+    color-scheme: only light;
     --background: 0 4% 95%;           /* #f3f2f2 Classical ground (was #F9F7F2 parchment) */
     --foreground: 40 5% 12%;          /* #201f1d ink */
     --card: 0 4% 95%;                 /* cards are unfilled: same as ground */
