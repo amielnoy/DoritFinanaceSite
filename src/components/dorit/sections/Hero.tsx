@@ -33,7 +33,11 @@ export default function Hero() {
 
         {/* Headline */}
         <div className="order-1 lg:order-2 flex flex-col gap-5">
-          <span className="text-sm text-accent animate-fade-up">
+          {/* The figcaption below the portrait repeats this exact line, so on a
+              phone — where the two sit one above the other instead of side by
+              side — it is a double-read of the same name before the fold.
+              Hidden under `sm`, still shown wherever there is room to spare. */}
+          <span className="hidden text-sm text-accent animate-fade-up sm:block">
             דורית גוב ארי · מתכננת פיננסית וסוכנת ביטוח
           </span>
           <ArchStatement />
