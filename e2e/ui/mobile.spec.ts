@@ -15,18 +15,20 @@ const stickyBar = (page: import("@playwright/test").Page) =>
   page.locator("div.md\\:hidden.fixed.bottom-0");
 
 test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
-  test("renders the sticky WhatsApp/call/contact bar instead of the desktop dock", async ({ page }) => {
+  test("renders the sticky WhatsApp/call/contact/support bar instead of the desktop dock", async ({ page }) => {
     await test_step("open the home page on a phone viewport", async () => {
       await gotoApp(page);
     });
 
-    await test_step("the sticky bar offers WhatsApp, a call and the short contact form", async () => {
+    await test_step("the sticky bar offers WhatsApp, a call, the short contact form and support", async () => {
       const stickyWhatsapp = stickyBar(page).getByRole("link", { name: /וואטסאפ/ });
       const stickyCall = stickyBar(page).getByRole("link", { name: /חייגו/ });
       const stickyForm = stickyBar(page).getByRole("link", { name: /השאירו פרטים/ });
+      const stickySupport = stickyBar(page).getByRole("link", { name: /תמיכה/ });
       await expect(stickyWhatsapp).toBeVisible();
       await expect(stickyCall).toBeVisible();
       await expect(stickyForm).toBeVisible();
+      await expect(stickySupport).toBeVisible();
       await expect(stickyWhatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776\?text=/);
       await expect(stickyCall).toHaveAttribute("href", "tel:+972508311776");
       await expect(stickyForm).toHaveAttribute("href", "#quick-contact");
@@ -109,6 +111,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
         stickyBar(page).getByRole("link", { name: /וואטסאפ/ }),
         stickyBar(page).getByRole("link", { name: /חייגו/ }),
         stickyBar(page).getByRole("link", { name: /השאירו פרטים/ }),
+        stickyBar(page).getByRole("link", { name: /תמיכה/ }),
         page.getByRole("button", { name: "תפריט" }),
       ];
 
@@ -211,7 +214,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
           (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(z);
         }, zoom);
         const links = stickyBar(page).getByRole("link");
-        await expect(links).toHaveCount(3);
+        await expect(links).toHaveCount(4);
         const lines = await links.evaluateAll((els) =>
           els.map((el) => {
             // Count the distinct line tops the label's text actually occupies.

@@ -109,6 +109,11 @@ describe("<MobileStickyBar />", () => {
     );
     expect(screen.getByRole("link", { name: /השאירו פרטים/ })).toHaveAttribute("href", "#quick-contact");
   });
+
+  it("offers a way to the support chat", () => {
+    withProviders(<MobileStickyBar />);
+    expect(screen.getByRole("link", { name: /תמיכה/ })).toHaveAttribute("href", "/faq#support-chat");
+  });
 });
 
 describe("<FloatingActions />", () => {

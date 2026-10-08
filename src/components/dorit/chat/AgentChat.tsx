@@ -381,10 +381,7 @@ export default function AgentChat({
   // The chat itself. Rendered alone when embedded, or beside the heading
   // column below when the agent is the whole section.
   const panel = (
-    <div
-      id={descriptor.sectionId}
-      className={`${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px]`}
-    >
+    <div className={`${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px]`}>
           <div className="flex items-center justify-between px-6 py-[18px] border-b border-border gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="w-9 h-9 flex items-center justify-center border border-highlight text-accent shrink-0">
@@ -677,7 +674,11 @@ export default function AgentChat({
   if (embedded) return panel;
 
   return (
-    <section data-track-location={descriptor.sectionId} className={descriptor.sectionClassName}>
+    <section
+      id={descriptor.sectionId}
+      data-track-location={descriptor.sectionId}
+      className={descriptor.sectionClassName}
+    >
       {/* `md:pl-20`: `FloatingActions` is a fixed dock at `left-4` (desktop
           only), and without this reserved clearance its top button clips the
           chat panel's own left border at common desktop widths. */}
