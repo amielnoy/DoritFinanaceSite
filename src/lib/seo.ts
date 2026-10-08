@@ -170,6 +170,75 @@ export function applySeo(config: SeoConfig): void {
   }
 }
 
+function escapeHtmlAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
+ * `applySeo`'s server-side twin: the same `SeoConfig` in, but patches a raw
+ * HTML document string instead of `document.head` — for the one context
+ * `applySeo` cannot reach, a server response to a crawler that never runs the
+ * app's JavaScript (see `api/og/blog/[id].ts`).
+ *
+ * Targeted replacements on the tags `index.html` already ships, in the same
+ * spirit as `scripts/prerender.mjs`'s own string patches — not a template
+ * engine, because the shell already has every tag this needs to overwrite.
+ * Route-scoped additions (article:*, JSON-LD) are appended before `</head>`,
+ * since the shell has no placeholder for them.
+ */
+export function renderSeoHtml(html: string, config: SeoConfig): string {
+  const {
+    title,
+    description,
+    path,
+    type = "website",
+    image = DEFAULT_OG_IMAGE,
+    imageAlt = SITE_NAME,
+    noIndex = false,
+    publishedTime,
+    tags,
+    jsonLd,
+  } = config;
+
+  const url = absoluteUrl(path);
+  const desc = clampDescription(description);
+  const t = escapeHtmlAttr(title);
+  const d = escapeHtmlAttr(desc);
+  const u = escapeHtmlAttr(url);
+  const img = escapeHtmlAttr(image);
+
+  let out = html;
+  out = out.replace(/<title>.*?<\/title>/s, `<title>${t}</title>`);
+  out = out.replace(/(<meta name="description" content=")[^"]*(")/, `$1${d}$2`);
+  out = out.replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${u}$2`);
+  out = out.replace(
+    /(<meta name="robots" content=")[^"]*(")/,
+    `$1${noIndex ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1"}$2`
+  );
+  out = out.replace(/(<meta property="og:type" content=")[^"]*(")/, `$1${type}$2`);
+  out = out.replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${t}$2`);
+  out = out.replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${d}$2`);
+  out = out.replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${u}$2`);
+  out = out.replace(/(<meta property="og:image" content=")[^"]*(")/, `$1${img}$2`);
+  out = out.replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${t}$2`);
+  out = out.replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${d}$2`);
+  out = out.replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${img}$2`);
+
+  const extra: string[] = [`<meta property="og:image:alt" content="${escapeHtmlAttr(imageAlt)}" />`];
+  if (publishedTime) {
+    extra.push(`<meta property="article:published_time" content="${escapeHtmlAttr(publishedTime)}" />`);
+  }
+  for (const tag of tags ?? []) {
+    extra.push(`<meta property="article:tag" content="${escapeHtmlAttr(tag)}" />`);
+  }
+  for (const block of jsonLd ?? []) {
+    extra.push(`<script type="application/ld+json">${JSON.stringify(block)}</script>`);
+  }
+  out = out.replace("</head>", `${extra.join("\n")}\n</head>`);
+
+  return out;
+}
+
 /** Route-level SEO. Re-applies whenever the described content changes. */
 export function useSeo(config: SeoConfig | null): void {
   const key = config ? JSON.stringify(config) : "";

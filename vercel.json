@@ -10,6 +10,11 @@
       "builder": false
     }
   },
+  "functions": {
+    "api/og/blog/[id].ts": {
+      "includeFiles": "dist/app.html"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -18,6 +23,17 @@
     {
       "source": "/ws-user-apps/:path*",
       "destination": "https://safe-arch-plan.base44.app/ws-user-apps/:path*"
+    },
+    {
+      "source": "/blog/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-User|Claude-SearchBot|PerplexityBot|Perplexity-User|Google-Extended|Applebot-Extended|CCBot|Googlebot|Bingbot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|TelegramBot|Discordbot).*"
+        }
+      ],
+      "destination": "/api/og/blog/:id"
     },
     {
       "source": "/(.*)",
