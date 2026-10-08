@@ -272,23 +272,29 @@ jobs:
 
   # ── 3. How much e2e this run gets ────────────────────────────────────────
   #
-  # The four platform legs are the whole cost of a run: 32 job-minutes, and a
-  # wall clock set by the slowest of them. WebKit takes 9m against Chromium's
-  # 4m for identical tests, and `ios-safari` is WebKit too — so two of the four
-  # legs are more than twice the price of the other two.
+  # WebKit (`web-webkit` and `ios-safari`, both `browser: webkit`) is dropped
+  # from CI as of 2026-10-08. Not for its own runtime — the slow part is
+  # `npx playwright install-deps webkit`, an apt install of ~150 packages
+  # (GStreamer, libav*, fonts, …) that is intermittently slow on GitHub-hosted
+  # runners. It blew the 10-minute per-shard timeout twice in a row on
+  # 2026-10-08 (pushes 404b0c4/71826d8), once past 10m even with the browser
+  # binary already cache-hit, taking real Base44 publishes down with it since
+  # that job depends on every e2e shard passing. A flaky dependency install is
+  # not a signal about the product, but it was blocking every merge to main.
   #
-  # Paying that on every push to a feature branch buys very little: a defect
-  # that only WebKit sees is rare, and when it happens the nightly run finds it
-  # the same day. Paying it before a merge to main, and before a production
-  # publish, buys a great deal.
+  # Chromium-based legs (`web-chromium`, `android-chrome`) cover the large
+  # majority of real traffic and have been reliably fast and green. If WebKit
+  # coverage needs to come back — e.g. a Safari-specific bug report — run it
+  # locally (`npx playwright test --project=webkit`) or re-add it here behind
+  # its own job so one slow apt mirror can't gate production again.
   #
   #   feature branch, PR      →  Chromium only, about 5 minutes
-  #   main, nightly, manual   →  all four platforms
+  #   main, nightly, manual   →  web-chromium + android-chrome
   #
-  # main is deliberately on the full matrix even though the request was for
-  # feature branches and PRs: the publish job below refuses to run unless
-  # test-e2e succeeded, so main's run is the gate in front of the client's
-  # site. Narrowing it would quietly weaken that gate.
+  # main is deliberately on the full (now two-platform) matrix even though the
+  # request was for feature branches and PRs: the publish job below refuses to
+  # run unless test-e2e succeeded, so main's run is the gate in front of the
+  # client's site. Narrowing it further would quietly weaken that gate.
   #
   # ── Sharding ──────────────────────────────────────────────────────────────
   #
@@ -307,14 +313,10 @@ jobs:
   #
   #   *More runners does work*, because each shard is two more real cores.
   #
-  # Shards are bought where the time actually is. The WebKit legs are the wall
-  # clock (9m22 and 8m15 against Chromium's 4m20), so they get three each and
-  # the Chromium legs two. Every shard re-pays its own setup — checkout, npm ci,
-  # the browser, the dist artifact, call it two minutes — so this trades total
-  # job-minutes for wall clock, and the trade stops being worth it quickly:
-  #
-  #   web-webkit   9m22  ≈ 2m setup + 7m20 tests  →  3 shards ≈ 2m + 2m27 ≈ 4m30
-  #   full matrix  10 jobs, ~9m22 wall → ~4m30 wall, ~32 → ~48 job-minutes
+  # Chromium is the only leg left, at two shards — the number already bought
+  # for web-chromium before the WebKit legs were dropped. Every shard re-pays
+  # its own setup — checkout, npm ci, the browser, the dist artifact, call it
+  # two minutes — so this trades total job-minutes for wall clock.
   #
   # Feature branches stay on a single Chromium shard. That path is already
   # ~5 minutes, over half of it setup, so a second shard would roughly double
@@ -331,7 +333,10 @@ jobs:
         run: |
           # project:browser:shards — the shard count lives next to the platform
           # it pays for, so the two policies are read and changed together.
-          full='web-chromium:chromium:2 web-webkit:webkit:3 ios-safari:webkit:3 android-chrome:chromium:2'
+          #
+          # WebKit (web-webkit, ios-safari) is deliberately absent — see the
+          # comment above this job for why.
+          full='web-chromium:chromium:2 android-chrome:chromium:2'
           quick='web-chromium:chromium:1'
 
           # Expanded to one matrix entry per shard. `shard` and `shards` stay
@@ -351,10 +356,10 @@ jobs:
           case "${{ github.event_name }}:${{ github.ref }}" in
             schedule:*|workflow_dispatch:*|*:refs/heads/main|*:refs/heads/builder)
               echo "matrix=$(expand "$full")" >> "$GITHUB_OUTPUT"
-              echo "depth=all four platforms, sharded across 10 runners" >> "$GITHUB_OUTPUT" ;;
+              echo "depth=web-chromium + android-chrome, sharded across 4 runners (WebKit dropped — see plan job comment)" >> "$GITHUB_OUTPUT" ;;
             *)
               echo "matrix=$(expand "$quick")" >> "$GITHUB_OUTPUT"
-              echo "depth=Chromium only — the nightly run covers WebKit and mobile" >> "$GITHUB_OUTPUT" ;;
+              echo "depth=Chromium only — main/nightly also covers android-chrome" >> "$GITHUB_OUTPUT" ;;
           esac
       - name: Say so in the run summary
         run: echo "**e2e depth:** ${{ steps.pick.outputs.depth }}" >> "$GITHUB_STEP_SUMMARY"
