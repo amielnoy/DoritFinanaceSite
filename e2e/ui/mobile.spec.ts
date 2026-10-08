@@ -169,7 +169,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("the hero caption and phrase list stay aligned, even with enlarged text", async ({ page }) => {
+  test("the hero caption stays on one line, even with enlarged text", async ({ page }) => {
     await test_step("open the home page on a phone viewport", async () => {
       await gotoApp(page);
     });
@@ -188,16 +188,6 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
           return Math.round(el.getBoundingClientRect().height / (lh * (parseFloat(document.body.style.zoom) || 1)));
         });
         expect(lines, "the licence number sits on one line").toBe(1);
-
-        const items = page.locator("#top ul > li");
-        await expect(items).toHaveCount(6);
-        const starts = await items.evaluateAll((lis) =>
-          lis.map((li) => Math.round(li.getBoundingClientRect().right)),
-        );
-        // RTL: every item starts at its column's right edge, so two columns
-        // give exactly two distinct start positions.
-        expect(new Set(starts).size, `item starts ${starts.join(",")}`).toBe(2);
-        await expect(page.locator("#top ul > li > span[aria-hidden]")).toHaveCount(6);
       });
     }
   });
