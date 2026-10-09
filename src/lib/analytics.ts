@@ -131,6 +131,8 @@ export type ChatMethod = "ai_interview" | "ai_support" | "ai_procedures" | "ai_b
 export const leadEvents = {
   /** The short contact form, once the lead is saved — not on the click. */
   formSubmitted: () => track("generate_lead", { method: "contact_form" }),
+  /** A claim report, once it is saved — ClaimForm fired no GA4 event at all before this. */
+  claimSubmitted: () => track("generate_lead", { method: "claim" }),
   /** The interview's summary, once the page has submitted it and it saved. */
   interviewCompleted: () => track("generate_lead", { method: "ai_interview" }),
   chatStarted: (method: ChatMethod) => track("chat_start", { method }),

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Upload, X, FileText, Loader2, Check, AlertTriangle } from "lucide-react";
 import { services } from "@/services";
 import { useSubmission } from "@/hooks/useSubmission";
+import { leadEvents } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
@@ -145,16 +146,31 @@ export default function ClaimForm() {
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="שם מלא *">
-            <input value={name} onChange={set("name")} className={inputClass()} />
+            <input value={name} onChange={set("name")} className={inputClass()} autoComplete="name" />
           </Field>
           <Field label="טלפון *">
-            <input value={phone} onChange={set("phone")} className={inputClass()} dir="ltr" />
+            <input
+              value={phone}
+              onChange={set("phone")}
+              className={inputClass()}
+              dir="ltr"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+            />
           </Field>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="אימייל (לא חובה)">
-            <input value={email} onChange={set("email")} className={inputClass()} dir="ltr" />
+            <input
+              value={email}
+              onChange={set("email")}
+              className={inputClass()}
+              dir="ltr"
+              type="email"
+              autoComplete="email"
+            />
           </Field>
           <Field label="מספר פוליסה (לא חובה)">
             <input value={policyNumber} onChange={set("policyNumber")} className={inputClass()} />

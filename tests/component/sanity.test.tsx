@@ -351,6 +351,29 @@ describe("<ClaimForm />", () => {
     expect(screen.getByLabelText(/שם מלא/)).toHaveValue("");
     expect(screen.getByRole("button", { name: /שליחת דיווח/ })).toBeDisabled();
   });
+
+  it("reports a lead to GA4 only after a successful submission", async () => {
+    const gtag = vi.fn();
+    (window as any).gtag = gtag;
+    const user = userEvent.setup();
+    try {
+      render(<ClaimForm />);
+      await user.type(screen.getByLabelText(/שם מלא/), "רונית אבני");
+      await user.type(screen.getByLabelText(/טלפון/), "0521234567");
+      await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
+      await screen.findByText("הדיווח התקבל");
+      expect(gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "claim" });
+    } finally {
+      delete (window as any).gtag;
+    }
+  });
+
+  it("carries autocomplete and inputMode on the phone and email fields", () => {
+    render(<ClaimForm />);
+    expect(screen.getByLabelText(/טלפון/)).toHaveAttribute("autoComplete", "tel");
+    expect(screen.getByLabelText(/טלפון/)).toHaveAttribute("inputMode", "tel");
+    expect(screen.getByLabelText(/אימייל/)).toHaveAttribute("autoComplete", "email");
+  });
 });
 
 describe("<FAQ />", () => {

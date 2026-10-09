@@ -111,6 +111,11 @@ describe("leadEvents", () => {
     expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "contact_form" });
   });
 
+  it("counts a submitted claim as a lead", () => {
+    leadEvents.claimSubmitted();
+    expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "claim" });
+  });
+
   it("names the chat that started and the one that asked for a person", () => {
     leadEvents.chatStarted("ai_interview");
     leadEvents.chatHandoff("ai_support");
@@ -140,6 +145,12 @@ describe("LEAD_EVENTS catalogue", () => {
   it("does not mark chat_handoff a key event — generate_lead already covers the completed hand-off", () => {
     const chatHandoff = LEAD_EVENTS.find((e) => e.name === "chat_handoff");
     expect(chatHandoff?.keyEvent).toBe(false);
+  });
+
+  it("includes claim as a generate_lead method, same catalogue entry as the others", () => {
+    leadEvents.claimSubmitted();
+    const names = new Set(LEAD_EVENTS.map((e) => e.name));
+    expect(names.has("generate_lead")).toBe(true);
   });
 });
 
