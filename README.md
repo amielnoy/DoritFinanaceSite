@@ -607,6 +607,11 @@ production BEFORE merging. CI deploys `submitLead` and `myAccount` on merge, and
 rejects every lead row until those columns exist. Enquiries from before
 summaries were recorded have no summary, and the page says so.
 
+Release order: apply `supabase/migrations/20261009000000_lead_channel.sql` to
+production BEFORE merging. CI deploys `submitLead`, `submitClaim` and
+`escalateToHuman` on merge, and all three now send `channel`/`campaign` to the
+Supabase mirror, so it rejects every lead row until those columns exist.
+
 What the page shows, in order (#115):
 
 - **Meetings** upcoming first, soonest first; then past ones, most recent first;

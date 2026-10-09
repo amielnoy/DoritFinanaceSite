@@ -107,6 +107,8 @@ describe("submitLead — the enquiry actually lands", () => {
     });
     expect(r.mailTo(OPS).text).toContain("הגיע/ה דרך: linkedin / autumn_push");
     expect(r.mailTo(OPS).html).toContain("הגיע/ה דרך");
+    expect(r.mailTo(AGENCY).text).toContain("הגיע/ה דרך: linkedin / autumn_push");
+    expect(r.mailTo(AGENCY).html).toContain("הגיע/ה דרך");
     expect(r.leads[0]).toMatchObject({ channel: "linkedin", campaign: "autumn_push" });
   });
 

@@ -600,12 +600,10 @@ function buildLinksFooter({ sheet, doc }) {
   return [`── קישורים ──`, ...rows.map(([label, v]) => `${label}: ${linkIn(v)}`)].join('\n');
 }
 
-function buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings, channel, campaign, landingPath }) {
-  const channelText = channelLine({ channel, campaign, landingPath });
+function buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings }) {
   return [
     `── מצב תפעולי ──`,
     `מקור: ${source || 'quick'}`,
-    ...(channelText ? [`הגיע/ה דרך: ${channelText}`] : []),
     `נושא: ${topic || '—'}`,
     `מזהה רשומה: ${leadId || '—'}`,
     `יומן: ${calendar}`,
@@ -853,6 +851,7 @@ function headingFor(source) {
 
 function buildAgentBody(source, data) {
   const header = headingFor(source);
+  const channelText = channelLine(data);
   const lines = [
     `${header} — ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}`,
     ``,
@@ -860,6 +859,7 @@ function buildAgentBody(source, data) {
     `טלפון: ${data.phone}`,
     `אימייל: ${data.email || '—'}`,
     `נשלח מ: ${data.device || 'לא ידוע'}`,
+    ...(channelText ? [`הגיע/ה דרך: ${channelText}`] : []),
   ];
   if (source === 'consultation') {
     lines.push(`תחום ייעוץ: ${data.topic || '—'}`);
@@ -973,11 +973,13 @@ function buildAgentHtml(source, data, ops, links = null) {
   const heading = headingFor(source);
 
   // 1 · מי פנה. טלפון ואימייל כקישורים — זו ההודעה שפותחים בטלפון כדי לחייג.
+  const whoChannelText = channelLine(data);
   const who = block('מי פנה', [
     detailRow('שם', data.name),
     detailRow('טלפון', data.phone, { link: `tel:${String(data.phone || '').replace(/[^\d+]/g, '')}` }),
     detailRow('אימייל', data.email, { link: data.email ? `mailto:${data.email}` : '' }),
-    detailRow('נשלח מ', data.device || 'לא ידוע', { last: true }),
+    detailRow('נשלח מ', data.device || 'לא ידוע', { last: !whoChannelText }),
+    ...(whoChannelText ? [detailRow('הגיע/ה דרך', whoChannelText, { last: true })] : []),
   ].join(''));
 
   // 2 · מה ביקש. השדות משתנים לפי מקור הפנייה, בדיוק כמו בגרסת הטקסט.
@@ -1037,11 +1039,9 @@ function buildAgentHtml(source, data, ops, links = null) {
         detailRow(label, 'לפתיחה', { link: linkIn(v), last: i === linkRows.length - 1 })).join(''))
     : '';
 
-  const opsChannelText = ops ? channelLine(ops) : '';
   const opsBlock = ops
     ? block('מצב תפעולי', [
         detailRow('מקור', ops.source || 'quick'),
-        ...(opsChannelText ? [detailRow('הגיע/ה דרך', opsChannelText)] : []),
         detailRow('מזהה רשומה', ops.leadId),
         detailRow('יומן', ops.calendar),
         detailRow('גיליון', statusOf(ops.sheet), { link: linkIn(ops.sheet) }),
@@ -1331,6 +1331,7 @@ export default async function(req) {
       message: safeMessage, notes, summary: safeSummary,
       profile: safeProfile, trackLabel, completeness,
       device: deviceLabel(req.headers.get('user-agent')),
+      channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath,
     };
     const agentBody = buildAgentBody(source, data);
     const subject = subjectFor(source, data);
