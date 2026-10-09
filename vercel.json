@@ -85,6 +85,14 @@
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(), payment=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self' https://www.googletagmanager.com 'sha256-pUAb4H6aeffr8Rz7nq5sMJ/i53m7eF7QPoxpPTqxKvA=' 'sha256-e+vlOT20Qwy4PgGocJvj5eilZioNzvfLgxaBuNzKdl0='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://media.base44.com https://base44.com https://safe-arch-plan.base44.app; font-src 'self'; connect-src 'self' https://safe-arch-plan.base44.app https://hjowdyiwjjrqceumkvgt.supabase.co https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     }
