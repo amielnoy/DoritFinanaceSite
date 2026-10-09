@@ -7,10 +7,12 @@
 // throws. And the agency's own browsing is marked `traffic_type: internal`, so
 // a GA4 filter can drop it.
 
+import { getAttribution } from "./attribution";
+
 const INTERNAL_KEY = "ga_internal_user";
 
 /** The only parameters an event may carry. Anything else is dropped. */
-const ALLOWED_PARAMS = ["location", "cta", "method", "channel"] as const;
+const ALLOWED_PARAMS = ["location", "cta", "method", "channel", "lead_source", "lead_campaign"] as const;
 type Param = (typeof ALLOWED_PARAMS)[number];
 export type TrackParams = Partial<Record<Param, string>>;
 
@@ -67,6 +69,13 @@ export function track(eventName: string, params: Record<string, unknown> = {}): 
     for (const key of ALLOWED_PARAMS) {
       const value = params[key];
       if (typeof value === "string" && value) payload[key] = value;
+    }
+    // Attached to every event, not just lead events, so any event in GA4 can
+    // be sliced by channel — and so no call site has to remember to pass it.
+    const attribution = getAttribution();
+    if (attribution) {
+      payload.lead_source = attribution.channel;
+      if (attribution.campaign) payload.lead_campaign = attribution.campaign;
     }
     if (isInternalBrowser()) payload.traffic_type = "internal";
     gtag("event", eventName, payload);
@@ -148,7 +157,7 @@ export const LEAD_EVENTS: ReadonlyArray<{
   { name: "click_email", meaning: "לחיצה על מייל", when: "כל קישור מייל באתר", keyEvent: false },
   { name: "cta_click", meaning: "לחיצה על \"לשיחה קצרה עם דורית\"", when: "כל קישור לראיון ההיכרות", keyEvent: false },
   { name: "chat_start", meaning: "התחלת שיחה עם עוזר", when: "אישור ההסכמה ולחיצה על \"התחלת השיחה\" (method: איזה צ׳אט)", keyEvent: false },
-  { name: "chat_handoff", meaning: "בקשה לעבור לדורית", when: "לחיצה על \"מעבר לדורית\" בצ׳אט", keyEvent: true },
+  { name: "chat_handoff", meaning: "בקשה לעבור לדורית", when: "לחיצה על \"מעבר לדורית\" בצ׳אט — ה-key event הוא generate_lead, ברגע שההעברה אכן הושלמה", keyEvent: false },
   { name: "preferred_channel_click", meaning: "בחירת ערוץ מועדף", when: "שמור לכפתור ערוץ שאינו קישור ישיר — כרגע אין כזה", keyEvent: false },
 ];
 

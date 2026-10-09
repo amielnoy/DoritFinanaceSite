@@ -73,6 +73,24 @@ describe("track", () => {
     track("click_phone", { location: "hero" });
     expect(w.gtag).toHaveBeenCalledWith("event", "click_phone", { location: "hero", traffic_type: "internal" });
   });
+
+  it("attaches lead_source and lead_campaign when an attribution is on record", async () => {
+    const { captureAttribution } = await import("@/lib/attribution");
+    window.history.replaceState(null, "", "/?utm_source=linkedin&utm_campaign=autumn_push");
+    captureAttribution();
+    track("click_phone", { location: "hero" });
+    expect(w.gtag).toHaveBeenCalledWith("event", "click_phone", {
+      location: "hero",
+      lead_source: "linkedin",
+      lead_campaign: "autumn_push",
+    });
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("omits lead_source/lead_campaign entirely when no attribution is on record", () => {
+    track("click_phone", { location: "hero" });
+    expect(w.gtag).toHaveBeenCalledWith("event", "click_phone", { location: "hero" });
+  });
 });
 
 describe("the internal flag", () => {
@@ -115,6 +133,13 @@ describe("leadEvents", () => {
     leadEvents.preferredChannel("whatsapp");
     const names = new Set(LEAD_EVENTS.map((e) => e.name));
     for (const [, event] of w.gtag!.mock.calls) expect(names.has(event)).toBe(true);
+  });
+});
+
+describe("LEAD_EVENTS catalogue", () => {
+  it("does not mark chat_handoff a key event — generate_lead already covers the completed hand-off", () => {
+    const chatHandoff = LEAD_EVENTS.find((e) => e.name === "chat_handoff");
+    expect(chatHandoff?.keyEvent).toBe(false);
   });
 });
 
