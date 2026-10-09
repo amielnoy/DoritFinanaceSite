@@ -45,6 +45,9 @@ export class Base44SupportService implements SupportPort {
         topic: "",
         consentVersion: request.consentVersion ?? "",
         consentAt: request.consentAt ?? "",
+        channel: request.channel ?? "",
+        campaign: request.campaign ?? "",
+        landingPath: request.landingPath ?? "",
       });
 
       if (!receipt?.contact) {

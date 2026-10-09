@@ -31,6 +31,9 @@ export class Base44LeadService implements LeadPort {
       message: lead.message ?? "",
       notes: lead.notes ?? "",
       scheduledAt: lead.scheduledAt ?? "",
+      channel: lead.channel ?? "",
+      campaign: lead.campaign ?? "",
+      landingPath: lead.landingPath ?? "",
     });
 
     return receipt ?? { ok: true };
@@ -55,6 +58,9 @@ export class Base44LeadService implements LeadPort {
       scheduledAt: summary.scheduledAt ?? "",
       summary: summary.summary ?? "",
       profile: summary.profile ?? {},
+      channel: summary.channel ?? "",
+      campaign: summary.campaign ?? "",
+      landingPath: summary.landingPath ?? "",
     });
 
     return receipt ?? { ok: true };
@@ -70,6 +76,9 @@ export class Base44LeadService implements LeadPort {
       policyNumber: report.policyNumber ?? "",
       description: report.description ?? "",
       documents: report.documents ?? [],
+      channel: report.channel ?? "",
+      campaign: report.campaign ?? "",
+      landingPath: report.landingPath ?? "",
     });
 
     return receipt ?? { ok: true };
