@@ -275,3 +275,31 @@ describe("escalateToHuman — the notification is readable", () => {
     }
   });
 });
+
+describe("escalateToHuman — channel attribution", () => {
+  it("adds a הגיע/ה דרך line and persists the channel when contactable", async () => {
+    const r = await invokeFunction("escalateToHuman", {
+      reason: "user_request",
+      summary: "בקשה לדבר עם דורית.",
+      agent: "needs_interview",
+      name: "דנה כהן",
+      phone: "0541112222",
+      channel: "ai_assistant",
+    });
+    expect(r.mailTo("dorit@govari-fin.co.il").text).toContain("הגיע/ה דרך: ai_assistant");
+    expect(r.leads[0]).toMatchObject({ channel: "ai_assistant" });
+  });
+
+  it("stores 'unknown' for an unrecognised channel and adds no line", async () => {
+    const r = await invokeFunction("escalateToHuman", {
+      reason: "user_request",
+      summary: "בקשה לדבר עם דורית.",
+      agent: "needs_interview",
+      name: "דנה כהן",
+      phone: "0541112222",
+      channel: "bogus",
+    });
+    expect(r.leads[0].channel).toBe("unknown");
+    expect(r.mailTo("dorit@govari-fin.co.il").text).not.toContain("הגיע/ה דרך");
+  });
+});

@@ -99,6 +99,40 @@ describe("submitLead — the enquiry actually lands", () => {
     expect(html).toContain("לא מוגדר");
   });
 
+  it("adds a הגיע/ה דרך line when a known channel is supplied, and persists it on the Lead", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...consultation,
+      channel: "linkedin",
+      campaign: "autumn_push",
+    });
+    expect(r.mailTo(OPS).text).toContain("הגיע/ה דרך: linkedin / autumn_push");
+    expect(r.mailTo(OPS).html).toContain("הגיע/ה דרך");
+    expect(r.leads[0]).toMatchObject({ channel: "linkedin", campaign: "autumn_push" });
+  });
+
+  it("omits the line and stores 'unknown' for an unrecognised channel, never echoing it into the email", async () => {
+    const r = await invokeFunction("submitLead", { ...consultation, channel: "<script>evil</script>" });
+    expect(r.mailTo(OPS).text).not.toContain("הגיע/ה דרך");
+    expect(r.mailTo(OPS).text).not.toContain("script");
+    expect(r.leads[0].channel).toBe("unknown");
+  });
+
+  it("re-sanitises campaign server-side rather than trusting the client's own stripping", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...consultation,
+      channel: "google",
+      campaign: "<script>alert(1)</script>",
+    });
+    expect(r.mailTo(OPS).text).not.toContain("<script>");
+    expect(r.leads[0].campaign).toBe("scriptalert1script");
+  });
+
+  it("omits the line entirely when no channel was supplied at all", async () => {
+    const r = await invokeFunction("submitLead", consultation);
+    expect(r.mailTo(OPS).text).not.toContain("הגיע/ה דרך");
+    expect(r.leads[0].channel).toBe("unknown");
+  });
+
   it("sends every copy as HTML with a plain-text twin", async () => {
     // The staff copies used to be text-only, and Gmail collapsed the newlines
     // into one running paragraph — eight fields, no line breaks, unreadable on

@@ -142,3 +142,32 @@ describe("submitClaim — a name that is really a payload", () => {
     expect(html).toContain("&lt;a");
   });
 });
+
+describe("submitClaim — channel attribution", () => {
+  it("stores the claim as a lead with the supplied channel", async () => {
+    const r = await invokeFunction("submitClaim", { ...claim, channel: "facebook" });
+    expect(r.status).toBe(200);
+    expect(r.leads[0]).toMatchObject({ source: "claim", channel: "facebook" });
+  });
+
+  it("adds a הגיע/ה דרך line to both the operations and agency copies — submitClaim sends them the same agentBody, unlike submitLead's richer ops-only footer", async () => {
+    const r = await invokeFunction("submitClaim", { ...claim, channel: "instagram", campaign: "q4" });
+    const opsBody = r.mailTo(OPS).body ?? r.mailTo(OPS).text ?? "";
+    const agencyBody = r.mailTo(AGENCY).body ?? r.mailTo(AGENCY).text ?? "";
+    expect(opsBody).toContain("הגיע/ה דרך: instagram / q4");
+    expect(agencyBody).toContain("הגיע/ה דרך: instagram / q4");
+  });
+
+  it("stores 'unknown' and adds no line for an unrecognised channel", async () => {
+    const r = await invokeFunction("submitClaim", { ...claim, channel: "not_a_real_channel" });
+    expect(r.leads[0].channel).toBe("unknown");
+    const opsBody = r.mailTo(OPS).body ?? r.mailTo(OPS).text ?? "";
+    expect(opsBody).not.toContain("הגיע/ה דרך");
+  });
+
+  it("works with no channel supplied at all", async () => {
+    const r = await invokeFunction("submitClaim", claim);
+    expect(r.status).toBe(200);
+    expect(r.leads[0].channel).toBe("unknown");
+  });
+});
