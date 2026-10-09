@@ -72,6 +72,9 @@ test.describe("Base44 API contract (observed traffic)", () => {
         "message",
         "notes",
         "scheduledAt",
+        "channel",
+        "campaign",
+        "landingPath",
       ];
       const body = req.body as Record<string, unknown>;
       const undeclared = Object.keys(body).filter((k) => !accepted.includes(k));
