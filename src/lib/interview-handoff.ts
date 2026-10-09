@@ -29,6 +29,15 @@ export interface InterviewSummary {
   scheduledAt?: string;
   summary?: string;
   profile?: Record<string, string>;
+  /**
+   * Marketing channel attribution — see src/lib/attribution.ts. Never parsed
+   * out of the agent's fenced block: the model has no way to know this, so
+   * `readHandoff` below never sets these. `AgentChat.tsx` merges them in from
+   * `getAttribution()` at the point it calls `submitInterview`.
+   */
+  channel?: string;
+  campaign?: string;
+  landingPath?: string;
 }
 
 /**

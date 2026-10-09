@@ -25,6 +25,11 @@ export interface Lead {
   notes?: string;
   /** ISO datetime when the visitor picked a specific date+time; empty otherwise. */
   scheduledAt?: string;
+  /** Marketing channel attribution — see src/lib/attribution.ts. Never PII. */
+  channel?: string;
+  campaign?: string;
+  /** The route the visitor was on when they converted. Informational only — never persisted. */
+  landingPath?: string;
 }
 
 export type LeadSource =
@@ -44,6 +49,10 @@ export interface ClaimReport {
   policyNumber?: string;
   description?: string;
   documents?: string[];
+  /** Marketing channel attribution — see src/lib/attribution.ts. Never PII. */
+  channel?: string;
+  campaign?: string;
+  landingPath?: string;
 }
 
 export interface SubmissionReceipt {
@@ -152,6 +161,10 @@ export interface EscalationRequest {
   email?: string;
   consentVersion?: string;
   consentAt?: string;
+  /** Marketing channel attribution — see src/lib/attribution.ts. Never PII. */
+  channel?: string;
+  campaign?: string;
+  landingPath?: string;
 }
 
 export interface HumanContact {
