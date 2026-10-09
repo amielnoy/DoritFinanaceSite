@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { initClickTracking, initInternalFlag } from '@/lib/analytics';
+import { captureAttribution } from '@/lib/attribution';
 import { MotionConfig } from 'framer-motion';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -104,6 +105,7 @@ function App() {
   useEffect(() => {
     initInternalFlag();
     initClickTracking();
+    captureAttribution();
   }, []);
 
   return (
