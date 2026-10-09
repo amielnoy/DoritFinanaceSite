@@ -14,6 +14,11 @@
 const STORAGE_KEY = "lead_attribution";
 const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
+const KNOWN_CHANNELS: readonly Channel[] = [
+  "google", "facebook", "instagram", "linkedin", "ai_assistant",
+  "email", "sms", "referral", "direct",
+];
+
 export type Channel =
   | "google"
   | "facebook"
@@ -52,6 +57,8 @@ const UTM_SOURCE_MAP: Record<string, Channel> = {
   google: "google",
   adwords: "google",
   cpc: "google",
+  email: "email",
+  sms: "sms",
 };
 
 /**
@@ -98,7 +105,7 @@ function classifyReferrer(referrer: string): Channel {
   for (const [known, channel] of Object.entries(SOCIAL_HOSTS)) {
     if (hostMatches(host, known)) return channel;
   }
-  if (/(^|\.)google\.[a-z.]+$/i.test(host)) return "google";
+  if (/^google\.[a-z]{2,3}(\.[a-z]{2,3})?$/i.test(host)) return "google";
   return "referral";
 }
 
@@ -152,8 +159,8 @@ export function getAttribution(): Attribution | null {
     const raw = store.getItem(STORAGE_KEY);
     if (!raw) return null;
     const existing = JSON.parse(raw) as StoredAttribution;
-    if (typeof existing.channel !== "string") return null;
-    return { channel: existing.channel, campaign: existing.campaign ?? null };
+    if (!KNOWN_CHANNELS.includes(existing.channel as Channel)) return null;
+    return { channel: existing.channel, campaign: sanitiseCampaign(existing.campaign ?? null) };
   } catch {
     return null;
   }

@@ -121,4 +121,26 @@ describe("captureAttribution / getAttribution", () => {
     expect(() => captureAttribution()).not.toThrow();
     expect(getAttribution()).toBeNull();
   });
+
+  it("classifies utm_source=email and utm_source=sms directly", () => {
+    setPage("?utm_source=email", "");
+    captureAttribution();
+    expect(getAttribution()?.channel).toBe("email");
+    window.localStorage.clear();
+
+    setPage("?utm_source=sms", "");
+    captureAttribution();
+    expect(getAttribution()?.channel).toBe("sms");
+  });
+
+  it("rejects a stored channel outside the known taxonomy", () => {
+    window.localStorage.setItem("lead_attribution", JSON.stringify({ channel: "not_a_real_channel", campaign: null, capturedAt: Date.now() }));
+    expect(getAttribution()).toBeNull();
+  });
+
+  it("does not misclassify a referrer host that merely starts with google.", () => {
+    setPage("", "https://google.com.evil.com/");
+    captureAttribution();
+    expect(getAttribution()?.channel).toBe("referral");
+  });
 });
