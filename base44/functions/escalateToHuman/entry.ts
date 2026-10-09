@@ -95,6 +95,44 @@ function upstreamReasons(result) {
   return safe.length ? `:${safe.join(',')}` : '';
 }
 
+// הערוצים השיווקיים הסגורים — ראו src/lib/attribution.ts בצד הלקוח, שאותו
+// מילון בדיוק (ללא 'unknown', שאינו ערך שהלקוח אי פעם שולח).
+//
+// משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+// מפוצל זה לא. tests/contract/agents.contract.test.ts נכשל כששלושת העותקים
+// מתפצלים.
+const CHANNEL_TAXONOMY = [
+  'google', 'facebook', 'instagram', 'linkedin', 'ai_assistant',
+  'email', 'sms', 'referral', 'direct', 'unknown',
+];
+
+/** ערך סגור בלבד — ולעולם לא נאמן מהלקוח, גם אם הוא כבר סינן בצד שלו. */
+function validChannel(value) {
+  return typeof value === 'string' && CHANNEL_TAXONOMY.includes(value) ? value : null;
+}
+
+/** נקי מתווים לא בטוחים, מוגבל באורך — בדיוק כמו הסינון בצד הלקוח, לא במקומו. */
+function validCampaign(value) {
+  if (typeof value !== 'string') return null;
+  const cleaned = value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
+  return cleaned || null;
+}
+
+/** נתיב יחסי בלבד — בלי query string ובלי סכימה. */
+function validLandingPath(value) {
+  if (typeof value !== 'string') return null;
+  return /^\/[a-zA-Z0-9/_-]{0,80}$/.test(value) ? value : null;
+}
+
+/** שורת "הגיע/ה דרך", משותפת בין גרסת ה-HTML לגרסת הטקסט של אותו מייל. */
+function channelLine({ channel, campaign, landingPath }) {
+  if (!channel || channel === 'unknown') return '';
+  let line = channel;
+  if (campaign) line += ` / ${campaign}`;
+  if (landingPath) line += ` (נחיתה: ${landingPath})`;
+  return line;
+}
+
 async function sendMail({ base44, to, subject, html, text, body, rid, role }) {
   // התפקיד ולא הכתובת. אחד הנמענים הוא המבקר עצמו, וכתובתו לא תיכתב ליומן
   // שנשמר לאורך זמן — `role` מספיק כדי לדעת איזה עותק לא יצא.
@@ -265,12 +303,14 @@ const validPhone = (phone) => /^0\d{8,9}$/.test(String(phone).replace(/[-\s]/g, 
 
 function buildNotification(reason, data) {
   const flag = URGENT.has(reason) ? '🔴 דחוף' : '🟠';
+  const escalationChannelText = channelLine(data);
   return [
     `${flag} פנייה שהועברה מהסוכן האוטומטי לטיפול אנושי`,
     `התקבל: ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}`,
     ``,
     `סיבת ההעברה: ${REASONS[reason] || reason}`,
     `סוכן: ${data.agent || '—'}`,
+    ...(escalationChannelText ? [`הגיע/ה דרך: ${escalationChannelText}`] : []),
     ``,
     `שם: ${data.name || 'לא נמסר'}`,
     `טלפון: ${data.phone || 'לא נמסר'}`,
@@ -376,10 +416,12 @@ function buildEscalationHtml(reason, data) {
     detailRow('נשלח מ', data.device || 'לא ידוע', { last: true }),
   ].join(''));
 
+  const whyChannelText = channelLine(data);
   const why = block('ההעברה', [
     detailRow('סיבה', REASONS[reason] || reason),
     detailRow('דחיפות', urgent ? 'דחוף — לטפל היום' : 'רגילה'),
-    detailRow('סוכן', data.agent || '—', { last: true }),
+    detailRow('סוכן', data.agent || '—', { last: !whyChannelText }),
+    ...(whyChannelText ? [detailRow('הגיע/ה דרך', whyChannelText, { last: true })] : []),
   ].join(''), { tone: urgent ? 'alert' : 'panel' });
 
   const summary = block('תקציר השיחה · לאחר השמטת פרטים רגישים', proseRow(data.summary));
@@ -486,7 +528,10 @@ export default async function(req) {
     log('info', 'request.start', { rid });
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { reason, summary, name, phone, email, agent, topic, consentVersion, consentAt } = body || {};
+    const { reason, summary, name, phone, email, agent, topic, consentVersion, consentAt, channel, campaign, landingPath } = body || {};
+    const safeChannel = validChannel(channel) || 'unknown';
+    const safeCampaign = validCampaign(campaign);
+    const safeLandingPath = validLandingPath(landingPath);
 
     const safeReason = Object.prototype.hasOwnProperty.call(REASONS, reason) ? reason : 'uncertain';
     const safeSummary = redact(summary);
@@ -518,6 +563,8 @@ export default async function(req) {
           handled_by_agent: agent || '',
           consent_version: consentVersion || '',
           consent_at: consentAt || '',
+          channel: safeChannel,
+          campaign: safeCampaign || '',
         });
         leadId = lead?.id ?? null;
       } catch (e) {
@@ -544,13 +591,17 @@ export default async function(req) {
       handled_by_agent: agent || '',
       consent_version: consentVersion || '',
       consent_at: consentAt || null,
+      channel: safeChannel,
+      campaign: safeCampaign,
     });
 
-    const notification = buildNotification(safeReason, { name, phone, email, agent, summary: safeSummary, device: deviceLabel(req.headers.get('user-agent')) });
+    const escalationAttribution = { channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath };
+    const notification = buildNotification(safeReason, { name, phone, email, agent, summary: safeSummary, device: deviceLabel(req.headers.get('user-agent')), ...escalationAttribution });
     const subject = `${URGENT.has(safeReason) ? '🔴 ' : ''}העברה לטיפול אנושי — ${REASONS[safeReason]}${name ? ` · ${name}` : ''}`;
     const escalationHtml = buildEscalationHtml(safeReason, {
       name, phone, email, agent, summary: safeSummary, contactable,
       device: deviceLabel(req.headers.get('user-agent')),
+      ...escalationAttribution,
     });
 
     let notified = false;
