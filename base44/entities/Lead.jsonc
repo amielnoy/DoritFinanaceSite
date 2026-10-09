@@ -81,6 +81,28 @@
       "type": "string",
       "title": "מועד מתן ההסכמה",
       "description": "חותמת זמן ISO של אישור ההסכמה בממשק."
+    },
+    "channel": {
+      "type": "string",
+      "title": "ערוץ שיווקי",
+      "description": "מאיזה ערוץ הגיע המבקר בפעם הראשונה — נגזר מ-utm_source או מהפניה, ולא נבחר באופן ידני.",
+      "enum": [
+        "google",
+        "facebook",
+        "instagram",
+        "linkedin",
+        "ai_assistant",
+        "email",
+        "sms",
+        "referral",
+        "direct",
+        "unknown"
+      ]
+    },
+    "campaign": {
+      "type": "string",
+      "title": "קמפיין",
+      "description": "ערך utm_campaign, אם נמסר — חופשי אך מסונן לפני שמירה."
     }
   },
   "required": [
