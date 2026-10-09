@@ -1,0 +1,120 @@
+name: Publish blog drafts
+
+# Manual only, by design — the same reasoning as "Prune old Vercel previews"
+# in ci.yml: this writes to production (Base44 + its Supabase mirror), and a
+# manual trigger that can only ever do one deliberate, previewable thing is
+# the right shape for that, not a button that runs on every push.
+#
+# `titles` is a newline-separated list of EXACT BlogPost titles — never
+# "everything currently a draft". A typo is reported as "not found", not
+# silently skipped, so a bad run cannot look like a successful one that
+# published nothing.
+#
+# Dry run by default, same convention as `scripts/seed-blog.mjs` and
+# `scripts/prune-vercel.mjs`: the preview step always runs and always needs
+# only the Base44 credentials already configured for the main "Publish to
+# Base44" job in ci.yml. Nothing is written until `apply` is explicitly
+# checked, and that step separately needs SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
+# — not yet configured as of this workflow's addition; the apply step skips
+# with a notice rather than failing until they are.
+on:
+  workflow_dispatch:
+    inputs:
+      titles:
+        description: "Exact article titles to publish, one per line"
+        required: true
+        type: string
+      apply:
+        description: "Actually publish (unchecked = preview only, changes nothing)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    name: Publish blog drafts by title
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      # Same precedence and the same instant, legible failure on a
+      # non-workspace key as the "Check publish credentials" step in
+      # ci.yml — a runner cannot answer the CLI's interactive device login.
+      - name: Check Base44 credentials
+        id: base44-creds
+        env:
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
+          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
+        run: |
+          if [ -z "${{ vars.BASE44_APP_ID }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::error::BASE44_APP_ID is unset — cannot even preview."
+            exit 1
+          elif [ -n "$BASE44_API_KEY" ] && [ "${BASE44_API_KEY#b44k_}" != "$BASE44_API_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BASE44_ACCESS_TOKEN" ] && [ -n "$BASE44_REFRESH_TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BASE44_API_KEY" ]; then
+            echo "::error::BASE44_API_KEY is set but is not a workspace API key — those start with 'b44k_' — and there is no BASE44_ACCESS_TOKEN + BASE44_REFRESH_TOKEN pair to fall back on. The CLI would fall back to an interactive device login, which cannot be answered on a runner."
+            exit 1
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::error::No Base44 credentials are configured — cannot preview or publish."
+            exit 1
+          fi
+
+      - name: Install the CLI
+        run: npm install -g base44@latest --allow-remote=all --allow-scripts=workerd,esbuild
+
+      # Always runs, apply or not — the preview in the job log is what tells
+      # you whether every title actually resolved before anything is written.
+      - name: Preview
+        env:
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
+          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
+          BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
+          TITLES: ${{ inputs.titles }}
+        run: |
+          if [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
+            unset BASE44_API_KEY
+          fi
+          node scripts/publish-blog.mjs
+
+      - name: Check Supabase credentials
+        id: supabase-creds
+        if: inputs.apply
+        run: |
+          if [ -n "${{ vars.SUPABASE_URL }}" ] && [ -n "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::error::apply was requested but SUPABASE_URL (repo variable) / SUPABASE_SERVICE_ROLE_KEY (secret) are not configured — nothing was published. Add both, then re-run with apply checked."
+            exit 1
+          fi
+
+      - name: Apply
+        if: inputs.apply && steps.supabase-creds.outputs.ready == 'true'
+        env:
+          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
+          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
+          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
+          BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TITLES: ${{ inputs.titles }}
+        run: |
+          if [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
+            unset BASE44_API_KEY
+          fi
+          node scripts/publish-blog.mjs --apply
