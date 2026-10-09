@@ -76,6 +76,12 @@ jobs:
       - name: Install the CLI
         run: npm install -g base44@latest --allow-remote=all --allow-scripts=workerd,esbuild
 
+      # `base44 exec` runs the given script inside a Deno sandbox — unlike
+      # `base44 deploy` (used elsewhere in CI), which never needed this.
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       # Always runs, apply or not — the preview in the job log is what tells
       # you whether every title actually resolved before anything is written.
       - name: Preview
