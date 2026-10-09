@@ -800,6 +800,33 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(lists[0].match(/"[^"]+@[^"]+"/g) ?? []).not.toHaveLength(0);
   });
 
+  it("keeps the channel taxonomy identical in every function that mails", () => {
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    const listOf = (src: string, name: string) => {
+      const i = src.indexOf("const CHANNEL_TAXONOMY = [");
+      expect(i, `${name} declares no CHANNEL_TAXONOMY`).toBeGreaterThan(-1);
+      return src.slice(i, src.indexOf("];", i)).replace(/\s+/g, " ").trim();
+    };
+    const lists = [
+      listOf(submitLead, "submitLead"),
+      listOf(escalate, "escalateToHuman"),
+      listOf(claim, "submitClaim"),
+    ];
+    expect(lists[1], "escalateToHuman drifted from submitLead").toBe(lists[0]);
+    expect(lists[2], "submitClaim drifted from submitLead").toBe(lists[0]);
+    // And it agrees with the client-side taxonomy, minus the server-only
+    // "unknown" catch-all the client never produces.
+    const clientSide = read(join(REPO_ROOT, "src/lib/attribution.ts"));
+    for (const channel of [
+      "google", "facebook", "instagram", "linkedin", "ai_assistant",
+      "email", "sms", "referral", "direct",
+    ]) {
+      expect(clientSide, `src/lib/attribution.ts is missing "${channel}"`).toContain(`"${channel}"`);
+      expect(lists[0], `submitLead's CHANNEL_TAXONOMY is missing '${channel}'`).toContain(`'${channel}'`);
+    }
+    expect(lists[0], "submitLead's CHANNEL_TAXONOMY is missing the server-only 'unknown'").toContain("'unknown'");
+  });
+
   /**
    * And the diary invites everyone the mail reaches.
    *
