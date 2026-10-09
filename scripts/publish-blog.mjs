@@ -121,7 +121,7 @@ async function main() {
   base44Exec(
     `const ids = ${JSON.stringify(ids)};
      for (const id of ids) { await base44.entities.BlogPost.update(id, { published: true }); }
-     console.log(${JSON.stringify(RESULT)} + "ok");`
+     console.log(${JSON.stringify(RESULT)} + JSON.stringify("ok"));`
   );
 
   let failed = 0;

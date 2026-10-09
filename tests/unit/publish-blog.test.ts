@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — plain .mjs tooling, imported for its pure planning step.
-import { planPublish } from "../../scripts/publish-blog.mjs";
+import { planPublish, readExecResult } from "../../scripts/publish-blog.mjs";
 
 /**
  * Publishing is a deliberate, by-title action — never "everything that is
@@ -40,5 +40,28 @@ describe("planPublish", () => {
     expect(steps[0]).toMatchObject({ found: true, alreadyPublished: false });
     expect(steps[1]).toMatchObject({ found: false });
     expect(steps[2]).toMatchObject({ found: true, alreadyPublished: true });
+  });
+});
+
+/**
+ * The real run this pins against: the publish exec call printed the bare
+ * word `ok` after the marker instead of a JSON-encoded string, and
+ * readExecResult's JSON.parse blew up on it *after* the Base44 updates had
+ * already run — the writes succeeded, only reading back the confirmation
+ * crashed the script, in a way this test would have caught before the first
+ * real GitHub Actions run did.
+ */
+describe("readExecResult", () => {
+  it("parses a JSON-encoded string result, not just an array or object", () => {
+    const stdout = ['npm notice run base44-app@0.0.0 npx', '@@publish-blog@@"ok"'].join("\n");
+    expect(readExecResult(stdout)).toBe("ok");
+  });
+
+  it("throws a clear error rather than a JSON.parse crash on a bare, unquoted word", () => {
+    // This is the exact shape of the bug this test exists to catch — guard
+    // against reintroducing `console.log(RESULT + "ok")` instead of
+    // `console.log(RESULT + JSON.stringify("ok"))`.
+    const stdout = "@@publish-blog@@ok";
+    expect(() => readExecResult(stdout)).toThrow();
   });
 });
