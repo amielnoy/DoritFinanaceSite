@@ -95,6 +95,44 @@ function upstreamReasons(result) {
   return safe.length ? `:${safe.join(',')}` : '';
 }
 
+// הערוצים השיווקיים הסגורים — ראו src/lib/attribution.ts בצד הלקוח, שאותו
+// מילון בדיוק (ללא 'unknown', שאינו ערך שהלקוח אי פעם שולח).
+//
+// משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+// מפוצל זה לא. tests/contract/agents.contract.test.ts נכשל כששלושת העותקים
+// מתפצלים.
+const CHANNEL_TAXONOMY = [
+  'google', 'facebook', 'instagram', 'linkedin', 'ai_assistant',
+  'email', 'sms', 'referral', 'direct', 'unknown',
+];
+
+/** ערך סגור בלבד — ולעולם לא נאמן מהלקוח, גם אם הוא כבר סינן בצד שלו. */
+function validChannel(value) {
+  return typeof value === 'string' && CHANNEL_TAXONOMY.includes(value) ? value : null;
+}
+
+/** נקי מתווים לא בטוחים, מוגבל באורך — בדיוק כמו הסינון בצד הלקוח, לא במקומו. */
+function validCampaign(value) {
+  if (typeof value !== 'string') return null;
+  const cleaned = value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
+  return cleaned || null;
+}
+
+/** נתיב יחסי בלבד — בלי query string ובלי סכימה. */
+function validLandingPath(value) {
+  if (typeof value !== 'string') return null;
+  return /^\/[a-zA-Z0-9/_-]{0,80}$/.test(value) ? value : null;
+}
+
+/** שורת "הגיע/ה דרך", משותפת בין גרסת ה-HTML לגרסת הטקסט של אותו מייל. */
+function channelLine({ channel, campaign, landingPath }) {
+  if (!channel || channel === 'unknown') return '';
+  let line = channel;
+  if (campaign) line += ` / ${campaign}`;
+  if (landingPath) line += ` (נחיתה: ${landingPath})`;
+  return line;
+}
+
 async function sendMail({ base44, to, subject, html, text, body, rid, role }) {
   // התפקיד ולא הכתובת. אחד הנמענים הוא המבקר עצמו, וכתובתו לא תיכתב ליומן
   // שנשמר לאורך זמן — `role` מספיק כדי לדעת איזה עותק לא יצא.
@@ -345,7 +383,10 @@ export default async function(req) {
     log('info', 'request.start', { rid, source: 'claim' });
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { name, phone, email, claimType, eventDate, policyNumber, description, documents } = body || {};
+    const { name, phone, email, claimType, eventDate, policyNumber, description, documents, channel, campaign, landingPath } = body || {};
+    const safeChannel = validChannel(channel) || 'unknown';
+    const safeCampaign = validCampaign(campaign);
+    const safeLandingPath = validLandingPath(landingPath);
 
     if (!name || !phone) {
       log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields' });
@@ -357,6 +398,7 @@ export default async function(req) {
       ? [``, `מסמכים מצורפים (${docList.length}):`, ...docList.map((d, i) => `${i + 1}. ${d}`)]
       : ['', 'מסמכים מצורפים: אין'];
 
+    const claimChannelText = channelLine({ channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath });
     const agentBody = [
       `דיווח אירוע ביטוחי חדש — ${new Date().toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' })}`,
       ``,
@@ -364,6 +406,7 @@ export default async function(req) {
       `טלפון: ${phone}`,
       `אימייל: ${email || '—'}`,
       `נשלח מ: ${deviceLabel(req.headers.get('user-agent'))}`,
+      ...(claimChannelText ? [`הגיע/ה דרך: ${claimChannelText}`] : []),
       `סוג אירוע: ${claimType || '—'}`,
       `תאריך אירוע: ${eventDate || '—'}`,
       `מספר פוליסה: ${policyNumber || '—'}`,
@@ -398,6 +441,8 @@ export default async function(req) {
         timing: eventDate || '',
         message: messageBody,
         status: 'new',
+        channel: safeChannel,
+        campaign: safeCampaign || '',
       });
       leadId = lead?.id ?? null;
       log('info', 'lead.created', { rid, leadId, source: 'claim' });
@@ -421,6 +466,8 @@ export default async function(req) {
       timing: eventDate || '',
       message: messageBody,
       status: 'new',
+      channel: safeChannel,
+      campaign: safeCampaign,
     });
 
     const warnings = [];
