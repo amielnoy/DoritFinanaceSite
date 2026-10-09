@@ -257,6 +257,44 @@ function upstreamReasons(result) {
   return safe.length ? `:${safe.join(',')}` : '';
 }
 
+// הערוצים השיווקיים הסגורים — ראו src/lib/attribution.ts בצד הלקוח, שאותו
+// מילון בדיוק (ללא 'unknown', שאינו ערך שהלקוח אי פעם שולח).
+//
+// משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
+// מפוצל זה לא. tests/contract/agents.contract.test.ts נכשל כששתי העותקים
+// מתפצלים.
+const CHANNEL_TAXONOMY = [
+  'google', 'facebook', 'instagram', 'linkedin', 'ai_assistant',
+  'email', 'sms', 'referral', 'direct', 'unknown',
+];
+
+/** ערך סגור בלבד — ולעולם לא נאמן מהלקוח, גם אם הוא כבר סינן בצד שלו. */
+function validChannel(value) {
+  return typeof value === 'string' && CHANNEL_TAXONOMY.includes(value) ? value : null;
+}
+
+/** נקי מתווים לא בטוחים, מוגבל באורך — בדיוק כמו הסינון בצד הלקוח, לא במקומו. */
+function validCampaign(value) {
+  if (typeof value !== 'string') return null;
+  const cleaned = value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
+  return cleaned || null;
+}
+
+/** נתיב יחסי בלבד — בלי query string ובלי סכימה. */
+function validLandingPath(value) {
+  if (typeof value !== 'string') return null;
+  return /^\/[a-zA-Z0-9/_-]{0,80}$/.test(value) ? value : null;
+}
+
+/** שורת "הגיע/ה דרך", משותפת בין גרסת ה-HTML לגרסת הטקסט של אותו מייל. */
+function channelLine({ channel, campaign, landingPath }) {
+  if (!channel || channel === 'unknown') return '';
+  let line = channel;
+  if (campaign) line += ` / ${campaign}`;
+  if (landingPath) line += ` (נחיתה: ${landingPath})`;
+  return line;
+}
+
 async function sendMail({ base44, to, subject, html, text, body, rid, role }) {
   // התפקיד ולא הכתובת. אחד הנמענים הוא המבקר עצמו, וכתובתו לא תיכתב ליומן
   // שנשמר לאורך זמן — `role` מספיק כדי לדעת איזה עותק לא יצא.
@@ -562,10 +600,12 @@ function buildLinksFooter({ sheet, doc }) {
   return [`── קישורים ──`, ...rows.map(([label, v]) => `${label}: ${linkIn(v)}`)].join('\n');
 }
 
-function buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings }) {
+function buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings, channel, campaign, landingPath }) {
+  const channelText = channelLine({ channel, campaign, landingPath });
   return [
     `── מצב תפעולי ──`,
     `מקור: ${source || 'quick'}`,
+    ...(channelText ? [`הגיע/ה דרך: ${channelText}`] : []),
     `נושא: ${topic || '—'}`,
     `מזהה רשומה: ${leadId || '—'}`,
     `יומן: ${calendar}`,
@@ -997,9 +1037,11 @@ function buildAgentHtml(source, data, ops, links = null) {
         detailRow(label, 'לפתיחה', { link: linkIn(v), last: i === linkRows.length - 1 })).join(''))
     : '';
 
+  const opsChannelText = ops ? channelLine(ops) : '';
   const opsBlock = ops
     ? block('מצב תפעולי', [
         detailRow('מקור', ops.source || 'quick'),
+        ...(opsChannelText ? [detailRow('הגיע/ה דרך', opsChannelText)] : []),
         detailRow('מזהה רשומה', ops.leadId),
         detailRow('יומן', ops.calendar),
         detailRow('גיליון', statusOf(ops.sheet), { link: linkIn(ops.sheet) }),
@@ -1242,7 +1284,10 @@ export default async function(req) {
     log('info', 'request.start', { rid });
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at, channel, campaign, landingPath } = body || {};
+    const safeChannel = validChannel(channel) || 'unknown';
+    const safeCampaign = validCampaign(campaign);
+    const safeLandingPath = validLandingPath(landingPath);
 
     if (!name || !phone) {
       log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields', source: source || 'quick' });
@@ -1343,6 +1388,8 @@ export default async function(req) {
         // מה שבאמת הוצג, ולעולם לא הסכמה שלא נתבקשה.
         consent_version: consent_version || '',
         consent_at: consent_at || '',
+        channel: safeChannel,
+        campaign: safeCampaign || '',
       });
       leadId = lead?.id ?? null;
       log('info', 'lead.created', { rid, leadId, source: source || 'quick' });
@@ -1383,6 +1430,8 @@ export default async function(req) {
       summary: safeSummary || null,
       profile: safeProfile.length ? safeProfile : null,
       track_label: trackLabel || null,
+      channel: safeChannel,
+      campaign: safeCampaign,
     });
 
     // And the booking as its own row, when there is a booking to speak of. A
@@ -1659,8 +1708,9 @@ export default async function(req) {
     // The same full lead the agent gets, plus the ops appendix — see the note
     // beside NOTIFY_EMAILS, and the consent wording it obliges. Each mailbox is
     // its own attempt: one that bounces must not take the others with it.
-    const opsHtml = buildAgentHtml(source, data, { source, leadId, topic, calendar, sheet, doc, warnings });
-    const opsText = `${agentBody}\n\n${buildOpsFooter(source, { leadId, topic, calendar, sheet, doc, warnings })}`;
+    const opsOps = { source, leadId, topic, calendar, sheet, doc, warnings, channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath };
+    const opsHtml = buildAgentHtml(source, data, opsOps);
+    const opsText = `${agentBody}\n\n${buildOpsFooter(source, opsOps)}`;
     // יחד, לא בתור. כל תיבה היא עדיין ניסיון נפרד — זו הסיבה שיש כאן catch
     // לכל אחת ולא catch אחד סביב הכול: תיבה שנכשלת אסור שתיקח איתה את השאר.
     await Promise.all(NOTIFY_EMAILS.map(async (to) => {
