@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Upload, X, FileText, Loader2, Check, AlertTriangle } from "lucide-react";
 import { services } from "@/services";
 import { useSubmission } from "@/hooks/useSubmission";
+import { getAttribution } from "@/lib/attribution";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
 
@@ -91,8 +92,9 @@ export default function ClaimForm() {
 
   const submit = async () => {
     if (!valid) return;
-    await submitReport(() =>
-      services.leads.submitClaim({
+    const ok = await submitReport(() => {
+      const attribution = getAttribution();
+      return services.leads.submitClaim({
         name,
         phone,
         email,
@@ -101,8 +103,12 @@ export default function ClaimForm() {
         policyNumber,
         description,
         documents: docs.map((d) => d.url),
-      })
-    );
+        channel: attribution?.channel,
+        campaign: attribution?.campaign ?? undefined,
+        landingPath: window.location.pathname,
+      });
+    });
+    if (ok) leadEvents.claimSubmitted();
   };
 
   if (done) {

@@ -122,3 +122,17 @@ describe("location attribution for a non-embedded chat", () => {
     expect(document.querySelector('[data-track-location="support-chat"]')).not.toBeNull();
   });
 });
+
+describe("the interview's attribution never comes from the model", () => {
+  it("ignores channel/campaign if the agent's fenced block happens to include them", async () => {
+    const { readHandoff } = await import("@/lib/interview-handoff");
+    const { summary } = readHandoff(
+      "תודה.\n\n```lead\n" +
+        JSON.stringify({ name: "רונית", phone: "0500000000", channel: "google", campaign: "hack" }) +
+        "\n```"
+    );
+    expect(summary).not.toBeNull();
+    expect(summary).not.toHaveProperty("channel");
+    expect(summary).not.toHaveProperty("campaign");
+  });
+});

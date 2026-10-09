@@ -15,6 +15,7 @@ import {
 } from "@/config/compliance";
 import { CONTACT } from "@/config/contact";
 import { readHandoff } from "@/lib/interview-handoff";
+import { getAttribution } from "@/lib/attribution";
 import { leadEvents, type ChatMethod } from "@/lib/analytics";
 import ContactChannels from "./ContactChannels";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
@@ -230,7 +231,13 @@ export default function AgentChat({
     submittedRef.current = true;
     void (async () => {
       try {
-        const receipt = await services.leads.submitInterview(summary);
+        const attribution = getAttribution();
+        const receipt = await services.leads.submitInterview({
+          ...summary,
+          channel: attribution?.channel,
+          campaign: attribution?.campaign ?? undefined,
+          landingPath: window.location.pathname,
+        });
         if (!receipt?.ok) throw new Error(`rejected${receipt?.rid ? ` rid=${receipt.rid}` : ""}`);
         leadEvents.interviewCompleted();
       } catch (e) {
@@ -331,6 +338,7 @@ export default function AgentChat({
       .map((m) => `${m.role === "user" ? "מבקר" : "סוכן"}: ${m.content}`)
       .join("\n");
     try {
+      const handoffAttribution = getAttribution();
       const receipt = await services.support.escalate({
         reason,
         summary: `בקשה מהאתר למעבר לטיפול אנושי (${descriptor.conversationName}).\n\n${transcript}`,
@@ -339,6 +347,9 @@ export default function AgentChat({
         phone,
         consentVersion: CONSENT_VERSION,
         consentAt: consentAt ?? "",
+        channel: handoffAttribution?.channel,
+        campaign: handoffAttribution?.campaign ?? undefined,
+        landingPath: window.location.pathname,
       });
       setHandoffSent(true);
       setHandoffOpen(false);

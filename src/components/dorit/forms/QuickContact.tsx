@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { services } from "@/services";
 import { useSubmission } from "@/hooks/useSubmission";
 import { leadEvents } from "@/lib/analytics";
+import { getAttribution } from "@/lib/attribution";
 import { CONTACT } from "@/config/contact";
 import { HUMAN_HANDOFF } from "@/config/compliance";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
@@ -38,15 +39,19 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
       return;
     }
     setValidationError(null);
-    const ok = await submit(() =>
-      services.leads.submitLead({
+    const ok = await submit(() => {
+      const attribution = getAttribution();
+      return services.leads.submitLead({
         name: form.name,
         phone: form.phone,
         email: form.email,
         source: "quick",
         message: form.message,
-      })
-    );
+        channel: attribution?.channel,
+        campaign: attribution?.campaign ?? undefined,
+        landingPath: window.location.pathname,
+      });
+    });
     if (ok) {
       // A lead once it is saved — never on the click.
       leadEvents.formSubmitted();
