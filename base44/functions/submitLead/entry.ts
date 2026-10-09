@@ -1562,7 +1562,7 @@ export default async function(req) {
           log('info', 'calendar.created', { rid, provider });
           return provider;
         } catch (e) {
-          log('warn', 'calendar.failed', { rid, provider });
+          log('warn', 'calendar.failed', { rid, provider, err: String(e?.message ?? e).slice(0, 200) });
           warnings.push(`calendar_${provider}_failed`);
           return null;
         }
