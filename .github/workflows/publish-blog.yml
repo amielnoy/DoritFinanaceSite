@@ -97,15 +97,20 @@ jobs:
           fi
           node scripts/publish-blog.mjs
 
+      # SUPABASE_URL isn't sensitive (it's already public in the client
+      # bundle), but accept it from either the variable or the secret —
+      # whichever tab it actually got added to.
       - name: Check Supabase credentials
         id: supabase-creds
         if: inputs.apply
+        env:
+          RESOLVED_SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
         run: |
-          if [ -n "${{ vars.SUPABASE_URL }}" ] && [ -n "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+          if [ -n "$RESOLVED_SUPABASE_URL" ] && [ -n "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::error::apply was requested but SUPABASE_URL (repo variable) / SUPABASE_SERVICE_ROLE_KEY (secret) are not configured — nothing was published. Add both, then re-run with apply checked."
+            echo "::error::apply was requested but SUPABASE_URL (variable or secret) / SUPABASE_SERVICE_ROLE_KEY (secret) are not configured — nothing was published. Add both, then re-run with apply checked."
             exit 1
           fi
 
@@ -116,7 +121,7 @@ jobs:
           BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
           BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
           BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
-          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           TITLES: ${{ inputs.titles }}
         run: |
