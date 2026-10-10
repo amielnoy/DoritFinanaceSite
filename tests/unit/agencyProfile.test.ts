@@ -46,4 +46,38 @@ describe("agencyProfile — one source, no drift", () => {
       expect(id).toBe(AGENCY_PROFILE.ga4MeasurementId);
     }
   });
+
+  it("the tenant-schema migration's seed row matches the profile", () => {
+    // The migration backfills `agency_profiles` for agency 1 with its own
+    // copy of these values (Postgres cannot import a TS module). This is
+    // the only thing stopping that copy from silently drifting — see A-34
+    // in tests/test-plan/10-known-issues.md for what unchecked drift cost
+    // before Phase 0.
+    const migration = read(
+      join(REPO_ROOT, "supabase/migrations/20261010000000_tenant_schema.sql"),
+    );
+    const insert = migration.match(
+      /insert into public\.agency_profiles[\s\S]*?values\s*\(([\s\S]*?)\);/,
+    );
+    expect(insert, "no agency_profiles seed insert found in the migration").not.toBeNull();
+    const values = [...insert![1].matchAll(/'((?:[^']|'')*)'/g)].map((m) => m[1]);
+    // Positional, matching the insert's own column list:
+    // agency_id, display_name, phone_e164, phone_display, whatsapp, email,
+    // default_whatsapp_message, licence_entity, licence_number, licence_regulator, ga4_measurement_id
+    const [, , phoneE164, phoneDisplay, whatsapp, email, defaultWhatsappMessage, licenceEntity, licenceNumber, licenceRegulator, ga4MeasurementId] = values;
+    expect({
+      phoneE164, phoneDisplay, whatsapp, email, defaultWhatsappMessage,
+      licenceEntity, licenceNumber, licenceRegulator, ga4MeasurementId,
+    }).toEqual({
+      phoneE164: AGENCY_PROFILE.phoneE164,
+      phoneDisplay: AGENCY_PROFILE.phoneDisplay,
+      whatsapp: AGENCY_PROFILE.whatsapp,
+      email: AGENCY_PROFILE.email,
+      defaultWhatsappMessage: AGENCY_PROFILE.defaultWhatsappMessage,
+      licenceEntity: AGENCY_PROFILE.licenceEntity,
+      licenceNumber: AGENCY_PROFILE.licenceNumber,
+      licenceRegulator: AGENCY_PROFILE.licenceRegulator,
+      ga4MeasurementId: AGENCY_PROFILE.ga4MeasurementId,
+    });
+  });
 });
