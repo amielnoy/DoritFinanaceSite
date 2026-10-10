@@ -119,3 +119,31 @@ describe("AgentChat reports each new assistant message", () => {
     expect(onAssistantMessage).toHaveBeenCalledTimes(callsSoFar);
   });
 });
+
+describe("the reading recommender's consent gate", () => {
+  const renderGate = (initialInput?: string) =>
+    render(
+      <MemoryRouter>
+        <AgentChat descriptor={AGENTS.blogRecommender} embedded initialInput={initialInput} />
+      </MemoryRouter>,
+    );
+
+  it("shows the approved one line and the licence, not the interview's notice", () => {
+    renderGate();
+    expect(screen.getByText("עוזר אוטומטי של דורית, לא ייעוץ. אין לכתוב תעודת זהות או מספרי פוליסה.")).toBeInTheDocument();
+    expect(screen.getByText(/L-00107009/)).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(document.body.textContent).not.toContain("נאספים שם וטלפון בלבד");
+  });
+
+  it("still gates the first message on the checkbox", async () => {
+    const user = userEvent.setup();
+    renderGate("נולד לנו ילד");
+    const start = screen.getByRole("button", { name: /התחלת השיחה/ });
+    expect(start).toBeDisabled();
+    expect(screen.getByRole("button", { name: "שליחה" })).toBeDisabled();
+    expect(screen.getByLabelText(AGENTS.blogRecommender.inputLabel)).toHaveValue("נולד לנו ילד");
+    await user.click(screen.getByRole("checkbox"));
+    expect(start).toBeEnabled();
+  });
+});

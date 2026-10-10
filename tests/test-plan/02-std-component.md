@@ -207,6 +207,18 @@ visitor would.
 | CMP-REC-007 | "clears an earlier search so the recommendation is not narrowed to nothing" | Search box emptied |
 | CMP-REC-008 | "scrolls the recommendation into view" | `scrollIntoView` called |
 
+### 4.14 Reading-recommender chat — `tests/component/blog-recommendation-chat.test.tsx`
+
+The real `AgentChat` with the recommender's descriptor; the agent service is faked.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-RCH-001 | "calls onAssistantMessage with the raw content, block included" | The `recommended` block reaches the page |
+| CMP-RCH-002 | "never shows the recommended block to the visitor" | No fence, no ids in the transcript |
+| CMP-RCH-003 | "does not re-report the same trailing assistant message once a later user message arrives" | No second call for the same content |
+| CMP-RCH-004 | "shows the approved one line and the licence, not the interview's notice" | The approved sentence and `L-00107009`; exactly two points; no "נאספים שם וטלפון בלבד" |
+| CMP-RCH-005 | "still gates the first message on the checkbox" | Start and send disabled before consent; the pre-filled text waits in the input |
+
 ## 5. Pass criteria
 
 All 76 cases pass. A `submitLead` or `submitClaim` payload assertion failing

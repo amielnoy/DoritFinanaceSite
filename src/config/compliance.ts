@@ -25,8 +25,11 @@
  * "סוכנות ביטוח בע״מ" to "מתכננת פיננסית וסוכנת ביטוח": she is an individual
  * agent, not a company. The bot disclosure names her rather than "the agency"
  * for the same reason. The name a visitor consented under changed.
+ *
+ * v5 gives the reading recommender its own notice,
+ * `BLOG_RECOMMENDER_CONSENT_POINTS`, in place of the interview's.
  */
-export const CONSENT_VERSION = "2026-10-agents-v4";
+export const CONSENT_VERSION = "2026-10-agents-v5";
 
 /** Licence details the agency must disclose. */
 export const LICENCE = {
@@ -94,6 +97,21 @@ export const PROCEDURES_CONSENT_POINTS = [
   `${LICENCE.entity} בעלת רישיון סוכן מ${LICENCE.regulator} מס' ${LICENCE.number}, ולה זיקה לגופים מוסדיים. הפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.`,
   "אין צורך למסור פרטים אישיים כדי לשאול כאן. אם תבחרו לעבור לדורית, תתבקשו שם וטלפון בלבד כדי שתהיה דרך לחזור אליכם. אין למסור בצ׳אט תעודת זהות, מספרי חשבון, פוליסה או קרן, יתרות, נתוני שכר או מידע רפואי — שליפה מהמסלקה נעשית בייפוי כוח חתום מול דורית, ולא כאן.",
   "תוכן השיחה נשמר אצל דורית ואצל הצוות שמתפעל את האתר מטעמה, כדי לדעת מה נשאל ולשפר את המענה. מזהים שנמסרו בטעות מושמטים לפני השמירה. אפשר לבקש עיון, תיקון או מחיקה בכל עת.",
+] as const;
+
+/**
+ * The gate for the reading recommender, as approved by Dorit's compliance
+ * adviser on 2026-10-10 (base44/agents/COMPLIANCE.md §9).
+ *
+ * The recommender points at articles already published and runs no interview,
+ * yet it showed the interview's notice — "נאספים שם וטלפון… מתאם פגישה", a
+ * description of processing that does not happen here. The adviser approved a
+ * single line for the whole chat, the "מעבר לדורית" form included; the licence
+ * and affiliation stay as a second line.
+ */
+export const BLOG_RECOMMENDER_CONSENT_POINTS = [
+  "עוזר אוטומטי של דורית, לא ייעוץ. אין לכתוב תעודת זהות או מספרי פוליסה.",
+  `${LICENCE.entity} בעלת רישיון סוכן מ${LICENCE.regulator} מס' ${LICENCE.number}, ולה זיקה לגופים מוסדיים. הפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.`,
 ] as const;
 
 /** Persistent line under the message box, visible for the whole conversation. */

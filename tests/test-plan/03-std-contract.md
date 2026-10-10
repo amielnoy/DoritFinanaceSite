@@ -218,6 +218,14 @@ notice says it, so the two cases hold each other up — that the transcript and
 topic are redacted before anything is written, and that the support row is keyed
 on the same normalised phone number `upsertContact` uses.
 
+The reading recommender had the same defect until `CONSENT_VERSION` v5: it
+showed the interview's notice. It now carries `BLOG_RECOMMENDER_CONSENT_POINTS`,
+the one-line notice Dorit's compliance adviser approved on 2026-10-10 plus the
+licence line (`COMPLIANCE.md` §9). "the reading recommender's notice" pins the
+approved sentence word for word, the licence and affiliation beside it, the
+absence of the interview's collection promise, and the v5 version stamp — so
+wording that drifts from what was approved fails before it ships.
+
 The `Contact` entity has a block of its own, covering code no agent calls today.
 It pins that the record is keyed on the phone number and nothing else, that the
 number is normalised before it becomes that key, and — the one that matters most
