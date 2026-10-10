@@ -163,6 +163,20 @@ create policy testimonials_write_admin on public.testimonials
   using (public.can_see(agency_id) or public.is_admin())
   with check (public.can_see(agency_id) or public.is_admin());
 
+-- testimonials_read_public was also missed above: it is `using (true)`, with
+-- no is_admin() call to replace, which is why it fell outside the
+-- "replace is_admin() with can_see() or is_admin()" sweep — RLS policies OR
+-- together, so leaving it in place would still let anyone read every
+-- agency's testimonials regardless of the policy above. Testimonials have no
+-- shared-library concept the way blog_posts do (the parent spec's data
+-- model lists no nullable note for this table), so this is scoped exactly
+-- like blog_posts' published rows: the one fixed agency, plus any member,
+-- plus admin.
+drop policy testimonials_read_public on public.testimonials;
+create policy testimonials_read_member_or_fixed_agency on public.testimonials
+  for select to anon, authenticated
+  using (agency_id = '00000000-0000-0000-0000-000000000001' or public.can_see(agency_id) or public.is_admin());
+
 drop policy meetings_read_admin on public.meetings;
 create policy meetings_read_admin on public.meetings
   for select to authenticated using (public.can_see(agency_id) or public.is_admin());
