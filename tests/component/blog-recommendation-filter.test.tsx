@@ -71,10 +71,19 @@ const renderBlog = () => {
   );
 };
 
-const recommend = (ids: string[]) =>
-  act(() => {
+/** The chat lives in a dialog the recommender box opens. A visitor reads the
+ *  answer there, then closes it to see the narrowed grid — which the open
+ *  modal hides from assistive tech, as it should. */
+const recommend = async (ids: string[]) => {
+  if (!capturedOnAssistantMessage) fireEvent.click(screen.getByRole("button", { name: "המליצו לי" }));
+  await act(() => {
     capturedOnAssistantMessage!("הנה המלצה.\n\n```recommended\n" + JSON.stringify(ids) + "\n```");
   });
+  const close = screen.queryByRole("button", { name: "סגירה" });
+  if (close) fireEvent.click(close);
+};
+
+const BACK_TO_ALL = "חזרה לכל המאמרים";
 
 const card = (id: string) => document.getElementById(`post-${id}`);
 const shownIds = () =>
@@ -94,7 +103,7 @@ describe("the blog page shows only the recommended posts", () => {
     renderBlog();
     await screen.findByText("דמי ניהול בפנסיה");
     expect(shownIds()).toEqual(["post-a", "post-b", "post-c"]);
-    expect(screen.queryByText("הצגת כל המאמרים")).toBeNull();
+    expect(screen.queryByText(BACK_TO_ALL)).toBeNull();
   });
 
   it("hides every post the chat did not recommend", async () => {
@@ -106,7 +115,7 @@ describe("the blog page shows only the recommended posts", () => {
     await waitFor(() => expect(card("post-b")).toBeNull());
     expect(card("post-a")).not.toBeNull();
     expect(card("post-c")).toBeNull();
-    expect(screen.getByText("מוצג מאמר אחד שהומלץ בצ'אט")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /מאמרים שהומלצו בצ'אט\s*מאמר אחד/ })).toBeTruthy();
   });
 
   it("orders the posts the way the chat ranked them", async () => {
@@ -116,7 +125,7 @@ describe("the blog page shows only the recommended posts", () => {
     await recommend(["post-c", "post-a"]);
 
     await waitFor(() => expect(shownIds()).toEqual(["post-c", "post-a"]));
-    expect(screen.getByText("מוצגים 2 מאמרים שהומלצו בצ'אט")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /מאמרים שהומלצו בצ'אט\s*2 מאמרים/ })).toBeTruthy();
   });
 
   it("brings every post back from the show-all button", async () => {
@@ -125,10 +134,10 @@ describe("the blog page shows only the recommended posts", () => {
     await recommend(["post-a"]);
     await waitFor(() => expect(card("post-b")).toBeNull());
 
-    fireEvent.click(screen.getByText("הצגת כל המאמרים"));
+    fireEvent.click(screen.getByText(BACK_TO_ALL));
 
     expect(shownIds()).toEqual(["post-a", "post-b", "post-c"]);
-    expect(screen.queryByText("הצגת כל המאמרים")).toBeNull();
+    expect(screen.queryByText(BACK_TO_ALL)).toBeNull();
   });
 
   it("keeps every post when none of the recommended ids exists, rather than an empty page", async () => {
@@ -138,7 +147,7 @@ describe("the blog page shows only the recommended posts", () => {
     await recommend(["no-such-post"]);
 
     expect(shownIds()).toEqual(["post-a", "post-b", "post-c"]);
-    expect(screen.queryByText("הצגת כל המאמרים")).toBeNull();
+    expect(screen.queryByText(BACK_TO_ALL)).toBeNull();
   });
 
   it("drops the recommendation filter once the visitor searches", async () => {

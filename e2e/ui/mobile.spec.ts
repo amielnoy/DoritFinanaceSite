@@ -31,11 +31,28 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
       await expect(stickySupport).toBeVisible();
       await expect(stickyWhatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776\?text=/);
       await expect(stickyCall).toHaveAttribute("href", "tel:+972508311776");
-      await expect(stickyForm).toHaveAttribute("href", "#quick-contact");
+      await expect(stickyForm).toHaveAttribute("href", "/#quick-contact");
     });
 
     await test_step("the desktop floating dock is hidden below md", async () => {
       await expect(page.getByRole("link", { name: "פתיחת שיחה בוואטסאפ" })).toBeHidden();
+    });
+  });
+
+  test("the sticky bar's השאירו פרטים reaches the form from another route", async ({ page }) => {
+    // The bar is on every route and the form only on home. As a bare
+    // `#quick-contact` it did nothing at all on /blog.
+    await test_step("open the blog on a phone viewport", async () => {
+      await gotoApp(page, "/blog");
+    });
+
+    await test_step("tap השאירו פרטים in the sticky bar", async () => {
+      await stickyBar(page).getByRole("link", { name: /השאירו פרטים/ }).click();
+    });
+
+    await test_step("it lands on the home page at the short contact form", async () => {
+      await expect(page).toHaveURL(/\/#quick-contact$/);
+      await expect(page.locator("#quick-contact")).toBeInViewport({ ratio: 0.05 });
     });
   });
 

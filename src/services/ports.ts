@@ -95,6 +95,8 @@ export interface Article {
   body?: string;
   image_url?: string;
   tags?: string;
+  /** How long acting on the article takes, as a reader would say it ("רבע שעה"). */
+  action_time?: string;
   published?: boolean;
   created_date: string;
 }

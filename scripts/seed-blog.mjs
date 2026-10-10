@@ -54,6 +54,7 @@ function parseArticle(raw) {
     title: meta.title,
     excerpt: meta.excerpt ?? "",
     tags: meta.tags ?? "",
+    action_time: meta.action_time ?? "",
     image_url: meta.image_url ?? "",
     published: meta.published === "true",
     body: m[2].trim(),
@@ -63,7 +64,7 @@ function parseArticle(raw) {
 export { parseArticle };
 
 /** Fields both stores hold for a post, in the shape both accept. */
-const FIELDS = ["title", "excerpt", "body", "tags", "image_url", "published"];
+const FIELDS = ["title", "excerpt", "body", "tags", "action_time", "image_url", "published"];
 
 /**
  * What to do with each article, given what Base44 already holds.

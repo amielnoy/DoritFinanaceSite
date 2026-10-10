@@ -42,7 +42,7 @@ on, and calls the Base44 client with the payload the backend contract expects.
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-BAR-001 | "offers a dial link and a consultation anchor" | `tel:+972508311776` and `#start` |
+| CMP-BAR-001 | "offers a dial link and the short contact form" | `tel:+972508311776` and `/#quick-contact` — a home-page anchor from every route, never a bare `#…` |
 | CMP-FLA-001 | "links to WhatsApp with a prefilled Hebrew message and a safe rel" | `wa.me/<number>`, `target=_blank`, `rel` contains `noopener`, message decodes to Hebrew |
 | CMP-FLA-002 | "links to the phone number in E.164 form" | `href === tel:${CONTACT.phoneE164}` |
 | CMP-BAR-002 | "offers a way to the support chat" | "תמיכה" → `/faq#support-chat` |
@@ -165,6 +165,47 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 | CMP-TST-003 | "keeps the section for an admin when empty, so the first one can be added" | The "הוספת המלצה" button is present |
 | CMP-TST-004 | "shows a signed-in visitor who is not an admin no add or delete controls" | Since the personal area, ordinary visitors sign in: the quote shows, no "הוספת המלצה" and no delete button |
 | CMP-TST-005 | "hides the empty section from a signed-in visitor who is not an admin" | No `#testimonials` |
+
+### 4.12 `<Blog />` — the blog index — `tests/component/blog-page.test.tsx`
+
+`AgentChat` is stubbed; the date is fixed with `vi.setSystemTime`, so the
+featured row's deadline does not decide the outcome of an unrelated run.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-BLOG-001 | "shows a count per topic and starts on הכל" | Five buttons with counts; הכל is `aria-pressed` |
+| CMP-BLOG-002 | "narrows the grid to the chosen topic and marks only that button pressed" | Only that topic's cards; H2 reads the topic and its count |
+| CMP-BLOG-003 | "combines with the search box" | Topic and search apply together |
+| CMP-BLOG-004 | "shows the first nine, then the rest on request" | 9 cards, then 12 after "הצגת כל המאמרים" |
+| CMP-BLOG-005 | "hides cards past the sixth on a phone only, with the count a phone sees" | Cards 7–9 carry `max-md:hidden`; button names both counts |
+| CMP-BLOG-006 | "shows the featured article and the three quickest to act on under הכל" | Badge, title, and the three shortest action times in order |
+| CMP-BLOG-007 | "stays under מיסוי ועצמאים and goes away under any other topic" | Row present under tax, absent under insurance and pension |
+| CMP-BLOG-008 | "is gone once its deadline has passed" | No row on 2 Jan 2027 |
+| CMP-BLOG-009 | "is gone when the featured article is not published" | No row |
+| CMP-BLOG-010 | "render no image at all when the article has none" | No `<img>` in the card |
+| CMP-BLOG-011 | "render the article's own image when it has one" | One `<img>` |
+| CMP-BLOG-012 | "show the action time when there is one, and the reading time always" | "ביצוע: …" only with `action_time`; "קריאה: כ־N דק׳" always |
+| CMP-BLOG-013 | "opens the reading-recommender chat with what the visitor typed" | A dialog with the embedded chat, its input pre-filled |
+| CMP-BLOG-014 | "gives the page back to assistive tech once the dialog closes" | The grid heading is hidden while the modal is open and back after closing |
+| CMP-BLOG-015 | "carries the one-line disclosure and the privacy link" | The line and a link to `/privacy` |
+| CMP-BLOG-016 | "offers WhatsApp with the blog's own opening line, and the phone" | `wa.me/<CONTACT.whatsapp>` with "שלום דורית, הגעתי מהבלוג"; `tel:<CONTACT.phoneE164>`; `blog_cta` |
+
+### 4.13 Reading-recommender filter — `tests/component/blog-recommendation-filter.test.tsx`
+
+A recommendation narrows the grid to the posts the chat named. The chat is
+opened from the recommender box and closed before the grid is read, as a
+visitor would.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-REC-001 | "shows every post when no recommendation has arrived yet" | All posts; no "חזרה לכל המאמרים" |
+| CMP-REC-002 | "hides every post the chat did not recommend" | Only the recommended card; H2 "מאמרים שהומלצו בצ'אט · מאמר אחד" |
+| CMP-REC-003 | "orders the posts the way the chat ranked them" | The chat's order |
+| CMP-REC-004 | "brings every post back from the show-all button" | "חזרה לכל המאמרים" restores the grid |
+| CMP-REC-005 | "keeps every post when none of the recommended ids exists, rather than an empty page" | Nothing filtered |
+| CMP-REC-006 | "drops the recommendation filter once the visitor searches" | The search result, not the recommendation |
+| CMP-REC-007 | "clears an earlier search so the recommendation is not narrowed to nothing" | Search box emptied |
+| CMP-REC-008 | "scrolls the recommendation into view" | `scrollIntoView` called |
 
 ## 5. Pass criteria
 

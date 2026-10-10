@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — plain .mjs tooling, imported for its pure planning step.
-import { planSeed, mirrorRow, readExecResult } from "../../scripts/seed-blog.mjs";
+import { planSeed, mirrorRow, parseArticle, readExecResult } from "../../scripts/seed-blog.mjs";
 
 /**
  * Seeding writes the repo's articles to both stores.
@@ -56,6 +56,18 @@ describe("mirrorRow", () => {
   it("mirrors the published state Base44 actually holds", () => {
     const [step] = planSeed([article()], [{ id: "b44-7", title: "להוריד דמי ניהול בפנסיה", published: true }]);
     expect(mirrorRow(step, "b44-7").published).toBe(true);
+  });
+
+  it("carries the action time from the front matter to both stores", () => {
+    const parsed = parseArticle('---\ntitle: "כותרת"\ntags: "פנסיה"\naction_time: "רבע שעה"\n---\nגוף');
+    expect(parsed.action_time).toBe("רבע שעה");
+    const [step] = planSeed([{ ...article(), ...parsed }], []);
+    expect(step.payload.action_time).toBe("רבע שעה");
+    expect(mirrorRow(step, "b44-new").action_time).toBe("רבע שעה");
+  });
+
+  it("sends an empty action time for an article that has none", () => {
+    expect(parseArticle('---\ntitle: "כותרת"\n---\nגוף').action_time).toBe("");
   });
 });
 
