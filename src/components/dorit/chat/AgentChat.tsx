@@ -603,7 +603,19 @@ export default function AgentChat({
                                 exactly what the server sent; stripping the
                                 second is a no-op for any agent that never
                                 emits it. */}
-                            <ReactMarkdown>
+                            <ReactMarkdown
+                              urlTransform={allowTel}
+                              components={{
+                                a: ({ href, children }) => (
+                                  <a
+                                    href={href}
+                                    className="text-accent underline underline-offset-4 hover:text-highlight transition-colors"
+                                  >
+                                    {children}
+                                  </a>
+                                ),
+                              }}
+                            >
                               {readRecommendation(readHandoff(m.content).visible).visible}
                             </ReactMarkdown>
                           </div>

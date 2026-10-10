@@ -78,10 +78,21 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
     // first, which strip the closing payload (A-59) and the blog-recommender's
     // `recommended` block respectively. Both are pure string transforms — what
     // matters here is unchanged: model output reaches the DOM only through the
-    // markdown renderer, never as raw HTML.
+    // markdown renderer, never as raw HTML. The renderer takes props (a custom
+    // link component, the tel: allow-list below) but still only ever receives
+    // the stripped string as children — nothing else reaches it.
+    expect(CHAT).toMatch(/<ReactMarkdown[\s\S]*?>/);
     expect(CHAT).toMatch(
-      /<ReactMarkdown>\s*\{readRecommendation\(readHandoff\(m\.content\)\.visible\)\.visible\}\s*<\/ReactMarkdown>/,
+      /\{readRecommendation\(readHandoff\(m\.content\)\.visible\)\.visible\}\s*<\/ReactMarkdown>/,
     );
+  });
+
+  it("wires the tel: allow-list into the renderer, not just defines it", () => {
+    // `allowTel` existing in the file proves nothing on its own — a prior
+    // refactor silently dropped the prop that wires it in, which no test here
+    // would have caught, and the tel: link it exists to fix would have quietly
+    // broken again.
+    expect(CHAT).toMatch(/<ReactMarkdown\s+urlTransform=\{allowTel\}/);
   });
 
   it("never renders the message text by any other route", () => {
