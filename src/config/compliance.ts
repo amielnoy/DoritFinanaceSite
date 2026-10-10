@@ -1,4 +1,6 @@
 
+import { AGENCY_PROFILE } from "./agencyProfile";
+
 /**
  * Compliance copy and constants for the on-site agents.
  *
@@ -30,9 +32,9 @@ export const CONSENT_VERSION = "2026-10-agents-v4";
 
 /** Licence details the agency must disclose. */
 export const LICENCE = {
-  entity: "דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח",
-  number: "L-00107009",
-  regulator: "רשות שוק ההון, ביטוח וחיסכון",
+  entity: AGENCY_PROFILE.licenceEntity,
+  number: AGENCY_PROFILE.licenceNumber,
+  regulator: AGENCY_PROFILE.licenceRegulator,
 } as const;
 
 /** Shown before a conversation may start. */

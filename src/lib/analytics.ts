@@ -8,6 +8,7 @@
 // a GA4 filter can drop it.
 
 import { getAttribution } from "./attribution";
+import { AGENCY_PROFILE } from "@/config/agencyProfile";
 
 const INTERNAL_KEY = "ga_internal_user";
 
@@ -164,7 +165,7 @@ export const LEAD_EVENTS: ReadonlyArray<{
 ];
 
 /** The GA4 property the site reports to, from the tag in index.html. */
-export const GA4_MEASUREMENT_ID = "G-LLSYPMGV58";
+export const GA4_MEASUREMENT_ID = AGENCY_PROFILE.ga4MeasurementId;
 
 /** True when the tag loaded in this browser (an ad blocker stops it). */
 export function isTagLoaded(): boolean {

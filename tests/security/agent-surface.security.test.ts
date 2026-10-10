@@ -27,7 +27,7 @@ const CHAT = read(join(REPO_ROOT, "src/components/dorit/chat/AgentChat.tsx"));
 const SUBMIT_LEAD = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
 const ESCALATE = read(join(REPO_ROOT, "base44/functions/escalateToHuman/entry.ts"));
 const COMPLIANCE = read(join(REPO_ROOT, "src/config/compliance.ts"));
-const CONTACT = read(join(REPO_ROOT, "src/config/contact.js"));
+const CONTACT = read(join(REPO_ROOT, "src/config/agencyProfile.ts"));
 const PKG = read(join(REPO_ROOT, "package.json"));
 
 /**

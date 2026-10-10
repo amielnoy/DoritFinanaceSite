@@ -15,7 +15,7 @@ import { REPO_ROOT } from "../helpers/entity-schema";
  *
  * It was not honest. It published `052-707-7776` and `doritg@fsfp-fin.co.il`
  * while every other surface — the footer, the JSON-LD, the escalation fallback,
- * `src/config/contact.js` — had moved to `050-831-1776` and
+ * `src/config/agencyProfile.ts` — had moved to `050-831-1776` and
  * `dorit@govari-fin.co.il`. Nothing failed, because nothing read it: a static
  * file in `public/` is invisible to the type-checker and to every other suite.
  * The one visible symptom would have been an assistant handing a prospect a
@@ -25,18 +25,18 @@ import { REPO_ROOT } from "../helpers/entity-schema";
 const LLMS = read(join(REPO_ROOT, "public/llms.txt"));
 const ROBOTS = read(join(REPO_ROOT, "public/robots.txt"));
 const SITEMAP = read(join(REPO_ROOT, "public/sitemap.xml"));
-const CONTACT = read(join(REPO_ROOT, "src/config/contact.js"));
+const CONTACT = read(join(REPO_ROOT, "src/config/agencyProfile.ts"));
 
-/** The values `src/config/contact.js` actually exports. */
+/** The values `src/config/agencyProfile.ts` actually exports. */
 function contactValue(key: string): string {
-  const m = CONTACT.match(new RegExp(`${key}:\\s*'([^']+)'`));
-  expect(m, `contact.js exports no ${key}`).not.toBeNull();
+  const m = CONTACT.match(new RegExp(`${key}:\\s*"([^"]+)"`));
+  expect(m, `agencyProfile.ts exports no ${key}`).not.toBeNull();
   return m![1];
 }
 
 describe("llms.txt — the surface an AI assistant can actually read", () => {
   it("publishes the phone number the rest of the site publishes", () => {
-    expect(LLMS, "llms.txt disagrees with src/config/contact.js").toContain(
+    expect(LLMS, "llms.txt disagrees with src/config/agencyProfile.ts").toContain(
       contactValue("phoneDisplay"),
     );
   });

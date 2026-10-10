@@ -27,7 +27,7 @@ something outside the repository.
 | `createPageUrl` | `src/utils/index.ts` |
 | `cn` | `src/lib/utils.js` |
 | `safeReturnTo` | `src/lib/authReturnTo.js` |
-| `CONTACT` | `src/config/contact.js` |
+| `CONTACT` | `src/config/contact.ts` (values from `src/config/agencyProfile.ts`) |
 | `useSubmission`, `submissionErrorMessage` | `src/hooks/useSubmission.ts` |
 | `Base44LeadAdminService`, `Base44ContentAdminService` | `src/services/base44/` |
 | `SupabaseAuthService` | `src/services/supabase/SupabaseAuthService.ts` |
@@ -115,7 +115,7 @@ the fee rate). Hostile input is exercised because every field is a free-text
 > UNIT-CNT-006 is generated from the file list, not written out: a second copy
 > of the number is the failure mode this suite exists to catch, and a copy is
 > only ever added in a file nobody thought to list. The number and the address
-> may appear in `src/config/contact.js` and nowhere else.
+> may appear in `src/config/agencyProfile.ts` and nowhere else.
 
 ### 4.5 Supabase auth adapter — `tests/unit/supabase-auth.test.ts`
 

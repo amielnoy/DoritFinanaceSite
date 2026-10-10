@@ -262,7 +262,7 @@ receives the home page's `<head>` on every route; `public/llms.txt` is therefore
 the only surface such a crawler reads in full, and the one nothing was checking.
 It had drifted to a phone number and an email that do not reach her — a static
 file in `public/` is invisible to the type-checker and to every other suite. The
-block derives the expected contact details from `src/config/contact.js`, fails
+block derives the expected contact details from `src/config/agencyProfile.ts`, fails
 on any other address or number in the file, and pins the disclosures an
 assistant would summarise: the licence number, the affiliation, that the
 automated helpers collect rather than advise, and that nothing promises a

@@ -35,9 +35,13 @@ describe("CONTACT config", () => {
  * PrivacyPolicy, the Outlook booking helper, the escalation fallback and the
  * handoff copy all did, so a change to `CONTACT` reached the footer and not
  * the contact form beneath it. This scan fails on the next such literal.
+ *
+ * The literal values themselves moved to `agencyProfile.ts` (Phase 0 of the
+ * multi-agent platform design — see tests/unit/agencyProfile.test.ts);
+ * `contact.ts` now only re-exports them, so the exemption moves with them.
  */
-describe("contact literals live only in src/config/contact.js", () => {
-  const CONFIG = "src/config/contact.js";
+describe("contact literals live only in src/config/agencyProfile.ts", () => {
+  const CONFIG = "src/config/agencyProfile.ts";
   const localDigits = CONTACT.phoneE164.replace(/^\+972/, "0"); // 0508311776
   const needles = [
     CONTACT.email,

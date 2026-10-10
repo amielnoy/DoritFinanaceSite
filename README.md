@@ -819,7 +819,7 @@ licence number, the affiliation disclosure, what the automated helpers refuse to
 do, and a link to every public route. It had drifted to a phone number and an
 email that do not reach her, because a file in `public/` is invisible to the
 type-checker and to every suite. `tests/contract/ai-surface.contract.test.ts`
-now derives the contact details from `src/config/contact.js` and fails on any
+now derives the contact details from `src/config/agencyProfile.ts` and fails on any
 other address or number in the file.
 
 `robots.txt` names each AI crawler explicitly and allows it, with a comment
