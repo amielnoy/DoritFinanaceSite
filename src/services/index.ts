@@ -1,6 +1,7 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
 import { AUTH_PROVIDER } from "@/config/auth-provider";
+import { UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
 import { Base44AccountService } from "./base44/Base44AccountService";
@@ -14,6 +15,7 @@ import { Base44LeadAdminService } from "./base44/Base44LeadAdminService";
 import { Base44LeadService } from "./base44/Base44LeadService";
 import { Base44SupportService } from "./base44/Base44SupportService";
 import { Base44UploadService } from "./base44/Base44UploadService";
+import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import type {
   AccountPort,
   AgentPort,
@@ -104,11 +106,23 @@ const accountPort: AccountPort =
     ? new SupabaseAccountService(supabase as unknown as SupabaseRpcClient)
     : new Base44AccountService(client);
 
+/**
+ * Where a claim document lands, from whichever provider is switched on.
+ *
+ * Falls back to Base44 when Supabase is unconfigured, same reasoning as
+ * `authPort`: a checkout without Supabase credentials should still accept a
+ * claim's attachments.
+ */
+const uploadPort: UploadPort =
+  UPLOAD_PROVIDER === "supabase" && supabase
+    ? new SupabaseUploadService(supabase as unknown as SupabaseStorageClient)
+    : new Base44UploadService(client);
+
 export const services: Services = {
   leads: new Base44LeadService(client),
   content: new Base44ContentService(client),
   agents: new Base44AgentService(client),
-  uploads: new Base44UploadService(client),
+  uploads: uploadPort,
   support: new Base44SupportService(client),
   auth: authPort,
   leadsAdmin: new Base44LeadAdminService(client),
