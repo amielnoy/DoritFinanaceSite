@@ -260,6 +260,19 @@ create policy testimonials_write_admin on public.testimonials
   using (public.can_see(agency_id) or public.is_admin())
   with check (public.can_see(agency_id) or public.is_admin());
 
+-- testimonials_read_public (`using (true)`, no is_admin() call) falls
+-- outside the "replace is_admin()" sweep above and must be handled on its
+-- own: dropping it without a replacement would make testimonials invisible
+-- to anon entirely (breaking the live reviews widget); leaving it in place
+-- would leak every agency's testimonials to everyone. Scoped exactly like
+-- blog_posts' published rows: the one fixed agency (testimonials have no
+-- shared-library/nullable concept per the parent spec's data model), plus
+-- any member, plus admin.
+drop policy testimonials_read_public on public.testimonials;
+create policy testimonials_read_member_or_fixed_agency on public.testimonials
+  for select to anon, authenticated
+  using (agency_id = '00000000-0000-0000-0000-000000000001' or public.can_see(agency_id) or public.is_admin());
+
 drop policy meetings_read_admin on public.meetings;
 create policy meetings_read_admin on public.meetings
   for select to authenticated using (public.can_see(agency_id) or public.is_admin());
@@ -443,10 +456,19 @@ do $$ begin
   if (select count(*) from public.meetings where agency_id = '00000000-0000-0000-0000-000000000001') <> 0 then
     raise exception 'agency 2 member read an agency 1 meeting';
   end if;
-  -- Own agency's rows, plus shared, plus the public's own published post —
-  -- never agency 1's own post.
-  if (select count(*) from public.blog_posts where title = 'מאמר א׳') <> 0 then
-    raise exception 'agency 2 member read agency 1''s own blog post';
+  -- Testimonials and agency 1's own published posts are public-exception
+  -- content — there is one live public site right now (no Phase 4 host
+  -- routing yet), and rls_check.sql/account_check.sql already require `anon`
+  -- to read both; a policy that blocked them for an authenticated member of
+  -- a *different* agency while still allowing a fully anonymous visitor
+  -- would be incoherent, not stricter. True per-agency isolation for this
+  -- content starts to mean something once a second agency has its own live
+  -- site. Agency 2's own (unpublished-to-the-world) content stays invisible.
+  if (select count(*) from public.testimonials where agency_id = '00000000-0000-0000-0000-000000000001') <> 1 then
+    raise exception 'agency 2 member cannot read agency 1''s public testimonial';
+  end if;
+  if (select count(*) from public.blog_posts where title = 'מאמר א׳') <> 1 then
+    raise exception 'agency 2 member cannot read agency 1''s own published blog post';
   end if;
   if (select count(*) from public.blog_posts where title = 'מאמר ב׳') <> 1 then
     raise exception 'agency 2 member cannot read their own blog post';
