@@ -113,6 +113,20 @@ const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
 };
 
 /**
+ * How long to wait for a reply before treating the conversation as stuck.
+ *
+ * `send()` can succeed — the backend accepts the message, no exception is
+ * thrown — and the reply still never arrives: an intermittent Base44 fault
+ * resolving an anonymous conversation's owner has been observed to do exactly
+ * this, silently, with no error anywhere a visitor or a console can see. That
+ * failure lands entirely outside `send()`'s own try/catch, in the separate
+ * subscribe/polling path that pushes replies into `messages` — so this is
+ * the one place left to catch it.
+ */
+export const NO_REPLY_TIMEOUT_MS = 20_000;
+const NO_REPLY_COPY = "מצטערת, נראה שההודעה לא התקבלה כראוי. אפשר לנסות שוב, או לעבור ישירות לדורית.";
+
+/**
  * One chat surface, driven entirely by its descriptor.
  *
  * This replaces three near-identical components that differed by roughly thirty
@@ -211,6 +225,15 @@ export default function AgentChat({
   /** The last assistant message already handed to `onAssistantMessage`, so a
    *  user message appended after it does not report the same content twice. */
   const lastReportedRef = useRef<string>("");
+  /** Set after a successful send, cleared the moment a reply arrives — see
+   *  `NO_REPLY_TIMEOUT_MS`. */
+  const noReplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearNoReplyTimeout = () => {
+    if (noReplyTimeoutRef.current) {
+      clearTimeout(noReplyTimeoutRef.current);
+      noReplyTimeoutRef.current = null;
+    }
+  };
   /** Which chat GA4 events name, by agent. */
   const chatMethod: ChatMethod = CHAT_METHOD[descriptor.agent] ?? "ai_interview";
 
@@ -222,6 +245,13 @@ export default function AgentChat({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  /** A reply arrived — whatever was waiting on NO_REPLY_TIMEOUT_MS is answered. */
+  useEffect(() => {
+    if (messages[messages.length - 1]?.role === "assistant") clearNoReplyTimeout();
+  }, [messages]);
+
+  useEffect(() => clearNoReplyTimeout, []);
 
   /**
    * The close of the interview, submitted by the page.
@@ -305,6 +335,13 @@ export default function AgentChat({
     setInput("");
     try {
       await services.agents.send(await ensureConversation(), text);
+      // The send itself succeeded — this is not the error path above, it is
+      // the gap that path cannot see: a reply that never arrives at all.
+      clearNoReplyTimeout();
+      noReplyTimeoutRef.current = setTimeout(() => {
+        noReplyTimeoutRef.current = null;
+        say(NO_REPLY_COPY);
+      }, NO_REPLY_TIMEOUT_MS);
     } catch (e) {
       // Put the text back in the box. The visitor's own message reaches the
       // transcript only by way of the server echoing it, so a failed send
@@ -403,6 +440,7 @@ export default function AgentChat({
   };
 
   const reset = () => {
+    clearNoReplyTimeout();
     setConversationId(null);
     setMessages([{ role: "assistant", content: descriptor.greeting }]);
     setInput("");
