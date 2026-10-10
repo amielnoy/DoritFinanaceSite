@@ -6,6 +6,7 @@ import { Loader2, ArrowLeft, Newspaper, Search, X } from "lucide-react";
 import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
 import AgentChat from "@/components/dorit/chat/AgentChat";
 import { AGENTS } from "@/config/agents";
+import { readRecommendation } from "@/lib/blog-recommendation";
 import Footer from "@/components/dorit/layout/Footer";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
@@ -26,6 +27,30 @@ export default function Blog() {
   const posts = (data ?? null) as BlogListItem[] | null;
   const [query, setQuery] = useState<string>("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  /** Post ids the reading-recommender chose, read from its `recommended`
+   *  block — see src/lib/blog-recommendation.ts. Highlighted below, and the
+   *  first one is scrolled into view. */
+  const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
+
+  // The grid is further down the same page, and `useArticles()` may not have
+  // resolved the instant a recommendation arrives — keep looking for the
+  // card until it mounts, same pattern as ScrollToTop.jsx's hash handling.
+  React.useEffect(() => {
+    if (!recommendedIds.length) return;
+    const targetId = `post-${recommendedIds[0]}`;
+    const deadline = Date.now() + 3000;
+    let timer: number;
+    const tryScroll = () => {
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth" });
+        return;
+      }
+      if (Date.now() < deadline) timer = window.setTimeout(tryScroll, 50);
+    };
+    timer = window.setTimeout(tryScroll, 50);
+    return () => window.clearTimeout(timer);
+  }, [recommendedIds]);
 
   useSeo({
     title: "בלוג — חידושים ותובנות בביטוח ובפיננסים | דורית גוב ארי",
@@ -118,7 +143,13 @@ export default function Blog() {
           It sat on the home page between a contact form and an FAQ, recommending
           articles to people who had not said they wanted to read anything. Here
           it answers the question the visitor arrived with. */}
-      <AgentChat descriptor={AGENTS.blogRecommender} />
+      <AgentChat
+        descriptor={AGENTS.blogRecommender}
+        onAssistantMessage={(content) => {
+          const { ids } = readRecommendation(content);
+          if (ids.length) setRecommendedIds(ids);
+        }}
+      />
 
       <div className="pb-24">
         <div className="max-w-[1400px] mx-auto px-6 md:px-10">
@@ -205,8 +236,13 @@ export default function Blog() {
                 {filtered.map((p) => (
                   <Link
                     key={p.id}
+                    id={`post-${p.id}`}
                     to={`/blog/${p.id}`}
-                    className="group flex flex-col bg-card border border-border/60 overflow-hidden hover:border-accent transition-colors"
+                    className={`group flex flex-col border overflow-hidden transition-colors ${
+                      recommendedIds.includes(p.id)
+                        ? "border-highlight bg-highlight-muted/15 hover:bg-highlight-muted/25"
+                        : "bg-card border-border/60 hover:border-accent"
+                    }`}
                   >
                     <div className="h-48 overflow-hidden bg-secondary">
                       {p.image_url ? (

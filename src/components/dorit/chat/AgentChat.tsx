@@ -15,6 +15,7 @@ import {
 } from "@/config/compliance";
 import { CONTACT } from "@/config/contact";
 import { readHandoff } from "@/lib/interview-handoff";
+import { readRecommendation } from "@/lib/blog-recommendation";
 import { getAttribution } from "@/lib/attribution";
 import { leadEvents, type ChatMethod } from "@/lib/analytics";
 import ContactChannels from "./ContactChannels";
@@ -127,6 +128,7 @@ const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
 export default function AgentChat({
   descriptor,
   embedded = false,
+  onAssistantMessage,
 }: {
   descriptor: AgentDescriptor;
   /**
@@ -138,6 +140,14 @@ export default function AgentChat({
    * beneath it, so the chat takes the width of the page and nothing else.
    */
   embedded?: boolean;
+  /**
+   * Called once per new assistant message, with its raw content (before any
+   * block is stripped). Generic on purpose: this component knows nothing
+   * about any one agent's structured output — a caller that cares (e.g. the
+   * blog page reading a `recommended` block, see blog-recommendation.ts)
+   * parses it itself.
+   */
+  onAssistantMessage?: (content: string) => void;
 }) {
   const [consentAt, setConsentAt] = useState<string | null>(null);
   const [consentChecked, setConsentChecked] = useState<boolean>(false);
@@ -188,6 +198,9 @@ export default function AgentChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   /** Set the moment a closing payload is accepted, so it is submitted once. */
   const submittedRef = useRef<boolean>(false);
+  /** The last assistant message already handed to `onAssistantMessage`, so a
+   *  user message appended after it does not report the same content twice. */
+  const lastReportedRef = useRef<string>("");
   /** Which chat GA4 events name, by agent. */
   const chatMethod: ChatMethod = CHAT_METHOD[descriptor.agent] ?? "ai_interview";
 
@@ -249,6 +262,14 @@ export default function AgentChat({
       }
     })();
   }, [messages]);
+
+  useEffect(() => {
+    if (!onAssistantMessage) return;
+    const last = [...messages].reverse().find((m) => m.role === "assistant");
+    if (!last || last.content === lastReportedRef.current) return;
+    lastReportedRef.current = last.content;
+    onAssistantMessage(last.content);
+  }, [messages, onAssistantMessage]);
 
   const ensureConversation = useCallback(async () => {
     if (conversationId) return { id: conversationId };
@@ -564,12 +585,17 @@ export default function AgentChat({
                           <p className="whitespace-pre-wrap">{m.content}</p>
                         ) : (
                           <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                            {/* The closing payload travels inside the message and
-                                is machinery, not conversation — see
-                                interview-handoff.ts. Stripped here rather than
-                                on arrival so `messages` stays exactly what the
-                                server sent. */}
-                            <ReactMarkdown>{readHandoff(m.content).visible}</ReactMarkdown>
+                            {/* A closing payload (interview-handoff.ts) or a
+                                recommendation (blog-recommendation.ts) can
+                                travel inside the message, and both are
+                                machinery, not conversation. Stripped here
+                                rather than on arrival so `messages` stays
+                                exactly what the server sent; stripping the
+                                second is a no-op for any agent that never
+                                emits it. */}
+                            <ReactMarkdown>
+                              {readRecommendation(readHandoff(m.content).visible).visible}
+                            </ReactMarkdown>
                           </div>
                         )}
                       </div>

@@ -74,11 +74,14 @@ const liftFunction = (src: string, name: string): string => {
 // ───────────────────────────────────────────────────────────────────────────
 describe("XSS — surfaces that render text somebody else wrote", () => {
   it("renders model output through a markdown renderer, never as raw HTML", () => {
-    // The message is passed through `readHandoff` first, which strips the
-    // closing payload the page submits on the agent's behalf (A-59). That is a
-    // pure string transform — what matters here is unchanged: model output
-    // reaches the DOM only through the markdown renderer, never as raw HTML.
-    expect(CHAT).toMatch(/<ReactMarkdown>\{readHandoff\(m\.content\)\.visible\}<\/ReactMarkdown>/);
+    // The message is passed through `readHandoff` and `readRecommendation`
+    // first, which strip the closing payload (A-59) and the blog-recommender's
+    // `recommended` block respectively. Both are pure string transforms — what
+    // matters here is unchanged: model output reaches the DOM only through the
+    // markdown renderer, never as raw HTML.
+    expect(CHAT).toMatch(
+      /<ReactMarkdown>\s*\{readRecommendation\(readHandoff\(m\.content\)\.visible\)\.visible\}\s*<\/ReactMarkdown>/,
+    );
   });
 
   it("never renders the message text by any other route", () => {
