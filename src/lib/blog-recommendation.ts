@@ -7,9 +7,8 @@
  * path is not something to parse reliably out of free text (a model's own
  * markdown habits vary, and a bare path never autolinks without `remark-gfm`
  * anyway). So, mirroring the interview agent's `lead` block, it also states
- * the chosen ids in a fenced block: the page reads it to highlight and
- * scroll to the matching cards already on the page, and the visitor never
- * sees it.
+ * the chosen ids in a fenced block: the page reads it to narrow its grid to
+ * the matching cards and scroll to them, and the visitor never sees it.
  */
 
 export interface RecommendationResult {

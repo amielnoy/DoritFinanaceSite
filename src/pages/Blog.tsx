@@ -13,6 +13,8 @@ import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
+const RECOMMENDED_BANNER_ID = "blog-recommended";
+
 interface BlogListItem {
   id: string;
   title: string;
@@ -28,20 +30,21 @@ export default function Blog() {
   const [query, setQuery] = useState<string>("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   /** Post ids the reading-recommender chose, read from its `recommended`
-   *  block — see src/lib/blog-recommendation.ts. Highlighted below, and the
-   *  first one is scrolled into view. */
+   *  block — see src/lib/blog-recommendation.ts. While set, the grid shows
+   *  only these posts. */
   const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
 
   // The grid is further down the same page, and `useArticles()` may not have
   // resolved the instant a recommendation arrives — keep looking for the
-  // card until it mounts, same pattern as ScrollToTop.jsx's hash handling.
+  // banner until it mounts, same pattern as ScrollToTop.jsx's hash handling.
+  // The banner rather than the first card, so the way back to every post is
+  // on screen too.
   React.useEffect(() => {
     if (!recommendedIds.length) return;
-    const targetId = `post-${recommendedIds[0]}`;
     const deadline = Date.now() + 3000;
     let timer: number;
     const tryScroll = () => {
-      const target = document.getElementById(targetId);
+      const target = document.getElementById(RECOMMENDED_BANNER_ID);
       if (target) {
         target.scrollIntoView({ behavior: "smooth" });
         return;
@@ -117,6 +120,24 @@ export default function Blog() {
     });
   }, [posts, query, activeTag]);
 
+  // In the order the agent ranked them. Ids with no matching post (one taken
+  // down since, or a model slip) are dropped; if none match, nothing is
+  // filtered — an empty page answers the visitor's question worse than all.
+  const recommended = React.useMemo(() => {
+    if (!posts || !recommendedIds.length) return [];
+    const byId = new Map(posts.map((p) => [p.id, p]));
+    return [...new Set(recommendedIds)]
+      .map((id) => byId.get(id))
+      .filter((p): p is BlogListItem => Boolean(p));
+  }, [posts, recommendedIds]);
+
+  const showingRecommended = recommended.length > 0;
+  const visiblePosts = showingRecommended ? recommended : filtered;
+
+  // One filter at a time: a recommendation intersected with an unrelated
+  // search or tag would usually leave nothing on screen.
+  const clearRecommendation = () => setRecommendedIds([]);
+
   return (
     <div className="relative bg-background min-h-screen">
       <FloatingHeader />
@@ -147,7 +168,10 @@ export default function Blog() {
         descriptor={AGENTS.blogRecommender}
         onAssistantMessage={(content) => {
           const { ids } = readRecommendation(content);
-          if (ids.length) setRecommendedIds(ids);
+          if (!ids.length) return;
+          setRecommendedIds(ids);
+          setQuery("");
+          setActiveTag(null);
         }}
       />
 
@@ -161,7 +185,10 @@ export default function Blog() {
                 <input
                   type="text"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    clearRecommendation();
+                  }}
                   placeholder="חיפוש מאמרים…"
                   className="w-full bg-card border border-border pr-12 pl-12 py-3.5 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
                 />
@@ -179,7 +206,10 @@ export default function Blog() {
               {allTags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => setActiveTag(null)}
+                    onClick={() => {
+                      setActiveTag(null);
+                      clearRecommendation();
+                    }}
                     className={`text-xs tracking-[0.15em] uppercase px-3.5 py-1.5 border transition-colors ${
                       !activeTag
                         ? "bg-primary text-primary-foreground border-primary"
@@ -191,7 +221,10 @@ export default function Blog() {
                   {allTags.map((tag) => (
                     <button
                       key={tag}
-                      onClick={() => setActiveTag((cur) => (cur === tag ? null : tag))}
+                      onClick={() => {
+                        setActiveTag((cur) => (cur === tag ? null : tag));
+                        clearRecommendation();
+                      }}
                       className={`text-xs tracking-[0.15em] uppercase px-3.5 py-1.5 border transition-colors ${
                         activeTag === tag
                           ? "bg-primary text-primary-foreground border-primary"
@@ -201,6 +234,25 @@ export default function Blog() {
                       {tag}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {showingRecommended && (
+                <div
+                  id={RECOMMENDED_BANNER_ID}
+                  className="flex flex-wrap items-center justify-between gap-3 border border-highlight bg-highlight-muted/15 px-5 py-3 scroll-mt-28"
+                >
+                  <p className="text-sm text-foreground">
+                    {recommended.length === 1
+                      ? "מוצג מאמר אחד שהומלץ בצ'אט"
+                      : `מוצגים ${recommended.length} מאמרים שהומלצו בצ'אט`}
+                  </p>
+                  <button
+                    onClick={clearRecommendation}
+                    className="text-sm text-accent underline underline-offset-4 hover:text-highlight transition-colors"
+                  >
+                    הצגת כל המאמרים
+                  </button>
                 </div>
               )}
             </div>
@@ -218,7 +270,7 @@ export default function Blog() {
                   עדיין אין מאמרים — בקרוב יעלו כאן עדכונים חדשים.
                 </p>
               </div>
-            ) : filtered.length === 0 ? (
+            ) : visiblePosts.length === 0 ? (
               <div className="text-center py-20 border border-dashed border-border">
                 <Search size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
                 <p className="text-muted-foreground">
@@ -233,16 +285,12 @@ export default function Blog() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 py-12">
-                {filtered.map((p) => (
+                {visiblePosts.map((p) => (
                   <Link
                     key={p.id}
                     id={`post-${p.id}`}
                     to={`/blog/${p.id}`}
-                    className={`group flex flex-col border overflow-hidden transition-colors ${
-                      recommendedIds.includes(p.id)
-                        ? "border-highlight bg-highlight-muted/15 hover:bg-highlight-muted/25"
-                        : "bg-card border-border/60 hover:border-accent"
-                    }`}
+                    className="group flex flex-col border overflow-hidden transition-colors bg-card border-border/60 hover:border-accent"
                   >
                     <div className="h-48 overflow-hidden bg-secondary">
                       {p.image_url ? (
