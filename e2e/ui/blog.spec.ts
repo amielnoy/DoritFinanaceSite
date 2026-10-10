@@ -1,4 +1,5 @@
 import { BLOG_POSTS } from "../fixtures/data";
+import { FEATURED } from "../../src/config/blog-topics";
 import { collectPageErrors, expect, gotoApp, test, test_step } from "../fixtures/app";
 
 test.describe("Blog — sanity", () => {
@@ -75,6 +76,35 @@ test.describe("Blog — sanity", () => {
     await test_step("the post offers at least one working share link", async () => {
       const shareLinks = page.locator('a[href*="wa.me"], a[href*="facebook.com"], a[href*="linkedin.com"], a[href*="twitter.com"], a[href*="x.com"]');
       expect(await shareLinks.count()).toBeGreaterThan(0);
+    });
+  });
+
+  test.describe("on a 375px phone", () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    test("the first article is on the first screen and a half", async ({ page, mockApi }) => {
+      // The chat, its four-paragraph notice and fifteen tag chips once put the
+      // first card ~2,300px down. Seeded with the featured article too, so the
+      // featured row's own height is part of what is measured.
+      await test_step("seed the posts, the featured deadline article among them", async () => {
+        mockApi.setEntity("BlogPost", [
+          { ...BLOG_POSTS[0], id: "featured", title: FEATURED.title, tags: "מיסוי, עצמאים", action_time: "חצי שעה" },
+          ...BLOG_POSTS,
+        ]);
+      });
+
+      await test_step("open the blog list", async () => {
+        await gotoApp(page, "/blog");
+        await expect(page.getByTestId("article-card").first()).toBeVisible();
+      });
+
+      await test_step("the first card starts within 1,250px of the top", async () => {
+        const top = await page
+          .getByTestId("article-card")
+          .first()
+          .evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+        expect(top).toBeLessThan(1250);
+      });
     });
   });
 

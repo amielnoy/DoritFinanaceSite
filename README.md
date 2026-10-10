@@ -612,6 +612,12 @@ production BEFORE merging. CI deploys `submitLead`, `submitClaim` and
 `escalateToHuman` on merge, and all three now send `channel`/`campaign` to the
 Supabase mirror, so it rejects every lead row until those columns exist.
 
+Release order: apply `supabase/migrations/20261011000000_blog_action_time.sql` to
+production BEFORE the next `seed-blog.mjs --apply`. The seed now writes
+`action_time` to both stores, so the Supabase mirror rejects every post row until
+the column exists. Base44 takes the field on the next CI publish (the entity ships
+with `base44 deploy`); until it is seeded, cards simply show no action-time chip.
+
 What the page shows, in order (#115):
 
 - **Meetings** upcoming first, soonest first; then past ones, most recent first;

@@ -276,7 +276,9 @@ the wildcard.
 `content/blog/`. Each must parse, be a real article rather than a stub, carry
 the גילוי נאות block with the licence number and the affiliation, contain no
 promise of a return, map cleanly onto the `BlogPost` entity, and ship as a
-draft: publishing stays a human decision.
+draft: publishing stays a human decision. The optional `action_time` ("רבע
+שעה") is declared on the entity as an optional string and kept to 20
+characters per article — it is a chip on a card, not a sentence.
 
 **`personal-area.contract.test.ts` — `CTR-ACC-001..006`** — what a signed-in
 visitor may read of their own enquiries. CI does not run

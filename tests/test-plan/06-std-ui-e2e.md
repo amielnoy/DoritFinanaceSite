@@ -113,6 +113,7 @@ because the backend still accepts leads recorded under them.
 | E2E-BLG-004 | "shows a friendly not-found for a missing post" | "המאמר לא נמצא" plus a back link; no `pageerror` |
 | E2E-BLG-005 | "share buttons point at real share endpoints" | ≥1 wa.me/facebook/linkedin/x link |
 | E2E-BLG-006 | "degrades gracefully when the blog backend errors" | Root non-empty; no `pageerror` |
+| E2E-BLG-007 | "the first article is on the first screen and a half" (375×812) | First `article-card` (the featured one, seeded) starts < 1,250px from the top; it was ~2,300px before the redesign |
 
 ### 3.7 Desktop chrome — `mobile.spec.ts` (desktop projects only)
 

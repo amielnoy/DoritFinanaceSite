@@ -129,6 +129,7 @@ export default function AgentChat({
   descriptor,
   embedded = false,
   onAssistantMessage,
+  initialInput,
 }: {
   descriptor: AgentDescriptor;
   /**
@@ -148,6 +149,12 @@ export default function AgentChat({
    * parses it itself.
    */
   onAssistantMessage?: (content: string) => void;
+  /**
+   * Text a visitor already typed elsewhere on the page, placed in the input.
+   * Never sent on their behalf: the consent gate still stands between it and
+   * the agent, and the visitor presses send themselves.
+   */
+  initialInput?: string;
 }) {
   const [consentAt, setConsentAt] = useState<string | null>(null);
   const [consentChecked, setConsentChecked] = useState<boolean>(false);
@@ -155,8 +162,11 @@ export default function AgentChat({
   const [messages, setMessages] = useState<AgentMessage[]>([
     { role: "assistant", content: descriptor.greeting },
   ]);
-  const [input, setInput] = useState<string>("");
+  const [input, setInput] = useState<string>(initialInput ?? "");
   const [sending, setSending] = useState<boolean>(false);
+  useEffect(() => {
+    if (initialInput) setInput(initialInput);
+  }, [initialInput]);
   const [handingOff, setHandingOff] = useState<boolean>(false);
   /**
    * The handoff reply, kept separately from `messages` and rendered outside

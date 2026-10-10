@@ -107,7 +107,9 @@ describe("<MobileStickyBar />", () => {
       "href",
       `tel:${CONTACT.phoneE164}`
     );
-    expect(screen.getByRole("link", { name: /השאירו פרטים/ })).toHaveAttribute("href", "#quick-contact");
+    // `/#…`, not `#…`: the bar is on every route and the form only on home —
+    // a bare hash on /blog points at nothing (see useSectionNav).
+    expect(screen.getByRole("link", { name: /השאירו פרטים/ })).toHaveAttribute("href", "/#quick-contact");
   });
 
   it("offers a way to the support chat", () => {

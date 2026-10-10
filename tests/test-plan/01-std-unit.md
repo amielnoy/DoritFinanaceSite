@@ -277,6 +277,8 @@ published. See [A-65](10-known-issues.md).
 | UNIT-SEED-005 | "mirrors the published state Base44 actually holds" | Mirror `published` follows Base44, not the file |
 | UNIT-SEED-006 | "finds the marked result among the CLI's own output" | Parsed past npm notices and the update banner |
 | UNIT-SEED-007 | "says the CLI may be signed out rather than parsing nothing" | Throws naming `base44 login` |
+| UNIT-SEED-008 | "carries the action time from the front matter to both stores" | `action_time` in the parsed article, the Base44 payload and the mirror row |
+| UNIT-SEED-009 | "sends an empty action time for an article that has none" | `action_time: ""` |
 
 ### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
 
@@ -368,6 +370,38 @@ it would write.
 | UNIT-REC-012 | "defaults a missing status to new and an empty constrained value to null" | `status: "new"`, `source: null` |
 | UNIT-REC-013 | "drops a value the Supabase check constraint would refuse, rather than failing the row" | Unknown `source` → null; unknown `status` → `"new"` |
 | UNIT-REC-014 | "refuses a lead without the two columns Supabase requires" | `null` without a name or a phone |
+
+### 4.17 Reading time — `tests/unit/reading-time.test.ts`
+
+The blog cards' "קריאה: כ־N דק׳": Hebrew read at ~1,100 characters a minute.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-READ-001 | "reads Hebrew at about 1,100 characters a minute" | 5,500 characters → 5 |
+| UNIT-READ-002 | "rounds to the nearest minute" | 3,849 → 3; 3,850 → 4 |
+| UNIT-READ-003 | "never says zero minutes, even for an empty or missing body" | 1 for a short, empty or missing body |
+
+### 4.18 Blog topics and the featured article — `tests/unit/blog-topics.test.ts`
+
+An article belongs to the topic of its own first tag that names one;
+`תכנון פיננסי` counts as family only when nothing else matches. The featured
+row is live through `FEATURED.until` by the Israeli calendar.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-TOP-001 | "takes the article's own first tag that names a topic" | The year-end guide is `tax`, not `pension` |
+| UNIT-TOP-002 | "skips tags that name no topic" | `התנהלות שוטפת` is passed over |
+| UNIT-TOP-003 | "counts תכנון פיננסי as family only when nothing else matches" | `insurance` when ביטוח follows it; `family` alone |
+| UNIT-TOP-004 | "puts a family tag first in family" | `חיסכון, ילדים, …` → `family` |
+| UNIT-TOP-005 | "returns null for an article with no topical tag" | `null` for no tags or only general ones |
+| UNIT-TOP-006 | "ignores spacing around tags" | Trimmed before matching |
+| UNIT-TOP-007 | "counts every post under 'all' and each post under its own topic" | One topic per post |
+| UNIT-TOP-008 | "offers the five topics in the page's order" | הכל · פנסיה וגמל · ביטוח · משפחה ואירועי חיים · מיסוי ועצמאים |
+| UNIT-TOP-009 | "reads the action times the articles use" | `2 דקות` → 2 … `חודש ראשון` → 43,200 |
+| UNIT-TOP-010 | "puts an empty or unreadable time last rather than first" | `Infinity` |
+| UNIT-TOP-011 | "is live through the last day, in Israel time" | Live at 23:59 on 31 Dec in Israel, gone at 00:00 |
+| UNIT-TOP-012 | "names an article that exists in content/blog" | `FEATURED.title` matches a front-matter title |
+| UNIT-TOP-013 | "each land in a topic" | Every repo article has a topic |
 
 ## 5. Pass criteria
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { Phone, MessageCircle, Send, LifeBuoy } from "lucide-react";
 import { CONTACT } from "@/config/contact";
+import { useSectionNav } from "@/hooks/useSectionNav";
 import SupportLink from "./SupportLink";
 
 /**
@@ -26,6 +27,8 @@ const CELL = "flex flex-col items-center justify-center gap-1 min-h-14 px-1.5 py
  * `md:`, so this bar is the only route to it on a phone at all.
  */
 export default function MobileStickyBar() {
+  // The bar is on every route, `#quick-contact` only on the home page.
+  const goToSection = useSectionNav();
   return (
     <div data-track-location="mobile_sticky_bar" className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border">
       {/* "השאירו פרטים" is the longest label here, so its cell borrows width
@@ -50,7 +53,8 @@ export default function MobileStickyBar() {
           חייגו
         </a>
         <a
-          href="#quick-contact"
+          href="/#quick-contact"
+          onClick={(e) => goToSection(e, "#quick-contact")}
           className={`${CELL} font-medium bg-card text-accent`}
         >
           <Send size={18} aria-hidden="true" />

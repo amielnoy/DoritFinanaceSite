@@ -35,7 +35,8 @@ Test is skipped: mobile projects only".
 
 | ID | Title | Steps | Expected result |
 |---|---|---|---|
-| E2E-MOB-001 | "renders the sticky call/consult bar instead of the desktop dock" | Load `/` | Sticky bar shows `tel:+972508311776` and `#start`; desktop WhatsApp dock hidden |
+| E2E-MOB-001 | "renders the sticky call/consult bar instead of the desktop dock" | Load `/` | Sticky bar shows `tel:+972508311776` and `/#quick-contact`; desktop WhatsApp dock hidden |
+| E2E-MOB-001b | "the sticky bar's השאירו פרטים reaches the form from another route" | Load `/blog`, tap it | URL `/#quick-contact`, the form in view — a bare `#…` did nothing off home |
 | E2E-MOB-002 | "the sticky bar stays pinned while scrolling" | Scroll to `#testimonials` | Call link still in viewport |
 | E2E-MOB-003 | "opens and closes the burger menu and navigates from it" | Tap burger → tap "בלוג" | Drawer opens with a close button; navigation lands on `/blog` |
 | E2E-MOB-004 | "the burger menu closes on Escape and on backdrop tap" | Tap burger, press Escape | Close button gone |

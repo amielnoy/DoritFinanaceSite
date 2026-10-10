@@ -19,9 +19,13 @@ interface Article {
   title: string;
   excerpt: string;
   tags: string;
+  action_time: string;
   published: boolean;
   body: string;
 }
+
+/** A chip on a card, not a sentence — "חודש ראשון", not an explanation. */
+const ACTION_TIME_MAX = 20;
 
 function parseArticle(file: string): Article {
   const raw = readFileSync(join(CONTENT_DIR, file), "utf8");
@@ -37,6 +41,7 @@ function parseArticle(file: string): Article {
     title: meta.title,
     excerpt: meta.excerpt ?? "",
     tags: meta.tags ?? "",
+    action_time: meta.action_time ?? "",
     published: meta.published === "true",
     body: m[2].trim(),
   };
@@ -50,6 +55,12 @@ const articles = readdirSync(CONTENT_DIR)
 describe("repo-held blog articles", () => {
   it("there are articles to check", () => {
     expect(articles.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("the BlogPost entity declares action_time as an optional string", () => {
+    const entity = loadEntity("BlogPost") as { properties: Record<string, { type: string }>; required: string[] };
+    expect(entity.properties.action_time?.type).toBe("string");
+    expect(entity.required).not.toContain("action_time");
   });
 
   for (const article of articles) {
@@ -85,12 +96,17 @@ describe("repo-held blog articles", () => {
         }
       });
 
+      it("keeps its optional action time short enough for a chip", () => {
+        expect(article.action_time.length).toBeLessThanOrEqual(ACTION_TIME_MAX);
+      });
+
       it("maps onto the BlogPost entity without stray fields", () => {
         const issues = validateAgainstEntity(loadEntity("BlogPost"), {
           title: article.title,
           excerpt: article.excerpt,
           body: article.body,
           tags: article.tags,
+          action_time: article.action_time,
           image_url: "",
           published: article.published,
         });

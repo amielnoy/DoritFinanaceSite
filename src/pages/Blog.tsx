@@ -1,44 +1,53 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
 import { useArticles } from "@/hooks/useContent";
-import { Image } from "@/components/ui/image";
-import { Loader2, ArrowLeft, Newspaper, Search, X } from "lucide-react";
+import { Loader2, Newspaper, Search, X } from "lucide-react";
 import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
-import AgentChat from "@/components/dorit/chat/AgentChat";
-import { AGENTS } from "@/config/agents";
-import { readRecommendation } from "@/lib/blog-recommendation";
 import Footer from "@/components/dorit/layout/Footer";
-import Reveal from "@/components/dorit/primitives/Reveal";
-import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
-import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
+import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import ArticleCard, { FOCUS_RING } from "@/components/dorit/blog/ArticleCard";
+import FeaturedRow from "@/components/dorit/blog/FeaturedRow";
+import BlogRecommender from "@/components/dorit/blog/BlogRecommender";
+import BlogContactBand from "@/components/dorit/blog/BlogContactBand";
+import { readRecommendation } from "@/lib/blog-recommendation";
+import {
+  FEATURED,
+  FEATURED_TOPICS,
+  TOPICS,
+  type TopicId,
+  actionMinutes,
+  isFeaturedLive,
+  topicCounts,
+  topicOf,
+} from "@/config/blog-topics";
+import type { Article } from "@/services";
+import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
 
 const RECOMMENDED_BANNER_ID = "blog-recommended";
+/** Cards before "show all": a phone gets the shorter list. */
+const PAGE_DESKTOP = 9;
+const PAGE_MOBILE = 6;
 
-interface BlogListItem {
-  id: string;
-  title: string;
-  excerpt?: string;
-  image_url?: string;
-  tags?: string;
-  created_date: string;
-}
+const TOPIC_LABEL = Object.fromEntries(TOPICS.map((t) => [t.id, t.label])) as Record<TopicId, string>;
+
+const articlesLabel = (n: number) => (n === 1 ? "מאמר אחד" : `${n} מאמרים`);
+const moreLabel = (n: number) => (n === 1 ? "מאמר נוסף" : `${n} נוספים`);
 
 export default function Blog() {
   const { data, isPending: loading } = useArticles();
-  const posts = (data ?? null) as BlogListItem[] | null;
+  const posts = (data ?? null) as Article[] | null;
   const [query, setQuery] = useState<string>("");
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [topic, setTopic] = useState<TopicId>("all");
+  const [expanded, setExpanded] = useState<boolean>(false);
   /** Post ids the reading-recommender chose, read from its `recommended`
    *  block — see src/lib/blog-recommendation.ts. While set, the grid shows
    *  only these posts. */
   const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
 
-  // The grid is further down the same page, and `useArticles()` may not have
-  // resolved the instant a recommendation arrives — keep looking for the
-  // banner until it mounts, same pattern as ScrollToTop.jsx's hash handling.
-  // The banner rather than the first card, so the way back to every post is
-  // on screen too.
+  // `useArticles()` may not have resolved the instant a recommendation
+  // arrives — keep looking for the banner until it mounts, same pattern as
+  // ScrollToTop.jsx's hash handling. The banner rather than the first card, so
+  // the way back to every post is on screen too.
   React.useEffect(() => {
     if (!recommendedIds.length) return;
     const deadline = Date.now() + 3000;
@@ -86,20 +95,7 @@ export default function Blog() {
     ],
   });
 
-
-  const allTags = React.useMemo(() => {
-    if (!posts) return [];
-    const set = new Set<string>();
-    posts.forEach((p) => {
-      if (p.tags) {
-        p.tags.split(",").forEach((t) => {
-          const trimmed = t.trim();
-          if (trimmed) set.add(trimmed);
-        });
-      }
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "he"));
-  }, [posts]);
+  const counts = React.useMemo(() => topicCounts(posts ?? []), [posts]);
 
   const filtered = React.useMemo(() => {
     if (!posts) return [];
@@ -110,15 +106,10 @@ export default function Blog() {
         p.title.toLowerCase().includes(q) ||
         (p.excerpt || "").toLowerCase().includes(q) ||
         (p.tags || "").toLowerCase().includes(q);
-      const matchesTag =
-        !activeTag ||
-        (p.tags || "")
-          .split(",")
-          .map((t) => t.trim())
-          .includes(activeTag);
-      return matchesQuery && matchesTag;
+      const matchesTopic = topic === "all" || topicOf(p.tags) === topic;
+      return matchesQuery && matchesTopic;
     });
-  }, [posts, query, activeTag]);
+  }, [posts, query, topic]);
 
   // In the order the agent ranked them. Ids with no matching post (one taken
   // down since, or a model slip) are dropped; if none match, nothing is
@@ -128,228 +119,237 @@ export default function Blog() {
     const byId = new Map(posts.map((p) => [p.id, p]));
     return [...new Set(recommendedIds)]
       .map((id) => byId.get(id))
-      .filter((p): p is BlogListItem => Boolean(p));
+      .filter((p): p is Article => Boolean(p));
   }, [posts, recommendedIds]);
 
   const showingRecommended = recommended.length > 0;
   const visiblePosts = showingRecommended ? recommended : filtered;
 
+  const featured = React.useMemo(
+    () => (isFeaturedLive() ? posts?.find((p) => p.title === FEATURED.title) : undefined),
+    [posts]
+  );
+  const fastest = React.useMemo(
+    () =>
+      (posts ?? [])
+        .filter((p) => p !== featured && Number.isFinite(actionMinutes(p.action_time)))
+        .sort((a, b) => actionMinutes(a.action_time) - actionMinutes(b.action_time))
+        .slice(0, 3),
+    [posts, featured]
+  );
+  const showFeatured =
+    Boolean(featured) && !showingRecommended && !query.trim() && FEATURED_TOPICS.includes(topic);
+
   // One filter at a time: a recommendation intersected with an unrelated
-  // search or tag would usually leave nothing on screen.
+  // search or topic would usually leave nothing on screen.
   const clearRecommendation = () => setRecommendedIds([]);
+  const chooseTopic = (id: TopicId) => {
+    setTopic(id);
+    setExpanded(false);
+    clearRecommendation();
+  };
+
+  const total = visiblePosts.length;
+  const limited = !showingRecommended && !expanded;
+  const shown = limited ? visiblePosts.slice(0, PAGE_DESKTOP) : visiblePosts;
+  const hasMore = limited && total > PAGE_MOBILE;
+
+  const gridTitle = showingRecommended
+    ? "מאמרים שהומלצו בצ'אט"
+    : topic === "all"
+      ? "כל המאמרים"
+      : TOPIC_LABEL[topic];
 
   return (
-    <div className="relative bg-background min-h-screen">
+    // `pb-14`: room for the phone's sticky bar under the footer, as on Home.
+    <div className="relative bg-background min-h-screen pb-14 md:pb-0">
       <FloatingHeader />
-      <div className="pt-32 md:pt-36 pb-24">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10">
-          <Reveal>
-            <Eyebrow>
-              מאמרים ותובנות
-            </Eyebrow>
-            <h1 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
-              בלוג · חידושים בעולם הביטוח
+
+      <main>
+        {/* No fade-in here: text that arrives late moves the cards under a
+            reader's thumb. */}
+        <section data-track-location="blog_hero" className="pt-28 md:pt-36 pb-8 md:pb-10">
+          <div className="max-w-[1400px] mx-auto px-6 md:px-10 md:pl-20">
+            <Eyebrow>בלוג · מידע שאפשר לפעול לפיו</Eyebrow>
+            <h1 className="font-heading text-3xl md:text-5xl mt-4 leading-tight text-foreground max-w-4xl">
+              מה אפשר לסדר השבוע — ברוב המקרים בפחות מחצי שעה
             </h1>
-            <p className="mt-6 max-w-2xl text-foreground/70 leading-relaxed text-lg">
-              עדכונים קצרים מהשטח — חידושים, מגמות ותובנות שמשפיעים על ההחלטות
-              הפיננסיות שלכם.
+            <p className="mt-4 max-w-2xl text-base md:text-lg leading-relaxed text-foreground">
+              מדריכים קצרים לפנסיה, לביטוח ולמס. בכל מאמר: כמה זמן לוקח לבצע, מה בודקים, ואיפה כדאי
+              לעצור ולהתייעץ.
             </p>
-          </Reveal>
 
-          <CredentialsStrip />
-        </div>
-      </div>
-
-      {/* The reading recommender, where the reading is.
-          It sat on the home page between a contact form and an FAQ, recommending
-          articles to people who had not said they wanted to read anything. Here
-          it answers the question the visitor arrived with. */}
-      <AgentChat
-        descriptor={AGENTS.blogRecommender}
-        onAssistantMessage={(content) => {
-          const { ids } = readRecommendation(content);
-          if (!ids.length) return;
-          setRecommendedIds(ids);
-          setQuery("");
-          setActiveTag(null);
-        }}
-      />
-
-      <div className="pb-24">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10">
-
-          {!loading && posts && posts.length > 0 && (
-            <div className="mt-12 space-y-6">
-              <div className="relative max-w-xl">
-                <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    clearRecommendation();
-                  }}
-                  placeholder="חיפוש מאמרים…"
-                  className="w-full bg-card border border-border pr-12 pl-12 py-3.5 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
-                />
-                {query && (
-                  <button
-                    onClick={() => setQuery("")}
-                    aria-label="ניקוי חיפוש"
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-accent transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-
-              {allTags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => {
-                      setActiveTag(null);
+            {!loading && posts && posts.length > 0 ? (
+              <div className="mt-6 space-y-4">
+                <div className="relative max-w-xl">
+                  <label htmlFor="blog-search" className="sr-only">
+                    חיפוש מאמרים
+                  </label>
+                  <Search
+                    size={18}
+                    aria-hidden="true"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
+                  <input
+                    id="blog-search"
+                    type="text"
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setExpanded(false);
                       clearRecommendation();
                     }}
-                    className={`text-xs tracking-[0.15em] uppercase px-3.5 py-1.5 border transition-colors ${
-                      !activeTag
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-border text-muted-foreground hover:border-accent hover:text-accent"
-                    }`}
-                  >
-                    הכל
-                  </button>
-                  {allTags.map((tag) => (
+                    placeholder="חיפוש מאמרים…"
+                    className="w-full min-h-12 bg-card border border-border rounded-md pr-12 pl-12 py-3 text-base text-foreground focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
+                  />
+                  {query ? (
                     <button
-                      key={tag}
-                      onClick={() => {
-                        setActiveTag((cur) => (cur === tag ? null : tag));
-                        clearRecommendation();
-                      }}
-                      className={`text-xs tracking-[0.15em] uppercase px-3.5 py-1.5 border transition-colors ${
-                        activeTag === tag
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border text-muted-foreground hover:border-accent hover:text-accent"
-                      }`}
+                      onClick={() => setQuery("")}
+                      aria-label="ניקוי חיפוש"
+                      className={`absolute left-1 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center text-muted-foreground hover:text-accent transition-colors ${FOCUS_RING}`}
                     >
-                      {tag}
+                      <X size={16} aria-hidden="true" />
                     </button>
-                  ))}
+                  ) : null}
                 </div>
-              )}
 
-              {showingRecommended && (
                 <div
-                  id={RECOMMENDED_BANNER_ID}
-                  className="flex flex-wrap items-center justify-between gap-3 border border-highlight bg-highlight-muted/15 px-5 py-3 scroll-mt-28"
+                  role="group"
+                  aria-label="סינון לפי נושא"
+                  className="-mx-6 px-6 md:mx-0 md:px-0 flex gap-2 overflow-x-auto pb-1"
                 >
-                  <p className="text-sm text-foreground">
-                    {recommended.length === 1
-                      ? "מוצג מאמר אחד שהומלץ בצ'אט"
-                      : `מוצגים ${recommended.length} מאמרים שהומלצו בצ'אט`}
-                  </p>
-                  <button
-                    onClick={clearRecommendation}
-                    className="text-sm text-accent underline underline-offset-4 hover:text-highlight transition-colors"
-                  >
-                    הצגת כל המאמרים
-                  </button>
+                  {TOPICS.map((t) => {
+                    const selected = topic === t.id && !showingRecommended;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => chooseTopic(t.id)}
+                        className={`shrink-0 whitespace-nowrap min-h-11 px-4 rounded-md border text-[15px] transition-colors ${FOCUS_RING} ${
+                          selected
+                            ? "bg-foreground text-background border-foreground"
+                            : "bg-card text-foreground border-border hover:border-accent"
+                        }`}
+                      >
+                        {t.label}
+                        <span className="ms-1.5 tabular-nums">{counts[t.id]}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            ) : null}
+          </div>
+        </section>
 
-          <div className="mt-8 border-t border-border/60">
+        <div className="max-w-[1400px] mx-auto px-6 md:px-10 md:pl-20 pb-16 md:pb-24 space-y-12 md:space-y-16">
+          {showFeatured && featured ? (
+            <FeaturedRow
+              featured={featured}
+              badge={FEATURED.badge}
+              topicLabel={topicLabelOf(featured)}
+              fastest={fastest}
+            />
+          ) : null}
+
+          <section aria-labelledby="blog-grid-title" data-track-location="blog_grid">
             {loading ? (
               <div className="flex justify-center py-20">
-                <Loader2 className="animate-spin text-accent" />
+                <Loader2 className="animate-spin text-accent" aria-label="טוען מאמרים" />
               </div>
             ) : !posts || posts.length === 0 ? (
-              <div className="text-center py-20 border border-dashed border-border">
-                <Newspaper size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
-                <p className="text-muted-foreground">
-                  עדיין אין מאמרים — בקרוב יעלו כאן עדכונים חדשים.
-                </p>
-              </div>
-            ) : visiblePosts.length === 0 ? (
-              <div className="text-center py-20 border border-dashed border-border">
-                <Search size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} />
-                <p className="text-muted-foreground">
-                  לא נמצאו מאמרים התואמים את החיפוש. ניתן לנסות מילים אחרות או נושא אחר.
-                </p>
-                <button
-                  onClick={() => { setQuery(""); setActiveTag(null); }}
-                  className="mt-4 text-sm text-accent underline underline-offset-4 hover:text-highlight transition-colors"
-                >
-                  ניקוי החיפוש
-                </button>
+              <div className="text-center py-20 border border-dashed border-border rounded-md">
+                <Newspaper size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} aria-hidden="true" />
+                <p className="text-muted-foreground">עדיין אין מאמרים — בקרוב יעלו כאן עדכונים חדשים.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 py-12">
-                {visiblePosts.map((p) => (
-                  <Link
-                    key={p.id}
-                    id={`post-${p.id}`}
-                    to={`/blog/${p.id}`}
-                    className="group flex flex-col border overflow-hidden transition-colors bg-card border-border/60 hover:border-accent"
-                  >
-                    <div className="h-48 overflow-hidden bg-secondary">
-                      {p.image_url ? (
-                        <Image
-                          src={p.image_url}
-                          alt={p.title}
-                          className="w-full h-full object-cover"
-                          fittingType="fill"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                          <Newspaper size={28} strokeWidth={1.25} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-6 flex flex-col flex-1">
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(p.created_date).toLocaleDateString("he-IL", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </p>
-                      <h2 className="font-heading text-2xl mt-3 leading-snug group-hover:text-accent transition-colors">
-                        {p.title}
-                      </h2>
-                      {p.excerpt && (
-                        <p className="mt-3 text-foreground/70 leading-relaxed text-sm">
-                          {p.excerpt}
-                        </p>
-                      )}
-                      {p.tags && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {p.tags
-                            .split(",")
-                            .map((t) => t.trim())
-                            .filter(Boolean)
-                            .map((t) => (
-                              <span
-                                key={t}
-                                className="text-sm px-2 py-0.5 border border-border text-muted-foreground"
-                              >
-                                {t}
-                              </span>
-                            ))}
-                        </div>
-                      )}
-                      <span className="mt-5 inline-flex items-center gap-1 text-sm text-accent">
-                        קריאת המאמר <ArrowLeft size={14} />
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+              <>
+                <div
+                  id={RECOMMENDED_BANNER_ID}
+                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 scroll-mt-28"
+                >
+                  <h2 id="blog-grid-title" className="font-heading text-2xl md:text-3xl text-foreground">
+                    {gridTitle}
+                    <span className="ms-3 text-base font-body text-muted-foreground tabular-nums">
+                      {articlesLabel(total)}
+                    </span>
+                  </h2>
+                  {showingRecommended ? (
+                    <button
+                      onClick={clearRecommendation}
+                      className={`min-h-11 text-sm text-accent underline underline-offset-4 hover:text-highlight transition-colors ${FOCUS_RING}`}
+                    >
+                      חזרה לכל המאמרים
+                    </button>
+                  ) : null}
+                </div>
+
+                {total === 0 ? (
+                  <div className="mt-6 text-center py-20 border border-dashed border-border rounded-md">
+                    <Search size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} aria-hidden="true" />
+                    <p className="text-muted-foreground">
+                      לא נמצאו מאמרים התואמים את החיפוש. ניתן לנסות מילים אחרות או נושא אחר.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setQuery("");
+                        chooseTopic("all");
+                      }}
+                      className={`mt-4 min-h-11 text-sm text-accent underline underline-offset-4 hover:text-highlight transition-colors ${FOCUS_RING}`}
+                    >
+                      ניקוי החיפוש
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-4 md:mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 md:gap-6 border-b border-border md:border-b-0">
+                    {shown.map((p, i) => (
+                      <ArticleCard
+                        key={p.id}
+                        post={p}
+                        topicLabel={topicLabelOf(p)}
+                        className={limited && i >= PAGE_MOBILE ? "max-md:hidden" : undefined}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {hasMore ? (
+                  <div className={`mt-8 flex justify-center ${total <= PAGE_DESKTOP ? "md:hidden" : ""}`}>
+                    <button
+                      onClick={() => setExpanded(true)}
+                      className={`min-h-12 px-6 rounded-md border border-foreground text-foreground hover:bg-foreground/[0.06] transition-colors ${FOCUS_RING}`}
+                    >
+                      הצגת כל המאמרים{" "}
+                      <span className="md:hidden">({moreLabel(total - PAGE_MOBILE)})</span>
+                      <span className="hidden md:inline">({moreLabel(Math.max(0, total - PAGE_DESKTOP))})</span>
+                    </button>
+                  </div>
+                ) : null}
+              </>
             )}
-          </div>
+          </section>
+
+          <BlogRecommender
+            onAssistantMessage={(content) => {
+              const { ids } = readRecommendation(content);
+              if (!ids.length) return;
+              setRecommendedIds(ids);
+              setQuery("");
+              setTopic("all");
+            }}
+          />
         </div>
-      </div>
+      </main>
+
+      <BlogContactBand />
+      <MobileStickyBar />
       <Footer />
     </div>
   );
+}
+
+function topicLabelOf(post: Article): string | undefined {
+  const t = topicOf(post.tags);
+  return t ? TOPIC_LABEL[t] : undefined;
 }
