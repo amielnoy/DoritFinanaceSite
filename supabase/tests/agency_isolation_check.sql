@@ -31,7 +31,11 @@ update public.profiles set role = 'admin' where id = 'bbbbbbbb-0000-0000-0000-00
 -- to find in both agencies.
 insert into public.leads (base44_id, name, phone, agency_id) values
   ('ISO-A1-LEAD', 'לקוח א׳', '050-000-1001', '00000000-0000-0000-0000-000000000001'),
-  ('ISO-A2-LEAD', 'לקוח ב׳', '050-000-1002', 'aaaaaaaa-0000-0000-0000-000000000002');
+  ('ISO-A2-LEAD', 'לקוח ב׳', '050-000-1002', 'aaaaaaaa-0000-0000-0000-000000000002'),
+  -- A third lead with no meeting of its own yet, so the new
+  -- meetings_write_admin coverage below has an FK target that doesn't
+  -- collide with meetings.lead_base44_id's existing unique constraint.
+  ('ISO-A1-LEAD-2', 'לקוח א׳ 2', '050-000-1003', '00000000-0000-0000-0000-000000000001');
 insert into public.contacts (phone, name, agency_id) values
   ('050-000-2001', 'איש קשר א׳', '00000000-0000-0000-0000-000000000001'),
   ('050-000-2002', 'איש קשר ב׳', 'aaaaaaaa-0000-0000-0000-000000000002');
@@ -122,6 +126,192 @@ do $$ begin
   end;
 end $$;
 
+-- Crafted insert naming a different agency is refused for contacts too
+-- (mirrors the leads crafted-insert test above). Verified by weakening
+-- contacts_insert_public's WITH CHECK to `(true)`: this block then raises.
+do $$ begin
+  begin
+    insert into public.contacts (phone, name, agency_id)
+      values ('050-000-9998', 'רמאי', 'aaaaaaaa-0000-0000-0000-000000000002');
+    raise exception 'a contact was inserted naming an agency other than the fixed one';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- leads_update_admin's WITH CHECK, checked against its actual definition
+-- rather than through a crafted UPDATE: Postgres independently re-validates
+-- that an UPDATE's new row still satisfies the table's SELECT policy (there
+-- is no "update a row into invisibility" escape — confirmed empirically),
+-- and leads_read_admin's SELECT policy is the identical can_see(agency_id)
+-- or is_admin() expression. That makes any reassignment attempt fail for
+-- the same reason regardless of what WITH CHECK itself says: weakening
+-- leads_update_admin's WITH CHECK to `(true)` does not change the existing
+-- reassignment test's outcome at all (verified directly — it stays clean
+-- either way), so a crafted-UPDATE test cannot isolate this clause. This
+-- checks its definition directly, which does catch that same weakening.
+do $$ begin
+  if (
+    select pg_get_expr(polwithcheck, polrelid) from pg_policy
+     where polrelid = 'public.leads'::regclass and polname = 'leads_update_admin'
+  ) is distinct from '(can_see(agency_id) OR is_admin())' then
+    raise exception 'leads_update_admin''s WITH CHECK no longer enforces agency scoping';
+  end if;
+end $$;
+
+-- contacts_update_admin's WITH CHECK: same reasoning and same fix as
+-- leads_update_admin above (contacts_read_admin's SELECT policy is the
+-- identical, exception-free can_see(agency_id) or is_admin() expression).
+do $$ begin
+  if (
+    select pg_get_expr(polwithcheck, polrelid) from pg_policy
+     where polrelid = 'public.contacts'::regclass and polname = 'contacts_update_admin'
+  ) is distinct from '(can_see(agency_id) OR is_admin())' then
+    raise exception 'contacts_update_admin''s WITH CHECK no longer enforces agency scoping';
+  end if;
+end $$;
+
+-- testimonials_write_admin's WITH CHECK, isolated from the read policy's
+-- public exception (unlike leads/contacts above, this one IS isolable
+-- through a crafted UPDATE): reassigning agency 2's own testimonial into
+-- the one fixed agency would stay readable under
+-- testimonials_read_member_or_fixed_agency regardless of membership (its
+-- own "agency_id = the fixed agency" clause), so Postgres's "don't update
+-- a row into invisibility" safety net does not save us here — only WITH
+-- CHECK does. Verified by weakening testimonials_write_admin's WITH CHECK
+-- to `(true)`: this block then raises.
+do $$ begin
+  begin
+    update public.testimonials set agency_id = '00000000-0000-0000-0000-000000000001'
+      where name = 'לקוחה ב׳';
+    raise exception 'agency 2 member reassigned their testimonial into agency 1';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- meetings_write_admin's WITH CHECK: meetings has no separate insert
+-- policy (it is `for all`), and INSERT has no prior row to protect, so,
+-- unlike UPDATE, there is no new-row-must-stay-visible safety net —
+-- WITH CHECK is the only gate. A crafted insert naming a different agency
+-- exercises it directly. Verified by weakening meetings_write_admin's
+-- WITH CHECK to `(true)`: this block then raises.
+do $$ begin
+  begin
+    insert into public.meetings (lead_base44_id, scheduled_at, agency_id)
+      values ('ISO-A1-LEAD-2', now() + interval '3 days', '00000000-0000-0000-0000-000000000001');
+    raise exception 'agency 2 member inserted a meeting naming agency 1';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- blog_posts_write_admin's WITH CHECK, isolated the same way testimonials'
+-- is above: reassigning agency 2's own published post to the one fixed
+-- agency stays readable under blog_posts_read_published_or_admin's own
+-- public-exception clause, so only WITH CHECK stands between this and a
+-- successful reassignment. Verified by weakening blog_posts_write_admin's
+-- WITH CHECK to `(true)`: this block then raises.
+do $$ begin
+  begin
+    update public.blog_posts set agency_id = '00000000-0000-0000-0000-000000000001'
+      where title = 'מאמר ב׳';
+    raise exception 'agency 2 member reassigned their blog post into agency 1';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- memberships has zero coverage above, and it is the table can_see()
+-- itself trusts. Verified by weakening memberships_write_admin's WITH
+-- CHECK to `(true)`: this block then raises.
+do $$ begin
+  begin
+    insert into public.memberships (user_id, agency_id, role)
+      values ('bbbbbbbb-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'owner');
+    raise exception 'agency 2 member added themselves to agency 1''s membership list';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- agencies and agency_profiles have zero coverage above. Both write
+-- policies are is_admin()-only (not can_see()-based, since neither is
+-- member-editable in this phase), so USING already excludes every row for
+-- a non-admin uniformly — an UPDATE attempt would affect zero rows
+-- silently regardless of WITH CHECK (confirmed empirically), making WITH
+-- CHECK only observable through INSERT, which USING does not gate at all.
+-- Verified by weakening agencies_write_admin's / agency_profiles_write_admin's
+-- WITH CHECK to `(true)`: each block below then raises.
+do $$ begin
+  begin
+    insert into public.agencies (name, status) values ('סוכנות גנובה', 'active');
+    raise exception 'agency 2 member (non-admin) inserted a new agency';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+do $$ begin
+  begin
+    insert into public.agency_profiles (
+      agency_id, display_name, phone_e164, phone_display, whatsapp, email,
+      default_whatsapp_message, licence_entity, licence_number, licence_regulator
+    ) values (
+      'aaaaaaaa-0000-0000-0000-000000000002', 'סוכנות ב׳', '+972500000000', '050-000-0000',
+      '972500000000', 'b@example.com', 'הודעה', 'סוכנות ב׳', 'L-2', 'רשות'
+    );
+    raise exception 'agency 2 member created their own agency''s profile without being admin';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- blog_posts insert with a null (shared-library) agency_id: can_see(null)
+-- is always false, so this is covered by the same blog_posts_write_admin
+-- policy as the reassignment test above, exercised through its one
+-- insert-shaped edge case. Verified by weakening blog_posts_write_admin's
+-- WITH CHECK to `(true)`: this block then raises.
+do $$ begin
+  begin
+    insert into public.blog_posts (title, body, published, agency_id)
+      values ('גנוב', 'תוכן', false, null);
+    raise exception 'agency 2 member inserted a null-agency blog post';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- leads delete refused. A DELETE that matches zero rows under RLS doesn't
+-- throw, so this checks the post-condition rather than assuming an
+-- exception (matching the shared-blog-post-write test's style above) — and
+-- the post-condition has to be read bypassing this actor's own read
+-- policy, which would hide agency 1's row whether or not it was actually
+-- deleted (confirmed empirically: querying as the agency-2 actor always
+-- shows zero rows here, deleted or not, since they can never see it either
+-- way — that reads as "deleted" regardless of the real outcome).
+do $$ begin
+  delete from public.leads where base44_id = 'ISO-A1-LEAD';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+do $$ begin
+  if (select count(*) from public.leads where base44_id = 'ISO-A1-LEAD') = 0 then
+    raise exception 'agency 2 member deleted an agency 1 lead';
+  end if;
+end $$;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-0000-0000-000000000002","role":"authenticated"}';
+
+-- leads_delete_admin's USING, checked against its actual definition for
+-- the same reason leads_update_admin's WITH CHECK is above: a DELETE also
+-- requires the target row to satisfy applicable SELECT policies (the same
+-- "don't act on a row you can no longer see" mechanism), and
+-- leads_read_admin's SELECT policy is the identical can_see(agency_id) or
+-- is_admin() expression — so the post-condition check just above stays
+-- clean whether leads_delete_admin's USING is correct or weakened to
+-- `true` (confirmed empirically), and cannot catch that weakening on its
+-- own.
+do $$ begin
+  if (
+    select pg_get_expr(polqual, polrelid) from pg_policy
+     where polrelid = 'public.leads'::regclass and polname = 'leads_delete_admin'
+  ) is distinct from '(can_see(agency_id) OR is_admin())' then
+    raise exception 'leads_delete_admin''s USING no longer enforces agency scoping';
+  end if;
+end $$;
+
 -- ── as a member of agency 1 only — the reverse ──────────────────────────
 set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-0000-0000-000000000001","role":"authenticated"}';
 
@@ -147,7 +337,9 @@ end $$;
 set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-0000-0000-000000000003","role":"authenticated"}';
 
 do $$ begin
-  if (select count(*) from public.leads) <> 2 then
+  -- 3, not 2: ISO-A1-LEAD-2 (added above as an FK target for the
+  -- meetings_write_admin coverage) is a third lead, fixed from agency 1.
+  if (select count(*) from public.leads) <> 3 then
     raise exception 'platform admin cannot read both agencies'' leads';
   end if;
   if (select count(*) from public.blog_posts) <> 4 then

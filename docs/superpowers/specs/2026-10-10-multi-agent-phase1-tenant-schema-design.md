@@ -106,9 +106,10 @@ create table public.memberships (
 );
 
 -- Every policy below asks this instead of `is_admin()` for agency-scoped
--- tables. `security definer` + `stable`, matching `is_admin()`'s own shape,
--- for the same reason: it must not recurse through `memberships`' own RLS,
--- and Postgres should evaluate it once per statement, not once per row.
+-- tables. `security definer`, matching `is_admin()`'s own shape, so it does
+-- not recurse through `memberships`' own RLS. Unlike `is_admin()` it takes
+-- a per-row argument and so runs once per row, not once per statement —
+-- acceptable at this app's data volume.
 create function public.can_see(p_agency_id uuid) returns boolean
   language sql
   security definer
@@ -174,9 +175,14 @@ update public.blog_posts set agency_id = '00000000-0000-0000-0000-000000000001'
 
 The four `not null default` columns backfill existing rows as part of the
 `alter table` itself (Postgres 11+ computes the default once for existing
-rows without a table rewrite); `blog_posts` is backfilled explicitly because
-its default must stop applying to future inserts that want a genuinely
-shared, null row.
+rows without a table rewrite, even though `blog_posts`' column is
+nullable) — the explicit `update` for `blog_posts` is therefore redundant
+given that default, and stays only as a defensive, explicit statement of
+intent (Dorit's existing posts are her own authored content, not generic
+shared material). The default does not stop applying to future inserts
+either: any insert that omits `agency_id` still gets agency 1, not null —
+only one that explicitly passes `agency_id: null` gets a null (shared)
+row.
 
 ### Policies — replace `is_admin()` with `can_see(agency_id) or is_admin()`
 
@@ -214,6 +220,20 @@ create policy testimonials_write_admin on public.testimonials
   using (public.can_see(agency_id) or public.is_admin())
   with check (public.can_see(agency_id) or public.is_admin());
 -- meetings_write_admin takes the identical treatment.
+
+-- testimonials_read_public was also missed above: it is `using (true)`, with
+-- no is_admin() call to replace, which is why it fell outside the
+-- "replace is_admin() with can_see() or is_admin()" sweep — RLS policies OR
+-- together, so leaving it in place would still let anyone read every
+-- agency's testimonials regardless of the policy above. Testimonials have no
+-- shared-library concept the way blog_posts do (this spec's data model
+-- lists no nullable note for this table), so this is scoped exactly like
+-- blog_posts' published rows: the one fixed agency, plus any member, plus
+-- admin.
+drop policy testimonials_read_public on public.testimonials;
+create policy testimonials_read_member_or_fixed_agency on public.testimonials
+  for select to anon, authenticated
+  using (agency_id = '00000000-0000-0000-0000-000000000001' or public.can_see(agency_id) or public.is_admin());
 
 drop policy blog_posts_write_admin on public.blog_posts;
 create policy blog_posts_write_admin on public.blog_posts
@@ -296,14 +316,23 @@ row — same self-containment as `rls_check.sql`'s `boss@example.com`/
 membership in agency 1 only, one with a membership in the new agency 2 only,
 and a third with `profiles.role = 'admin'` and *no* membership in either
 agency (promoted the same way `rls_check.sql` line 21 already does). As the
-agency-2 user, asserts `select count(*)` is 0 against `leads`, `contacts`,
-`testimonials` and `meetings` filtered to agency 1's rows (seeded directly as
-the table owner before the role switch, bypassing RLS, same as
-`rls_check.sql` already does), and that `blog_posts` returns only agency 2's
-own published post plus any null-agency published post, never agency 1's. A
-second block, as the agency-1 user, proves the reverse. A third, as the
-admin with no membership row at all, asserts it still reads both agencies'
-rows — proving "platform admin keeps seeing everything in this phase" holds
+agency-2 user, asserts `select count(*)` is 0 against `leads`, `contacts`
+and `meetings` filtered to agency 1's rows (seeded directly as the table
+owner before the role switch, bypassing RLS, same as `rls_check.sql`
+already does). `testimonials` and agency 1's own *published* `blog_posts`
+row are the one deliberate exception to that 0: there is one live public
+site right now (no Phase 4 host routing yet), and `rls_check.sql`/
+`account_check.sql` already require `anon` to read both — a policy that
+blocked them for an authenticated member of a *different* agency while
+still allowing a fully anonymous visitor would be incoherent, not stricter.
+True per-agency isolation for this public-exception content starts to mean
+something once a second agency has its own live site. So the agency-2 user
+is asserted to see exactly agency 1's public testimonial and published post
+(not zero), while agency 2's own *unpublished-to-the-world* content (and
+every other agency-scoped table) stays invisible, same as before. A second
+block, as the agency-1 user, proves the reverse. A third, as the admin with
+no membership row at all, asserts it still reads both agencies' rows —
+proving "platform admin keeps seeing everything in this phase" holds
 through `is_admin()` alone, independent of `can_see()`.
 
 Stays a manual `supabase start` check, matching `rls_check.sql` and

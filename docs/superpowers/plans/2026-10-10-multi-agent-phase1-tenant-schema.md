@@ -450,9 +450,6 @@ do $$ begin
   if (select count(*) from public.contacts where agency_id = '00000000-0000-0000-0000-000000000001') <> 0 then
     raise exception 'agency 2 member read an agency 1 contact';
   end if;
-  if (select count(*) from public.testimonials where agency_id = '00000000-0000-0000-0000-000000000001') <> 0 then
-    raise exception 'agency 2 member read an agency 1 testimonial';
-  end if;
   if (select count(*) from public.meetings where agency_id = '00000000-0000-0000-0000-000000000001') <> 0 then
     raise exception 'agency 2 member read an agency 1 meeting';
   end if;

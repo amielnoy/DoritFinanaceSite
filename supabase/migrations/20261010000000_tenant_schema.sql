@@ -55,9 +55,10 @@ create table public.memberships (
 );
 
 -- Every policy below asks this instead of is_admin() for agency-scoped
--- tables. security definer + stable, matching is_admin()'s own shape, for
--- the same reason: it must not recurse through memberships' own RLS, and
--- Postgres should evaluate it once per statement, not once per row.
+-- tables. security definer, matching is_admin()'s own shape, so it does not
+-- recurse through memberships' own RLS. Unlike is_admin() it takes a
+-- per-row argument and so runs once per row, not once per statement —
+-- acceptable at this app's data volume.
 create function public.can_see(p_agency_id uuid) returns boolean
   language sql
   security definer
@@ -88,9 +89,12 @@ insert into public.agency_profiles (
 );
 
 -- Dorit's own membership. Her user id is looked up by email rather than
--- hard-coded, because — unlike the agency id this migration invents — her
--- auth.users row already exists in every environment this runs against and
--- migrations must not assume its id matches between them.
+-- hard-coded, because the agency id this migration invents has no such
+-- equivalent elsewhere. Locally (and anywhere auth hasn't been provisioned
+-- yet) this silently inserts nothing — harmless while is_admin() covers
+-- her, but note for Phase 2's checklist: re-run this insert (or an
+-- equivalent one-off) once her real Supabase Auth account exists, or she
+-- will have no membership row once admin-sees-all is ever narrowed.
 insert into public.memberships (user_id, agency_id, role)
 select id, '00000000-0000-0000-0000-000000000001', 'owner'
   from auth.users where email = 'dorit@govari-fin.co.il'
@@ -112,9 +116,17 @@ alter table public.meetings
     references public.agencies(id);
 
 -- Nullable, unlike the four above: null = the shared platform library,
--- set = the agency's own article. Dorit's existing posts are her own
--- authored content, not generic shared material, so they backfill to her
--- agency id explicitly, below, rather than being left null by the default.
+-- set = the agency's own article. The column default (agency 1, like the
+-- four above) already backfills every existing row — including Dorit's —
+-- on its own; Postgres 11+ computes an ADD COLUMN ... DEFAULT once, with no
+-- table rewrite, even for a nullable column, so the explicit UPDATE below
+-- is redundant given that default. It stays anyway as a defensive,
+-- explicit statement of intent: Dorit's existing posts are her own
+-- authored content, not generic shared material, and the point should
+-- read from this migration, not be inferred from "the default happened to
+-- do it." The default also does not stop applying to future inserts: any
+-- insert that omits agency_id still gets agency 1, not null — only one
+-- that explicitly passes agency_id: null gets a null (shared) row.
 alter table public.blog_posts
   add column agency_id uuid references public.agencies(id)
     default '00000000-0000-0000-0000-000000000001';
@@ -242,3 +254,10 @@ create policy memberships_write_admin on public.memberships
 grant select, insert, update, delete on public.agencies        to authenticated;
 grant select, insert, update, delete on public.agency_profiles to authenticated;
 grant select, insert, update, delete on public.memberships     to authenticated;
+
+-- Local dev and some hosted configurations give anon/service_role default
+-- privileges (including TRUNCATE) on new tables unless explicitly revoked.
+-- RLS already hides every row from anon regardless, but the grant should say
+-- what the policies already enforce, not rely on a project setting to agree.
+revoke all on public.agencies, public.agency_profiles, public.memberships from anon, service_role;
+grant execute on function public.can_see(uuid) to anon, authenticated;

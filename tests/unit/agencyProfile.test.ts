@@ -80,4 +80,34 @@ describe("agencyProfile — one source, no drift", () => {
       ga4MeasurementId: AGENCY_PROFILE.ga4MeasurementId,
     });
   });
+
+  it("the tenant-schema migration's agencies.name and membership-lookup email also match the profile", () => {
+    // Two more literals in the same migration copy from AGENCY_PROFILE but
+    // live outside the agency_profiles insert the test above checks:
+    // agencies.name copies licenceEntity (the agency's own legal name is
+    // also what the one fixed agency is called), and the membership
+    // seed's `where email = ...` lookup copies email (it has to match the
+    // same address agency_profiles was seeded with, or Dorit's own seed
+    // membership insert silently finds nobody).
+    const migration = read(
+      join(REPO_ROOT, "supabase/migrations/20261010000000_tenant_schema.sql"),
+    );
+    const agenciesInsert = migration.match(
+      /insert into public\.agencies[\s\S]*?values\s*\(([\s\S]*?)\);/,
+    );
+    expect(agenciesInsert, "no agencies seed insert found in the migration").not.toBeNull();
+    const agenciesValues = [...agenciesInsert![1].matchAll(/'((?:[^']|'')*)'/g)].map((m) => m[1]);
+    // Positional, matching the insert's own column list: id, name, status.
+    const [, name] = agenciesValues;
+    expect(name).toBe(AGENCY_PROFILE.licenceEntity);
+
+    const membershipLookup = migration.match(
+      /from auth\.users where email = '((?:[^']|'')*)'/,
+    );
+    expect(
+      membershipLookup,
+      "no membership-lookup email found in the migration",
+    ).not.toBeNull();
+    expect(membershipLookup![1]).toBe(AGENCY_PROFILE.email);
+  });
 });
