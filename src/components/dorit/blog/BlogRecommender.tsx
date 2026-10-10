@@ -13,9 +13,9 @@ import { FOCUS_RING } from "./ArticleCard";
  *
  * The chat used to sit above the articles with its whole consent notice open,
  * which put the first card ~2,300px down on a phone. The notice itself is
- * unchanged: it still gates the first message inside AgentChat, and the text
- * typed here only pre-fills the chat's input. A shorter notice is proposed in
- * base44/agents/COMPLIANCE.md and needs the compliance adviser's approval.
+ * a gate: it still holds back the first message inside AgentChat, and the text
+ * typed here only pre-fills the chat's input. Its wording is the one-line
+ * version the compliance adviser approved (COMPLIANCE.md §9).
  *
  * Closing the dialog ends the conversation; the recommendation it produced
  * lives on the page and stays. Keeping the dialog mounted while closed would

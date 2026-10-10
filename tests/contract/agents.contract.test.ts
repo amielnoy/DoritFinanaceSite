@@ -1740,6 +1740,41 @@ describe("the support chat on the site", () => {
 });
 
 /**
+ * The reading recommender's notice — the one-line version Dorit's compliance
+ * adviser approved on 2026-10-10 (COMPLIANCE.md §9). Same failure as the
+ * support chat's: it used to show the interview's notice, which promises a name
+ * and a phone are collected for a meeting. The wording is the adviser's; these
+ * pin it, so an edit cannot drift from what was approved without failing here.
+ */
+describe("the reading recommender's notice", () => {
+  const agentsConfig = read(join(REPO_ROOT, "src/config/agents.ts"));
+  const compliance = read(join(REPO_ROOT, "src/config/compliance.ts"));
+  const points = compliance.match(
+    /export const BLOG_RECOMMENDER_CONSENT_POINTS = \[([\s\S]*?)\] as const;/
+  )?.[1];
+
+  it("is its own, not the interview's", () => {
+    const descriptor = agentsConfig.slice(agentsConfig.indexOf('agent: "blog_recommender"'));
+    expect(descriptor).toMatch(/consentPoints: BLOG_RECOMMENDER_CONSENT_POINTS/);
+    expect(points, "no BLOG_RECOMMENDER_CONSENT_POINTS").toBeDefined();
+    expect(points).not.toContain("נאספים שם וטלפון בלבד");
+  });
+
+  it("carries the approved line, word for word", () => {
+    expect(points).toContain('"עוזר אוטומטי של דורית, לא ייעוץ. אין לכתוב תעודת זהות או מספרי פוליסה."');
+  });
+
+  it("keeps the licence and the affiliation beside it", () => {
+    expect(points).toContain("${LICENCE.entity} בעלת רישיון סוכן מ${LICENCE.regulator}");
+    expect(points).toMatch(/שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי/);
+  });
+
+  it("came with a new consent version, so a stamp resolves to one wording", () => {
+    expect(compliance).toMatch(/CONSENT_VERSION = "2026-10-agents-v5"/);
+  });
+});
+
+/**
  * The pension clearing house, offered without an identity number.
  *
  * A full pension picture pulled before the meeting is the single largest

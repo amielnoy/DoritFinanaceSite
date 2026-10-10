@@ -1,6 +1,6 @@
 import { BookOpen, FileSearch, LifeBuoy, MessagesSquare } from "lucide-react";
 import type { AgentDescriptor } from "@/components/dorit/chat/AgentChat";
-import { PROCEDURES_CONSENT_POINTS,
+import { BLOG_RECOMMENDER_CONSENT_POINTS, PROCEDURES_CONSENT_POINTS,
   SUPPORT_CONSENT_POINTS } from "@/config/compliance";
 
 /**
@@ -167,5 +167,6 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
     greeting: "שלום. אני כאן כדי להמליץ לך על מאמרים רלוונטיים מהבלוג של דורית. באיזה נושא פיננסי מעניין אותך לקרוא? למשל: פנסיה, גמל והשתלמות, מיסוי, קיבוע זכויות, ביטוחי חיים ובריאות, דמי ניהול, פרישה.",
     conversationName: "המלצות קריאה",
     conversationDescription: "המלצות מאמרים לפי נושא",
+    consentPoints: BLOG_RECOMMENDER_CONSENT_POINTS,
   },
 };
