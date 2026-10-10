@@ -259,7 +259,7 @@ Isolation is proven before a second agency goes live.
 | Phase | What it does | Gate to the next phase |
 |---|---|---|
 | Phase 0 · Profile, not constants | Dorit becomes agency 1; contact, licence, mail and GA ids load from one profile | All suites green; production smoke shows no change |
-| Phase 1 · Tenant schema | `agencies`, `memberships`, `agency_id` on every table, backfilled; policies use `can_see()` | A user of agency B reads zero rows of agency A, in every table |
+| Phase 1 · Tenant schema — **done**, see [2026-10-10-multi-agent-phase1-tenant-schema-design.md](2026-10-10-multi-agent-phase1-tenant-schema-design.md) | `agencies`, `memberships`, `agency_id` on every table, backfilled; policies use `can_see()` | A user of agency B reads zero rows of agency A, in every table |
 | Phase 2 · Off Base44 | Functions to Supabase Edge; auth, files and data on Supabase; site served by Vercel | Base44 read-only for two weeks with no traffic, then switched off |
 | Phase 3 · Chat function and articles | Chat moves to a backend function; shared library under each agency's disclosure | Compliance adviser approves the second agency's notices |
 | Phase 4 · First outside agency | Own domain, mail sender, GA4, booking; customers consent under its own notice | Processing agreement signed; licence checked on the regulator's register |
