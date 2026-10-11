@@ -8,7 +8,7 @@ import { base44Mock } from "./base44-mock";
 vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
 vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
-const auth = vi.hoisted(() => ({ value: { user: null, isAuthenticated: false } as { user: Record<string, unknown> | null; isAuthenticated: boolean; logout?: (...a: unknown[]) => void } }));
+const auth = vi.hoisted(() => ({ value: { user: null, isAuthenticated: false } as { user: Record<string, unknown> | null; isAuthenticated: boolean; authChecked?: boolean; logout?: (...a: unknown[]) => void; navigateToLogin?: () => void } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));
 
 // framer-motion's layout animations need APIs jsdom does not implement.
@@ -66,5 +66,30 @@ describe("<FloatingHeader /> account links", () => {
     renderHeader({ user: { email: "a@example.com", role: "user" }, isAuthenticated: true, logout });
     fireEvent.click(screen.getAllByRole("button", { name: "יציאה" })[0]);
     expect(logout).toHaveBeenCalledWith(true, `${window.location.origin}/`);
+  });
+
+  /**
+   * A way in that does not need the address of an admin page.
+   *
+   * Signed out, the menu offered nothing: the only route to sign-in was typing
+   * /admin/leads and letting the guard bounce you to it. "כניסה" now starts
+   * the same flow from wherever you are, and comes back there.
+   */
+  it("offers a signed-out visitor a way to sign in, and starts it", () => {
+    const navigateToLogin = vi.fn();
+    renderHeader({ user: null, isAuthenticated: false, authChecked: true, navigateToLogin });
+    const signIn = screen.getAllByRole("button", { name: "כניסה" });
+    fireEvent.click(signIn[0]);
+    expect(navigateToLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no sign-in to someone already signed in", () => {
+    renderHeader({ user: { email: "a@example.com", role: "user" }, isAuthenticated: true, authChecked: true });
+    expect(screen.queryAllByRole("button", { name: "כניסה" })).toHaveLength(0);
+  });
+
+  it("does not flash a sign-in button while the auth check is still running", () => {
+    renderHeader({ user: null, isAuthenticated: false, authChecked: false });
+    expect(screen.queryAllByRole("button", { name: "כניסה" })).toHaveLength(0);
   });
 });

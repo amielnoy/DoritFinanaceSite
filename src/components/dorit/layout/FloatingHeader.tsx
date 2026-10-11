@@ -44,7 +44,17 @@ const NAV_LINK =
 export default function FloatingHeader() {
   const [open, setOpen] = useState<boolean>(false);
   const navigateToSection = useSectionNav();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, authChecked, navigateToLogin } = useAuth();
+  // Only once the auth check has answered: before that, a signed-in visitor
+  // would see "כניסה" flash and then vanish.
+  const showSignIn = authChecked && !isAuthenticated;
+  // Straight to Google and back to this page. Signed out, there used to be no
+  // way in from the menu at all — only typing /admin/leads and letting the
+  // guard bounce you to sign-in.
+  const signIn = () => {
+    setOpen(false);
+    navigateToLogin();
+  };
   // Home rather than this page: on /account or /admin/* the guard would bounce a
   // signed-out visitor straight to the login screen.
   const signOut = () => {
@@ -163,6 +173,11 @@ export default function FloatingHeader() {
               יציאה
             </button>
           ) : null}
+          {showSignIn ? (
+            <button type="button" onClick={signIn} className={NAV_LINK}>
+              כניסה
+            </button>
+          ) : null}
         </div>
       </nav>
 
@@ -231,6 +246,11 @@ export default function FloatingHeader() {
           {isAuthenticated ? (
             <button type="button" onClick={signOut} className="w-full flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200 text-start">
               <span>יציאה</span>
+            </button>
+          ) : null}
+          {showSignIn ? (
+            <button type="button" onClick={signIn} className="w-full flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200 text-start">
+              <span>כניסה</span>
             </button>
           ) : null}
               </nav>
