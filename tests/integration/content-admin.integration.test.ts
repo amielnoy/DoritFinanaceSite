@@ -56,3 +56,21 @@ describe("contentAdmin — the Supabase mirror", () => {
     expect(Object.keys(r.json).sort()).toEqual(["error", "rid"]);
   });
 });
+
+describe("contentAdmin — retrying a delete after a failed mirror", () => {
+  const deletes = ops.filter(([name]) => name.startsWith("remove"));
+
+  it.each(deletes)("%s: a Base44 404 means already gone, and the mirror still runs", async (_name, body, table) => {
+    const r = await invokeFunction("contentAdmin", body, { env, headers, routes: asAdmin, leadAlreadyDeleted: true });
+    expect(r.status).toBe(200);
+    const calls = r.callsTo(`/rest/v1/${table}`);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe("DELETE");
+  });
+
+  it.each(deletes)("%s: any other Base44 failure still fails the request, with no mirror call", async (_name, body, table) => {
+    const r = await invokeFunction("contentAdmin", body, { env, headers, routes: asAdmin, failLeadWrite: true });
+    expect(r.status).toBe(500);
+    expect(r.callsTo(`/rest/v1/${table}`)).toHaveLength(0);
+  });
+});

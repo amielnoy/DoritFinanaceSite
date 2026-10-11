@@ -104,7 +104,7 @@ const TESTIMONIAL_FIELDS = ['name', 'role', 'quote', 'image_url', 'rating', 'sou
  * שנחתם ב-base44_id, ואין מזהה לכתוב איתו קודם. יצירה שנכשלה כאן משאירה שורה
  * ב-Base44 בלבד; המזהה שלה נרשם ביומן, ו-scripts/reconcile-stores.mjs מוצא אותה.
  */
-async function mirror(rid, op, table, body, query = '') {
+async function mirror(rid, op, table, id, body, query = '') {
   const url = (Deno.env.get('SUPABASE_URL') || '').trim();
   const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
   if (!url || !key) throw new Error('Supabase is not configured');
@@ -123,9 +123,25 @@ async function mirror(rid, op, table, body, query = '') {
     log('info', 'content.mirrored', { rid, table, op });
   } catch (e) {
     log('error', 'content.mirror_failed', {
-      rid, table, op, base44Id: body?.base44_id ?? null, err: String(e?.message ?? e).slice(0, 200),
+      rid, table, op, base44Id: id ?? null, err: String(e?.message ?? e).slice(0, 200),
     });
     throw e;
+  }
+}
+
+/**
+ * מחיקה ב-Base44, כש-404 פירושו "כבר נמחק".
+ *
+ * מחיקה שהשיקוף שלה נכשל נענית ב-500, אבל השורה ב-Base44 כבר נעלמה. ניסיון חוזר
+ * היה נתקע לנצח על ה-404 לפני שהשיקוף בכלל רץ, והפריט היה נשאר באתר, שקורא
+ * מ-Supabase. לכן 404 ממשיך לשיקוף. כל שגיאה אחרת עדיין מכשילה את הבקשה.
+ * אותו כלל כמו ב-adminLead.
+ */
+async function deleteBase44(run) {
+  try {
+    await run();
+  } catch (e) {
+    if ((e?.status ?? e?.response?.status) !== 404) throw e;
   }
 }
 
@@ -156,19 +172,19 @@ export default async function(req) {
         const fields = { ...pick(draft, ARTICLE_FIELDS), published: !!draft?.published };
         const row = await base44.asServiceRole.entities.BlogPost.create(fields);
         const newId = row?.id ?? null;
-        await mirror(rid, 'upsert', 'blog_posts?on_conflict=base44_id', { ...fields, base44_id: newId });
+        await mirror(rid, 'upsert', 'blog_posts?on_conflict=base44_id', newId, { ...fields, base44_id: newId });
         result = { ok: true, id: newId };
         break;
       }
       case 'updateArticle': {
         const fields = pick(draft, ARTICLE_FIELDS);
         await base44.asServiceRole.entities.BlogPost.update(id, fields);
-        await mirror(rid, 'upsert', 'blog_posts?on_conflict=base44_id', { ...fields, base44_id: id });
+        await mirror(rid, 'upsert', 'blog_posts?on_conflict=base44_id', id, { ...fields, base44_id: id });
         break;
       }
       case 'removeArticle': {
-        await base44.asServiceRole.entities.BlogPost.delete(id);
-        await mirror(rid, 'delete', 'blog_posts', null, `?base44_id=eq.${encodeURIComponent(id)}`);
+        await deleteBase44(() => base44.asServiceRole.entities.BlogPost.delete(id));
+        await mirror(rid, 'delete', 'blog_posts', id, null, `?base44_id=eq.${encodeURIComponent(id)}`);
         break;
       }
       case 'createTestimonial': {
@@ -179,13 +195,13 @@ export default async function(req) {
         };
         const row = await base44.asServiceRole.entities.Testimonial.create(fields);
         const newId = row?.id ?? null;
-        await mirror(rid, 'upsert', 'testimonials?on_conflict=base44_id', { ...fields, base44_id: newId });
+        await mirror(rid, 'upsert', 'testimonials?on_conflict=base44_id', newId, { ...fields, base44_id: newId });
         result = { ok: true, id: newId };
         break;
       }
       case 'removeTestimonial': {
-        await base44.asServiceRole.entities.Testimonial.delete(id);
-        await mirror(rid, 'delete', 'testimonials', null, `?base44_id=eq.${encodeURIComponent(id)}`);
+        await deleteBase44(() => base44.asServiceRole.entities.Testimonial.delete(id));
+        await mirror(rid, 'delete', 'testimonials', id, null, `?base44_id=eq.${encodeURIComponent(id)}`);
         break;
       }
       default:

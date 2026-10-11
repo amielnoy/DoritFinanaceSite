@@ -1306,6 +1306,7 @@ git commit -m "Reconcile: compare and backfill BlogPost.action_time too"
 
 The user does this step, because the Base44 export contains customer names and phone numbers and must never pass through an agent's context or the repo:
 
+0. Before anything else, confirm migration `supabase/migrations/20261011000000_blog_action_time.sql` is applied in production: `select column_name from information_schema.columns where table_name='blog_posts' and column_name='action_time';` must return one row. `ARTICLE_COLUMNS` selects `action_time`, so a missing column breaks every blog read.
 1. Export the `Lead`, `BlogPost` and `Testimonial` entities (and `Contact`, which the script also compares) from the Base44 dashboard into one JSON file shaped `{ "Lead": [...], "BlogPost": [...], "Testimonial": [...], "Contact": [...] }`, saved **outside** the repo.
 2. Run:
    ```bash
@@ -1314,6 +1315,8 @@ The user does this step, because the Base44 export contains customer names and p
 3. **Gate:** the `Lead`, `BlogPost` and `Testimonial` rows must show `0` missing, `0` mismatched. `Contact` drift is not this piece's gate (no port reads contacts). An `orphaned` row is a Supabase-only row. Look at it before merging, because Task 4's fallback will show it in the admin list.
 4. On drift: `node scripts/backfill-from-base44.mjs /path/outside/repo/export.json > /path/outside/repo/backfill.sql`, inspect it, apply it with the Supabase SQL editor, and re-run step 2 until the three rows are clean.
 5. Delete the export and the SQL file.
+6. Spot-check a few posts' dates: reconcile does not compare `created_at`, which now drives blog ordering, displayed dates and `datePublished`.
+7. A Base44 post or testimonial that reconcile reports "missing" may be a duplicate left by retrying a create whose mirror failed. Check it in the admin UI first, and delete the duplicate in Base44 rather than backfilling it onto the site.
 
 Do not merge until this gate is clean.
 
