@@ -12,8 +12,6 @@
  * pretending otherwise just moves the failure somewhere less obvious.
  */
 interface ImportMetaEnv {
-  /** Who answers "who is signed in" — see `src/config/auth-provider.ts`. */
-  readonly VITE_AUTH_PROVIDER?: "base44" | "supabase";
   /** Who stores a claim document — see `src/config/upload-provider.ts`. */
   readonly VITE_UPLOAD_PROVIDER?: "base44" | "supabase";
   readonly VITE_BASE44_APP_ID?: string;

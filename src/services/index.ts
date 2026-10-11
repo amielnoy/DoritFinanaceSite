@@ -1,14 +1,10 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
-import { AUTH_PROVIDER } from "@/config/auth-provider";
 import { UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
-import { Base44AccountService } from "./base44/Base44AccountService";
 import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
-import { appParams } from "@/lib/app-params";
 import { Base44AgentService } from "./base44/Base44AgentService";
-import { Base44AuthService } from "./base44/Base44AuthService";
 import { Base44ContentAdminService } from "./base44/Base44ContentAdminService";
 import { Base44ContentService } from "./base44/Base44ContentService";
 import { Base44LeadAdminService } from "./base44/Base44LeadAdminService";
@@ -56,55 +52,37 @@ export interface Services {
 const client = base44 as any;
 
 /**
- * Content admin, during the migration.
+ * Content admin, unconditionally on Supabase.
  *
- * With Base44 answering "who is signed in", the browser writes Base44 directly,
- * exactly as it always has, and Supabase is left alone — an anonymous client
- * cannot satisfy `is_admin()` and every shadow write would be refused.
- *
- * With Supabase answering, the browser cannot write Base44 either: its rules
- * want a Base44 admin session and a Supabase one is refused with 403, before
- * the shadow write is even reached. So the writes move to a backend function,
- * which holds both credentials and needs no browser identity — only proof of
- * who is asking. Reads stay anonymous on Base44 either way, because posts and
- * testimonials are public.
+ * The browser cannot write Base44 directly: its rules want a Base44 admin
+ * session, and the only identity on offer now is Supabase's, which is refused
+ * with 403 before the shadow write is even reached. So the writes go through a
+ * backend function, which holds both credentials and needs no browser identity
+ * — only proof of who is asking. Reads stay anonymous on Base44, because posts
+ * and testimonials are public.
  */
-const contentAdmin: ContentAdminPort = (() => {
-  const base44Admin = new Base44ContentAdminService(client);
-  if (AUTH_PROVIDER !== "supabase") return base44Admin;
-
-  return new FunctionContentAdminService(
-    client as unknown as FunctionsClient,
-    base44Admin,
-    async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
-  );
-})();
+const contentAdmin: ContentAdminPort = new FunctionContentAdminService(
+  client as unknown as FunctionsClient,
+  new Base44ContentAdminService(client),
+  async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
+);
 
 /**
- * Identity, from whichever provider is switched on.
- *
- * Falls back to Base44 when Supabase is unconfigured rather than throwing: a
- * checkout without Supabase credentials should still sign people in, and an
- * auth provider that fails to construct takes the whole app with it.
+ * Identity, unconditionally on Supabase.
  */
 const authPort: AuthPort =
-  AUTH_PROVIDER === "supabase" && supabase
-    // The cast is narrowing, not widening: `SupabaseAuthClient` describes the
-    // handful of calls this adapter makes, and the real client does satisfy it.
-    // Matching them structurally makes tsc unfold PostgREST's generics until it
-    // gives up (TS2589), so the shape is asserted once here instead of being
-    // re-derived at every call.
-    ? new SupabaseAuthService(supabase as unknown as SupabaseAuthClient)
-    : new Base44AuthService(client, () => !!appParams.token);
+  // The cast is narrowing, not widening: `SupabaseAuthClient` describes the
+  // handful of calls this adapter makes, and the real client does satisfy it.
+  // Matching them structurally makes tsc unfold PostgREST's generics until it
+  // gives up (TS2589), so the shape is asserted once here instead of being
+  // re-derived at every call.
+  new SupabaseAuthService(supabase as unknown as SupabaseAuthClient);
 
 /**
- * The personal area, from whichever sign-in is switched on — the same rule as
+ * The personal area, unconditionally on Supabase — the same rule as
  * `authPort`, so the page asks the system that knows who the visitor is.
  */
-const accountPort: AccountPort =
-  AUTH_PROVIDER === "supabase" && supabase
-    ? new SupabaseAccountService(supabase as unknown as SupabaseRpcClient)
-    : new Base44AccountService(client);
+const accountPort: AccountPort = new SupabaseAccountService(supabase as unknown as SupabaseRpcClient);
 
 /**
  * Where a claim document lands, from whichever provider is switched on.
