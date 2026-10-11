@@ -189,6 +189,13 @@ featured row's deadline does not decide the outcome of an unrelated run.
 | CMP-BLOG-014 | "gives the page back to assistive tech once the dialog closes" | The grid heading is hidden while the modal is open and back after closing |
 | CMP-BLOG-015 | "carries the one-line disclosure and the privacy link" | The line and a link to `/privacy` |
 | CMP-BLOG-016 | "offers WhatsApp with the blog's own opening line, and the phone" | `wa.me/<CONTACT.whatsapp>` with "שלום דורית, הגעתי מהבלוג"; `tel:<CONTACT.phoneE164>`; `blog_cta` |
+| CMP-BLOG-017 | "offers every keyword under הכל, a keyword on most articles last" | All tags present; פנסיה (7 of 12) is last |
+| CMP-BLOG-018 | "offers only the chosen topic's keywords" | Under ביטוח: ביטוח · בריאות · משכנתא |
+| CMP-BLOG-019 | "narrows within the topic, and says so in the heading" | One card; `aria-pressed`; H2 "ביטוח · משכנתא" |
+| CMP-BLOG-020 | "clears on a second tap" | Topic's cards back; not pressed |
+| CMP-BLOG-021 | "drops a keyword the new topic does not carry" | Switching topic clears it |
+| CMP-BLOG-022 | "keeps a keyword the new topic still carries" | Still pressed after the switch |
+| CMP-BLOG-023 | "hides the featured row while a keyword is chosen" | No featured row; only matching cards |
 
 ### 4.13 Reading-recommender filter — `tests/component/blog-recommendation-filter.test.tsx`
 
@@ -206,6 +213,8 @@ visitor would.
 | CMP-REC-006 | "drops the recommendation filter once the visitor searches" | The search result, not the recommendation |
 | CMP-REC-007 | "clears an earlier search so the recommendation is not narrowed to nothing" | Search box emptied |
 | CMP-REC-008 | "scrolls the recommendation into view" | `scrollIntoView` called |
+| CMP-REC-009 | "clears a chosen keyword when a recommendation arrives" | Recommended card only; keyword no longer pressed |
+| CMP-REC-010 | "drops the recommendation filter once the visitor picks a keyword" | The keyword's cards, not the recommendation |
 
 ### 4.14 Reading-recommender chat — `tests/component/blog-recommendation-chat.test.tsx`
 

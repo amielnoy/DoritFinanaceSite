@@ -17,6 +17,8 @@ import {
   type TopicId,
   actionMinutes,
   isFeaturedLive,
+  tagCounts,
+  tagsOf,
   topicCounts,
   topicOf,
 } from "@/config/blog-topics";
@@ -38,6 +40,8 @@ export default function Blog() {
   const posts = (data ?? null) as Article[] | null;
   const [query, setQuery] = useState<string>("");
   const [topic, setTopic] = useState<TopicId>("all");
+  /** A keyword from the row under the topics; narrows within the topic. */
+  const [tag, setTag] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<boolean>(false);
   /** Post ids the reading-recommender chose, read from its `recommended`
    *  block — see src/lib/blog-recommendation.ts. While set, the grid shows
@@ -97,6 +101,12 @@ export default function Blog() {
 
   const counts = React.useMemo(() => topicCounts(posts ?? []), [posts]);
 
+  /** The keyword row offers only what the chosen topic's articles carry. */
+  const topicTags = React.useMemo(
+    () => tagCounts((posts ?? []).filter((p) => inTopic(p, topic))),
+    [posts, topic]
+  );
+
   const filtered = React.useMemo(() => {
     if (!posts) return [];
     const q = query.trim().toLowerCase();
@@ -106,10 +116,10 @@ export default function Blog() {
         p.title.toLowerCase().includes(q) ||
         (p.excerpt || "").toLowerCase().includes(q) ||
         (p.tags || "").toLowerCase().includes(q);
-      const matchesTopic = topic === "all" || topicOf(p.tags) === topic;
-      return matchesQuery && matchesTopic;
+      const matchesTag = !tag || tagsOf(p.tags).includes(tag);
+      return matchesQuery && inTopic(p, topic) && matchesTag;
     });
-  }, [posts, query, topic]);
+  }, [posts, query, topic, tag]);
 
   // In the order the agent ranked them. Ids with no matching post (one taken
   // down since, or a model slip) are dropped; if none match, nothing is
@@ -138,13 +148,20 @@ export default function Blog() {
     [posts, featured]
   );
   const showFeatured =
-    Boolean(featured) && !showingRecommended && !query.trim() && FEATURED_TOPICS.includes(topic);
+    Boolean(featured) && !showingRecommended && !query.trim() && !tag && FEATURED_TOPICS.includes(topic);
 
   // One filter at a time: a recommendation intersected with an unrelated
-  // search or topic would usually leave nothing on screen.
+  // search, topic or keyword would usually leave nothing on screen.
   const clearRecommendation = () => setRecommendedIds([]);
   const chooseTopic = (id: TopicId) => {
     setTopic(id);
+    // A keyword survives the switch only if the new topic still has it.
+    setTag((cur) => (cur && posts?.some((p) => inTopic(p, id) && tagsOf(p.tags).includes(cur)) ? cur : null));
+    setExpanded(false);
+    clearRecommendation();
+  };
+  const chooseTag = (t: string) => {
+    setTag((cur) => (cur === t ? null : t));
     setExpanded(false);
     clearRecommendation();
   };
@@ -156,9 +173,7 @@ export default function Blog() {
 
   const gridTitle = showingRecommended
     ? "מאמרים שהומלצו בצ'אט"
-    : topic === "all"
-      ? "כל המאמרים"
-      : TOPIC_LABEL[topic];
+    : `${topic === "all" ? "כל המאמרים" : TOPIC_LABEL[topic]}${tag ? ` · ${tag}` : ""}`;
 
   return (
     // `pb-14`: room for the phone's sticky bar under the footer, as on Home.
@@ -238,6 +253,35 @@ export default function Blog() {
                     );
                   })}
                 </div>
+
+                {/* One sideways-scrolling line on a phone, so it costs a row
+                    rather than pushing the articles down; wraps from md. */}
+                {topicTags.length > 0 ? (
+                  <div
+                    role="group"
+                    aria-label="סינון לפי מילת מפתח"
+                    className="-mx-6 px-6 md:mx-0 md:px-0 flex gap-2 overflow-x-auto md:flex-wrap md:overflow-visible pb-1"
+                  >
+                    {topicTags.map(({ tag: t }) => {
+                      const selected = tag === t && !showingRecommended;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => chooseTag(t)}
+                          className={`shrink-0 whitespace-nowrap min-h-11 px-3 rounded-md border text-sm transition-colors ${FOCUS_RING} ${
+                            selected
+                              ? "bg-accent text-accent-foreground border-accent"
+                              : "bg-transparent text-muted-foreground border-border hover:border-accent hover:text-accent"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -295,6 +339,7 @@ export default function Blog() {
                       onClick={() => {
                         setQuery("");
                         chooseTopic("all");
+                        setTag(null);
                       }}
                       className={`mt-4 min-h-11 text-sm text-accent underline underline-offset-4 hover:text-highlight transition-colors ${FOCUS_RING}`}
                     >
@@ -337,6 +382,7 @@ export default function Blog() {
               setRecommendedIds(ids);
               setQuery("");
               setTopic("all");
+              setTag(null);
             }}
           />
         </div>
@@ -347,6 +393,10 @@ export default function Blog() {
       <Footer />
     </div>
   );
+}
+
+function inTopic(post: Article, id: TopicId): boolean {
+  return id === "all" || topicOf(post.tags) === id;
 }
 
 function topicLabelOf(post: Article): string | undefined {

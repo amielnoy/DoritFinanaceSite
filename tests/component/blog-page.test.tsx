@@ -139,6 +139,75 @@ describe("the topic filter", () => {
   });
 });
 
+describe("the keyword row", () => {
+  const keywordRow = () => screen.getByRole("group", { name: "סינון לפי מילת מפתח" });
+  const keyword = (name: string) => within(keywordRow()).getByRole("button", { name });
+  const keywordLabels = () => within(keywordRow()).getAllByRole("button").map((b) => b.textContent);
+
+  it("offers every keyword under הכל, a keyword on most articles last", async () => {
+    renderBlog();
+    await loaded();
+    // פנסיה is on 7 of 12: it narrows little, and repeats a topic button.
+    expect(keywordLabels().at(-1)).toBe("פנסיה");
+    expect(keywordLabels()).toHaveLength(9);
+    expect(keywordLabels()).toEqual(expect.arrayContaining(["משכנתא", "ילדים", "החזר מס"]));
+  });
+
+  it("offers only the chosen topic's keywords", async () => {
+    renderBlog();
+    await loaded();
+    fireEvent.click(topicButton(/^ביטוח/));
+    expect(keywordLabels()).toEqual(["ביטוח", "בריאות", "משכנתא"]);
+  });
+
+  it("narrows within the topic, and says so in the heading", async () => {
+    renderBlog();
+    await loaded();
+    fireEvent.click(topicButton(/^ביטוח/));
+    fireEvent.click(keyword("משכנתא"));
+    expect(gridIds()).toEqual(["ins-1"]);
+    expect(keyword("משכנתא").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("heading", { level: 2, name: /^ביטוח · משכנתא\s*מאמר אחד$/ })).toBeTruthy();
+  });
+
+  it("clears on a second tap", async () => {
+    renderBlog();
+    await loaded();
+    fireEvent.click(topicButton(/^ביטוח/));
+    fireEvent.click(keyword("משכנתא"));
+    fireEvent.click(keyword("משכנתא"));
+    expect(gridIds()).toEqual(["ins-1", "ins-2"]);
+    expect(keyword("משכנתא").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("drops a keyword the new topic does not carry", async () => {
+    renderBlog();
+    await loaded();
+    fireEvent.click(topicButton(/^ביטוח/));
+    fireEvent.click(keyword("משכנתא"));
+    fireEvent.click(topicButton(/^פנסיה וגמל/));
+    expect(gridIds()).toHaveLength(7);
+    expect(within(keywordRow()).queryByRole("button", { pressed: true })).toBeNull();
+  });
+
+  it("keeps a keyword the new topic still carries", async () => {
+    renderBlog();
+    await loaded();
+    fireEvent.click(keyword("פנסיה"));
+    fireEvent.click(topicButton(/^פנסיה וגמל/));
+    expect(keyword("פנסיה").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("hides the featured row while a keyword is chosen", async () => {
+    renderBlog();
+    await loaded();
+    expect(featuredRow()).not.toBeNull();
+    fireEvent.click(keyword("מיסוי"));
+    expect(featuredRow()).toBeNull();
+    expect(gridIds()).toEqual(["tax-1"]);
+  });
+});
+
 describe("show all", () => {
   it("shows the first nine, then the rest on request", async () => {
     renderBlog();
