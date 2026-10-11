@@ -12,6 +12,8 @@ import { Base44LeadService } from "./base44/Base44LeadService";
 import { Base44SupportService } from "./base44/Base44SupportService";
 import { Base44UploadService } from "./base44/Base44UploadService";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
+import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
+import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
 import type {
   AccountPort,
   AgentPort,
@@ -52,7 +54,8 @@ export interface Services {
 const client = base44 as any;
 
 /**
- * Content admin, unconditionally on Supabase.
+ * Content admin: reads stay on Base44, writes go through a backend function
+ * authenticated by the Supabase session.
  *
  * The browser cannot write Base44 directly: its rules want a Base44 admin
  * session, and the only identity on offer now is Supabase's, which is refused
@@ -68,28 +71,31 @@ const contentAdmin: ContentAdminPort = new FunctionContentAdminService(
 );
 
 /**
- * Identity, unconditionally on Supabase.
+ * Identity, on Supabase. A build without Supabase credentials gets a stand-in
+ * that answers "nobody is signed in" instead of crashing on a null client.
  */
-const authPort: AuthPort =
-  // The cast is narrowing, not widening: `SupabaseAuthClient` describes the
-  // handful of calls this adapter makes, and the real client does satisfy it.
-  // Matching them structurally makes tsc unfold PostgREST's generics until it
-  // gives up (TS2589), so the shape is asserted once here instead of being
-  // re-derived at every call.
-  new SupabaseAuthService(supabase as unknown as SupabaseAuthClient);
+const authPort: AuthPort = supabase
+  ? // The cast is narrowing, not widening: `SupabaseAuthClient` describes the
+    // handful of calls this adapter makes, and the real client does satisfy it.
+    // Matching them structurally makes tsc unfold PostgREST's generics until it
+    // gives up (TS2589), so the shape is asserted once here instead of being
+    // re-derived at every call.
+    new SupabaseAuthService(supabase as unknown as SupabaseAuthClient)
+  : new UnconfiguredAuthService();
 
 /**
- * The personal area, unconditionally on Supabase — the same rule as
- * `authPort`, so the page asks the system that knows who the visitor is.
+ * The personal area, on Supabase — the same rule as `authPort`, so the page
+ * asks the system that knows who the visitor is.
  */
-const accountPort: AccountPort = new SupabaseAccountService(supabase as unknown as SupabaseRpcClient);
+const accountPort: AccountPort = supabase
+  ? new SupabaseAccountService(supabase as unknown as SupabaseRpcClient)
+  : new UnconfiguredAccountService();
 
 /**
  * Where a claim document lands, from whichever provider is switched on.
  *
- * Falls back to Base44 when Supabase is unconfigured, same reasoning as
- * `authPort`: a checkout without Supabase credentials should still accept a
- * claim's attachments.
+ * Falls back to Base44 when Supabase is unconfigured — a checkout without
+ * Supabase credentials should still accept a claim's attachments.
  */
 const uploadPort: UploadPort =
   UPLOAD_PROVIDER === "supabase" && supabase
