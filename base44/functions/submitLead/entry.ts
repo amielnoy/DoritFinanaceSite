@@ -1326,9 +1326,17 @@ export default async function(req) {
     // האם השיחה הזו כבר פתחה רשומה. זה מה שמבדיל עדכון מכפילות, וזה השדה
     // שמסביר בדיעבד למה ראיון אחד הופיע פעמיים במסך הפניות.
     log('info', 'lead.resolved', { rid, source: source || 'quick', track: track || '', stage: partial ? 'partial' : 'complete', upsert: Boolean(openInterview?.id) });
+    // שם ומועד, פעם אחת לשני המאגרים. העדכון השמיט אותם מ-Base44 בזמן
+    // שהשיקוף ל-Supabase לקח אותם מהבקשה — ושני העותקים של אותו ראיון נפרדו
+    // (11 מתוך 49 פניות ב-reconcile-stores). מועד שכבר נשמר נשמר, אם הסיום
+    // לא שלח חדש; ריק לא דורס אותו באף אחד מהמאגרים.
+    const storedName = name || openInterview?.name || '';
+    const storedTiming = timing || openInterview?.timing || '';
     if (openInterview?.id) {
       try {
         await base44.asServiceRole.entities.Lead.update(openInterview.id, {
+          name: storedName,
+          timing: storedTiming,
           email: email || openInterview.email || '',
           topic: effectiveTopic || '',
           message: leadMessage,
@@ -1381,12 +1389,12 @@ export default async function(req) {
     // אחת בדיוק, ואחרי שהכתיבה הסמכותית הצליחה — אותו סדר שבו תופעות הלוואי
     // שבהמשך רצות פעם אחת ולא פעם לכל מאגר.
     await mirrorLeadToSupabase(rid, leadId, {
-      name,
+      name: storedName,
       phone,
       email: email || '',
       source: source || 'quick',
       topic: effectiveTopic || '',
-      timing: timing || '',
+      timing: storedTiming,
       message: leadMessage,
       status: partial ? 'partial' : 'new',
       consent_version: consent_version || '',
