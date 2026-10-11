@@ -28,10 +28,13 @@ about correctly even though nothing production-relevant still chooses it.
 - Delete `src/config/auth-provider.ts` and the `VITE_AUTH_PROVIDER` type
   entry in `src/vite-env.d.ts` (its `VITE_UPLOAD_PROVIDER` sibling entry
   stays — that flag has its own, separate lifecycle).
-- Delete `src/services/base44/Base44AuthService.ts`,
-  `src/services/base44/Base44AccountService.ts`, and
-  `src/services/base44/invoke.ts` (the `failureOf` helper has no other
-  caller once `Base44AccountService` is gone).
+- Delete `src/services/base44/Base44AuthService.ts` and
+  `src/services/base44/Base44AccountService.ts`. Remove only the
+  `failureOf` function from `src/services/base44/invoke.ts` — that file's
+  other exports, `responseBody` and `invokeFunction`, are still used by
+  `Base44LeadAdminService.ts`, `Base44LeadService.ts`, and
+  `Base44SupportService.ts`, none of which this piece touches, so the file
+  itself stays.
 - In `src/services/index.ts`: `authPort`, `accountPort` and the
   `ContentAdminPort` branch all currently key off
   `AUTH_PROVIDER === "supabase" && supabase`. Replace each with the
