@@ -96,11 +96,18 @@ const pick = (obj, keys) => {
 const ARTICLE_FIELDS = ['title', 'excerpt', 'body', 'image_url', 'tags', 'published'];
 const TESTIMONIAL_FIELDS = ['name', 'role', 'quote', 'image_url', 'rating', 'source'];
 
-/** שיקוף ל-Supabase. לעולם לא זורק — Base44 הוא המקור הסמכותי בשלב הזה. */
+/**
+ * שיקוף ל-Supabase. כשל זורק, והבקשה כולה נכשלת.
+ *
+ * האתר קורא מ-Supabase, ולכן כתיבה שלא הגיעה לשם היא — מבחינת המבקר — כתיבה
+ * שלא קרתה. הסדר נשאר Base44 ואז Supabase: ביצירה, Base44 הוא שמנפיק את המזהה
+ * שנחתם ב-base44_id, ואין מזהה לכתוב איתו קודם. יצירה שנכשלה כאן משאירה שורה
+ * ב-Base44 בלבד; המזהה שלה נרשם ביומן, ו-scripts/reconcile-stores.mjs מוצא אותה.
+ */
 async function mirror(rid, op, table, body, query = '') {
   const url = (Deno.env.get('SUPABASE_URL') || '').trim();
   const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
-  if (!url || !key) return;
+  if (!url || !key) throw new Error('Supabase is not configured');
   try {
     const res = await fetch(`${url}/rest/v1/${table}${query}`, {
       method: op === 'delete' ? 'DELETE' : 'POST',
@@ -115,7 +122,10 @@ async function mirror(rid, op, table, body, query = '') {
     if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 140)}`);
     log('info', 'content.mirrored', { rid, table, op });
   } catch (e) {
-    log('warn', 'content.mirror_failed', { rid, table, op, err: String(e?.message ?? e).slice(0, 200) });
+    log('error', 'content.mirror_failed', {
+      rid, table, op, base44Id: body?.base44_id ?? null, err: String(e?.message ?? e).slice(0, 200),
+    });
+    throw e;
   }
 }
 
