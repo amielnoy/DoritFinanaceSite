@@ -144,6 +144,10 @@ if has e2e; then
     # Once SKIP_BUILD=1 the bundle is sealed and the config's `env` block has
     # nothing left to affect, so whatever is in .env.local wins instead.
     export VITE_BASE44_APP_BASE_URL=""
+    # Same for Supabase — see playwright.config.ts. Empty, not unset: Vite
+    # lets process env override .env.local only when the variable exists.
+    export VITE_SUPABASE_URL=""
+    export VITE_SUPABASE_PUBLISHABLE_KEY=""
     # `build:prerender`, not `build`. This built the client shell and then set
     # SKIP_BUILD=1, so playwright.config.ts skipped its own `build:prerender`
     # and the suite was pointed at a dist/ with no prerendered routes at all.

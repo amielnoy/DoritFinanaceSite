@@ -21,6 +21,13 @@ export default defineConfig({
     // Default is node; files needing a DOM opt in with a
     // `@vitest-environment jsdom` docblock (see tests/unit/auth-return-to).
     environment: "node",
+    // Every test run takes the Base44 fallback, as CI always has. Vitest loads
+    // .env.local, which holds real Supabase credentials on a developer's
+    // machine — without this, a component test that mocks the Base44 client
+    // would read the live Supabase project instead, and pass or fail on
+    // whatever production holds that day. Tests that want a Supabase client
+    // mock `@/api/supabaseClient` explicitly.
+    env: { VITE_SUPABASE_URL: "", VITE_SUPABASE_PUBLISHABLE_KEY: "" },
     // Allure results are written on every run, CI or not: they are what the
     // published report and `npm run allure:open` are built from, and without
     // this the report showed only the Playwright legs — the 174 unit,
