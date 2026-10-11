@@ -333,16 +333,22 @@ export default function AgentChat({
     if (!text || sending || !consentAt) return;
     setSending(true);
     setInput("");
+    // Armed before the send, not after it. The gap this covers is a reply that
+    // never arrives at all — but Base44's send can resolve only once the agent
+    // has finished answering, and the answer reaches the page first, through
+    // the subscription. Armed after the await, the timer started after the
+    // reply had already come and gone, and the apology appeared 20 seconds
+    // later under a perfectly good answer (2026-10-11).
+    clearNoReplyTimeout();
+    noReplyTimeoutRef.current = setTimeout(() => {
+      noReplyTimeoutRef.current = null;
+      say(NO_REPLY_COPY);
+    }, NO_REPLY_TIMEOUT_MS);
     try {
       await services.agents.send(await ensureConversation(), text);
-      // The send itself succeeded — this is not the error path above, it is
-      // the gap that path cannot see: a reply that never arrives at all.
-      clearNoReplyTimeout();
-      noReplyTimeoutRef.current = setTimeout(() => {
-        noReplyTimeoutRef.current = null;
-        say(NO_REPLY_COPY);
-      }, NO_REPLY_TIMEOUT_MS);
     } catch (e) {
+      // A failed send says so itself, below; it is not "no reply".
+      clearNoReplyTimeout();
       // Put the text back in the box. The visitor's own message reaches the
       // transcript only by way of the server echoing it, so a failed send
       // leaves it nowhere at all: cleared from the input, absent from the

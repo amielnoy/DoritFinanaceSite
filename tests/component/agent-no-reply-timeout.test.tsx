@@ -109,6 +109,48 @@ describe("a send that never gets a reply", () => {
     expect(screen.getByText("תשובה אמיתית הגיעה בזמן")).toBeInTheDocument();
   });
 
+  /**
+   * The order production actually has.
+   *
+   * Base44's send can resolve only after the agent has finished answering, and
+   * the answer reaches the page first, through the subscription. The timer used
+   * to be armed after `send` resolved — after the reply had already cleared a
+   * timer that did not exist yet — so 20 seconds later the apology appeared
+   * under a perfectly good answer (govari-fin.co.il, 2026-10-11).
+   */
+  it("does not apologise when the reply lands before the send resolves", async () => {
+    const { services } = await import("@/services");
+    let resolveSend!: () => void;
+    vi.mocked(services.agents.send).mockImplementationOnce(
+      () => new Promise<undefined>((resolve) => { resolveSend = () => resolve(undefined); }),
+    );
+    await startAndSend("שלום");
+
+    // The send is still pending when the answer arrives through the subscription…
+    act(() => {
+      pushMessages!([
+        { role: "assistant", content: "ברוך הבא" },
+        { role: "user", content: "שלום" },
+        { role: "assistant", content: "התשובה הגיעה לפני שהשליחה הסתיימה" },
+      ]);
+    });
+    // …and only then does the send resolve.
+    await act(async () => resolveSend());
+
+    await act(async () => vi.advanceTimersByTimeAsync(NO_REPLY_TIMEOUT_MS * 2));
+    expect(screen.getByText("התשובה הגיעה לפני שהשליחה הסתיימה")).toBeInTheDocument();
+    expect(screen.queryByText(/לא התקבלה כראוי/)).not.toBeInTheDocument();
+  });
+
+  it("does not apologise for a send that failed outright — that path says so itself", async () => {
+    const { services } = await import("@/services");
+    vi.mocked(services.agents.send).mockRejectedValueOnce(new Error("network"));
+    await startAndSend("שלום");
+
+    await act(async () => vi.advanceTimersByTimeAsync(NO_REPLY_TIMEOUT_MS * 2));
+    expect(screen.queryByText(/לא התקבלה כראוי/)).not.toBeInTheDocument();
+  });
+
   it("does not leave a stale timeout armed after the conversation is reset", async () => {
     await startAndSend("שלום");
 
