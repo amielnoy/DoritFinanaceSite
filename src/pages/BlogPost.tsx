@@ -18,7 +18,7 @@ export default function BlogPost() {
   const post: Article | null = data ?? null;
 
   // A missing post must never be indexed as a real article — same rule
-  // api/og/blog/[id].ts falls back to when Base44 has nothing for the id.
+  // api/og/blog.ts falls back to when Base44 has nothing for the id.
   useSeo(post ? computeBlogSeoConfig(post) : notFound ? BLOG_POST_NOT_FOUND_SEO : null);
 
   if (loading) {
