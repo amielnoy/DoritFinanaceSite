@@ -46,7 +46,7 @@ const TABLES = {
   },
   BlogPost: {
     table: "blog_posts",
-    cols: ["title","excerpt","body","image_url","tags","published"],
+    cols: ["title","excerpt","body","image_url","tags","action_time","published"],
   },
   Testimonial: {
     table: "testimonials",

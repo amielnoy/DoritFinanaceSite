@@ -286,7 +286,7 @@ describe("dependency inversion holds", () => {
     const wiring = sourceFiles().filter((f) => {
       const r = rel(f);
       if (r.startsWith("src/services/")) return false;
-      return /new Base44\w+Service\(/.test(read(f));
+      return /new (Base44|Supabase)\w+Service\(/.test(read(f));
     });
     expect(wiring.map(rel)).toEqual([]);
   });

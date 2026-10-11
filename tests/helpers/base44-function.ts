@@ -73,6 +73,14 @@ export interface HarnessOptions {
   user?: Record<string, unknown> | Error | null;
   /** JSON returned by a Supabase RPC, keyed by function name. */
   rpc?: Record<string, unknown>;
+  /** Extra request headers — `X-Supabase-Auth` for `contentAdmin`, which reads the caller's token there. */
+  headers?: Record<string, string>;
+  /**
+   * Answers for particular upstream URLs: the first route whose `match` the URL
+   * contains wins. `fetchStatus` sets every call at once, which cannot say
+   * "the admin check passed but the mirror write did not".
+   */
+  routes?: { match: string; status: number; json?: unknown; text?: string }[];
 }
 
 export interface Invocation {
@@ -241,6 +249,15 @@ export async function invokeFunction(
         json: async () => options.resendResponse ?? { ok: status >= 200 && status < 300, ids: ["mailer-test-id"] } };
     }
     if (options.failFetch || options.failCalendar) throw new Error("simulated network failure");
+    const route = options.routes?.find((r) => String(url).includes(r.match));
+    if (route) {
+      return {
+        ok: route.status >= 200 && route.status < 300,
+        status: route.status,
+        json: async () => route.json ?? {},
+        text: async () => route.text ?? "",
+      };
+    }
     const rpc = String(url).match(/\/rest\/v1\/rpc\/(\w+)/);
     if (rpc && options.rpc && rpc[1] in options.rpc) {
       const status = options.fetchStatus ?? 200;
@@ -264,7 +281,7 @@ export async function invokeFunction(
   const response = await handler(
     new Request("https://example.test/fn", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(options.headers ?? {}) },
       body: JSON.stringify(body ?? {}),
     }),
   );

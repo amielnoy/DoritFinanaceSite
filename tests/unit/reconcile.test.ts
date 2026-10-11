@@ -115,4 +115,13 @@ describe("reconciliation — do the two stores agree", () => {
     );
     expect(drifted.mismatched).toEqual([{ key: "p1", fields: ["published"] }]);
   });
+
+  it("flags a post whose action_time reached only one store", () => {
+    const { mismatched } = compareRows(
+      [{ id: "p1", title: "t", body: "b", published: true, action_time: "רבע שעה" }],
+      [{ base44_id: "p1", title: "t", body: "b", published: true, action_time: null }],
+      SPECS.BlogPost,
+    );
+    expect(mismatched).toEqual([{ key: "p1", fields: ["action_time"] }]);
+  });
 });

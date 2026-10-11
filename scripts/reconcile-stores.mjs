@@ -42,7 +42,7 @@ export const SPECS = {
   BlogPost: {
     table: "blog_posts",
     key: (row) => row.base44_id ?? row.id,
-    compare: ["title", "excerpt", "body", "image_url", "tags", "published"],
+    compare: ["title", "excerpt", "body", "image_url", "tags", "action_time", "published"],
   },
   Testimonial: {
     table: "testimonials",

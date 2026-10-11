@@ -162,6 +162,11 @@ export default defineConfig({
           // every /api call; a request that slipped past the fixture has to
           // 404, not create a real lead and send real email.
           VITE_BASE44_APP_BASE_URL: "",
+          // The same reasoning for Supabase: the e2e fixtures stub Base44, so a
+          // build that inlined .env.local's Supabase credentials would read the
+          // live project for every blog, testimonial and admin list instead.
+          VITE_SUPABASE_URL: "",
+          VITE_SUPABASE_PUBLISHABLE_KEY: "",
         },
       },
 });
