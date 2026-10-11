@@ -136,8 +136,21 @@ describe("leadEvents", () => {
     leadEvents.chatHandoff("ai_interview");
     leadEvents.handoffCompleted("ai_interview");
     leadEvents.preferredChannel("whatsapp");
+    leadEvents.wizardStarted();
+    leadEvents.wizardStep(3);
+    leadEvents.wizardCompleted();
+    leadEvents.wizardClaimHandoff();
     const names = new Set(LEAD_EVENTS.map((e) => e.name));
     for (const [, event] of w.gtag!.mock.calls) expect(names.has(event)).toBe(true);
+  });
+});
+
+describe("the needs wizard's events", () => {
+  it("sends the step by number only, and a lead only as generate_lead", () => {
+    leadEvents.wizardStep(4);
+    expect(w.gtag).toHaveBeenCalledWith("event", "wizard_step", { method: "needs_wizard", location: "step_4" });
+    leadEvents.wizardCompleted();
+    expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "needs_wizard" });
   });
 });
 

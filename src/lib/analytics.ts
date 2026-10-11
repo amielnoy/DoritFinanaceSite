@@ -142,6 +142,18 @@ export const leadEvents = {
   /** The hand-off form, once `escalateToHuman` has actually reached דורית. */
   handoffCompleted: (method: ChatMethod) => track("generate_lead", { method }),
   preferredChannel: (channel: "whatsapp" | "phone") => track("preferred_channel_click", { channel }),
+  /** The needs wizard's first answer — the visitor started, not yet a lead. */
+  wizardStarted: () => track("wizard_start", { method: "needs_wizard" }),
+  /**
+   * A wizard screen completed, by its number and nothing else. `location`
+   * carries the step because it is already on the allow-list; the answers never
+   * travel, and the list is not widened for them.
+   */
+  wizardStep: (step: number) => track("wizard_step", { method: "needs_wizard", location: `step_${step}` }),
+  /** The wizard's summary, once `submitInterview` saved it — not on the click. */
+  wizardCompleted: () => track("generate_lead", { method: "needs_wizard" }),
+  /** The wizard's claim route, once `escalateToHuman` actually reached דורית. */
+  wizardClaimHandoff: () => track("generate_lead", { method: "needs_wizard_claim" }),
 };
 
 /**
@@ -154,13 +166,15 @@ export const LEAD_EVENTS: ReadonlyArray<{
   when: string;
   keyEvent: boolean;
 }> = [
-  { name: "generate_lead", meaning: "ליד שנשמר", when: "טופס יצירת קשר, סיכום ראיון או בקשת מעבר לדורית בצ׳אט שנשמרו בהצלחה (method מבחין ביניהם)", keyEvent: true },
+  { name: "generate_lead", meaning: "ליד שנשמר", when: "טופס יצירת קשר, סיכום ראיון, שאלון ההיכרות או בקשת מעבר לדורית שנשמרו בהצלחה (method מבחין ביניהם)", keyEvent: true },
   { name: "click_phone", meaning: "לחיצה על טלפון", when: "כל קישור חיוג באתר (location אומר מאיפה)", keyEvent: true },
   { name: "click_whatsapp", meaning: "לחיצה על וואטסאפ", when: "כל קישור וואטסאפ באתר", keyEvent: true },
   { name: "click_email", meaning: "לחיצה על מייל", when: "כל קישור מייל באתר", keyEvent: false },
   { name: "cta_click", meaning: "לחיצה על \"לשיחה קצרה עם דורית\"", when: "כל קישור לראיון ההיכרות", keyEvent: false },
   { name: "chat_start", meaning: "התחלת שיחה עם עוזר", when: "אישור ההסכמה ולחיצה על \"התחלת השיחה\" (method: איזה צ׳אט)", keyEvent: false },
   { name: "chat_handoff", meaning: "בקשה לעבור לדורית", when: "לחיצה על \"מעבר לדורית\" בצ׳אט — ה-key event הוא generate_lead, ברגע שההעברה אכן הושלמה", keyEvent: false },
+  { name: "wizard_start", meaning: "התחלת שאלון ההיכרות", when: "התשובה הראשונה בשאלון — עוד לא ליד", keyEvent: false },
+  { name: "wizard_step", meaning: "שלב בשאלון ההיכרות", when: "מעבר מסך בשאלון (location: מספר השלב בלבד, בלי התשובות)", keyEvent: false },
   { name: "preferred_channel_click", meaning: "בחירת ערוץ מועדף", when: "שמור לכפתור ערוץ שאינו קישור ישיר — כרגע אין כזה", keyEvent: false },
 ];
 

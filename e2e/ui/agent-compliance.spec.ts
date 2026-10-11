@@ -1,4 +1,4 @@
-import type { Locator } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, gotoApp, test, test_step } from "../fixtures/app";
 
 /**
@@ -24,10 +24,22 @@ const handoffForm = (section: Locator) =>
 
 const INTERVIEW = "#start";
 
+/**
+ * The home page with the interview chat open.
+ *
+ * The needs wizard is the primary path in #start now; the chat it replaced is
+ * one press away, behind "לשיחה עם העוזר". Everything below is about the chat's
+ * regulatory shell, which is unchanged — it just has to be opened first.
+ */
+async function openInterviewChat(page: Page): Promise<void> {
+  await gotoApp(page, "/");
+  await page.locator(INTERVIEW).getByRole("button", { name: /לשיחה עם העוזר/ }).click();
+}
+
 test.describe("Agent chat — regulatory shell", () => {
   test("a visitor cannot type before accepting the consent notice", async ({ page, mockApi }) => {
     await test_step("open the home page and find the interview agent", async () => {
-      await gotoApp(page, "/");
+      await openInterviewChat(page);
     });
 
     const section = page.locator(INTERVIEW);
@@ -50,7 +62,7 @@ test.describe("Agent chat — regulatory shell", () => {
   });
 
   test("the notice discloses the bot, the licence and the data collected", async ({ page }) => {
-    await gotoApp(page, "/");
+    await openInterviewChat(page);
     const section = page.locator(INTERVIEW);
 
     await test_step("it says this is not a person and not a licence holder", async () => {
@@ -77,7 +89,7 @@ test.describe("Agent chat — regulatory shell", () => {
   test("the fence is published beside the interview agent", async ({ page }) => {
     const section = page.locator(INTERVIEW);
     await test_step("open the home page, where the interview lives", async () => {
-      await gotoApp(page, "/");
+      await openInterviewChat(page);
     });
 
     await test_step("the one-line claim about where the automation stops is on screen", async () => {
@@ -101,7 +113,7 @@ test.describe("Agent chat — regulatory shell", () => {
 
   test("a standing disclaimer sits under every message box", async ({ page }) => {
     await test_step("open the home page", async () => {
-      await gotoApp(page, "/");
+      await openInterviewChat(page);
     });
 
     await test_step("every chat says it is not advice, where the typing happens", async () => {
@@ -129,7 +141,7 @@ test.describe("Agent chat — regulatory shell", () => {
    * sits in a footer that does not.
    */
   test("the consent checkbox is reachable without scrolling", async ({ page }) => {
-    await gotoApp(page, "/");
+    await openInterviewChat(page);
     const section = page.locator(INTERVIEW);
     const box = section.getByRole("checkbox");
     const start = section.getByRole("button", { name: /התחלת השיחה/ });
@@ -167,7 +179,7 @@ test.describe("Agent chat — regulatory shell", () => {
     page,
     mockApi,
   }) => {
-    await gotoApp(page, "/");
+    await openInterviewChat(page);
     const section = page.locator(INTERVIEW);
 
     await test_step("the handoff control is present from the first frame", async () => {
@@ -297,7 +309,7 @@ test.describe("Support chat — the open question", () => {
  */
 test.describe("Agent chat — when the backend refuses", () => {
   test("a refused conversation gives the visitor their message back", async ({ page, mockApi }) => {
-    await gotoApp(page, "/");
+    await openInterviewChat(page);
     const section = page.locator(INTERVIEW);
     const box = section.getByLabel("הודעה לסוכן ההיכרות");
 
@@ -333,7 +345,7 @@ test.describe("Agent chat — when the backend refuses", () => {
     page,
     mockApi,
   }) => {
-    await gotoApp(page, "/");
+    await openInterviewChat(page);
     const section = page.locator(INTERVIEW);
 
     await test_step("escalateToHuman is down", async () => {
@@ -353,7 +365,7 @@ test.describe("Agent chat — when the backend refuses", () => {
     page,
     mockApi,
   }) => {
-    await gotoApp(page, "/");
+    await openInterviewChat(page);
     const section = page.locator(INTERVIEW);
 
     await test_step("the second door is there", async () => {
@@ -371,7 +383,7 @@ test.describe("Agent chat — when the backend refuses", () => {
     page,
     mockApi,
   }) => {
-    await gotoApp(page, "/");
+    await openInterviewChat(page);
     const section = page.locator(INTERVIEW);
 
     await test_step("give a name and no number, then send", async () => {
