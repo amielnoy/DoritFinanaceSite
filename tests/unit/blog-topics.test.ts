@@ -6,9 +6,46 @@ import {
   TOPICS,
   actionMinutes,
   isFeaturedLive,
+  tagCounts,
+  tagsOf,
   topicCounts,
   topicOf,
 } from "@/config/blog-topics";
+
+describe("tagsOf", () => {
+  it("splits, trims and drops empty tags", () => {
+    expect(tagsOf("  ביטוח ,משכנתא,, ")).toEqual(["ביטוח", "משכנתא"]);
+    expect(tagsOf(undefined)).toEqual([]);
+  });
+});
+
+describe("tagCounts", () => {
+  it("lists every keyword once, most common first, ties in Hebrew order", () => {
+    expect(
+      tagCounts([{ tags: "ביטוח, משכנתא" }, { tags: "ביטוח" }, { tags: "בריאות" }, { tags: "משכנתא" }, { tags: "חיסכון" }]),
+    ).toEqual([
+      { tag: "ביטוח", count: 2 },
+      { tag: "משכנתא", count: 2 },
+      { tag: "בריאות", count: 1 },
+      { tag: "חיסכון", count: 1 },
+    ]);
+  });
+
+  it("moves a keyword carried by more than half the articles to the end", () => {
+    expect(
+      tagCounts([{ tags: "פנסיה, ביטוח" }, { tags: "פנסיה, משכנתא" }, { tags: "ביטוח, פנסיה" }, { tags: "בריאות" }]),
+    ).toEqual([
+      { tag: "ביטוח", count: 2 },
+      { tag: "בריאות", count: 1 },
+      { tag: "משכנתא", count: 1 },
+      { tag: "פנסיה", count: 3 },
+    ]);
+  });
+
+  it("counts a tag repeated within one article once", () => {
+    expect(tagCounts([{ tags: "פנסיה, פנסיה" }])).toEqual([{ tag: "פנסיה", count: 1 }]);
+  });
+});
 
 describe("topicOf", () => {
   it("takes the article's own first tag that names a topic", () => {

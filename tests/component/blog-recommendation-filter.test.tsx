@@ -8,7 +8,7 @@
  * separately in blog-recommendation-chat.test.tsx — here AgentChat is stubbed
  * so this test is about Blog.tsx's own reaction.
  */
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -53,10 +53,13 @@ vi.mock("@/components/dorit/chat/AgentChat", () => ({
 }));
 
 const POSTS = [
-  { id: "post-a", title: "דמי ניהול בפנסיה", excerpt: "", created_date: "2026-01-01" },
-  { id: "post-b", title: "ביטוח חיים ומשכנתא", excerpt: "", created_date: "2026-01-02" },
-  { id: "post-c", title: "ליווי תביעות", excerpt: "", created_date: "2026-01-03" },
+  { id: "post-a", title: "דמי ניהול בפנסיה", excerpt: "", tags: "פנסיה", created_date: "2026-01-01" },
+  { id: "post-b", title: "ביטוח חיים ומשכנתא", excerpt: "", tags: "ביטוח", created_date: "2026-01-02" },
+  { id: "post-c", title: "ליווי תביעות", excerpt: "", tags: "תביעות", created_date: "2026-01-03" },
 ];
+
+const keyword = (name: string) =>
+  within(screen.getByRole("group", { name: "סינון לפי מילת מפתח" })).getByRole("button", { name });
 
 const { default: Blog } = await import("@/pages/Blog");
 
@@ -148,6 +151,29 @@ describe("the blog page shows only the recommended posts", () => {
 
     expect(shownIds()).toEqual(["post-a", "post-b", "post-c"]);
     expect(screen.queryByText(BACK_TO_ALL)).toBeNull();
+  });
+
+  it("clears a chosen keyword when a recommendation arrives", async () => {
+    renderBlog();
+    await screen.findByText("דמי ניהול בפנסיה");
+    fireEvent.click(keyword("תביעות"));
+    expect(shownIds()).toEqual(["post-c"]);
+
+    await recommend(["post-a"]);
+
+    await waitFor(() => expect(shownIds()).toEqual(["post-a"]));
+    expect(keyword("תביעות").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("drops the recommendation filter once the visitor picks a keyword", async () => {
+    renderBlog();
+    await screen.findByText("דמי ניהול בפנסיה");
+    await recommend(["post-a"]);
+    await waitFor(() => expect(card("post-b")).toBeNull());
+
+    fireEvent.click(keyword("ביטוח"));
+
+    expect(shownIds()).toEqual(["post-b"]);
   });
 
   it("drops the recommendation filter once the visitor searches", async () => {

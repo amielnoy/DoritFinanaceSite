@@ -35,8 +35,35 @@ const TAG_TO_TOPIC = new Map<string, Topic>(
   )
 );
 
+export function tagsOf(tags: string | undefined): string[] {
+  return (tags ?? "").split(",").map((t) => t.trim()).filter(Boolean);
+}
+
+/**
+ * The keyword row: each tag once, most common first — except a tag carried by
+ * more than half the articles, which goes to the end. Such a tag narrows almost
+ * nothing ("התנהלות שוטפת" is on nearly every article, and "פנסיה" under הכל
+ * repeats a topic button), and a phone's sideways-scrolling row should open on
+ * the keywords that actually narrow.
+ */
+export function tagCounts(posts: readonly { tags?: string }[]): { tag: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const p of posts) {
+    for (const tag of new Set(tagsOf(p.tags))) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  const broad = (count: number) => count > posts.length / 2;
+  return [...counts]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort(
+      (a, b) =>
+        Number(broad(a.count)) - Number(broad(b.count)) ||
+        b.count - a.count ||
+        a.tag.localeCompare(b.tag, "he")
+    );
+}
+
 export function topicOf(tags: string | undefined): Topic | null {
-  const list = (tags ?? "").split(",").map((t) => t.trim()).filter(Boolean);
+  const list = tagsOf(tags);
   for (const tag of list) {
     const topic = TAG_TO_TOPIC.get(tag);
     if (topic) return topic;

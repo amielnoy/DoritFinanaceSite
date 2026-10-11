@@ -402,6 +402,10 @@ row is live through `FEATURED.until` by the Israeli calendar.
 | UNIT-TOP-011 | "is live through the last day, in Israel time" | Live at 23:59 on 31 Dec in Israel, gone at 00:00 |
 | UNIT-TOP-012 | "names an article that exists in content/blog" | `FEATURED.title` matches a front-matter title |
 | UNIT-TOP-013 | "each land in a topic" | Every repo article has a topic |
+| UNIT-TOP-014 | "splits, trims and drops empty tags" | `tagsOf` → clean list; `[]` for none |
+| UNIT-TOP-015 | "lists every keyword once, most common first, ties in Hebrew order" | `tagCounts` order: count desc, then `he` collation |
+| UNIT-TOP-016 | "counts a tag repeated within one article once" | Count 1 |
+| UNIT-TOP-017 | "moves a keyword carried by more than half the articles to the end" | A broad tag sorts after every narrower one |
 
 ## 5. Pass criteria
 
