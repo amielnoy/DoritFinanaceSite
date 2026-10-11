@@ -232,7 +232,29 @@ export function hasSupabaseSessionKey(storage: Pick<Storage, "length" | "key">):
   return false;
 }
 
+/**
+ * Is this page load the return from a sign-in?
+ *
+ * The implicit flow — what this client uses — returns with `#access_token=…`;
+ * the PKCE flow with `?code=…`. A failed sign-in (`#error=…`) carries neither.
+ * A false "yes" costs one redundant auth check, the same trade as above.
+ */
+export function isAuthCallback(location: Pick<Location, "hash" | "search">): boolean {
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  return hash.has("access_token") || new URLSearchParams(location.search).has("code");
+}
+
+/**
+ * The callback counts as a session, because on that one load the storage is
+ * still empty: supabase-js writes the session only after verifying the token,
+ * and AuthContext asks once, on mount, before that finishes. Answering from
+ * storage alone left a person who had just signed in looking signed out until
+ * they reloaded. `getUser()` waits for supabase-js to finish reading the URL,
+ * so starting the check now is safe.
+ */
 function defaultSessionPresent(): boolean {
-  if (typeof window === "undefined" || !window.localStorage) return false;
+  if (typeof window === "undefined") return false;
+  if (isAuthCallback(window.location)) return true;
+  if (!window.localStorage) return false;
   return hasSupabaseSessionKey(window.localStorage);
 }
