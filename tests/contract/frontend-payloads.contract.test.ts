@@ -360,22 +360,17 @@ describe("email is sent from the backend, never the browser", () => {
     expect(fromBrowser.map((c) => c.file)).toEqual([]);
   });
 
-  it("reaches Base44's own mailer only through the one routing helper", () => {
-    // Core delivers to registered users only, so `CORE_EMAILS` is the list of
-    // addresses it can actually reach — not the list of people on the team.
-    // Confining it to `sendMail` keeps that a routing decision in one place
-    // rather than a choice made three times, and anyone not on that list must
-    // never land on it, because Core would silently fail to deliver.
+  it("no backend function calls Core.SendEmail either — one transport, dorit-mailer, for everyone", () => {
+    // Core delivered to registered users of the app only, which is why
+    // `CORE_EMAILS` and the branch that used it existed at all — not a list of
+    // the team, a list of who that one transport could actually reach. It
+    // silently dropped the agency, the second operations mailbox and every
+    // visitor confirmation once; removing it removes that failure mode too.
     for (const file of BACKEND) {
       const src = read(file);
       const calls = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-      const uses = [...calls.matchAll(/integrations\.Core\.SendEmail\(/g)];
-      if (!uses.length) continue;
-      expect(uses, `${rel(file)} calls Core.SendEmail more than once`).toHaveLength(1);
-      // And that one call sits inside the NOTIFY_EMAILS branch of sendMail.
-      const helper = calls.slice(calls.indexOf("async function sendMail"));
-      expect(helper, `${rel(file)}: the Core call is outside sendMail`).toMatch(
-        /CORE_EMAILS\.includes\(to\)[\s\S]{0,200}?integrations\.Core\.SendEmail\(/
+      expect(calls, `${rel(file)} still calls Core.SendEmail`).not.toMatch(
+        /integrations\.Core\.SendEmail\(/
       );
     }
   });

@@ -1075,33 +1075,20 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     }
   });
 
-  it("keeps the Core-reachable list identical in every function that mails", () => {
-    // `CORE_EMAILS` decides which transport a recipient takes. If the three
-    // copies disagree, the same address is mailed one way by one function and
-    // another way by the next — and the one that cannot deliver fails silently.
+  it("never calls Base44's Core.SendEmail — one transport for every recipient now", () => {
+    // The whole original defect was two transports for one set of mailboxes:
+    // Core delivers to registered users only, the agency is not one, and a
+    // copy that silently failed to her looked the same as one that arrived.
+    // CORE_EMAILS and the branch that used it are gone from all three —
+    // dorit-mailer is the only transport left, and it reaches everyone.
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    const listOf = (src: string, name: string) => {
-      const i = src.indexOf("const CORE_EMAILS = [");
-      expect(i, `${name} declares no CORE_EMAILS`).toBeGreaterThan(-1);
-      return src.slice(i, src.indexOf("];", i)).replace(/\s+/g, " ").trim();
-    };
-    const lists = [
-      listOf(submitLead, "submitLead"),
-      listOf(escalate, "escalateToHuman"),
-      listOf(claim, "submitClaim"),
-    ];
-    expect(lists[1], "escalateToHuman drifted from submitLead").toBe(lists[0]);
-    expect(lists[2], "submitClaim drifted from submitLead").toBe(lists[0]);
-  });
-
-  it("never routes the agency through a transport that cannot reach her", () => {
-    // The whole original defect in one assertion: Core delivers to registered
-    // users, the agency is not one, and a copy that silently fails to her looks
-    // the same as one that arrived.
-    expect(submitLead).toMatch(/const CORE_EMAILS = \[/);
-    const list = submitLead.slice(submitLead.indexOf("const CORE_EMAILS = ["));
-    const addresses = list.slice(0, list.indexOf("];"));
-    expect(addresses, "the agency is on the Core path").not.toContain("dorit@govari-fin.co.il");
+    for (const [src, name] of [[submitLead, "submitLead"], [escalate, "escalateToHuman"], [claim, "submitClaim"]] as const) {
+      // Comments still name Core.SendEmail, explaining why it once existed —
+      // only actual code is disqualifying here.
+      const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+      expect(code, `${name} still declares CORE_EMAILS`).not.toMatch(/const CORE_EMAILS/);
+      expect(code, `${name} still calls Core.SendEmail`).not.toMatch(/Core\.SendEmail/);
+    }
   });
 
   it("gives every mailbox its own delivery attempt", () => {
