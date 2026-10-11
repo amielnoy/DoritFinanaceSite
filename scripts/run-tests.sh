@@ -138,18 +138,12 @@ if has e2e; then
     # never looks at the app id, so the run proved nothing about the one path a
     # visitor actually takes.
     export VITE_BASE44_APP_ID="${VITE_BASE44_APP_ID:-e2e-sanity-app}"
-    # The other two the webServer sets, for the same reason: Vite inlines
+    # The other one the webServer sets, for the same reason: Vite inlines
     # `import.meta.env.*` at build time, so a value handed to `vite preview` —
     # or to `playwright test` — arrives after the only moment it could be read.
     # Once SKIP_BUILD=1 the bundle is sealed and the config's `env` block has
     # nothing left to affect, so whatever is in .env.local wins instead.
-    #
-    # That is why `VITE_AUTH_PROVIDER=supabase` in a developer's .env.local made
-    # exactly three specs fail here and pass in CI, for months, and why passing
-    # the variable on the playwright command did not help: by then it was too
-    # late. The build is the only moment that counts.
     export VITE_BASE44_APP_BASE_URL=""
-    export VITE_AUTH_PROVIDER="${VITE_AUTH_PROVIDER:-base44}"
     # `build:prerender`, not `build`. This built the client shell and then set
     # SKIP_BUILD=1, so playwright.config.ts skipped its own `build:prerender`
     # and the suite was pointed at a dist/ with no prerendered routes at all.

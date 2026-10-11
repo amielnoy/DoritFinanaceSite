@@ -20,7 +20,7 @@ import { safeReturnTo } from "@/lib/authReturnTo";
  * Supabase dashboard — which also means an account signed up through Google has
  * no password until somebody sets one, and the form will refuse it.
  *
- * Which provider answers is `VITE_AUTH_PROVIDER`'s business, not this page's.
+ * Which provider answers is the composition root's business, not this page's.
  * Both routes go through the port, so switching provider switches where the
  * visitor actually signs in — not just who answers `me()` afterwards.
  */
