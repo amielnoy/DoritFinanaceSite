@@ -200,7 +200,7 @@ function jsonLdScript(block: Record<string, unknown>): string {
  * `applySeo`'s server-side twin: the same `SeoConfig` in, but patches a raw
  * HTML document string instead of `document.head` — for the one context
  * `applySeo` cannot reach, a server response to a crawler that never runs the
- * app's JavaScript (see `api/og/blog/[id].ts`).
+ * app's JavaScript (see `api/og/blog.ts`).
  *
  * Targeted replacements on the tags `index.html` already ships, in the same
  * spirit as `scripts/prerender.mjs`'s own string patches — not a template

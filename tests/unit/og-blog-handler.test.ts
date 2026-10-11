@@ -56,7 +56,7 @@ function makeRes() {
 
 async function loadHandler() {
   vi.resetModules();
-  const mod = await import("../../api/og/blog/[id].ts");
+  const mod = await import("../../api/og/blog.ts");
   return mod.default;
 }
 
@@ -71,7 +71,7 @@ afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
 });
 
-describe("api/og/blog/[id] handler", () => {
+describe("api/og/blog handler", () => {
   it("renders the post's SEO into the shell on success", async () => {
     getImpl = async (id) => ({
       id,

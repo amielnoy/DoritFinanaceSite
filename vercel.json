@@ -28,7 +28,7 @@
           "value": ".*(GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-User|Claude-SearchBot|PerplexityBot|Perplexity-User|Google-Extended|Applebot-Extended|CCBot|Googlebot|Bingbot|facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|WhatsApp|TelegramBot|Discordbot).*"
         }
       ],
-      "destination": "/api/og/blog/:id"
+      "destination": "/api/og/blog?id=:id"
     },
     {
       "source": "/(.*)",

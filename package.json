@@ -10,7 +10,7 @@
     "prerender": "node scripts/prerender.mjs",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc -p ./tsconfig.json",
+    "typecheck": "tsc -p ./tsconfig.json && tsc -p ./api/tsconfig.json",
     "typecheck:gate": "npm run typecheck",
     "preview": "npm run build && vite preview",
     "seed:blog": "node scripts/seed-blog.mjs",

@@ -1,9 +1,9 @@
 // A single place to turn an Article into its SeoConfig — used by the client
 // route (src/pages/BlogPost.tsx, via useSeo) and by the server-side bot
-// response (api/og/blog/[id].ts, via renderSeoHtml). One function, so the
+// response (api/og/blog.ts, via renderSeoHtml). One function, so the
 // two can never disagree about what a post's title, description or image is.
 
-import type { Article } from "@/services";
+import type { Article } from "../services/ports.js";
 import {
   DEFAULT_OG_IMAGE,
   SITE_NAME,
@@ -11,7 +11,7 @@ import {
   breadcrumbLd,
   clampDescription,
   type SeoConfig,
-} from "./seo";
+} from "./seo.js";
 
 /** Markdown stripped to prose — a description is read, not rendered. */
 function stripMarkdown(body: string): string {

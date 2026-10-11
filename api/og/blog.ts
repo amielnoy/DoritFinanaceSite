@@ -6,14 +6,23 @@
 // `vercel.json` rewrites a bot's request for `/blog/:id` here by User-Agent;
 // a human's request for the same path keeps hitting the SPA shell.
 //
+// The id arrives as `?id=`, not as a `[id]` path segment: Vercel matches a
+// dynamic function path only after vercel.json's rewrites, and its `/api/*`
+// and `/(.*)` catch-alls took every such request first — the function
+// deployed and was never once reached. A fixed path is a file on disk, which
+// is checked before any rewrite.
+//
+// Relative imports carry `.js` because `"type": "module"` makes @vercel/node
+// compile this as Node ESM, which resolves no extensionless path.
+//
 // `computeBlogSeoConfig` and `renderSeoHtml` are the same functions the client
 // route uses (via `useSeo`), so this can never describe a post differently
 // than the page a visitor who followed the link actually sees.
 
 import { createClient } from "@base44/sdk";
-import { renderSeoHtml, SITE_URL } from "../../../src/lib/seo";
-import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "../../../src/lib/blogSeo";
-import type { Article } from "../../../src/services/ports";
+import { renderSeoHtml, SITE_URL } from "../../src/lib/seo.js";
+import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "../../src/lib/blogSeo.js";
+import type { Article } from "../../src/services/ports.js";
 
 /** The request/response surface this handler needs — Vercel's Node runtime
  *  supplies both regardless of which `@vercel/node` types are installed. */
