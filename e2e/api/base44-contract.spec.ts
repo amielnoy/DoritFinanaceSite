@@ -7,15 +7,17 @@ import { expect, gotoApp, test, test_step } from "../fixtures/app";
  * tests/contract read the source; these observe the real requests.
  */
 test.describe("Base44 API contract (observed traffic)", () => {
-  test("bootstraps through the documented public-settings endpoint", async ({ page, mockApi }) => {
-    const req = await test_step("open the home page and capture the bootstrap call", async () => {
+  test("no longer calls the retired public-settings endpoint", async ({ page, mockApi }) => {
+    await test_step("open the home page and wait for its content to load", async () => {
       await gotoApp(page);
-      return mockApi.waitForRequest("/public-settings/");
+      // A content read, not an auth one: it happens whichever provider answers
+      // identity, so it marks the boot as finished.
+      await mockApi.waitForRequest("/entities/Testimonial");
     });
 
-    await test_step("it is a GET on the documented public-settings path", async () => {
-      expect(req.method).toBe("GET");
-      expect(req.path).toMatch(/^\/api\/apps\/public\/prod\/public-settings\/by-id\/[^/]+$/);
+    await test_step("the bootstrap never touched public-settings", async () => {
+      // Only Base44's auth adapter fetched it; identity is no longer on Base44.
+      expect(mockApi.requestsTo("/public-settings/")).toHaveLength(0);
     });
   });
 
@@ -139,7 +141,7 @@ test.describe("Base44 API contract (observed traffic)", () => {
   test("an anonymous visitor never triggers an authenticated user fetch", async ({ page, mockApi }) => {
     await test_step("open the home page as an anonymous visitor", async () => {
       await gotoApp(page);
-      await mockApi.waitForRequest("/public-settings/");
+      await mockApi.waitForRequest("/entities/Testimonial");
     });
 
     await test_step("the app never asked the backend who the user is", async () => {
