@@ -11,6 +11,10 @@ import { Base44LeadAdminService } from "./base44/Base44LeadAdminService";
 import { Base44LeadService } from "./base44/Base44LeadService";
 import { Base44SupportService } from "./base44/Base44SupportService";
 import { Base44UploadService } from "./base44/Base44UploadService";
+import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
+import { SupabaseContentService } from "./supabase/SupabaseContentService";
+import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
+import type { SupabaseTableClient } from "./supabase/SupabaseTableClient";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
@@ -54,21 +58,38 @@ export interface Services {
 const client = base44 as any;
 
 /**
- * Content admin: reads stay on Base44, writes go through a backend function
- * authenticated by the Supabase session.
+ * Table reads, on Supabase when it is configured.
+ *
+ * Every write already mirrors into these tables, so the data is there and
+ * current. A build without Supabase reads Base44 as before. Content and leads
+ * are data, not identity, so a missing client means "the old path", not
+ * "broken", unlike `authPort` below.
+ */
+const tables: SupabaseTableClient | null = supabase ? (supabase as unknown as SupabaseTableClient) : null;
+
+const contentPort: ContentPort = tables ? new SupabaseContentService(tables) : new Base44ContentService(client);
+
+/**
+ * Content admin: writes go through a backend function authenticated by the
+ * Supabase session; reads come from `tables` like the public ones.
  *
  * The browser cannot write Base44 directly: its rules want a Base44 admin
  * session, and the only identity on offer now is Supabase's, which is refused
  * with 403 before the shadow write is even reached. So the writes go through a
  * backend function, which holds both credentials and needs no browser identity
- * — only proof of who is asking. Reads stay anonymous on Base44, because posts
- * and testimonials are public.
+ * — only proof of who is asking.
  */
 const contentAdmin: ContentAdminPort = new FunctionContentAdminService(
   client as unknown as FunctionsClient,
-  new Base44ContentAdminService(client),
+  tables ? new SupabaseContentAdminService(tables) : new Base44ContentAdminService(client),
   async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
 );
+
+/** Lead writes stay on `adminLead` (through the Base44 adapter) whichever store is read. */
+const base44LeadsAdmin = new Base44LeadAdminService(client);
+const leadsAdminPort: LeadAdminPort = tables
+  ? new SupabaseLeadAdminService(tables, base44LeadsAdmin)
+  : base44LeadsAdmin;
 
 /**
  * Identity, on Supabase. A build without Supabase credentials gets a stand-in
@@ -104,12 +125,12 @@ const uploadPort: UploadPort =
 
 export const services: Services = {
   leads: new Base44LeadService(client),
-  content: new Base44ContentService(client),
+  content: contentPort,
   agents: new Base44AgentService(client),
   uploads: uploadPort,
   support: new Base44SupportService(client),
   auth: authPort,
-  leadsAdmin: new Base44LeadAdminService(client),
+  leadsAdmin: leadsAdminPort,
   contentAdmin,
   account: accountPort,
 };

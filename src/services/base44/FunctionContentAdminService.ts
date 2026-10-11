@@ -37,8 +37,8 @@ export interface FunctionsClient {
  * function verifies it and checks the role itself, because `asServiceRole`
  * bypasses the rules that used to be the gate.
  *
- * Reads stay on Base44 and stay anonymous: posts and testimonials are readable
- * by anyone, which is the point of a public site.
+ * Reads are not this class's concern: they go to `reads`, which the composition
+ * root builds from Supabase when it is configured and from Base44 when not.
  */
 export class FunctionContentAdminService implements ContentAdminPort {
   constructor(
