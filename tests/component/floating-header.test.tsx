@@ -8,7 +8,7 @@ import { base44Mock } from "./base44-mock";
 vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
 vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
-const auth = vi.hoisted(() => ({ value: { user: null, isAuthenticated: false } as { user: Record<string, unknown> | null; isAuthenticated: boolean; logout?: (...a: unknown[]) => void } }));
+const auth = vi.hoisted(() => ({ value: { user: null, isAuthenticated: false } as { user: Record<string, unknown> | null; isAuthenticated: boolean; isLoadingAuth?: boolean; logout?: (...a: unknown[]) => void } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));
 
 // framer-motion's layout animations need APIs jsdom does not implement.
@@ -66,5 +66,28 @@ describe("<FloatingHeader /> account links", () => {
     renderHeader({ user: { email: "a@example.com", role: "user" }, isAuthenticated: true, logout });
     fireEvent.click(screen.getAllByRole("button", { name: "יציאה" })[0]);
     expect(logout).toHaveBeenCalledWith(true, `${window.location.origin}/`);
+  });
+
+  /**
+   * A way in for a client, from any page.
+   *
+   * Signed out, the header used to offer nothing: the only route to sign-in was
+   * typing an admin address and letting the guard bounce you there.
+   */
+  it("offers a signed-out visitor \"כניסה ללקוחות\", into their own area", () => {
+    renderHeader({ user: null, isAuthenticated: false });
+    const links = linksNamed("כניסה ללקוחות");
+    expect(links.length).toBeGreaterThan(0);
+    links.forEach((l) => expect(l).toHaveAttribute("href", "/login?returnTo=/account"));
+  });
+
+  it("does not offer it to a signed-in visitor", () => {
+    renderHeader({ user: { email: "a@example.com", role: "user" }, isAuthenticated: true });
+    expect(linksNamed("כניסה ללקוחות")).toHaveLength(0);
+  });
+
+  it("does not flash it while the auth check is still answering", () => {
+    renderHeader({ user: null, isAuthenticated: false, isLoadingAuth: true });
+    expect(linksNamed("כניסה ללקוחות")).toHaveLength(0);
   });
 });

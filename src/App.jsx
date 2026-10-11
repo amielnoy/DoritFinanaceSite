@@ -64,6 +64,16 @@ const RouteFallback = () => (
 //
 // E2E-HOM-001 and E2E-HOM-006 assert the home page renders with the backend
 // dead, which is exactly the case this used to fail.
+// Sends a signed-out visitor to sign-in carrying the page they asked for, so
+// they come back to it. A bare "/login" dropped it: an admin who opened
+// /admin/leads signed in and landed on "/". The login page reads returnTo
+// through `safeReturnTo`, which is the open-redirect guard — this only says
+// where to come back to.
+const LoginRedirect = () => {
+  const { pathname, search } = useLocation();
+  return <Navigate to={`/login?returnTo=${encodeURIComponent(pathname + search)}`} replace />;
+};
+
 const AuthenticatedApp = () => {
   const { pathname } = useLocation();
   return (
@@ -85,7 +95,7 @@ const AuthenticatedApp = () => {
         <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login?returnTo=/account" replace />} />}>
           <Route path="/account" element={<Account />} />
         </Route>
-        <Route element={<AdminRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        <Route element={<AdminRoute unauthenticatedElement={<LoginRedirect />} />}>
           <Route path="/admin/leads" element={<Leads />} />
           <Route path="/admin/blog" element={<BlogAdmin />} />
         </Route>
