@@ -1054,6 +1054,50 @@ describe("submitLead — a partial interview, and the upsert that completes it",
     expect(r.emails.map((e) => e.to)).toContain(AGENCY);
   });
 
+  /**
+   * The completion writes the same name and time to both stores.
+   *
+   * The update used to leave `name` and `timing` out of the Base44 write while
+   * the Supabase mirror took them from the request — so the two copies of one
+   * interview disagreed, and reconcile-stores reported 11 of 49 leads drifted
+   * on exactly these two fields. Whichever store a screen reads, it should see
+   * the time the visitor actually agreed.
+   */
+  describe("the completion, in both stores", () => {
+    const mirrorEnv = {
+      MAILER_URL,
+      MAILER_TOKEN: "test-only-token",
+      SUPABASE_URL: "https://stub.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "test-only-service-key",
+    };
+    const opened = {
+      id: "LEAD-EXISTING", name: "אורי", phone: "0541112233", source: "interview",
+      status: "partial", email: "", timing: "", created_date: new Date().toISOString(),
+    };
+    const mirrored = (r: Awaited<ReturnType<typeof invokeFunction>>) =>
+      r.callsTo("/rest/v1/leads")[0]?.body as Record<string, unknown>;
+
+    it("carries the agreed time and the full name to Base44, matching the mirror", async () => {
+      const r = await invokeFunction(
+        "submitLead",
+        { ...partial, stage: "complete", timing: "בשבוע הבא" },
+        { existingLeads: [opened], env: mirrorEnv },
+      );
+      expect(r.leadUpdates[0].fields).toMatchObject({ name: "אורי לוי", timing: "בשבוע הבא" });
+      expect(mirrored(r)).toMatchObject({ name: "אורי לוי", timing: "בשבוע הבא" });
+    });
+
+    it("keeps a time already stored when the completion sends none, in both stores", async () => {
+      const r = await invokeFunction(
+        "submitLead",
+        { ...partial, stage: "complete" },
+        { existingLeads: [{ ...opened, timing: "בבוקר" }], env: mirrorEnv },
+      );
+      expect(r.leadUpdates[0].fields).toMatchObject({ timing: "בבוקר" });
+      expect(mirrored(r)).toMatchObject({ timing: "בבוקר" });
+    });
+  });
+
   it("does not adopt an interview that is too old to be this conversation", async () => {
     const stale = {
       id: "LEAD-OLD", phone: "0541112233", source: "interview", status: "partial",
