@@ -427,6 +427,30 @@ test.describe("Procedures chat — reading the regulator's data", () => {
     });
   });
 
+  /**
+   * The same gate on an iPhone-width screen, in a browser CI still runs.
+   *
+   * At 390px and below the chat's header wraps tall enough to squeeze the
+   * consent region to its minimum, and the start button slid under the message
+   * box's footer: visible, but every tap landed on the footer instead. Only the
+   * WebKit legs caught it, and WebKit left CI on 2026-10-08 — so this pins it at
+   * 375px, the narrowest common phone, on whichever engine the run has.
+   */
+  test.describe("on a narrow phone", () => {
+    test.use({ viewport: { width: 375, height: 812 } });
+
+    test("the start button can actually be pressed", async ({ page }) => {
+      await gotoApp(page, "/tools");
+      const section = page.locator(PROCEDURES);
+
+      await test_step("accepting the notice unlocks the box", async () => {
+        await section.getByRole("checkbox").check();
+        await section.getByRole("button", { name: "התחלת השיחה" }).click({ timeout: 5_000 });
+        await expect(section.getByLabel("שאלה על התהליך")).toBeEnabled();
+      });
+    });
+  });
+
   test("the notice promises process only, and no comparison", async ({ page }) => {
     await gotoApp(page, "/tools");
     const section = page.locator(PROCEDURES);

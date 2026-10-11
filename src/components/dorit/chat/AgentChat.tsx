@@ -540,47 +540,57 @@ export default function AgentChat({
              * screen and scrollable, and the action moves to a footer that is
              * always reachable. Nothing hidden, nothing to scroll past.
              */
-            /* `min-h-[170px]`, not `min-h-0`: with the hand-off form also open
-             * (open before consent is possible — see the panel's own
-             * `overflow-y-auto`), flex-shrink had nowhere left to take space
-             * from and squeezed this to literally zero, so its content
-             * overflowed over the hand-off form's instead of being clipped or
-             * scrolled. 170px is enough to keep the heading, checkbox and
-             * start button on screen even at its most squeezed; the numbered
-             * notice below them scrolls out of view first, in its own
-             * overflow-y-auto, rather than the footer disappearing.
+            /* No fixed floor here; the floor is what's inside. With the
+             * hand-off form also open (open before consent is possible — see
+             * the panel's own `overflow-y-auto`), flex-shrink once squeezed this
+             * to literally zero and its content overflowed over the hand-off
+             * form's. A fixed `min-h-[170px]` stopped that, on the belief that
+             * 170px always held the checkbox and the start button. At 390px and
+             * below it did not: the header wraps tall, this was squeezed to
+             * 170, the checkbox row alone is 166 plus the notice's padding, and
+             * the start button spilled under the message box's footer —
+             * visible, but every tap landed on the footer.
+             *
+             * So the notice is taken out of the sizing: it fills an `absolute
+             * inset-0` box and scrolls inside it, which contributes nothing to
+             * this column's height except its own `min-h-24` — room for the
+             * heading. The checkbox row is in flow and shrink-0, so this column
+             * can never be shorter than heading-room plus the row, at any
+             * width. When the panel cannot fit that, the panel scrolls.
              */
-            <div className="flex-1 min-h-[170px] flex flex-col">
-              <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-7 pb-5">
-                <div className="max-w-[820px] flex flex-col gap-[18px]">
-                  <div className="flex flex-col gap-1">
-                    <p className="font-heading text-[22px] font-medium">{CONSENT.heading}</p>
-                    <p className="text-[15px] text-muted-foreground leading-[1.6]">
-                      {BOT_DISCLOSURE}
-                    </p>
+            <div className="flex-1 flex flex-col">
+              <div className="relative flex-1 min-h-24">
+                <div className="absolute inset-0 overflow-y-auto px-6 pt-7 pb-5">
+                  <div className="max-w-[820px] flex flex-col gap-[18px]">
+                    <div className="flex flex-col gap-1">
+                      <p className="font-heading text-[22px] font-medium">{CONSENT.heading}</p>
+                      <p className="text-[15px] text-muted-foreground leading-[1.6]">
+                        {BOT_DISCLOSURE}
+                      </p>
+                    </div>
+
+                    {/* 16px and a loose leading: this is the one text on the site a
+                        visitor is asked to confirm they have read, and the audience
+                        skews older. It was 13.5px. The points are numbered, not
+                        dashed — they are four things, in order. */}
+                    <ol className="m-0 p-0 list-none flex flex-col gap-3.5 text-base leading-[1.75] text-foreground/80">
+                      {(descriptor.consentPoints ?? CONSENT.points).map((point, i) => (
+                        <li key={point} className="grid grid-cols-[28px_minmax(0,1fr)] gap-2">
+                          <span className="font-heading text-[19px] text-accent lining-nums tabular-nums" aria-hidden="true">
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ol>
+
+                    <a
+                      href={CONSENT.privacyHref}
+                      className="self-start text-[15px] text-accent underline decoration-highlight/50 underline-offset-4 hover:decoration-highlight"
+                    >
+                      {CONSENT.privacyLinkLabel}
+                    </a>
                   </div>
-
-                  {/* 16px and a loose leading: this is the one text on the site a
-                      visitor is asked to confirm they have read, and the audience
-                      skews older. It was 13.5px. The points are numbered, not
-                      dashed — they are four things, in order. */}
-                  <ol className="m-0 p-0 list-none flex flex-col gap-3.5 text-base leading-[1.75] text-foreground/80">
-                    {(descriptor.consentPoints ?? CONSENT.points).map((point, i) => (
-                      <li key={point} className="grid grid-cols-[28px_minmax(0,1fr)] gap-2">
-                        <span className="font-heading text-[19px] text-accent lining-nums tabular-nums" aria-hidden="true">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                        <span>{point}</span>
-                      </li>
-                    ))}
-                  </ol>
-
-                  <a
-                    href={CONSENT.privacyHref}
-                    className="self-start text-[15px] text-accent underline decoration-highlight/50 underline-offset-4 hover:decoration-highlight"
-                  >
-                    {CONSENT.privacyLinkLabel}
-                  </a>
                 </div>
               </div>
 
