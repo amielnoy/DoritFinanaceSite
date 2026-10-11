@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   SupabaseAuthService,
   hasSupabaseSessionKey,
+  isAuthCallback,
   type SupabaseAuthClient,
 } from "@/services/supabase/SupabaseAuthService";
 
@@ -235,6 +236,46 @@ describe("SupabaseAuthService", () => {
     it("says no rather than throwing when storage is unavailable", () => {
       const hostile = { length: 1, key: () => { throw new Error("blocked"); } };
       expect(hasSupabaseSessionKey(hostile)).toBe(false);
+    });
+  });
+
+  /**
+   * The page load that comes back from Google.
+   *
+   * The session arrives in the address (`#access_token=…`) and supabase-js
+   * stores it only after a round trip to verify it. AuthContext asks
+   * hasStoredToken once, on mount — before that round trip ends — so on this
+   * one load the answer was "no", the auth check was skipped, and a person who
+   * had just signed in saw the site signed out until they reloaded (2026-10-11,
+   * production). `getUser()` waits for supabase-js to finish reading the URL,
+   * so a callback in the address is reason enough to start the check.
+   */
+  describe("the return from a sign-in", () => {
+    it("recognises the implicit-flow callback and the PKCE one", () => {
+      expect(isAuthCallback({ hash: "#access_token=abc&token_type=bearer&expires_in=3600", search: "" })).toBe(true);
+      expect(isAuthCallback({ hash: "", search: "?code=8f2c" })).toBe(true);
+    });
+
+    it("is not fooled by an ordinary anchor or a failed sign-in", () => {
+      expect(isAuthCallback({ hash: "#services", search: "" })).toBe(false);
+      expect(isAuthCallback({ hash: "", search: "" })).toBe(false);
+      expect(isAuthCallback({ hash: "#error=access_denied&error_description=x", search: "" })).toBe(false);
+    });
+
+    it("starts the auth check on that load, before anything is stored", () => {
+      const before = window.location.href;
+      window.history.replaceState(null, "", "/#access_token=abc&token_type=bearer");
+      try {
+        // No sessionPresent override: this is the default probe the app uses,
+        // in a jsdom without localStorage — nothing stored, token in the URL.
+        expect(new SupabaseAuthService(clientWith({})).hasStoredToken()).toBe(true);
+      } finally {
+        window.history.replaceState(null, "", before);
+      }
+    });
+
+    it("still says no on an ordinary load with nothing stored", () => {
+      expect(new SupabaseAuthService(clientWith({})).hasStoredToken()).toBe(false);
     });
   });
 
