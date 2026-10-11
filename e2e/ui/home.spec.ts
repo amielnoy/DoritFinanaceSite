@@ -1,4 +1,4 @@
-import { collectPageErrors, expect, gotoApp, test, test_step } from "../fixtures/app";
+import { AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE, collectPageErrors, expect, gotoApp, test, test_step } from "../fixtures/app";
 
 test.describe("Home — sanity", () => {
   test("boots past the auth/bootstrap spinner and renders the page shell", async ({ page, mockApi }) => {
@@ -94,6 +94,8 @@ test.describe("Home — sanity", () => {
   });
 
   test("renders the reviews pulled from the backend", async ({ page, mockApi }) => {
+
+    test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     await test_step("open the home page", async () => {
       await gotoApp(page);
     });
@@ -108,6 +110,8 @@ test.describe("Home — sanity", () => {
   });
 
   test("leaves the testimonials section out when there are none", async ({ page, mockApi }) => {
+
+    test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     await test_step("the backend has no testimonials", async () => {
       mockApi.setEntity("Testimonial", []);
     });

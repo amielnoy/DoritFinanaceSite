@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { expect, gotoApp, test, test_step } from "../fixtures/app";
+import { AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE, expect, gotoApp, test, test_step } from "../fixtures/app";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -305,6 +305,7 @@ test.describe("Accessibility — structural sanity", () => {
  */
 test.describe("Article legibility", () => {
   test("an article is set for people who find reading hard", async ({ page }) => {
+    test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     await gotoApp(page, "/blog/post-1");
     const body = page.locator(".blog-body");
     await expect(body).toBeVisible();
