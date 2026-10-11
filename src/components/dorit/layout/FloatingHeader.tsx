@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft } from "lucide-react";
+import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft, User } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
 import { useAuth } from "@/lib/AuthContext";
@@ -41,10 +41,22 @@ const NAV: NavItem[] = [
 const NAV_LINK =
   "text-[15px] py-2.5 text-foreground border-b border-transparent hover:text-accent hover:border-highlight transition-colors duration-200";
 
+/**
+ * Where a signed-out visitor signs in, and comes back to their own area.
+ *
+ * Until this existed the header offered no way in at all: the account links
+ * appeared only once signed in, and the only route to sign-in was typing an
+ * admin address and letting the guard bounce you there.
+ */
+const LOGIN_HREF = "/login?returnTo=/account";
+
 export default function FloatingHeader() {
   const [open, setOpen] = useState<boolean>(false);
   const navigateToSection = useSectionNav();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, isLoadingAuth, user, logout } = useAuth();
+  // Not while the auth check is still answering: a signed-in visitor would see
+  // the sign-in link flash and vanish on every page load.
+  const showLogin = !isAuthenticated && !isLoadingAuth;
   // Home rather than this page: on /account or /admin/* the guard would bounce a
   // signed-out visitor straight to the login screen.
   const signOut = () => {
@@ -149,20 +161,31 @@ export default function FloatingHeader() {
               </a>
             )
           )}
-          {isAuthenticated ? (
-            <Link to="/account" className={NAV_LINK}>האזור שלי</Link>
-          ) : null}
-          {isAuthenticated && user?.role === "admin" ? (
-            <>
-              <Link to="/admin/leads" className={NAV_LINK}>ניהול פניות</Link>
-              <Link to="/admin/blog" className={NAV_LINK}>ניהול בלוג</Link>
-            </>
-          ) : null}
-          {isAuthenticated ? (
-            <button type="button" onClick={signOut} className={NAV_LINK}>
-              יציאה
-            </button>
-          ) : null}
+          {/* The account links, apart from the site's sections at the far end of
+              the row. A quiet text link like the others — the gold CTA in the
+              top row stays the one thing asking to be pressed. */}
+          <div className="ms-auto flex items-center gap-x-7">
+            {showLogin ? (
+              <Link to={LOGIN_HREF} className={`${NAV_LINK} inline-flex items-center gap-1.5`}>
+                <User size={15} aria-hidden="true" className="text-accent" />
+                כניסה ללקוחות
+              </Link>
+            ) : null}
+            {isAuthenticated ? (
+              <Link to="/account" className={NAV_LINK}>האזור שלי</Link>
+            ) : null}
+            {isAuthenticated && user?.role === "admin" ? (
+              <>
+                <Link to="/admin/leads" className={NAV_LINK}>ניהול פניות</Link>
+                <Link to="/admin/blog" className={NAV_LINK}>ניהול בלוג</Link>
+              </>
+            ) : null}
+            {isAuthenticated ? (
+              <button type="button" onClick={signOut} className={NAV_LINK}>
+                יציאה
+              </button>
+            ) : null}
+          </div>
         </div>
       </nav>
 
@@ -221,6 +244,8 @@ export default function FloatingHeader() {
                 )}
           {isAuthenticated ? (
             <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>האזור שלי</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+          ) : showLogin ? (
+            <Link to={LOGIN_HREF} className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span className="inline-flex items-center gap-2"><User size={18} aria-hidden="true" className="text-accent" />כניסה ללקוחות</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
           ) : null}
           {isAuthenticated && user?.role === "admin" ? (
             <>

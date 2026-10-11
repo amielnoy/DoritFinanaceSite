@@ -7,6 +7,7 @@ import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { safeReturnTo } from "@/lib/authReturnTo";
+import { signInErrorMessage } from "@/lib/signInError";
 
 /**
  * Sign in. Google first, with an address and password beside it.
@@ -38,7 +39,7 @@ export default function Login() {
     try {
       services.auth.signInWithGoogle(returnTo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start sign-in. Please try again.");
+      setError("לא הצלחנו להתחיל את ההתחברות. נסו שוב.");
     }
   };
 
@@ -50,21 +51,21 @@ export default function Login() {
       await services.auth.signInWithPassword(email, password);
       window.location.href = returnTo;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid email or password");
+      setError(signInErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout icon={LogIn} title="Welcome back" subtitle="Log in to your account">
+    <AuthLayout icon={LogIn} title="ברוכים השבים" subtitle="כניסה לאזור האישי שלכם">
       <Button
         variant="outline"
         className="w-full h-12 text-sm font-medium mb-6"
         onClick={handleGoogle}
       >
-        <GoogleIcon className="w-5 h-5 mr-2" />
-        Continue with Google
+        <GoogleIcon className="w-5 h-5 me-2" />
+        המשיכו עם Google
       </Button>
 
       <div className="relative mb-6">
@@ -72,7 +73,7 @@ export default function Login() {
           <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-3 text-muted-foreground">or</span>
+          <span className="bg-card px-3 text-muted-foreground">או</span>
         </div>
       </div>
 
@@ -82,12 +83,13 @@ export default function Login() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">דוא״ל</Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="email"
               type="email"
+              dir="ltr"
               autoComplete="email"
               placeholder="you@example.com"
               value={email}
@@ -98,12 +100,13 @@ export default function Login() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">סיסמה</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               id="password"
               type="password"
+              dir="ltr"
               autoComplete="current-password"
               placeholder="••••••••"
               value={password}
@@ -116,11 +119,11 @@ export default function Login() {
         <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Logging in...
+              <Loader2 className="w-4 h-4 me-2 animate-spin" />
+              מתחברים…
             </>
           ) : (
-            "Log in"
+            "כניסה"
           )}
         </Button>
       </form>

@@ -24,8 +24,8 @@ const PUBLIC_ROUTES = [
   { path: "/faq", heading: /שאלות|תשובות/ },
   { path: "/privacy", heading: /פרטיות/ },
   { path: "/accessibility", heading: /נגישות/ },
-  // The auth screens ship with the Base44 starter copy (English).
-  { path: "/login", heading: /Welcome back/i },
+  // The login screen is ours (Login.tsx), in Hebrew; the platform's .jsx copy is shadowed (A-52).
+  { path: "/login", heading: /ברוכים השבים/ },
 ];
 
 test.describe("Routing — sanity", () => {
@@ -236,8 +236,10 @@ test.describe("Routing — sanity", () => {
       await gotoApp(page, "/admin/leads");
     });
 
-    await test_step("the visitor is redirected to the login screen", async () => {
-      await expect(page).toHaveURL(/\/login/);
+    await test_step("the visitor is redirected to the login screen, carrying the page they asked for", async () => {
+      // A bare /login dropped it, and an admin who signed in landed on "/"
+      // instead of the leads they had opened.
+      await expect(page).toHaveURL(/\/login\?(.*&)?returnTo=(\/admin\/leads|%2Fadmin%2Fleads)(&|$)/);
     });
   });
 });

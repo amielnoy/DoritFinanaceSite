@@ -133,7 +133,7 @@ test.describe("Client-side security posture", () => {
     for (const hostile of ["https://evil.example", "//evil.example", "/\\evil.example", "/.//evil.example"]) {
       await test_step(`open the login screen with returnTo=${hostile}`, async () => {
         await gotoApp(page, `/login?returnTo=${encodeURIComponent(hostile)}`);
-        await expect(page.locator("body")).toContainText(/Welcome back/i);
+        await expect(page.locator("body")).toContainText(/ברוכים השבים/);
       });
 
       await test_step(`the visitor stays on this origin (${hostile})`, async () => {
