@@ -18,8 +18,8 @@ test.describe("Home — sanity", () => {
       expect(errors, errors.join("\n")).toEqual([]);
     });
 
-    await test_step("the shell asked the backend for its public settings", async () => {
-      expect(mockApi.requestsTo("/public-settings/").length).toBeGreaterThan(0);
+    await test_step("the shell no longer asks the backend for public settings", async () => {
+      expect(mockApi.requestsTo("/public-settings/")).toHaveLength(0);
     });
   });
 
