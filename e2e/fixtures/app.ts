@@ -203,6 +203,21 @@ export { expect };
 export { test_step } from "./steps";
 
 /** Waits for the app shell to have booted past the bootstrap spinner. */
+/**
+ * The run is pointed at a real deployment — the production smoke job sets
+ * PLAYWRIGHT_BASE_URL — rather than at the hermetic build this suite serves.
+ *
+ * That bundle carries real Supabase settings and talks to Base44 directly, so
+ * content never passes through the same-origin /api this fixture stubs: the
+ * testimonials and articles come from Supabase, the SDK calls Base44's own
+ * host. A test whose premise is "the page asked our stubbed /api for X" cannot
+ * hold there and would only time out, so it skips and says why. It still runs
+ * on every hermetic CI build; the live probes beside it cover the deployment.
+ */
+export const AGAINST_A_DEPLOYMENT = Boolean(process.env.PLAYWRIGHT_BASE_URL);
+export const STUBS_UNREACHABLE =
+  "against a deployment, content comes from Supabase and Base44 directly; the same-origin /api stubs never see it";
+
 export async function gotoApp(page: Page, path = "/"): Promise<void> {
   await page.goto(path, { waitUntil: "domcontentloaded" });
   await expect(page.locator("#root")).not.toBeEmpty();

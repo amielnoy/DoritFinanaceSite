@@ -1,5 +1,5 @@
 import { loadEntity, validateAgainstEntity } from "../../tests/helpers/entity-schema";
-import { expect, gotoApp, test, test_step } from "../fixtures/app";
+import { AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE, expect, gotoApp, test, test_step } from "../fixtures/app";
 
 /**
  * Runtime contract: what the browser actually puts on the wire, checked against
@@ -8,6 +8,7 @@ import { expect, gotoApp, test, test_step } from "../fixtures/app";
  */
 test.describe("Base44 API contract (observed traffic)", () => {
   test("no longer calls the retired public-settings endpoint", async ({ page, mockApi }) => {
+    test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     await test_step("open the home page and wait for its content to load", async () => {
       await gotoApp(page);
       // A content read, not an auth one: it happens whichever provider answers
@@ -22,6 +23,8 @@ test.describe("Base44 API contract (observed traffic)", () => {
   });
 
   test("lists testimonials with a bounded, sorted query", async ({ page, mockApi }) => {
+
+    test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     const req = await test_step("open the home page and capture the testimonials call", async () => {
       await gotoApp(page);
       return mockApi.waitForRequest("/entities/Testimonial");
@@ -95,6 +98,8 @@ test.describe("Base44 API contract (observed traffic)", () => {
   // and the agent prompt contract rather than by a browser flow.
 
   test("every API call is same-origin and relative to /api", async ({ page, mockApi }) => {
+
+    test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     const form = page.locator("#quick-contact");
 
     await test_step("exercise the app until it has talked to the backend", async () => {
@@ -139,6 +144,8 @@ test.describe("Base44 API contract (observed traffic)", () => {
   });
 
   test("an anonymous visitor never triggers an authenticated user fetch", async ({ page, mockApi }) => {
+
+    test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     await test_step("open the home page as an anonymous visitor", async () => {
       await gotoApp(page);
       await mockApi.waitForRequest("/entities/Testimonial");
