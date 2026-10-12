@@ -28,6 +28,7 @@ export interface Mail {
   body?: string;
   rid: string;
   role: string;
+  ics?: string;
 }
 
 /**
@@ -35,7 +36,7 @@ export interface Mail {
  * `dorit-mailer`, which holds the Resend key. The same code as
  * base44/functions/submitClaim's sendMail, with `log` passed in.
  */
-export async function sendMail(log: Log, { to, subject, html, text, body, rid, role }: Mail): Promise<void> {
+export async function sendMail(log: Log, { to, subject, html, text, body, rid, role, ics }: Mail): Promise<void> {
   // התפקיד ולא הכתובת. אחד הנמענים הוא המבקר עצמו, וכתובתו לא תיכתב ליומן
   // שנשמר לאורך זמן — `role` מספיק כדי לדעת איזה עותק לא יצא.
   const started = Date.now();
@@ -58,6 +59,7 @@ export async function sendMail(log: Log, { to, subject, html, text, body, rid, r
         subject,
         html,
         text: text ?? body,
+        ics,
       }),
       signal: AbortSignal.timeout(10000),
     });

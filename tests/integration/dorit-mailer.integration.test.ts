@@ -284,3 +284,36 @@ describe("dorit-mailer — failure", () => {
     expect(JSON.stringify(await res.json())).not.toContain("re_test_key");
   });
 });
+
+describe("a rendered message with a meeting invitation", () => {
+  const ics = "BEGIN:VCALENDAR\r\nMETHOD:REQUEST\r\nSUMMARY:ייעוץ\r\nEND:VCALENDAR\r\n";
+  const send = async (body: unknown) => {
+    const mailer = await loadMailer();
+    const res = await mailer.onRequestPost({ request: post(body, AUTH), env: ENV });
+    return { status: res.status, json: await res.json(), resendBody: sent[0] as Record<string, unknown> | undefined };
+  };
+
+  it("attaches it to Resend as one text/calendar REQUEST", async () => {
+    const r = await send({ type: "rendered", to: "dorit@govari-fin.co.il", subject: "s", text: "t", ics });
+    expect(r.status).toBe(200);
+    expect(r.resendBody!.attachments).toEqual([
+      { filename: "invite.ics", content: Buffer.from(ics, "utf8").toString("base64"), content_type: "text/calendar; method=REQUEST" },
+    ]);
+  });
+
+  it("sends no attachment when there is no invitation", async () => {
+    const r = await send({ type: "rendered", to: "dorit@govari-fin.co.il", subject: "s", text: "t" });
+    expect(r.resendBody!.attachments).toBeUndefined();
+  });
+
+  it("refuses an invitation over 20 kB rather than clip it", async () => {
+    const r = await send({ type: "rendered", to: "dorit@govari-fin.co.il", subject: "s", text: "t", ics: "x".repeat(20_001) });
+    expect(r.status).toBe(400);
+    expect(r.json).toMatchObject({ ok: false, error: "ics_too_large" });
+  });
+
+  it("ignores ics on the other message types", async () => {
+    const r = await send({ type: "contact", name: "דנה", phone: "0501234567", email: "d@example.com", message: "שלום", ics });
+    expect(r.resendBody?.attachments).toBeUndefined();
+  });
+});
