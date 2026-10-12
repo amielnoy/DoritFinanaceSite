@@ -14,6 +14,7 @@ import { Base44UploadService } from "./base44/Base44UploadService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
+import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
 import type { SupabaseTableClient } from "./supabase/SupabaseTableClient";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
@@ -123,8 +124,18 @@ const uploadPort: UploadPort =
     ? new SupabaseUploadService(supabase as unknown as SupabaseStorageClient)
     : new Base44UploadService(client);
 
+/**
+ * Claims go to the `submit-claim` Edge Function when Supabase is configured.
+ * Every other lead path still runs on Base44's functions, which hold the
+ * calendar and Sheets connections, so it is passed through untouched.
+ */
+const base44Leads = new Base44LeadService(client);
+const leadPort: LeadPort = supabase
+  ? new SupabaseLeadService(supabase as unknown as SupabaseFunctionsClient, base44Leads)
+  : base44Leads;
+
 export const services: Services = {
-  leads: new Base44LeadService(client),
+  leads: leadPort,
   content: contentPort,
   agents: new Base44AgentService(client),
   uploads: uploadPort,
