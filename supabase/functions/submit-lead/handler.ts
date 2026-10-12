@@ -35,6 +35,7 @@ import {
 const FN = 'submit-lead';
 const log = createLog(FN);
 const CONFIRMATIONS_PER_ADDRESS_PER_DAY = 3;
+const INVITE_DESCRIPTION_MAX = 4_000;
 
 /** The leads sheet, for the link in the mail; sheets.ts reads the same setting to append. */
 const SHEET_ID = (Deno.env.get('SHEET_ID') || '').trim();
@@ -245,6 +246,7 @@ export async function handler(req: Request): Promise<Response> {
     // agreed nothing still gets one, because "asked for חמישי and nothing was
     // held" is the case worth being able to query.
     const booking = Boolean(scheduledAt || meetingTopic || timing || notes);
+    const warnings: string[] = [];
     if (booking) {
       try {
         await upsertRow('meetings', {
@@ -263,7 +265,6 @@ export async function handler(req: Request): Promise<Response> {
 
     // מכאן והלאה — מיטבי. הפנייה כבר שמורה, ולכן כשל בהודעה מדווח
     // בתשובה במקום להיכשל, כדי שניתן יהיה לנטר אותו.
-    const warnings: string[] = [];
 
     // ראיון חלקי נגמר בשמירה. הוא ימשיך להתעדכן כשהמבקר יסיים; אם לא יסיים,
     // הרשומה נשארת כ-partial וגלויה במסך הפניות — וזה ההבדל בין נוטש שנעלם
@@ -375,6 +376,12 @@ export async function handler(req: Request): Promise<Response> {
       const calEndIso = wallClock(calStartIso, 30) as string;
       calendarStartedAt = calStartIso;
       const description = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
+      // The .ics is capped (20,000 bytes) and a long interview in Hebrew can
+      // pass it, which would fail every invitation. The invitation carries the
+      // opening of the body; the mail text and the calendar event carry it all.
+      const inviteDescription = agentBody.length > INVITE_DESCRIPTION_MAX
+        ? `${agentBody.slice(0, INVITE_DESCRIPTION_MAX)}\n…הפרטים המלאים במייל`
+        : agentBody;
       try {
         const ev = await createCalendarEvent({ summary: subject, description, startIso: calStartIso, endIso: calEndIso });
         log('info', 'calendar.created', { rid, provider: 'google' });
@@ -386,7 +393,7 @@ export async function handler(req: Request): Promise<Response> {
               subject: `הזמנה: ${subject}`,
               text: `${description}\n\nהאירוע ביומן: ${ev.htmlLink}`,
               ics: buildInvitation({
-                uid: ev.iCalUID, start: ev.start, end: ev.end, summary: subject, description,
+                uid: ev.iCalUID, start: ev.start, end: ev.end, summary: subject, description: inviteDescription,
                 organizer: Deno.env.get('GOOGLE_CALENDAR_ID')!.trim(), organizerName: 'דורית גוב ארי', attendee,
               }),
               rid,

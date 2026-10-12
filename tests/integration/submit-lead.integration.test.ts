@@ -2051,6 +2051,28 @@ describe("Edge submit-lead — what only it does", () => {
     expect(String(r.meetings[0].calendar_status)).toMatch(/^אירוע נוצר ✓/);
   });
 
+  it("clips the invitation's description for a long interview, and leaves the event whole", async () => {
+    // `notes` is capped at 4,000 characters and the summary, redacted, at 2,000;
+    // the body is the two together with its headings, well past the 4,000 the
+    // invitation carries. Hence 3,990 of notes (9,000 would be refused) and a 9,000-character summary.
+    const notes = "פרטים על המצב הפיננסי ".repeat(420); // ~9,000 Hebrew characters
+    expect(notes.length).toBeGreaterThan(8_900);
+    const r = await invokeEdge("submit-lead", { ...consultation, summary: notes, notes: notes.slice(0, 3_990) });
+    expect(r.status).toBe(200);
+    const invitations = r.emails.filter((e) => e.ics);
+    expect(invitations).toHaveLength(3);
+    const encoder = new TextEncoder();
+    for (const mail of invitations) {
+      expect(encoder.encode(mail.ics!).length, mail.to).toBeLessThan(20_000);
+      expect(mail.ics!.replace(/\r\n /g, "")).toContain("…הפרטים המלאים במייל");
+    }
+    const description = String(r.calendarEvents[0].description);
+    // The event keeps everything: far more than the 4,000 the invitation carries.
+    expect(description.length).toBeGreaterThan(6_000);
+    expect(description).not.toContain("הפרטים המלאים במייל");
+    expect(r.json.warnings ?? []).not.toContain("invite_failed");
+  });
+
   it("appends the Events row through the service account", async () => {
     const r = await invokeEdge("submit-lead", consultation);
     expect(r.sheetRows).toHaveLength(1);
