@@ -53,7 +53,7 @@ describe("planPublish", () => {
  */
 describe("readExecResult", () => {
   it("parses a JSON-encoded string result, not just an array or object", () => {
-    const stdout = ['npm notice run base44-app@0.0.0 npx', '@@publish-blog@@"ok"'].join("\n");
+    const stdout = ['npm notice run dorit-finance-site@0.0.0 npx', '@@publish-blog@@"ok"'].join("\n");
     expect(readExecResult(stdout)).toBe("ok");
   });
 

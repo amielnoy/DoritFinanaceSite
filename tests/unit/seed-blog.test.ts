@@ -75,7 +75,7 @@ describe("readExecResult", () => {
   it("finds the marked result among the CLI's own output", () => {
     // npm's notices and the CLI's update banner share stdout with the script.
     const stdout = [
-      "npm notice run base44-app@0.0.0 npx",
+      "npm notice run dorit-finance-site@0.0.0 npx",
       '@@seed-blog@@[{"id":"b44-7","title":"t","published":true}]',
       "Update available: 0.1.15 → 0.1.27.",
     ].join("\n");
