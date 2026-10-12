@@ -45,9 +45,9 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `submitLead` | every form on the site, and the interview agent |
 | `escalateToHuman` | all three on-site agents |
 | `submitClaim` | the claims form |
+| `submit-claim` (Edge) | a claim, saved to Supabase and announced — the same cases as `submitClaim`, plus its own |
 | `upsertContact` | no caller yet — built for a channel that supplies a phone number, dormant per B-8 |
 | `logSupportChat` | the support agent, at the end of every conversation |
-| `myAccount` | the personal area, for a visitor signed in through Base44 |
 | `adminLead` | `/admin/leads` — an admin's status change and delete, written to Supabase and then Base44 |
 | `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
@@ -421,32 +421,6 @@ call to the visitor, so the function has to leave it nothing to report: a
 refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 `200`, and the conversation the visitor already had is unaffected.
 
-### 4.20 `myAccount` — a Base44 user's own enquiries — `INT-ACC-001..010`
-
-The personal area for a visitor signed in through Base44. The function takes the
-caller's address from the session, never from the request, and asks Supabase for
-what `enquiries_for` lets out. It does not decide the columns itself: the SQL
-does, and the function repeats the list so a future change to the SQL cannot
-widen what leaves.
-
-`INT-ACC-001` pins the call: the address arrives trimmed and lower-cased, and the
-service key travels as the bearer. `INT-ACC-002` returns the rows with the
-request id. `INT-ACC-003` to `005` are the refusals — nobody signed in is `401`,
-an unverified address and a disabled account are `403`, each with its own
-message ("כתובת המייל בחשבון עדיין לא אומתה." and "החשבון אינו פעיל.") — and all three
-assert that Supabase is never reached. `INT-ACC-006` and `007` are failure:
-Supabase refusing, and Supabase not configured, both answer `500` with a fixed
-message and the request id and nothing that names the host, the key or the status;
-the unconfigured case also asserts the answer carries exactly `error` and `rid`
-and that no RPC call was made.
-`INT-ACC-008` feeds a row carrying a phone number, a status and an escalation
-reason and expects none of them back.
-
-`INT-ACC-009` and `010` separate a Base44 outage from a signed-out visitor: an
-`auth.me()` failure carrying status `503` answers `500` with the request id and
-never reaches Supabase, while an axios-shaped `response.status` of `401` is still
-read as signed out. Only `401` and `403` mean the visitor is not signed in.
-
 ### 4.21 `adminLead` — an admin's writes to a lead — `INT-ADL-001..031`
 
 An admin's status change and delete used to reach Base44 only, so Supabase kept
@@ -473,6 +447,19 @@ and `rid`. `INT-ADL-031` is a retried delete: when Base44 answers `404` because
 an earlier delete went through and only its response was lost, the function
 answers `200` — the lead is gone from both stores, and an error there would
 leave the admin stuck on one that no retry could clear.
+
+### 4.22 `submit-claim` — the claim, on Supabase — `INT-CLM-EDGE-001..011`
+
+Every `submitClaim` case runs against both implementations (`describe.each` in
+`submit-claim.integration.test.ts`), and two cases compare what they send: the
+reporter's HTML must be identical, and the staff report identical apart from
+its timestamp line. `submit-claim-edge.integration.test.ts` holds what only the
+Edge Function does: the row it writes (today's fields, no Base44 id, `leadId`
+is its uuid), the service-key insert ahead of any mail, a non-JSON body
+answered as 400 with nothing touched, missing Supabase credentials as 500 with
+no mail, a database refusal that quotes the row kept out of the log, and the
+CORS answers — a preflight that does nothing, the site's origin on every
+answer, none for a stranger's.
 
 ## 5. Pass criteria
 

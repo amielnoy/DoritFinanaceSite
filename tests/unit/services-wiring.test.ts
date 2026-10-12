@@ -29,6 +29,8 @@ async function load(supabase: unknown, base44: unknown) {
     SupabaseLeadAdminService: (await import("@/services/supabase/SupabaseLeadAdminService")).SupabaseLeadAdminService,
     Base44ContentService: (await import("@/services/base44/Base44ContentService")).Base44ContentService,
     Base44LeadAdminService: (await import("@/services/base44/Base44LeadAdminService")).Base44LeadAdminService,
+    SupabaseLeadService: (await import("@/services/supabase/SupabaseLeadService")).SupabaseLeadService,
+    Base44LeadService: (await import("@/services/base44/Base44LeadService")).Base44LeadService,
   };
 }
 
@@ -44,10 +46,12 @@ describe("composition root", () => {
       auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
       storage: { from: () => ({}) },
       rpc: async () => ({ data: [], error: null }),
+      functions: { invoke: vi.fn() },
     };
     const m = await load(supabase, base44Fake().client);
     expect(m.services.content).toBeInstanceOf(m.SupabaseContentService);
     expect(m.services.leadsAdmin).toBeInstanceOf(m.SupabaseLeadAdminService);
+    expect(m.services.leads).toBeInstanceOf(m.SupabaseLeadService);
 
     await m.services.contentAdmin.listArticles();
     expect(fake.calls).toContainEqual(["from", "blog_posts"]);
@@ -59,6 +63,7 @@ describe("composition root", () => {
     const m = await load(null, b.client);
     expect(m.services.content).toBeInstanceOf(m.Base44ContentService);
     expect(m.services.leadsAdmin).toBeInstanceOf(m.Base44LeadAdminService);
+    expect(m.services.leads).toBeInstanceOf(m.Base44LeadService);
 
     await m.services.contentAdmin.listArticles();
     expect(b.blogList).toHaveBeenCalled();

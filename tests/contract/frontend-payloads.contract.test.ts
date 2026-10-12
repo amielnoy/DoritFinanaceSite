@@ -135,6 +135,31 @@ describe("adapter → submitClaim", () => {
   });
 });
 
+describe("adapter → submit-claim (Supabase)", () => {
+  const ADAPTER = [join(REPO_ROOT, "src/services/supabase/SupabaseLeadService.ts")];
+  const calls = existsSync(ADAPTER[0])
+    ? findObjectLiteralCalls(/functions\.invoke\(\s*["']submit-claim["']\s*,\s*\{\s*body:\s*/, ADAPTER)
+    : [];
+  const accepted = destructuredBody(readFileSync(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"), "utf8"));
+
+  it("exactly one adapter owns the call", () => {
+    expect(calls).toHaveLength(1);
+  });
+
+  it("sends only fields the function reads, including name and phone", () => {
+    expect(calls[0].keys.filter((k) => !accepted.includes(k))).toEqual([]);
+    for (const required of ["name", "phone"]) expect(calls[0].keys).toContain(required);
+  });
+
+  it("sends what the Base44 adapter sends, so switching store changes nothing the function sees", () => {
+    const base44 = findObjectLiteralCalls(
+      /invokeFunction(?:<\w+>)?\(\s*this\.client\s*,\s*["']submitClaim["']\s*,\s*/,
+      [join(REPO_ROOT, "src/services/base44/Base44LeadService.ts")],
+    );
+    expect([...calls[0].keys].sort()).toEqual([...base44[0].keys].sort());
+  });
+});
+
 /**
  * The seven files the platform owns.
  *

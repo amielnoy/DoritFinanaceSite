@@ -48,7 +48,7 @@ with one adapter — two for `AuthPort` and `AccountPort`:
 | `LeadAdminPort` | `Base44LeadAdminService` | `entities.Lead` |
 | `ContentAdminPort` | `Base44ContentAdminService` | `entities.*` |
 | `AuthPort` | `Base44AuthService` **/ `SupabaseAuthService`** | `auth.*` |
-| `AccountPort` | `Base44AccountService` **/ `SupabaseAccountService`** | `functions.invoke` (`myAccount`), via `invokeFunction` / Supabase `rpc("my_enquiries")` |
+| `AccountPort` | `SupabaseAccountService` | Supabase `rpc("my_enquiries")` |
 
 The last two rows are the proof of concept: **`AuthPort` and `AccountPort` each
 have two adapters**, chosen at runtime by `VITE_AUTH_PROVIDER` (`AccountPort`
@@ -70,15 +70,14 @@ Raw SDK surface, counted across `src/`:
 
 About thirty call sites (recounted 2026-10-06: 31, the one change being `auth.*`
 9 → 10), all inside nine Base44 files that nothing else imports plus
-`SupabaseAuthService`. `AccountPort` adds none: `Base44AccountService` reaches
-`myAccount` through `invokeFunction`, which was already counted, and
-`SupabaseAccountService` calls the Supabase client, not Base44's.
+`SupabaseAuthService`. `AccountPort` adds none: `SupabaseAccountService` calls
+the Supabase client, not Base44's.
 
 ---
 
 ## 3. What the backend actually uses
 
-Nine functions, 4,029 lines (recounted 2026-10-07; `adminLead` is the ninth). The Deno-specific surface is **one API**:
+Eight functions on Base44 (`myAccount` removed 2026-10-12). `submitClaim` and `adminLead` remain deployed as the rollback only: claims go to the `submit-claim` Supabase Edge Function and admin lead writes go straight to Supabase. The Deno-specific surface is **one API**:
 
 ```
 33  Deno.env.get      → process.env
@@ -97,7 +96,6 @@ What is genuinely Base44, per function:
 | `upsertContact` | 302 | ✓ | | ✓ | ✓ | |
 | `contentAdmin` | 192 | | | ✓ | ✓ | |
 | `logSupportChat` | 190 | ✓ | | | | |
-| `myAccount` | 84 | | | | ✓ | |
 | `adminLead` | 119 | | | ✓ | ✓ | |
 
 Three dependencies, in descending order of difficulty:

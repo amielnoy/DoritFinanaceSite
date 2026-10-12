@@ -597,12 +597,12 @@ they sign in. Decided 2026-10-06 by the site operator; the privacy policy says
 so, and the wording needs Dorit's and her compliance adviser's approval (see
 `base44/agents/COMPLIANCE.md` section 6). Data is reached only through
 `enquiries_for` in Supabase (migration `20261006000000_personal_area.sql`), via
-the Base44 function `myAccount`, or `my_enquiries()` for Supabase sign-in —
-a wrapper that calls `enquiries_for(my_email())`. Phone, name, notes and
+`my_enquiries()` — a wrapper that calls `enquiries_for(my_email())`. (The Base44
+function `myAccount`, which served Base44 sign-in, was removed on 2026-10-12.) Phone, name, notes and
 handling status are never returned.
 
 Release order: apply `supabase/migrations/20261006000000_personal_area.sql` to
-production BEFORE merging. CI deploys `submitLead` and `myAccount` on merge, and
+production BEFORE merging. CI deployed `submitLead` (and the since-removed `myAccount`) on merge, and
 `submitLead` now sends summary, profile and track label, so the Supabase mirror
 rejects every lead row until those columns exist. Enquiries from before
 summaries were recorded have no summary, and the page says so.
@@ -632,17 +632,16 @@ What the page shows, in order (#115):
   `unverified` are not.
 - **Admins see both admin links** in the header, "ניהול פניות" and "ניהול בלוג"
   (desktop bar and drawer); everyone signed in sees "האזור שלי".
-- **`adminLead` is the only way an admin changes a lead.** `/admin/leads` status
-  changes and deletes go through it, not through the `Lead` entity: it writes the
-  Supabase copy first and Base44 second, so a lead Dorit deletes also leaves the
-  visitor's personal area. A direct entity write leaves Supabase stale. To repair
-  rows written before it existed, run `node --env-file=.env.local
-  scripts/reconcile-leads.mjs` (a dry run; `--apply` writes). Add
-  `--create-missing` to also rebuild the Supabase copy of a lead whose
-  create-time mirror failed — from what Base44 stores, with its original date;
-  it cannot recover the interview summary or profile, which only the mirror held.
-- **A disabled Base44 account** gets its own answer from `myAccount`, "החשבון אינו
-  פעיל.", instead of the unverified-email message.
+- **Supabase is the record for leads.** With Supabase configured, `/admin/leads`
+  status changes and deletes write the `leads` table directly under the admin's
+  session (row-level security), and claims are saved by the `submit-claim` Edge
+  Function — so Base44's `Lead` copy is stale by design: it lacks claims, keeps
+  deleted leads and old statuses. `adminLead` and Base44's `submitClaim` remain
+  only as the rollback. **Never copy leads from Base44 into Supabase:**
+  `scripts/reconcile-leads.mjs` is a read-only comparison now (`--apply` and
+  `--create-missing` refuse), and `scripts/backfill-from-base44.mjs` no longer
+  imports `Lead` — either would undo Dorit's changes and bring back leads a
+  visitor asked to have removed.
 
 "ביומן" is not shown for consultation-form bookings: that form was removed from
 the site, and only stale clients still reach `createConsultationEvent`.

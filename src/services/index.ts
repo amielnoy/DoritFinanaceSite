@@ -14,7 +14,8 @@ import { Base44UploadService } from "./base44/Base44UploadService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
-import type { SupabaseTableClient } from "./supabase/SupabaseTableClient";
+import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
+import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
@@ -65,7 +66,7 @@ const client = base44 as any;
  * are data, not identity, so a missing client means "the old path", not
  * "broken", unlike `authPort` below.
  */
-const tables: SupabaseTableClient | null = supabase ? (supabase as unknown as SupabaseTableClient) : null;
+const tables: SupabaseLeadTableClient | null = supabase ? (supabase as unknown as SupabaseLeadTableClient) : null;
 
 const contentPort: ContentPort = tables ? new SupabaseContentService(tables) : new Base44ContentService(client);
 
@@ -85,11 +86,10 @@ const contentAdmin: ContentAdminPort = new FunctionContentAdminService(
   async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
 );
 
-/** Lead writes stay on `adminLead` (through the Base44 adapter) whichever store is read. */
-const base44LeadsAdmin = new Base44LeadAdminService(client);
+/** The admin's leads: read and written in Supabase when it is configured, else through Base44 as before. */
 const leadsAdminPort: LeadAdminPort = tables
-  ? new SupabaseLeadAdminService(tables, base44LeadsAdmin)
-  : base44LeadsAdmin;
+  ? new SupabaseLeadAdminService(tables)
+  : new Base44LeadAdminService(client);
 
 /**
  * Identity, on Supabase. A build without Supabase credentials gets a stand-in
@@ -123,8 +123,18 @@ const uploadPort: UploadPort =
     ? new SupabaseUploadService(supabase as unknown as SupabaseStorageClient)
     : new Base44UploadService(client);
 
+/**
+ * Claims go to the `submit-claim` Edge Function when Supabase is configured.
+ * Every other lead path still runs on Base44's functions, which hold the
+ * calendar and Sheets connections, so it is passed through untouched.
+ */
+const base44Leads = new Base44LeadService(client);
+const leadPort: LeadPort = supabase
+  ? new SupabaseLeadService(supabase as unknown as SupabaseFunctionsClient, base44Leads)
+  : base44Leads;
+
 export const services: Services = {
-  leads: new Base44LeadService(client),
+  leads: leadPort,
   content: contentPort,
   agents: new Base44AgentService(client),
   uploads: uploadPort,

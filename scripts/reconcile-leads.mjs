@@ -2,6 +2,10 @@
 /**
  * Brings Supabase's `leads` back in line with Base44's Lead entity.
  *
+ * READ-ONLY NOW. Supabase is the record for leads since claims and the admin's
+ * writes moved there (piece 6); `--apply` and `--create-missing` refuse. What
+ * follows describes what this did while Base44 was the authority.
+ *
  * Until `adminLead` existed, an admin's status change and delete wrote to
  * Base44 only. So Supabase kept every status at "new", and kept leads Dorit had
  * deleted — which the visitor's personal area still showed. This finds both and,
@@ -155,7 +159,18 @@ async function create(url, key, row) {
 }
 
 async function main() {
-  const apply = process.argv.includes("--apply");
+  // Since claims and the admin's status changes and deletes moved to Supabase
+  // (Off Base44, piece 6), Base44's Lead copy is stale by design. Applying it
+  // would put back every status Dorit changed and every lead she deleted —
+  // including one a visitor asked to have removed. The dry run still reports.
+  if (process.argv.includes("--apply") || process.argv.includes("--create-missing")) {
+    console.error(
+      "Refusing to write: Supabase is the record for leads now, and Base44's copy is stale by design. " +
+        "Run without flags for the read-only comparison.",
+    );
+    process.exit(1);
+  }
+  const apply = false;
   const createMissing = process.argv.includes("--create-missing");
   const { SUPABASE_SERVICE_ROLE_KEY: key } = process.env;
   const url = process.env.SUPABASE_URL?.replace(/\/+$/, "");
