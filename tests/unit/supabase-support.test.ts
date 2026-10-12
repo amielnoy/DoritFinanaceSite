@@ -20,4 +20,20 @@ describe("SupabaseSupportService", () => {
     expect(out.contact).toBeTruthy();
     expect(out.warnings).toContain("escalation_call_failed");
   });
+
+  it("answers with the direct channels when the receipt carries no contact", async () => {
+    const invoke = vi.fn().mockResolvedValue({ data: { ok: true, warnings: [] }, error: null });
+    const out = await new SupabaseSupportService({ functions: { invoke } }).escalate(request);
+    expect(out.ok).toBe(false);
+    expect(out.contact).toBeTruthy();
+    expect(out.warnings).toEqual(["no_contact_in_receipt"]);
+  });
+
+  it("answers with the direct channels when the call itself throws", async () => {
+    const invoke = vi.fn().mockRejectedValue(new Error("network"));
+    const out = await new SupabaseSupportService({ functions: { invoke } }).escalate(request);
+    expect(out.ok).toBe(false);
+    expect(out.contact).toBeTruthy();
+    expect(out.warnings).toEqual(["escalation_call_failed"]);
+  });
 });
