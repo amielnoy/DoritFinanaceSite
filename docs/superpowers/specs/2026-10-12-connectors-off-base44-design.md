@@ -11,7 +11,7 @@ Four Base44 functions are still tied to Base44's connector OAuth, the lock-in
 | Function | Connectors | Callers |
 |---|---|---|
 | `submitLead` | `googlecalendar`, `outlook`, `googlesheets`, `googledocs` | the site's forms; the `needs_interview` agent |
-| `createConsultationEvent` | `googlecalendar`, `outlook` | the consultation form, through `requestConsultationEvent` |
+| `createConsultationEvent` | `googlecalendar`, `outlook` | stale builds only: it logs every call as `client.stale`, and `requestConsultationEvent` has no caller |
 | `escalateToHuman` | `googlesheets` | all four agents |
 | `logSupportChat` | `googlesheets` | `support_agent`, `procedures_agent` |
 
@@ -53,8 +53,9 @@ All taken with the user on 2026-10-12.
 **In:**
 
 - **`supabase/functions/submit-lead/`** — the contact form, the detailed
-  enquiry, the consultation (including its calendar hold, which was
-  `createConsultationEvent`), and the interview's partial and complete saves.
+  enquiry, the consultation (its calendar hold is already `submitLead`'s own;
+  `createConsultationEvent` only answers stale builds), and the interview's
+  partial and complete saves.
   Same input, same validation and guards (`_shared/guard.ts`), same mail.
 - **`supabase/functions/escalate-to-human/`** and
   **`supabase/functions/log-support-chat/`** — the same input and behaviour as
@@ -84,8 +85,20 @@ All taken with the user on 2026-10-12.
   and `logSupportChat` become about 30 lines each: read the body, POST it to
   the Edge function with the caller's `user-agent`, and return its status and
   JSON unchanged. No entities, no connectors, no mail.
-- **CI** — `deploy-supabase` deploys the three new functions, as it does
-  `submit-claim`.
+- **A migration for `meetings`.** A booking is keyed today by
+  `lead_base44_id`, `not null` and a foreign key to `leads.base44_id`, and
+  `enquiries_for` (the personal area) joins on it. A lead written only to
+  Supabase has no `base44_id`, so:
+  - `meetings.lead_id uuid unique references leads(id) on delete cascade`,
+    backfilled from `lead_base44_id`, then `not null`;
+  - a `before insert or update` trigger fills `lead_id` from `lead_base44_id`
+    when only the latter is given, so Base44's mirror keeps working until the
+    switch;
+  - `lead_base44_id` becomes nullable;
+  - `enquiries_for` joins on `m.lead_id = l.id`.
+- **CI** — `deploy-supabase` already deploys every function in
+  `supabase/functions`; the three new ones only need their `config.toml`
+  entries (`verify_jwt = false`, as `submit-claim`).
 - **Smoke** — an empty request to each new function answers `400`, with
   `ready: { db, mailer, google }` all true.
 
@@ -95,8 +108,8 @@ All taken with the user on 2026-10-12.
   for the agents), `submitClaim` and `adminLead` stay deployed and untouched.
   The old ones are the rollback until Base44 is switched off.
 - The chat agents and their runtime — Phase 3.
-- No migration. `leads` and `meetings` already have every column the mirror
-  writes, and `base44_id` is nullable.
+- `leads` needs no change: it has every column the mirror writes, and
+  `base44_id` is nullable. (`meetings` does — see *In*.)
 
 ## Configuration
 
@@ -132,7 +145,8 @@ Revoking access is un-sharing the calendar and the sheet, or deleting the key.
    `sameInterviewee` accepts (same name or a name prefix, no conflicting
    email), newest first. A match is updated by `id`; otherwise a row is
    inserted. A failed write is the one hard failure: `500`, and nobody is mailed.
-3. The booking, if there is one: an insert into `meetings`, as the mirror does now.
+3. The booking, if there is one: an upsert into `meetings` on `lead_id`
+   (`on_conflict=lead_id`), as the mirror does now on `lead_base44_id`.
 4. Best-effort, in parallel: the Google event, the sheet row, the invites.
    Each failure becomes a warning; none of them changes the answer.
 5. Mail, as today: the ops mailboxes, Dorit's copy, and the visitor's
