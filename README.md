@@ -417,7 +417,10 @@ next to the `MAILER_URL` and `MAILER_TOKEN` above. Dorit must share her calendar
 ("make changes to events") and the leads sheet (editor) with the service
 account's address. The meeting invitation goes by mail as an `.ics` file
 through `dorit-mailer`; there is no Outlook or Google Docs step any more.
-Rollout: ship dark, set the secrets and sharing until the smoke's `submit-lead`
+Release order: apply `supabase/migrations/20261013000000_meetings_lead_id.sql` to
+the production database by hand after merge (CI deploys functions only) and before
+switching `VITE_LEAD_FUNCTIONS` — a Supabase-only lead has no Base44 id, so its
+booking needs `meetings.lead_id` to be stored and shown. Rollout: ship dark, set the secrets and sharing until the smoke's `submit-lead`
 case answers `ready` all true, set `VITE_LEAD_FUNCTIONS=supabase` on Vercel and
 redeploy, then send one real enquiry and one consultation. To go back, unset it
 and redeploy. Revoking access is un-sharing the calendar and sheet, or deleting
