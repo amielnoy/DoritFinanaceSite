@@ -1,3 +1,4 @@
+import type { APIRequestContext } from "@playwright/test";
 import { expect, test, test_step } from "../fixtures/app";
 
 /**
@@ -22,6 +23,24 @@ import { expect, test, test_step } from "../fixtures/app";
  * the mailer are all reachable) and `log-support-chat`.
  */
 const LIVE_URL = process.env.E2E_LIVE_API_URL;
+// Google's secrets arrive at rollout step 2, after the merge. Until the repo
+// variable LEAD_FUNCTIONS says "supabase", submit-lead's Google readiness is
+// not asserted at all.
+const EXPECT_GOOGLE = process.env.E2E_EXPECT_GOOGLE === "supabase";
+
+/** The Supabase URL and publishable key the deployed bundle carries. */
+async function deployedSupabase(site: APIRequestContext): Promise<{ url: string; key: string }> {
+  let url = "";
+  let key = "";
+  const html = await (await site.get("/")).text();
+  const scripts = [...new Set([...html.matchAll(/\/assets\/[^"']+\.js/g)].map((m) => m[0]))];
+  for (const path of scripts) {
+    const js = await (await site.get(path)).text();
+    url ||= js.match(/https:\/\/[a-z0-9]+\.supabase\.co/)?.[0] ?? "";
+    key ||= js.match(/sb_publishable_[A-Za-z0-9_-]+/)?.[0] ?? "";
+  }
+  return { url, key };
+}
 
 test.describe("Live Supabase, with the deployed bundle's key (opt-in)", () => {
   test.skip(!LIVE_URL, "set E2E_LIVE_API_URL to enable");
@@ -32,13 +51,7 @@ test.describe("Live Supabase, with the deployed bundle's key (opt-in)", () => {
     let key = "";
 
     await test_step("the deployed bundle names a Supabase project and a publishable key", async () => {
-      const html = await (await site.get("/")).text();
-      const scripts = [...new Set([...html.matchAll(/\/assets\/[^"']+\.js/g)].map((m) => m[0]))];
-      for (const path of scripts) {
-        const js = await (await site.get(path)).text();
-        url ||= js.match(/https:\/\/[a-z0-9]+\.supabase\.co/)?.[0] ?? "";
-        key ||= js.match(/sb_publishable_[A-Za-z0-9_-]+/)?.[0] ?? "";
-      }
+      ({ url, key } = await deployedSupabase(site));
       expect(url, "no Supabase URL in the deployed bundle").not.toBe("");
       expect(key, "no sb_publishable_ key in the deployed bundle").not.toBe("");
     });
@@ -90,8 +103,20 @@ test.describe("Live Supabase, with the deployed bundle's key (opt-in)", () => {
       expect(res.status(), `submit-lead: ${JSON.stringify(body)}`).toBe(400);
       expect(body.ready, "submit-lead cannot save a lead — its Supabase key is missing").toMatchObject({ db: true });
       expect(body.ready, "submit-lead cannot mail — set MAILER_URL and MAILER_TOKEN in its secrets").toMatchObject({ mailer: true });
-      expect(body.ready, "submit-lead cannot reach Google — set GOOGLE_SERVICE_ACCOUNT_JSON and GOOGLE_CALENDAR_ID").toMatchObject({ google: true });
+      if (EXPECT_GOOGLE) {
+        expect(body.ready, "submit-lead cannot reach Google — set GOOGLE_SERVICE_ACCOUNT_JSON and GOOGLE_CALENDAR_ID").toMatchObject({ google: true });
+      }
     });
+
+    await supabase.dispose();
+    await site.dispose();
+  });
+
+  test("the support-chat log function is deployed", async ({ playwright }) => {
+    const site = await playwright.request.newContext({ baseURL: LIVE_URL });
+    const { url, key } = await deployedSupabase(site);
+    expect(key, "no sb_publishable_ key in the deployed bundle").not.toBe("");
+    const supabase = await playwright.request.newContext({ baseURL: url, extraHTTPHeaders: { apikey: key } });
 
     await test_step("the support-chat log is deployed", async () => {
       // 200 without SHEET_ID ("not configured"), 400 with it and an empty body:

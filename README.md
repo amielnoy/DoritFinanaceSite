@@ -422,7 +422,8 @@ the production database by hand after merge (CI deploys functions only) and befo
 switching `VITE_LEAD_FUNCTIONS` — a Supabase-only lead has no Base44 id, so its
 booking needs `meetings.lead_id` to be stored and shown. Rollout: ship dark, set the secrets and sharing until the smoke's `submit-lead`
 case answers `ready` all true, set `VITE_LEAD_FUNCTIONS=supabase` on Vercel and
-redeploy, then send one real enquiry and one consultation. To go back, unset it
+redeploy (and the GitHub repo variable `LEAD_FUNCTIONS=supabase` alongside it, which
+makes the smoke require Google readiness), then send one real enquiry and one consultation. To go back, unset it
 and redeploy. Revoking access is un-sharing the calendar and sheet, or deleting
 the key.
 
