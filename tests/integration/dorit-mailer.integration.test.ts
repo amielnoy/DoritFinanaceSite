@@ -314,6 +314,9 @@ describe("a rendered message with a meeting invitation", () => {
 
   it("ignores ics on the other message types", async () => {
     const r = await send({ type: "contact", name: "דנה", phone: "0501234567", email: "d@example.com", message: "שלום", ics });
+    // Prove delivery first, or an invalid payload would pass vacuously.
+    expect(r.status).toBe(200);
+    expect(r.resendBody).toBeDefined();
     expect(r.resendBody?.attachments).toBeUndefined();
   });
 });
