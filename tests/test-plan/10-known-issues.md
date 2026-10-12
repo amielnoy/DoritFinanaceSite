@@ -301,7 +301,21 @@ delivers a phone number with the message, and re-enabling one means adding a
 separate number, wiring the tool back to the agent, and deciding how the saving
 is disclosed on a channel with no consent screen.
 
-### B-10 · The Resend sending domain has no DNS records, so no mail can leave
+### B-10 · The Resend sending domain had no DNS records, so no mail could leave
+
+*Status, 2026-10-12: the sending records exist; DMARC is still missing.* Measured
+on the public resolvers (8.8.8.8, 1.1.1.1):
+
+| Record | Found |
+|---|---|
+| `resend._domainkey.mail.govari-fin.co.il` TXT | a DKIM public key (`p=MIGfMA0…`) |
+| `send.mail.govari-fin.co.il` | `CNAME send.forge.rmta.net.`, which carries `MX 10 feedback.forge.rmta.net.` and an SPF of explicit `ip4:` ranges |
+| `_dmarc.govari-fin.co.il` TXT | none |
+
+These are not the Amazon SES values expected below, and the DNS alone does not show
+whether Resend accepts them. Its dashboard marking `mail.govari-fin.co.il` verified is
+the check that closes this issue. Adding the apex DMARC record is still worth doing.
+The original finding follows.
 
 `dorit-mailer` sends through Resend from an address on `mail.govari-fin.co.il`.
 That subdomain does not exist. Checked 2026-09-27 against the public resolvers:

@@ -21,11 +21,13 @@ gated: the publish job in `.github/workflows/ci.yml` refuses to run unless `buil
 On `builder` the Vercel deploy is a *preview* of one change rather than a site anyone
 lives on, which is why the run summary's table is written on `main` only.
 
-Neither URL is written into the pipeline. Production comes from the `BASE44_URL`
-repository variable and staging from the deploy job's own output, both reported in the
-**Deployed sites** table on every `main` run — so the table keeps telling the truth
-through the domain move described in [Moving production to the custom
-domain](#moving-production-to-the-custom-domain), which swaps these two roles around.
+Neither URL is written into the pipeline. Production comes from the `PRODUCTION_URL`
+repository variable (falling back to `BASE44_URL`) and staging from the deploy job's own
+output, both reported in the **Deployed sites** table on every `main` run — so the table
+kept telling the truth through the domain move described in [Moving production to the
+custom domain](#moving-production-to-the-custom-domain). Since 2026-10-11
+`PRODUCTION_URL` is `https://govari-fin.co.il`, served by Vercel, and `BASE44_URL` is
+`https://safe-arch-plan.base44.app`.
 
 ## Prerequisites
 
@@ -185,16 +187,20 @@ where it was.
 
 ## Moving production to the custom domain
 
-Today the client-facing site is `safe-arch-plan.base44.app` — Base44 serves both the
-app and the backend. Production is moving to `govari-fin.co.il` on Vercel, which keeps
+*Status, 2026-10-12:* the move is done except for the Base44 half of step 4 and the
+Search Console resubmission in step 6. Since 2026-10-11 the client-facing site is
+`govari-fin.co.il` on Vercel. Each step below carries its own status line.
+
+The client-facing site used to be `safe-arch-plan.base44.app`, where Base44 served
+both the app and the backend. Moving it to `govari-fin.co.il` on Vercel keeps
 Base44 as the backend and is the precondition for the Python migration: the Vercel
 `/api/*` rewrite is what lets a Python service take paths over one at a time, and
 Base44's own host has no equivalent — it answers `405` to any path it does not own.
 
-The repo side is already done and is inert until the last step. `VITE_SITE_URL` sets
-the canonical origin: `src/lib/seo.ts` reads it at runtime, and a build plugin rewrites
-`index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` to match. Unset, the build emits
-exactly what it does today, so nothing moves until you move it.
+`VITE_SITE_URL` sets the canonical origin: `src/lib/seo.ts` reads it at runtime, and a
+build plugin rewrites `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` to match.
+Unset, the build emits the Base44 origin, so a builder without it keeps declaring
+the old host canonical.
 
 `index.html` is on that list because the document a crawler is served is the one that
 matters, and it was the one being missed: the sitemap moved hosts while the served HTML
@@ -220,6 +226,9 @@ does not resolve is worse than one pointing at the old site.
    a notice rather than failing when they are missing, which before this change meant a
    missed staging deploy and afterwards means production silently stops updating.
 
+   *Status, 2026-10-12: confirmed.* The last six pushes to `main` each produced exactly
+   one production deployment, all with source `cli`, which is the workflow's deploy.
+
 1. **Point DNS at Vercel.** Add `govari-fin.co.il` and `www.govari-fin.co.il` to the
    Vercel project, then set the records the dashboard shows at the registrar. Pick one
    as canonical — `www` or the apex — and let Vercel redirect the other. Wait for both
@@ -235,9 +244,16 @@ does not resolve is worse than one pointing at the old site.
 2. **Take the production deployment out from behind login.** Vercel → Settings →
    Deployment Protection. Staging is protected on purpose; production cannot be, or the
    site is unreachable. Leave preview protection alone.
+
+   *Status: done.* The setting is Standard Protection, and production answers `200`
+   anonymously.
 3. **Check the site answers on the domain**, including `/api/*`. The rewrite forwards to
    Base44, so a form submission is the honest test: if a lead arrives, the domain and the
    backend are talking.
+
+   *Status, 2026-10-12: done.* A `POST` with an empty body to
+   `govari-fin.co.il/api/apps/<id>/functions/submitLead` gets `submitLead`'s own guard,
+   `400 נדרשים שם וטלפון`, so the rewrite reaches the backend.
 4. **Set `VITE_SITE_URL`** to the canonical origin — in **both** builders.
 
    In the Vercel project (Production scope): `vercel pull` carries it into the build.
@@ -257,13 +273,26 @@ does not resolve is worse than one pointing at the old site.
    llms.txt and the share links together — Vite resolves the variable from the shell or
    from a `.env` file, and the build plugin reads the same resolved value the
    application does, so the two cannot disagree.
+
+   *Status, 2026-10-12: Vercel done, Base44 open.* The Vercel copy names
+   `https://govari-fin.co.il/` in its canonical tag, `og:url`, JSON-LD, robots.txt and
+   sitemap. The Base44 copy still names `safe-arch-plan.base44.app` in its JSON-LD and
+   robots.txt. The Builder's environment is set only in the Base44 dashboard; the CLI
+   has no command for it. Set the variable there, then Publish.
 5. **Set the `PRODUCTION_URL` repository variable** to the same origin, and
    `BASE44_URL` to `https://safe-arch-plan.base44.app`. The smoke test targets
    `PRODUCTION_URL`, so this is what repoints it; the two were one variable while the
    two hosts coincided.
+
+   *Status: done.* `PRODUCTION_URL` was set on 2026-10-11 and `BASE44_URL` on
+   2026-10-12.
 6. **Resubmit the sitemap** in Search Console for the new property, and keep the old
    one until it stops receiving traffic. Base44 cannot `301` to Vercel — you do not
    control its routing — so the old URL ages out rather than redirecting.
+
+   *Status, 2026-10-12: open.* The verification TXT record
+   (`google-site-verification=pSXd…aiI`) is live at DTNT. What remains is to verify
+   the property in Search Console and submit `https://govari-fin.co.il/sitemap.xml`.
 
 Base44 keeps being deployed throughout. It still owns auth, the agents, the entity
 store and the connectors; what changes is that the browser reaches it through Vercel
@@ -1327,7 +1356,10 @@ page while Vercel updated, then new smoke tests ran against the older Base44 sit
 CI now checks actual publish outputs for the host named by `PRODUCTION_URL`
 before starting smoke tests. Missing publication fails immediately with the
 relevant deployment configuration, and the run summary reports no publication.
-For the current Base44 production host, configure the GitHub Actions
-`BASE44_API_KEY` secret and `BASE44_APP_ID` variable, then rerun CI on `main` with
-publishing enabled. The key must be available to the `production` environment.
-Changing test selectors or increasing timeouts cannot update an older deployment.
+`scripts/check-production-publish.mjs` picks the publisher by comparing origins.
+Since `PRODUCTION_URL` became `https://govari-fin.co.il`, it requires a Vercel
+**production** promotion; a preview does not count. If `PRODUCTION_URL` ever names the
+Base44 host again, it requires the Base44 publish instead, which needs the
+`BASE44_API_KEY` secret and `BASE44_APP_ID` variable available to the `production`
+environment. Changing test selectors or increasing timeouts cannot update an older
+deployment.
