@@ -358,7 +358,7 @@ and pins all of it.
 
 In **Cloudflare Pages → Settings → Environment variables** (see
 [`.dev.vars.example`](dorit-mailer/.dev.vars.example)):
-`RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO`, `MAILER_TOKEN`, `ALLOWED_ORIGIN`.
+`RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO`, `MAILER_TOKEN`, `MAILER_TOKEN_SUPABASE`, `ALLOWED_ORIGIN`.
 Set the key and the token as **Secret**, the rest as Text.
 
 The Pages project must build **`dorit-mailer`**, not the repository root: set
@@ -367,6 +367,10 @@ build command. Left empty, Cloudflare serves the repo root — which is the
 website — and the function is never deployed at all.
 
 In **Base44 secrets**: `MAILER_URL` and the same `MAILER_TOKEN`.
+In **Supabase Edge Function secrets**: `MAILER_URL`, and as `MAILER_TOKEN` the value of the
+mailer's `MAILER_TOKEN_SUPABASE` — a token of its own, so either caller can be rotated or revoked
+without the other. Neither value can be read back once stored; to replace one, generate a new
+value and write it to both ends.
 
 `MAIL_FROM` must be on the domain verified in Resend — the subdomain
 `mail.govari-fin.co.il`, never the apex, which points at Microsoft 365 with an

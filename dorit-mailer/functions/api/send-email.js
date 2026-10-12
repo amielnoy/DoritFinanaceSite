@@ -24,6 +24,9 @@
  *   MAILER_TOKEN     מחרוזת אקראית. חובה לכל בקשה, בלי יוצא מן הכלל. בלעדיה
  *                    הנקודה הזו היא ממסר דואר פתוח שכל אחד יכול לשלוח ממנו
  *                    בשם הסוכנות, מהדומיין המאומת שלה.
+ *   MAILER_TOKEN_SUPABASE  מחרוזת אקראית נפרדת לפונקציות ה-Edge של Supabase
+ *                    (שם הסוד אצלן: MAILER_TOKEN). טוקן לכל קורא, כדי שאפשר
+ *                    יהיה להחליף או לבטל אחד בלי לגעת בשני.
  *   ALLOWED_ORIGIN   https://safe-arch-plan.base44.app
  *                    CORS בלבד, ואינו אמצעי אבטחה: הוא נאכף על ידי דפדפנים
  *                    ומתעלמים ממנו לחלוטין curl או שרת. מה ששומר על הנקודה
@@ -118,12 +121,22 @@ export async function onRequestPost({ request, env }) {
 
 /* ---------- helpers ---------- */
 
-/** Bearer token, compared in full. Absent MAILER_TOKEN means nothing is authorised. */
+/**
+ * Bearer token, compared in full against each caller's own token.
+ *
+ * MAILER_TOKEN is Base44's functions'; MAILER_TOKEN_SUPABASE is the Supabase
+ * Edge Functions'. One per caller, so either can be rotated or revoked alone.
+ * A token that is not configured authorises nothing — an empty setting never
+ * matches an empty bearer — and with neither set, nothing is authorised.
+ */
 function isAuthorised(request, env) {
-  if (!env.MAILER_TOKEN) return false;
+  const accepted = [env.MAILER_TOKEN, env.MAILER_TOKEN_SUPABASE].filter(
+    (t) => typeof t === "string" && t.length > 0,
+  );
+  if (accepted.length === 0) return false;
   const header = request.headers.get("Authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  return token.length > 0 && token === env.MAILER_TOKEN;
+  return token.length > 0 && accepted.includes(token);
 }
 
 /** The configured staff mailboxes, in order. The first is the agency's. */
