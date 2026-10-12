@@ -78,3 +78,8 @@ export async function sendMail(log: Log, { to, subject, html, text, body, rid, r
   if (why) log('warn', 'mail.partial', { rid, role, transport: 'mailer', why: why.slice(1) });
   log('info', 'mail.sent', { rid, role, transport: 'mailer', ms: Date.now() - started });
 }
+
+/** Whether mail could be sent now — present settings, never their values. */
+export function mailerConfigured(): boolean {
+  return Boolean(Deno.env.get('MAILER_URL')?.trim() && Deno.env.get('MAILER_TOKEN')?.trim());
+}

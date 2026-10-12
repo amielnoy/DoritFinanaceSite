@@ -34,12 +34,11 @@ const q = (v) => {
 };
 
 /** Which entity becomes which table, and which declared fields come with it. */
+// No `Lead`: Supabase is the record for leads since piece 6. Base44's copy
+// lacks every claim and keeps every lead Dorit deleted and every status she
+// changed, so loading it — conflicts update — would undo her work and bring
+// back leads a visitor asked to have removed.
 const TABLES = {
-  Lead: {
-    table: "leads",
-    cols: ["name","phone","email","source","topic","timing","message","status",
-           "escalation_reason","handled_by_agent","consent_version","consent_at"],
-  },
   Contact: {
     table: "contacts",
     cols: ["phone","name","email","channel","notes","last_seen"],

@@ -62,12 +62,47 @@ describe("submit-claim — the row", () => {
   });
 });
 
+describe("submit-claim — the key it writes with", () => {
+  it("uses the project's secret key when Supabase provides one, on apikey alone", async () => {
+    const r = await invokeEdge("submit-claim", claim, {
+      env: {
+        MAILER_URL,
+        MAILER_TOKEN: "t",
+        SUPABASE_URL,
+        SUPABASE_SECRET_KEYS: JSON.stringify({ default: "sb_secret_test" }),
+        SUPABASE_SERVICE_ROLE_KEY: "legacy-jwt",
+      },
+    });
+    expect(r.status).toBe(200);
+    const insert = r.fetches.find((f) => f.url === `${SUPABASE_URL}/rest/v1/leads`)!;
+    expect(insert.headers.apikey).toBe("sb_secret_test");
+    // A secret key is not a JWT; as a bearer the gateway would refuse it.
+    expect(insert.headers).not.toHaveProperty("Authorization");
+  });
+
+  it("falls back to the legacy service key, on both headers, while that is all there is", async () => {
+    const r = await invokeEdge("submit-claim", claim);
+    const insert = r.fetches.find((f) => f.url === `${SUPABASE_URL}/rest/v1/leads`)!;
+    expect(insert.headers).toMatchObject({ apikey: "service-role-test", Authorization: "Bearer service-role-test" });
+  });
+});
+
 describe("submit-claim — what it refuses", () => {
   it("answers a body that is not JSON as a missing name and phone, touching nothing", async () => {
     const r = await invokeEdge("submit-claim", null, { rawBody: "not json" });
     expect(r.status).toBe(400);
-    expect(r.json).toEqual({ error: "נדרשים שם וטלפון", rid: expect.any(String) });
+    expect(r.json).toEqual({ error: "נדרשים שם וטלפון", rid: expect.any(String), ready: { db: true, mailer: true } });
     expect(r.fetches).toEqual([]);
+  });
+
+  it("says, on an empty claim, whether it could save and announce one — never what the settings are", async () => {
+    // The production smoke asks this. The mailer secrets are set by hand and
+    // the deploy token cannot read them, so without it a lost secret would
+    // mean claims saved and nobody told, with every check green.
+    const r = await invokeEdge("submit-claim", {}, { env: { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: "k" } });
+    expect(r.status).toBe(400);
+    expect(r.json.ready).toEqual({ db: true, mailer: false });
+    expect(JSON.stringify(r.json)).not.toContain(SUPABASE_URL);
   });
 
   it("saves nothing and mails nobody when Supabase is not configured", async () => {

@@ -11,8 +11,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { deviceLabel } from '../_shared/device.ts';
 import { buildClientHtml, type ClientMail } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
-import { deliveryWarning, sendMail } from '../_shared/mail.ts';
-import { insertRow } from '../_shared/rest.ts';
+import { deliveryWarning, mailerConfigured, sendMail } from '../_shared/mail.ts';
+import { insertRow, supabaseConfigured } from '../_shared/rest.ts';
 
 const FN = 'submit-claim';
 const log = createLog(FN);
@@ -61,7 +61,12 @@ export async function handler(req: Request): Promise<Response> {
 
     if (!name || !phone) {
       log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields' });
-      return Response.json({ error: 'נדרשים שם וטלפון', rid }, { status: 400, headers: cors });
+      // `ready` answers the production smoke's empty claim: whether a real one
+      // could be saved and announced. Two booleans — never a setting's value.
+      // The mailer secrets are set by hand and the deploy token cannot read
+      // them, so this is the only check that sees one go missing.
+      const ready = { db: supabaseConfigured(), mailer: mailerConfigured() };
+      return Response.json({ error: 'נדרשים שם וטלפון', rid, ready }, { status: 400, headers: cors });
     }
 
     const docList: unknown[] = Array.isArray(documents) ? documents : [];

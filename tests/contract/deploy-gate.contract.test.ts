@@ -335,9 +335,12 @@ describe("Supabase Edge Functions deploy from green main, before production", ()
     expect(job).toMatch(/supabase functions deploy --project-ref "\$SUPABASE_PROJECT_REF" --use-api/);
   });
 
-  it("skips with a notice rather than failing when the token is not set", () => {
-    expect(job).toMatch(/::notice::SUPABASE_ACCESS_TOKEN is not set/);
-    expect(job).toMatch(/ready=false/);
+  it("fails rather than skips when the token is not set", () => {
+    // A skip satisfied both production gates: once any version of a function is
+    // live, a deleted or expired token would ship new frontends against stale
+    // functions, and the smoke — which only asks "is it deployed" — stays green.
+    expect(job).toMatch(/::error::SUPABASE_ACCESS_TOKEN is not set[^\n]*\n\s*exit 1/);
+    expect(job).not.toMatch(/::notice::SUPABASE_ACCESS_TOKEN/);
   });
 
   it("holds the Base44 publish until the functions are deployed", () => {

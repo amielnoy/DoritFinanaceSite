@@ -66,9 +66,12 @@ test.describe("Live Supabase, with the deployed bundle's key (opt-in)", () => {
         data: {},
         headers: { Origin: origin, Authorization: `Bearer ${key}` },
       });
-      const body = (await res.json().catch(() => ({}))) as { rid?: string };
+      const body = (await res.json().catch(() => ({}))) as { rid?: string; ready?: { db?: boolean; mailer?: boolean } };
       expect(res.status(), `submit-claim: ${JSON.stringify(body)}`).toBe(400);
       expect(body.rid, "the answer carries no rid").toBeTruthy();
+      // Deployed is not enough: a missing secret would save claims and tell nobody.
+      expect(body.ready, "submit-claim cannot save a claim — its Supabase key is missing").toMatchObject({ db: true });
+      expect(body.ready, "submit-claim cannot mail — set MAILER_URL and MAILER_TOKEN in its secrets").toMatchObject({ mailer: true });
       expect(res.headers()["access-control-allow-origin"], "the site's origin is not allowed").toBe(origin);
     });
 
