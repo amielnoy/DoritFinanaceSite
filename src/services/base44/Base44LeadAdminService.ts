@@ -38,6 +38,11 @@ export class Base44LeadAdminService implements LeadAdminPort {
     await this.write({ action: "delete", id });
   }
 
+  /** Base44 stores a document as a file URL, which already opens it. */
+  async documentLink(ref: string): Promise<string> {
+    return ref;
+  }
+
   private async write(payload: Record<string, unknown>): Promise<void> {
     const receipt = await invokeFunction<{ ok?: boolean; error?: string; rid?: string }>(
       this.client,

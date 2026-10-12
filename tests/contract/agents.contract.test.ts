@@ -2050,3 +2050,60 @@ describe("the configuration nobody typed by hand", () => {
     });
   }
 });
+
+/**
+ * The public entry points' guards, duplicated because Base44 functions share
+ * no module. A drifted copy is a hole in exactly one door: a looser isEmail or
+ * greetingName in one function makes that one the relay again.
+ */
+describe("the guards on the no-sign-in functions", () => {
+  const submitLead = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+  const submitClaim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+  const edgeClaim = read(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"));
+  const claimForm = read(join(REPO_ROOT, "src/components/dorit/forms/ClaimForm.tsx"));
+
+  const topLevelFn = (src: string, name: string): string => {
+    const start = src.indexOf(`function ${name}(`);
+    expect(start, `${name} is missing`).toBeGreaterThan(-1);
+    const end = src.indexOf("\n}", start);
+    return src.slice(start, end + 2).replace(/\s+/g, " ").trim();
+  };
+
+  it("keeps every guard helper identical in submitLead and submitClaim", () => {
+    for (const helper of ["oversizedField", "isEmail", "greetingName", "plainOr", "sha256Hex", "withinLimit"]) {
+      expect(topLevelFn(submitClaim, helper), `${helper} drifted`).toBe(topLevelFn(submitLead, helper));
+    }
+  });
+
+  it("checks the address and the daily limit before every visitor confirmation", () => {
+    for (const [name, src] of [["submitLead", submitLead], ["submitClaim", submitClaim], ["submit-claim", edgeClaim]]) {
+      // The send's own property line, not the log lines that mention the role.
+      const at = src.search(/role: 'visitor',\s*\n/);
+      expect(at, `${name} sends no visitor confirmation`).toBeGreaterThan(-1);
+      const before = src.slice(Math.max(0, at - 2500), at);
+      expect(before, `${name} mails an unchecked address`).toMatch(/!isEmail\(email\)/);
+      expect(before, `${name} mails without the per-address limit`).toMatch(/confirm-to:/);
+    }
+  });
+
+  it("offers the same claim types the confirmations recognise", () => {
+    const list = (src: string) => {
+      const m = src.match(/CLAIM_TYPES(?::[^=]*)? = \[([\s\S]*?)\]/);
+      expect(m, "CLAIM_TYPES is missing").not.toBeNull();
+      return [...m![1].matchAll(/["']([^"']+)["']/g)].map((x) => x[1]);
+    };
+    expect(list(submitClaim)).toEqual(list(claimForm));
+    expect(list(edgeClaim)).toEqual(list(claimForm));
+  });
+});
+
+describe("a claim document stored in Supabase", () => {
+  it("is marked the same way by the browser that uploads it and the function that signs it", async () => {
+    const { CLAIM_DOCUMENT_REF_PREFIX } = await import("@/services/supabase/SupabaseUploadService");
+    const handler = read(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"));
+    const m = handler.match(/STORAGE_REF_PREFIX = '([^']+)'/);
+    expect(m?.[1]).toBe(CLAIM_DOCUMENT_REF_PREFIX);
+    const leads = read(join(REPO_ROOT, "src/pages/Leads.tsx"));
+    expect(leads).toContain("storage:claim-documents\\/");
+  });
+});

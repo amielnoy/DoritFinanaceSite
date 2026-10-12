@@ -42,6 +42,20 @@ do $$ begin
   end if;
 end $$;
 
+-- ── an admin: may read, which is what lets the leads screen sign a link ─────
+reset role;
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000ad', 'admin-check@example.test');
+insert into public.profiles (id, role) values ('00000000-0000-0000-0000-0000000000ad', 'admin')
+  on conflict (id) do update set role = 'admin';
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000ad","role":"authenticated"}';
+
+do $$ begin
+  if (select count(*) from storage.objects where bucket_id = 'claim-documents') < 2 then
+    raise exception 'an admin cannot read claim documents — the leads screen could not sign a link';
+  end if;
+end $$;
+
 -- ── the bucket itself ────────────────────────────────────────────────────────
 reset role;
 do $$ begin

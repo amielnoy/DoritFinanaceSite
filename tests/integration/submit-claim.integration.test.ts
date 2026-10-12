@@ -155,13 +155,62 @@ describe.each(IMPLEMENTATIONS)("$label", ({ run }) => {
         ...claim,
         name: '<a href="https://evil.example">לחצו כאן</a> מזרחי',
       });
-      const html = r.mailTo("ronit@example.com").html!;
-      // Only the first word reaches the greeting — `firstName` is split on the
-      // space — so the assertion is that no live tag survives, and that the
-      // fragment that did arrive came through escaped.
-      expect(html).not.toContain('<a href="https://evil.example"');
-      expect(html).not.toContain("<a ");
-      expect(html).toContain("&lt;a");
+      const mail = r.mailTo("ronit@example.com");
+      // A first "word" that is not made of letters is dropped, not escaped:
+      // the greeting goes out without a name, so nothing of it arrives.
+      expect(mail.html).not.toContain("<a ");
+      expect(mail.html).not.toContain("&lt;a");
+      expect(mail.html).not.toContain("evil.example");
+      expect(mail.html).toContain("שלום,");
+      expect(mail.text).toMatch(/^שלום, קיבלתי/);
+    });
+
+    it("greets a letters-only first name as before", async () => {
+      const r = await run(claim);
+      expect(r.mailTo("ronit@example.com").html).toContain("שלום רונית,");
+    });
+
+    it("names in the reporter's copy only a claim type from the form's list", async () => {
+      const r = await run({ ...claim, claimType: "visit https://evil.example now" });
+      const mail = r.mailTo("ronit@example.com");
+      expect(mail.html).not.toContain("evil.example");
+      expect(mail.text).toContain("סוג אירוע: כללי");
+      // Dorit's copy still says what was typed — she is the one who has to read it.
+      expect(r.mailTo("dorit@govari-fin.co.il").body).toContain("visit https://evil.example now");
+    });
+
+    it("shows the event date to the reporter only when it is a date", async () => {
+      const r = await run({ ...claim, eventDate: "https://evil.example" });
+      expect(r.mailTo("ronit@example.com").text).toContain("תאריך: —");
+    });
+  });
+
+  describe("submitClaim — the public entry point's limits", () => {
+    it("refuses a field longer than its ceiling, and writes nothing", async () => {
+      const r = await run({ ...claim, description: "x".repeat(4001) });
+      expect(r.status).toBe(400);
+      expect(r.leads).toHaveLength(0);
+      expect(r.emails).toHaveLength(0);
+    });
+
+    it("refuses a field that is not text", async () => {
+      const r = await run({ ...claim, name: { first: "רונית" } });
+      expect(r.status).toBe(400);
+      expect(r.leads).toHaveLength(0);
+    });
+
+    it("refuses more than ten documents", async () => {
+      const r = await run({ ...claim, documents: Array.from({ length: 11 }, (_, i) => `doc-${i}.pdf`) });
+      expect(r.status).toBe(400);
+      expect(r.leads).toHaveLength(0);
+    });
+
+    it("keeps the report but sends no confirmation to something that is not an address", async () => {
+      const r = await run({ ...claim, email: "a@b.com, victim@example.com" });
+      expect(r.status).toBe(200);
+      expect(r.leads).toHaveLength(1);
+      expect(r.emails.map((e) => e.to)).not.toContain("a@b.com, victim@example.com");
+      expect(r.json.warnings).toContain("client_email_invalid");
     });
   });
 

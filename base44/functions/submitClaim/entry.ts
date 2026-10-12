@@ -166,12 +166,110 @@ async function sendMail({ to, subject, html, text, body, rid, role }) {
 }
 
 
+// ── הגנות על כניסה ציבורית ─────────────────────────────────────────────────
+//
+// הפונקציה לא דורשת התחברות, ושולחת אישור ממותג מהדומיין המאומת של דורית לכל
+// כתובת שנמסרה לה. בלי הגבלה זה ממסר חינמי: כל טקסט בשם או בנושא מגיע לתיבה של
+// זר תחת השם שלה. לכן לשדות יש תקרת אורך, האישור נושא רק ערכים שנבדקו, כתובת
+// שאינה כתובת לא מקבלת מייל, ולכל נמען יש תקרה יומית.
+//
+// עותקים זהים ב-submitLead וב-submitClaim (agents.contract.test.ts); התאום של
+// Supabase הוא supabase/functions/_shared/guard.ts.
+
+const CONFIRMATIONS_PER_ADDRESS_PER_DAY = 3;
+
+/** השדה הראשון שאינו מחרוזת בתוך התקרה שלו, או null. */
+function oversizedField(body, limits) {
+  for (const [field, max] of Object.entries(limits)) {
+    const value = body?.[field];
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value !== 'string' || value.length > max) return field;
+  }
+  return null;
+}
+
+/** תיבת דואר אחת סבירה: בלי רווחים, בלי מפרידי רשימה, דומיין עם נקודה. */
+function isEmail(value) {
+  if (typeof value !== 'string' || value.length > 254) return false;
+  return /^[^\s@<>()[\]\\,;:"]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,24}$/.test(value);
+}
+
+/**
+ * השם הפרטי לפנייה במייל, או '' לפנייה בלי שם. רק מילה של אותיות (עם גרש או
+ * מקף בפנים) עוברת; כל מה שיכול לשאת קישור או משפט מוריד את השם ולא עורך אותו.
+ */
+function greetingName(name) {
+  const first = String(name ?? '').trim().split(/\s+/)[0] ?? '';
+  return /^\p{L}(?:[\p{L}'’-]{0,28}\p{L})?$/u.test(first) ? first : '';
+}
+
+/** ערך קצר בלי שום דבר שנראה כמו קישור או כתובת, או ברירת המחדל. */
+function plainOr(value, fallback) {
+  const s = typeof value === 'string' ? value.trim() : '';
+  if (!s || s.length > 60) return fallback;
+  return /:\/\/|www\.|@|[<>]|\.[a-z]{2,}\b/i.test(s) ? fallback : s;
+}
+
+/** SHA-256 בהקסה — המונה שומר את זה, לעולם לא כתובת. */
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * האם עוד בקשה תחת `key` נכנסת ב-`max` לחלון, ואם כן — נספרת. נכשל פתוח:
+ * מונה שאינו מוגדר או אינו זמין מעביר את הבקשה, כי פנייה שאבדה גרועה מרצף מיילים.
+ */
+async function withinLimit(rid, key, windowSeconds, max) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const apiKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  if (!url || !apiKey) return true;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/allow_submission`, {
+      method: 'POST',
+      headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_key: key, p_window_seconds: windowSeconds, p_max: max }),
+    });
+    if (!res.ok) throw new Error(`rpc_http_${res.status}`);
+    return (await res.json()) !== false;
+  } catch (e) {
+    log('warn', 'limit.unavailable', { rid, err: String(e?.message ?? e).slice(0, 200) });
+    return true;
+  }
+}
+
+// ── סוף ההגנות ─────────────────────────────────────────────────────────────
+
+/** רשימת הטופס עצמה (src/components/dorit/forms/ClaimForm.tsx); האישור נוקב באחד מאלה או בכלום. */
+const CLAIM_TYPES = [
+  'ביטוח בריאות משלים',
+  'ביטוח חיים / מקרה מוות',
+  'אובדן כושר עבודה',
+  'רכוש / דירה / רכב',
+  'אחר',
+];
+
+const CLAIM_FIELD_LIMITS = {
+  name: 80,
+  phone: 30,
+  email: 254,
+  claimType: 60,
+  eventDate: 20,
+  policyNumber: 60,
+  description: 4000,
+};
+
+/** סוג מהרשימה, או 'כללי'. */
+const claimTypeLabel = (value) => (CLAIM_TYPES.includes(value) ? value : 'כללי');
+/** תאריך ISO, או '—'. */
+const eventDateLabel = (value) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '—');
+
 /**
  * מה שמשתנה בהודעה של submitClaim — התוכן בלבד. התבנית עצמה משותפת.
  */
 function clientMailFor(data) {
   return {
-    firstName: (data.name || '').split(' ')[0],
+    firstName: greetingName(data.name),
     eyebrow: 'אישור דיווח',
     heading: 'קיבלנו את דיווח האירוע',
     intro: 'קיבלתי את דיווח האירוע הביטוחי והפרטים תועדו בהצלחה. אחזור אליכם אישית בהקדם האפשרי להמשך טיפול התביעה וליווי צמוד ברגע האמת.',
@@ -181,8 +279,8 @@ function clientMailFor(data) {
     // on printing it — the two halves of one email disagreeing about which
     // fields exist. A claim filed without a date should say so in both.
     details: [
-      ['סוג אירוע', data.claimType || 'כללי'],
-      ['תאריך אירוע', data.eventDate || '—'],
+      ['סוג אירוע', claimTypeLabel(data.claimType)],
+      ['תאריך אירוע', eventDateLabel(data.eventDate)],
     ],
   };
 }
@@ -224,6 +322,8 @@ function escapeHtml(text) {
  */
 function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, details }) {
   const rows = (details || []).filter(([, value]) => value);
+  // No name rather than a doubtful one: greetingName returns '' for anything not made of letters.
+  const greeting = firstName ? 'שלום ' + firstName + ',' : 'שלום,';
   const divider =
     `
               <tr>
@@ -262,7 +362,7 @@ function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, detai
         <tr><td style="padding:44px 48px 36px; text-align:right;">
           <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">${escapeHtml(eyebrow)}</p>
           <h1 style="margin:0 0 24px; font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#1A1A1B; line-height:1.3; letter-spacing:-0.02em; text-align:right;">${escapeHtml(heading)}</h1>
-          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">שלום ${escapeHtml(firstName)},</p>
+          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(greeting)}</p>
           <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(intro)}</p>
           ${detailsBlock}
           <div style="height:2px; width:48px; background:#C3AD96; margin:32px 0 20px;"></div>
@@ -366,6 +466,16 @@ export default async function(req) {
     if (!name || !phone) {
       log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields' });
       return Response.json({ error: 'נדרשים שם וטלפון', rid }, { status: 400 });
+    }
+
+    const docsTooMany = documents !== undefined && documents !== null && (
+      !Array.isArray(documents) || documents.length > 10 ||
+      documents.some((d) => typeof d !== 'string' || d.length > 1000)
+    );
+    const oversized = oversizedField(body, CLAIM_FIELD_LIMITS) || (docsTooMany ? 'documents' : null);
+    if (oversized) {
+      log('warn', 'request.rejected', { rid, reason: 'field_too_long', field: oversized });
+      return Response.json({ error: 'אחד השדות ארוך מדי. אפשר לקצר ולשלוח שוב.', rid }, { status: 400 });
     }
 
     const docList = Array.isArray(documents) ? documents : [];
@@ -477,13 +587,19 @@ export default async function(req) {
       warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
-    // אישור ללקוח — מיטבי
-    if (email) {
+    // אישור ללקוח — מיטבי, ורק למשהו שהוא כתובת, ולא יותר מכמה פעמים ביום לכתובת.
+    if (email && !isEmail(email)) {
+      log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'invalid_address' });
+      warnings.push('client_email_invalid');
+    } else if (email && !(await withinLimit(rid, `confirm-to:${await sha256Hex(email.toLowerCase())}`, 86400, CONFIRMATIONS_PER_ADDRESS_PER_DAY))) {
+      log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'rate_limited' });
+      warnings.push('client_confirmation_rate_limited');
+    } else if (email) {
       try {
-        const firstName = (name || '').split(' ')[0];
+        const firstName = greetingName(name);
         const clientText = [
-          `שלום ${firstName}, קיבלתי את דיווח האירוע הביטוחי והפרטים תועדו בהצלחה.`,
-          `סוג אירוע: ${claimType || 'כללי'} · תאריך: ${eventDate || '—'}`,
+          `${firstName ? `שלום ${firstName}, ` : 'שלום, '}קיבלתי את דיווח האירוע הביטוחי והפרטים תועדו בהצלחה.`,
+          `סוג אירוע: ${claimTypeLabel(claimType)} · תאריך: ${eventDateLabel(eventDate)}`,
           `אחזור אליכם אישית בהקדם האפשרי להמשך טיפול התביעה.`,
           `לכל שאלה — ניתן להשיב ישירות למייל זה.`,
           `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,

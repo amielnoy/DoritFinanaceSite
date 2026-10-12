@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SupabaseLeadAdminService } from "@/services/supabase/SupabaseLeadAdminService";
 import { tableFake } from "../helpers/supabase-table-fake";
 
@@ -101,5 +101,42 @@ describe("SupabaseLeadAdminService writes", () => {
       "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת",
     );
     await expect(new SupabaseLeadAdminService(client).setStatus("x", "closed")).rejects.toThrow("הפעולה לא בוצעה");
+  });
+});
+
+describe("SupabaseLeadAdminService.documentLink", () => {
+  const storageOf = (result: { data: { signedUrl: string } | null; error: { message: string } | null }) => {
+    const createSignedUrl = vi.fn().mockResolvedValue(result);
+    const from = vi.fn(() => ({ upload: vi.fn(), createSignedUrl }));
+    return { storage: { storage: { from } }, from, createSignedUrl };
+  };
+  const ref = "storage:claim-documents/00000000-0000-0000-0000-000000000001/abc-tz.pdf";
+
+  it("signs a stored document for five minutes, by its path in the private bucket", async () => {
+    const { client } = tableFake({ data: [], error: null });
+    const s = storageOf({ data: { signedUrl: "https://project.supabase.co/signed" }, error: null });
+    const link = await new SupabaseLeadAdminService(client, s.storage).documentLink(ref);
+    expect(link).toBe("https://project.supabase.co/signed");
+    expect(s.from).toHaveBeenCalledWith("claim-documents");
+    expect(s.createSignedUrl).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000001/abc-tz.pdf", 300);
+  });
+
+  it("returns a Base44 file URL unchanged, without asking storage", async () => {
+    const { client } = tableFake({ data: [], error: null });
+    const s = storageOf({ data: null, error: null });
+    const url = "https://base44.app/api/files/tz.pdf";
+    expect(await new SupabaseLeadAdminService(client, s.storage).documentLink(url)).toBe(url);
+    expect(s.createSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("says so when storage refuses — not an admin, or the file is gone", async () => {
+    const { client } = tableFake({ data: [], error: null });
+    const s = storageOf({ data: null, error: { message: "Object not found" } });
+    await expect(new SupabaseLeadAdminService(client, s.storage).documentLink(ref)).rejects.toThrow("לא ניתן לפתוח");
+  });
+
+  it("refuses a stored document when it has no storage client", async () => {
+    const { client } = tableFake({ data: [], error: null });
+    await expect(new SupabaseLeadAdminService(client).documentLink(ref)).rejects.toThrow();
   });
 });

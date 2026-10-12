@@ -25,6 +25,12 @@ export interface EdgeOptions {
   headers?: Record<string, string>;
   /** Sent as-is instead of JSON.stringify(body). */
   rawBody?: string;
+  /** `allow_submission` answers false for keys starting with any of these ('claim-ip:', 'confirm-to:'). */
+  overLimit?: string[];
+  /** `allow_submission` fails with this HTTP status instead of answering. */
+  failLimiter?: number;
+  /** Storage refuses to sign links with this HTTP status. */
+  failSign?: number;
 }
 
 export interface EdgeInvocation {
@@ -98,6 +104,18 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       const row = { id: `00000000-0000-4000-8000-${String(leads.length + 1).padStart(12, "0")}`, ...parsed };
       leads.push(row);
       return new Response(JSON.stringify([row]), { status: 201 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/rpc/allow_submission` && method === "POST") {
+      if (options.failLimiter) return new Response('{"message":"simulated"}', { status: options.failLimiter });
+      const over = (options.overLimit ?? []).some((prefix) => String(parsed.p_key).startsWith(prefix));
+      return new Response(JSON.stringify(!over), { status: 200 });
+    }
+    const signPrefix = `${SUPABASE_URL}/storage/v1/object/sign/`;
+    if (u.startsWith(signPrefix) && method === "POST") {
+      if (options.failSign) return new Response('{"message":"simulated"}', { status: options.failSign });
+      return new Response(JSON.stringify({ signedURL: `/object/sign/${u.slice(signPrefix.length)}?token=test` }), {
+        status: 200,
+      });
     }
     throw new Error(`unexpected fetch in an Edge Function test: ${method} ${u}`);
   };

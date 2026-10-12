@@ -12,10 +12,40 @@ import { deviceLabel } from '../_shared/device.ts';
 import { buildClientHtml, type ClientMail } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, mailerConfigured, sendMail } from '../_shared/mail.ts';
-import { insertRow, supabaseConfigured } from '../_shared/rest.ts';
+import { insertRow, signStorageUrl, supabaseConfigured } from '../_shared/rest.ts';
+import {
+  clientIp,
+  greetingName,
+  isEmail,
+  isoDateOr,
+  knownOr,
+  oversizedField,
+  sha256Hex,
+  withinLimit,
+} from '../_shared/guard.ts';
 
 const FN = 'submit-claim';
 const log = createLog(FN);
+
+/** The claim form's own list (src/components/dorit/forms/ClaimForm.tsx); the
+ *  confirmation names one of these or none. A contract test keeps them equal. */
+export const CLAIM_TYPES = [
+  'ביטוח בריאות משלים',
+  'ביטוח חיים / מקרה מוות',
+  'אובדן כושר עבודה',
+  'רכוש / דירה / רכב',
+  'אחר',
+] as const;
+
+/** Claims from one address, per hour. A family reporting two events fits; a script does not. */
+const CLAIMS_PER_IP_PER_HOUR = 5;
+/** Confirmations to one mailbox, per day — the limit that protects a stranger's inbox. */
+const CONFIRMATIONS_PER_ADDRESS_PER_DAY = 3;
+
+/** A document the browser uploaded to Supabase Storage, by path (SupabaseUploadService). */
+export const STORAGE_REF_PREFIX = 'storage:claim-documents/';
+/** How long the link in the notification mail opens the document. Past that, the admin screen signs a fresh one. */
+const MAIL_LINK_SECONDS = 7 * 24 * 60 * 60;
 
 // Several mailboxes, one team — see the note in base44/functions/submitLead/entry.ts.
 const NOTIFY_EMAILS = ['amielnoy@gmail.com', 'amielnoy@outlook.com'];
@@ -24,7 +54,7 @@ const SECONDARY_EMAIL = 'dorit@govari-fin.co.il';
 /** What changes in this function's confirmation — the content only; the template is shared. */
 function clientMailFor(data: { name?: string; claimType?: string; eventDate?: string }): ClientMail {
   return {
-    firstName: (data.name || '').split(' ')[0],
+    firstName: greetingName(data.name),
     eyebrow: 'אישור דיווח',
     heading: 'קיבלנו את דיווח האירוע',
     intro: 'קיבלתי את דיווח האירוע הביטוחי והפרטים תועדו בהצלחה. אחזור אליכם אישית בהקדם האפשרי להמשך טיפול התביעה וליווי צמוד ברגע האמת.',
@@ -33,9 +63,12 @@ function clientMailFor(data: { name?: string; claimType?: string; eventDate?: st
     // string would take the row out of the HTML while the plain-text twin went
     // on printing it — the two halves of one email disagreeing about which
     // fields exist. A claim filed without a date should say so in both.
+    // Only values this code recognises: a type from the form's list and an
+    // ISO date. Whatever else was typed stays in Dorit's copy, not the
+    // visitor's — the visitor's copy goes to an address nobody verified.
     details: [
-      ['סוג אירוע', data.claimType || 'כללי'],
-      ['תאריך אירוע', data.eventDate || '—'],
+      ['סוג אירוע', knownOr(data.claimType, CLAIM_TYPES, 'כללי')],
+      ['תאריך אירוע', isoDateOr(data.eventDate, '—')],
     ],
   };
 }
@@ -69,9 +102,36 @@ export async function handler(req: Request): Promise<Response> {
       return Response.json({ error: 'נדרשים שם וטלפון', rid, ready }, { status: 400, headers: cors });
     }
 
-    const docList: unknown[] = Array.isArray(documents) ? documents : [];
+    const oversized = oversizedField(body);
+    if (oversized) {
+      log('warn', 'request.rejected', { rid, reason: 'field_too_long', field: oversized });
+      return Response.json({ error: 'אחד השדות ארוך מדי. אפשר לקצר ולשלוח שוב.', rid }, { status: 400, headers: cors });
+    }
+
+    const ip = clientIp(req);
+    if (ip && !(await withinLimit(log, rid, `claim-ip:${await sha256Hex(ip)}`, 3600, CLAIMS_PER_IP_PER_HOUR))) {
+      log('warn', 'request.rejected', { rid, reason: 'rate_limited' });
+      return Response.json(
+        { error: 'התקבלו כמה דיווחים ברצף. אפשר לנסות שוב בעוד שעה, או לפנות לדורית ישירות.', rid },
+        { status: 429, headers: cors },
+      );
+    }
+
+    const docList: string[] = Array.isArray(documents) ? documents : [];
+    // A document uploaded to Supabase Storage arrives as its path; the record
+    // keeps the path, and the notification gets a link that expires. One that
+    // cannot be signed is listed by path, so Dorit still knows it exists.
+    const docLinks = await Promise.all(docList.map(async (d) => {
+      if (!d.startsWith(STORAGE_REF_PREFIX)) return d;
+      try {
+        return await signStorageUrl('claim-documents', d.slice(STORAGE_REF_PREFIX.length), MAIL_LINK_SECONDS);
+      } catch (e) {
+        log('warn', 'document.sign_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        return d;
+      }
+    }));
     const docLines = docList.length
-      ? [``, `מסמכים מצורפים (${docList.length}):`, ...docList.map((d, i) => `${i + 1}. ${d}`)]
+      ? [``, `מסמכים מצורפים (${docList.length}):`, ...docLinks.map((d, i) => `${i + 1}. ${d}`)]
       : ['', 'מסמכים מצורפים: אין'];
 
     const claimChannelText = channelLine({ channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath });
@@ -151,13 +211,20 @@ export async function handler(req: Request): Promise<Response> {
       warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
-    // The reporter's confirmation — best effort.
-    if (email) {
+    // The reporter's confirmation — best effort, and only to something that is
+    // an address, at most a few times a day per address.
+    if (email && !isEmail(email)) {
+      log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'invalid_address' });
+      warnings.push('client_email_invalid');
+    } else if (email && !(await withinLimit(log, rid, `confirm-to:${await sha256Hex(email.toLowerCase())}`, 86400, CONFIRMATIONS_PER_ADDRESS_PER_DAY))) {
+      log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'rate_limited' });
+      warnings.push('client_confirmation_rate_limited');
+    } else if (email) {
       try {
-        const firstName = (name || '').split(' ')[0];
+        const firstName = greetingName(name);
         const clientText = [
-          `שלום ${firstName}, קיבלתי את דיווח האירוע הביטוחי והפרטים תועדו בהצלחה.`,
-          `סוג אירוע: ${claimType || 'כללי'} · תאריך: ${eventDate || '—'}`,
+          `${firstName ? `שלום ${firstName}, ` : 'שלום, '}קיבלתי את דיווח האירוע הביטוחי והפרטים תועדו בהצלחה.`,
+          `סוג אירוע: ${knownOr(claimType, CLAIM_TYPES, 'כללי')} · תאריך: ${isoDateOr(eventDate, '—')}`,
           `אחזור אליכם אישית בהקדם האפשרי להמשך טיפול התביעה.`,
           `לכל שאלה — ניתן להשיב ישירות למייל זה.`,
           `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,

@@ -68,7 +68,7 @@ export default function ClaimForm() {
     setUploadError("");
     try {
       for (const file of Array.from(files)) {
-        const { url: file_url } = await services.uploads.upload(file);
+        const { url: file_url } = await services.claimDocuments.upload(file);
         setDocs((d) => [...d, { name: file.name, url: file_url }]);
       }
     } catch {
