@@ -19,7 +19,7 @@ export const SITE_NAME = "דורית גוב ארי — מתכננת פיננסי
 
 // A photograph of Dorit, not the generated stock image it used to be: the
 // card a shared link unfurls into is the first face of the business.
-export const DEFAULT_OG_IMAGE = absoluteUrl("/images/dorit-office-portrait.png");
+export const DEFAULT_OG_IMAGE = absoluteUrl("/images/dorit-office-portrait.jpg");
 
 /** Resolve a path or absolute URL to an absolute, canonical URL. */
 export function absoluteUrl(pathOrUrl: string): string {

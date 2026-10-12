@@ -252,7 +252,7 @@ export function isAuthCallback(location: Pick<Location, "hash" | "search">): boo
  * they reloaded. `getUser()` waits for supabase-js to finish reading the URL,
  * so starting the check now is safe.
  */
-function defaultSessionPresent(): boolean {
+export function defaultSessionPresent(): boolean {
   if (typeof window === "undefined") return false;
   if (isAuthCallback(window.location)) return true;
   if (!window.localStorage) return false;
