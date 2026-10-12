@@ -144,6 +144,54 @@ describe("dorit-mailer — who is allowed to send", () => {
   });
 });
 
+/**
+ * One token per caller. Base44's functions and the Supabase Edge Functions each
+ * hold their own, so either can be rotated or revoked without touching the
+ * other — and the second could be added without reading the first, which no
+ * system will reveal once stored.
+ */
+describe("dorit-mailer — a second caller's token", () => {
+  const BOTH = { ...ENV, MAILER_TOKEN_SUPABASE: "supabase-only-token" };
+  const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+  it("accepts the Supabase token", async () => {
+    const mailer = await loadMailer();
+    const res = await mailer.onRequestPost({ request: post(rendered, bearer("supabase-only-token")), env: BOTH });
+    expect(res.status).toBe(200);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("still accepts Base44's token beside it", async () => {
+    const mailer = await loadMailer();
+    const res = await mailer.onRequestPost({ request: post(rendered, AUTH), env: BOTH });
+    expect(res.status).toBe(200);
+  });
+
+  it("accepts the Supabase token even where Base44's is not configured", async () => {
+    const mailer = await loadMailer();
+    const { MAILER_TOKEN, ...onlySupabase } = BOTH;
+    const res = await mailer.onRequestPost({ request: post(rendered, bearer("supabase-only-token")), env: onlySupabase });
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses a token that matches neither", async () => {
+    const mailer = await loadMailer();
+    const res = await mailer.onRequestPost({ request: post(rendered, bearer("supabase-only-token-x")), env: BOTH });
+    expect(res.status).toBe(401);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("never lets an empty setting authorise an empty or missing bearer", async () => {
+    const mailer = await loadMailer();
+    const empty = { ...ENV, MAILER_TOKEN_SUPABASE: "" };
+    for (const headers of [{}, { Authorization: "Bearer " }, { Authorization: "Bearer" }]) {
+      const res = await mailer.onRequestPost({ request: post(rendered, headers), env: empty });
+      expect(res.status, JSON.stringify(headers)).toBe(401);
+    }
+    expect(sent).toHaveLength(0);
+  });
+});
+
 describe("dorit-mailer — what it sends", () => {
   it("sends from the configured identity, not one the caller chose", async () => {
     const mailer = await loadMailer();
