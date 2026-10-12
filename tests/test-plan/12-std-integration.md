@@ -45,6 +45,7 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `submitLead` | every form on the site, and the interview agent |
 | `escalateToHuman` | all three on-site agents |
 | `submitClaim` | the claims form |
+| `submit-claim` (Edge) | a claim, saved to Supabase and announced — the same cases as `submitClaim`, plus its own |
 | `upsertContact` | no caller yet — built for a channel that supplies a phone number, dormant per B-8 |
 | `logSupportChat` | the support agent, at the end of every conversation |
 | `adminLead` | `/admin/leads` — an admin's status change and delete, written to Supabase and then Base44 |
@@ -446,6 +447,19 @@ and `rid`. `INT-ADL-031` is a retried delete: when Base44 answers `404` because
 an earlier delete went through and only its response was lost, the function
 answers `200` — the lead is gone from both stores, and an error there would
 leave the admin stuck on one that no retry could clear.
+
+### 4.22 `submit-claim` — the claim, on Supabase — `INT-CLM-EDGE-001..011`
+
+Every `submitClaim` case runs against both implementations (`describe.each` in
+`submit-claim.integration.test.ts`), and two cases compare what they send: the
+reporter's HTML must be identical, and the staff report identical apart from
+its timestamp line. `submit-claim-edge.integration.test.ts` holds what only the
+Edge Function does: the row it writes (today's fields, no Base44 id, `leadId`
+is its uuid), the service-key insert ahead of any mail, a non-JSON body
+answered as 400 with nothing touched, missing Supabase credentials as 500 with
+no mail, a database refusal that quotes the row kept out of the log, and the
+CORS answers — a preflight that does nothing, the site's origin on every
+answer, none for a stranger's.
 
 ## 5. Pass criteria
 

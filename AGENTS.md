@@ -45,11 +45,23 @@ npx skills add base44/skills
   column to it deliberately, never by opening `leads`. The revokes name `anon` and
   `authenticated` because Supabase's default privileges grant EXECUTE to them by
   name; a bare `from public` leaves the functions open.
-- `base44/functions/adminLead`: an admin's status change and delete on a lead.
-  Writes Supabase first, then Base44, because both are idempotent and a failure
-  part-way must leave the lead in the admin list for the retry to finish. The
-  browser must not write the `Lead` entity directly — Supabase would keep the old
-  status and the deleted enquiry, and the personal area reads Supabase. See A-73.
+- `base44/functions/adminLead`: the rollback path for an admin's status change
+  and delete on a lead, used only when Supabase is not configured. Writes
+  Supabase first, then Base44. The browser must not write Base44's `Lead` entity
+  directly — Supabase would keep the old status and the deleted enquiry, and the
+  personal area reads Supabase. See A-73.
+- `src/services/supabase/SupabaseLeadAdminService.ts`: with Supabase configured,
+  the admin's lead writes go straight to `leads` under her session
+  (`leads_update_admin` / `leads_delete_admin`), by Supabase `id`, and ask for
+  the row back — a write row-level security filters out changes nothing and
+  returns no error, so an empty answer is an error, never a success.
+- `supabase/functions/<name>/`: Supabase Edge Functions (Deno).
+  - **Layout:** `handler.ts` exports `handler`, and `index.ts` is only `Deno.serve(handler)`.
+  - **Shared code:** helpers live once in `supabase/functions/_shared/` and are imported, never copied. The Base44 "duplicated helper" rule does not apply here.
+  - **JWT:** every function has a `[functions.<name>]` block with `verify_jwt` in `supabase/config.toml`.
+  - **Tests:** `tests/helpers/edge-function.ts` runs a handler in-process, as `base44-function.ts` does for Base44.
+  - **Deploy:** CI deploys every function on green `main`, before either production goes out.
+  - **Contracts:** the logging, clock and rid contracts scan them, with the shared modules each one imports.
 - `src/lib/analytics.ts`: every event the site sends to GA4, and the one place
   that sends it. Three rules. **Never send personal data:** `track` keeps only
   `location`, `cta`, `method` and `channel` and drops every other parameter, so a

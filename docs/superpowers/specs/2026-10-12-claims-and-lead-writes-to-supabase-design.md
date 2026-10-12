@@ -185,12 +185,18 @@ the bucket's limits.
   other branches.
 - **Without the token:** if `SUPABASE_ACCESS_TOKEN` is empty, it prints a
   notice and succeeds, the same opt-in shape as the Base44 publish.
-- **Command:**
-  `supabase functions deploy submit-claim --project-ref hjowdyiwjjrqceumkvgt --use-api`.
-  `--use-api` bundles on Supabase's side, so the runner needs no Docker.
-- **Order:** "Publish to Base44" adds `deploy-supabase` to its `needs`, so the
-  production site is never published ahead of the function it calls. The
-  Vercel staging deploy is not gated, because it is not production.
+- **Command:** `supabase functions deploy --project-ref hjowdyiwjjrqceumkvgt --use-api`,
+  naming no function: every directory under `supabase/functions` except
+  `_shared`, so the next function needs no CI edit. `--use-api` bundles on
+  Supabase's side, so the runner needs no Docker.
+- **Order:** production has been served by **Vercel** since 2026-10-11
+  (`govari-fin.co.il` → Vercel), so both productions wait:
+  - "Publish to Base44" adds `deploy-supabase` to its `needs`.
+  - Vercel's "Choose production or preview" step passes `--prod` only when
+    `needs.deploy-supabase.result == 'success'`. A red run still deploys a
+    preview.
+- **Type-check:** `deno check` on `supabase/functions/*/index.ts` runs in the
+  test job, because `tsc` covers `src/**` only.
 
 **Production smoke test:** a new case posts `{}` to
 `${VITE_SUPABASE_URL}/functions/v1/submit-claim` with the publishable key and
