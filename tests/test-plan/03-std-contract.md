@@ -427,6 +427,14 @@ rendered in CI's fallback faces instead of the real ones. See A-74.
 Regenerate the files with `node scripts/self-host-fonts.mjs`; never edit
 `src/fonts.css` or `public/fonts/poa.css` by hand.
 
+### 4.7 The lead functions on Edge — `edge-functions.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-EDGE-001 | "mention no Docs, no Outlook and no Base44 connector" | No file under `supabase/functions` names `googledocs`, `graph.microsoft.com`, `connectors.` or `createClientFromRequest` |
+| CTR-EDGE-002 | "are each registered without JWT verification, as submit-claim is" | `verify_jwt = false` for `submit-claim`, `submit-lead`, `escalate-to-human`, `log-support-chat` in `config.toml` |
+| CTR-EDGE-003 | "ask Google for exactly two scopes" | `_shared/google.ts` lists only `calendar.events` and `spreadsheets` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed

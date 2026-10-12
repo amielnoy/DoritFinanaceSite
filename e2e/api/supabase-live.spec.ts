@@ -17,7 +17,9 @@ import { expect, test, test_step } from "../fixtures/app";
  * Only public reads are made — what any anonymous visitor's browser does.
  *
  * It also asks `submit-claim` an empty question, which proves the Edge Function
- * is deployed and allows the site's origin without storing anything.
+ * is deployed and allows the site's origin without storing anything, and does
+ * the same for `submit-lead` (whose answer says whether Google, the database and
+ * the mailer are all reachable) and `log-support-chat`.
  */
 const LIVE_URL = process.env.E2E_LIVE_API_URL;
 
@@ -73,6 +75,32 @@ test.describe("Live Supabase, with the deployed bundle's key (opt-in)", () => {
       expect(body.ready, "submit-claim cannot save a claim — its Supabase key is missing").toMatchObject({ db: true });
       expect(body.ready, "submit-claim cannot mail — set MAILER_URL and MAILER_TOKEN in its secrets").toMatchObject({ mailer: true });
       expect(res.headers()["access-control-allow-origin"], "the site's origin is not allowed").toBe(origin);
+    });
+
+    await test_step("the lead function is deployed and can reach everything it writes to", async () => {
+      // An empty enquiry: refused for want of a name and phone, but only after
+      // the function has said what it could do — the Google key and calendar
+      // are set, the database is reachable and the mailer is configured.
+      const origin = new URL(LIVE_URL!).origin;
+      const res = await supabase.post("/functions/v1/submit-lead", {
+        data: {},
+        headers: { Origin: origin, Authorization: `Bearer ${key}` },
+      });
+      const body = (await res.json().catch(() => ({}))) as { ready?: { db?: boolean; mailer?: boolean; google?: boolean } };
+      expect(res.status(), `submit-lead: ${JSON.stringify(body)}`).toBe(400);
+      expect(body.ready, "submit-lead cannot save a lead — its Supabase key is missing").toMatchObject({ db: true });
+      expect(body.ready, "submit-lead cannot mail — set MAILER_URL and MAILER_TOKEN in its secrets").toMatchObject({ mailer: true });
+      expect(body.ready, "submit-lead cannot reach Google — set GOOGLE_SERVICE_ACCOUNT_JSON and GOOGLE_CALENDAR_ID").toMatchObject({ google: true });
+    });
+
+    await test_step("the support-chat log is deployed", async () => {
+      // 200 without SHEET_ID ("not configured"), 400 with it and an empty body:
+      // either way the function is deployed and answering, and nothing is written.
+      const res = await supabase.post("/functions/v1/log-support-chat", {
+        data: {},
+        headers: { Origin: new URL(LIVE_URL!).origin, Authorization: `Bearer ${key}` },
+      });
+      expect([200, 400], `log-support-chat answered ${res.status()}`).toContain(res.status());
     });
 
     await supabase.dispose();

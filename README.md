@@ -399,6 +399,30 @@ mailer's `MAILER_TOKEN_SUPABASE` — a token of its own, so either caller can be
 without the other. Neither value can be read back once stored; to replace one, generate a new
 value and write it to both ends.
 
+### Lead functions on Supabase
+
+`submitLead`, `escalateToHuman` and `logSupportChat` also exist as Supabase Edge
+Functions (`submit-lead`, `escalate-to-human`, `log-support-chat`), with Google
+Calendar and Sheets reached through a service account instead of Base44's
+connectors. `VITE_LEAD_FUNCTIONS` picks which the site calls, the same way
+`VITE_AUTH_PROVIDER` does for sign-in: `supabase` switches, anything else (the
+default) keeps Base44's functions, which stay deployed as the rollback. The
+interview and support agents still call Base44's tool functions until a second
+PR makes them forwarders.
+
+In **Supabase Edge Function secrets** (set by hand — the CI token cannot write
+secrets): `GOOGLE_SERVICE_ACCOUNT_JSON` (the service account's JSON key),
+`GOOGLE_CALENDAR_ID` (`govaridorit@gmail.com`) and `SHEET_ID` (the leads sheet),
+next to the `MAILER_URL` and `MAILER_TOKEN` above. Dorit must share her calendar
+("make changes to events") and the leads sheet (editor) with the service
+account's address. The meeting invitation goes by mail as an `.ics` file
+through `dorit-mailer`; there is no Outlook or Google Docs step any more.
+Rollout: ship dark, set the secrets and sharing until the smoke's `submit-lead`
+case answers `ready` all true, set `VITE_LEAD_FUNCTIONS=supabase` on Vercel and
+redeploy, then send one real enquiry and one consultation. To go back, unset it
+and redeploy. Revoking access is un-sharing the calendar and sheet, or deleting
+the key.
+
 `MAIL_FROM` must be on the domain verified in Resend — the subdomain
 `mail.govari-fin.co.il`, never the apex, which points at Microsoft 365 with an
 SPF ending in `-all`.

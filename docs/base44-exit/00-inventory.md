@@ -89,13 +89,13 @@ What is genuinely Base44, per function:
 
 | Function | Lines | connectors | Core mail | entities | supabase | mailer |
 |---|---:|:-:|:-:|:-:|:-:|:-:|
-| `submitLead` | 1692 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `escalateToHuman` | 640 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `submitLead` (Edge, forwarders pending) | 1692 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `escalateToHuman` (Edge, forwarders pending) | 640 | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `submitClaim` | 495 | | ✓ | ✓ | ✓ | ✓ |
 | `createConsultationEvent` | 315 | ✓ | | | | |
 | `upsertContact` | 302 | ✓ | | ✓ | ✓ | |
 | `contentAdmin` | 192 | | | ✓ | ✓ | |
-| `logSupportChat` | 190 | ✓ | | | | |
+| `logSupportChat` (Edge, forwarders pending) | 190 | ✓ | | | | |
 | `adminLead` | 119 | | | ✓ | ✓ | |
 
 Three dependencies, in descending order of difficulty:
@@ -163,6 +163,15 @@ Two things make it smaller than it sounds. The Google three could be a **service
 account** with domain delegation, which removes refresh-token handling
 altogether. And the `outlook` connector is authorised as `amielnoy@outlook.com`
 rather than Dorit (A-54), so that account has to be revisited either way.
+
+**Decided (2026-10-12):** the Edge versions of `submitLead`, `escalateToHuman`
+and `logSupportChat` use one Google **service account** (no refresh tokens) for
+Calendar and Sheets — Dorit shares her calendar and the leads sheet with its
+address. `googledocs` is dropped, and so is `outlook`: the meeting invitation
+now goes by mail as an `.ics` attachment through `dorit-mailer`. The browser
+picks the implementation with `VITE_LEAD_FUNCTIONS`; the Base44 functions stay
+as the rollback until the agents' forwarders land. Design:
+`docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md`.
 
 ---
 
