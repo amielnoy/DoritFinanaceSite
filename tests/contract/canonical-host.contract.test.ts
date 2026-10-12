@@ -117,11 +117,15 @@ describe("the canonical host has a single source", () => {
     expect(ws!.destination).toContain("base44.app");
 
     // Before the catch-all, or it never matches.
-    const at = (pred: (r: { source: string }) => boolean) => rewrites.findIndex(pred);
+    // The catch-all is the rule that serves the app shell, whatever paths it
+    // leaves out (it skips /assets, so a removed chunk is a 404).
+    const at = (pred: (r: { source: string; destination: string }) => boolean) => rewrites.findIndex(pred);
+    const shell = at((r) => r.destination === "/app.html");
+    expect(shell, "no rule serves the app shell").toBeGreaterThan(-1);
     expect(
       at((r) => r.source.startsWith("/ws-user-apps")),
       "the catch-all swallows the socket path",
-    ).toBeLessThan(at((r) => r.source === "/(.*)"));
+    ).toBeLessThan(shell);
   });
 
   it("still points the API rewrite at Base44, which is a backend address and not the canonical host", () => {
