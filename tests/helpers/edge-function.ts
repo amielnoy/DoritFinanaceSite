@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { join } from "node:path";
 import { buildSync } from "esbuild";
 import { REPO_ROOT } from "./entity-schema";
@@ -15,6 +16,16 @@ import { MAILER_URL, type EmailCall, type FetchCall } from "./base44-function";
 export const SUPABASE_URL = "https://project-ref.supabase.test";
 const SERVICE_KEY = "service-role-test";
 
+/** One service-account key per test file: real RS256, signed by google.ts, never sent anywhere. */
+const TEST_SA = (() => {
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  return JSON.stringify({
+    client_email: "leads@test-project.iam.gserviceaccount.com",
+    private_key: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    token_uri: "https://oauth2.googleapis.com/token",
+  });
+})();
+
 export interface EdgeOptions {
   /** PostgREST refuses the insert: `true` for a 500, or a status and body of your own. */
   failLeadWrite?: boolean | { status: number; body: string };
@@ -31,6 +42,14 @@ export interface EdgeOptions {
   failLimiter?: number;
   /** Storage refuses to sign links with this HTTP status. */
   failSign?: number;
+  /** Rows `selectRows('leads', …)` answers, filtered by phone=eq., source=eq., status=eq. (and created_at=gte.). */
+  existingLeads?: Record<string, unknown>[];
+  /** That Google call answers 500. */
+  failGoogle?: "token" | "calendar" | "sheets";
+  /** The calendar answers this status. */
+  calendarStatus?: number;
+  /** The env has no GOOGLE_SERVICE_ACCOUNT_JSON. */
+  noGoogle?: boolean;
 }
 
 export interface EdgeInvocation {
@@ -42,6 +61,11 @@ export interface EdgeInvocation {
   emails: EmailCall[];
   fetches: FetchCall[];
   mailTo(address: string): EmailCall;
+  leadUpdates: { id: string; fields: Record<string, unknown> }[];
+  meetings: Record<string, unknown>[];
+  calendarEvents: Record<string, unknown>[];
+  sheetRows: { tab: string; row: unknown[] }[];
+  callsTo(fragment: string): FetchCall[];
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -80,6 +104,11 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
   const leads: Record<string, unknown>[] = [];
   const emails: EmailCall[] = [];
   const fetches: FetchCall[] = [];
+  const leadUpdates: { id: string; fields: Record<string, unknown> }[] = [];
+  const meetings: Record<string, unknown>[] = [];
+  const calendarEvents: Record<string, unknown>[] = [];
+  const sheetRows: { tab: string; row: unknown[] }[] = [];
+  const stored: Record<string, unknown>[] = [...(options.existingLeads ?? [])];
 
   const fetchImpl = async (url: string, init: RequestInit = {}) => {
     const u = String(url);
@@ -103,6 +132,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       }
       const row = { id: `00000000-0000-4000-8000-${String(leads.length + 1).padStart(12, "0")}`, ...parsed };
       leads.push(row);
+      stored.push(row);
       return new Response(JSON.stringify([row]), { status: 201 });
     }
     if (u === `${SUPABASE_URL}/rest/v1/rpc/allow_submission` && method === "POST") {
@@ -117,6 +147,59 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
         status: 200,
       });
     }
+    if (u === "https://oauth2.googleapis.com/token" && method === "POST") {
+      if (options.failGoogle === "token") return new Response('{"error":"simulated"}', { status: 500 });
+      return new Response(JSON.stringify({ access_token: "google-test-token", expires_in: 3600 }), { status: 200 });
+    }
+    if (u.startsWith("https://www.googleapis.com/calendar/v3/calendars/") && method === "POST") {
+      if (options.failGoogle === "calendar") return new Response("{}", { status: 500 });
+      if (options.calendarStatus && options.calendarStatus >= 400) return new Response("{}", { status: options.calendarStatus });
+      const n = calendarEvents.push(parsed);
+      return new Response(
+        JSON.stringify({
+          id: `ev${n}`,
+          iCalUID: `ev${n}@google.com`,
+          htmlLink: `https://calendar.google.com/event?eid=ev${n}`,
+          start: { dateTime: `${parsed.start.dateTime}+03:00` },
+          end: { dateTime: `${parsed.end.dateTime}+03:00` },
+        }),
+        { status: 200 },
+      );
+    }
+    if (u.startsWith("https://sheets.googleapis.com/v4/spreadsheets/") && method === "POST") {
+      if (options.failGoogle === "sheets") return new Response("{}", { status: 500 });
+      const tab = decodeURIComponent(u.split("/values/")[1]).split("!")[0];
+      sheetRows.push({ tab, row: parsed.values[0] });
+      return new Response("{}", { status: 200 });
+    }
+    if (u.startsWith(`${SUPABASE_URL}/rest/v1/leads?id=eq.`) && method === "PATCH") {
+      const id = decodeURIComponent(u.split("id=eq.")[1]);
+      leadUpdates.push({ id, fields: parsed });
+      const row = stored.find((l) => l.id === id);
+      if (row) Object.assign(row, parsed);
+      return new Response(null, { status: 204 });
+    }
+    if (u.startsWith(`${SUPABASE_URL}/rest/v1/leads?`) && method === "GET") {
+      const q = new URLSearchParams(u.split("?")[1]);
+      const eq = (k: string) => q.get(k)?.replace(/^eq\./, "");
+      const since = q.get("created_at")?.replace(/^gte\./, ""); // rows older than this bound are not returned; undated rows are kept
+      const rows = stored.filter((l) => {
+        const at = (l.created_at ?? l.created_date) as string | undefined;
+        return (
+          (!eq("phone") || l.phone === eq("phone")) &&
+          (!eq("source") || l.source === eq("source")) &&
+          (!eq("status") || l.status === eq("status")) &&
+          (!since || !at || new Date(at).getTime() >= new Date(since).getTime())
+        );
+      });
+      return new Response(JSON.stringify(rows), { status: 200 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/meetings?on_conflict=lead_id` && method === "POST") {
+      const at = meetings.findIndex((m) => m.lead_id === parsed.lead_id);
+      if (at >= 0) Object.assign(meetings[at], parsed);
+      else meetings.push({ ...parsed });
+      return new Response(null, { status: 201 });
+    }
     throw new Error(`unexpected fetch in an Edge Function test: ${method} ${u}`);
   };
 
@@ -125,6 +208,9 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     MAILER_TOKEN: "test-only-token",
     SUPABASE_URL,
     SUPABASE_SERVICE_ROLE_KEY: SERVICE_KEY,
+    ...(options.noGoogle ? {} : { GOOGLE_SERVICE_ACCOUNT_JSON: TEST_SA }),
+    GOOGLE_CALENDAR_ID: "govaridorit@gmail.com",
+    SHEET_ID: "sheet-test",
   };
   const module = { exports: {} as Record<string, unknown> };
   const handler = compiled.get(name)!(module, module.exports, fetchImpl, { env: { get: (k: string) => env[k] } });
@@ -146,6 +232,11 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     leads,
     emails,
     fetches,
+    leadUpdates,
+    meetings,
+    calendarEvents,
+    sheetRows,
+    callsTo: (fragment) => fetches.filter((f) => f.url.includes(fragment)),
     mailTo(address) {
       const found = emails.filter((e) => e.to === address);
       if (found.length !== 1) {
