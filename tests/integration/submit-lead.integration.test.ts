@@ -2073,6 +2073,13 @@ describe("Edge submit-lead — what only it does", () => {
     expect(r.json.warnings ?? []).not.toContain("invite_failed");
   });
 
+  it("says so when the booking row cannot be written, once", async () => {
+    const r = await invokeEdge("submit-lead", consultation, { failMeetings: true });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+    expect((r.json.warnings as string[]).filter((w) => w === "meeting_write_failed")).toHaveLength(1);
+  });
+
   it("appends the Events row through the service account", async () => {
     const r = await invokeEdge("submit-lead", consultation);
     expect(r.sheetRows).toHaveLength(1);

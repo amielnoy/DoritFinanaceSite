@@ -48,6 +48,8 @@ export interface EdgeOptions {
   failGoogle?: "token" | "calendar" | "sheets";
   /** The calendar answers this status. */
   calendarStatus?: number;
+  /** The meetings upsert answers 404. */
+  failMeetings?: boolean;
   /** The env has no GOOGLE_SERVICE_ACCOUNT_JSON. */
   noGoogle?: boolean;
   /** Changes to the default env: a value sets the key, `null` removes it. Ignored with `env`. */
@@ -221,6 +223,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       return new Response(JSON.stringify(rows), { status: 200 });
     }
     if (u === `${SUPABASE_URL}/rest/v1/meetings?on_conflict=lead_id` && method === "POST") {
+      if (options.failMeetings) return new Response("{}", { status: 404 });
       const at = meetings.findIndex((m) => m.lead_id === parsed.lead_id);
       if (at >= 0) Object.assign(meetings[at], parsed);
       else meetings.push({ ...parsed });

@@ -247,6 +247,8 @@ export async function handler(req: Request): Promise<Response> {
     // held" is the case worth being able to query.
     const booking = Boolean(scheduledAt || meetingTopic || timing || notes);
     const warnings: string[] = [];
+    // Both meetings writes can fail; the warning is pushed once.
+    let meetingWriteFailed = false;
     if (booking) {
       try {
         await upsertRow('meetings', {
@@ -260,6 +262,7 @@ export async function handler(req: Request): Promise<Response> {
         }, 'lead_id');
       } catch (e) {
         log('warn', 'meeting.write_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        if (!meetingWriteFailed) { meetingWriteFailed = true; warnings.push('meeting_write_failed'); }
       }
     }
 
@@ -427,6 +430,7 @@ export async function handler(req: Request): Promise<Response> {
         }, 'lead_id');
       } catch (e) {
         log('warn', 'meeting.write_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        if (!meetingWriteFailed) { meetingWriteFailed = true; warnings.push('meeting_write_failed'); }
       }
     }
 
