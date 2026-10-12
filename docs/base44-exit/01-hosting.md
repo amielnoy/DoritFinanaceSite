@@ -97,17 +97,19 @@ A      @    64.29.17.1
 CNAME  www  30fa16059da418c7.vercel-dns-017.com.
 ```
 
-Not yet applied, so the measurement above (`ENOTFOUND`) still stands. Re-run it
-once DTNT confirms, and only then move to step 2's check and step 4.
+Applied by DTNT on 2026-10-11, so the `ENOTFOUND` measurement above no longer
+holds. Both hosts resolve to Vercel and serve valid Let's Encrypt certificates.
+The apex answers `200`, and `www` answers `308` to it.
 
-**Two oddities on the Vercel project to resolve:**
+**The two oddities on the Vercel project were removed on 2026-10-12:**
 
-- `mail.govari-fin.co.il` is attached to it. It was meant for Resend sending, not
-  for the website; a web project should not answer on a mail subdomain, and the
-  Resend records belong at the registrar, not here.
-- `dorit-govari-fin.co.il` is attached to it. Dorit asked DTNT for `govari.co.il`
-  and `dorit-govari.co.il`, and neither is registered, so this is not a domain
-  she asked for. Find out where it came from before keeping it.
+- `mail.govari-fin.co.il` was meant for Resend sending, not for the website. It
+  never resolved, and Resend's records (`resend._domainkey.mail`, `send.mail`)
+  live in DTNT's DNS, so detaching it from the project changed nothing for mail.
+- `dorit-govari-fin.co.il` was never registered. Dorit had asked DTNT for
+  `govari.co.il` and `dorit-govari.co.il`, which are separate domains and still
+  open: `dorit-govari.co.il` does not exist, and `govari.co.il` is registered
+  but on Cloudflare nameservers, not DTNT's.
 
 ---
 

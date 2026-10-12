@@ -225,15 +225,13 @@ does not resolve is worse than one pointing at the old site.
    as canonical — `www` or the apex — and let Vercel redirect the other. Wait for both
    to resolve before continuing.
 
-   *Status, 2026-10-06:* both domains are added and verified in the Vercel project
-   (the apex is canonical; `www` answers `308` to it). The records are **not yet
-   applied**: DTNT (ticket 84851895) was asked to add `A 216.198.79.1`,
-   `A 64.29.17.1` and `CNAME www → 30fa16059da418c7.vercel-dns-017.com.`. Two
-   oddities on the Vercel project still need resolving:
-   `mail.govari-fin.co.il` (meant for Resend sending, not the site) and
-   `dorit-govari-fin.co.il` (Dorit asked DTNT for `govari.co.il` and
-   `dorit-govari.co.il`, which are not registered). See
-   `docs/base44-exit/01-hosting.md`.
+   *Status, 2026-10-12: done.* DTNT (ticket 84851895) applied `A 216.198.79.1`,
+   `A 64.29.17.1` and `CNAME www → 30fa16059da418c7.vercel-dns-017.com.` on
+   2026-10-11. The apex serves `200` and `www` answers `308` to it, both on valid
+   Let's Encrypt certificates. The two stray domains on the Vercel project,
+   `mail.govari-fin.co.il` and `dorit-govari-fin.co.il`, were removed on
+   2026-10-12. Neither resolved, and Resend's records for `mail.` live in DTNT's
+   DNS, not on Vercel. See `docs/base44-exit/01-hosting.md`.
 2. **Take the production deployment out from behind login.** Vercel → Settings →
    Deployment Protection. Staging is protected on purpose; production cannot be, or the
    site is unreachable. Leave preview protection alone.
