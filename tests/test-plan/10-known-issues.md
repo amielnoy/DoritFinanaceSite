@@ -303,21 +303,28 @@ is disclosed on a channel with no consent screen.
 
 ### B-10 · The Resend sending domain had no DNS records, so no mail could leave
 
-*Status, 2026-10-12: closed, except for DMARC.* Mail leaves. Resend refuses any send
-from an unverified domain, and `dorit-mailer`'s confirmations from
+*Status, 2026-10-12: closed.* Mail leaves. Resend refuses any send from an
+unverified domain, and `dorit-mailer`'s confirmations from
 `notifications@mail.govari-fin.co.il` reached a Gmail inbox (not spam) nine times
 between 2026-10-04 and 2026-10-08. The records, measured on the public resolvers
-(8.8.8.8, 1.1.1.1):
+(8.8.8.8, 1.1.1.1, 9.9.9.9) and DTNT's own nameservers:
 
 | Record | Found |
 |---|---|
 | `resend._domainkey.mail.govari-fin.co.il` TXT | a DKIM public key (`p=MIGfMA0…`) |
 | `send.mail.govari-fin.co.il` | `CNAME send.forge.rmta.net.`, which carries `MX 10 feedback.forge.rmta.net.` and an SPF of explicit `ip4:` ranges |
-| `_dmarc.govari-fin.co.il` TXT | none |
+| `_dmarc.govari-fin.co.il` TXT | `v=DMARC1; p=none` |
 
 These are not the Amazon SES values expected below; Resend accepts them, as the
-delivered mail shows. What remains is the apex DMARC record. The original finding
-follows.
+delivered mail shows. The DMARC record is monitor-only (`p=none`) and names no
+report address. Tightening it to `quarantine` should wait until Microsoft 365 signs
+the apex with DKIM: `selector1._domainkey` has no record, so Dorit's own mail aligns
+through SPF alone, and that breaks whenever it is forwarded.
+
+When measuring, note that `ns1.dtnt.info` and `ns3.dtnt.info` intermittently time
+out, and `dig +short` prints nothing on a timeout. Query a public resolver or
+`ns2.dtnt.info`, or drop `+short`, before concluding a record is absent. The
+original finding follows.
 
 `dorit-mailer` sends through Resend from an address on `mail.govari-fin.co.il`.
 That subdomain does not exist. Checked 2026-09-27 against the public resolvers:
