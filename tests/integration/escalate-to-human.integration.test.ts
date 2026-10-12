@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { invokeFunction } from "../helpers/base44-function";
+import { invokeFunction, type HarnessOptions } from "../helpers/base44-function";
+import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
 
 /**
  * `escalateToHuman`, executed.
@@ -15,7 +16,26 @@ import { invokeFunction } from "../helpers/base44-function";
  * source check can see `hasOwnProperty` in the file. Only running it shows
  * that `__proto__` comes back as `uncertain` rather than as a truthy lookup
  * against `Object.prototype`.
+ *
+ * Two implementations answer these cases while both are deployed: Base44's
+ * `escalateToHuman` and its Supabase Edge port `escalate-to-human`. A case that
+ * holds for one must hold for the other; what only the port does is at the end.
  */
+
+/** Both harnesses' options. A case passes only knobs both understand. */
+type RunOptions = HarnessOptions & EdgeOptions;
+type Result = Awaited<ReturnType<typeof invokeFunction>>;
+
+const IMPLEMENTATIONS = [
+  {
+    label: "Base44 escalateToHuman",
+    run: (body: unknown, o: RunOptions = {}) => invokeFunction("escalateToHuman", body, o) as Promise<Result>,
+  },
+  {
+    label: "Edge escalate-to-human",
+    run: (body: unknown, o: RunOptions = {}) => invokeEdge("escalate-to-human", body, o) as unknown as Promise<Result>,
+  },
+];
 
 const AGENCY = "dorit@govari-fin.co.il";
 const OPS = "amielnoy@gmail.com";
@@ -33,9 +53,9 @@ const escalation = {
   consentAt: "2026-09-13T10:00:00.000Z",
 };
 
-describe("escalateToHuman — handing a conversation to a person", () => {
+describe.each(IMPLEMENTATIONS)("$label — handing a conversation to a person", ({ run }) => {
   it("records the escalation and notifies both inboxes", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
 
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ ok: true, recorded: true, notified: true });
@@ -49,7 +69,7 @@ describe("escalateToHuman — handing a conversation to a person", () => {
   });
 
   it("stores the consent the visitor was shown, so a record ties to its wording", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
     expect(r.leads[0]).toMatchObject({
       consent_version: "2026-10-agents-v3",
       consent_at: "2026-09-13T10:00:00.000Z",
@@ -57,7 +77,7 @@ describe("escalateToHuman — handing a conversation to a person", () => {
   });
 
   it("always hands back the contact channels, whatever else happened", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
     expect(r.json.contact).toMatchObject({
       phoneDisplay: "050-831-1776",
       email: AGENCY,
@@ -66,56 +86,56 @@ describe("escalateToHuman — handing a conversation to a person", () => {
   });
 
   it("flags the reasons that should not wait in a queue", async () => {
-    const urgent = await invokeFunction("escalateToHuman", { ...escalation, reason: "complaint" });
+    const urgent = await run({ ...escalation, reason: "complaint" });
     expect(urgent.mailTo(AGENCY).subject).toContain("🔴");
 
-    const ordinary = await invokeFunction("escalateToHuman", escalation);
+    const ordinary = await run(escalation);
     expect(ordinary.mailTo(AGENCY).subject).not.toContain("🔴");
   });
 });
 
-describe("escalateToHuman — a reason the model made up", () => {
+describe.each(IMPLEMENTATIONS)("$label — a reason the model made up", ({ run }) => {
   it("clamps __proto__ to uncertain instead of finding it on the prototype", async () => {
     // `reason in REASONS` or a bare `REASONS[reason]` guard would treat this as
     // a valid reason, because every object inherits it. This is the case the
     // hasOwnProperty check exists for, and the only way to see it is to run it.
-    const r = await invokeFunction("escalateToHuman", { ...escalation, reason: "__proto__" });
+    const r = await run({ ...escalation, reason: "__proto__" });
     expect(r.json.reason).toBe("uncertain");
     expect(r.leads[0].escalation_reason).toBe("uncertain");
   });
 
   it("clamps constructor too", async () => {
-    const r = await invokeFunction("escalateToHuman", { ...escalation, reason: "constructor" });
+    const r = await run({ ...escalation, reason: "constructor" });
     expect(r.json.reason).toBe("uncertain");
   });
 
   it("clamps anything simply invented", async () => {
-    const r = await invokeFunction("escalateToHuman", { ...escalation, reason: "give_advice" });
+    const r = await run({ ...escalation, reason: "give_advice" });
     expect(r.json.reason).toBe("uncertain");
     expect(r.leads[0].escalation_reason).toBe("uncertain");
   });
 
   it("clamps a missing reason", async () => {
-    const r = await invokeFunction("escalateToHuman", { ...escalation, reason: undefined });
+    const r = await run({ ...escalation, reason: undefined });
     expect(r.json.reason).toBe("uncertain");
   });
 
   it("keeps a declared reason exactly as given", async () => {
     for (const reason of ["regulated_advice", "privacy_request", "sensitive_data", "user_request"]) {
-      const r = await invokeFunction("escalateToHuman", { ...escalation, reason });
+      const r = await run({ ...escalation, reason });
       expect(r.json.reason, reason).toBe(reason);
     }
   });
 });
 
-describe("escalateToHuman — identifiers in a model-written summary", () => {
+describe.each(IMPLEMENTATIONS)("$label — identifiers in a model-written summary", ({ run }) => {
   const leaky = {
     ...escalation,
     summary: "מסר ת״ז 123456789, חשבון IL620108000000099999999 וכרטיס 4580-1234-5678-9012.",
   };
 
   it("redacts before the record is written", async () => {
-    const r = await invokeFunction("escalateToHuman", leaky);
+    const r = await run(leaky);
     const message = String(r.leads[0].message);
     expect(message).not.toContain("123456789");
     expect(message).not.toContain("99999999");
@@ -124,7 +144,7 @@ describe("escalateToHuman — identifiers in a model-written summary", () => {
   });
 
   it("redacts before the notification is sent", async () => {
-    const r = await invokeFunction("escalateToHuman", leaky);
+    const r = await run(leaky);
     for (const mail of r.emails) {
       // Every half of every copy. `body` is absent once a message carries HTML
       // — Base44 rejects the two together — so asserting on it alone would pass
@@ -136,16 +156,16 @@ describe("escalateToHuman — identifiers in a model-written summary", () => {
   });
 
   it("leaves an ordinary summary untouched", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
     expect(r.mailTo(AGENCY).body).toContain("שאל איזו קרן עדיפה");
   });
 });
 
-describe("escalateToHuman — the notification outranks the record", () => {
+describe.each(IMPLEMENTATIONS)("$label — the notification outranks the record", ({ run }) => {
   it("still notifies when there are no contact details to store", async () => {
     // A visitor who asked for a person without leaving a number still has to
     // reach one. Nothing is stored; דורית is told regardless.
-    const r = await invokeFunction("escalateToHuman", {
+    const r = await run({
       reason: "user_request",
       summary: "ביקש לדבר עם אדם.",
       agent: "blog_recommender",
@@ -158,13 +178,13 @@ describe("escalateToHuman — the notification outranks the record", () => {
   });
 
   it("refuses to store an invalid phone number, and notifies anyway", async () => {
-    const r = await invokeFunction("escalateToHuman", { ...escalation, phone: "12345" });
+    const r = await run({ ...escalation, phone: "12345" });
     expect(r.leads).toHaveLength(0);
     expect(r.json.notified).toBe(true);
   });
 
   it("notifies even when the record fails to write", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation, { failLeadWrite: true });
+    const r = await run(escalation, { failLeadWrite: true });
     expect(r.json.notified).toBe(true);
     expect(r.json.warnings).toContain("lead_write_failed");
     expect(r.status).toBe(200);
@@ -173,7 +193,7 @@ describe("escalateToHuman — the notification outranks the record", () => {
   it("still answers the agent with contact details when every mailbox bounces", async () => {
     // The worst case: nothing stored, nobody mailed. The visitor must still be
     // given a way to reach a person, so the agent can read it out.
-    const r = await invokeFunction("escalateToHuman", escalation, {
+    const r = await run(escalation, {
       failLeadWrite: true,
       failEmailTo: [AGENCY, OPS, OPS2],
     });
@@ -183,14 +203,14 @@ describe("escalateToHuman — the notification outranks the record", () => {
   });
 
   it("names the agent that handed over, so a pattern is visible later", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
     expect(r.mailTo(AGENCY).body).toContain("needs_interview");
   });
 });
 
-describe("escalateToHuman — the operations mailboxes", () => {
+describe.each(IMPLEMENTATIONS)("$label — the operations mailboxes", ({ run }) => {
   it("notifies both operations mailboxes as well as the agency", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
     for (const to of [OPS, OPS2, AGENCY]) {
       expect(r.emails.map((e) => e.to), to).toContain(to);
     }
@@ -199,7 +219,7 @@ describe("escalateToHuman — the operations mailboxes", () => {
   it("still reports notified when only one mailbox bounces", async () => {
     // An escalation that reached nobody is a regulatory failure; one that
     // reached two of three is not, and must not be reported as one.
-    const r = await invokeFunction("escalateToHuman", escalation, { failEmailTo: [OPS] });
+    const r = await run(escalation, { failEmailTo: [OPS] });
     expect(r.json.notified).toBe(true);
     expect(r.emails.map((e) => e.to)).toContain(OPS2);
   });
@@ -216,9 +236,9 @@ describe("escalateToHuman — the operations mailboxes", () => {
  * The same defect was found and fixed for ordinary enquiries (A-14) and left
  * here, which is why these assert the layout rather than only the content.
  */
-describe("escalateToHuman — the notification is readable", () => {
+describe.each(IMPLEMENTATIONS)("$label — the notification is readable", ({ run }) => {
   it("sends HTML with the plain text alongside it, not instead of it", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
     for (const to of [AGENCY, OPS, OPS2]) {
       const mail = r.mailTo(to);
       expect(mail.html, `${to} got no HTML`).toContain("<table");
@@ -227,7 +247,7 @@ describe("escalateToHuman — the notification is readable", () => {
   });
 
   it("breaks it into titled blocks rather than one paragraph", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
     const html = r.mailTo(AGENCY).html!;
     for (const heading of ["מי פנה", "ההעברה", "תקציר השיחה", "מצב"]) {
       expect(html, heading).toContain(heading);
@@ -235,26 +255,26 @@ describe("escalateToHuman — the notification is readable", () => {
   });
 
   it("makes the phone dialable, because that is what this mail is for", async () => {
-    const r = await invokeFunction("escalateToHuman", escalation);
+    const r = await run(escalation);
     expect(r.mailTo(AGENCY).html).toContain("tel:");
   });
 
   it("marks an urgent reason so it reads as urgent at a glance", async () => {
     // A complaint and an out-of-scope question must not look alike in a list.
-    const urgent = await invokeFunction("escalateToHuman", { ...escalation, reason: "complaint" });
+    const urgent = await run({ ...escalation, reason: "complaint" });
     expect(urgent.mailTo(AGENCY).html).toContain("דחוף");
 
-    const ordinary = await invokeFunction("escalateToHuman", { ...escalation, reason: "out_of_scope" });
+    const ordinary = await run({ ...escalation, reason: "out_of_scope" });
     expect(ordinary.mailTo(AGENCY).html).not.toContain("דחוף — לטפל היום");
   });
 
   it("says plainly when nothing was stored, because then this is the only record", async () => {
-    const r = await invokeFunction("escalateToHuman", { ...escalation, name: "", phone: "" });
+    const r = await run({ ...escalation, name: "", phone: "" });
     expect(r.mailTo(AGENCY).html).toContain("זו ההודעה היחידה");
   });
 
   it("escapes a name that is really a payload", async () => {
-    const r = await invokeFunction("escalateToHuman", {
+    const r = await run({
       ...escalation,
       name: '<a href="https://evil.example">לחצו</a> כהן',
     });
@@ -266,7 +286,7 @@ describe("escalateToHuman — the notification is readable", () => {
   it("keeps the redaction, now that the summary is rendered twice", async () => {
     // It reaches both the HTML and the text. A value stripped from one and not
     // the other would be the worst of both.
-    const r = await invokeFunction("escalateToHuman", {
+    const r = await run({
       ...escalation,
       summary: "מסר ת״ז 123456789 בשיחה",
     });
@@ -276,9 +296,9 @@ describe("escalateToHuman — the notification is readable", () => {
   });
 });
 
-describe("escalateToHuman — channel attribution", () => {
+describe.each(IMPLEMENTATIONS)("$label — channel attribution", ({ run }) => {
   it("adds a הגיע/ה דרך line and persists the channel when contactable", async () => {
-    const r = await invokeFunction("escalateToHuman", {
+    const r = await run({
       reason: "user_request",
       summary: "בקשה לדבר עם דורית.",
       agent: "needs_interview",
@@ -291,7 +311,7 @@ describe("escalateToHuman — channel attribution", () => {
   });
 
   it("stores 'unknown' for an unrecognised channel and adds no line", async () => {
-    const r = await invokeFunction("escalateToHuman", {
+    const r = await run({
       reason: "user_request",
       summary: "בקשה לדבר עם דורית.",
       agent: "needs_interview",
@@ -301,5 +321,41 @@ describe("escalateToHuman — channel attribution", () => {
     });
     expect(r.leads[0].channel).toBe("unknown");
     expect(r.mailTo("dorit@govari-fin.co.il").text).not.toContain("הגיע/ה דרך");
+  });
+});
+
+// What only the port does. The Base44 function mirrored each lead into Supabase
+// after writing its own entity; the port writes Supabase alone and appends the
+// sheet row through the service account (spec: Supabase is the only store, no
+// connectors), so these have no Base44 counterpart.
+describe("Edge escalate-to-human — what only it does", () => {
+  const handoff = { reason: "user_request", summary: "רוצה לדבר עם דורית", name: "דנה", phone: "0501234567", agent: "support_agent" };
+
+  it("writes the hand-off to Supabase and the sheet, and nothing to Base44", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff);
+    expect(r.json).toMatchObject({ ok: true, recorded: true });
+    expect(r.leads[0]).toMatchObject({ source: "escalation", status: "escalated", escalation_reason: "user_request", handled_by_agent: "support_agent" });
+    expect(r.sheetRows[0]).toMatchObject({ tab: "Events" });
+    expect(r.sheetRows[0].row[1]).toBe("conversation_escalation");
+    expect(r.callsTo("base44")).toEqual([]);
+  });
+
+  it("still answers with the contact details when the sheet fails", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff, { failGoogle: "sheets" });
+    expect(r.json).toMatchObject({ ok: true, notified: true });
+    expect(r.json.warnings).toContain("sheet_append_failed");
+  });
+
+  it("stores an absent consent time as null, not an empty string a timestamptz refuses", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff);
+    expect(r.leads[0].consent_at).toBeNull();
+  });
+
+  it("answers ok: false with the contact details when the body is not usable", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff, { rawBody: "{not json" });
+    // Base44's `await req.json()` throws into the catch; the port does the same.
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: false });
+    expect(r.json.contact).toMatchObject({ phoneDisplay: "050-831-1776" });
   });
 });

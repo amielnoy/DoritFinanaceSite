@@ -1,0 +1,180 @@
+/**
+ * A conversation handed to a person — the agent has decided it may not answer.
+ *
+ * The Supabase twin of base44/functions/escalateToHuman, transcribed top to
+ * bottom: same input, same checks, same mail, same answer. What differs is
+ * decided in docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md:
+ * Supabase is the only store (no entity write, no mirror), and the sheet row
+ * goes in through the service account. tests/integration/
+ * escalate-to-human.integration.test.ts runs both against one set of cases
+ * while both exist.
+ */
+import { validCampaign, validChannel, validLandingPath } from '../_shared/attribution.ts';
+import { corsHeaders } from '../_shared/cors.ts';
+import { deviceLabel } from '../_shared/device.ts';
+import { createLog, newRequestId } from '../_shared/log.ts';
+import { deliveryWarning, sendMail } from '../_shared/mail.ts';
+import { insertRow } from '../_shared/rest.ts';
+import { appendSheetRow } from '../_shared/sheets.ts';
+import {
+  HUMAN_CONTACT, NOTIFY_EMAILS, REASONS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB, URGENT,
+  buildEscalationHtml, buildNotification, redact, validPhone,
+} from './escalation.js';
+// escalation.js is plain JavaScript, as Base44's file was. The few casts below
+// tell Deno's checker the shapes it cannot infer from it.
+
+const FN = 'escalate-to-human';
+const log = createLog(FN);
+
+// Every `err:` below is truncated inline: tests/contract/logging.contract.test.ts
+// reads each log call's text and requires the `.slice(0, N)` to be visible there.
+
+export async function handler(req: Request): Promise<Response> {
+  const cors = corsHeaders(req.headers.get('origin'));
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+  const rid = newRequestId();
+  const startedAt = Date.now();
+  try {
+    log('info', 'request.start', { rid });
+    const body = await req.json();
+    const { reason, summary, name, phone, email, agent, topic, consentVersion, consentAt, channel, campaign, landingPath } = body || {};
+    const safeChannel = validChannel(channel) || 'unknown';
+    const safeCampaign = validCampaign(campaign);
+    const safeLandingPath = validLandingPath(landingPath);
+
+    const safeReason: string = Object.prototype.hasOwnProperty.call(REASONS, reason) ? reason : 'uncertain';
+    const reasonText = (REASONS as Record<string, string>)[safeReason];
+    const safeSummary: string = redact(summary);
+    const contactable = Boolean(name && phone && validPhone(phone));
+
+    // ── סדר הפעולות ─────────────────────────────────────────────────────
+    // ההודעה לדורית היא העיקר: העברה לאדם שלא הגיעה לאדם היא כישלון
+    // רגולטורי, לא רק תקלה. לכן היא נשלחת גם כשאין פרטי קשר לשמור, וכשל
+    // בשמירה במאגר אינו מונע אותה.
+    const warnings: string[] = [];
+    let leadId: string | null = null;
+
+    // הסיבה והסוכן — לא התקציר. ההעברה היא האירוע שהכי חשוב לעקוב אחריו,
+    // והתקציר הוא בדיוק מה שהמבקר אמר.
+    log('info', 'escalation.received', { rid, reason: safeReason, agent: agent || 'unknown', contactable });
+
+    if (contactable) {
+      try {
+        const row = await insertRow('leads', {
+          name,
+          phone,
+          email: email || '',
+          source: 'escalation',
+          topic: topic || reasonText,
+          timing: '',
+          message: `[הועבר לטיפול אנושי — ${reasonText}]\n\n${safeSummary}`,
+          status: 'escalated',
+          escalation_reason: safeReason,
+          handled_by_agent: agent || '',
+          consent_version: consentVersion || '',
+          // A timestamptz: absent is null, as the mirror wrote it — '' is refused.
+          consent_at: consentAt || null,
+          channel: safeChannel,
+          campaign: safeCampaign,
+        });
+        leadId = typeof row.id === 'string' ? row.id : null;
+      } catch (e) {
+        log('error', 'lead.create_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        warnings.push('lead_write_failed');
+      }
+    } else {
+      log('info', 'escalation.anonymous', { rid, reason: safeReason });
+      warnings.push('no_contact_details');
+    }
+
+    const escalationAttribution = { channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath };
+    const notification: string = buildNotification(safeReason, { name, phone, email, agent, summary: safeSummary, device: deviceLabel(req.headers.get('user-agent')), ...escalationAttribution });
+    const subject = `${URGENT.has(safeReason) ? '🔴 ' : ''}העברה לטיפול אנושי — ${reasonText}${name ? ` · ${name}` : ''}`;
+    const escalationHtml: string = buildEscalationHtml(safeReason, {
+      name, phone, email, agent, summary: safeSummary, contactable,
+      device: deviceLabel(req.headers.get('user-agent')),
+      ...escalationAttribution,
+    });
+
+    let notified = false;
+    // One sender for all three, through the mailer.
+    for (const to of [...NOTIFY_EMAILS, SECONDARY_EMAIL]) {
+      try {
+        await sendMail(log, {
+          to,
+          subject,
+          html: escalationHtml,
+          text: notification,
+          body: notification,
+          rid,
+          role: to === SECONDARY_EMAIL ? 'agency' : 'ops',
+        });
+        notified = true;
+      } catch (e) {
+        // ההתראה שלא יצאה היא הכשל היחיד כאן שהוא רגולטורי ולא תפעולי.
+        log('error', 'mail.failed', { rid, role: to === SECONDARY_EMAIL ? 'agency' : 'ops', err: String((e as Error)?.message ?? e).slice(0, 200) });
+        warnings.push(deliveryWarning('notify_email_failed', e));
+      }
+    }
+
+    // רישום ביומן האירועים — מיטבי, ואחרי ההתראה. התראה שלא יצאה היא כשל
+    // רגולטורי; שורה שלא נרשמה בגיליון אינה, ולכן הגיליון אף פעם לא חוסם.
+    try {
+      await appendSheetRow(SHEET_TAB, SHEET_COLUMNS.length, [
+        new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jerusalem' }),
+        'conversation_escalation',
+        'escalation',
+        '',                       // מסלול — רלוונטי רק בראיון
+        agent || '',
+        topic || reasonText,
+        '',                       // מועד מבוקש — אין בהעברה לאדם
+        name || '',
+        phone || '',
+        email || '',
+        leadId || '',
+        safeReason,
+        safeSummary,
+        // שש עמודות הראיון. העברה לאדם אינה ראיון ואין לה מה למלא בהן — ריק
+        // ולא מושמט, אחרת השורה מתקצרת והכותרות מפסיקות להתיישר.
+        '', '', '', '', '', '',
+      ]);
+      log('info', 'sheet.appended', { rid, tab: SHEET_TAB });
+    } catch (e) {
+      log('warn', 'sheet.append_failed', { rid, tab: SHEET_TAB, err: String((e as Error)?.message ?? e).slice(0, 200) });
+      warnings.push('sheet_append_failed');
+    }
+
+    // התשובה נבנית כדי שהסוכן יוכל להקריא אותה כמות שהיא. גם כשהכל נכשל
+    // המבקר מקבל דרך ישירה לאדם — זו הנקודה שבה אסור להשאיר אותו בלי מענה.
+    const acknowledgement = contactable
+      ? 'הפרטים הועברו לדורית והיא תחזור אישית תוך יום עסקים אחד.'
+      : 'אפשר לפנות לדורית ישירות בכל אחד מהערוצים הבאים.';
+
+    log('info', 'request.end', { rid, ms: Date.now() - startedAt, reason: safeReason, notified, recorded: leadId !== null, warnings: warnings.length });
+    return Response.json({
+      ok: true,
+      rid,
+      leadId,
+      recorded: leadId !== null,
+      notified,
+      reason: safeReason,
+      contact: HUMAN_CONTACT,
+      acknowledgement,
+      warnings,
+    }, { headers: cors });
+  } catch (error) {
+    log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String((error as Error)?.message ?? error).slice(0, 200) });
+    // גם מסלול הכישלון מחזיר ערוצי קשר — סוכן שנתקל בשגיאה עדיין חייב
+    // להיות מסוגל למסור למבקר איך להגיע לאדם.
+    return Response.json(
+      {
+        ok: false,
+        rid,
+        contact: HUMAN_CONTACT,
+        acknowledgement: 'אפשר לפנות לדורית ישירות בטלפון או בוואטסאפ.',
+      },
+      { status: 200, headers: cors },
+    );
+  }
+}
