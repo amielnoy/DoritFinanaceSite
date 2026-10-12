@@ -7,7 +7,7 @@
 // escapeHtml, greetingName and channelLine are the shared copies.
 import { channelLine } from '../_shared/attribution.ts';
 import { greetingName } from '../_shared/guard.ts';
-import { escapeHtml, buildClientHtml } from '../_shared/html.ts';
+import { escapeHtml } from '../_shared/html.ts';
 
 /**
  * מועד "שעון קיר" — מחרוזת בלי אזור זמן ובלי Z, ועוד דקות עליה.

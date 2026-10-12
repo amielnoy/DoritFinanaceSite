@@ -50,6 +50,14 @@ export interface EdgeOptions {
   calendarStatus?: number;
   /** The env has no GOOGLE_SERVICE_ACCOUNT_JSON. */
   noGoogle?: boolean;
+  /** Changes to the default env: a value sets the key, `null` removes it. Ignored with `env`. */
+  envPatch?: Record<string, string | null>;
+  /** The leads lookup (`GET /rest/v1/leads?…`) answers 500. */
+  failLeadLookup?: boolean;
+  /** Every mailer call answers this status — the same knob as base44-function.ts. */
+  resendStatus?: number;
+  /** …with this body instead of the default. */
+  resendResponse?: unknown;
 }
 
 export interface EdgeInvocation {
@@ -108,21 +116,33 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
   const meetings: Record<string, unknown>[] = [];
   const calendarEvents: Record<string, unknown>[] = [];
   const sheetRows: { tab: string; row: unknown[] }[] = [];
-  const stored: Record<string, unknown>[] = [...(options.existingLeads ?? [])];
+  // Copies: a PATCH writes into the stored row, and a suite that runs the same
+  // fixture against Base44 and then Edge must not see the first run's update.
+  const stored: Record<string, unknown>[] = (options.existingLeads ?? []).map((l) => ({ ...l }));
 
   const fetchImpl = async (url: string, init: RequestInit = {}) => {
     const u = String(url);
     const method = String(init.method ?? "GET");
-    const parsed = typeof init.body === "string" ? JSON.parse(init.body) : init.body;
+    // JSON, except Google's token exchange, which is a form (grant_type=…&assertion=…).
+    const form = /x-www-form-urlencoded/.test(JSON.stringify(init.headers ?? {}));
+    const parsed =
+      typeof init.body !== "string"
+        ? init.body
+        : form
+          ? Object.fromEntries(new URLSearchParams(init.body))
+          : JSON.parse(init.body);
     fetches.push({ url: u, method, headers: (init.headers ?? {}) as Record<string, string>, body: parsed });
 
     // The mailer, not the provider — the same boundary base44-function.ts records.
     if (u === MAILER_URL) {
-      const ok = !options.failEmailTo?.includes(parsed.to);
-      if (ok) emails.push({ to: parsed.to, subject: parsed.subject, html: parsed.html, text: parsed.text, body: parsed.text });
-      return new Response(JSON.stringify(ok ? { ok: true, ids: ["mailer-test-id"] } : { ok: false, failed: ["http_422"] }), {
-        status: ok ? 200 : 422,
-      });
+      const refused = options.failEmailTo?.includes(parsed.to);
+      const status = options.resendStatus ?? (refused ? 422 : 200);
+      const ok = status >= 200 && status < 300;
+      if (ok) {
+        emails.push({ to: parsed.to, subject: parsed.subject, html: parsed.html, text: parsed.text, body: parsed.text, ics: parsed.ics });
+      }
+      const answer = options.resendResponse ?? (ok ? { ok: true, ids: ["mailer-test-id"] } : { ok: false, failed: ["http_422"] });
+      return new Response(JSON.stringify(answer), { status });
     }
     if (u === `${SUPABASE_URL}/rest/v1/leads` && method === "POST") {
       if (options.failLeadWrite) {
@@ -180,6 +200,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       return new Response(null, { status: 204 });
     }
     if (u.startsWith(`${SUPABASE_URL}/rest/v1/leads?`) && method === "GET") {
+      if (options.failLeadLookup) return new Response('{"message":"simulated"}', { status: 500 });
       const q = new URLSearchParams(u.split("?")[1]);
       const eq = (k: string) => q.get(k)?.replace(/^eq\./, "");
       const since = q.get("created_at")?.replace(/^gte\./, ""); // rows older than this bound are not returned; undated rows are kept
@@ -203,7 +224,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     throw new Error(`unexpected fetch in an Edge Function test: ${method} ${u}`);
   };
 
-  const env = options.env ?? {
+  const env: Record<string, string> = options.env ?? {
     MAILER_URL,
     MAILER_TOKEN: "test-only-token",
     SUPABASE_URL,
@@ -212,6 +233,12 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     GOOGLE_CALENDAR_ID: "govaridorit@gmail.com",
     SHEET_ID: "sheet-test",
   };
+  if (!options.env) {
+    for (const [key, value] of Object.entries(options.envPatch ?? {})) {
+      if (value === null) delete env[key];
+      else env[key] = value;
+    }
+  }
   const module = { exports: {} as Record<string, unknown> };
   const handler = compiled.get(name)!(module, module.exports, fetchImpl, { env: { get: (k: string) => env[k] } });
 

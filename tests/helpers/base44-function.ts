@@ -32,6 +32,8 @@ export interface EmailCall {
   body?: string;
   html?: string;
   text?: string;
+  /** A meeting invitation the mailer attaches (the Edge functions only). */
+  ics?: string;
 }
 
 export interface FetchCall {
@@ -165,7 +167,9 @@ export async function invokeFunction(
    * upsert is exercised by nothing — so seeded rows go in here and are matched
    * on the same fields the function filters by.
    */
-  const stored: Record<string, unknown>[] = [...(options.existingLeads ?? [])];
+  // Copies, as in edge-function.ts: an update writes into the stored row, and
+  // the same fixture may be run against both implementations.
+  const stored: Record<string, unknown>[] = (options.existingLeads ?? []).map((l) => ({ ...l }));
 
   const filterLeads = async (where: Record<string, unknown>) => {
     if (options.failLeadLookup) throw new Error("simulated lookup outage");
