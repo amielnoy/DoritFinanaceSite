@@ -16,7 +16,14 @@ export interface SupabaseStorageClient {
   };
 }
 
-const BUCKET = "claim-documents";
+export const CLAIM_DOCUMENTS_BUCKET = "claim-documents";
+
+/**
+ * What a claim document is known by once uploaded: its path in the private
+ * bucket, marked so `submit-claim` and the leads screen can tell it from a
+ * Base44 file URL. Never a signed URL — see the class comment.
+ */
+export const CLAIM_DOCUMENT_REF_PREFIX = `storage:${CLAIM_DOCUMENTS_BUCKET}/`;
 
 /**
  * Dorit has no second agency yet, so this is the same fixed literal Phase 1
@@ -25,30 +32,28 @@ const BUCKET = "claim-documents";
  */
 const AGENCY_1_ID = "00000000-0000-0000-0000-000000000001";
 
-/** Ten years, in seconds. The URL this returns is embedded in a Lead record
- *  and in the email sent at submission time, both reviewed long after the
- *  claim, so a short expiry would quietly break an old claim's attachment —
- *  unlike a one-time view, this has to outlive the moment it was created in. */
-const SIGNED_URL_EXPIRY_SECONDS = 10 * 365 * 24 * 60 * 60;
-
 /** A name safe to put in a storage path: letters, digits, dot, dash, underscore. */
 const sanitizeFilename = (name: string): string => name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
 
+/**
+ * Claim documents into the private bucket, uploaded by an anonymous visitor.
+ *
+ * Returns the object's path, not a link. The visitor may insert into the
+ * bucket and nothing else, so it could not sign one anyway — and a link that
+ * outlives the claim, sitting in a mailbox, is the wrong thing to hand out for
+ * insurance documents. `submit-claim` signs a week-long link for the
+ * notification mail with the service key; after that, the leads screen signs
+ * a short one when an admin opens the document (`LeadAdminPort.documentLink`).
+ */
 export class SupabaseUploadService implements UploadPort {
   constructor(private readonly client: SupabaseStorageClient) {}
 
   async upload(file: File): Promise<{ url: string }> {
     const path = `${AGENCY_1_ID}/${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
 
-    const { error: uploadError } = await this.client.storage.from(BUCKET).upload(path, file);
-    if (uploadError) throw new Error(`claim document upload failed: ${uploadError.message}`);
+    const { error } = await this.client.storage.from(CLAIM_DOCUMENTS_BUCKET).upload(path, file);
+    if (error) throw new Error(`claim document upload failed: ${error.message}`);
 
-    const { data, error: signError } = await this.client.storage
-      .from(BUCKET)
-      .createSignedUrl(path, SIGNED_URL_EXPIRY_SECONDS);
-    if (signError || !data) {
-      throw new Error(`claim document uploaded but could not be signed: ${signError?.message ?? "no data"}`);
-    }
-    return { url: data.signedUrl };
+    return { url: `${CLAIM_DOCUMENT_REF_PREFIX}${path}` };
   }
 }

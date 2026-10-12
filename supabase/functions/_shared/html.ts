@@ -46,6 +46,8 @@ export function escapeHtml(text: unknown): string {
  */
 export function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, details }: ClientMail): string {
   const rows = (details || []).filter(([, value]) => value);
+  // No name rather than a doubtful one: greetingName returns '' for anything not made of letters.
+  const greeting = firstName ? 'שלום ' + firstName + ',' : 'שלום,';
   const divider =
     `
               <tr>
@@ -84,7 +86,7 @@ export function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle
         <tr><td style="padding:44px 48px 36px; text-align:right;">
           <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">${escapeHtml(eyebrow)}</p>
           <h1 style="margin:0 0 24px; font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#1A1A1B; line-height:1.3; letter-spacing:-0.02em; text-align:right;">${escapeHtml(heading)}</h1>
-          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">שלום ${escapeHtml(firstName)},</p>
+          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(greeting)}</p>
           <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(intro)}</p>
           ${detailsBlock}
           <div style="height:2px; width:48px; background:#C3AD96; margin:32px 0 20px;"></div>

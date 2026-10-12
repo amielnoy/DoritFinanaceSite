@@ -184,17 +184,23 @@ describe("submitLead — a name that is really a payload", () => {
     expect(html).not.toContain('<a href="https://evil.example"');
   });
 
-  it("escapes it into something a mail client shows as text", async () => {
+  it("leaves the payload out of the visitor's copy altogether", async () => {
     const r = await invokeFunction("submitLead", hostile);
-    const html = r.mailTo("yael@example.com").html!;
-    // `topic` is interpolated whole, so it carries the full escaped tag.
-    expect(html).toContain("&lt;img src=x");
-    expect(html).toContain("&quot;alert(1)&quot;");
-    // `firstName` is name.split(' ')[0], so only the opening token reaches the
-    // greeting — escaped all the same.
-    expect(html).toContain("&lt;a");
+    const mail = r.mailTo("yael@example.com");
+    // Neither the name nor the topic is plain text, so neither is repeated:
+    // the greeting has no name and the topic falls back to the default.
+    expect(mail.html).not.toContain("&lt;a");
+    expect(mail.html).not.toContain("&lt;img");
+    expect(mail.html).toContain("שלום,");
+    expect(mail.html).toContain("ייעוץ כללי");
+    expect(mail.text).not.toContain("<img");
   });
 
+  it("keeps the payload, escaped, in what Dorit reads", async () => {
+    const r = await invokeFunction("submitLead", hostile);
+    const copy = r.mailTo(AGENCY);
+    expect(copy.html ?? copy.body).toContain("img src=x");
+  });
   it("leaves the plain-text staff copy unescaped, because it cannot render", async () => {
     // Escaping the text copy too would only make the staff email unreadable.
     // This pins the boundary: escaping belongs to the HTML builder alone.
@@ -239,6 +245,51 @@ describe("submitLead — a name that is really a payload", () => {
     const r = await invokeFunction("submitLead", hostile);
     expect(r.leads[0].name).toBe(hostile.name);
   });
+});
+
+describe("submitLead — the visitor's copy repeats only plain text", () => {
+  it("drops a topic that carries a link", async () => {
+    const r = await invokeFunction("submitLead", { ...consultation, topic: "ראו www.evil.example" });
+    const mail = r.mailTo("yael@example.com");
+    expect(mail.html).not.toContain("evil.example");
+    expect(mail.text).toContain("נושא: ייעוץ כללי");
+  });
+
+  it("drops a requested time that carries an address", async () => {
+    const r = await invokeFunction("submitLead", { ...consultation, timing: "write to x@evil.example" });
+    expect(r.mailTo("yael@example.com").text).toContain("מועד מבוקש: לפי תיאום");
+  });
+
+  it("keeps an ordinary topic", async () => {
+    const r = await invokeFunction("submitLead", consultation);
+    expect(r.mailTo("yael@example.com").text).toContain(`נושא: ${consultation.topic}`);
+  });
+});
+
+describe("submitLead — the public entry point's limits", () => {
+  it("refuses a field longer than its ceiling, and writes nothing", async () => {
+    const r = await invokeFunction("submitLead", { ...consultation, notes: "x".repeat(4001) });
+    expect(r.status).toBe(400);
+    expect(r.leads).toHaveLength(0);
+    expect(r.emails).toHaveLength(0);
+  });
+
+  it("refuses a profile larger than any interview", async () => {
+    const r = await invokeFunction("submitLead", {
+      ...consultation, source: "interview", stage: "partial", profile: { goal: "x".repeat(20001) },
+    });
+    expect(r.status).toBe(400);
+    expect(r.leads).toHaveLength(0);
+  });
+
+  it("keeps the enquiry but mails no confirmation to something that is not an address", async () => {
+    const r = await invokeFunction("submitLead", { ...consultation, email: "yael@example.com\nbcc: victim@example.com" });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+    expect(r.json.warnings).toContain("client_email_invalid");
+    expect(r.emails.some((e) => e.to.includes("victim"))).toBe(false);
+  });
+
 });
 
 describe("submitLead — identifiers a visitor volunteered", () => {
@@ -1035,7 +1086,7 @@ describe("submitLead — a partial interview, and the upsert that completes it",
 
   it("updates that row on completion rather than creating a second", async () => {
     const existing = {
-      id: "LEAD-EXISTING", phone: "0541112233", source: "interview",
+      id: "LEAD-EXISTING", name: "אורי לוי", phone: "0541112233", source: "interview",
       status: "partial", email: "", created_date: new Date().toISOString(),
     };
     const r = await invokeFunction("submitLead", {
@@ -1070,10 +1121,12 @@ describe("submitLead — a partial interview, and the upsert that completes it",
       SUPABASE_URL: "https://stub.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "test-only-service-key",
     };
-    const opened = {
+    // A fresh object per test: an update writes into the stored lead, and a
+    // completed one (status "new") is no longer an open interview.
+    const opened = () => ({
       id: "LEAD-EXISTING", name: "אורי", phone: "0541112233", source: "interview",
       status: "partial", email: "", timing: "", created_date: new Date().toISOString(),
-    };
+    });
     const mirrored = (r: Awaited<ReturnType<typeof invokeFunction>>) =>
       r.callsTo("/rest/v1/leads")[0]?.body as Record<string, unknown>;
 
@@ -1081,7 +1134,7 @@ describe("submitLead — a partial interview, and the upsert that completes it",
       const r = await invokeFunction(
         "submitLead",
         { ...partial, stage: "complete", timing: "בשבוע הבא" },
-        { existingLeads: [opened], env: mirrorEnv },
+        { existingLeads: [opened()], env: mirrorEnv },
       );
       expect(r.leadUpdates[0].fields).toMatchObject({ name: "אורי לוי", timing: "בשבוע הבא" });
       expect(mirrored(r)).toMatchObject({ name: "אורי לוי", timing: "בשבוע הבא" });
@@ -1091,7 +1144,7 @@ describe("submitLead — a partial interview, and the upsert that completes it",
       const r = await invokeFunction(
         "submitLead",
         { ...partial, stage: "complete" },
-        { existingLeads: [{ ...opened, timing: "בבוקר" }], env: mirrorEnv },
+        { existingLeads: [{ ...opened(), timing: "בבוקר" }], env: mirrorEnv },
       );
       expect(r.leadUpdates[0].fields).toMatchObject({ timing: "בבוקר" });
       expect(mirrored(r)).toMatchObject({ timing: "בבוקר" });
@@ -1116,6 +1169,58 @@ describe("submitLead — a partial interview, and the upsert that completes it",
     const r = await invokeFunction("submitLead", { ...partial, stage: "complete" }, { existingLeads: [other] });
     expect(r.leadUpdates).toHaveLength(0);
     expect(r.leads).toHaveLength(1);
+  });
+
+  /**
+   * A phone number is not a secret. Before, anyone who knew one could submit
+   * `source: "interview"` with it and overwrite that person's open interview —
+   * the email, the message and the status, in both stores.
+   */
+  describe("whose interview it is", () => {
+    const victims = (over: Record<string, unknown> = {}) => [{
+      id: "LEAD-VICTIM", name: "אורי לוי", phone: "0541112233", source: "interview",
+      status: "partial", email: "uri@example.com", created_date: new Date().toISOString(), ...over,
+    }];
+
+    it("does not adopt the same number under another name", async () => {
+      const r = await invokeFunction(
+        "submitLead",
+        { ...partial, name: "מישהו אחר", email: "attacker@example.com", stage: "complete" },
+        { existingLeads: victims() },
+      );
+      expect(r.leadUpdates).toHaveLength(0);
+      expect(r.leads).toHaveLength(1);
+    });
+
+    it("does not adopt it when the address on file says someone else", async () => {
+      const r = await invokeFunction(
+        "submitLead",
+        { ...partial, email: "attacker@example.com", stage: "complete" },
+        { existingLeads: victims() },
+      );
+      expect(r.leadUpdates).toHaveLength(0);
+      expect(r.leads).toHaveLength(1);
+    });
+
+    it("does not reopen an interview that was already completed", async () => {
+      const r = await invokeFunction(
+        "submitLead",
+        { ...partial, email: "uri@example.com", stage: "complete" },
+        { existingLeads: victims({ status: "new" }) },
+      );
+      expect(r.leadUpdates).toHaveLength(0);
+      expect(r.leads).toHaveLength(1);
+    });
+
+    it("still completes the visitor's own interview", async () => {
+      const r = await invokeFunction(
+        "submitLead",
+        { ...partial, name: "  אורי   לוי ", email: "URI@example.com", stage: "complete" },
+        { existingLeads: victims() },
+      );
+      expect(r.leadUpdates.map((u) => u.id)).toEqual(["LEAD-VICTIM"]);
+      expect(r.leads).toHaveLength(0);
+    });
   });
 
   it("does not adopt a lead that was never an interview", async () => {

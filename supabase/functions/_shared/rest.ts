@@ -36,6 +36,49 @@ export async function insertRow(table: string, row: Record<string, unknown>): Pr
 }
 
 /**
+ * A Postgres function through PostgREST's `/rpc`, with the service key. Used
+ * for `allow_submission`, which only the service role may execute. Throws on
+ * a refusal with the status alone, like insertRow.
+ */
+export async function callRpc(fn: string, args: Record<string, unknown>): Promise<unknown> {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const auth = serviceAuth();
+  if (!url || !auth) throw new Error('supabase_not_configured');
+
+  const res = await fetch(`${url}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`rpc_http_${res.status}`);
+  return res.json();
+}
+
+/**
+ * A time-limited link to a private storage object, signed with the service
+ * key. The path is the object's name inside the bucket, as the upload stored
+ * it; the link Supabase returns is relative to `/storage/v1`.
+ */
+export async function signStorageUrl(bucket: string, path: string, expiresIn: number): Promise<string> {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const auth = serviceAuth();
+  if (!url || !auth) throw new Error('supabase_not_configured');
+
+  const objectPath = path.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(`${url}/storage/v1/object/sign/${bucket}/${objectPath}`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expiresIn }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`sign_http_${res.status}`);
+  const signed = ((await res.json().catch(() => null)) as { signedURL?: unknown } | null)?.signedURL;
+  if (typeof signed !== 'string' || !signed.startsWith('/')) throw new Error('sign_returned_nothing');
+  return `${url}/storage/v1${signed}`;
+}
+
+/**
  * The headers that let a function write past row-level security.
  *
  * Supabase injects the project's new secret key as `SUPABASE_SECRET_KEYS`, a

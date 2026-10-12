@@ -236,6 +236,13 @@ export interface LeadAdminPort {
   list(limit?: number): Promise<LeadRecord[]>;
   setStatus(id: string, status: LeadStatus): Promise<void>;
   remove(id: string): Promise<void>;
+  /**
+   * A link that opens one of a claim's documents. A Base44 file URL is already
+   * one; a Supabase Storage reference (`storage:claim-documents/…`) is signed
+   * for a few minutes under the admin's own session, so a link copied out of
+   * the screen stops working rather than lasting for years.
+   */
+  documentLink(ref: string): Promise<string>;
 }
 
 export interface ArticleDraft {

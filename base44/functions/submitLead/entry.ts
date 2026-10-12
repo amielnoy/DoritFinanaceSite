@@ -695,17 +695,41 @@ const INTERVIEW_TRACKS = {
 // נאספו אחרונים, ולכן מבקר שענה על ארבע שאלות וסגר את החלון נעלם בלי שייוותר
 // דבר. עכשיו נשארת רשומה, מסומנת כ-partial.
 //
-// הקריאה השנייה מעדכנת את אותה רשומה במקום ליצור שנייה — וזו גם ההגנה מפני
-// מבקר שמריץ את הראיון שלוש פעמים.
+// הקריאה השנייה מעדכנת את אותה רשומה במקום ליצור שנייה — כל עוד הרשומה עדיין
+// partial ושייכת לאותו אדם (findOpenInterview). ראיון שכבר הסתיים לא נפתח
+// מחדש, ולכן ריצה שלישית היא רשומה משלה.
 const INTERVIEW_WINDOW_MS = 6 * 60 * 60 * 1000;
 
+/** שם להשוואה: בלי רווחים כפולים ובלי הבדלי אותיות גדולות. */
+const normalizeName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 /**
- * הראיון הפתוח של אותו מספר טלפון, אם קיים בחלון הזמן.
+ * אותו אדם לפי מה שידוע: אותו שם — או שם שאחד מהם הוא תחילתו של השני, "דנה"
+ * מול "דנה כהן" — וכתובת שאינה סותרת. טלפון לבדו אינו סוד: מי שיודע מספר של
+ * מישהו אחר לא יכול לדרוס בו את הראיון שלו.
+ */
+function sameInterviewee(lead, name, email) {
+  const stored = normalizeName(lead?.name);
+  const incoming = normalizeName(name);
+  if (!stored || !incoming) return false;
+  const nameMatches = stored === incoming || stored.startsWith(`${incoming} `) || incoming.startsWith(`${stored} `);
+  if (!nameMatches) return false;
+  const storedEmail = String(lead?.email ?? '').trim().toLowerCase();
+  const incomingEmail = String(email ?? '').trim().toLowerCase();
+  return !storedEmail || !incomingEmail || storedEmail === incomingEmail;
+}
+
+/**
+ * הראיון הפתוח של אותו אדם, אם קיים בחלון הזמן.
+ *
+ * פתוח פירושו partial: ראיון שהסתיים כבר לא מתעדכן, וריצה נוספת יוצרת רשומה
+ * משלה. ואותו אדם — לא רק אותו טלפון (sameInterviewee). מי שאינו עומד בשני
+ * התנאים מקבל רשומה חדשה: כפילות עדיפה על ראיון של מישהו אחר שנדרס.
  *
  * החיפוש מיטבי: אם הוא נכשל נוצרת רשומה חדשה, כי רשומה כפולה עדיפה על ראיון
  * שאבד. נעשה ב-asServiceRole מפני שקריאת Lead חסומה ל-RLS של מנהל בלבד.
  */
-async function findOpenInterview(base44, phone) {
+async function findOpenInterview(base44, phone, name, email) {
   if (!phone) return null;
   try {
     const found = await base44.asServiceRole.entities.Lead.filter({
@@ -714,6 +738,8 @@ async function findOpenInterview(base44, phone) {
     });
     const cutoff = Date.now() - INTERVIEW_WINDOW_MS;
     const open = (found || []).filter((lead) => {
+      if (lead?.status !== 'partial') return false;
+      if (!sameInterviewee(lead, name, email)) return false;
       const at = Date.parse(lead?.created_date ?? '');
       return Number.isNaN(at) ? true : at >= cutoff;
     });
@@ -1065,8 +1091,100 @@ function buildAgentHtml(source, data, ops, links = null) {
  */
 const POA_URL = (Deno.env.get('POA_URL') || '').trim();
 
+// ── הגנות על כניסה ציבורית ─────────────────────────────────────────────────
+//
+// הפונקציה לא דורשת התחברות, ושולחת אישור ממותג מהדומיין המאומת של דורית לכל
+// כתובת שנמסרה לה. בלי הגבלה זה ממסר חינמי: כל טקסט בשם או בנושא מגיע לתיבה של
+// זר תחת השם שלה. לכן לשדות יש תקרת אורך, האישור נושא רק ערכים שנבדקו, כתובת
+// שאינה כתובת לא מקבלת מייל, ולכל נמען יש תקרה יומית.
+//
+// עותקים זהים ב-submitLead וב-submitClaim (agents.contract.test.ts); התאום של
+// Supabase הוא supabase/functions/_shared/guard.ts.
+
+const CONFIRMATIONS_PER_ADDRESS_PER_DAY = 3;
+
+/** השדה הראשון שאינו מחרוזת בתוך התקרה שלו, או null. */
+function oversizedField(body, limits) {
+  for (const [field, max] of Object.entries(limits)) {
+    const value = body?.[field];
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value !== 'string' || value.length > max) return field;
+  }
+  return null;
+}
+
+/** תיבת דואר אחת סבירה: בלי רווחים, בלי מפרידי רשימה, דומיין עם נקודה. */
+function isEmail(value) {
+  if (typeof value !== 'string' || value.length > 254) return false;
+  return /^[^\s@<>()[\]\\,;:"]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,24}$/.test(value);
+}
+
+/**
+ * השם הפרטי לפנייה במייל, או '' לפנייה בלי שם. רק מילה של אותיות (עם גרש או
+ * מקף בפנים) עוברת; כל מה שיכול לשאת קישור או משפט מוריד את השם ולא עורך אותו.
+ */
+function greetingName(name) {
+  const first = String(name ?? '').trim().split(/\s+/)[0] ?? '';
+  return /^\p{L}(?:[\p{L}'’-]{0,28}\p{L})?$/u.test(first) ? first : '';
+}
+
+/** ערך קצר בלי שום דבר שנראה כמו קישור או כתובת, או ברירת המחדל. */
+function plainOr(value, fallback) {
+  const s = typeof value === 'string' ? value.trim() : '';
+  if (!s || s.length > 60) return fallback;
+  return /:\/\/|www\.|@|[<>]|\.[a-z]{2,}\b/i.test(s) ? fallback : s;
+}
+
+/** SHA-256 בהקסה — המונה שומר את זה, לעולם לא כתובת. */
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * האם עוד בקשה תחת `key` נכנסת ב-`max` לחלון, ואם כן — נספרת. נכשל פתוח:
+ * מונה שאינו מוגדר או אינו זמין מעביר את הבקשה, כי פנייה שאבדה גרועה מרצף מיילים.
+ */
+async function withinLimit(rid, key, windowSeconds, max) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const apiKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  if (!url || !apiKey) return true;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/allow_submission`, {
+      method: 'POST',
+      headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_key: key, p_window_seconds: windowSeconds, p_max: max }),
+    });
+    if (!res.ok) throw new Error(`rpc_http_${res.status}`);
+    return (await res.json()) !== false;
+  } catch (e) {
+    log('warn', 'limit.unavailable', { rid, err: String(e?.message ?? e).slice(0, 200) });
+    return true;
+  }
+}
+
+// ── סוף ההגנות ─────────────────────────────────────────────────────────────
+
+const LEAD_FIELD_LIMITS = {
+  name: 80,
+  phone: 30,
+  email: 254,
+  source: 40,
+  stage: 20,
+  track: 40,
+  topic: 200,
+  timing: 200,
+  meetingTopic: 200,
+  scheduledAt: 60,
+  consent_version: 40,
+  consent_at: 60,
+  notes: 4000,
+  message: 10000,
+  summary: 10000,
+};
+
 function clientMailFor(source, data) {
-  const firstName = (data.name || '').split(' ')[0];
+  const firstName = greetingName(data.name);
   if (source === 'interview') {
     // רק למי שאמר שהוא מעוניין. 'לא' או שדה חסר — אין אזכור, ואין מסמך שנשלח
     // למי שלא ביקש אותו.
@@ -1088,8 +1206,8 @@ function clientMailFor(source, data) {
         : 'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה.',
       panelTitle: 'מה נשמר',
       details: poaOffered
-        ? [['נושא מרכזי', data.topic || 'הקשר כללי'], ['ייפוי כוח למסלקה', POA_URL]]
-        : [['נושא מרכזי', data.topic || 'הקשר כללי']],
+        ? [['נושא מרכזי', plainOr(data.topic, 'הקשר כללי')], ['ייפוי כוח למסלקה', POA_URL]]
+        : [['נושא מרכזי', plainOr(data.topic, 'הקשר כללי')]],
     };
   }
   const isConsultation = source === 'consultation';
@@ -1102,7 +1220,7 @@ function clientMailFor(source, data) {
       : 'תודה שפניתם אליי. הפרטים תועדו בהצלחה, ואחזור אליכם אישית בהקדם האפשרי.',
     panelTitle: 'פרטי הבקשה',
     details: isConsultation
-      ? [['תחום ייעוץ', data.topic || 'ייעוץ כללי'], ['מועד מבוקש', data.timing || 'לפי תיאום']]
+      ? [['תחום ייעוץ', plainOr(data.topic, 'ייעוץ כללי')], ['מועד מבוקש', plainOr(data.timing, 'לפי תיאום')]]
       : [],
   };
 }
@@ -1144,6 +1262,8 @@ function escapeHtml(text) {
  */
 function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, details }) {
   const rows = (details || []).filter(([, value]) => value);
+  // No name rather than a doubtful one: greetingName returns '' for anything not made of letters.
+  const greeting = firstName ? 'שלום ' + firstName + ',' : 'שלום,';
   const divider =
     `
               <tr>
@@ -1182,7 +1302,7 @@ function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, detai
         <tr><td style="padding:44px 48px 36px; text-align:right;">
           <p style="margin:0 0 20px; font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:#7D6B5D;">${escapeHtml(eyebrow)}</p>
           <h1 style="margin:0 0 24px; font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#1A1A1B; line-height:1.3; letter-spacing:-0.02em; text-align:right;">${escapeHtml(heading)}</h1>
-          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">שלום ${escapeHtml(firstName)},</p>
+          <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(greeting)}</p>
           <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(intro)}</p>
           ${detailsBlock}
           <div style="height:2px; width:48px; background:#C3AD96; margin:32px 0 20px;"></div>
@@ -1207,8 +1327,10 @@ function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, detai
 }
 
 function buildClientText(source, data) {
-  const firstName = (data.name || '').split(' ')[0];
-  const when = data.timing || 'לפי תיאום';
+  const firstName = greetingName(data.name);
+  // What the visitor typed comes back only when it carries nothing link-like.
+  const hello = firstName ? `שלום ${firstName}, ` : 'שלום, ';
+  const when = plainOr(data.timing, 'לפי תיאום');
   if (source === 'interview') {
     // התאום של גרסת ה-HTML. שתי המחציות של אותו מייל חייבות לומר אותו דבר —
     // לקוח שאינו מציג HTML מקבל את הטקסט, ואם רק אחת מהן מזכירה את ייפוי הכוח
@@ -1217,8 +1339,8 @@ function buildClientText(source, data) {
       .find(([label]) => String(label).includes('מסלקה'));
     const wantsClearinghouse = Boolean(chRow) && String(chRow[1]).startsWith('מעוניין');
     return [
-      `שלום ${firstName}, תודה על השיחה. הסיכום שאישרתם הועבר אליי כפי שהוא.`,
-      `נושא מרכזי: ${data.topic || 'הקשר כללי'}`,
+      `${hello}תודה על השיחה. הסיכום שאישרתם הועבר אליי כפי שהוא.`,
+      `נושא מרכזי: ${plainOr(data.topic, 'הקשר כללי')}`,
       ...(wantsClearinghouse && POA_URL
         ? [`ייפוי כוח לשליפת נתוני מסלקה — לחתימה לפני הפגישה: ${POA_URL}`]
         : []),
@@ -1229,15 +1351,15 @@ function buildClientText(source, data) {
   }
   if (source === 'consultation') {
     return [
-      `שלום ${firstName}, קיבלתי את בקשת הייעוץ והפרטים תועדו בהצלחה.`,
-      `נושא: ${data.topic || 'ייעוץ כללי'} · מועד מבוקש: ${when}`,
+      `${hello}קיבלתי את בקשת הייעוץ והפרטים תועדו בהצלחה.`,
+      `נושא: ${plainOr(data.topic, 'ייעוץ כללי')} · מועד מבוקש: ${when}`,
       `אחזור אליכם אישית תוך יום עסקים אחד לתיאום מדויק.`,
       `לכל שאלה — ניתן להשיב ישירות למייל זה.`,
       `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,
     ].join('\n');
   }
   return [
-    `שלום ${firstName}, קיבלתי את פנייתכם והפרטים תועדו בהצלחה.`,
+    `${hello}קיבלתי את פנייתכם והפרטים תועדו בהצלחה.`,
     `אחזור אליכם אישית בהקדם האפשרי.`,
     `לכל שאלה — ניתן להשיב ישירות למייל זה.`,
     `בברכה, דורית גוב ארי · dorit@govari-fin.co.il`,
@@ -1266,6 +1388,16 @@ export default async function(req) {
     if (!name || !phone) {
       log('warn', 'request.rejected', { rid, reason: 'missing_contact_fields', source: source || 'quick' });
       return Response.json({ error: 'נדרשים שם וטלפון', rid }, { status: 400 });
+    }
+
+    // תקרות נדיבות: הסוכן מוסר כאן סיכום ופרופיל שכתב מודל, וראיון אמיתי לא
+    // יתקרב אליהן. מה שעובר אותן אינו פנייה אלא מטען.
+    const profileTooBig = profile !== undefined && profile !== null &&
+      JSON.stringify(profile).length > 20000;
+    const oversized = oversizedField(body, LEAD_FIELD_LIMITS) || (profileTooBig ? 'profile' : null);
+    if (oversized) {
+      log('warn', 'request.rejected', { rid, reason: 'field_too_long', field: oversized, source: source || 'quick' });
+      return Response.json({ error: 'אחד השדות ארוך מדי. אפשר לקצר ולשלוח שוב.', rid }, { status: 400 });
     }
 
     // התקציר נכתב על ידי מודל, ולכן עובר סינון לפני שהוא נשלח לאן שהוא.
@@ -1322,7 +1454,7 @@ export default async function(req) {
     let leadId = null;
 
     // ראיון שכבר נפתח בשיחה הזו מתעדכן במקום להיווצר מחדש.
-    const openInterview = source === 'interview' ? await findOpenInterview(base44, phone) : null;
+    const openInterview = source === 'interview' ? await findOpenInterview(base44, phone, name, email) : null;
     // האם השיחה הזו כבר פתחה רשומה. זה מה שמבדיל עדכון מכפילות, וזה השדה
     // שמסביר בדיעבד למה ראיון אחד הופיע פעמיים במסך הפניות.
     log('info', 'lead.resolved', { rid, source: source || 'quick', track: track || '', stage: partial ? 'partial' : 'complete', upsert: Boolean(openInterview?.id) });
@@ -1444,8 +1576,14 @@ export default async function(req) {
       return Response.json({ ok: true, rid, leadId, stage: 'partial', notified: false, warnings });
     }
 
-    // אישור ללקוח
-    if (email) {
+    // אישור ללקוח — רק למשהו שהוא כתובת, ולא יותר מכמה פעמים ביום לכתובת.
+    if (email && !isEmail(email)) {
+      log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'invalid_address' });
+      warnings.push('client_email_invalid');
+    } else if (email && !(await withinLimit(rid, `confirm-to:${await sha256Hex(email.toLowerCase())}`, 86400, CONFIRMATIONS_PER_ADDRESS_PER_DAY))) {
+      log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'rate_limited' });
+      warnings.push('client_confirmation_rate_limited');
+    } else if (email) {
       try {
         // הכותרת חייבת לומר את מה שגוף המכתב אומר. clientMailFor פותח ראיון
         // ב"קיבלנו את סיכום השיחה", ונושא שאומר "פנייתכם" הופך את אותו מייל

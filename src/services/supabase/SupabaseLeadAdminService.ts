@@ -1,5 +1,10 @@
 import type { LeadAdminPort, LeadRecord, LeadStatus } from "../ports";
 import {
+  CLAIM_DOCUMENT_REF_PREFIX,
+  CLAIM_DOCUMENTS_BUCKET,
+  type SupabaseStorageClient,
+} from "./SupabaseUploadService";
+import {
   fetchRows,
   toPortRow,
   type SupabaseLeadTableClient,
@@ -13,6 +18,9 @@ const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,cre
 
 const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת";
 
+/** How long a document link from the leads screen opens the file: long enough to open it, not to keep it. */
+const DOCUMENT_LINK_SECONDS = 5 * 60;
+
 /**
  * The admin's leads, read and written in Supabase under her own session.
  *
@@ -24,7 +32,10 @@ const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או ש�
  * written by the `submit-claim` Edge Function have no Base44 id at all.
  */
 export class SupabaseLeadAdminService implements LeadAdminPort {
-  constructor(private readonly client: SupabaseLeadTableClient) {}
+  constructor(
+    private readonly client: SupabaseLeadTableClient,
+    private readonly storage: SupabaseStorageClient | null = null,
+  ) {}
 
   async list(limit = 500): Promise<LeadRecord[]> {
     const rows = await fetchRows(
@@ -40,6 +51,22 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
 
   remove(id: string): Promise<void> {
     return applied(this.client.from("leads").delete().eq("id", id).select("id"), "delete");
+  }
+
+  /**
+   * A storage reference signed for five minutes under the admin's session —
+   * `claim_documents_read_admin` is what allows it. Anything else (a Base44
+   * file URL from before the switch) is returned as it is.
+   */
+  async documentLink(ref: string): Promise<string> {
+    if (!ref.startsWith(CLAIM_DOCUMENT_REF_PREFIX)) return ref;
+    if (!this.storage) throw new Error("אין חיבור לאחסון המסמכים");
+    const path = ref.slice(CLAIM_DOCUMENT_REF_PREFIX.length);
+    const { data, error } = await this.storage.storage
+      .from(CLAIM_DOCUMENTS_BUCKET)
+      .createSignedUrl(path, DOCUMENT_LINK_SECONDS);
+    if (error || !data) throw new Error(`לא ניתן לפתוח את המסמך: ${error?.message ?? "no data"}`);
+    return data.signedUrl;
   }
 }
 

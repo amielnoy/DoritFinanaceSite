@@ -155,3 +155,83 @@ describe("submit-claim — the browser's side", () => {
     expect(r.headers.get("access-control-allow-origin")).toBeNull();
   });
 });
+
+describe("submit-claim — how often", () => {
+  const fromIp = { headers: { "x-forwarded-for": "203.0.113.7, 10.0.0.1" } };
+  const limiterCalls = (r: Awaited<ReturnType<typeof invokeEdge>>) =>
+    r.fetches.filter((f) => f.url === `${SUPABASE_URL}/rest/v1/rpc/allow_submission`);
+
+  it("counts the caller by a hash of the first forwarded address, never the address itself", async () => {
+    const r = await invokeEdge("submit-claim", claim, fromIp);
+    expect(r.status).toBe(200);
+    const ipCall = limiterCalls(r).find((f) => String((f.body as { p_key: string }).p_key).startsWith("claim-ip:"))!;
+    expect((ipCall.body as { p_key: string }).p_key).toMatch(/^claim-ip:[0-9a-f]{64}$/);
+    expect(JSON.stringify(r.fetches.map((f) => f.body))).not.toContain("203.0.113.7");
+  });
+
+  it("refuses a caller over the hourly limit, and writes and mails nothing", async () => {
+    const r = await invokeEdge("submit-claim", claim, { ...fromIp, overLimit: ["claim-ip:"] });
+    expect(r.status).toBe(429);
+    expect(r.leads).toHaveLength(0);
+    expect(r.emails).toHaveLength(0);
+  });
+
+  it("keeps the report but skips the confirmation to an address already mailed enough today", async () => {
+    const r = await invokeEdge("submit-claim", claim, { overLimit: ["confirm-to:"] });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+    expect(r.emails.map((e) => e.to)).not.toContain("ronit@example.com");
+    expect(r.emails.map((e) => e.to)).toContain("dorit@govari-fin.co.il");
+    expect(r.json.warnings).toContain("client_confirmation_rate_limited");
+  });
+
+  it("counts the recipient case-insensitively, by hash", async () => {
+    const r = await invokeEdge("submit-claim", { ...claim, email: "Ronit@Example.com" });
+    const to = limiterCalls(r).find((f) => String((f.body as { p_key: string }).p_key).startsWith("confirm-to:"))!;
+    const lower = limiterCalls(await invokeEdge("submit-claim", claim)).find((f) =>
+      String((f.body as { p_key: string }).p_key).startsWith("confirm-to:"))!;
+    expect((to.body as { p_key: string }).p_key).toBe((lower.body as { p_key: string }).p_key);
+  });
+
+  it("lets the claim through when the limiter itself is down", async () => {
+    const r = await invokeEdge("submit-claim", claim, { ...fromIp, failLimiter: 503 });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+    expect(r.emails.map((e) => e.to)).toContain("ronit@example.com");
+  });
+
+  it("does not limit a request with no forwarded address", async () => {
+    const r = await invokeEdge("submit-claim", claim);
+    expect(limiterCalls(r).some((f) => String((f.body as { p_key: string }).p_key).startsWith("claim-ip:"))).toBe(false);
+  });
+});
+
+describe("submit-claim — documents uploaded to Supabase Storage", () => {
+  const stored = "storage:claim-documents/00000000-0000-0000-0000-000000000001/abc-police.pdf";
+
+  it("stores the path, and mails Dorit a link that expires in a week", async () => {
+    const r = await invokeEdge("submit-claim", { ...claim, documents: [stored, "plain-name.pdf"] });
+    expect(r.status).toBe(200);
+    expect(r.leads[0].message).toContain(stored);
+    const sign = r.fetches.find((f) => f.url.includes("/storage/v1/object/sign/claim-documents/"))!;
+    expect(sign.url).toBe(
+      `${SUPABASE_URL}/storage/v1/object/sign/claim-documents/00000000-0000-0000-0000-000000000001/abc-police.pdf`,
+    );
+    expect(sign.body).toEqual({ expiresIn: 7 * 24 * 60 * 60 });
+    const copy = r.mailTo("dorit@govari-fin.co.il").body!;
+    expect(copy).toContain(`${SUPABASE_URL}/storage/v1/object/sign/claim-documents/`);
+    expect(copy).toContain("plain-name.pdf");
+  });
+
+  it("still lists a document it could not sign, by its path", async () => {
+    const r = await invokeEdge("submit-claim", { ...claim, documents: [stored] }, { failSign: 500 });
+    expect(r.status).toBe(200);
+    expect(r.mailTo("dorit@govari-fin.co.il").body).toContain(stored);
+  });
+
+  it("never puts a document link in the reporter's own copy", async () => {
+    const r = await invokeEdge("submit-claim", { ...claim, documents: [stored] });
+    const mail = r.mailTo("ronit@example.com");
+    expect(`${mail.html}${mail.text}`).not.toContain("storage/v1");
+  });
+});

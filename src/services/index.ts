@@ -41,7 +41,10 @@ export interface Services {
   leads: LeadPort;
   content: ContentPort;
   agents: AgentPort;
+  /** Public images — blog covers, testimonial photos. */
   uploads: UploadPort;
+  /** A claim's documents: private, and never mixed with the public images. */
+  claimDocuments: UploadPort;
   support: SupportPort;
   /** Who is signed in. Read by the route guards and the owner-only controls. */
   auth: AuthPort;
@@ -88,7 +91,7 @@ const contentAdmin: ContentAdminPort = new FunctionContentAdminService(
 
 /** The admin's leads: read and written in Supabase when it is configured, else through Base44 as before. */
 const leadsAdminPort: LeadAdminPort = tables
-  ? new SupabaseLeadAdminService(tables)
+  ? new SupabaseLeadAdminService(tables, supabase as unknown as SupabaseStorageClient | null)
   : new Base44LeadAdminService(client);
 
 /**
@@ -113,12 +116,19 @@ const accountPort: AccountPort = supabase
   : new UnconfiguredAccountService();
 
 /**
+ * Public images (blog covers, testimonial photos) stay on Base44: the only
+ * Supabase bucket is the private claim-documents one, and an image put there
+ * would be unreadable to every visitor.
+ */
+const uploadPort: UploadPort = new Base44UploadService(client);
+
+/**
  * Where a claim document lands, from whichever provider is switched on.
  *
  * Falls back to Base44 when Supabase is unconfigured — a checkout without
  * Supabase credentials should still accept a claim's attachments.
  */
-const uploadPort: UploadPort =
+const claimDocumentsPort: UploadPort =
   UPLOAD_PROVIDER === "supabase" && supabase
     ? new SupabaseUploadService(supabase as unknown as SupabaseStorageClient)
     : new Base44UploadService(client);
@@ -138,6 +148,7 @@ export const services: Services = {
   content: contentPort,
   agents: new Base44AgentService(client),
   uploads: uploadPort,
+  claimDocuments: claimDocumentsPort,
   support: new Base44SupportService(client),
   auth: authPort,
   leadsAdmin: leadsAdminPort,

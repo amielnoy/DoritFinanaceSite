@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
+import { services, type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
 import { useLeads, useRemoveLead, useSetLeadStatus } from "@/hooks/useAdmin";
 import { Link } from "react-router-dom";
 import { Loader2, Download, Trash2, ArrowRight } from "lucide-react";
@@ -43,6 +43,62 @@ const SOURCE_LABEL: Record<LeadSource, string> = {
 function csvEscape(v: unknown): string {
   const s = String(v ?? "");
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** A claim document stored in Supabase, as `submit-claim` writes it into the message. */
+const DOCUMENT_REF = /(storage:claim-documents\/[^\s|]+)/;
+
+/**
+ * Opens one claim document. The link is signed on the click, for five minutes,
+ * so nothing long-lived sits in the page or in a copied URL.
+ *
+ * The tab is opened before the await: Safari blocks a window opened after one,
+ * and the signing is a round trip.
+ */
+function DocumentLink({ docRef, index }: { docRef: string; index: number }) {
+  const [error, setError] = useState<string | null>(null);
+  const open = async () => {
+    setError(null);
+    const tab = window.open("about:blank", "_blank");
+    try {
+      const url = await services.leadsAdmin.documentLink(docRef);
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = url;
+      } else {
+        setError("הדפדפן חסם את החלון — אפשר לאשר חלונות קופצים ולנסות שוב");
+      }
+    } catch (e) {
+      tab?.close();
+      setError(e instanceof Error ? e.message : "לא ניתן לפתוח את המסמך");
+    }
+  };
+  return (
+    <span>
+      <button type="button" onClick={open} className="underline text-accent hover:text-foreground">
+        מסמך {index}
+      </button>
+      {error && <span className="block text-xs text-destructive">{error}</span>}
+    </span>
+  );
+}
+
+/** The details column: topic, time and message, with any stored document as a button. */
+function LeadDetails({ lead }: { lead: LeadRecord }) {
+  const text = [lead.topic, lead.timing, lead.message].filter(Boolean).join(" · ");
+  if (!text) return <>—</>;
+  const parts = text.split(DOCUMENT_REF);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <DocumentLink key={i} docRef={part} index={(i + 1) / 2} />
+        ) : (
+          <React.Fragment key={i}>{part}</React.Fragment>
+        ),
+      )}
+    </>
+  );
 }
 
 export default function Leads() {
@@ -232,7 +288,7 @@ export default function Leads() {
                     <td className="px-4 py-3 text-foreground/70" dir="ltr">{l.email || "—"}</td>
                     <td className="px-4 py-3 text-foreground/70">{SOURCE_LABEL[l.source] || "—"}</td>
                     <td className="px-4 py-3 text-foreground/70 max-w-xs">
-                      {[l.topic, l.timing, l.message].filter(Boolean).join(" · ") || "—"}
+                      <LeadDetails lead={l} />
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2.5 py-1 text-xs ${STATUS_COLOR[l.status] || ""}`}>
