@@ -45,11 +45,6 @@ npx skills add base44/skills
   column to it deliberately, never by opening `leads`. The revokes name `anon` and
   `authenticated` because Supabase's default privileges grant EXECUTE to them by
   name; a bare `from public` leaves the functions open.
-- `base44/functions/myAccount`: the same rule on the Base44 side. It requires a
-  verified, enabled caller, matches on the verified email (`lower(trim)`), and
-  filters the columns again through `VISIBLE`. Answers carry a `rid`, never an
-  error message. `src/pages/Account.tsx` reads through `AccountPort`, one adapter
-  per sign-in.
 - `base44/functions/adminLead`: an admin's status change and delete on a lead.
   Writes Supabase first, then Base44, because both are idempotent and a failure
   part-way must leave the lead in the admin list for the retry to finish. The
