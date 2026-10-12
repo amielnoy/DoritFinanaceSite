@@ -32,9 +32,11 @@ const ADAPTERS = [
 ];
 
 describe("adapter → submitLead", () => {
+  // The bodies live in `lead-bodies.ts` (shared by the Base44 and Supabase
+  // adapters), so the contract reads the returned literals from there.
   const calls = findObjectLiteralCalls(
-    /(?:functions\.invoke\(|invokeFunction(?:<\w+>)?\(\s*this\.client\s*,)\s*["']submitLead["']\s*,\s*/,
-    ADAPTERS
+    /export function (?:leadBody|interviewBody)\([^)]*\)[^{]*\{\s*return\s*/,
+    [join(REPO_ROOT, "src/services/lead-bodies.ts")]
   );
   const accepted = destructuredBody(backendSource("submitLead"));
 
@@ -73,7 +75,7 @@ describe("adapter → submitLead", () => {
     expect(calls.length).toBeGreaterThan(0);
     for (const c of calls) {
       expect(c.file, "a component is building this payload again").toBe(
-        "src/services/base44/Base44LeadService.ts",
+        "src/services/lead-bodies.ts",
       );
     }
   });

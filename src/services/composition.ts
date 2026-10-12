@@ -1,5 +1,6 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
+import { LEAD_FUNCTIONS } from "@/config/lead-functions";
 import { UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
@@ -16,6 +17,7 @@ import { SupabaseContentService } from "./supabase/SupabaseContentService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
 import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
 import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
+import { SupabaseSupportService } from "./supabase/SupabaseSupportService";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
@@ -27,6 +29,7 @@ import type {
   ContentPort,
   LeadAdminPort,
   LeadPort,
+  SupportPort,
   UploadPort,
 } from "./ports";
 
@@ -123,8 +126,14 @@ const claimDocumentsPort: UploadPort =
  */
 const base44Leads = new Base44LeadService(client);
 const leadPort: LeadPort = supabase
-  ? new SupabaseLeadService(supabase as unknown as SupabaseFunctionsClient, base44Leads)
+  ? new SupabaseLeadService(supabase as unknown as SupabaseFunctionsClient, base44Leads, LEAD_FUNCTIONS === "supabase")
   : base44Leads;
+
+const base44Support = new Base44SupportService(client);
+const supportPort: SupportPort =
+  supabase && LEAD_FUNCTIONS === "supabase"
+    ? new SupabaseSupportService(supabase as unknown as SupabaseFunctionsClient)
+    : base44Support;
 
 export const services: Services = {
   leads: leadPort,
@@ -132,7 +141,7 @@ export const services: Services = {
   agents: new Base44AgentService(client),
   uploads: uploadPort,
   claimDocuments: claimDocumentsPort,
-  support: new Base44SupportService(client),
+  support: supportPort,
   auth: authPort,
   leadsAdmin: leadsAdminPort,
   contentAdmin,

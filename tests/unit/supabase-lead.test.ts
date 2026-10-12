@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { SupabaseLeadService, type SupabaseFunctionsClient } from "@/services/supabase/SupabaseLeadService";
 import type { LeadPort } from "@/services/ports";
+import { leadBody } from "@/services/lead-bodies";
 
 const report = { name: "רונית", phone: "0536667788", claimType: "תאונת דרכים", documents: ["https://x/a.pdf"] };
 
@@ -78,5 +79,40 @@ describe("SupabaseLeadService — everything else stays on Base44", () => {
     expect(r.submitInterview).toHaveBeenCalledWith(summary);
     expect(r.requestConsultationEvent).toHaveBeenCalledWith(lead);
     expect(invoke).not.toHaveBeenCalled();
+  });
+});
+
+describe("SupabaseLeadService — with the Edge lead functions switched on", () => {
+  const lead = { name: "דנה", phone: "0501234567", source: "consultation" as const, topic: "פנסיה" };
+
+  it("sends a lead to submit-lead with the body Base44 would have had", async () => {
+    const invoke = vi.fn().mockResolvedValue({ data: { ok: true, rid: "r1" }, error: null });
+    const rest = { submitLead: vi.fn(), submitInterview: vi.fn(), requestConsultationEvent: vi.fn(), submitClaim: vi.fn() };
+    const svc = new SupabaseLeadService({ functions: { invoke } }, rest, true);
+    await svc.submitLead(lead);
+    expect(invoke).toHaveBeenCalledWith("submit-lead", { body: leadBody(lead) });
+    expect(rest.submitLead).not.toHaveBeenCalled();
+  });
+
+  it("sends an interview to submit-lead as a complete stage", async () => {
+    const invoke = vi.fn().mockResolvedValue({ data: { ok: true }, error: null });
+    const svc = new SupabaseLeadService({ functions: { invoke } }, {} as never, true);
+    await svc.submitInterview({ name: "דנה", phone: "0501234567", track: "pension" });
+    expect(invoke.mock.calls[0][1].body).toMatchObject({ source: "interview", stage: "complete", track: "pension" });
+  });
+
+  it("stays on Base44 when switched off", async () => {
+    const invoke = vi.fn();
+    const rest = { submitLead: vi.fn().mockResolvedValue({ ok: true }), submitInterview: vi.fn(), requestConsultationEvent: vi.fn(), submitClaim: vi.fn() };
+    await new SupabaseLeadService({ functions: { invoke } }, rest, false).submitLead(lead);
+    expect(invoke).not.toHaveBeenCalled();
+    expect(rest.submitLead).toHaveBeenCalled();
+  });
+
+  it("throws with the function's message and rid when submit-lead refuses", async () => {
+    const res = new Response(JSON.stringify({ error: "נדרשים שם וטלפון", rid: "ab12" }), { status: 400 });
+    const invoke = vi.fn().mockResolvedValue({ data: null, error: { message: "non-2xx", context: res } });
+    await expect(new SupabaseLeadService({ functions: { invoke } }, {} as never, true).submitLead(lead))
+      .rejects.toThrow("submit-lead failed: נדרשים שם וטלפון (rid ab12)");
   });
 });

@@ -6,6 +6,7 @@ import type {
   SubmissionReceipt,
 } from "../ports";
 
+import { interviewBody, leadBody } from "../lead-bodies";
 import { invokeFunction, type FunctionInvoker } from "./invoke";
 
 export type { FunctionInvoker };
@@ -21,20 +22,7 @@ export class Base44LeadService implements LeadPort {
   constructor(private readonly client: FunctionInvoker) {}
 
   async submitLead(lead: Lead): Promise<SubmissionReceipt> {
-    const receipt = await invokeFunction<SubmissionReceipt>(this.client, "submitLead", {
-      name: lead.name,
-      phone: lead.phone,
-      email: lead.email ?? "",
-      source: lead.source,
-      topic: lead.topic ?? "",
-      timing: lead.timing ?? "",
-      message: lead.message ?? "",
-      notes: lead.notes ?? "",
-      scheduledAt: lead.scheduledAt ?? "",
-      channel: lead.channel ?? "",
-      campaign: lead.campaign ?? "",
-      landingPath: lead.landingPath ?? "",
-    });
+    const receipt = await invokeFunction<SubmissionReceipt>(this.client, "submitLead", leadBody(lead));
 
     return receipt ?? { ok: true };
   }
@@ -45,23 +33,7 @@ export class Base44LeadService implements LeadPort {
    * because the partial one is the agent's own and does not reach us.
    */
   async submitInterview(summary: InterviewSummary): Promise<SubmissionReceipt> {
-    const receipt = await invokeFunction<SubmissionReceipt>(this.client, "submitLead", {
-      source: "interview",
-      stage: "complete",
-      name: summary.name,
-      phone: summary.phone,
-      email: summary.email ?? "",
-      track: summary.track ?? "",
-      meetingTopic: summary.meetingTopic ?? "",
-      timing: summary.timing ?? "",
-      notes: summary.notes ?? "",
-      scheduledAt: summary.scheduledAt ?? "",
-      summary: summary.summary ?? "",
-      profile: summary.profile ?? {},
-      channel: summary.channel ?? "",
-      campaign: summary.campaign ?? "",
-      landingPath: summary.landingPath ?? "",
-    });
+    const receipt = await invokeFunction<SubmissionReceipt>(this.client, "submitLead", interviewBody(summary));
 
     return receipt ?? { ok: true };
   }
