@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { checkFreshness } from "@/lib/freshness";
+import { checkFreshness, watchFreshness } from "@/lib/freshness";
 
 /**
  * The check that notices a browser is running a build the server has replaced.
@@ -85,5 +85,32 @@ describe("freshness — leaving a build the server has replaced", () => {
     expect(await checkFreshness()).toBe("stale");
     expect(await checkFreshness()).toBe("fresh");
     expect(replaced).toHaveLength(1);
+  });
+
+  it("leaves again when a later deploy replaces the build it left for", async () => {
+    // A tab left open through several deploys in one day. The guard is about
+    // not navigating twice towards the same build, not about never again.
+    serverSays("/assets/index-NEW42.js");
+    expect(await checkFreshness()).toBe("stale");
+    serverSays("/assets/index-NEW99.js");
+    expect(await checkFreshness()).toBe("stale");
+    expect(replaced).toHaveLength(2);
+    expect(replaced[1]).toMatch(/[?&]_v=99/);
+  });
+
+  it("checks when a lazy page fails to load, which is how a stale tab first breaks", async () => {
+    // Navigating inside an old tab asks for a page chunk the new deploy no
+    // longer has. Vite reports that as `vite:preloadError`; the page boundary
+    // would otherwise show "משהו השתבש" until a manual reload.
+    serverSays("/assets/index-NEW42.js");
+    watchFreshness();
+    await new Promise((r) => setTimeout(r, 0));
+    replaced.length = 0;
+    window.sessionStorage.clear();
+    serverSays("/assets/index-NEW77.js");
+    window.dispatchEvent(new Event("vite:preloadError"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(replaced).toHaveLength(1);
+    expect(replaced[0]).toMatch(/[?&]_v=77/);
   });
 });

@@ -15,9 +15,15 @@
  * rejected for missing contact fields, with no `submitLead` anywhere near it.
  * A publish does not reach such a device. See A-57.
  *
- * So the page asks, once on load and again whenever it is brought back to the
- * foreground, which bundle the server is naming now. The comparison is between
- * the module script this document loaded and the one the fresh HTML lists.
+ * So the page asks, once on load, again whenever it is brought back to the
+ * foreground, and again when a lazy page fails to load, which bundle the
+ * server is naming now. The comparison is between the module script this
+ * document loaded and the one the fresh HTML lists.
+ *
+ * The lazy-page case is how a tab left open through a deploy first breaks:
+ * navigating inside it asks for a page chunk the new deploy no longer has.
+ * Vite reports that as `vite:preloadError`. On 2026-10-12 it was /faq, in a
+ * tab opened before the day's deploys, showing "משהו השתבש בטעינת הדף".
  *
  * Caveats worth keeping in mind rather than hiding:
  *   - A device already holding a stale `index.html` is running code that
@@ -50,12 +56,17 @@ async function publishedEntry(signal?: AbortSignal): Promise<string | null> {
   }
 }
 
-/** Set once we have navigated, so a wrong answer cannot become a reload loop. */
+/**
+ * The build we last navigated towards, so a wrong answer cannot become a
+ * reload loop: we never navigate twice for the same target. A later deploy
+ * names a different one, and is followed — a session-wide "done" flag left a
+ * tab stuck after the second deploy of a day.
+ */
 const ESCAPED = "freshness:escaped";
 
-function alreadyEscaped(): boolean {
+function alreadyEscapedTo(entry: string): boolean {
   try {
-    return window.sessionStorage.getItem(ESCAPED) === "1";
+    return window.sessionStorage.getItem(ESCAPED) === entry;
   } catch {
     // Private mode, or storage blocked. Treat as "not yet" — the worst case is
     // one extra navigation, which is still better than a week of stale code.
@@ -63,9 +74,9 @@ function alreadyEscaped(): boolean {
   }
 }
 
-function markEscaped(): void {
+function markEscaped(entry: string): void {
   try {
-    window.sessionStorage.setItem(ESCAPED, "1");
+    window.sessionStorage.setItem(ESCAPED, entry);
   } catch {
     /* nothing to do; see above */
   }
@@ -77,13 +88,13 @@ function markEscaped(): void {
  * Exported for the tests, which drive it directly rather than through a timer.
  */
 export async function checkFreshness(): Promise<"fresh" | "unknown" | "stale"> {
-  if (alreadyEscaped()) return "fresh";
   const loaded = loadedEntry(document);
   if (!loaded) return "unknown";
   const published = await publishedEntry();
   if (!published || published === loaded) return published ? "fresh" : "unknown";
+  if (alreadyEscapedTo(published)) return "fresh";
 
-  markEscaped();
+  markEscaped(published);
   // Not `reload()`: the stale `index.html` has no validator, so a reload can be
   // answered from the same cache entry that caused this. A URL the cache has
   // not seen cannot be.
@@ -93,10 +104,14 @@ export async function checkFreshness(): Promise<"fresh" | "unknown" | "stale"> {
   return "stale";
 }
 
-/** Wires the check to load and to the tab being brought back. */
+/** Wires the check to load, to the tab being brought back, and to a lazy page failing to load. */
 export function watchFreshness(): void {
   void checkFreshness();
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") void checkFreshness();
   });
+  // Not prevented: the import still rejects and the page boundary shows its
+  // fallback, which is right when the server is merely unreachable. When the
+  // build was replaced, the navigation below takes the tab to the new one.
+  window.addEventListener("vite:preloadError", () => void checkFreshness());
 }
