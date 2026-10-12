@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { invokeFunction } from "../helpers/base44-function";
+import { invokeEdge } from "../helpers/edge-function";
 
 /**
  * `submitClaim`, executed.
@@ -14,6 +15,10 @@ import { invokeFunction } from "../helpers/base44-function";
  * A claim is also the most time-critical thing the site accepts. The record is
  * written first and every notification is best-effort after it, same as
  * `submitLead` — these pin that a bounce costs a message and never the report.
+ *
+ * Both implementations run every case below while both exist: Base44's
+ * `submitClaim` (the rollback) and the `submit-claim` Edge Function that
+ * replaced it. A case that passes for one and fails for the other is drift.
  */
 
 const AGENCY = "dorit@govari-fin.co.il";
@@ -31,143 +36,178 @@ const claim = {
   documents: ["אישור משטרה.pdf", "תמונות.zip"],
 };
 
-describe("submitClaim — the report lands", () => {
-  it("stores the claim and tells the agency and both operations mailboxes", async () => {
-    const r = await invokeFunction("submitClaim", claim);
+type Run = (
+  body: unknown,
+  options?: { failLeadWrite?: boolean; failEmailTo?: string[] },
+) => Promise<{
+  status: number;
+  json: Record<string, unknown>;
+  leads: Record<string, unknown>[];
+  emails: { to: string; subject: string; html?: string; text?: string; body?: string }[];
+  mailTo(address: string): { subject: string; html?: string; text?: string; body?: string };
+}>;
 
-    expect(r.status).toBe(200);
-    expect(r.json).toMatchObject({ ok: true, warnings: [] });
-    expect(r.leads).toHaveLength(1);
-    expect(r.leads[0]).toMatchObject({ name: "רונית מזרחי", source: "claim", status: "new" });
+const IMPLEMENTATIONS: { label: string; run: Run }[] = [
+  { label: "Base44 submitClaim", run: (body, options) => invokeFunction("submitClaim", body, options) },
+  { label: "Edge submit-claim", run: (body, options) => invokeEdge("submit-claim", body, options) },
+];
 
-    for (const to of [AGENCY, OPS, OPS2, "ronit@example.com"]) {
-      expect(r.emails.map((e) => e.to), to).toContain(to);
-    }
-  });
+describe.each(IMPLEMENTATIONS)("$label", ({ run }) => {
+  describe("submitClaim — the report lands", () => {
+    it("stores the claim and tells the agency and both operations mailboxes", async () => {
+      const r = await run(claim);
 
-  it("gives every staff mailbox the same report", async () => {
-    const r = await invokeFunction("submitClaim", claim);
-    for (const to of [AGENCY, OPS, OPS2]) {
-      const body = r.mailTo(to).body ?? r.mailTo(to).text ?? "";
-      expect(body, to).toContain("רונית מזרחי");
-      expect(body, to).toContain("0536667788");
-      expect(body, to).toContain("נזק לרכב בחניון");
-      expect(body, to).toContain("אישור משטרה.pdf");
-    }
-  });
+      expect(r.status).toBe(200);
+      expect(r.json).toMatchObject({ ok: true, warnings: [] });
+      expect(r.leads).toHaveLength(1);
+      expect(r.leads[0]).toMatchObject({ name: "רונית מזרחי", source: "claim", status: "new" });
 
-  it("pins the status and the source rather than taking them from the caller", async () => {
-    const r = await invokeFunction("submitClaim", { ...claim, status: "closed", source: "quick" });
-    expect(r.leads[0].status).toBe("new");
-    expect(r.leads[0].source).toBe("claim");
-  });
-
-  it("says so when no documents were attached", async () => {
-    const r = await invokeFunction("submitClaim", { ...claim, documents: [] });
-    const body = r.mailTo(AGENCY).body ?? r.mailTo(AGENCY).text ?? "";
-    expect(body).toContain("מסמכים מצורפים: אין");
-  });
-
-  it("skips the reporter's confirmation when no address was given", async () => {
-    const r = await invokeFunction("submitClaim", { ...claim, email: "" });
-    expect(r.status).toBe(200);
-    expect(r.emails.map((e) => e.to).sort()).toEqual([AGENCY, OPS, OPS2].sort());
-  });
-});
-
-describe("submitClaim — the operations mailboxes", () => {
-  it("delivers to the second mailbox when the first bounces", async () => {
-    const r = await invokeFunction("submitClaim", claim, { failEmailTo: [OPS] });
-    expect(r.emails.map((e) => e.to)).toContain(OPS2);
-    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("notify_email_failed")));
-    // The agency and the reporter are on separate sends and are unaffected.
-    expect(r.emails.map((e) => e.to)).toContain(AGENCY);
-    expect(r.status).toBe(200);
-  });
-
-  it("delivers to the first when the second bounces", async () => {
-    const r = await invokeFunction("submitClaim", claim, { failEmailTo: [OPS2] });
-    expect(r.emails.map((e) => e.to)).toContain(OPS);
-    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("notify_email_failed")));
-  });
-
-  it("still tells the agency when both operations mailboxes bounce", async () => {
-    const r = await invokeFunction("submitClaim", claim, { failEmailTo: [OPS, OPS2] });
-    expect(r.emails.map((e) => e.to)).toContain(AGENCY);
-    expect(r.status).toBe(200);
-  });
-});
-
-describe("submitClaim — what survives a failure", () => {
-  it("refuses without a phone number, and writes nothing", async () => {
-    const r = await invokeFunction("submitClaim", { ...claim, phone: "" });
-    expect(r.status).toBe(400);
-    expect(r.leads).toHaveLength(0);
-    expect(r.emails).toHaveLength(0);
-  });
-
-  it("refuses without a name", async () => {
-    const r = await invokeFunction("submitClaim", { ...claim, name: "" });
-    expect(r.status).toBe(400);
-  });
-
-  it("fails loudly when the record cannot be written, and mails nobody", async () => {
-    // A claim nobody stored is worse than a claim nobody was mailed about:
-    // the reporter believes it is in hand.
-    const r = await invokeFunction("submitClaim", claim, { failLeadWrite: true });
-    expect(r.status).toBe(500);
-    expect(r.emails).toHaveLength(0);
-  });
-
-  it("keeps the report when only the confirmation bounces", async () => {
-    const r = await invokeFunction("submitClaim", claim, { failEmailTo: ["ronit@example.com"] });
-    expect(r.status).toBe(200);
-    expect(r.leads).toHaveLength(1);
-    expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("client_confirmation_failed")));
-  });
-});
-
-describe("submitClaim — a name that is really a payload", () => {
-  it("renders no live markup into the reporter's HTML mail", async () => {
-    const r = await invokeFunction("submitClaim", {
-      ...claim,
-      name: '<a href="https://evil.example">לחצו כאן</a> מזרחי',
+      for (const to of [AGENCY, OPS, OPS2, "ronit@example.com"]) {
+        expect(r.emails.map((e) => e.to), to).toContain(to);
+      }
     });
-    const html = r.mailTo("ronit@example.com").html!;
-    // Only the first word reaches the greeting — `firstName` is split on the
-    // space — so the assertion is that no live tag survives, and that the
-    // fragment that did arrive came through escaped.
-    expect(html).not.toContain('<a href="https://evil.example"');
-    expect(html).not.toContain("<a ");
-    expect(html).toContain("&lt;a");
+
+    it("gives every staff mailbox the same report", async () => {
+      const r = await run(claim);
+      for (const to of [AGENCY, OPS, OPS2]) {
+        const body = r.mailTo(to).body ?? r.mailTo(to).text ?? "";
+        expect(body, to).toContain("רונית מזרחי");
+        expect(body, to).toContain("0536667788");
+        expect(body, to).toContain("נזק לרכב בחניון");
+        expect(body, to).toContain("אישור משטרה.pdf");
+      }
+    });
+
+    it("pins the status and the source rather than taking them from the caller", async () => {
+      const r = await run({ ...claim, status: "closed", source: "quick" });
+      expect(r.leads[0].status).toBe("new");
+      expect(r.leads[0].source).toBe("claim");
+    });
+
+    it("says so when no documents were attached", async () => {
+      const r = await run({ ...claim, documents: [] });
+      const body = r.mailTo(AGENCY).body ?? r.mailTo(AGENCY).text ?? "";
+      expect(body).toContain("מסמכים מצורפים: אין");
+    });
+
+    it("skips the reporter's confirmation when no address was given", async () => {
+      const r = await run({ ...claim, email: "" });
+      expect(r.status).toBe(200);
+      expect(r.emails.map((e) => e.to).sort()).toEqual([AGENCY, OPS, OPS2].sort());
+    });
+  });
+
+  describe("submitClaim — the operations mailboxes", () => {
+    it("delivers to the second mailbox when the first bounces", async () => {
+      const r = await run(claim, { failEmailTo: [OPS] });
+      expect(r.emails.map((e) => e.to)).toContain(OPS2);
+      expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("notify_email_failed")));
+      // The agency and the reporter are on separate sends and are unaffected.
+      expect(r.emails.map((e) => e.to)).toContain(AGENCY);
+      expect(r.status).toBe(200);
+    });
+
+    it("delivers to the first when the second bounces", async () => {
+      const r = await run(claim, { failEmailTo: [OPS2] });
+      expect(r.emails.map((e) => e.to)).toContain(OPS);
+      expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("notify_email_failed")));
+    });
+
+    it("still tells the agency when both operations mailboxes bounce", async () => {
+      const r = await run(claim, { failEmailTo: [OPS, OPS2] });
+      expect(r.emails.map((e) => e.to)).toContain(AGENCY);
+      expect(r.status).toBe(200);
+    });
+  });
+
+  describe("submitClaim — what survives a failure", () => {
+    it("refuses without a phone number, and writes nothing", async () => {
+      const r = await run({ ...claim, phone: "" });
+      expect(r.status).toBe(400);
+      expect(r.leads).toHaveLength(0);
+      expect(r.emails).toHaveLength(0);
+    });
+
+    it("refuses without a name", async () => {
+      const r = await run({ ...claim, name: "" });
+      expect(r.status).toBe(400);
+    });
+
+    it("fails loudly when the record cannot be written, and mails nobody", async () => {
+      // A claim nobody stored is worse than a claim nobody was mailed about:
+      // the reporter believes it is in hand.
+      const r = await run(claim, { failLeadWrite: true });
+      expect(r.status).toBe(500);
+      expect(r.emails).toHaveLength(0);
+    });
+
+    it("keeps the report when only the confirmation bounces", async () => {
+      const r = await run(claim, { failEmailTo: ["ronit@example.com"] });
+      expect(r.status).toBe(200);
+      expect(r.leads).toHaveLength(1);
+      expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("client_confirmation_failed")));
+    });
+  });
+
+  describe("submitClaim — a name that is really a payload", () => {
+    it("renders no live markup into the reporter's HTML mail", async () => {
+      const r = await run({
+        ...claim,
+        name: '<a href="https://evil.example">לחצו כאן</a> מזרחי',
+      });
+      const html = r.mailTo("ronit@example.com").html!;
+      // Only the first word reaches the greeting — `firstName` is split on the
+      // space — so the assertion is that no live tag survives, and that the
+      // fragment that did arrive came through escaped.
+      expect(html).not.toContain('<a href="https://evil.example"');
+      expect(html).not.toContain("<a ");
+      expect(html).toContain("&lt;a");
+    });
+  });
+
+  describe("submitClaim — channel attribution", () => {
+    it("stores the claim as a lead with the supplied channel", async () => {
+      const r = await run({ ...claim, channel: "facebook" });
+      expect(r.status).toBe(200);
+      expect(r.leads[0]).toMatchObject({ source: "claim", channel: "facebook" });
+    });
+
+    it("adds a הגיע/ה דרך line to both the operations and agency copies — submitClaim sends them the same agentBody, unlike submitLead's richer ops-only footer", async () => {
+      const r = await run({ ...claim, channel: "instagram", campaign: "q4" });
+      const opsBody = r.mailTo(OPS).body ?? r.mailTo(OPS).text ?? "";
+      const agencyBody = r.mailTo(AGENCY).body ?? r.mailTo(AGENCY).text ?? "";
+      expect(opsBody).toContain("הגיע/ה דרך: instagram / q4");
+      expect(agencyBody).toContain("הגיע/ה דרך: instagram / q4");
+    });
+
+    it("stores 'unknown' and adds no line for an unrecognised channel", async () => {
+      const r = await run({ ...claim, channel: "not_a_real_channel" });
+      expect(r.leads[0].channel).toBe("unknown");
+      const opsBody = r.mailTo(OPS).body ?? r.mailTo(OPS).text ?? "";
+      expect(opsBody).not.toContain("הגיע/ה דרך");
+    });
+
+    it("works with no channel supplied at all", async () => {
+      const r = await run(claim);
+      expect(r.status).toBe(200);
+      expect(r.leads[0].channel).toBe("unknown");
+    });
   });
 });
 
-describe("submitClaim — channel attribution", () => {
-  it("stores the claim as a lead with the supplied channel", async () => {
-    const r = await invokeFunction("submitClaim", { ...claim, channel: "facebook" });
-    expect(r.status).toBe(200);
-    expect(r.leads[0]).toMatchObject({ source: "claim", channel: "facebook" });
+describe("the two implementations say the same thing", () => {
+  it("send the reporter the same HTML", async () => {
+    const [base44, edge] = await Promise.all([invokeFunction("submitClaim", claim), invokeEdge("submit-claim", claim)]);
+    expect(edge.mailTo("ronit@example.com").html).toBe(base44.mailTo("ronit@example.com").html);
+    expect(edge.mailTo("ronit@example.com").subject).toBe(base44.mailTo("ronit@example.com").subject);
   });
 
-  it("adds a הגיע/ה דרך line to both the operations and agency copies — submitClaim sends them the same agentBody, unlike submitLead's richer ops-only footer", async () => {
-    const r = await invokeFunction("submitClaim", { ...claim, channel: "instagram", campaign: "q4" });
-    const opsBody = r.mailTo(OPS).body ?? r.mailTo(OPS).text ?? "";
-    const agencyBody = r.mailTo(AGENCY).body ?? r.mailTo(AGENCY).text ?? "";
-    expect(opsBody).toContain("הגיע/ה דרך: instagram / q4");
-    expect(agencyBody).toContain("הגיע/ה דרך: instagram / q4");
-  });
-
-  it("stores 'unknown' and adds no line for an unrecognised channel", async () => {
-    const r = await invokeFunction("submitClaim", { ...claim, channel: "not_a_real_channel" });
-    expect(r.leads[0].channel).toBe("unknown");
-    const opsBody = r.mailTo(OPS).body ?? r.mailTo(OPS).text ?? "";
-    expect(opsBody).not.toContain("הגיע/ה דרך");
-  });
-
-  it("works with no channel supplied at all", async () => {
-    const r = await invokeFunction("submitClaim", claim);
-    expect(r.status).toBe(200);
-    expect(r.leads[0].channel).toBe("unknown");
+  it("send the staff the same report, apart from the timestamp line", async () => {
+    const [base44, edge] = await Promise.all([invokeFunction("submitClaim", claim), invokeEdge("submit-claim", claim)]);
+    const rest = (text = "") => text.split("\n").slice(1).join("\n");
+    for (const to of [AGENCY, OPS, OPS2]) {
+      expect(rest(edge.mailTo(to).text), to).toBe(rest(base44.mailTo(to).body ?? base44.mailTo(to).text));
+      expect(edge.mailTo(to).subject, to).toBe(base44.mailTo(to).subject);
+    }
   });
 });

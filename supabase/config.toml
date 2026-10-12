@@ -380,3 +380,9 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# The claim form posts without signing in, as it always has; the function
+# checks its own input. The new `sb_publishable_` keys are not JWTs either, so
+# the gateway's JWT check would refuse every visitor.
+[functions.submit-claim]
+verify_jwt = false
