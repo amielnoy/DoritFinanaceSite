@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
+import { edgeFunctionFiles, edgeSource } from "../helpers/source-scan";
 
 /**
  * A time a person reads is Israel time, whatever clock the server keeps.
@@ -28,6 +29,9 @@ const entries = readdirSync(FUNCTIONS, { withFileTypes: true })
     }
   });
 
+// The Supabase Edge Functions run on Deno in UTC too.
+entries.push(...edgeFunctionFiles().map((path) => ({ path, source: edgeSource(path) })));
+
 /** Every `toLocale…String(…)` call, with its argument list as written. */
 function localeCalls(source: string): string[] {
   const calls: string[] = [];
@@ -49,6 +53,7 @@ describe("the functions stamp times in Israel time", () => {
   it("finds the functions to check", () => {
     // An empty scan would pass every assertion below.
     expect(entries.length).toBeGreaterThan(5);
+    expect(entries.map((e) => relative(REPO_ROOT, e.path))).toContain("supabase/functions/submit-claim/handler.ts");
   });
 
   it("names the zone on every date it formats", () => {

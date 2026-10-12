@@ -124,3 +124,37 @@ export function findObjectLiteralCalls(pattern: RegExp, files = sourceFiles()): 
   }
   return out;
 }
+
+/** Supabase Edge Function handlers: supabase/functions/<name>/handler.ts, skipping `_shared`. */
+export function edgeFunctionFiles(): string[] {
+  const root = join(REPO_ROOT, "supabase/functions");
+  const out: string[] = [];
+  let names: string[] = [];
+  try {
+    names = readdirSync(root);
+  } catch {
+    return out;
+  }
+  for (const name of names) {
+    if (name.startsWith("_")) continue;
+    const handler = join(root, name, "handler.ts");
+    try {
+      if (statSync(handler).isFile()) out.push(handler);
+    } catch {
+      /* not a function directory */
+    }
+  }
+  return out.sort();
+}
+
+/**
+ * A handler and the shared modules it imports, as one text — what a scan of
+ * "this function's source" means once helpers stop being duplicated into it.
+ */
+export function edgeSource(handler: string): string {
+  const src = read(handler);
+  const shared = [...src.matchAll(/from '\.\.\/_shared\/([a-z-]+\.ts)'/g)].map((m) =>
+    read(join(REPO_ROOT, "supabase/functions/_shared", m[1])),
+  );
+  return [src, ...shared].join("\n");
+}

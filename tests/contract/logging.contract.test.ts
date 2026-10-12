@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { REPO_ROOT } from "../helpers/entity-schema";
-import { backendFiles, read, rel } from "../helpers/source-scan";
+import { backendFiles, edgeFunctionFiles, edgeSource, read, rel } from "../helpers/source-scan";
 
 /**
  * What the backend is allowed to write down about a request.
@@ -35,6 +35,11 @@ const sources = Object.fromEntries(
   functionNames.map((name) => [name, read(join(FUNCTIONS_DIR, name, "entry.ts"))]),
 );
 
+/** Supabase Edge Functions, keyed by directory name, each with the shared modules it imports. */
+const edgeNames = edgeFunctionFiles().map((f) => f.split("/").at(-2)!);
+for (const f of edgeFunctionFiles()) sources[f.split("/").at(-2)!] = edgeSource(f);
+const allNames = [...functionNames, ...edgeNames];
+
 /** Every `log(...)` call in a file, as source text. */
 function logCalls(src: string): string[] {
   const calls: string[] = [];
@@ -56,11 +61,11 @@ function logCalls(src: string): string[] {
 }
 
 describe("every backend function keeps a diary", () => {
-  it.each(functionNames)("%s emits a structured line", (name) => {
+  it.each(allNames)("%s emits a structured line", (name) => {
     expect(sources[name], `${name} never logs`).toMatch(/\blog\('(info|warn|error)'/);
   });
 
-  it.each(functionNames)("%s opens and closes the request", (name) => {
+  it.each(allNames)("%s opens and closes the request", (name) => {
     // A start with no end is an invocation that vanished, and the difference
     // between "it was never called" and "it hung" is most of a diagnosis.
     expect(sources[name]).toMatch(/log\('info', 'request\.start'/);
@@ -69,7 +74,7 @@ describe("every backend function keeps a diary", () => {
     );
   });
 
-  it.each(functionNames)("%s correlates its lines with one id", (name) => {
+  it.each(allNames)("%s correlates its lines with one id", (name) => {
     // Without this a busy minute is an interleaving of several enquiries with
     // no way to tell which line belongs to which.
     expect(sources[name]).toMatch(/const rid = newRequestId\(\)/);
@@ -78,7 +83,7 @@ describe("every backend function keeps a diary", () => {
     }
   });
 
-  it.each(functionNames)("%s reports how long it took", (name) => {
+  it.each(allNames)("%s reports how long it took", (name) => {
     expect(sources[name]).toMatch(/Date\.now\(\) - startedAt|Date\.now\(\) - started/);
   });
 
@@ -98,10 +103,8 @@ describe("every backend function keeps a diary", () => {
   });
 
   it("names the function it came from, and never the same name twice", () => {
-    const declared = functionNames.map(
-      (n) => sources[n].match(/const FN = '([^']+)'/)?.[1] ?? null,
-    );
-    expect(declared).toEqual(functionNames);
+    const declared = allNames.map((n) => sources[n].match(/const FN = '([^']+)'/)?.[1] ?? null);
+    expect(declared).toEqual(allNames);
   });
 });
 
@@ -128,7 +131,7 @@ describe("what the diary may not contain", () => {
     "consentAt",
   ];
 
-  it.each(functionNames)("%s logs no personal field", (name) => {
+  it.each(allNames)("%s logs no personal field", (name) => {
     for (const call of logCalls(sources[name])) {
       for (const field of FORBIDDEN) {
         // Matches `field:` or a shorthand `field` between delimiters — the two
@@ -141,7 +144,7 @@ describe("what the diary may not contain", () => {
     }
   });
 
-  it.each(functionNames)("%s logs a recipient's role rather than the address", (name) => {
+  it.each(allNames)("%s logs a recipient's role rather than the address", (name) => {
     // One of the recipients is the visitor. `role` says which copy failed
     // without putting anybody's address in a file that outlives them.
     const calls = logCalls(sources[name]).filter((c) => c.includes("mail."));
@@ -163,7 +166,7 @@ describe("what the diary may not contain", () => {
   it("truncates whatever an error message turned out to contain", () => {
     // A provider's error text is not ours and is not bounded: Resend has
     // returned the recipient list, and a stack can carry a URL with a token.
-    for (const name of functionNames) {
+    for (const name of allNames) {
       for (const call of logCalls(sources[name])) {
         if (!call.includes("err:")) continue;
         expect(call, `${name}: an unbounded error in a log line`).toMatch(/\.slice\(0, \d+\)/);
@@ -391,7 +394,7 @@ describe("the publish gate chooses a credential", () => {
  * Eight characters turn that into one search.
  */
 describe("a failure you can look up", () => {
-  const fns = backendFiles();
+  const fns = [...backendFiles(), ...edgeFunctionFiles()];
 
   it("returns the request id with every answer", () => {
     for (const f of fns) {
