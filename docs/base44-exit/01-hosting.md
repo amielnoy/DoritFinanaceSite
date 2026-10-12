@@ -1,6 +1,7 @@
 # Step 1 — hosting → Vercel: what is ready, and what is not
 
-Probed 2026-10-05 against both live copies. Nothing was changed.
+Probed 2026-10-05 against both live copies. Nothing was changed. Statuses
+re-measured 2026-10-12; the 2026-10-05 measurements are kept below as history.
 
 The runbook is already in `README.md` under *Moving production to the custom
 domain*, and the repo side is already written and inert. This records which of
@@ -13,13 +14,13 @@ was not known when the step was planned.
 
 | README step | State | Who |
 |---|---|---|
-| 0 · only CI promotes production | `vercel.json` sets `git.deploymentEnabled.main: false`; needs one dashboard confirmation | you |
-| 1 · point DNS at Vercel | **half done** (2026-10-06) — both domains are added and verified in Vercel; the DNS records are requested from DTNT and not yet applied, so the names still do not resolve | DTNT |
+| 0 · only CI promotes production | **confirmed** (2026-10-12) — the last six pushes to `main` each made exactly one production deployment, source `cli` | — |
+| 1 · point DNS at Vercel | **done** (2026-10-11) — DTNT applied the records; apex `200`, `www` `308` to it, valid certificates | — |
 | 2 · production out from behind login | **done** — the Vercel production URL answers `200` anonymously | — |
-| 3 · the site answers, including `/api/*` | **verified** on `dorit-finance-site.vercel.app` | — |
-| 4 · set `VITE_SITE_URL` in both builders | **not done**, correctly — see below | you |
+| 3 · the site answers, including `/api/*` | **verified** on `govari-fin.co.il` (2026-10-12): `submitLead` returns its own `400` guard | — |
+| 4 · set `VITE_SITE_URL` in both builders | **Vercel done** (2026-10-11); **Base44 open** — its copy still names itself in JSON-LD and robots.txt | you |
 
-### What was measured
+### What was measured on 2026-10-05
 
 ```
 dorit-finance-site.vercel.app/            200   cache-control: no-cache
@@ -32,11 +33,11 @@ That `400` is the good answer: it is `submitLead`'s own guard rejecting a body
 with no name and no phone. The rewrite forwarded the request to Base44 and the
 backend replied. **Step 3 is proven** — the only thing left for it is the domain.
 
-`VITE_SITE_URL` being unset is right for today. The Vercel copy declares
-`safe-arch-plan.base44.app` as canonical, which is true while Base44 is
-production and keeps the two copies from competing. It is set *last*, per the
+At the time, `VITE_SITE_URL` being unset was right. The Vercel copy declared
+`safe-arch-plan.base44.app` as canonical, which was true while Base44 was
+production and kept the two copies from competing. It was set *last*, per the
 runbook, because a sitemap advertising a host that does not resolve is worse
-than one pointing at the old site.
+than one pointing at the old site. It has been set on Vercel since 2026-10-11.
 
 ---
 
@@ -67,8 +68,8 @@ The two JSON-LD blocks are correct in both, because the build plugin rewrites
 static files. It is exactly the two tags that are patched at runtime which are
 empty in the document.
 
-So production today is the copy that is bad for search, and the staging copy is
-the good one. Moving hosting does not merely fix the cache headers; it is the
+So production on 2026-10-05 was the copy that is bad for search, and the staging
+copy was the good one. Since 2026-10-11 the prerendered Vercel copy is production. Moving hosting does not merely fix the cache headers; it is the
 difference between a crawler seeing a page and seeing a shell.
 
 ### Why not simply prerender on Base44
@@ -97,36 +98,37 @@ A      @    64.29.17.1
 CNAME  www  30fa16059da418c7.vercel-dns-017.com.
 ```
 
-Not yet applied, so the measurement above (`ENOTFOUND`) still stands. Re-run it
-once DTNT confirms, and only then move to step 2's check and step 4.
+Applied by DTNT on 2026-10-11, so the `ENOTFOUND` measurement above no longer
+holds. Both hosts resolve to Vercel and serve valid Let's Encrypt certificates.
+The apex answers `200`, and `www` answers `308` to it.
 
-**Two oddities on the Vercel project to resolve:**
+**The two oddities on the Vercel project were removed on 2026-10-12:**
 
-- `mail.govari-fin.co.il` is attached to it. It was meant for Resend sending, not
-  for the website; a web project should not answer on a mail subdomain, and the
-  Resend records belong at the registrar, not here.
-- `dorit-govari-fin.co.il` is attached to it. Dorit asked DTNT for `govari.co.il`
-  and `dorit-govari.co.il`, and neither is registered, so this is not a domain
-  she asked for. Find out where it came from before keeping it.
+- `mail.govari-fin.co.il` was meant for Resend sending, not for the website. It
+  never resolved, and Resend's records (`resend._domainkey.mail`, `send.mail`)
+  live in DTNT's DNS, so detaching it from the project changed nothing for mail.
+- `dorit-govari-fin.co.il` was never registered. Dorit had asked DTNT for
+  `govari.co.il` and `dorit-govari.co.il`, which are separate domains and still
+  open: `dorit-govari.co.il` does not exist, and `govari.co.il` is registered
+  but on Cloudflare nameservers, not DTNT's.
 
 ---
 
 ## What only you can do
 
-1. **Confirm in the Vercel dashboard** that a push to `main` produces exactly one
-   deployment, and that it is the workflow's. `vercel.json` already disables the
-   Git integration for `main` and `builder`; this is confirming it took effect.
-2. **Add `govari-fin.co.il` and `www` to the Vercel project** and set the records
-   at the registrar. (Added and verified on 2026-10-06; the records are with DTNT,
-   see above.) The domain exists — it has MX records pointing at Microsoft
-   365 — so this is adding web records beside mail, not registering anything.
-   Wait for both to resolve.
+1. ~~**Confirm in the Vercel dashboard** that a push to `main` produces exactly one
+   deployment, and that it is the workflow's.~~ Confirmed 2026-10-12 from the
+   deployment list.
+2. ~~**Add `govari-fin.co.il` and `www` to the Vercel project** and set the records
+   at the registrar.~~ Done 2026-10-11.
 3. **Set `VITE_SITE_URL`** to the canonical origin, in **both** builders: the
-   Vercel project's Production scope and Base44's app settings. The second half
-   is the one that is easy to forget, and without it the copy Base44 keeps
-   serving goes on declaring itself canonical and competes with the real site.
+   Vercel project's Production scope and Base44's app settings. The Vercel half
+   is done. The Base44 half is still open: it is the one that is easy to forget,
+   and without it the copy Base44 keeps serving goes on declaring itself canonical
+   and competes with the real site. It is set in the Base44 dashboard only, then
+   Publish.
 
-Everything in the repo is done and waits for those.
+Everything in the repo is done; only the Base44 setting remains.
 
 ---
 
