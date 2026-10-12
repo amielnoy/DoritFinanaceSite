@@ -27,7 +27,7 @@ export const MAX_ICS_BYTES = 20_000;
 const utc = (d: Date): string => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 
 const text = (s: string): string =>
-  s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r\n|\r|\n/g, '\\n');
 
 /** A parameter value, quoted: a display name may hold a comma or a colon. */
 const param = (s: string): string => `"${s.replace(/"/g, "'")}"`;

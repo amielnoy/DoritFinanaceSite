@@ -35,6 +35,11 @@ describe("buildInvitation", () => {
     expect(ics).toContain("DESCRIPTION:שם: רונית מזרחי\\nטלפון: 0536667788\\nתחום ייעוץ: פנסיה\\, גמל והשתלמות\\; ביטוח בריאות משלים");
   });
 
+  it("turns a lone carriage return into a line break too", () => {
+    const ics = unfold(buildInvitation({ ...invite, summary: "א\rב" }));
+    expect(ics).toContain("\r\nSUMMARY:א\\nב\r\n");
+  });
+
   it("folds every line at 75 octets without splitting a Hebrew character", () => {
     const raw = buildInvitation({ ...invite, description: "דורית ".repeat(80) });
     for (const line of raw.split("\r\n")) {
