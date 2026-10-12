@@ -1,7 +1,8 @@
 import type {
+  SupabaseLeadTableClient,
   SupabaseQuery,
   SupabaseReadResult,
-  SupabaseTableClient,
+  SupabaseWriteQuery,
 } from "@/services/supabase/SupabaseTableClient";
 
 export type Call = [method: string, ...args: unknown[]];
@@ -14,7 +15,10 @@ export type Call = [method: string, ...args: unknown[]];
  * returns the right *shape* either way, and only the recorded `eq` tells them
  * apart.
  */
-export function tableFake(result: SupabaseReadResult): { client: SupabaseTableClient; calls: Call[] } {
+export function tableFake(
+  result: SupabaseReadResult,
+  writeResult: SupabaseReadResult = result,
+): { client: SupabaseLeadTableClient; calls: Call[] } {
   const calls: Call[] = [];
   const query: SupabaseQuery = {
     eq(column, value) {
@@ -33,13 +37,32 @@ export function tableFake(result: SupabaseReadResult): { client: SupabaseTableCl
       return Promise.resolve(result).then(onFulfilled, onRejected);
     },
   };
-  const client: SupabaseTableClient = {
+  const write: SupabaseWriteQuery = {
+    eq(column, value) {
+      calls.push(["eq", column, value]);
+      return {
+        select(columns) {
+          calls.push(["select", columns]);
+          return { then: (onFulfilled, onRejected) => Promise.resolve(writeResult).then(onFulfilled, onRejected) };
+        },
+      };
+    },
+  };
+  const client: SupabaseLeadTableClient = {
     from(table) {
       calls.push(["from", table]);
       return {
         select(columns) {
           calls.push(["select", columns]);
           return query;
+        },
+        update(values) {
+          calls.push(["update", values]);
+          return write;
+        },
+        delete() {
+          calls.push(["delete"]);
+          return write;
         },
       };
     },

@@ -16,6 +16,20 @@ export interface SupabaseTableClient {
   from(table: string): { select(columns: string): SupabaseQuery };
 }
 
+/** An update or delete narrowed to one row, asking for what it changed. */
+export interface SupabaseWriteQuery {
+  eq(column: string, value: unknown): { select(columns: string): PromiseLike<SupabaseReadResult> };
+}
+
+/** The table client with the two writes the lead admin makes. */
+export interface SupabaseLeadTableClient extends SupabaseTableClient {
+  from(table: string): {
+    select(columns: string): SupabaseQuery;
+    update(values: Record<string, unknown>): SupabaseWriteQuery;
+    delete(): SupabaseWriteQuery;
+  };
+}
+
 /**
  * Await a read and hand back its rows, or throw.
  *
