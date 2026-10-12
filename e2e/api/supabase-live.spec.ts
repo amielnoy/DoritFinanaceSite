@@ -15,6 +15,9 @@ import { expect, test, test_step } from "../fixtures/app";
  * CI's environment, because the bundle is what a visitor runs; a correct value
  * in CI next to a wrong one baked into the build is exactly the case to catch.
  * Only public reads are made — what any anonymous visitor's browser does.
+ *
+ * It also asks `submit-claim` an empty question, which proves the Edge Function
+ * is deployed and allows the site's origin without storing anything.
  */
 const LIVE_URL = process.env.E2E_LIVE_API_URL;
 
@@ -52,6 +55,21 @@ test.describe("Live Supabase, with the deployed bundle's key (opt-in)", () => {
     await test_step("sign-in's endpoint accepts it", async () => {
       const res = await supabase.get("/auth/v1/settings");
       expect(res.status(), await res.text()).toBe(200);
+    });
+
+    await test_step("the claim function is deployed and answers the site", async () => {
+      // An empty claim: refused for want of a name and phone, so nothing is
+      // stored and nobody is mailed — but only a deployed, reachable function
+      // that allows this origin answers it this way.
+      const origin = new URL(LIVE_URL!).origin;
+      const res = await supabase.post("/functions/v1/submit-claim", {
+        data: {},
+        headers: { Origin: origin, Authorization: `Bearer ${key}` },
+      });
+      const body = (await res.json().catch(() => ({}))) as { rid?: string };
+      expect(res.status(), `submit-claim: ${JSON.stringify(body)}`).toBe(400);
+      expect(body.rid, "the answer carries no rid").toBeTruthy();
+      expect(res.headers()["access-control-allow-origin"], "the site's origin is not allowed").toBe(origin);
     });
 
     await supabase.dispose();
