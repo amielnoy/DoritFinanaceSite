@@ -864,6 +864,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     for (const [src, name] of [
       [submitLead, "submitLead"],
       [consultation, "createConsultationEvent"],
+      [read(join(REPO_ROOT, "supabase/functions/submit-lead/lead.js")), "submit-lead (Edge)"],
     ] as const) {
       const invited = addresses(src, "const CALENDAR_ATTENDEES = [", name);
       // Nobody in the diary who is not on the enquiry.
@@ -2076,7 +2077,7 @@ describe("the guards on the no-sign-in functions", () => {
   });
 
   it("checks the address and the daily limit before every visitor confirmation", () => {
-    for (const [name, src] of [["submitLead", submitLead], ["submitClaim", submitClaim], ["submit-claim", edgeClaim]]) {
+    for (const [name, src] of [["submitLead", submitLead], ["submitClaim", submitClaim], ["submit-claim", edgeClaim], ["submit-lead", read(join(REPO_ROOT, "supabase/functions/submit-lead/handler.ts"))]]) {
       // The send's own property line, not the log lines that mention the role.
       const at = src.search(/role: 'visitor',\s*\n/);
       expect(at, `${name} sends no visitor confirmation`).toBeGreaterThan(-1);
