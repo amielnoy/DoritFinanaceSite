@@ -67,4 +67,32 @@ do $$ begin
   if (select count(*) from public.enquiries_for('   ')) <> 0 then raise exception 'a blank address matched'; end if;
 end $$;
 
+-- ── a booking for a lead that exists only in Supabase ──────────────────────
+reset role;
+insert into public.leads (id, name, phone, email, source, status)
+values ('00000000-0000-4000-8000-0000000000c1', 'רק סופבייס', '0500000001', 'only-supabase@example.test', 'interview', 'new');
+insert into public.meetings (lead_id, scheduled_at, calendar_status)
+values ('00000000-0000-4000-8000-0000000000c1', '2026-11-01 10:00+02', 'אירוע נוצר ✓ (google)');
+
+do $$ begin
+  if not exists (
+    select 1 from public.enquiries_for('only-supabase@example.test')
+     where scheduled_at = '2026-11-01 10:00+02' and in_calendar
+  ) then
+    raise exception 'a Supabase-only lead''s booking does not reach the personal area';
+  end if;
+end $$;
+
+-- ── Base44's mirror still writes by lead_base44_id alone ───────────────────
+insert into public.leads (id, base44_id, name, phone, email, source, status)
+values ('00000000-0000-4000-8000-0000000000c2', 'b44-check-1', 'מבייס44', '0500000002', 'b44@example.test', 'consultation', 'new');
+insert into public.meetings (lead_base44_id, topic) values ('b44-check-1', 'פנסיה');
+
+do $$ begin
+  if (select lead_id from public.meetings where lead_base44_id = 'b44-check-1')
+       is distinct from '00000000-0000-4000-8000-0000000000c2' then
+    raise exception 'the trigger did not fill lead_id from lead_base44_id';
+  end if;
+end $$;
+
 rollback;
