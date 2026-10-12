@@ -396,3 +396,6 @@ verify_jwt = false
 # answers every request, with the contact details even when it fails.
 [functions.escalate-to-human]
 verify_jwt = false
+
+[functions.log-support-chat]
+verify_jwt = false

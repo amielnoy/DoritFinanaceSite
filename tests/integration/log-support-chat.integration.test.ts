@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { invokeFunction, MAILER_URL } from "../helpers/base44-function";
+import { invokeEdge } from "../helpers/edge-function";
 
 /**
  * `logSupportChat`, executed.
@@ -14,9 +15,53 @@ import { invokeFunction, MAILER_URL } from "../helpers/base44-function";
  * the tests below are mostly about restraint: what gets stripped before it is
  * written, how much is kept, and the fact that a failed write is never allowed
  * to become the visitor's problem.
+ *
+ * Two implementations answer these cases while both are deployed: Base44's
+ * `logSupportChat` and its Supabase Edge port `log-support-chat`. A case that
+ * holds for one must hold for the other; what only the port does is at the end.
  */
 
 const ENV = { MAILER_URL, MAILER_TOKEN: "test-only-token", SHEET_ID: "sheet-1" };
+
+interface Outcome {
+  status: number;
+  json: Record<string, unknown>;
+  /** The sheet appends the function made, as the tab and the cells it sent. */
+  rows: { tab: string; row: string[] }[];
+  emails: unknown[];
+  leads: unknown[];
+}
+interface Knobs {
+  /** The spreadsheet is not configured. */
+  noSheet?: boolean;
+  /** The sheet append is refused with a 500. */
+  failSheet?: boolean;
+}
+
+const IMPLEMENTATIONS = [
+  {
+    label: "Base44 logSupportChat",
+    async run(body: unknown, k: Knobs = {}): Promise<Outcome> {
+      const env = k.noSheet ? { MAILER_URL, MAILER_TOKEN: "test-only-token" } : ENV;
+      const r = await invokeFunction("logSupportChat", body, { env, ...(k.failSheet ? { fetchStatus: 500 } : {}) });
+      const rows = r.callsTo("sheets.googleapis.com").map((c) => ({
+        tab: /values\/([^!]+)!A:G/.exec(decodeURIComponent(c.url))?.[1] ?? "",
+        row: (c.body as { values: string[][] }).values[0],
+      }));
+      return { status: r.status, json: r.json, rows, emails: r.emails, leads: r.leads };
+    },
+  },
+  {
+    label: "Edge log-support-chat",
+    async run(body: unknown, k: Knobs = {}): Promise<Outcome> {
+      const r = await invokeEdge("log-support-chat", body, {
+        ...(k.noSheet ? { envPatch: { SHEET_ID: null } } : {}),
+        ...(k.failSheet ? { failGoogle: "sheets" as const } : {}),
+      });
+      return { status: r.status, json: r.json, rows: r.sheetRows as Outcome["rows"], emails: r.emails, leads: r.leads };
+    },
+  },
+];
 
 const chat = (fields: Record<string, unknown> = {}) => ({
   channel: "site",
@@ -27,12 +72,12 @@ const chat = (fields: Record<string, unknown> = {}) => ({
   ...fields,
 });
 
-describe("logSupportChat — the row", () => {
+describe.each(IMPLEMENTATIONS)("$label — the row", ({ run }) => {
   it("writes the conversation to the support tab", async () => {
-    const run = await invokeFunction("logSupportChat", chat(), { env: ENV });
-    const [append] = run.callsTo("sheets.googleapis.com");
-    expect(decodeURIComponent(append.url)).toContain("Support!A:G");
-    expect((append.body as { values: string[][] }).values[0].slice(1)).toEqual([
+    const r = await run(chat());
+    const [append] = r.rows;
+    expect(append.tab).toBe("Support");
+    expect(append.row.slice(1)).toEqual([
       "site",
       "",
       "דמי ניהול",
@@ -53,50 +98,37 @@ describe("logSupportChat — the row", () => {
       "made up by the model": "לא ידוע",
     };
     for (const [outcome, expected] of Object.entries(outcomes)) {
-      const run = await invokeFunction("logSupportChat", chat({ outcome }), { env: ENV });
-      const [append] = run.callsTo("sheets.googleapis.com");
-      expect((append.body as { values: string[][] }).values[0][4], outcome).toBe(expected);
+      const r = await run(chat({ outcome }));
+      expect(r.rows[0].row[4], outcome).toBe(expected);
     }
   });
 
   it("keeps the WhatsApp number in the same shape the contact list uses", async () => {
     // Both tabs are keyed on a phone number, and a row that cannot be matched
     // to the contact it belongs to is a row nobody can follow up.
-    const run = await invokeFunction(
-      "logSupportChat",
-      chat({ channel: "whatsapp", phone: "972501234567" }),
-      { env: ENV },
-    );
-    const [append] = run.callsTo("sheets.googleapis.com");
+    const r = await run(chat({ channel: "whatsapp", phone: "972501234567" }));
     // `'` forces Sheets to keep this as text; see the note in `appendEventRow`.
     // Without it the leading zero is lost to numeric coercion.
-    expect((append.body as { values: string[][] }).values[0][2]).toBe("'0501234567");
+    expect(r.rows[0].row[2]).toBe("'0501234567");
   });
 
   it("leaves the number empty for the site chat, which has none", async () => {
-    const run = await invokeFunction("logSupportChat", chat(), { env: ENV });
-    const [append] = run.callsTo("sheets.googleapis.com");
-    expect((append.body as { values: string[][] }).values[0][2]).toBe("");
+    const r = await run(chat());
+    expect(r.rows[0].row[2]).toBe("");
   });
 
   it("falls back to the site channel rather than storing what it was told", async () => {
-    const run = await invokeFunction("logSupportChat", chat({ channel: "sms" }), { env: ENV });
-    const [append] = run.callsTo("sheets.googleapis.com");
-    expect((append.body as { values: string[][] }).values[0][1]).toBe("site");
+    const r = await run(chat({ channel: "sms" }));
+    expect(r.rows[0].row[1]).toBe("site");
   });
 });
 
-describe("logSupportChat — restraint", () => {
+describe.each(IMPLEMENTATIONS)("$label — restraint", ({ run }) => {
   it("strips identifiers out of the transcript", async () => {
     // Rule 3 says the agent must not repeat sensitive data back. This is the
     // same rule applied to the copy nobody reads until months later.
-    const run = await invokeFunction(
-      "logSupportChat",
-      chat({ transcript: 'שלח ת"ז 123456789 ומספר פוליסה 4580111122223333' }),
-      { env: ENV },
-    );
-    const [append] = run.callsTo("sheets.googleapis.com");
-    const row = (append.body as { values: string[][] }).values[0][6];
+    const r = await run(chat({ transcript: 'שלח ת"ז 123456789 ומספר פוליסה 4580111122223333' }));
+    const row = r.rows[0].row[6];
     expect(row).not.toContain("123456789");
     expect(row).not.toContain("4580111122223333");
   });
@@ -105,52 +137,48 @@ describe("logSupportChat — restraint", () => {
     // A cell holds far more than this, and the cap is `redact`'s own — the
     // limit is proportionality rather than storage: a support chat kept in
     // full, forever, collects more than the stated purpose needs.
-    const run = await invokeFunction(
-      "logSupportChat",
-      chat({ transcript: "א".repeat(9000) }),
-      { env: ENV },
-    );
-    const [append] = run.callsTo("sheets.googleapis.com");
-    expect((append.body as { values: string[][] }).values[0][6]).toHaveLength(2000);
+    const r = await run(chat({ transcript: "א".repeat(9000) }));
+    expect(r.rows[0].row[6]).toHaveLength(2000);
   });
 
   it("writes nothing when there is nothing to write", async () => {
-    const run = await invokeFunction(
-      "logSupportChat",
-      { channel: "site", outcome: "abandoned" },
-      { env: ENV },
-    );
-    expect(run.status).toBe(400);
-    expect(run.callsTo("sheets.googleapis.com")).toHaveLength(0);
+    const r = await run({ channel: "site", outcome: "abandoned" });
+    expect(r.status).toBe(400);
+    expect(r.rows).toHaveLength(0);
   });
 
   it("sends no mail and creates no record", async () => {
-    const run = await invokeFunction("logSupportChat", chat(), { env: ENV });
-    expect(run.emails).toHaveLength(0);
-    expect(run.leads).toHaveLength(0);
+    const r = await run(chat());
+    expect(r.emails).toHaveLength(0);
+    expect(r.leads).toHaveLength(0);
   });
 });
 
-describe("logSupportChat — failure", () => {
+describe.each(IMPLEMENTATIONS)("$label — failure", ({ run }) => {
   it("never makes a failed write the visitor's problem", async () => {
     // The agent is told not to report this call. So it has to answer in a way
     // that gives it nothing to report: the conversation already happened.
-    const run = await invokeFunction("logSupportChat", chat(), { env: ENV, fetchStatus: 500 });
-    expect(run.status).toBe(200);
-    expect(run.json.ok).toBe(true);
-    expect(run.json.sheet).toBe("נכשל");
-    expect(run.json.warnings).toContain("sheet_append_failed (sheets 500)");
+    const r = await run(chat(), { failSheet: true });
+    expect(r.status).toBe(200);
+    expect(r.json.ok).toBe(true);
+    expect(r.json.sheet).toBe("נכשל");
+    // The reason in brackets is the sheet client's own wording, which differs
+    // between the two (`sheets 500` / `sheets_http_500`); the label does not.
+    expect(r.json.warnings).toEqual([expect.stringMatching(/^sheet_append_failed \(sheets[ _](http_)?500\)$/)]);
   });
 
   it("skips quietly when no spreadsheet is configured", async () => {
-    const run = await invokeFunction("logSupportChat", chat(), {
-      env: { MAILER_URL, MAILER_TOKEN: "test-only-token" },
-    });
-    expect(run.status).toBe(200);
-    expect(run.json.sheet).toBe("לא מוגדר");
-    expect(run.callsTo("sheets.googleapis.com")).toHaveLength(0);
+    const r = await run(chat(), { noSheet: true });
+    expect(r.status).toBe(200);
+    expect(r.json.sheet).toBe("לא מוגדר");
+    expect(r.rows).toHaveLength(0);
   });
+});
 
+// Base44 only: the connector's authorisation is Base44's own state. The Edge
+// function has no connector — it signs in as the service account — so there is
+// nothing to leave unauthorised (spec: connectors off Base44).
+describe("Base44 logSupportChat — connector not authorised", () => {
   it("does not stall the chat when the connector is not authorised", async () => {
     const run = await invokeFunction("logSupportChat", chat(), {
       env: ENV,
@@ -158,5 +186,32 @@ describe("logSupportChat — failure", () => {
     });
     expect(run.status).toBe(200);
     expect(run.json.sheet).toBe("אין חיבור");
+  });
+});
+
+// What only the port does: the row goes in through the service account.
+describe("Edge log-support-chat — what only it does", () => {
+  it("appends to the Support tab through the service account", async () => {
+    const r = await invokeEdge("log-support-chat", {
+      channel: "site",
+      phone: "0501234567",
+      topic: "שאלה",
+      transcript: "שלום",
+      outcome: "answered",
+      messageCount: 3,
+    });
+    expect(r.json).toMatchObject({ ok: true });
+    expect(r.sheetRows).toEqual([{ tab: "Support", row: expect.arrayContaining(["site", "'0501234567", "שאלה"]) }]);
+  });
+
+  it("answers ok with a failed sheet when the service account cannot sign in", async () => {
+    const r = await invokeEdge("log-support-chat", { topic: "שאלה" }, { failGoogle: "token" });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, sheet: "נכשל" });
+  });
+
+  it("answers the preflight", async () => {
+    const r = await invokeEdge("log-support-chat", null, { method: "OPTIONS" });
+    expect(r.status).toBe(204);
   });
 });
