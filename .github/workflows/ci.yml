@@ -234,6 +234,15 @@ jobs:
       - name: Contract tests
         run: npm run test:contract
 
+      # The Edge Functions run on Deno and are outside tsconfig (src/** only);
+      # this is the one place their types are checked before a deploy.
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check the Edge Functions
+        run: deno check --no-config supabase/functions/*/index.ts
+
       # Runs the Base44 functions in-process against a recording client. They
       # are outside tsconfig and execute on Deno in production, so this is the
       # only place their behaviour — not their source — is checked.
@@ -459,13 +468,59 @@ jobs:
   # means every one of these jobs must have *succeeded* — this is the gate that
   # keeps a known-broken build off the client's site, and it is deliberately
   # the strictest one in the file. Staging still deploys; see deploy-vercel.
+  # ── Supabase Edge Functions ───────────────────────────────────────────────
+  # The backend the site calls for claims (and, piece by piece, the rest). On
+  # green main only — the same rule as the Base44 publish — and before either
+  # production goes out, so the site is never live ahead of the function it
+  # calls. The token is scoped to Edge Functions read-write on this one
+  # project; without it the job says so and skips, and the production smoke
+  # (e2e/api/supabase-live.spec.ts) then fails on the missing function.
+  deploy-supabase:
+    name: Deploy Supabase functions
+    runs-on: ubuntu-latest
+    needs: [build, test-node, test-e2e]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || inputs.deploy)
+    timeout-minutes: 10
+    env:
+      SUPABASE_PROJECT_REF: hjowdyiwjjrqceumkvgt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check deploy credentials
+        id: creds
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SUPABASE_ACCESS_TOKEN is not set — the Edge Functions were not deployed."
+          fi
+
+      - uses: supabase/setup-cli@v1
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          version: latest
+
+      # No function named: every directory under supabase/functions except
+      # `_shared`, with each one's verify_jwt from supabase/config.toml.
+      # --use-api bundles on Supabase's side, so the runner needs no Docker.
+      - name: Deploy
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api
+
   deploy:
     name: Publish to Base44
     outputs:
       published: ${{ steps.publish.outputs.published }}
       previous_asset: ${{ steps.before.outputs.asset }}
     runs-on: ubuntu-latest
-    needs: [build, test-node, test-e2e]
+    needs: [build, test-node, test-e2e, deploy-supabase]
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || inputs.deploy)
@@ -630,7 +685,7 @@ jobs:
   deploy-vercel:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
-    needs: [build, test-node, test-e2e]
+    needs: [build, test-node, test-e2e, deploy-supabase]
     outputs:
       url: ${{ steps.deploy.outputs.url }}
       deployed: ${{ steps.deploy.outputs.deployed }}
@@ -708,15 +763,17 @@ jobs:
         env:
           UNIT: ${{ needs.test-node.result }}
           E2E: ${{ needs.test-e2e.result }}
+          FUNCTIONS: ${{ needs.deploy-supabase.result }}
         run: |
           if [ "$GITHUB_REF" = "refs/heads/main" ] \
-            && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ]; then
+            && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ] \
+            && [ "$FUNCTIONS" = "success" ]; then
             echo "prod=--prod" >> "$GITHUB_OUTPUT"
             echo "env=production" >> "$GITHUB_OUTPUT"
             echo "kind=production" >> "$GITHUB_OUTPUT"
           else
             if [ "$GITHUB_REF" = "refs/heads/main" ]; then
-              echo "::warning::Tests are red (unit: ${UNIT}, e2e: ${E2E}) — deploying this as a preview instead of promoting it to production."
+              echo "::warning::Not promoting (unit: ${UNIT}, e2e: ${E2E}, functions: ${FUNCTIONS}) — deploying this as a preview instead of production."
             fi
             echo "prod=" >> "$GITHUB_OUTPUT"
             echo "env=preview" >> "$GITHUB_OUTPUT"

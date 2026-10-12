@@ -40,7 +40,7 @@ describe("production has one promoter", () => {
 
   it("keeps CI the thing that deploys", () => {
     expect(workflow).toContain("vercel deploy --prebuilt");
-    expect(workflow).toMatch(/deploy-vercel:[\s\S]*?needs: \[build, test-node, test-e2e\]/);
+    expect(workflow).toMatch(/deploy-vercel:[\s\S]*?needs: \[build, test-node, test-e2e, deploy-supabase\]/);
   });
 
   it("promotes to production only when the suites went green", () => {
@@ -311,5 +311,45 @@ describe("the Vercel build gets the real app id", () => {
 
   it("refuses to deploy a bundle that still names the placeholder", () => {
     expect(step).toMatch(/grep[^\n]*e2e-sanity-app[^\n]*\.vercel\/output/);
+  });
+});
+
+describe("Supabase Edge Functions deploy from green main, before production", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const job = workflow.slice(workflow.indexOf("  deploy-supabase:"), workflow.indexOf("\n  deploy:\n"));
+
+  it("exists, ahead of the Base44 publish", () => {
+    expect(workflow.indexOf("  deploy-supabase:")).toBeGreaterThan(-1);
+    expect(workflow.indexOf("  deploy-supabase:")).toBeLessThan(workflow.indexOf("\n  deploy:\n"));
+  });
+
+  it("runs only on main, only after the suites pass", () => {
+    expect(job).toContain("needs: [build, test-node, test-e2e]");
+    expect(job).toMatch(/if: >-\s*\n\s*github\.ref == 'refs\/heads\/main' &&/);
+    // No `!cancelled()` / `always()`: the implicit success() is the gate.
+    expect(job).not.toMatch(/!cancelled\(\)|always\(\)/);
+  });
+
+  it("deploys every function to this project, bundled by Supabase", () => {
+    expect(job).toContain("SUPABASE_PROJECT_REF: hjowdyiwjjrqceumkvgt");
+    expect(job).toMatch(/supabase functions deploy --project-ref "\$SUPABASE_PROJECT_REF" --use-api/);
+  });
+
+  it("skips with a notice rather than failing when the token is not set", () => {
+    expect(job).toMatch(/::notice::SUPABASE_ACCESS_TOKEN is not set/);
+    expect(job).toMatch(/ready=false/);
+  });
+
+  it("holds the Base44 publish until the functions are deployed", () => {
+    expect(workflow).toMatch(/\n  deploy:\n[\s\S]*?needs: \[build, test-node, test-e2e, deploy-supabase\]/);
+  });
+
+  it("promotes Vercel to production only once the functions are deployed", () => {
+    const step = workflow.slice(
+      workflow.indexOf("- name: Choose production or preview"),
+      workflow.indexOf("- name: Build for Vercel"),
+    );
+    expect(step).toContain("needs.deploy-supabase.result");
+    expect(step).toMatch(/\$E2E[\s\S]*?\$FUNCTIONS[\s\S]*?prod=--prod/);
   });
 });
