@@ -348,6 +348,8 @@ describe.each(IMPLEMENTATIONS)("$label — the public entry point's limits", ({ 
     expect(r.status).toBe(400);
     expect(r.leads).toHaveLength(0);
     expect(r.emails).toHaveLength(0);
+    // And no invitation: on Edge those are mail too, kept out of `emails` above.
+    expect(r.invitations ?? []).toEqual([]);
   });
 
   it("refuses a profile larger than any interview", async () => {
@@ -398,6 +400,8 @@ describe.each(IMPLEMENTATIONS)("$label — what survives a failure", ({ run, dow
     expect(r.status).toBe(400);
     expect(r.leads).toHaveLength(0);
     expect(r.emails).toHaveLength(0);
+    // And no invitation: on Edge those are mail too, kept out of `emails` above.
+    expect(r.invitations ?? []).toEqual([]);
   });
 
   it("refuses without a name", async () => {
@@ -411,6 +415,8 @@ describe.each(IMPLEMENTATIONS)("$label — what survives a failure", ({ run, dow
     const r = await run(consultation, { failLeadWrite: true });
     expect(r.status).toBe(500);
     expect(r.emails).toHaveLength(0);
+    // And no invitation: on Edge those are mail too, kept out of `emails` above.
+    expect(r.invitations ?? []).toEqual([]);
     expect(String(r.json.error)).toMatch(/לא הצלחנו לשמור/);
   });
 
@@ -1150,6 +1156,8 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
     // The point of the early save is the record, not a message: mailing on
     // everyone who starts answering would turn the inbox into noise.
     expect(r.emails).toHaveLength(0);
+    // And no invitation: on Edge those are mail too, kept out of `emails` above.
+    expect(r.invitations ?? []).toEqual([]);
   });
 
   it("keeps what was answered so far, so an abandoned interview is still useful", async () => {
@@ -1205,13 +1213,28 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
 
 
   it("does not adopt an interview that is too old to be this conversation", async () => {
+    // The same person in every other respect — name, phone, address, still
+    // partial — so the six-hour window is the only thing that can turn it away.
     const stale = {
-      id: "LEAD-OLD", phone: "0541112233", source: "interview", status: "partial",
+      id: "LEAD-OLD", name: "אורי לוי", phone: "0541112233", email: "", source: "interview", status: "partial",
       created_date: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
     };
     const r = await run({ ...partial, stage: "complete" }, { existingLeads: [stale] });
     expect(r.leadUpdates).toHaveLength(0);
     expect(r.leads).toHaveLength(1);
+  });
+
+  it("completes the newest of two open interviews", async () => {
+    // A rerun within the window joins the latest attempt, not the first.
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
+    const older = {
+      id: "LEAD-OLDER", name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
+      status: "partial", created_date: hoursAgo(2),
+    };
+    const newer = { ...older, id: "LEAD-NEWER", created_date: hoursAgo(1) };
+    const r = await run({ ...partial, stage: "complete" }, { existingLeads: [older, newer] });
+    expect(r.leadUpdates.map((u) => u.id)).toEqual(["LEAD-NEWER"]);
+    expect(r.leads).toHaveLength(0);
   });
 
   it("does not adopt another person's interview", async () => {
@@ -1589,6 +1612,8 @@ describe.each(IMPLEMENTATIONS)("$label — the row it appends to the sheet", ({ 
       track: "pension", profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
     }, { env: SHEET });
     expect(r.emails).toHaveLength(0);
+    // And no invitation: on Edge those are mail too, kept out of `emails` above.
+    expect(r.invitations ?? []).toEqual([]);
     expect(r.callsTo("sheets.googleapis.com")).toHaveLength(0);
     expect(r.leads, "the record itself is still written").toHaveLength(1);
   });

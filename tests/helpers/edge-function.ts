@@ -213,6 +213,11 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
           (!since || !at || new Date(at).getTime() >= new Date(since).getTime())
         );
       });
+      // `order=created_at.desc`, newest first, as PostgREST would answer it.
+      if (q.get("order") === "created_at.desc") {
+        const time = (l: Record<string, unknown>) => new Date(String(l.created_at ?? l.created_date ?? 0)).getTime();
+        rows.sort((a, b) => time(b) - time(a));
+      }
       return new Response(JSON.stringify(rows), { status: 200 });
     }
     if (u === `${SUPABASE_URL}/rest/v1/meetings?on_conflict=lead_id` && method === "POST") {
