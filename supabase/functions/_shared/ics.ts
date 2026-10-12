@@ -1,10 +1,10 @@
 /**
  * A meeting invitation (RFC 5545, METHOD:REQUEST) for one booked meeting.
  *
- * Dorit works in her Microsoft 365 Outlook calendar, and a Google service
+ * Dorit works in her Microsoft 365 desktop calendar, and a Google service
  * account cannot add attendees on a consumer calendar. So the event goes to
  * her Google calendar without attendees, and this file goes to each address
- * by mail; Outlook offers it as a meeting to accept. The UID is the Google
+ * by mail; her calendar client offers it as a meeting to accept. The UID is the Google
  * event's iCalUID, so both are one meeting. Times are UTC, which needs no
  * VTIMEZONE block.
  */
