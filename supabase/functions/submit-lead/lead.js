@@ -96,8 +96,14 @@ export const INVITE_ATTENDEES = [
   "amielnoy@outlook.com",
 ];
 
-/** כתובת השולח של האתר: מארגן ההזמנה, ולעולם לא אחד מהמוזמנים. */
-export const INVITE_ORGANIZER = "site@govari-fin.co.il";
+/** כתובת השולח של המערכת (MAIL_FROM של dorit-mailer): מארגן ההזמנה, ולעולם לא אחד מהמוזמנים. */
+export const INVITE_ORGANIZER = "notifications@mail.govari-fin.co.il";
+
+/**
+ * כשאירוע Google לא נוצר (אין GOOGLE_CALENDAR_ID, או שהקריאה נכשלה), ליומן
+ * Google של המפעיל מגיעה הפגישה בהזמנה בדואר. עם האירוע — אין הזמנה לכתובת הזו.
+ */
+export const INVITE_FALLBACK_GOOGLE = "amielnoy@gmail.com";
 
 // שני נמענים, שניהם מקבלים את הפנייה המלאה.
 //

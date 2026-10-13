@@ -419,10 +419,11 @@ not Dorit's) and `SHEET_ID` (the leads sheet), next to the `MAILER_URL` and
 share anything. A meeting arrives as an event in that Google calendar (no
 attendees) **and** as an `.ics` invitation by mail through `dorit-mailer` to
 `dorit@govari-fin.co.il` (her Outlook) and `amielnoy@outlook.com`, from
-`site@govari-fin.co.il`; none goes to the Gmail address, which already holds the
+`notifications@mail.govari-fin.co.il`; none goes to the Gmail address, which already holds the
 event. The invitations do not depend on the event: with `GOOGLE_CALENDAR_ID`
 unset, or the Google call failing (a `calendar_google_*` warning), they still go
-out, under a local `lead-<id>@govari-fin.co.il` UID instead of the event's.
+out, under a local `lead-<id>@govari-fin.co.il` UID instead of the event's; in that
+case `amielnoy@gmail.com` is invited too, so his Google calendar still gets the meeting.
 There is no Outlook or Google Docs step any more.
 Release order: apply `supabase/migrations/20261013000000_meetings_lead_id.sql` to
 the production database by hand after merge (CI deploys functions only) and before

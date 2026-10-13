@@ -490,10 +490,10 @@ Invitations independent of the Google event — `INT-INV-001..007`, in the Edge
 
 | ID | Title | Expected result |
 |---|---|---|
-| INT-INV-001 | "sends both with a local UID and a warning when the Google call fails; the lead is saved" | 200; one lead; `.ics` to Dorit and `amielnoy@outlook.com` with `UID:lead-<id>@govari-fin.co.il`; `calendar_google_failed`; ops mail `אירוע ביומן Google לא נוצר`, `נשלחו 2/2` |
-| INT-INV-002 | "sends both, with no Google request for the event, when GOOGLE_CALENDAR_ID is unset" | 2 invitations; no call to `/calendar/v3/calendars/` |
+| INT-INV-001 | "sends both with a local UID and a warning when the Google call fails; the lead is saved" | 200; one lead; `.ics` to Dorit, `amielnoy@outlook.com` and the Gmail fallback with `UID:lead-<id>@govari-fin.co.il`; `calendar_google_failed`; ops mail `אירוע ביומן Google לא נוצר`, `נשלחו 3/3` |
+| INT-INV-002 | "sends both, with no Google request for the event, when GOOGLE_CALENDAR_ID is unset" | 3 invitations (Gmail fallback included); no call to `/calendar/v3/calendars/` |
 | INT-INV-003 | "keeps the other invitation, says 1/2 and saves the lead when one invitation fails" | 200; lead saved; invitation to Dorit only; `נשלחו 1/2`; an `invite_failed` warning |
-| INT-INV-004 | "is organised by the site, never by an attendee" | ORGANIZER `site@govari-fin.co.il`, not an attendee |
+| INT-INV-004 | "is organised by the site, never by an attendee" | ORGANIZER `notifications@mail.govari-fin.co.il` (the mailer's From), not an attendee |
 | INT-INV-005..006 | "puts a 10:00 Israel slot at the right instant in %s" (2) | Summer `07:00Z`–`07:30Z`; winter `08:00Z`–`08:30Z` |
 | INT-INV-007 | "reports ready.google from the service account alone" | `ready.google: true` with `GOOGLE_CALENDAR_ID` unset |
 

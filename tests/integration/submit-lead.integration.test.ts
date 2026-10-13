@@ -2050,23 +2050,26 @@ describe("Edge submit-lead — what only it does", () => {
 
   describe("invitations do not depend on the Google event", () => {
     const icsOf = (r: Awaited<ReturnType<typeof invokeEdge>>) => r.emails.filter((e) => e.ics);
+    // The enquiry copy: with an invitation also going to Gmail, mailTo() would see two.
+    const opsText = (r: Awaited<ReturnType<typeof invokeEdge>>) => r.emails.find((e) => e.to === "amielnoy@gmail.com" && !e.ics)!.text;
 
     it("sends both with a local UID and a warning when the Google call fails; the lead is saved", async () => {
       const r = await invokeEdge("submit-lead", consultation, { failGoogle: "calendar" });
       expect(r.status).toBe(200);
       expect(r.leads).toHaveLength(1);
       const mails = icsOf(r);
-      expect(mails.map((m) => m.to).sort()).toEqual(["amielnoy@outlook.com", "dorit@govari-fin.co.il"]);
+      // The Google event is missing, so Gmail gets the meeting by invitation.
+      expect(mails.map((m) => m.to).sort()).toEqual(["amielnoy@gmail.com", "amielnoy@outlook.com", "dorit@govari-fin.co.il"]);
       for (const m of mails) expect(m.ics).toContain(`UID:lead-${r.leads[0].id}@govari-fin.co.il`);
       expect(r.json.warnings).toContain("calendar_google_failed");
-      expect(r.mailTo("amielnoy@gmail.com").text).toMatch(/אירוע ביומן Google לא נוצר/);
-      expect(r.mailTo("amielnoy@gmail.com").text).toMatch(/נשלחו 2\/2/);
+      expect(opsText(r)).toMatch(/אירוע ביומן Google לא נוצר/);
+      expect(opsText(r)).toMatch(/נשלחו 3\/3/);
     });
 
-    it("sends both, with no Google request for the event, when GOOGLE_CALENDAR_ID is unset", async () => {
+    it("sends all three, with no Google request for the event, when GOOGLE_CALENDAR_ID is unset", async () => {
       const r = await invokeEdge("submit-lead", consultation, { envPatch: { GOOGLE_CALENDAR_ID: null } });
       expect(r.status).toBe(200);
-      expect(icsOf(r)).toHaveLength(2);
+      expect(icsOf(r).map((m) => m.to).sort()).toEqual(["amielnoy@gmail.com", "amielnoy@outlook.com", "dorit@govari-fin.co.il"]);
       expect(r.callsTo("/calendar/v3/calendars/")).toEqual([]);
       expect(icsOf(r)[0].ics).toContain("UID:lead-");
     });
@@ -2076,16 +2079,17 @@ describe("Edge submit-lead — what only it does", () => {
       expect(r.status).toBe(200);
       expect(r.leads).toHaveLength(1);
       expect(icsOf(r).map((m) => m.to)).toEqual(["dorit@govari-fin.co.il"]);
-      expect(r.mailTo("amielnoy@gmail.com").text).toMatch(/נשלחו 1\/2/);
+      expect(opsText(r)).toMatch(/נשלחו 1\/2/);
+      expect(icsOf(r).some((m) => m.to === "amielnoy@gmail.com")).toBe(false);
       expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("invite_failed")));
     });
 
     it("is organised by the site, never by an attendee", async () => {
       const r = await invokeEdge("submit-lead", consultation, { failGoogle: "calendar" });
-      expect(icsOf(r)).toHaveLength(2);
+      expect(icsOf(r)).toHaveLength(3);
       for (const m of icsOf(r)) {
         const organizer = /ORGANIZER[^:]*:mailto:(\S+)/.exec(m.ics!.replace(/\r\n /g, ""))![1];
-        expect(organizer).toBe("site@govari-fin.co.il");
+        expect(organizer).toBe("notifications@mail.govari-fin.co.il");
         expect(["amielnoy@outlook.com", "dorit@govari-fin.co.il", "amielnoy@gmail.com"]).not.toContain(organizer);
       }
     });
@@ -2095,7 +2099,7 @@ describe("Edge submit-lead — what only it does", () => {
       ["winter, UTC+2", "2026-12-15T10:00", "DTSTART:20261215T080000Z", "DTEND:20261215T083000Z"],
     ])("puts a 10:00 Israel slot at the right instant in %s, on the local-UID path", async (_n, at, start, end) => {
       const r = await invokeEdge("submit-lead", { ...consultation, scheduledAt: at }, { failGoogle: "calendar" });
-      expect(icsOf(r)).toHaveLength(2);
+      expect(icsOf(r)).toHaveLength(3);
       for (const m of icsOf(r)) {
         expect(m.ics).toContain(start);
         expect(m.ics).toContain(end);
@@ -2124,7 +2128,7 @@ describe("Edge submit-lead — what only it does", () => {
     const r = await invokeEdge("submit-lead", { ...consultation, summary: notes, notes: notes.slice(0, 3_990) });
     expect(r.status).toBe(200);
     const invitations = r.emails.filter((e) => e.ics);
-    expect(invitations).toHaveLength(2);
+    expect(invitations).toHaveLength(2); // the Google event exists here
     const encoder = new TextEncoder();
     for (const mail of invitations) {
       expect(encoder.encode(mail.ics!).length, mail.to).toBeLessThan(20_000);
@@ -2187,13 +2191,14 @@ describe("Edge submit-lead — what only it does", () => {
 
   describe("submit-lead — when Google is not there", () => {
     for (const fail of ["token", "calendar", "sheets"] as const) {
-      it(`still saves and mails when the ${fail} call fails, with a warning${fail === "sheets" ? "" : " and both invitations still sent"}`, async () => {
+      it(`still saves and mails when the ${fail} call fails, with a warning${fail === "sheets" ? "" : " and the invitations still sent"}`, async () => {
         const r = await invokeEdge("submit-lead", consultation, { failGoogle: fail });
         expect(r.status).toBe(200);
         expect(r.leads).toHaveLength(1);
         expect(r.emails.map((e) => e.to)).toContain("dorit@govari-fin.co.il");
         expect(r.json.warnings.length).toBeGreaterThan(0);
-        expect(r.emails.filter((e) => e.ics)).toHaveLength(2);
+        // The sheet failing leaves the event, so Gmail needs no invitation.
+        expect(r.emails.filter((e) => e.ics)).toHaveLength(fail === "sheets" ? 2 : 3);
       });
     }
 

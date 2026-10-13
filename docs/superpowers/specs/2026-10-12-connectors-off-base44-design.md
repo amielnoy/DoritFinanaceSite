@@ -246,7 +246,7 @@ authorisations are revoked.
 ## Amendment 2026-10-13: invitations independent of the Google event
 
 - `GOOGLE_CALENDAR_ID` is now the operator's own Google calendar (amielnoy@gmail.com), shared with the service account; Dorit shares nothing. The event is written there without attendees, as before.
-- The `.ics` invitations no longer depend on that event. They go only to `dorit@govari-fin.co.il` and `amielnoy@outlook.com` (`INVITE_ATTENDEES`; `CALENDAR_ATTENDEES` is unchanged), organised by `site@govari-fin.co.il`, never by an attendee. None goes to the Gmail address, which holds the event.
+- The `.ics` invitations no longer depend on that event. They go only to `dorit@govari-fin.co.il` and `amielnoy@outlook.com` (`INVITE_ATTENDEES`; `CALENDAR_ATTENDEES` is unchanged), organised by `notifications@mail.govari-fin.co.il` (the mailer's own From, which keeps Outlook and Gmail from flagging it), never by an attendee. With the event created none goes to the Gmail address, which holds it; without the event (id unset, call failed or rejected) `INVITE_FALLBACK_GOOGLE` (amielnoy@gmail.com) is invited too and `invites` reads `נשלחו n/3`.
 - UID: the event's `iCalUID` when it was created, otherwise `lead-<leadId>@govari-fin.co.il`; times are the Asia/Jerusalem slot as UTC instants either way.
 - With the calendar id unset or the Google call failing, the invitations still go out and the failure is a `calendar_google_failed` / `_rejected` warning. A failed invitation is an `invite_failed` warning. Neither fails the lead.
 - The `calendar` field reads `אירוע נוצר ✓ (google) — <slot>` or `אירוע ביומן Google לא נוצר`; `invites` reads `נשלחו n/2`.

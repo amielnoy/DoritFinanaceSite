@@ -24,7 +24,7 @@ import { calendarConfigured, createCalendarEvent } from '../_shared/calendar.ts'
 import { appendSheetRow } from '../_shared/sheets.ts';
 import { buildInvitation } from '../_shared/ics.ts';
 import {
-  INTERVIEW_TRACKS, INVITE_ATTENDEES, INVITE_ORGANIZER, INTERVIEW_WINDOW_MS, LEAD_FIELD_LIMITS, NOTIFY_EMAILS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB,
+  INTERVIEW_TRACKS, INVITE_ATTENDEES, INVITE_FALLBACK_GOOGLE, INVITE_ORGANIZER, INTERVIEW_WINDOW_MS, LEAD_FIELD_LIMITS, NOTIFY_EMAILS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB,
   buildAgentBody, buildAgentHtml, buildClientText, buildInterviewProfile, buildLinksFooter, buildOpsFooter,
   clientMailFor, completenessLine, eventTypeFor, interviewCompleteness, israelInstant, profileValue,
   redact, sameInterviewee, subjectFor, tomorrowInIsrael, wallClock,
@@ -407,7 +407,9 @@ export async function handler(req: Request): Promise<Response> {
       const startAt = ev?.start ?? new Date(israelInstant(calStartIso) ?? Date.now());
       const endAt = ev?.end ?? new Date(startAt.getTime() + 30 * 60000);
       const uid = ev?.iCalUID ?? `lead-${leadId}@govari-fin.co.il`;
-      const sent = await Promise.all(INVITE_ATTENDEES.map(async (attendee: string) => {
+      // With no event, Gmail's calendar would hold nothing: it gets the invitation.
+      const invitees = ev ? INVITE_ATTENDEES : [...INVITE_ATTENDEES, INVITE_FALLBACK_GOOGLE];
+      const sent = await Promise.all(invitees.map(async (attendee: string) => {
         try {
           await sendMail(log, {
             to: attendee,
@@ -427,7 +429,7 @@ export async function handler(req: Request): Promise<Response> {
           return false;
         }
       }));
-      invites = `נשלחו ${sent.filter(Boolean).length}/${INVITE_ATTENDEES.length}`;
+      invites = `נשלחו ${sent.filter(Boolean).length}/${invitees.length}`;
     }
 
     // The outcome, written back onto the booking. `scheduled_at` is what was
