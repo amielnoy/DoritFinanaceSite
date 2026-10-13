@@ -507,6 +507,29 @@ that writes real slugs.
 | CTR-INOW-002 | "is a step of the Vercel deploy job, for production only" | The step is gated on `steps.target.outputs.env == 'production'` and runs `node scripts/indexnow.mjs` |
 | CTR-INOW-003 | "can never fail the deploy" | `continue-on-error: true`; the script has no non-zero `process.exit` / `exitCode` |
 
+### 4.10 The chat tables — `chat-schema.contract.test.ts`
+
+The chat function's records (`chat_conversations`, `chat_messages`, `chat_usage`,
+`chat_budget_alerts`) are written only by the `chat` Edge Function with the
+service role; an agency member or a platform admin reads their own agency's
+rows. These cases read the two migrations as text. `supabase/tests/chat_tables_check.sql`
+is the runtime counterpart: against a local database it asserts that anon and an
+outsider read nothing, that a member sees only their agency and an admin sees
+both, that an authenticated user can neither write a message nor call the purge,
+that `chat_month_usage` sums per model, that the purge removes exactly the
+expired conversation with its messages, and that deleting a lead deletes its
+transcript and usage rows.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHSCH-001 | "%s has row-level security on" (4 tables) | `enable row level security` for each of the four tables |
+| CTR-CHSCH-002 | "are closed to anon and to authenticated writes" | Table privileges revoked from anon and authenticated; `select` alone granted back; no insert/update/delete grant to authenticated |
+| CTR-CHSCH-003 | "let a member or an admin read their own agency's rows, and nobody else" | One `can_see(agency_id) or is_admin()` select policy on each of the three readable tables; none on `chat_budget_alerts` |
+| CTR-CHSCH-004 | "delete a transcript with its lead, and messages and usage with their conversation" | `lead_id` and the two conversation FKs are `on delete cascade` |
+| CTR-CHSCH-005 | "keep transcripts twelve months by default" | `delete_after` defaults to `now() + interval '12 months'` |
+| CTR-CHSCH-006 | "open the usage totals and the purge to the service role only" | `revoke execute` from public, anon, authenticated and `grant execute` to service_role on `chat_month_usage` and `purge_chat_conversations` |
+| CTR-CHSCH-007 | "schedule the purge nightly, after enabling pg_cron" | The schedule migration creates the extension and schedules `chat-purge-nightly` at `15 1 * * *` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
