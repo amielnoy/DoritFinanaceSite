@@ -1,12 +1,24 @@
-// Server-rendered HTML for a single blog post — what `scripts/prerender.mjs`
-// deliberately does not do (a post's content is live in Base44 and would go
-// stale the moment it is baked into a build), for the crawlers that cannot
-// run the JavaScript `useSeo` depends on to write the per-post head at all.
+// Server-side answers for an article address that has no prebuilt page.
 //
-// `vercel.json` rewrites a bot's request for `/blog/:id` here by User-Agent;
-// a human's request for the same path keeps hitting the SPA shell.
+// Two kinds of request arrive here, both by `vercel.json` rewrite:
 //
-// The id arrives as `?id=`, not as a `[id]` path segment: Vercel matches a
+//   - `/blog/<24 hex>` — a Base44 id, the form every article link had before
+//     slugs: bookmarks, search results, the agents' answers. From anyone, bot
+//     or person. Answered with a 301 to `/blog/<slug>`, so the address shared
+//     and indexed from now on is the readable one.
+//   - `/blog/<slug>` from a crawler, for an article published since the last
+//     build. Prebuilt articles are files (scripts/prerender.mjs), and Vercel
+//     serves a file before any rewrite, so only the not-yet-built ones get
+//     here. Answered with the SPA shell and the article's own <head>.
+//
+// Anything else — no such article, or a draft — is a 404 with noindex.
+//
+// The article is read from Supabase with the publishable key: the same
+// anonymous read the site makes, so row-level security returns published rows
+// only. And the same resolution (`SupabaseContentService.getArticle`: slug,
+// then Base44 id, then uuid) the page itself uses, so the two never disagree.
+//
+// The key arrives as `?id=`, not as a `[id]` path segment: Vercel matches a
 // dynamic function path only after vercel.json's rewrites, and its `/api/*`
 // and `/(.*)` catch-alls took every such request first — the function
 // deployed and was never once reached. A fixed path is a file on disk, which
@@ -19,10 +31,11 @@
 // route uses (via `useSeo`), so this can never describe a post differently
 // than the page a visitor who followed the link actually sees.
 
-import { createClient } from "@base44/sdk";
 import { renderSeoHtml, SITE_URL } from "../../src/lib/seo.js";
 import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "../../src/lib/blogSeo.js";
-import type { Article } from "../../src/services/ports.js";
+import { articlePath } from "../../src/lib/articlePath.js";
+import { RestTableClient } from "../../src/services/supabase/RestTableClient.js";
+import { SupabaseContentService } from "../../src/services/supabase/SupabaseContentService.js";
 
 /** The request/response surface this handler needs — Vercel's Node runtime
  *  supplies both regardless of which `@vercel/node` types are installed. */
@@ -36,21 +49,13 @@ interface OgResponse {
   send(body: string): void;
 }
 
-interface EntityReader {
-  entities: { BlogPost: { get(id: string): Promise<unknown> } };
-}
+const SUPABASE_URL = (process.env.VITE_SUPABASE_URL ?? "").trim();
+const SUPABASE_KEY = (process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "").trim();
 
-const APP_ID = process.env.VITE_BASE44_APP_ID;
-// Not `SITE_URL` directly: that reads `import.meta.env.VITE_SITE_URL`, which a
-// visitor may point at a custom domain the Base44 backend itself knows nothing
-// about. This is the backend's own origin — the same one `vite preview`'s
-// local proxy uses (`scripts/vite-base44-backend-plugin.mjs`) — and it falls
-// back to the same production host `SITE_URL` does when unset.
-const BASE44_ORIGIN = (process.env.VITE_BASE44_APP_BASE_URL || SITE_URL).replace(/\/+$/, "");
-
-const client: EntityReader | null = APP_ID
-  ? (createClient({ appId: APP_ID, serverUrl: BASE44_ORIGIN }) as unknown as EntityReader)
-  : null;
+const content: SupabaseContentService | null =
+  SUPABASE_URL && SUPABASE_KEY
+    ? new SupabaseContentService(new RestTableClient(SUPABASE_URL, SUPABASE_KEY))
+    : null;
 
 // `VERCEL_URL` — the platform-assigned hostname of *this* deployment, never a
 // client-supplied value — not `req.headers.host`: a request can carry any
@@ -63,8 +68,8 @@ let shellHtml: string | null = null;
 
 /**
  * The untouched SPA shell `scripts/prerender.mjs` writes alongside the
- * prerendered static routes — the same file every unrecognised path already
- * falls back to via `vercel.json`'s catch-all rewrite. Fetched from this
+ * prerendered routes — the same file every unrecognised path already falls
+ * back to via `vercel.json`'s catch-all rewrite. Fetched from this
  * deployment's own origin rather than bundled in: bundling it required
  * `vercel.json`'s `functions.includeFiles`, which points at a path
  * (`dist/app.html`) that does not survive from `vercel build` into
@@ -81,34 +86,59 @@ async function loadShell(): Promise<string> {
   return shellHtml;
 }
 
+/**
+ * The visitor's own query string (utm_* tags and the like), without the `id`
+ * the rewrite added. Vercel passes the original query through a rewrite, so a
+ * link shared as `/blog/<id>?utm_source=whatsapp` keeps its attribution.
+ */
+function forwardedQuery(query: OgRequest["query"]): string {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries(query)) {
+    if (name === "id" || value === undefined) continue;
+    for (const v of Array.isArray(value) ? value : [value]) params.append(name, v);
+  }
+  const s = params.toString();
+  return s ? `?${s}` : "";
+}
+
 export default async function handler(req: OgRequest, res: OgResponse): Promise<void> {
   if (req.method && req.method !== "GET" && req.method !== "HEAD") {
     res.status(405).send("Method Not Allowed");
     return;
   }
 
-  const id = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id;
+  const key = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
 
-  if (!id || !client) {
-    if (!client) console.error("[api/og/blog] VITE_BASE44_APP_ID is not set");
+  if (!key || !content) {
+    if (!content) console.error("[api/og/blog] VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY are not set");
     res.setHeader("Cache-Control", "no-store");
     res.status(500).send(renderSeoHtml(await loadShell(), BLOG_POST_NOT_FOUND_SEO));
     return;
   }
 
   try {
-    const post = (await client.entities.BlogPost.get(id)) as Article & { published?: boolean };
-    // BlogPost is readable by anyone on Base44, so an id is all it takes to
-    // ask. A draft is answered exactly as a missing post: same 404, same
-    // noindex, nothing of its title or description.
-    if (post?.published !== true) throw Object.assign(new Error("not published"), { status: 404 });
+    const post = await content.getArticle(key);
+    // Row-level security already hides drafts from this anonymous read. The
+    // check stays so a change there cannot turn a draft into a public page,
+    // or leak its slug through a redirect.
+    if (post.published !== true) throw Object.assign(new Error("not published"), { status: 404 });
+
+    if (post.slug && post.slug !== key) {
+      res.setHeader("Location", `${articlePath(post)}${forwardedQuery(req.query)}`);
+      // A day, not forever: a 301 with no lifetime is kept by browsers
+      // indefinitely, and a slug can still be renamed from /admin/blog.
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=86400");
+      res.status(301).send("");
+      return;
+    }
+
     const shell = await loadShell();
     res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
     res.status(200).send(renderSeoHtml(shell, computeBlogSeoConfig(post)));
   } catch (err) {
     const status = (err as { status?: number }).status;
-    if (status !== 404) console.error("[api/og/blog] failed to load post", id, err);
+    if (status !== 404) console.error("[api/og/blog] failed to load post", key, err);
     res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
     res.setHeader("X-Robots-Tag", "noindex");
     res.status(status === 404 ? 404 : 502).send(renderSeoHtml(await loadShell(), BLOG_POST_NOT_FOUND_SEO));

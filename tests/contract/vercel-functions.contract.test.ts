@@ -42,6 +42,20 @@ describe("Vercel functions under api/", () => {
     expect(new URLSearchParams(query).get("id")).toBe(":id");
   });
 
+  it("sends every old Base44-id address to the function, whoever asks, before any other blog rule", () => {
+    // Bookmarks, search results and the agents' answers name /blog/<Base44 id>.
+    // The function answers 301 to the slug — for people as well as crawlers, so
+    // no `has` condition — and it must match before the crawler rule and the
+    // SPA catch-all would take the request.
+    const rules = vercelConfig.rewrites as Array<{ source: string; destination: string; has?: unknown }>;
+    const old = rules.findIndex((r) => r.source === "/blog/:id([0-9a-f]{24})");
+    expect(old, "no rewrite for /blog/<24 hex>").toBeGreaterThan(-1);
+    expect(rules[old].destination).toBe("/api/og/blog?id=:id");
+    expect(rules[old].has).toBeUndefined();
+    expect(old).toBeLessThan(rules.findIndex((r) => r.source === "/blog/:id"));
+    expect(old).toBeLessThan(rules.findIndex((r) => r.destination === "/app.html"));
+  });
+
   it("are type-checked the way @vercel/node builds them", () => {
     // `"type": "module"` makes @vercel/node compile api/ as Node ESM, where an
     // import without its `.js` extension does not resolve at all. The api

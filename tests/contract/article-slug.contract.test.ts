@@ -100,6 +100,7 @@ describe("every article link goes through articlePath", () => {
     "src/pages/BlogPost.tsx",
     "src/lib/blogSeo.ts",
     "src/pages/BlogAdmin.tsx",
+    "api/og/blog.ts",
   ])("%s links articles through articlePath", (file) => {
     expect(read(file)).toMatch(/\barticlePath\(/);
   });

@@ -537,7 +537,31 @@ than a row silently created.
 | UNIT-BKF-003 | "refuses to invent an address from nothing" | Throws `no id` |
 | UNIT-BKF-004 | "is spelled the way the migration spells it" | The migration's SQL holds the same regex, trim and `p_id::text` fallback |
 
+### 4.24 The server's answer for an article address — `tests/unit/og-blog-handler.test.ts`
+
+`api/og/blog.ts` reads Supabase with the publishable key and the same
+`getArticle` the page uses. Old keys get a 301 to the slug; a not-yet-built slug
+gets the shell with its head; anything else is 404 + noindex.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-OG-001 | "renders the article's head into the shell, from Supabase" | 200; title, image, canonical on the slug; `or=(slug.eq…,base44_id.eq…)` |
+| UNIT-OG-002 | "reads with the publishable key, as an anonymous visitor would" | `apikey` is the publishable key |
+| UNIT-OG-003 | "fetches the shell from a fixed, trusted origin" | `${SITE_URL}/app.html`, whatever the Host |
+| UNIT-OG-004 | "answers a Base44 id with a 301 to the article's slug" | `Location: /blog/<slug>`; a day's cache |
+| UNIT-OG-005 | "keeps the visitor's own query string, without the id the rewrite added" | `?utm_source=whatsapp&tag=a&tag=b` |
+| UNIT-OG-006 | "answers a Supabase uuid the same way" | 301; `id.eq.<uuid>` asked |
+| UNIT-OG-007 | "never redirects to a draft — its slug stays private" | 404; no `Location`; slug absent |
+| UNIT-OG-008 | "returns 404 and noindex when no article has the key" | 404, `noindex` |
+| UNIT-OG-009 | "answers a draft asked for by its slug exactly as a missing one" | 404; title absent |
+| UNIT-OG-010 | "treats an article with no published flag as a draft" | 404 |
+| UNIT-OG-011 | "does not ask Supabase about a key no article can have" | 404; no request |
+| UNIT-OG-012 | "returns 502 and noindex when Supabase fails" | 502 |
+| UNIT-OG-013 | "answers 500 without calling Supabase when it is not configured" | 500, `no-store` |
+| UNIT-OG-014 | "answers 500 when the route is hit without an id" | 500 |
+| UNIT-OG-015 | "rejects non-GET methods" | 405 |
+
 ## 5. Pass criteria
 
-All 417 cases pass. Any failure is a functional defect, not an environment issue —
+All 423 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

@@ -20,6 +20,10 @@
       "destination": "https://safe-arch-plan.base44.app/ws-user-apps/:path*"
     },
     {
+      "source": "/blog/:id([0-9a-f]{24})",
+      "destination": "/api/og/blog?id=:id"
+    },
+    {
       "source": "/blog/:id",
       "has": [
         {

@@ -930,6 +930,27 @@ named in Latin kebab-case (`horadat-dmei-nihul.md`); the script refuses any
 other. The slug goes to Supabase only — Base44's `BlogPost` has no such field —
 and a re-seed writes the file name back over a slug changed in `/admin/blog`.
 
+### Article addresses
+
+An article lives at `/blog/<slug>`: Latin kebab-case (`horadat-dmei-nihul`),
+held in Supabase's `blog_posts.slug` only — Base44's `BlogPost` has no such
+field, so `contentAdmin` passes it to the mirror and nowhere else. A repo
+article's slug is its file name; one written in `/admin/blog` gets the slug
+typed in the form, which refuses anything but kebab-case, a slug another
+article has, and one shaped like a Base44 id.
+
+Every link the site builds goes through `articlePath()` in
+`src/lib/articlePath.ts`. Old links — `/blog/<Base44 id>`, in bookmarks, search
+results and the agents' answers — keep working: `vercel.json` sends every
+`/blog/<24 hex characters>` to `api/og/blog.ts` for every visitor, which reads
+Supabase and answers `301` to `/blog/<slug>` (keeping the visitor's query
+string, cached for a day), or `404` with `noindex` for a draft or an unknown id.
+A page reached by an old address some other way replaces it with the slug in
+the browser.
+
+Renaming a published article's slug breaks every link to the old one — there is
+no redirect table. The form says so before you save.
+
 ## Tests
 
 The full battery — lint, typecheck, unit, component, contract, integration,

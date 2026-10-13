@@ -359,6 +359,11 @@ host out must be one the build rewrites. `index.html` was missing from that list
 so a host move shifted the sitemap and left the served document advertising the
 old origin in its canonical tag, `og:url` and two static JSON-LD blocks.
 
+**`vercel-functions.contract.test.ts`, old article addresses.** Every
+`/blog/<24 hex>` — a Base44 id, what article links were before slugs — must be
+rewritten to `api/og/blog.ts` with no `has` condition (people get the 301 as
+well as crawlers), before the crawler rule and the SPA catch-all.
+
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
 the environment supplies none, never overriding it; a checkout with no
@@ -460,7 +465,7 @@ that writes real slugs.
 | CTR-SLUG-003 | "names the two live articles older than the repo files" | `bituach-briut-digitali`, `pensia-beidan-ha-ai` with their exact titles |
 | CTR-SLUG-004 | "maps 22 distinct titles to 22 distinct slugs" | 22 rows, no title or slug twice |
 | CTR-SLUG-005 | "builds no /blog/<…> address by hand" | No `/blog/${` or `"/blog/" +` in `src/` or `api/` outside `articlePath.ts` |
-| CTR-SLUG-006 | "%s links articles through articlePath" (6 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo, BlogAdmin |
+| CTR-SLUG-006 | "%s links articles through articlePath" (7 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo, BlogAdmin, api/og/blog.ts |
 | CTR-SLUG-007 | "contentAdmin's copy is the same" | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
 | CTR-SLUG-008 | "the build's copy is the same" | `scripts/published-articles.mjs` patterns equal `articlePath.ts`'s |
 
@@ -473,7 +478,7 @@ time.
 
 ## 6. Pass criteria
 
-All 556 cases pass. A failure means either the frontend or the backend definition
+All 558 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight
