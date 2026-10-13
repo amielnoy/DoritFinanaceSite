@@ -30,7 +30,7 @@ class MemoryStore implements ChatStore {
   async createConversation(row: NewConversation) {
     this.check();
     const id = `00000000-0000-4000-8000-${String(++this.n).padStart(12, "0")}`;
-    const full = { id, status: "open" as const, lead_id: null, escalated_at: null, turns: 0, last_message_at: new Date(clock.now).toISOString(), ...row };
+    const full = { id, status: "open" as const, lead_id: null, escalated_at: null, turns: 0, busy_until: null as string | null, last_message_at: new Date(clock.now).toISOString(), ...row };
     this.conversations.set(id, full);
     return { ...full };
   }
@@ -54,6 +54,22 @@ class MemoryStore implements ChatStore {
     // PostgREST's `lead_id=is.null` filter: no row matches once lead_id is set, and the PATCH changes nothing.
     if (options?.onlyIfLeadIdNull && c.lead_id !== null) return;
     Object.assign(c, fields);
+  }
+  /** PostgREST's filtered PATCH: `turns=eq.<n>`, status open or escalated, and no live lease. */
+  async claimTurn(id: string, turns: number, nowIso: string, leaseUntilIso: string) {
+    this.check();
+    const c = this.conversations.get(id);
+    if (!c || c.turns !== turns || !["open", "escalated"].includes(c.status)) return null;
+    if (c.busy_until !== null && Date.parse(c.busy_until) >= Date.parse(nowIso)) return null;
+    Object.assign(c, { turns: turns + 1, busy_until: leaseUntilIso });
+    return { ...c };
+  }
+  async releaseTurn(id: string, leaseUntilIso: string, lastMessageAt: string) {
+    this.check();
+    const c = this.conversations.get(id)!;
+    // `busy_until=eq.<lease>`: a lease another turn has since taken is not this turn's to clear.
+    if (c.busy_until !== leaseUntilIso) return;
+    Object.assign(c, { busy_until: null, last_message_at: lastMessageAt });
   }
   async recordEscalation(id: string) {
     this.check();
@@ -257,6 +273,90 @@ describe("later messages", () => {
     const written = [...store.messages.slice(before), ...store.usage.slice(1)];
     expect(written.length).toBeGreaterThanOrEqual(3);
     for (const row of written) expect(row.agency_id).toBe("agency-stored");
+  });
+});
+
+describe("one turn at a time (I3)", () => {
+  /** A model whose answer waits until `open()`; `calls` counts the turns that reached it. */
+  function gated(reply = "תשובה") {
+    let open: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (open = r));
+    const model = {
+      model: "claude-haiku-5-5",
+      calls: 0,
+      async complete(): Promise<ModelResponse> {
+        model.calls += 1;
+        await gate;
+        return text(reply);
+      },
+    };
+    return { model, open: () => open() };
+  }
+  async function opened() {
+    const s = setup({}, [text("שלום")]);
+    const { body } = await json(await s.chat(post(first())));
+    return { ...s, id: body.conversationId as string };
+  }
+
+  it("runs the model for exactly one of two messages sent at once; the other is answered busy", async () => {
+    const { chat, deps, store, id } = await opened();
+    const { model, open } = gated();
+    deps.model = model;
+    const both = Promise.all([chat(post(next(id, "א"))), chat(post(next(id, "ב")))]);
+    await vi.waitFor(() => expect(model.calls).toBe(1));
+    open();
+    const answers = await Promise.all((await both).map(json));
+    expect(answers.map((a) => a.status).sort()).toEqual([200, 409]);
+    expect(answers.find((a) => a.status === 409)?.body.code).toBe("busy");
+    expect(model.calls).toBe(1);
+    expect(store.conversations.get(id)).toMatchObject({ turns: 2, busy_until: null });
+  });
+
+  it("holds the conversation while a turn runs and lets it go after, even when the turn fails", async () => {
+    const { chat, deps, store, id } = await opened();
+    const during: (string | null)[] = [];
+    deps.model = {
+      model: "claude-haiku-5-5",
+      async complete() {
+        during.push(store.conversations.get(id)!.busy_until);
+        throw new ModelError("http", 529);
+      },
+    };
+    const { status } = await json(await chat(post(next(id))));
+    expect(status).toBe(503);
+    expect(during[0]).toBe(new Date(clock.now + 60_000).toISOString());
+    expect(store.conversations.get(id)!.busy_until).toBeNull();
+  });
+
+  it("lets a crashed turn's hold lapse after sixty seconds", async () => {
+    const { chat, deps, store, id } = await opened();
+    deps.model = scripted([text("חזרתי")]);
+    // A turn that died without letting go: its lease is all that is left.
+    store.conversations.get(id)!.busy_until = new Date(clock.now + 60_000).toISOString();
+    const held = await json(await chat(post(next(id))));
+    expect([held.status, held.body.code]).toEqual([409, "busy"]);
+    const start = clock.now;
+    clock.now += 60_001;
+    try {
+      expect((await json(await chat(post(next(id))))).status).toBe(200);
+    } finally {
+      clock.now = start;
+    }
+  });
+
+  it("holds the forty-turn cap when the thirty-ninth and fortieth messages arrive together", async () => {
+    const { chat, deps, store, id } = await opened();
+    store.conversations.get(id)!.turns = 39;
+    const { model, open } = gated();
+    deps.model = model;
+    const both = Promise.all([chat(post(next(id, "א"))), chat(post(next(id, "ב")))]);
+    await vi.waitFor(() => expect(model.calls).toBe(1));
+    open();
+    const statuses = (await Promise.all((await both).map(json))).map((a) => a.status).sort();
+    expect(statuses).toEqual([200, 409]);
+    expect(store.conversations.get(id)!.turns).toBe(40);
+    expect(model.calls).toBe(1);
+    expect((await json(await chat(post(next(id))))).body.code).toBe("too_many_turns");
   });
 });
 

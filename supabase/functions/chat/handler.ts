@@ -29,6 +29,8 @@ export const MAX_TURNS = 40;
 export const IDLE_MS = 2 * 60 * 60 * 1000;
 export const PER_IP_PER_MINUTE = 20;
 export const NEW_CONVERSATIONS_PER_HOUR = 300;
+/** How long a turn holds its conversation: past the 25 s turn budget and its tools. A crashed turn's hold lapses after it. */
+export const TURN_LEASE_MS = 60_000;
 /** submit-lead's `LEAD_FIELD_LIMITS.consent_version`: a longer version would open a chat whose every save fails. */
 export const MAX_CONSENT_VERSION_CHARS = 40;
 const EVAL_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -90,6 +92,8 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       let conversation: ConversationRow;
       let issuedToken: string | null = null;
       const conversationId = str(input.conversationId);
+      // One turn at a time (I3): a turn claims the row until this time and lets go when done.
+      const leaseUntil = new Date(deps.now() + TURN_LEASE_MS).toISOString();
 
       if (!conversationId) {
         const consentVersion = str(input.consentVersion).trim();
@@ -118,6 +122,9 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
             landingPath: validLandingPath(a.landingPath) ?? '',
           },
           is_eval: evalMode,
+          // Created already claimed for its first turn.
+          turns: 1,
+          busy_until: leaseUntil,
           ...(evalMode ? { delete_after: new Date(deps.now() + EVAL_RETENTION_MS).toISOString() } : {}),
         });
         log('info', 'conversation.created', { rid, conversation: conversation.id, role, evalMode });
@@ -132,116 +139,125 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           return refuse(409, 'closed');
         }
         if (conversation.turns >= MAX_TURNS) return refuse(400, 'too_many_turns');
+        // The claim counts the turn in the same write, only while the count is still the one
+        // read here: a second message sent at once, or the forty-first, matches no row.
+        const claimed = await deps.store.claimTurn(conversation.id, conversation.turns, new Date(deps.now()).toISOString(), leaseUntil);
+        if (!claimed) return refuse(409, 'busy');
+        conversation = claimed;
       }
 
-      // Every write below carries the stored row's agency, never anything the request said.
       const id = conversation.id;
-      const agencyId = conversation.agency_id;
-      await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'user', content: redactChat(text) });
-      const history = toModelHistory(await deps.store.listMessages(id));
-
-      // The runners mutate ctx.conversation (one lead, one hand-off); persistOutcome writes it.
-      const facts = toFacts(conversation);
-      const attribution = conversation.attribution ?? { channel: '', campaign: '', landingPath: '' };
-      const ctx: ToolCallContext = {
-        conversation: {
-          ...facts,
-          attribution: { channel: attribution.channel ?? '', campaign: attribution.campaign ?? '', landingPath: attribution.landingPath ?? '' },
-        },
-        agent,
-        origin: req.headers.get('origin'),
-        userAgent: req.headers.get('user-agent'),
-        forwardedFor: req.headers.get('x-forwarded-for'),
-        evalMode,
-      };
-
-      /**
-       * A tool's effect on the row, written the moment the tool answers, before
-       * the model is called again: a later failure in this turn (the model, a
-       * usage row) can then never leave a saved lead's row 'open' for a retry to
-       * save twice. Status first — it is what refuses a second lead. Ruling 11:
-       * the interview lead always takes lead_id; a hand-off's only fills an
-       * empty one. A failure here is storage down, and fails the request.
-       */
-      const written = { status: facts.status, escalated: facts.escalated };
-      const persistOutcome = async (o: ToolOutcome) => {
-        const fields: { status?: ConversationStatus; lead_id?: string } = {};
-        if (ctx.conversation.status !== written.status) fields.status = ctx.conversation.status;
-        if (o.name === 'submitLead' && o.leadId) fields.lead_id = o.leadId;
-        if (fields.status || fields.lead_id) await deps.store.updateConversation(id, fields);
-        written.status = ctx.conversation.status;
-        if (o.name === 'escalateToHuman' && o.leadId) await deps.store.updateConversation(id, { lead_id: o.leadId }, { onlyIfLeadIdNull: true });
-        if (ctx.conversation.escalated && !written.escalated) {
-          await deps.store.recordEscalation(id);
-          written.escalated = true;
-        }
-      };
-
-      let result: TurnResult | null = null;
-      let failure: TurnFailure | null = null;
       try {
-        result = await runTurn({
-          model: deps.model,
-          system: systemBlocks(role),
-          tools: ROLE_TOOLS[role],
-          history,
-          runTool: async (name, args) => {
-            const outcome = await deps.runTool(name, args, ctx);
-            await persistOutcome(outcome);
-            return outcome;
+        // Every write below carries the stored row's agency, never anything the request said.
+        const agencyId = conversation.agency_id;
+        await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'user', content: redactChat(text) });
+        const history = toModelHistory(await deps.store.listMessages(id));
+
+        // The runners mutate ctx.conversation (one lead, one hand-off); persistOutcome writes it.
+        const facts = toFacts(conversation);
+        const attribution = conversation.attribution ?? { channel: '', campaign: '', landingPath: '' };
+        const ctx: ToolCallContext = {
+          conversation: {
+            ...facts,
+            attribution: { channel: attribution.channel ?? '', campaign: attribution.campaign ?? '', landingPath: attribution.landingPath ?? '' },
           },
-          now: deps.now,
-        });
-      } catch (e) {
-        if (!(e instanceof TurnFailure)) throw e;
-        failure = e;
-      }
+          agent,
+          origin: req.headers.get('origin'),
+          userAgent: req.headers.get('user-agent'),
+          forwardedFor: req.headers.get('x-forwarded-for'),
+          evalMode,
+        };
 
-      // The record of the turn, not its state: a row that cannot be written is logged, never a failed answer.
-      const bestEffort = async (event: string, write: () => Promise<void>) => {
+        /**
+         * A tool's effect on the row, written the moment the tool answers, before
+         * the model is called again: a later failure in this turn (the model, a
+         * usage row) can then never leave a saved lead's row 'open' for a retry to
+         * save twice. Status first — it is what refuses a second lead. Ruling 11:
+         * the interview lead always takes lead_id; a hand-off's only fills an
+         * empty one. A failure here is storage down, and fails the request.
+         */
+        const written = { status: facts.status, escalated: facts.escalated };
+        const persistOutcome = async (o: ToolOutcome) => {
+          const fields: { status?: ConversationStatus; lead_id?: string } = {};
+          if (ctx.conversation.status !== written.status) fields.status = ctx.conversation.status;
+          if (o.name === 'submitLead' && o.leadId) fields.lead_id = o.leadId;
+          if (fields.status || fields.lead_id) await deps.store.updateConversation(id, fields);
+          written.status = ctx.conversation.status;
+          if (o.name === 'escalateToHuman' && o.leadId) await deps.store.updateConversation(id, { lead_id: o.leadId }, { onlyIfLeadIdNull: true });
+          if (ctx.conversation.escalated && !written.escalated) {
+            await deps.store.recordEscalation(id);
+            written.escalated = true;
+          }
+        };
+
+        let result: TurnResult | null = null;
+        let failure: TurnFailure | null = null;
         try {
-          await write();
+          result = await runTurn({
+            model: deps.model,
+            system: systemBlocks(role),
+            tools: ROLE_TOOLS[role],
+            history,
+            runTool: async (name, args) => {
+              const outcome = await deps.runTool(name, args, ctx);
+              await persistOutcome(outcome);
+              return outcome;
+            },
+            now: deps.now,
+          });
         } catch (e) {
-          log('warn', event, { rid, conversation: id, err: String((e as Error)?.message ?? e).slice(0, 200) });
+          if (!(e instanceof TurnFailure)) throw e;
+          failure = e;
         }
-      };
-      const outcomes = result?.tools ?? failure?.tools ?? [];
-      for (const o of outcomes) {
-        await bestEffort('store.tool_row_failed', () =>
-          deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'tool', content: `${o.name}: ${o.status}` }),
-        );
-      }
-      for (const u of result?.usage ?? failure?.usage ?? []) {
-        await bestEffort('store.usage_failed', () =>
-          deps.store.recordUsage({ conversation_id: id, agency_id: agencyId, model: u.model, input_tokens: u.input, cached_tokens: u.cached, output_tokens: u.output }),
-        );
-      }
-      const leadSaved = outcomes.some((o) => o.leadSaved);
-      const status = ctx.conversation.status;
-      if (result) {
-        // The store clips to the column's 8,000 characters, past anything MAX_REPLY_TOKENS allows in practice.
-        await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'assistant', content: redactChat(result.reply) });
-      }
-      await deps.store.updateConversation(id, {
-        turns: conversation.turns + 1,
-        last_message_at: new Date(deps.now()).toISOString(),
-      });
 
-      const continuation = { conversationId: id, ...(issuedToken ? { token: issuedToken } : {}) };
-      if (!result) {
-        log('warn', 'model.failed', { rid, conversation: id, reason: failure?.reason ?? 'unknown', ms: Date.now() - startedAt });
-        return respond(503, { ok: false, code: 'unavailable', leadSaved, ...continuation });
+        // The record of the turn, not its state: a row that cannot be written is logged, never a failed answer.
+        const bestEffort = async (event: string, write: () => Promise<void>) => {
+          try {
+            await write();
+          } catch (e) {
+            log('warn', event, { rid, conversation: id, err: String((e as Error)?.message ?? e).slice(0, 200) });
+          }
+        };
+        const outcomes = result?.tools ?? failure?.tools ?? [];
+        for (const o of outcomes) {
+          await bestEffort('store.tool_row_failed', () =>
+            deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'tool', content: `${o.name}: ${o.status}` }),
+          );
+        }
+        for (const u of result?.usage ?? failure?.usage ?? []) {
+          await bestEffort('store.usage_failed', () =>
+            deps.store.recordUsage({ conversation_id: id, agency_id: agencyId, model: u.model, input_tokens: u.input, cached_tokens: u.cached, output_tokens: u.output }),
+          );
+        }
+        const leadSaved = outcomes.some((o) => o.leadSaved);
+        const status = ctx.conversation.status;
+        if (result) {
+          // The store clips to the column's 8,000 characters, past anything MAX_REPLY_TOKENS allows in practice.
+          await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'assistant', content: redactChat(result.reply) });
+        }
+        const continuation = { conversationId: id, ...(issuedToken ? { token: issuedToken } : {}) };
+        if (!result) {
+          log('warn', 'model.failed', { rid, conversation: id, reason: failure?.reason ?? 'unknown', ms: Date.now() - startedAt });
+          return respond(503, { ok: false, code: 'unavailable', leadSaved, ...continuation });
+        }
+        log('info', 'request.end', { rid, ms: Date.now() - startedAt, conversation: id, tools: outcomes.length, leadSaved, status });
+        return respond(200, {
+          ok: true,
+          ...continuation,
+          reply: result.reply,
+          leadSaved,
+          status,
+          // Model arguments, for the evaluation's holder only; never stored or logged.
+          ...(evalMode ? { eval: { toolCalls: result.toolCalls } } : {}),
+        });
+      } finally {
+        // Let go, stamping the time; a failure here only means the hold lapses on its own.
+        try {
+          await deps.store.releaseTurn(id, leaseUntil, new Date(deps.now()).toISOString());
+        } catch (e) {
+          log('warn', 'store.release_failed', { rid, conversation: id, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        }
       }
-      log('info', 'request.end', { rid, ms: Date.now() - startedAt, conversation: id, tools: outcomes.length, leadSaved, status });
-      return respond(200, {
-        ok: true,
-        ...continuation,
-        reply: result.reply,
-        leadSaved,
-        status,
-        // Model arguments, for the evaluation's holder only; never stored or logged.
-        ...(evalMode ? { eval: { toolCalls: result.toolCalls } } : {}),
-      });
     } catch (error) {
       log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String((error as Error)?.message ?? error).slice(0, 200) });
       return respond(500, { ok: false, code: 'failed' });

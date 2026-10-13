@@ -266,6 +266,7 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-CHATFN-004 | "shows Dorit's channels and gives the text back when the function cannot answer" | A `tel:` link shown; the box holds the text again (`AgentUnavailableError`) |
 | CMP-CHATFN-005 | "answers a rate limit with its own final wording and gives the text back" | `נשלחו הרבה הודעות בזמן קצר. אפשר לנסות שוב בעוד דקה.`; box refilled |
 | CMP-CHATFN-006 | "answers a closed conversation with its own final wording" | `השיחה הזו הסתיימה. אפשר להתחיל שיחה חדשה.` |
+| CMP-CHATFN-010 | "answers a message sent while the last one is still being answered, and gives the text back" | 409 `busy`: `הודעה קודמת עדיין בטיפול — רגע אחד.`; box refilled (I3) |
 | CMP-CHATFN-007 | "keep the v5 notice, byte for byte" | A Base44 agent shows its v5 points and not the v6 fourth point |
 | CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
 | CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
@@ -281,6 +282,6 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 
 ## 5. Pass criteria
 
-All 105 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 106 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

@@ -116,6 +116,8 @@ const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
   // Raised only by the chat function's adapter.
   rate_limited: "נשלחו הרבה הודעות בזמן קצר. אפשר לנסות שוב בעוד דקה.",
   conversation_closed: "השיחה הזו הסתיימה. אפשר להתחיל שיחה חדשה.",
+  // Raised only by the chat function's adapter: one message per conversation at a time.
+  busy: "הודעה קודמת עדיין בטיפול — רגע אחד.",
 };
 
 /**

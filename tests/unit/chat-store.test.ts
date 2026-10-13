@@ -102,6 +102,37 @@ describe("restStore", () => {
     expect((calls[0].body as { content: string }).content).toBe("a".repeat(7999));
   });
 
+  it("claims a turn with one filtered PATCH: this turn count, open or escalated, no live lease", async () => {
+    answer = () => new Response(JSON.stringify([{ id: ID, status: "open", turns: 3, busy_until: "2026-10-13T09:01:00.000Z" }]), { status: 200 });
+    const row = await restStore.claimTurn(ID, 2, "2026-10-13T09:00:00.000Z", "2026-10-13T09:01:00.000Z");
+    expect(row).toMatchObject({ id: ID, turns: 3 });
+    const url = new URL(calls[0].url);
+    expect(calls[0].method).toBe("PATCH");
+    expect(url.pathname).toBe("/rest/v1/chat_conversations");
+    expect(url.searchParams.get("id")).toBe(`eq.${ID}`);
+    expect(url.searchParams.get("turns")).toBe("eq.2");
+    expect(url.searchParams.get("status")).toBe("in.(open,escalated)");
+    expect(url.searchParams.get("or")).toBe('(busy_until.is.null,busy_until.lt."2026-10-13T09:00:00.000Z")');
+    expect(calls[0].body).toEqual({ turns: 3, busy_until: "2026-10-13T09:01:00.000Z" });
+  });
+
+  it("answers null when no row matched the claim (another turn holds it, or the count moved)", async () => {
+    answer = () => new Response("[]", { status: 200 });
+    expect(await restStore.claimTurn(ID, 2, "2026-10-13T09:00:00.000Z", "2026-10-13T09:01:00.000Z")).toBeNull();
+    expect(await restStore.claimTurn("not-a-uuid", 2, "2026-10-13T09:00:00.000Z", "2026-10-13T09:01:00.000Z")).toBeNull();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("lets go of its own lease only, stamping the last message time", async () => {
+    answer = () => new Response(null, { status: 204 });
+    await restStore.releaseTurn(ID, "2026-10-13T09:01:00.000Z", "2026-10-13T09:00:20.000Z");
+    const url = new URL(calls[0].url);
+    expect(calls[0].method).toBe("PATCH");
+    expect(url.searchParams.get("id")).toBe(`eq.${ID}`);
+    expect(url.searchParams.get("busy_until")).toBe("eq.2026-10-13T09:01:00.000Z");
+    expect(calls[0].body).toEqual({ busy_until: null, last_message_at: "2026-10-13T09:00:20.000Z" });
+  });
+
   it("sets lead_id only while it is null when asked to", async () => {
     answer = () => new Response(null, { status: 204 });
     await restStore.updateConversation(ID, { lead_id: "lead-1" }, { onlyIfLeadIdNull: true });

@@ -737,6 +737,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHSTORE-010 | "does not cut an emoji in half at the limit" | A surrogate pair straddling the limit is dropped whole |
 | UNIT-CHSTORE-011 | "sets lead_id only while it is null when asked to" | `onlyIfLeadIdNull` adds `&lead_id=is.null` to the PATCH; without it no filter |
 | UNIT-CHSTORE-012 | "lets a budget-alert refusal other than the conflict through, by its code" | A 500 rejects with `insert_http_500:XX000`; the message is not quoted |
+| UNIT-CHSTORE-013 | "claims a turn with one filtered PATCH: this turn count, open or escalated, no live lease" | PATCH with `id=eq`, `turns=eq.2`, `status=in.(open,escalated)`, `or=(busy_until.is.null,busy_until.lt."<now>")`; body `turns: 3`, `busy_until`; the row returned (I3) |
+| UNIT-CHSTORE-014 | "answers null when no row matched the claim (another turn holds it, or the count moved)" | `[]` gives `null`; a non-uuid sends nothing (I3) |
+| UNIT-CHSTORE-015 | "lets go of its own lease only, stamping the last message time" | PATCH filtered on `busy_until=eq.<lease>` with `busy_until: null`, `last_message_at` (I3) |
 
 ### 4.35 The chat function's handler — `tests/unit/chat-handler.test.ts`
 
@@ -787,6 +790,10 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-041 | "keeps lead_saved and lead_id when %s cannot be written, answers the reply, and never writes a second lead" | The usage row, then the tool row, throws after a real complete `submitLead`: 200 with the reply; the row is `lead_saved` with `lead_id`; the assistant row stored; a `store.usage_failed` / `store.tool_row_failed` warn line with the code; a resend gets 409 `closed`, submit-lead was called once, and the runner on the stored facts answers `already_saved` (I2) |
 | UNIT-CHHANDLER-042 | "carries on when a tool's handler throws: the model hears it failed, the visitor gets a reply, the row stays open" | Real runner over a throwing handler: 200 with the model's reply, an `is_error` tool result, status `open`, tool row `submitLead: error` (I2) |
 | UNIT-CHHANDLER-043 | "persists lead_saved and lead_id the moment the tool succeeds, before the model's closing reply" | At the second model call the row is already `lead_saved` with `lead_id`; that call failing gives 503 with `leadSaved: true` (I2) |
+| UNIT-CHHANDLER-044 | "runs the model for exactly one of two messages sent at once; the other is answered busy" | Two sends on one conversation: one 200, one 409 `busy`; the model called once; turns 2 and the hold released (I3) |
+| UNIT-CHHANDLER-045 | "holds the conversation while a turn runs and lets it go after, even when the turn fails" | During the model call `busy_until` is now + 60 s; after a 503 it is null (I3) |
+| UNIT-CHHANDLER-046 | "lets a crashed turn's hold lapse after sixty seconds" | A live `busy_until` left behind gives 409 `busy`; 60 s later the message is answered 200 (I3) |
+| UNIT-CHHANDLER-047 | "holds the forty-turn cap when the thirty-ninth and fortieth messages arrive together" | At 39 turns two sends at once: one 200, one 409; turns 40; the next send is 400 `too_many_turns` (I3) |
 
 ### 4.35a The chat's redaction — `tests/unit/chat-redact.test.ts`
 
@@ -816,7 +823,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHADAPTER-003 | "gives a late subscriber what already arrived" | A subscriber added after the send is called at once with the transcript |
 | UNIT-CHADAPTER-004 | "marks the reply that saved the lead" | `leadSaved: true` gives the assistant message `signal: "lead_saved"` |
 | UNIT-CHADAPTER-005 | "refuses a long message before any request" | `AgentLimitError("too_long")` for 1,001 characters; `invoke` not called |
-| UNIT-CHADAPTER-006 | "maps a %i answer to AgentLimitError(%s)" | 400 `too_many_turns`, 429 `rate_limited`, 403 `gone` and 409 `closed` (the last two `conversation_closed`) |
+| UNIT-CHADAPTER-006 | "maps a %i answer to AgentLimitError(%s)" | 400 `too_many_turns`, 429 `rate_limited`, 403 `gone` and 409 `closed` (both `conversation_closed`), 409 `busy` (`busy`, I3) |
 | UNIT-CHADAPTER-007 | "starts a new server conversation after one was closed, under the same consent" | After a 409 the next send has the consent fields and no `conversationId` (Review Focus 5) |
 | UNIT-CHADAPTER-008 | "maps %i to AgentUnavailableError" | 503 `unavailable` and 500 `failed` give `AgentUnavailableError` carrying the `rid` |
 | UNIT-CHADAPTER-009 | "keeps the conversation a 503 opened, so the next message continues it" | The 503's `conversationId` and `token` are sent with the next message |
@@ -879,5 +886,5 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 ## 5. Pass criteria
 
-All 619 cases pass. Any failure is a functional defect, not an environment issue —
+All 627 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

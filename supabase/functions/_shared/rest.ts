@@ -73,6 +73,23 @@ export async function updateRow(table: string, id: string, fields: Record<string
   if (!res.ok) throw new Error(`update_http_${res.status}${await refusal(res)}`);
 }
 
+/**
+ * The rows a PostgREST filter (`id=eq.…&col=…`) matches, changed and handed
+ * back: how a caller learns whether a conditional write applied, and to what.
+ */
+export async function updateRows(table: string, filter: string, fields: Record<string, unknown>): Promise<Record<string, unknown>[]> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?${filter}`, {
+    method: 'PATCH',
+    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(fields),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`update_http_${res.status}${await refusal(res)}`);
+  const rows = await res.json();
+  return Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
+}
+
 /** Insert or merge on a unique key — the booking row is written twice per request. */
 export async function upsertRow(table: string, row: Record<string, unknown>, onConflict: string): Promise<void> {
   const { url, auth } = target();

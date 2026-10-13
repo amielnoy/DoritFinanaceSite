@@ -118,6 +118,13 @@ describe("the interview on the chat function", () => {
     expect((screen.getByPlaceholderText("כתבו כאן…") as HTMLTextAreaElement).value).toBe("עוד אחת");
   });
 
+  it("answers a message sent while the last one is still being answered, and gives the text back", async () => {
+    invoke.mockResolvedValue(failure(409, "busy"));
+    await startAndSend("עוד משהו");
+    expect(await screen.findByText("הודעה קודמת עדיין בטיפול — רגע אחד.")).toBeTruthy();
+    expect((screen.getByPlaceholderText("כתבו כאן…") as HTMLTextAreaElement).value).toBe("עוד משהו");
+  });
+
   it("answers a closed conversation with its own final wording", async () => {
     invoke.mockResolvedValue(failure(410, "gone"));
     await startAndSend("חזרתי");

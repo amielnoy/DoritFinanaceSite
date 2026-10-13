@@ -23,6 +23,10 @@ create table public.chat_conversations (
   -- holds one value: a lead saved and a hand-off made are both facts.
   escalated_at    timestamptz,
   turns           integer not null default 0 check (turns >= 0),
+  -- One turn at a time: a turn claims the row (a filtered PATCH that also
+  -- counts the turn) until this time and clears it when done; a crashed
+  -- turn's claim lapses on its own. Null when no turn is running.
+  busy_until      timestamptz,
   -- channel, campaign, landingPath — from the page's first request, never the model.
   attribution     jsonb not null default '{}'::jsonb,
   is_eval         boolean not null default false,

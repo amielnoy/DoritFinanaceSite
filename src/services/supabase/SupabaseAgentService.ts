@@ -92,6 +92,8 @@ export class SupabaseAgentService implements AgentPort {
     if (body?.token) local.token = body.token;
     if (body?.code === "too_long") return new AgentLimitError("too_long");
     if (body?.code === "too_many_turns") return new AgentLimitError("too_many_turns");
+    // The function answers one message per conversation at a time; this one was not run.
+    if (body?.code === "busy") return new AgentLimitError("busy");
     if (res?.status === 429) return new AgentLimitError("rate_limited");
     if (body?.code === "gone" || body?.code === "closed") {
       local.serverId = null;

@@ -34,6 +34,10 @@ describe("the chat tables", () => {
     expect(migration).toMatch(/escalated_at\s+timestamptz,/);
   });
 
+  it("hold a conversation for one turn at a time with a lease, free by default (I3)", () => {
+    expect(migration).toMatch(/busy_until\s+timestamptz,/);
+  });
+
   it("keep transcripts twelve months by default", () => {
     expect(migration).toMatch(/delete_after\s+timestamptz not null default \(now\(\) \+ interval '12 months'\)/);
   });

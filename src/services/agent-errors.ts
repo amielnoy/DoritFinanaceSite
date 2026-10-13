@@ -7,7 +7,7 @@
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_TURNS_PER_CONVERSATION = 40;
 
-export type AgentLimitReason = "too_long" | "too_many_turns" | "rate_limited" | "conversation_closed";
+export type AgentLimitReason = "too_long" | "too_many_turns" | "rate_limited" | "conversation_closed" | "busy";
 
 export class AgentLimitError extends Error {
   constructor(public readonly reason: AgentLimitReason) {

@@ -59,6 +59,7 @@ describe("SupabaseAgentService", () => {
     [429, { code: "rate_limited" }, "rate_limited"],
     [403, { code: "gone" }, "conversation_closed"],
     [409, { code: "closed" }, "conversation_closed"],
+    [409, { code: "busy" }, "busy"],
   ])("maps a %i answer to AgentLimitError(%s)", async (status, body, reason) => {
     const svc = new SupabaseAgentService(client(refused(status, body)), () => "l");
     const err = await svc.send(await svc.start("needs_interview", META), "x").catch((e) => e);

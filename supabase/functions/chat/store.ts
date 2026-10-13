@@ -2,7 +2,7 @@
  * The chat function's reads and writes, through PostgREST with the service key
  * (_shared/rest.ts). The only module that knows the tables' names.
  */
-import { callRpc, insertRow, selectRows, updateRow } from '../_shared/rest.ts';
+import { callRpc, insertRow, selectRows, updateRow, updateRows } from '../_shared/rest.ts';
 import type { UsageTotals } from './budget.ts';
 import type { ConversationFacts, ConversationStatus } from './tools.ts';
 import type { StoredMessage } from './turn.ts';
@@ -25,6 +25,8 @@ export interface ConversationRow {
   /** When a hand-off was made; null until then. Apart from status (Ruling 9). */
   escalated_at: string | null;
   turns: number;
+  /** A running turn's hold on the conversation; null when none runs (I3). */
+  busy_until: string | null;
   attribution: Attribution;
   is_eval: boolean;
   last_message_at: string;
@@ -38,6 +40,9 @@ export interface NewConversation {
   consent_at: string;
   attribution: Attribution;
   is_eval: boolean;
+  /** Created already claimed for its first turn: turns 1, busy_until set. */
+  turns: number;
+  busy_until: string;
   delete_after?: string;
 }
 
@@ -51,7 +56,16 @@ export interface ChatStore {
   getConversation(id: string): Promise<ConversationRow | null>;
   listMessages(conversationId: string): Promise<StoredMessage[]>;
   addMessage(m: { conversation_id: string; agency_id: string; role: 'user' | 'assistant' | 'tool'; content: string }): Promise<void>;
-  updateConversation(id: string, fields: Partial<Pick<ConversationRow, 'status' | 'lead_id' | 'turns' | 'last_message_at'>>, options?: UpdateOptions): Promise<void>;
+  updateConversation(id: string, fields: Partial<Pick<ConversationRow, 'status' | 'lead_id'>>, options?: UpdateOptions): Promise<void>;
+  /**
+   * Claim the conversation for one turn, atomically: only while its turn count
+   * is still `turns`, its status open or escalated, and no other turn holds it
+   * (`busy_until` null or past `nowIso`). Counts the turn and holds it until
+   * `leaseUntilIso`. The claimed row, or null when nothing matched.
+   */
+  claimTurn(id: string, turns: number, nowIso: string, leaseUntilIso: string): Promise<ConversationRow | null>;
+  /** End this turn's claim (only while it is still `leaseUntilIso`), stamping last_message_at. */
+  releaseTurn(id: string, leaseUntilIso: string, lastMessageAt: string): Promise<void>;
   /** Persist a hand-off: escalated_at = now. */
   recordEscalation(id: string): Promise<void>;
   recordUsage(row: { conversation_id: string; agency_id: string; model: string; input_tokens: number; cached_tokens: number; output_tokens: number }): Promise<void>;
@@ -104,6 +118,20 @@ export const restStore: ChatStore = {
   },
   async updateConversation(id, fields, options) {
     await updateRow('chat_conversations', id, { ...fields }, options?.onlyIfLeadIdNull ? 'lead_id=is.null' : undefined);
+  },
+  async claimTurn(id, turns, nowIso, leaseUntilIso) {
+    if (!UUID.test(id) || !Number.isInteger(turns)) return null;
+    // Values in or=() with `:` or `.` are double-quoted (PostgREST's reserved characters).
+    const free = encodeURIComponent(`(busy_until.is.null,busy_until.lt."${nowIso}")`);
+    const rows = await updateRows(
+      'chat_conversations',
+      `id=eq.${id}&turns=eq.${turns}&status=in.(open,escalated)&or=${free}`,
+      { turns: turns + 1, busy_until: leaseUntilIso },
+    );
+    return rows.length === 1 ? (rows[0] as unknown as ConversationRow) : null;
+  },
+  async releaseTurn(id, leaseUntilIso, lastMessageAt) {
+    await updateRow('chat_conversations', id, { busy_until: null, last_message_at: lastMessageAt }, `busy_until=eq.${encodeURIComponent(leaseUntilIso)}`);
   },
   async recordEscalation(id) {
     await updateRow('chat_conversations', id, { escalated_at: new Date().toISOString() });
