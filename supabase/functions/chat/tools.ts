@@ -123,8 +123,15 @@ async function answerOf(res: Response): Promise<Record<string, unknown>> {
 
 export function createToolRunner(handlers: { submitLead: EdgeHandler; escalateToHuman: EdgeHandler }): ToolRunner {
   return async (name, input, ctx) => {
-    if (name === 'submitLead') return submitLead(handlers.submitLead, input, ctx);
-    if (name === 'escalateToHuman') return escalateToHuman(handlers.escalateToHuman, input, ctx);
+    try {
+      if (name === 'submitLead') return await submitLead(handlers.submitLead, input, ctx);
+      if (name === 'escalateToHuman') return await escalateToHuman(handlers.escalateToHuman, input, ctx);
+    } catch {
+      // A handler that throws (both catch their own errors today) is a failed tool the
+      // model can tell the visitor about, never a crashed turn. The conversation is
+      // marked only after a handler answers ok, so it is left as it was.
+      return { name, status: 'error', isError: true, forModel: JSON.stringify({ ok: false, error: 'tool_failed' }) };
+    }
     return { name, status: 'error', isError: true, forModel: JSON.stringify({ ok: false, error: 'unknown_tool' }) };
   };
 }

@@ -3,7 +3,7 @@ import type { ModelClient, ModelRequest, ModelResponse } from "../../supabase/fu
 import { ModelError } from "../../supabase/functions/chat/anthropic.ts";
 import type { UsageTotals } from "../../supabase/functions/chat/budget.ts";
 import { createChatHandler, MAX_CONSENT_VERSION_CHARS, type ChatDeps } from "../../supabase/functions/chat/handler.ts";
-import type { ChatStore, ConversationRow, NewConversation, UpdateOptions } from "../../supabase/functions/chat/store.ts";
+import { toFacts, type ChatStore, type ConversationRow, type NewConversation, type UpdateOptions } from "../../supabase/functions/chat/store.ts";
 import { createToolRunner, type EdgeHandler, type ToolCallContext, type ToolOutcome } from "../../supabase/functions/chat/tools.ts";
 
 const TOKEN = "a".repeat(64);
@@ -19,6 +19,9 @@ class MemoryStore implements ChatStore {
   spend: UsageTotals[] = [];
   broken = false;
   alertBroken = false;
+  /** Writes that fail as a storage outage would: usage rows, or messages of one role. */
+  usageBroken = false;
+  brokenRole: "user" | "assistant" | "tool" | null = null;
   monthUsageReads = 0;
   private n = 0;
   private check() {
@@ -42,6 +45,7 @@ class MemoryStore implements ChatStore {
   }
   async addMessage(m: (typeof this.messages)[number]) {
     this.check();
+    if (m.role === this.brokenRole) throw new Error("insert_http_503");
     this.messages.push(m);
   }
   async updateConversation(id: string, fields: Partial<ConversationRow>, options?: UpdateOptions) {
@@ -56,6 +60,7 @@ class MemoryStore implements ChatStore {
     this.conversations.get(id)!.escalated_at = new Date(clock.now).toISOString();
   }
   async recordUsage(row: { conversation_id: string; agency_id: string; model: string; input_tokens: number; cached_tokens: number; output_tokens: number }) {
+    if (this.usageBroken) throw new Error("insert_http_503");
     this.usage.push(row);
   }
   async monthUsage() {
@@ -359,6 +364,65 @@ describe("the conversation's lead (Ruling 11)", () => {
     expect([...store.conversations.values()][0]).toMatchObject({ lead_id: "lead-handoff", status: "escalated" });
     await chat(post(next(body.conversationId, "בכל זאת אשמח לפגישה")));
     expect([...store.conversations.values()][0]).toMatchObject({ lead_id: "lead-interview", status: "lead_saved" });
+  });
+});
+
+describe("a saved lead survives a later storage failure (I2)", () => {
+  const steps = () => [toolUse("submitLead", { stage: "complete", name: "רונית", phone: "050-1234567" }), text("נשמר. דורית תחזור אלייך.")];
+
+  it.each([
+    ["the usage row", (s: MemoryStore) => void (s.usageBroken = true)],
+    ["the tool row", (s: MemoryStore) => void (s.brokenRole = "tool")],
+  ])("keeps lead_saved and lead_id when %s cannot be written, answers the reply, and never writes a second lead", async (_what, breakIt) => {
+    const warnings: string[] = [];
+    vi.spyOn(console, "warn").mockImplementation((line: unknown) => void warnings.push(String(line)));
+    const { calls, runTool } = realRunner({ submitLead: { ok: true, leadId: "lead-1" } });
+    const { chat, store } = setup({ runTool }, steps());
+    breakIt(store);
+    const { status, body } = await json(await chat(post(first("כן, הכל נכון"))));
+    expect([status, body.reply, body.leadSaved]).toEqual([200, "נשמר. דורית תחזור אלייך.", true]);
+    const [conv] = [...store.conversations.values()];
+    expect(conv).toMatchObject({ status: "lead_saved", lead_id: "lead-1" });
+    expect(store.messages.find((m) => m.role === "assistant")?.content).toBe("נשמר. דורית תחזור אלייך.");
+    expect(warnings.some((w) => /"event":"store\.(usage|tool_row)_failed"/.test(w) && /insert_http_503/.test(w))).toBe(true);
+    // The visitor sends again: the stored row refuses it, and a runner reading the stored facts would answer already_saved.
+    const again = await json(await chat(post(next(body.conversationId, "שלחתי שוב"))));
+    expect([again.status, again.body.code]).toEqual([409, "closed"]);
+    expect(calls.submitLead).toBe(1);
+    const ctx = { conversation: toFacts(conv), agent: "needs_interview", origin: null, userAgent: null, forwardedFor: null, evalMode: false };
+    expect((await runTool("submitLead", { stage: "complete", name: "רונית", phone: "050-1234567" }, ctx)).status).toBe("already_saved");
+  });
+
+  it("carries on when a tool's handler throws: the model hears it failed, the visitor gets a reply, the row stays open", async () => {
+    const boom: EdgeHandler = async () => {
+      throw new Error("insert_http_503");
+    };
+    const runTool = createToolRunner({ submitLead: boom, escalateToHuman: boom });
+    const { chat, store, model } = setup({ runTool }, [...steps().slice(0, 1), text("לא הצלחתי לשמור, אפשר לנסות שוב?")]);
+    const { status, body } = await json(await chat(post(first())));
+    expect([status, body.reply, body.leadSaved]).toEqual([200, "לא הצלחתי לשמור, אפשר לנסות שוב?", false]);
+    expect(model.calls[1].messages.at(-1)).toMatchObject({ content: [{ type: "tool_result", is_error: true }] });
+    expect([...store.conversations.values()][0]).toMatchObject({ status: "open", lead_id: null });
+    expect(store.messages.filter((m) => m.role === "tool").map((m) => m.content)).toEqual(["submitLead: error"]);
+  });
+
+  it("persists lead_saved and lead_id the moment the tool succeeds, before the model's closing reply", async () => {
+    const { runTool } = realRunner({ submitLead: { ok: true, leadId: "lead-1" } });
+    const seen: unknown[] = [];
+    const store = new MemoryStore();
+    const model: ModelClient = {
+      model: "claude-haiku-5-5",
+      async complete() {
+        seen.push(store.conversations.size ? { ...[...store.conversations.values()][0] } : null);
+        if (seen.length === 1) return toolUse("submitLead", { stage: "complete", name: "רונית", phone: "050-1234567" });
+        throw new ModelError("http", 529);
+      },
+    };
+    const { chat } = setup({ runTool, store, model });
+    const { status, body } = await json(await chat(post(first())));
+    // The closing call failed twice: still a saved lead on the row, and the answer says so.
+    expect([status, body.leadSaved]).toEqual([503, true]);
+    expect(seen[1]).toMatchObject({ status: "lead_saved", lead_id: "lead-1" });
   });
 });
 

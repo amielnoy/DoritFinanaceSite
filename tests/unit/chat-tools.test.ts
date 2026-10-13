@@ -222,4 +222,18 @@ describe("anything else", () => {
     const run = createToolRunner({ submitLead: answering(200, {}), escalateToHuman: answering(200, {}) });
     expect(await run("createConsultationEvent", {}, ctx())).toMatchObject({ status: "error", isError: true });
   });
+
+  it.each(["submitLead", "escalateToHuman"])("turns a %s handler that throws into an error outcome, leaving the conversation as it was", async (name) => {
+    const boom = vi.fn(async () => {
+      throw new Error("insert_http_503");
+    });
+    const run = createToolRunner({ submitLead: boom, escalateToHuman: boom });
+    const c = ctx();
+    const outcome = await run(name, { ...LEAD, reason: "complaint", summary: "x" }, c);
+    expect(outcome).toMatchObject({ name, status: "error", isError: true });
+    expect(outcome.leadSaved ?? false).toBe(false);
+    expect(outcome.escalated ?? false).toBe(false);
+    expect(JSON.parse(outcome.forModel)).toMatchObject({ ok: false });
+    expect(c.conversation).toMatchObject({ status: "open", escalated: false });
+  });
 });

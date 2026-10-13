@@ -686,6 +686,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-016 | "answers already_escalated to a second hand-off after the lead was saved" | Ruling 9: lead saved, hand-off, second hand-off: `already_escalated`, handler once, status `lead_saved` |
 | UNIT-CHTOOL-017 | "refuses a partial save once the lead is saved: already_saved, no second row" | Ruling 10: complete then partial: second is `already_saved`, handler called once |
 | UNIT-CHTOOL-018 | "refuses a partial save after a simulated complete one too" | Ruling 10: the same in evaluation mode |
+| UNIT-CHTOOL-019 | "turns a %s handler that throws into an error outcome, leaving the conversation as it was" | `submitLead` and `escalateToHuman`: `status: error`, `isError`, no `leadSaved`/`escalated`, `{ ok: false }` for the model; status `open`, `escalated` false (I2) |
 
 ### 4.33 The chat function's model client, turn loop and budget — `tests/unit/chat-anthropic.test.ts`, `chat-turn.test.ts`, `chat-budget.test.ts`
 
@@ -783,6 +784,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-038 | "keeps the visitor's phone %s, in storage and for the model" | `050-1234567`, `050 1234567`, `0501234567`, `+972-50-1234567`, `+972501234567`, `03-1234567`, `031234567`: the stored row and the model's history hold the phone unchanged (C1) |
 | UNIT-CHHANDLER-039 | "keeps the phone and redacts the ID and the card in one message" | ID and card become their markers; `050-1234567` stays, in storage and for the model (C1) |
 | UNIT-CHHANDLER-040 | "stores a 3,000-character reply whole, and the model reads it back whole" | No 2,000-character clip: the stored assistant row and the next turn's history equal the reply (M1) |
+| UNIT-CHHANDLER-041 | "keeps lead_saved and lead_id when %s cannot be written, answers the reply, and never writes a second lead" | The usage row, then the tool row, throws after a real complete `submitLead`: 200 with the reply; the row is `lead_saved` with `lead_id`; the assistant row stored; a `store.usage_failed` / `store.tool_row_failed` warn line with the code; a resend gets 409 `closed`, submit-lead was called once, and the runner on the stored facts answers `already_saved` (I2) |
+| UNIT-CHHANDLER-042 | "carries on when a tool's handler throws: the model hears it failed, the visitor gets a reply, the row stays open" | Real runner over a throwing handler: 200 with the model's reply, an `is_error` tool result, status `open`, tool row `submitLead: error` (I2) |
+| UNIT-CHHANDLER-043 | "persists lead_saved and lead_id the moment the tool succeeds, before the model's closing reply" | At the second model call the row is already `lead_saved` with `lead_id`; that call failing gives 503 with `leadSaved: true` (I2) |
 
 ### 4.35a The chat's redaction — `tests/unit/chat-redact.test.ts`
 
@@ -875,5 +879,5 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 ## 5. Pass criteria
 
-All 613 cases pass. Any failure is a functional defect, not an environment issue —
+All 619 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

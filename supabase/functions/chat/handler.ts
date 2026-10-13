@@ -16,7 +16,7 @@ import type { ModelClient } from './anthropic.ts';
 import { monthKey, monthStartIso, spendUsd } from './budget.ts';
 import { systemBlocks, type ChatRole } from './prompt.ts';
 import { toFacts, type ChatStore, type ConversationRow } from './store.ts';
-import { INTERVIEW_TOOLS, type ToolCallContext, type ToolDefinition, type ToolRunner } from './tools.ts';
+import { INTERVIEW_TOOLS, type ConversationStatus, type ToolCallContext, type ToolDefinition, type ToolOutcome, type ToolRunner } from './tools.ts';
 import { runTurn, toModelHistory, TurnFailure, type TurnResult } from './turn.ts';
 
 const FN = 'chat';
@@ -140,7 +140,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'user', content: redactChat(text) });
       const history = toModelHistory(await deps.store.listMessages(id));
 
-      // The runners mutate ctx.conversation (one lead, one hand-off); it is what gets persisted below.
+      // The runners mutate ctx.conversation (one lead, one hand-off); persistOutcome writes it.
       const facts = toFacts(conversation);
       const attribution = conversation.attribution ?? { channel: '', campaign: '', landingPath: '' };
       const ctx: ToolCallContext = {
@@ -155,6 +155,28 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
         evalMode,
       };
 
+      /**
+       * A tool's effect on the row, written the moment the tool answers, before
+       * the model is called again: a later failure in this turn (the model, a
+       * usage row) can then never leave a saved lead's row 'open' for a retry to
+       * save twice. Status first — it is what refuses a second lead. Ruling 11:
+       * the interview lead always takes lead_id; a hand-off's only fills an
+       * empty one. A failure here is storage down, and fails the request.
+       */
+      const written = { status: facts.status, escalated: facts.escalated };
+      const persistOutcome = async (o: ToolOutcome) => {
+        const fields: { status?: ConversationStatus; lead_id?: string } = {};
+        if (ctx.conversation.status !== written.status) fields.status = ctx.conversation.status;
+        if (o.name === 'submitLead' && o.leadId) fields.lead_id = o.leadId;
+        if (fields.status || fields.lead_id) await deps.store.updateConversation(id, fields);
+        written.status = ctx.conversation.status;
+        if (o.name === 'escalateToHuman' && o.leadId) await deps.store.updateConversation(id, { lead_id: o.leadId }, { onlyIfLeadIdNull: true });
+        if (ctx.conversation.escalated && !written.escalated) {
+          await deps.store.recordEscalation(id);
+          written.escalated = true;
+        }
+      };
+
       let result: TurnResult | null = null;
       let failure: TurnFailure | null = null;
       try {
@@ -163,7 +185,11 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           system: systemBlocks(role),
           tools: ROLE_TOOLS[role],
           history,
-          runTool: (name, args) => deps.runTool(name, args, ctx),
+          runTool: async (name, args) => {
+            const outcome = await deps.runTool(name, args, ctx);
+            await persistOutcome(outcome);
+            return outcome;
+          },
           now: deps.now,
         });
       } catch (e) {
@@ -171,32 +197,34 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
         failure = e;
       }
 
-      // A failed turn may still have run tools: their effects are persisted all the same.
+      // The record of the turn, not its state: a row that cannot be written is logged, never a failed answer.
+      const bestEffort = async (event: string, write: () => Promise<void>) => {
+        try {
+          await write();
+        } catch (e) {
+          log('warn', event, { rid, conversation: id, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        }
+      };
       const outcomes = result?.tools ?? failure?.tools ?? [];
       for (const o of outcomes) {
-        await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'tool', content: `${o.name}: ${o.status}` });
+        await bestEffort('store.tool_row_failed', () =>
+          deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'tool', content: `${o.name}: ${o.status}` }),
+        );
       }
       for (const u of result?.usage ?? failure?.usage ?? []) {
-        await deps.store.recordUsage({ conversation_id: id, agency_id: agencyId, model: u.model, input_tokens: u.input, cached_tokens: u.cached, output_tokens: u.output });
-      }
-      if (outcomes.some((o) => o.escalated)) await deps.store.recordEscalation(id);
-      // Ruling 11: the interview lead always wins the conversation's lead_id; a hand-off's
-      // lead only fills an empty one. Applied in call order, so either order ends on the interview lead.
-      for (const o of outcomes) {
-        if (!o.leadId) continue;
-        if (o.name === 'submitLead') await deps.store.updateConversation(id, { lead_id: o.leadId });
-        else if (o.name === 'escalateToHuman') await deps.store.updateConversation(id, { lead_id: o.leadId }, { onlyIfLeadIdNull: true });
+        await bestEffort('store.usage_failed', () =>
+          deps.store.recordUsage({ conversation_id: id, agency_id: agencyId, model: u.model, input_tokens: u.input, cached_tokens: u.cached, output_tokens: u.output }),
+        );
       }
       const leadSaved = outcomes.some((o) => o.leadSaved);
       const status = ctx.conversation.status;
       if (result) {
-        // The store clips to the column's 8,000 characters; MAX_REPLY_TOKENS keeps a reply well under it.
+        // The store clips to the column's 8,000 characters, past anything MAX_REPLY_TOKENS allows in practice.
         await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'assistant', content: redactChat(result.reply) });
       }
       await deps.store.updateConversation(id, {
         turns: conversation.turns + 1,
         last_message_at: new Date(deps.now()).toISOString(),
-        status,
       });
 
       const continuation = { conversationId: id, ...(issuedToken ? { token: issuedToken } : {}) };
