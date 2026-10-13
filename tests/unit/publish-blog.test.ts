@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 // @ts-expect-error — plain .mjs tooling, imported for its pure planning step.
-import { planPublish, readExecResult } from "../../scripts/publish-blog.mjs";
+import { planPublish, publishInSupabase, readExecResult } from "../../scripts/publish-blog.mjs";
 
 /**
  * Publishing is a deliberate, by-title action — never "everything that is
@@ -63,5 +63,32 @@ describe("readExecResult", () => {
     // `console.log(RESULT + JSON.stringify("ok"))`.
     const stdout = "@@publish-blog@@ok";
     expect(() => readExecResult(stdout)).toThrow();
+  });
+});
+
+describe("publishInSupabase", () => {
+  const reply = (body: unknown, status = 200) =>
+    vi.fn(async (_url: string, _init?: RequestInit) =>
+      new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }),
+    );
+
+  it("PATCHes the one row by base44_id, touching only `published`", async () => {
+    const fetchImpl = reply([{ base44_id: "b44-7" }]);
+    await publishInSupabase("https://x.supabase.co", "service-key", "b44-7", fetchImpl);
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe("https://x.supabase.co/rest/v1/blog_posts?base44_id=eq.b44-7");
+    expect(init!.method).toBe("PATCH");
+    expect(JSON.parse(String(init!.body))).toEqual({ published: true });
+    expect((init!.headers as Record<string, string>).Prefer).toBe("return=representation");
+  });
+
+  it("fails when no Supabase row has the id, rather than reporting it published", async () => {
+    await expect(publishInSupabase("https://x.supabase.co", "k", "b44-7", reply([]))).rejects.toThrow(/no Supabase row/);
+  });
+
+  it("fails on a refusal, naming the status", async () => {
+    await expect(publishInSupabase("https://x.supabase.co", "k", "b44-7", reply({ message: "x" }, 401))).rejects.toThrow(
+      /401/,
+    );
   });
 });

@@ -281,6 +281,9 @@ published. See [A-65](10-known-issues.md).
 | UNIT-SEED-007 | "says the CLI may be signed out rather than parsing nothing" | Throws naming `base44 login` |
 | UNIT-SEED-008 | "carries the action time from the front matter to both stores" | `action_time` in the parsed article, the Base44 payload and the mirror row |
 | UNIT-SEED-009 | "sends an empty action time for an article that has none" | `action_time: ""` |
+| UNIT-SEED-010 | "mirrors the file name as the slug, and keeps it out of the Base44 payload" | Mirror row `slug`; payload has none |
+| UNIT-SEED-011 | "takes the slug from the file name" | `horadat-dmei-nihul` |
+| UNIT-SEED-012 | "refuses a file name that cannot be an address" | Throws naming kebab-case |
 
 ### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
 
@@ -513,7 +516,28 @@ or a bracket in it would rewrite the filter.
 | UNIT-ART-007 | "never asks about %j" (6 keys) | `status: 404`; no call recorded |
 | UNIT-ART-008 | "fails, rather than answering 'not found', when the read fails" | `blog_posts read failed`; no `status` |
 
+### 4.25 Publishing by title — `tests/unit/publish-blog.test.ts` (`publishInSupabase`)
+
+The Supabase half of a publish is a PATCH by `base44_id`: it changes
+`published` and nothing else, and a row that is not there is a failure rather
+than a row silently created.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-PUB-001 | "PATCHes the one row by base44_id" | `PATCH …?base44_id=eq.b44-7`, `{ published: true }`, `return=representation` |
+| UNIT-PUB-002 | "fails when no Supabase row has the id, rather than reporting it published" | Throws `no Supabase row` |
+| UNIT-PUB-003 | "fails on a refusal, naming the status" | Throws `401` |
+
+### 4.26 The Base44 export backfill — `tests/unit/base44-repair-scripts.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-BKF-001 | "gives an imported article a fallback slug, and never overwrites one already set" | `slug` column with `'post-<lowercased id>'`; no `slug = excluded.slug` |
+| UNIT-BKF-002 | "turns %j into what the migration's SQL does" (9 inputs) | Uppercase, symbols, leading/trailing symbols, non-Latin; all-symbols and empty fall back to the uuid |
+| UNIT-BKF-003 | "refuses to invent an address from nothing" | Throws `no id` |
+| UNIT-BKF-004 | "is spelled the way the migration spells it" | The migration's SQL holds the same regex, trim and `p_id::text` fallback |
+
 ## 5. Pass criteria
 
-All 399 cases pass. Any failure is a functional defect, not an environment issue —
+All 417 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

@@ -35,6 +35,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isValidSlug } from "./published-articles.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTENT_DIR = join(ROOT, "content/blog");
@@ -63,6 +64,21 @@ function parseArticle(raw) {
 
 export { parseArticle };
 
+/**
+ * The article's address, `/blog/<slug>`: its file name. Supabase holds it
+ * (Base44's BlogPost has no such field), so it goes to the mirror only. A file
+ * name that could not be an address is refused before anything is written.
+ * Note that a re-seed writes the file name back over a slug renamed in
+ * /admin/blog.
+ */
+export function slugFromFile(file) {
+  const slug = file.replace(/\.md$/, "");
+  if (!isValidSlug(slug)) {
+    throw new Error(`${file}: the file name is the article's address (/blog/<name>) and must be Latin kebab-case`);
+  }
+  return slug;
+}
+
 /** Fields both stores hold for a post, in the shape both accept. */
 const FIELDS = ["title", "excerpt", "body", "tags", "action_time", "image_url", "published"];
 
@@ -85,13 +101,13 @@ export function planSeed(articles, existing) {
 
 /** The Supabase row for a step, once Base44 has given it an id. */
 export function mirrorRow(step, base44Id) {
-  return { ...step.payload, published: step.published, base44_id: base44Id };
+  return { ...step.payload, published: step.published, slug: step.article.slug, base44_id: base44Id };
 }
 
 function loadArticles() {
   const articles = readdirSync(CONTENT_DIR)
     .filter((f) => f.endsWith(".md"))
-    .map((f) => ({ file: f, ...parseArticle(readFileSync(join(CONTENT_DIR, f), "utf8")) }));
+    .map((f) => ({ file: f, slug: slugFromFile(f), ...parseArticle(readFileSync(join(CONTENT_DIR, f), "utf8")) }));
 
   for (const a of articles) {
     if (!a.title || !a.body) throw new Error(`${a.file}: BlogPost requires title and body`);

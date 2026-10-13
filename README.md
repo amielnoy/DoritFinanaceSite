@@ -925,6 +925,11 @@ Posts are matched by title (update if present, create if not). New posts are
 never touches `published` on a post that exists, so correcting an article cannot
 take down one that is live.
 
+Each post's address, `/blog/<slug>`, is its **file name**, so a file must be
+named in Latin kebab-case (`horadat-dmei-nihul.md`); the script refuses any
+other. The slug goes to Supabase only — Base44's `BlogPost` has no such field —
+and a re-seed writes the file name back over a slug changed in `/admin/blog`.
+
 ## Tests
 
 The full battery — lint, typecheck, unit, component, contract, integration,
