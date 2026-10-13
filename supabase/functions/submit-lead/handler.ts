@@ -17,7 +17,6 @@ import { deviceLabel } from '../_shared/device.ts';
 import { buildClientHtml, type ClientMail } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { createRequest, maslekaEnabled } from '../_shared/masleka.ts';
-import { buildClientInvite } from '../_shared/masleka-mail.ts';
 import { deliveryWarning, mailerConfigured, sendMail } from '../_shared/mail.ts';
 import { insertRow, selectRows, supabaseConfigured, updateRow, upsertRow } from '../_shared/rest.ts';
 import { isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
@@ -76,8 +75,9 @@ async function findOpenInterview(rid: string, phone: string, name: unknown, emai
 }
 
 /**
- * The invitation went out: the request's one client reminder counts from now.
- * Never throws — the lead is already stored and the mail already sent.
+ * The confirmation carrying the link went out: the request's one client
+ * reminder counts from now. Never throws — the lead is already stored and the
+ * mail already sent.
  */
 async function markMaslekaInvited(rid: string, requestId: string): Promise<boolean> {
   try {
@@ -165,10 +165,6 @@ export async function handler(req: Request): Promise<Response> {
       profile: safeProfile, trackLabel, completeness,
       device: deviceLabel(req.headers.get('user-agent')),
       channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath,
-      // Whether the clearinghouse invitation went out (below), so the
-      // confirmation says where the link is instead of attaching the mandate.
-      // Set only by this handler, never from the request.
-      maslekaInvited: false,
     };
     const agentBody: string = buildAgentBody(source, data);
     const subject: string = subjectFor(source, data);
@@ -298,11 +294,12 @@ export async function handler(req: Request): Promise<Response> {
     }
 
     // The clearinghouse request (PR A, dark until MASLEKA_ENABLED): an
-    // interview that asked for the pull gets a request, and its personal link
-    // goes out in the pipeline's own invitation where the mandate link was. If
-    // the request cannot be created, or its invitation cannot be sent, the
+    // interview that asked for the pull gets a request, and the confirmation
+    // below carries its personal link as a button where the mandate link was —
+    // one mail, not two (Ruling 21). If the request cannot be created, the
     // confirmation is today's, mandate and all, and a warning says so. The
-    // link stays in this local: never in `data`, a log line or the answer.
+    // link stays in this local and the confirmation's own copy of `data`:
+    // never in what the staff copies read, a log line or the answer.
     let masleka: { id: string; link: string } | null = null;
     if (source === 'interview' && maslekaEnabled() && wantsClearinghouse(safeProfile)) {
       try {
@@ -327,18 +324,8 @@ export async function handler(req: Request): Promise<Response> {
       log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'rate_limited' });
       warnings.push('client_confirmation_rate_limited');
     } else if (email) {
-      // The invitation first, under the same address checks and daily limit
-      // as the confirmation, so the confirmation can tell the truth about it.
-      if (masleka) {
-        try {
-          await sendMail(log, { to: email, ...buildClientInvite(String(name), masleka.link), rid, role: 'visitor' });
-          data.maslekaInvited = true;
-          if (!(await markMaslekaInvited(rid, masleka.id))) warnings.push('masleka_invite_mark_failed');
-        } catch (e) {
-          log('warn', 'mail.failed', { rid, role: 'visitor', err: String((e as Error)?.message ?? e).slice(0, 200) });
-          warnings.push('masleka_invite_failed');
-        }
-      }
+      // Only the visitor's letter sees the link; with no request it is `data` itself.
+      const clientData = masleka ? { ...data, maslekaLink: masleka.link } : data;
       try {
         // הכותרת חייבת לומר את מה שגוף המכתב אומר. clientMailFor פותח ראיון
         // ב"קיבלנו את סיכום השיחה", ונושא שאומר "פנייתכם" הופך את אותו מייל
@@ -351,11 +338,13 @@ export async function handler(req: Request): Promise<Response> {
         await sendMail(log, {
           to: email,
           subject: clientSubject,
-          html: buildClientHtml(clientMailFor(source, data) as ClientMail),
-          text: buildClientText(source, data),
+          html: buildClientHtml(clientMailFor(source, clientData) as ClientMail),
+          text: buildClientText(source, clientData),
           rid,
           role: 'visitor',
         });
+        // Marked only once the letter carrying the link has gone out.
+        if (masleka && !(await markMaslekaInvited(rid, masleka.id))) warnings.push('masleka_invite_mark_failed');
       } catch (e) {
         log('warn', 'mail.failed', { rid, role: 'visitor', err: String((e as Error)?.message ?? e).slice(0, 200) });
         warnings.push(deliveryWarning('client_confirmation_failed', e));

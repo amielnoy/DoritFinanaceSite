@@ -1,22 +1,20 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { invokeEdge, type EdgeInvocation, type EdgeOptions } from "../helpers/edge-function";
-import { buildClientInvite } from "../../supabase/functions/_shared/masleka-mail.ts";
 
 /**
  * What only the Edge submit-lead does for the clearinghouse (PR A): with
  * MASLEKA_ENABLED on, an interview that answered "מעוניין/ת" gets a request,
- * and its personal /masleka link goes out in the pipeline's own invitation
- * (buildClientInvite, with its https button) where the mandate link was. Off,
- * nothing changes — byte for byte, pinned below against the output this
- * function produced before the pipeline existed.
+ * and the one confirmation it already receives carries the personal /masleka
+ * link as an https button (Ruling 13) where the mandate link was — one mail,
+ * not two (Ruling 21). Off, nothing changes — byte for byte, pinned below
+ * against the output this function produced before the pipeline existed.
  */
 const AGENCY_1 = "00000000-0000-0000-0000-000000000001";
 const POA = "https://example.test/poa.pdf";
 const ON = { MASLEKA_ENABLED: "true" };
 const STAFF = ["dorit@govari-fin.co.il", "amielnoy@gmail.com", "amielnoy@outlook.com"];
 const LINK = /https:\/\/govari-fin\.co\.il\/masleka#t=([A-Za-z0-9_-]{43})/;
-const INVITE_SUBJECT = "שליפת נתוני מסלקה — מסירת קוד · דורית גוב ארי";
 const CONFIRM_SUBJECT = "אישור — קיבלנו את סיכום השיחה · דורית גוב ארי";
 const base = {
   name: "אורי לוי",
@@ -37,10 +35,11 @@ const run = (body: unknown, envPatch: Record<string, string | null> = {}, extra:
 
 /** Every mail the visitor received. */
 const toVisitor = (r: EdgeInvocation, address = base.email) => r.emails.filter((e) => e.to === address);
-const invitation = (r: EdgeInvocation) => toVisitor(r).filter((e) => e.subject === INVITE_SUBJECT);
+/** The visitor's only mail: the confirmation. Fails unless there is exactly one. */
 const confirmation = (r: EdgeInvocation) => {
-  const found = toVisitor(r).filter((e) => e.subject === CONFIRM_SUBJECT);
-  expect(found, "exactly one confirmation").toHaveLength(1);
+  const found = toVisitor(r);
+  expect(found, "exactly one mail to the visitor").toHaveLength(1);
+  expect(found[0].subject).toBe(CONFIRM_SUBJECT);
   return found[0];
 };
 
@@ -196,7 +195,7 @@ describe("submit-lead — dark: today's lead path while MASLEKA_ENABLED is off",
 });
 
 describe("submit-lead — the clearinghouse request, with the switch on", () => {
-  it("creates a request for an interview that asked for the pull, and sends its invitation instead of the mandate", async () => {
+  it("creates a request for an interview that asked for the pull, and its one confirmation carries the link as a button instead of the mandate", async () => {
     const r = await run(interested, ON);
     expect(r.status).toBe(200);
     expect(r.maslekaRequests).toHaveLength(1);
@@ -210,37 +209,25 @@ describe("submit-lead — the clearinghouse request, with the switch on", () => 
       created_by: null,
     });
 
-    const invites = invitation(r);
-    expect(invites, "one invitation").toHaveLength(1);
-    const invite = invites[0];
-    const token = invite.text!.match(LINK)![1];
+    const mail = confirmation(r);
+    const token = mail.text!.match(LINK)![1];
     const link = `https://govari-fin.co.il/masleka#t=${token}`;
     expect(row.token_hash).toBe(sha(token));
-    // The pipeline's own invitation, with its https button (Ruling 13), byte for byte.
-    const built = buildClientInvite("אורי לוי", link);
-    expect(invite.subject).toBe(built.subject);
-    expect(invite.html).toBe(built.html);
-    expect(invite.text).toBe(built.text);
-    expect(invite.html).toContain(`href="${link}"`);
+    // Ruling 13's https button, in the HTML half; the plain link in the text half.
+    expect(mail.html).toContain(`<a href="${link}"`);
+    expect(mail.text).toContain(link);
+    for (const half of [mail.html!, mail.text!]) expect(half).not.toContain(POA);
     expect(row.client_invited_at).toEqual(expect.any(String));
-
-    // The confirmation no longer carries the mandate, and says where the link went.
-    const confirm = confirmation(r);
-    for (const half of [confirm.html!, confirm.text!]) {
-      expect(half).not.toContain(POA);
-      expect(half).not.toContain("masleka#t=");
-      expect(half).toContain("במייל נפרד");
-    }
-    expect(toVisitor(r)).toHaveLength(2);
   });
 
   it("says nothing about the clearinghouse to a visitor who declined", async () => {
     const r = await run(declined, ON);
     expect(r.maslekaRequests).toHaveLength(0);
     expect(r.callsTo("masleka_requests")).toHaveLength(0);
-    expect(toVisitor(r)).toHaveLength(1);
-    expect(r.mailTo(base.email).text).not.toContain("masleka#t=");
-    expect(r.mailTo(base.email).text).not.toContain("מסלקה");
+    const mail = confirmation(r);
+    expect(mail.text).not.toContain("masleka#t=");
+    expect(mail.html).not.toContain("masleka#t=");
+    expect(mail.text).not.toContain("מסלקה");
   });
 
   it("creates nothing for an interview that is still partial", async () => {
@@ -257,36 +244,32 @@ describe("submit-lead — the clearinghouse request, with the switch on", () => 
     expect(r.leads).toHaveLength(1);
     expect(r.calendarEvents).toHaveLength(1);
     for (const to of STAFF) expect(r.emails.some((e) => e.to === to && !e.ics), to).toBe(true);
-    expect(invitation(r)).toHaveLength(0);
-    expect(r.mailTo(base.email).text).toContain(POA);
-    expect(r.mailTo(base.email).html).toContain(POA);
-    expect(r.mailTo(base.email).text).not.toContain("masleka#t=");
+    const mail = confirmation(r);
+    expect(mail.text).toContain(POA);
+    expect(mail.html).toContain(POA);
+    expect(mail.text).not.toContain("masleka#t=");
+    expect(mail.html).not.toContain("masleka#t=");
   });
 
-  it("falls back to the mandate when the invitation cannot be sent, and leaves the request not invited", async () => {
-    const r = await run(booked, ON, { failEmailSubject: INVITE_SUBJECT });
+  it("leaves the request not invited when the confirmation carrying the link cannot be sent, and the lead still lands", async () => {
+    const r = await run(booked, ON, { failEmailTo: [base.email] });
     expect(r.status).toBe(200);
-    expect(r.json.warnings).toContain("masleka_invite_failed");
+    expect(r.json.warnings).toEqual(expect.arrayContaining([expect.stringMatching(/^client_confirmation_failed/)]));
     expect(r.maslekaRequests).toHaveLength(1);
     expect(r.maslekaRequests[0].client_invited_at).toBeNull();
     expect(r.requestPatches).toHaveLength(0);
     expect(r.leads).toHaveLength(1);
     expect(r.calendarEvents).toHaveLength(1);
     for (const to of STAFF) expect(r.emails.some((e) => e.to === to && !e.ics), to).toBe(true);
-    const confirm = r.mailTo(base.email);
-    expect(confirm.subject).toBe(CONFIRM_SUBJECT);
-    expect(confirm.text).toContain(POA);
-    expect(confirm.text).not.toContain("במייל נפרד");
   });
 
-  it("still answers 200 when the invitation went out but could not be marked", async () => {
+  it("still answers 200 when the confirmation went out but could not be marked", async () => {
     const { r, lines } = await withLogs(interested, ON, { masleka: { failPatchMatching: "id=eq." } });
     expect(r.status).toBe(200);
-    expect(invitation(r)).toHaveLength(1);
+    expect(confirmation(r).text).toMatch(LINK);
     expect(r.maslekaRequests[0].client_invited_at).toBeNull();
     expect(r.json.warnings).toContain("masleka_invite_mark_failed");
     expect(lines.some((l) => l.includes('"masleka.invite_mark_failed"'))).toBe(true);
-    expect(confirmation(r).text).toContain("במייל נפרד");
   });
 
   it("never takes the link from the request body", async () => {
@@ -297,9 +280,9 @@ describe("submit-lead — the clearinghouse request, with the switch on", () => 
       for (const e of r.emails) expect(`${e.html}${e.text}`, JSON.stringify(envPatch)).not.toContain("evil.example");
     }
     const on = await run(body, ON);
-    expect(invitation(on)[0].text).toMatch(LINK);
+    expect(confirmation(on).text).toMatch(LINK);
     const off = await run(body);
-    expect(off.mailTo(base.email).text, "the off path reads no flag from the body").toContain(POA);
+    expect(confirmation(off).text, "the off path reads nothing from the body").toContain(POA);
   });
 
   it("creates the request without mailing when there is no address, or none that is one", async () => {
@@ -311,7 +294,7 @@ describe("submit-lead — the clearinghouse request, with the switch on", () => 
     }
   });
 
-  it("sends no invitation to an address over its daily confirmation limit", async () => {
+  it("sends no link to an address over its daily confirmation limit", async () => {
     const r = await run(interested, ON, { overLimit: ["confirm-to:"] });
     expect(r.status).toBe(200);
     expect(r.maslekaRequests).toHaveLength(1);
@@ -319,9 +302,9 @@ describe("submit-lead — the clearinghouse request, with the switch on", () => 
     expect(toVisitor(r)).toHaveLength(0);
   });
 
-  it("puts the link only in the client's invitation — never in a log line, the answer, the confirmation or a staff copy", async () => {
+  it("puts the link only in the client's confirmation — never in a log line, the answer or a staff copy", async () => {
     const { r, lines } = await withLogs(booked, ON);
-    const token = invitation(r)[0].text!.match(LINK)![1];
+    const token = confirmation(r).text!.match(LINK)![1];
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
       expect(line).not.toContain(token);
@@ -330,7 +313,7 @@ describe("submit-lead — the clearinghouse request, with the switch on", () => 
     }
     expect(lines.some((l) => l.includes('"masleka.request_created"'))).toBe(true);
     expect(JSON.stringify(r.json)).not.toContain(token);
-    const others = r.emails.filter((e) => e.subject !== INVITE_SUBJECT);
+    const others = r.emails.filter((e) => e.to !== base.email);
     expect(others.length).toBeGreaterThan(1);
     for (const e of others) expect(`${e.html}${e.text}${e.ics ?? ""}`, e.to).not.toContain(token);
   });

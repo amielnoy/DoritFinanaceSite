@@ -656,14 +656,15 @@ export function wantsClearinghouse(profile) {
 }
 
 /**
- * The interview confirmation once the clearinghouse invitation has gone out
- * (PR A, MASLEKA_ENABLED): the personal link travels in that invitation —
- * buildClientInvite, with its button — so this letter only says where it is.
- * `data.maslekaInvited` is set by the handler after that mail was sent; it is
- * never read from the request.
+ * The interview confirmation when the clearinghouse request replaces the
+ * mandate (PR A, MASLEKA_ENABLED; Ruling 21: one mail). The link itself is
+ * `data.maslekaLink`, built by the handler from a token it just issued and
+ * rendered as html.ts's https-only button — never read from the request, so
+ * no visitor can put a link of theirs into a mail from Dorit.
  */
 export const MASLEKA_INTRO =
-  'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה. ביקשתם שאשלוף עבורכם תמונת מצב פנסיונית מהמסלקה — הקישור האישי למסירת קוד ייפוי הכוח נשלח אליכם במייל נפרד, ובו ההסבר המלא, צעד אחר צעד.';
+  'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה. ביקשתם שאשלוף עבורכם תמונת מצב פנסיונית מהמסלקה — הכפתור שלמטה מוביל לעמוד האישי שלכם למסירת קוד ייפוי הכוח, ושם מחכה ההסבר המלא, צעד אחר צעד.';
+export const MASLEKA_ACTION_LABEL = 'למסירת קוד המסלקה';
 
 /** ערך קצר בלי שום דבר שנראה כמו קישור או כתובת, או ברירת המחדל. */
 export function plainOr(value, fallback) {
@@ -700,16 +701,16 @@ export function clientMailFor(source, data) {
     // שעבר redact, ולכן הבדיקה היא על התווית. buildInterviewProfile משמיט שדה
     // ריק, כך שעצם קיומה של השורה אומר שנשאל ונענה.
     const wants = wantsClearinghouse(data?.profile);
-    // With the clearinghouse pipeline on and its invitation sent, that mail
-    // replaces the mandate; otherwise (switch off, or the request or its
-    // invitation failed) this letter is exactly what it was.
-    const maslekaInvited = wants && data?.maslekaInvited === true;
-    const poaOffered = wants && !maslekaInvited && POA_URL;
-    return {
+    // With the clearinghouse pipeline on, the personal /masleka link replaces
+    // the mandate, as a button; with it off (or when the request could not be
+    // created) the letter is exactly what it was — no `action` key at all.
+    const maslekaOffered = wants && typeof data?.maslekaLink === 'string' && data.maslekaLink !== '';
+    const poaOffered = wants && !maslekaOffered && POA_URL;
+    const mail = {
       firstName,
       eyebrow: 'אישור קבלה',
       heading: 'קיבלנו את סיכום השיחה',
-      intro: maslekaInvited
+      intro: maslekaOffered
         ? MASLEKA_INTRO
         : poaOffered
         ? 'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה. ביקשתם שאשלוף עבורכם תמונת מצב פנסיונית מהמסלקה — לשם כך נדרש ייפוי כוח חתום, והוא מצורף כאן למטה. אפשר לחתום עליו לפני הפגישה, וכך נגיע אליה עם התמונה המלאה.'
@@ -719,6 +720,7 @@ export function clientMailFor(source, data) {
         ? [['נושא מרכזי', plainOr(data.topic, 'הקשר כללי')], ['ייפוי כוח למסלקה', POA_URL]]
         : [['נושא מרכזי', plainOr(data.topic, 'הקשר כללי')]],
     };
+    return maslekaOffered ? { ...mail, action: { label: MASLEKA_ACTION_LABEL, href: data.maslekaLink } } : mail;
   }
   const isConsultation = source === 'consultation';
   return {
@@ -745,12 +747,12 @@ export function buildClientText(source, data) {
     // לקוח שאינו מציג HTML מקבל את הטקסט, ואם רק אחת מהן מזכירה את ייפוי הכוח
     // הוא קיים או לא קיים לפי היכולת של תוכנת הדואר שלו.
     const wants = wantsClearinghouse(data?.profile);
-    const maslekaInvited = wants && data?.maslekaInvited === true;
+    const maslekaOffered = wants && typeof data?.maslekaLink === 'string' && data.maslekaLink !== '';
     return [
       `${hello}תודה על השיחה. הסיכום שאישרתם הועבר אליי כפי שהוא.`,
       `נושא מרכזי: ${plainOr(data.topic, 'הקשר כללי')}`,
-      ...(maslekaInvited
-        ? [`שליפת נתוני מסלקה — הקישור האישי למסירת קוד ייפוי הכוח נשלח אליכם במייל נפרד.`]
+      ...(maslekaOffered
+        ? [`מסירת קוד המסלקה — הקישור האישי שלכם: ${data.maslekaLink}`]
         : wants && POA_URL
         ? [`ייפוי כוח לשליפת נתוני מסלקה — לחתימה לפני הפגישה: ${POA_URL}`]
         : []),
