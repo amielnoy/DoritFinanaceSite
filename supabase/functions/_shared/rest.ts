@@ -61,10 +61,10 @@ export async function selectRows(table: string, query: string): Promise<Record<s
   return Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
 }
 
-/** One row, by its `id`. */
-export async function updateRow(table: string, id: string, fields: Record<string, unknown>): Promise<void> {
+/** One row, by its `id`; `extraFilter` (e.g. `lead_id=is.null`) narrows it further, a PostgREST query fragment. */
+export async function updateRow(table: string, id: string, fields: Record<string, unknown>, extraFilter?: string): Promise<void> {
   const { url, auth } = target();
-  const res = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+  const res = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}${extraFilter ? `&${extraFilter}` : ''}`, {
     method: 'PATCH',
     headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify(fields),

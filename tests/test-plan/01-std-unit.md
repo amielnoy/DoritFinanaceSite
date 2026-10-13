@@ -716,7 +716,25 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHBUDGET-008 | "takes 0 as the kill switch" | `"0"` gives 0 |
 | UNIT-CHBUDGET-009 | "falls back to 50 on nonsense" | `"lots"` and `"-5"` give 50 |
 
+### 4.34 The chat function's store — `tests/unit/chat-store.test.ts`
+
+`supabase/functions/chat/store.ts`: reads and writes of the chat tables over PostgREST with a fake `fetch`. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHSTORE-001 | "reads a conversation by id" | GET `chat_conversations?id=eq.<id>&select=*&limit=1`; the row returned |
+| UNIT-CHSTORE-002 | "never queries with an id that is not a uuid" | `null`, no request sent |
+| UNIT-CHSTORE-003 | "lists a conversation's messages in the order they were written" | `order=id.asc&limit=200`; `role` and `content` only |
+| UNIT-CHSTORE-004 | "reads this month's totals through the RPC, as numbers" | POST `rpc/chat_month_usage` with `p_agency_id`, `p_since`; bigint strings become numbers |
+| UNIT-CHSTORE-005 | "claims the month's budget alert once: true on the insert, false on the conflict" | 201 gives `true`; 409 (23505) gives `false` |
+| UNIT-CHSTORE-006 | "creates a conversation and hands back the stored row" | POST `chat_conversations`; the stored row returned |
+| UNIT-CHSTORE-007 | "loads escalated_at into the conversation's facts as escalated" | `toFacts`: `escalated` false for null, true for a timestamp |
+| UNIT-CHSTORE-008 | "persists a hand-off as escalated_at, set to the current time" | PATCH `id=eq.<id>` with only `escalated_at`, a current ISO time |
+| UNIT-CHSTORE-009 | "truncates a message to the 8,000 characters the column allows" | 8,500 characters sent as 8,000; a short one unchanged |
+| UNIT-CHSTORE-010 | "does not cut an emoji in half at the limit" | A surrogate pair straddling the limit is dropped whole |
+| UNIT-CHSTORE-011 | "sets lead_id only while it is null when asked to" | `onlyIfLeadIdNull` adds `&lead_id=is.null` to the PATCH; without it no filter |
+
 ## 5. Pass criteria
 
-All 505 cases pass. Any failure is a functional defect, not an environment issue —
+All 516 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
