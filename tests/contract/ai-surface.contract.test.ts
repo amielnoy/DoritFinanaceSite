@@ -161,4 +161,13 @@ describe("the SEO files are written by every prerendered build", () => {
   it("leaves the Base44 Builder's plain build alone", () => {
     expect(pkg.scripts.build).toBe("vite build");
   });
+
+  it("reads the environment through one helper in both build steps", () => {
+    expect(read(join(REPO_ROOT, "scripts/published-articles.mjs"))).toMatch(/export async function buildEnv\(/);
+    for (const script of ["scripts/prerender.mjs", "scripts/build-seo-files.mjs"]) {
+      const source = read(join(REPO_ROOT, script));
+      expect(source, script).toMatch(/buildEnv\(/);
+      expect(source, script).not.toMatch(/loadPublishedArticles\(\s*process\.env/);
+    }
+  });
 });

@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildLlms,
   buildLlmsFull,
+  absolutizeLinks,
   buildSitemap,
+  demoteHeadings,
   lastmodOf,
   originFromSitemap,
+  withBuiltPages,
   // @ts-expect-error — plain .mjs tooling, imported for its pure steps.
 } from "../../scripts/seo-files.mjs";
 
@@ -135,5 +138,56 @@ describe("buildLlmsFull", () => {
   });
   it("refuses a template without the pages heading it cuts at", () => {
     expect(() => buildLlmsFull("# x\n", ORIGIN, [], [])).toThrow(/## דפים/);
+  });
+});
+
+describe("demoteHeadings", () => {
+  it("moves every heading two levels down, stopping at h6", () => {
+    expect(demoteHeadings("## a\n\n#### b\n\n###### c")).toBe("#### a\n\n###### b\n\n###### c");
+    expect(demoteHeadings("# t")).toBe("### t");
+  });
+  it("leaves a heading-looking line inside a fenced block alone", () => {
+    expect(demoteHeadings("```\n## x\n```\n## y")).toBe("```\n## x\n```\n#### y");
+    expect(demoteHeadings("~~~\n## x\n~~~\n## y")).toBe("~~~\n## x\n~~~\n#### y");
+  });
+  it("leaves #hashtag (no space) and mid-line hashes alone", () => {
+    expect(demoteHeadings("#hashtag\ntext ## not")).toBe("#hashtag\ntext ## not");
+  });
+});
+
+describe("absolutizeLinks", () => {
+  it("makes a root-relative Markdown link target absolute", () => {
+    expect(absolutizeLinks("[a](/#start) and [b](/blog)", ORIGIN)).toBe(`[a](${ORIGIN}/#start) and [b](${ORIGIN}/blog)`);
+  });
+  it("leaves absolute and protocol-relative targets alone", () => {
+    const text = "[x](https://x.example/a) [y](//cdn.example/a)";
+    expect(absolutizeLinks(text, ORIGIN)).toBe(text);
+  });
+  it("leaves a fenced block alone", () => {
+    expect(absolutizeLinks("```\n[a](/x)\n```", ORIGIN)).toBe("```\n[a](/x)\n```");
+  });
+});
+
+describe("withBuiltPages", () => {
+  const rows = [{ slug: "a" }, { slug: "b" }, { slug: "c" }];
+  it("keeps only articles whose page exists, and names the rest", () => {
+    const out = withBuiltPages(rows, (slug: string) => slug !== "b");
+    expect(out.kept).toEqual([{ slug: "a" }, { slug: "c" }]);
+    expect(out.dropped).toEqual(["b"]);
+  });
+  it("drops nothing when every page exists", () => {
+    expect(withBuiltPages(rows, () => true)).toEqual({ kept: rows, dropped: [] });
+  });
+});
+
+describe("buildLlmsFull — article bodies", () => {
+  const article = { slug: "s", title: "T", body: "## מה בודקים\n\nראו [כאן](/#start).", updated_at: "2026-10-10T00:00:00Z" };
+  const out = buildLlmsFull(LLMS, ORIGIN, [], [article]);
+  it("demotes the body's headings below the article title", () => {
+    expect(out).toContain("#### מה בודקים");
+    expect(out).not.toMatch(/^## מה בודקים/m);
+  });
+  it("makes the body's root-relative links absolute", () => {
+    expect(out).toContain(`[כאן](${ORIGIN}/#start)`);
   });
 });

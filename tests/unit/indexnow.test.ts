@@ -76,6 +76,31 @@ describe("submit — never fails the deploy", () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("ENOTFOUND"));
   });
 
+  it("warns when the sitemap's articles are on another host", async () => {
+    const warn = vi.fn();
+    const info = vi.fn();
+    const fetchImpl = vi.fn(async () => new Response(SITEMAP, { status: 200 }));
+    await expect(submit({ origin: "https://other.example", fetchImpl, now: NOW, log: { info, warn } })).resolves.toEqual({
+      submitted: 0,
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("not on https://other.example"));
+    expect(info).not.toHaveBeenCalledWith(expect.stringContaining("no article changed"));
+  });
+
+  it("still submits when the origin has a trailing slash", async () => {
+    const fetchImpl = sitemapThen(new Response(null, { status: 202 }));
+    await expect(submit({ origin: `${ORIGIN}/`, fetchImpl, now: NOW, log })).resolves.toEqual({ submitted: 2 });
+  });
+
+  it("warns and resolves when the sitemap answers with an error", async () => {
+    const warn = vi.fn();
+    const fetchImpl = vi.fn(async () => new Response("no", { status: 503 }));
+    await expect(submit({ origin: ORIGIN, fetchImpl, now: NOW, log: { info: vi.fn(), warn } })).resolves.toEqual({
+      submitted: 0,
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("503"));
+  });
+
   it("warns and resolves without an origin", async () => {
     const warn = vi.fn();
     await expect(submit({ origin: "", fetchImpl: vi.fn(), now: NOW, log: { info: vi.fn(), warn } })).resolves.toEqual({

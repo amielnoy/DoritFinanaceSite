@@ -916,8 +916,13 @@ the `dist/` copies, so the host the site-url plugin chose is already in them.
 The article list is the prerender's own (`loadPublishedArticles`, read from
 Supabase in pages, and refusing a list that came back cut short). That is
 deliberate: the sitemap must not advertise a page the build did not make.
-Production (`PRERENDER_REQUIRED=1`) fails without the list; a preview warns and
-ships the templates.
+Production (`PRERENDER_REQUIRED=1`) fails without the list. A preview that
+cannot read it warns and ships the sitemap and `llms.txt` without articles
+(`llms.txt` still gains the `llms-full.txt` pointer, and `llms-full.txt` is
+written with the FAQ only). An article without a prebuilt
+`dist/blog/<slug>.html` is left out of all three, with a warning. In
+`llms-full.txt` each article's headings are demoted below its title and its
+root-relative links are made absolute.
 
 The static routes carry no `lastmod`, because nothing dates them honestly.
 `/blog` carries its newest article's, and each article carries its `updated_at`.
@@ -937,9 +942,10 @@ design; it proves nothing but that we control the site.
 After each green production deploy (a push, the nightly run, or a publish
 dispatch), the step "Tell IndexNow about new and changed articles" runs
 `scripts/indexnow.mjs`. It reads the sitemap now being served and submits the
-article URLs whose `lastmod` is within the last 48 hours. Successive runs overlap within the window, and submitting an article twice is
-harmless. It never
-fails the deploy: every problem becomes a warning.
+article URLs whose `lastmod` is within the last 48 hours. Successive runs
+overlap within the window, and submitting an article twice is harmless. It never
+fails the deploy: every problem becomes a warning, including a sitemap whose
+article URLs are on a different host from `PRODUCTION_URL`.
 
 Static routes are not submitted by the step; submit them by hand once.
 

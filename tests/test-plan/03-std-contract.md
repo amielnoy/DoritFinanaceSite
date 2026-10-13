@@ -267,7 +267,7 @@ cases extract the step's shell out of the YAML and run it under `bash -e` for
 each combination, since shell embedded in a workflow is covered by nothing else
 here.
 
-**`ai-surface.contract.test.ts` — `CTR-AI-001..017`** — what an AI assistant can
+**`ai-surface.contract.test.ts` — `CTR-AI-001..018`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript
 receives the home page's `<head>` on every route; `public/llms.txt` is therefore
 the only surface such a crawler reads in full, and the one nothing was checking.
@@ -285,7 +285,8 @@ the wildcard. `CTR-AI-015..017` pin that `robots.txt` tells a crawler where
 `/llms-full.txt` is, that `build:prerender` runs `scripts/build-seo-files.mjs`
 after the prerender (so Vercel and CI write the sitemap, `llms.txt` and
 `llms-full.txt` with the published articles), and that the Base44 Builder's plain
-`build` stays `vite build`.
+`build` stays `vite build`. `CTR-AI-018` pins that the prerender and the SEO
+files both read their environment through `buildEnv`.
 
 **`blog-content.contract.test.ts` — `CTR-ART-001..019`** — the repo-held articles under
 `content/blog/`. Each must parse, be a real article rather than a stub, carry
@@ -515,7 +516,7 @@ time.
 
 ## 6. Pass criteria
 
-All 571 cases pass. A failure means either the frontend or the backend definition
+All 572 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

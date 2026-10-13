@@ -26,6 +26,45 @@ const oneLine = (value) => String(value ?? '').replace(/\s+/g, ' ').trim()
 /** A link label: square brackets would end the Markdown link early, so they become parentheses. */
 const linkLabel = (value) => oneLine(value).replace(/\[/g, '(').replace(/\]/g, ')')
 
+/** Runs `fn` over the text outside fenced code blocks (``` or ~~~), line by line. */
+function outsideFences(text, fn) {
+  let fence = null
+  return String(text)
+    .split('\n')
+    .map((line) => {
+      const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1]
+      if (fence) {
+        if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null
+        return line
+      }
+      if (marker) {
+        fence = marker
+        return line
+      }
+      return fn(line)
+    })
+    .join('\n')
+}
+
+/** Every ATX heading two levels down (capped at h6), so a body nests under its "###" title. */
+export function demoteHeadings(text) {
+  return outsideFences(text, (line) =>
+    line.replace(/^(#{1,6})(?= )/, (hashes) => '#'.repeat(Math.min(6, hashes.length + 2))),
+  )
+}
+
+/** Markdown link targets starting with a single "/" become absolute on `origin`. */
+export function absolutizeLinks(text, origin) {
+  return outsideFences(text, (line) => line.replace(/\]\(\/(?!\/)/g, `](${origin}/`))
+}
+
+/** Splits rows by whether their built page exists: { kept, dropped (slugs) }. */
+export function withBuiltPages(rows, exists) {
+  const kept = rows.filter((row) => exists(row.slug))
+  const dropped = rows.filter((row) => !exists(row.slug)).map((row) => row.slug)
+  return { kept, dropped }
+}
+
 /** The origin of the first https <loc> — the home page in public/sitemap.xml. */
 export function originFromSitemap(xml) {
   const loc = /<loc>(https:\/\/[^<]+)<\/loc>/.exec(xml)
@@ -109,7 +148,7 @@ export function buildLlmsFull(template, origin, faq, articles) {
       const lastmod = lastmodOf(article)
       const dated = lastmod ? ` · עודכן ${lastmod.slice(0, 10)}` : ''
       parts.push(
-        `### ${oneLine(article.title)}\n\n${origin}${articleRoute(article.slug)}${dated}\n\n${String(article.body ?? '').trim()}\n\n`,
+        `### ${oneLine(article.title)}\n\n${origin}${articleRoute(article.slug)}${dated}\n\n${absolutizeLinks(demoteHeadings(String(article.body ?? '').trim()), origin)}\n\n`,
       )
     }
   }

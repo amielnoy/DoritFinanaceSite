@@ -606,6 +606,16 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-SEOF-017 | "carries every question and answer under its own heading" | `### question` then answer |
 | UNIT-SEOF-018 | "carries every article's text under its title and address" | Title, address and `עודכן` date, then body |
 | UNIT-SEOF-019 | "refuses a template without the pages heading it cuts at" | Throws "## דפים" |
+| UNIT-SEOF-020 | "moves every heading two levels down, stopping at h6" | `##`→`####`, `####`→`######`, `######` stays |
+| UNIT-SEOF-021 | "leaves a heading-looking line inside a fenced block alone" | ``` and ~~~ fences untouched |
+| UNIT-SEOF-022 | "leaves #hashtag (no space) and mid-line hashes alone" | Text unchanged |
+| UNIT-SEOF-023 | "makes a root-relative Markdown link target absolute" | `](/#start)` and `](/blog)` gain the origin |
+| UNIT-SEOF-024 | "leaves absolute and protocol-relative targets alone" | `https://` and `//cdn` unchanged |
+| UNIT-SEOF-025 | "leaves a fenced block alone" | Link inside a fence unchanged |
+| UNIT-SEOF-026 | "keeps only articles whose page exists, and names the rest" | `kept` and `dropped` slugs from a fake `exists` |
+| UNIT-SEOF-027 | "drops nothing when every page exists" | `dropped` empty |
+| UNIT-SEOF-028 | "demotes the body's headings below the article title" | `#### מה בודקים` in llms-full |
+| UNIT-SEOF-029 | "makes the body's root-relative links absolute" | Link carries the origin in llms-full |
 
 ### 4.29 Search Console and Bing verification tags — `tests/unit/site-verification.test.ts`
 
@@ -634,8 +644,11 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-INOW-007 | "warns and resolves on a refused submission" | HTTP 422 warned; `{ submitted: 0 }` |
 | UNIT-INOW-008 | "warns and resolves when IndexNow cannot be reached" | Network error warned; `{ submitted: 0 }` |
 | UNIT-INOW-009 | "warns and resolves without an origin" | Warns; `{ submitted: 0 }` |
+| UNIT-INOW-010 | "warns when the sitemap's articles are on another host" | Warns "not on <site>"; no "no article changed" info; `{ submitted: 0 }` |
+| UNIT-INOW-011 | "still submits when the origin has a trailing slash" | `{ submitted: 2 }` |
+| UNIT-INOW-012 | "warns and resolves when the sitemap answers with an error" | HTTP 503 warned; `{ submitted: 0 }` |
 
 ## 5. Pass criteria
 
-All 445 cases pass. Any failure is a functional defect, not an environment issue —
+All 458 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

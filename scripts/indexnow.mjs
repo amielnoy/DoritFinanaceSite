@@ -41,7 +41,12 @@ export async function submit({ origin, fetchImpl = fetch, now = new Date(), log 
       log.warn(`::warning::IndexNow: ${site}/sitemap.xml answered HTTP ${sitemap.status}; nothing submitted.`)
       return { submitted: 0 }
     }
-    const urls = recentUrls(await sitemap.text(), now).filter((u) => u.startsWith(`${site}/`))
+    const recent = recentUrls(await sitemap.text(), now)
+    const urls = recent.filter((u) => u.startsWith(`${site}/`))
+    if (recent.length > 0 && urls.length === 0) {
+      log.warn(`::warning::IndexNow: the sitemap's article URLs are not on ${site}; nothing submitted.`)
+      return { submitted: 0 }
+    }
     if (urls.length === 0) {
       log.info('IndexNow: no article changed in the last 48 hours; nothing to submit.')
       return { submitted: 0 }

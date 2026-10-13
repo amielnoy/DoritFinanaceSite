@@ -197,6 +197,9 @@ test.describe("HTTP surface — sanity", () => {
       expect(body).toContain("## שאלות ותשובות");
       expect(body).toContain("## מאמרים");
       expect(body).toContain("L-00107009");
+      // The article's own "##" section is demoted below its "###" title.
+      expect(body).toContain("#### מה בודקים");
+      expect(body).not.toMatch(/^## מה בודקים/m);
     });
   });
 

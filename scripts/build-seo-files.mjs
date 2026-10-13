@@ -10,11 +10,12 @@
 // (PRERENDER_REQUIRED=1) fails without it; a preview warns and ships the
 // static files.
 
+import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { FAQ_ENTRIES } from '../src/content/faq.ts'
-import { loadPublishedArticles } from './published-articles.mjs'
-import { buildLlms, buildLlmsFull, buildSitemap, originFromSitemap } from './seo-files.mjs'
+import { buildEnv, loadPublishedArticles } from './published-articles.mjs'
+import { buildLlms, buildLlmsFull, buildSitemap, originFromSitemap, withBuiltPages } from './seo-files.mjs'
 
 const DIST = join(process.cwd(), 'dist')
 const COLUMNS = 'slug,title,excerpt,body,updated_at,created_at'
@@ -22,13 +23,22 @@ const COLUMNS = 'slug,title,excerpt,body,updated_at,created_at'
 async function main() {
   let loaded
   try {
-    loaded = await loadPublishedArticles(process.env, { columns: COLUMNS })
+    loaded = await loadPublishedArticles(await buildEnv(), { columns: COLUMNS })
   } catch (err) {
     console.error(`\n::error::SEO files: ${err.message}`)
     process.exit(1)
   }
   if (loaded.warning) console.warn(`::warning::SEO files: ${loaded.warning}`)
-  const articles = loaded.rows
+  // Never list an article whose page was not built (a preview, or an article
+  // published between the prerender and this step).
+  const { kept: articles, dropped } = withBuiltPages(loaded.rows, (slug) =>
+    existsSync(join(DIST, 'blog', `${slug}.html`)),
+  )
+  if (dropped.length) {
+    console.warn(
+      `::warning::SEO files: ${dropped.length} published article(s) have no prebuilt page and are left out: ${dropped.join(', ')}`,
+    )
+  }
 
   const sitemapTemplate = await readFile(join(DIST, 'sitemap.xml'), 'utf8')
   const llmsTemplate = await readFile(join(DIST, 'llms.txt'), 'utf8')

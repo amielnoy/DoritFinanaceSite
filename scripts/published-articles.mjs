@@ -169,3 +169,13 @@ export function duplicateTitles(results) {
     .filter(([, routes]) => routes.length > 1)
     .map(([title, routes]) => ({ title, routes }))
 }
+
+/**
+ * The environment both build steps read the article list with: the process
+ * environment over the env files, as `vite build` reads them, so the prerender
+ * and the SEO files come from the same Supabase project.
+ */
+export async function buildEnv(cwd = process.cwd()) {
+  const { loadEnv } = await import('vite')
+  return { ...process.env, ...loadEnv('production', cwd, 'VITE_') }
+}
