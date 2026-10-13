@@ -81,6 +81,28 @@ carries a `<script>`, an `<img onerror>`, a `javascript:` markdown link and a
 | SEC-HDR-001 | "the document response carries the expected hardening headers" | — | **Skipped by default.** Enable with `E2E_ENFORCE_SECURITY_HEADERS=1` against a deployment; asserts `x-content-type-options`, `referrer-policy`, HSTS and a CSP |
 | SEC-HDR-002 | "reports which hardening headers are present (informational)" | Fetch `/` | Always passes; records the missing headers as a test annotation |
 
+## 4b. Content-Security-Policy — vercel.json, enforced
+
+`vercel.json` sends the policy as `Content-Security-Policy` (enforced since the
+CSP fix) and `require-trusted-types-for 'script'` as a second,
+`Content-Security-Policy-Report-Only` header. Both report to `/api/csp-report`.
+Inline scripts are allowed by `sha256-` hash only, never `'unsafe-inline'`.
+
+| ID | Test | Holds |
+|---|---|---|
+| SEC-CSP-001 | `tests/contract/vercel-functions.contract.test.ts` — "enforces the policy, allowing inline scripts only by hash" | The enforced header exists; `script-src` has no `'unsafe-inline'`/`'unsafe-eval'`; `object-src 'none'`, `base-uri 'self'` |
+| SEC-CSP-002 | same — "asks for Trusted Types in report-only mode" / "the %s policy names a report endpoint" | Trusted Types is requested; both policies name `/api/csp-report` and `report-to csp` |
+| SEC-CSP-003 | same — "checks every inline script against the policy before a Vercel deploy" | `ci.yml` runs `scripts/check-csp-hashes.mjs` on `.vercel/output/static` (fatal for production, a warning for previews) |
+| SEC-CSP-004 | `tests/unit/check-csp-hashes.test.ts` | An inline script whose text changed is named with the hash to add; external scripts and `ld+json` blocks are ignored; `index.html`'s gtag snippet is allowed as it stands |
+| SEC-CSP-005 | `tests/unit/trusted-types.dom.test.ts` | The `default` policy accepts same-origin script URLs only and defines no HTML/script rule; `freshness` passes the fetched page to `DOMParser`; `jsonld` vouches only for JSON it serialised itself; nothing throws without Trusted Types |
+
+Before enforcing, the policy was checked in a browser against the live site
+and a local production build (ten public pages, scrolled): zero enforced
+violations, zero Trusted Types reports. Not covered there: the signed-in
+admin pages, and Vercel Analytics' script injection (off in local builds) —
+which is why Trusted Types stays report-only until `[csp]` lines in the Vercel
+logs show the admin pages clean.
+
 ## 4a. Agent surface — `tests/security/agent-surface.security.test.ts`
 
 46 cases over the four surfaces the agents introduced. A model's behaviour

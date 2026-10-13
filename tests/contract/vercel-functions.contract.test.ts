@@ -53,21 +53,44 @@ describe("Vercel functions under api/", () => {
   });
 });
 
-describe("the Content-Security-Policy reports somewhere", () => {
-  // Report-Only with nowhere to report enforces nothing and records nothing.
+describe("the Content-Security-Policy is enforced, and both policies report", () => {
+  // The main policy is enforced; Trusted Types rides alongside as Report-Only
+  // until every page — the admin editor included — is known to pass it. A
+  // policy with nowhere to report records nothing, so both name the endpoint.
   const headers = (vercelConfig as unknown as { headers: { headers: { key: string; value: string }[] }[] }).headers
     .flatMap((b) => b.headers);
-  const csp = headers.find((h) => h.key === "Content-Security-Policy-Report-Only");
+  const enforced = headers.find((h) => h.key === "Content-Security-Policy");
+  const reportOnly = headers.find((h) => h.key === "Content-Security-Policy-Report-Only");
 
-  it("names a report endpoint that is a function in api/", () => {
-    expect(csp, "no Content-Security-Policy-Report-Only header").toBeDefined();
+  it("enforces the policy, allowing inline scripts only by hash", () => {
+    expect(enforced, "no enforced Content-Security-Policy header").toBeDefined();
+    const scriptSrc = enforced!.value.match(/script-src ([^;]+)/)?.[1] ?? "";
+    expect(scriptSrc).not.toMatch(/'unsafe-inline'|'unsafe-eval'/);
+    expect(enforced!.value).toMatch(/object-src 'none'/);
+    expect(enforced!.value).toMatch(/base-uri 'self'/);
+  });
+
+  it("asks for Trusted Types in report-only mode", () => {
+    expect(reportOnly?.value).toMatch(/require-trusted-types-for 'script'/);
+  });
+
+  it.each([
+    ["enforced", () => enforced],
+    ["report-only", () => reportOnly],
+  ])("the %s policy names a report endpoint that is a function in api/", (_, policy) => {
+    const csp = policy();
     const uri = csp!.value.match(/report-uri (\S+?);?(\s|$)/)?.[1];
     expect(uri, "the policy has no report-uri").toBe("/api/csp-report");
+    expect(csp!.value).toMatch(/report-to csp(;|$)/);
     expect(existsSync(join(REPO_ROOT, "api/csp-report.ts"))).toBe(true);
   });
 
   it("names the same endpoint for the Reporting API", () => {
-    expect(csp!.value).toMatch(/report-to csp(;|$)/);
     expect(headers.find((h) => h.key === "Reporting-Endpoints")?.value).toBe('csp="/api/csp-report"');
+  });
+
+  it("checks every inline script against the policy before a Vercel deploy", () => {
+    const ci = readFileSync(join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8");
+    expect(ci).toMatch(/node scripts\/check-csp-hashes\.mjs \.vercel\/output\/static/);
   });
 });

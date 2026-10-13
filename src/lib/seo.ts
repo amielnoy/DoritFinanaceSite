@@ -6,6 +6,7 @@
 // homepage. This module gives each route its own head.
 
 import { useEffect } from "react";
+import { jsonLdText } from "./trusted-types.js";
 
 // tsconfig sets `types: []`, so Vite's ImportMeta augmentation is not loaded.
 const viteEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
@@ -165,7 +166,7 @@ export function applySeo(config: SeoConfig): void {
     const script = document.createElement("script");
     script.type = "application/ld+json";
     script.setAttribute(`${MANAGED}-jsonld`, "");
-    script.textContent = JSON.stringify(block);
+    script.textContent = jsonLdText(block);
     document.head.appendChild(script);
   }
 }
