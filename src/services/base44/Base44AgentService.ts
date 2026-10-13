@@ -1,3 +1,4 @@
+import { AgentLimitError, MAX_MESSAGE_CHARS, MAX_TURNS_PER_CONVERSATION } from "../agent-errors";
 import type { AgentConversation, AgentMessage, AgentPort } from "../ports";
 
 /** All this adapter needs of a conversation, and all the runtime promises. */
@@ -64,15 +65,7 @@ export const visibleMessages = (messages: RawAgentMessage[]): AgentMessage[] =>
  * a substitute for server-side rate limiting — see docs — but it removes the
  * trivial abuse path of pasting a novel into a public LLM endpoint.
  */
-export const MAX_MESSAGE_CHARS = 1000;
-export const MAX_TURNS_PER_CONVERSATION = 40;
-
-export class AgentLimitError extends Error {
-  constructor(public readonly reason: "too_long" | "too_many_turns") {
-    super(reason);
-    this.name = "AgentLimitError";
-  }
-}
+export { AgentLimitError, MAX_MESSAGE_CHARS, MAX_TURNS_PER_CONVERSATION } from "../agent-errors";
 
 export class Base44AgentService implements AgentPort {
   private turns = new Map<string, number>();

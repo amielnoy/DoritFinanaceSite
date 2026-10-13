@@ -110,6 +110,9 @@ export interface AgentDescriptor {
 const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
   too_long: `ההודעה ארוכה מדי — עד ${MAX_MESSAGE_CHARS} תווים.`,
   too_many_turns: "השיחה הגיעה לאורכה המרבי. אפשר להתחיל שיחה חדשה.",
+  // Raised only by the chat function's adapter; Task 8 gives them their final wording.
+  rate_limited: "נשלחו הרבה הודעות בזמן קצר. אפשר לנסות שוב בעוד רגע.",
+  conversation_closed: "השיחה הסתיימה. אפשר להתחיל שיחה חדשה.",
 };
 
 /**

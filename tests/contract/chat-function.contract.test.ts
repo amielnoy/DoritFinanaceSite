@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
-import { MAX_MESSAGE_CHARS as CLIENT_MAX_CHARS, MAX_TURNS_PER_CONVERSATION } from "@/services/base44/Base44AgentService";
+import { MAX_MESSAGE_CHARS as CLIENT_MAX_CHARS, MAX_TURNS_PER_CONVERSATION } from "@/services/agent-errors";
+import { SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
 import { MAX_CONSENT_VERSION_CHARS, MAX_MESSAGE_CHARS, MAX_TURNS } from "../../supabase/functions/chat/handler.ts";
 import { ESCALATION_REASONS, INTERVIEW_TOOLS } from "../../supabase/functions/chat/tools.ts";
 
@@ -52,5 +53,21 @@ describe("the chat function's registration and limits", () => {
     const column = Number(/export const LEAD_FIELD_LIMITS = \{[^}]*\bconsent_version: (\d+),/.exec(limits)?.[1]);
     expect(column).toBeGreaterThan(0);
     expect(MAX_CONSENT_VERSION_CHARS).toBe(column);
+  });
+});
+
+describe("adapter → chat", () => {
+  it("sends only fields the function reads", async () => {
+    const handlerSrc = read("supabase/functions/chat/handler.ts");
+    const reads = new Set([...handlerSrc.matchAll(/str\(input\.(\w+)\)|input\.(\w+)/g)].map((m) => m[1] ?? m[2]));
+    const bodies: Record<string, unknown>[] = [];
+    const svc = new SupabaseAgentService(
+      { functions: { invoke: async (_n: string, { body }: { body: Record<string, unknown> }) => (bodies.push(body), { data: { ok: true, conversationId: "s", token: "t".repeat(64), reply: "r" }, error: null }) } },
+      () => "l",
+    );
+    const conv = await svc.start("needs_interview", { consent_version: "v6", consent_at: "2026-10-13T09:00:00.000Z" });
+    await svc.send(conv, "1");
+    await svc.send(conv, "2");
+    for (const body of bodies) for (const key of Object.keys(body)) expect(reads, key).toContain(key);
   });
 });

@@ -129,6 +129,8 @@ export interface AgentMessage {
   role: "user" | "assistant";
   content: string;
   tool_calls?: unknown[];
+  /** Set by the chat function's adapter on the reply that saved the interview's lead. */
+  signal?: "lead_saved";
 }
 
 export interface AgentConversation {
