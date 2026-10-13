@@ -293,8 +293,16 @@ describe("Phishing — the site's name on somebody else's message", () => {
         m[0].toLowerCase(),
       );
       for (const e of new Set(emails)) {
+        // notifications@mail.govari-fin.co.il is the mailer's own From address,
+        // named in lead.js as the invitations' ORGANIZER (#170) — the site's
+        // sending identity, on its own domain, not a look-alike of Dorit's.
         expect(
-          ["dorit@govari-fin.co.il", "amielnoy@gmail.com", "amielnoy@outlook.com"].includes(e),
+          [
+            "dorit@govari-fin.co.il",
+            "amielnoy@gmail.com",
+            "amielnoy@outlook.com",
+            "notifications@mail.govari-fin.co.il",
+          ].includes(e),
           `unexpected address ${e}`,
         ).toBe(true);
       }
