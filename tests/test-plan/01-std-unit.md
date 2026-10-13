@@ -687,7 +687,36 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-017 | "refuses a partial save once the lead is saved: already_saved, no second row" | Ruling 10: complete then partial: second is `already_saved`, handler called once |
 | UNIT-CHTOOL-018 | "refuses a partial save after a simulated complete one too" | Ruling 10: the same in evaluation mode |
 
+### 4.33 The chat function's model client, turn loop and budget — `tests/unit/chat-anthropic.test.ts`, `chat-turn.test.ts`, `chat-budget.test.ts`
+
+`supabase/functions/chat/{anthropic,turn,budget}.ts`: the Anthropic Messages API over a fake `fetch`, the turn loop over a scripted model, and the budget arithmetic. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHMODEL-001 | "posts the Messages API request with the key, the version and the cache marks" | URL, `x-api-key`, `anthropic-version`, body fields; usage folds cache creation into `input` and cache reads into `cached` |
+| UNIT-CHMODEL-002 | "turns an HTTP refusal into ModelError('http') with its status" | `kind: http`, `status: 529` |
+| UNIT-CHMODEL-003 | "turns an abort into ModelError('timeout')" | `kind: timeout` |
+| UNIT-CHMODEL-004 | "turns an answer without content into ModelError('shape')" | Rejects with `ModelError` |
+| UNIT-CHTURN-001 | "drops tool rows, merges consecutive turns of one side, and starts with the visitor" | Alternating user/assistant history, leading assistant and tool rows dropped, consecutive user rows joined by a blank line |
+| UNIT-CHTURN-002 | "returns the reply when the model answers in words" | `reply` is the text; one usage record |
+| UNIT-CHTURN-003 | "runs a tool, hands the result back, and returns the closing reply" | `runTool` called with the model's input; second request ends with a `tool_result`; result carries `tools` and `toolCalls` |
+| UNIT-CHTURN-004 | "marks a failed tool as an error for the model" | `tool_result` has `is_error: true` |
+| UNIT-CHTURN-005 | "allows three tool rounds and fails the fourth" | `TurnFailure` `too_many_tool_rounds`, three tool outcomes kept |
+| UNIT-CHTURN-006 | "retries once when the first failure comes early" | A 529 then a reply gives the reply |
+| UNIT-CHTURN-007 | "fails without a retry when the first failure comes after ten seconds" | `TurnFailure` `model_http_529` |
+| UNIT-CHTURN-008 | "fails on a second failure, keeping what the tools already did" | `TurnFailure` `model_timeout`, `tools` equals the earlier outcome |
+| UNIT-CHTURN-009 | "refuses an empty reply" | `TurnFailure` `empty_reply` |
+| UNIT-CHBUDGET-001 | "prices Haiku tokens per million" | 1M input + 1M cached + 1M output = $0.61 |
+| UNIT-CHBUDGET-002 | "prices an unknown model at the most expensive known rate, never at zero" | 1M input tokens = $2 |
+| UNIT-CHBUDGET-003 | "accepts the totals as PostgREST sends bigints" | String token counts are summed as numbers |
+| UNIT-CHBUDGET-004 | "starts at the first of the UTC month" | `2026-10-01T00:00:00.000Z` |
+| UNIT-CHBUDGET-005 | "is keyed YYYY-MM" | `2026-10` |
+| UNIT-CHBUDGET-006 | "defaults to 50" | `parseBudget(undefined)` is 50 |
+| UNIT-CHBUDGET-007 | "reads a number" | `" 120 "` gives 120 |
+| UNIT-CHBUDGET-008 | "takes 0 as the kill switch" | `"0"` gives 0 |
+| UNIT-CHBUDGET-009 | "falls back to 50 on nonsense" | `"lots"` and `"-5"` give 50 |
+
 ## 5. Pass criteria
 
-All 483 cases pass. Any failure is a functional defect, not an environment issue —
+All 505 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

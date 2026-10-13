@@ -1,0 +1,128 @@
+/**
+ * One visitor message, answered: the model, its tool calls (at most three
+ * rounds), and the final reply, within a 25-second budget. One retry when the
+ * first failure comes within ten seconds; a second failure ends the turn.
+ */
+import { ModelError, type ContentBlock, type ModelClient, type ModelMessage, type ModelUsage } from './anthropic.ts';
+import type { SystemBlock } from './prompt.ts';
+import type { ToolDefinition, ToolOutcome } from './tools.ts';
+
+export const MAX_TOOL_ROUNDS = 3;
+export const TURN_BUDGET_MS = 25_000;
+export const RETRY_WINDOW_MS = 10_000;
+export const MAX_REPLY_TOKENS = 1024;
+
+export interface StoredMessage {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+}
+
+export interface UsageRecord extends ModelUsage {
+  model: string;
+}
+
+export interface TurnResult {
+  reply: string;
+  usage: UsageRecord[];
+  tools: ToolOutcome[];
+  toolCalls: {
+    name: string;
+    /** model arguments — never store or log */
+    input: Record<string, unknown>;
+  }[];
+}
+
+export class TurnFailure extends Error {
+  constructor(
+    public readonly reason: string,
+    public readonly tools: ToolOutcome[],
+    public readonly usage: UsageRecord[],
+  ) {
+    super(reason);
+    this.name = 'TurnFailure';
+  }
+}
+
+/**
+ * Stored rows → the alternating history the API requires: tool rows dropped
+ * (their effect is in the conversation's status), consecutive rows of one side
+ * merged (a visitor message whose reply failed), leading assistant rows dropped.
+ */
+export function toModelHistory(rows: StoredMessage[]): ModelMessage[] {
+  const out: { role: 'user' | 'assistant'; content: string }[] = [];
+  for (const row of rows) {
+    if (row.role === 'tool') continue;
+    if (out.length === 0 && row.role === 'assistant') continue;
+    const last = out[out.length - 1];
+    if (last && last.role === row.role) last.content = `${last.content}\n\n${row.content}`;
+    else out.push({ role: row.role, content: row.content });
+  }
+  return out;
+}
+
+export async function runTurn(args: {
+  model: ModelClient;
+  system: SystemBlock[];
+  tools: ToolDefinition[];
+  history: ModelMessage[];
+  runTool: (name: string, input: Record<string, unknown>) => Promise<ToolOutcome>;
+  now?: () => number;
+}): Promise<TurnResult> {
+  const now = args.now ?? Date.now;
+  const started = now();
+  const deadline = started + TURN_BUDGET_MS;
+  const messages: ModelMessage[] = [...args.history];
+  const usage: UsageRecord[] = [];
+  const tools: ToolOutcome[] = [];
+  const toolCalls: TurnResult['toolCalls'] = [];
+  let retried = false;
+
+  const call = async () => {
+    for (;;) {
+      const remaining = deadline - now();
+      if (remaining <= 0) throw new TurnFailure('timeout', tools, usage);
+      try {
+        return await args.model.complete(
+          { system: args.system, messages, tools: args.tools, maxTokens: MAX_REPLY_TOKENS },
+          AbortSignal.timeout(remaining),
+        );
+      } catch (e) {
+        if (!retried && now() - started < RETRY_WINDOW_MS) {
+          retried = true;
+          continue;
+        }
+        throw new TurnFailure(e instanceof ModelError ? e.message : 'model_failed', tools, usage);
+      }
+    }
+  };
+
+  for (let round = 0; ; round++) {
+    const response = await call();
+    usage.push({ model: response.model, ...response.usage });
+    const reply = response.content
+      .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+      .trim();
+    const uses = response.content.filter((b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use');
+
+    if (response.stopReason !== 'tool_use' || uses.length === 0) {
+      if (!reply) throw new TurnFailure('empty_reply', tools, usage);
+      return { reply, usage, tools, toolCalls };
+    }
+    if (round >= MAX_TOOL_ROUNDS) throw new TurnFailure('too_many_tool_rounds', tools, usage);
+
+    messages.push({ role: 'assistant', content: response.content });
+    const results: ContentBlock[] = [];
+    // Sequential on purpose: the runners mutate the shared conversation after an await
+    // (one lead, one hand-off), so these calls must never run under Promise.all.
+    for (const use of uses) {
+      const input = use.input && typeof use.input === 'object' ? use.input : {};
+      toolCalls.push({ name: use.name, input });
+      const outcome = await args.runTool(use.name, input);
+      tools.push(outcome);
+      results.push({ type: 'tool_result', tool_use_id: use.id, content: outcome.forModel, ...(outcome.isError ? { is_error: true } : {}) });
+    }
+    messages.push({ role: 'user', content: results });
+  }
+}
