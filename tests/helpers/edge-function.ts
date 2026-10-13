@@ -49,6 +49,10 @@ export interface MaslekaFake {
    * and its conditional update.
    */
   raceBeforePatch?: Record<string, unknown>;
+  /** These fields are merged into every stored request each time a mail is accepted (a write landing mid-run). */
+  afterMail?: Record<string, unknown>;
+  /** PATCHes to `masleka_requests` whose query contains this text answer 500. */
+  failPatchMatching?: string;
 }
 
 export interface EdgeOptions {
@@ -228,6 +232,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       const ok = status >= 200 && status < 300;
       if (ok) {
         emails.push({ to: parsed.to, subject: parsed.subject, html: parsed.html, text: parsed.text, body: parsed.text, ics: parsed.ics });
+        if (masleka.afterMail) for (const r of maslekaRequests) Object.assign(r, masleka.afterMail);
       }
       const answer = options.resendResponse ?? (ok ? { ok: true, ids: ["mailer-test-id"] } : { ok: false, failed: ["http_422"] });
       return new Response(JSON.stringify(answer), { status });
@@ -354,6 +359,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       }
       if (method === "PATCH") {
         if (masleka.failRequestWrite) return new Response('{"message":"simulated"}', { status: 500 });
+        if (masleka.failPatchMatching && query.includes(masleka.failPatchMatching)) return new Response('{"message":"simulated"}', { status: 500 });
         if (masleka.raceBeforePatch && !raced) {
           raced = true;
           for (const r of maslekaRequests) Object.assign(r, masleka.raceBeforePatch);

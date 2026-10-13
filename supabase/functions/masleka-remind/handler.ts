@@ -19,7 +19,8 @@
  *
  * Client: one reminder a week after the invitation went out by mail. The
  * stored hash cannot rebuild the old link, so the reminder carries a new one
- * and the old one stops working. The rotation KEEPS the original
+ * and the old one stops working — but only after the mail was accepted, so a
+ * refused mail never locks the client out. The rotation KEEPS the original
  * `token_expires_at`: a reminder neither shortens nor extends the thirty days
  * (a person who wants a longer one issues a fresh link, which does). A request
  * whose link has already expired is not reminded — a dead link is no help.
@@ -34,7 +35,7 @@ import { createLog, newRequestId } from '../_shared/log.ts';
 import { sendMail } from '../_shared/mail.ts';
 import { buildClientInvite, buildStaffNotice, type StaffNoticeKind } from '../_shared/masleka-mail.ts';
 import {
-  AGENCY_1, CLIENT_REMINDER_DAYS, DEADLINE_REMINDER_BUSINESS_DAY, READY_AFTER_HOURS, UUID,
+  AGENCY_1, CLEARINGHOUSE_RETENTION_BUSINESS_DAYS, CLIENT_REMINDER_DAYS, DEADLINE_REMINDER_BUSINESS_DAY, READY_AFTER_HOURS, UUID,
   maslekaEnabled, maslekaLink, newToken, tokenHash,
 } from '../_shared/masleka.ts';
 import { selectRows, updateWhere } from '../_shared/rest.ts';
@@ -98,7 +99,9 @@ export async function handler(req: Request): Promise<Response> {
       (r) =>
         !r.deadline_reminded_at &&
         Number.isFinite(instant(r.submitted_at)) &&
-        addBusinessDays(new Date(instant(r.submitted_at)), DEADLINE_REMINDER_BUSINESS_DAY).getTime() <= now.getTime(),
+        addBusinessDays(new Date(instant(r.submitted_at)), DEADLINE_REMINDER_BUSINESS_DAY).getTime() <= now.getTime() &&
+        // After the deletion day itself (e.g. a cron outage) "in two days" would be untrue.
+        now.getTime() < addBusinessDays(new Date(instant(r.submitted_at)), CLEARINGHOUSE_RETENTION_BUSINESS_DAYS).getTime(),
     );
 
     let recipients: string[] | null = null;
@@ -166,16 +169,24 @@ export async function handler(req: Request): Promise<Response> {
       const to = typeof row.contact_email === 'string' ? row.contact_email : '';
       const requestId = String(row.id);
       if (!isEmail(to) || !UUID.test(requestId)) continue;
-      const token = newToken();
-      // Claim and rotate in one statement. token_expires_at is not in the
-      // update: the original expiry stands.
-      const claimed = await updateWhere(
-        'masleka_requests',
-        `id=eq.${requestId}&agency_id=eq.${AGENCY_1}&status=eq.invited&client_reminded_at=is.null` +
-          `&token_expires_at=gt.${nowIso}&select=id`,
-        { token_hash: await tokenHash(token), client_reminded_at: nowIso },
-      );
+      // 1. Claim: mark the row reminded, where nobody has yet. The hash is NOT
+      //    touched, so a mail that never arrives costs the client nothing.
+      let claimed: Record<string, unknown>[];
+      try {
+        claimed = await updateWhere(
+          'masleka_requests',
+          `id=eq.${requestId}&agency_id=eq.${AGENCY_1}&status=eq.invited&client_reminded_at=is.null` +
+            `&token_expires_at=gt.${nowIso}&select=id`,
+          { client_reminded_at: nowIso },
+        );
+      } catch (e) {
+        log('warn', 'reminder.claim_failed', { rid, requestId, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        warnings.push('client_claim_failed');
+        continue;
+      }
       if (!claimed.length) continue;
+      // 2. Send the new link.
+      const token = newToken();
       try {
         await sendMail(log, {
           to,
@@ -183,7 +194,6 @@ export async function handler(req: Request): Promise<Response> {
           rid,
           role: 'visitor',
         });
-        clients += 1;
       } catch (e) {
         log('warn', 'mail.failed', { rid, role: 'visitor', requestId, err: String((e as Error)?.message ?? e).slice(0, 200) });
         warnings.push('client_reminder_failed');
@@ -194,6 +204,23 @@ export async function handler(req: Request): Promise<Response> {
         } catch (e2) {
           log('warn', 'reminder.reset_failed', { rid, requestId, err: String((e2 as Error)?.message ?? e2).slice(0, 200) });
         }
+        continue;
+      }
+      clients += 1;
+      // 3. Only now the old link dies, and only if the row is still ours: a code
+      //    that arrived meanwhile, or a link a person sent by hand (which
+      //    replaced the marker), is never overwritten. token_expires_at is not
+      //    in the update: the original expiry stands.
+      try {
+        const rotated = await updateWhere(
+          'masleka_requests',
+          `id=eq.${requestId}&status=eq.invited&client_reminded_at=eq.${nowIso}&select=id`,
+          { token_hash: await tokenHash(token) },
+        );
+        if (!rotated.length) warnings.push('client_rotate_failed');
+      } catch (e) {
+        log('warn', 'reminder.rotate_failed', { rid, requestId, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        warnings.push('client_rotate_failed');
       }
     }
 

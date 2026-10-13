@@ -626,7 +626,7 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKNEW-022 | "refuses a request that is no longer waiting for a code" | 409; hash unchanged |
 | INT-MSKNEW-023 | "refuses an id that is not one" | 400 `invalid`; no `masleka_requests` call |
 
-### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..024`
+### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..029`
 
 Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Israel.
 
@@ -647,19 +647,24 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-MSKREM-013 | "gives the claim back when no staff address could be mailed, so the next run tries again" | Both markers null again; warnings `ready_not_sent`, `deadline_not_sent` |
 | INT-MSKREM-014 | "takes business day 5 from the business calendar: a Thursday submission is due the next Thursday" | Not due at 08:00 UTC Thursday 15 Oct, due at 09:00 (`addBusinessDays`) |
 | INT-MSKREM-015 | "never carries a code, an ID or ciphertext in a mail, and never asks for the ciphertext columns" | No ciphertext marker in any mail; no `masleka_requests` URL names a ciphertext column |
-| INT-MSKREM-016 | "never repeats a reminder" | Second run sends nothing |
-| INT-MSKREM-017 | "reminds a client once, a week after the invitation, with a new link" | One reminder; stored hash = new token; original `token_expires_at` kept; others untouched |
-| INT-MSKREM-018 | "the old link stops working once the reminder has rotated it" | `masleka-code` refuses the old token, accepts the new |
-| INT-MSKREM-019 | "puts the reminder back when the client's mail fails, so the next run tries again" | `client_reminded_at` null; warning |
-| INT-MSKREM-020 | "claims the client reminder in one conditional update that checks it was never sent" | One PATCH: `client_reminded_at=is.null`, `status=eq.invited`; sets only the hash and the marker |
-| INT-MSKREM-021 | "does not remind a client whose link a person sent by hand, or one whose link has expired" | Hand-sent (marker set) and expired rows: no mail, hash unchanged |
-| INT-MSKREM-022 | "sends nothing to a client when another run has already claimed the reminder" | Rival marker: zero rows back, no mail, `clients: 0` |
-| INT-MSKREM-023 | "writes no name, address, token or link to a log line" | Across a clean run and a failing-mail run: none of the names, addresses, secret, link or old token in any line |
-| INT-MSKREM-024 | "answers how many it sent" | `{ready: 1, deadline: 1, clients: 1, warnings: []}` |
+| INT-MSKREM-016 | "does not say 'deleted in two days' at or after business day 7" | No notice and no marker at business day 7 (Tue 20 Oct); still sent the day before |
+| INT-MSKREM-017 | "never repeats a reminder" | Second run sends nothing |
+| INT-MSKREM-018 | "reminds a client once, a week after the invitation, with a new link" | One reminder; stored hash = new token (rotated after the send); original `token_expires_at` kept; others untouched |
+| INT-MSKREM-019 | "the old link stops working once the reminder has rotated it" | `masleka-code` refuses the old token, accepts the new |
+| INT-MSKREM-020 | "puts the reminder back when the client's mail fails, so the next run tries again" | `client_reminded_at` null; warning |
+| INT-MSKREM-021 | "pins the claim and the rotation as two updates: the claim never touches the hash, the rotation only follows our own marker" | Two PATCHes: the claim sets only `client_reminded_at` (filtered `is.null`, `status=eq.invited`); the rotation sets only `token_hash`, filtered `client_reminded_at=eq.<now>` |
+| INT-MSKREM-022 | "keeps the old link working when the reminder mail fails" | Hash still the old token's, marker null; `masleka-code` still accepts the old token |
+| INT-MSKREM-023 | "leaves the hash alone and warns when the row stopped being invited before the rotation" | A code arriving after the mail: hash untouched; warning `client_rotate_failed` |
+| INT-MSKREM-024 | "warns, and the old link still works, when the rotation update fails" | Hash untouched; warning `client_rotate_failed` |
+| INT-MSKREM-025 | "one failing client claim does not stop the other clients" | Other client reminded; warning `client_claim_failed`; `clients: 1` |
+| INT-MSKREM-026 | "does not remind a client whose link a person sent by hand, or one whose link has expired" | Hand-sent (marker set) and expired rows: no mail, hash unchanged |
+| INT-MSKREM-027 | "sends nothing to a client when another run has already claimed the reminder" | Rival marker: zero rows back, no mail, `clients: 0` |
+| INT-MSKREM-028 | "writes no name, address, token or link to a log line" | Across a clean run and a failing-mail run: none of the names, addresses, secret, link or old token in any line |
+| INT-MSKREM-029 | "answers how many it sent" | `{ready: 1, deadline: 1, clients: 1, warnings: []}` |
 
 ## 5. Pass criteria
 
-All 406 cases pass. These assert behaviour, not shape — a failure means the
+All 411 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

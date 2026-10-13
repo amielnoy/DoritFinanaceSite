@@ -209,6 +209,18 @@ describe("masleka-remind — the staff", () => {
     for (const f of r.callsTo("masleka_requests")) expect(f.url).not.toContain("ciphertext");
   });
 
+  it("does not say 'deleted in two days' at or after business day 7", async () => {
+    // Submitted Sunday 2026-10-11; business day 7 is Tuesday 2026-10-20.
+    const rows = ROWS();
+    vi.setSystemTime(new Date("2026-10-20T09:00:00Z"));
+    const at7 = await run({ fake: { requests: rows } });
+    expect(at7.emails.filter((e) => e.subject.startsWith("נמחק"))).toHaveLength(0);
+    expect(byId(at7.maslekaRequests, "11111111-0000-4000-8000-000000000003").deadline_reminded_at).toBeNull();
+    vi.setSystemTime(new Date("2026-10-19T09:00:00Z"));
+    const at6 = await run({ fake: { requests: ROWS() } });
+    expect(at6.emails.filter((e) => e.subject.startsWith("נמחק")).length).toBeGreaterThan(0);
+  });
+
   it("never repeats a reminder", async () => {
     const first = await run();
     const second = await run({ fake: { requests: first.maslekaRequests } });
@@ -254,12 +266,57 @@ describe("masleka-remind — the client", () => {
     expect(r.json.warnings).toContain("client_reminder_failed");
   });
 
-  it("claims the client reminder in one conditional update that checks it was never sent", async () => {
+  it("pins the claim and the rotation as two updates: the claim never touches the hash, the rotation only follows our own marker", async () => {
     const r = await run();
-    const claim = r.requestPatches.find((p) => "token_hash" in p.fields)!;
+    const patches = r.requestPatches.filter((p) => p.query.includes("22222222-0000-4000-8000-000000000001"));
+    expect(patches).toHaveLength(2);
+    const [claim, rotate] = patches;
     expect(claim.query).toContain("client_reminded_at=is.null");
     expect(claim.query).toContain("status=eq.invited");
-    expect(Object.keys(claim.fields).sort()).toEqual(["client_reminded_at", "token_hash"]);
+    expect(claim.fields).toEqual({ client_reminded_at: NOW.toISOString() });
+    expect(rotate.query).toContain("status=eq.invited");
+    expect(rotate.query).toContain(`client_reminded_at=eq.${NOW.toISOString()}`);
+    expect(Object.keys(rotate.fields)).toEqual(["token_hash"]);
+  });
+
+  it("keeps the old link working when the reminder mail fails", async () => {
+    const r = await run({ failEmailTo: ["uri@example.com"] });
+    const row = byId(r.maslekaRequests, "22222222-0000-4000-8000-000000000001");
+    expect(row.token_hash).toBe(sha(OLD_TOKEN));
+    expect(row.client_reminded_at).toBeNull();
+    const asClient = await invokeEdge("masleka-code", { code: "AB12-CD34", idNumber: "000000018", token: OLD_TOKEN }, {
+      envPatch: ON,
+      headers: { "x-forwarded-for": "203.0.113.7" },
+      masleka: { requests: r.maslekaRequests.map((x) => ({ ...x })), staffEmails: STAFF_EMAILS },
+    });
+    expect(asClient.json).toMatchObject({ ok: true });
+  });
+
+  it("leaves the hash alone and warns when the row stopped being invited before the rotation", async () => {
+    // Only client rows, so the staff mails (sent first) do not trigger the write.
+    const clientRows = ROWS().filter((x) => x.status === "invited");
+    const r = await run({ fake: { requests: clientRows, afterMail: { status: "code_received" } } });
+    const row = byId(r.maslekaRequests, "22222222-0000-4000-8000-000000000001");
+    expect(row.token_hash).toBe(sha(OLD_TOKEN));
+    expect(r.json.warnings).toContain("client_rotate_failed");
+  });
+
+  it("warns, and the old link still works, when the rotation update fails", async () => {
+    const r = await run({ fake: { failPatchMatching: "client_reminded_at=eq." } });
+    expect(byId(r.maslekaRequests, "22222222-0000-4000-8000-000000000001").token_hash).toBe(sha(OLD_TOKEN));
+    expect(r.json.warnings).toContain("client_rotate_failed");
+  });
+
+  it("one failing client claim does not stop the other clients", async () => {
+    const rows = ROWS();
+    rows.push(req("22222222-0000-4000-8000-000000000006", {
+      status: "invited", contact_email: "second@example.com", client_invited_at: "2026-10-10T10:00:00.000Z",
+    }));
+    const r = await run({ fake: { requests: rows, failPatchMatching: "id=eq.22222222-0000-4000-8000-000000000001" } });
+    expect(r.mailTo("second@example.com").subject).toContain("תזכורת");
+    expect(r.emails.some((e) => e.to === "uri@example.com")).toBe(false);
+    expect(r.json.warnings).toContain("client_claim_failed");
+    expect(r.json).toMatchObject({ ok: true, clients: 1 });
   });
 
   it("does not remind a client whose link a person sent by hand, or one whose link has expired", async () => {
