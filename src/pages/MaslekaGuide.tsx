@@ -17,7 +17,7 @@ export default function MaslekaGuide({ screenshots }: { screenshots?: StepScreen
       title: "נכנסים לאתר המסלקה כבעלי רישיון",
       body: (
         <>
-          באתר המסלקה הפנסיונית בוחרים בכניסה לבעלי רישיון / יועצים.{" "}
+          באתר המסלקה הפנסיונית נכנסים לאזור המיועד לבעלי רישיון ויועצים.{" "}
           <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className="underline text-accent">
             לאתר המסלקה
           </a>
@@ -42,7 +42,7 @@ export default function MaslekaGuide({ screenshots }: { screenshots?: StepScreen
       body: (
         <>
           כ־3–4 שעות אחרי ההגשה הקבצים מוכנים בפורטל (וגם נשלחים לכתובת הרשומה במסלקה). המסלקה מוחקת אותם אחרי 7
-          ימי עסקים; הלוח מזכיר ביום העסקים החמישי.
+          ימי עסקים; ביום העסקים החמישי תישלח לצוות תזכורת במייל.
         </>
       ),
     },
