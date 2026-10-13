@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { buildClientHtml } from "../../supabase/functions/_shared/html.ts";
 import { buildClientInvite, buildStaffNotice } from "../../supabase/functions/_shared/masleka-mail.ts";
 
 const LINK = `https://govari-fin.co.il/masleka#t=${"T".repeat(43)}`;
@@ -61,5 +63,29 @@ describe("the client invitation", () => {
     expect(mail.html).toContain("שלום,");
     expect(mail.html).not.toContain("evil.example");
     expect(mail.text).not.toContain("evil.example");
+  });
+
+  it("offers the link as a clickable button, and keeps it in the text too", () => {
+    for (const reminder of [false, true]) {
+      const mail = buildClientInvite("רונית מזרחי", LINK, reminder);
+      expect(mail.html).toContain(`<a href="${LINK}"`);
+      expect(mail.text).toContain(LINK);
+    }
+  });
+});
+
+describe("the shared client letter without an action", () => {
+  it("is byte-for-byte what it was before the button existed", () => {
+    const html = buildClientHtml({
+      firstName: "דנה",
+      eyebrow: "e",
+      heading: "h",
+      intro: "i",
+      panelTitle: "p",
+      details: [["a", "b"], ["c", "d<"]],
+    });
+    expect(createHash("sha256").update(html).digest("hex")).toBe(
+      "5b27348d1644dae478801236621605f78733c56f505c95b526b200b7826703a6",
+    );
   });
 });

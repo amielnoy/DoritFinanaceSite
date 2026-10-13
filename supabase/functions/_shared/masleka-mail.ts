@@ -81,6 +81,7 @@ export function buildClientInvite(clientName: string, link: string, reminder = f
       ['קישור', link],
       ['תוקף', '30 יום מיום ההזמנה'],
     ],
+    action: { label: reminder ? 'להמשך — מסירת הקוד' : 'למסירת הקוד', href: link },
   });
   const hello = firstName ? `שלום ${firstName}, ` : 'שלום, ';
   const text = [

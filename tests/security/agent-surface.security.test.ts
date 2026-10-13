@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
+import { buildClientHtml as buildSharedClientHtml } from "../../supabase/functions/_shared/html.ts";
 import { read, sourceFiles, backendFiles } from "../helpers/source-scan";
 
 /**
@@ -502,5 +503,36 @@ describe("DLP — what may leave, and in whose hands", () => {
   it("names in the consent exactly the fields that are collected", () => {
     expect(COMPLIANCE).toMatch(/נאספים שם וטלפון בלבד/);
     expect(COMPLIANCE).toMatch(/אין למסור בצ׳אט תעודת זהות/);
+  });
+});
+
+describe("XSS — the shared letter's button", () => {
+  const letter = (href: string) =>
+    buildSharedClientHtml({
+      firstName: "",
+      eyebrow: "e",
+      heading: "h",
+      intro: "i",
+      panelTitle: "p",
+      details: [],
+      action: { label: "<b>go</b>", href },
+    });
+
+  it("renders no anchor for a javascript:, data: or relative href", () => {
+    for (const href of ["javascript:alert(1)", "data:text/html,x", "/masleka", "http://govari-fin.co.il/"]) {
+      expect(letter(href)).not.toMatch(/<a /);
+    }
+  });
+
+  it("cannot be broken out of the attribute by a quote or a tag", () => {
+    const html = letter('https://govari-fin.co.il/"><script>alert(1)</script>');
+    expect(html).not.toContain("<script");
+    expect(html).not.toMatch(/<a /);
+  });
+
+  it("escapes the label", () => {
+    const html = letter("https://govari-fin.co.il/masleka#t=abc");
+    expect(html).toContain("&lt;b&gt;go&lt;/b&gt;");
+    expect(html).toContain('<a href="https://govari-fin.co.il/masleka#t=abc"');
   });
 });

@@ -739,8 +739,10 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-MSKML-007 | "carries the personal link in both halves" | Link in HTML and text; greeting by first name |
 | UNIT-MSKML-008 | "says a reminder replaces the earlier link" | Reminder subject; "מחליף" |
 | UNIT-MSKML-009 | "greets without a name that is not a name" | "שלום,"; no foreign link |
+| UNIT-MSKML-010 | "offers the link as a clickable button, and keeps it in the text too" | `<a href="…#t=…">` in the invitation and the reminder; link also in text |
+| UNIT-MSKML-011 | "is byte-for-byte what it was before the button existed" | The shared letter without an `action` hashes to its pre-change SHA-256 |
 
 ## 5. Pass criteria
 
-All 552 cases pass. Any failure is a functional defect, not an environment issue —
+All 554 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
