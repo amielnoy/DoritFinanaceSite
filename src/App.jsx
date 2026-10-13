@@ -15,6 +15,7 @@ import SeoRouteGuard from '@/components/SeoRouteGuard';
 // `/react`, not `/next`: Vercel's docs lead with the Next entry, which pulls
 // `next/navigation` and has nothing to bind to in a Vite SPA.
 import { Analytics } from '@vercel/analytics/react';
+import { stripFragment } from '@/lib/vercel-analytics';
 // Add page imports here
 // The home page is the marketing entry point and the LCP path, so it stays in
 // the main chunk. Everything else is split out: mobile-first indexing scores
@@ -149,7 +150,7 @@ function App() {
               every page load while reporting no data at all. The flag is
               derived from `VERCEL` in `vite.config.js`, so there is nothing to
               set per environment and nothing to forget. */}
-          {import.meta.env.VITE_VERCEL_ANALYTICS ? <Analytics /> : null}
+          {import.meta.env.VITE_VERCEL_ANALYTICS ? <Analytics beforeSend={stripFragment} /> : null}
           <AuthenticatedApp />
         </Router>
         <Toaster />

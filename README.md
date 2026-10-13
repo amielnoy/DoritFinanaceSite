@@ -450,7 +450,9 @@ the hourly `masleka-housekeeping` job after 9 days at the latest. The client's
 link is `https://govari-fin.co.il/masleka#t=<token>`: the token rides in the
 fragment, which is never sent in the HTTP request or in a Referer; GA4's
 `page_location` drops it (checked with real gtag.js: the collect hits carried
-`dl=…/masleka` with no fragment); and the page removes it from the address bar
+`dl=…/masleka` with no fragment); Vercel Web Analytics would record it, so
+`<Analytics beforeSend={stripFragment} />` (`src/lib/vercel-analytics.ts`) cuts
+the fragment from every event; and the page removes it from the address bar
 after load.
 
 **Two switches, both off by default** and both on only when exactly `true`:
@@ -513,6 +515,7 @@ runs in CI):
 - [ ] When the step screenshots are captured, confirm the portal's wording in `/admin/masleka/guide` against the real screens (the guide quotes no portal menu label until then).
 - [ ] The compliance adviser has approved the points in `base44/agents/COMPLIANCE.md` §10, including the interview and wizard wording that still promises a signed mandate.
 - [ ] After switch-on, open one test link with GA4 DebugView and confirm no `#t=` appears in `page_location`.
+- [ ] After switch-on, open one test link with the browser's network tab open and confirm the Vercel Web Analytics beacon (`/_vercel/insights/view`) carries a url with no `#t=`.
 - [ ] Staff memberships added (SQL above), Dorit's own `owner` row confirmed: `select * from public.memberships;`.
 - [ ] Switch on: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED=true` and `VITE_MASLEKA_ENABLED=true` on Vercel (production and preview), then redeploy. Smoke with a hand-made request to a staff member's own address: the client page, a reveal (a row appears in `masleka_access_log`), **הגשתי** (`select count(*) from masleka_requests where (code_ciphertext is not null or id_ciphertext is not null) and status <> 'code_received';` is 0).
 - [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days.
