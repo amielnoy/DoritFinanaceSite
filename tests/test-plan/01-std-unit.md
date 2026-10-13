@@ -497,6 +497,8 @@ and test articles can never reach a deployment.
 | UNIT-PUBART-022 | "names each title more than one route was rendered with" | `{ title, routes }` |
 | UNIT-PUBART-023 | "is empty when every title is distinct" | `[]` |
 | UNIT-PUBART-024 | "are the app's rule and address" | Same verdicts as `articlePath.ts` |
+| UNIT-PUBART-025..029 | "fetchPublishedArticles — every row, or an error" (asks for an exact count and a range; reads page after page until the total is reached; refuses fewer rows than the total; refuses an answer with no total; accepts an empty list when the total says zero) | `Prefer`, `Range-Unit`, `Range: 0-999`; two pages of a three-row list; `incomplete: 1 of 5`; `Content-Range` error; `[]` |
+| UNIT-PUBART-030..033 | "loadPublishedArticles — the same rules for every build step" (live rows with the columns asked for; fixture rows; warns when not required; throws when required) | `{ rows, fromFixture, warning }`; `select=slug%2Ctitle`; `HTTP 500` warning or throw |
 
 ### 4.23 Reading one article — `tests/unit/supabase-content.test.ts` (`getArticle`)
 
