@@ -27,9 +27,9 @@
 - **The Edge contracts:**
   - `index.ts` is exactly `import { handler } from './handler.ts';\n\nDeno.serve(handler);`;
   - `handler.ts` declares `const FN = 'chat'`, `const rid = newRequestId()`, `log('info', 'request.start'` and `log('info', 'request.end'`;
-  - every log call carries `rid`, uses `Date.now() - startedAt`, and contains no personal field (`name`, `phone`, `email`, `message`, `summary`, `profile`, `notes`, `transcript`, `topic`, `body`, `consentAt`);
+  - every log call carries `rid` and contains no personal field (`name`, `phone`, `email`, `message`, `summary`, `profile`, `notes`, `transcript`, `topic`, `body`, `consentAt`), and the file reports `ms` (`Date.now() - startedAt`) on its terminal and failure lines;
   - every `err:` is `.slice(0, 200)`;
-  - every answer goes through `Response.json({ ...body, rid }`;
+  - every JSON answer goes through `Response.json({ ...body, rid }` (the OPTIONS preflight is a bodiless 204);
   - `config.toml` has `[functions.chat]\nverify_jwt = false`.
 - **Migrations:** `20261016000000_chat_conversations.sql` and `20261016010000_chat_purge_schedule.sql`. The clearinghouse branch has taken `20261015000000`.
 - **pg_cron:** no migration enables it yet. The user enables it on the project (Dashboard → Database → Extensions → `pg_cron`) before the schedule migration is applied to production. The migration also says `create extension if not exists pg_cron`.

@@ -58,3 +58,6 @@ base44/.app.jsonc
 logs/
 supabase/.temp/
 supabase/.branches/
+
+# Output of npm run test:eval:chat (transcripts of evaluation conversations).
+eval-results/

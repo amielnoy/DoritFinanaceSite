@@ -106,4 +106,67 @@ describe("composition root", () => {
     expect(supabase.functions.invoke).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalled();
   });
+
+  describe("the chat switch (VITE_CHAT_AGENTS)", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    const supabaseFake = () => ({
+      ...tableFake({ data: [], error: null }).client,
+      auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+      storage: { from: () => ({}) },
+      rpc: async () => ({ data: [], error: null }),
+      functions: { invoke: vi.fn(async () => ({ data: { ok: true, conversationId: "srv", token: "t".repeat(64), reply: "שלום" }, error: null })) },
+    });
+    const base44WithAgents = () => {
+      const agents = {
+        createConversation: vi.fn(async () => ({ id: "b44-1" })),
+        getConversation: vi.fn(async (id: string) => ({ id })),
+        addMessage: vi.fn(async () => undefined),
+        subscribeToConversation: vi.fn(() => () => undefined),
+      };
+      return { ...base44Fake().client, agents };
+    };
+    const META = { consent_version: "v6", consent_at: "2026-10-13T09:00:00.000Z" };
+
+    it("sends the named agent to the chat function and every other agent to Base44", async () => {
+      vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
+      vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_x");
+      vi.stubEnv("VITE_CHAT_AGENTS", "needs_interview");
+      const supabase = supabaseFake();
+      const b44 = base44WithAgents();
+      const { services } = await load(supabase, b44);
+
+      const interview = await services.agents.start("needs_interview", META);
+      await services.agents.send(interview, "היי");
+      services.agents.subscribe(interview.id, () => undefined);
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("chat", expect.objectContaining({ body: expect.objectContaining({ agent: "needs_interview", message: "היי" }) }));
+      expect(b44.agents.createConversation).not.toHaveBeenCalled();
+      expect(b44.agents.addMessage).not.toHaveBeenCalled();
+      expect(b44.agents.subscribeToConversation).not.toHaveBeenCalled();
+
+      supabase.functions.invoke.mockClear();
+      const support = await services.agents.start("support_agent");
+      await services.agents.send(support, "שלום");
+      services.agents.subscribe(support.id, () => undefined);
+      expect(b44.agents.createConversation).toHaveBeenCalledTimes(1);
+      expect(b44.agents.addMessage).toHaveBeenCalledTimes(1);
+      expect(b44.agents.subscribeToConversation).toHaveBeenCalledTimes(1);
+      expect(supabase.functions.invoke).not.toHaveBeenCalled();
+    });
+
+    it("sends every agent to Base44 when the switch is empty", async () => {
+      vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
+      vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_x");
+      vi.stubEnv("VITE_CHAT_AGENTS", "");
+      const supabase = supabaseFake();
+      const b44 = base44WithAgents();
+      const { services } = await load(supabase, b44);
+
+      const interview = await services.agents.start("needs_interview", META);
+      await services.agents.send(interview, "היי");
+      expect(b44.agents.createConversation).toHaveBeenCalledTimes(1);
+      expect(b44.agents.addMessage).toHaveBeenCalledTimes(1);
+      expect(supabase.functions.invoke).not.toHaveBeenCalled();
+    });
+  });
 });

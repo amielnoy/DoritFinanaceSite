@@ -187,3 +187,24 @@ export const HUMAN_HANDOFF = {
   phoneError: "צריך מספר טלפון שאפשר לחזור אליו.",
   alreadySent: "הפנייה כבר הועברה לדורית.",
 } as const;
+
+/**
+ * v6 — the notice for agents served by the `chat` Edge Function only
+ * (`VITE_CHAT_AGENTS`). v5 above stays the notice for every agent still on
+ * Base44, so turning the switch off restores both the transport and the notice.
+ *
+ * The fourth point replaces "not passed to any other party", which the chat
+ * cannot promise: the conversation is processed by an AI provider outside
+ * Israel, and its transcript is kept for 12 months.
+ *
+ * TODO(compliance): adviser to approve — the fourth point's wording is a
+ * release gate before VITE_CHAT_AGENTS is set (spec, "Compliance").
+ */
+export const CHAT_FUNCTION_CONSENT_VERSION = "2026-10-agents-v6";
+
+export const CHAT_FUNCTION_CONSENT_POINTS = [
+  CONSENT.points[0],
+  CONSENT.points[1],
+  CONSENT.points[2],
+  "הפרטים ותוכן השיחה נשמרים אצל דורית ואצל הצוות שמתפעל את האתר מטעמה, ואינם משמשים לשיווק. השיחה מעובדת אצל ספק שירותי בינה מלאכותית מחוץ לישראל, שאינו משתמש בה לאימון מודלים. תמליל השיחה נשמר 12 חודשים ונמחק; מזהים שנמסרו בטעות מושמטים לפני השמירה. אפשר לבקש עיון, תיקון או מחיקה בכל עת.",
+] as const;

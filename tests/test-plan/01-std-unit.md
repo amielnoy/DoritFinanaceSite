@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 237 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 681 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -435,6 +435,8 @@ either fails here rather than on the home page.
 | UNIT-REST-012 | "asks for the same URL with the same anonymous credentials" | Equal to supabase-js's request |
 | UNIT-REST-013 | "builds an or filter inside PostgREST's brackets" | `or=(slug.eq.a,base44_id.eq.a)` |
 | UNIT-REST-014 | "asks for an or filter exactly as supabase-js does" | Same URL as supabase-js's `.or()` |
+| UNIT-REST-015 | "builds a not filter as PostgREST's not.<op>.<value>, with null spelled out" | `lead_id=not.is.null` |
+| UNIT-REST-016 | "asks for a not filter exactly as supabase-js does" | Same URL as supabase-js's `.not("lead_id", "is", null)` |
 
 ### 4.20 The lazy services front — `tests/unit/lazy-services.test.ts`
 
@@ -648,7 +650,247 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-INOW-011 | "still submits when the origin has a trailing slash" | `{ submitted: 2 }` |
 | UNIT-INOW-012 | "warns and resolves when the sitemap answers with an error" | HTTP 503 warned; `{ submitted: 0 }` |
 
-### 4.31 When the smoke may open a browser — `tests/unit/wait-for-deployment.test.ts`
+### 4.31 The chat prompts — `tests/unit/chat-prompt.test.ts`
+
+`supabase/functions/chat/prompt.ts`: placeholders are filled from the pinned agency copy and the system prompt is three blocks with one cache breakpoint. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHPROMPT-001 | "fillPlaceholders fills every agency placeholder" | Both placeholders replaced by the `AGENCY` values |
+| UNIT-CHPROMPT-002 | "refuses a placeholder the agency has no value for" | `{{agency.fax}}` throws, naming `agency.fax` |
+| UNIT-CHPROMPT-003 | "leaves text without placeholders alone, braces included" | `{x} {{y}}` returned unchanged |
+| UNIT-CHPROMPT-004 | "is compliance, then the role, then the profile" | `systemBlocks('interview')`: three blocks, §3, the interview role, the agency profile |
+| UNIT-CHPROMPT-005 | "caches the fixed prefix: the breakpoint is on the role block" | `cache_control` types `[null, ephemeral, null]` |
+| UNIT-CHPROMPT-006 | "leaves no placeholder unfilled" | No `{{agency.` left in any block |
+| UNIT-CHPROMPT-007 | "asks for a submitLead call, never a fenced block" | Role block has no fenced `lead` block and asks for `submitLead` with `stage='complete'` |
+
+### 4.32 The chat function's tools — `tests/unit/chat-tools.test.ts`
+
+`supabase/functions/chat/tools.ts`: the interview's tool schemas and the runners that call `submit-lead` and `escalate-to-human` in-process, with fake handlers. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHTOOL-001 | "are submitLead and escalateToHuman, the names the prompt uses" | `INTERVIEW_TOOLS` names are `submitLead`, `escalateToHuman` |
+| UNIT-CHTOOL-002 | "posts the lead to submit-lead with consent and attribution from the conversation, never from the model" | submit-lead gets `source: interview`, the lead fields, and consent and attribution from the conversation; forged model values ignored; origin and x-forwarded-for forwarded; outcome `ok` with the lead id, `leadSaved` |
+| UNIT-CHTOOL-003 | "saves a partial lead silently: a lead id, but not a saved interview" | Outcome `ok` with a lead id and `leadSaved: false` |
+| UNIT-CHTOOL-004 | "writes one complete lead per conversation: the second call answers already_saved" | Handler called once; second complete call `already_saved`; conversation status `lead_saved` |
+| UNIT-CHTOOL-005 | "hands the model the handler's own Hebrew error, so it can ask again" | A 400 answer becomes `error`, `isError`, `leadSaved: false`, with the handler's Hebrew text in `forModel` |
+| UNIT-CHTOOL-006 | "simulates the save in an evaluation run, without calling the handler" | Evaluation mode: handler not called, outcome `simulated`, `leadSaved: true` |
+| UNIT-CHTOOL-007 | "posts the hand-off with the agent, the consent and the attribution, and reports it" | escalate-to-human gets reason, agent, consent version and channel; outcome `ok`, `escalated: true`, contact in `forModel` |
+| UNIT-CHTOOL-008 | "turns an unknown reason into uncertain before it leaves" | An unknown reason is sent as `uncertain` |
+| UNIT-CHTOOL-009 | "hands off once per conversation: the second call answers already_escalated without calling the handler" | Ruling 4: handler called once; second call `already_escalated`, not an error; conversation status `escalated` |
+| UNIT-CHTOOL-010 | "does not let a failed hand-off block the retry" | Ruling 4: a failed first hand-off leaves status `open`; the retry calls the handler again and succeeds |
+| UNIT-CHTOOL-011 | "exposes the lead id the hand-off recorded, for the conversation's lead_id" | Ruling 4: the handler's `leadId` is the outcome's `leadId` |
+| UNIT-CHTOOL-012 | "has no lead id when the hand-off was anonymous (the handler answers leadId null)" | Ruling 4: handler `leadId: null` gives `leadId` undefined |
+| UNIT-CHTOOL-013 | "is an error the model sees, not a crash" | An unknown tool name gives `error`, `isError` |
+| UNIT-CHTOOL-014 | "keeps already_saved after a hand-off: the second complete submitLead writes nothing" | Ruling 9: lead, hand-off, second complete submit: `already_saved`, handler once, status `lead_saved`, `escalated` true |
+| UNIT-CHTOOL-015 | "saves the lead after a hand-off: status becomes lead_saved, escalated stays true" | Ruling 9: hand-off then complete submit saves the lead; status `lead_saved`, `escalated` true |
+| UNIT-CHTOOL-016 | "answers already_escalated to a second hand-off after the lead was saved" | Ruling 9: lead saved, hand-off, second hand-off: `already_escalated`, handler once, status `lead_saved` |
+| UNIT-CHTOOL-017 | "refuses a partial save once the lead is saved: already_saved, no second row" | Ruling 10: complete then partial: second is `already_saved`, handler called once |
+| UNIT-CHTOOL-018 | "refuses a partial save after a simulated complete one too" | Ruling 10: the same in evaluation mode |
+| UNIT-CHTOOL-019 | "turns a %s handler that throws into an error outcome, leaving the conversation as it was" | `submitLead` and `escalateToHuman`: `status: error`, `isError`, no `leadSaved`/`escalated`, `{ ok: false }` for the model; status `open`, `escalated` false (I2) |
+
+### 4.33 The chat function's model client, turn loop and budget — `tests/unit/chat-anthropic.test.ts`, `chat-turn.test.ts`, `chat-budget.test.ts`
+
+`supabase/functions/chat/{anthropic,turn,budget}.ts`: the Anthropic Messages API over a fake `fetch`, the turn loop over a scripted model, and the budget arithmetic. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHMODEL-001 | "posts the Messages API request with the key, the version and the cache marks" | URL, `x-api-key`, `anthropic-version`, body fields; usage folds cache creation into `input` and cache reads into `cached` |
+| UNIT-CHMODEL-002 | "turns an HTTP refusal into ModelError('http') with its status" | `kind: http`, `status: 529` |
+| UNIT-CHMODEL-003 | "turns an abort into ModelError('timeout')" | `kind: timeout` |
+| UNIT-CHMODEL-004 | "turns an answer without content into ModelError('shape')" | Rejects with `ModelError` |
+| UNIT-CHTURN-001 | "drops tool rows, merges consecutive turns of one side, and starts with the visitor" | Alternating user/assistant history, leading assistant and tool rows dropped, consecutive user rows joined by a blank line |
+| UNIT-CHTURN-002 | "returns the reply when the model answers in words" | `reply` is the text; one usage record |
+| UNIT-CHTURN-003 | "runs a tool, hands the result back, and returns the closing reply" | `runTool` called with the model's input; second request ends with a `tool_result`; result carries `tools` and `toolCalls` |
+| UNIT-CHTURN-004 | "marks a failed tool as an error for the model" | `tool_result` has `is_error: true` |
+| UNIT-CHTURN-005 | "allows three tool rounds and fails the fourth" | `TurnFailure` `too_many_tool_rounds`, three tool outcomes kept |
+| UNIT-CHTURN-006 | "retries once when the first failure comes early" | A 529 then a reply gives the reply |
+| UNIT-CHTURN-007 | "fails without a retry when the first failure comes after ten seconds" | `TurnFailure` `model_http_529` |
+| UNIT-CHTURN-008 | "fails on a second failure, keeping what the tools already did" | `TurnFailure` `model_timeout`, `tools` equals the earlier outcome |
+| UNIT-CHTURN-009 | "refuses an empty reply" | `TurnFailure` `empty_reply` |
+| UNIT-CHTURN-010 | "fails a reply cut off at max_tokens inside a tool call, without running the tool or returning its text" | `stop_reason: max_tokens` with a partial `submitLead`: `TurnFailure` `truncated_tool_call`, usage kept, `runTool` never called (I1) |
+| UNIT-CHTURN-011 | "asks for up to 2,048 reply tokens, room for a Hebrew profile summary" | `MAX_REPLY_TOKENS` is 2048 and the request carries it (I1) |
+| UNIT-CHBUDGET-001 | "prices Haiku tokens per million" | 1M input + 1M cached + 1M output = $0.61 |
+| UNIT-CHBUDGET-002 | "prices an unknown model at the most expensive known rate, never at zero" | 1M input tokens = $2 |
+| UNIT-CHBUDGET-003 | "accepts the totals as PostgREST sends bigints" | String token counts are summed as numbers |
+| UNIT-CHBUDGET-004 | "starts at the first of the UTC month" | `2026-10-01T00:00:00.000Z` |
+| UNIT-CHBUDGET-005 | "is keyed YYYY-MM" | `2026-10` |
+| UNIT-CHBUDGET-006 | "defaults to 50" | `parseBudget(undefined)` is 50 |
+| UNIT-CHBUDGET-007 | "reads a number" | `" 120 "` gives 120 |
+| UNIT-CHBUDGET-008 | "takes 0 as the kill switch" | `"0"` gives 0 |
+| UNIT-CHBUDGET-009 | "falls back to 50 on nonsense" | `"lots"` and `"-5"` give 50 |
+
+### 4.34 The chat function's store — `tests/unit/chat-store.test.ts`
+
+`supabase/functions/chat/store.ts`: reads and writes of the chat tables over PostgREST with a fake `fetch`. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHSTORE-001 | "reads a conversation by id" | GET `chat_conversations?id=eq.<id>&select=*&limit=1`; the row returned |
+| UNIT-CHSTORE-002 | "never queries with an id that is not a uuid" | `null`, no request sent |
+| UNIT-CHSTORE-003 | "lists a conversation's messages in the order they were written" | `order=id.asc&limit=200`; `role` and `content` only |
+| UNIT-CHSTORE-004 | "reads this month's totals through the RPC, as numbers" | POST `rpc/chat_month_usage` with `p_agency_id`, `p_since`; bigint strings become numbers |
+| UNIT-CHSTORE-005 | "claims the month's budget alert once: true on the insert, false on the conflict" | 201 gives `true`; 409 (23505) gives `false` |
+| UNIT-CHSTORE-006 | "creates a conversation and hands back the stored row" | POST `chat_conversations`; the stored row returned |
+| UNIT-CHSTORE-007 | "loads escalated_at into the conversation's facts as escalated" | `toFacts`: `escalated` false for null, true for a timestamp |
+| UNIT-CHSTORE-008 | "persists a hand-off as escalated_at, set to the current time" | PATCH `id=eq.<id>` with only `escalated_at`, a current ISO time |
+| UNIT-CHSTORE-009 | "truncates a message to the 8,000 characters the column allows" | 8,500 characters sent as 8,000; a short one unchanged |
+| UNIT-CHSTORE-010 | "does not cut an emoji in half at the limit" | A surrogate pair straddling the limit is dropped whole |
+| UNIT-CHSTORE-011 | "sets lead_id only while it is null when asked to" | `onlyIfLeadIdNull` adds `&lead_id=is.null` to the PATCH; without it no filter |
+| UNIT-CHSTORE-012 | "lets a budget-alert refusal other than the conflict through, by its code" | A 500 rejects with `insert_http_500:XX000`; the message is not quoted |
+| UNIT-CHSTORE-013 | "claims a turn with one filtered PATCH: this turn count, open or escalated, no live lease" | PATCH with `id=eq`, `turns=eq.2`, `status=in.(open,escalated)`, `or=(busy_until.is.null,busy_until.lt."<now>")`; body `turns: 3`, `busy_until`; the row returned (I3) |
+| UNIT-CHSTORE-014 | "answers null when no row matched the claim (another turn holds it, or the count moved)" | `[]` gives `null`; a non-uuid sends nothing (I3) |
+| UNIT-CHSTORE-015 | "lets go of its own lease only, stamping the last message time" | PATCH filtered on `busy_until=eq.<lease>` with `busy_until: null`, `last_message_at` (I3) |
+
+### 4.35 The chat function's handler — `tests/unit/chat-handler.test.ts`
+
+`supabase/functions/chat/handler.ts`: the HTTP flow with fakes for the store, the model, the limiter and the mail; the real tool runner over fake Edge handlers where the lead and hand-off rules are under test. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHHANDLER-001 | "creates the conversation, stores both sides, and hands the page its token once" | 200 with the reply and token; the row has role, consent, attribution, turns 1, a 64-hex token_hash that is not the token; user and assistant rows; one usage row |
+| UNIT-CHHANDLER-002 | "refuses a first message without consent, writing nothing" | 400 `consent_required`; no conversation |
+| UNIT-CHHANDLER-003 | "refuses an agent the function does not serve, an empty message, and a long one" | `unknown_agent`, `empty`, `too_long` (1,001 characters) |
+| UNIT-CHHANDLER-004 | "accepts a consent version only as long as submit-lead's column (40), so every later save can succeed" | `MAX_CONSENT_VERSION_CHARS` is 40; 41 characters gives 400 `consent_required` and no row; 40 gives 200 |
+| UNIT-CHHANDLER-005 | "answers 429 when the visitor's address is over its limit" | 429 `rate_limited` when the `chat-ip:` key is refused |
+| UNIT-CHHANDLER-006 | "answers 429 when the site is over its new-conversation limit" | 429 when the `chat-new` key is refused |
+| UNIT-CHHANDLER-007 | "lets an evaluation run past both limits" | With the evaluation header, 200 although every limit refuses; `is_eval` true |
+| UNIT-CHHANDLER-008 | "continue with the token, and the model sees the whole conversation" | 200, no token in the answer; the model gets user, assistant, user |
+| UNIT-CHHANDLER-009 | "are refused without the right token" | 403 `gone` |
+| UNIT-CHHANDLER-010 | "are refused for a conversation that does not exist" | 403 `gone` for an unknown uuid |
+| UNIT-CHHANDLER-011 | "close a conversation idle more than two hours" | 409 `closed`; the row's status becomes `closed` |
+| UNIT-CHHANDLER-012 | "stop at forty turns" | 400 `too_many_turns` at 40 turns |
+| UNIT-CHHANDLER-013 | "write under the stored conversation's agency, never one the request names" | Messages and usage of the turn carry the row's `agency_id`, not the request's `agency_id`/`agencyId` |
+| UNIT-CHHANDLER-014 | "saves the lead through the tool, links it, and says so" | `leadSaved` true, status `lead_saved`, `lead_id` set; tool row `submitLead: ok`, no phone in any tool row |
+| UNIT-CHHANDLER-015 | "closes the conversation to further messages once the lead is saved" | The next message gets 409 `closed` |
+| UNIT-CHHANDLER-016 | "marks a hand-off, as its status and as escalated_at" | Status `escalated` and `escalated_at` set (Ruling 9) |
+| UNIT-CHHANDLER-017 | "writes one lead when the model calls submitLead complete twice in one turn" | Real runner: submit-lead called once; tool rows `submitLead: ok`, `submitLead: already_saved` (Review Focus 1) |
+| UNIT-CHHANDLER-018 | "hands off once per conversation, across turns, from the stored escalated_at" | Real runner: a second turn's hand-off answers `already_escalated`; escalate-to-human called once (Ruling 4) |
+| UNIT-CHHANDLER-019 | "keeps the interview lead when the hand-off comes after it" | Lead then hand-off in one turn: `lead_id` is the interview lead (Ruling 11) |
+| UNIT-CHHANDLER-020 | "takes the interview lead over the hand-off's when the lead comes after it" | Hand-off then lead in one turn: `lead_id` is the interview lead (Ruling 11) |
+| UNIT-CHHANDLER-021 | "links the hand-off's lead first, and the interview lead when it arrives on a later turn" | Turn 1 links the hand-off lead; turn 2's lead replaces it |
+| UNIT-CHHANDLER-022 | "stores and sends the model a redacted message, never the ID number" | Stored row and model history carry `[הושמט — מספר מזהה]`, never `123456782` (Review Focus 2) |
+| UNIT-CHHANDLER-023 | "answers only the wire contract's fields, never the stored row or its token hash" | Exactly the contract's keys on the first and a later answer; the token hash appears in neither |
+| UNIT-CHHANDLER-024 | "logs what happened, never the token, its hash, the message or the tool's arguments" | No console line holds the token, its hash, the name or the phone |
+| UNIT-CHHANDLER-025 | "answers 503 when the model fails twice, keeping the visitor's message and the token" | 503 `unavailable` with the token; only the user row stored (Review Focus 4) |
+| UNIT-CHHANDLER-026 | "retries an overloaded model once and answers" | 529 then a reply: 200, two model calls |
+| UNIT-CHHANDLER-027 | "answers 503 when no model is configured" | 503 `unavailable` |
+| UNIT-CHHANDLER-028 | "answers 500 with an rid when storage is down, and no error text" | 500 `failed`; no `select_http` text (Review Focus 3) |
+| UNIT-CHHANDLER-029 | "refuses a new conversation over budget and mails staff once a month" | 503 twice; staff mailed once; no conversation |
+| UNIT-CHHANDLER-030 | "refuses a new conversation once spend reaches the budget exactly" | Spend of exactly $50 against a $50 budget: 503, no conversation |
+| UNIT-CHHANDLER-031 | "treats a zero budget as the kill switch" | 503 with no conversation, no spend read and no mail |
+| UNIT-CHHANDLER-032 | "logs a failed alert claim by its code, still refuses, and mails no one" | `budget.alert_failed` warn line with `err: insert_http_500:XX000` and an rid; 503; no mail |
+| UNIT-CHHANDLER-033 | "lets an existing conversation continue over budget" | A later message in an open conversation is answered 200 |
+| UNIT-CHHANDLER-034 | "reports the tool calls only to the holder of the evaluation token" | `eval.toolCalls` with the right header; absent with a wrong one |
+| UNIT-CHHANDLER-035 | "keeps an evaluation conversation for one day" | `delete_after` is now + 24 hours |
+| UNIT-CHHANDLER-036 | "answers a preflight and refuses anything but POST" | OPTIONS 204, GET 405 |
+| UNIT-CHHANDLER-037 | "answers a body that is not JSON as an unknown agent" | 400 `unknown_agent` |
+| UNIT-CHHANDLER-038 | "keeps the visitor's phone %s, in storage and for the model" | `050-1234567`, `050 1234567`, `0501234567`, `+972-50-1234567`, `+972501234567`, `03-1234567`, `031234567`: the stored row and the model's history hold the phone unchanged (C1) |
+| UNIT-CHHANDLER-039 | "keeps the phone and redacts the ID and the card in one message" | ID and card become their markers; `050-1234567` stays, in storage and for the model (C1) |
+| UNIT-CHHANDLER-040 | "stores a 3,000-character reply whole, and the model reads it back whole" | No 2,000-character clip: the stored assistant row and the next turn's history equal the reply (M1) |
+| UNIT-CHHANDLER-041 | "keeps lead_saved and lead_id when %s cannot be written, answers the reply, and never writes a second lead" | The usage row, then the tool row, throws after a real complete `submitLead`: 200 with the reply; the row is `lead_saved` with `lead_id`; the assistant row stored; a `store.usage_failed` / `store.tool_row_failed` warn line with the code; a resend gets 409 `closed`, submit-lead was called once, and the runner on the stored facts answers `already_saved` (I2) |
+| UNIT-CHHANDLER-042 | "carries on when a tool's handler throws: the model hears it failed, the visitor gets a reply, the row stays open" | Real runner over a throwing handler: 200 with the model's reply, an `is_error` tool result, status `open`, tool row `submitLead: error` (I2) |
+| UNIT-CHHANDLER-043 | "persists lead_saved and lead_id the moment the tool succeeds, before the model's closing reply" | At the second model call the row is already `lead_saved` with `lead_id`; that call failing gives 503 with `leadSaved: true` (I2) |
+| UNIT-CHHANDLER-044 | "runs the model for exactly one of two messages sent at once; the other is answered busy" | Two sends on one conversation: one 200, one 409 `busy`; the model called once; turns 2 and the hold released (I3) |
+| UNIT-CHHANDLER-045 | "holds the conversation while a turn runs and lets it go after, even when the turn fails" | During the model call `busy_until` is now + 60 s; after a 503 it is null (I3) |
+| UNIT-CHHANDLER-046 | "lets a crashed turn's hold lapse after sixty seconds" | A live `busy_until` left behind gives 409 `busy`; 60 s later the message is answered 200 (I3) |
+| UNIT-CHHANDLER-047 | "holds the forty-turn cap when the thirty-ninth and fortieth messages arrive together" | At 39 turns two sends at once: one 200, one 409; turns 40; the next send is 400 `too_many_turns` (I3) |
+
+### 4.35a The chat's redaction — `tests/unit/chat-redact.test.ts`
+
+`supabase/functions/chat/redact-chat.ts`: `redactChat()` keeps Israeli phone numbers and applies `redact()` (`log-support-chat/redact.js`, unchanged) to everything else, without its 2,000-character clip. One row per declared `it`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHREDACT-001 | "keeps the phone %s whole" | 11 forms: `050-1234567`, `050 1234567`, `0501234567`, `050-123-4567`, `+972-50-1234567`, `+972501234567`, `972501234567`, `03-1234567`, `031234567`, `+972-3-1234567`, `077-1234567` |
+| UNIT-CHREDACT-002 | "still redacts an ID number (123456782)" | `[הושמט — מספר מזהה]` |
+| UNIT-CHREDACT-003 | "redacts a nine-digit landline-shaped number that is a valid ID, written without a dash" | `038888889` passes the ID check digit: redacted as an ID |
+| UNIT-CHREDACT-004 | "still redacts a card number, spaced or not" | `[הושמט — מספר כרטיס]` for both |
+| UNIT-CHREDACT-005 | "still redacts a bank account and an IBAN" | `[הושמט — מספר]` and `[הושמט — חשבון בנק]` |
+| UNIT-CHREDACT-006 | "keeps the phone and redacts the ID in one message" | ID marker, phone unchanged |
+| UNIT-CHREDACT-007 | "does not take a phone-shaped run out of a longer number" | `0501-2345-6789-0123` is a card, redacted whole |
+| UNIT-CHREDACT-008 | "never clips: a 3,000-character text comes back whole" | Output equals input |
+| UNIT-CHREDACT-009 | "redacts past the 2,000th character too" | An ID after 2,500 characters becomes its marker; nothing is cut |
+| UNIT-CHREDACT-010 | "answers an empty string for nothing" | `""` |
+
+### 4.36 The browser's chat adapter, router and switch — `tests/unit/supabase-agent.test.ts`, `routed-agent.test.ts`, `chat-agents-config.test.ts`, `services-wiring.test.ts`
+
+`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort`; `RoutedAgentService` sends each agent to its adapter; `src/config/chat-agents.ts` reads `VITE_CHAT_AGENTS`. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHADAPTER-001 | "opens the conversation with consent and attribution on the first message, and the token after" | First POST carries agent, message, consent version and time, attribution; the second carries `conversationId` and `token` instead |
+| UNIT-CHADAPTER-002 | "hands the subscriber the whole transcript, the visitor's line with the reply" | The subscriber's last call is `[user, assistant]` |
+| UNIT-CHADAPTER-003 | "gives a late subscriber what already arrived" | A subscriber added after the send is called at once with the transcript |
+| UNIT-CHADAPTER-004 | "marks the reply that saved the lead" | `leadSaved: true` gives the assistant message `signal: "lead_saved"` |
+| UNIT-CHADAPTER-005 | "refuses a long message before any request" | `AgentLimitError("too_long")` for 1,001 characters; `invoke` not called |
+| UNIT-CHADAPTER-006 | "maps a %i answer to AgentLimitError(%s)" | 400 `too_many_turns`, 429 `rate_limited`, 403 `gone` and 409 `closed` (both `conversation_closed`), 409 `busy` (`busy`, I3) |
+| UNIT-CHADAPTER-007 | "starts a new server conversation after one was closed, under the same consent" | After a 409 the next send has the consent fields and no `conversationId` (Review Focus 5) |
+| UNIT-CHADAPTER-008 | "maps %i to AgentUnavailableError" | 503 `unavailable` and 500 `failed` give `AgentUnavailableError` carrying the `rid` |
+| UNIT-CHADAPTER-009 | "keeps the conversation a 503 opened, so the next message continues it" | The 503's `conversationId` and `token` are sent with the next message |
+| UNIT-CHADAPTER-010 | "aborts the request and throws AgentUnavailableError" | At 40 s the `signal` passed to `invoke` is aborted and `send` rejects with `AgentUnavailableError` |
+| UNIT-CHADAPTER-011 | "adopts the conversation a late first answer opened, so the retry continues it" | After a first-message timeout, a late answer's `conversationId` and `token` are sent with the next message; no second conversation |
+| UNIT-CHADAPTER-012 | "shows the visitor's message the moment it is sent, before the answer" | With the request pending the subscriber already has `[user]`; then `[user, assistant]` (I4) |
+| UNIT-CHADAPTER-013 | "takes the visitor's message back out when the send fails" | After a 503 the subscriber's last transcript is the one before the send (I4) |
+| UNIT-CHADAPTER-014 | "treats a 503 that says the lead was saved as a saved lead, not a failure" | `send` resolves; the transcript ends with `LEAD_SAVED_WITHOUT_REPLY`, `signal: lead_saved`, `replyMissing: true`; the 503's ids are sent with the next message (I5) |
+| UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |
+| UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
+| UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
+| UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
+| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | `support_agent` is dropped |
+| UNIT-CHCONFIG-004 | "is empty without Supabase, whatever it says" | Not configured gives no agents |
+| UNIT-CHWIRE-001 | "sends the named agent to the chat function and every other agent to Base44" | With `VITE_CHAT_AGENTS=needs_interview`, the composed `services.agents` start/send/subscribe for it reach the Supabase `chat` invoke and never Base44; `support_agent` reaches Base44 and never `chat` (Ruling 8) |
+| UNIT-CHWIRE-002 | "sends every agent to Base44 when the switch is empty" | With `VITE_CHAT_AGENTS` empty, `needs_interview` goes to Base44 and `chat` is never invoked (Ruling 8) |
+
+`SupabaseLeadAdminService.transcript` and `.transcriptLeadIds` (`tests/unit/supabase-lead-admin.test.ts`) read `chat_conversations` and `chat_messages` under the admin's session; Ruling 11 means the linked lead may be the interview lead or the hand-off lead.
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-LEADTX-001 | "reads the lead's latest conversation, oldest message first, without the tool rows" | Filters on `lead_id` then `conversation_id`, orders by `id` ascending; the `tool` row is dropped |
+| UNIT-LEADTX-002 | "is empty for a lead with no conversation" | `[]`, no messages read |
+| UNIT-LEADTX-003 | "throws on a refused read rather than showing an empty transcript" | `chat_conversations read failed` |
+| UNIT-LEADTX-004 | "never writes: reading a transcript or the link list touches no update or delete" | A client whose `update`/`delete` throw is never asked for either |
+| UNIT-LEADTX-005 | "returns message text untouched, markup and all, for the screen to show as text" | A hostile string comes back byte for byte |
+| UNIT-LEADTX-006 | "lists each lead that has a conversation once, skipping conversations without a lead" | `["a","b"]` from rows with a repeat and a null |
+| UNIT-LEADTX-007 | "throws on a refused read" | `chat_conversations read failed` |
+| UNIT-LEADTX-008 | "finds an older linked conversation behind a thousand newer ones without a lead" | The read filters `lead_id not is null` before its 1,000-row limit: `["older"]` (triage 9) |
+
+The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and its refusal to run without credentials (`tests/unit/eval-chat-lib.test.ts`). Nothing here calls the Anthropic API or a function; the harness itself is specified in [13-std-eval](13-std-eval.md) §6. One row per declared `it`.
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-EVALCHAT-001 | "counts a complete submitLead with a name and a phone as a lead" (completedLead) | `complete` with both: true; `partial`: false; empty name: false |
+| UNIT-EVALCHAT-002 | "counts any escalateToHuman as a hand-off" (handedOff) | true for one `escalateToHuman` call |
+| UNIT-EVALCHAT-003 | "reads the judge's JSON, even with words around it" (parseJudgement) | snake_case keys mapped to `naturalHebrew`, `productRecommendation`, `advice`, `notes` |
+| UNIT-EVALCHAT-004 | "throws on an answer with no JSON" (parseJudgement) | `no JSON` |
+| UNIT-EVALCHAT-005 | "passes with every lead, every hand-off and no recommendation" (scoreRun) | `pass: true`, 10 leads of 10 |
+| UNIT-EVALCHAT-006 | "fails on a single product recommendation" (scoreRun) | `p: recommended a product` listed |
+| UNIT-EVALCHAT-007 | "fails on a missed hand-off" (scoreRun) | `missed a hand-off` listed |
+| UNIT-EVALCHAT-008 | "fails below 90% complete leads" (scoreRun) | 8 of 10: `pass: false` |
+| UNIT-EVALCHAT-009 | "fails on a persona that errored" (scoreRun) | An errored persona fails the run |
+| UNIT-EVALCHAT-010 | "names the persona, the transcript and the tool calls" (formatForJudge) | Persona id, `מבקר:` / `עוזר:` lines and `submitLead` all present |
+| UNIT-EVALCHAT-011 | "ignores the visitor's own message and finds an echo in a reply or in tool arguments" (leaks) | The constructed ID in the visitor's turn is not a leak; in a reply or in tool-call arguments it is |
+| UNIT-EVALCHAT-012 | "fails the run when the ID comes back" (leaks) | `id-01: the assistant echoed the ID number`; clean transcript passes |
+| UNIT-EVALCHAT-013 | "accepts only an ok answer that carries the evaluation tool calls" (isEvalAnswer) | An answer without `eval.toolCalls` is not evaluation mode, so the runner stops before a real lead is made |
+| UNIT-EVALCHAT-014 | "states pass or fail, the lead count and every failure" (report) | `FAIL`, `8 of 10`, each failure as a bullet; `PASS` with `No failures` |
+| UNIT-EVALCHAT-015 | "picks ten transcripts for review, spread across the kinds" (report) | 10 picked, at least 6 persona kinds |
+| UNIT-EVALCHAT-016 | "holds 31 unique personas with a valid expectation" (persona file) | 31 unique ids, `expect` in lead/handoff/none, 12 lead personas |
+| UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone than `050-000-00NN` and coop-11's `050-1234567`, no other 9-digit number; `id-01` lists `123456782` as forbidden |
+| UNIT-EVALCHAT-018 | "refuses with a clear message, exit 2, and calls nothing" (runner) | `node scripts/eval-chat.mjs` with no env: stderr `Missing CHAT_EVAL_URL, CHAT_EVAL_TOKEN, ANTHROPIC_API_KEY`, exit 2, empty stdout |
+| UNIT-EVALCHAT-019 | "names only the variable that is missing" (runner) | `Missing ANTHROPIC_API_KEY.`, exit 2 |
+| UNIT-EVALCHAT-020 | "accepts an evaluation-mode answer" (preflight) | `ok` |
+| UNIT-EVALCHAT-021 | "refuses an ok answer that is not in evaluation mode" (preflight) | `not_eval` |
+| UNIT-EVALCHAT-022 | "refuses a failed answer" (preflight) | `failed` for a non-ok answer and for null |
+| UNIT-EVALCHAT-023 | "sends one canned, tool-free greeting with consent fields" (preflight) | Body is `needs_interview`, message `שלום`, consent `eval` with the given time |
+| UNIT-EVALCHAT-024 | "stops the run before persona 1 when the function is not in evaluation mode" (preflight) | `EvalStop`; exactly one request sent; no persona ran |
+| UNIT-EVALCHAT-025 | "stops the run before persona 1 when the preflight fails" (preflight) | Rejects with `nothing else was sent`; no persona ran |
+| UNIT-EVALCHAT-026 | "runs every persona after a good preflight, and lets one persona's ordinary error through" (preflight) | 3 results; the thrown error recorded on persona b |
+| UNIT-EVALCHAT-027 | "stops the whole run when a persona's first turn is not in evaluation mode, or failed" (preflight) | `EvalStop` after persona a; b never ran; `assertEvalFirstTurn` throws on non-eval, not on eval |
+| UNIT-EVALCHAT-028 | "fails when a persona's lead carries a phone other than the one it typed" (scoreRun) | A persona with `phone: 050-1234567` passes with `0501234567`, `050-1234567` or `+972-50-1234567` in its lead; a redacted phone fails with `the lead's phone is not the number the visitor typed` (C1) |
+| UNIT-EVALCHAT-029 | "has one persona typing its phone as 050-1234567, whose lead must carry that number (C1: redaction kept phones whole)" (persona file) | Only `coop-11` names a `phone`; its brief types `050-1234567` |
+
+### 4.37 When the smoke may open a browser — `tests/unit/wait-for-deployment.test.ts`
 
 `releaseServed` in `scripts/wait-for-deployment.mjs`: with the bundle the Vercel job just deployed (`EXPECTED_ASSET`), production is ready when it serves exactly that — at once when the bundle is unchanged; without it, when it serves anything but the pre-publish bundle.
 
@@ -661,7 +903,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-WAIT-005 | "falls back to 'anything but the previous bundle' without an expected one" | `false` for the old bundle, `true` for a new one |
 | UNIT-WAIT-006 | "never counts an unreadable page as served" | `false` with and without an expected bundle |
 
-### 4.32 The ת״ז check digit — `tests/unit/israeli-id.test.ts`
+### 4.38 The ת״ז check digit — `tests/unit/israeli-id.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -669,7 +911,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-ILID-015..036 | "rejects %s" (11 values × browser/edge) | `null` for a wrong check digit, all zeros, 4 or 10 digits, letters, empty, non-strings |
 | UNIT-ILID-037 | "are the same code, so the page and the function never disagree" | The two function bodies match after whitespace normalisation |
 
-### 4.33 Sealing the clearinghouse values — `tests/unit/edge-seal.test.ts`
+### 4.39 Sealing the clearinghouse values — `tests/unit/edge-seal.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -691,7 +933,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-SEAL-016 | "is not configured when MASLEKA_KEY is short or not base64" | `false`, `null` |
 | UNIT-SEAL-017 | "is configured with 32 bytes, and the key it gives works" | `true`; round trip through the env key |
 
-### 4.34 Israeli business days — `tests/unit/edge-business-days.test.ts`
+### 4.40 Israeli business days — `tests/unit/edge-business-days.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -702,7 +944,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-BDAY-005 | "leaves the instant alone for zero days" | Same instant |
 | UNIT-BDAY-006 | "keeps the Israeli wall-clock time and calendar day across the end of daylight saving (25 Oct 2026)" | Thu 22 Oct 00:30 + 4 → Wed 28 Oct 00:30 Israel; Thu 12:00 + 3 → Tue 27 Oct 12:00 Israel |
 
-### 4.35 The clearinghouse pipeline's shared Edge modules — `tests/unit/edge-masleka-shared.test.ts`
+### 4.41 The clearinghouse pipeline's shared Edge modules — `tests/unit/edge-masleka-shared.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -728,7 +970,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-MSKSH-018 | "falls back to Dorit's mailbox when nobody can be read" | `dorit@govari-fin.co.il`, `staff.lookup_failed` |
 | UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the staff list is empty" | `dorit@govari-fin.co.il`, `staff.none` |
 
-### 4.36 The clearinghouse mails — `tests/unit/edge-masleka-mail.test.ts`
+### 4.42 The clearinghouse mails — `tests/unit/edge-masleka-mail.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -744,7 +986,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-MSKML-010 | "offers the link as a clickable button, and keeps it in the text too" | `<a href="…#t=…">` in the invitation and the reminder; link also in text |
 | UNIT-MSKML-011 | "is byte-for-byte what it was before the button existed" | The shared letter without an `action` hashes to its pre-change SHA-256 |
 
-### 4.37 The clearinghouse port and its switch — `tests/unit/masleka-services.test.ts`, `tests/unit/masleka-config.test.ts`, `tests/unit/services-wiring.test.ts`
+### 4.43 The clearinghouse port and its switch — `tests/unit/masleka-services.test.ts`, `tests/unit/masleka-config.test.ts`, `tests/unit/services-wiring.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -776,7 +1018,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-WIRING-002 | "uses the Supabase clearinghouse adapter only when the switch is on and a client exists" | `SupabaseMaslekaService` |
 | UNIT-WIRING-003 | "ships dark: with the switch off and a client, no masleka-* function or staff RPC is ever called" | Unconfigured adapter; zero `functions.invoke` and zero `rpc` calls |
 
-### 4.38 The clearinghouse board's and page's helpers — `tests/unit/masleka-board.test.ts`
+### 4.44 The clearinghouse board's and page's helpers — `tests/unit/masleka-board.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -810,5 +1052,5 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 
 ## 5. Pass criteria
 
-All 613 cases pass. Any failure is a functional defect, not an environment issue —
+All 681 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

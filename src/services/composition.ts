@@ -1,5 +1,6 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
+import { CHAT_AGENTS } from "@/config/chat-agents";
 import { LEAD_FUNCTIONS } from "@/config/lead-functions";
 import { MASLEKA_ENABLED } from "@/config/masleka";
 import { UPLOAD_PROVIDER } from "@/config/upload-provider";
@@ -13,6 +14,7 @@ import { Base44LeadAdminService } from "./base44/Base44LeadAdminService";
 import { Base44LeadService } from "./base44/Base44LeadService";
 import { Base44SupportService } from "./base44/Base44SupportService";
 import { Base44UploadService } from "./base44/Base44UploadService";
+import { SupabaseAgentService } from "./supabase/SupabaseAgentService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
@@ -24,9 +26,11 @@ import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/Su
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
 import { UnconfiguredMaslekaService } from "./unconfigured/UnconfiguredMaslekaService";
+import { RoutedAgentService } from "./RoutedAgentService";
 import type { Services } from "./index";
 import type {
   AccountPort,
+  AgentPort,
   AuthPort,
   ContentAdminPort,
   ContentPort,
@@ -149,10 +153,20 @@ const maslekaPort: MaslekaPort =
     ? new SupabaseMaslekaService(supabase as unknown as SupabaseMaslekaClient)
     : new UnconfiguredMaslekaService();
 
+/**
+ * The on-site agents: the `chat` Edge Function for those named in
+ * `VITE_CHAT_AGENTS` (empty by default), Base44 for the rest.
+ */
+const agentPort: AgentPort = new RoutedAgentService(
+  new Base44AgentService(client),
+  supabase ? new SupabaseAgentService(supabase as unknown as SupabaseFunctionsClient) : null,
+  CHAT_AGENTS,
+);
+
 export const services: Services = {
   leads: leadPort,
   content: contentPort,
-  agents: new Base44AgentService(client),
+  agents: agentPort,
   uploads: uploadPort,
   claimDocuments: claimDocumentsPort,
   support: supportPort,

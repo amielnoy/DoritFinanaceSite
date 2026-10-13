@@ -60,6 +60,8 @@ export interface EdgeOptions {
   masleka?: MaslekaFake;
   /** PostgREST refuses the insert: `true` for a 500, or a status and body of your own. */
   failLeadWrite?: boolean | { status: number; body: string };
+  /** The insert answers a row with no `id`. */
+  leadWithoutId?: boolean;
   /** Recipients whose delivery the mailer refuses. */
   failEmailTo?: string[];
   env?: Record<string, string>;
@@ -246,6 +248,10 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       const row = { id: `00000000-0000-4000-8000-${String(leads.length + 1).padStart(12, "0")}`, ...parsed };
       leads.push(row);
       stored.push(row);
+      if (options.leadWithoutId) {
+        const { id: _id, ...bare } = row;
+        return new Response(JSON.stringify([bare]), { status: 201 });
+      }
       return new Response(JSON.stringify([row]), { status: 201 });
     }
     if (u === `${SUPABASE_URL}/rest/v1/rpc/allow_submission` && method === "POST") {

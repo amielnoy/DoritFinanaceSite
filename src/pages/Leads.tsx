@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { services, type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
-import { useLeads, useRemoveLead, useSetLeadStatus } from "@/hooks/useAdmin";
+import { useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds } from "@/hooks/useAdmin";
 import { Link } from "react-router-dom";
 import { Loader2, Download, Trash2, ArrowRight } from "lucide-react";
 import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
@@ -83,6 +83,31 @@ function DocumentLink({ docRef, index }: { docRef: string; index: number }) {
   );
 }
 
+/** The interview behind a lead, read-only — what the client actually said, for the meeting. Plain text only: it is visitor-typed. */
+function LeadTranscript({ leadId }: { leadId: string }) {
+  const [open, setOpen] = useState(false);
+  const { data, isLoading, error } = useLeadTranscript(leadId, open);
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="text-xs underline text-accent hover:text-foreground">
+        {open ? "הסתרת השיחה" : "שיחה"}
+      </button>
+      {open && (
+        <div className="mt-2 max-h-64 overflow-y-auto border border-border/60 p-2 text-xs leading-relaxed whitespace-pre-wrap">
+          {isLoading && <span className="text-muted-foreground">טוען…</span>}
+          {error && <span className="text-destructive">לא ניתן לטעון את השיחה</span>}
+          {data && data.length === 0 && <span className="text-muted-foreground">אין תמליל שמור לפנייה הזו</span>}
+          {data?.map((line, i) => (
+            <p key={i} className="mb-1">
+              <span className="font-medium">{line.role === "user" ? "מבקר/ת" : "עוזר"}:</span> {line.content}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The details column: topic, time and message, with any stored document as a button. */
 function LeadDetails({ lead }: { lead: LeadRecord }) {
   const text = [lead.topic, lead.timing, lead.message].filter(Boolean).join(" · ");
@@ -103,6 +128,8 @@ function LeadDetails({ lead }: { lead: LeadRecord }) {
 
 export default function Leads() {
   const { data, isPending: loading, isError } = useLeads();
+  const transcriptIds = useTranscriptLeadIds();
+  const withTranscript = useMemo(() => new Set(transcriptIds.data ?? []), [transcriptIds.data]);
   const setStatus = useSetLeadStatus();
   const removeLead = useRemoveLead();
   const [filter, setFilter] = useState<string>("all");
@@ -289,6 +316,7 @@ export default function Leads() {
                     <td className="px-4 py-3 text-foreground/70">{SOURCE_LABEL[l.source] || "—"}</td>
                     <td className="px-4 py-3 text-foreground/70 max-w-xs">
                       <LeadDetails lead={l} />
+                      {withTranscript.has(l.id) && <LeadTranscript leadId={l.id} />}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2.5 py-1 text-xs ${STATUS_COLOR[l.status] || ""}`}>

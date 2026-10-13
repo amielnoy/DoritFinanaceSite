@@ -104,7 +104,7 @@ test.describe("Live Supabase, with the deployed bundle's key (opt-in)", () => {
       expect(body.ready, "submit-lead cannot save a lead — its Supabase key is missing").toMatchObject({ db: true });
       expect(body.ready, "submit-lead cannot mail — set MAILER_URL and MAILER_TOKEN in its secrets").toMatchObject({ mailer: true });
       if (EXPECT_GOOGLE) {
-        expect(body.ready, "submit-lead cannot reach Google — set GOOGLE_SERVICE_ACCOUNT_JSON and GOOGLE_CALENDAR_ID").toMatchObject({ google: true });
+        expect(body.ready, "submit-lead cannot reach Google — set GOOGLE_SERVICE_ACCOUNT_JSON").toMatchObject({ google: true });
       }
     });
 

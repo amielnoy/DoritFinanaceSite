@@ -94,7 +94,8 @@ async function fingerprint(body: unknown, envPatch: Record<string, string | null
 
 /**
  * What submit-lead produced for these three interviews before Task 12 touched
- * it (captured from commit 733c9bd with the clock and fixtures above). A
+ * it (captured from commit 733c9bd, then re-captured after #170 narrowed the
+ * invitations to Dorit and the Outlook address, with the clock and fixtures above). A
  * switched-off pipeline must reproduce it exactly: the same mails, byte for
  * byte, the same answer and the same log lines.
  */
@@ -117,10 +118,9 @@ const TODAY = {
     status: 200,
     json: answer,
     mails: [
-      "amielnoy@gmail.com | הזמנה: סיכום ראיון היכרות — אורי לוי | html:e3b0c44298fc1c14 text:a2d72e70a532e5c2 ics:yes",
-      "amielnoy@gmail.com | סיכום ראיון היכרות — אורי לוי | html:5a024926f3d7d36a text:aab5545db2cf0164 ics:-",
+      "amielnoy@gmail.com | סיכום ראיון היכרות — אורי לוי | html:58b611cad3c7624e text:9e7c57f030c7be7d ics:-",
       "amielnoy@outlook.com | הזמנה: סיכום ראיון היכרות — אורי לוי | html:e3b0c44298fc1c14 text:a2d72e70a532e5c2 ics:yes",
-      "amielnoy@outlook.com | סיכום ראיון היכרות — אורי לוי | html:5a024926f3d7d36a text:aab5545db2cf0164 ics:-",
+      "amielnoy@outlook.com | סיכום ראיון היכרות — אורי לוי | html:58b611cad3c7624e text:9e7c57f030c7be7d ics:-",
       "dorit@govari-fin.co.il | הזמנה: סיכום ראיון היכרות — אורי לוי | html:e3b0c44298fc1c14 text:a2d72e70a532e5c2 ics:yes",
       "dorit@govari-fin.co.il | סיכום ראיון היכרות — אורי לוי | html:75ee6c82b0f36d50 text:495f18d212660c37 ics:-",
       "uri@example.com | אישור — קיבלנו את סיכום השיחה · דורית גוב ארי | html:77a84198865c003e text:08969448b0f14f10 ics:-",
@@ -128,7 +128,6 @@ const TODAY = {
     logs: [
       'info calendar.created {"provider":"google"}',
       ...commonLogs,
-      'info mail.sent {"role":"invite","transport":"mailer"}',
       'info mail.sent {"role":"invite","transport":"mailer"}',
       'info mail.sent {"role":"invite","transport":"mailer"}',
     ].sort(),

@@ -162,6 +162,8 @@ export const services: Services = {
     setStatus: (id, status) => real().then((s) => s.leadsAdmin.setStatus(id, status)),
     remove: (id) => real().then((s) => s.leadsAdmin.remove(id)),
     documentLink: (ref) => real().then((s) => s.leadsAdmin.documentLink(ref)),
+    transcript: (leadId) => real().then((s) => s.leadsAdmin.transcript(leadId)),
+    transcriptLeadIds: () => real().then((s) => s.leadsAdmin.transcriptLeadIds()),
   },
   contentAdmin: {
     listArticles: (limit) => real().then((s) => s.contentAdmin.listArticles(limit)),
