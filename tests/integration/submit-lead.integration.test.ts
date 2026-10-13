@@ -18,11 +18,8 @@ import { REPO_ROOT } from "../helpers/entity-schema";
  * reached the HTML, whether the plain-text copy was escaped by mistake, or
  * whether a bounce to one recipient silently dropped the other two.
  *
- * Two implementations answer these cases while both are deployed: Base44's
- * `submitLead` and its Supabase Edge port `submit-lead`. A case that holds for
- * one must hold for the other. The few that describe something the port
- * deliberately does not do (docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md)
- * are Base44-only and say which decision; what only the port does is at the end.
+ * The Edge function `submit-lead` does the work; Base44's `submitLead` is a
+ * forwarder to it (forwarders.integration.test.ts).
  */
 
 /** Both harnesses' options. A case passes only knobs both understand, or takes them from `down`. */
@@ -65,21 +62,6 @@ async function runEdge(body: unknown, o: RunOptions = {}) {
 }
 
 const IMPLEMENTATIONS = [
-  {
-    label: "Base44 submitLead",
-    edge: false,
-    run: (body: unknown, o: RunOptions = {}) => invokeFunction("submitLead", body, o) as Promise<Result>,
-    /** Where its builders live, for the cases that read a list out of the source. */
-    source: "base44/functions/submitLead/entry.ts",
-    /** The calendar call each booking makes. */
-    calendarCall: "graph.microsoft.com",
-    /** One step failing, in this harness's terms. */
-    down: {
-      network: { failFetch: true },
-      calendar: { failCalendar: true },
-      sheet: { fetchStatus: 500 },
-    } as Record<"network" | "calendar" | "sheet", RunOptions>,
-  },
   {
     label: "Edge submit-lead",
     edge: true,
@@ -481,16 +463,6 @@ describe.each(IMPLEMENTATIONS)("$label — what survives a failure", ({ run, dow
 });
 
 // Base44 only: there is no connector to be unconnected.
-describe("Base44 submitLead — what survives a failure", () => {
-  it("does not attempt a calendar event without a connector token", async () => {
-    const r = await invokeFunction("submitLead", consultation, {
-      connections: { outlook: null },
-    });
-    expect(r.callsTo("graph.microsoft.com")).toHaveLength(0);
-    expect(r.status).toBe(200);
-  });
-});
-
 /**
  * The meeting, in Supabase.
  *
@@ -667,26 +639,6 @@ describe.each(IMPLEMENTATIONS)("$label — the calendar event it books", ({ run,
 
 // Base44 only: the Edge function writes no Outlook event (spec, "No Outlook connector").
 // Its Google event's reminders, zone and token are cases of its own, at the end.
-describe("Base44 submitLead — the calendar event it books", () => {
-  it("asks for a reminder and sets the Israel timezone", async () => {
-    const r = await invokeFunction("submitLead", consultation);
-    const [call] = r.callsTo("graph.microsoft.com");
-    expect(call.body).toMatchObject({
-      isReminderOn: true,
-      start: { timeZone: "Israel Standard Time" },
-    });
-  });
-
-  it("authorises with the connector token and never leaks it to the caller", async () => {
-    const r = await invokeFunction("submitLead", consultation, {
-      connections: { outlook: "secret-outlook-token" },
-    });
-    const [call] = r.callsTo("graph.microsoft.com");
-    expect(call.headers.Authorization).toBe("Bearer secret-outlook-token");
-    expect(JSON.stringify(r.json)).not.toContain("secret-outlook-token");
-  });
-});
-
 /**
  * The introduction interview, ending.
  *
@@ -1332,46 +1284,6 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
 // Base44 only: the mirror is Base44's second store; the Edge function writes
 // Supabase alone (spec, "Supabase is the only store"), so its update is the
 // whole case and is shared above.
-describe("Base44 submitLead — the completion, in both stores", () => {
-  const partial = {
-    name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
-    stage: "partial", track: "pension",
-    profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
-  };
-  const mirrorEnv = {
-    MAILER_URL,
-    MAILER_TOKEN: "test-only-token",
-    SUPABASE_URL: "https://stub.supabase.co",
-    SUPABASE_SERVICE_ROLE_KEY: "test-only-service-key",
-  };
-  const opened = () => ({
-    id: "LEAD-EXISTING", name: "אורי", phone: "0541112233", source: "interview",
-    status: "partial", email: "", timing: "", created_date: new Date().toISOString(),
-  });
-  const mirrored = (r: Result) =>
-    r.callsTo("/rest/v1/leads")[0]?.body as Record<string, unknown>;
-
-  it("carries the agreed time and the full name to Base44, matching the mirror", async () => {
-    const r = await invokeFunction(
-      "submitLead",
-      { ...partial, stage: "complete", timing: "בשבוע הבא" },
-      { existingLeads: [opened()], env: mirrorEnv },
-    );
-    expect(r.leadUpdates[0].fields).toMatchObject({ name: "אורי לוי", timing: "בשבוע הבא" });
-    expect(mirrored(r)).toMatchObject({ name: "אורי לוי", timing: "בשבוע הבא" });
-  });
-
-  it("keeps a time already stored when the completion sends none, in both stores", async () => {
-    const r = await invokeFunction(
-      "submitLead",
-      { ...partial, stage: "complete" },
-      { existingLeads: [{ ...opened(), timing: "בבוקר" }], env: mirrorEnv },
-    );
-    expect(r.leadUpdates[0].fields).toMatchObject({ timing: "בבוקר" });
-    expect(mirrored(r)).toMatchObject({ timing: "בבוקר" });
-  });
-});
-
 describe.each(IMPLEMENTATIONS)("$label — how complete the interview was", ({ run }) => {
   const base = {
     name: "אורי לוי", phone: "0541112233", email: "", source: "interview", track: "pension",
@@ -1841,35 +1753,6 @@ describe.each(IMPLEMENTATIONS)("$label — a step that quietly did not happen sa
   });
 });
 
-describe("Base44 submitLead — a step that quietly did not happen says so", () => {
-  const env = { MAILER_URL, MAILER_TOKEN: "test-only-token", SHEET_ID: "sheet-test-id", SHEET_TAB: "Events" };
-
-  // Base44 only: there is no connector to be unconnected.
-  it("counts an unauthorised connector as a fault", async () => {
-    const r = await invokeFunction("submitLead", consultation, {
-      env,
-      connections: { googledocs: null },
-    });
-    expect(r.json.warnings).toContain("doc_not_connected");
-    expect(r.mailTo(OPS).text, "the appendix still claims nothing went wrong").not.toMatch(
-      /תקלות: אין/,
-    );
-  });
-
-  // Base44 only: no per-enquiry Doc (spec, "No per-enquiry Google Doc").
-  it("does not call a quick enquiry's absent document a fault", async () => {
-    // `לא רלוונטי` — there is no conversation to write up, and saying so in
-    // the warnings would train the reader to ignore the line.
-    const r = await invokeFunction(
-      "submitLead",
-      { name: "דנה לוי", phone: "0529876543", message: "שאלה קצרה" },
-      { env },
-    );
-    expect(r.json.warnings).not.toContain("doc_not_connected");
-    expect(r.json.warnings.join(" ")).not.toMatch(/doc_/);
-  });
-});
-
 /**
  * The two links Dorit needs, in the copy she actually reads.
  *
@@ -1970,64 +1853,6 @@ describe.each(IMPLEMENTATIONS)("$label — the agency copy carries the links", (
 
 // Base44 only: no per-enquiry Doc (spec, "No per-enquiry Google Doc"). The
 // sheet's half of each case is shared above.
-describe("Base44 submitLead — the agency copy carries the links", () => {
-  const env = {
-    MAILER_URL,
-    MAILER_TOKEN: "test-only-token",
-    SHEET_ID: "sheet-test-id",
-    SHEET_TAB: "Events",
-  };
-  const SHEET = "https://docs.google.com/spreadsheets/d/sheet-test-id/edit";
-  const DOC = "https://docs.google.com/document/d/doc-test-id/edit";
-
-  it("links the summary document and the sheet row, in both halves", async () => {
-    const r = await invokeFunction("submitLead", consultation, { env });
-    const mail = r.mailTo(AGENCY);
-    expect(mail.html, "the document is not linked").toContain(`href="${DOC}"`);
-    expect(mail.html, "the sheet row is not linked").toContain(`href="${SHEET}"`);
-    // The text half is not a courtesy: it is what a client that refuses HTML
-    // renders, and a link present in only one half disappears without a sound.
-    expect(mail.text).toContain(DOC);
-    expect(mail.text).toContain(SHEET);
-  });
-
-  it("does not print either address twice to the operations team", async () => {
-    // They read the appendix, which already carries both. A second copy of the
-    // same two links above it is noise in the mail that is read under pressure.
-    const r = await invokeFunction("submitLead", consultation, { env });
-    const html = r.mailTo(OPS).html!;
-    expect(html.split(`href="${DOC}"`)).toHaveLength(2);
-    expect(html.split(`href="${SHEET}"`)).toHaveLength(2);
-  });
-
-  it("still links the sheet when the document could not be created", async () => {
-    // Partial success is the common case, and the mail should reflect exactly
-    // which of the two exists rather than falling back to neither.
-    const r = await invokeFunction("submitLead", consultation, {
-      env,
-      connections: { googledocs: null },
-    });
-    const mail = r.mailTo(AGENCY);
-    expect(mail.html).toContain(`href="${SHEET}"`);
-    expect(mail.html).not.toContain("/document/d/");
-  });
-
-  it("sends her copy after the sheet and the document, not before", async () => {
-    // The ordering *is* the fix. If her send moves back ahead of these, the
-    // links go empty again and only this assertion would notice.
-    const r = await invokeFunction("submitLead", consultation, { env });
-    const agencySend = r.fetches.findIndex(
-      (f) => f.url === MAILER_URL && (f.body as { to?: string }).to === AGENCY
-    );
-    const sheetWrite = r.fetches.findIndex((f) => f.url.includes("sheets.googleapis.com"));
-    const docWrite = r.fetches.findIndex((f) => f.url.includes("docs.googleapis.com"));
-    expect(sheetWrite).toBeGreaterThanOrEqual(0);
-    expect(docWrite).toBeGreaterThanOrEqual(0);
-    expect(agencySend).toBeGreaterThan(sheetWrite);
-    expect(agencySend).toBeGreaterThan(docWrite);
-  });
-});
-
 describe("Edge submit-lead — what only it does", () => {
   const consultation = {
     name: "יעל כהן", phone: "0521234567", email: "yael@example.com", source: "consultation",

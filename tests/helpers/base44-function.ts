@@ -83,6 +83,8 @@ export interface HarnessOptions {
    * "the admin check passed but the mirror write did not".
    */
   routes?: { match: string; status: number; json?: unknown; text?: string }[];
+  /** Like `routes`, keyed by URL fragment, answering `{ status, body }` — checked before the default answer. */
+  fetchResponses?: Record<string, { status: number; body: unknown }>;
 }
 
 export interface Invocation {
@@ -105,13 +107,16 @@ export interface Invocation {
 
 type Handler = (req: Request) => Promise<Response>;
 
+/** Absent from the forwarders, which use no SDK at all. */
 const SDK_IMPORT = /^\s*import\s*\{[^}]*\}\s*from\s*['"]npm:@base44\/sdk[^'"]*['"];?\s*$/m;
 
 function compile(name: string): (sdk: unknown, fetchImpl: unknown, deno: unknown) => Handler {
   const entry = join(REPO_ROOT, "base44/functions", name, "entry.ts");
   const source = readFileSync(entry, "utf8");
 
-  if (!SDK_IMPORT.test(source)) {
+  // The three agent tools are forwarders with no SDK import; every other function has one.
+  const isForwarder = /\/functions\/v1\//.test(source) && !/@base44\/sdk/.test(source);
+  if (!isForwarder && !SDK_IMPORT.test(source)) {
     throw new Error(`${name}/entry.ts no longer imports the SDK the way this harness expects`);
   }
   const withoutImport = source.replace(SDK_IMPORT, "");
@@ -253,6 +258,15 @@ export async function invokeFunction(
         json: async () => options.resendResponse ?? { ok: status >= 200 && status < 300, ids: ["mailer-test-id"] } };
     }
     if (options.failFetch || options.failCalendar) throw new Error("simulated network failure");
+    const answer = Object.entries(options.fetchResponses ?? {}).find(([fragment]) => String(url).includes(fragment))?.[1];
+    if (answer) {
+      return {
+        ok: answer.status >= 200 && answer.status < 300,
+        status: answer.status,
+        json: async () => answer.body,
+        text: async () => JSON.stringify(answer.body),
+      };
+    }
     const route = options.routes?.find((r) => String(url).includes(r.match));
     if (route) {
       return {

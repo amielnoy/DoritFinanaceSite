@@ -17,9 +17,8 @@ import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
  * that `__proto__` comes back as `uncertain` rather than as a truthy lookup
  * against `Object.prototype`.
  *
- * Two implementations answer these cases while both are deployed: Base44's
- * `escalateToHuman` and its Supabase Edge port `escalate-to-human`. A case that
- * holds for one must hold for the other; what only the port does is at the end.
+ * The Edge function `escalate-to-human` does the work; Base44's `escalateToHuman`
+ * is a forwarder to it (forwarders.integration.test.ts).
  */
 
 /** Both harnesses' options. A case passes only knobs both understand. */
@@ -27,10 +26,6 @@ type RunOptions = HarnessOptions & EdgeOptions;
 type Result = Awaited<ReturnType<typeof invokeFunction>>;
 
 const IMPLEMENTATIONS = [
-  {
-    label: "Base44 escalateToHuman",
-    run: (body: unknown, o: RunOptions = {}) => invokeFunction("escalateToHuman", body, o) as Promise<Result>,
-  },
   {
     label: "Edge escalate-to-human",
     run: (body: unknown, o: RunOptions = {}) => invokeEdge("escalate-to-human", body, o) as unknown as Promise<Result>,

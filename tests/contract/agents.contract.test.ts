@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { transformSync } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT, loadEntity } from "../helpers/entity-schema";
 import { read } from "../helpers/source-scan";
@@ -18,6 +19,24 @@ import { read } from "../helpers/source-scan";
  */
 
 const AGENTS_DIR = join(REPO_ROOT, "base44/agents");
+
+/**
+ * An Edge function's whole source: its handler and sibling modules, and the
+ * shared modules it imports. submitLead, escalateToHuman and logSupportChat are
+ * forwarders in Base44 now, so what they used to do is read from here.
+ */
+function edgeBundle(dir: string): string {
+  const base = join(REPO_ROOT, "supabase/functions", dir);
+  const own = readdirSync(base)
+    .filter((f) => /\.(ts|js)$/.test(f) && f !== "index.ts")
+    .sort()
+    .map((f) => read(join(base, f)));
+  const shared = new Set<string>();
+  for (const src of own) {
+    for (const m of src.matchAll(/from '\.\.\/_shared\/([a-z-]+)(?:\.ts)?'/g)) shared.add(m[1]);
+  }
+  return [...own, ...[...shared].sort().map((f) => read(join(REPO_ROOT, "supabase/functions/_shared", `${f}.ts`)))].join("\n");
+}
 
 interface AgentDefinition {
   name: string;
@@ -638,9 +657,24 @@ describe("the interview agent states its fence in the page, not only in the prom
  * send back to metadata while the notice still names a wider team also fails,
  * because an over-broad disclosure is its own defect.
  */
+describe("the agents' three tools", () => {
+  it("leaves them as forwarders only", () => {
+    const EDGE = { submitLead: "submit-lead", escalateToHuman: "escalate-to-human", logSupportChat: "log-support-chat" };
+    for (const [fn, edge] of Object.entries(EDGE)) {
+      const src = read(join(REPO_ROOT, `base44/functions/${fn}/entry.ts`));
+      for (const banned of ["entities.", "connectors.", "sendMail", "MAILER_URL"]) {
+        expect(src.includes(banned), `${fn} still does work itself (${banned})`).toBe(false);
+      }
+      // The URL is built from EDGE, so pin both halves: the path and the name.
+      expect(src).toContain("/functions/v1/${EDGE}");
+      expect(src, `${fn} forwards to the wrong function`).toContain(`const EDGE = '${edge}';`);
+    }
+  });
+});
+
 describe("who receives a lead, and whether the consent text admits it", () => {
-  const submitLead = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
-  const escalate = read(join(REPO_ROOT, "base44/functions/escalateToHuman/entry.ts"));
+  const submitLead = edgeBundle("submit-lead");
+  const escalate = edgeBundle("escalate-to-human");
   const consent = read(join(REPO_ROOT, "src/config/compliance.ts"));
   const privacy = read(join(REPO_ROOT, "src/pages/PrivacyPolicy.tsx"));
 
@@ -725,62 +759,6 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   });
 
 
-
-  /**
-   * One team, spelled the same in three files.
-   *
-   * `NOTIFY_EMAILS` is the fourth thing Base44's isolated entry points force us
-   * to duplicate, alongside `redact`, `escapeHtml` and `SHEET_COLUMNS`. It is
-   * the one whose drift is hardest to see: a mailbox added to `submitLead` and
-   * not to `escalateToHuman` produces no error anywhere — enquiries arrive, and
-   * escalations, the messages that matter most, quietly reach one fewer person.
-   */
-  /**
-   * The eighth duplicated helper, and the one that exists because of a silence.
-   *
-   * `dorit-mailer` answers a refusal with the upstream reason — `http_403` from
-   * Resend, say — and the three callers threw on the status before reading the
-   * body. So a failed send reported "the mailer returned 502", which is enough
-   * to know Dorit did not get the summary and not enough to know why. The
-   * difference in practice was a morning.
-   *
-   * The vocabulary is closed on purpose. Only `http_<status>`,
-   * `no_message_id` and `network_error` survive the filter, so this stays a
-   * status code and never becomes a provider's prose or a credential — which
-   * is what the comment above the throw was protecting.
-   */
-  it("keeps the upstream-reason filter identical in every function that mails", () => {
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    const bodyOf = (src: string, name: string) => {
-      const i = src.indexOf("function upstreamReasons");
-      expect(i, `${name} has no upstream-reason filter`).toBeGreaterThan(-1);
-      return src.slice(i, src.indexOf("\n}", i)).replace(/\s+/g, " ").trim();
-    };
-    expect(bodyOf(escalate, "escalateToHuman"), "escalateToHuman drifted").toBe(
-      bodyOf(submitLead, "submitLead")
-    );
-    expect(bodyOf(claim, "submitClaim"), "submitClaim drifted").toBe(bodyOf(submitLead, "submitLead"));
-
-    for (const [src, name] of [
-      [submitLead, "submitLead"],
-      [escalate, "escalateToHuman"],
-      [claim, "submitClaim"],
-    ] as const) {
-      // Read before the status is judged: on a refusal the body is the only
-      // place the cause exists, and throwing first discards it.
-      const readsBody = src.indexOf("const result = await response.json()");
-      const throwsOnStatus = src.indexOf("if (!response.ok) throw");
-      expect(readsBody, `${name} never reads the mailer's answer`).toBeGreaterThan(-1);
-      expect(
-        readsBody,
-        `${name} throws on the status before reading the reason`
-      ).toBeLessThan(throwsOnStatus);
-      // And the reason reaches the warning the operations mail prints.
-      expect(src, `${name} drops the reason it just read`).toMatch(
-        /mailer_http_\$\{response\.status\}\$\{why\}/
-      );
-    }
-  });
 
   it("keeps the operations mailbox list identical in every function that mails", () => {
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
@@ -900,35 +878,20 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   it("runs the work after the save together, not in a queue", () => {
     const at = (needle: string) => submitLead.indexOf(needle);
 
-    // The two Google writes start before the calendar rather than behind it.
+    // The sheet append starts before the calendar rather than behind it.
     expect(at("const sheetPromise ="), "the sheet append is not started early").toBeGreaterThan(-1);
-    expect(at("const docPromise ="), "the document is not started early").toBeGreaterThan(-1);
     expect(
       at("const sheetPromise ="),
       "the sheet append still queues behind the calendar",
     ).toBeLessThan(at("const booksCalendar ="));
-    expect(at("const docPromise ="), "the document still queues behind the calendar").toBeLessThan(
-      at("const booksCalendar ="),
-    );
 
-    // And they are collected in one place, before the mail that links them.
-    expect(submitLead).toMatch(/await Promise\.all\(\[sheetPromise, docPromise\]\)/);
+    // And it is collected before the mail that links it.
     expect(
-      at("Promise.all([sheetPromise, docPromise])"),
-      "the links are read before the writes that produce them",
+      at("await sheetPromise"),
+      "the link is read before the write that produces it",
     ).toBeLessThan(at("role: 'agency'"));
 
-    // Both diaries at once, not one after the other.
-    expect(submitLead, "the calendars are written in a queue").toMatch(
-      /await Promise\.all\(CALENDAR_PROVIDERS\.map\(/,
-    );
-    // A `continue` cannot leave a `.map` callback; a stale one would silently
-    // become a syntax error rather than a skipped provider, so pin its absence
-    // while the surrounding shape is a map.
-    const calBlock = submitLead.slice(at("CALENDAR_PROVIDERS.map("), at("const booked ="));
-    expect(calBlock, "a provider skip still uses loop control").not.toMatch(/\bcontinue\b/);
-
-    // And the three copies of the notification go out together.
+    // The three copies of the notification go out together.
     expect(submitLead, "the ops mailboxes are served in a queue").toMatch(
       /await Promise\.all\(NOTIFY_EMAILS\.map\(/,
     );
@@ -938,15 +901,11 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     // Graph sends them itself. Google adds the attendee and stays silent unless
     // `sendUpdates=all` is on the URL — so without it the invite never arrives
     // and the diary the person checks stays empty, with no error anywhere.
+    // (submit-lead sends its invitations by mail instead.)
     const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
-    for (const [src, name] of [
-      [submitLead, "submitLead"],
-      [consultation, "createConsultationEvent"],
-    ] as const) {
-      expect(src, `${name} adds attendees to Google without asking it to notify them`).toMatch(
-        /googleapis\.com[^']*sendUpdates=all/
-      );
-    }
+    expect(consultation, "createConsultationEvent adds attendees to Google without asking it to notify them").toMatch(
+      /googleapis\.com[^']*sendUpdates=all/
+    );
   });
 
   /**
@@ -965,21 +924,8 @@ describe("who receives a lead, and whether the consent text admits it", () => {
    */
   it("keeps the device label identical in every function that notifies", () => {
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    const bodyOf = (src: string, name: string) => {
-      const i = src.indexOf("function deviceLabel");
-      expect(i, `${name} has no device label`).toBeGreaterThan(-1);
-      return src.slice(i, src.indexOf("\n}", i)).replace(/\s+/g, " ").trim();
-    };
-    const copies = [
-      bodyOf(submitLead, "submitLead"),
-      bodyOf(escalate, "escalateToHuman"),
-      bodyOf(claim, "submitClaim"),
-    ];
-    expect(copies[1], "escalateToHuman drifted from submitLead").toBe(copies[0]);
-    expect(copies[2], "submitClaim drifted from submitLead").toBe(copies[0]);
-    // And each one actually reaches a notification, rather than being declared
-    // and quietly unused.
-    for (const [src, name] of [[submitLead, "submitLead"], [escalate, "escalateToHuman"], [claim, "submitClaim"]] as const) {
+    // The Edge functions share one module; submitClaim is the only Base44 copy.
+    for (const [src, name] of [[submitLead, "submit-lead"], [escalate, "escalate-to-human"], [claim, "submitClaim"]] as const) {
       expect(src, `${name} declares the device label but never uses it`).toMatch(/deviceLabel\(/);
       expect(src, `${name} never puts it in the notification`).toMatch(/נשלח מ/);
     }
@@ -1017,65 +963,6 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     }
   });
 
-  /**
-   * The provider table is the seventh duplicated helper, and the newest.
-   *
-   * Two calendars differ in five trap-shaped ways — connector, endpoint,
-   * timezone-name dialect, link field, and whether an invitation is sent at
-   * all — and every one of them fails by being
-   * accepted and wrong. A-47 is what one copy of that knowledge learning
-   * something the other did not costs: meetings three hours out in the only
-   * diary Dorit reads.
-   */
-  it("keeps the calendar provider table identical in both calendar writers", () => {
-    const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
-    const tableOf = (src: string, name: string) => {
-      const i = src.indexOf("const CALENDARS = {");
-      expect(i, `${name} has no calendar provider table`).toBeGreaterThan(-1);
-      return src.slice(i, src.indexOf("\n};", i)).replace(/\s+/g, " ").trim();
-    };
-    expect(tableOf(consultation, "createConsultationEvent"), "the provider tables drifted").toBe(
-      tableOf(submitLead, "submitLead")
-    );
-
-    const listOf = (src: string) => {
-      const i = src.indexOf("const CALENDAR_PROVIDERS =");
-      return src.slice(i, src.indexOf(";", i)).replace(/\s+/g, " ").trim();
-    };
-    expect(listOf(consultation), "the provider lists drifted").toBe(listOf(submitLead));
-
-    for (const [src, name] of [[submitLead, "submitLead"], [consultation, "createConsultationEvent"]] as const) {
-      expect(src, `${name} declares the table but never uses it`).toMatch(/CALENDARS\[provider\]/);
-      // Posting straight at one vendor is how the table gets bypassed without
-      // anyone editing it.
-      expect(src, `${name} calls a calendar API outside the table`).not.toMatch(
-        /fetch\(\s*['"`]https:\/\/(graph\.microsoft|www\.googleapis)/
-      );
-    }
-  });
-
-  it("keeps the Supabase mirror identical in every function that captures a lead", () => {
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    const bodyOf = (src: string, name: string) => {
-      const i = src.indexOf("async function mirrorLeadToSupabase");
-      expect(i, `${name} has no Supabase mirror`).toBeGreaterThan(-1);
-      return src.slice(i, src.indexOf("\n}", i)).replace(/\s+/g, " ").trim();
-    };
-    const copies = [
-      bodyOf(submitLead, "submitLead"),
-      bodyOf(escalate, "escalateToHuman"),
-      bodyOf(claim, "submitClaim"),
-    ];
-    expect(copies[1], "escalateToHuman drifted from submitLead").toBe(copies[0]);
-    expect(copies[2], "submitClaim drifted from submitLead").toBe(copies[0]);
-    // And every one of them is actually called, not merely declared.
-    for (const [src, name] of [[submitLead, "submitLead"], [escalate, "escalateToHuman"], [claim, "submitClaim"]] as const) {
-      expect(src, `${name} declares the mirror but never calls it`).toMatch(
-        /await mirrorLeadToSupabase\(/,
-      );
-    }
-  });
-
   it("never calls Base44's Core.SendEmail — one transport for every recipient now", () => {
     // The whole original defect was two transports for one set of mailboxes:
     // Core delivers to registered users only, the agency is not one, and a
@@ -1104,21 +991,6 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     }
   });
 
-  it("keeps the mail layout helpers identical across the functions that render", () => {
-    // `escalateToHuman` grew an HTML notification of its own, which meant
-    // copying the palette helpers into a third entry point. Base44 gives these
-    // files no shared module, so duplicated is the only option — drifted is
-    // not, and a drifted `escapeHtml` is a phishing vector rather than a
-    // cosmetic difference.
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    const norm = (src: string, name: string) => topLevelFn(src, name).replace(/\s+/g, " ").trim();
-    for (const helper of ["escapeHtml", "detailRow", "block", "proseRow"]) {
-      if (!escalate.includes(`function ${helper}(`)) continue;
-      expect(norm(escalate, helper), `escalateToHuman.${helper} drifted`).toBe(norm(submitLead, helper));
-    }
-    expect(norm(claim, "escapeHtml"), "submitClaim.escapeHtml drifted").toBe(norm(submitLead, "escapeHtml"));
-  });
-
   it("renders the handover rather than sending a paragraph", () => {
     // The mail Dorit opens on a phone to decide whether to call someone back.
     expect(escalate).toMatch(/function buildEscalationHtml\(/);
@@ -1128,18 +1000,19 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   });
 
   it("keeps every copy of redact() identical", () => {
-    // Base44 functions are isolated entry points with no shared module, so the
-    // helper is duplicated. Duplicated is fine; drifted is not.
+    // Each Edge function that redacts keeps its own copy, and upsertContact (a
+    // Base44 function, so no shared module) the last Base44 one. Duplicated is
+    // fine; drifted is not.
     //
-    // `upsertContact` is the third copy, and the one with the least forgiving
-    // input: it redacts a note taken from a WhatsApp message, where people
-    // paste an ID number or a policy number without being asked for one.
+    // `upsertContact` redacts a note taken from a WhatsApp message, where
+    // people paste an ID number or a policy number without being asked for one.
     const norm = (src: string) => topLevelFn(src, "redact").replace(/\s+/g, " ").trim();
-    for (const fn of ["upsertContact", "logSupportChat"]) {
-      const src = read(join(REPO_ROOT, `base44/functions/${fn}/entry.ts`));
-      expect(norm(src), fn).toBe(norm(submitLead));
-    }
-    expect(norm(submitLead)).toBe(norm(escalate));
+    const copies = {
+      upsertContact: read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts")),
+      "log-support-chat": edgeBundle("log-support-chat"),
+      "escalate-to-human": escalate,
+    };
+    for (const [fn, src] of Object.entries(copies)) expect(norm(src), fn).toBe(norm(submitLead));
   });
 
   it("has the interview agent close the booking it used to hand off", () => {
@@ -1233,7 +1106,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
      * missing exactly the answers the visitor took the trouble to give.
      */
     describe("the interview schema agrees between prompt and function", () => {
-      const fn = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+      const fn = edgeBundle("submit-lead");
       const tracks = [...fn.matchAll(/^  ([a-z_]+): \{\n    label:/gm)].map((m) => m[1]);
 
       it("declares tracks in the function at all", () => {
@@ -1274,7 +1147,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
      */
     it("declares that it collects rather than advises, in both places", () => {
       expect(interview.instructions).toMatch(/אני אוסף מידע, לא מייעץ/);
-      const fn = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+      const fn = edgeBundle("submit-lead");
       expect(fn).toMatch(/INTERVIEW_DECLARATION/);
       expect(fn).toMatch(/אינו בירור צרכים/);
     });
@@ -1365,7 +1238,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
  * and content is passed in.
  */
 describe("the letter a customer gets", () => {
-  const submitLead = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+  const submitLead = edgeBundle("submit-lead");
   const submitClaim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
   const CUSTOMER_MAILERS = { submitLead, submitClaim };
 
@@ -1378,14 +1251,6 @@ describe("the letter a customer gets", () => {
     return next === -1 ? rest : rest.slice(0, next);
   };
   const norm = (src: string, name: string) => fnSource(src, name).replace(/\s+/g, " ").trim();
-
-  it("renders both confirmations from the same template", () => {
-    expect(norm(submitLead, "buildClientHtml")).toBe(norm(submitClaim, "buildClientHtml"));
-  });
-
-  it("escapes with the same helper in both", () => {
-    expect(norm(submitLead, "escapeHtml")).toBe(norm(submitClaim, "escapeHtml"));
-  });
 
   for (const [fn, src] of Object.entries(CUSTOMER_MAILERS)) {
     describe(fn, () => {
@@ -1430,12 +1295,12 @@ describe("the letter a customer gets", () => {
  */
 describe("the event log in Google Sheets", () => {
   const writers = {
-    submitLead: read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts")),
-    escalateToHuman: read(join(REPO_ROOT, "base44/functions/escalateToHuman/entry.ts")),
+    submitLead: edgeBundle("submit-lead"),
+    escalateToHuman: edgeBundle("escalate-to-human"),
   };
   /** The other two writers, each on its own tab of the same spreadsheet. */
   const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
-  const supportLog = read(join(REPO_ROOT, "base44/functions/logSupportChat/entry.ts"));
+  const supportLog = edgeBundle("log-support-chat");
 
   const block = (src: string, start: string, close: string): string => {
     const i = src.indexOf(start);
@@ -1443,15 +1308,13 @@ describe("the event log in Google Sheets", () => {
     return src.slice(i, src.indexOf(close, i) + close.length).replace(/\s+/g, " ").trim();
   };
 
-  it("declares the connector both functions ask for", () => {
+  it("declares the connector the contact writer still asks for", () => {
+    expect(contacts).toMatch(/getConnection\('googlesheets'\)/);
     const connector = read(join(REPO_ROOT, "base44/connectors/googlesheets.jsonc"));
     expect(connector).toMatch(/"type":\s*"googlesheets"/);
     expect(connector).toMatch(/auth\/spreadsheets/);
     // The narrower scope on purpose: drive would reach every other file.
     expect(connector).not.toMatch(/auth\/drive/);
-    for (const src of Object.values(writers)) {
-      expect(src).toMatch(/getConnection\('googlesheets'\)/);
-    }
   });
 
   it("asks the profile only for labels the schema defines", () => {
@@ -1492,18 +1355,6 @@ describe("the event log in Google Sheets", () => {
     expect(columns[0].match(/'[^']+'/g) ?? []).toHaveLength(19);
   });
 
-  it("keeps appendEventRow identical in every writer", () => {
-    // Four copies now: the two event writers, `upsertContact` and
-    // `logSupportChat`, each appending to a different tab of the same
-    // spreadsheet. The tab and the columns differ between them — those are the
-    // constants above it — but the append itself is one piece of code that
-    // happens to exist four times.
-    const fns = [...Object.values(writers), contacts, supportLog].map((src) =>
-      block(src, "async function appendEventRow(", "\n}"),
-    );
-    for (const [i, fn] of fns.entries()) expect(fn, `copy ${i}`).toBe(fns[0]);
-  });
-
   it("labels every customer event with a type", () => {
     // The column exists so the sheet can be filtered by what happened.
     expect(writers.submitLead).toMatch(/'consultation_request'/);
@@ -1514,31 +1365,28 @@ describe("the event log in Google Sheets", () => {
   });
 
   it("never lets a failed append cost the enquiry", () => {
-    // The sheet is a view, not the record. Lead.create is the only hard failure.
-    // Two shapes of the same rule. The three functions that answer a visitor
-    // collect the failure into the `warnings` they already return; the support
-    // log has nothing else to report, so it answers `ok: true` and carries the
-    // warning with it. What neither may do is let the throw escape.
-    for (const [name, src] of Object.entries({ ...writers, upsertContact: contacts })) {
-      // The catch body, whatever else it now contains — a log line was added
-      // in front of the push, and pinning the two as adjacent would have made
-      // this fail on a change that cannot affect the behaviour it guards.
-      const catchBody = src.slice(src.indexOf("catch (e) {", src.indexOf("await appendEventRow(base44")));
+    // The sheet is a view, not the record. The lead write is the only hard failure.
+    // The two functions that answer a visitor collect the failure into the
+    // `warnings` they already return; the support log has nothing else to report,
+    // so it answers `ok: true` and carries the warning with it. What neither may
+    // do is let the throw escape.
+    for (const [name, src] of Object.entries({ ...writers })) {
+      // The catch body, whatever else it now contains — a log line sits in
+      // front of the push, and pinning the two as adjacent would fail on a
+      // change that cannot affect the behaviour this guards.
+      const catchBody = src.slice(src.indexOf("catch (e) {", src.indexOf("await appendSheetRow(")));
       const body = catchBody.slice(0, catchBody.indexOf("\n    }"));
       expect(body, `${name} must record a sheet failure`).toMatch(/sheet_append_failed/);
       expect(body, `${name} must not throw on a sheet failure`).not.toMatch(/\bthrow\b/);
-      // `return` was banned outright until the append started running as a
-      // promise alongside the calendar, where returning the sentinel status is
-      // the ordinary shape rather than an escape. What must never appear is a
-      // return that ends the request and skips the notifications.
+      // Returning the sentinel status is the ordinary shape once the append runs
+      // as a promise beside the calendar; what must never appear is a return
+      // that ends the request and skips the notifications.
       expect(body, `${name} must not end the request on a sheet failure`).not.toMatch(
         /return\s*;|return\s+Response/,
       );
     }
-    // Same rule, different shape: it has nothing else to report, so it answers
-    // `ok: true` and carries the warning rather than collecting it.
     const supportCatch = supportLog.slice(
-      supportLog.indexOf("catch (e) {", supportLog.indexOf("await appendEventRow(base44")),
+      supportLog.indexOf("catch (e) {", supportLog.indexOf("await appendSheetRow(")),
     );
     expect(supportCatch.slice(0, supportCatch.indexOf("\n    }"))).toMatch(
       /ok: true[\s\S]*sheet_append_failed|sheet_append_failed[\s\S]*ok: true/,
@@ -1546,10 +1394,11 @@ describe("the event log in Google Sheets", () => {
   });
 
   it("skips quietly until a spreadsheet is configured", () => {
-    // A fresh clone, or a deploy without the sheet, still takes enquiries.
-    for (const src of Object.values(writers)) {
-      expect(src).toMatch(/if \(!SHEET_ID\) return/);
-    }
+    // A fresh clone, or a deploy without the sheet, still takes enquiries: the
+    // one shared appender answers 'לא מוגדר' instead of throwing.
+    const appender = read(join(REPO_ROOT, "supabase/functions/_shared/sheets.ts"));
+    expect(appender).toMatch(/if \(!sheetId\) return 'לא מוגדר'/);
+    for (const src of Object.values(writers)) expect(src).toMatch(/appendSheetRow\(/);
   });
 });
 
@@ -1648,7 +1497,7 @@ describe("the contact record behind the enquiries", () => {
  */
 describe("the support chat on the site", () => {
   const support = loadAgent("support_agent");
-  const log = read(join(REPO_ROOT, "base44/functions/logSupportChat/entry.ts"));
+  const log = edgeBundle("log-support-chat");
   const agentsConfig = read(join(REPO_ROOT, "src/config/agents.ts"));
   const compliance = read(join(REPO_ROOT, "src/config/compliance.ts"));
   const faqPage = read(join(REPO_ROOT, "src/pages/FAQPage.tsx"));
@@ -1698,14 +1547,14 @@ describe("the support chat on the site", () => {
   });
 
   it("writes the support log to its own tab, with a fixed set of outcomes", () => {
-    expect(log).toMatch(/SHEET_TAB_SUPPORT.*\|\| 'Support'/);
-    expect(log).toMatch(/const OUTCOMES = \{/);
+    expect(log).toMatch(/SHEET_TAB_SUPPORT'\) \|\| 'Support'/);
+    expect(log).toMatch(/const OUTCOMES: Record<string, string> = \{/);
     expect(log).toMatch(/OUTCOMES\[outcome\] \|\| 'לא ידוע'/);
   });
 
   it("redacts the transcript before it is written anywhere", () => {
-    expect(log).toMatch(/const safeTranscript = redact\(transcript\)/);
-    expect(log).toMatch(/const safeTopic = redact\(topic\)/);
+    expect(log).toMatch(/const safeTranscript: string = redact\(transcript\)/);
+    expect(log).toMatch(/const safeTopic: string = redact\(topic\)/);
   });
 
   it("keys the support row on the same normalised number as the contact list", () => {
@@ -1713,12 +1562,19 @@ describe("the support chat on the site", () => {
     // It is pinned anyway: two tabs of one spreadsheet normalised differently
     // cannot be read together, and that would surface on the day a channel
     // that does have a number is switched on — long after this was written.
-    const norm = (src: string) => {
+    // The Edge copy is TypeScript, so the two are compared by what they return.
+    const compile = (src: string, ts: boolean) => {
       const start = src.indexOf("function normalisePhone(");
       expect(start, "normalisePhone is missing").toBeGreaterThan(-1);
-      return src.slice(start, src.indexOf("\n}", start)).replace(/\s+/g, " ").trim();
+      const fn = src.slice(start, src.indexOf("\n}", start) + 2);
+      const js = ts ? transformSync(fn, { loader: "ts" }).code : fn;
+      return new Function(`${js}; return normalisePhone;`)() as (raw: unknown) => string;
     };
-    expect(norm(log)).toBe(norm(read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"))));
+    const edge = compile(log, true);
+    const base44 = compile(read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts")), false);
+    for (const raw of ["0501234567", "+972 50-123-4567", "972501234567", "501234567", "", null, undefined, "abc"]) {
+      expect(edge(raw), String(raw)).toBe(base44(raw));
+    }
   });
 
   it("gives the agent the tool it is told to call", () => {
@@ -1781,7 +1637,7 @@ describe("the reading recommender's notice", () => {
  */
 describe("the clearing-house offer", () => {
   const interview = loadAgent("needs_interview");
-  const submitLead = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+  const submitLead = edgeBundle("submit-lead");
 
   it("offers the pull and names what it actually requires", () => {
     expect(interview.instructions).toMatch(/מסלקה/);
@@ -2058,7 +1914,7 @@ describe("the configuration nobody typed by hand", () => {
  * greetingName in one function makes that one the relay again.
  */
 describe("the guards on the no-sign-in functions", () => {
-  const submitLead = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
+  const submitLead = edgeBundle("submit-lead");
   const submitClaim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
   const edgeClaim = read(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"));
   const claimForm = read(join(REPO_ROOT, "src/components/dorit/forms/ClaimForm.tsx"));
@@ -2069,12 +1925,6 @@ describe("the guards on the no-sign-in functions", () => {
     const end = src.indexOf("\n}", start);
     return src.slice(start, end + 2).replace(/\s+/g, " ").trim();
   };
-
-  it("keeps every guard helper identical in submitLead and submitClaim", () => {
-    for (const helper of ["oversizedField", "isEmail", "greetingName", "plainOr", "sha256Hex", "withinLimit"]) {
-      expect(topLevelFn(submitClaim, helper), `${helper} drifted`).toBe(topLevelFn(submitLead, helper));
-    }
-  });
 
   it("checks the address and the daily limit before every visitor confirmation", () => {
     for (const [name, src] of [["submitLead", submitLead], ["submitClaim", submitClaim], ["submit-claim", edgeClaim], ["submit-lead", read(join(REPO_ROOT, "supabase/functions/submit-lead/handler.ts"))]]) {

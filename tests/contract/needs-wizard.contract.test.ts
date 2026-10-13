@@ -21,7 +21,7 @@ const instructions = (
   ) as { instructions: string }
 ).instructions;
 
-const submitLead = readFileSync(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"), "utf8");
+const submitLead = readFileSync(join(REPO_ROOT, "supabase/functions/submit-lead/lead.js"), "utf8");
 
 const TRACKS: Track[] = ["pension", "insurance", "retirement", "tax", "savings", "self_employed", "general"];
 

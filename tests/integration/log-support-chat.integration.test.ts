@@ -40,18 +40,6 @@ interface Knobs {
 
 const IMPLEMENTATIONS = [
   {
-    label: "Base44 logSupportChat",
-    async run(body: unknown, k: Knobs = {}): Promise<Outcome> {
-      const env = k.noSheet ? { MAILER_URL, MAILER_TOKEN: "test-only-token" } : ENV;
-      const r = await invokeFunction("logSupportChat", body, { env, ...(k.failSheet ? { fetchStatus: 500 } : {}) });
-      const rows = r.callsTo("sheets.googleapis.com").map((c) => ({
-        tab: /values\/([^!]+)!A:G/.exec(decodeURIComponent(c.url))?.[1] ?? "",
-        row: (c.body as { values: string[][] }).values[0],
-      }));
-      return { status: r.status, json: r.json, rows, emails: r.emails, leads: r.leads };
-    },
-  },
-  {
     label: "Edge log-support-chat",
     async run(body: unknown, k: Knobs = {}): Promise<Outcome> {
       const r = await invokeEdge("log-support-chat", body, {
@@ -178,17 +166,6 @@ describe.each(IMPLEMENTATIONS)("$label — failure", ({ run }) => {
 // Base44 only: the connector's authorisation is Base44's own state. The Edge
 // function has no connector — it signs in as the service account — so there is
 // nothing to leave unauthorised (spec: connectors off Base44).
-describe("Base44 logSupportChat — connector not authorised", () => {
-  it("does not stall the chat when the connector is not authorised", async () => {
-    const run = await invokeFunction("logSupportChat", chat(), {
-      env: ENV,
-      connections: { googlesheets: null },
-    });
-    expect(run.status).toBe(200);
-    expect(run.json.sheet).toBe("אין חיבור");
-  });
-});
-
 // What only the port does: the row goes in through the service account.
 describe("Edge log-support-chat — what only it does", () => {
   it("appends to the Support tab through the service account", async () => {

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MAILER_URL, invokeFunction } from '../helpers/base44-function';
 
-const names = ['submitLead', 'submitClaim', 'escalateToHuman'];
+// submitLead, escalateToHuman and logSupportChat are forwarders now; their Edge
+// homes are covered by the Edge integration suites.
+const names = ['submitClaim'];
 const payload = { name: 'Test', phone: '0501234567', source: 'contact', reason: 'uncertain', claimType: 'רכב' };
 
 describe.each(names)('%s — external agency email', (name) => {
