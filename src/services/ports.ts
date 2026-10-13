@@ -90,6 +90,12 @@ export interface LeadPort {
 
 export interface Article {
   id: string;
+  /**
+   * The article's address, `/blog/<slug>`, in Latin kebab-case. Only the
+   * Supabase store has one (Base44's BlogPost does not), so a build reading
+   * Base44 links by `id`. Build links with `articlePath()`, never by hand.
+   */
+  slug?: string;
   title: string;
   excerpt?: string;
   body?: string;
@@ -247,6 +253,11 @@ export interface LeadAdminPort {
 
 export interface ArticleDraft {
   title: string;
+  /**
+   * Required to create an article. Stored in the Supabase mirror only:
+   * `contentAdmin` keeps it out of the Base44 write, whose entity has no such field.
+   */
+  slug?: string;
   excerpt?: string;
   body: string;
   image_url?: string;

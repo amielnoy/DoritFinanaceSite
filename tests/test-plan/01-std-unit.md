@@ -35,6 +35,7 @@ something outside the repository.
 | Insurance self-assessment | `src/lib/insurance-assessment.ts` |
 | `reconcile-stores`, `prune-vercel-deployments` | `scripts/*.mjs` |
 | `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
+| `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
 | `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
 | `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
@@ -444,7 +445,25 @@ watching it fail.
 | UNIT-LAZY-005 | "answers hasStoredToken and getPublicSettings without loading the composition root" | Zero loads |
 | UNIT-LAZY-006 | "finds a stored Supabase session without loading the SDK" | `true`, zero loads |
 
+### 4.21 Article addresses — `tests/unit/article-path.test.ts`
+
+Every link to an article is built by `articlePath`, so these cases are what the
+cards, the blog's JSON-LD, the post's canonical and the server redirect inherit.
+A slug shaped like a Base44 id is refused because `vercel.json` sends every
+`/blog/<24 hex>` to the old-link redirect.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SLUG-001 | "is /blog/<slug> when the article has one" | `/blog/horadat-dmei-nihul` |
+| UNIT-SLUG-002 | "falls back to the id where the store has no slug (Base44)" | `/blog/<id>`, also for an empty slug |
+| UNIT-SLUG-003 | "accepts %j" (5 slugs) | `null`; `isValidSlug` is true |
+| UNIT-SLUG-004 | "asks for a slug when there is none" | `SLUG_PROBLEMS.missing` |
+| UNIT-SLUG-005 | "refuses %j as not Latin kebab-case" (10 inputs) | `SLUG_PROBLEMS.format` |
+| UNIT-SLUG-006 | "refuses a slug shaped like a Base44 id" | `SLUG_PROBLEMS.base44Id`; 23 or 25 hex characters are ordinary slugs |
+| UNIT-SLUG-007 | "is false for anything that is not a string" | `false` |
+| UNIT-SLUG-008 | "tells a Base44 id, a uuid and a slug apart" | All three are slug-shaped; only the uuid matches `UUID_PATTERN` |
+
 ## 5. Pass criteria
 
-All 341 cases pass. Any failure is a functional defect, not an environment issue —
+All 362 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
