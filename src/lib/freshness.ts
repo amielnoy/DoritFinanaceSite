@@ -32,6 +32,8 @@
  *     the escape is a navigation to a URL the cache has never seen.
  */
 
+import { freshnessHtml } from "./trusted-types";
+
 /** The `src` of the module script this document actually loaded. */
 function loadedEntry(doc: Document): string | null {
   const el = doc.querySelector<HTMLScriptElement>('script[type="module"][src]');
@@ -47,7 +49,7 @@ async function publishedEntry(signal?: AbortSignal): Promise<string | null> {
       signal,
     });
     if (!res.ok) return null;
-    const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+    const doc = new DOMParser().parseFromString(freshnessHtml(await res.text()), "text/html");
     return loadedEntry(doc);
   } catch {
     // Offline, blocked, or the navigation was cancelled. Staleness is not

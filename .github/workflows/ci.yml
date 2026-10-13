@@ -801,6 +801,15 @@ jobs:
             echo "::error::The Vercel bundle still carries the e2e app id (e2e-sanity-app) — refusing to deploy it."
             exit 1
           fi
+          # The CSP is enforced and allows inline scripts by hash only. One whose
+          # text changed (the gtag snippet, or the Base44 plugin's page-view
+          # logger with its baked-in app id) would be refused without a sound.
+          # Fatal for production; a preview only warns, since its app id may differ.
+          if [ "${{ steps.target.outputs.env }}" = production ]; then
+            node scripts/check-csp-hashes.mjs .vercel/output/static
+          else
+            node scripts/check-csp-hashes.mjs .vercel/output/static || echo "::warning::A preview inline script is outside the CSP (see above); production would refuse to deploy it."
+          fi
 
       - name: Deploy
         id: deploy
