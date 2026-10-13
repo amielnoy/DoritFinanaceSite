@@ -598,9 +598,37 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKSUB-015 | "never writes a ciphertext, a name or the session token to a log line" | Across success, failed write and outsider: every line has `rid`; no ciphertext, client name, last4 or session token |
 | INT-MSKSUB-016 | "answers the browser's preflight and does nothing else" | 204, site origin allowed; no fetch |
 
+### 4.28 `masleka-create` — a hand-made request, or a fresh link — `INT-MSKNEW-001..023`
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKNEW-001 | "answers disabled while MASLEKA_ENABLED is unset" | 404 |
+| INT-MSKNEW-002 | "refuses a caller with no session, and an outsider" | 401, 403; no row; an outsider cannot rotate a link |
+| INT-MSKNEW-003 | "answers disabled before reading the body or calling anything" | 404 `disabled` + rid; no fetch |
+| INT-MSKNEW-004 | "creates an invited request, mails the client the link, and returns it for copying" | Row with hash of the returned token; invitation carries the link; `no-store` |
+| INT-MSKNEW-005 | "only returns the link when the staff member will send it themselves" | No mail; `client_invited_at` null |
+| INT-MSKNEW-006 | "mails nobody when there is no address" | `contact_email` null; no mail |
+| INT-MSKNEW-007 | "still returns the link when the invitation mail fails" | 200, `invited: false` |
+| INT-MSKNEW-008 | "refuses an empty or overlong name" | 400 `invalid_name` |
+| INT-MSKNEW-009 | "refuses an address that is not one" | 400 `invalid_email`; no row |
+| INT-MSKNEW-010 | "takes the agency and the creator from the server, never the body" | `agency_id` = agency 1, `created_by` = caller; body's agency, creator, status, lead and hash ignored |
+| INT-MSKNEW-011 | "mails the invitation with a clickable https button to the link, as the client's role" | `href` = the https link; one mail |
+| INT-MSKNEW-012 | "keeps the name and address within their limits" | 80-char name ok; non-string name/address and 254+ address refused |
+| INT-MSKNEW-013 | "answers 500 without a link when the request cannot be stored" | 500 `failed`, no `ok`, no link, no mail |
+| INT-MSKNEW-014 | "never writes the link, the token, the name or the address to a log line" | Across create, mail failure, fresh link, outsider and failed write: every line has `rid`; none carries them |
+| INT-MSKNEW-015 | "answers the browser's preflight and does nothing else" | 204, site origin allowed; no fetch |
+| INT-MSKNEW-016 | "replaces the token, restarts its thirty days and stops the automatic reminder" | New hash; expiry >= 29 days on; `client_reminded_at` set |
+| INT-MSKNEW-017 | "writes one conditional update scoped to the agency, naming the columns it gets back" | One PATCH: `id` (lowercased), `agency_id`, `status=eq.invited`, `select=id`, `return=representation`; three fields |
+| INT-MSKNEW-018 | "makes the old link stop working: the stored hash no longer matches it" | Stored hash is the new token's only |
+| INT-MSKNEW-019 | "extends the expiry, never shortens it: thirty days from now whatever was left" | Near and lapsed expiries both become >= 29 days on |
+| INT-MSKNEW-020 | "does not touch another agency's request, or one that is not there" | 409; hash unchanged |
+| INT-MSKNEW-021 | "answers 500 and no link when the update fails" | 500 `failed`; no link |
+| INT-MSKNEW-022 | "refuses a request that is no longer waiting for a code" | 409; hash unchanged |
+| INT-MSKNEW-023 | "refuses an id that is not one" | 400 `invalid`; no `masleka_requests` call |
+
 ## 5. Pass criteria
 
-All 359 cases pass. These assert behaviour, not shape — a failure means the
+All 382 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
