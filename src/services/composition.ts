@@ -1,6 +1,7 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
 import { LEAD_FUNCTIONS } from "@/config/lead-functions";
+import { MASLEKA_ENABLED } from "@/config/masleka";
 import { UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
@@ -17,10 +18,12 @@ import { SupabaseContentService } from "./supabase/SupabaseContentService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
 import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
 import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
+import { SupabaseMaslekaService, type SupabaseMaslekaClient } from "./supabase/SupabaseMaslekaService";
 import { SupabaseSupportService } from "./supabase/SupabaseSupportService";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
+import { UnconfiguredMaslekaService } from "./unconfigured/UnconfiguredMaslekaService";
 import type { Services } from "./index";
 import type {
   AccountPort,
@@ -29,6 +32,7 @@ import type {
   ContentPort,
   LeadAdminPort,
   LeadPort,
+  MaslekaPort,
   SupportPort,
   UploadPort,
 } from "./ports";
@@ -135,6 +139,16 @@ const supportPort: SupportPort =
     ? new SupabaseSupportService(supabase as unknown as SupabaseFunctionsClient)
     : base44Support;
 
+/**
+ * The clearinghouse pipeline: on Supabase only when the switch is on AND a
+ * client exists. Otherwise a stand-in that is never available and never
+ * touches the network, so a dark build calls no `masleka-*` function.
+ */
+const maslekaPort: MaslekaPort =
+  MASLEKA_ENABLED && supabase
+    ? new SupabaseMaslekaService(supabase as unknown as SupabaseMaslekaClient)
+    : new UnconfiguredMaslekaService();
+
 export const services: Services = {
   leads: leadPort,
   content: contentPort,
@@ -146,5 +160,6 @@ export const services: Services = {
   leadsAdmin: leadsAdminPort,
   contentAdmin,
   account: accountPort,
+  masleka: maslekaPort,
 };
 

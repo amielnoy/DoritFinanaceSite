@@ -744,7 +744,39 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-MSKML-010 | "offers the link as a clickable button, and keeps it in the text too" | `<a href="…#t=…">` in the invitation and the reminder; link also in text |
 | UNIT-MSKML-011 | "is byte-for-byte what it was before the button existed" | The shared letter without an `action` hashes to its pre-change SHA-256 |
 
+### 4.37 The clearinghouse port and its switch — `tests/unit/masleka-services.test.ts`, `tests/unit/masleka-config.test.ts`, `tests/unit/services-wiring.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MSKSVC-001 | "posts the token, the code and the ID to masleka-code" | One invoke with exactly those three |
+| UNIT-MSKSVC-002 | "turns the function's error into a reason the page can word, with the rid" | `MaslekaError('link_invalid', 'abc123')` |
+| UNIT-MSKSVC-003 | "calls anything else a failure" | Unknown reason or no Response → `failed` |
+| UNIT-MSKSVC-004 | "asks the database for the caller's role" | `rpc('my_staff_role')` |
+| UNIT-MSKSVC-005 | "knows no role for null or an unknown answer" | `null` |
+| UNIT-MSKSVC-006 | "fails rather than guessing when the role cannot be read" | Rejects `failed` |
+| UNIT-MSKSVC-007 | "reads the open requests by the granted columns only, newest first" | `MASLEKA_COLUMNS` (no ciphertext/hash), four statuses, `created_at desc`, camelCase |
+| UNIT-MSKSVC-008 | "throws when the list cannot be read, so an outage never looks like an empty board" | Rejects |
+| UNIT-MSKSVC-009 | "creates a request and hands back its link" | Body and `MaslekaLink` |
+| UNIT-MSKSVC-010 | "asks for a fresh link by request id" | `{ requestId }` |
+| UNIT-MSKSVC-011 | "returns a revealed value, and fails on an answer without one" | Value; `failed` |
+| UNIT-MSKSVC-012 | "marks a request submitted" | `masleka-submitted` |
+| UNIT-MSKSVC-013 | "tells a second הגשתי apart from a failure: already_submitted is its own reason" | 409 → `already_submitted` with rid (a state for the board to show, Ruling 18) |
+| UNIT-MSKSVC-014 | "maps 409 not_available, 404 disabled, 429 and 503 unavailable to their own reasons" | Each status/body → its own reason with rid |
+| UNIT-MSKSVC-015 | "falls back to the status when a gateway answers without our body" | 401 `unauthorized`, 403 `forbidden`, 429 `rate_limited`, 503 `unavailable`, else `failed` |
+| UNIT-MSKSVC-016 | "never lets the revealed value reach storage or the console" | No storage write, value absent from every console method, on success and on failure |
+| UNIT-MSKSVC-017 | "passes a removed membership through as forbidden" | `forbidden` with rid |
+| UNIT-MSKSVC-018 | "is never available and gives nobody a role" | Unconfigured: `unavailable`, `null` |
+| UNIT-MSKCFG-001 | "is off when unset" | `false` |
+| UNIT-MSKCFG-002..005 | "is off for %j" (TRUE, 1, yes, tru) | `false` |
+| UNIT-MSKCFG-006..007 | "is on for %j" (true, " true ") | `true` (trim, then `=== "true"`) |
+| UNIT-MSKCFG-008 | "sends people to the clearinghouse operator over https" | Both URLs on `https://www.swiftness.co.il/` |
+| UNIT-MSKCFG-009 | "agrees with the Edge switch for every input, so the site and the functions cannot disagree" | `isMaslekaOn` equals `maslekaEnabled` over true, " true ", TRUE, 1, "", unset |
+| UNIT-LAZY-007 | "loads the composition root on its first call and delegates to it" | `services.masleka.myRole()` reaches the root once |
+| UNIT-WIRING-001 | "falls back to Base44 when Supabase is not configured" (extended) | `services.masleka` is `UnconfiguredMaslekaService` |
+| UNIT-WIRING-002 | "uses the Supabase clearinghouse adapter only when the switch is on and a client exists" | `SupabaseMaslekaService` |
+| UNIT-WIRING-003 | "ships dark: with the switch off and a client, no masleka-* function or staff RPC is ever called" | Unconfigured adapter; zero `functions.invoke` and zero `rpc` calls |
+
 ## 5. Pass criteria
 
-All 556 cases pass. Any failure is a functional defect, not an environment issue —
+All 586 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
