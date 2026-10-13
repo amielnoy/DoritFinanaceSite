@@ -67,15 +67,15 @@ describe("Vercel functions under api/", () => {
     const fn = readFileSync(join(REPO_ROOT, "api/og/blog.ts"), "utf8");
   });
 
-  it("reads the shell from disk, bundled with the function, never over HTTP", () => {
-    // A self-fetch of the deployment URL hits deployment protection (a redirect
-    // to SSO) and every shell-needing path answered 500.
+  it("fetches the shell from the canonical origin: no includeFiles, no VERCEL_URL", () => {
+    // `functions.includeFiles` for dist/app.html aborts `vercel deploy --prebuilt`
+    // (ENOENT readlink), and a fetch from VERCEL_URL hits deployment protection.
     const fns = (vercelConfig as { functions?: Record<string, { includeFiles?: string }> }).functions;
-    expect(fns?.["api/og/blog.ts"]?.includeFiles).toBe("dist/app.html");
+    expect(fns?.["api/og/blog.ts"]?.includeFiles).toBeUndefined();
     const fn = readFileSync(join(REPO_ROOT, "api/og/blog.ts"), "utf8");
-    expect(fn).not.toMatch(/fetch\([^)]*\/app/);
-    expect(fn).not.toMatch(/VERCEL_URL/);
-    expect(fn).toMatch(/readFile\(/);
+    expect(fn).toMatch(/fetch\(`\$\{SITE_URL\}\/app`, \{ redirect: "error" \}\)/);
+    expect(fn).not.toMatch(/process\.env\.VERCEL_URL/);
+    expect(fn).not.toMatch(/fetch\([^)]*app\.html/);
   });
 
   it("are type-checked the way @vercel/node builds them", () => {

@@ -377,8 +377,9 @@ well as crawlers), before the crawler rule and the SPA catch-all.
 
 **`vercel-functions.contract.test.ts`, clean URLs.** `cleanUrls` is `true` (so
 `dist/<route>.html` answers `/<route>`), the catch-all rewrites to `/app`, and
-`vercel.json` bundles `dist/app.html` with `api/og/blog.ts` (`includeFiles`), which
-reads it from disk and never fetches it — a self-fetch hits deployment protection.
+`api/og/blog.ts` fetches the shell from `${SITE_URL}/app` — no `VERCEL_URL`
+(deployment protection) and no `functions.includeFiles` (it aborts
+`deploy --prebuilt`).
 
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when

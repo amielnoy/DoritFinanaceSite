@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SITE_URL } from "@/lib/seo";
 
-// The shell is read from disk (bundled with the function), so the reader is
-// what the tests control — never a network call.
+// The shell is fetched from the canonical origin; `shellFile.html === null`
+// makes that fetch fail the way a protected or unreachable origin would.
 const shellFile = vi.hoisted(() => ({ html: null as string | null }));
-const readFileMock = vi.hoisted(() => vi.fn());
-vi.mock("node:fs/promises", () => ({ readFile: readFileMock }));
 
 // A trimmed stand-in for the bundled `dist/app.html` — enough tags for
 // `renderSeoHtml` to patch, so the handler's output is inspectable without a
@@ -56,6 +54,10 @@ vi.stubGlobal(
   "fetch",
   vi.fn(async (input: string) => {
     const url = String(input);
+    if (url === `${SITE_URL}/app`) {
+      if (shellFile.html === null) throw new TypeError("fetch failed: unexpected redirect");
+      return { ok: true, status: 200, text: async () => shellFile.html } as Response;
+    }
     if (url.startsWith(`${SUPABASE}/rest/v1/blog_posts`)) {
       restCalls.push(new URL(url));
       const body = restStatus === 200 ? rows : { message: "upstream down" };
@@ -98,12 +100,7 @@ beforeEach(() => {
   restStatus = 200;
   restCalls.length = 0;
   fetchMock().mockClear();
-  readFileMock.mockReset();
   shellFile.html = SHELL;
-  readFileMock.mockImplementation(async () => {
-    if (shellFile.html === null) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-    return shellFile.html;
-  });
 });
 
 afterEach(() => {
@@ -135,19 +132,21 @@ describe("api/og/blog — an article asked for by its slug", () => {
     expect((init as { headers: Record<string, string> }).headers.apikey).toBe("sb_publishable_test");
   });
 
-  it("reads the shell once from the bundled dist/app.html and reuses it — never over HTTP", async () => {
+  it("fetches the shell once from the canonical origin, never from the request, and reuses it", async () => {
     rows = [article()];
     const handler = await loadHandler();
 
     await handler({ method: "GET", query: { id: SLUG } }, makeRes().res);
+    // A hostile Host header must not change where the shell comes from
+    // (CWE-918 / SSRF).
     await handler({ method: "GET", query: { id: SLUG }, headers: { host: "attacker.example" } } as never, makeRes().res);
 
-    expect(readFileMock).toHaveBeenCalledTimes(1);
-    expect(String(readFileMock.mock.calls[0][0])).toMatch(/dist[\\/]app\.html$/);
-    expect(fetchMock().mock.calls.every(([u]) => String(u).startsWith(SUPABASE))).toBe(true);
+    const shellCalls = fetchMock().mock.calls.filter(([u]) => !String(u).startsWith(SUPABASE));
+    expect(shellCalls).toHaveLength(1);
+    expect(shellCalls[0]).toEqual([`${SITE_URL}/app`, { redirect: "error" }]);
   });
 
-  it("answers 502 + noindex, not a crash, when the shell file is missing", async () => {
+  it("answers 502 + noindex, not a crash, when the shell cannot be fetched", async () => {
     rows = [article()];
     shellFile.html = null;
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -256,7 +255,7 @@ describe("api/og/blog — nothing to show", () => {
     expect(restCalls).toHaveLength(0);
   });
 
-  it("still answers 404 + noindex when the shell file is missing, and logs the read once", async () => {
+  it("still answers 404 + noindex when the shell cannot be fetched, and logs the read once", async () => {
     shellFile.html = null;
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const handler = await loadHandler();
@@ -267,7 +266,7 @@ describe("api/og/blog — nothing to show", () => {
       expect(state.headers["X-Robots-Tag"]).toBe("noindex");
       expect(state.body).toContain("noindex");
     }
-    expect(spy.mock.calls.filter(([m]) => String(m).includes("cannot read the app shell"))).toHaveLength(1);
+    expect(spy.mock.calls.filter(([m]) => String(m).includes("cannot fetch the app shell"))).toHaveLength(1);
     spy.mockRestore();
   });
 

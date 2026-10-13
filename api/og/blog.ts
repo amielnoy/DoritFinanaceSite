@@ -31,10 +31,7 @@
 // route uses (via `useSeo`), so this can never describe a post differently
 // than the page a visitor who followed the link actually sees.
 
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
-import { renderSeoHtml } from "../../src/lib/seo.js";
+import { renderSeoHtml, SITE_URL } from "../../src/lib/seo.js";
 import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "../../src/lib/blogSeo.js";
 import { articlePath } from "../../src/lib/articlePath.js";
 import { RestTableClient } from "../../src/services/supabase/RestTableClient.js";
@@ -60,33 +57,40 @@ const content: SupabaseContentService | null =
     ? new SupabaseContentService(new RestTableClient(SUPABASE_URL, SUPABASE_KEY))
     : null;
 
-// The shell is our own build output, bundled with this function
-// (`vercel.json` -> `functions["api/og/blog.ts"].includeFiles`) and read from
-// disk. It is never fetched: a self-fetch of the deployment URL hits Vercel's
-// deployment protection (a redirect to SSO, so every shell-needing path
-// answered 500), and fetching an origin named by the request's Host header
-// would let a visitor point the outbound request, and the shell cached for
-// every later request on this warm instance, at a server they control.
-const SHELL_PATH = join(process.cwd(), "dist", "app.html");
-
+// The shell is fetched over HTTP from the canonical site origin, `SITE_URL`,
+// and only from there. Two dead ends led here:
+//   - `VERCEL_URL`: every *.vercel.app deployment URL, production's own
+//     included, is behind deployment protection, so the fetch got a redirect
+//     to SSO (`redirect: "error"` -> "unexpected redirect") and every
+//     shell-needing path answered 500. The custom domain is open.
+//   - `functions.includeFiles` for `dist/app.html`: it aborts
+//     `vercel deploy --prebuilt` with `ENOENT … readlink`, i.e. every deploy.
+// `SITE_URL` is our own constant, never influenced by the request (a Host
+// header would let a visitor point this fetch, and the shell cached for every
+// later request on the warm instance, at a server they control). A preview's
+// function therefore injects production's shell; previews are never crawled.
 let shellHtml: string | null = null;
 let shellFailureLogged = false;
 
 /**
- * The untouched SPA shell `scripts/prerender.mjs` writes as `dist/app.html`
- * beside the prerendered routes. Read once and kept in module scope. `null`
- * when it cannot be read (logged once): callers answer their status with a
- * minimal body instead of crashing.
+ * The untouched SPA shell (`dist/app.html`, written by scripts/prerender.mjs),
+ * served at `/app` because `cleanUrls` makes the literal `.html` a 308 and
+ * `redirect: "error"` refuses any redirect. Fetched once and kept in module
+ * scope. `null` when it cannot be fetched (logged once per instance): callers
+ * answer their status with a minimal body instead of crashing.
  */
 async function loadShell(): Promise<string | null> {
   if (shellHtml !== null) return shellHtml;
   try {
-    shellHtml = await readFile(SHELL_PATH, "utf8");
+    const res = await fetch(`${SITE_URL}/app`, { redirect: "error" });
+    if (!res.ok) throw new Error(`fetching /app: ${res.status}`);
+    shellHtml = await res.text();
     return shellHtml;
   } catch (err) {
     if (!shellFailureLogged) {
       shellFailureLogged = true;
-      console.error("[api/og/blog] cannot read the app shell", SHELL_PATH, err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[api/og/blog] cannot fetch the app shell:", message.slice(0, 200));
     }
     return null;
   }

@@ -40,11 +40,6 @@
       "destination": "/app"
     }
   ],
-  "functions": {
-    "api/og/blog.ts": {
-      "includeFiles": "dist/app.html"
-    }
-  },
   "headers": [
     {
       "source": "/fonts/(.*)",
