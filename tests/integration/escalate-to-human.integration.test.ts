@@ -354,3 +354,59 @@ describe("Edge escalate-to-human — what only it does", () => {
     expect(r.json.contact).toMatchObject({ phoneDisplay: "050-831-1776" });
   });
 });
+
+describe("Edge escalate-to-human — what it refuses and what it holds back", () => {
+  const handoff = { reason: "user_request", summary: "רוצה לדבר עם דורית", name: "דנה", phone: "0501234567", agent: "support_agent" };
+
+  it("answers 400 to a request with nothing in it, and sends, stores and appends nothing", async () => {
+    const r = await invokeEdge("escalate-to-human", {});
+    expect(r.status).toBe(400);
+    expect(r.json).toMatchObject({ error: expect.any(String), rid: expect.any(String) });
+    expect(r.emails).toHaveLength(0);
+    expect(r.leads).toHaveLength(0);
+    expect(r.sheetRows).toHaveLength(0);
+  });
+
+  it("treats a blank summary and blank contact fields as nothing", async () => {
+    const r = await invokeEdge("escalate-to-human", { reason: "user_request", summary: "  \n ", name: " ", phone: "", email: null });
+    expect(r.status).toBe(400);
+    expect(r.emails).toHaveLength(0);
+  });
+
+  it("still takes a summary with no way to reach the visitor: an anonymous hand-off is real", async () => {
+    const r = await invokeEdge("escalate-to-human", { reason: "user_request", summary: "רוצה לדבר עם אדם" });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, notified: true, recorded: false });
+    expect(r.emails.length).toBeGreaterThan(0);
+  });
+
+  it("still takes contact details with no summary", async () => {
+    const r = await invokeEdge("escalate-to-human", { name: "דנה", phone: "0501234567" });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, notified: true, recorded: true });
+  });
+
+  it("holds back the staff mail over the hourly cap, and still records the hand-off", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff, { overLimit: ["escalate:notify"] });
+    expect(r.status).toBe(200);
+    expect(r.emails).toHaveLength(0);
+    expect(r.json).toMatchObject({ ok: true, notified: false, recorded: true });
+    expect(r.json.warnings).toContain("notify_rate_limited");
+    expect(r.leads).toHaveLength(1);
+    expect(r.sheetRows).toHaveLength(1);
+  });
+
+  it("mails staff when the limiter is unreachable: it fails open", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff, { failLimiter: 500 });
+    expect(r.json).toMatchObject({ ok: true, notified: true });
+    expect(r.emails.length).toBeGreaterThan(0);
+    expect(r.json.warnings).not.toContain("notify_rate_limited");
+  });
+
+  it("counts one hand-off once, not once per recipient", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff);
+    const checks = r.fetches.filter((f) => f.url.endsWith("/rpc/allow_submission"));
+    expect(checks).toHaveLength(1);
+    expect(checks[0].body).toMatchObject({ p_key: "escalate:notify", p_window_seconds: 3600, p_max: 60 });
+  });
+});
