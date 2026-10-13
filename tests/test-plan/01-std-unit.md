@@ -691,7 +691,18 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-SEAL-016 | "is not configured when MASLEKA_KEY is short or not base64" | `false`, `null` |
 | UNIT-SEAL-017 | "is configured with 32 bytes, and the key it gives works" | `true`; round trip through the env key |
 
+### 4.34 Israeli business days — `tests/unit/edge-business-days.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-BDAY-001 | "skips Friday and Saturday: day 5 after a Sunday is the next Sunday" | 2026-10-18 |
+| UNIT-BDAY-002 | "puts day 7 after a Sunday on the Tuesday after" | 2026-10-20 |
+| UNIT-BDAY-003 | "goes from a Thursday straight to Sunday" | 2026-10-18 |
+| UNIT-BDAY-004 | "reads the weekday in Israel, not in UTC" | Israel Friday 01:30 + 1 → Israel Sunday 01:30 |
+| UNIT-BDAY-005 | "leaves the instant alone for zero days" | Same instant |
+| UNIT-BDAY-006 | "keeps the Israeli wall-clock time and calendar day across the end of daylight saving (25 Oct 2026)" | Thu 22 Oct 00:30 + 4 → Wed 28 Oct 00:30 Israel; Thu 12:00 + 3 → Tue 27 Oct 12:00 Israel |
+
 ## 5. Pass criteria
 
-All 518 cases pass. Any failure is a functional defect, not an environment issue —
+All 524 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
