@@ -83,7 +83,7 @@ export async function handler(req: Request): Promise<Response> {
     const key = await sealKeyFromEnv();
     if (!key) {
       log('error', 'seal.not_configured', { rid });
-      return Response.json({ error: 'failed', rid }, { status: 500, headers: cors });
+      return Response.json({ error: 'unavailable', rid }, { status: 503, headers: cors });
     }
 
     // The query takes the token only as its hash (isToken above), the rest

@@ -296,8 +296,8 @@ describe("masleka-code — when something is missing or down", () => {
     // Ruling 10: no key is a refusal, never "store it in the clear".
     for (const MASLEKA_KEY of [null, Buffer.alloc(16, 7).toString("base64"), "!!!"]) {
       const r = await run(body, { envPatch: { MASLEKA_KEY } });
-      expect(r.status, String(MASLEKA_KEY)).toBe(500);
-      expect(r.json, String(MASLEKA_KEY)).toMatchObject({ error: "failed", rid: expect.any(String) });
+      expect(r.status, String(MASLEKA_KEY)).toBe(503);
+      expect(r.json, String(MASLEKA_KEY)).toMatchObject({ error: "unavailable", rid: expect.any(String) });
       expect(r.callsTo("/rest/v1/masleka_requests"), String(MASLEKA_KEY)).toHaveLength(0);
       expect(r.maslekaRequests[0], String(MASLEKA_KEY)).toEqual(invited());
       expect(r.emails, String(MASLEKA_KEY)).toHaveLength(0);

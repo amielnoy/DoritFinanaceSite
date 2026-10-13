@@ -540,7 +540,7 @@ between — or any replay — matches nothing.
 | INT-MSKCODE-023 | "counts every call against its address and its link, never by the raw values" | `allow_submission` with `masleka-ip:<sha256(ip)>` 3600/10, then `masleka-link:<token hash>` 3600/5 |
 | INT-MSKCODE-024 | "refuses a flood from one address" | 429 `rate_limited`; no PATCH |
 | INT-MSKCODE-025 | "refuses a flood on one link" | 429 `rate_limited`; no PATCH |
-| INT-MSKCODE-026 | "stores nothing when there is no key to seal with, or the key is not 32 bytes" | Missing, 16-byte and non-base64 key: 500 `failed` + rid; no `masleka_requests` call; row unchanged; no mail |
+| INT-MSKCODE-026 | "stores nothing when there is no key to seal with, or the key is not 32 bytes" | Missing, 16-byte and non-base64 key: 503 `unavailable` + rid; no `masleka_requests` call; row unchanged; no mail |
 | INT-MSKCODE-027 | "reports a database failure with its rid and nothing else" | Answer is exactly `{ error: 'failed', rid }`; no mail |
 | INT-MSKCODE-028 | "answers the browser's preflight and does nothing else" | 204; no fetch |
 
