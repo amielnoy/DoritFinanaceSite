@@ -952,6 +952,24 @@ the browser.
 Renaming a published article's slug breaks every link to the old one — there is
 no redirect table. The form says so before you save.
 
+### When an article's page is rebuilt
+
+Article pages are prebuilt at deploy time, so a change reaches its page only on
+the next production deploy. Two things make one without anyone asking:
+
+- **Publishing from the "Publish blog drafts" workflow** ends by dispatching CI
+  on `main` with `deploy` ticked (`gh workflow run ci.yml --ref main -f
+  deploy=true`, with the workflow's own token — `workflow_dispatch` is the one
+  event `GITHUB_TOKEN` may start, so there is no new secret). Only after a real
+  publish; a preview dispatches nothing.
+- **The nightly CI run** (22:00 Israel summer time) deploys the Supabase
+  functions and promotes the Vercel build, which picks up anything published or
+  edited from `/admin/blog` that day. It does not publish Base44.
+
+Until then a new article is still reachable — the site renders it in the
+browser, and a crawler gets its `<head>` from `api/og/blog.ts` — just not as
+full HTML.
+
 ## Tests
 
 The full battery — lint, typecheck, unit, component, contract, integration,
@@ -1157,8 +1175,11 @@ would quietly weaken the gate in front of the client's site.
 
 A feature branch deploys **nothing**: every deploy job checks the ref, so
 `main` and `builder` stay the only branches that can reach a site, and only
-those two publish the report. Nor can the nightly run deploy — every deploy job
-also requires a `push` event.
+those two publish the report. The nightly run deploys one thing: it rebuilds
+and promotes the Vercel site from `main` (after deploying the Supabase functions
+it calls, behind the same green gate), so an article edited from `/admin/blog`
+has its prebuilt page the next morning. It never publishes Base44 — that still
+takes a push or a manual run with `deploy` ticked.
 
 A pull request triggers a run when it **opens**; later commits are covered by
 the push trigger, so the matrix does not run twice for the same SHA.

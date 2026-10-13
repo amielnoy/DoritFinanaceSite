@@ -72,8 +72,12 @@ on:
     # runs, and a job that rewrites its own schedule twice a year is a worse
     # thing to own than an hour of slack.
     #
-    # Scheduled runs use the default branch, and no deploy job can fire from
-    # them — every one requires `github.event_name == 'push'`.
+    # Scheduled runs use the default branch. They deploy the Supabase functions
+    # and promote the Vercel build (the usual green gate applies), so an
+    # article published or edited from /admin/blog has its prebuilt page by
+    # the next night. They never publish Base44: that ships the agents, and
+    # nobody is watching at 22:00 — the `deploy` job still requires a push or
+    # a manual run with `deploy` ticked.
     - cron: "0 19 * * *"
 
   workflow_dispatch:
@@ -485,9 +489,11 @@ jobs:
     name: Deploy Supabase functions
     runs-on: ubuntu-latest
     needs: [build, test-node, test-e2e]
+    # `schedule` too: the nightly run promotes Vercel, and --prod waits for
+    # this job, so the site is never live ahead of the functions it calls.
     if: >-
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || inputs.deploy)
+      (github.event_name == 'push' || github.event_name == 'schedule' || inputs.deploy)
     timeout-minutes: 10
     env:
       SUPABASE_PROJECT_REF: hjowdyiwjjrqceumkvgt
@@ -694,11 +700,13 @@ jobs:
     # Also on `builder`, where it deploys a *preview* rather than production.
     # That is the point of the branch: a Builder edit gets a URL you can open
     # and look at before you merge it, instead of being judged from a diff.
+    # The nightly run (`schedule`) rebuilds production so every prebuilt
+    # article page is current — see README, "When an article's page is rebuilt".
     if: >-
       !cancelled() &&
       needs.build.result == 'success' &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/builder') &&
-      (github.event_name == 'push' || inputs.deploy)
+      (github.event_name == 'push' || github.event_name == 'schedule' || inputs.deploy)
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'vercel' || 'vercel-preview' }}
       url: ${{ steps.deploy.outputs.url }}
@@ -790,6 +798,10 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           SCOPE: ${{ vars.VERCEL_SCOPE }}
           PROJECT: ${{ vars.VERCEL_PROJECT_NAME }}
+          # Production must prebuild every published article: a Supabase it
+          # cannot read fails this build instead of shipping a blog without its
+          # pages. A preview warns and goes on (scripts/published-articles.mjs).
+          PRERENDER_REQUIRED: ${{ steps.target.outputs.env == 'production' && '1' || '0' }}
         run: |
           # The workflow-wide VITE_BASE44_APP_ID is the e2e placeholder, and a
           # process variable outranks what `vercel pull` writes — so without
@@ -861,6 +873,14 @@ jobs:
             || { echo "::error::Deployment did not serve the app shell"; exit 1; }
           echo "$body" | grep -q 'lang="he"' \
             || { echo "::error::Deployment did not serve the Hebrew RTL document"; exit 1; }
+          # /blog is a file (blog.html) and, since articles are prebuilt, also a
+          # directory (blog/<slug>.html). Production must still answer /blog
+          # with the blog index's own page, not the shell or a 404.
+          if [ "${{ steps.target.outputs.env }}" = production ]; then
+            blog=$(npx vercel curl "$URL/blog")
+            echo "$blog" | grep -qE '<link rel="canonical" href="[^"]*/blog"' \
+              || { echo "::error::/blog is not served its prebuilt page"; exit 1; }
+          fi
 
   # ── 6. Post-deploy smoke test against the live site ──────────────────────
   #

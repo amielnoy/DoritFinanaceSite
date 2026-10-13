@@ -321,6 +321,17 @@ declare it. It also forbids a build that strips `VITE_BASE44_APP_ID` from writin
 the default `dist/` in any job that uploads `dist` — that arrangement shipped a
 bundle whose app id inlined to `undefined` as the artifact all ten e2e shards
 tested, and the suite stayed green because the fixture stubs `**/api/**`.
+Since articles are prebuilt, the nightly run is no longer deploy-free: CTR-REB-001
+requires `deploy-vercel` and `deploy-supabase` to run on `schedule` (the functions
+first, because `--prod` waits for them), and a companion case keeps the Base44
+publish — which ships the agents — off it. CTR-REB-002 pins that the publish
+workflow ends by dispatching `ci.yml` on `main` with `deploy=true`, with
+`actions: write` and only after a real publish. CTR-REB-003 requires
+`PRERENDER_REQUIRED=1` on the production Vercel build only; CTR-REB-004 keeps
+`PRERENDER_ARTICLES_FIXTURE` in the e2e `build` job's `Build` step and out of the
+workflow-level `env`, every other job and `vercel.json`; CTR-REB-005 requires the
+production deploy check to fetch `/blog`, which now shares its name with the
+`blog/` directory of articles.
 
 **`deploy-gate.contract.test.ts`** — that exactly one thing promotes production.
 `vercel.json` must disable Git-triggered deploys on `main` and `builder` and
@@ -482,7 +493,7 @@ time.
 
 ## 6. Pass criteria
 
-All 559 cases pass. A failure means either the frontend or the backend definition
+All 567 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

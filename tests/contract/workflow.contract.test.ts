@@ -22,6 +22,7 @@ const workflow = parse(
   readFileSync(join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8"),
 ) as {
   on: Record<string, unknown>;
+  env?: Record<string, string>;
   jobs: Record<
     string,
     {
@@ -29,7 +30,14 @@ const workflow = parse(
       if?: string;
       outputs?: Record<string, string>;
       strategy?: { matrix?: { include?: unknown } };
-      steps?: Array<{ name?: string; uses?: string; id?: string; with?: Record<string, string> }>;
+      steps?: Array<{
+        name?: string;
+        uses?: string;
+        id?: string;
+        with?: Record<string, string>;
+        env?: Record<string, string>;
+        run?: string;
+      }>;
     }
   >;
 };
@@ -174,11 +182,20 @@ describe("the workflow tests every branch and deploys from only two", () => {
     expect(schedule![0].cron).toBe("0 19 * * *");
   });
 
-  it("lets no deploy fire from the nightly run", () => {
-    // Every deploying job must require a push, or a scheduled run would
-    // publish to the client's site at 22:00 with nobody watching.
-    for (const name of ["deploy", "deploy-vercel"]) {
-      expect(workflow.jobs[name].if ?? "", name).toMatch(/github\.event_name == 'push'/);
+  it("keeps the Base44 publish off the nightly run", () => {
+    // Publishing Base44 ships the agents too, and the nightly run has nobody
+    // watching it. A push, or a deliberate manual run, only.
+    const condition = workflow.jobs.deploy.if ?? "";
+    expect(condition).toMatch(/github\.event_name == 'push'/);
+    expect(condition).not.toMatch(/schedule/);
+  });
+
+  it("rebuilds the Vercel site nightly, with the functions deployed first (CTR-REB-001)", () => {
+    // Articles are prebuilt at deploy time, so an edit made from /admin/blog
+    // reaches its page only on the next production build. The functions job
+    // must run too: --prod waits for it, so the site is never ahead of them.
+    for (const name of ["deploy-vercel", "deploy-supabase"]) {
+      expect(workflow.jobs[name].if ?? "", name).toMatch(/github\.event_name == 'schedule'/);
     }
   });
 
@@ -210,5 +227,79 @@ describe("the workflow tests every branch and deploys from only two", () => {
     const cf = stepsOf(workflow.jobs.allure).find((s) => s.id === "cf");
     expect(cf, "the Cloudflare credential gate is missing").toBeTruthy();
     expect(cf!.if ?? "").toMatch(/refs\/heads\/main/);
+  });
+});
+
+describe("articles are prebuilt from the right list", () => {
+  type Step = { name?: string; env?: Record<string, string>; run?: string };
+  const step = (job: string, name: string) =>
+    (stepsOf(workflow.jobs[job]) as Step[]).find((s) => s.name === name);
+
+  it("requires the article list in a production build, and only there (CTR-REB-003)", () => {
+    // A production build that cannot list the articles must fail rather than
+    // ship a blog without pages; a preview may warn and go on.
+    expect(step("deploy-vercel", "Build for Vercel")?.env?.PRERENDER_REQUIRED).toBe(
+      "${{ steps.target.outputs.env == 'production' && '1' || '0' }}",
+    );
+  });
+
+  it("prebuilds the e2e fixture article in the tested build and nowhere else (CTR-REB-004)", () => {
+    expect(step("build", "Build")?.env?.PRERENDER_ARTICLES_FIXTURE).toBe("e2e/fixtures/prerender-articles.json");
+    // Not workflow-wide: a workflow-level env would reach every job, the Vercel build included.
+    expect(JSON.stringify(workflow.env ?? {}), "workflow-level env").not.toContain("PRERENDER_ARTICLES_FIXTURE");
+    // Within the build job, only the Build step carries it.
+    for (const s of stepsOf(workflow.jobs.build) as Step[]) {
+      if (s.name === "Build") continue;
+      expect(JSON.stringify(s), `build job step "${s.name}"`).not.toContain("PRERENDER_ARTICLES_FIXTURE");
+    }
+    expect(JSON.stringify({ ...workflow.jobs.build, steps: undefined })).not.toContain("PRERENDER_ARTICLES_FIXTURE");
+    for (const [name, job] of jobs) {
+      if (name === "build") continue;
+      expect(JSON.stringify(job), `${name} must not prebuild the fixture article`).not.toContain(
+        "PRERENDER_ARTICLES_FIXTURE",
+      );
+    }
+    expect(JSON.stringify(step("deploy-vercel", "Build for Vercel"))).not.toContain("PRERENDER_ARTICLES_FIXTURE");
+    expect(readFileSync(join(REPO_ROOT, "vercel.json"), "utf8")).not.toContain("PRERENDER_ARTICLES_FIXTURE");
+  });
+
+  it("checks that a production deployment still serves /blog its own page (CTR-REB-005)", () => {
+    // `blog.html` and the `blog/` directory of articles sit side by side.
+    expect(step("deploy-vercel", "Verify the deployment serves the app")?.run ?? "").toContain(
+      'vercel curl "$URL/blog"',
+    );
+  });
+});
+
+describe("publishing an article rebuilds the site (CTR-REB-002)", () => {
+  const publish = parse(readFileSync(join(REPO_ROOT, ".github/workflows/publish-blog.yml"), "utf8")) as {
+    jobs: {
+      publish: {
+        permissions?: Record<string, string>;
+        steps: Array<{ name?: string; if?: string; env?: Record<string, string>; run?: string }>;
+      };
+    };
+  };
+  const job = publish.jobs.publish;
+  const last = job.steps[job.steps.length - 1];
+
+  it("ends by dispatching a production deploy of main with the workflow's own token", () => {
+    expect(last.run).toMatch(/gh workflow run ci\.yml --ref main -f deploy=true/);
+    expect(last.env?.GH_TOKEN).toBe("${{ github.token }}");
+  });
+
+  it("may dispatch workflows, and still only read the code", () => {
+    expect(job.permissions).toEqual({ contents: "read", actions: "write" });
+  });
+
+  it("dispatches only after a real publish", () => {
+    expect(last.if).toContain("inputs.apply");
+    expect(last.if).toContain("steps.supabase-creds.outputs.ready == 'true'");
+  });
+
+  it("sends an input the CI workflow declares", () => {
+    const dispatch = (workflow.on as { workflow_dispatch: { inputs: Record<string, { type: string }> } })
+      .workflow_dispatch;
+    expect(dispatch.inputs.deploy.type).toBe("boolean");
   });
 });
