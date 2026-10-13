@@ -25,6 +25,10 @@ export function tableFake(
       calls.push(["eq", column, value]);
       return query;
     },
+    or(filters) {
+      calls.push(["or", filters]);
+      return query;
+    },
     order(column, options) {
       calls.push(["order", column, options]);
       return query;

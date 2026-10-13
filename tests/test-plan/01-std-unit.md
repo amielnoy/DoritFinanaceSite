@@ -429,6 +429,8 @@ either fails here rather than on the home page.
 | UNIT-REST-010 | "turns a network failure into an error rather than a rejection" | `{ data: null, error }` |
 | UNIT-REST-011 | "reports a 200 that is not a list as an error, not as no rows" | `error`, never `data: []` |
 | UNIT-REST-012 | "asks for the same URL with the same anonymous credentials" | Equal to supabase-js's request |
+| UNIT-REST-013 | "builds an or filter inside PostgREST's brackets" | `or=(slug.eq.a,base44_id.eq.a)` |
+| UNIT-REST-014 | "asks for an or filter exactly as supabase-js does" | Same URL as supabase-js's `.or()` |
 
 ### 4.20 The lazy services front — `tests/unit/lazy-services.test.ts`
 
@@ -463,7 +465,25 @@ A slug shaped like a Base44 id is refused because `vercel.json` sends every
 | UNIT-SLUG-007 | "is false for anything that is not a string" | `false` |
 | UNIT-SLUG-008 | "tells a Base44 id, a uuid and a slug apart" | All three are slug-shaped; only the uuid matches `UUID_PATTERN` |
 
+### 4.23 Reading one article — `tests/unit/supabase-content.test.ts` (`getArticle`)
+
+`/blog/:key` holds a slug, an old Base44 id, or a uuid. One PostgREST request
+asks for all three and the slug wins. The key reaches an `or=(…)` filter, so a
+key that is not slug-shaped is answered "not found" without a request — a comma
+or a bracket in it would rewrite the filter.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ART-001 | "reads the slug with every article" | `slug` in `ARTICLE_COLUMNS` |
+| UNIT-ART-002 | "asks for the key as a slug or a Base44 id, in one request" | `or: slug.eq.k,base44_id.eq.k`; no `eq` |
+| UNIT-ART-003 | "adds the uuid clause only for a uuid-shaped key" | `…,id.eq.<uuid>` |
+| UNIT-ART-004 | "prefers the slug, then the Base44 id, then the uuid" | The slug's row; without it, the Base44 id's |
+| UNIT-ART-005 | "returns the article under its Base44 id, with its slug" | `id` is the Base44 id; `slug` present |
+| UNIT-ART-006 | "throws a 404 'not found' when no row matches" | `status: 404` |
+| UNIT-ART-007 | "never asks about %j" (6 keys) | `status: 404`; no call recorded |
+| UNIT-ART-008 | "fails, rather than answering 'not found', when the read fails" | `blog_posts read failed`; no `status` |
+
 ## 5. Pass criteria
 
-All 362 cases pass. Any failure is a functional defect, not an environment issue —
+All 374 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
