@@ -227,6 +227,20 @@ Nothing reaches a visitor before the compliance adviser has seen:
 
 The provider's business terms must say API data is not used for training.
 
+## Amendments during PR 1
+
+Where the build differs from the text above, the build wins:
+
+- Tool names stay camelCase `submitLead` / `escalateToHuman`, not `submit_lead` / `escalate_to_human`: the interview prompt names them about ten times, and keeping them keeps the rendered prompt byte for byte equal to today's.
+- `compliance.md` is the COMPLIANCE.md section 3 and 5 excerpt (the model-facing rules), not the whole 44 KB adviser document, which is not sent to the model.
+- One hand-off per conversation, recorded in `escalated_at` apart from `status`, so an escalation after a saved lead cannot let a second lead through.
+- One lead per conversation whatever the stage: once `status` is `lead_saved`, `submitLead` answers `already_saved` even for a `partial` stage.
+- `lead_id` prefers the interview lead: set by a `submitLead` outcome always, by an `escalateToHuman` outcome only while it is still null, so the "שיחה" tab follows the richer lead.
+- The 20 s no-reply watchdog is off for agents served by `chat`; the adapter's 40 s abort and the function's 25 s budget cover it.
+- The e2e test for the interview on the function is deferred to the switch-on PR (CI's build has no Supabase); a routing unit test (`VITE_CHAT_AGENTS` names go to the function adapter) ships now.
+- The "שיחה" tab shows for any lead with a linked conversation, not only `source=interview`, because hand-off leads link too.
+- The 60-an-hour staff-mail cap mentioned above exists only in draft PR #162, not on main; until it lands the hand-off is limited only by one per conversation and the per-IP and per-site rate limits.
+
 ## Rollout
 
 Each step is reversible on its own.
