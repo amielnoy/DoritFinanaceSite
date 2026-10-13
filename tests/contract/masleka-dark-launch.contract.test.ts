@@ -14,6 +14,13 @@ const FUNCTIONS = readdirSync(join(REPO_ROOT, "supabase/functions"))
   .filter((name) => name.startsWith("masleka-"))
   .sort();
 
+/** Whether a file's code (comment lines aside) sets MASLEKA_ENABLED to true, in any config syntax. */
+const SWITCH_ON = /MASLEKA_ENABLED["']?\s*[:=]\s*["']?true/;
+export function turnsSwitchOn(text: string, pattern: RegExp = SWITCH_ON): boolean {
+  const code = text.split("\n").filter((line) => !/^\s*(\/\/|#|\*|\/\*)/.test(line)).join("\n");
+  return pattern.test(code);
+}
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
@@ -62,8 +69,7 @@ describe("the clearinghouse pipeline ships dark", () => {
     ];
     for (const file of files) {
       // A comment may mention the value (vitest.config.ts explains why it pins it off).
-      const code = read(file).split("\n").filter((line) => !/^\s*(\/\/|#|\*|\/\*)/.test(line)).join("\n");
-      expect(code, file).not.toMatch(/MASLEKA_ENABLED\s*[:=]\s*["']?true/);
+      expect(turnsSwitchOn(read(file)), file).toBe(false);
     }
   });
 
@@ -71,5 +77,22 @@ describe("the clearinghouse pipeline ships dark", () => {
     expect(read("src/App.jsx")).toMatch(/\{MASLEKA_ENABLED \? \(\s*<Route element=\{<StaffRoute/);
     expect(read("src/App.jsx")).toContain('<Route path="/masleka" element={<Masleka />} />');
     expect(read("src/pages/Masleka.tsx")).toContain("enabled = MASLEKA_ENABLED");
+  });
+
+  it.each([
+    ['"VITE_MASLEKA_ENABLED": "true"', true],
+    ['"MASLEKA_ENABLED":true', true],
+    ["MASLEKA_ENABLED: true", true],
+    ["MASLEKA_ENABLED=true", true],
+    ['VITE_MASLEKA_ENABLED: "true"', true],
+    ["VITE_MASLEKA_ENABLED = 'true'", true],
+    ["MASLEKA_ENABLED=false", false],
+    ['MASLEKA_ENABLED=""', false],
+    ['"VITE_MASLEKA_ENABLED": ""', false],
+    ["# MASLEKA_ENABLED=true", false],
+    ["// VITE_MASLEKA_ENABLED=true", false],
+    ["return (Deno.env.get('MASLEKA_ENABLED') || '').trim() === 'true';", false],
+  ])("recognises %s as switch-on: %s", (line, on) => {
+    expect(turnsSwitchOn(line)).toBe(on);
   });
 });

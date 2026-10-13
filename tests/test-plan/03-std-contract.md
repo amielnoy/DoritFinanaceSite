@@ -555,6 +555,18 @@ itself is proved by `supabase/tests/masleka_check.sql` against a local
 | CTR-MSKD-009 | "is off in a build that does not set VITE_MASLEKA_ENABLED" | `false` |
 | CTR-MSKD-010 | "is turned on by nothing in the repository" | No `MASLEKA_ENABLED=true` (comment lines aside) in Vercel, Playwright, Vitest, Supabase config, package.json or workflows |
 | CTR-MSKD-011 | "registers the staff pages only when switched on, and the client page always (it then says unavailable)" | Guarded `StaffRoute` block; `/masleka` route; page default `enabled = MASLEKA_ENABLED` |
+| CTR-MSKD-012 | "recognises "VITE_MASLEKA_ENABLED": "true" as switch-on: true" | Detected (JSON-quoted key with a string true) |
+| CTR-MSKD-013 | "recognises "MASLEKA_ENABLED":true as switch-on: true" | Detected (JSON-quoted key with a bare true) |
+| CTR-MSKD-014 | "recognises MASLEKA_ENABLED: true as switch-on: true" | Detected (unquoted YAML) |
+| CTR-MSKD-015 | "recognises MASLEKA_ENABLED=true as switch-on: true" | Detected (env style) |
+| CTR-MSKD-016 | "recognises VITE_MASLEKA_ENABLED: "true" as switch-on: true" | Detected (YAML with a quoted value) |
+| CTR-MSKD-017 | "recognises VITE_MASLEKA_ENABLED = 'true' as switch-on: true" | Detected (spaced, single-quoted) |
+| CTR-MSKD-018 | "recognises MASLEKA_ENABLED=false as switch-on: false" | Not detected |
+| CTR-MSKD-019 | "recognises MASLEKA_ENABLED="" as switch-on: false" | Not detected |
+| CTR-MSKD-020 | "recognises "VITE_MASLEKA_ENABLED": "" as switch-on: false" | Not detected |
+| CTR-MSKD-021 | "recognises # MASLEKA_ENABLED=true as switch-on: false" | Not detected |
+| CTR-MSKD-022 | "recognises // VITE_MASLEKA_ENABLED=true as switch-on: false" | Not detected |
+| CTR-MSKD-023 | "recognises the `=== 'true'` comparison in code as switch-on: false" | Not detected |
 
 ## 5. Runtime counterpart
 
@@ -565,7 +577,7 @@ time.
 
 ## 6. Pass criteria
 
-All 597 cases pass. A failure means either the frontend or the backend definition
+All 609 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

@@ -29,7 +29,7 @@
 ## The flow
 
 ### Client (prompted by the site)
-1. A lead answers "מעוניין/ת" to the clearinghouse question (needs wizard screen 5, or the chat interview). `submit-lead` creates a `masleka_requests` row (status `invited`) with an unguessable token and emails the client a link to `/masleka#t=<token>` (a fragment, not a query: it is never sent to a server, a log or a Referer, and the page removes it from the address bar before anything else reads it). Staff can also create a request by hand from the queue (for leads from the phone) and copy the link to send.
+1. A lead answers "מעוניין/ת" to the clearinghouse question (needs wizard screen 5, or the chat interview). `submit-lead` creates a `masleka_requests` row (status `invited`) with an unguessable token and emails the client a link to `/masleka#t=<token>` (a fragment, not a query: it is never sent in the HTTP request or a Referer; GA4's page_location drops it, as checked with real gtag.js; and the page removes it from the address bar after load). Staff can also create a request by hand from the queue (for leads from the phone) and copy the link to send.
 2. `/masleka` — three numbered steps with screenshots, in plain Hebrew: register on swiftness.co.il (free); press "הפקת קוד ייפוי כוח"; paste the code and your ID number here. The ID is checked with the Israeli check-digit rule before sending.
 3. The form posts to the Edge Function `masleka-code`, which encrypts both values and moves the request to `code_received`. The client sees "תודה — דורית תטפל בזה" and nothing else.
 
