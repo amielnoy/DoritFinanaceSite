@@ -130,6 +130,7 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-HDR-003 | "gives an admin both admin pages" | "ניהול פניות" points to `/admin/leads` and "ניהול בלוג" to `/admin/blog` |
 | CMP-HDR-004 | "offers no sign-out to a signed-out visitor" | No "יציאה" button |
 | CMP-HDR-005 | "signs a visitor out and sends them home" | "יציאה" calls `logout(true, <origin>/)` |
+| CMP-HDR-006 | "offers no clearinghouse board link, even to an admin, while the switch is off" | No "בקשות מסלקה" link with `VITE_MASLEKA_ENABLED` unset |
 
 ### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
@@ -298,8 +299,43 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-STF-010 | "does not take %s on the user for the platform admin" (3: `ADMIN`, no role, `owner`) | One lookup, then redirect to `/`; no outlet |
 | CMP-STF-011 | "does not let one user's role reach the next user who signs in" | Second user never sees the outlet; two lookups |
 
+### 4.19 `<MaslekaBoard />` — the staff board — `tests/component/masleka-board.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSKB-001 | "lays the requests out by status, with the third column empty until PR B" | Each name in its region; empty-state text in "הושלם" |
+| CMP-MSKB-002 | "says when the files should be ready, and how long the clearinghouse keeps them" | Readiness and deletion labels per card |
+| CMP-MSKB-003 | "reports a list that failed to load" | Alert text |
+| CMP-MSKB-004 | "copies the ID to the clipboard, revealing it only on the click" | No reveal before the click; `writeText('000000018')`; "הועתק ✓" |
+| CMP-MSKB-005 | "falls back to a selected field when there is no clipboard" | Read-only field with the value; "העתק ידנית" |
+| CMP-MSKB-006 | "falls back when the browser refuses the clipboard" | Read-only field with the value |
+| CMP-MSKB-007 | "hides a manually-copied value when asked" | Value gone after "הסתר" |
+| CMP-MSKB-008 | "clears a manually-copied value after a minute" | `REVEAL_MS` is 60 000; value still shown at 59 s, gone at 60 s |
+| CMP-MSKB-009 | "clears a manually-copied value on the next click elsewhere, but not on a click in its field" | A click in the field keeps it; a click on the heading clears it |
+| CMP-MSKB-010 | "shows one value at a time: revealing another client's clears the first" | The second client's field shown; the first client's gone |
+| CMP-MSKB-011 | "drops a value that arrives after a newer reveal was asked for" | A slower answer for the first click never reaches the screen |
+| CMP-MSKB-012 | "copies nothing when a value arrives after the board is gone" | Unmounted before the answer: `writeText` never called |
+| CMP-MSKB-013 | "forgets a shown value once its row leaves the column, so it never comes back with the row" | Row moves to submitted and back on two refetches; value not shown again |
+| CMP-MSKB-014 | "keeps the revealed value out of the query cache, storage, the console and the address" | Not in any query or mutation state, any storage write, any console call, `location.href` |
+| CMP-MSKB-015 | "wipes on הגשתי only after asking first" | Declined confirm → nothing; accepted → `markSubmitted('r2')` and a refetch |
+| CMP-MSKB-016 | "shows a second הגשתי as already submitted, not as an error, and refreshes the row" | `already_submitted` → `role="status"` "כבר סומן כהוגש", no alert; refetch (Ruling 18) |
+| CMP-MSKB-017 | "tells a staff member whose access was removed" | Alert "ההרשאה שלך הוסרה" (`staffMessage`) |
+| CMP-MSKB-018 | "words a failed list or a refused request in the staff vocabulary" | A forbidden list and an `invalid_email` create both say `staffMessage`'s text |
+| CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
+| CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל" |
+| CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown |
+
+### 4.20 `<FloatingHeader />` — the clearinghouse board link, switched on — `tests/component/floating-header-masleka.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSKH-001 | "links the admin to the board without asking for a membership" | "בקשות מסלקה" → `/admin/masleka`; no `myRole` call |
+| CMP-MSKH-002 | "links a member of the agency to the board" | `myRole` → `staff`: link shown |
+| CMP-MSKH-003 | "offers no board link to a signed-in client with no membership, or when the role cannot be read" | `myRole` → `null`, then rejecting: no link |
+| CMP-MSKH-004 | "asks nothing for a signed-out visitor" | No link; no `myRole` call |
+
 ## 5. Pass criteria
 
-All 119 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 145 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

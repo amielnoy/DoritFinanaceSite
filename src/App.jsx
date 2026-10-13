@@ -23,6 +23,8 @@ import { Analytics } from '@vercel/analytics/react';
 import Home from '@/pages/Home';
 import FloatingActions from '@/components/dorit/layout/FloatingActions';
 import AdminRoute from '@/components/AdminRoute';
+import StaffRoute from '@/components/StaffRoute';
+import { MASLEKA_ENABLED } from '@/config/masleka';
 
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const Accessibility = lazy(() => import('@/pages/Accessibility'));
@@ -37,6 +39,7 @@ const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const Tools = lazy(() => import('@/pages/Tools'));
 const Perspective = lazy(() => import('@/pages/Perspective'));
 const Masleka = lazy(() => import('@/pages/Masleka'));
+const MaslekaBoard = lazy(() => import('@/pages/MaslekaBoard'));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -101,6 +104,14 @@ const AuthenticatedApp = () => {
           <Route path="/admin/leads" element={<Leads />} />
           <Route path="/admin/blog" element={<BlogAdmin />} />
         </Route>
+        {/* The clearinghouse board: the admin or an agency member (StaffRoute).
+            Not registered at all until VITE_MASLEKA_ENABLED — a dark build
+            answers 404 here. */}
+        {MASLEKA_ENABLED ? (
+          <Route element={<StaffRoute unauthenticatedElement={<LoginRedirect />} />}>
+            <Route path="/admin/masleka" element={<MaslekaBoard />} />
+          </Route>
+        ) : null}
         <Route path="*" element={<PageNotFound />} />
       </Routes>
       </ErrorBoundary>

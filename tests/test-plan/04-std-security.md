@@ -138,6 +138,13 @@ Two findings came out of writing these, one of them a defect that is now fixed:
   lint step sees them. These tests read the source as text, which is the only
   check that currently exists on the code holding the compliance logic.
 
+## 4c. The clearinghouse board's gate — `tests/security/static-security.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| SEC-STAFF-001 | "keeps the clearinghouse board behind a gate that requires sign-in and a staff role, and only when switched on" | `/admin/masleka` inside `<StaffRoute>` under `MASLEKA_ENABLED ?`, and nowhere else in `App.jsx`; StaffRoute falls back to ProtectedRoute, redirects a non-member to `/`, asks `myRole()` |
+| SEC-STAFF-002 | "the clearinghouse board keeps a revealed value out of storage, logs and the access log" | `MaslekaBoard.tsx` names no `masleka_access_log` (the server writes it, Ruling 17), no Web Storage or IndexedDB, no `console.`, no analytics call, no history/navigation write |
+
 ## 5. Deviations
 
 `SEC-HDR-001` is opt-in because transport hardening is set by the host
@@ -146,5 +153,5 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 
 ## 6. Pass criteria
 
-All 75 static cases pass; all 15 runtime cases pass on all four platforms,
+All 77 static cases pass; all 15 runtime cases pass on all four platforms,
 with `SEC-HDR-001` skipped unless explicitly enabled.

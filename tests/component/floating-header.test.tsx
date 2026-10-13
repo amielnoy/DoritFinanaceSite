@@ -56,6 +56,11 @@ describe("<FloatingHeader /> account links", () => {
     expect(linksNamed("ניהול בלוג").length).toBeGreaterThan(0);
   });
 
+  it("offers no clearinghouse board link, even to an admin, while the switch is off", () => {
+    renderHeader({ user: { id: "u1", email: "d@example.com", role: "admin" }, isAuthenticated: true });
+    expect(linksNamed("בקשות מסלקה")).toHaveLength(0);
+  });
+
   it("offers no sign-out to a signed-out visitor", () => {
     renderHeader({ user: null, isAuthenticated: false });
     expect(screen.queryAllByRole("button", { name: "יציאה" })).toHaveLength(0);
