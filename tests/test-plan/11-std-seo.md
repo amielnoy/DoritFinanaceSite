@@ -128,15 +128,18 @@ what fails if `scripts/prerender.mjs` silently stops running.
 
 | ID | Title | Expected result |
 |---|---|---|
-| SEO-PRE-001..008 | "`<route>` is served with its own title and canonical" for the eight public routes | The **served HTML** carries the route's own title, and a canonical whose path is the route — not `/` |
+| SEO-PRE-001..008 | "`<route>` is served with its own title and canonical" for the eight public routes and the fixture article (SEO-PRE-012) | The **served HTML** carries the route's own title, and a canonical whose path is the route — not `/` |
 | SEO-PRE-009 | "no two routes are served the same title or canonical" | Eight distinct titles and canonicals. The regression this catches is the original defect returning wholesale: eight files, all of them the home page |
 | SEO-PRE-010 | "the FAQ answers are in the HTML, not only in the JavaScript" | Every question **and answer** the served `FAQPage` markup declares appears as text in the same document — the property that makes `/faq` citable by an assistant |
 | SEO-PRE-011 | "the prerendered pages carry no build-host URLs" | No `127.0.0.1` or `localhost` in any prerendered page. Vite's `modulepreload` hints arrive absolute from the preview server and would otherwise ship |
+| SEO-PRE-012 | "`/blog/bdikat-maslul-e2e` is served with its own title and canonical" | The prebuilt article's title, and a canonical on its slug |
+| SEO-PRE-013 | "an article is served as full HTML: its body, its canonical and its BlogPosting" | The body's first sentence is in the HTML; canonical and `BlogPosting.mainEntityOfPage` are `/blog/<slug>`; `headline` is the title |
 
-> Blog posts are deliberately not prerendered: they come from the Base44 backend
-> at runtime, so a prerender would bake a snapshot into the bundle and go stale
-> the moment a post is edited. They keep the SPA shell, and `useSeo` keeps
-> governing their head for crawlers that execute JavaScript.
+> Published articles are prerendered too (`dist/blog/<slug>.html`). In this
+> suite the build prebuilds one fixture article from
+> `e2e/fixtures/prerender-articles.json` (`PRERENDER_ARTICLES_FIXTURE`), so the
+> cases are hermetic; production lists the real ones from Supabase. SEO-PRE-009
+> and SEO-PRE-011 include it.
 
 **These cases test an artifact, so the artifact has to be the right one.** In CI
 the e2e shards run with `SKIP_BUILD=1` against the `dist` uploaded by the `build`
@@ -161,7 +164,7 @@ To reproduce the failure deliberately: `rm -rf dist && npm run build`, then
 
 ## 6. Pass criteria
 
-All 19 unit and 48 e2e cases pass, with SEO-MOB-005 reporting rather than
+All 19 unit and 50 e2e cases pass, with SEO-MOB-005 reporting rather than
 enforcing. SEO-MET-007 and SEO-LD-002 are the two that would fail first if the
 per-route head regressed in the browser; SEO-PRE-009 is the one that fails if it
 regressed in the HTML.

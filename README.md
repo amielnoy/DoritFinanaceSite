@@ -869,15 +869,25 @@ Worth knowing before changing it:
   but nine opaque failures in a later job against a suite that is working
   correctly. That is how this was found the first time; the variable moves the
   error to the job that could have installed the browser.
-- **Blog posts stay client-rendered** on purpose: they come from the Base44
-  backend, so prerendering them would bake a snapshot into the bundle that goes
-  stale the moment a post is edited.
+- **Published articles are prebuilt too**, one `dist/blog/<slug>.html` each.
+  `scripts/published-articles.mjs` lists them from Supabase with the publishable
+  key (row-level security returns published rows only), and Vercel serves the
+  file before any rewrite. A page is a snapshot: an edit reaches it on the next
+  production deploy — see "When an article's page is rebuilt". A production
+  build (`PRERENDER_REQUIRED=1`) that cannot list the articles fails rather than
+  shipping a blog without its pages; any other build warns and prebuilds the
+  static routes only.
+- **The e2e build prebuilds a fixture article**, not a real one.
+  `PRERENDER_ARTICLES_FIXTURE=e2e/fixtures/prerender-articles.json` (set by the
+  CI `build` job, `playwright.config.ts` and `scripts/run-tests.sh`) makes the
+  prerender answer the page's read from that file. It is refused in a Vercel
+  build and in a bundle that reads Supabase, so it cannot reach a deployment.
 
 `e2e/seo/prerender.spec.ts` is what keeps it honest. It uses Playwright's
 `request`, never `page`, so nothing in it can pass because a browser repaired
 the page afterwards — and it fails if any two routes are served the same title.
 
-What still mitigates the blog-post case is [`public/llms.txt`](public/llms.txt): a static file those
+Beside the pages sits [`public/llms.txt`](public/llms.txt): a static file those
 crawlers *can* read in full, carrying the services, the contact details, the
 licence number, the affiliation disclosure, what the automated helpers refuse to
 do, and a link to every public route. It had drifted to a phone number and an

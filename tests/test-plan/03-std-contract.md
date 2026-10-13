@@ -462,6 +462,7 @@ that writes real slugs.
 | CTR-SLUG-005 | "builds no /blog/<…> address by hand" | No `/blog/${` or `"/blog/" +` in `src/` or `api/` outside `articlePath.ts` |
 | CTR-SLUG-006 | "%s links articles through articlePath" (6 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo, BlogAdmin |
 | CTR-SLUG-007 | "contentAdmin's copy is the same" | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
+| CTR-SLUG-008 | "the build's copy is the same" | `scripts/published-articles.mjs` patterns equal `articlePath.ts`'s |
 
 ## 5. Runtime counterpart
 
@@ -472,7 +473,7 @@ time.
 
 ## 6. Pass criteria
 
-All 555 cases pass. A failure means either the frontend or the backend definition
+All 556 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

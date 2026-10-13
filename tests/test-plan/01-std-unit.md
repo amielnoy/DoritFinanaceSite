@@ -37,6 +37,7 @@ something outside the repository.
 | `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
 | `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
 | `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
+| `fetchPublishedArticles`, `planArticles`, `fixtureArticleFor`, `duplicateTitles` | `scripts/published-articles.mjs` |
 | `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
 > **Note.** `computePensionFees` was extracted from `PensionFeeCalculator.tsx`
@@ -465,6 +466,35 @@ A slug shaped like a Base44 id is refused because `vercel.json` sends every
 | UNIT-SLUG-007 | "is false for anything that is not a string" | `false` |
 | UNIT-SLUG-008 | "tells a Base44 id, a uuid and a slug apart" | All three are slug-shaped; only the uuid matches `UUID_PATTERN` |
 
+### 4.22 The published articles at build time — `tests/unit/published-articles.test.ts`
+
+The list `prerender.mjs` prebuilds pages for, and that PR 2's sitemap and
+llms.txt will read. An answer that cannot be trusted is never "no articles",
+and test articles can never reach a deployment.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-PUBART-001 | "asks PostgREST for published rows, newest first, with the publishable key" | `published=eq.true`, `order=created_at.desc`; key as `apikey` and bearer |
+| UNIT-PUBART-002 | "selects the columns it is asked for" | `select` as given |
+| UNIT-PUBART-003 | "returns the rows" | Rows unchanged |
+| UNIT-PUBART-004 | "throws on a refusal, naming the status" | `HTTP 401` |
+| UNIT-PUBART-005 | "throws on an answer that is not a list" | `not a list` |
+| UNIT-PUBART-006..009 | "refuses a row whose slug %j could not be a file under dist/blog" | `../escape`, `Bad`, a Base44 id, `null` → `unusable slug` |
+| UNIT-PUBART-010 | "lists the published articles as /blog/<slug> routes" | `["/blog/a", "/blog/b"]` |
+| UNIT-PUBART-011 | "warns, and prebuilds no article, when Supabase is not configured" | Warning; no request |
+| UNIT-PUBART-012 | "fails when articles are required and Supabase is not configured" | Throws |
+| UNIT-PUBART-013 | "warns when Supabase cannot be read and articles are not required" | Warning naming `HTTP 503` |
+| UNIT-PUBART-014 | "fails when Supabase cannot be read and articles are required" | Throws `HTTP 503` |
+| UNIT-PUBART-015 | "takes the fixture's articles in the e2e build, without asking Supabase" | Fixture routes and rows; no request |
+| UNIT-PUBART-016..017 | "refuses the fixture in a Vercel build (%j)" | `VERCEL=1` or `VERCEL_ENV` → throws |
+| UNIT-PUBART-018 | "refuses the fixture in a bundle that reads Supabase" | Throws |
+| UNIT-PUBART-019 | "refuses a fixture article with an unusable slug" | Throws |
+| UNIT-PUBART-020 | "answers the page's Base44 read by the slug at the end of its URL" | The fixture row |
+| UNIT-PUBART-021 | "answers null for any other key" | `null` |
+| UNIT-PUBART-022 | "names each title more than one route was rendered with" | `{ title, routes }` |
+| UNIT-PUBART-023 | "is empty when every title is distinct" | `[]` |
+| UNIT-PUBART-024 | "are the app's rule and address" | Same verdicts as `articlePath.ts` |
+
 ### 4.23 Reading one article — `tests/unit/supabase-content.test.ts` (`getArticle`)
 
 `/blog/:key` holds a slug, an old Base44 id, or a uuid. One PostgREST request
@@ -485,5 +515,5 @@ or a bracket in it would rewrite the filter.
 
 ## 5. Pass criteria
 
-All 375 cases pass. Any failure is a functional defect, not an environment issue —
+All 399 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

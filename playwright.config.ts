@@ -167,6 +167,10 @@ export default defineConfig({
           // live project for every blog, testimonial and admin list instead.
           VITE_SUPABASE_URL: "",
           VITE_SUPABASE_PUBLISHABLE_KEY: "",
+          // One fixture article for the prerender to prebuild. The build has no
+          // Supabase (above), so the article list comes from this file and the
+          // page's Base44 read is answered from it — scripts/published-articles.mjs.
+          PRERENDER_ARTICLES_FIXTURE: "e2e/fixtures/prerender-articles.json",
         },
       },
 });

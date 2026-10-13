@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { BASE44_ID_PATTERN, SLUG_PATTERN } from "@/lib/articlePath";
 // @ts-expect-error — plain .mjs tooling, imported for its front-matter reader.
 import { parseArticle } from "../../scripts/seed-blog.mjs";
+// @ts-expect-error — plain .mjs tooling, imported for its copy of the rule.
+import * as published from "../../scripts/published-articles.mjs";
 
 /**
  * An article's address, as a contract.
@@ -21,6 +23,11 @@ const read = (p: string) => readFileSync(join(REPO_ROOT, p), "utf8");
 const MIGRATION = "supabase/migrations/20261014000000_blog_slug.sql";
 
 describe("one slug rule, wherever it is spelled", () => {
+  it("the build's copy is the same", () => {
+    expect(published.SLUG_PATTERN.source).toBe(SLUG_PATTERN.source);
+    expect(published.BASE44_ID_PATTERN.source).toBe(BASE44_ID_PATTERN.source);
+  });
+
   it("the migration's CHECKs are articlePath's patterns", () => {
     const sql = read(MIGRATION);
     expect(sql.match(/check \(slug ~ '([^']+)'\)/)?.[1]).toBe(SLUG_PATTERN.source);

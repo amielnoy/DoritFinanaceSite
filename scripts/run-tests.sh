@@ -148,6 +148,8 @@ if has e2e; then
     # lets process env override .env.local only when the variable exists.
     export VITE_SUPABASE_URL=""
     export VITE_SUPABASE_PUBLISHABLE_KEY=""
+    # The one article the e2e build prebuilds, without Supabase — see playwright.config.ts.
+    export PRERENDER_ARTICLES_FIXTURE="e2e/fixtures/prerender-articles.json"
     # `build:prerender`, not `build`. This built the client shell and then set
     # SKIP_BUILD=1, so playwright.config.ts skipped its own `build:prerender`
     # and the suite was pointed at a dist/ with no prerendered routes at all.
