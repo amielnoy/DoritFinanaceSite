@@ -733,8 +733,53 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHSTORE-009 | "truncates a message to the 8,000 characters the column allows" | 8,500 characters sent as 8,000; a short one unchanged |
 | UNIT-CHSTORE-010 | "does not cut an emoji in half at the limit" | A surrogate pair straddling the limit is dropped whole |
 | UNIT-CHSTORE-011 | "sets lead_id only while it is null when asked to" | `onlyIfLeadIdNull` adds `&lead_id=is.null` to the PATCH; without it no filter |
+| UNIT-CHSTORE-012 | "lets a budget-alert refusal other than the conflict through, by its code" | A 500 rejects with `insert_http_500:XX000`; the message is not quoted |
+
+### 4.35 The chat function's handler — `tests/unit/chat-handler.test.ts`
+
+`supabase/functions/chat/handler.ts`: the HTTP flow with fakes for the store, the model, the limiter and the mail; the real tool runner over fake Edge handlers where the lead and hand-off rules are under test. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHHANDLER-001 | "creates the conversation, stores both sides, and hands the page its token once" | 200 with the reply and token; the row has role, consent, attribution, turns 1, a 64-hex token_hash that is not the token; user and assistant rows; one usage row |
+| UNIT-CHHANDLER-002 | "refuses a first message without consent, writing nothing" | 400 `consent_required`; no conversation |
+| UNIT-CHHANDLER-003 | "refuses an agent the function does not serve, an empty message, and a long one" | `unknown_agent`, `empty`, `too_long` (1,001 characters) |
+| UNIT-CHHANDLER-004 | "accepts a consent version only as long as submit-lead's column (40), so every later save can succeed" | `MAX_CONSENT_VERSION_CHARS` is 40; 41 characters gives 400 `consent_required` and no row; 40 gives 200 |
+| UNIT-CHHANDLER-005 | "answers 429 when the visitor's address is over its limit" | 429 `rate_limited` when the `chat-ip:` key is refused |
+| UNIT-CHHANDLER-006 | "answers 429 when the site is over its new-conversation limit" | 429 when the `chat-new` key is refused |
+| UNIT-CHHANDLER-007 | "lets an evaluation run past both limits" | With the evaluation header, 200 although every limit refuses; `is_eval` true |
+| UNIT-CHHANDLER-008 | "continue with the token, and the model sees the whole conversation" | 200, no token in the answer; the model gets user, assistant, user |
+| UNIT-CHHANDLER-009 | "are refused without the right token" | 403 `gone` |
+| UNIT-CHHANDLER-010 | "are refused for a conversation that does not exist" | 403 `gone` for an unknown uuid |
+| UNIT-CHHANDLER-011 | "close a conversation idle more than two hours" | 409 `closed`; the row's status becomes `closed` |
+| UNIT-CHHANDLER-012 | "stop at forty turns" | 400 `too_many_turns` at 40 turns |
+| UNIT-CHHANDLER-013 | "write under the stored conversation's agency, never one the request names" | Messages and usage of the turn carry the row's `agency_id`, not the request's `agency_id`/`agencyId` |
+| UNIT-CHHANDLER-014 | "saves the lead through the tool, links it, and says so" | `leadSaved` true, status `lead_saved`, `lead_id` set; tool row `submitLead: ok`, no phone in any tool row |
+| UNIT-CHHANDLER-015 | "closes the conversation to further messages once the lead is saved" | The next message gets 409 `closed` |
+| UNIT-CHHANDLER-016 | "marks a hand-off, as its status and as escalated_at" | Status `escalated` and `escalated_at` set (Ruling 9) |
+| UNIT-CHHANDLER-017 | "writes one lead when the model calls submitLead complete twice in one turn" | Real runner: submit-lead called once; tool rows `submitLead: ok`, `submitLead: already_saved` (Review Focus 1) |
+| UNIT-CHHANDLER-018 | "hands off once per conversation, across turns, from the stored escalated_at" | Real runner: a second turn's hand-off answers `already_escalated`; escalate-to-human called once (Ruling 4) |
+| UNIT-CHHANDLER-019 | "keeps the interview lead when the hand-off comes after it" | Lead then hand-off in one turn: `lead_id` is the interview lead (Ruling 11) |
+| UNIT-CHHANDLER-020 | "takes the interview lead over the hand-off's when the lead comes after it" | Hand-off then lead in one turn: `lead_id` is the interview lead (Ruling 11) |
+| UNIT-CHHANDLER-021 | "links the hand-off's lead first, and the interview lead when it arrives on a later turn" | Turn 1 links the hand-off lead; turn 2's lead replaces it |
+| UNIT-CHHANDLER-022 | "stores and sends the model a redacted message, never the ID number" | Stored row and model history carry `[הושמט — מספר מזהה]`, never `123456782` (Review Focus 2) |
+| UNIT-CHHANDLER-023 | "answers only the wire contract's fields, never the stored row or its token hash" | Exactly the contract's keys on the first and a later answer; the token hash appears in neither |
+| UNIT-CHHANDLER-024 | "logs what happened, never the token, its hash, the message or the tool's arguments" | No console line holds the token, its hash, the name or the phone |
+| UNIT-CHHANDLER-025 | "answers 503 when the model fails twice, keeping the visitor's message and the token" | 503 `unavailable` with the token; only the user row stored (Review Focus 4) |
+| UNIT-CHHANDLER-026 | "retries an overloaded model once and answers" | 529 then a reply: 200, two model calls |
+| UNIT-CHHANDLER-027 | "answers 503 when no model is configured" | 503 `unavailable` |
+| UNIT-CHHANDLER-028 | "answers 500 with an rid when storage is down, and no error text" | 500 `failed`; no `select_http` text (Review Focus 3) |
+| UNIT-CHHANDLER-029 | "refuses a new conversation over budget and mails staff once a month" | 503 twice; staff mailed once; no conversation |
+| UNIT-CHHANDLER-030 | "refuses a new conversation once spend reaches the budget exactly" | Spend of exactly $50 against a $50 budget: 503, no conversation |
+| UNIT-CHHANDLER-031 | "treats a zero budget as the kill switch" | 503 with no conversation, no spend read and no mail |
+| UNIT-CHHANDLER-032 | "logs a failed alert claim by its code, still refuses, and mails no one" | `budget.alert_failed` warn line with `err: insert_http_500:XX000` and an rid; 503; no mail |
+| UNIT-CHHANDLER-033 | "lets an existing conversation continue over budget" | A later message in an open conversation is answered 200 |
+| UNIT-CHHANDLER-034 | "reports the tool calls only to the holder of the evaluation token" | `eval.toolCalls` with the right header; absent with a wrong one |
+| UNIT-CHHANDLER-035 | "keeps an evaluation conversation for one day" | `delete_after` is now + 24 hours |
+| UNIT-CHHANDLER-036 | "answers a preflight and refuses anything but POST" | OPTIONS 204, GET 405 |
+| UNIT-CHHANDLER-037 | "answers a body that is not JSON as an unknown agent" | 400 `unknown_agent` |
 
 ## 5. Pass criteria
 
-All 516 cases pass. Any failure is a functional defect, not an environment issue —
+All 554 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

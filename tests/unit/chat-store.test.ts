@@ -50,6 +50,11 @@ describe("restStore", () => {
     expect(await restStore.claimBudgetAlert("agency", "2026-10")).toBe(false);
   });
 
+  it("lets a budget-alert refusal other than the conflict through, by its code", async () => {
+    answer = () => new Response(JSON.stringify({ code: "XX000", message: "Failing row contains (secret)" }), { status: 500 });
+    await expect(restStore.claimBudgetAlert("agency", "2026-10")).rejects.toThrow(/^insert_http_500:XX000$/);
+  });
+
   it("creates a conversation and hands back the stored row", async () => {
     answer = () => new Response(JSON.stringify([{ id: ID, status: "open", turns: 0 }]), { status: 201 });
     const row = await restStore.createConversation({

@@ -124,10 +124,12 @@ export const restStore: ChatStore = {
     try {
       await insertRow('chat_budget_alerts', { agency_id: agencyId, month });
       return true;
-    } catch {
-      // A conflict is the normal "already sent this month"; any other refusal
-      // also sends nothing — one missing email beats one per conversation.
-      return false;
+    } catch (e) {
+      // A conflict is the normal "already sent this month". Anything else is
+      // thrown for the caller to log by its code (insertRow's errors carry the
+      // status and PostgREST code only); the caller sends nothing either way.
+      if (String((e as Error)?.message ?? '').startsWith('insert_http_409')) return false;
+      throw e;
     }
   },
 };
