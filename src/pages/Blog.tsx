@@ -24,6 +24,7 @@ import {
 } from "@/config/blog-topics";
 import type { Article } from "@/services";
 import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
+import { articlePath } from "@/lib/articlePath";
 
 const RECOMMENDED_BANNER_ID = "blog-recommended";
 /** Cards before "show all": a phone gets the shorter list. */
@@ -89,7 +90,7 @@ export default function Blog() {
               blogPost: posts.slice(0, 20).map((post) => ({
                 "@type": "BlogPosting",
                 headline: post.title,
-                url: absoluteUrl(`/blog/${post.id}`),
+                url: absoluteUrl(articlePath(post)),
                 datePublished: post.created_date,
                 ...(post.image_url ? { image: post.image_url } : {}),
               })),

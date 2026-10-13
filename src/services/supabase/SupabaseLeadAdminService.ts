@@ -1,4 +1,4 @@
-import type { LeadAdminPort, LeadRecord, LeadStatus } from "../ports";
+import type { LeadAdminPort, LeadRecord, LeadStatus, TranscriptLine } from "../ports";
 import {
   CLAIM_DOCUMENT_REF_PREFIX,
   CLAIM_DOCUMENTS_BUCKET,
@@ -67,6 +67,41 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
       .createSignedUrl(path, DOCUMENT_LINK_SECONDS);
     if (error || !data) throw new Error(`לא ניתן לפתוח את המסמך: ${error?.message ?? "no data"}`);
     return data.signedUrl;
+  }
+
+  /**
+   * The chat behind a lead, read under the admin's session —
+   * `chat_*_read_member_or_admin` is the gate, as for the leads themselves.
+   * Read-only: this class holds no write to the chat tables.
+   */
+  async transcript(leadId: string): Promise<TranscriptLine[]> {
+    const conversations = await fetchRows(
+      this.client.from("chat_conversations").select("id").eq("lead_id", leadId).order("created_at", { ascending: false }).limit(1),
+      "chat_conversations",
+    );
+    const id = conversations[0]?.id;
+    if (!id) return [];
+    const rows = await fetchRows(
+      this.client.from("chat_messages").select("role,content,created_at").eq("conversation_id", id).order("id", { ascending: true }).limit(500),
+      "chat_messages",
+    );
+    return rows
+      .filter((r) => r.role === "user" || r.role === "assistant")
+      .map((r) => ({ role: r.role as TranscriptLine["role"], content: String(r.content ?? ""), at: String(r.created_at ?? "") }));
+  }
+
+  /**
+   * Which leads have a conversation: one read of the link column, so the screen
+   * can show the tab only where there is something to read. Only linked rows:
+   * conversations without a lead (most of them) would otherwise fill the window
+   * and hide an older lead's tab.
+   */
+  async transcriptLeadIds(): Promise<string[]> {
+    const rows = await fetchRows(
+      this.client.from("chat_conversations").select("lead_id").not("lead_id", "is", null).order("created_at", { ascending: false }).limit(1000),
+      "chat_conversations",
+    );
+    return [...new Set(rows.map((r) => r.lead_id).filter((v): v is string => typeof v === "string" && v !== ""))];
   }
 }
 

@@ -9,6 +9,7 @@ import {
   useSetArticlePublished,
 } from "@/hooks/useAdmin";
 import { Image } from "@/components/ui/image";
+import { SLUG_TAKEN, articlePath, slugProblem } from "@/lib/articlePath";
 import {
   Plus,
   X,
@@ -29,6 +30,12 @@ type BlogPostItem = Article;
 interface BlogPostEdit {
   id?: string;
   title: string;
+  /** The article's address, `/blog/<slug>`. Stored in the Supabase mirror only. */
+  slug: string;
+  /** The slug the article had when the editor opened — the address links already use. */
+  originalSlug: string;
+  /** Whether the article was live when the editor opened, so links to it may exist. */
+  wasPublished: boolean;
   excerpt: string;
   body: string;
   image_url: string;
@@ -38,6 +45,9 @@ interface BlogPostEdit {
 
 const EMPTY: BlogPostEdit = {
   title: "",
+  slug: "",
+  originalSlug: "",
+  wasPublished: false,
   excerpt: "",
   body: "",
   image_url: "",
@@ -49,12 +59,28 @@ const EMPTY: BlogPostEdit = {
 const toEdit = (p: BlogPostItem): BlogPostEdit => ({
   id: p.id,
   title: p.title,
+  slug: p.slug ?? "",
+  originalSlug: p.slug ?? "",
+  wasPublished: !!p.published,
   excerpt: p.excerpt ?? "",
   body: p.body ?? "",
   image_url: p.image_url ?? "",
   tags: p.tags ?? "",
   published: !!p.published,
 });
+
+/** contentAdmin's answers to a slug it will not store (400 invalid, 409 taken). */
+const SLUG_REFUSALS: Record<number, string> = {
+  400: "כתובת המאמר חסרה או אינה תקינה.",
+  409: SLUG_TAKEN,
+};
+
+/** The server's words for a slug refusal, or null for any other failure — unknown text is never shown. */
+const refusalText = (err: unknown): string | null => {
+  const { status, message } = err as { status?: unknown; message?: unknown };
+  if (typeof status !== "number") return null;
+  return SLUG_REFUSALS[status] !== undefined && message === SLUG_REFUSALS[status] ? SLUG_REFUSALS[status] : null;
+};
 
 export default function BlogAdmin() {
   const { data, isPending: loading, isError } = useAdminArticles();
@@ -69,10 +95,23 @@ export default function BlogAdmin() {
   // it keeps its own in-flight flag; `busy` is what the button reads.
   const [uploading, setUploading] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string>("");
+  // Shown after a published article is unpublished or deleted: its prebuilt
+  // public page stays up until the next production deploy.
+  const [takedownNote, setTakedownNote] = useState<boolean>(false);
 
   const posts: BlogPostItem[] = data ?? [];
   const busy = uploading || saveArticle.isPending;
   const writeError = saveError || (removeArticle.isError || setPublished.isError ? "הפעולה האחרונה לא נשמרה. ניתן לנסות שוב." : "");
+  // The form's own list holds every article's slug (drafts included), so a
+  // taken one is caught here; contentAdmin refuses it again with 409.
+  const slugError = editing
+    ? slugProblem(editing.slug) ??
+      (posts.some((p) => p.slug === editing.slug && p.id !== editing.id) ? SLUG_TAKEN : null)
+    : null;
+  // There is no redirect table: a published article's old address will 404.
+  const slugChanged = Boolean(
+    editing?.id && editing.wasPublished && editing.originalSlug && editing.slug !== editing.originalSlug,
+  );
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -101,7 +140,7 @@ export default function BlogAdmin() {
   };
 
   const save = async () => {
-    if (!editing || !editing.title || !editing.body) return;
+    if (!editing || !editing.title || !editing.body || slugError) return;
     setSaveError("");
     let image_url = editing.image_url;
     if (file) {
@@ -116,9 +155,11 @@ export default function BlogAdmin() {
       }
     }
     // Kept as a literal object: tests/contract/frontend-payloads pins its keys
-    // to the BlogPost entity schema.
+    // to the BlogPost entity schema. `slug` is the one exception, sent for the
+    // Supabase mirror only (contentAdmin keeps it out of the Base44 write).
     const payload = {
       title: editing.title,
+      slug: editing.slug,
       excerpt: editing.excerpt,
       body: editing.body,
       tags: editing.tags,
@@ -127,19 +168,26 @@ export default function BlogAdmin() {
     };
     try {
       await saveArticle.mutateAsync({ id: editing.id, draft: payload });
+      setTakedownNote(editing.wasPublished && !editing.published);
       cancel();
-    } catch {
-      setSaveError("שמירת המאמר נכשלה. ניתן לנסות שוב.");
+    } catch (err) {
+      setSaveError(refusalText(err) ?? "שמירת המאמר נכשלה. ניתן לנסות שוב.");
     }
   };
 
-  const remove = (id: string) => {
+  const remove = (p: BlogPostItem) => {
     if (!window.confirm("למחוק את המאמר?")) return;
-    removeArticle.mutate(id);
+    setTakedownNote(false);
+    removeArticle.mutate(p.id, { onSuccess: () => setTakedownNote(!!p.published) });
   };
 
-  const togglePublished = (p: BlogPostItem) =>
-    setPublished.mutate({ id: p.id, published: !p.published });
+  const togglePublished = (p: BlogPostItem) => {
+    setTakedownNote(false);
+    setPublished.mutate(
+      { id: p.id, published: !p.published },
+      { onSuccess: () => setTakedownNote(!!p.published) },
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background pt-28 pb-20">
@@ -190,6 +238,38 @@ export default function BlogAdmin() {
                   onChange={(e) => setEditing({ ...editing, title: e.target.value })}
                   className="w-full bg-background border border-border px-4 py-3 focus:outline-none focus:border-accent transition-colors"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label
+                  htmlFor="blog-slug"
+                  className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2"
+                >
+                  כתובת המאמר (slug) *
+                </label>
+                <input
+                  id="blog-slug"
+                  dir="ltr"
+                  value={editing.slug}
+                  onChange={(e) => setEditing({ ...editing, slug: e.target.value.toLowerCase() })}
+                  placeholder="horadat-dmei-nihul"
+                  aria-describedby="blog-slug-path"
+                  aria-invalid={slugError ? true : undefined}
+                  className="w-full bg-background border border-border px-4 py-3 font-mono text-sm focus:outline-none focus:border-accent transition-colors"
+                />
+                <p id="blog-slug-path" dir="ltr" className="mt-2 text-xs text-muted-foreground">
+                  {articlePath({ id: editing.id ?? "", slug: editing.slug })}
+                </p>
+                {slugError ? (
+                  <p aria-live="polite" className="mt-1 text-sm text-destructive">
+                    {slugError}
+                  </p>
+                ) : null}
+                {slugChanged ? (
+                  <p role="status" className="mt-1 text-sm text-accent">
+                    שינוי הכתובת של מאמר שפורסם ישבור קישורים קיימים אליו:{" "}
+                    <span dir="ltr">{articlePath({ id: "", slug: editing.originalSlug })}</span> תחזיר "המאמר לא נמצא".
+                  </p>
+                ) : null}
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
@@ -265,7 +345,7 @@ export default function BlogAdmin() {
                 </button>
                 <button
                   onClick={save}
-                  disabled={busy || !editing.title || !editing.body}
+                  disabled={busy || !editing.title || !editing.body || Boolean(slugError)}
                   className={ctaClass()}
                 >
                   {busy ? (
@@ -278,6 +358,13 @@ export default function BlogAdmin() {
               </div>
             </div>
           </div>
+        )}
+
+        {takedownNote && (
+          <p role="status" className="mb-6 text-sm text-accent">
+            דף המאמר הציבורי יוסר בעדכון הבא של האתר (הלילה). להסרה מיידית — פנו לבעל האתר
+            (ההוראות ב-README, "Taking an article down now").
+          </p>
         )}
 
         {writeError && (
@@ -334,7 +421,7 @@ export default function BlogAdmin() {
                   <Pencil size={18} />
                 </button>
                 <button
-                  onClick={() => remove(p.id)}
+                  onClick={() => remove(p)}
                   className="text-muted-foreground hover:text-destructive transition-colors"
                   aria-label="מחיקה"
                 >

@@ -42,6 +42,42 @@ describe("Vercel functions under api/", () => {
     expect(new URLSearchParams(query).get("id")).toBe(":id");
   });
 
+  it("sends every old Base44-id address to the function, whoever asks, before any other blog rule", () => {
+    // Bookmarks, search results and the agents' answers name /blog/<Base44 id>.
+    // The function answers 301 to the slug — for people as well as crawlers, so
+    // no `has` condition — and it must match before the crawler rule and the
+    // SPA catch-all would take the request.
+    const rules = vercelConfig.rewrites as Array<{ source: string; destination: string; has?: unknown }>;
+    const old = rules.findIndex((r) => r.source === "/blog/:id([0-9a-f]{24})");
+    expect(old, "no rewrite for /blog/<24 hex>").toBeGreaterThan(-1);
+    expect(rules[old].destination).toBe("/api/og/blog?id=:id");
+    expect(rules[old].has).toBeUndefined();
+    expect(old).toBeLessThan(rules.findIndex((r) => r.source === "/blog/:id"));
+    expect(old).toBeLessThan(rules.findIndex((r) => r.destination === "/app"));
+  });
+
+  it("serves dist/<route>.html at /<route>: cleanUrls on, the catch-all serves the shell at /app", () => {
+    // Without cleanUrls no file named `faq` exists, so the catch-all rewrite
+    // answered /faq, /faq/ and /tools with the empty shell. With it, a literal
+    // `/app.html` is a 308 to `/app`, so the rewrite must not use the `.html`
+    // spelling.
+    expect((vercelConfig as { cleanUrls?: boolean }).cleanUrls).toBe(true);
+    const catchAll = vercelConfig.rewrites.find((r) => r.source === "/((?!assets/).*)");
+    expect(catchAll?.destination).toBe("/app");
+    const fn = readFileSync(join(REPO_ROOT, "api/og/blog.ts"), "utf8");
+  });
+
+  it("fetches the shell from the canonical origin: no includeFiles, no VERCEL_URL", () => {
+    // `functions.includeFiles` for dist/app.html aborts `vercel deploy --prebuilt`
+    // (ENOENT readlink), and a fetch from VERCEL_URL hits deployment protection.
+    const fns = (vercelConfig as { functions?: Record<string, { includeFiles?: string }> }).functions;
+    expect(fns?.["api/og/blog.ts"]?.includeFiles).toBeUndefined();
+    const fn = readFileSync(join(REPO_ROOT, "api/og/blog.ts"), "utf8");
+    expect(fn).toMatch(/fetch\(`\$\{SITE_URL\}\/app`, \{ redirect: "error" \}\)/);
+    expect(fn).not.toMatch(/process\.env\.VERCEL_URL/);
+    expect(fn).not.toMatch(/fetch\([^)]*app\.html/);
+  });
+
   it("are type-checked the way @vercel/node builds them", () => {
     // `"type": "module"` makes @vercel/node compile api/ as Node ESM, where an
     // import without its `.js` extension does not resolve at all. The api
@@ -53,21 +89,44 @@ describe("Vercel functions under api/", () => {
   });
 });
 
-describe("the Content-Security-Policy reports somewhere", () => {
-  // Report-Only with nowhere to report enforces nothing and records nothing.
+describe("the Content-Security-Policy is enforced, and both policies report", () => {
+  // The main policy is enforced; Trusted Types rides alongside as Report-Only
+  // until every page — the admin editor included — is known to pass it. A
+  // policy with nowhere to report records nothing, so both name the endpoint.
   const headers = (vercelConfig as unknown as { headers: { headers: { key: string; value: string }[] }[] }).headers
     .flatMap((b) => b.headers);
-  const csp = headers.find((h) => h.key === "Content-Security-Policy-Report-Only");
+  const enforced = headers.find((h) => h.key === "Content-Security-Policy");
+  const reportOnly = headers.find((h) => h.key === "Content-Security-Policy-Report-Only");
 
-  it("names a report endpoint that is a function in api/", () => {
-    expect(csp, "no Content-Security-Policy-Report-Only header").toBeDefined();
+  it("enforces the policy, allowing inline scripts only by hash", () => {
+    expect(enforced, "no enforced Content-Security-Policy header").toBeDefined();
+    const scriptSrc = enforced!.value.match(/script-src ([^;]+)/)?.[1] ?? "";
+    expect(scriptSrc).not.toMatch(/'unsafe-inline'|'unsafe-eval'/);
+    expect(enforced!.value).toMatch(/object-src 'none'/);
+    expect(enforced!.value).toMatch(/base-uri 'self'/);
+  });
+
+  it("asks for Trusted Types in report-only mode", () => {
+    expect(reportOnly?.value).toMatch(/require-trusted-types-for 'script'/);
+  });
+
+  it.each([
+    ["enforced", () => enforced],
+    ["report-only", () => reportOnly],
+  ])("the %s policy names a report endpoint that is a function in api/", (_, policy) => {
+    const csp = policy();
     const uri = csp!.value.match(/report-uri (\S+?);?(\s|$)/)?.[1];
     expect(uri, "the policy has no report-uri").toBe("/api/csp-report");
+    expect(csp!.value).toMatch(/report-to csp(;|$)/);
     expect(existsSync(join(REPO_ROOT, "api/csp-report.ts"))).toBe(true);
   });
 
   it("names the same endpoint for the Reporting API", () => {
-    expect(csp!.value).toMatch(/report-to csp(;|$)/);
     expect(headers.find((h) => h.key === "Reporting-Endpoints")?.value).toBe('csp="/api/csp-report"');
+  });
+
+  it("checks every inline script against the policy before a Vercel deploy", () => {
+    const ci = readFileSync(join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8");
+    expect(ci).toMatch(/node scripts\/check-csp-hashes\.mjs \.vercel\/output\/static/);
   });
 });

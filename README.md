@@ -265,7 +265,7 @@ does not resolve is worse than one pointing at the old site.
 
    There is now a second reason the Vercel copy should be the canonical one: it is
    the only one that is prerendered. Vercel runs `npm run build:prerender`, so its
-   eight public routes ship their own HTML; Base44 runs plain `npm run build` and
+   public routes (the static pages plus every published article) ship their own HTML; Base44 runs plain `npm run build` and
    serves the client-rendered shell. Two copies of the same content where only one
    is legible to an AI crawler — point the canonical at that one.
 
@@ -412,11 +412,19 @@ PR makes them forwarders.
 
 In **Supabase Edge Function secrets** (set by hand — the CI token cannot write
 secrets): `GOOGLE_SERVICE_ACCOUNT_JSON` (the service account's JSON key),
-`GOOGLE_CALENDAR_ID` (`govaridorit@gmail.com`) and `SHEET_ID` (the leads sheet),
-next to the `MAILER_URL` and `MAILER_TOKEN` above. Dorit must share her calendar
-("make changes to events") and the leads sheet (editor) with the service
-account's address. The meeting invitation goes by mail as an `.ics` file
-through `dorit-mailer`; there is no Outlook or Google Docs step any more.
+`GOOGLE_CALENDAR_ID` (amielnoy@gmail.com — the operator's own Google calendar,
+not Dorit's) and `SHEET_ID` (the leads sheet), next to the `MAILER_URL` and
+`MAILER_TOKEN` above. Share that calendar with the service account's address
+("make changes to events"), and the leads sheet (editor). Dorit does not need to
+share anything. A meeting arrives as an event in that Google calendar (no
+attendees) **and** as an `.ics` invitation by mail through `dorit-mailer` to
+`dorit@govari-fin.co.il` (her Outlook) and `amielnoy@outlook.com`, from
+`notifications@mail.govari-fin.co.il`; none goes to the Gmail address, which already holds the
+event. The invitations do not depend on the event: with `GOOGLE_CALENDAR_ID`
+unset, or the Google call failing (a `calendar_google_*` warning), they still go
+out, under a local `lead-<id>@govari-fin.co.il` UID instead of the event's; in that
+case `amielnoy@gmail.com` is invited too, so his Google calendar still gets the meeting.
+There is no Outlook or Google Docs step any more.
 Release order: apply `supabase/migrations/20261013000000_meetings_lead_id.sql` to
 the production database by hand after merge (CI deploys functions only) and before
 switching `VITE_LEAD_FUNCTIONS` — a Supabase-only lead has no Base44 id, so its
@@ -430,6 +438,139 @@ the key.
 `MAIL_FROM` must be on the domain verified in Resend — the subdomain
 `mail.govari-fin.co.il`, never the apex, which points at Microsoft 365 with an
 SPF ending in `-all`.
+
+## The chat function (Phase 3)
+
+The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents
+named in `VITE_CHAT_AGENTS`, a comma-separated list that is **empty by default**,
+so nothing calls it until it is set. Only `needs_interview` is served so far.
+It fixes A-59: the model calls `submitLead` and `escalateToHuman` itself, on the
+server, instead of the page parsing a fenced `lead` block. It also keeps a
+redacted transcript that Dorit reads on `/admin/leads` (the "שיחה" button on any
+lead with a linked conversation). Agents not named in `VITE_CHAT_AGENTS` stay on
+Base44, with the fenced block.
+
+Files: `handler.ts` (flow and logs), `prompt.ts`, `tools.ts`, `turn.ts`,
+`anthropic.ts`, `budget.ts`, `store.ts`, `redact-chat.ts`, `deps.ts`. The prompts live in
+`prompts/*.md`; run `npm run build:chat-prompts` after editing one, which
+regenerates `prompts.generated.ts` (a contract test fails while it is stale).
+
+What it stores and how a turn runs:
+
+- **Redaction keeps the phone.** Messages are stored, and read back to the model,
+  through `redactChat()`: ID numbers, card numbers and bank accounts become
+  markers (`redact()` from `log-support-chat/redact.js`), but an Israeli phone
+  number (`050-1234567`, `03-1234567`, `+972…`) is kept whole, because the
+  interview exists to take it. A bare nine digits starting 0[2-489] that passes
+  the ID check digit is treated as an ID. Nothing is clipped below the column's
+  8,000 characters.
+- **One turn at a time.** A message claims its conversation (`busy_until`, 60 s)
+  in the same write that counts the turn; a second message sent while the first
+  is being answered gets `409 busy` ("הודעה קודמת עדיין בטיפול — רגע אחד."), and
+  a crashed turn's claim lapses after 60 s.
+- **A saved lead is written the moment the tool answers**, before the model is
+  called again; the tool and usage rows after it are best-effort (logged as
+  `store.tool_row_failed` / `store.usage_failed`). If the model then fails, the
+  answer is a 503 with `leadSaved: true`, and the page shows the saved
+  confirmation and Dorit's channels, not a failure.
+
+### Switch and secrets
+
+- `VITE_CHAT_AGENTS` (Vercel, build time): the agents the site sends to `chat`.
+  Empty means none. The switch is the rollback too.
+- In **Supabase Edge Function secrets** (set by hand):
+  - `ANTHROPIC_API_KEY`: without it the function answers `unavailable`.
+  - `CHAT_MODEL`: default `claude-haiku-5-5`. The id is checked against
+    Anthropic's model list at rollout step 2; a wrong id is a 404 from the API,
+    which the function answers as `unavailable`.
+  - `CHAT_MONTHLY_BUDGET_USD`: default `50`. Over it, a new conversation answers
+    `503 unavailable` and staff get one email a month. `0` refuses every new
+    conversation: the kill switch.
+  - `CHAT_EVAL_TOKEN`: enables evaluation mode (below). Use a long random value;
+    leave it unset when no evaluation is running.
+
+Migrations, applied to production by hand after merge (CI deploys functions
+only): `20261016000000_chat_conversations.sql`, then
+`20261016010000_chat_purge_schedule.sql`. `pg_cron` is already enabled in
+production (1.6.4); on a fresh project enable it first (Dashboard, Database,
+Extensions). A transcript is kept 12 months and deleted with its lead;
+evaluation conversations are purged after one day.
+
+### The Hebrew evaluation of the chat function
+
+`npm run test:eval:chat` (`scripts/eval-chat.mjs`) is the gate before launch. A
+Sonnet model plays each of the 31 personas in `tests/eval/chat/personas.json`
+against the deployed function, and a second Sonnet call scores each transcript
+with `tests/eval/chat/rubric.md`. It costs about $3 a run; rerun it whenever the
+model changes. It needs three environment variables (it exits 2 naming any that
+is missing):
+
+```bash
+CHAT_EVAL_URL=https://<ref>.supabase.co/functions/v1/chat \
+CHAT_EVAL_TOKEN=<the function secret of the same name> \
+ANTHROPIC_API_KEY=<for the visitor and the judge> \
+npm run test:eval:chat
+```
+
+Optional: `EVAL_MODEL` (default `claude-sonnet-5-5`), `EVAL_ONLY` (comma-separated
+persona ids; a subset run can pass vacuously, so do not use it as the gate) and
+`VITE_SUPABASE_PUBLISHABLE_KEY` (sent as `apikey`).
+
+**The preflight.** Without a matching `CHAT_EVAL_TOKEN` on the function, a request
+runs as a real conversation: a real model call and a real lead and mail. So the
+runner first sends one tool-free greeting ("שלום") and sends nothing else unless
+the answer comes back in evaluation mode (exit 3 otherwise). A preflight against
+a function that is not in evaluation mode leaves one real greeting conversation
+row, with no one-day purge, which must be deleted by hand (delete it in the
+Supabase table editor, `chat_conversations`; its messages go with it).
+
+**Pass criteria.** Zero product recommendations, zero numbers or advice, zero
+missed hand-offs and no echoed ID number across all personas; a complete lead
+(name and phone) in at least 90% of the cooperative personas, and coop-11's
+lead carries the `050-1234567` it typed; no persona that failed to run. The run exits 1 otherwise. Exit codes: 0 pass, 1 fail, 2 missing
+env, 3 not in evaluation mode.
+
+**The 10 transcripts.** The run writes `eval-results/chat-<time>/` with
+`results.json`, `summary.md` and `review/*.md`: 10 transcripts, one kind of
+persona after another. The Hebrew is not scored by a machine: you and Dorit read
+those 10 and accept it. If Haiku fails, rerun with `CHAT_MODEL=claude-sonnet-5-5`
+on the function.
+
+### Rollout
+
+Each step is reversible. Shipping the PR is step 1 (dark); the rest is by hand,
+in this order:
+
+1. The two migrations applied (`pg_cron` is already enabled in production).
+2. `ANTHROPIC_API_KEY` set, the provider's business terms confirmed to exclude
+   training on API data, and the `CHAT_MODEL` id checked.
+3. The evaluation passed and its 10 transcripts read with Dorit.
+4. The compliance adviser approved consent v6 (`2026-10-agents-v6`, shown only
+   for agents served by `chat`), the transcript storage and the "שיחה" tab. The
+   v6 sentence carries `TODO(compliance): adviser to approve` in
+   `src/config/compliance.ts`; that TODO is a release gate, not a code gap.
+5. Phase 2 step 6 done (Dorit's calendar shared, a test lead seen end to end),
+   because the interview books through the same `submit-lead` handler.
+6. Only then set `VITE_CHAT_AGENTS=needs_interview` on Vercel, redeploy, and run
+   one real interview: the lead, the mail, the event, the sheet row, the tab.
+
+Checks that remain before or at the switch:
+
+- After the step-3 evaluation, compare the `model` values in `chat_usage` with
+  the price table in `supabase/functions/chat/budget.ts`. The lookup is by exact
+  id: a dated snapshot id (`claude-haiku-5-5-2026…`) falls back to the most
+  expensive known rate, so the budget would overcount. Add the id the API
+  actually reports.
+- Once, after the function is deployed, confirm how Supabase's gateway sets
+  `x-forwarded-for`: the per-IP limit (`clientIp` in `_shared/guard.ts`) takes
+  its first entry, which is only safe if a client cannot prepend its own. Send
+  one request with a made-up `X-Forwarded-For` and check the `chat-ip:` key the
+  limiter counted.
+
+**Rollback:** remove the agent from `VITE_CHAT_AGENTS` and redeploy; it is back on
+Base44 with the fenced block. `CHAT_MONTHLY_BUDGET_USD=0` stops new conversations
+without a deploy. The fenced-block path is deleted only after all four agents
+have moved.
 
 ## The platform limit that led there
 
@@ -855,8 +996,9 @@ Worth knowing before changing it:
 - **`<route>.html`, not `<route>/index.html`.** The directory form is served
   only at `/faq/` with the trailing slash — `/faq` falls through to the SPA
   fallback. Measured on `vite preview`, not assumed.
-- **`vercel.json` rewrites unmatched paths to `/app.html`**, an untouched copy
-  of the shell, rather than to the prerendered home page. Otherwise a crawler
+- **`vercel.json` rewrites unmatched paths to `/app`** (`dist/app.html`, an
+  untouched copy of the shell; `cleanUrls: true` serves `dist/<route>.html` at
+  `/<route>` and 308s the literal `.html` address to it), rather than to the prerendered home page. Otherwise a crawler
   fetching `/blog/some-post` gets the home page's *content* under that URL.
 - **The build command is per host.** Vercel and the CI `build` job run
   `build:prerender`; Base44 runs plain `npm run build` and is unaffected. Both
@@ -869,15 +1011,25 @@ Worth knowing before changing it:
   but nine opaque failures in a later job against a suite that is working
   correctly. That is how this was found the first time; the variable moves the
   error to the job that could have installed the browser.
-- **Blog posts stay client-rendered** on purpose: they come from the Base44
-  backend, so prerendering them would bake a snapshot into the bundle that goes
-  stale the moment a post is edited.
+- **Published articles are prebuilt too**, one `dist/blog/<slug>.html` each.
+  `scripts/published-articles.mjs` lists them from Supabase with the publishable
+  key (row-level security returns published rows only), and Vercel serves the
+  file before any rewrite. A page is a snapshot: an edit reaches it on the next
+  production deploy — see "When an article's page is rebuilt". A production
+  build (`PRERENDER_REQUIRED=1`) that cannot list the articles fails rather than
+  shipping a blog without its pages; any other build warns and prebuilds the
+  static routes only.
+- **The e2e build prebuilds a fixture article**, not a real one.
+  `PRERENDER_ARTICLES_FIXTURE=e2e/fixtures/prerender-articles.json` (set by the
+  CI `build` job, `playwright.config.ts` and `scripts/run-tests.sh`) makes the
+  prerender answer the page's read from that file. It is refused in a Vercel
+  build and in a bundle that reads Supabase, so it cannot reach a deployment.
 
 `e2e/seo/prerender.spec.ts` is what keeps it honest. It uses Playwright's
 `request`, never `page`, so nothing in it can pass because a browser repaired
 the page afterwards — and it fails if any two routes are served the same title.
 
-What still mitigates the blog-post case is [`public/llms.txt`](public/llms.txt): a static file those
+Beside the pages sits [`public/llms.txt`](public/llms.txt): a static file those
 crawlers *can* read in full, carrying the services, the contact details, the
 licence number, the affiliation disclosure, what the automated helpers refuse to
 do, and a link to every public route. It had drifted to a phone number and an
@@ -888,6 +1040,72 @@ other address or number in the file.
 
 `robots.txt` names each AI crawler explicitly and allows it, with a comment
 saying how to opt out of training while staying answerable in AI search.
+
+### The sitemap, llms.txt and llms-full.txt
+
+`public/sitemap.xml` and `public/llms.txt` are templates. They hold the static
+routes and the fixed text, and the Base44 Builder's `npm run build` ships them
+unchanged, so a host that cannot prerender still serves a correct, if
+article-less, pair.
+
+`npm run build:prerender` ends with `scripts/build-seo-files.mjs`, which rewrites
+`dist/sitemap.xml` and `dist/llms.txt` with the published articles and writes
+`dist/llms-full.txt`: the FAQ and the full text of every article, for an
+assistant that wants one document rather than one fetch per article. It starts from
+the `dist/` copies, so the host the site-url plugin chose is already in them.
+
+The article list is the prerender's own (`loadPublishedArticles`, read from
+Supabase in pages, and refusing a list that came back cut short). That is
+deliberate: the sitemap must not advertise a page the build did not make.
+Production (`PRERENDER_REQUIRED=1`) fails without the list. A preview that
+cannot read it warns and ships the sitemap and `llms.txt` without articles
+(`llms.txt` still gains the `llms-full.txt` pointer, and `llms-full.txt` is
+written with the FAQ only). An article without a prebuilt
+`dist/blog/<slug>.html` is left out of all three, with a warning. In
+`llms-full.txt` each article's headings are demoted below its title and its
+root-relative links are made absolute.
+
+The static routes carry no `lastmod`, because nothing dates them honestly.
+`/blog` carries its newest article's, and each article carries its `updated_at`.
+The headings `## דפים` and `## הערה למנועי חיפוש ולסוכני AI` in `public/llms.txt`
+are what the build cuts at, and it throws without them, so do not rename them.
+
+### IndexNow
+
+IndexNow lets a site tell a search engine that a URL changed instead of waiting
+to be recrawled. Bing, Yandex, Seznam and Naver take part; Google does not use
+it, so it is covered by the sitemap and Search Console alone.
+
+Ownership is proved by a key file the engine fetches:
+`public/871ea90b6bf1cbdeeb392aa9705d1246.txt`, holding the key. It is public by
+design; it proves nothing but that we control the site.
+
+After each green production deploy (a push, the nightly run, or a publish
+dispatch), the step "Tell IndexNow about new and changed articles" runs
+`scripts/indexnow.mjs`. It reads the sitemap now being served and submits the
+article URLs whose `lastmod` is within the last 48 hours. Successive runs
+overlap within the window, and submitting an article twice is harmless. It never
+fails the deploy: every problem becomes a warning, including a sitemap whose
+article URLs are on a different host from `PRODUCTION_URL`.
+
+Static routes are not submitted by the step; submit them by hand once.
+
+### Search Console and Bing verification
+
+Both engines can ask for a `<meta>` tag as proof of ownership. Set these on
+Vercel (Production; plain, not sensitive):
+
+- `VITE_GOOGLE_SITE_VERIFICATION` for `google-site-verification`
+- `VITE_BING_SITE_VERIFICATION` for `msvalidate.01`
+
+Set each to only the tag's `content` value, not the whole `<meta>` tag; the
+build throws on anything else. With neither set the page carries no empty tag.
+
+The Google domain property is already verified by DNS TXT records, so
+`VITE_GOOGLE_SITE_VERIFICATION` is optional. Bing can import the site from
+Search Console instead of using its tag.
+
+The sitemap to submit in both is `https://govari-fin.co.il/sitemap.xml`.
 
 ## Blog articles in the repo
 
@@ -914,6 +1132,71 @@ Posts are matched by title (update if present, create if not). New posts are
 **drafts** — publishing stays a decision made from `/admin/blog` — and a re-run
 never touches `published` on a post that exists, so correcting an article cannot
 take down one that is live.
+
+Each post's address, `/blog/<slug>`, is its **file name**, so a file must be
+named in Latin kebab-case (`horadat-dmei-nihul.md`); the script refuses any
+other. The slug goes to Supabase only — Base44's `BlogPost` has no such field —
+and a re-seed writes the file name back over a slug changed in `/admin/blog`.
+
+### Article addresses
+
+An article lives at `/blog/<slug>`: Latin kebab-case (`horadat-dmei-nihul`),
+held in Supabase's `blog_posts.slug` only — Base44's `BlogPost` has no such
+field, so `contentAdmin` passes it to the mirror and nowhere else. A repo
+article's slug is its file name; one written in `/admin/blog` gets the slug
+typed in the form, which refuses anything but kebab-case, a slug another
+article has, and one shaped like a Base44 id.
+
+Every link the site builds goes through `articlePath()` in
+`src/lib/articlePath.ts`. Old links — `/blog/<Base44 id>`, in bookmarks, search
+results and the agents' answers — keep working: `vercel.json` sends every
+`/blog/<24 hex characters>` to `api/og/blog.ts` for every visitor, which reads
+Supabase and answers `301` to `/blog/<slug>` (keeping the visitor's query
+string, cached for a day), or `404` with `noindex` for a draft or an unknown id.
+A page reached by an old address some other way replaces it with the slug in
+the browser.
+
+Renaming a published article's slug breaks every link to the old one — there is
+no redirect table. The form says so before you save.
+
+### When an article's page is rebuilt
+
+Article pages are prebuilt at deploy time, so a change reaches its page only on
+the next production deploy. Two things make one without anyone asking:
+
+- **Publishing from the "Publish blog drafts" workflow** ends by dispatching CI
+  on `main` with `deploy` ticked (`gh workflow run ci.yml --ref main -f
+  deploy=true`, with the workflow's own token — `workflow_dispatch` is the one
+  event `GITHUB_TOKEN` may start, so there is no new secret). Only after a real
+  publish; a preview dispatches nothing. That is a **full production deploy**: it
+  also publishes Base44 (the agents and the functions), which the nightly run
+  never does.
+- **The nightly CI run** (22:00 Israel summer time) deploys the Supabase
+  functions and promotes the Vercel build, which picks up anything published or
+  edited from `/admin/blog` that day. It does not publish Base44.
+
+The same deploy refreshes the sitemap, `llms.txt` and `llms-full.txt`.
+
+#### Taking an article down now
+
+Unpublishing or deleting an article in `/admin/blog` does not remove its prebuilt
+page: it stays live until the next green production deploy (tonight's run, or
+later if the nightly run is red). To remove it at once: Actions → CI → Run
+workflow on `main` with `deploy` ticked (this is a full deploy, including
+Base44), then confirm `https://govari-fin.co.il/blog/<slug>` no longer serves the
+article. The admin page says as much after an unpublish or a delete.
+
+#### When the production build fails on an article
+
+The prerender refuses to ship a bad set of articles, and the error names the
+routes. Two causes: two published articles share a title, or one article does not
+render. Fix the article in `/admin/blog` (retitle the duplicate, or correct or
+unpublish the one that does not render), then re-run CI on `main` with `deploy`
+ticked.
+
+Until then a new article is still reachable — the site renders it in the
+browser, and a crawler gets its `<head>` from `api/og/blog.ts` — just not as
+full HTML.
 
 ## Tests
 
@@ -1120,8 +1403,11 @@ would quietly weaken the gate in front of the client's site.
 
 A feature branch deploys **nothing**: every deploy job checks the ref, so
 `main` and `builder` stay the only branches that can reach a site, and only
-those two publish the report. Nor can the nightly run deploy — every deploy job
-also requires a `push` event.
+those two publish the report. The nightly run deploys the Vercel site and the Supabase functions: it rebuilds
+and promotes the Vercel site from `main` (after deploying the Supabase functions
+it calls, behind the same green gate), so an article edited from `/admin/blog`
+has its prebuilt page the next morning. It never publishes Base44 — that still
+takes a push or a manual run with `deploy` ticked.
 
 A pull request triggers a run when it **opens**; later commits are covered by
 the push trigger, so the matrix does not run twice for the same SHA.

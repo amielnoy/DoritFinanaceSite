@@ -13,22 +13,24 @@
 //
 // So: run the real app in a real browser at build time, let `useSeo` and the
 // components do exactly what they do for a visitor, and write the resulting DOM
-// to `dist/<route>/index.html`. No second copy of the metadata to drift, because
+// to `dist/<route>.html`. No second copy of the metadata to drift, because
 // nothing here knows what any route's title should be — it renders and asks.
 //
 // Two files, deliberately:
 //
 //   dist/index.html — the prerendered home page, served at `/`.
-//   dist/app.html   — the untouched SPA shell, the rewrite target for anything
-//                     without a prerendered file (blog posts, 404s).
+//   dist/app.html   — the untouched SPA shell, the rewrite target (`/app`) for anything
+//                     without a prerendered file (an article published since
+//                     the last build, 404s).
 //
 // Without the split, the SPA fallback would be the prerendered *home* page, and
-// a crawler fetching /blog/some-post would be served the home page's content
-// under that URL. An empty shell is the honest answer for a route we have not
-// prerendered.
+// a crawler fetching an article not yet prebuilt would be served the home
+// page's content under that URL. An empty shell is the honest answer for a
+// route we have not prerendered.
 
 import { access, cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { buildEnv, duplicateTitles, fixtureArticleFor, planArticles } from './published-articles.mjs'
 
 const DIST = join(process.cwd(), 'dist')
 const PORT = Number(process.env.PRERENDER_PORT ?? 4183)
@@ -39,9 +41,9 @@ const PORT = Number(process.env.PRERENDER_PORT ?? 4183)
  *
  * Without it, running the script twice against one build destroys the fallback:
  * the second run copies the already-prerendered `index.html` over `app.html`,
- * and every route that is *not* prerendered — every blog post — starts being
- * served the home page's content under its own URL. `npm run build:prerender`
- * happens to be safe because `vite build` rewrites `index.html` first; running
+ * and every route that is *not* prerendered starts being served the home
+ * page's content under its own URL. `npm run build:prerender` happens to be
+ * safe because `vite build` rewrites `index.html` first; running
  * `npm run prerender` on its own is not, and that is the command someone
  * reaches for when iterating.
  */
@@ -51,9 +53,12 @@ const exists = async (p) => access(p).then(() => true, () => false)
 
 // The public, statically-routed pages — the sitemap's contents.
 //
-// Blog posts are deliberately absent: they come from the Base44 backend at
-// runtime, so prerendering them would bake a snapshot of live content into the
-// bundle and go stale the moment a post is edited. They keep the SPA shell.
+// Published articles are added to these at build time (`planArticles` in
+// scripts/published-articles.mjs): each becomes `dist/blog/<slug>.html`, which
+// Vercel serves before any rewrite. A page is a snapshot, so an article edited
+// since the last build is stale until the next production deploy — the publish
+// workflow and the nightly CI run are what make one (README, "When an article's
+// page is rebuilt").
 const ROUTES = [
   '/',
   '/faq',
@@ -113,6 +118,25 @@ function dropVercelBeacon(html) {
   return html.replace(/<script\b[^>]*\bsrc="\/_vercel\/[^"]*"[^>]*><\/script>/g, '')
 }
 
+/**
+ * Answer a prerendered article page's Base44 read from the fixture file.
+ *
+ * Only in the e2e build (`PRERENDER_ARTICLES_FIXTURE`), whose bundle has no
+ * Supabase and so reads the article through the Base44 SDK, which nothing
+ * serves at build time. `planArticles` refuses the fixture anywhere it could
+ * reach a deployment.
+ */
+async function serveFixtureArticles(page, rows) {
+  await page.route(/\/entities\/BlogPost\/[^/?#]+/, (route) => {
+    const row = fixtureArticleFor(route.request().url(), rows)
+    return route.fulfill({
+      status: row ? 200 : 404,
+      contentType: 'application/json',
+      body: JSON.stringify(row ?? { error: 'not found' }),
+    })
+  })
+}
+
 async function main() {
   const { preview } = await import('vite')
   const { chromium } = await import('@playwright/test')
@@ -135,6 +159,20 @@ async function main() {
   } else {
     await cp(indexPath, shellPath)
   }
+
+  // Which articles to prebuild. The environment is read the way `vite build`
+  // read it — the env files, with the process environment winning — so the list
+  // comes from the same Supabase project the bundle reads.
+  const env = await buildEnv()
+  let articles
+  try {
+    articles = await planArticles(env)
+  } catch (err) {
+    console.error(`\n::error::The published articles cannot be prebuilt: ${err.message}`)
+    process.exit(1)
+  }
+  if (articles.warning) console.warn(`\n::warning::${articles.warning}`)
+  const routes = [...ROUTES, ...articles.routes]
 
   const server = await preview({
     preview: { port: PORT, host: '127.0.0.1', strictPort: true },
@@ -180,9 +218,17 @@ async function main() {
   const results = []
 
   try {
-    for (const route of ROUTES) {
+    for (const route of routes) {
       const page = await browser.newPage()
       try {
+        // Hermetic, like e2e/fixtures/app.ts: a build must not send a page_view
+        // to Google Analytics for every route it renders.
+        await page.route(/googletagmanager\.com|google-analytics\.com/, (r) => r.abort())
+
+        if (articles.fixtureRows && route.startsWith('/blog/')) {
+          await serveFixtureArticles(page, articles.fixtureRows)
+        }
+
         await page.goto(`http://127.0.0.1:${PORT}${route}`, {
           waitUntil: 'networkidle',
           timeout: 45_000,
@@ -190,7 +236,9 @@ async function main() {
 
         // Wait for the route's own metadata rather than a fixed delay: the
         // whole point is to capture the head `useSeo` writes, and a timeout
-        // that fires early would bake the static head back in.
+        // that fires early would bake the static head back in. An article that
+        // does not load keeps the not-found canonical (`/blog`), times out
+        // here, and fails the build rather than shipping a "not found" page.
         const want = canonicalFor(route)
         await page.waitForFunction(
           (expected) => {
@@ -223,9 +271,12 @@ async function main() {
         // directory form is only served at `/faq/` with the trailing slash —
         // `/faq` falls straight through to the SPA fallback, which would have
         // shipped eight prerendered files that nothing ever requested. The
-        // sibling file answers `/faq`, `/faq/` and `/faq.html` alike, on
-        // `vite preview` and on Vercel, and every copy declares `/faq` as its
-        // canonical so the spare spellings consolidate.
+        // sibling file answers `/faq` and `/faq/` on `vite preview`, and on
+        // Vercel because `vercel.json` sets `cleanUrls: true` — without it no
+        // file named `faq` exists and the catch-all rewrite serves the empty
+        // shell. With it the literal `/faq.html` answers a 308 to `/faq`.
+        // Every copy declares `/faq` as its canonical. An article is
+        // `dist/blog/<slug>.html`, beside `dist/blog.html`.
         const target =
           route === '/' ? join(DIST, 'index.html') : join(DIST, `${route.slice(1)}.html`)
         await mkdir(dirname(target), { recursive: true })
@@ -245,22 +296,25 @@ async function main() {
     await server.close()
   }
 
-  // Every route serving the same title is the exact defect this step exists to
-  // remove, and it would fail silently — eight files, all of them the home
-  // page. Assert it here rather than discover it in Search Console.
-  const titles = new Set(results.map((r) => r.title))
-  if (titles.size !== results.length) {
+  // Two routes with one title is the defect this step exists to remove — every
+  // page the home page — or two articles competing for one search result.
+  // Either way it would fail silently, so assert it here rather than discover
+  // it in Search Console.
+  const dupes = duplicateTitles(results)
+  if (dupes.length) {
     console.error(
-      `\nPrerender produced ${titles.size} distinct titles for ${results.length} routes — ` +
-        `the per-route head did not apply. Refusing to ship a directory of identical pages.`,
+      `\nPrerender gave more than one route the same title — the per-route head did not apply, ` +
+        `or two published articles share a title. Refusing to ship pages that compete with each other:\n` +
+        dupes.map((d) => `  "${d.title}": ${d.routes.join(', ')}`).join('\n'),
     )
     process.exit(1)
   }
 
   // The fallback is the one output nothing downstream inspects — no route
   // serves it under `vite preview`, so a corrupted `app.html` would reach
-  // production silently and hand crawlers the home page under every blog-post
-  // URL. Assert it is still an empty shell rather than assume.
+  // production silently and hand crawlers the home page under every
+  // not-yet-built article URL. Assert it is still an empty shell rather than
+  // assume.
   const shell = await readFile(shellPath, 'utf8')
   const shellRoot = shell.match(/<div id="root">([\s\S]*?)<\/div>/)?.[1] ?? ''
   if (shell.includes(MARKER) || shellRoot.trim() !== '') {
@@ -272,7 +326,9 @@ async function main() {
     process.exit(1)
   }
 
-  console.log(`\nPrerendered ${results.length} routes, ${titles.size} distinct titles.`)
+  console.log(
+    `\nPrerendered ${results.length} routes (${articles.routes.length} articles), every title distinct.`,
+  )
 }
 
 await main()

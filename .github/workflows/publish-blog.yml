@@ -17,6 +17,7 @@ name: Publish blog drafts
 # checked, and that step separately needs SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
 # — not yet configured as of this workflow's addition; the apply step skips
 # with a notice rather than failing until they are.
+# A real publish ends by dispatching CI on main with deploy=true, which prebuilds the new articles' pages.
 on:
   workflow_dispatch:
     inputs:
@@ -36,6 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # To dispatch ci.yml at the end — the one workflow event GITHUB_TOKEN may
+      # start, so no new secret is needed.
+      actions: write
     steps:
       - uses: actions/checkout@v4
 
@@ -129,3 +133,16 @@ jobs:
             unset BASE44_API_KEY
           fi
           node scripts/publish-blog.mjs --apply
+
+      # Articles are prebuilt into the site at deploy time (scripts/prerender.mjs),
+      # so a newly published one has a full-HTML page only after the next
+      # production deploy. Only after a real publish: a preview changes nothing,
+      # and a failed Apply stops the job before this. If a push to main is
+      # already running, the dispatched run supersedes it (ci.yml's concurrency
+      # group) and deploys the same commit.
+      - name: Rebuild the site so the new articles are prebuilt
+        if: inputs.apply && steps.supabase-creds.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run ci.yml --ref main -f deploy=true

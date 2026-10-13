@@ -41,6 +41,35 @@ export const ASSET_SOURCES = { "index.html": "index.html" };
 
 const trimTrailingSlashes = (value) => value.replace(/\/+$/, "");
 
+/**
+ * Search Console's and Bing Webmaster Tools' ownership tags, from the build's
+ * env. Emitted as <meta> by Vite's HTML transform rather than written into
+ * index.html, so a build without the variables carries no empty tag. They
+ * are not scripts, so the enforced CSP is untouched. Every prerendered page is
+ * a snapshot of this document and carries them too.
+ */
+const VERIFICATION = [
+  ["VITE_GOOGLE_SITE_VERIFICATION", "google-site-verification"],
+  ["VITE_BING_SITE_VERIFICATION", "msvalidate.01"],
+];
+const VERIFICATION_TOKEN = /^[A-Za-z0-9_-]{8,128}$/;
+
+export function verificationTags(env = {}) {
+  const tags = [];
+  for (const [variable, name] of VERIFICATION) {
+    const value = (env[variable] ?? "").trim();
+    if (!value) continue;
+    if (!VERIFICATION_TOKEN.test(value)) {
+      throw new Error(
+        `${variable} must be only the content value of the verification tag (letters, digits, "_" and "-"), ` +
+          "not the whole <meta> tag.",
+      );
+    }
+    tags.push({ tag: "meta", attrs: { name, content: value }, injectTo: "head" });
+  }
+  return tags;
+}
+
 export function siteUrl({ env: override } = {}) {
   /**
    * Read the origin from Vite's own resolved env, not from `process.env`.
@@ -62,6 +91,9 @@ export function siteUrl({ env: override } = {}) {
     configResolved(config) {
       resolved = override ?? config.env;
       outDir = outDirOf(config);
+    },
+    transformIndexHtml() {
+      return verificationTags(resolved ?? {});
     },
     async closeBundle() {
       const configured = trimTrailingSlashes(resolved?.VITE_SITE_URL ?? "");

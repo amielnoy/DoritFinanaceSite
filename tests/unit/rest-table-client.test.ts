@@ -55,6 +55,18 @@ describe("RestTableClient — the request", () => {
     expect(new URL(raw).searchParams.get("base44_id")).toBe("eq.a b&c=d");
   });
 
+  it("builds a not filter as PostgREST's not.<op>.<value>, with null spelled out", async () => {
+    const { rest, fetchImpl } = client(ok([]));
+    await rest.from("chat_conversations").select("lead_id").not("lead_id", "is", null);
+    expect(new URL(String(fetchImpl.mock.calls[0][0])).searchParams.get("lead_id")).toBe("not.is.null");
+  });
+
+  it("builds an or filter inside PostgREST's brackets", async () => {
+    const { rest, fetchImpl } = client(ok([]));
+    await rest.from("blog_posts").select("*").or("slug.eq.a,base44_id.eq.a").limit(3);
+    expect(new URL(String(fetchImpl.mock.calls[0][0])).searchParams.get("or")).toBe("(slug.eq.a,base44_id.eq.a)");
+  });
+
   it("does not double the slash when the project URL ends with one", async () => {
     const fetchImpl = vi.fn(async () => ok([]));
     await new RestTableClient(`${URL_}/`, KEY, fetchImpl as unknown as typeof fetch).from("testimonials").select("*");
@@ -150,5 +162,37 @@ describe("RestTableClient — the same request supabase-js makes", () => {
     expect(fromRest.headers.authorization).toBe(fromSdk.headers.authorization);
     // The SDK also names the schema; `public` is PostgREST's default, so leaving it out reads the same rows.
     expect(fromSdk.headers["accept-profile"] ?? "public").toBe("public");
+  });
+
+  it("asks for an or filter exactly as supabase-js does", async () => {
+    const { createClient } = await import("@supabase/supabase-js");
+    const seen: string[] = [];
+    const record = (async (input: RequestInfo | URL) => {
+      seen.push(String(input));
+      return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    const sdk = createClient(URL_, KEY, {
+      global: { fetch: record },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    await sdk.from("blog_posts").select("id,slug").or("slug.eq.k,base44_id.eq.k").limit(3);
+    await new RestTableClient(URL_, KEY, record).from("blog_posts").select("id,slug").or("slug.eq.k,base44_id.eq.k").limit(3);
+    expect(seen[1]).toBe(seen[0]);
+  });
+
+  it("asks for a not filter exactly as supabase-js does", async () => {
+    const { createClient } = await import("@supabase/supabase-js");
+    const seen: string[] = [];
+    const record = (async (input: RequestInfo | URL) => {
+      seen.push(String(input));
+      return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    const sdk = createClient(URL_, KEY, {
+      global: { fetch: record },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    await sdk.from("chat_conversations").select("lead_id").not("lead_id", "is", null).limit(1000);
+    await new RestTableClient(URL_, KEY, record).from("chat_conversations").select("lead_id").not("lead_id", "is", null).limit(1000);
+    expect(seen[1]).toBe(seen[0]);
   });
 });

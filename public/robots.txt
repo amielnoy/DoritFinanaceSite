@@ -12,8 +12,9 @@ Disallow: /oauth/
 # These are stated rather than left to the wildcard above for two reasons: the
 # wildcard's meaning for AI training is contested, and an explicit rule is what
 # a person auditing this file needs to see. Most of these crawlers do not run
-# JavaScript, and this is a client-rendered app — so /llms.txt, not the rendered
-# page, is what they can actually read. See the note at the end of that file.
+# JavaScript. The public pages and every article are served as prebuilt HTML;
+# /llms.txt summarises the site, and /llms-full.txt carries the full text of
+# the questions and answers and of every article, in one file.
 #
 # To opt out of AI training while staying answerable in AI search, disallow
 # GPTBot, ClaudeBot, Google-Extended and Applebot-Extended, and keep

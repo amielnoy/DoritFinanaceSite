@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 216
+**Location:** `tests/integration/` · **Cases:** 223
 
 ---
 
@@ -469,8 +469,10 @@ answer, none for a stranger's.
 over Base44 and Edge, as §4.22 does for the claim, so the Edge functions keep
 the guards, answers, mail and sheet rows the Base44 ones have. Differences are
 their own cases: Edge `submit-lead` writes the Google event and sheet row
-through the service account, mails the visitor and Dorit an `.ics` invitation
-instead of using Outlook, and answers an empty request with `400` and
+through the service account (the event in the calendar `GOOGLE_CALENDAR_ID`
+names, without attendees), mails Dorit and `amielnoy@outlook.com` an `.ics`
+invitation by mail instead of using Outlook — independently of the Google event
+— and answers an empty request with `400` and
 `ready: { db, mailer, google }`; `log-support-chat` answers `200` with
 `sheet: "לא מוגדר"` when `SHEET_ID` is unset; each Edge function has a "what
 only it does" block. `dorit-mailer.integration.test.ts` adds the invitation
@@ -483,9 +485,44 @@ the endpoint's words), `edge-ics.test.ts` (the invitation: UTC, escaping,
 sheet append, PostgREST helpers). The live smoke asks `submit-lead` and
 `log-support-chat` an empty question in production.
 
+Invitations independent of the Google event — `INT-INV-001..007`, in the Edge
+"what only it does" block of `submit-lead.integration.test.ts`:
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-INV-001 | "sends both with a local UID and a warning when the Google call fails; the lead is saved" | 200; one lead; `.ics` to Dorit, `amielnoy@outlook.com` and the Gmail fallback with `UID:lead-<id>@govari-fin.co.il`; `calendar_google_failed`; ops mail `אירוע ביומן Google לא נוצר`, `נשלחו 3/3` |
+| INT-INV-002 | "sends both, with no Google request for the event, when GOOGLE_CALENDAR_ID is unset" | 3 invitations (Gmail fallback included); no call to `/calendar/v3/calendars/` |
+| INT-INV-003 | "keeps the other invitation, says 1/2 and saves the lead when one invitation fails" | 200; lead saved; invitation to Dorit only; `נשלחו 1/2`; an `invite_failed` warning |
+| INT-INV-004 | "is organised by the site, never by an attendee" | ORGANIZER `notifications@mail.govari-fin.co.il` (the mailer's From), not an attendee |
+| INT-INV-005..006 | "puts a 10:00 Israel slot at the right instant in %s" (2) | Summer `07:00Z`–`07:30Z`; winter `08:00Z`–`08:30Z` |
+| INT-INV-007 | "reports ready.google from the service account alone" | `ready.google: true` with `GOOGLE_CALENDAR_ID` unset |
+
+With the Google event created, the one existing case asserts that the two
+invitations carry the event's own UID and that none goes to `amielnoy@gmail.com`.
+
+### 4.24 `contentAdmin` — the article's address — `INT-CNT-001..008`
+
+`content-admin.integration.test.ts`. The slug is the Supabase mirror's alone,
+so it is validated and checked for uniqueness before Base44 is written — a
+refusal from the mirror's unique constraint would arrive after the Base44 row
+exists. An update is a PATCH by `base44_id` carrying only what changed, so a
+publish toggle touches `published` and nothing else; a PATCH that finds no row
+is a failure, never a silently created row.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CNT-001 | "refuses to create an article with %s, before writing anything" (4) | 400 with `error` and `rid`; no Base44 create; no `blog_posts` call |
+| INT-CNT-002 | "refuses a slug another article has with 409, before writing Base44" | 409 "הכתובת כבר בשימוש במאמר אחר."; no create, no mirror POST |
+| INT-CNT-003 | "writes the slug to the mirror and keeps it out of Base44" | Base44 fields have no `slug`; the mirror POST has `slug: koteret` |
+| INT-CNT-004 | "updates the mirror in place with a PATCH of only what changed" | `PATCH …?base44_id=eq.post-1` with `{ published: false }`; no slug lookup |
+| INT-CNT-005 | "never sends a null or empty slug to the mirror" | An update without a slug sends a body with no `slug` key; a null or empty slug is 400 with no write; a create always sends the validated slug |
+| INT-CNT-006 | "lets an article keep its own slug, and sends it to the mirror only" | 200; Base44 update has no `slug`; PATCH carries it |
+| INT-CNT-007 | "fails an update whose mirror row is missing" | 500 |
+| INT-CNT-008 | "refuses to rename an article to a slug another one has" | 409; no Base44 update |
+
 ## 5. Pass criteria
 
-All 284 cases pass. These assert behaviour, not shape — a failure means the
+All 302 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

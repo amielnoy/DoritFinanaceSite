@@ -1,5 +1,5 @@
 import { invokeFunction, type FunctionInvoker } from "./invoke";
-import type { LeadAdminPort, LeadRecord, LeadStatus } from "../ports";
+import type { LeadAdminPort, LeadRecord, LeadStatus, TranscriptLine } from "../ports";
 
 /** What this adapter needs: Lead reads through the entity, writes through the `adminLead` function. */
 export interface LeadAdminClient extends FunctionInvoker {
@@ -41,6 +41,15 @@ export class Base44LeadAdminService implements LeadAdminPort {
   /** Base44 stores a document as a file URL, which already opens it. */
   async documentLink(ref: string): Promise<string> {
     return ref;
+  }
+
+  /** Base44 keeps no transcripts the site can read. */
+  async transcript(): Promise<TranscriptLine[]> {
+    return [];
+  }
+
+  async transcriptLeadIds(): Promise<string[]> {
+    return [];
   }
 
   private async write(payload: Record<string, unknown>): Promise<void> {

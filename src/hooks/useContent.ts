@@ -28,12 +28,15 @@ export function useArticles(limit = 50) {
   });
 }
 
-export function useArticle(id: string | undefined) {
+export function useArticle(key: string | undefined) {
   return useQuery<Article>({
-    queryKey: contentKeys.article(id),
-    queryFn: () => services.content.getArticle(id as string),
-    enabled: !!id,
+    queryKey: contentKeys.article(key),
+    queryFn: () => services.content.getArticle(key as string),
+    enabled: !!key,
     retry: false, // a missing article is an answer, not a failure to retry
+    // Fresh for as long as the lists are. BlogPost.tsx seeds the slug's key
+    // when it moves an old address there, and that copy must not be re-read.
+    staleTime: 5 * 60 * 1000,
   });
 }
 

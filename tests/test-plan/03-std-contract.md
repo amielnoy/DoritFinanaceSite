@@ -60,11 +60,14 @@ Two helpers do the work:
 | CTR-BLG-001 | "the admin payload carries title and body and nothing undeclared" | `BlogAdmin` payload conforms |
 | CTR-BLG-002 | "publish toggles only flip the declared boolean field" | Every updated key is declared |
 | CTR-BLG-003 | "the public blog list filters on the published flag only" | One `filter` call, `{published}`, declared boolean |
+| CTR-BLG-004 | "keeps the mirror-only fields off the BlogPost entity" | `slug` is not a BlogPost property |
 | CTR-TST-001 | "sends only declared fields and both required ones" | `Testimonial.create` conforms |
 | CTR-TST-002 | "keeps the rating inside the declared 1..5 range" | 5 valid; 6 and 0 rejected |
 | CTR-TST-003 | "only accepts the declared review sources" | `google \| midrag`; `yelp` rejected |
 | CTR-EML-001 | "every send supplies to, subject and body" | Exactly those three keys on every `SendEmail` |
 | CTR-EML-002 | "never hardcodes a recipient inline" | No literal `to:` string — recipients come from named constants |
+
+`slug` is the one key the admin's BlogPost payload may carry that the entity lacks — it is the Supabase mirror's alone — and a case fails if it ever becomes a Base44 field.
 
 ### 4.3 Backend function — `consultation-function.contract.test.ts`
 
@@ -264,7 +267,7 @@ cases extract the step's shell out of the YAML and run it under `bash -e` for
 each combination, since shell embedded in a workflow is covered by nothing else
 here.
 
-**`ai-surface.contract.test.ts` — `CTR-AI-001..014`** — what an AI assistant can
+**`ai-surface.contract.test.ts` — `CTR-AI-001..018`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript
 receives the home page's `<head>` on every route; `public/llms.txt` is therefore
 the only surface such a crawler reads in full, and the one nothing was checking.
@@ -278,7 +281,12 @@ return. It also pins that `llms.txt` links every route the sitemap advertises �
 the two drift in opposite directions, because a new page reaches the sitemap
 when an SEO test asks for it and is forgotten here because nothing does — and
 that `robots.txt` names each AI crawler explicitly rather than leaving them to
-the wildcard.
+the wildcard. `CTR-AI-015..017` pin that `robots.txt` tells a crawler where
+`/llms-full.txt` is, that `build:prerender` runs `scripts/build-seo-files.mjs`
+after the prerender (so Vercel and CI write the sitemap, `llms.txt` and
+`llms-full.txt` with the published articles), and that the Base44 Builder's plain
+`build` stays `vite build`. `CTR-AI-018` pins that the prerender and the SEO
+files both read their environment through `buildEnv`.
 
 **`blog-content.contract.test.ts` — `CTR-ART-001..019`** — the repo-held articles under
 `content/blog/`. Each must parse, be a real article rather than a stub, carry
@@ -318,6 +326,25 @@ declare it. It also forbids a build that strips `VITE_BASE44_APP_ID` from writin
 the default `dist/` in any job that uploads `dist` — that arrangement shipped a
 bundle whose app id inlined to `undefined` as the artifact all ten e2e shards
 tested, and the suite stayed green because the fixture stubs `**/api/**`.
+Since articles are prebuilt, the nightly run is no longer deploy-free: CTR-REB-001
+requires `deploy-vercel` and `deploy-supabase` to run on `schedule` (the functions
+first, because `--prod` waits for them), and a companion case keeps the Base44
+publish — which ships the agents — off it. CTR-REB-002 pins that the publish
+workflow ends by dispatching `ci.yml` on `main` with `deploy=true`, with
+`actions: write` and only after a real publish. CTR-REB-003 requires
+`PRERENDER_REQUIRED=1` on the production Vercel build only; CTR-REB-004 keeps
+`PRERENDER_ARTICLES_FIXTURE` in the e2e `build` job's `Build` step and out of the
+workflow-level `env`, every other job and `vercel.json`; CTR-REB-005 requires the
+production deploy check to fetch `/blog`, which now shares its name with the
+`blog/` directory of articles. CTR-REB-006 requires the workflow's `cancel-in-progress`
+to be false on `schedule`, so the nightly run queues behind an in-flight push rather
+than cancelling it (Vercel on new code, Base44 on old); CTR-REB-007 requires the
+production smoke to skip the agent-conversation probes on `schedule`, and the spec to
+honour `E2E_SKIP_AGENT_PROBES`. `prerender-hermetic.contract.test.ts` (CTR-REB-008)
+pins that `scripts/prerender.mjs` aborts `googletagmanager.com` / `google-analytics.com`
+before navigating, as the e2e fixture does, so a build sends no fake page_views.
+`article-slug.contract.test.ts` (CTR-SLG-REF) pins the 400 and 409 slug-refusal texts
+in `BlogAdmin.tsx` to the ones in `contentAdmin`.
 
 **`deploy-gate.contract.test.ts`** — that exactly one thing promotes production.
 `vercel.json` must disable Git-triggered deploys on `main` and `builder` and
@@ -335,6 +362,15 @@ deploy shipped a bundle posting to `/api/apps/e2e-sanity-app/...`. One case
 requires the "Build for Vercel" step to drop the variable before `vercel build`;
 the other requires the step to refuse a bundle under `.vercel/output` that still
 names the placeholder.
+
+The "waits for the new release to be served" case also pins how long that wait
+can be. The Vercel job records the bundle it is deploying to production (step
+`built`, read from `.vercel/output/static/index.html`, production only, after
+"Build for Vercel"), and the smoke passes it as `EXPECTED_ASSET`. Production is
+then ready the moment it serves that bundle, which is immediately when a commit
+left the frontend unchanged. Before this, the wait asked for the bundle to
+*change* and sat out its whole eight-minute timeout on every backend-, docs- or
+SEO-file merge.
 
 Ten further cases cover the run summary, per writer rather than per file. The
 two writers are split by branch and cannot both fire — "Deployed sites" on
@@ -355,6 +391,17 @@ one of them.
 host out must be one the build rewrites. `index.html` was missing from that list,
 so a host move shifted the sitemap and left the served document advertising the
 old origin in its canonical tag, `og:url` and two static JSON-LD blocks.
+
+**`vercel-functions.contract.test.ts`, old article addresses.** Every
+`/blog/<24 hex>` — a Base44 id, what article links were before slugs — must be
+rewritten to `api/og/blog.ts` with no `has` condition (people get the 301 as
+well as crawlers), before the crawler rule and the SPA catch-all.
+
+**`vercel-functions.contract.test.ts`, clean URLs.** `cleanUrls` is `true` (so
+`dist/<route>.html` answers `/<route>`), the catch-all rewrites to `/app`, and
+`api/og/blog.ts` fetches the shell from `${SITE_URL}/app` — no `VERCEL_URL`
+(deployment protection) and no `functions.includeFiles` (it aborts
+`deploy --prebuilt`).
 
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
@@ -435,6 +482,96 @@ Regenerate the files with `node scripts/self-host-fonts.mjs`; never edit
 | CTR-EDGE-002 | "are each registered without JWT verification, as submit-claim is" | `verify_jwt = false` for `submit-claim`, `submit-lead`, `escalate-to-human`, `log-support-chat` in `config.toml` |
 | CTR-EDGE-003 | "ask Google for exactly two scopes" | `_shared/google.ts` lists only `calendar.events` and `spreadsheets` |
 
+### 4.8 Article addresses — `article-slug.contract.test.ts`
+
+`blog_posts.slug` is shaped by four things that cannot import one another — the
+migration's CHECK, `src/lib/articlePath.ts`, `contentAdmin` and
+`scripts/published-articles.mjs` — and these cases keep them one rule. The
+backfill is checked against the files it names, from its own side, so a draft
+added to `content/blog/` later needs no row in a migration that has shipped.
+`supabase/tests/blog_slug_check.sql` is the runtime counterpart: it re-applies
+the migration on production-shaped rows (a duplicated title, an untidy Base44
+id, a row with none) and asserts the backfill and every constraint. It also
+asserts the BEFORE INSERT fallback trigger: an insert or upsert that sends no
+slug gets `post-<id>`, an existing slug is never overwritten, and a sent slug is
+kept. That trigger is what lets the migration reach production before the code
+that writes real slugs.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-SLUG-001 | "the migration's CHECKs are articlePath's patterns" | `slug ~` equals `SLUG_PATTERN.source`; `slug !~` equals `BASE44_ID_PATTERN.source` |
+| CTR-SLUG-002 | "gives a repo article's slug to that file's exact title" | 20 backfill rows name a file; each title equals that file's front matter |
+| CTR-SLUG-003 | "names the two live articles older than the repo files" | `bituach-briut-digitali`, `pensia-beidan-ha-ai` with their exact titles |
+| CTR-SLUG-004 | "maps 22 distinct titles to 22 distinct slugs" | 22 rows, no title or slug twice |
+| CTR-SLUG-005 | "builds no /blog/<…> address by hand" | No `/blog/${` or `"/blog/" +` in `src/` or `api/` outside `articlePath.ts` |
+| CTR-SLUG-006 | "%s links articles through articlePath" (7 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo, BlogAdmin, api/og/blog.ts |
+| CTR-SLUG-007 | "contentAdmin's copy is the same" | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
+| CTR-SLUG-008 | "the build's copy is the same" | `scripts/published-articles.mjs` patterns equal `articlePath.ts`'s |
+
+### 4.9 IndexNow — `indexnow.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-INOW-001 | "publishes the key file at the site root, holding the key" | `public/<key>.txt` contains `INDEXNOW_KEY` |
+| CTR-INOW-002 | "is a step of the Vercel deploy job, for production only" | The step is gated on `steps.target.outputs.env == 'production'` and runs `node scripts/indexnow.mjs` |
+| CTR-INOW-003 | "can never fail the deploy" | `continue-on-error: true`; the script has no non-zero `process.exit` / `exitCode` |
+
+### 4.10 The chat tables — `chat-schema.contract.test.ts`
+
+The chat function's records (`chat_conversations`, `chat_messages`, `chat_usage`,
+`chat_budget_alerts`) are written only by the `chat` Edge Function with the
+service role; an agency member or a platform admin reads their own agency's
+rows. These cases read the two migrations as text. `supabase/tests/chat_tables_check.sql`
+is the runtime counterpart: against a local database it asserts that anon and an
+outsider read nothing, that a member sees only their agency and an admin sees
+both, that an authenticated user can neither write a message nor call the purge,
+that `chat_month_usage` sums per model, that the purge removes exactly the
+expired conversation with its messages, and that deleting a lead deletes its
+transcript and usage rows.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHSCH-001 | "%s has row-level security on" (4 tables) | `enable row level security` for each of the four tables |
+| CTR-CHSCH-002 | "are closed to anon and to authenticated writes" | Table privileges revoked from anon and authenticated; `select` alone granted back; outside comments, no grant naming insert/update/delete/all (alone or in a list) to authenticated, and no grant at all to anon |
+| CTR-CHSCH-003 | "let a member or an admin read their own agency's rows, and nobody else" | One `can_see(agency_id) or is_admin()` select policy on each of the three readable tables; none on `chat_budget_alerts`; exactly three `create policy chat_` |
+| CTR-CHSCH-004 | "delete a transcript with its lead, and messages and usage with their conversation" | `lead_id` and the two conversation FKs are `on delete cascade` |
+| CTR-CHSCH-005 | "keep transcripts twelve months by default" | `delete_after` defaults to `now() + interval '12 months'` |
+| CTR-CHSCH-006 | "open the usage totals and the purge to the service role only" | `revoke execute` from public, anon, authenticated and `grant execute` to service_role on `chat_month_usage` and `purge_chat_conversations` |
+| CTR-CHSCH-007 | "schedule the purge nightly, after enabling pg_cron" | The schedule migration creates the extension and schedules `chat-purge-nightly` at `15 1 * * *` |
+| CTR-CHSCH-008 | "record a hand-off apart from status, so a lead and a hand-off can both be told" | `chat_conversations.escalated_at timestamptz` is nullable and present |
+| CTR-CHSCH-009 | "hold a conversation for one turn at a time with a lease, free by default (I3)" | `chat_conversations.busy_until timestamptz` is nullable and present |
+| CTR-CHSCH-010 | "guard against write grants hidden in a list and against any grant to anon" | The two guards match `grant select, insert … to authenticated`, `grant all …`, a grant to `service_role, authenticated`, and a grant to anon; not a select grant, not the service-role grant, not a comment (triage 1) |
+
+### 4.11 The chat prompts — `chat-prompts.contract.test.ts`
+
+The chat function's prompts are Markdown files under `supabase/functions/chat/prompts/`, built into `prompts.generated.ts`. `interview.md`, filled for Dorit, must equal today's `needs_interview.jsonc` instructions apart from three tool-section lines; `compliance.md` is `COMPLIANCE.md` §3 and §5 verbatim; the function's agency copy must equal `agencyProfile.ts`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHPROMPT-001 | "%s equals agencyProfile.ts" | `AGENCY` (the function's copy) equals `AGENCY_PROFILE`, field by field (6 cases) |
+| CTR-CHPROMPT-002 | "names the agency the tenant migration seeds" | The tenant migration inserts `AGENCY.id` |
+| CTR-CHPROMPT-003 | "each tool-section change matches exactly one line of today's instructions" | The three `startsWith` prefixes each match one line of `needs_interview.jsonc` |
+| CTR-CHPROMPT-004 | "renders, for Dorit, to today's text byte for byte apart from the three tool-section lines" | `interview.md` filled for agency 1 equals today's instructions with only the three lines replaced |
+| CTR-CHPROMPT-005 | "asks for submitLead and never for a fenced block" | `interview.md` has no fenced `lead` block and requests the `submitLead` call |
+| CTR-CHPROMPT-006 | "is COMPLIANCE.md §3 and §5, verbatim" | `compliance.md` equals the §3 + §5 excerpt of `COMPLIANCE.md` |
+| CTR-CHPROMPT-007 | "no longer lists createConsultationEvent as an interview tool" | The stale `createConsultationEvent` row is gone from `COMPLIANCE.md` |
+| CTR-CHPROMPT-008 | "is what the build script writes from the Markdown files today" | `prompts.generated.ts` equals `renderPromptsModule` output; stale means run `npm run build:chat-prompts` |
+
+### 4.12 The chat function's tools — `tests/contract/chat-function.contract.test.ts`
+
+The interview's tools ask the model for nothing their Edge handlers do not read, and offer exactly the hand-off reasons `escalate-to-human` knows. Tasks 6 and 7 add their cases here.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHFN-001 | "submitLead asks the model only for fields submit-lead reads" | Every `submitLead` schema property is destructured by the submit-lead handler |
+| CTR-CHFN-002 | "escalateToHuman asks the model only for fields escalate-to-human reads" | Every `escalateToHuman` schema property is destructured by the escalate-to-human handler |
+| CTR-CHFN-003 | "offers exactly the hand-off reasons escalate-to-human knows" | `ESCALATION_REASONS` equals the keys of `REASONS` in `escalation.js`, in order |
+| CTR-CHFN-004 | "is public, like the forms, and registered" | `config.toml` has `[functions.chat]` with `verify_jwt = false` |
+| CTR-CHFN-005 | "enforces the same limits the page states" | The handler's `MAX_MESSAGE_CHARS` and `MAX_TURNS` equal the page's |
+| CTR-CHFN-006 | "accepts no consent version longer than submit-lead's column holds" | `MAX_CONSENT_VERSION_CHARS` equals `LEAD_FIELD_LIMITS.consent_version` in `submit-lead/lead.js` |
+| CTR-CHFN-008 | "stamps every conversation with the consent version it was given under" (changed pin, `agents.contract.test.ts`) | `consent_version: consentVersion`, chosen as `viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION` |
+| CTR-CHFN-007 | "sends only fields the function reads" | Every key the browser adapter posts, on the first and the following message, is read by `handler.ts` as `input.<key>` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -444,7 +581,7 @@ time.
 
 ## 6. Pass criteria
 
-All 542 cases pass. A failure means either the frontend or the backend definition
+All 590 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

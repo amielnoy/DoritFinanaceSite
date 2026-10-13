@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Image } from "@/components/ui/image";
 import type { Article } from "@/services";
 import { cn } from "@/lib/utils";
+import { articlePath } from "@/lib/articlePath";
 import ArticleMeta from "./ArticleMeta";
 
 export const FOCUS_RING =
@@ -27,7 +28,7 @@ export default function ArticleCard({
     <Link
       id={`post-${post.id}`}
       data-testid="article-card"
-      to={`/blog/${post.id}`}
+      to={articlePath(post)}
       className={cn(
         "group flex flex-col border-t border-border py-5",
         "md:border md:border-border md:bg-card md:p-6 md:rounded-md md:hover:border-accent md:transition-colors",

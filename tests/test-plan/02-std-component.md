@@ -196,6 +196,7 @@ featured row's deadline does not decide the outcome of an unrelated run.
 | CMP-BLOG-021 | "drops a keyword the new topic does not carry" | Switching topic clears it |
 | CMP-BLOG-022 | "keeps a keyword the new topic still carries" | Still pressed after the switch |
 | CMP-BLOG-023 | "hides the featured row while a keyword is chosen" | No featured row; only matching cards |
+| CMP-BLOG-024 | "links each card and the blog's JSON-LD to the slug, or to the id where the store has none" | `/blog/maslul-hashkaa` and `/blog/pen-2` in the cards and in `Blog.blogPost[].url` |
 
 ### 4.13 Reading-recommender filter — `tests/component/blog-recommendation-filter.test.tsx`
 
@@ -228,8 +229,63 @@ The real `AgentChat` with the recommender's descriptor; the agent service is fak
 | CMP-RCH-004 | "shows the approved one line and the licence, not the interview's notice" | The approved sentence and `L-00107009`; exactly two points; no "נאספים שם וטלפון בלבד" |
 | CMP-RCH-005 | "still gates the first message on the checkbox" | Start and send disabled before consent; the pre-filled text waits in the input |
 
+### 4.15 `<BlogPost />` — old addresses — `tests/component/blog-post-redirect.test.tsx`
+
+An address from before slugs (a Base44 id) shows the article, then replaces
+itself with `/blog/<slug>`, keeping the query and hash the link carried. The
+article is cached under the slug first, so the switch reads nothing again.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-POST-001 | "takes its slug address, keeping the query and the hash" | `/blog/horadat-dmei-nihul?utm_source=whatsapp#mah-bodkim`; one read |
+| CMP-POST-002 | "stays where it is when the address already is the slug" | Unchanged |
+| CMP-POST-003 | "stays on the id where the store has no slug (a build reading Base44)" | Unchanged |
+
+### 4.16 `<BlogAdmin />` — the article's address — `tests/component/blog-admin-slug.test.tsx`
+
+The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of STD-12).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-BADM-001 | "prefills an existing article's slug" | `horadat-dmei-nihul` |
+| CMP-BADM-002 | "asks for one on a new article, and will not save without it" | `SLUG_PROBLEMS.missing`; save disabled |
+| CMP-BADM-003 | "refuses %j" (3) | Format, Base44-id and taken messages; save disabled |
+| CMP-BADM-004 | "warns before a published article's address changes" | `role="status"` naming `/blog/horadat-dmei-nihul` |
+| CMP-BADM-005 | "does not warn for a draft, which nobody links to yet" | No status |
+| CMP-BADM-006 | "sends the slug with the article" | `mutateAsync({ id, draft: { …, slug } })` |
+| CMP-BADM-007 | "accepts a legacy fallback slug as it is" | `post-6ac8eb62b0a953274445869d` valid; save enabled |
+| CMP-BADM-008 | "asks a legacy article with no slug for one, and saves once it has one" | `SLUG_PROBLEMS.missing`; save disabled until a valid slug is typed |
+| CMP-BADM-009 | "shows the server's words when the address is taken (409), …" / "… invalid (400)" (2) | The 409 / 400 text in the alert; inputs and save still enabled |
+| CMP-BADM-010 | "keeps the generic message for any other failure, never the raw server text" | `שמירת המאמר נכשלה. ניתן לנסות שוב.` for a 500 |
+| CMP-BADM-011 | "says the public page goes at the next deploy after a published article is unpublished" | `role="status"` with "יוסר בעדכון הבא" and a pointer to the README; absent before the click |
+| CMP-BADM-012 | "says nothing when a draft is published" | No note |
+| CMP-BADM-013 | "says it after a published article is deleted, but not a draft" | Note only for the published one |
+| CMP-CHATFN-001 | "shows the v6 notice" | The fourth v6 consent point is rendered for `needs_interview` when served by `chat` |
+| CMP-CHATFN-002 | "sends the first message with the v6 stamp and shows the reply" | `consentVersion: 2026-10-agents-v6` in the function body; the reply appears |
+| CMP-CHATFN-003 | "counts the lead the function saved, and never submits it from the page" | `interviewCompleted` once on `signal: lead_saved`; `submitInterview` not called |
+| CMP-CHATFN-004 | "shows Dorit's channels and gives the text back when the function cannot answer" | A `tel:` link shown; the box holds the text again (`AgentUnavailableError`) |
+| CMP-CHATFN-005 | "answers a rate limit with its own final wording and gives the text back" | `נשלחו הרבה הודעות בזמן קצר. אפשר לנסות שוב בעוד דקה.`; box refilled |
+| CMP-CHATFN-006 | "answers a closed conversation with its own final wording" | `השיחה הזו הסתיימה. אפשר להתחיל שיחה חדשה.` |
+| CMP-CHATFN-010 | "answers a message sent while the last one is still being answered, and gives the text back" | 409 `busy`: `הודעה קודמת עדיין בטיפול — רגע אחד.`; box refilled (I3) |
+| CMP-CHATFN-011 | "shows the saved confirmation and Dorit's channels when the lead was saved but the reply failed (503 leadSaved)" | `LEAD_SAVED_WITHOUT_REPLY`, `HUMAN_HANDOFF.reachHer` and a `tel:` link; no failure copy; `interviewCompleted` once; box left empty (I5) |
+| CMP-CHATFN-012 | "shows the visitor's message while the reply is on its way" | The sent text is on screen before the answer; then the reply (I4) |
+| CMP-CHATFN-013 | "open their Base44 conversation with main's metadata only, no attribution keys (dark means byte-exact)" | A Base44 agent's `start` metadata has exactly `name`, `description`, `consent_version` (v5), `consent_at` (triage 7) |
+| CMP-CHATFN-014 | "while the interview on the chat function sends its attribution" | The served interview's metadata adds `channel`, `campaign`, `landing_path` (triage 7) |
+| CMP-CHATFN-007 | "keep the v5 notice, byte for byte" | A Base44 agent shows its v5 points and not the v6 fourth point |
+| CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
+| CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
+
+The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`, hooks stubbed). Read-only; visitor text is plain text.
+
+| ID | Test | Expect |
+|---|---|---|
+| CMP-LEADTX-001 | "is offered for the lead with a conversation and for no other" | One "שיחה" button for two leads |
+| CMP-LEADTX-002 | "is absent when no lead has a conversation" | No "שיחה" button; the page is as before |
+| CMP-LEADTX-003 | "shows the visitor's markup as text, never as elements" | The hostile string is in `textContent`; no `img`, no `b` element |
+| CMP-LEADTX-004 | "offers no control to write from the tab" | No textbox; only the hide button |
+
 ## 5. Pass criteria
 
-All 76 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 110 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

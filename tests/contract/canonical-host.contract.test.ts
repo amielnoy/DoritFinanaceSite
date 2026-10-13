@@ -120,7 +120,7 @@ describe("the canonical host has a single source", () => {
     // The catch-all is the rule that serves the app shell, whatever paths it
     // leaves out (it skips /assets, so a removed chunk is a 404).
     const at = (pred: (r: { source: string; destination: string }) => boolean) => rewrites.findIndex(pred);
-    const shell = at((r) => r.destination === "/app.html");
+    const shell = at((r) => r.destination === "/app");
     expect(shell, "no rule serves the app shell").toBeGreaterThan(-1);
     expect(
       at((r) => r.source.startsWith("/ws-user-apps")),

@@ -445,12 +445,22 @@ describe("email is sent from the backend, never the browser", () => {
 describe("BlogPost writes match the BlogPost entity", () => {
   const blogPost = loadEntity("BlogPost");
 
+  /** Sent by the form, stored by the Supabase mirror only — contentAdmin keeps it out of the Base44 write. */
+  const MIRROR_ONLY = ["slug"];
+
+  it("keeps the mirror-only fields off the BlogPost entity", () => {
+    for (const key of MIRROR_ONLY) {
+      expect(key in blogPost.properties, `${key} became a Base44 field — drop it from MIRROR_ONLY`).toBe(false);
+    }
+  });
+
   it("the admin payload carries title and body and nothing undeclared", () => {
     const adminPayload = findObjectLiteralCalls(/const payload\s*=\s*/).find(
       (c) => c.file === "src/pages/BlogAdmin.tsx"
     );
     expect(adminPayload, "BlogAdmin payload literal").toBeDefined();
-    expect(adminPayload!.keys.filter((k) => !(k in blogPost.properties))).toEqual([]);
+    expect(adminPayload!.keys).toContain("slug");
+    expect(adminPayload!.keys.filter((k) => !(k in blogPost.properties) && !MIRROR_ONLY.includes(k))).toEqual([]);
     for (const required of blogPost.required ?? []) {
       expect(adminPayload!.keys).toContain(required);
     }

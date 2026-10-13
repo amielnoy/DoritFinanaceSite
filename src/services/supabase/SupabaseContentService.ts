@@ -1,9 +1,16 @@
-import type { Article, ContentPort, Testimonial } from "../ports";
-import { fetchRows, toPortRow, type SupabaseTableClient } from "./SupabaseTableClient";
+import type { Article, ContentPort, Testimonial } from "../ports.js";
+import { SLUG_PATTERN, UUID_PATTERN } from "../../lib/articlePath.js";
+import { fetchRows, toPortRow, type SupabaseTableClient } from "./SupabaseTableClient.js";
 
-/** Named columns, not `*`: the port's fields and the two the mapping needs. */
+// Relative imports carry `.js`: api/og/blog.ts uses this class, and api/ is
+// compiled as Node ESM (nodenext), which resolves no extensionless path.
+
+/**
+ * Named columns, not `*`: the port's fields and the two the mapping needs.
+ * `slug` is the article's address, `/blog/<slug>` — see src/lib/articlePath.ts.
+ */
 export const ARTICLE_COLUMNS =
-  "id,base44_id,title,excerpt,body,image_url,tags,action_time,published,created_at";
+  "id,base44_id,slug,title,excerpt,body,image_url,tags,action_time,published,created_at";
 export const TESTIMONIAL_COLUMNS = "id,base44_id,name,role,quote,image_url,rating,source,created_at";
 
 export const toArticle = (row: Record<string, unknown>): Article => toPortRow(row) as unknown as Article;
@@ -14,6 +21,13 @@ export const toTestimonial = (row: Record<string, unknown>): Testimonial => {
   if (out.rating !== undefined) out.rating = Number(out.rating);
   return out as unknown as Testimonial;
 };
+
+/**
+ * "No such article", shaped the way api/og/blog.ts and Base44's `get` both
+ * spell it: a 404 status on the error. BlogPost.tsx reads any error as
+ * "not found"; the server tells a 404 from a failed read by this.
+ */
+const notFound = (key: string) => Object.assign(new Error(`article ${key} not found`), { status: 404 });
 
 /**
  * Read side of the content store, on Supabase.
@@ -39,15 +53,31 @@ export class SupabaseContentService implements ContentPort {
     return rows.map(toArticle);
   }
 
-  /** `id` is a Base44 id — see toPortRow — so the filter is on `base44_id`. */
-  async getArticle(id: string): Promise<Article> {
-    const [row] = await fetchRows(
-      this.client.from("blog_posts").select(ARTICLE_COLUMNS).eq("base44_id", id).limit(1),
+  /**
+   * One article, by whatever followed `/blog/` in the address.
+   *
+   * That is a slug (every link the site builds now), a Base44 id (every link
+   * before slugs: bookmarks, search results, the agents' answers), or Supabase's
+   * uuid for a row that never had a Base44 id. One request asks for all three,
+   * and the slug wins, then the Base44 id, then the uuid.
+   *
+   * The key goes into a PostgREST `or=(…)` filter, where a comma or a bracket
+   * would change the filter itself. So a key that is not slug-shaped is never
+   * sent: no slug, Base44 id or uuid can look like it. The uuid clause is sent
+   * only for a uuid-shaped key, because PostgREST answers `id.eq.<not a uuid>`
+   * with an error (22P02), not with an empty list.
+   */
+  async getArticle(key: string): Promise<Article> {
+    if (!SLUG_PATTERN.test(key)) throw notFound(key);
+    const clauses = [`slug.eq.${key}`, `base44_id.eq.${key}`];
+    if (UUID_PATTERN.test(key)) clauses.push(`id.eq.${key}`);
+    const rows = await fetchRows(
+      this.client.from("blog_posts").select(ARTICLE_COLUMNS).or(clauses.join(",")).limit(3),
       "blog_posts",
     );
-    // Base44's `get` threw on a missing id, and BlogPost.tsx reads that error as
-    // "not found". An empty result has to say the same thing.
-    if (!row) throw new Error(`article ${id} not found`);
+    const row =
+      rows.find((r) => r.slug === key) ?? rows.find((r) => r.base44_id === key) ?? rows.find((r) => r.id === key);
+    if (!row) throw notFound(key);
     return toArticle(row);
   }
 

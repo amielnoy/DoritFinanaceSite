@@ -25,6 +25,14 @@ export function tableFake(
       calls.push(["eq", column, value]);
       return query;
     },
+    or(filters) {
+      calls.push(["or", filters]);
+      return query;
+    },
+    not(column, operator, value) {
+      calls.push(["not", column, operator, value]);
+      return query;
+    },
     order(column, options) {
       calls.push(["order", column, options]);
       return query;

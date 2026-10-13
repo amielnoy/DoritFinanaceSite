@@ -399,3 +399,8 @@ verify_jwt = false
 
 [functions.log-support-chat]
 verify_jwt = false
+
+# The site's chat posts without signing in, like the forms; the function checks
+# its own input and holds a conversation by its own token.
+[functions.chat]
+verify_jwt = false

@@ -32,10 +32,13 @@ use the stubbed backend from `e2e/fixtures/app.ts`.
 | API-HTP-005 | "sitemap.xml is well-formed and lists only https URLs" | 200, XML content type, correct namespace, every `<loc>` is https |
 | API-HTP-006 | "every sitemap URL resolves on this deployment" | Each listed path returns 200 |
 | API-HTP-007 | "llms.txt is published for generative crawlers" | 200, `text/plain`, non-trivial length |
-| API-HTP-008 | "client-side routes fall back to the SPA shell with a 200" | `/blog`, `/claims`, `/privacy`, `/accessibility`, `/blog/:id` all 200 HTML |
+| API-HTP-008 | "client-side routes fall back to the SPA shell with a 200" | `/blog`, `/claims`, `/privacy`, `/accessibility` all 200 HTML; `/blog/:slug` is the article's prebuilt HTML (200), and a 24-hex `/blog/:id` is a 301 to the slug (`api/og/blog.ts`) |
 | API-HTP-009 | "the built JS and CSS bundles are reachable and non-empty" | Every `/assets/*` reference returns 200 with a body |
 | API-HTP-010 | "every same-origin file referenced by index.html actually exists" | 200 **and not `text/html`** — a missing static file is otherwise masked by the SPA fallback |
 | API-HTP-011 | "HEAD on the document does not error" | 200, 204 or 405 |
+| API-HTP-012 | "the sitemap lists the prebuilt articles" | At least one `/blog/<slug>` `<loc>`, and every one is followed by a `<lastmod>` (written by `scripts/build-seo-files.mjs`). Asserts no fixture slug, because the post-deploy smoke runs it against production |
+| API-HTP-013 | "llms.txt lists the articles and points at the full text" | Has the `## מאמרים` section and the `/llms-full.txt` link; its article links are exactly the sitemap's `/blog/<slug>` URLs |
+| API-HTP-014 | "llms-full.txt carries the questions and the articles as text" | 200, `text/plain`, the `## שאלות ותשובות` and `## מאמרים` sections and the licence number; after `## מאמרים` there is no top-level `## ` heading (article headings are demoted), at least one `### ` title, and no root-relative link |
 
 > API-HTP-010 found a real defect on the first run: `index.html` referenced
 > `/manifest.json`, which did not exist and was silently answered with the SPA

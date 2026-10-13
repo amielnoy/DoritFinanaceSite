@@ -172,6 +172,53 @@ test.describe("HTTP surface — sanity", () => {
     });
   });
 
+  // These three run against every build: the e2e fixture build in CI and the
+  // live site in the post-deploy smoke (`PLAYWRIGHT_BASE_URL`). So they assert
+  // properties any real article list has, never the fixture's own slug.
+  const ARTICLE_LOC = /<loc>(https:\/\/[^<]+\/blog\/[a-z0-9-]+)<\/loc>(\s*<lastmod>[^<]+<\/lastmod>)?/g;
+
+  test("the sitemap lists the prebuilt articles", async ({ request }) => {
+    const body = await test_step("GET /sitemap.xml", async () => (await request.get("/sitemap.xml")).text());
+    await test_step("there is at least one article, and each has a lastmod", async () => {
+      const articles = [...body.matchAll(ARTICLE_LOC)];
+      expect(articles.length, "no /blog/<slug> URL in the sitemap").toBeGreaterThan(0);
+      for (const [, loc, lastmod] of articles) expect(lastmod, `${loc} has no <lastmod>`).toBeTruthy();
+    });
+  });
+
+  test("llms.txt lists the articles and points at the full text", async ({ request }) => {
+    const [llms, sitemap] = await test_step("GET /llms.txt and /sitemap.xml", async () =>
+      Promise.all([(await request.get("/llms.txt")).text(), (await request.get("/sitemap.xml")).text()]),
+    );
+    await test_step("its articles are the sitemap's articles, and it links llms-full.txt", async () => {
+      expect(llms).toContain("## מאמרים");
+      expect(llms).toContain("/llms-full.txt");
+      const listed = [...llms.matchAll(/^- \[[^\]]*\]\((https:\/\/[^)]+\/blog\/[a-z0-9-]+)\)/gm)].map((m) => m[1]);
+      const inSitemap = [...sitemap.matchAll(ARTICLE_LOC)].map((m) => m[1]);
+      expect(listed.length, "no article line in llms.txt").toBeGreaterThan(0);
+      expect(listed.sort()).toEqual(inSitemap.sort());
+    });
+  });
+
+  test("llms-full.txt carries the questions and the articles as text", async ({ request }) => {
+    const res = await test_step("GET /llms-full.txt", () => request.get("/llms-full.txt"));
+    await test_step("it is served as plain text with both sections", async () => {
+      expect(res.status()).toBe(200);
+      expect(res.headers()["content-type"]).toContain("text/plain");
+      const body = await res.text();
+      expect(body).toContain("## שאלות ותשובות");
+      expect(body).toContain("## מאמרים");
+      expect(body).toContain("L-00107009");
+      // Articles' own headings are demoted below their "###" titles, so nothing
+      // after "## מאמרים" is a top-level section of the file.
+      const articles = body.slice(body.indexOf("## מאמרים") + "## מאמרים".length);
+      expect(articles).not.toMatch(/^## /m);
+      expect(articles).toMatch(/^### /m);
+      // Links inside the articles are absolute: the file is read on its own.
+      expect(articles).not.toMatch(/\]\(\/(?!\/)/);
+    });
+  });
+
   test("client-side routes fall back to the SPA shell with a 200", async ({ request }) => {
     for (const path of ["/blog", "/claims", "/privacy", "/accessibility", "/blog/some-id"]) {
       await test_step(`${path} is answered with the SPA shell`, async () => {

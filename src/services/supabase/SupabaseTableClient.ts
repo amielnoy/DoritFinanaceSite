@@ -7,6 +7,10 @@ export interface SupabaseReadResult {
 /** The chainable part of a select — only the calls the read adapters make. */
 export interface SupabaseQuery extends PromiseLike<SupabaseReadResult> {
   eq(column: string, value: unknown): SupabaseQuery;
+  /** PostgREST `or=(…)`. `filters` without the brackets, as supabase-js takes it. */
+  or(filters: string): SupabaseQuery;
+  /** PostgREST `col=not.<op>.<value>`, as supabase-js's `.not("lead_id", "is", null)`. */
+  not(column: string, operator: string, value: unknown): SupabaseQuery;
   order(column: string, options: { ascending: boolean }): SupabaseQuery;
   limit(count: number): SupabaseQuery;
 }
