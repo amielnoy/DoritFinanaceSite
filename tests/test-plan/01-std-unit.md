@@ -706,6 +706,8 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTURN-007 | "fails without a retry when the first failure comes after ten seconds" | `TurnFailure` `model_http_529` |
 | UNIT-CHTURN-008 | "fails on a second failure, keeping what the tools already did" | `TurnFailure` `model_timeout`, `tools` equals the earlier outcome |
 | UNIT-CHTURN-009 | "refuses an empty reply" | `TurnFailure` `empty_reply` |
+| UNIT-CHTURN-010 | "fails a reply cut off at max_tokens inside a tool call, without running the tool or returning its text" | `stop_reason: max_tokens` with a partial `submitLead`: `TurnFailure` `truncated_tool_call`, usage kept, `runTool` never called (I1) |
+| UNIT-CHTURN-011 | "asks for up to 2,048 reply tokens, room for a Hebrew profile summary" | `MAX_REPLY_TOKENS` is 2048 and the request carries it (I1) |
 | UNIT-CHBUDGET-001 | "prices Haiku tokens per million" | 1M input + 1M cached + 1M output = $0.61 |
 | UNIT-CHBUDGET-002 | "prices an unknown model at the most expensive known rate, never at zero" | 1M input tokens = $2 |
 | UNIT-CHBUDGET-003 | "accepts the totals as PostgREST sends bigints" | String token counts are summed as numbers |
@@ -873,5 +875,5 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 ## 5. Pass criteria
 
-All 611 cases pass. Any failure is a functional defect, not an environment issue —
+All 613 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ModelError, type ModelClient, type ModelRequest, type ModelResponse } from "../../supabase/functions/chat/anthropic.ts";
-import { runTurn, toModelHistory, TurnFailure } from "../../supabase/functions/chat/turn.ts";
+import { MAX_REPLY_TOKENS, runTurn, toModelHistory, TurnFailure } from "../../supabase/functions/chat/turn.ts";
 import type { ToolOutcome } from "../../supabase/functions/chat/tools.ts";
 
 const usage = { input: 100, cached: 0, output: 10 };
@@ -100,6 +100,29 @@ describe("runTurn", () => {
     const err = await runTurn({ ...base, model, runTool: async () => ok }).catch((e) => e);
     expect(err.reason).toBe("model_timeout");
     expect(err.tools).toEqual([ok]);
+  });
+
+  it("fails a reply cut off at max_tokens inside a tool call, without running the tool or returning its text", async () => {
+    // The model began the closing submitLead and ran out of tokens: the arguments are partial.
+    const cut: ModelResponse = {
+      content: [{ type: "text", text: "מעולה, אני שומרת את הפרטים" }, { type: "tool_use", id: "tu_1", name: "submitLead", input: { stage: "complete", name: "רונית" } }],
+      stopReason: "max_tokens",
+      usage,
+      model: "claude-haiku-5-5",
+    };
+    const runTool = vi.fn(async () => ok);
+    const err = await runTurn({ ...base, model: scripted([cut]), runTool }).catch((e) => e);
+    expect(err).toBeInstanceOf(TurnFailure);
+    expect(err.reason).toBe("truncated_tool_call");
+    expect(err.usage).toHaveLength(1);
+    expect(runTool).not.toHaveBeenCalled();
+  });
+
+  it("asks for up to 2,048 reply tokens, room for a Hebrew profile summary", async () => {
+    const model = scripted([text("שלום")]);
+    await runTurn({ ...base, model, runTool: vi.fn() });
+    expect(MAX_REPLY_TOKENS).toBe(2048);
+    expect(model.calls[0].maxTokens).toBe(2048);
   });
 
   it("refuses an empty reply", async () => {

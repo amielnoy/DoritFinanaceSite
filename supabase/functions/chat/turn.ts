@@ -10,7 +10,8 @@ import type { ToolDefinition, ToolOutcome } from './tools.ts';
 export const MAX_TOOL_ROUNDS = 3;
 export const TURN_BUDGET_MS = 25_000;
 export const RETRY_WINDOW_MS = 10_000;
-export const MAX_REPLY_TOKENS = 1024;
+/** Room for a closing reply and a full submitLead (a Hebrew profile summary) in one response. */
+export const MAX_REPLY_TOKENS = 2048;
 
 export interface StoredMessage {
   role: 'user' | 'assistant' | 'tool';
@@ -106,6 +107,9 @@ export async function runTurn(args: {
       .trim();
     const uses = response.content.filter((b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use');
 
+    // Cut off inside a tool call: its arguments are partial. Neither run it (half a
+    // lead) nor answer with the text before it (the visitor would think it was saved).
+    if (response.stopReason === 'max_tokens' && uses.length > 0) throw new TurnFailure('truncated_tool_call', tools, usage);
     if (response.stopReason !== 'tool_use' || uses.length === 0) {
       if (!reply) throw new TurnFailure('empty_reply', tools, usage);
       return { reply, usage, tools, toolCalls };
