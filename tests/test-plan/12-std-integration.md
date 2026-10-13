@@ -626,9 +626,40 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKNEW-022 | "refuses a request that is no longer waiting for a code" | 409; hash unchanged |
 | INT-MSKNEW-023 | "refuses an id that is not one" | 400 `invalid`; no `masleka_requests` call |
 
+### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..024`
+
+Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Israel.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKREM-001 | "answers disabled while MASLEKA_ENABLED is unset" | 404 |
+| INT-MSKREM-002 | "refuses everything when no secret is configured" | 503; no table read |
+| INT-MSKREM-003 | "refuses everything when the secret is shorter than 32 characters" | 503 for a 31-character secret even when the header matches; no table read, no staff lookup, no mail |
+| INT-MSKREM-004 | "refuses a caller without the secret, or with another" | 401 for none, a wrong one, a prefix and a longer string; no table read, no mail |
+| INT-MSKREM-005 | "does nothing at all while the switch is off, even for the right secret" | 404 `disabled`; no fetch, no mail |
+| INT-MSKREM-006 | "tells staff the files are ready four hours after הגשתי" | One notice per staff address for the 5-hour-old submission only; marked |
+| INT-MSKREM-007 | "sends one digest when several are ready" | One mail per address, "— 2 לקוחות" |
+| INT-MSKREM-008 | "tells staff on business day 5 that the clearinghouse deletes in two days" | Deadline notice for the Sunday-before submission; marked |
+| INT-MSKREM-009 | "does not warn before business day 5" | No deadline notice at 08:00 UTC |
+| INT-MSKREM-010 | "ignores requests PR B has completed" | Completed row untouched |
+| INT-MSKREM-011 | "claims each staff notice in one conditional update that checks it was never sent" | One PATCH per kind, filtered on `status=eq.submitted` and the marker `is.null` |
+| INT-MSKREM-012 | "sends nothing when another run has already claimed the notice" | Marker set by a rival run before the claim: zero rows back, no staff mail |
+| INT-MSKREM-013 | "gives the claim back when no staff address could be mailed, so the next run tries again" | Both markers null again; warnings `ready_not_sent`, `deadline_not_sent` |
+| INT-MSKREM-014 | "takes business day 5 from the business calendar: a Thursday submission is due the next Thursday" | Not due at 08:00 UTC Thursday 15 Oct, due at 09:00 (`addBusinessDays`) |
+| INT-MSKREM-015 | "never carries a code, an ID or ciphertext in a mail, and never asks for the ciphertext columns" | No ciphertext marker in any mail; no `masleka_requests` URL names a ciphertext column |
+| INT-MSKREM-016 | "never repeats a reminder" | Second run sends nothing |
+| INT-MSKREM-017 | "reminds a client once, a week after the invitation, with a new link" | One reminder; stored hash = new token; original `token_expires_at` kept; others untouched |
+| INT-MSKREM-018 | "the old link stops working once the reminder has rotated it" | `masleka-code` refuses the old token, accepts the new |
+| INT-MSKREM-019 | "puts the reminder back when the client's mail fails, so the next run tries again" | `client_reminded_at` null; warning |
+| INT-MSKREM-020 | "claims the client reminder in one conditional update that checks it was never sent" | One PATCH: `client_reminded_at=is.null`, `status=eq.invited`; sets only the hash and the marker |
+| INT-MSKREM-021 | "does not remind a client whose link a person sent by hand, or one whose link has expired" | Hand-sent (marker set) and expired rows: no mail, hash unchanged |
+| INT-MSKREM-022 | "sends nothing to a client when another run has already claimed the reminder" | Rival marker: zero rows back, no mail, `clients: 0` |
+| INT-MSKREM-023 | "writes no name, address, token or link to a log line" | Across a clean run and a failing-mail run: none of the names, addresses, secret, link or old token in any line |
+| INT-MSKREM-024 | "answers how many it sent" | `{ready: 1, deadline: 1, clients: 1, warnings: []}` |
+
 ## 5. Pass criteria
 
-All 382 cases pass. These assert behaviour, not shape — a failure means the
+All 406 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

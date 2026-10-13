@@ -416,3 +416,6 @@ verify_jwt = false
 
 [functions.masleka-create]
 verify_jwt = false
+
+[functions.masleka-remind]
+verify_jwt = false
