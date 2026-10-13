@@ -435,6 +435,28 @@ Regenerate the files with `node scripts/self-host-fonts.mjs`; never edit
 | CTR-EDGE-002 | "are each registered without JWT verification, as submit-claim is" | `verify_jwt = false` for `submit-claim`, `submit-lead`, `escalate-to-human`, `log-support-chat` in `config.toml` |
 | CTR-EDGE-003 | "ask Google for exactly two scopes" | `_shared/google.ts` lists only `calendar.events` and `spreadsheets` |
 
+### 4.8 Article addresses — `article-slug.contract.test.ts`
+
+`blog_posts.slug` is shaped by four things that cannot import one another — the
+migration's CHECK, `src/lib/articlePath.ts`, `contentAdmin` and
+`scripts/published-articles.mjs` — and these cases keep them one rule. The
+backfill is checked against the files it names, from its own side, so a draft
+added to `content/blog/` later needs no row in a migration that has shipped.
+`supabase/tests/blog_slug_check.sql` is the runtime counterpart: it re-applies
+the migration on production-shaped rows (a duplicated title, an untidy Base44
+id, a row with none) and asserts the backfill and every constraint. It also
+asserts the BEFORE INSERT fallback trigger: an insert or upsert that sends no
+slug gets `post-<id>`, an existing slug is never overwritten, and a sent slug is
+kept. That trigger is what lets the migration reach production before the code
+that writes real slugs.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-SLUG-001 | "the migration's CHECKs are articlePath's patterns" | `slug ~` equals `SLUG_PATTERN.source`; `slug !~` equals `BASE44_ID_PATTERN.source` |
+| CTR-SLUG-002 | "gives a repo article's slug to that file's exact title" | 20 backfill rows name a file; each title equals that file's front matter |
+| CTR-SLUG-003 | "names the two live articles older than the repo files" | `bituach-briut-digitali`, `pensia-beidan-ha-ai` with their exact titles |
+| CTR-SLUG-004 | "maps 22 distinct titles to 22 distinct slugs" | 22 rows, no title or slug twice |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -444,7 +466,7 @@ time.
 
 ## 6. Pass criteria
 
-All 542 cases pass. A failure means either the frontend or the backend definition
+All 546 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight
