@@ -117,14 +117,25 @@ function ManualCopy({
   );
 }
 
-function LinkPanel({ link, clipboard }: { link: MaslekaLink; clipboard: ClipboardLike | null }) {
+function LinkPanel({
+  link,
+  clipboard,
+  mailRequested = false,
+}: {
+  link: MaslekaLink;
+  clipboard: ClipboardLike | null;
+  /** The invitation was asked for: if it did not go, say so rather than stay quiet. */
+  mailRequested?: boolean;
+}) {
   const [copied, setCopied] = useState<"idle" | "copied" | "manual">("idle");
   return (
     <div className="mt-3 border border-border/60 bg-background p-3">
       <p className="text-sm">
         {link.invited
           ? "הקישור נשלח במייל ללקוח. אפשר גם להעתיק אותו:"
-          : "הקישור מוצג פעם אחת בלבד — העתיקו ושלחו ללקוח:"}
+          : mailRequested
+            ? "המייל ללקוח לא נשלח. העבירו לו את הקישור בעצמכם — הוא מוצג פעם אחת בלבד:"
+            : "הקישור מוצג פעם אחת בלבד — העתיקו ושלחו ללקוח:"}
       </p>
       <input
         readOnly
@@ -159,11 +170,13 @@ function Column({ title, empty, children }: { title: string; empty: string; chil
 function NewRequest({
   service,
   clipboard,
+  onStart,
   onCreated,
   onFailure,
 }: {
   service: MaslekaPort;
   clipboard: ClipboardLike | null;
+  onStart: () => void;
   onCreated: () => Promise<unknown>;
   onFailure: (e: unknown) => void;
 }) {
@@ -171,22 +184,27 @@ function NewRequest({
   const [email, setEmail] = useState("");
   const [sendInvite, setSendInvite] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<MaslekaLink | null>(null);
+  const [result, setResult] = useState<{ link: MaslekaLink; mailRequested: boolean } | null>(null);
   const headingId = useId();
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const clientName = name.trim();
     const contactEmail = email.trim();
-    if (!clientName) return;
+    onStart();
+    if (!clientName) {
+      onFailure(new MaslekaError("invalid_name"));
+      return;
+    }
+    const mailRequested = sendInvite && Boolean(contactEmail);
     setBusy(true);
     try {
       const link = await service.create({
         clientName,
         contactEmail: contactEmail || undefined,
-        sendInvite: sendInvite && Boolean(contactEmail),
+        sendInvite: mailRequested,
       });
-      setResult(link);
+      setResult({ link, mailRequested });
       setName("");
       setEmail("");
       await onCreated();
@@ -238,7 +256,7 @@ function NewRequest({
           צור בקשה
         </button>
       </form>
-      {result ? <LinkPanel link={result} clipboard={clipboard} /> : null}
+      {result ? <LinkPanel link={result.link} mailRequested={result.mailRequested} clipboard={clipboard} /> : null}
     </section>
   );
 }
@@ -247,16 +265,19 @@ function InvitedRow({
   request,
   service,
   clipboard,
+  onStart,
   onFailure,
 }: {
   request: MaslekaRequest;
   service: MaslekaPort;
   clipboard: ClipboardLike | null;
+  onStart: () => void;
   onFailure: (e: unknown) => void;
 }) {
   const [link, setLink] = useState<MaslekaLink | null>(null);
   const [busy, setBusy] = useState(false);
   const relink = async () => {
+    onStart();
     setBusy(true);
     try {
       setLink(await service.relink(request.id));
@@ -285,14 +306,24 @@ function InvitedRow({
 /**
  * The one revealed value on the board, if any: at most one at a time, and
  * only the answer to the latest ask is ever used — a slower answer to an
- * earlier click, or one that lands after the page is gone, is dropped before
- * it reaches the clipboard or the screen.
+ * earlier click, or one that lands after the page is gone, after `hide()` or
+ * after its row has left the column, is dropped before it reaches the
+ * clipboard or the screen.
  */
-function useReveal(service: MaslekaPort, clipboard: ClipboardLike | null, onFailure: (e: unknown) => void) {
+function useReveal(
+  service: MaslekaPort,
+  clipboard: ClipboardLike | null,
+  onStart: () => void,
+  onFailure: (e: unknown) => void,
+) {
   const [shown, setShown] = useState<Shown | null>(null);
   const [busy, setBusy] = useState<{ requestId: string; field: MaslekaField } | null>(null);
   const latest = useRef(0);
   const fieldRef = useRef<HTMLInputElement>(null);
+  // The row the board is busy with or showing, for hideFor() called from a callback.
+  const activeId = shown?.requestId ?? busy?.requestId ?? null;
+  const activeRef = useRef<string | null>(activeId);
+  activeRef.current = activeId;
 
   useEffect(
     () => () => {
@@ -322,6 +353,7 @@ function useReveal(service: MaslekaPort, clipboard: ClipboardLike | null, onFail
 
   const reveal = async (request: MaslekaRequest, field: MaslekaField) => {
     const ask = ++latest.current;
+    onStart();
     setShown(null);
     setBusy({ requestId: request.id, field });
     try {
@@ -337,8 +369,20 @@ function useReveal(service: MaslekaPort, clipboard: ClipboardLike | null, onFail
     }
   };
 
-  const hide = useCallback(() => setShown(null), []);
-  return { shown, busy, fieldRef, reveal, hide };
+  /** Off the screen, and any answer still on its way dropped. */
+  const hide = useCallback(() => {
+    latest.current += 1;
+    setShown(null);
+    setBusy(null);
+  }, []);
+  /** hide(), when the board is busy with or showing this row. */
+  const hideFor = useCallback(
+    (requestId: string) => {
+      if (activeRef.current === requestId) hide();
+    },
+    [hide],
+  );
+  return { shown, busy, activeId, fieldRef, reveal, hide, hideFor };
 }
 
 export default function MaslekaBoard({
@@ -352,11 +396,15 @@ export default function MaslekaBoard({
   const [notice, setNotice] = useState<Message | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: BOARD_KEY });
   const report = (e: unknown) => setNotice({ tone: staffMessage(e).tone, text: failureText(e) });
-  const { shown, busy, fieldRef, reveal, hide } = useReveal(service, clipboard, report);
+  // Each action starts with a clean slate, so an old failure never sits beside a later success.
+  const clearNotice = () => setNotice(null);
+  const { shown, busy, activeId, fieldRef, reveal, hide, hideFor } = useReveal(service, clipboard, clearNotice, report);
+  const submitting = useRef(false);
   const submitted = useMutation({
     mutationFn: (id: string) => service.markSubmitted(id),
-    onSuccess: () => {
-      setNotice(null);
+    onSuccess: (_done, id) => {
+      // Wiped server-side: off the screen now, not after the refetch (which may fail).
+      hideFor(id);
       return refresh();
     },
     onError: (e) => {
@@ -370,15 +418,24 @@ export default function MaslekaBoard({
   const columns = boardColumns(requests.data ?? []);
   const at = now();
 
-  // A value whose row has left "ממתין להגשה" (submitted, expired) goes with it.
-  const shownRowWaiting = shown ? columns.waiting.some((r) => r.id === shown.requestId) : true;
+  // A value whose row has left "ממתין להגשה" (submitted, expired) goes with it,
+  // and so does an answer for that row still on its way.
+  const activeRowWaiting = activeId === null || columns.waiting.some((r) => r.id === activeId);
   useEffect(() => {
-    if (!shownRowWaiting) hide();
-  }, [shownRowWaiting, hide]);
+    if (!activeRowWaiting) hide();
+  }, [activeRowWaiting, hide]);
 
   const onSubmitted = (request: MaslekaRequest) => {
+    // One call per הגשתי: a double click lands before the button is disabled.
+    if (submitting.current) return;
     if (!confirm(`להגיש עבור ${request.clientName}? הקוד ומספר הזהות יימחקו מהמערכת.`)) return;
-    submitted.mutate(request.id);
+    submitting.current = true;
+    clearNotice();
+    submitted.mutate(request.id, {
+      onSettled: () => {
+        submitting.current = false;
+      },
+    });
   };
 
   const revealButton = (request: MaslekaRequest, field: MaslekaField) => {
@@ -425,7 +482,7 @@ export default function MaslekaBoard({
           </p>
         ) : null}
 
-        <NewRequest service={service} clipboard={clipboard} onCreated={refresh} onFailure={report} />
+        <NewRequest service={service} clipboard={clipboard} onStart={clearNotice} onCreated={refresh} onFailure={report} />
 
         {requests.isError ? (
           <div role="alert" className="text-sm">
@@ -437,7 +494,7 @@ export default function MaslekaBoard({
 
         <Column title="הוזמנו — ממתינים לקוד" empty="אין לקוחות שממתינים לקוד.">
           {columns.invited.map((r) => (
-            <InvitedRow key={r.id} request={r} service={service} clipboard={clipboard} onFailure={report} />
+            <InvitedRow key={r.id} request={r} service={service} clipboard={clipboard} onStart={clearNotice} onFailure={report} />
           ))}
         </Column>
 

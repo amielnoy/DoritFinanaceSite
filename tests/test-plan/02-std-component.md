@@ -324,6 +324,12 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
 | CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל" |
 | CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown |
+| CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves before the answer: never copied, never shown, no "הועתק ✓" when the row returns |
+| CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks in one tick → one `markSubmitted`, one refetch |
+| CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |
+| CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | "הועתק ✓" gone right after `markSubmitted('r2')`, with the refetch rejecting |
+| CMP-MSKB-026 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
+| CMP-MSKB-027 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
 
 ### 4.20 `<FloatingHeader />` — the clearinghouse board link, switched on — `tests/component/floating-header-masleka.test.tsx`
 
@@ -336,6 +342,6 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 
 ## 5. Pass criteria
 
-All 145 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 151 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

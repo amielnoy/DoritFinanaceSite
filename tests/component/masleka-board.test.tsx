@@ -243,24 +243,58 @@ describe("<MaslekaBoard /> — copying", () => {
       key: () => null,
       length: 0,
     });
-    for (const name of ["localStorage", "sessionStorage"]) {
+    const names = ["localStorage", "sessionStorage"] as const;
+    const originals = names.map((name) => Object.getOwnPropertyDescriptor(window, name));
+    for (const name of names) {
       Object.defineProperty(window, name, { value: recording(), configurable: true });
     }
-    const { client } = renderBoard({ service: service(), clipboard: null });
-    const waiting = column("ממתין להגשה");
-    await userEvent.click(await waiting.findByRole("button", { name: "העתק ת״ז" }));
-    expect(await waiting.findByDisplayValue("000000018")).toBeInTheDocument();
+    try {
+      const { client } = renderBoard({ service: service(), clipboard: null });
+      const waiting = column("ממתין להגשה");
+      await userEvent.click(await waiting.findByRole("button", { name: "העתק ת״ז" }));
+      expect(await waiting.findByDisplayValue("000000018")).toBeInTheDocument();
 
-    const cached = JSON.stringify([
-      client.getQueryCache().getAll().map((q) => q.state),
-      client.getMutationCache().getAll().map((m) => m.state),
-    ]);
-    expect(cached).not.toContain("000000018");
-    expect(writes.join("\n")).not.toContain("000000018");
-    for (const spy of spies) {
-      expect(JSON.stringify(spy.mock.calls)).not.toContain("000000018");
+      const cached = JSON.stringify([
+        client.getQueryCache().getAll().map((q) => q.state),
+        client.getMutationCache().getAll().map((m) => m.state),
+      ]);
+      expect(cached).not.toContain("000000018");
+      expect(writes.join("\n")).not.toContain("000000018");
+      for (const spy of spies) {
+        expect(JSON.stringify(spy.mock.calls)).not.toContain("000000018");
+      }
+      expect(window.location.href).not.toContain("000000018");
+    } finally {
+      names.forEach((name, i) => {
+        const original = originals[i];
+        if (original) Object.defineProperty(window, name, original);
+        else delete (window as unknown as Record<string, unknown>)[name];
+      });
     }
-    expect(window.location.href).not.toContain("000000018");
+  });
+
+  it("drops a value still on its way when its row leaves the column", async () => {
+    const slow = deferred<string>();
+    const clipboard = { writeText: vi.fn(async () => {}) };
+    const gone = ROWS.map((r) => (r.id === "r2" ? { ...r, status: "submitted" as const, submittedAt: iso(0) } : r));
+    const list = vi.fn().mockResolvedValueOnce(ROWS).mockResolvedValueOnce(gone).mockResolvedValue(ROWS);
+    const { client } = renderBoard({ service: service({ list, reveal: vi.fn(async () => slow.promise) }), clipboard });
+    await userEvent.click(await column("ממתין להגשה").findByRole("button", { name: "העתק ת״ז" }));
+    await act(async () => {
+      await client.invalidateQueries();
+    });
+    expect(await column("ממתין להגשה").findByText("אין קודים שממתינים להגשה.")).toBeInTheDocument();
+    await act(async () => {
+      slow.resolve("000000018");
+      await slow.promise;
+    });
+    await act(async () => {
+      await client.invalidateQueries();
+    });
+    expect(await column("ממתין להגשה").findByText("רונית מזרחי")).toBeInTheDocument();
+    expect(clipboard.writeText).not.toHaveBeenCalled();
+    expect(screen.queryByDisplayValue("000000018")).not.toBeInTheDocument();
+    expect(column("ממתין להגשה").queryByRole("button", { name: "הועתק ✓" })).not.toBeInTheDocument();
   });
 });
 
@@ -325,6 +359,75 @@ describe("<MaslekaBoard /> — acting", () => {
     expect(svc.create).toHaveBeenCalledWith({ clientName: "משה כהן", contactEmail: "moshe@example.com", sendInvite: true });
     expect(await screen.findByDisplayValue(LINK)).toBeInTheDocument();
     expect(screen.getByText(/הקישור נשלח במייל ללקוח/)).toBeInTheDocument();
+  });
+
+  it("makes one הגשתי call for a double click that lands before the button is disabled", async () => {
+    const wipe = deferred<void>();
+    const svc = service({ markSubmitted: vi.fn(() => wipe.promise) });
+    renderBoard({ service: svc, clipboard: null, confirm: () => true });
+    const button = await column("ממתין להגשה").findByRole("button", { name: "הגשתי" });
+    // Both clicks land before React re-renders the button as disabled.
+    act(() => {
+      button.click();
+      button.click();
+    });
+    await act(async () => {
+      wipe.resolve();
+      await wipe.promise;
+    });
+    await waitFor(() => expect(svc.list).toHaveBeenCalledTimes(2));
+    expect(svc.markSubmitted).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears an old failure when the next action starts", async () => {
+    const reveal = vi
+      .fn()
+      .mockRejectedValueOnce(new MaslekaError("unavailable", "z4"))
+      .mockResolvedValue("000000018");
+    const clipboard = { writeText: vi.fn(async () => {}) };
+    renderBoard({ service: service({ reveal }), clipboard });
+    const waiting = column("ממתין להגשה");
+    await userEvent.click(await waiting.findByRole("button", { name: "העתק ת״ז" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("השירות אינו זמין כרגע");
+    await userEvent.click(waiting.getByRole("button", { name: "העתק ת״ז" }));
+    expect(await waiting.findByRole("button", { name: "הועתק ✓" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails", async () => {
+    const list = vi.fn().mockResolvedValueOnce(ROWS).mockRejectedValue(new MaslekaError("failed"));
+    const svc = service({ list });
+    const clipboard = { writeText: vi.fn(async () => {}) };
+    renderBoard({ service: svc, clipboard, confirm: () => true });
+    const waiting = column("ממתין להגשה");
+    await userEvent.click(await waiting.findByRole("button", { name: "העתק ת״ז" }));
+    expect(await waiting.findByRole("button", { name: "הועתק ✓" })).toBeInTheDocument();
+    await userEvent.click(waiting.getByRole("button", { name: "הגשתי" }));
+    await waitFor(() => expect(svc.markSubmitted).toHaveBeenCalledWith("r2"));
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    expect(waiting.getByText("רונית מזרחי")).toBeInTheDocument();
+    expect(waiting.queryByRole("button", { name: "הועתק ✓" })).not.toBeInTheDocument();
+    expect(waiting.getByRole("button", { name: "העתק ת״ז" })).toBeInTheDocument();
+  });
+
+  it("says a blank name is not valid, and sends nothing", async () => {
+    const svc = service();
+    renderBoard({ service: svc, clipboard: null });
+    await userEvent.type(screen.getByLabelText("שם הלקוח"), "   ");
+    await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("השם אינו תקין");
+    expect(svc.create).not.toHaveBeenCalled();
+  });
+
+  it("says so when the invitation e-mail was asked for but not sent", async () => {
+    const svc = service({ create: vi.fn(async () => ({ requestId: "r9", link: LINK, invited: false })) });
+    renderBoard({ service: svc, clipboard: null });
+    await userEvent.type(screen.getByLabelText("שם הלקוח"), "משה כהן");
+    await userEvent.type(screen.getByLabelText("מייל (לא חובה)"), "moshe@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
+    expect(await screen.findByDisplayValue(LINK)).toBeInTheDocument();
+    expect(screen.getByText(/המייל ללקוח לא נשלח/)).toBeInTheDocument();
+    expect(screen.queryByText(/הקישור נשלח במייל ללקוח/)).not.toBeInTheDocument();
   });
 
   it("issues a fresh link for an invited client", async () => {
