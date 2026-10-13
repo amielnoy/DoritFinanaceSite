@@ -162,6 +162,15 @@ To reproduce the failure deliberately: `rm -rf dist && npm run build`, then
 `SKIP_BUILD=1 npx playwright test e2e/seo/prerender.spec.ts`.
 
 
+## 5b. The generated sitemap, llms files and IndexNow
+
+The sitemap, `llms.txt` and `llms-full.txt` that `build:prerender` writes, and the
+IndexNow step after a production deploy, are not covered by the browser cases
+above. Their cases live elsewhere: UNIT-SEOF-* in `01-std-unit.md` (section 4.28)
+and the IndexNow unit cases (section 4.30), the build wiring, the ai-surface and
+`indexnow.contract.test.ts` rows (CTR-INOW-*) in `03-std-contract.md`, and
+API-HTP-013 and API-HTP-014 in `05-std-api.md` for the served files.
+
 ## 6. Pass criteria
 
 All 19 unit and 50 e2e cases pass, with SEO-MOB-005 reporting rather than

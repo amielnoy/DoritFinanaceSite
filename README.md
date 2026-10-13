@@ -900,6 +900,66 @@ other address or number in the file.
 `robots.txt` names each AI crawler explicitly and allows it, with a comment
 saying how to opt out of training while staying answerable in AI search.
 
+### The sitemap, llms.txt and llms-full.txt
+
+`public/sitemap.xml` and `public/llms.txt` are templates. They hold the static
+routes and the fixed text, and the Base44 Builder's `npm run build` ships them
+unchanged, so a host that cannot prerender still serves a correct, if
+article-less, pair.
+
+`npm run build:prerender` ends with `scripts/build-seo-files.mjs`, which rewrites
+`dist/sitemap.xml` and `dist/llms.txt` with the published articles and writes
+`dist/llms-full.txt`: the FAQ and the full text of every article, for an
+assistant that wants one document rather than one fetch per article. It starts from
+the `dist/` copies, so the host the site-url plugin chose is already in them.
+
+The article list is the prerender's own (`loadPublishedArticles`, read from
+Supabase in pages, and refusing a list that came back cut short). That is
+deliberate: the sitemap must not advertise a page the build did not make.
+Production (`PRERENDER_REQUIRED=1`) fails without the list; a preview warns and
+ships the templates.
+
+The static routes carry no `lastmod`, because nothing dates them honestly.
+`/blog` carries its newest article's, and each article carries its `updated_at`.
+The headings `## דפים` and `## הערה למנועי חיפוש ולסוכני AI` in `public/llms.txt`
+are what the build cuts at, and it throws without them, so do not rename them.
+
+### IndexNow
+
+IndexNow lets a site tell a search engine that a URL changed instead of waiting
+to be recrawled. Bing, Yandex, Seznam and Naver take part; Google does not use
+it, so it is covered by the sitemap and Search Console alone.
+
+Ownership is proved by a key file the engine fetches:
+`public/871ea90b6bf1cbdeeb392aa9705d1246.txt`, holding the key. It is public by
+design; it proves nothing but that we control the site.
+
+After each green production deploy (a push, the nightly run, or a publish
+dispatch), the step "Tell IndexNow about new and changed articles" runs
+`scripts/indexnow.mjs`. It reads the sitemap now being served and submits the
+article URLs whose `lastmod` is within the last 48 hours. Successive runs overlap within the window, and submitting an article twice is
+harmless. It never
+fails the deploy: every problem becomes a warning.
+
+Static routes are not submitted by the step; submit them by hand once.
+
+### Search Console and Bing verification
+
+Both engines can ask for a `<meta>` tag as proof of ownership. Set these on
+Vercel (Production; plain, not sensitive):
+
+- `VITE_GOOGLE_SITE_VERIFICATION` for `google-site-verification`
+- `VITE_BING_SITE_VERIFICATION` for `msvalidate.01`
+
+Set each to only the tag's `content` value, not the whole `<meta>` tag; the
+build throws on anything else. With neither set the page carries no empty tag.
+
+The Google domain property is already verified by DNS TXT records, so
+`VITE_GOOGLE_SITE_VERIFICATION` is optional. Bing can import the site from
+Search Console instead of using its tag.
+
+The sitemap to submit in both is `https://govari-fin.co.il/sitemap.xml`.
+
 ## Blog articles in the repo
 
 Articles under [`content/blog/`](content/blog/) are Markdown with front matter.
@@ -967,6 +1027,8 @@ the next production deploy. Two things make one without anyone asking:
 - **The nightly CI run** (22:00 Israel summer time) deploys the Supabase
   functions and promotes the Vercel build, which picks up anything published or
   edited from `/admin/blog` that day. It does not publish Base44.
+
+The same deploy refreshes the sitemap, `llms.txt` and `llms-full.txt`.
 
 #### Taking an article down now
 
