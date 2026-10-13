@@ -56,17 +56,26 @@ describe("Vercel functions under api/", () => {
     expect(old).toBeLessThan(rules.findIndex((r) => r.destination === "/app"));
   });
 
-  it("serves dist/<route>.html at /<route>: cleanUrls on, the shell reached by its clean address", () => {
+  it("serves dist/<route>.html at /<route>: cleanUrls on, the catch-all serves the shell at /app", () => {
     // Without cleanUrls no file named `faq` exists, so the catch-all rewrite
     // answered /faq, /faq/ and /tools with the empty shell. With it, a literal
-    // `/app.html` is a 308 to `/app`, so nothing may fetch or rewrite to the
-    // `.html` spelling.
+    // `/app.html` is a 308 to `/app`, so the rewrite must not use the `.html`
+    // spelling.
     expect((vercelConfig as { cleanUrls?: boolean }).cleanUrls).toBe(true);
     const catchAll = vercelConfig.rewrites.find((r) => r.source === "/((?!assets/).*)");
     expect(catchAll?.destination).toBe("/app");
     const fn = readFileSync(join(REPO_ROOT, "api/og/blog.ts"), "utf8");
-    expect(fn).toMatch(/fetch\(`\$\{SELF_ORIGIN\}\/app`/);
-    expect(fn).not.toMatch(/fetch\([^)]*\/app\.html/);
+  });
+
+  it("reads the shell from disk, bundled with the function, never over HTTP", () => {
+    // A self-fetch of the deployment URL hits deployment protection (a redirect
+    // to SSO) and every shell-needing path answered 500.
+    const fns = (vercelConfig as { functions?: Record<string, { includeFiles?: string }> }).functions;
+    expect(fns?.["api/og/blog.ts"]?.includeFiles).toBe("dist/app.html");
+    const fn = readFileSync(join(REPO_ROOT, "api/og/blog.ts"), "utf8");
+    expect(fn).not.toMatch(/fetch\([^)]*\/app/);
+    expect(fn).not.toMatch(/VERCEL_URL/);
+    expect(fn).toMatch(/readFile\(/);
   });
 
   it("are type-checked the way @vercel/node builds them", () => {

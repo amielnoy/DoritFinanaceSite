@@ -31,7 +31,10 @@
 // route uses (via `useSeo`), so this can never describe a post differently
 // than the page a visitor who followed the link actually sees.
 
-import { renderSeoHtml, SITE_URL } from "../../src/lib/seo.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+import { renderSeoHtml } from "../../src/lib/seo.js";
 import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "../../src/lib/blogSeo.js";
 import { articlePath } from "../../src/lib/articlePath.js";
 import { RestTableClient } from "../../src/services/supabase/RestTableClient.js";
@@ -57,34 +60,43 @@ const content: SupabaseContentService | null =
     ? new SupabaseContentService(new RestTableClient(SUPABASE_URL, SUPABASE_KEY))
     : null;
 
-// `VERCEL_URL` — the platform-assigned hostname of *this* deployment, never a
-// client-supplied value — not `req.headers.host`: a request can carry any
-// Host header it likes, and fetching whatever that names would let a visitor
-// point this function's outbound request (and the shell it then caches for
-// every later request on this warm instance) at a server they control.
-const SELF_ORIGIN = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : SITE_URL;
+// The shell is our own build output, bundled with this function
+// (`vercel.json` -> `functions["api/og/blog.ts"].includeFiles`) and read from
+// disk. It is never fetched: a self-fetch of the deployment URL hits Vercel's
+// deployment protection (a redirect to SSO, so every shell-needing path
+// answered 500), and fetching an origin named by the request's Host header
+// would let a visitor point the outbound request, and the shell cached for
+// every later request on this warm instance, at a server they control.
+const SHELL_PATH = join(process.cwd(), "dist", "app.html");
 
 let shellHtml: string | null = null;
+let shellFailureLogged = false;
 
 /**
- * The untouched SPA shell `scripts/prerender.mjs` writes alongside the
- * prerendered routes — the same file every unrecognised path already falls
- * back to via `vercel.json`'s catch-all rewrite. Fetched from this
- * deployment's own origin rather than bundled in: bundling it required
- * `vercel.json`'s `functions.includeFiles`, which points at a path
- * (`dist/app.html`) that does not survive from `vercel build` into
- * `vercel deploy --prebuilt` — the deploy step tried to `readlink` it and
- * failed with ENOENT. A same-origin fetch has no such handoff to get wrong:
- * if `/app` were missing, every other route on the site would already be
- * broken too. The address is `/app`, not `/app.html`: `cleanUrls` answers the
- * literal `.html` with a 308, and `redirect: "error"` would throw on it.
+ * The untouched SPA shell `scripts/prerender.mjs` writes as `dist/app.html`
+ * beside the prerendered routes. Read once and kept in module scope. `null`
+ * when it cannot be read (logged once): callers answer their status with a
+ * minimal body instead of crashing.
  */
-async function loadShell(): Promise<string> {
+async function loadShell(): Promise<string | null> {
   if (shellHtml !== null) return shellHtml;
-  const res = await fetch(`${SELF_ORIGIN}/app`, { redirect: "error" });
-  if (!res.ok) throw new Error(`fetching /app: ${res.status}`);
-  shellHtml = await res.text();
-  return shellHtml;
+  try {
+    shellHtml = await readFile(SHELL_PATH, "utf8");
+    return shellHtml;
+  } catch (err) {
+    if (!shellFailureLogged) {
+      shellFailureLogged = true;
+      console.error("[api/og/blog] cannot read the app shell", SHELL_PATH, err);
+    }
+    return null;
+  }
+}
+
+const MINIMAL_BODY = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>המאמר לא נמצא</title></head><body></body></html>`;
+
+/** An error page: the not-found head on the shell, or a bare noindex page without it. */
+function errorPage(shell: string | null): string {
+  return shell === null ? MINIMAL_BODY : renderSeoHtml(shell, BLOG_POST_NOT_FOUND_SEO);
 }
 
 /**
@@ -114,7 +126,8 @@ export default async function handler(req: OgRequest, res: OgResponse): Promise<
   if (!key || !content) {
     if (!content) console.error("[api/og/blog] VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY are not set");
     res.setHeader("Cache-Control", "no-store");
-    res.status(500).send(renderSeoHtml(await loadShell(), BLOG_POST_NOT_FOUND_SEO));
+    res.setHeader("X-Robots-Tag", "noindex");
+    res.status(500).send(errorPage(await loadShell()));
     return;
   }
 
@@ -135,6 +148,7 @@ export default async function handler(req: OgRequest, res: OgResponse): Promise<
     }
 
     const shell = await loadShell();
+    if (shell === null) throw new Error("app shell unavailable");
     res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
     res.status(200).send(renderSeoHtml(shell, computeBlogSeoConfig(post)));
   } catch (err) {
@@ -142,6 +156,6 @@ export default async function handler(req: OgRequest, res: OgResponse): Promise<
     if (status !== 404) console.error("[api/og/blog] failed to load post", key, err);
     res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=600");
     res.setHeader("X-Robots-Tag", "noindex");
-    res.status(status === 404 ? 404 : 502).send(renderSeoHtml(await loadShell(), BLOG_POST_NOT_FOUND_SEO));
+    res.status(status === 404 ? 404 : 502).send(errorPage(await loadShell()));
   }
 }

@@ -377,7 +377,8 @@ well as crawlers), before the crawler rule and the SPA catch-all.
 
 **`vercel-functions.contract.test.ts`, clean URLs.** `cleanUrls` is `true` (so
 `dist/<route>.html` answers `/<route>`), the catch-all rewrites to `/app`, and
-`api/og/blog.ts` fetches the shell at `/app` — the literal `.html` is a 308.
+`vercel.json` bundles `dist/app.html` with `api/og/blog.ts` (`includeFiles`), which
+reads it from disk and never fetches it — a self-fetch hits deployment protection.
 
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
@@ -493,7 +494,7 @@ time.
 
 ## 6. Pass criteria
 
-All 567 cases pass. A failure means either the frontend or the backend definition
+All 568 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

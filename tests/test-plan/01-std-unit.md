@@ -547,7 +547,9 @@ gets the shell with its head; anything else is 404 + noindex.
 |---|---|---|
 | UNIT-OG-001 | "renders the article's head into the shell, from Supabase" | 200; title, image, canonical on the slug; `or=(slug.eq…,base44_id.eq…)` |
 | UNIT-OG-002 | "reads with the publishable key, as an anonymous visitor would" | `apikey` is the publishable key |
-| UNIT-OG-003 | "fetches the shell from a fixed, trusted origin" | `${SITE_URL}/app`, whatever the Host |
+| UNIT-OG-003 | "reads the shell once from the bundled dist/app.html and reuses it — never over HTTP" | One `readFile`; no request but Supabase's, whatever the Host |
+| UNIT-OG-016 | "answers 502 + noindex, not a crash, when the shell file is missing" | 502, `noindex`, bare body |
+| UNIT-OG-017 | "still answers 404 + noindex when the shell file is missing, and logs the read once" | 404, `noindex`; one log line |
 | UNIT-OG-004 | "answers a Base44 id with a 301 to the article's slug" | `Location: /blog/<slug>`; a day's cache |
 | UNIT-OG-005 | "keeps the visitor's own query string, without the id the rewrite added" | `?utm_source=whatsapp&tag=a&tag=b` |
 | UNIT-OG-006 | "answers a Supabase uuid the same way" | 301; `id.eq.<uuid>` asked |
@@ -563,5 +565,5 @@ gets the shell with its head; anything else is 404 + noindex.
 
 ## 5. Pass criteria
 
-All 423 cases pass. Any failure is a functional defect, not an environment issue —
+All 425 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

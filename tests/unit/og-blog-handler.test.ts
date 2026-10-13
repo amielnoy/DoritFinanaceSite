@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SITE_URL } from "@/lib/seo";
 
+// The shell is read from disk (bundled with the function), so the reader is
+// what the tests control — never a network call.
+const shellFile = vi.hoisted(() => ({ html: null as string | null }));
+const readFileMock = vi.hoisted(() => vi.fn());
+vi.mock("node:fs/promises", () => ({ readFile: readFileMock }));
+
 // A trimmed stand-in for the bundled `dist/app.html` — enough tags for
 // `renderSeoHtml` to patch, so the handler's output is inspectable without a
 // real build.
@@ -50,7 +56,6 @@ vi.stubGlobal(
   "fetch",
   vi.fn(async (input: string) => {
     const url = String(input);
-    if (url.endsWith("/app")) return { ok: true, status: 200, text: async () => SHELL } as Response;
     if (url.startsWith(`${SUPABASE}/rest/v1/blog_posts`)) {
       restCalls.push(new URL(url));
       const body = restStatus === 200 ? rows : { message: "upstream down" };
@@ -93,6 +98,12 @@ beforeEach(() => {
   restStatus = 200;
   restCalls.length = 0;
   fetchMock().mockClear();
+  readFileMock.mockReset();
+  shellFile.html = SHELL;
+  readFileMock.mockImplementation(async () => {
+    if (shellFile.html === null) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    return shellFile.html;
+  });
 });
 
 afterEach(() => {
@@ -124,20 +135,31 @@ describe("api/og/blog — an article asked for by its slug", () => {
     expect((init as { headers: Record<string, string> }).headers.apikey).toBe("sb_publishable_test");
   });
 
-  it("fetches the shell from a fixed, trusted origin, never from the request's own headers", async () => {
+  it("reads the shell once from the bundled dist/app.html and reuses it — never over HTTP", async () => {
     rows = [article()];
     const handler = await loadHandler();
-    const { res } = makeRes();
 
-    // Vercel always gives the function a `headers` object, so a malicious
-    // or forwarded Host must not change where the shell is fetched from —
-    // this is the regression test for exactly that (CWE-918 / SSRF).
-    await handler(
-      { method: "GET", query: { id: SLUG }, headers: { host: "attacker.example" } } as never,
-      res
-    );
+    await handler({ method: "GET", query: { id: SLUG } }, makeRes().res);
+    await handler({ method: "GET", query: { id: SLUG }, headers: { host: "attacker.example" } } as never, makeRes().res);
 
-    expect(fetchMock()).toHaveBeenCalledWith(`${SITE_URL}/app`, { redirect: "error" });
+    expect(readFileMock).toHaveBeenCalledTimes(1);
+    expect(String(readFileMock.mock.calls[0][0])).toMatch(/dist[\\/]app\.html$/);
+    expect(fetchMock().mock.calls.every(([u]) => String(u).startsWith(SUPABASE))).toBe(true);
+  });
+
+  it("answers 502 + noindex, not a crash, when the shell file is missing", async () => {
+    rows = [article()];
+    shellFile.html = null;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const handler = await loadHandler();
+    const { res, state } = makeRes();
+
+    await handler({ method: "GET", query: { id: SLUG } }, res);
+
+    expect(state.status).toBe(502);
+    expect(state.headers["X-Robots-Tag"]).toBe("noindex");
+    expect(state.body).toContain("noindex");
+    spy.mockRestore();
   });
 });
 
@@ -234,6 +256,21 @@ describe("api/og/blog — nothing to show", () => {
     expect(restCalls).toHaveLength(0);
   });
 
+  it("still answers 404 + noindex when the shell file is missing, and logs the read once", async () => {
+    shellFile.html = null;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const handler = await loadHandler();
+    for (let i = 0; i < 2; i++) {
+      const { res, state } = makeRes();
+      await handler({ method: "GET", query: { id: "missing" } }, res);
+      expect(state.status).toBe(404);
+      expect(state.headers["X-Robots-Tag"]).toBe("noindex");
+      expect(state.body).toContain("noindex");
+    }
+    expect(spy.mock.calls.filter(([m]) => String(m).includes("cannot read the app shell"))).toHaveLength(1);
+    spy.mockRestore();
+  });
+
   it("returns 502 and noindex when Supabase fails", async () => {
     restStatus = 500;
     const handler = await loadHandler();
@@ -254,6 +291,7 @@ describe("api/og/blog — nothing to show", () => {
 
     expect(state.status).toBe(500);
     expect(state.headers["Cache-Control"]).toBe("no-store");
+    expect(state.headers["X-Robots-Tag"]).toBe("noindex");
     expect(restCalls).toHaveLength(0);
   });
 
