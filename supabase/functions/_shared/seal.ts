@@ -9,6 +9,11 @@
  * a changed byte or the wrong key fails the tag instead of decrypting to
  * nonsense.
  *
+ * Every value is also bound to a context string (`aad`, e.g. `${requestId}:code`
+ * or `${requestId}:id`) as AES-GCM additional data: it is not stored, but a
+ * ciphertext copied onto another row or field fails the tag when unsealed with
+ * that row's own context.
+ *
  * No return types are spelled out on the byte helpers on purpose: newer
  * TypeScript types `Uint8Array` by its buffer, and inference keeps Deno's
  * checker and Web Crypto's `BufferSource` in agreement.
@@ -37,7 +42,12 @@ export function sealConfigured(): boolean {
 }
 
 export async function importSealKey(base64: string): Promise<CryptoKey> {
-  const raw = fromBase64(base64.trim());
+  let raw;
+  try {
+    raw = fromBase64(base64.trim());
+  } catch {
+    throw new Error('seal_key_length');
+  }
   if (raw.length !== KEY_BYTES) throw new Error('seal_key_length');
   return await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
@@ -48,10 +58,10 @@ export async function sealKeyFromEnv(): Promise<CryptoKey | null> {
   return await importSealKey((Deno.env.get('MASLEKA_KEY') || '').trim());
 }
 
-export async function seal(key: CryptoKey, plaintext: string): Promise<string> {
+export async function seal(key: CryptoKey, plaintext: string, aad: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const sealed = new Uint8Array(
-    await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)),
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(aad) }, key, new TextEncoder().encode(plaintext)),
   );
   const out = new Uint8Array(IV_BYTES + sealed.length);
   out.set(iv, 0);
@@ -59,14 +69,22 @@ export async function seal(key: CryptoKey, plaintext: string): Promise<string> {
   return toBase64(out);
 }
 
-/** The plaintext, or a throw: tampered, truncated, not base64, or another key. */
-export async function unseal(key: CryptoKey, value: string): Promise<string> {
-  const bytes = fromBase64(value);
-  if (bytes.length < IV_BYTES + TAG_BYTES) throw new Error('sealed_too_short');
-  const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: bytes.slice(0, IV_BYTES) },
-    key,
-    bytes.slice(IV_BYTES),
-  );
-  return new TextDecoder().decode(plain);
+/**
+ * The plaintext, or a throw of one fixed `sealed_invalid` whatever went wrong
+ * (not base64, truncated, tampered, another key, another `aad`) — nothing of
+ * the input is echoed.
+ */
+export async function unseal(key: CryptoKey, value: string, aad: string): Promise<string> {
+  try {
+    const bytes = fromBase64(value);
+    if (bytes.length < IV_BYTES + TAG_BYTES) throw new Error('short');
+    const plain = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: bytes.slice(0, IV_BYTES), additionalData: new TextEncoder().encode(aad) },
+      key,
+      bytes.slice(IV_BYTES),
+    );
+    return new TextDecoder().decode(plain);
+  } catch {
+    throw new Error('sealed_invalid');
+  }
 }

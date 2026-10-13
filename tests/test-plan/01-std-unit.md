@@ -673,19 +673,25 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-SEAL-001 | "round-trips a value" | `unseal(seal(x)) === x` |
+| UNIT-SEAL-001 | "round-trips a value" | `unseal(seal(x, aad), aad) === x` |
 | UNIT-SEAL-002 | "uses a fresh IV every time, so equal values never look equal" | Two seals of one value differ |
 | UNIT-SEAL-003 | "stores the IV, then the ciphertext and its 16-byte tag" | Decoded length = 12 + plaintext + 16 |
-| UNIT-SEAL-004 | "refuses a value that was changed after sealing" | Rejects |
-| UNIT-SEAL-005 | "refuses a value sealed with another key" | Rejects |
-| UNIT-SEAL-006 | "refuses a value too short to hold an IV and a tag" | `sealed_too_short` |
-| UNIT-SEAL-007 | "refuses text that is not base64" | Rejects |
-| UNIT-SEAL-008 | "refuses a key that is not 32 bytes" | `seal_key_length` |
-| UNIT-SEAL-009 | "is not configured when MASLEKA_KEY is missing" | `false`, `null` |
-| UNIT-SEAL-010 | "is not configured when MASLEKA_KEY is short or not base64" | `false`, `null` |
-| UNIT-SEAL-011 | "is configured with 32 bytes, and the key it gives works" | `true`; round trip through the env key |
+| UNIT-SEAL-004 | "refuses a value that was changed after sealing" | `sealed_invalid` |
+| UNIT-SEAL-005 | "refuses a value sealed with another key" | `sealed_invalid` |
+| UNIT-SEAL-006 | "refuses a value too short to hold an IV and a tag" | `sealed_invalid` |
+| UNIT-SEAL-007 | "refuses text that is not base64" | `sealed_invalid`, nothing echoed |
+| UNIT-SEAL-008 | "refuses a value unsealed with a different aad" | `sealed_invalid` for another request id and for the other field |
+| UNIT-SEAL-009 | "refuses a changed IV byte" | `sealed_invalid` for each of bytes 0-11 |
+| UNIT-SEAL-010 | "refuses a changed tag byte" | `sealed_invalid` for each of the last 16 bytes |
+| UNIT-SEAL-011 | "refuses a truncation that is still long enough to look sealed" | 28 bytes: fails on the tag, `sealed_invalid` |
+| UNIT-SEAL-012 | "imports a key that cannot be exported and only encrypts and decrypts" | `extractable === false`; usages exactly encrypt, decrypt |
+| UNIT-SEAL-013 | "refuses a key that is not base64" | `seal_key_length` |
+| UNIT-SEAL-014 | "refuses a key that is not 32 bytes" | `seal_key_length` |
+| UNIT-SEAL-015 | "is not configured when MASLEKA_KEY is missing" | `false`, `null` |
+| UNIT-SEAL-016 | "is not configured when MASLEKA_KEY is short or not base64" | `false`, `null` |
+| UNIT-SEAL-017 | "is configured with 32 bytes, and the key it gives works" | `true`; round trip through the env key |
 
 ## 5. Pass criteria
 
-All 512 cases pass. Any failure is a functional defect, not an environment issue —
+All 518 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
