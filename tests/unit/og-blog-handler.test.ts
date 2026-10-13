@@ -54,7 +54,8 @@ vi.stubGlobal(
   "fetch",
   vi.fn(async (input: string) => {
     const url = String(input);
-    if (url === `${SITE_URL}/app`) {
+    // Any origin's /app: the tests assert which origin was asked.
+    if (new URL(url).pathname === "/app") {
       if (shellFile.html === null) throw new TypeError("fetch failed: unexpected redirect");
       return { ok: true, status: 200, text: async () => shellFile.html } as Response;
     }
@@ -310,5 +311,55 @@ describe("api/og/blog — nothing to show", () => {
     await handler({ method: "POST", query: { id: SLUG } }, res);
 
     expect(state.status).toBe(405);
+  });
+});
+
+describe("api/og/blog — the origin in Vercel's Node runtime", () => {
+  // Under Vitest, `import.meta.env` mirrors process.env's VITE_* keys, so the
+  // handler above can never see the gap that broke production: in the deployed
+  // function `import.meta.env` does not exist, and SITE_URL fell back to the
+  // Base44 host — the preview's 404 page carried Base44's /app bundle. This
+  // runs the code the way it deploys: bundled by esbuild (as the edge-function
+  // harness does), where `import.meta` is an empty object, so the only
+  // VITE_SITE_URL it can find is the server's.
+  const PROD = "https://govari-fin.co.il";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("fetches the shell from, and writes the canonical on, the server's VITE_SITE_URL", async () => {
+    const { buildSync } = await import("esbuild");
+    const { join } = await import("node:path");
+    const { REPO_ROOT } = await import("../helpers/entity-schema");
+    const out = buildSync({
+      entryPoints: [join(REPO_ROOT, "api/og/blog.ts")],
+      bundle: true,
+      write: false,
+      format: "cjs",
+      platform: "node",
+      target: "es2022",
+      logLevel: "silent",
+    });
+    expect(out.outputFiles[0].text, "import.meta.env survived the bundle").not.toMatch(/import\.meta\.env/);
+
+    vi.stubEnv("VITE_SITE_URL", PROD);
+    rows = [article()];
+    // eslint-disable-next-line no-new-func -- runs the bundle as the function deploys
+    const run = new Function("module", "exports", "require", `${out.outputFiles[0].text}\n;return module.exports.default;`);
+    const mod = { exports: {} as Record<string, unknown> };
+    const handler = run(mod, mod.exports, (id: string) => {
+      throw new Error(`unexpected require: ${id}`);
+    }) as (req: unknown, res: unknown) => Promise<void>;
+
+    const { res, state } = makeRes();
+    await handler({ method: "GET", query: { id: SLUG } }, res);
+
+    const shellCalls = fetchMock().mock.calls.filter(([u]) => !String(u).startsWith(SUPABASE));
+    expect(shellCalls[0]).toEqual([`${PROD}/app`, { redirect: "error" }]);
+    expect(state.status).toBe(200);
+    expect(state.body).toContain(`<link rel="canonical" href="${PROD}/blog/${SLUG}"`);
+    expect(state.body).toContain(`<meta property="og:url" content="${PROD}/blog/${SLUG}"`);
+    expect(state.body).not.toContain("safe-arch-plan.base44.app/blog");
   });
 });

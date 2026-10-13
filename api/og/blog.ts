@@ -65,6 +65,10 @@ const content: SupabaseContentService | null =
 //     shell-needing path answered 500. The custom domain is open.
 //   - `functions.includeFiles` for `dist/app.html`: it aborts
 //     `vercel deploy --prebuilt` with `ENOENT … readlink`, i.e. every deploy.
+// In this Node runtime `SITE_URL` comes from the project's
+// `process.env.VITE_SITE_URL`: `import.meta.env` exists only inside the Vite
+// bundle (see `resolveSiteUrl`). Left unset, it is the old Base44 host — whose
+// shell, and canonical, this would then serve.
 // `SITE_URL` is our own constant, never influenced by the request (a Host
 // header would let a visitor point this fetch, and the shell cached for every
 // later request on the warm instance, at a server they control). A preview's

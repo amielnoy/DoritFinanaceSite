@@ -562,8 +562,24 @@ gets the shell with its head; anything else is 404 + noindex.
 | UNIT-OG-013 | "answers 500 without calling Supabase when it is not configured" | 500, `no-store` |
 | UNIT-OG-014 | "answers 500 when the route is hit without an id" | 500 |
 | UNIT-OG-015 | "rejects non-GET methods" | 405 |
+| UNIT-OG-018 | "fetches the shell from, and writes the canonical on, the server's VITE_SITE_URL" | Run as deployed (esbuild bundle, no `import.meta.env`) with only `process.env.VITE_SITE_URL=https://govari-fin.co.il`: shell fetched from `https://govari-fin.co.il/app`; canonical and `og:url` on that host; no Base44 host |
+
+### 4.27 Where the canonical origin comes from — `tests/unit/seo-site-url.test.ts` (`resolveSiteUrl`)
+
+`SITE_URL` in `src/lib/seo.ts` is Vite's `VITE_SITE_URL`, else the server's
+(`process.env`, the only one a Vercel function has), else the default host.
+Tested on the pure resolver: under Vitest `import.meta.env` mirrors
+`process.env`, so the end-to-end case is UNIT-OG-018.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SURL-001 | "takes Vite's VITE_SITE_URL first, over the server's" | Vite's value |
+| UNIT-SURL-002 | "falls back to the server's VITE_SITE_URL when Vite's env lacks it — a Vercel function" | Server's value, for an absent or empty Vite env |
+| UNIT-SURL-003 | "falls back to the default host when neither names one" | `https://safe-arch-plan.base44.app` |
+| UNIT-SURL-004 | "treats a blank value as unset, as the build plugin does" | Empty / whitespace skipped |
+| UNIT-SURL-005 | "strips trailing slashes from whichever source wins" | No trailing `/` |
 
 ## 5. Pass criteria
 
-All 425 cases pass. Any failure is a functional defect, not an environment issue —
+All 431 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
