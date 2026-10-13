@@ -513,6 +513,7 @@ runs in CI):
 - [ ] Decide the resubmitted-interview duplicate: a completed interview submitted twice creates a second request for the same contact. Reuse or rotate the existing `invited` request in `submit-lead`, or accept the duplicate knowingly.
 - [ ] Verify at swiftness.co.il whether the advisor portal needs the ID number besides the code; if not, a later PR drops `id_ciphertext`, `id_last4` and the form field. Confirm the saver-registration and advisor-portal URLs (`CLEARINGHOUSE_SAVER_URL` / `CLEARINGHOUSE_ADVISOR_URL`).
 - [ ] When the step screenshots are captured, confirm the portal's wording in `/admin/masleka/guide` against the real screens (the guide quotes no portal menu label until then).
+- [ ] **Privacy policy gate:** the privacy policy is updated to cover collecting the Israeli ID number and the clearinghouse code (purpose, retention of at most 9 days, access by staff, wipe) and the compliance adviser has approved the wording (`base44/agents/COMPLIANCE.md` §10, point 7). Not before switch-on, no switch-on.
 - [ ] The compliance adviser has approved the points in `base44/agents/COMPLIANCE.md` §10, including the interview and wizard wording that still promises a signed mandate.
 - [ ] After switch-on, open one test link with GA4 DebugView and confirm no `#t=` appears in `page_location`.
 - [ ] After switch-on, open one test link with the browser's network tab open and confirm the Vercel Web Analytics beacon (`/_vercel/insights/view`) carries a url with no `#t=`.
