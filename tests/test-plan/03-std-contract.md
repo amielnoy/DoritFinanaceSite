@@ -530,6 +530,21 @@ transcript and usage rows.
 | CTR-CHSCH-006 | "open the usage totals and the purge to the service role only" | `revoke execute` from public, anon, authenticated and `grant execute` to service_role on `chat_month_usage` and `purge_chat_conversations` |
 | CTR-CHSCH-007 | "schedule the purge nightly, after enabling pg_cron" | The schedule migration creates the extension and schedules `chat-purge-nightly` at `15 1 * * *` |
 
+### 4.11 The chat prompts — `chat-prompts.contract.test.ts`
+
+The chat function's prompts are Markdown files under `supabase/functions/chat/prompts/`, built into `prompts.generated.ts`. `interview.md`, filled for Dorit, must equal today's `needs_interview.jsonc` instructions apart from three tool-section lines; `compliance.md` is `COMPLIANCE.md` §3 and §5 verbatim; the function's agency copy must equal `agencyProfile.ts`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHPROMPT-001 | "%s equals agencyProfile.ts" | `AGENCY` (the function's copy) equals `AGENCY_PROFILE`, field by field (6 cases) |
+| CTR-CHPROMPT-002 | "names the agency the tenant migration seeds" | The tenant migration inserts `AGENCY.id` |
+| CTR-CHPROMPT-003 | "each tool-section change matches exactly one line of today's instructions" | The three `startsWith` prefixes each match one line of `needs_interview.jsonc` |
+| CTR-CHPROMPT-004 | "renders, for Dorit, to today's text byte for byte apart from the three tool-section lines" | `interview.md` filled for agency 1 equals today's instructions with only the three lines replaced |
+| CTR-CHPROMPT-005 | "asks for submitLead and never for a fenced block" | `interview.md` has no fenced `lead` block and requests the `submitLead` call |
+| CTR-CHPROMPT-006 | "is COMPLIANCE.md §3 and §5, verbatim" | `compliance.md` equals the §3 + §5 excerpt of `COMPLIANCE.md` |
+| CTR-CHPROMPT-007 | "no longer lists createConsultationEvent as an interview tool" | The stale `createConsultationEvent` row is gone from `COMPLIANCE.md` |
+| CTR-CHPROMPT-008 | "is what the build script writes from the Markdown files today" | `prompts.generated.ts` equals `renderPromptsModule` output; stale means run `npm run build:chat-prompts` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -539,7 +554,7 @@ time.
 
 ## 6. Pass criteria
 
-All 572 cases pass. A failure means either the frontend or the backend definition
+All 580 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

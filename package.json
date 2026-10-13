@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:chat-prompts": "node scripts/build-chat-prompts.mjs",
     "build:prerender": "vite build && node scripts/prerender.mjs && node scripts/build-seo-files.mjs",
     "prerender": "node scripts/prerender.mjs",
     "lint": "eslint . --quiet",

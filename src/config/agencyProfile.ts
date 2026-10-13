@@ -8,6 +8,7 @@
  * a later phase turns into an `agency_profiles` row for agency 1.
  */
 export const AGENCY_PROFILE = {
+  displayName: "דורית גוב ארי",
   phoneE164: "+972508311776",
   phoneDisplay: "050-831-1776",
   whatsapp: "972508311776",

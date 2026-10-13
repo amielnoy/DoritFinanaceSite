@@ -648,7 +648,21 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-INOW-011 | "still submits when the origin has a trailing slash" | `{ submitted: 2 }` |
 | UNIT-INOW-012 | "warns and resolves when the sitemap answers with an error" | HTTP 503 warned; `{ submitted: 0 }` |
 
+### 4.31 The chat prompts — `tests/unit/chat-prompt.test.ts`
+
+`supabase/functions/chat/prompt.ts`: placeholders are filled from the pinned agency copy and the system prompt is three blocks with one cache breakpoint. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHPROMPT-001 | "fillPlaceholders fills every agency placeholder" | Both placeholders replaced by the `AGENCY` values |
+| UNIT-CHPROMPT-002 | "refuses a placeholder the agency has no value for" | `{{agency.fax}}` throws, naming `agency.fax` |
+| UNIT-CHPROMPT-003 | "leaves text without placeholders alone, braces included" | `{x} {{y}}` returned unchanged |
+| UNIT-CHPROMPT-004 | "is compliance, then the role, then the profile" | `systemBlocks('interview')`: three blocks, §3, the interview role, the agency profile |
+| UNIT-CHPROMPT-005 | "caches the fixed prefix: the breakpoint is on the role block" | `cache_control` types `[null, ephemeral, null]` |
+| UNIT-CHPROMPT-006 | "leaves no placeholder unfilled" | No `{{agency.` left in any block |
+| UNIT-CHPROMPT-007 | "asks for a submitLead call, never a fenced block" | Role block has no fenced `lead` block and asks for `submitLead` with `stage='complete'` |
+
 ## 5. Pass criteria
 
-All 458 cases pass. Any failure is a functional defect, not an environment issue —
+All 465 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

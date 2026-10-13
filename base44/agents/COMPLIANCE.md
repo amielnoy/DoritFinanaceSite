@@ -11,7 +11,7 @@
 
 | סוכן | תפקיד | כלים |
 |---|---|---|
-| `needs_interview` | ראיון היכרות בסכימה קבועה לפי מסלול שנגזר מהיעד, וקביעת הפגישה עצמה | `submitLead`, `createConsultationEvent`, `escalateToHuman` |
+| `needs_interview` | ראיון היכרות בסכימה קבועה לפי מסלול שנגזר מהיעד, וקביעת הפגישה עצמה | `submitLead`, `escalateToHuman` |
 | `blog_recommender` | הפניה למאמרים מהבלוג | `BlogPost.read`, `escalateToHuman` |
 | `support_agent` | מענה על שאלות כלליות מתוך התוכן שפורסם, בצ׳אט החופשי ב-`/faq` | `BlogPost.read`, `logSupportChat`, `escalateToHuman` |
 | `procedures_agent` | הסבר תהליך: איך קוראים גמל נט ופנסיה נט, ומה דרוש לשליפה מהמסלקה — בתחתית `/tools` | `BlogPost.read`, `logSupportChat`, `escalateToHuman` |
