@@ -27,13 +27,18 @@ export const FIELD_LIMITS: Record<string, number> = {
 export const MAX_DOCUMENTS = 10;
 export const MAX_DOCUMENT_LENGTH = 1000;
 
-/** The first field that is not a string within its limit, or null when all are. */
-export function oversizedField(body: Record<string, unknown>): string | null {
-  for (const [field, max] of Object.entries(FIELD_LIMITS)) {
+/**
+ * The first field that is not a string within its limit, or null when all are.
+ * `limits` defaults to the claim form's; submit-lead passes its own. The
+ * documents check belongs to the claim form and runs only with its limits.
+ */
+export function oversizedField(body: Record<string, unknown>, limits: Record<string, number> = FIELD_LIMITS): string | null {
+  for (const [field, max] of Object.entries(limits)) {
     const value = body[field];
     if (value === undefined || value === null || value === '') continue;
     if (typeof value !== 'string' || value.length > max) return field;
   }
+  if (limits !== FIELD_LIMITS) return null;
   const docs = body.documents;
   if (docs !== undefined && docs !== null) {
     if (!Array.isArray(docs) || docs.length > MAX_DOCUMENTS) return 'documents';

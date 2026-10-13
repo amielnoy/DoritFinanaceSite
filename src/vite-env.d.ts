@@ -14,6 +14,7 @@
 interface ImportMetaEnv {
   /** Who stores a claim document — see `src/config/upload-provider.ts`. */
   readonly VITE_UPLOAD_PROVIDER?: "base44" | "supabase";
+  readonly VITE_LEAD_FUNCTIONS?: "base44" | "supabase";
   readonly VITE_BASE44_APP_ID?: string;
   readonly VITE_BASE44_FUNCTIONS_VERSION?: string;
   readonly VITE_BASE44_APP_BASE_URL?: string;

@@ -32,11 +32,18 @@ const ADAPTERS = [
 ];
 
 describe("adapter → submitLead", () => {
+  // The bodies live in `lead-bodies.ts` (shared by the Base44 and Supabase
+  // adapters), so the contract reads the returned literals from there.
   const calls = findObjectLiteralCalls(
-    /(?:functions\.invoke\(|invokeFunction(?:<\w+>)?\(\s*this\.client\s*,)\s*["']submitLead["']\s*,\s*/,
-    ADAPTERS
+    /export function (?:leadBody|interviewBody)\([^)]*\)[^{]*\{\s*return\s*/,
+    [join(REPO_ROOT, "src/services/lead-bodies.ts")]
   );
   const accepted = destructuredBody(backendSource("submitLead"));
+  // The same body is also sent to the Edge function when VITE_LEAD_FUNCTIONS
+  // picks Supabase, so the Edge handler is a second source of truth.
+  const acceptedByEdge = destructuredBody(
+    readFileSync(join(REPO_ROOT, "supabase/functions/submit-lead/handler.ts"), "utf8"),
+  );
 
   // Fields the agent passes as a tool call and that no browser form has. The
   // booking agent composes `summary` from the conversation; a contact form has
@@ -73,7 +80,7 @@ describe("adapter → submitLead", () => {
     expect(calls.length).toBeGreaterThan(0);
     for (const c of calls) {
       expect(c.file, "a component is building this payload again").toBe(
-        "src/services/base44/Base44LeadService.ts",
+        "src/services/lead-bodies.ts",
       );
     }
   });
@@ -83,6 +90,15 @@ describe("adapter → submitLead", () => {
       expect(
         c.keys.filter((k) => !accepted.includes(k)),
         "a field the backend never destructures",
+      ).toEqual([]);
+    }
+  });
+
+  it("sends nothing the Edge function does not read either", () => {
+    for (const c of calls) {
+      expect(
+        c.keys.filter((k) => !acceptedByEdge.includes(k)),
+        "a field the Edge handler never destructures",
       ).toEqual([]);
     }
   });
@@ -107,6 +123,7 @@ describe("adapter → submitLead", () => {
     // Guards the escape hatch above: a name listed there that the backend does
     // not actually destructure would silently excuse a real mismatch.
     for (const field of AGENT_ONLY) expect(accepted).toContain(field);
+    for (const field of AGENT_ONLY) expect(acceptedByEdge).toContain(field);
   });
 
   it("sends the two fields the function requires", () => {

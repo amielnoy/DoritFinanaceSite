@@ -5,6 +5,7 @@ import type {
   HumanContact,
   SupportPort,
 } from "../ports";
+import { escalationBody } from "../lead-bodies";
 import { invokeFunction, type FunctionInvoker } from "./invoke";
 
 export type { FunctionInvoker };
@@ -35,20 +36,7 @@ export class Base44SupportService implements SupportPort {
 
   async escalate(request: EscalationRequest): Promise<EscalationReceipt> {
     try {
-      const receipt = await invokeFunction<EscalationReceipt>(this.client, "escalateToHuman", {
-        reason: request.reason,
-        summary: request.summary,
-        agent: request.agent ?? "",
-        name: request.name ?? "",
-        phone: request.phone ?? "",
-        email: request.email ?? "",
-        topic: "",
-        consentVersion: request.consentVersion ?? "",
-        consentAt: request.consentAt ?? "",
-        channel: request.channel ?? "",
-        campaign: request.campaign ?? "",
-        landingPath: request.landingPath ?? "",
-      });
+      const receipt = await invokeFunction<EscalationReceipt>(this.client, "escalateToHuman", escalationBody(request));
 
       if (!receipt?.contact) {
         return {

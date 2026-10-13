@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
@@ -64,5 +65,38 @@ describe("Edge Functions", () => {
     const base44 = quoted(read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts")), "const CHANNEL_TAXONOMY = [");
     expect(edge.length).toBeGreaterThan(5);
     expect(edge).toEqual(base44);
+  });
+});
+
+describe("the lead functions on Edge", () => {
+  const dir = join(REPO_ROOT, "supabase/functions");
+  const sources = readdirSync(dir, { recursive: true })
+    .map(String)
+    .filter((p) => /\.(ts|js)$/.test(p))
+    .map((p) => [p, readFileSync(join(dir, p), "utf8")] as const);
+
+  it("mention no Docs, no Outlook and no Base44 connector", () => {
+    expect(sources.length).toBeGreaterThan(5);
+    for (const [path, src] of sources) {
+      for (const banned of ["googledocs", "graph.microsoft.com", "connectors.", "createClientFromRequest"]) {
+        expect(src.includes(banned), `${path} mentions ${banned}`).toBe(false);
+      }
+    }
+  });
+
+  it("are each registered without JWT verification, as submit-claim is", () => {
+    const toml = readFileSync(join(REPO_ROOT, "supabase/config.toml"), "utf8");
+    for (const fn of ["submit-claim", "submit-lead", "escalate-to-human", "log-support-chat"]) {
+      expect(toml).toMatch(new RegExp(`\\[functions\\.${fn}\\]\\s*\\nverify_jwt = false`));
+    }
+  });
+
+  it("ask Google for exactly two scopes", () => {
+    const google = readFileSync(join(dir, "_shared/google.ts"), "utf8");
+    const scopes = [...google.matchAll(/'(https:\/\/www\.googleapis\.com\/auth\/[^']+)'/g)].map((m) => m[1]);
+    expect(scopes).toEqual([
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/spreadsheets",
+    ]);
   });
 });

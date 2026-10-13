@@ -37,6 +37,14 @@ const RESEND_URL = "https://api.resend.com/emails";
 const MAX_LEN = { name: 100, phone: 30, email: 120, message: 3000, summary: 6000 };
 /** גוף הודעה מוכנה יכול להיות ארוך — נספח תפעולי, פרופיל מלא ו-HTML. */
 const MAX_RENDERED = { subject: 300, html: 200_000, text: 60_000 };
+const MAX_ICS = 20_000;
+
+/** Base64 of the UTF-8 bytes — the calendar text is Hebrew. */
+function base64Utf8(text) {
+  let s = "";
+  for (const b of new TextEncoder().encode(text)) s += String.fromCharCode(b);
+  return btoa(s);
+}
 
 export async function onRequestOptions({ env }) {
   return new Response(null, { status: 204, headers: cors(env) });
@@ -82,6 +90,14 @@ export async function onRequestPost({ request, env }) {
       html: clip(body.html, MAX_RENDERED.html),
       text: clip(body.text, MAX_RENDERED.text),
     };
+    // A meeting invitation rides along as an attachment. Refused, not
+    // clipped, past its cap: a clipped calendar file is a broken one.
+    if (body.ics !== undefined) {
+      if (typeof body.ics !== "string" || body.ics.length > MAX_ICS) {
+        return json({ ok: false, error: "ics_too_large" }, 400, headers);
+      }
+      mail.ics = body.ics;
+    }
     if (!mail.subject || (!mail.html && !mail.text)) {
       return json({ ok: false, error: "missing_content" }, 400, headers);
     }
@@ -162,6 +178,9 @@ async function deliver({ env, to, replyTo, mail, type }) {
         subject: mail.subject,
         html: mail.html || undefined,
         text: mail.text || undefined,
+        attachments: mail.ics
+          ? [{ filename: "invite.ics", content: base64Utf8(mail.ics), content_type: "text/calendar; method=REQUEST" }]
+          : undefined,
         tags: [{ name: "type", value: type }],
       }),
     });

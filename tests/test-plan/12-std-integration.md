@@ -46,6 +46,7 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `escalateToHuman` | all three on-site agents |
 | `submitClaim` | the claims form |
 | `submit-claim` (Edge) | a claim, saved to Supabase and announced — the same cases as `submitClaim`, plus its own |
+| `submit-lead` / `escalate-to-human` / `log-support-chat` (Edge) | the same callers as their Base44 versions, behind `VITE_LEAD_FUNCTIONS=supabase`; the same cases run against both |
 | `upsertContact` | no caller yet — built for a channel that supplies a phone number, dormant per B-8 |
 | `logSupportChat` | the support agent, at the end of every conversation |
 | `adminLead` | `/admin/leads` — an admin's status change and delete, written to Supabase and then Base44 |
@@ -460,6 +461,27 @@ answered as 400 with nothing touched, missing Supabase credentials as 500 with
 no mail, a database refusal that quotes the row kept out of the log, and the
 CORS answers — a preflight that does nothing, the site's origin on every
 answer, none for a stranger's.
+
+### 4.23 The lead functions on Supabase — one suite, two implementations
+
+`submit-lead.integration.test.ts`, `escalate-to-human.integration.test.ts` and
+`log-support-chat.integration.test.ts` run their cases with `describe.each`
+over Base44 and Edge, as §4.22 does for the claim, so the Edge functions keep
+the guards, answers, mail and sheet rows the Base44 ones have. Differences are
+their own cases: Edge `submit-lead` writes the Google event and sheet row
+through the service account, mails the visitor and Dorit an `.ics` invitation
+instead of using Outlook, and answers an empty request with `400` and
+`ready: { db, mailer, google }`; `log-support-chat` answers `200` with
+`sheet: "לא מוגדר"` when `SHEET_ID` is unset; each Edge function has a "what
+only it does" block. `dorit-mailer.integration.test.ts` adds the invitation
+cases: one `text/calendar` REQUEST attached to the Resend call, none without
+`ics`, one over 20 kB refused rather than clipped, and `ics` ignored on other
+message types. The shared Edge modules have unit tests: `edge-google.test.ts`
+(service-account token: two scopes, cached for the hour, failure named without
+the endpoint's words), `edge-ics.test.ts` (the invitation: UTC, escaping,
+75-octet folding, size limit) and `edge-google-apis.test.ts` (calendar event,
+sheet append, PostgREST helpers). The live smoke asks `submit-lead` and
+`log-support-chat` an empty question in production.
 
 ## 5. Pass criteria
 

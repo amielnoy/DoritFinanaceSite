@@ -35,6 +35,56 @@ export async function insertRow(table: string, row: Record<string, unknown>): Pr
   return inserted as Record<string, unknown>;
 }
 
+/** PostgREST's code from a refusal body, never its message (it can quote the row). */
+async function refusal(res: Response): Promise<string> {
+  const code = ((await res.json().catch(() => null)) as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && /^[A-Z0-9]{1,10}$/.test(code) ? `:${code}` : '';
+}
+
+function target(): { url: string; auth: Record<string, string> } {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const auth = serviceAuth();
+  if (!url || !auth) throw new Error('supabase_not_configured');
+  return { url, auth };
+}
+
+/** Rows matching a PostgREST query string (`select=…&col=eq.…&order=…`). */
+export async function selectRows(table: string, query: string): Promise<Record<string, unknown>[]> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?${query}`, {
+    method: 'GET',
+    headers: { ...auth },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`select_http_${res.status}${await refusal(res)}`);
+  const rows = await res.json();
+  return Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
+}
+
+/** One row, by its `id`. */
+export async function updateRow(table: string, id: string, fields: Record<string, unknown>): Promise<void> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify(fields),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`update_http_${res.status}${await refusal(res)}`);
+}
+
+/** Insert or merge on a unique key — the booking row is written twice per request. */
+export async function upsertRow(table: string, row: Record<string, unknown>, onConflict: string): Promise<void> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?on_conflict=${onConflict}`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(row),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`upsert_http_${res.status}${await refusal(res)}`);
+}
+
 /**
  * A Postgres function through PostgREST's `/rpc`, with the service key. Used
  * for `allow_submission`, which only the service role may execute. Throws on

@@ -1,3 +1,4 @@
+import { interviewBody, leadBody } from "../lead-bodies";
 import type { ClaimReport, InterviewSummary, Lead, LeadPort, SubmissionReceipt } from "../ports";
 
 /** The one call this adapter makes — narrowed for the reason SupabaseAuthClient is. */
@@ -11,7 +12,8 @@ export interface SupabaseFunctionsClient {
 }
 
 /**
- * Claims, on the `submit-claim` Edge Function; every other lead path, unchanged.
+ * Claims, on the `submit-claim` Edge Function; leads and interviews on `submit-lead`
+ * when `useEdge` is on; every other lead path, unchanged.
  *
  * Contact forms, interviews and calendar holds still run on Base44's functions,
  * which hold the calendar and Sheets connections. They go to `rest`, the Base44
@@ -21,14 +23,21 @@ export class SupabaseLeadService implements LeadPort {
   constructor(
     private readonly client: SupabaseFunctionsClient,
     private readonly rest: LeadPort,
+    private readonly useEdge: boolean = false,
   ) {}
 
   submitLead(lead: Lead): Promise<SubmissionReceipt> {
-    return this.rest.submitLead(lead);
+    return this.useEdge ? this.edge("submit-lead", leadBody(lead)) : this.rest.submitLead(lead);
   }
 
   submitInterview(summary: InterviewSummary): Promise<SubmissionReceipt> {
-    return this.rest.submitInterview(summary);
+    return this.useEdge ? this.edge("submit-lead", interviewBody(summary)) : this.rest.submitInterview(summary);
+  }
+
+  private async edge(name: string, body: Record<string, unknown>): Promise<SubmissionReceipt> {
+    const { data, error } = await this.client.functions.invoke(name, { body });
+    if (error) throw await functionFailure(name, error);
+    return (data as SubmissionReceipt | null) ?? { ok: true };
   }
 
   requestConsultationEvent(lead: Lead): Promise<void> {
@@ -51,7 +60,7 @@ export class SupabaseLeadService implements LeadPort {
         landingPath: report.landingPath ?? "",
       },
     });
-    if (error) throw await claimFailure(error);
+    if (error) throw await functionFailure("submit-claim", error);
     return (data as SubmissionReceipt | null) ?? { ok: true };
   }
 }
@@ -62,10 +71,10 @@ export class SupabaseLeadService implements LeadPort {
  * shows its own failure text either way — the rid is for whoever reads the
  * console when a visitor reports it.
  */
-async function claimFailure(error: { message: string; context?: unknown }): Promise<Error> {
+async function functionFailure(name: string, error: { message: string; context?: unknown }): Promise<Error> {
   const res = error.context;
   const body =
     res instanceof Response ? ((await res.json().catch(() => null)) as { error?: string; rid?: string } | null) : null;
   const rid = body?.rid ? ` (rid ${body.rid})` : "";
-  return new Error(`submit-claim failed: ${body?.error ?? error.message}${rid}`);
+  return new Error(`${name} failed: ${body?.error ?? error.message}${rid}`);
 }

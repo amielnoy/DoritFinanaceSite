@@ -942,6 +942,9 @@ jobs:
           # skip here impossible rather than merely unlikely.
           E2E_LIVE_API_URL: ${{ vars.PRODUCTION_URL }}
           E2E_LIVE_APP_ID: ${{ vars.BASE44_APP_ID }}
+          # "supabase" once the lead functions are switched on: the smoke then
+          # requires submit-lead to report Google ready. Unset, it is not asked.
+          E2E_EXPECT_GOOGLE: ${{ vars.LEAD_FUNCTIONS }}
 
       - name: Upload smoke report
         if: always()

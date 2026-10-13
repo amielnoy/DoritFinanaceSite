@@ -386,3 +386,16 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # the gateway's JWT check would refuse every visitor.
 [functions.submit-claim]
 verify_jwt = false
+
+# The site's forms and the interview agent post without signing in, as they
+# always have; the function checks its own input, as submit-claim does.
+[functions.submit-lead]
+verify_jwt = false
+
+# Called by the agents' tool and the smoke without signing in; the function
+# answers every request, with the contact details even when it fails.
+[functions.escalate-to-human]
+verify_jwt = false
+
+[functions.log-support-chat]
+verify_jwt = false
