@@ -669,7 +669,23 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-ILID-015..036 | "rejects %s" (11 values × browser/edge) | `null` for a wrong check digit, all zeros, 4 or 10 digits, letters, empty, non-strings |
 | UNIT-ILID-037 | "are the same code, so the page and the function never disagree" | The two function bodies match after whitespace normalisation |
 
+### 4.33 Sealing the clearinghouse values — `tests/unit/edge-seal.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SEAL-001 | "round-trips a value" | `unseal(seal(x)) === x` |
+| UNIT-SEAL-002 | "uses a fresh IV every time, so equal values never look equal" | Two seals of one value differ |
+| UNIT-SEAL-003 | "stores the IV, then the ciphertext and its 16-byte tag" | Decoded length = 12 + plaintext + 16 |
+| UNIT-SEAL-004 | "refuses a value that was changed after sealing" | Rejects |
+| UNIT-SEAL-005 | "refuses a value sealed with another key" | Rejects |
+| UNIT-SEAL-006 | "refuses a value too short to hold an IV and a tag" | `sealed_too_short` |
+| UNIT-SEAL-007 | "refuses text that is not base64" | Rejects |
+| UNIT-SEAL-008 | "refuses a key that is not 32 bytes" | `seal_key_length` |
+| UNIT-SEAL-009 | "is not configured when MASLEKA_KEY is missing" | `false`, `null` |
+| UNIT-SEAL-010 | "is not configured when MASLEKA_KEY is short or not base64" | `false`, `null` |
+| UNIT-SEAL-011 | "is configured with 32 bytes, and the key it gives works" | `true`; round trip through the env key |
+
 ## 5. Pass criteria
 
-All 501 cases pass. Any failure is a functional defect, not an environment issue —
+All 512 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
