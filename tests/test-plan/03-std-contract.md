@@ -540,6 +540,22 @@ itself is proved by `supabase/tests/masleka_check.sql` against a local
 | CTR-MSK-012 | "pins an empty search_path on every security definer function" | Every `security definer` function has `set search_path = ''` |
 | CTR-MSK-013 | "keeps the access log append-only, even for service_role" | service_role's default privileges revoked; log granted `select, insert` only; log FK `on delete set null`, no cascade |
 
+### 4.11 The clearinghouse ships dark — `masleka-dark-launch.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-MSKD-001 | "has the five functions to check" | Exactly the five `masleka-*` directories |
+| CTR-MSKD-002 | "masleka-code refuses before it reads or writes anything while the switch is off" | `if (!maslekaEnabled())` precedes every read, write and mail |
+| CTR-MSKD-003 | "masleka-create refuses before it reads or writes anything while the switch is off" | Same |
+| CTR-MSKD-004 | "masleka-remind refuses before it reads or writes anything while the switch is off" | Same |
+| CTR-MSKD-005 | "masleka-reveal refuses before it reads or writes anything while the switch is off" | Same |
+| CTR-MSKD-006 | "masleka-submitted refuses before it reads or writes anything while the switch is off" | Same |
+| CTR-MSKD-007 | "turns the Edge switch on only for exactly \"true\"" | The literal comparison after `trim()` |
+| CTR-MSKD-008 | "lets submit-lead create a request only behind the same switch" | `createRequest` inside the guarded branch |
+| CTR-MSKD-009 | "is off in a build that does not set VITE_MASLEKA_ENABLED" | `false` |
+| CTR-MSKD-010 | "is turned on by nothing in the repository" | No `MASLEKA_ENABLED=true` (comment lines aside) in Vercel, Playwright, Vitest, Supabase config, package.json or workflows |
+| CTR-MSKD-011 | "registers the staff pages only when switched on, and the client page always (it then says unavailable)" | Guarded `StaffRoute` block; `/masleka` route; page default `enabled = MASLEKA_ENABLED` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -549,7 +565,7 @@ time.
 
 ## 6. Pass criteria
 
-All 586 cases pass. A failure means either the frontend or the backend definition
+All 597 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

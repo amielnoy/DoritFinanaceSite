@@ -431,6 +431,81 @@ the key.
 `mail.govari-fin.co.il`, never the apex, which points at Microsoft 365 with an
 SPF ending in `-all`.
 
+### The clearinghouse requests (dark until the compliance review)
+
+`/masleka` collects a client's clearinghouse power-of-attorney code and ID
+number; `/admin/masleka` is the staff board that submits them in the
+clearinghouse portal (spec: `docs/superpowers/specs/2026-10-13-clearinghouse-route2-design.md`,
+PR A). Both values are AES-GCM ciphertext made by the Edge Functions with
+`MASLEKA_KEY`; they are wiped when a staff member presses **הגשתי**, and by
+the hourly `masleka-housekeeping` job after 9 days at the latest. The client's
+link is `https://govari-fin.co.il/masleka#t=<token>`: the token rides in the
+fragment, which no server, log or Referer sees, and the page removes it from
+the address bar at once.
+
+**Two switches, both off by default** and both on only when exactly `true`:
+`MASLEKA_ENABLED` (Supabase Edge Function secret) and `VITE_MASLEKA_ENABLED`
+(Vercel build env). Off: `/masleka` says "השירות אינו זמין כרגע", every
+`masleka-*` function answers 404 `disabled`, `submit-lead` sends today's
+`POA_URL` mail and creates no request, and `/admin/masleka` is a 404.
+`tests/contract/masleka-dark-launch.contract.test.ts` fails if either default
+changes or anything in the repo turns them on, and `e2e/ui/masleka.spec.ts`
+proves the dark page in the built site. Do not turn them on before Dorit's
+compliance adviser has signed off (`base44/agents/COMPLIANCE.md` §10).
+
+**Secrets** (Supabase Edge Function secrets, set by hand):
+`MASLEKA_KEY` — `openssl rand -base64 32` (exactly 32 bytes; losing it makes
+waiting codes unreadable, nothing else; rotate it only when no row is in
+`code_received`, or re-invite those clients); `MASLEKA_CRON_SECRET` —
+`openssl rand -hex 32`. The hourly reminder call reads two Vault secrets:
+`select vault.create_secret('https://hjowdyiwjjrqceumkvgt.supabase.co', 'masleka_functions_url');`
+and `select vault.create_secret('<the same MASLEKA_CRON_SECRET>', 'masleka_cron_secret');`.
+Until both exist, `masleka_call_remind()` does nothing.
+
+**Staff.** The board admits the platform admin (`profiles.role = 'admin'`) and
+anyone with a `memberships` row in agency 1; the blog and `/admin/leads` stay
+admin-only. Adding a staff member is one statement, after they have signed in
+once (so `auth.users` has them):
+
+```sql
+insert into public.memberships (user_id, agency_id, role)
+select id, '00000000-0000-0000-0000-000000000001', 'staff'
+  from auth.users where email = 'new.staff@example.com'
+on conflict do nothing;
+```
+
+Removing them is the matching `delete`; every board action re-checks
+membership, so it takes effect on their next click. Staff notices go to the
+profile e-mail of every admin and member (`masleka_staff_emails()`), or to
+`dorit@govari-fin.co.il` if none can be read — not to `dorit-mailer`'s
+`MAIL_TO`, which a rendered message cannot address.
+
+**Automatic invitations** come from `submit-lead`, so they need
+`VITE_LEAD_FUNCTIONS=supabase` as well; until then, staff create requests by
+hand on the board and copy the link. Business days are Sunday–Thursday;
+holidays are not modelled, so a holiday week's day-5 warning arrives early,
+never late.
+
+**Release:** the migration `20261015000000_masleka_requests.sql` is applied to
+production by hand and only on request (CI deploys functions only); run
+`supabase/tests/masleka_check.sql` against a local `supabase start` first.
+
+**Launch checklist** (every box before `MASLEKA_ENABLED` is set; none of it
+runs in CI):
+
+- [ ] Migration applied, then `select jobname, schedule from cron.job where jobname like 'masleka-%';` returns **2 rows** (`masleka-housekeeping`, `masleka-remind`). A missing `pg_net` only raises a NOTICE in the migration, so also run `select extname from pg_extension where extname in ('pg_cron','pg_net');` and expect both; if `pg_net` is missing, enable it (Dashboard, Database, Extensions) and re-run the `masleka-remind` scheduling block.
+- [ ] Edge secrets set: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_KEY="$(openssl rand -base64 32)" MASLEKA_CRON_SECRET="$(openssl rand -hex 32)"`. Functions deployed (the CI deploy job does this on merge).
+- [ ] Vault `masleka_cron_secret` is the same value as `MASLEKA_CRON_SECRET` and has **at least 32 characters** (a shorter one makes every reminder call answer 503): `select length(decrypted_secret) from vault.decrypted_secrets where name = 'masleka_cron_secret';` must be at least 32. Confirm `masleka_call_remind()` sends the header `x-masleka-cron` with that secret: `select pg_get_functiondef('public.masleka_call_remind'::regproc);` and look for `'x-masleka-cron'`.
+- [ ] The gateway's `x-forwarded-for`, once, on a deployed function (the per-IP limit of `masleka-code` keys on the header's first entry, so a client that can forge it defeats the limit). With the switch on for the smoke, post one bad submission twice, the second time with a forged header: `curl -s -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-code -H 'content-type: application/json' -H 'x-forwarded-for: 198.51.100.7' -d '{"token":"x","code":"x","id":"x"}'`. Then `select key, count(*) from public.submission_limits where key like 'masleka-ip:%' and at > now() - interval '10 minutes' group by key;` and compare with `printf %s "$(curl -s https://api.ipify.org)" | shasum -a 256`. Expected: the key is `masleka-ip:` plus the hash of your real address, not of 198.51.100.7. If it is the forged one, derive the IP from the last entry instead, in `clientIp` (`supabase/functions/_shared/guard.ts`), before launch.
+- [ ] `masleka-reveal` keeps `Cache-Control: no-store` through the gateway. Only the 200 answer carries it, so use the smoke's hand-made `code_received` request and a staff session: `curl -i -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-reveal -H 'content-type: application/json' -H "authorization: Bearer $STAFF_JWT" -d '{"requestId":"<id>","field":"code"}'` and read `Cache-Control: no-store` in the response headers (a CDN or gateway that rewrites it is a launch blocker).
+- [ ] Decide the resubmitted-interview duplicate: a completed interview submitted twice creates a second request for the same contact. Reuse or rotate the existing `invited` request in `submit-lead`, or accept the duplicate knowingly.
+- [ ] Verify at swiftness.co.il whether the advisor portal needs the ID number besides the code; if not, a later PR drops `id_ciphertext`, `id_last4` and the form field. Confirm the saver-registration and advisor-portal URLs (`CLEARINGHOUSE_SAVER_URL` / `CLEARINGHOUSE_ADVISOR_URL`).
+- [ ] When the step screenshots are captured, confirm the portal's wording in `/admin/masleka/guide` against the real screens (the guide quotes no portal menu label until then).
+- [ ] The compliance adviser has approved the points in `base44/agents/COMPLIANCE.md` §10, including the interview and wizard wording that still promises a signed mandate.
+- [ ] Staff memberships added (SQL above), Dorit's own `owner` row confirmed: `select * from public.memberships;`.
+- [ ] Switch on: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED=true` and `VITE_MASLEKA_ENABLED=true` on Vercel (production and preview), then redeploy. Smoke with a hand-made request to a staff member's own address: the client page, a reveal (a row appears in `masleka_access_log`), **הגשתי** (`select count(*) from masleka_requests where (code_ciphertext is not null or id_ciphertext is not null) and status <> 'code_received';` is 0).
+- [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days.
+
 ## The platform limit that led there
 
 Base44's `Core.SendEmail` delivers **only to registered users of the app**. An
