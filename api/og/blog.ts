@@ -98,7 +98,11 @@ export default async function handler(req: OgRequest, res: OgResponse): Promise<
   }
 
   try {
-    const post = (await client.entities.BlogPost.get(id)) as Article;
+    const post = (await client.entities.BlogPost.get(id)) as Article & { published?: boolean };
+    // BlogPost is readable by anyone on Base44, so an id is all it takes to
+    // ask. A draft is answered exactly as a missing post: same 404, same
+    // noindex, nothing of its title or description.
+    if (post?.published !== true) throw Object.assign(new Error("not published"), { status: 404 });
     const shell = await loadShell();
     res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
     res.status(200).send(renderSeoHtml(shell, computeBlogSeoConfig(post)));

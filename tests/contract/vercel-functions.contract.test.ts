@@ -52,3 +52,22 @@ describe("Vercel functions under api/", () => {
     expect(read("package.json").scripts.typecheck).toContain("api/tsconfig.json");
   });
 });
+
+describe("the Content-Security-Policy reports somewhere", () => {
+  // Report-Only with nowhere to report enforces nothing and records nothing.
+  const headers = (vercelConfig as unknown as { headers: { headers: { key: string; value: string }[] }[] }).headers
+    .flatMap((b) => b.headers);
+  const csp = headers.find((h) => h.key === "Content-Security-Policy-Report-Only");
+
+  it("names a report endpoint that is a function in api/", () => {
+    expect(csp, "no Content-Security-Policy-Report-Only header").toBeDefined();
+    const uri = csp!.value.match(/report-uri (\S+?);?(\s|$)/)?.[1];
+    expect(uri, "the policy has no report-uri").toBe("/api/csp-report");
+    expect(existsSync(join(REPO_ROOT, "api/csp-report.ts"))).toBe(true);
+  });
+
+  it("names the same endpoint for the Reporting API", () => {
+    expect(csp!.value).toMatch(/report-to csp(;|$)/);
+    expect(headers.find((h) => h.key === "Reporting-Endpoints")?.value).toBe('csp="/api/csp-report"');
+  });
+});
