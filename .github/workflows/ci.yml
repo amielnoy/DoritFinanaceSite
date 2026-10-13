@@ -1006,6 +1006,9 @@ jobs:
           # "supabase" once the lead functions are switched on: the smoke then
           # requires submit-lead to report Google ready. Unset, it is not asked.
           E2E_EXPECT_GOOGLE: ${{ vars.LEAD_FUNCTIONS }}
+          # The same variable tells base44-contract.spec.ts which function the
+          # form posts to: submit-lead on Supabase, or submitLead on Base44.
+          E2E_LEAD_FUNCTIONS: ${{ vars.LEAD_FUNCTIONS }}
           # The nightly run has nobody watching it and publishes no Base44, so
           # it skips the probes that open (empty) agent conversations.
           E2E_SKIP_AGENT_PROBES: ${{ github.event_name != 'schedule' && '0' || '1' }}

@@ -212,6 +212,16 @@ describe("the workflow tests every branch and deploys from only two", () => {
     expect(spec).toMatch(/E2E_SKIP_AGENT_PROBES === "1"/);
   });
 
+  it("tells the smoke which lead function the deployment posts to", () => {
+    const smoke = stepsOf(workflow.jobs.smoke).find((s) => s.name === "Smoke the deployment");
+    expect(smoke?.env?.E2E_LEAD_FUNCTIONS).toBe("${{ vars.LEAD_FUNCTIONS }}");
+    const spec = readFileSync(join(REPO_ROOT, "e2e/api/base44-contract.spec.ts"), "utf8");
+    expect(spec).toContain("LEAD_VIA_SUPABASE");
+    const fixture = readFileSync(join(REPO_ROOT, "e2e/fixtures/app.ts"), "utf8");
+    expect(fixture).toContain("process.env.E2E_LEAD_FUNCTIONS");
+    expect(fixture).toContain("process.env.VITE_LEAD_FUNCTIONS");
+  });
+
   it("builds the e2e matrix from the plan job rather than hard-coding it", () => {
     const matrix = workflow.jobs["test-e2e"].strategy?.matrix;
     expect(String(matrix?.include)).toContain("needs.plan.outputs.matrix");

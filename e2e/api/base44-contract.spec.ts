@@ -1,5 +1,5 @@
 import { loadEntity, validateAgainstEntity } from "../../tests/helpers/entity-schema";
-import { AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE, expect, gotoApp, test, test_step } from "../fixtures/app";
+import { AGAINST_A_DEPLOYMENT, LEAD_FUNCTION_PATH, LEAD_VIA_SUPABASE, STUBS_UNREACHABLE, expect, gotoApp, test, test_step } from "../fixtures/app";
 
 /**
  * Runtime contract: what the browser actually puts on the wire, checked against
@@ -51,8 +51,11 @@ test.describe("Base44 API contract (observed traffic)", () => {
       await expect(form.getByText("ההודעה נשלחה. תודה.")).toBeVisible();
     });
 
+    // Supabase Edge function when the build posts leads there, else Base44.
     const req = await test_step("capture the Lead the app wrote", () =>
-      mockApi.waitForRequest("/functions/submitLead")
+      LEAD_VIA_SUPABASE
+        ? mockApi.waitForEdgeRequest(LEAD_FUNCTION_PATH)
+        : mockApi.waitForRequest(LEAD_FUNCTION_PATH)
     );
 
     await test_step("it is a JSON POST", async () => {
@@ -83,7 +86,7 @@ test.describe("Base44 API contract (observed traffic)", () => {
       ];
       const body = req.body as Record<string, unknown>;
       const undeclared = Object.keys(body).filter((k) => !accepted.includes(k));
-      const issues = undeclared.map((field) => ({ field, problem: "not accepted by submitLead" }));
+      const issues = undeclared.map((field) => ({ field, problem: `not accepted by ${LEAD_VIA_SUPABASE ? "submit-lead" : "submitLead"}` }));
       expect(body.source, "source must be an enum value the Lead entity declares").toBeTruthy();
       expect(loadEntity("Lead").properties.source.enum).toContain(body.source);
       expect(issues, JSON.stringify(issues)).toEqual([]);
@@ -108,7 +111,9 @@ test.describe("Base44 API contract (observed traffic)", () => {
       await form.locator("#qc-name").fill("ישראלה");
       await form.locator("#qc-phone").fill("050-1234567");
       await form.getByRole("button", { name: "שליחת הודעה" }).click();
-      await mockApi.waitForRequest("/functions/submitLead");
+      await (LEAD_VIA_SUPABASE
+        ? mockApi.waitForEdgeRequest(LEAD_FUNCTION_PATH)
+        : mockApi.waitForRequest(LEAD_FUNCTION_PATH));
     });
 
     await test_step("no request left the origin or the /api prefix", async () => {
@@ -130,11 +135,14 @@ test.describe("Base44 API contract (observed traffic)", () => {
       await form.locator("#qc-phone").fill("0501234567");
       await form.locator("#qc-email").fill("secret@example.com");
       await form.getByRole("button", { name: "שליחת הודעה" }).click();
-      await mockApi.waitForRequest("/functions/submitLead");
+      await (LEAD_VIA_SUPABASE
+        ? mockApi.waitForEdgeRequest(LEAD_FUNCTION_PATH)
+        : mockApi.waitForRequest(LEAD_FUNCTION_PATH));
     });
 
     await test_step("no query string leaked the details or a credential", async () => {
-      for (const req of mockApi.requests) {
+      // The Supabase Edge calls are checked too, not only /api.
+      for (const req of [...mockApi.requests, ...mockApi.edgeRequests]) {
         const query = new URL(req.url).search;
         expect(query, req.url).not.toContain("0501234567");
         expect(query, req.url).not.toContain("secret@example.com");
