@@ -282,8 +282,24 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-MSK-015 | "renders no screenshot slot when none is given, and the given one when it is" | 0 figures; then 1 |
 | CMP-MSK-016 | "is marked noindex" | SeoRouteGuard writes `noindex` on `/masleka` |
 
+### 4.18 `<StaffRoute />` — the clearinghouse board's gate — `tests/component/staff-route.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-STF-001 | "sends a signed-out visitor to sign in" | `unauthenticatedElement`; no role lookup |
+| CMP-STF-002 | "admits the platform admin without asking for a membership" | Outlet; no lookup |
+| CMP-STF-003 | "admits a member of the agency" | Outlet |
+| CMP-STF-004 | "turns away a signed-in user with no membership" | Redirect to `/` |
+| CMP-STF-005 | "says so when the role cannot be read, rather than guessing either way" | Alert; no outlet |
+| CMP-STF-006 | "waits while sign-in is still being checked" | Neither outlet nor redirect |
+| CMP-STF-007 | "turns away a membership answer of %s, never rendering the outlet" (3 cases: empty string, `superuser`, `Staff`) | Redirect to `/`; no outlet |
+| CMP-STF-008 | "alerts, never renders the outlet, when the membership answer is undefined" | Alert; no outlet |
+| CMP-STF-009 | "turns away a signed-in user who has no id, without asking" | Redirect to `/`; no lookup |
+| CMP-STF-010 | "does not take %s on the user for the platform admin" (3: `ADMIN`, no role, `owner`) | One lookup, then redirect to `/`; no outlet |
+| CMP-STF-011 | "does not let one user's role reach the next user who signs in" | Second user never sees the outlet; two lookups |
+
 ## 5. Pass criteria
 
-All 108 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 119 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
