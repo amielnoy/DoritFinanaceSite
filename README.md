@@ -855,8 +855,9 @@ Worth knowing before changing it:
 - **`<route>.html`, not `<route>/index.html`.** The directory form is served
   only at `/faq/` with the trailing slash — `/faq` falls through to the SPA
   fallback. Measured on `vite preview`, not assumed.
-- **`vercel.json` rewrites unmatched paths to `/app.html`**, an untouched copy
-  of the shell, rather than to the prerendered home page. Otherwise a crawler
+- **`vercel.json` rewrites unmatched paths to `/app`** (`dist/app.html`, an
+  untouched copy of the shell; `cleanUrls: true` serves `dist/<route>.html` at
+  `/<route>` and 308s the literal `.html` address to it), rather than to the prerendered home page. Otherwise a crawler
   fetching `/blog/some-post` gets the home page's *content* under that URL.
 - **The build command is per host.** Vercel and the CI `build` job run
   `build:prerender`; Base44 runs plain `npm run build` and is unaffected. Both

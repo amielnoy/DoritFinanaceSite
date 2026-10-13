@@ -75,13 +75,14 @@ let shellHtml: string | null = null;
  * (`dist/app.html`) that does not survive from `vercel build` into
  * `vercel deploy --prebuilt` — the deploy step tried to `readlink` it and
  * failed with ENOENT. A same-origin fetch has no such handoff to get wrong:
- * if `/app.html` were missing, every other route on the site would already be
- * broken too.
+ * if `/app` were missing, every other route on the site would already be
+ * broken too. The address is `/app`, not `/app.html`: `cleanUrls` answers the
+ * literal `.html` with a 308, and `redirect: "error"` would throw on it.
  */
 async function loadShell(): Promise<string> {
   if (shellHtml !== null) return shellHtml;
-  const res = await fetch(`${SELF_ORIGIN}/app.html`, { redirect: "error" });
-  if (!res.ok) throw new Error(`fetching /app.html: ${res.status}`);
+  const res = await fetch(`${SELF_ORIGIN}/app`, { redirect: "error" });
+  if (!res.ok) throw new Error(`fetching /app: ${res.status}`);
   shellHtml = await res.text();
   return shellHtml;
 }

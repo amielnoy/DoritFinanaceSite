@@ -18,7 +18,7 @@ describe("hashed assets that no longer exist", () => {
   };
 
   it("are not rewritten to the app shell", () => {
-    const shell = vercel.rewrites.filter((r) => r.destination === "/app.html");
+    const shell = vercel.rewrites.filter((r) => r.destination === "/app");
     expect(shell.length).toBeGreaterThan(0);
     for (const rule of shell) {
       const re = new RegExp(`^${rule.source}$`);

@@ -19,7 +19,7 @@
 // Two files, deliberately:
 //
 //   dist/index.html — the prerendered home page, served at `/`.
-//   dist/app.html   — the untouched SPA shell, the rewrite target for anything
+//   dist/app.html   — the untouched SPA shell, the rewrite target (`/app`) for anything
 //                     without a prerendered file (an article published since
 //                     the last build, 404s).
 //
@@ -267,9 +267,11 @@ async function main() {
         // directory form is only served at `/faq/` with the trailing slash —
         // `/faq` falls straight through to the SPA fallback, which would have
         // shipped eight prerendered files that nothing ever requested. The
-        // sibling file answers `/faq`, `/faq/` and `/faq.html` alike, on
-        // `vite preview` and on Vercel, and every copy declares `/faq` as its
-        // canonical so the spare spellings consolidate. An article is
+        // sibling file answers `/faq` and `/faq/` on `vite preview`, and on
+        // Vercel because `vercel.json` sets `cleanUrls: true` — without it no
+        // file named `faq` exists and the catch-all rewrite serves the empty
+        // shell. With it the literal `/faq.html` answers a 308 to `/faq`.
+        // Every copy declares `/faq` as its canonical. An article is
         // `dist/blog/<slug>.html`, beside `dist/blog.html`.
         const target =
           route === '/' ? join(DIST, 'index.html') : join(DIST, `${route.slice(1)}.html`)

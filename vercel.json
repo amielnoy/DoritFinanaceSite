@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
+  "cleanUrls": true,
   "buildCommand": "npx playwright install chromium && npm run build:prerender",
   "outputDirectory": "dist",
   "installCommand": "npm i -g npm@12 && npm ci",
@@ -36,7 +37,7 @@
     },
     {
       "source": "/((?!assets/).*)",
-      "destination": "/app.html"
+      "destination": "/app"
     }
   ],
   "headers": [

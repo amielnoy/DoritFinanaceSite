@@ -50,7 +50,7 @@ vi.stubGlobal(
   "fetch",
   vi.fn(async (input: string) => {
     const url = String(input);
-    if (url.endsWith("/app.html")) return { ok: true, status: 200, text: async () => SHELL } as Response;
+    if (url.endsWith("/app")) return { ok: true, status: 200, text: async () => SHELL } as Response;
     if (url.startsWith(`${SUPABASE}/rest/v1/blog_posts`)) {
       restCalls.push(new URL(url));
       const body = restStatus === 200 ? rows : { message: "upstream down" };
@@ -137,7 +137,7 @@ describe("api/og/blog — an article asked for by its slug", () => {
       res
     );
 
-    expect(fetchMock()).toHaveBeenCalledWith(`${SITE_URL}/app.html`, { redirect: "error" });
+    expect(fetchMock()).toHaveBeenCalledWith(`${SITE_URL}/app`, { redirect: "error" });
   });
 });
 

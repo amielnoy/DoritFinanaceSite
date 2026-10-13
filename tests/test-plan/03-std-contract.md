@@ -364,6 +364,10 @@ old origin in its canonical tag, `og:url` and two static JSON-LD blocks.
 rewritten to `api/og/blog.ts` with no `has` condition (people get the 301 as
 well as crawlers), before the crawler rule and the SPA catch-all.
 
+**`vercel-functions.contract.test.ts`, clean URLs.** `cleanUrls` is `true` (so
+`dist/<route>.html` answers `/<route>`), the catch-all rewrites to `/app`, and
+`api/og/blog.ts` fetches the shell at `/app` — the literal `.html` is a 308.
+
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
 the environment supplies none, never overriding it; a checkout with no
@@ -478,7 +482,7 @@ time.
 
 ## 6. Pass criteria
 
-All 558 cases pass. A failure means either the frontend or the backend definition
+All 559 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

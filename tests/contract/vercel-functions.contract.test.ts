@@ -53,7 +53,20 @@ describe("Vercel functions under api/", () => {
     expect(rules[old].destination).toBe("/api/og/blog?id=:id");
     expect(rules[old].has).toBeUndefined();
     expect(old).toBeLessThan(rules.findIndex((r) => r.source === "/blog/:id"));
-    expect(old).toBeLessThan(rules.findIndex((r) => r.destination === "/app.html"));
+    expect(old).toBeLessThan(rules.findIndex((r) => r.destination === "/app"));
+  });
+
+  it("serves dist/<route>.html at /<route>: cleanUrls on, the shell reached by its clean address", () => {
+    // Without cleanUrls no file named `faq` exists, so the catch-all rewrite
+    // answered /faq, /faq/ and /tools with the empty shell. With it, a literal
+    // `/app.html` is a 308 to `/app`, so nothing may fetch or rewrite to the
+    // `.html` spelling.
+    expect((vercelConfig as { cleanUrls?: boolean }).cleanUrls).toBe(true);
+    const catchAll = vercelConfig.rewrites.find((r) => r.source === "/((?!assets/).*)");
+    expect(catchAll?.destination).toBe("/app");
+    const fn = readFileSync(join(REPO_ROOT, "api/og/blog.ts"), "utf8");
+    expect(fn).toMatch(/fetch\(`\$\{SELF_ORIGIN\}\/app`/);
+    expect(fn).not.toMatch(/fetch\([^)]*\/app\.html/);
   });
 
   it("are type-checked the way @vercel/node builds them", () => {

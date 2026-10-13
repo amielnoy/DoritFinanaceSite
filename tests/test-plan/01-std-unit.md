@@ -547,7 +547,7 @@ gets the shell with its head; anything else is 404 + noindex.
 |---|---|---|
 | UNIT-OG-001 | "renders the article's head into the shell, from Supabase" | 200; title, image, canonical on the slug; `or=(slug.eq…,base44_id.eq…)` |
 | UNIT-OG-002 | "reads with the publishable key, as an anonymous visitor would" | `apikey` is the publishable key |
-| UNIT-OG-003 | "fetches the shell from a fixed, trusted origin" | `${SITE_URL}/app.html`, whatever the Host |
+| UNIT-OG-003 | "fetches the shell from a fixed, trusted origin" | `${SITE_URL}/app`, whatever the Host |
 | UNIT-OG-004 | "answers a Base44 id with a 301 to the article's slug" | `Location: /blog/<slug>`; a day's cache |
 | UNIT-OG-005 | "keeps the visitor's own query string, without the id the rewrite added" | `?utm_source=whatsapp&tag=a&tag=b` |
 | UNIT-OG-006 | "answers a Supabase uuid the same way" | 301; `id.eq.<uuid>` asked |

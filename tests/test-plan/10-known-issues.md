@@ -142,9 +142,10 @@ assumption:
 - **The file layout.** `dist/<route>/index.html` is served only at `/faq/`, with
   the trailing slash — `/faq` falls through to the SPA fallback. Eight
   prerendered files that nothing would ever request. `dist/<route>.html` answers
-  `/faq`, `/faq/` and `/faq.html` alike, so that is what the script writes.
+  `/faq` and `/faq/` (on Vercel because `cleanUrls` is on; `/faq.html` 308s to
+  `/faq`), so that is what the script writes.
 - **The SPA fallback.** `vercel.json` now rewrites unmatched paths to
-  `/app.html`, an untouched copy of the shell, rather than to the prerendered
+  `/app`, an untouched copy of the shell, rather than to the prerendered
   home page — otherwise a crawler fetching `/blog/some-post` would be served the
   home page's *content* under that URL.
 
