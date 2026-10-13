@@ -241,8 +241,21 @@ article is cached under the slug first, so the switch reads nothing again.
 | CMP-POST-002 | "stays where it is when the address already is the slug" | Unchanged |
 | CMP-POST-003 | "stays on the id where the store has no slug (a build reading Base44)" | Unchanged |
 
+### 4.16 `<BlogAdmin />` — the article's address — `tests/component/blog-admin-slug.test.tsx`
+
+The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of STD-12).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-BADM-001 | "prefills an existing article's slug" | `horadat-dmei-nihul` |
+| CMP-BADM-002 | "asks for one on a new article, and will not save without it" | `SLUG_PROBLEMS.missing`; save disabled |
+| CMP-BADM-003 | "refuses %j" (3) | Format, Base44-id and taken messages; save disabled |
+| CMP-BADM-004 | "warns before a published article's address changes" | `role="status"` naming `/blog/horadat-dmei-nihul` |
+| CMP-BADM-005 | "does not warn for a draft, which nobody links to yet" | No status |
+| CMP-BADM-006 | "sends the slug with the article" | `mutateAsync({ id, draft: { …, slug } })` |
+
 ## 5. Pass criteria
 
-All 80 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 88 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

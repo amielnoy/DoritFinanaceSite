@@ -60,11 +60,14 @@ Two helpers do the work:
 | CTR-BLG-001 | "the admin payload carries title and body and nothing undeclared" | `BlogAdmin` payload conforms |
 | CTR-BLG-002 | "publish toggles only flip the declared boolean field" | Every updated key is declared |
 | CTR-BLG-003 | "the public blog list filters on the published flag only" | One `filter` call, `{published}`, declared boolean |
+| CTR-BLG-004 | "keeps the mirror-only fields off the BlogPost entity" | `slug` is not a BlogPost property |
 | CTR-TST-001 | "sends only declared fields and both required ones" | `Testimonial.create` conforms |
 | CTR-TST-002 | "keeps the rating inside the declared 1..5 range" | 5 valid; 6 and 0 rejected |
 | CTR-TST-003 | "only accepts the declared review sources" | `google \| midrag`; `yelp` rejected |
 | CTR-EML-001 | "every send supplies to, subject and body" | Exactly those three keys on every `SendEmail` |
 | CTR-EML-002 | "never hardcodes a recipient inline" | No literal `to:` string — recipients come from named constants |
+
+`slug` is the one key the admin's BlogPost payload may carry that the entity lacks — it is the Supabase mirror's alone — and a case fails if it ever becomes a Base44 field.
 
 ### 4.3 Backend function — `consultation-function.contract.test.ts`
 
@@ -457,7 +460,7 @@ that writes real slugs.
 | CTR-SLUG-003 | "names the two live articles older than the repo files" | `bituach-briut-digitali`, `pensia-beidan-ha-ai` with their exact titles |
 | CTR-SLUG-004 | "maps 22 distinct titles to 22 distinct slugs" | 22 rows, no title or slug twice |
 | CTR-SLUG-005 | "builds no /blog/<…> address by hand" | No `/blog/${` or `"/blog/" +` in `src/` or `api/` outside `articlePath.ts` |
-| CTR-SLUG-006 | "%s links articles through articlePath" (5 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo |
+| CTR-SLUG-006 | "%s links articles through articlePath" (6 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo, BlogAdmin |
 | CTR-SLUG-007 | "contentAdmin's copy is the same" | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
 
 ## 5. Runtime counterpart
@@ -469,7 +472,7 @@ time.
 
 ## 6. Pass criteria
 
-All 553 cases pass. A failure means either the frontend or the backend definition
+All 555 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

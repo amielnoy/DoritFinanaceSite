@@ -92,6 +92,7 @@ describe("every article link goes through articlePath", () => {
     "src/pages/Blog.tsx",
     "src/pages/BlogPost.tsx",
     "src/lib/blogSeo.ts",
+    "src/pages/BlogAdmin.tsx",
   ])("%s links articles through articlePath", (file) => {
     expect(read(file)).toMatch(/\barticlePath\(/);
   });
