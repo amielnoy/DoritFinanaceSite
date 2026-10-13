@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 158
+**Location:** `tests/contract/` · **Cases:** 158 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 888 including `it.each` / `describe.each` expansions (887 pass, 1 skipped)
 
 ---
 
@@ -633,7 +633,7 @@ time.
 
 ## 6. Pass criteria
 
-All 158 cases pass. A failure means either the frontend or the backend definition
+All 158 declared cases pass (vitest: 887 pass, 1 skipped, of 888 with expansions). A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 145
+**Location:** `tests/integration/` · **Cases:** 145 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 725 including `it.each` / `describe.each` expansions
 
 ---
 
@@ -681,7 +681,7 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 
 ### 4.30 `submit-lead` — the clearinghouse request — `INT-LEADMSK-001..014`
 
-`tests/integration/submit-lead-masleka.integration.test.ts`. The dark cases fix the clock (`vi.setSystemTime`, Date only) and compare against the output captured from submit-lead before this change (commit 733c9bd).
+`tests/integration/submit-lead-masleka.integration.test.ts`. The dark cases fix the clock (`vi.setSystemTime`, Date only) and compare against the output re-captured from submit-lead after #170 landed, at the merge a8f7a9f.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -702,7 +702,7 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 
 ## 5. Pass criteria
 
-All 145 cases pass. These assert behaviour, not shape — a failure means the
+All 145 declared cases pass (vitest: 725 with expansions). These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

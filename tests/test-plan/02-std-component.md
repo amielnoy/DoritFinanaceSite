@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 206 · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 206 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 246 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -375,6 +375,6 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 
 ## 5. Pass criteria
 
-All 206 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 206 declared cases pass (vitest: 246 with expansions). A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

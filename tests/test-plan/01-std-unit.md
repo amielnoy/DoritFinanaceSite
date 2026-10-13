@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 681 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 688 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1164 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -907,9 +907,9 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-ILID-001..014 | "accepts %s as %s" (7 values × browser/edge) | Zero-padded nine digits returned; spaces and hyphens ignored |
-| UNIT-ILID-015..036 | "rejects %s" (11 values × browser/edge) | `null` for a wrong check digit, all zeros, 4 or 10 digits, letters, empty, non-strings |
-| UNIT-ILID-037 | "are the same code, so the page and the function never disagree" | The two function bodies match after whitespace normalisation |
+| UNIT-ILID-001..016 | "accepts %s as %s" (8 values × browser/edge; `123456782` reaches the carry branch) | Zero-padded nine digits returned; spaces and hyphens ignored |
+| UNIT-ILID-017..040 | "rejects %s" (12 values × browser/edge; `123456789` has a wrong check digit) | `null` for a wrong check digit, all zeros, 4 or 10 digits, letters, empty, non-strings |
+| UNIT-ILID-041 | "are the same code, so the page and the function never disagree" | The two function bodies match after whitespace normalisation |
 
 ### 4.39 Sealing the clearinghouse values — `tests/unit/edge-seal.test.ts`
 
@@ -1050,7 +1050,15 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKBD-026 | "says a dead link is dead, and a switched-off service is unavailable" | link_invalid / disabled copy |
 | UNIT-MSKBD-027 | "treats anything that is not a MaslekaError as a failure" | Same as `failed` |
 
+### 4.45 Vercel Analytics beforeSend — `tests/unit/vercel-analytics.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-VANA-001 | "drops the #t= token from a /masleka url" | `https://govari-fin.co.il/masleka`; the token appears nowhere in the event |
+| UNIT-VANA-002 | "leaves a url without a hash unchanged" | Same url |
+| UNIT-VANA-003 | "keeps the query and drops only the hash" | `…/masleka?utm=x&a=1` |
+
 ## 5. Pass criteria
 
-All 681 cases pass. Any failure is a functional defect, not an environment issue —
+All 688 declared cases pass (vitest: 1164 with expansions). Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

@@ -4,7 +4,7 @@
 `npm run test:e2e:security` (runtime, Playwright)
 **Location:** `tests/security/static-security.test.ts`,
 `tests/security/agent-surface.security.test.ts`, `e2e/security/security.spec.ts`
-**Cases:** 76 static (26 site + 50 agent surface) + 15 runtime (× 4 platforms)
+**Cases:** 76 static declared (26 site + 50 agent surface; `npm run test:security` runs 79 including `it.each` expansions) + 15 runtime (× 4 platforms)
 
 ---
 
@@ -153,5 +153,5 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 
 ## 6. Pass criteria
 
-All 76 static cases pass; all 15 runtime cases pass on all four platforms,
+All 76 static declared cases pass (vitest: 79 with expansions); all 15 runtime cases pass on all four platforms,
 with `SEC-HDR-001` skipped unless explicitly enabled.
