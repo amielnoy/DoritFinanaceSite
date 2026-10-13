@@ -260,9 +260,18 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-BADM-011 | "says the public page goes at the next deploy after a published article is unpublished" | `role="status"` with "יוסר בעדכון הבא" and a pointer to the README; absent before the click |
 | CMP-BADM-012 | "says nothing when a draft is published" | No note |
 | CMP-BADM-013 | "says it after a published article is deleted, but not a draft" | Note only for the published one |
+| CMP-CHATFN-001 | "shows the v6 notice" | The fourth v6 consent point is rendered for `needs_interview` when served by `chat` |
+| CMP-CHATFN-002 | "sends the first message with the v6 stamp and shows the reply" | `consentVersion: 2026-10-agents-v6` in the function body; the reply appears |
+| CMP-CHATFN-003 | "counts the lead the function saved, and never submits it from the page" | `interviewCompleted` once on `signal: lead_saved`; `submitInterview` not called |
+| CMP-CHATFN-004 | "shows Dorit's channels and gives the text back when the function cannot answer" | A `tel:` link shown; the box holds the text again (`AgentUnavailableError`) |
+| CMP-CHATFN-005 | "answers a rate limit with its own final wording and gives the text back" | `נשלחו הרבה הודעות בזמן קצר. אפשר לנסות שוב בעוד דקה.`; box refilled |
+| CMP-CHATFN-006 | "answers a closed conversation with its own final wording" | `השיחה הזו הסתיימה. אפשר להתחיל שיחה חדשה.` |
+| CMP-CHATFN-007 | "keep the v5 notice, byte for byte" | A Base44 agent shows its v5 points and not the v6 fourth point |
+| CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
+| CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
 
 ## 5. Pass criteria
 
-All 92 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 101 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

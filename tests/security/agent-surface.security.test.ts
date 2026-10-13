@@ -383,7 +383,10 @@ describe("Prompt injection — through the chat box", () => {
   it("keeps the consent stamp a property of the shell, not of the conversation", () => {
     // If the model could supply consent_version, a persuaded model could
     // backdate what the visitor agreed to.
-    expect(CHAT).toMatch(/consent_version: CONSENT_VERSION/);
+    // The shell chooses the stamp — v5, or v6 for an agent on the chat
+    // function — from its own constants; never from the conversation.
+    expect(CHAT).toMatch(/consent_version: consentVersion/);
+    expect(CHAT).toMatch(/const consentVersion = viaChatFunction \? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION;/);
   });
 
   it("gates sending on consent held in the shell's own state", () => {
