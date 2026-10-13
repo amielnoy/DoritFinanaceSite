@@ -24,7 +24,7 @@ import { calendarConfigured, createCalendarEvent } from '../_shared/calendar.ts'
 import { appendSheetRow } from '../_shared/sheets.ts';
 import { buildInvitation } from '../_shared/ics.ts';
 import {
-  CALENDAR_ATTENDEES, INTERVIEW_TRACKS, INTERVIEW_WINDOW_MS, LEAD_FIELD_LIMITS, NOTIFY_EMAILS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB,
+  INTERVIEW_TRACKS, INVITE_ATTENDEES, INVITE_ORGANIZER, INTERVIEW_WINDOW_MS, LEAD_FIELD_LIMITS, NOTIFY_EMAILS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB,
   buildAgentBody, buildAgentHtml, buildClientText, buildInterviewProfile, buildLinksFooter, buildOpsFooter,
   clientMailFor, completenessLine, eventTypeFor, interviewCompleteness, israelInstant, profileValue,
   redact, sameInterviewee, subjectFor, tomorrowInIsrael, wallClock,
@@ -97,7 +97,7 @@ export async function handler(req: Request): Promise<Response> {
       // `ready` answers the production smoke's empty request: whether a real
       // enquiry could be stored, announced and booked. Booleans — never a
       // setting's value.
-      const ready = { db: supabaseConfigured(), mailer: mailerConfigured(), google: googleConfigured() && calendarConfigured() };
+      const ready = { db: supabaseConfigured(), mailer: mailerConfigured(), google: googleConfigured() };
       return Response.json({ error: 'נדרשים שם וטלפון', rid, ready }, { status: 400, headers: cors });
     }
 
@@ -369,10 +369,10 @@ export async function handler(req: Request): Promise<Response> {
     // The slot the hold was actually placed on, which is not always the slot
     // that was agreed — it falls back to tomorrow 09:00 when nothing was.
     let calendarStartedAt: string | null = null;
-    // One event in Dorit's Google calendar, without attendees — a service
-    // account cannot invite on a consumer calendar — and then each attendee
-    // gets the meeting by mail, under the event's own UID, so the invitation
-    // and the event are one meeting. Sent only when the event exists.
+    // One event in the calendar GOOGLE_CALENDAR_ID names (amielnoy@gmail.com's,
+    // shared with the service account), without attendees; and, independently
+    // of it, an invitation by mail to Dorit and to amielnoy@outlook.com. When
+    // the event exists the invitations carry its UID — one meeting.
     let invites = booksCalendar ? 'לא נשלחו' : 'לא רלוונטי';
     if (booksCalendar) {
       const calStartIso = wallClock(scheduledAt) ?? `${tomorrowInIsrael()}T09:00:00`;
@@ -385,37 +385,49 @@ export async function handler(req: Request): Promise<Response> {
       const inviteDescription = agentBody.length > INVITE_DESCRIPTION_MAX
         ? `${agentBody.slice(0, INVITE_DESCRIPTION_MAX)}\n…הפרטים המלאים במייל`
         : agentBody;
-      try {
-        const ev = await createCalendarEvent({ summary: subject, description, startIso: calStartIso, endIso: calEndIso });
-        log('info', 'calendar.created', { rid, provider: 'google' });
-        calendar = `אירוע נוצר ✓ (google) — ${calStartIso.slice(0, 16).replace('T', ' ')}`;
-        const sent = await Promise.all(CALENDAR_ATTENDEES.map(async (attendee: string) => {
-          try {
-            await sendMail(log, {
-              to: attendee,
-              subject: `הזמנה: ${subject}`,
-              text: `${description}\n\nהאירוע ביומן: ${ev.htmlLink}`,
-              ics: buildInvitation({
-                uid: ev.iCalUID, start: ev.start, end: ev.end, summary: subject, description: inviteDescription,
-                organizer: Deno.env.get('GOOGLE_CALENDAR_ID')!.trim(), organizerName: 'דורית גוב ארי', attendee,
-              }),
-              rid,
-              role: 'invite',
-            });
-            return true;
-          } catch (e) {
-            log('warn', 'invite.failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
-            warnings.push(deliveryWarning('invite_failed', e));
-            return false;
-          }
-        }));
-        invites = `נשלחו ${sent.filter(Boolean).length}/${CALENDAR_ATTENDEES.length}`;
-      } catch (e) {
-        const msg = String((e as Error)?.message ?? e);
-        const rejected = /^calendar_http_4\d\d$/.test(msg);
-        log(rejected ? 'error' : 'warn', rejected ? 'calendar.rejected' : 'calendar.failed', { rid, provider: 'google', err: msg.slice(0, 200) });
-        warnings.push(rejected ? 'calendar_google_rejected' : 'calendar_google_failed');
+      // The Google event goes in first, but nothing below waits on it for its
+      // own sake: it only supplies the UID when it exists. Unset calendar id,
+      // a refusal, a timeout — the invitations go out all the same.
+      let ev: Awaited<ReturnType<typeof createCalendarEvent>> | null = null;
+      calendar = 'אירוע ביומן Google לא נוצר';
+      if (calendarConfigured()) {
+        try {
+          ev = await createCalendarEvent({ summary: subject, description, startIso: calStartIso, endIso: calEndIso });
+          log('info', 'calendar.created', { rid, provider: 'google' });
+          calendar = `אירוע נוצר ✓ (google) — ${calStartIso.slice(0, 16).replace('T', ' ')}`;
+        } catch (e) {
+          const msg = String((e as Error)?.message ?? e);
+          const rejected = /^calendar_http_4\d\d$/.test(msg);
+          log(rejected ? 'error' : 'warn', rejected ? 'calendar.rejected' : 'calendar.failed', { rid, provider: 'google', err: msg.slice(0, 200) });
+          warnings.push(rejected ? 'calendar_google_rejected' : 'calendar_google_failed');
+        }
       }
+      // One meeting everywhere: the event's own UID when there is one, else a
+      // stable local one. Without an event the instants come from the slot.
+      const startAt = ev?.start ?? new Date(israelInstant(calStartIso) ?? Date.now());
+      const endAt = ev?.end ?? new Date(startAt.getTime() + 30 * 60000);
+      const uid = ev?.iCalUID ?? `lead-${leadId}@govari-fin.co.il`;
+      const sent = await Promise.all(INVITE_ATTENDEES.map(async (attendee: string) => {
+        try {
+          await sendMail(log, {
+            to: attendee,
+            subject: `הזמנה: ${subject}`,
+            text: `${description}${ev ? `\n\nהאירוע ביומן: ${ev.htmlLink}` : ''}`,
+            ics: buildInvitation({
+              uid, start: startAt, end: endAt, summary: subject, description: inviteDescription,
+              organizer: INVITE_ORGANIZER, organizerName: 'דורית גוב ארי', attendee,
+            }),
+            rid,
+            role: 'invite',
+          });
+          return true;
+        } catch (e) {
+          log('warn', 'invite.failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+          warnings.push(deliveryWarning('invite_failed', e));
+          return false;
+        }
+      }));
+      invites = `נשלחו ${sent.filter(Boolean).length}/${INVITE_ATTENDEES.length}`;
     }
 
     // The outcome, written back onto the booking. `scheduled_at` is what was

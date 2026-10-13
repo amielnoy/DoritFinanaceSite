@@ -442,7 +442,7 @@ describe.each(IMPLEMENTATIONS)("$label — what survives a failure", ({ run, dow
 
   it("reports the calendar failure in the operations appendix", async () => {
     const r = await run(consultation, down.calendar);
-    expect(r.mailTo(OPS).text).toMatch(/יומן: לא נוצר/);
+    expect(r.mailTo(OPS).text).toMatch(/יומן: (אירוע ביומן Google )?לא נוצר/);
     expect(r.mailTo(OPS).text).toMatch(/תקלות:.*calendar_\w+_(failed|rejected)/);
   });
 
@@ -2040,8 +2040,72 @@ describe("Edge submit-lead — what only it does", () => {
     expect(r.callsTo("/calendar/v3/calendars/govaridorit%40gmail.com/events")).toHaveLength(1);
     expect(r.calendarEvents[0]).not.toHaveProperty("attendees");
     const invited = r.emails.filter((e) => e.ics).map((e) => e.to).sort();
-    expect(invited).toEqual(["amielnoy@gmail.com", "amielnoy@outlook.com", "dorit@govari-fin.co.il"]);
-    expect(r.emails.find((e) => e.ics)!.ics).toContain("UID:ev1@google.com");
+    // Not to the Gmail address: the event is written straight into that calendar.
+    expect(invited).toEqual(["amielnoy@outlook.com", "dorit@govari-fin.co.il"]);
+    for (const m of r.emails.filter((e) => e.ics)) {
+      expect(m.ics).toContain("UID:ev1@google.com");
+      expect(m.ics).toContain("METHOD:REQUEST");
+    }
+  });
+
+  describe("invitations do not depend on the Google event", () => {
+    const icsOf = (r: Awaited<ReturnType<typeof invokeEdge>>) => r.emails.filter((e) => e.ics);
+
+    it("sends both with a local UID and a warning when the Google call fails; the lead is saved", async () => {
+      const r = await invokeEdge("submit-lead", consultation, { failGoogle: "calendar" });
+      expect(r.status).toBe(200);
+      expect(r.leads).toHaveLength(1);
+      const mails = icsOf(r);
+      expect(mails.map((m) => m.to).sort()).toEqual(["amielnoy@outlook.com", "dorit@govari-fin.co.il"]);
+      for (const m of mails) expect(m.ics).toContain(`UID:lead-${r.leads[0].id}@govari-fin.co.il`);
+      expect(r.json.warnings).toContain("calendar_google_failed");
+      expect(r.mailTo("amielnoy@gmail.com").text).toMatch(/אירוע ביומן Google לא נוצר/);
+      expect(r.mailTo("amielnoy@gmail.com").text).toMatch(/נשלחו 2\/2/);
+    });
+
+    it("sends both, with no Google request for the event, when GOOGLE_CALENDAR_ID is unset", async () => {
+      const r = await invokeEdge("submit-lead", consultation, { envPatch: { GOOGLE_CALENDAR_ID: null } });
+      expect(r.status).toBe(200);
+      expect(icsOf(r)).toHaveLength(2);
+      expect(r.callsTo("/calendar/v3/calendars/")).toEqual([]);
+      expect(icsOf(r)[0].ics).toContain("UID:lead-");
+    });
+
+    it("keeps the other invitation, says 1/2 and saves the lead when one invitation fails", async () => {
+      const r = await invokeEdge("submit-lead", consultation, { failEmailTo: ["amielnoy@outlook.com"] });
+      expect(r.status).toBe(200);
+      expect(r.leads).toHaveLength(1);
+      expect(icsOf(r).map((m) => m.to)).toEqual(["dorit@govari-fin.co.il"]);
+      expect(r.mailTo("amielnoy@gmail.com").text).toMatch(/נשלחו 1\/2/);
+      expect(r.json.warnings as string[]).toSatisfy((w: string[]) => w.some((x) => x.startsWith("invite_failed")));
+    });
+
+    it("is organised by the site, never by an attendee", async () => {
+      const r = await invokeEdge("submit-lead", consultation, { failGoogle: "calendar" });
+      expect(icsOf(r)).toHaveLength(2);
+      for (const m of icsOf(r)) {
+        const organizer = /ORGANIZER[^:]*:mailto:(\S+)/.exec(m.ics!.replace(/\r\n /g, ""))![1];
+        expect(organizer).toBe("site@govari-fin.co.il");
+        expect(["amielnoy@outlook.com", "dorit@govari-fin.co.il", "amielnoy@gmail.com"]).not.toContain(organizer);
+      }
+    });
+
+    it.each([
+      ["summer, UTC+3", "2026-07-15T10:00", "DTSTART:20260715T070000Z", "DTEND:20260715T073000Z"],
+      ["winter, UTC+2", "2026-12-15T10:00", "DTSTART:20261215T080000Z", "DTEND:20261215T083000Z"],
+    ])("puts a 10:00 Israel slot at the right instant in %s, on the local-UID path", async (_n, at, start, end) => {
+      const r = await invokeEdge("submit-lead", { ...consultation, scheduledAt: at }, { failGoogle: "calendar" });
+      expect(icsOf(r)).toHaveLength(2);
+      for (const m of icsOf(r)) {
+        expect(m.ics).toContain(start);
+        expect(m.ics).toContain(end);
+      }
+    });
+
+    it("reports ready.google from the service account alone", async () => {
+      const r = await invokeEdge("submit-lead", {}, { envPatch: { GOOGLE_CALENDAR_ID: null } });
+      expect(r.json.ready).toMatchObject({ google: true });
+    });
   });
 
   it("writes a booking row by the lead's Supabase id", async () => {
@@ -2060,7 +2124,7 @@ describe("Edge submit-lead — what only it does", () => {
     const r = await invokeEdge("submit-lead", { ...consultation, summary: notes, notes: notes.slice(0, 3_990) });
     expect(r.status).toBe(200);
     const invitations = r.emails.filter((e) => e.ics);
-    expect(invitations).toHaveLength(3);
+    expect(invitations).toHaveLength(2);
     const encoder = new TextEncoder();
     for (const mail of invitations) {
       expect(encoder.encode(mail.ics!).length, mail.to).toBeLessThan(20_000);
@@ -2123,13 +2187,13 @@ describe("Edge submit-lead — what only it does", () => {
 
   describe("submit-lead — when Google is not there", () => {
     for (const fail of ["token", "calendar", "sheets"] as const) {
-      it(`still saves and mails when the ${fail} call fails, with one warning and no invitation`, async () => {
+      it(`still saves and mails when the ${fail} call fails, with a warning${fail === "sheets" ? "" : " and both invitations still sent"}`, async () => {
         const r = await invokeEdge("submit-lead", consultation, { failGoogle: fail });
         expect(r.status).toBe(200);
         expect(r.leads).toHaveLength(1);
         expect(r.emails.map((e) => e.to)).toContain("dorit@govari-fin.co.il");
         expect(r.json.warnings.length).toBeGreaterThan(0);
-        if (fail !== "sheets") expect(r.emails.filter((e) => e.ics)).toEqual([]);
+        expect(r.emails.filter((e) => e.ics)).toHaveLength(2);
       });
     }
 

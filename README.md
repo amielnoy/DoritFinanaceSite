@@ -412,11 +412,18 @@ PR makes them forwarders.
 
 In **Supabase Edge Function secrets** (set by hand — the CI token cannot write
 secrets): `GOOGLE_SERVICE_ACCOUNT_JSON` (the service account's JSON key),
-`GOOGLE_CALENDAR_ID` (`govaridorit@gmail.com`) and `SHEET_ID` (the leads sheet),
-next to the `MAILER_URL` and `MAILER_TOKEN` above. Dorit must share her calendar
-("make changes to events") and the leads sheet (editor) with the service
-account's address. The meeting invitation goes by mail as an `.ics` file
-through `dorit-mailer`; there is no Outlook or Google Docs step any more.
+`GOOGLE_CALENDAR_ID` (amielnoy@gmail.com — the operator's own Google calendar,
+not Dorit's) and `SHEET_ID` (the leads sheet), next to the `MAILER_URL` and
+`MAILER_TOKEN` above. Share that calendar with the service account's address
+("make changes to events"), and the leads sheet (editor). Dorit does not need to
+share anything. A meeting arrives as an event in that Google calendar (no
+attendees) **and** as an `.ics` invitation by mail through `dorit-mailer` to
+`dorit@govari-fin.co.il` (her Outlook) and `amielnoy@outlook.com`, from
+`site@govari-fin.co.il`; none goes to the Gmail address, which already holds the
+event. The invitations do not depend on the event: with `GOOGLE_CALENDAR_ID`
+unset, or the Google call failing (a `calendar_google_*` warning), they still go
+out, under a local `lead-<id>@govari-fin.co.il` UID instead of the event's.
+There is no Outlook or Google Docs step any more.
 Release order: apply `supabase/migrations/20261013000000_meetings_lead_id.sql` to
 the production database by hand after merge (CI deploys functions only) and before
 switching `VITE_LEAD_FUNCTIONS` — a Supabase-only lead has no Base44 id, so its

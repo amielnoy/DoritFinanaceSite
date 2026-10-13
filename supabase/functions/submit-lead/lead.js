@@ -86,6 +86,19 @@ export const CALENDAR_ATTENDEES = [
   "amielnoy@outlook.com",
 ];
 
+/**
+ * מי מקבל הזמנת פגישה בדואר (Edge בלבד). האירוע ביומן Google נכתב ישירות
+ * ליומן של amielnoy@gmail.com, ולכן אין לשלוח לו הזמנה נוספת; דורית
+ * וה-Outlook של הצוות מקבלים הזמנה. תת-קבוצה של CALENDAR_ATTENDEES.
+ */
+export const INVITE_ATTENDEES = [
+  "dorit@govari-fin.co.il",
+  "amielnoy@outlook.com",
+];
+
+/** כתובת השולח של האתר: מארגן ההזמנה, ולעולם לא אחד מהמוזמנים. */
+export const INVITE_ORGANIZER = "site@govari-fin.co.il";
+
 // שני נמענים, שניהם מקבלים את הפנייה המלאה.
 //
 // SECONDARY_EMAIL הוא הסוכנת. NOTIFY_EMAILS הן תיבות הצוות שמתפעל את האתר מטעמה,
