@@ -121,8 +121,8 @@ const claimDocumentsPort: UploadPort =
 
 /**
  * Claims go to the `submit-claim` Edge Function when Supabase is configured.
- * Every other lead path still runs on Base44's functions, which hold the
- * calendar and Sheets connections, so it is passed through untouched.
+ * Leads, interviews and hand-offs follow `VITE_LEAD_FUNCTIONS`: Base44's
+ * functions by default, the Supabase Edge Functions once it says "supabase".
  */
 const base44Leads = new Base44LeadService(client);
 const leadPort: LeadPort = supabase
