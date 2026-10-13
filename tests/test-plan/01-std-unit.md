@@ -607,7 +607,19 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-SEOF-018 | "carries every article's text under its title and address" | Title, address and `עודכן` date, then body |
 | UNIT-SEOF-019 | "refuses a template without the pages heading it cuts at" | Throws "## דפים" |
 
+### 4.29 Search Console and Bing verification tags — `tests/unit/site-verification.test.ts`
+
+`verificationTags` in `scripts/vite-site-url-plugin.mjs`, injected into `index.html` by the plugin's `transformIndexHtml`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SVER-001 | "emits nothing when neither variable is set" | `[]` |
+| UNIT-SVER-002 | "emits Google's and Bing's tags from their variables" | `google-site-verification` then `msvalidate.01` meta tags, `injectTo: head` |
+| UNIT-SVER-003 | "ignores a variable that is set but blank" | `[]` |
+| UNIT-SVER-004 | "refuses a whole pasted <meta> tag and says what to paste" | Throws "only the content value" |
+| UNIT-SVER-005 | "is what the plugin injects into index.html" | `transformIndexHtml()` equals `verificationTags(env)` |
+
 ## 5. Pass criteria
 
-All 431 cases pass. Any failure is a functional defect, not an environment issue —
+All 436 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
