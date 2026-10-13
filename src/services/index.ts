@@ -1,24 +1,7 @@
-import { base44 } from "@/api/base44Client";
-import { supabase } from "@/api/supabaseClient";
-import { UPLOAD_PROVIDER } from "@/config/upload-provider";
-import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
-import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
-import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
-import { Base44AgentService } from "./base44/Base44AgentService";
-import { Base44ContentAdminService } from "./base44/Base44ContentAdminService";
-import { Base44ContentService } from "./base44/Base44ContentService";
-import { Base44LeadAdminService } from "./base44/Base44LeadAdminService";
-import { Base44LeadService } from "./base44/Base44LeadService";
-import { Base44SupportService } from "./base44/Base44SupportService";
-import { Base44UploadService } from "./base44/Base44UploadService";
-import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
+import { toast } from "@/components/ui/use-toast";
+import { RestTableClient } from "./supabase/RestTableClient";
+import { defaultSessionPresent } from "./supabase/SupabaseAuthService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
-import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
-import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
-import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
-import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
-import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
-import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
 import type {
   AccountPort,
   AgentPort,
@@ -32,10 +15,28 @@ import type {
 } from "./ports";
 
 /**
- * Composition root — the single place that knows the concrete implementations.
+ * The services the app talks to — a light front for `./composition.ts`.
  *
- * Everything else imports the ports. Swapping Base44 for another backend, or a
- * fake in a test, means changing this file and nothing else.
+ * `composition.ts` is the composition root: the one place that names concrete
+ * implementations, and the one that imports both SDKs. Imported eagerly, it put
+ * `@supabase/supabase-js` and `@base44/sdk` (~100 KB gzipped together) on the
+ * critical path of every page, modulepreloaded ahead of the hero — while an
+ * anonymous visitor reading the home page calls neither.
+ *
+ * So this module exposes the same `services` object, but each port loads the
+ * composition root on its first real call and delegates to it. A visitor who
+ * submits a form, opens a chat or signs in pays for the SDKs at that moment;
+ * one who only reads never does. Two things are answered here, without it:
+ *
+ *   - `auth.hasStoredToken()` and `auth.getPublicSettings()`, which AuthContext
+ *     calls on every page load. Both were already SDK-free (a localStorage
+ *     probe and a constant), so they keep their exact answers. A visitor with
+ *     no session never reaches `me()`, and so never loads the SDK.
+ *   - Public content reads (testimonials, articles), over `RestTableClient` —
+ *     the same anonymous PostgREST query the SDK made, sent with `fetch`.
+ *
+ * Every method that returns a Promise keeps its signature. The few `void` ones
+ * (redirects) and `agents.subscribe` start the load and act when it lands.
  */
 export interface Services {
   leads: LeadPort;
@@ -48,112 +49,129 @@ export interface Services {
   support: SupportPort;
   /** Who is signed in. Read by the route guards and the owner-only controls. */
   auth: AuthPort;
-  /** Owner-only surfaces. Reachable from the same object as the public ports,
-   *  as they always were — what changed is that they now go through an
-   *  interface, so the admin screens can be tested against a fake and the
-   *  backend behind them can be replaced without touching a component. */
+  /** Owner-only surfaces, behind the same object as the public ports. */
   leadsAdmin: LeadAdminPort;
   contentAdmin: ContentAdminPort;
   /** The signed-in visitor's own enquiries — the personal area. */
   account: AccountPort;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const client = base44 as any;
+let loading: Promise<Services> | null = null;
+
+/** The real services, loading the composition root once. A failed chunk load is retried next time. */
+function real(): Promise<Services> {
+  loading ??= import("./composition").then(
+    (m) => m.services,
+    (e: unknown) => {
+      loading = null;
+      throw e;
+    },
+  );
+  return loading;
+}
+
+/** Start loading the SDKs ahead of need — e.g. when a form or chat first comes into view. */
+export function preloadServices(): void {
+  void real().catch(() => {});
+}
 
 /**
- * Table reads, on Supabase when it is configured.
+ * For the `void` methods: act once loaded, and never leave a rejection unhandled.
  *
- * Every write already mirrors into these tables, so the data is there and
- * current. A build without Supabase reads Base44 as before. Content and leads
- * are data, not identity, so a missing client means "the old path", not
- * "broken", unlike `authPort` below.
+ * Sign-out and the sign-in redirects return nothing to await, so when the load
+ * fails there is no caller to tell — the visitor clicks and nothing happens.
+ * The toast is the only way that failure can reach them.
  */
-const tables: SupabaseLeadTableClient | null = supabase ? (supabase as unknown as SupabaseLeadTableClient) : null;
+function later(run: (s: Services) => void): void {
+  real()
+    .then(run)
+    .catch((e) => {
+      console.error("services failed to load:", e);
+      toast({
+        variant: "destructive",
+        title: "לא הצלחנו להשלים את הפעולה",
+        description: "בדקו את החיבור לאינטרנט ונסו שוב.",
+      });
+    });
+}
 
-const contentPort: ContentPort = tables ? new SupabaseContentService(tables) : new Base44ContentService(client);
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+/** Mirrors `@/api/supabaseClient`: Supabase is in use exactly when both are set. */
+const supabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
-/**
- * Content admin: writes go through a backend function authenticated by the
- * Supabase session; reads come from `tables` like the public ones.
- *
- * The browser cannot write Base44 directly: its rules want a Base44 admin
- * session, and the only identity on offer now is Supabase's, which is refused
- * with 403 before the shadow write is even reached. So the writes go through a
- * backend function, which holds both credentials and needs no browser identity
- * — only proof of who is asking.
- */
-const contentAdmin: ContentAdminPort = new FunctionContentAdminService(
-  client as unknown as FunctionsClient,
-  tables ? new SupabaseContentAdminService(tables) : new Base44ContentAdminService(client),
-  async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
-);
+const content: ContentPort = supabaseConfigured
+  ? new SupabaseContentService(new RestTableClient(SUPABASE_URL as string, SUPABASE_KEY as string))
+  : {
+      listArticles: (limit) => real().then((s) => s.content.listArticles(limit)),
+      getArticle: (id) => real().then((s) => s.content.getArticle(id)),
+      listTestimonials: (limit) => real().then((s) => s.content.listTestimonials(limit)),
+    };
 
-/** The admin's leads: read and written in Supabase when it is configured, else through Base44 as before. */
-const leadsAdminPort: LeadAdminPort = tables
-  ? new SupabaseLeadAdminService(tables, supabase as unknown as SupabaseStorageClient | null)
-  : new Base44LeadAdminService(client);
+const auth: AuthPort = {
+  // Same answers as SupabaseAuthService / UnconfiguredAuthService, without loading either SDK.
+  hasStoredToken: () => (supabaseConfigured ? defaultSessionPresent() : false),
+  getPublicSettings: async () => ({}),
+  me: () => real().then((s) => s.auth.me()),
+  signInWithPassword: (email, password) => real().then((s) => s.auth.signInWithPassword(email, password)),
+  logout: (redirectUrl) => later((s) => s.auth.logout(redirectUrl)),
+  redirectToLogin: (returnUrl) => later((s) => s.auth.redirectToLogin(returnUrl)),
+  signInWithGoogle: (returnUrl) => later((s) => s.auth.signInWithGoogle(returnUrl)),
+};
 
-/**
- * Identity, on Supabase. A build without Supabase credentials gets a stand-in
- * that answers "nobody is signed in" instead of crashing on a null client.
- */
-const authPort: AuthPort = supabase
-  ? // The cast is narrowing, not widening: `SupabaseAuthClient` describes the
-    // handful of calls this adapter makes, and the real client does satisfy it.
-    // Matching them structurally makes tsc unfold PostgREST's generics until it
-    // gives up (TS2589), so the shape is asserted once here instead of being
-    // re-derived at every call.
-    new SupabaseAuthService(supabase as unknown as SupabaseAuthClient)
-  : new UnconfiguredAuthService();
-
-/**
- * The personal area, on Supabase — the same rule as `authPort`, so the page
- * asks the system that knows who the visitor is.
- */
-const accountPort: AccountPort = supabase
-  ? new SupabaseAccountService(supabase as unknown as SupabaseRpcClient)
-  : new UnconfiguredAccountService();
-
-/**
- * Public images (blog covers, testimonial photos) stay on Base44: the only
- * Supabase bucket is the private claim-documents one, and an image put there
- * would be unreadable to every visitor.
- */
-const uploadPort: UploadPort = new Base44UploadService(client);
-
-/**
- * Where a claim document lands, from whichever provider is switched on.
- *
- * Falls back to Base44 when Supabase is unconfigured — a checkout without
- * Supabase credentials should still accept a claim's attachments.
- */
-const claimDocumentsPort: UploadPort =
-  UPLOAD_PROVIDER === "supabase" && supabase
-    ? new SupabaseUploadService(supabase as unknown as SupabaseStorageClient)
-    : new Base44UploadService(client);
-
-/**
- * Claims go to the `submit-claim` Edge Function when Supabase is configured.
- * Every other lead path still runs on Base44's functions, which hold the
- * calendar and Sheets connections, so it is passed through untouched.
- */
-const base44Leads = new Base44LeadService(client);
-const leadPort: LeadPort = supabase
-  ? new SupabaseLeadService(supabase as unknown as SupabaseFunctionsClient, base44Leads)
-  : base44Leads;
+const agents: AgentPort = {
+  start: (agentName, metadata) => real().then((s) => s.agents.start(agentName, metadata)),
+  send: (conversation, text) => real().then((s) => s.agents.send(conversation, text)),
+  subscribe: (conversationId, onMessages) => {
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
+    later((s) => {
+      if (!cancelled) unsubscribe = s.agents.subscribe(conversationId, onMessages);
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  },
+};
 
 export const services: Services = {
-  leads: leadPort,
-  content: contentPort,
-  agents: new Base44AgentService(client),
-  uploads: uploadPort,
-  claimDocuments: claimDocumentsPort,
-  support: new Base44SupportService(client),
-  auth: authPort,
-  leadsAdmin: leadsAdminPort,
-  contentAdmin,
-  account: accountPort,
+  leads: {
+    submitLead: (lead) => real().then((s) => s.leads.submitLead(lead)),
+    submitClaim: (report) => real().then((s) => s.leads.submitClaim(report)),
+    requestConsultationEvent: (lead) => real().then((s) => s.leads.requestConsultationEvent(lead)),
+    submitInterview: (summary) => real().then((s) => s.leads.submitInterview(summary)),
+  },
+  content,
+  agents,
+  uploads: {
+    upload: (file) => real().then((s) => s.uploads.upload(file)),
+  },
+  claimDocuments: {
+    upload: (file) => real().then((s) => s.claimDocuments.upload(file)),
+  },
+  support: {
+    escalate: (request) => real().then((s) => s.support.escalate(request)),
+  },
+  auth,
+  leadsAdmin: {
+    list: (limit) => real().then((s) => s.leadsAdmin.list(limit)),
+    setStatus: (id, status) => real().then((s) => s.leadsAdmin.setStatus(id, status)),
+    remove: (id) => real().then((s) => s.leadsAdmin.remove(id)),
+    documentLink: (ref) => real().then((s) => s.leadsAdmin.documentLink(ref)),
+  },
+  contentAdmin: {
+    listArticles: (limit) => real().then((s) => s.contentAdmin.listArticles(limit)),
+    createArticle: (draft) => real().then((s) => s.contentAdmin.createArticle(draft)),
+    updateArticle: (id, draft) => real().then((s) => s.contentAdmin.updateArticle(id, draft)),
+    removeArticle: (id) => real().then((s) => s.contentAdmin.removeArticle(id)),
+    listTestimonials: (limit) => real().then((s) => s.contentAdmin.listTestimonials(limit)),
+    createTestimonial: (draft) => real().then((s) => s.contentAdmin.createTestimonial(draft)),
+    removeTestimonial: (id) => real().then((s) => s.contentAdmin.removeTestimonial(id)),
+  },
+  account: {
+    myEnquiries: () => real().then((s) => s.account.myEnquiries()),
+  },
 };
 
 export * from "./ports";

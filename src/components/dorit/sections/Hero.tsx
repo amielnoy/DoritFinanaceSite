@@ -1,10 +1,18 @@
 import React from "react";
-import { Image } from "@/components/ui/image";
 import { ArrowDown } from "lucide-react";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 
-const HERO_IMG = "/images/dorit-office-portrait.png";
+/**
+ * The portrait, pre-sized. The original PNG was 1.85 MB — 79% of the home
+ * page's weight and its LCP element. These are generated from it (480/768/1080
+ * wide, AVIF + WebP); the PNG stays only as the source and is not served here.
+ * `sizes` and the srcsets must match the preload in index.html exactly.
+ */
+const HERO = "/images/dorit-office-portrait";
+const WIDTHS = [480, 768, 1080] as const;
+const srcset = (ext: string) => WIDTHS.map((w) => `${HERO}-${w}.${ext} ${w}w`).join(", ");
+const HERO_SIZES = "(min-width: 1024px) 490px, calc(100vw - 40px)";
 
 export default function Hero() {
   return (
@@ -13,14 +21,20 @@ export default function Hero() {
         {/* Portrait, in a matted plate. The name sits under it as a caption. */}
         <figure className="order-2 lg:order-1 m-0 flex flex-col gap-3">
           <div className="plate h-[clamp(320px,46vh,440px)]">
-            <Image
-              src={HERO_IMG}
-              alt="דורית גוב ארי — דיוקן מקצועי"
-              className="w-full h-full object-cover object-[center_20%]"
-              fittingType="fill"
-              loading="eager"
-              fetchPriority="high"
-            />
+            <picture className="block w-full h-full">
+              <source type="image/avif" srcSet={srcset("avif")} sizes={HERO_SIZES} />
+              <source type="image/webp" srcSet={srcset("webp")} sizes={HERO_SIZES} />
+              <img
+                src={`${HERO}-768.webp`}
+                alt="דורית גוב ארי — דיוקן מקצועי"
+                width={1122}
+                height={1402}
+                className="w-full h-full object-cover object-[center_20%]"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </picture>
           </div>
           {/* Stacked on a phone, side by side from sm. Side by side at 390px
               squeezed the title onto two ragged lines and broke the licence

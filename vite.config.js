@@ -56,6 +56,11 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
+            // `tslib`'s helpers are shared by supabase-js and Radix
+            // (react-remove-scroll). Left to the groups below they land in
+            // vendor-supabase, and every page with a Radix component then
+            // modulepreloads the whole SDK for four small functions.
+            { name: 'vendor-tslib', test: /node_modules[\\/]tslib[\\/]/, priority: 60 },
             { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|@remix-run)[\\/]/, priority: 50 },
             { name: 'vendor-motion', test: /node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/, priority: 40 },
             { name: 'vendor-supabase', test: /node_modules[\\/]@supabase[\\/]/, priority: 30 },

@@ -406,7 +406,45 @@ row is live through `FEATURED.until` by the Israeli calendar.
 | UNIT-TOP-016 | "counts a tag repeated within one article once" | Count 1 |
 | UNIT-TOP-017 | "moves a keyword carried by more than half the articles to the end" | A broad tag sorts after every narrower one |
 
+### 4.19 Public reads without the SDK — `tests/unit/rest-table-client.test.ts`
+
+`RestTableClient` answers the home page's anonymous reads over plain `fetch`,
+so supabase-js stays off the critical path. One case builds the same query
+through supabase-js and through this client against a recording `fetch` and
+requires the same URL, `apikey` and bearer — a supabase-js upgrade that changes
+either fails here rather than on the home page.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-REST-001 | "builds select, eq, order and limit into PostgREST's query string, in call order" | `select`, `col=eq.v`, `order=col.desc`, `limit=n` |
+| UNIT-REST-002 | "orders ascending when asked" | `order=created_at.asc` |
+| UNIT-REST-003 | "encodes a filter value that has characters of its own" | Percent-encoded, decoded back intact |
+| UNIT-REST-004 | "does not double the slash when the project URL ends with one" | One `/rest/v1/` |
+| UNIT-REST-005 | "sends the publishable key as apikey and as the bearer" | GET with both headers |
+| UNIT-REST-006 | "is immutable: a branch of a query does not change the query it came from" | The base query has no `limit` |
+| UNIT-REST-007 | "returns the rows" | `{ data: rows, error: null }` |
+| UNIT-REST-008 | "maps a PostgREST refusal to its message and code" | `{ data: null, error: { message, code } }` |
+| UNIT-REST-009 | "names the HTTP status when the error body is not JSON" | `HTTP 502` |
+| UNIT-REST-010 | "turns a network failure into an error rather than a rejection" | `{ data: null, error }` |
+| UNIT-REST-011 | "reports a 200 that is not a list as an error, not as no rows" | `error`, never `data: []` |
+| UNIT-REST-012 | "asks for the same URL with the same anonymous credentials" | Equal to supabase-js's request |
+
+### 4.20 The lazy services front — `tests/unit/lazy-services.test.ts`
+
+`@/services` loads the composition root (both SDKs) on a port's first real
+call. Each case was checked by breaking the front the way it describes and
+watching it fail.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-LAZY-001 | "never subscribes when the caller unsubscribed before the SDKs arrived" | The real `subscribe` is never called |
+| UNIT-LAZY-002 | "subscribes once loaded, and its unsubscribe reaches the real one" | Real unsubscribe called once |
+| UNIT-LAZY-003 | "fails that call, and the next call loads again rather than repeating the failure" | Second call loads and succeeds |
+| UNIT-LAZY-004 | "loads once for many concurrent first calls" | One load |
+| UNIT-LAZY-005 | "answers hasStoredToken and getPublicSettings without loading the composition root" | Zero loads |
+| UNIT-LAZY-006 | "finds a stored Supabase session without loading the SDK" | `true`, zero loads |
+
 ## 5. Pass criteria
 
-All 323 cases pass. Any failure is a functional defect, not an environment issue —
+All 341 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

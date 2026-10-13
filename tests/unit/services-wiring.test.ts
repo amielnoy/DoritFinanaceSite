@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { tableFake } from "../helpers/supabase-table-fake";
 
 /**
- * Which adapter the composition root picks, with and without a Supabase client.
+ * Which adapter the composition root (`@/services/composition`) picks, with and
+ * without a Supabase client.
  *
  * Each case re-imports `@/services` under its own mocks, because the choice is
  * made once, at module load.
@@ -22,7 +23,9 @@ async function load(supabase: unknown, base44: unknown) {
   vi.resetModules();
   vi.doMock("@/api/base44Client", () => ({ base44 }));
   vi.doMock("@/api/supabaseClient", () => ({ supabase }));
-  const { services } = await import("@/services");
+  // The composition root, not `@/services`: that is a lazy front which loads
+  // this module on a port's first real call (see src/services/index.ts).
+  const { services } = await import("@/services/composition");
   return {
     services,
     SupabaseContentService: (await import("@/services/supabase/SupabaseContentService")).SupabaseContentService,
