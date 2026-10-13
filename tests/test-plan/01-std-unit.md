@@ -581,6 +581,32 @@ Tested on the pure resolver: under Vitest `import.meta.env` mirrors
 | UNIT-SURL-004 | "treats a blank value as unset, as the build plugin does" | Empty / whitespace skipped |
 | UNIT-SURL-005 | "strips trailing slashes from whichever source wins" | No trailing `/` |
 
+### 4.28 The sitemap and llms files — `tests/unit/seo-files.test.ts`
+
+Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted copies of `public/sitemap.xml` and `public/llms.txt`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SEOF-001 | "reads the host the site-url plugin already chose" | Origin of the first `<loc>` |
+| UNIT-SEOF-002 | "refuses a sitemap with no https <loc>" | Throws "no <loc>" |
+| UNIT-SEOF-003 | "prefers updated_at, then the created dates, and normalises to ISO" | ISO `.000Z` timestamps |
+| UNIT-SEOF-004 | "is null when there is no usable date" | `null` for `{}` and an unparsable date |
+| UNIT-SEOF-005 | "keeps the static routes without a lastmod" | `<loc>` followed directly by `<changefreq>` |
+| UNIT-SEOF-006 | "dates /blog by its newest article" | `/blog` has the newest `<lastmod>` |
+| UNIT-SEOF-007 | "adds every article at /blog/<slug> with its own lastmod" | One entry per article |
+| UNIT-SEOF-008 | "writes no empty lastmod for an article without a date" | No `<lastmod></lastmod>` |
+| UNIT-SEOF-009 | "stays one well-formed urlset" | One `<urlset>`, ends `</urlset>`, 4 `<url>` |
+| UNIT-SEOF-010 | "leaves /blog undated when there are no articles" | Output equals the template |
+| UNIT-SEOF-011 | "keeps everything before the pages list verbatim" | llms.txt header unchanged |
+| UNIT-SEOF-012 | "adds an articles section before the crawler note, one line per article" | Link lines; brackets in titles become parentheses |
+| UNIT-SEOF-013 | "points at llms-full.txt from the crawler note" | `<origin>/llms-full.txt` present |
+| UNIT-SEOF-014 | "collapses a line break in an excerpt so the list stays a list" | Excerpt on one line |
+| UNIT-SEOF-015 | "refuses a template without the crawler note it inserts before" | Throws |
+| UNIT-SEOF-016 | "opens with the identity, contact, disclosure and limitations, verbatim" | Header kept; no `## דפים` |
+| UNIT-SEOF-017 | "carries every question and answer under its own heading" | `### question` then answer |
+| UNIT-SEOF-018 | "carries every article's text under its title and address" | Title, address and `עודכן` date, then body |
+| UNIT-SEOF-019 | "refuses a template without the pages heading it cuts at" | Throws "## דפים" |
+
 ## 5. Pass criteria
 
 All 431 cases pass. Any failure is a functional defect, not an environment issue —
