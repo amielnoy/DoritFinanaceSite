@@ -516,6 +516,28 @@ that writes real slugs.
 | CTR-INOW-002 | "is a step of the Vercel deploy job, for production only" | The step is gated on `steps.target.outputs.env == 'production'` and runs `node scripts/indexnow.mjs` |
 | CTR-INOW-003 | "can never fail the deploy" | `continue-on-error: true`; the script has no non-zero `process.exit` / `exitCode` |
 
+### 4.10 The clearinghouse schema — `masleka-schema.contract.test.ts`
+
+Reads `supabase/migrations/20261015000000_masleka_requests.sql`. The behaviour
+itself is proved by `supabase/tests/masleka_check.sql` against a local
+`supabase start` (manual, like the other SQL checks):
+`supabase start && supabase db reset && psql "$(supabase status -o env | grep DB_URL | cut -d= -f2- | tr -d '"')" -f supabase/tests/masleka_check.sql`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-MSK-001 | "sorts after every migration that came before it" | After `20261014000000_blog_slug.sql` |
+| CTR-MSK-002 | "turns row-level security on for both tables" | Both `enable row level security` |
+| CTR-MSK-003 | "grants anon nothing at all" | No grant names `anon` |
+| CTR-MSK-004 | "lets the browser read neither the ciphertext nor the token hash" | Column grant without `code_ciphertext`, `id_ciphertext`, `token_hash`; no table-wide select; no writes |
+| CTR-MSK-005 | "keeps the service-only functions away from anon and authenticated, by name" | Five revokes `from public, anon, authenticated`; `my_staff_role` to authenticated only |
+| CTR-MSK-006 | "refuses ciphertext outside code_received, in the table itself" | The check constraint |
+| CTR-MSK-007 | "wipes at nine days and expires links at thirty" | Both intervals present |
+| CTR-MSK-008 | "schedules its jobs only where pg_cron and pg_net exist" | Both `cron.schedule` calls after the `pg_available_extensions` guard |
+| CTR-MSK-009 | "keeps the remind call's address and secret in Vault, not in the migration" | Vault names present; no URL |
+| CTR-MSK-010 | "creates no storage bucket — no clearinghouse file is ever uploaded" | No `storage.buckets` |
+| CTR-MSK-011 | "hands the two staff lookups to service_role alone" | `staff_role` and `masleka_staff_emails` granted to `service_role`, to no one else |
+| CTR-MSK-012 | "pins an empty search_path on every security definer function" | Every `security definer` function has `set search_path = ''` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -525,7 +547,7 @@ time.
 
 ## 6. Pass criteria
 
-All 572 cases pass. A failure means either the frontend or the backend definition
+All 584 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight
