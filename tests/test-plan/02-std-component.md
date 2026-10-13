@@ -340,8 +340,18 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-MSKH-003 | "offers no board link to a signed-in client with no membership, or when the role cannot be read" | `myRole` → `null`, then rejecting: no link |
 | CMP-MSKH-004 | "asks nothing for a signed-out visitor" | No link; no `myRole` call |
 
+### 4.21 `<MaslekaGuide />` — registering as an advisor — `tests/component/masleka-guide.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSKG-001 | "walks through registering, submitting and downloading, in order" | Four step headings in order |
+| CMP-MSKG-002 | "names the licence the registration is made under" | `LICENCE.number` shown |
+| CMP-MSKG-003 | "links to the clearinghouse in a new tab without a referrer, and back to the board" | `href` is `CLEARINGHOUSE_ADVISOR_URL`, `_blank` + `noopener noreferrer`; back link `/admin/masleka` |
+| CMP-MSKG-004 | "shows no screenshot unless one is given" | 0 figures; then the given image |
+| CMP-MSKG-005 | "is marked noindex" | `/admin/masleka/guide` through `SeoRouteGuard` sets `robots` to `noindex` |
+
 ## 5. Pass criteria
 
-All 151 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 156 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

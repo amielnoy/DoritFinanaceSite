@@ -186,6 +186,7 @@ describe("auth and token handling", () => {
     expect(gateStart, "the clearinghouse pages must be wrapped in StaffRoute").toBeGreaterThan(-1);
     const gateBlock = app.slice(gateStart, app.indexOf("</Route>", gateStart));
     expect(gateBlock).toContain('path="/admin/masleka"');
+    expect(gateBlock).toContain('path="/admin/masleka/guide"');
     expect(app.slice(Math.max(0, gateStart - 80), gateStart)).toMatch(/MASLEKA_ENABLED \?/);
     // Registered nowhere else: no /admin/masleka route outside the switched StaffRoute block.
     expect(app.split('path="/admin/masleka').length - 1).toBe(gateBlock.split('path="/admin/masleka').length - 1);

@@ -40,6 +40,7 @@ const Tools = lazy(() => import('@/pages/Tools'));
 const Perspective = lazy(() => import('@/pages/Perspective'));
 const Masleka = lazy(() => import('@/pages/Masleka'));
 const MaslekaBoard = lazy(() => import('@/pages/MaslekaBoard'));
+const MaslekaGuide = lazy(() => import('@/pages/MaslekaGuide'));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -110,6 +111,7 @@ const AuthenticatedApp = () => {
         {MASLEKA_ENABLED ? (
           <Route element={<StaffRoute unauthenticatedElement={<LoginRedirect />} />}>
             <Route path="/admin/masleka" element={<MaslekaBoard />} />
+            <Route path="/admin/masleka/guide" element={<MaslekaGuide />} />
           </Route>
         ) : null}
         <Route path="*" element={<PageNotFound />} />
