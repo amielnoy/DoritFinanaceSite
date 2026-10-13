@@ -270,8 +270,17 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
 | CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
 
+The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`, hooks stubbed). Read-only; visitor text is plain text.
+
+| ID | Test | Expect |
+|---|---|---|
+| CMP-LEADTX-001 | "is offered for the lead with a conversation and for no other" | One "שיחה" button for two leads |
+| CMP-LEADTX-002 | "is absent when no lead has a conversation" | No "שיחה" button; the page is as before |
+| CMP-LEADTX-003 | "shows the visitor's markup as text, never as elements" | The hostile string is in `textContent`; no `img`, no `b` element |
+| CMP-LEADTX-004 | "offers no control to write from the tab" | No textbox; only the hide button |
+
 ## 5. Pass criteria
 
-All 101 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 105 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

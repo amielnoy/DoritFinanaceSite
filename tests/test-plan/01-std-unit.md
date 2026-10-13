@@ -805,7 +805,19 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHWIRE-001 | "sends the named agent to the chat function and every other agent to Base44" | With `VITE_CHAT_AGENTS=needs_interview`, the composed `services.agents` start/send/subscribe for it reach the Supabase `chat` invoke and never Base44; `support_agent` reaches Base44 and never `chat` (Ruling 8) |
 | UNIT-CHWIRE-002 | "sends every agent to Base44 when the switch is empty" | With `VITE_CHAT_AGENTS` empty, `needs_interview` goes to Base44 and `chat` is never invoked (Ruling 8) |
 
+`SupabaseLeadAdminService.transcript` and `.transcriptLeadIds` (`tests/unit/supabase-lead-admin.test.ts`) read `chat_conversations` and `chat_messages` under the admin's session; Ruling 11 means the linked lead may be the interview lead or the hand-off lead.
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-LEADTX-001 | "reads the lead's latest conversation, oldest message first, without the tool rows" | Filters on `lead_id` then `conversation_id`, orders by `id` ascending; the `tool` row is dropped |
+| UNIT-LEADTX-002 | "is empty for a lead with no conversation" | `[]`, no messages read |
+| UNIT-LEADTX-003 | "throws on a refused read rather than showing an empty transcript" | `chat_conversations read failed` |
+| UNIT-LEADTX-004 | "never writes: reading a transcript or the link list touches no update or delete" | A client whose `update`/`delete` throw is never asked for either |
+| UNIT-LEADTX-005 | "returns message text untouched, markup and all, for the screen to show as text" | A hostile string comes back byte for byte |
+| UNIT-LEADTX-006 | "lists each lead that has a conversation once, skipping conversations without a lead" | `["a","b"]` from rows with a repeat and a null |
+| UNIT-LEADTX-007 | "throws on a refused read" | `chat_conversations read failed` |
+
 ## 5. Pass criteria
 
-All 573 cases pass. Any failure is a functional defect, not an environment issue —
+All 580 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

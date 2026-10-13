@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { SupabaseLeadAdminService } from "@/services/supabase/SupabaseLeadAdminService";
 import { tableFake } from "../helpers/supabase-table-fake";
+import type { SupabaseLeadTableClient, SupabaseQuery, SupabaseReadResult } from "@/services/supabase/SupabaseTableClient";
 
 const leadRow = (over: Record<string, unknown> = {}) => ({
   id: "6f1c0e3a-0000-4000-8000-0000000000aa",
@@ -138,5 +139,96 @@ describe("SupabaseLeadAdminService.documentLink", () => {
   it("refuses a stored document when it has no storage client", async () => {
     const { client } = tableFake({ data: [], error: null });
     await expect(new SupabaseLeadAdminService(client).documentLink(ref)).rejects.toThrow();
+  });
+});
+
+/** A client whose answer depends on the table — the transcript reads two. Any write is a test failure. */
+function byTable(answers: Record<string, SupabaseReadResult>) {
+  const calls: unknown[][] = [];
+  const query = (table: string): SupabaseQuery => {
+    const q: SupabaseQuery = {
+      eq: (c, v) => (calls.push([table, "eq", c, v]), q),
+      or: () => q,
+      order: (c, o) => (calls.push([table, "order", c, o]), q),
+      limit: (n) => (calls.push([table, "limit", n]), q),
+      then: (f, r) => Promise.resolve(answers[table]).then(f, r),
+    };
+    return q;
+  };
+  const refuse = (table: string, verb: string) => () => {
+    calls.push([table, verb]);
+    throw new Error(`${verb} on ${table}`);
+  };
+  const client = {
+    from: (table: string) => ({ select: () => query(table), update: refuse(table, "update"), delete: refuse(table, "delete") }),
+  } as unknown as SupabaseLeadTableClient;
+  return { client, calls };
+}
+
+describe("SupabaseLeadAdminService.transcript", () => {
+  it("reads the lead's latest conversation, oldest message first, without the tool rows", async () => {
+    const { client, calls } = byTable({
+      chat_conversations: { data: [{ id: "c1" }], error: null },
+      chat_messages: {
+        data: [
+          { role: "user", content: "שלום", created_at: "2026-10-13T09:00:00Z" },
+          { role: "tool", content: "submitLead: ok", created_at: "2026-10-13T09:01:00Z" },
+          { role: "assistant", content: "נשמר", created_at: "2026-10-13T09:01:00Z" },
+        ],
+        error: null,
+      },
+    });
+    expect(await new SupabaseLeadAdminService(client).transcript("lead-1")).toEqual([
+      { role: "user", content: "שלום", at: "2026-10-13T09:00:00Z" },
+      { role: "assistant", content: "נשמר", at: "2026-10-13T09:01:00Z" },
+    ]);
+    expect(calls).toContainEqual(["chat_conversations", "eq", "lead_id", "lead-1"]);
+    expect(calls).toContainEqual(["chat_messages", "eq", "conversation_id", "c1"]);
+    expect(calls).toContainEqual(["chat_messages", "order", "id", { ascending: true }]);
+  });
+
+  it("is empty for a lead with no conversation", async () => {
+    const { client } = byTable({ chat_conversations: { data: [], error: null }, chat_messages: { data: [], error: null } });
+    expect(await new SupabaseLeadAdminService(client).transcript("lead-2")).toEqual([]);
+  });
+
+  it("throws on a refused read rather than showing an empty transcript", async () => {
+    const { client } = byTable({ chat_conversations: { data: null, error: { message: "permission denied" } }, chat_messages: { data: [], error: null } });
+    await expect(new SupabaseLeadAdminService(client).transcript("lead-3")).rejects.toThrow(/chat_conversations read failed/);
+  });
+
+  it("never writes: reading a transcript or the link list touches no update or delete", async () => {
+    const { client, calls } = byTable({
+      chat_conversations: { data: [{ id: "c1", lead_id: "lead-1" }], error: null },
+      chat_messages: { data: [{ role: "user", content: "x", created_at: "t" }], error: null },
+    });
+    const s = new SupabaseLeadAdminService(client);
+    await s.transcript("lead-1");
+    await s.transcriptLeadIds();
+    expect(calls.filter((c) => c[1] === "update" || c[1] === "delete")).toEqual([]);
+  });
+
+  it("returns message text untouched, markup and all, for the screen to show as text", async () => {
+    const hostile = '<img src=x onerror=alert(1)> **bold** [a](javascript:alert(1))';
+    const { client } = byTable({
+      chat_conversations: { data: [{ id: "c1" }], error: null },
+      chat_messages: { data: [{ role: "user", content: hostile, created_at: "t" }], error: null },
+    });
+    expect((await new SupabaseLeadAdminService(client).transcript("l"))[0].content).toBe(hostile);
+  });
+});
+
+describe("SupabaseLeadAdminService.transcriptLeadIds", () => {
+  it("lists each lead that has a conversation once, skipping conversations without a lead", async () => {
+    const { client } = byTable({
+      chat_conversations: { data: [{ lead_id: "a" }, { lead_id: null }, { lead_id: "b" }, { lead_id: "a" }], error: null },
+      chat_messages: { data: [], error: null },
+    });
+    expect(await new SupabaseLeadAdminService(client).transcriptLeadIds()).toEqual(["a", "b"]);
+  });
+
+  it("throws on a refused read", async () => {
+    const { client } = byTable({ chat_conversations: { data: null, error: { message: "denied" } }, chat_messages: { data: [], error: null } });
+    await expect(new SupabaseLeadAdminService(client).transcriptLeadIds()).rejects.toThrow(/chat_conversations read failed/);
   });
 });

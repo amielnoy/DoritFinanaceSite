@@ -240,6 +240,13 @@ export interface LeadRecord {
 }
 
 /** Managing received enquiries. Every method here touches personal data. */
+/** One line of a chat transcript as Dorit reads it: the visitor's words and the agent's, already redacted. */
+export interface TranscriptLine {
+  role: "user" | "assistant";
+  content: string;
+  at: string;
+}
+
 export interface LeadAdminPort {
   list(limit?: number): Promise<LeadRecord[]>;
   setStatus(id: string, status: LeadStatus): Promise<void>;
@@ -251,6 +258,10 @@ export interface LeadAdminPort {
    * the screen stops working rather than lasting for years.
    */
   documentLink(ref: string): Promise<string>;
+  /** The interview behind a lead, if it came from the chat function; [] otherwise. Read-only. */
+  transcript(leadId: string): Promise<TranscriptLine[]>;
+  /** The ids of the leads that have a conversation behind them — the screen shows the tab for these and no others. */
+  transcriptLeadIds(): Promise<string[]>;
 }
 
 export interface ArticleDraft {
