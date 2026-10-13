@@ -726,7 +726,21 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-MSKSH-018 | "falls back to Dorit's mailbox when nobody can be read" | `dorit@govari-fin.co.il`, `staff.lookup_failed` |
 | UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the staff list is empty" | `dorit@govari-fin.co.il`, `staff.none` |
 
+### 4.36 The clearinghouse mails — `tests/unit/edge-masleka-mail.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MSKML-001 | "names the client in the subject and links the board" | Subject with the name; board link in both halves |
+| UNIT-MSKML-002 | "lists every client in one digest when there are several" | "— 2 לקוחות"; both names |
+| UNIT-MSKML-003 | "says the deadline plainly" | "נמחק במסלקה בעוד יומיים — …" |
+| UNIT-MSKML-004 | "escapes a name that is really markup" | `&lt;img`, no `<img` |
+| UNIT-MSKML-005 | "keeps a line break in a name out of the subject" | No newline in the subject |
+| UNIT-MSKML-006 | "links only to the agency's own domain" | Every href host is `govari-fin.co.il` |
+| UNIT-MSKML-007 | "carries the personal link in both halves" | Link in HTML and text; greeting by first name |
+| UNIT-MSKML-008 | "says a reminder replaces the earlier link" | Reminder subject; "מחליף" |
+| UNIT-MSKML-009 | "greets without a name that is not a name" | "שלום,"; no foreign link |
+
 ## 5. Pass criteria
 
-All 543 cases pass. Any failure is a functional defect, not an environment issue —
+All 552 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
