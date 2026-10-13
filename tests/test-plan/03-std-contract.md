@@ -529,6 +529,7 @@ transcript and usage rows.
 | CTR-CHSCH-005 | "keep transcripts twelve months by default" | `delete_after` defaults to `now() + interval '12 months'` |
 | CTR-CHSCH-006 | "open the usage totals and the purge to the service role only" | `revoke execute` from public, anon, authenticated and `grant execute` to service_role on `chat_month_usage` and `purge_chat_conversations` |
 | CTR-CHSCH-007 | "schedule the purge nightly, after enabling pg_cron" | The schedule migration creates the extension and schedules `chat-purge-nightly` at `15 1 * * *` |
+| CTR-CHSCH-008 | "record a hand-off apart from status, so a lead and a hand-off can both be told" | `chat_conversations.escalated_at timestamptz` is nullable and present |
 
 ### 4.11 The chat prompts — `chat-prompts.contract.test.ts`
 
@@ -564,7 +565,7 @@ time.
 
 ## 6. Pass criteria
 
-All 583 cases pass. A failure means either the frontend or the backend definition
+All 584 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

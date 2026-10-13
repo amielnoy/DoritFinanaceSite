@@ -681,8 +681,11 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-011 | "exposes the lead id the hand-off recorded, for the conversation's lead_id" | Ruling 4: the handler's `leadId` is the outcome's `leadId` |
 | UNIT-CHTOOL-012 | "has no lead id when the hand-off was anonymous (the handler answers leadId null)" | Ruling 4: handler `leadId: null` gives `leadId` undefined |
 | UNIT-CHTOOL-013 | "is an error the model sees, not a crash" | An unknown tool name gives `error`, `isError` |
+| UNIT-CHTOOL-014 | "keeps already_saved after a hand-off: the second complete submitLead writes nothing" | Ruling 9: lead, hand-off, second complete submit: `already_saved`, handler once, status `lead_saved`, `escalated` true |
+| UNIT-CHTOOL-015 | "saves the lead after a hand-off: status becomes lead_saved, escalated stays true" | Ruling 9: hand-off then complete submit saves the lead; status `lead_saved`, `escalated` true |
+| UNIT-CHTOOL-016 | "answers already_escalated to a second hand-off after the lead was saved" | Ruling 9: lead saved, hand-off, second hand-off: `already_escalated`, handler once, status `lead_saved` |
 
 ## 5. Pass criteria
 
-All 478 cases pass. Any failure is a functional defect, not an environment issue —
+All 481 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

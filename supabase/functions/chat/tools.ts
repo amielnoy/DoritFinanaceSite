@@ -76,6 +76,8 @@ export type ConversationStatus = 'open' | 'closed' | 'lead_saved' | 'escalated';
 export interface ConversationFacts {
   id: string;
   status: ConversationStatus;
+  /** A hand-off has been made. Kept apart from status, which holds one value: a lead and a hand-off can both be told. Persisted as `escalated_at is not null`. */
+  escalated: boolean;
   consentVersion: string;
   consentAt: string;
   attribution: { channel: string; campaign: string; landingPath: string };
@@ -172,14 +174,20 @@ async function submitLead(handler: EdgeHandler, input: Record<string, unknown>, 
   return { name: 'submitLead', status: 'ok', isError: false, leadId, leadSaved: stage === 'complete', forModel: JSON.stringify({ ok: true, stage }) };
 }
 
+/** The hand-off is a fact of its own; status becomes 'escalated' only from 'open', never over 'lead_saved' or 'closed'. */
+function markEscalated(c: ConversationFacts): void {
+  c.escalated = true;
+  if (c.status === 'open') c.status = 'escalated';
+}
+
 async function escalateToHuman(handler: EdgeHandler, input: Record<string, unknown>, ctx: ToolCallContext): Promise<ToolOutcome> {
   // One successful hand-off per conversation: a second call mails no one.
-  if (ctx.conversation.status === 'escalated') {
+  if (ctx.conversation.escalated) {
     return { name: 'escalateToHuman', status: 'already_escalated', isError: false, forModel: JSON.stringify({ ok: true, alreadyEscalated: true }) };
   }
   const reason = (ESCALATION_REASONS as readonly string[]).includes(str(input.reason)) ? str(input.reason) : 'uncertain';
   if (ctx.evalMode) {
-    ctx.conversation.status = 'escalated';
+    markEscalated(ctx.conversation);
     return { name: 'escalateToHuman', status: 'simulated', isError: false, escalated: true, forModel: JSON.stringify({ ok: true }) };
   }
   const { attribution } = ctx.conversation;
@@ -204,7 +212,7 @@ async function escalateToHuman(handler: EdgeHandler, input: Record<string, unkno
   );
   const answer = await answerOf(res);
   const ok = res.ok && answer.ok === true;
-  if (ok) ctx.conversation.status = 'escalated';
+  if (ok) markEscalated(ctx.conversation);
   const leadId = ok && typeof answer.leadId === 'string' ? answer.leadId : undefined;
   return {
     name: 'escalateToHuman',

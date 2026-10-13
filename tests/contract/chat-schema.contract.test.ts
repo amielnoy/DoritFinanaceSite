@@ -30,6 +30,10 @@ describe("the chat tables", () => {
     expect(migration.match(/references public\.chat_conversations\(id\) on delete cascade/g)).toHaveLength(2);
   });
 
+  it("record a hand-off apart from status, so a lead and a hand-off can both be told", () => {
+    expect(migration).toMatch(/escalated_at\s+timestamptz,/);
+  });
+
   it("keep transcripts twelve months by default", () => {
     expect(migration).toMatch(/delete_after\s+timestamptz not null default \(now\(\) \+ interval '12 months'\)/);
   });

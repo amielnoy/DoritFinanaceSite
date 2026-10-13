@@ -19,6 +19,9 @@ create table public.chat_conversations (
                     check (status in ('open', 'closed', 'lead_saved', 'escalated')),
   -- A client's deletion request deletes their lead, and their transcript with it.
   lead_id         uuid references public.leads(id) on delete cascade,
+  -- When the conversation was handed to a person. Apart from status, which
+  -- holds one value: a lead saved and a hand-off made are both facts.
+  escalated_at    timestamptz,
   turns           integer not null default 0 check (turns >= 0),
   -- channel, campaign, landingPath — from the page's first request, never the model.
   attribution     jsonb not null default '{}'::jsonb,

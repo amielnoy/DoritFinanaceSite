@@ -9,6 +9,7 @@ const ctx = (over: Partial<ToolCallContext> = {}): ToolCallContext => ({
   conversation: {
     id: "00000000-0000-4000-8000-000000000001",
     status: "open",
+    escalated: false,
     consentVersion: "2026-10-agents-v6",
     consentAt: "2026-10-13T09:00:00.000Z",
     attribution: { channel: "google", campaign: "", landingPath: "/" },
@@ -127,6 +128,7 @@ describe("escalateToHuman", () => {
     expect(escalateToHuman).toHaveBeenCalledTimes(1);
     expect(second).toMatchObject({ status: "already_escalated", isError: false });
     expect(c.conversation.status).toBe("escalated");
+    expect(c.conversation.escalated).toBe(true);
   });
 
   it("does not let a failed hand-off block the retry", async () => {
@@ -154,6 +156,46 @@ describe("escalateToHuman", () => {
     const run = createToolRunner({ submitLead: answering(200, {}), escalateToHuman: answering(200, { ok: true, leadId: null, recorded: false }) });
     const outcome = await run("escalateToHuman", { reason: "user_request", summary: "x" }, ctx());
     expect(outcome.leadId).toBeUndefined();
+  });
+});
+
+describe("a hand-off and a lead in one conversation (Ruling 9)", () => {
+  it("keeps already_saved after a hand-off: the second complete submitLead writes nothing", async () => {
+    const submitLead = answering(200, { ok: true, leadId: "lead-1" });
+    const run = createToolRunner({ submitLead, escalateToHuman: answering(200, { ok: true }) });
+    const c = ctx();
+    await run("submitLead", LEAD, c);
+    await run("escalateToHuman", { reason: "uncertain", summary: "x" }, c);
+    const second = await run("submitLead", LEAD, c);
+    expect(second).toMatchObject({ status: "already_saved" });
+    expect(submitLead).toHaveBeenCalledTimes(1);
+    expect(c.conversation.status).toBe("lead_saved");
+    expect(c.conversation.escalated).toBe(true);
+  });
+
+  it("saves the lead after a hand-off: status becomes lead_saved, escalated stays true", async () => {
+    const submitLead = answering(200, { ok: true, leadId: "lead-1" });
+    const run = createToolRunner({ submitLead, escalateToHuman: answering(200, { ok: true }) });
+    const c = ctx();
+    await run("escalateToHuman", { reason: "uncertain", summary: "x" }, c);
+    expect(c.conversation.status).toBe("escalated");
+    const outcome = await run("submitLead", LEAD, c);
+    expect(submitLead).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ status: "ok", leadSaved: true });
+    expect(c.conversation.status).toBe("lead_saved");
+    expect(c.conversation.escalated).toBe(true);
+  });
+
+  it("answers already_escalated to a second hand-off after the lead was saved", async () => {
+    const escalateToHuman = answering(200, { ok: true });
+    const run = createToolRunner({ submitLead: answering(200, { ok: true, leadId: "l" }), escalateToHuman });
+    const c = ctx();
+    await run("submitLead", LEAD, c);
+    await run("escalateToHuman", { reason: "uncertain", summary: "x" }, c);
+    const second = await run("escalateToHuman", { reason: "uncertain", summary: "y" }, c);
+    expect(second).toMatchObject({ status: "already_escalated" });
+    expect(escalateToHuman).toHaveBeenCalledTimes(1);
+    expect(c.conversation.status).toBe("lead_saved");
   });
 });
 
