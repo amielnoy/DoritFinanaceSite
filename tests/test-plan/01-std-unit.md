@@ -648,7 +648,20 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-INOW-011 | "still submits when the origin has a trailing slash" | `{ submitted: 2 }` |
 | UNIT-INOW-012 | "warns and resolves when the sitemap answers with an error" | HTTP 503 warned; `{ submitted: 0 }` |
 
+### 4.31 When the smoke may open a browser — `tests/unit/wait-for-deployment.test.ts`
+
+`releaseServed` in `scripts/wait-for-deployment.mjs`: with the bundle the Vercel job just deployed (`EXPECTED_ASSET`), production is ready when it serves exactly that — at once when the bundle is unchanged; without it, when it serves anything but the pre-publish bundle.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-WAIT-001 | "is served at once when the built bundle is the one already live" | `true` (no wait for a change that never comes) |
+| UNIT-WAIT-002 | "waits while production still serves the previous bundle" | `false` |
+| UNIT-WAIT-003 | "is served once production serves the built bundle" | `true` |
+| UNIT-WAIT-004 | "does not accept some third bundle in place of the one just built" | `false` |
+| UNIT-WAIT-005 | "falls back to 'anything but the previous bundle' without an expected one" | `false` for the old bundle, `true` for a new one |
+| UNIT-WAIT-006 | "never counts an unreadable page as served" | `false` with and without an expected bundle |
+
 ## 5. Pass criteria
 
-All 458 cases pass. Any failure is a functional defect, not an environment issue —
+All 464 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
