@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MAILER_URL, invokeFunction } from '../helpers/base44-function';
 
-const names = ['submitLead', 'submitClaim', 'escalateToHuman'];
+// submitLead, escalateToHuman and logSupportChat are forwarders now; their Edge
+// homes are covered by the Edge integration suites.
+const names = ['submitClaim'];
 const payload = { name: 'Test', phone: '0501234567', source: 'contact', reason: 'uncertain', claimType: 'רכב' };
 
 describe.each(names)('%s — external agency email', (name) => {
@@ -66,11 +68,12 @@ describe.each(names)('%s — external agency email', (name) => {
   });
 });
 
-it('keeps the mail transport identical in all isolated entry points', () => {
-  const helpers = names.map(name => {
-    const source = readFileSync(`base44/functions/${name}/entry.ts`, 'utf8');
-    return source.match(/async function sendMail\([\s\S]*?\n\}/)?.[0];
-  });
-  expect(helpers[0]).toBeTruthy();
-  expect(new Set(helpers).size).toBe(1);
+it('gives submitClaim its own sendMail transport, to the mailer and nowhere else', () => {
+  // submitLead and escalateToHuman are forwarders; their mail goes out through
+  // the Edge functions' shared mail module. This is the one Base44 transport left.
+  const source = readFileSync('base44/functions/submitClaim/entry.ts', 'utf8');
+  const helper = source.match(/async function sendMail\([\s\S]*?\n\}/)?.[0];
+  expect(helper).toBeTruthy();
+  expect(helper).toMatch(/MAILER_URL/);
+  expect(helper).not.toMatch(/Core\.SendEmail/);
 });

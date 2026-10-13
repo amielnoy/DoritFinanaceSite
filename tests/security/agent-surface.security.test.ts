@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { transformSync } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
 import { read, sourceFiles, backendFiles } from "../helpers/source-scan";
@@ -24,8 +25,12 @@ import { read, sourceFiles, backendFiles } from "../helpers/source-scan";
  */
 
 const CHAT = read(join(REPO_ROOT, "src/components/dorit/chat/AgentChat.tsx"));
-const SUBMIT_LEAD = read(join(REPO_ROOT, "base44/functions/submitLead/entry.ts"));
-const ESCALATE = read(join(REPO_ROOT, "base44/functions/escalateToHuman/entry.ts"));
+// submitLead and escalateToHuman are forwarders in Base44 now; the code that
+// composes the mail, redacts and appends the sheet row lives in the Edge functions.
+const HTML_MAIL = read(join(REPO_ROOT, "supabase/functions/_shared/html.ts"));
+const SUBMIT_LEAD = read(join(REPO_ROOT, "supabase/functions/submit-lead/lead.js"));
+const ESCALATE = read(join(REPO_ROOT, "supabase/functions/escalate-to-human/escalation.js"));
+const ESCALATE_HANDLER = read(join(REPO_ROOT, "supabase/functions/escalate-to-human/handler.ts"));
 const COMPLIANCE = read(join(REPO_ROOT, "src/config/compliance.ts"));
 const CONTACT = read(join(REPO_ROOT, "src/config/agencyProfile.ts"));
 const PKG = read(join(REPO_ROOT, "package.json"));
@@ -187,18 +192,35 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-describe("XSS — the HTML email the backend composes", () => {
-  const clientHtml = SUBMIT_LEAD.slice(
-    SUBMIT_LEAD.indexOf("function buildClientHtml"),
-    SUBMIT_LEAD.indexOf("function buildClientText"),
-  );
+/**
+ * The visitor-facing HTML is composed by two implementations: the Edge shared
+ * module (submit-lead) and Base44's submitClaim, which keeps its own copy. Both
+ * are run, by behaviour, because they are not the same text any more.
+ */
+const CLAIM = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+const wholeFn = (src: string, name: string): string => {
+  const start = src.search(new RegExp(`(?:export )?function ${name}\\(`));
+  expect(start, `${name} not found`).toBeGreaterThan(-1);
+  return src.slice(start, src.indexOf("\n}", start) + 2);
+};
+const MAIL_IMPLEMENTATIONS = [
+  { label: "Edge _shared/html.ts", src: HTML_MAIL, ts: true },
+  { label: "Base44 submitClaim", src: CLAIM, ts: false },
+].map(({ label, src, ts }) => {
+  const code = `${wholeFn(src, "escapeHtml")}\n${wholeFn(src, "buildClientHtml")}`.replace(/^export /gm, "");
+  const js = ts ? transformSync(code, { loader: "ts" }).code : code;
+  const load = new Function(`${js}; return { escapeHtml, buildClientHtml };`)() as {
+    escapeHtml: (s: unknown) => string;
+    buildClientHtml: (m: Record<string, unknown>) => string;
+  };
+  return { label, src, template: wholeFn(src, "buildClientHtml"), ...load };
+});
 
-  const escapeHtml = new Function(
-    `${liftFunction(SUBMIT_LEAD, "escapeHtml")}; return escapeHtml;`,
-  )() as (s: unknown) => string;
+describe.each(MAIL_IMPLEMENTATIONS)("XSS — the HTML email: $label", ({ src, template, escapeHtml, buildClientHtml }) => {
+  const clientHtml = template;
 
   it("has an escaping helper at all", () => {
-    expect(SUBMIT_LEAD).toMatch(/function escapeHtml\(/);
+    expect(src).toMatch(/function escapeHtml\(/);
   });
 
   it("escapes the five characters that matter", () => {
@@ -225,13 +247,20 @@ describe("XSS — the HTML email the backend composes", () => {
     expect(escapeHtml(hostile)).toMatch(/&lt;a /);
   });
 
+  it("escapes a hostile detail value in the rendered letter", () => {
+    const html = buildClientHtml({
+      firstName: "דנה", eyebrow: "e", heading: "h", intro: "i", panelTitle: "p",
+      details: [["נושא", '<script>alert(1)</script>']],
+    });
+    expect(html).not.toContain("<script>alert(1)");
+    expect(html).toContain("&lt;script&gt;");
+  });
 
   it("binds nothing else from `data` straight into the HTML body", () => {
     // Anything new must go through escapeHtml at its binding site.
     const interpolations = clientHtml.match(/\$\{data\.[a-zA-Z]+/g) ?? [];
     expect(interpolations).toEqual([]);
   });
-
 });
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -243,13 +272,9 @@ describe("Phishing — the site's name on somebody else's message", () => {
     }
   });
 
-  it("links only to the agency's own domain from the email template", () => {
+  it.each(MAIL_IMPLEMENTATIONS)("links only to the agency's own domain from the email template: $label", ({ template }) => {
     // Scoped to the rendered template, not the file: comments may legitimately
     // cite a docs URL, and a comment is not something a recipient can click.
-    const template = SUBMIT_LEAD.slice(
-      SUBMIT_LEAD.indexOf("function buildClientHtml"),
-      SUBMIT_LEAD.indexOf("function buildClientText"),
-    );
     const hosts = [...template.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1]);
     for (const host of new Set(hosts)) {
       expect(
@@ -263,13 +288,21 @@ describe("Phishing — the site's name on somebody else's message", () => {
     // A near-miss domain in one template is how a staff member gets trained to
     // trust the wrong sender. There is one spelling, everywhere.
     expect(CONTACT).toMatch(/dorit@govari-fin\.co\.il/);
-    for (const src of [SUBMIT_LEAD, ESCALATE, COMPLIANCE]) {
+    for (const src of [SUBMIT_LEAD, ESCALATE, HTML_MAIL, COMPLIANCE]) {
       const emails = [...src.matchAll(/[a-z0-9._%-]+@[a-z0-9.-]+\.[a-z]{2,}/gi)].map((m) =>
         m[0].toLowerCase(),
       );
       for (const e of new Set(emails)) {
+        // notifications@mail.govari-fin.co.il is the mailer's own From address,
+        // named in lead.js as the invitations' ORGANIZER (#170) — the site's
+        // sending identity, on its own domain, not a look-alike of Dorit's.
         expect(
-          ["dorit@govari-fin.co.il", "amielnoy@gmail.com", "amielnoy@outlook.com"].includes(e),
+          [
+            "dorit@govari-fin.co.il",
+            "amielnoy@gmail.com",
+            "amielnoy@outlook.com",
+            "notifications@mail.govari-fin.co.il",
+          ].includes(e),
           `unexpected address ${e}`,
         ).toBe(true);
       }
@@ -293,9 +326,8 @@ describe("Phishing — the site's name on somebody else's message", () => {
     );
     expect(COMPLIANCE, "the copy reaches for CONTACT again").not.toMatch(/\bCONTACT\./);
 
-    // `escalateToHuman` gets no such help: it is a Base44 entry point with no shared
-    // module (see AGENTS.md), so its copy is a hand-kept literal and still matches by
-    // hand — which is exactly why it keeps its own assertion below.
+    // The hand-off's contact block is a literal in the Edge escalate-to-human
+    // module, so it keeps its own assertion below.
     expect(ESCALATE).toMatch(/050-831-1776/);
     expect(CONTACT).toMatch(/050-831-1776/);
   });
@@ -354,7 +386,7 @@ describe("Phishing — the site's name on somebody else's message", () => {
     // And the fallback is the config constant, not a literal typed in here.
     expect(CHAT).toMatch(/const FALLBACK_CONTACT: HumanContact = CONTACT;/);
     expect(ESCALATE).toMatch(/const HUMAN_CONTACT = \{/);
-    expect(ESCALATE).toMatch(/contact: HUMAN_CONTACT/);
+    expect(ESCALATE_HANDLER).toMatch(/contact: HUMAN_CONTACT/);
   });
 
   it("never widens an email recipient from the request body", () => {

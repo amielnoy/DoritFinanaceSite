@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { invokeFunction, type HarnessOptions } from "../helpers/base44-function";
 import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
 
@@ -17,9 +17,8 @@ import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
  * that `__proto__` comes back as `uncertain` rather than as a truthy lookup
  * against `Object.prototype`.
  *
- * Two implementations answer these cases while both are deployed: Base44's
- * `escalateToHuman` and its Supabase Edge port `escalate-to-human`. A case that
- * holds for one must hold for the other; what only the port does is at the end.
+ * The Edge function `escalate-to-human` does the work; Base44's `escalateToHuman`
+ * is a forwarder to it (forwarders.integration.test.ts).
  */
 
 /** Both harnesses' options. A case passes only knobs both understand. */
@@ -27,10 +26,6 @@ type RunOptions = HarnessOptions & EdgeOptions;
 type Result = Awaited<ReturnType<typeof invokeFunction>>;
 
 const IMPLEMENTATIONS = [
-  {
-    label: "Base44 escalateToHuman",
-    run: (body: unknown, o: RunOptions = {}) => invokeFunction("escalateToHuman", body, o) as Promise<Result>,
-  },
   {
     label: "Edge escalate-to-human",
     run: (body: unknown, o: RunOptions = {}) => invokeEdge("escalate-to-human", body, o) as unknown as Promise<Result>,
@@ -357,5 +352,79 @@ describe("Edge escalate-to-human — what only it does", () => {
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ ok: false });
     expect(r.json.contact).toMatchObject({ phoneDisplay: "050-831-1776" });
+  });
+});
+
+/** The structured log lines a run wrote, parsed. */
+async function withLogs<T>(run: () => Promise<T>): Promise<{ result: T; lines: Record<string, unknown>[] }> {
+  const spies = (["log", "warn", "error"] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
+  try {
+    const result = await run();
+    const lines = spies
+      .flatMap((spy) => spy.mock.calls.map((c) => String(c[0])))
+      .flatMap((text) => {
+        try { return [JSON.parse(text) as Record<string, unknown>]; } catch { return []; }
+      });
+    return { result, lines };
+  } finally {
+    spies.forEach((spy) => spy.mockRestore());
+  }
+}
+
+describe("Edge escalate-to-human — what it refuses and what it holds back", () => {
+  const handoff = { reason: "user_request", summary: "רוצה לדבר עם דורית", name: "דנה", phone: "0501234567", agent: "support_agent" };
+
+  it("answers 400 to a request with nothing in it, and sends, stores and appends nothing", async () => {
+    const { result: r, lines } = await withLogs(() => invokeEdge("escalate-to-human", {}));
+    expect(lines).toContainEqual(expect.objectContaining({ level: "warn", event: "request.rejected", reason: "nothing_to_hand_over" }));
+    expect(r.status).toBe(400);
+    expect(r.json).toMatchObject({ error: expect.any(String), rid: expect.any(String) });
+    expect(r.emails).toHaveLength(0);
+    expect(r.leads).toHaveLength(0);
+    expect(r.sheetRows).toHaveLength(0);
+  });
+
+  it("treats a blank summary and blank contact fields as nothing", async () => {
+    const r = await invokeEdge("escalate-to-human", { reason: "user_request", summary: "  \n ", name: " ", phone: "", email: null });
+    expect(r.status).toBe(400);
+    expect(r.emails).toHaveLength(0);
+  });
+
+  it("still takes a summary with no way to reach the visitor: an anonymous hand-off is real", async () => {
+    const r = await invokeEdge("escalate-to-human", { reason: "user_request", summary: "רוצה לדבר עם אדם" });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, notified: true, recorded: false });
+    expect(r.emails.length).toBeGreaterThan(0);
+  });
+
+  it("still takes contact details with no summary", async () => {
+    const r = await invokeEdge("escalate-to-human", { name: "דנה", phone: "0501234567" });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, notified: true, recorded: true });
+  });
+
+  it("holds back the staff mail over the hourly cap, and still records the hand-off", async () => {
+    const { result: r, lines } = await withLogs(() => invokeEdge("escalate-to-human", handoff, { overLimit: ["escalate:notify"] }));
+    expect(lines).toContainEqual(expect.objectContaining({ level: "warn", event: "mail.skipped", reason: "rate_limited" }));
+    expect(r.status).toBe(200);
+    expect(r.emails).toHaveLength(0);
+    expect(r.json).toMatchObject({ ok: true, notified: false, recorded: true });
+    expect(r.json.warnings).toContain("notify_rate_limited");
+    expect(r.leads).toHaveLength(1);
+    expect(r.sheetRows).toHaveLength(1);
+  });
+
+  it("mails staff when the limiter is unreachable: it fails open", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff, { failLimiter: 500 });
+    expect(r.json).toMatchObject({ ok: true, notified: true });
+    expect(r.emails.length).toBeGreaterThan(0);
+    expect(r.json.warnings).not.toContain("notify_rate_limited");
+  });
+
+  it("counts one hand-off once, not once per recipient", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff);
+    const checks = r.fetches.filter((f) => f.url.endsWith("/rpc/allow_submission"));
+    expect(checks).toHaveLength(1);
+    expect(checks[0].body).toMatchObject({ p_key: "escalate:notify", p_window_seconds: 3600, p_max: 60 });
   });
 });
