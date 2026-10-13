@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
 import { AgentLimitError, AgentUnavailableError } from "@/services/agent-errors";
 import type { AgentMessage } from "@/services/ports";
@@ -16,7 +16,7 @@ describe("SupabaseAgentService", () => {
     const conv = await svc.start("needs_interview", META);
     await svc.send(conv, "היי");
     await svc.send(conv, "ועוד");
-    expect(c.functions.invoke.mock.calls[0]).toEqual(["chat", { body: { agent: "needs_interview", message: "היי", consentVersion: META.consent_version, consentAt: META.consent_at, attribution: { channel: "direct", campaign: "", landingPath: "/" } } }]);
+    expect(c.functions.invoke.mock.calls[0]).toEqual(["chat", { body: { agent: "needs_interview", message: "היי", consentVersion: META.consent_version, consentAt: META.consent_at, attribution: { channel: "direct", campaign: "", landingPath: "/" } }, signal: expect.any(AbortSignal) }]);
     expect(c.functions.invoke.mock.calls[1][1].body).toEqual({ agent: "needs_interview", conversationId: "srv-1", token: "t".repeat(64), message: "ועוד" });
   });
 
@@ -93,5 +93,38 @@ describe("SupabaseAgentService", () => {
     await svc.send(conv, "1").catch(() => undefined);
     await svc.send(conv, "2");
     expect(c.functions.invoke.mock.calls[1][1].body).toMatchObject({ conversationId: "s1", token: "t".repeat(64) });
+  });
+
+  describe("at the 40 second timeout", () => {
+    afterEach(() => vi.useRealTimers());
+
+    it("aborts the request and throws AgentUnavailableError", async () => {
+      vi.useFakeTimers();
+      let signal: AbortSignal | undefined;
+      const c = { functions: { invoke: vi.fn((_n: string, o: { body: Record<string, unknown>; signal?: AbortSignal }) => { signal = o.signal; return new Promise<never>(() => undefined); }) } };
+      const svc = new SupabaseAgentService(c, () => "l");
+      const conv = await svc.start("needs_interview", META);
+      const result = svc.send(conv, "x").catch((e) => e);
+      expect(signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(40_000);
+      expect(signal?.aborted).toBe(true);
+      expect(await result).toBeInstanceOf(AgentUnavailableError);
+    });
+
+    it("adopts the conversation a late first answer opened, so the retry continues it", async () => {
+      vi.useFakeTimers();
+      let release: (v: { data: unknown; error: null }) => void = () => undefined;
+      let n = 0;
+      const c = client(() => (++n === 1 ? new Promise((r) => { release = r; }) : ok({ ok: true, conversationId: "late-1", reply: "r" })()));
+      const svc = new SupabaseAgentService(c, () => "l");
+      const conv = await svc.start("needs_interview", META);
+      const first = svc.send(conv, "1").catch((e) => e);
+      await vi.advanceTimersByTimeAsync(40_000);
+      expect(await first).toBeInstanceOf(AgentUnavailableError);
+      release({ data: { ok: true, conversationId: "late-1", token: "t".repeat(64), reply: "late" }, error: null });
+      await vi.advanceTimersByTimeAsync(0);
+      await svc.send(conv, "2");
+      expect(c.functions.invoke.mock.calls[1][1].body).toEqual({ agent: "needs_interview", conversationId: "late-1", token: "t".repeat(64), message: "2" });
+    });
   });
 });

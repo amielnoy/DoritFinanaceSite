@@ -6,7 +6,7 @@ export interface SupabaseFunctionsClient {
   functions: {
     invoke(
       name: string,
-      options: { body: Record<string, unknown> },
+      options: { body: Record<string, unknown>; signal?: AbortSignal },
     ): Promise<{ data: unknown; error: { message: string; context?: unknown } | null }>;
   };
 }

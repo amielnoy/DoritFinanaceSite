@@ -62,7 +62,7 @@ export class SupabaseAgentService implements AgentPort {
           attribution: { channel: str(m.channel), campaign: str(m.campaign), landingPath: str(m.landing_path) },
         };
 
-    const { data, error } = await withTimeout(this.client.functions.invoke("chat", { body }), CHAT_REQUEST_TIMEOUT_MS);
+    const { data, error } = await this.invokeWithin(local, body);
     if (error) throw await this.failure(local, error);
     const answer = (data ?? {}) as ChatAnswer;
     if (answer.ok !== true || typeof answer.reply !== "string") throw new AgentUnavailableError(answer.rid);
@@ -100,12 +100,34 @@ export class SupabaseAgentService implements AgentPort {
     }
     return new AgentUnavailableError(body?.rid);
   }
-}
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new AgentUnavailableError()), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  /**
+   * One request, cancelled at the timeout. The abort can arrive after the server
+   * committed the turn, so a late answer still gives the conversation its ids:
+   * the next message continues it instead of opening a second one. The late
+   * reply's text is dropped; the visitor was already told it failed.
+   */
+  private invokeWithin(local: LocalConversation, body: Record<string, unknown>) {
+    const controller = new AbortController();
+    const request = this.client.functions.invoke("chat", { body, signal: controller.signal });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        void request.then(
+          async ({ data, error }) => {
+            const res = error?.context instanceof Response ? error.context : null;
+            const late = (res ? await res.json().catch(() => null) : data) as ChatAnswer | null;
+            if (!local.serverId && late?.conversationId && late.token) {
+              local.serverId = late.conversationId;
+              local.token = late.token;
+            }
+          },
+          () => undefined,
+        );
+        reject(new AgentUnavailableError());
+      }, CHAT_REQUEST_TIMEOUT_MS);
+    });
+    return Promise.race([request, timeout]).finally(() => clearTimeout(timer));
+  }
 }
