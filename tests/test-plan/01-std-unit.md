@@ -776,7 +776,39 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-WIRING-002 | "uses the Supabase clearinghouse adapter only when the switch is on and a client exists" | `SupabaseMaslekaService` |
 | UNIT-WIRING-003 | "ships dark: with the switch off and a client, no masleka-* function or staff RPC is ever called" | Unconfigured adapter; zero `functions.invoke` and zero `rpc` calls |
 
+### 4.38 The clearinghouse board's and page's helpers — `tests/unit/masleka-board.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MSKBD-001 | "puts each request in its column, oldest waiting first, and drops what left the board" | Four columns; expired/cancelled absent |
+| UNIT-MSKBD-002 | "says when the files should be ready, then that they are" | 4-hour threshold |
+| UNIT-MSKBD-003 | "counts the days the clearinghouse still keeps the files" | 5 / 1 / partial day = 1 |
+| UNIT-MSKBD-004 | "says when they are gone, and nothing when there is no date" | "נמחק במסלקה"; "" |
+| UNIT-MSKBD-005 | "copies when the clipboard works" | `copied` |
+| UNIT-MSKBD-006 | "falls back when there is no clipboard (a non-secure page, an old browser)" | `manual` without a document |
+| UNIT-MSKBD-007 | "falls back when the browser refuses, however it refuses" | `manual` for a rejection and a throw |
+| UNIT-MSKBD-008 | "reads a token from the link's fragment" | The token |
+| UNIT-MSKBD-009 | "reads nothing else" | `null` for empty, short, other key, extra params |
+| UNIT-MSKBD-010 | "accepts what the clearinghouse could issue and nothing that carries markup" | Shape check |
+| UNIT-MSKBD-011 | "accepts and refuses the same codes (isPlausibleCode is normalizeCode's pattern)" | Equal to the Edge `normalizeCode` over 16 samples (Ruling 6) |
+| UNIT-MSKBD-012 | "waits the same time before the files are ready" | `READY_AFTER_MS` = Edge `READY_AFTER_HOURS` hours |
+| UNIT-MSKBD-013 | "counts days to the deletion date the way the server set it, across a daylight-saving end" | Edge `addBusinessDays` from 22 Oct 2026 00:30, +7 → 11 Israeli calendar days, not 12 |
+| UNIT-MSKBD-014 | "reads the day in Israel, not in UTC" | Friday 00:30 in Israel is the next day for a Thursday-evening UTC date |
+| UNIT-MSKBD-015 | "is business day 5 and 7 after submission for any weekday, counted in calendar days" | 9–11 calendar days to business day 7 from every weekday |
+| UNIT-MSKBD-016 | "copies through a temporary field when the clipboard is missing, and takes the field away at once" | append, copy, remove; nothing attached |
+| UNIT-MSKBD-017 | "copies through the field when the clipboard refuses" | `copied`; nothing attached |
+| UNIT-MSKBD-018 | "clears the field's value before it is removed" | Value empty |
+| UNIT-MSKBD-019 | "says manual, with no field left, when the browser refuses the copy command or throws" | `manual`; nothing attached |
+| UNIT-MSKBD-020 | "says manual when there is no document at all" | `manual` |
+| UNIT-MSKBD-021 | "never writes the value to storage or the console, on any path" | No storage write, no console call |
+| UNIT-MSKBD-022 | "has Hebrew copy for every reason, on both pages" | All 15 reasons, both helpers |
+| UNIT-MSKBD-023 | "shows a second הגשתי as a state, not an error (Ruling 18)" | `state` "כבר סומן כהוגש"; every other reason `error` |
+| UNIT-MSKBD-024 | "tells a client who tried too often to wait a while, and that the link is not dead" | 429 copy: wait, link valid |
+| UNIT-MSKBD-025 | "does not invite a retry after a failure that may have stored the code" | "ייתכן שהקוד כבר התקבל", Dorit will be in touch, no retry |
+| UNIT-MSKBD-026 | "says a dead link is dead, and a switched-off service is unavailable" | link_invalid / disabled copy |
+| UNIT-MSKBD-027 | "treats anything that is not a MaslekaError as a failure" | Same as `failed` |
+
 ## 5. Pass criteria
 
-All 586 cases pass. Any failure is a functional defect, not an environment issue —
+All 613 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
