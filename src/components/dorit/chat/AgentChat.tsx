@@ -5,14 +5,17 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { AnimatePresence, motion } from "framer-motion";
 import { services } from "@/services";
 import type { AgentMessage, EscalationReason, HumanContact } from "@/services";
-import { AgentLimitError, MAX_MESSAGE_CHARS } from "@/services/base44/Base44AgentService";
+import { AgentLimitError, AgentUnavailableError, MAX_MESSAGE_CHARS } from "@/services/agent-errors";
 import {
   BOT_DISCLOSURE,
   CHAT_DISCLAIMER,
+  CHAT_FUNCTION_CONSENT_POINTS,
+  CHAT_FUNCTION_CONSENT_VERSION,
   CONSENT,
   CONSENT_VERSION,
   HUMAN_HANDOFF,
 } from "@/config/compliance";
+import { servedByChatFunction } from "@/config/chat-agents";
 import { CONTACT } from "@/config/contact";
 import { readHandoff } from "@/lib/interview-handoff";
 import { readRecommendation } from "@/lib/blog-recommendation";
@@ -110,6 +113,11 @@ export interface AgentDescriptor {
 const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
   too_long: `ההודעה ארוכה מדי — עד ${MAX_MESSAGE_CHARS} תווים.`,
   too_many_turns: "השיחה הגיעה לאורכה המרבי. אפשר להתחיל שיחה חדשה.",
+  // Raised only by the chat function's adapter.
+  rate_limited: "נשלחו הרבה הודעות בזמן קצר. אפשר לנסות שוב בעוד דקה.",
+  conversation_closed: "השיחה הזו הסתיימה. אפשר להתחיל שיחה חדשה.",
+  // Raised only by the chat function's adapter: one message per conversation at a time.
+  busy: "הודעה קודמת עדיין בטיפול — רגע אחד.",
 };
 
 /**
@@ -237,6 +245,11 @@ export default function AgentChat({
   /** Which chat GA4 events name, by agent. */
   const chatMethod: ChatMethod = CHAT_METHOD[descriptor.agent] ?? "ai_interview";
 
+  /** On the `chat` function (VITE_CHAT_AGENTS), not Base44: its own notice, no fenced block, no watchdog. */
+  const viaChatFunction = servedByChatFunction(descriptor.agent);
+  const consentVersion = viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION;
+  const consentPoints = viaChatFunction ? CHAT_FUNCTION_CONSENT_POINTS : (descriptor.consentPoints ?? CONSENT.points);
+
   useEffect(() => {
     if (!conversationId) return;
     return services.agents.subscribe(conversationId, setMessages);
@@ -266,7 +279,7 @@ export default function AgentChat({
    * and a second send means Dorit gets the enquiry twice.
    */
   useEffect(() => {
-    if (submittedRef.current) return;
+    if (viaChatFunction || submittedRef.current) return;
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     if (!last) return;
     const { summary, malformed } = readHandoff(last.content);
@@ -301,7 +314,18 @@ export default function AgentChat({
         showChannelsOnly();
       }
     })();
-  }, [messages]);
+  }, [messages, viaChatFunction]);
+
+  /** On the chat function the lead is saved server-side; the reply that saved it says so. */
+  useEffect(() => {
+    if (!viaChatFunction || submittedRef.current) return;
+    const last = [...messages].reverse().find((m) => m.role === "assistant");
+    if (last?.signal !== "lead_saved") return;
+    submittedRef.current = true;
+    leadEvents.interviewCompleted();
+    // Saved, but the reply that would have said so was lost: the confirmation, and her channels for anything else.
+    if (last.replyMissing) setHandoffNotice({ message: HUMAN_HANDOFF.reachHer, contact: FALLBACK_CONTACT });
+  }, [messages, viaChatFunction]);
 
   useEffect(() => {
     if (!onAssistantMessage) return;
@@ -318,12 +342,17 @@ export default function AgentChat({
       description: descriptor.conversationDescription,
       // Recorded on the conversation so a stored enquiry can always be tied to
       // the exact notice the visitor was shown.
-      consent_version: CONSENT_VERSION,
+      consent_version: consentVersion,
       consent_at: consentAt ?? "",
+      // The function stores these on the conversation. Only for its agents: a Base44
+      // conversation keeps exactly the metadata it had before the function existed.
+      ...(viaChatFunction
+        ? { channel: getAttribution()?.channel ?? "", campaign: getAttribution()?.campaign ?? "", landing_path: window.location.pathname }
+        : {}),
     });
     setConversationId(conv.id);
     return conv;
-  }, [conversationId, consentAt, descriptor]);
+  }, [conversationId, consentAt, descriptor, consentVersion, viaChatFunction]);
 
   const say = (content: string) =>
     setMessages((m) => [...m, { role: "assistant" as const, content }]);
@@ -340,10 +369,14 @@ export default function AgentChat({
     // reply had already come and gone, and the apology appeared 20 seconds
     // later under a perfectly good answer (2026-10-11).
     clearNoReplyTimeout();
-    noReplyTimeoutRef.current = setTimeout(() => {
-      noReplyTimeoutRef.current = null;
-      say(NO_REPLY_COPY);
-    }, NO_REPLY_TIMEOUT_MS);
+    // Off on the chat function: its reply arrives with the send itself, the
+    // adapter times out at 40 s and the function's own budget is 25 s.
+    if (!viaChatFunction) {
+      noReplyTimeoutRef.current = setTimeout(() => {
+        noReplyTimeoutRef.current = null;
+        say(NO_REPLY_COPY);
+      }, NO_REPLY_TIMEOUT_MS);
+    }
     try {
       await services.agents.send(await ensureConversation(), text);
     } catch (e) {
@@ -355,6 +388,10 @@ export default function AgentChat({
       // conversation, one line of apology in its place. That is the difference
       // between "try again" and "this site ate what I wrote".
       setInput(text);
+      if (e instanceof AgentUnavailableError) {
+        showChannelsOnly();
+        return;
+      }
       say(
         e instanceof AgentLimitError
           ? LIMIT_COPY[e.reason]
@@ -419,7 +456,7 @@ export default function AgentChat({
         agent: descriptor.agent,
         name,
         phone,
-        consentVersion: CONSENT_VERSION,
+        consentVersion,
         consentAt: consentAt ?? "",
         channel: handoffAttribution?.channel,
         campaign: handoffAttribution?.campaign ?? undefined,
@@ -580,7 +617,7 @@ export default function AgentChat({
                         skews older. It was 13.5px. The points are numbered, not
                         dashed — they are four things, in order. */}
                     <ol className="m-0 p-0 list-none flex flex-col gap-3.5 text-base leading-[1.75] text-foreground/80">
-                      {(descriptor.consentPoints ?? CONSENT.points).map((point, i) => (
+                      {consentPoints.map((point, i) => (
                         <li key={point} className="grid grid-cols-[28px_minmax(0,1fr)] gap-2">
                           <span className="font-heading text-[19px] text-accent lining-nums tabular-nums" aria-hidden="true">
                             {String(i + 1).padStart(2, "0")}

@@ -18,12 +18,29 @@ import type { Article, ArticleDraft, LeadRecord, LeadStatus, TestimonialDraft } 
 export const adminKeys = {
   leads: ["admin", "leads"] as const,
   articles: ["admin", "articles"] as const,
+  transcriptLeadIds: ["admin", "lead-transcript-ids"] as const,
 };
 
 export function useLeads() {
   return useQuery<LeadRecord[]>({
     queryKey: adminKeys.leads,
     queryFn: () => services.leadsAdmin.list(),
+  });
+}
+
+/** The leads that have a conversation behind them. Empty while loading or if the read fails: no tab rather than a wrong one. */
+export function useTranscriptLeadIds() {
+  return useQuery<string[]>({
+    queryKey: adminKeys.transcriptLeadIds,
+    queryFn: () => services.leadsAdmin.transcriptLeadIds(),
+  });
+}
+
+export function useLeadTranscript(leadId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "lead-transcript", leadId],
+    queryFn: () => services.leadsAdmin.transcript(leadId),
+    enabled,
   });
 }
 

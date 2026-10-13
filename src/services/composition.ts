@@ -1,5 +1,6 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
+import { CHAT_AGENTS } from "@/config/chat-agents";
 import { LEAD_FUNCTIONS } from "@/config/lead-functions";
 import { UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
@@ -12,6 +13,7 @@ import { Base44LeadAdminService } from "./base44/Base44LeadAdminService";
 import { Base44LeadService } from "./base44/Base44LeadService";
 import { Base44SupportService } from "./base44/Base44SupportService";
 import { Base44UploadService } from "./base44/Base44UploadService";
+import { SupabaseAgentService } from "./supabase/SupabaseAgentService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
@@ -21,9 +23,11 @@ import { SupabaseSupportService } from "./supabase/SupabaseSupportService";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
+import { RoutedAgentService } from "./RoutedAgentService";
 import type { Services } from "./index";
 import type {
   AccountPort,
+  AgentPort,
   AuthPort,
   ContentAdminPort,
   ContentPort,
@@ -135,10 +139,20 @@ const supportPort: SupportPort =
     ? new SupabaseSupportService(supabase as unknown as SupabaseFunctionsClient)
     : base44Support;
 
+/**
+ * The on-site agents: the `chat` Edge Function for those named in
+ * `VITE_CHAT_AGENTS` (empty by default), Base44 for the rest.
+ */
+const agentPort: AgentPort = new RoutedAgentService(
+  new Base44AgentService(client),
+  supabase ? new SupabaseAgentService(supabase as unknown as SupabaseFunctionsClient) : null,
+  CHAT_AGENTS,
+);
+
 export const services: Services = {
   leads: leadPort,
   content: contentPort,
-  agents: new Base44AgentService(client),
+  agents: agentPort,
   uploads: uploadPort,
   claimDocuments: claimDocumentsPort,
   support: supportPort,

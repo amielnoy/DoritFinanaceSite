@@ -132,6 +132,19 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
     expect(CHAT).not.toMatch(/dangerouslySetInnerHTML/);
   });
 
+  it("shows a stored transcript to Dorit as plain text, with no write path", () => {
+    // The transcript is visitor-typed text read back from chat_messages. The
+    // admin tab renders it as text nodes: no HTML sink, no markdown renderer,
+    // and the adapter's transcript reads touch no update or delete.
+    const leads = read(join(REPO_ROOT, "src/pages/Leads.tsx"));
+    expect(leads).not.toMatch(/dangerouslySetInnerHTML|innerHTML|react-markdown|ReactMarkdown/);
+    const adapter = read(join(REPO_ROOT, "src/services/supabase/SupabaseLeadAdminService.ts"));
+    const transcript = adapter.slice(adapter.indexOf("async transcript("), adapter.indexOf("\n}\n", adapter.indexOf("async transcript(")));
+    expect(transcript).toMatch(/chat_messages/);
+    expect(transcript).not.toMatch(/\.(update|delete|insert|upsert|rpc)\(/);
+    expect(adapter).not.toMatch(/service_role|SERVICE_ROLE/);
+  });
+
   it("renders the handoff notice through markdown too", () => {
     // The failure copy is the one path that runs when everything else broke;
     // it must not become the one path that skips escaping.
@@ -383,7 +396,10 @@ describe("Prompt injection — through the chat box", () => {
   it("keeps the consent stamp a property of the shell, not of the conversation", () => {
     // If the model could supply consent_version, a persuaded model could
     // backdate what the visitor agreed to.
-    expect(CHAT).toMatch(/consent_version: CONSENT_VERSION/);
+    // The shell chooses the stamp — v5, or v6 for an agent on the chat
+    // function — from its own constants; never from the conversation.
+    expect(CHAT).toMatch(/consent_version: consentVersion/);
+    expect(CHAT).toMatch(/const consentVersion = viaChatFunction \? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION;/);
   });
 
   it("gates sending on consent held in the shell's own state", () => {

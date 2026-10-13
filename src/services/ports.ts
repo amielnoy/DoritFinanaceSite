@@ -129,6 +129,10 @@ export interface AgentMessage {
   role: "user" | "assistant";
   content: string;
   tool_calls?: unknown[];
+  /** Set by the chat function's adapter on the reply that saved the interview's lead. */
+  signal?: "lead_saved";
+  /** The lead was saved but the model's reply was lost: the content is the adapter's own confirmation. */
+  replyMissing?: true;
 }
 
 export interface AgentConversation {
@@ -238,6 +242,13 @@ export interface LeadRecord {
 }
 
 /** Managing received enquiries. Every method here touches personal data. */
+/** One line of a chat transcript as Dorit reads it: the visitor's words and the agent's, already redacted. */
+export interface TranscriptLine {
+  role: "user" | "assistant";
+  content: string;
+  at: string;
+}
+
 export interface LeadAdminPort {
   list(limit?: number): Promise<LeadRecord[]>;
   setStatus(id: string, status: LeadStatus): Promise<void>;
@@ -249,6 +260,10 @@ export interface LeadAdminPort {
    * the screen stops working rather than lasting for years.
    */
   documentLink(ref: string): Promise<string>;
+  /** The interview behind a lead, if it came from the chat function; [] otherwise. Read-only. */
+  transcript(leadId: string): Promise<TranscriptLine[]>;
+  /** The ids of the leads that have a conversation behind them — the screen shows the tab for these and no others. */
+  transcriptLeadIds(): Promise<string[]>;
 }
 
 export interface ArticleDraft {

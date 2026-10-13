@@ -516,6 +516,62 @@ that writes real slugs.
 | CTR-INOW-002 | "is a step of the Vercel deploy job, for production only" | The step is gated on `steps.target.outputs.env == 'production'` and runs `node scripts/indexnow.mjs` |
 | CTR-INOW-003 | "can never fail the deploy" | `continue-on-error: true`; the script has no non-zero `process.exit` / `exitCode` |
 
+### 4.10 The chat tables — `chat-schema.contract.test.ts`
+
+The chat function's records (`chat_conversations`, `chat_messages`, `chat_usage`,
+`chat_budget_alerts`) are written only by the `chat` Edge Function with the
+service role; an agency member or a platform admin reads their own agency's
+rows. These cases read the two migrations as text. `supabase/tests/chat_tables_check.sql`
+is the runtime counterpart: against a local database it asserts that anon and an
+outsider read nothing, that a member sees only their agency and an admin sees
+both, that an authenticated user can neither write a message nor call the purge,
+that `chat_month_usage` sums per model, that the purge removes exactly the
+expired conversation with its messages, and that deleting a lead deletes its
+transcript and usage rows.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHSCH-001 | "%s has row-level security on" (4 tables) | `enable row level security` for each of the four tables |
+| CTR-CHSCH-002 | "are closed to anon and to authenticated writes" | Table privileges revoked from anon and authenticated; `select` alone granted back; outside comments, no grant naming insert/update/delete/all (alone or in a list) to authenticated, and no grant at all to anon |
+| CTR-CHSCH-003 | "let a member or an admin read their own agency's rows, and nobody else" | One `can_see(agency_id) or is_admin()` select policy on each of the three readable tables; none on `chat_budget_alerts`; exactly three `create policy chat_` |
+| CTR-CHSCH-004 | "delete a transcript with its lead, and messages and usage with their conversation" | `lead_id` and the two conversation FKs are `on delete cascade` |
+| CTR-CHSCH-005 | "keep transcripts twelve months by default" | `delete_after` defaults to `now() + interval '12 months'` |
+| CTR-CHSCH-006 | "open the usage totals and the purge to the service role only" | `revoke execute` from public, anon, authenticated and `grant execute` to service_role on `chat_month_usage` and `purge_chat_conversations` |
+| CTR-CHSCH-007 | "schedule the purge nightly, after enabling pg_cron" | The schedule migration creates the extension and schedules `chat-purge-nightly` at `15 1 * * *` |
+| CTR-CHSCH-008 | "record a hand-off apart from status, so a lead and a hand-off can both be told" | `chat_conversations.escalated_at timestamptz` is nullable and present |
+| CTR-CHSCH-009 | "hold a conversation for one turn at a time with a lease, free by default (I3)" | `chat_conversations.busy_until timestamptz` is nullable and present |
+| CTR-CHSCH-010 | "guard against write grants hidden in a list and against any grant to anon" | The two guards match `grant select, insert … to authenticated`, `grant all …`, a grant to `service_role, authenticated`, and a grant to anon; not a select grant, not the service-role grant, not a comment (triage 1) |
+
+### 4.11 The chat prompts — `chat-prompts.contract.test.ts`
+
+The chat function's prompts are Markdown files under `supabase/functions/chat/prompts/`, built into `prompts.generated.ts`. `interview.md`, filled for Dorit, must equal today's `needs_interview.jsonc` instructions apart from three tool-section lines; `compliance.md` is `COMPLIANCE.md` §3 and §5 verbatim; the function's agency copy must equal `agencyProfile.ts`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHPROMPT-001 | "%s equals agencyProfile.ts" | `AGENCY` (the function's copy) equals `AGENCY_PROFILE`, field by field (6 cases) |
+| CTR-CHPROMPT-002 | "names the agency the tenant migration seeds" | The tenant migration inserts `AGENCY.id` |
+| CTR-CHPROMPT-003 | "each tool-section change matches exactly one line of today's instructions" | The three `startsWith` prefixes each match one line of `needs_interview.jsonc` |
+| CTR-CHPROMPT-004 | "renders, for Dorit, to today's text byte for byte apart from the three tool-section lines" | `interview.md` filled for agency 1 equals today's instructions with only the three lines replaced |
+| CTR-CHPROMPT-005 | "asks for submitLead and never for a fenced block" | `interview.md` has no fenced `lead` block and requests the `submitLead` call |
+| CTR-CHPROMPT-006 | "is COMPLIANCE.md §3 and §5, verbatim" | `compliance.md` equals the §3 + §5 excerpt of `COMPLIANCE.md` |
+| CTR-CHPROMPT-007 | "no longer lists createConsultationEvent as an interview tool" | The stale `createConsultationEvent` row is gone from `COMPLIANCE.md` |
+| CTR-CHPROMPT-008 | "is what the build script writes from the Markdown files today" | `prompts.generated.ts` equals `renderPromptsModule` output; stale means run `npm run build:chat-prompts` |
+
+### 4.12 The chat function's tools — `tests/contract/chat-function.contract.test.ts`
+
+The interview's tools ask the model for nothing their Edge handlers do not read, and offer exactly the hand-off reasons `escalate-to-human` knows. Tasks 6 and 7 add their cases here.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHFN-001 | "submitLead asks the model only for fields submit-lead reads" | Every `submitLead` schema property is destructured by the submit-lead handler |
+| CTR-CHFN-002 | "escalateToHuman asks the model only for fields escalate-to-human reads" | Every `escalateToHuman` schema property is destructured by the escalate-to-human handler |
+| CTR-CHFN-003 | "offers exactly the hand-off reasons escalate-to-human knows" | `ESCALATION_REASONS` equals the keys of `REASONS` in `escalation.js`, in order |
+| CTR-CHFN-004 | "is public, like the forms, and registered" | `config.toml` has `[functions.chat]` with `verify_jwt = false` |
+| CTR-CHFN-005 | "enforces the same limits the page states" | The handler's `MAX_MESSAGE_CHARS` and `MAX_TURNS` equal the page's |
+| CTR-CHFN-006 | "accepts no consent version longer than submit-lead's column holds" | `MAX_CONSENT_VERSION_CHARS` equals `LEAD_FIELD_LIMITS.consent_version` in `submit-lead/lead.js` |
+| CTR-CHFN-008 | "stamps every conversation with the consent version it was given under" (changed pin, `agents.contract.test.ts`) | `consent_version: consentVersion`, chosen as `viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION` |
+| CTR-CHFN-007 | "sends only fields the function reads" | Every key the browser adapter posts, on the first and the following message, is read by `handler.ts` as `input.<key>` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -525,7 +581,7 @@ time.
 
 ## 6. Pass criteria
 
-All 572 cases pass. A failure means either the frontend or the backend definition
+All 590 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight
