@@ -60,11 +60,14 @@ Two helpers do the work:
 | CTR-BLG-001 | "the admin payload carries title and body and nothing undeclared" | `BlogAdmin` payload conforms |
 | CTR-BLG-002 | "publish toggles only flip the declared boolean field" | Every updated key is declared |
 | CTR-BLG-003 | "the public blog list filters on the published flag only" | One `filter` call, `{published}`, declared boolean |
+| CTR-BLG-004 | "keeps the mirror-only fields off the BlogPost entity" | `slug` is not a BlogPost property |
 | CTR-TST-001 | "sends only declared fields and both required ones" | `Testimonial.create` conforms |
 | CTR-TST-002 | "keeps the rating inside the declared 1..5 range" | 5 valid; 6 and 0 rejected |
 | CTR-TST-003 | "only accepts the declared review sources" | `google \| midrag`; `yelp` rejected |
 | CTR-EML-001 | "every send supplies to, subject and body" | Exactly those three keys on every `SendEmail` |
 | CTR-EML-002 | "never hardcodes a recipient inline" | No literal `to:` string — recipients come from named constants |
+
+`slug` is the one key the admin's BlogPost payload may carry that the entity lacks — it is the Supabase mirror's alone — and a case fails if it ever becomes a Base44 field.
 
 ### 4.3 Backend function — `consultation-function.contract.test.ts`
 
@@ -318,6 +321,25 @@ declare it. It also forbids a build that strips `VITE_BASE44_APP_ID` from writin
 the default `dist/` in any job that uploads `dist` — that arrangement shipped a
 bundle whose app id inlined to `undefined` as the artifact all ten e2e shards
 tested, and the suite stayed green because the fixture stubs `**/api/**`.
+Since articles are prebuilt, the nightly run is no longer deploy-free: CTR-REB-001
+requires `deploy-vercel` and `deploy-supabase` to run on `schedule` (the functions
+first, because `--prod` waits for them), and a companion case keeps the Base44
+publish — which ships the agents — off it. CTR-REB-002 pins that the publish
+workflow ends by dispatching `ci.yml` on `main` with `deploy=true`, with
+`actions: write` and only after a real publish. CTR-REB-003 requires
+`PRERENDER_REQUIRED=1` on the production Vercel build only; CTR-REB-004 keeps
+`PRERENDER_ARTICLES_FIXTURE` in the e2e `build` job's `Build` step and out of the
+workflow-level `env`, every other job and `vercel.json`; CTR-REB-005 requires the
+production deploy check to fetch `/blog`, which now shares its name with the
+`blog/` directory of articles. CTR-REB-006 requires the workflow's `cancel-in-progress`
+to be false on `schedule`, so the nightly run queues behind an in-flight push rather
+than cancelling it (Vercel on new code, Base44 on old); CTR-REB-007 requires the
+production smoke to skip the agent-conversation probes on `schedule`, and the spec to
+honour `E2E_SKIP_AGENT_PROBES`. `prerender-hermetic.contract.test.ts` (CTR-REB-008)
+pins that `scripts/prerender.mjs` aborts `googletagmanager.com` / `google-analytics.com`
+before navigating, as the e2e fixture does, so a build sends no fake page_views.
+`article-slug.contract.test.ts` (CTR-SLG-REF) pins the 400 and 409 slug-refusal texts
+in `BlogAdmin.tsx` to the ones in `contentAdmin`.
 
 **`deploy-gate.contract.test.ts`** — that exactly one thing promotes production.
 `vercel.json` must disable Git-triggered deploys on `main` and `builder` and
@@ -355,6 +377,17 @@ one of them.
 host out must be one the build rewrites. `index.html` was missing from that list,
 so a host move shifted the sitemap and left the served document advertising the
 old origin in its canonical tag, `og:url` and two static JSON-LD blocks.
+
+**`vercel-functions.contract.test.ts`, old article addresses.** Every
+`/blog/<24 hex>` — a Base44 id, what article links were before slugs — must be
+rewritten to `api/og/blog.ts` with no `has` condition (people get the 301 as
+well as crawlers), before the crawler rule and the SPA catch-all.
+
+**`vercel-functions.contract.test.ts`, clean URLs.** `cleanUrls` is `true` (so
+`dist/<route>.html` answers `/<route>`), the catch-all rewrites to `/app`, and
+`api/og/blog.ts` fetches the shell from `${SITE_URL}/app` — no `VERCEL_URL`
+(deployment protection) and no `functions.includeFiles` (it aborts
+`deploy --prebuilt`).
 
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
@@ -435,6 +468,32 @@ Regenerate the files with `node scripts/self-host-fonts.mjs`; never edit
 | CTR-EDGE-002 | "are each registered without JWT verification, as submit-claim is" | `verify_jwt = false` for `submit-claim`, `submit-lead`, `escalate-to-human`, `log-support-chat` in `config.toml` |
 | CTR-EDGE-003 | "ask Google for exactly two scopes" | `_shared/google.ts` lists only `calendar.events` and `spreadsheets` |
 
+### 4.8 Article addresses — `article-slug.contract.test.ts`
+
+`blog_posts.slug` is shaped by four things that cannot import one another — the
+migration's CHECK, `src/lib/articlePath.ts`, `contentAdmin` and
+`scripts/published-articles.mjs` — and these cases keep them one rule. The
+backfill is checked against the files it names, from its own side, so a draft
+added to `content/blog/` later needs no row in a migration that has shipped.
+`supabase/tests/blog_slug_check.sql` is the runtime counterpart: it re-applies
+the migration on production-shaped rows (a duplicated title, an untidy Base44
+id, a row with none) and asserts the backfill and every constraint. It also
+asserts the BEFORE INSERT fallback trigger: an insert or upsert that sends no
+slug gets `post-<id>`, an existing slug is never overwritten, and a sent slug is
+kept. That trigger is what lets the migration reach production before the code
+that writes real slugs.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-SLUG-001 | "the migration's CHECKs are articlePath's patterns" | `slug ~` equals `SLUG_PATTERN.source`; `slug !~` equals `BASE44_ID_PATTERN.source` |
+| CTR-SLUG-002 | "gives a repo article's slug to that file's exact title" | 20 backfill rows name a file; each title equals that file's front matter |
+| CTR-SLUG-003 | "names the two live articles older than the repo files" | `bituach-briut-digitali`, `pensia-beidan-ha-ai` with their exact titles |
+| CTR-SLUG-004 | "maps 22 distinct titles to 22 distinct slugs" | 22 rows, no title or slug twice |
+| CTR-SLUG-005 | "builds no /blog/<…> address by hand" | No `/blog/${` or `"/blog/" +` in `src/` or `api/` outside `articlePath.ts` |
+| CTR-SLUG-006 | "%s links articles through articlePath" (7 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo, BlogAdmin, api/og/blog.ts |
+| CTR-SLUG-007 | "contentAdmin's copy is the same" | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
+| CTR-SLUG-008 | "the build's copy is the same" | `scripts/published-articles.mjs` patterns equal `articlePath.ts`'s |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -444,7 +503,7 @@ time.
 
 ## 6. Pass criteria
 
-All 542 cases pass. A failure means either the frontend or the backend definition
+All 568 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

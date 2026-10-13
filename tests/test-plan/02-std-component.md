@@ -196,6 +196,7 @@ featured row's deadline does not decide the outcome of an unrelated run.
 | CMP-BLOG-021 | "drops a keyword the new topic does not carry" | Switching topic clears it |
 | CMP-BLOG-022 | "keeps a keyword the new topic still carries" | Still pressed after the switch |
 | CMP-BLOG-023 | "hides the featured row while a keyword is chosen" | No featured row; only matching cards |
+| CMP-BLOG-024 | "links each card and the blog's JSON-LD to the slug, or to the id where the store has none" | `/blog/maslul-hashkaa` and `/blog/pen-2` in the cards and in `Blog.blogPost[].url` |
 
 ### 4.13 Reading-recommender filter — `tests/component/blog-recommendation-filter.test.tsx`
 
@@ -228,8 +229,40 @@ The real `AgentChat` with the recommender's descriptor; the agent service is fak
 | CMP-RCH-004 | "shows the approved one line and the licence, not the interview's notice" | The approved sentence and `L-00107009`; exactly two points; no "נאספים שם וטלפון בלבד" |
 | CMP-RCH-005 | "still gates the first message on the checkbox" | Start and send disabled before consent; the pre-filled text waits in the input |
 
+### 4.15 `<BlogPost />` — old addresses — `tests/component/blog-post-redirect.test.tsx`
+
+An address from before slugs (a Base44 id) shows the article, then replaces
+itself with `/blog/<slug>`, keeping the query and hash the link carried. The
+article is cached under the slug first, so the switch reads nothing again.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-POST-001 | "takes its slug address, keeping the query and the hash" | `/blog/horadat-dmei-nihul?utm_source=whatsapp#mah-bodkim`; one read |
+| CMP-POST-002 | "stays where it is when the address already is the slug" | Unchanged |
+| CMP-POST-003 | "stays on the id where the store has no slug (a build reading Base44)" | Unchanged |
+
+### 4.16 `<BlogAdmin />` — the article's address — `tests/component/blog-admin-slug.test.tsx`
+
+The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of STD-12).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-BADM-001 | "prefills an existing article's slug" | `horadat-dmei-nihul` |
+| CMP-BADM-002 | "asks for one on a new article, and will not save without it" | `SLUG_PROBLEMS.missing`; save disabled |
+| CMP-BADM-003 | "refuses %j" (3) | Format, Base44-id and taken messages; save disabled |
+| CMP-BADM-004 | "warns before a published article's address changes" | `role="status"` naming `/blog/horadat-dmei-nihul` |
+| CMP-BADM-005 | "does not warn for a draft, which nobody links to yet" | No status |
+| CMP-BADM-006 | "sends the slug with the article" | `mutateAsync({ id, draft: { …, slug } })` |
+| CMP-BADM-007 | "accepts a legacy fallback slug as it is" | `post-6ac8eb62b0a953274445869d` valid; save enabled |
+| CMP-BADM-008 | "asks a legacy article with no slug for one, and saves once it has one" | `SLUG_PROBLEMS.missing`; save disabled until a valid slug is typed |
+| CMP-BADM-009 | "shows the server's words when the address is taken (409), …" / "… invalid (400)" (2) | The 409 / 400 text in the alert; inputs and save still enabled |
+| CMP-BADM-010 | "keeps the generic message for any other failure, never the raw server text" | `שמירת המאמר נכשלה. ניתן לנסות שוב.` for a 500 |
+| CMP-BADM-011 | "says the public page goes at the next deploy after a published article is unpublished" | `role="status"` with "יוסר בעדכון הבא" and a pointer to the README; absent before the click |
+| CMP-BADM-012 | "says nothing when a draft is published" | No note |
+| CMP-BADM-013 | "says it after a published article is deleted, but not a draft" | Note only for the published one |
+
 ## 5. Pass criteria
 
-All 76 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 92 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

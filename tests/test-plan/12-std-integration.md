@@ -483,9 +483,29 @@ the endpoint's words), `edge-ics.test.ts` (the invitation: UTC, escaping,
 sheet append, PostgREST helpers). The live smoke asks `submit-lead` and
 `log-support-chat` an empty question in production.
 
+### 4.24 `contentAdmin` — the article's address — `INT-CNT-001..008`
+
+`content-admin.integration.test.ts`. The slug is the Supabase mirror's alone,
+so it is validated and checked for uniqueness before Base44 is written — a
+refusal from the mirror's unique constraint would arrive after the Base44 row
+exists. An update is a PATCH by `base44_id` carrying only what changed, so a
+publish toggle touches `published` and nothing else; a PATCH that finds no row
+is a failure, never a silently created row.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CNT-001 | "refuses to create an article with %s, before writing anything" (4) | 400 with `error` and `rid`; no Base44 create; no `blog_posts` call |
+| INT-CNT-002 | "refuses a slug another article has with 409, before writing Base44" | 409 "הכתובת כבר בשימוש במאמר אחר."; no create, no mirror POST |
+| INT-CNT-003 | "writes the slug to the mirror and keeps it out of Base44" | Base44 fields have no `slug`; the mirror POST has `slug: koteret` |
+| INT-CNT-004 | "updates the mirror in place with a PATCH of only what changed" | `PATCH …?base44_id=eq.post-1` with `{ published: false }`; no slug lookup |
+| INT-CNT-005 | "never sends a null or empty slug to the mirror" | An update without a slug sends a body with no `slug` key; a null or empty slug is 400 with no write; a create always sends the validated slug |
+| INT-CNT-006 | "lets an article keep its own slug, and sends it to the mirror only" | 200; Base44 update has no `slug`; PATCH carries it |
+| INT-CNT-007 | "fails an update whose mirror row is missing" | 500 |
+| INT-CNT-008 | "refuses to rename an article to a slug another one has" | 409; no Base44 update |
+
 ## 5. Pass criteria
 
-All 284 cases pass. These assert behaviour, not shape — a failure means the
+All 295 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

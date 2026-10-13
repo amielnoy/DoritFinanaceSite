@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — plain .mjs tooling, imported for its pure planning step.
-import { planSeed, mirrorRow, parseArticle, readExecResult } from "../../scripts/seed-blog.mjs";
+import { planSeed, mirrorRow, parseArticle, readExecResult, slugFromFile } from "../../scripts/seed-blog.mjs";
 
 /**
  * Seeding writes the repo's articles to both stores.
@@ -12,6 +12,7 @@ import { planSeed, mirrorRow, parseArticle, readExecResult } from "../../scripts
  */
 const article = (over: Record<string, unknown> = {}) => ({
   file: "horadat-dmei-nihul.md",
+  slug: "horadat-dmei-nihul",
   title: "להוריד דמי ניהול בפנסיה",
   excerpt: "תקציר",
   tags: "פנסיה, דמי ניהול",
@@ -84,5 +85,21 @@ describe("readExecResult", () => {
 
   it("says the CLI may be signed out rather than parsing nothing", () => {
     expect(() => readExecResult("Not logged in\n")).toThrow(/base44 login/);
+  });
+});
+
+describe("the article's address", () => {
+  it("mirrors the file name as the slug, and keeps it out of the Base44 payload", () => {
+    const [step] = planSeed([article()], []);
+    expect(step.payload).not.toHaveProperty("slug");
+    expect(mirrorRow(step, "b44-new").slug).toBe("horadat-dmei-nihul");
+  });
+
+  it("takes the slug from the file name", () => {
+    expect(slugFromFile("horadat-dmei-nihul.md")).toBe("horadat-dmei-nihul");
+  });
+
+  it("refuses a file name that cannot be an address", () => {
+    expect(() => slugFromFile("Horadat Dmei.md")).toThrow(/kebab-case/);
   });
 });

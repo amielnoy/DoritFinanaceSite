@@ -35,7 +35,9 @@ something outside the repository.
 | Insurance self-assessment | `src/lib/insurance-assessment.ts` |
 | `reconcile-stores`, `prune-vercel-deployments` | `scripts/*.mjs` |
 | `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
+| `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
 | `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
+| `fetchPublishedArticles`, `planArticles`, `fixtureArticleFor`, `duplicateTitles` | `scripts/published-articles.mjs` |
 | `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
 > **Note.** `computePensionFees` was extracted from `PensionFeeCalculator.tsx`
@@ -279,6 +281,9 @@ published. See [A-65](10-known-issues.md).
 | UNIT-SEED-007 | "says the CLI may be signed out rather than parsing nothing" | Throws naming `base44 login` |
 | UNIT-SEED-008 | "carries the action time from the front matter to both stores" | `action_time` in the parsed article, the Base44 payload and the mirror row |
 | UNIT-SEED-009 | "sends an empty action time for an article that has none" | `action_time: ""` |
+| UNIT-SEED-010 | "mirrors the file name as the slug, and keeps it out of the Base44 payload" | Mirror row `slug`; payload has none |
+| UNIT-SEED-011 | "takes the slug from the file name" | `horadat-dmei-nihul` |
+| UNIT-SEED-012 | "refuses a file name that cannot be an address" | Throws naming kebab-case |
 
 ### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
 
@@ -428,6 +433,8 @@ either fails here rather than on the home page.
 | UNIT-REST-010 | "turns a network failure into an error rather than a rejection" | `{ data: null, error }` |
 | UNIT-REST-011 | "reports a 200 that is not a list as an error, not as no rows" | `error`, never `data: []` |
 | UNIT-REST-012 | "asks for the same URL with the same anonymous credentials" | Equal to supabase-js's request |
+| UNIT-REST-013 | "builds an or filter inside PostgREST's brackets" | `or=(slug.eq.a,base44_id.eq.a)` |
+| UNIT-REST-014 | "asks for an or filter exactly as supabase-js does" | Same URL as supabase-js's `.or()` |
 
 ### 4.20 The lazy services front — `tests/unit/lazy-services.test.ts`
 
@@ -444,7 +451,135 @@ watching it fail.
 | UNIT-LAZY-005 | "answers hasStoredToken and getPublicSettings without loading the composition root" | Zero loads |
 | UNIT-LAZY-006 | "finds a stored Supabase session without loading the SDK" | `true`, zero loads |
 
+### 4.21 Article addresses — `tests/unit/article-path.test.ts`
+
+Every link to an article is built by `articlePath`, so these cases are what the
+cards, the blog's JSON-LD, the post's canonical and the server redirect inherit.
+A slug shaped like a Base44 id is refused because `vercel.json` sends every
+`/blog/<24 hex>` to the old-link redirect.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SLUG-001 | "is /blog/<slug> when the article has one" | `/blog/horadat-dmei-nihul` |
+| UNIT-SLUG-002 | "falls back to the id where the store has no slug (Base44)" | `/blog/<id>`, also for an empty slug |
+| UNIT-SLUG-003 | "accepts %j" (5 slugs) | `null`; `isValidSlug` is true |
+| UNIT-SLUG-004 | "asks for a slug when there is none" | `SLUG_PROBLEMS.missing` |
+| UNIT-SLUG-005 | "refuses %j as not Latin kebab-case" (10 inputs) | `SLUG_PROBLEMS.format` |
+| UNIT-SLUG-006 | "refuses a slug shaped like a Base44 id" | `SLUG_PROBLEMS.base44Id`; 23 or 25 hex characters are ordinary slugs |
+| UNIT-SLUG-007 | "is false for anything that is not a string" | `false` |
+| UNIT-SLUG-008 | "tells a Base44 id, a uuid and a slug apart" | All three are slug-shaped; only the uuid matches `UUID_PATTERN` |
+
+### 4.22 The published articles at build time — `tests/unit/published-articles.test.ts`
+
+The list `prerender.mjs` prebuilds pages for, and that PR 2's sitemap and
+llms.txt will read. An answer that cannot be trusted is never "no articles",
+and test articles can never reach a deployment.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-PUBART-001 | "asks PostgREST for published rows, newest first, with the publishable key" | `published=eq.true`, `order=created_at.desc`; key as `apikey` and bearer |
+| UNIT-PUBART-002 | "selects the columns it is asked for" | `select` as given |
+| UNIT-PUBART-003 | "returns the rows" | Rows unchanged |
+| UNIT-PUBART-004 | "throws on a refusal, naming the status" | `HTTP 401` |
+| UNIT-PUBART-005 | "throws on an answer that is not a list" | `not a list` |
+| UNIT-PUBART-006..009 | "refuses a row whose slug %j could not be a file under dist/blog" | `../escape`, `Bad`, a Base44 id, `null` → `unusable slug` |
+| UNIT-PUBART-010 | "lists the published articles as /blog/<slug> routes" | `["/blog/a", "/blog/b"]` |
+| UNIT-PUBART-011 | "warns, and prebuilds no article, when Supabase is not configured" | Warning; no request |
+| UNIT-PUBART-012 | "fails when articles are required and Supabase is not configured" | Throws |
+| UNIT-PUBART-013 | "warns when Supabase cannot be read and articles are not required" | Warning naming `HTTP 503` |
+| UNIT-PUBART-014 | "fails when Supabase cannot be read and articles are required" | Throws `HTTP 503` |
+| UNIT-PUBART-015 | "takes the fixture's articles in the e2e build, without asking Supabase" | Fixture routes and rows; no request |
+| UNIT-PUBART-016..017 | "refuses the fixture in a Vercel build (%j)" | `VERCEL=1` or `VERCEL_ENV` → throws |
+| UNIT-PUBART-018 | "refuses the fixture in a bundle that reads Supabase" | Throws |
+| UNIT-PUBART-019 | "refuses a fixture article with an unusable slug" | Throws |
+| UNIT-PUBART-020 | "answers the page's Base44 read by the slug at the end of its URL" | The fixture row |
+| UNIT-PUBART-021 | "answers null for any other key" | `null` |
+| UNIT-PUBART-022 | "names each title more than one route was rendered with" | `{ title, routes }` |
+| UNIT-PUBART-023 | "is empty when every title is distinct" | `[]` |
+| UNIT-PUBART-024 | "are the app's rule and address" | Same verdicts as `articlePath.ts` |
+
+### 4.23 Reading one article — `tests/unit/supabase-content.test.ts` (`getArticle`)
+
+`/blog/:key` holds a slug, an old Base44 id, or a uuid. One PostgREST request
+asks for all three and the slug wins. The key reaches an `or=(…)` filter, so a
+key that is not slug-shaped is answered "not found" without a request — a comma
+or a bracket in it would rewrite the filter.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ART-001 | "reads the slug with every article" | `slug` in `ARTICLE_COLUMNS` |
+| UNIT-ART-002 | "asks for the key as a slug or a Base44 id, in one request" | `or: slug.eq.k,base44_id.eq.k`; no `eq` |
+| UNIT-ART-003 | "adds the uuid clause only for a uuid-shaped key" | `…,id.eq.<uuid>` |
+| UNIT-ART-004 | "prefers the slug, then the Base44 id, then the uuid" | The slug's row; without it, the Base44 id's |
+| UNIT-ART-005 | "returns the article under its Base44 id, with its slug" | `id` is the Base44 id; `slug` present |
+| UNIT-ART-006 | "throws a 404 'not found' when no row matches" | `status: 404` |
+| UNIT-ART-007 | "never asks about %j" (6 keys) | `status: 404`; no call recorded |
+| UNIT-ART-008 | "fails, rather than answering 'not found', when the read fails" | `blog_posts read failed`; no `status` |
+
+### 4.25 Publishing by title — `tests/unit/publish-blog.test.ts` (`publishInSupabase`)
+
+The Supabase half of a publish is a PATCH by `base44_id`: it changes
+`published` and nothing else, and a row that is not there is a failure rather
+than a row silently created.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-PUB-001 | "PATCHes the one row by base44_id" | `PATCH …?base44_id=eq.b44-7`, `{ published: true }`, `return=representation` |
+| UNIT-PUB-002 | "fails when no Supabase row has the id, rather than reporting it published" | Throws `no Supabase row` |
+| UNIT-PUB-003 | "fails on a refusal, naming the status" | Throws `401` |
+
+### 4.26 The Base44 export backfill — `tests/unit/base44-repair-scripts.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-BKF-001 | "gives an imported article a fallback slug, and never overwrites one already set" | `slug` column with `'post-<lowercased id>'`; no `slug = excluded.slug` |
+| UNIT-BKF-002 | "turns %j into what the migration's SQL does" (9 inputs) | Uppercase, symbols, leading/trailing symbols, non-Latin; all-symbols and empty fall back to the uuid |
+| UNIT-BKF-003 | "refuses to invent an address from nothing" | Throws `no id` |
+| UNIT-BKF-004 | "is spelled the way the migration spells it" | The migration's SQL holds the same regex, trim and `p_id::text` fallback |
+
+### 4.24 The server's answer for an article address — `tests/unit/og-blog-handler.test.ts`
+
+`api/og/blog.ts` reads Supabase with the publishable key and the same
+`getArticle` the page uses. Old keys get a 301 to the slug; a not-yet-built slug
+gets the shell with its head; anything else is 404 + noindex.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-OG-001 | "renders the article's head into the shell, from Supabase" | 200; title, image, canonical on the slug; `or=(slug.eq…,base44_id.eq…)` |
+| UNIT-OG-002 | "reads with the publishable key, as an anonymous visitor would" | `apikey` is the publishable key |
+| UNIT-OG-003 | "fetches the shell once from the canonical origin, never from the request, and reuses it" | One `fetch(`${SITE_URL}/app`, { redirect: "error" })`, whatever the Host |
+| UNIT-OG-016 | "answers 502 + noindex, not a crash, when the shell cannot be fetched" | 502, `noindex`, a visible "המאמר לא נמצא." line and a link to `/blog` |
+| UNIT-OG-017 | "still answers 404 + noindex when the shell cannot be fetched, and logs the read once" | 404, `noindex`; one log line |
+| UNIT-OG-004 | "answers a Base44 id with a 301 to the article's slug" | `Location: /blog/<slug>`; a day's cache |
+| UNIT-OG-005 | "keeps the visitor's own query string, without the id the rewrite added" | `?utm_source=whatsapp&tag=a&tag=b` |
+| UNIT-OG-006 | "answers a Supabase uuid the same way" | 301; `id.eq.<uuid>` asked |
+| UNIT-OG-007 | "never redirects to a draft — its slug stays private" | 404; no `Location`; slug absent |
+| UNIT-OG-008 | "returns 404 and noindex when no article has the key" | 404, `noindex` |
+| UNIT-OG-009 | "answers a draft asked for by its slug exactly as a missing one" | 404; title absent |
+| UNIT-OG-010 | "treats an article with no published flag as a draft" | 404 |
+| UNIT-OG-011 | "does not ask Supabase about a key no article can have" | 404; no request |
+| UNIT-OG-012 | "returns 502 and noindex when Supabase fails" | 502 |
+| UNIT-OG-013 | "answers 500 without calling Supabase when it is not configured" | 500, `no-store` |
+| UNIT-OG-014 | "answers 500 when the route is hit without an id" | 500 |
+| UNIT-OG-015 | "rejects non-GET methods" | 405 |
+| UNIT-OG-018 | "fetches the shell from, and writes the canonical on, the server's VITE_SITE_URL" | Run as deployed (esbuild bundle, no `import.meta.env`) with only `process.env.VITE_SITE_URL=https://govari-fin.co.il`: shell fetched from `https://govari-fin.co.il/app`; canonical and `og:url` on that host; no Base44 host |
+
+### 4.27 Where the canonical origin comes from — `tests/unit/seo-site-url.test.ts` (`resolveSiteUrl`)
+
+`SITE_URL` in `src/lib/seo.ts` is Vite's `VITE_SITE_URL`, else the server's
+(`process.env`, the only one a Vercel function has), else the default host.
+Tested on the pure resolver: under Vitest `import.meta.env` mirrors
+`process.env`, so the end-to-end case is UNIT-OG-018.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SURL-001 | "takes Vite's VITE_SITE_URL first, over the server's" | Vite's value |
+| UNIT-SURL-002 | "falls back to the server's VITE_SITE_URL when Vite's env lacks it — a Vercel function" | Server's value, for an absent or empty Vite env |
+| UNIT-SURL-003 | "falls back to the default host when neither names one" | `https://safe-arch-plan.base44.app` |
+| UNIT-SURL-004 | "treats a blank value as unset, as the build plugin does" | Empty / whitespace skipped |
+| UNIT-SURL-005 | "strips trailing slashes from whichever source wins" | No trailing `/` |
+
 ## 5. Pass criteria
 
-All 341 cases pass. Any failure is a functional defect, not an environment issue —
+All 431 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

@@ -1,6 +1,7 @@
 import React from "react";
-import { useParams, Link } from "react-router-dom";
-import { useArticle } from "@/hooks/useContent";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { contentKeys, useArticle } from "@/hooks/useContent";
 import type { Article } from "@/services";
 import { Image } from "@/components/ui/image";
 import ReactMarkdown from "react-markdown";
@@ -10,16 +11,33 @@ import Footer from "@/components/dorit/layout/Footer";
 import ShareButtons from "@/components/dorit/primitives/ShareButtons";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { useSeo } from "@/lib/seo";
+import { articlePath } from "@/lib/articlePath";
 import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "@/lib/blogSeo";
 
 export default function BlogPost() {
-  const { id } = useParams<string>();
-  const { data, isPending: loading, isError: notFound } = useArticle(id);
+  /** A slug, or — from a link made before slugs — a Base44 id or a uuid. */
+  const { key } = useParams<{ key: string }>();
+  const { data, isPending: loading, isError: notFound } = useArticle(key);
   const post: Article | null = data ?? null;
+  const navigate = useNavigate();
+  const { search, hash } = useLocation();
+  const queryClient = useQueryClient();
 
   // A missing post must never be indexed as a real article — same rule
-  // api/og/blog.ts falls back to when Base44 has nothing for the id.
+  // api/og/blog.ts falls back to when Supabase has nothing for the key.
   useSeo(post ? computeBlogSeoConfig(post) : notFound ? BLOG_POST_NOT_FOUND_SEO : null);
+
+  // Reached by an old address (a Base44 id from a bookmark, a search result
+  // or an agent's answer): show the article, then take the address it lives
+  // at, so what the visitor copies or shares is the slug. `replace`, so Back
+  // does not return to the old form and bounce forward again. The query and
+  // hash the link carried come along (utm_* tags among them). The article is
+  // put under its new key first, so the switch costs no second read.
+  React.useEffect(() => {
+    if (!post?.slug || post.slug === key) return;
+    queryClient.setQueryData(contentKeys.article(post.slug), post);
+    navigate(`${articlePath(post)}${search}${hash}`, { replace: true });
+  }, [post, key, search, hash, navigate, queryClient]);
 
   if (loading) {
     return (

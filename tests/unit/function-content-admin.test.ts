@@ -73,6 +73,18 @@ describe("FunctionContentAdminService", () => {
     await expect(svc.removeTestimonial("t1")).rejects.toThrow("not an admin");
   });
 
+  it("carries the HTTP status on the thrown error", async () => {
+    const svc = new FunctionContentAdminService(
+      fakeClient(409, { error: "הכתובת כבר בשימוש במאמר אחר." }),
+      fakeReads(),
+      async () => "tok",
+    );
+    await expect(svc.updateArticle("id", { slug: "x" })).rejects.toMatchObject({
+      message: "הכתובת כבר בשימוש במאמר אחר.",
+      status: 409,
+    });
+  });
+
   it("falls back to a status-coded message when the body carries no error text", async () => {
     const client = fakeClient(500, {});
     const svc = new FunctionContentAdminService(client, fakeReads(), async () => "tok");

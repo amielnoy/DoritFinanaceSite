@@ -22,7 +22,7 @@ update public.profiles set role = 'admin' where id = '11111111-1111-1111-1111-11
 
 -- Seed as the table owner, bypassing RLS, so the reads below have something to find.
 insert into public.leads (name, phone) values ('ראובן','050-000-0001');
-insert into public.blog_posts (title, body, published) values ('published','b', true), ('draft','b', false);
+insert into public.blog_posts (title, body, published, slug) values ('published','b', true, 'rls-published'), ('draft','b', false, 'rls-draft');
 insert into public.testimonials (name, quote) values ('לקוחה','מצוין');
 -- A booking, hung off a lead with a base44_id so the foreign key has something
 -- to point at. The meeting is the *when and where* of an enquiry; it is at

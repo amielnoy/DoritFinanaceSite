@@ -18,6 +18,7 @@
  * the migration, and `is_sample` marks demo data (none in production today).
  */
 import { readFileSync } from "node:fs";
+import { fallbackSlug } from "./fallback-slug.mjs";
 
 const file = process.argv[2];
 if (!file) {
@@ -46,6 +47,12 @@ const TABLES = {
   BlogPost: {
     table: "blog_posts",
     cols: ["title","excerpt","body","image_url","tags","action_time","published"],
+    // Base44 has no slug, and blog_posts.slug is NOT NULL. The table's fill
+    // trigger does not fire here (the load runs with session_replication_role
+    // = replica), so a new row gets the migration's fallback (`post-<id>`)
+    // from this script instead; an existing row keeps the slug it
+    // has, so a re-run never renames a live article.
+    insertOnly: { slug: (r) => fallbackSlug(r.id) },
   },
   Testimonial: {
     table: "testimonials",
@@ -67,16 +74,18 @@ console.log("begin;");
 console.log("set local session_replication_role = replica;\n");
 
 let total = 0;
-for (const [entity, { table, cols }] of Object.entries(TABLES)) {
+for (const [entity, { table, cols, insertOnly = {} }] of Object.entries(TABLES)) {
   const rows = data[entity] ?? [];
   if (!rows.length) {
     console.log(`-- ${entity}: nothing to import\n`);
     continue;
   }
 
-  const columns = [...cols, "base44_id", "created_at", "updated_at"];
+  const extra = Object.keys(insertOnly);
+  const columns = [...cols, ...extra, "base44_id", "created_at", "updated_at"];
   // `status` carries a NOT NULL default; an explicit NULL would defeat it.
-  const updatable = columns.filter((c) => c !== "base44_id");
+  // Insert-only columns are set on a new row and never overwritten.
+  const updatable = columns.filter((c) => c !== "base44_id" && !extra.includes(c));
 
   console.log(`-- ${entity} → ${table} (${rows.length})`);
   console.log(`insert into public.${table} (${columns.join(", ")}) values`);
@@ -84,6 +93,7 @@ for (const [entity, { table, cols }] of Object.entries(TABLES)) {
     rows
       .map((r) => {
         const vals = cols.map((c) => q(r[c]));
+        for (const c of extra) vals.push(q(insertOnly[c](r)));
         vals.push(q(r.id), q(r.created_date), q(r.updated_date ?? r.created_date));
         return "  (" + vals.join(", ") + ")";
       })

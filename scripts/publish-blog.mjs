@@ -58,18 +58,29 @@ function base44Exec(code) {
   return readExecResult(stdout);
 }
 
-async function upsertSupabase(url, key, row) {
-  const res = await fetch(`${url}/rest/v1/blog_posts?on_conflict=base44_id`, {
-    method: "POST",
+/**
+ * Publish the Supabase copy in place.
+ *
+ * A PATCH, not an upsert: publishing changes `published` and nothing else,
+ * and must never create a row Base44 does not have. An empty answer means no
+ * row had this base44_id — reported as a failure, never counted as published.
+ */
+export async function publishInSupabase(url, key, base44Id, fetchImpl = fetch) {
+  const res = await fetchImpl(`${url}/rest/v1/blog_posts?base44_id=eq.${encodeURIComponent(base44Id)}`, {
+    method: "PATCH",
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal",
+      Prefer: "return=representation",
     },
-    body: JSON.stringify(row),
+    body: JSON.stringify({ published: true }),
   });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
+  const rows = await res.json().catch(() => null);
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("no Supabase row has this base44_id — run scripts/reconcile-stores.mjs");
+  }
 }
 
 function loadTitles() {
@@ -127,7 +138,7 @@ async function main() {
   let failed = 0;
   for (const s of toPublish) {
     try {
-      await upsertSupabase(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { base44_id: s.id, published: true });
+      await publishInSupabase(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, s.id);
       console.log(`פורסם: ${s.title}`);
     } catch (e) {
       failed++;

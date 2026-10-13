@@ -45,6 +45,14 @@ describe("blogTagList", () => {
 describe("computeBlogSeoConfig", () => {
   const config = computeBlogSeoConfig(post);
 
+  it("uses the article's slug for its path, breadcrumb and BlogPosting when it has one", () => {
+    const withSlug = computeBlogSeoConfig({ ...post, slug: "bechirat-keren-pensia" });
+    expect(withSlug.path).toBe("/blog/bechirat-keren-pensia");
+    const [crumbs, posting] = withSlug.jsonLd as Array<Record<string, any>>;
+    expect(crumbs.itemListElement.at(-1).item).toBe(`${SITE_URL}/blog/bechirat-keren-pensia`);
+    expect(posting.mainEntityOfPage["@id"]).toBe(`${SITE_URL}/blog/bechirat-keren-pensia`);
+  });
+
   it("builds the post's title, path and article type", () => {
     expect(config.title).toBe(`${post.title} | בלוג · דורית גוב ארי`);
     expect(config.path).toBe(`/blog/${post.id}`);

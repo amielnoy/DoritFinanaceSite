@@ -8,13 +8,40 @@
 import { useEffect } from "react";
 import { jsonLdText } from "./trusted-types.js";
 
+type Env = Record<string, string | undefined> | undefined;
+
 // tsconfig sets `types: []`, so Vite's ImportMeta augmentation is not loaded.
-const viteEnv = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+const viteEnv = (import.meta as unknown as { env?: Env }).env;
+
+// The server's environment, for code that runs outside the Vite bundle: the
+// Vercel functions under api/ import this module, and in their Node runtime
+// `import.meta.env` does not exist — Vite only inlines it into the browser
+// bundle. Without this, SITE_URL there fell back to the default host, so
+// api/og/blog fetched Base44's shell and wrote Base44 canonicals. Read through
+// `globalThis` with a `typeof` guard so the browser bundle (where `process` is
+// undefined, and the app tsconfig has no Node types) never names `process`.
+const serverEnv: Env =
+  typeof (globalThis as { process?: unknown }).process === "object"
+    ? (globalThis as unknown as { process: { env?: Env } }).process.env
+    : undefined;
+
+/**
+ * The canonical origin, in order: the build's `VITE_SITE_URL` (Vite's env), the
+ * server's `VITE_SITE_URL` (process env, set in the Vercel project), the old
+ * default. A blank value counts as unset, as it does in the build plugin.
+ * Deploy-time configuration only — never anything from a request (a Host header
+ * would let a visitor choose the origin the server fetches from and links to).
+ */
+export function resolveSiteUrl(fromVite: Env, fromServer: Env): string {
+  const pick = (env: Env) => env?.VITE_SITE_URL?.trim() || undefined;
+  return (pick(fromVite) ?? pick(fromServer) ?? "https://safe-arch-plan.base44.app").replace(
+    /\/+$/,
+    "",
+  );
+}
 
 /** Canonical origin. Override per environment with VITE_SITE_URL. */
-export const SITE_URL: string = (
-  viteEnv?.VITE_SITE_URL ?? "https://safe-arch-plan.base44.app"
-).replace(/\/+$/, "");
+export const SITE_URL: string = resolveSiteUrl(viteEnv, serverEnv);
 
 export const SITE_NAME = "דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח";
 

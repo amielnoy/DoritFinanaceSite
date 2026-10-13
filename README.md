@@ -265,7 +265,7 @@ does not resolve is worse than one pointing at the old site.
 
    There is now a second reason the Vercel copy should be the canonical one: it is
    the only one that is prerendered. Vercel runs `npm run build:prerender`, so its
-   eight public routes ship their own HTML; Base44 runs plain `npm run build` and
+   public routes (the static pages plus every published article) ship their own HTML; Base44 runs plain `npm run build` and
    serves the client-rendered shell. Two copies of the same content where only one
    is legible to an AI crawler — point the canonical at that one.
 
@@ -855,8 +855,9 @@ Worth knowing before changing it:
 - **`<route>.html`, not `<route>/index.html`.** The directory form is served
   only at `/faq/` with the trailing slash — `/faq` falls through to the SPA
   fallback. Measured on `vite preview`, not assumed.
-- **`vercel.json` rewrites unmatched paths to `/app.html`**, an untouched copy
-  of the shell, rather than to the prerendered home page. Otherwise a crawler
+- **`vercel.json` rewrites unmatched paths to `/app`** (`dist/app.html`, an
+  untouched copy of the shell; `cleanUrls: true` serves `dist/<route>.html` at
+  `/<route>` and 308s the literal `.html` address to it), rather than to the prerendered home page. Otherwise a crawler
   fetching `/blog/some-post` gets the home page's *content* under that URL.
 - **The build command is per host.** Vercel and the CI `build` job run
   `build:prerender`; Base44 runs plain `npm run build` and is unaffected. Both
@@ -869,15 +870,25 @@ Worth knowing before changing it:
   but nine opaque failures in a later job against a suite that is working
   correctly. That is how this was found the first time; the variable moves the
   error to the job that could have installed the browser.
-- **Blog posts stay client-rendered** on purpose: they come from the Base44
-  backend, so prerendering them would bake a snapshot into the bundle that goes
-  stale the moment a post is edited.
+- **Published articles are prebuilt too**, one `dist/blog/<slug>.html` each.
+  `scripts/published-articles.mjs` lists them from Supabase with the publishable
+  key (row-level security returns published rows only), and Vercel serves the
+  file before any rewrite. A page is a snapshot: an edit reaches it on the next
+  production deploy — see "When an article's page is rebuilt". A production
+  build (`PRERENDER_REQUIRED=1`) that cannot list the articles fails rather than
+  shipping a blog without its pages; any other build warns and prebuilds the
+  static routes only.
+- **The e2e build prebuilds a fixture article**, not a real one.
+  `PRERENDER_ARTICLES_FIXTURE=e2e/fixtures/prerender-articles.json` (set by the
+  CI `build` job, `playwright.config.ts` and `scripts/run-tests.sh`) makes the
+  prerender answer the page's read from that file. It is refused in a Vercel
+  build and in a bundle that reads Supabase, so it cannot reach a deployment.
 
 `e2e/seo/prerender.spec.ts` is what keeps it honest. It uses Playwright's
 `request`, never `page`, so nothing in it can pass because a browser repaired
 the page afterwards — and it fails if any two routes are served the same title.
 
-What still mitigates the blog-post case is [`public/llms.txt`](public/llms.txt): a static file those
+Beside the pages sits [`public/llms.txt`](public/llms.txt): a static file those
 crawlers *can* read in full, carrying the services, the contact details, the
 licence number, the affiliation disclosure, what the automated helpers refuse to
 do, and a link to every public route. It had drifted to a phone number and an
@@ -914,6 +925,69 @@ Posts are matched by title (update if present, create if not). New posts are
 **drafts** — publishing stays a decision made from `/admin/blog` — and a re-run
 never touches `published` on a post that exists, so correcting an article cannot
 take down one that is live.
+
+Each post's address, `/blog/<slug>`, is its **file name**, so a file must be
+named in Latin kebab-case (`horadat-dmei-nihul.md`); the script refuses any
+other. The slug goes to Supabase only — Base44's `BlogPost` has no such field —
+and a re-seed writes the file name back over a slug changed in `/admin/blog`.
+
+### Article addresses
+
+An article lives at `/blog/<slug>`: Latin kebab-case (`horadat-dmei-nihul`),
+held in Supabase's `blog_posts.slug` only — Base44's `BlogPost` has no such
+field, so `contentAdmin` passes it to the mirror and nowhere else. A repo
+article's slug is its file name; one written in `/admin/blog` gets the slug
+typed in the form, which refuses anything but kebab-case, a slug another
+article has, and one shaped like a Base44 id.
+
+Every link the site builds goes through `articlePath()` in
+`src/lib/articlePath.ts`. Old links — `/blog/<Base44 id>`, in bookmarks, search
+results and the agents' answers — keep working: `vercel.json` sends every
+`/blog/<24 hex characters>` to `api/og/blog.ts` for every visitor, which reads
+Supabase and answers `301` to `/blog/<slug>` (keeping the visitor's query
+string, cached for a day), or `404` with `noindex` for a draft or an unknown id.
+A page reached by an old address some other way replaces it with the slug in
+the browser.
+
+Renaming a published article's slug breaks every link to the old one — there is
+no redirect table. The form says so before you save.
+
+### When an article's page is rebuilt
+
+Article pages are prebuilt at deploy time, so a change reaches its page only on
+the next production deploy. Two things make one without anyone asking:
+
+- **Publishing from the "Publish blog drafts" workflow** ends by dispatching CI
+  on `main` with `deploy` ticked (`gh workflow run ci.yml --ref main -f
+  deploy=true`, with the workflow's own token — `workflow_dispatch` is the one
+  event `GITHUB_TOKEN` may start, so there is no new secret). Only after a real
+  publish; a preview dispatches nothing. That is a **full production deploy**: it
+  also publishes Base44 (the agents and the functions), which the nightly run
+  never does.
+- **The nightly CI run** (22:00 Israel summer time) deploys the Supabase
+  functions and promotes the Vercel build, which picks up anything published or
+  edited from `/admin/blog` that day. It does not publish Base44.
+
+#### Taking an article down now
+
+Unpublishing or deleting an article in `/admin/blog` does not remove its prebuilt
+page: it stays live until the next green production deploy (tonight's run, or
+later if the nightly run is red). To remove it at once: Actions → CI → Run
+workflow on `main` with `deploy` ticked (this is a full deploy, including
+Base44), then confirm `https://govari-fin.co.il/blog/<slug>` no longer serves the
+article. The admin page says as much after an unpublish or a delete.
+
+#### When the production build fails on an article
+
+The prerender refuses to ship a bad set of articles, and the error names the
+routes. Two causes: two published articles share a title, or one article does not
+render. Fix the article in `/admin/blog` (retitle the duplicate, or correct or
+unpublish the one that does not render), then re-run CI on `main` with `deploy`
+ticked.
+
+Until then a new article is still reachable — the site renders it in the
+browser, and a crawler gets its `<head>` from `api/og/blog.ts` — just not as
+full HTML.
 
 ## Tests
 
@@ -1120,8 +1194,11 @@ would quietly weaken the gate in front of the client's site.
 
 A feature branch deploys **nothing**: every deploy job checks the ref, so
 `main` and `builder` stay the only branches that can reach a site, and only
-those two publish the report. Nor can the nightly run deploy — every deploy job
-also requires a `push` event.
+those two publish the report. The nightly run deploys the Vercel site and the Supabase functions: it rebuilds
+and promotes the Vercel site from `main` (after deploying the Supabase functions
+it calls, behind the same green gate), so an article edited from `/admin/blog`
+has its prebuilt page the next morning. It never publishes Base44 — that still
+takes a push or a manual run with `deploy` ticked.
 
 A pull request triggers a run when it **opens**; later commits are covered by
 the push trigger, so the matrix does not run twice for the same SHA.

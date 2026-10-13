@@ -1,4 +1,22 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test, test_step } from "../fixtures/app";
+
+/**
+ * The one article the e2e build prebuilds (PRERENDER_ARTICLES_FIXTURE, set in
+ * playwright.config.ts, scripts/run-tests.sh and CI's build job). The build
+ * has no Supabase, so the prerender answers the page's read from this file —
+ * hermetic, and refused anywhere it could reach a deployment.
+ */
+const [ARTICLE] = JSON.parse(
+  readFileSync(join(process.cwd(), "e2e/fixtures/prerender-articles.json"), "utf8"),
+) as Array<{ slug: string; title: string; body: string }>;
+const ARTICLE_PATH = `/blog/${ARTICLE.slug}`;
+/** The first prose line of the body — what a crawler must be able to quote. */
+const ARTICLE_SENTENCE = ARTICLE.body
+  .split("\n")
+  .map((l) => l.trim())
+  .find((l) => l && !l.startsWith("#"))!;
 
 /**
  * Prerendering, asserted the way a crawler experiences it.
@@ -22,6 +40,7 @@ const PRERENDERED = [
   { path: "/blog", titleContains: "בלוג" },
   { path: "/privacy", titleContains: "פרטיות" },
   { path: "/accessibility", titleContains: "נגישות" },
+  { path: ARTICLE_PATH, titleContains: ARTICLE.title },
 ];
 
 const titleOf = (html: string) => html.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim() ?? "";
@@ -96,6 +115,31 @@ test.describe("Prerendered HTML — what a crawler that does not run JavaScript 
           q.acceptedAnswer.text.slice(0, 40)
         );
       }
+    });
+  });
+
+  test("an article is served as full HTML: its body, its canonical and its BlogPosting", async ({ request }) => {
+    // The point of prebuilding articles: an assistant that does not run
+    // JavaScript can quote the article itself, under its own address.
+    const html = await test_step(`fetch ${ARTICLE_PATH} without a browser`, async () => {
+      const res = await request.get(ARTICLE_PATH);
+      expect(res.status(), `${ARTICLE_PATH} did not return 200`).toBe(200);
+      return res.text();
+    });
+
+    await test_step("the body text is in the HTML", async () => {
+      expect(html.replace(/<[^>]+>/g, " ")).toContain(ARTICLE_SENTENCE);
+    });
+
+    await test_step("the canonical is the article's slug address", async () => {
+      expect(new URL(canonicalOf(html)).pathname).toBe(ARTICLE_PATH);
+    });
+
+    await test_step("BlogPosting names the article and the same address", async () => {
+      const posting = jsonLdOf(html).find((b) => b["@type"] === "BlogPosting");
+      expect(posting, "no BlogPosting markup in the served HTML").toBeTruthy();
+      expect(posting.headline).toBe(ARTICLE.title);
+      expect(new URL(posting.mainEntityOfPage["@id"]).pathname).toBe(ARTICLE_PATH);
     });
   });
 

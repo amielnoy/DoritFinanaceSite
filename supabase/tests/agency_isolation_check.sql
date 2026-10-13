@@ -47,11 +47,11 @@ insert into public.meetings (lead_base44_id, scheduled_at, agency_id) values
   ('ISO-A2-LEAD', now() + interval '2 days', 'aaaaaaaa-0000-0000-0000-000000000002');
 -- A published post for each agency, plus one null-agency (shared-library)
 -- published post and one null-agency draft.
-insert into public.blog_posts (title, body, published, agency_id) values
-  ('מאמר א׳', 'תוכן', true, '00000000-0000-0000-0000-000000000001'),
-  ('מאמר ב׳', 'תוכן', true, 'aaaaaaaa-0000-0000-0000-000000000002'),
-  ('מאמר משותף', 'תוכן', true, null),
-  ('טיוטה משותפת', 'תוכן', false, null);
+insert into public.blog_posts (title, body, published, agency_id, slug) values
+  ('מאמר א׳', 'תוכן', true, '00000000-0000-0000-0000-000000000001', 'iso-a'),
+  ('מאמר ב׳', 'תוכן', true, 'aaaaaaaa-0000-0000-0000-000000000002', 'iso-b'),
+  ('מאמר משותף', 'תוכן', true, null, 'iso-shared'),
+  ('טיוטה משותפת', 'תוכן', false, null, 'iso-shared-draft');
 
 -- ── as a member of agency 2 only ─────────────────────────────────────────
 set local role authenticated;

@@ -1,4 +1,4 @@
-import type { SupabaseQuery, SupabaseReadResult, SupabaseTableClient } from "./SupabaseTableClient";
+import type { SupabaseQuery, SupabaseReadResult, SupabaseTableClient } from "./SupabaseTableClient.js";
 
 /**
  * Public table reads over plain `fetch`, without `@supabase/supabase-js`.
@@ -44,6 +44,10 @@ class RestQuery implements SupabaseQuery {
 
   eq(column: string, value: unknown): SupabaseQuery {
     return this.with(column, `eq.${String(value)}`);
+  }
+
+  or(filters: string): SupabaseQuery {
+    return this.with("or", `(${filters})`);
   }
 
   order(column: string, options: { ascending: boolean }): SupabaseQuery {

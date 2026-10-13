@@ -86,7 +86,7 @@ const AuthenticatedApp = () => {
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/accessibility" element={<Accessibility />} />
         <Route path="/blog" element={<Blog />} />
-        <Route path="/blog/:id" element={<BlogPost />} />
+        <Route path="/blog/:key" element={<BlogPost />} />
         <Route path="/claims" element={<Claims />} />
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/tools" element={<Tools />} />
