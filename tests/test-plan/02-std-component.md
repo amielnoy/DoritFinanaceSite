@@ -257,6 +257,9 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-BADM-008 | "asks a legacy article with no slug for one, and saves once it has one" | `SLUG_PROBLEMS.missing`; save disabled until a valid slug is typed |
 | CMP-BADM-009 | "shows the server's words when the address is taken (409), …" / "… invalid (400)" (2) | The 409 / 400 text in the alert; inputs and save still enabled |
 | CMP-BADM-010 | "keeps the generic message for any other failure, never the raw server text" | `שמירת המאמר נכשלה. ניתן לנסות שוב.` for a 500 |
+| CMP-BADM-011 | "says the public page goes at the next deploy after a published article is unpublished" | `role="status"` with "יוסר בעדכון הבא" and a pointer to the README; absent before the click |
+| CMP-BADM-012 | "says nothing when a draft is published" | No note |
+| CMP-BADM-013 | "says it after a published article is deleted, but not a draft" | Note only for the published one |
 
 ## 5. Pass criteria
 

@@ -95,6 +95,9 @@ export default function BlogAdmin() {
   // it keeps its own in-flight flag; `busy` is what the button reads.
   const [uploading, setUploading] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string>("");
+  // Shown after a published article is unpublished or deleted: its prebuilt
+  // public page stays up until the next production deploy.
+  const [takedownNote, setTakedownNote] = useState<boolean>(false);
 
   const posts: BlogPostItem[] = data ?? [];
   const busy = uploading || saveArticle.isPending;
@@ -165,19 +168,26 @@ export default function BlogAdmin() {
     };
     try {
       await saveArticle.mutateAsync({ id: editing.id, draft: payload });
+      setTakedownNote(editing.wasPublished && !editing.published);
       cancel();
     } catch (err) {
       setSaveError(refusalText(err) ?? "שמירת המאמר נכשלה. ניתן לנסות שוב.");
     }
   };
 
-  const remove = (id: string) => {
+  const remove = (p: BlogPostItem) => {
     if (!window.confirm("למחוק את המאמר?")) return;
-    removeArticle.mutate(id);
+    setTakedownNote(false);
+    removeArticle.mutate(p.id, { onSuccess: () => setTakedownNote(!!p.published) });
   };
 
-  const togglePublished = (p: BlogPostItem) =>
-    setPublished.mutate({ id: p.id, published: !p.published });
+  const togglePublished = (p: BlogPostItem) => {
+    setTakedownNote(false);
+    setPublished.mutate(
+      { id: p.id, published: !p.published },
+      { onSuccess: () => setTakedownNote(!!p.published) },
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background pt-28 pb-20">
@@ -350,6 +360,13 @@ export default function BlogAdmin() {
           </div>
         )}
 
+        {takedownNote && (
+          <p role="status" className="mb-6 text-sm text-accent">
+            דף המאמר הציבורי יוסר בעדכון הבא של האתר (הלילה). להסרה מיידית — פנו לבעל האתר
+            (ההוראות ב-README, "Taking an article down now").
+          </p>
+        )}
+
         {writeError && (
           <p role="alert" className="mb-6 text-sm text-destructive">
             {writeError}
@@ -404,7 +421,7 @@ export default function BlogAdmin() {
                   <Pencil size={18} />
                 </button>
                 <button
-                  onClick={() => remove(p.id)}
+                  onClick={() => remove(p)}
                   className="text-muted-foreground hover:text-destructive transition-colors"
                   aria-label="מחיקה"
                 >

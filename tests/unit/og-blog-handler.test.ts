@@ -159,6 +159,9 @@ describe("api/og/blog — an article asked for by its slug", () => {
     expect(state.status).toBe(502);
     expect(state.headers["X-Robots-Tag"]).toBe("noindex");
     expect(state.body).toContain("noindex");
+    // M7: the no-shell fallback is not blank — a visitor sees a line and a way out.
+    expect(state.body).toContain("המאמר לא נמצא.");
+    expect(state.body).toContain('href="/blog"');
     spy.mockRestore();
   });
 });

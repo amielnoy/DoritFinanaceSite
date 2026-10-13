@@ -199,6 +199,19 @@ describe("the workflow tests every branch and deploys from only two", () => {
     }
   });
 
+  it("queues the nightly run behind a push instead of cancelling it (M1)", () => {
+    const concurrency = (workflow as unknown as { concurrency: { "cancel-in-progress": string } })
+      .concurrency;
+    expect(concurrency["cancel-in-progress"]).toContain("github.event_name != 'schedule'");
+  });
+
+  it("skips the agent-conversation probes on the nightly smoke (M6)", () => {
+    const smoke = stepsOf(workflow.jobs.smoke).find((s) => s.name === "Smoke the deployment");
+    expect(smoke?.env?.E2E_SKIP_AGENT_PROBES).toContain("github.event_name != 'schedule'");
+    const spec = readFileSync(join(REPO_ROOT, "e2e/api/base44-contract.spec.ts"), "utf8");
+    expect(spec).toMatch(/E2E_SKIP_AGENT_PROBES === "1"/);
+  });
+
   it("builds the e2e matrix from the plan job rather than hard-coding it", () => {
     const matrix = workflow.jobs["test-e2e"].strategy?.matrix;
     expect(String(matrix?.include)).toContain("needs.plan.outputs.matrix");

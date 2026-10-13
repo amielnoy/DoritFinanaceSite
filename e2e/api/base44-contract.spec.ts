@@ -282,6 +282,8 @@ test.describe("Live Base44 backend (opt-in)", () => {
    */
   for (const agent of ["blog_recommender", "needs_interview", "support_agent"]) {
     test(`${agent} opens a conversation for a signed-out visitor`, async ({ playwright }) => {
+      // The nightly smoke sets this: each run would leave three empty conversations.
+      test.skip(process.env.E2E_SKIP_AGENT_PROBES === "1", "skipped on the nightly run");
       const api = await playwright.request.newContext({ baseURL: LIVE_URL });
 
       await test_step("an anonymous POST is accepted and returns a conversation", async () => {

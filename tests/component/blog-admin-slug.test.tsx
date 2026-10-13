@@ -48,13 +48,16 @@ const h = vi.hoisted(() => ({
     },
   ],
   save: vi.fn(async (_args: unknown) => {}),
+  // A successful mutation: runs the caller's onSuccess, as react-query does.
+  setPublished: vi.fn((_vars: unknown, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.()),
+  remove: vi.fn((_id: unknown, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.()),
 }));
 
 vi.mock("@/hooks/useAdmin", () => ({
   useAdminArticles: () => ({ data: h.articles, isPending: false, isError: false }),
   useSaveArticle: () => ({ mutateAsync: h.save, isPending: false }),
-  useSetArticlePublished: () => ({ mutate: vi.fn(), isError: false }),
-  useRemoveArticle: () => ({ mutate: vi.fn(), isError: false }),
+  useSetArticlePublished: () => ({ mutate: h.setPublished, isError: false }),
+  useRemoveArticle: () => ({ mutate: h.remove, isError: false }),
 }));
 vi.mock("@/services", () => ({ services: { uploads: { upload: vi.fn() } } }));
 
@@ -176,5 +179,34 @@ describe("the article's address in the admin form", () => {
     fireEvent.click(saveButton());
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("שמירת המאמר נכשלה. ניתן לנסות שוב.");
+  });
+});
+
+describe("taking an article down (I1)", () => {
+  const NOTE = /דף המאמר הציבורי יוסר בעדכון הבא/;
+  const toggle = (i: number) => fireEvent.click(screen.getAllByRole("button", { name: "החלפת פרסום" })[i]);
+
+  it("says the public page goes at the next deploy after a published article is unpublished", () => {
+    renderAdmin();
+    expect(screen.queryByText(NOTE)).toBeNull();
+    toggle(0);
+    expect(screen.getByRole("status")).toHaveTextContent(NOTE);
+    expect(screen.getByRole("status")).toHaveTextContent(/README/);
+  });
+
+  it("says nothing when a draft is published", () => {
+    renderAdmin();
+    toggle(1);
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+
+  it("says it after a published article is deleted, but not a draft", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderAdmin();
+    const del = () => screen.getAllByRole("button", { name: "מחיקה" });
+    fireEvent.click(del()[1]);
+    expect(screen.queryByText(NOTE)).toBeNull();
+    fireEvent.click(del()[0]);
+    expect(screen.getByText(NOTE)).toBeTruthy();
   });
 });

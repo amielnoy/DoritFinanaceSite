@@ -331,7 +331,15 @@ workflow ends by dispatching `ci.yml` on `main` with `deploy=true`, with
 `PRERENDER_ARTICLES_FIXTURE` in the e2e `build` job's `Build` step and out of the
 workflow-level `env`, every other job and `vercel.json`; CTR-REB-005 requires the
 production deploy check to fetch `/blog`, which now shares its name with the
-`blog/` directory of articles.
+`blog/` directory of articles. CTR-REB-006 requires the workflow's `cancel-in-progress`
+to be false on `schedule`, so the nightly run queues behind an in-flight push rather
+than cancelling it (Vercel on new code, Base44 on old); CTR-REB-007 requires the
+production smoke to skip the agent-conversation probes on `schedule`, and the spec to
+honour `E2E_SKIP_AGENT_PROBES`. `prerender-hermetic.contract.test.ts` (CTR-REB-008)
+pins that `scripts/prerender.mjs` aborts `googletagmanager.com` / `google-analytics.com`
+before navigating, as the e2e fixture does, so a build sends no fake page_views.
+`article-slug.contract.test.ts` (CTR-SLG-REF) pins the 400 and 409 slug-refusal texts
+in `BlogAdmin.tsx` to the ones in `contentAdmin`.
 
 **`deploy-gate.contract.test.ts`** — that exactly one thing promotes production.
 `vercel.json` must disable Git-triggered deploys on `main` and `builder` and

@@ -548,7 +548,7 @@ gets the shell with its head; anything else is 404 + noindex.
 | UNIT-OG-001 | "renders the article's head into the shell, from Supabase" | 200; title, image, canonical on the slug; `or=(slug.eq…,base44_id.eq…)` |
 | UNIT-OG-002 | "reads with the publishable key, as an anonymous visitor would" | `apikey` is the publishable key |
 | UNIT-OG-003 | "fetches the shell once from the canonical origin, never from the request, and reuses it" | One `fetch(`${SITE_URL}/app`, { redirect: "error" })`, whatever the Host |
-| UNIT-OG-016 | "answers 502 + noindex, not a crash, when the shell cannot be fetched" | 502, `noindex`, bare body |
+| UNIT-OG-016 | "answers 502 + noindex, not a crash, when the shell cannot be fetched" | 502, `noindex`, a visible "המאמר לא נמצא." line and a link to `/blog` |
 | UNIT-OG-017 | "still answers 404 + noindex when the shell cannot be fetched, and logs the read once" | 404, `noindex`; one log line |
 | UNIT-OG-004 | "answers a Base44 id with a 301 to the article's slug" | `Location: /blog/<slug>`; a day's cache |
 | UNIT-OG-005 | "keeps the visitor's own query string, without the id the rewrite added" | `?utm_source=whatsapp&tag=a&tag=b` |

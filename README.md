@@ -265,7 +265,7 @@ does not resolve is worse than one pointing at the old site.
 
    There is now a second reason the Vercel copy should be the canonical one: it is
    the only one that is prerendered. Vercel runs `npm run build:prerender`, so its
-   eight public routes ship their own HTML; Base44 runs plain `npm run build` and
+   public routes (the static pages plus every published article) ship their own HTML; Base44 runs plain `npm run build` and
    serves the client-rendered shell. Two copies of the same content where only one
    is legible to an AI crawler — point the canonical at that one.
 
@@ -961,10 +961,29 @@ the next production deploy. Two things make one without anyone asking:
   on `main` with `deploy` ticked (`gh workflow run ci.yml --ref main -f
   deploy=true`, with the workflow's own token — `workflow_dispatch` is the one
   event `GITHUB_TOKEN` may start, so there is no new secret). Only after a real
-  publish; a preview dispatches nothing.
+  publish; a preview dispatches nothing. That is a **full production deploy**: it
+  also publishes Base44 (the agents and the functions), which the nightly run
+  never does.
 - **The nightly CI run** (22:00 Israel summer time) deploys the Supabase
   functions and promotes the Vercel build, which picks up anything published or
   edited from `/admin/blog` that day. It does not publish Base44.
+
+#### Taking an article down now
+
+Unpublishing or deleting an article in `/admin/blog` does not remove its prebuilt
+page: it stays live until the next green production deploy (tonight's run, or
+later if the nightly run is red). To remove it at once: Actions → CI → Run
+workflow on `main` with `deploy` ticked (this is a full deploy, including
+Base44), then confirm `https://govari-fin.co.il/blog/<slug>` no longer serves the
+article. The admin page says as much after an unpublish or a delete.
+
+#### When the production build fails on an article
+
+The prerender refuses to ship a bad set of articles, and the error names the
+routes. Two causes: two published articles share a title, or one article does not
+render. Fix the article in `/admin/blog` (retitle the duplicate, or correct or
+unpublish the one that does not render), then re-run CI on `main` with `deploy`
+ticked.
 
 Until then a new article is still reachable — the site renders it in the
 browser, and a crawler gets its `<head>` from `api/og/blog.ts` — just not as
@@ -1175,7 +1194,7 @@ would quietly weaken the gate in front of the client's site.
 
 A feature branch deploys **nothing**: every deploy job checks the ref, so
 `main` and `builder` stay the only branches that can reach a site, and only
-those two publish the report. The nightly run deploys one thing: it rebuilds
+those two publish the report. The nightly run deploys the Vercel site and the Supabase functions: it rebuilds
 and promotes the Vercel site from `main` (after deploying the Supabase functions
 it calls, behind the same green gate), so an article edited from `/admin/blog`
 has its prebuilt page the next morning. It never publishes Base44 — that still

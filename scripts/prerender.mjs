@@ -221,6 +221,10 @@ async function main() {
     for (const route of routes) {
       const page = await browser.newPage()
       try {
+        // Hermetic, like e2e/fixtures/app.ts: a build must not send a page_view
+        // to Google Analytics for every route it renders.
+        await page.route(/googletagmanager\.com|google-analytics\.com/, (r) => r.abort())
+
         if (articles.fixtureRows && route.startsWith('/blog/')) {
           await serveFixtureArticles(page, articles.fixtureRows)
         }

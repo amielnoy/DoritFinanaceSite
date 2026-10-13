@@ -32,7 +32,7 @@ use the stubbed backend from `e2e/fixtures/app.ts`.
 | API-HTP-005 | "sitemap.xml is well-formed and lists only https URLs" | 200, XML content type, correct namespace, every `<loc>` is https |
 | API-HTP-006 | "every sitemap URL resolves on this deployment" | Each listed path returns 200 |
 | API-HTP-007 | "llms.txt is published for generative crawlers" | 200, `text/plain`, non-trivial length |
-| API-HTP-008 | "client-side routes fall back to the SPA shell with a 200" | `/blog`, `/claims`, `/privacy`, `/accessibility`, `/blog/:id` all 200 HTML |
+| API-HTP-008 | "client-side routes fall back to the SPA shell with a 200" | `/blog`, `/claims`, `/privacy`, `/accessibility` all 200 HTML; `/blog/:slug` is the article's prebuilt HTML (200), and a 24-hex `/blog/:id` is a 301 to the slug (`api/og/blog.ts`) |
 | API-HTP-009 | "the built JS and CSS bundles are reachable and non-empty" | Every `/assets/*` reference returns 200 with a body |
 | API-HTP-010 | "every same-origin file referenced by index.html actually exists" | 200 **and not `text/html`** — a missing static file is otherwise masked by the SPA fallback |
 | API-HTP-011 | "HEAD on the document does not error" | 200, 204 or 405 |

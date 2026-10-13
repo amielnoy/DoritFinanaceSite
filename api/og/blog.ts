@@ -100,7 +100,7 @@ async function loadShell(): Promise<string | null> {
   }
 }
 
-const MINIMAL_BODY = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>המאמר לא נמצא</title></head><body></body></html>`;
+const MINIMAL_BODY = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>המאמר לא נמצא</title></head><body><p>המאמר לא נמצא.</p><p><a href="/blog">לכל המאמרים</a></p></body></html>`;
 
 /** An error page: the not-found head on the shell, or a bare noindex page without it. */
 function errorPage(shell: string | null): string {

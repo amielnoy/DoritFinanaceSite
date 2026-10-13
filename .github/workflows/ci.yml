@@ -106,7 +106,10 @@ concurrency:
   # already declines to speak for a superseded run (`!cancelled()`), so the
   # cancelled half posts no verdict.
   group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: true
+  # The nightly run queues behind an in-flight push instead of cancelling it:
+  # cancelling a deploying push could leave Vercel on the new code and Base44
+  # on the old.
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 env:
   NODE_VERSION: "22"
@@ -978,6 +981,9 @@ jobs:
           # "supabase" once the lead functions are switched on: the smoke then
           # requires submit-lead to report Google ready. Unset, it is not asked.
           E2E_EXPECT_GOOGLE: ${{ vars.LEAD_FUNCTIONS }}
+          # The nightly run has nobody watching it and publishes no Base44, so
+          # it skips the probes that open (empty) agent conversations.
+          E2E_SKIP_AGENT_PROBES: ${{ github.event_name != 'schedule' && '0' || '1' }}
 
       - name: Upload smoke report
         if: always()

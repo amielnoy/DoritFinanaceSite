@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { BASE44_ID_PATTERN, SLUG_PATTERN } from "@/lib/articlePath";
+import { BASE44_ID_PATTERN, SLUG_PATTERN, SLUG_TAKEN } from "@/lib/articlePath";
 // @ts-expect-error — plain .mjs tooling, imported for its front-matter reader.
 import { parseArticle } from "../../scripts/seed-blog.mjs";
 // @ts-expect-error — plain .mjs tooling, imported for its copy of the rule.
@@ -103,5 +103,24 @@ describe("every article link goes through articlePath", () => {
     "api/og/blog.ts",
   ])("%s links articles through articlePath", (file) => {
     expect(read(file)).toMatch(/\barticlePath\(/);
+  });
+});
+
+describe("the slug refusals the form shows are the ones contentAdmin sends (M8)", () => {
+  // BlogAdmin shows a refusal only when the server's text equals its own copy,
+  // so a reworded message on either side would silently fall back to the
+  // generic "save failed". Both are pinned to the function's source.
+  const fn = read("base44/functions/contentAdmin/entry.ts");
+  const form = read("src/pages/BlogAdmin.tsx");
+  const INVALID = "כתובת המאמר חסרה או אינה תקינה.";
+
+  it("400: invalid or missing", () => {
+    expect(form).toContain(`400: "${INVALID}"`);
+    expect([...fn.matchAll(/error: '([^']+)' \}, 400\)/g)].map((m) => m[1])).toContain(INVALID);
+    expect(fn.match(new RegExp(`error: '${INVALID}' \\}, 400\\)`, "g"))).toHaveLength(2);
+  });
+
+  it("409: taken", () => {
+    expect(fn.match(new RegExp(`error: '${SLUG_TAKEN}' \\}, 409\\)`, "g"))).toHaveLength(2);
   });
 });
