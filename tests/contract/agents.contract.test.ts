@@ -760,6 +760,36 @@ describe("who receives a lead, and whether the consent text admits it", () => {
 
 
 
+  it("keeps submitClaim's upstream-reason filter reading the body before it throws", () => {
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    expect(claim, "submitClaim has no upstream-reason filter").toMatch(/function upstreamReasons/);
+    // Read before the status is judged: on a refusal the body is the only
+    // place the cause exists, and throwing first discards it.
+    const readsBody = claim.indexOf("const result = await response.json()");
+    const throwsOnStatus = claim.indexOf("if (!response.ok) throw");
+    expect(readsBody, "submitClaim never reads the mailer's answer").toBeGreaterThan(-1);
+    expect(readsBody, "submitClaim throws on the status before reading the reason").toBeLessThan(throwsOnStatus);
+    // And the reason reaches the warning the operations mail prints.
+    expect(claim, "submitClaim drops the reason it just read").toMatch(/mailer_http_\$\{response\.status\}\$\{why\}/);
+  });
+
+  it("keeps createConsultationEvent's calendar provider table declared, used and the only route out", () => {
+    const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
+    expect(consultation, "createConsultationEvent has no calendar provider table").toMatch(/const CALENDARS = \{/);
+    expect(consultation, "createConsultationEvent declares the table but never uses it").toMatch(/CALENDARS\[provider\]/);
+    // Posting straight at one vendor is how the table gets bypassed without
+    // anyone editing it.
+    expect(consultation, "createConsultationEvent calls a calendar API outside the table").not.toMatch(
+      /fetch\(\s*['"`]https:\/\/(graph\.microsoft|www\.googleapis)/
+    );
+  });
+
+  it("keeps submitClaim's Supabase mirror declared and called", () => {
+    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    expect(claim, "submitClaim has no Supabase mirror").toMatch(/async function mirrorLeadToSupabase/);
+    expect(claim, "submitClaim declares the mirror but never calls it").toMatch(/await mirrorLeadToSupabase\(/);
+  });
+
   it("keeps the operations mailbox list identical in every function that mails", () => {
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
     const listOf = (src: string, name: string) => {

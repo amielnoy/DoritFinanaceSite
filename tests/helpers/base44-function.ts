@@ -84,7 +84,7 @@ export interface HarnessOptions {
    */
   routes?: { match: string; status: number; json?: unknown; text?: string }[];
   /** Like `routes`, keyed by URL fragment, answering `{ status, body }` — checked before the default answer. */
-  fetchResponses?: Record<string, { status: number; body: unknown }>;
+  fetchResponses?: Record<string, { status: number; body?: unknown; raw?: string }>;
 }
 
 export interface Invocation {
@@ -263,8 +263,9 @@ export async function invokeFunction(
       return {
         ok: answer.status >= 200 && answer.status < 300,
         status: answer.status,
-        json: async () => answer.body,
-        text: async () => JSON.stringify(answer.body),
+        // `raw` is a body that is not JSON, as a gateway's error page is: `json()` rejects on it.
+        json: async () => (answer.raw !== undefined ? JSON.parse(answer.raw) : answer.body),
+        text: async () => answer.raw ?? JSON.stringify(answer.body),
       };
     }
     const route = options.routes?.find((r) => String(url).includes(r.match));

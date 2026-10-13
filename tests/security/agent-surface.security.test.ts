@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { transformSync } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
 import { read, sourceFiles, backendFiles } from "../helpers/source-scan";
@@ -178,14 +179,35 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-describe("XSS — the HTML email the backend composes", () => {
-  const clientHtml = HTML_MAIL.slice(HTML_MAIL.indexOf("export function buildClientHtml"));
+/**
+ * The visitor-facing HTML is composed by two implementations: the Edge shared
+ * module (submit-lead) and Base44's submitClaim, which keeps its own copy. Both
+ * are run, by behaviour, because they are not the same text any more.
+ */
+const CLAIM = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+const wholeFn = (src: string, name: string): string => {
+  const start = src.search(new RegExp(`(?:export )?function ${name}\\(`));
+  expect(start, `${name} not found`).toBeGreaterThan(-1);
+  return src.slice(start, src.indexOf("\n}", start) + 2);
+};
+const MAIL_IMPLEMENTATIONS = [
+  { label: "Edge _shared/html.ts", src: HTML_MAIL, ts: true },
+  { label: "Base44 submitClaim", src: CLAIM, ts: false },
+].map(({ label, src, ts }) => {
+  const code = `${wholeFn(src, "escapeHtml")}\n${wholeFn(src, "buildClientHtml")}`.replace(/^export /gm, "");
+  const js = ts ? transformSync(code, { loader: "ts" }).code : code;
+  const load = new Function(`${js}; return { escapeHtml, buildClientHtml };`)() as {
+    escapeHtml: (s: unknown) => string;
+    buildClientHtml: (m: Record<string, unknown>) => string;
+  };
+  return { label, src, template: wholeFn(src, "buildClientHtml"), ...load };
+});
 
-  const escapeHtml = (text: unknown): string =>
-    (new Function(`${liftFunction(HTML_MAIL, "escapeHtml").replace(/\(text: unknown\): string/, "(text)")}; return escapeHtml;`)() as (s: unknown) => string)(text);
+describe.each(MAIL_IMPLEMENTATIONS)("XSS — the HTML email: $label", ({ src, template, escapeHtml, buildClientHtml }) => {
+  const clientHtml = template;
 
   it("has an escaping helper at all", () => {
-    expect(HTML_MAIL).toMatch(/function escapeHtml\(/);
+    expect(src).toMatch(/function escapeHtml\(/);
   });
 
   it("escapes the five characters that matter", () => {
@@ -212,13 +234,20 @@ describe("XSS — the HTML email the backend composes", () => {
     expect(escapeHtml(hostile)).toMatch(/&lt;a /);
   });
 
+  it("escapes a hostile detail value in the rendered letter", () => {
+    const html = buildClientHtml({
+      firstName: "דנה", eyebrow: "e", heading: "h", intro: "i", panelTitle: "p",
+      details: [["נושא", '<script>alert(1)</script>']],
+    });
+    expect(html).not.toContain("<script>alert(1)");
+    expect(html).toContain("&lt;script&gt;");
+  });
 
   it("binds nothing else from `data` straight into the HTML body", () => {
     // Anything new must go through escapeHtml at its binding site.
     const interpolations = clientHtml.match(/\$\{data\.[a-zA-Z]+/g) ?? [];
     expect(interpolations).toEqual([]);
   });
-
 });
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -230,10 +259,9 @@ describe("Phishing — the site's name on somebody else's message", () => {
     }
   });
 
-  it("links only to the agency's own domain from the email template", () => {
+  it.each(MAIL_IMPLEMENTATIONS)("links only to the agency's own domain from the email template: $label", ({ template }) => {
     // Scoped to the rendered template, not the file: comments may legitimately
     // cite a docs URL, and a comment is not something a recipient can click.
-    const template = HTML_MAIL.slice(HTML_MAIL.indexOf("export function buildClientHtml"));
     const hosts = [...template.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1]);
     for (const host of new Set(hosts)) {
       expect(

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { invokeFunction, type HarnessOptions } from "../helpers/base44-function";
 import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
 
@@ -355,11 +355,28 @@ describe("Edge escalate-to-human — what only it does", () => {
   });
 });
 
+/** The structured log lines a run wrote, parsed. */
+async function withLogs<T>(run: () => Promise<T>): Promise<{ result: T; lines: Record<string, unknown>[] }> {
+  const spies = (["log", "warn", "error"] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
+  try {
+    const result = await run();
+    const lines = spies
+      .flatMap((spy) => spy.mock.calls.map((c) => String(c[0])))
+      .flatMap((text) => {
+        try { return [JSON.parse(text) as Record<string, unknown>]; } catch { return []; }
+      });
+    return { result, lines };
+  } finally {
+    spies.forEach((spy) => spy.mockRestore());
+  }
+}
+
 describe("Edge escalate-to-human — what it refuses and what it holds back", () => {
   const handoff = { reason: "user_request", summary: "רוצה לדבר עם דורית", name: "דנה", phone: "0501234567", agent: "support_agent" };
 
   it("answers 400 to a request with nothing in it, and sends, stores and appends nothing", async () => {
-    const r = await invokeEdge("escalate-to-human", {});
+    const { result: r, lines } = await withLogs(() => invokeEdge("escalate-to-human", {}));
+    expect(lines).toContainEqual(expect.objectContaining({ level: "warn", event: "request.rejected", reason: "nothing_to_hand_over" }));
     expect(r.status).toBe(400);
     expect(r.json).toMatchObject({ error: expect.any(String), rid: expect.any(String) });
     expect(r.emails).toHaveLength(0);
@@ -387,7 +404,8 @@ describe("Edge escalate-to-human — what it refuses and what it holds back", ()
   });
 
   it("holds back the staff mail over the hourly cap, and still records the hand-off", async () => {
-    const r = await invokeEdge("escalate-to-human", handoff, { overLimit: ["escalate:notify"] });
+    const { result: r, lines } = await withLogs(() => invokeEdge("escalate-to-human", handoff, { overLimit: ["escalate:notify"] }));
+    expect(lines).toContainEqual(expect.objectContaining({ level: "warn", event: "mail.skipped", reason: "rate_limited" }));
     expect(r.status).toBe(200);
     expect(r.emails).toHaveLength(0);
     expect(r.json).toMatchObject({ ok: true, notified: false, recorded: true });

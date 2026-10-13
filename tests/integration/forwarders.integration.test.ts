@@ -28,6 +28,25 @@ describe.each(FORWARDERS)("Base44 %s forwards to Edge %s", (fn, edge) => {
     expect(r.json).toEqual({ error: "נדרשים שם וטלפון", rid: "e1" });
   });
 
+  it("passes a 200 answer through unchanged", async () => {
+    const answer = { ok: true, rid: "e2", warnings: [] };
+    const r = await invokeFunction(fn, { name: "דנה", phone: "0501234567" }, {
+      env,
+      fetchResponses: { [`/functions/v1/${edge}`]: { status: 200, body: answer } },
+    });
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual(answer);
+  });
+
+  it("answers in JSON, with Edge's status, when Edge's answer is not JSON", async () => {
+    const r = await invokeFunction(fn, { name: "דנה", phone: "0501234567" }, {
+      env,
+      fetchResponses: { [`/functions/v1/${edge}`]: { status: 502, raw: "<html>Bad gateway</html>" } },
+    });
+    expect(r.status).toBe(502);
+    expect(r.json).toEqual({ error: "תשובה לא תקינה מהשרת." });
+  });
+
   it("answers in JSON, not a crash, when Edge cannot be reached", async () => {
     const r = await invokeFunction(fn, { name: "דנה", phone: "0501234567" }, { env, failFetch: true });
     expect(r.status).toBe(502);

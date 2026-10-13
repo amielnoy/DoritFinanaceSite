@@ -462,7 +462,6 @@ describe.each(IMPLEMENTATIONS)("$label — what survives a failure", ({ run, dow
   });
 });
 
-// Base44 only: there is no connector to be unconnected.
 /**
  * The meeting, in Supabase.
  *
@@ -637,8 +636,6 @@ describe.each(IMPLEMENTATIONS)("$label — the calendar event it books", ({ run,
   });
 });
 
-// Base44 only: the Edge function writes no Outlook event (spec, "No Outlook connector").
-// Its Google event's reminders, zone and token are cases of its own, at the end.
 /**
  * The introduction interview, ending.
  *
@@ -1281,9 +1278,6 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
  * on exactly these two fields. Whichever store a screen reads, it should see
  * the time the visitor actually agreed.
  */
-// Base44 only: the mirror is Base44's second store; the Edge function writes
-// Supabase alone (spec, "Supabase is the only store"), so its update is the
-// whole case and is shared above.
 describe.each(IMPLEMENTATIONS)("$label — how complete the interview was", ({ run }) => {
   const base = {
     name: "אורי לוי", phone: "0541112233", email: "", source: "interview", track: "pension",
@@ -1851,8 +1845,6 @@ describe.each(IMPLEMENTATIONS)("$label — the agency copy carries the links", (
   });
 });
 
-// Base44 only: no per-enquiry Doc (spec, "No per-enquiry Google Doc"). The
-// sheet's half of each case is shared above.
 describe("Edge submit-lead — what only it does", () => {
   const consultation = {
     name: "יעל כהן", phone: "0521234567", email: "yael@example.com", source: "consultation",

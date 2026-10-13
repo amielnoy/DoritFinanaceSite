@@ -163,9 +163,6 @@ describe.each(IMPLEMENTATIONS)("$label — failure", ({ run }) => {
   });
 });
 
-// Base44 only: the connector's authorisation is Base44's own state. The Edge
-// function has no connector — it signs in as the service account — so there is
-// nothing to leave unauthorised (spec: connectors off Base44).
 // What only the port does: the row goes in through the service account.
 describe("Edge log-support-chat — what only it does", () => {
   it("appends to the Support tab through the service account", async () => {
