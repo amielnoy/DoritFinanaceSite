@@ -323,6 +323,8 @@ export default function AgentChat({
     if (last?.signal !== "lead_saved") return;
     submittedRef.current = true;
     leadEvents.interviewCompleted();
+    // Saved, but the reply that would have said so was lost: the confirmation, and her channels for anything else.
+    if (last.replyMissing) setHandoffNotice({ message: HUMAN_HANDOFF.reachHer, contact: FALLBACK_CONTACT });
   }, [messages, viaChatFunction]);
 
   useEffect(() => {
@@ -342,14 +344,15 @@ export default function AgentChat({
       // the exact notice the visitor was shown.
       consent_version: consentVersion,
       consent_at: consentAt ?? "",
-      // The function stores these on the conversation (Base44 ignores the extra keys).
-      channel: getAttribution()?.channel ?? "",
-      campaign: getAttribution()?.campaign ?? "",
-      landing_path: window.location.pathname,
+      // The function stores these on the conversation. Only for its agents: a Base44
+      // conversation keeps exactly the metadata it had before the function existed.
+      ...(viaChatFunction
+        ? { channel: getAttribution()?.channel ?? "", campaign: getAttribution()?.campaign ?? "", landing_path: window.location.pathname }
+        : {}),
     });
     setConversationId(conv.id);
     return conv;
-  }, [conversationId, consentAt, descriptor, consentVersion]);
+  }, [conversationId, consentAt, descriptor, consentVersion, viaChatFunction]);
 
   const say = (content: string) =>
     setMessages((m) => [...m, { role: "assistant" as const, content }]);

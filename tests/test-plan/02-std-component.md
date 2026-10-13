@@ -267,6 +267,10 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-CHATFN-005 | "answers a rate limit with its own final wording and gives the text back" | `נשלחו הרבה הודעות בזמן קצר. אפשר לנסות שוב בעוד דקה.`; box refilled |
 | CMP-CHATFN-006 | "answers a closed conversation with its own final wording" | `השיחה הזו הסתיימה. אפשר להתחיל שיחה חדשה.` |
 | CMP-CHATFN-010 | "answers a message sent while the last one is still being answered, and gives the text back" | 409 `busy`: `הודעה קודמת עדיין בטיפול — רגע אחד.`; box refilled (I3) |
+| CMP-CHATFN-011 | "shows the saved confirmation and Dorit's channels when the lead was saved but the reply failed (503 leadSaved)" | `LEAD_SAVED_WITHOUT_REPLY`, `HUMAN_HANDOFF.reachHer` and a `tel:` link; no failure copy; `interviewCompleted` once; box left empty (I5) |
+| CMP-CHATFN-012 | "shows the visitor's message while the reply is on its way" | The sent text is on screen before the answer; then the reply (I4) |
+| CMP-CHATFN-013 | "open their Base44 conversation with main's metadata only, no attribution keys (dark means byte-exact)" | A Base44 agent's `start` metadata has exactly `name`, `description`, `consent_version` (v5), `consent_at` (triage 7) |
+| CMP-CHATFN-014 | "while the interview on the chat function sends its attribution" | The served interview's metadata adds `channel`, `campaign`, `landing_path` (triage 7) |
 | CMP-CHATFN-007 | "keep the v5 notice, byte for byte" | A Base44 agent shows its v5 points and not the v6 fourth point |
 | CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
 | CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
@@ -282,6 +286,6 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 
 ## 5. Pass criteria
 
-All 106 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 110 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

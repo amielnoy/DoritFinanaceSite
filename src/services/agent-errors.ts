@@ -16,6 +16,12 @@ export class AgentLimitError extends Error {
   }
 }
 
+/**
+ * What the visitor reads when the function saved the interview's lead and then
+ * could not write its reply (a 503 carrying `leadSaved`): saved, not failed.
+ */
+export const LEAD_SAVED_WITHOUT_REPLY = "הפרטים נשמרו ודורית תחזור בהקדם.";
+
 /** The agent cannot answer now (model down, over budget, storage down): show Dorit's channels. */
 export class AgentUnavailableError extends Error {
   constructor(public readonly rid?: string) {

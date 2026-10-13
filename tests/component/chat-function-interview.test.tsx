@@ -29,6 +29,8 @@ vi.mock("@/config/chat-agents", () => ({
 }));
 
 const invoke = vi.fn();
+/** Every agents.start call: the agent and the conversation metadata it was given. */
+const starts: [string, Record<string, unknown>][] = [];
 const submitInterview = vi.fn(async () => ({ ok: true }));
 /** What a Base44 agent's send does here: accepted, and no reply ever comes. */
 const base44Send = vi.fn(async () => undefined);
@@ -37,8 +39,10 @@ vi.mock("@/services", async (importOriginal) => {
   const { SupabaseAgentService } = await import("@/services/supabase/SupabaseAgentService");
   const chat = new SupabaseAgentService({ functions: { invoke } }, () => "local-1");
   const agents = {
-    start: async (agent: string, meta: Record<string, unknown>) =>
-      agent === "needs_interview" ? chat.start(agent, meta) : { id: "b44_1" },
+    start: async (agent: string, meta: Record<string, unknown>) => {
+      starts.push([agent, meta]);
+      return agent === "needs_interview" ? chat.start(agent, meta) : { id: "b44_1" };
+    },
     send: async (conv: { id: string }, text: string) =>
       conv.id === "b44_1" ? base44Send() : chat.send(conv, text),
     subscribe: (id: string, cb: (m: any[]) => void) => (id === "b44_1" ? () => undefined : chat.subscribe(id, cb)),
@@ -51,7 +55,8 @@ vi.mock("@/services", async (importOriginal) => {
 
 const { default: AgentChat, NO_REPLY_TIMEOUT_MS } = await import("@/components/dorit/chat/AgentChat");
 const { AGENTS } = await import("@/config/agents");
-const { CHAT_FUNCTION_CONSENT_POINTS, CHAT_FUNCTION_CONSENT_VERSION, CONSENT } = await import("@/config/compliance");
+const { CHAT_FUNCTION_CONSENT_POINTS, CHAT_FUNCTION_CONSENT_VERSION, CONSENT, CONSENT_VERSION, HUMAN_HANDOFF } = await import("@/config/compliance");
+const { LEAD_SAVED_WITHOUT_REPLY } = await import("@/services/agent-errors");
 const { leadEvents } = await import("@/lib/analytics");
 
 async function startAndSend(text = "שלום") {
@@ -125,6 +130,33 @@ describe("the interview on the chat function", () => {
     expect((screen.getByPlaceholderText("כתבו כאן…") as HTMLTextAreaElement).value).toBe("עוד משהו");
   });
 
+  it("shows the saved confirmation and Dorit's channels when the lead was saved but the reply failed (503 leadSaved)", async () => {
+    const completed = vi.spyOn(leadEvents, "interviewCompleted");
+    completed.mockClear();
+    invoke.mockResolvedValue({
+      data: null,
+      error: { message: "non-2xx", context: new Response(JSON.stringify({ ok: false, code: "unavailable", rid: "r1", leadSaved: true, conversationId: "s1", token: "t".repeat(64) }), { status: 503 }) },
+    });
+    await startAndSend("כן, הכל נכון");
+    expect(await screen.findByText(LEAD_SAVED_WITHOUT_REPLY)).toBeTruthy();
+    await waitFor(() => expect([...document.querySelectorAll("a")].some((a) => (a.getAttribute("href") ?? "").startsWith("tel:"))).toBe(true));
+    expect(screen.getByText(HUMAN_HANDOFF.reachHer)).toBeTruthy();
+    expect(screen.queryByText(HUMAN_HANDOFF.failure)).toBeNull();
+    expect(completed).toHaveBeenCalledTimes(1);
+    expect(submitInterview).not.toHaveBeenCalled();
+    // Saved, so nothing is handed back to send again.
+    expect((screen.getByPlaceholderText("כתבו כאן…") as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("shows the visitor's message while the reply is on its way", async () => {
+    let release: (v: unknown) => void = () => undefined;
+    invoke.mockImplementation(() => new Promise((r) => (release = r)));
+    await startAndSend("מה עם הפנסיה שלי?");
+    expect(await screen.findByText("מה עם הפנסיה שלי?")).toBeTruthy();
+    await act(async () => release({ data: { ok: true, conversationId: "s1", token: "t".repeat(64), reply: "נבדוק יחד.", leadSaved: false }, error: null }));
+    expect(await screen.findByText("נבדוק יחד.")).toBeTruthy();
+  });
+
   it("answers a closed conversation with its own final wording", async () => {
     invoke.mockResolvedValue(failure(410, "gone"));
     await startAndSend("חזרתי");
@@ -133,6 +165,22 @@ describe("the interview on the chat function", () => {
 });
 
 describe("agents not served by the chat function", () => {
+  it("open their Base44 conversation with main's metadata only, no attribution keys (dark means byte-exact)", async () => {
+    starts.length = 0;
+    await startAndSendSync(AGENTS.support);
+    const [agent, meta] = starts.at(-1)!;
+    expect(agent).toBe(AGENTS.support.agent);
+    expect(Object.keys(meta).sort()).toEqual(["consent_at", "consent_version", "description", "name"]);
+    expect(meta).toMatchObject({ name: AGENTS.support.conversationName, description: AGENTS.support.conversationDescription, consent_version: CONSENT_VERSION });
+  });
+
+  it("while the interview on the chat function sends its attribution", async () => {
+    starts.length = 0;
+    invoke.mockResolvedValue({ data: { ok: true, conversationId: "s1", token: "t".repeat(64), reply: "שלום", leadSaved: false }, error: null });
+    await startAndSendSync(AGENTS.needsInterview);
+    expect(Object.keys(starts.at(-1)![1]).sort()).toEqual(["campaign", "channel", "consent_at", "consent_version", "description", "landing_path", "name"]);
+  });
+
   it("keep the v5 notice, byte for byte", () => {
     render(<MemoryRouter><AgentChat descriptor={AGENTS.support} /></MemoryRouter>);
     const points = AGENTS.support.consentPoints ?? CONSENT.points;

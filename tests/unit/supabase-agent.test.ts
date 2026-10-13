@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
-import { AgentLimitError, AgentUnavailableError } from "@/services/agent-errors";
+import { AgentLimitError, AgentUnavailableError, LEAD_SAVED_WITHOUT_REPLY } from "@/services/agent-errors";
 import type { AgentMessage } from "@/services/ports";
 
 type Invoke = (name: string, options: { body: Record<string, unknown> }) => Promise<{ data: unknown; error: { message: string; context?: unknown } | null }>;
@@ -93,6 +93,54 @@ describe("SupabaseAgentService", () => {
     const conv = await svc.start("needs_interview", META);
     await svc.send(conv, "1").catch(() => undefined);
     await svc.send(conv, "2");
+    expect(c.functions.invoke.mock.calls[1][1].body).toMatchObject({ conversationId: "s1", token: "t".repeat(64) });
+  });
+
+  it("shows the visitor's message the moment it is sent, before the answer", async () => {
+    let release: (v: { data: unknown; error: null }) => void = () => undefined;
+    const c = client(() => new Promise((r) => (release = r)));
+    const svc = new SupabaseAgentService(c, () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const seen: AgentMessage[][] = [];
+    svc.subscribe(conv.id, (m) => seen.push(m));
+    const sending = svc.send(conv, "היי");
+    expect(seen.at(-1)).toEqual([{ role: "user", content: "היי" }]);
+    release({ data: { ok: true, conversationId: "s", token: "t".repeat(64), reply: "שלום" }, error: null });
+    await sending;
+    expect(seen.at(-1)).toEqual([{ role: "user", content: "היי" }, { role: "assistant", content: "שלום" }]);
+  });
+
+  it("takes the visitor's message back out when the send fails", async () => {
+    let n = 0;
+    const c = client(async () => (++n === 1 ? ok({ ok: true, conversationId: "s", token: "t".repeat(64), reply: "שלום" })() : refused(503, { code: "unavailable" })()));
+    const svc = new SupabaseAgentService(c, () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const seen: AgentMessage[][] = [];
+    svc.subscribe(conv.id, (m) => seen.push(m));
+    await svc.send(conv, "היי");
+    await expect(svc.send(conv, "שוב")).rejects.toBeInstanceOf(AgentUnavailableError);
+    expect(seen.at(-2)).toEqual([{ role: "user", content: "היי" }, { role: "assistant", content: "שלום" }, { role: "user", content: "שוב" }]);
+    expect(seen.at(-1)).toEqual([{ role: "user", content: "היי" }, { role: "assistant", content: "שלום" }]);
+  });
+
+  it("treats a 503 that says the lead was saved as a saved lead, not a failure", async () => {
+    let n = 0;
+    const c = client(async () =>
+      ++n === 1
+        ? refused(503, { ok: false, code: "unavailable", rid: "r1", leadSaved: true, conversationId: "s1", token: "t".repeat(64) })()
+        : refused(409, { code: "closed" })(),
+    );
+    const svc = new SupabaseAgentService(c, () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const cb = vi.fn();
+    svc.subscribe(conv.id, cb);
+    await expect(svc.send(conv, "כן, זה נכון")).resolves.toBeUndefined();
+    expect(cb.mock.calls.at(-1)![0]).toEqual([
+      { role: "user", content: "כן, זה נכון" },
+      { role: "assistant", content: LEAD_SAVED_WITHOUT_REPLY, signal: "lead_saved", replyMissing: true },
+    ]);
+    // The ids were adopted: the next message continues that conversation (and is told it is closed).
+    await svc.send(conv, "עוד").catch(() => undefined);
     expect(c.functions.invoke.mock.calls[1][1].body).toMatchObject({ conversationId: "s1", token: "t".repeat(64) });
   });
 

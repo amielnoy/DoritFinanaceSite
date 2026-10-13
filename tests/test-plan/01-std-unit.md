@@ -829,6 +829,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHADAPTER-009 | "keeps the conversation a 503 opened, so the next message continues it" | The 503's `conversationId` and `token` are sent with the next message |
 | UNIT-CHADAPTER-010 | "aborts the request and throws AgentUnavailableError" | At 40 s the `signal` passed to `invoke` is aborted and `send` rejects with `AgentUnavailableError` |
 | UNIT-CHADAPTER-011 | "adopts the conversation a late first answer opened, so the retry continues it" | After a first-message timeout, a late answer's `conversationId` and `token` are sent with the next message; no second conversation |
+| UNIT-CHADAPTER-012 | "shows the visitor's message the moment it is sent, before the answer" | With the request pending the subscriber already has `[user]`; then `[user, assistant]` (I4) |
+| UNIT-CHADAPTER-013 | "takes the visitor's message back out when the send fails" | After a 503 the subscriber's last transcript is the one before the send (I4) |
+| UNIT-CHADAPTER-014 | "treats a 503 that says the lead was saved as a saved lead, not a failure" | `send` resolves; the transcript ends with `LEAD_SAVED_WITHOUT_REPLY`, `signal: lead_saved`, `replyMissing: true`; the 503's ids are sent with the next message (I5) |
 | UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |
 | UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
@@ -886,5 +889,5 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 ## 5. Pass criteria
 
-All 627 cases pass. Any failure is a functional defect, not an environment issue —
+All 630 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

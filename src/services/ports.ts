@@ -131,6 +131,8 @@ export interface AgentMessage {
   tool_calls?: unknown[];
   /** Set by the chat function's adapter on the reply that saved the interview's lead. */
   signal?: "lead_saved";
+  /** The lead was saved but the model's reply was lost: the content is the adapter's own confirmation. */
+  replyMissing?: true;
 }
 
 export interface AgentConversation {

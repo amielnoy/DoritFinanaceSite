@@ -1,4 +1,4 @@
-import { AgentLimitError, AgentUnavailableError, MAX_MESSAGE_CHARS } from "../agent-errors";
+import { AgentLimitError, AgentUnavailableError, LEAD_SAVED_WITHOUT_REPLY, MAX_MESSAGE_CHARS } from "../agent-errors";
 import type { AgentConversation, AgentMessage, AgentPort } from "../ports";
 import type { SupabaseFunctionsClient } from "./SupabaseLeadService";
 
@@ -23,6 +23,9 @@ interface ChatAnswer {
   reply?: string;
   leadSaved?: boolean;
 }
+
+/** A refusal that still saved the lead: the send succeeded as far as the visitor is concerned. */
+const SAVED = Symbol("lead_saved");
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
@@ -62,17 +65,35 @@ export class SupabaseAgentService implements AgentPort {
           attribution: { channel: str(m.channel), campaign: str(m.campaign), landingPath: str(m.landing_path) },
         };
 
-    const { data, error } = await this.invokeWithin(local, body);
-    if (error) throw await this.failure(local, error);
-    const answer = (data ?? {}) as ChatAnswer;
-    if (answer.ok !== true || typeof answer.reply !== "string") throw new AgentUnavailableError(answer.rid);
-    if (answer.conversationId) local.serverId = answer.conversationId;
-    if (answer.token) local.token = answer.token;
-    local.messages = [
-      ...local.messages,
-      { role: "user", content: text },
-      { role: "assistant", content: answer.reply, ...(answer.leadSaved ? { signal: "lead_saved" as const } : {}) },
-    ];
+    // On screen at once, not after the reply (up to 25 s): the visitor sees what was sent.
+    const sent: AgentMessage = { role: "user", content: text };
+    this.publish(local, [...local.messages, sent]);
+    try {
+      const { data, error } = await this.invokeWithin(local, body);
+      if (error) {
+        const failed = await this.failure(local, error);
+        if (failed !== SAVED) throw failed;
+        // The lead is saved; only the reply was lost. Not a failure to the visitor.
+        this.publish(local, [...local.messages, { role: "assistant", content: LEAD_SAVED_WITHOUT_REPLY, signal: "lead_saved", replyMissing: true }]);
+        return;
+      }
+      const answer = (data ?? {}) as ChatAnswer;
+      if (answer.ok !== true || typeof answer.reply !== "string") throw new AgentUnavailableError(answer.rid);
+      if (answer.conversationId) local.serverId = answer.conversationId;
+      if (answer.token) local.token = answer.token;
+      this.publish(local, [
+        ...local.messages,
+        { role: "assistant", content: answer.reply, ...(answer.leadSaved ? { signal: "lead_saved" as const } : {}) },
+      ]);
+    } catch (e) {
+      // Not sent after all: off the screen, and AgentChat puts the text back in the box.
+      this.publish(local, local.messages.filter((m) => m !== sent));
+      throw e;
+    }
+  }
+
+  private publish(local: LocalConversation, messages: AgentMessage[]): void {
+    local.messages = messages;
     for (const listener of local.listeners) listener(local.messages);
   }
 
@@ -84,12 +105,14 @@ export class SupabaseAgentService implements AgentPort {
     return () => local.listeners.delete(onMessages);
   }
 
-  private async failure(local: LocalConversation, error: { message: string; context?: unknown }): Promise<Error> {
+  private async failure(local: LocalConversation, error: { message: string; context?: unknown }): Promise<Error | typeof SAVED> {
     const res = error.context instanceof Response ? error.context : null;
     const body = (res ? await res.json().catch(() => null) : null) as ChatAnswer | null;
     // A 503 may already have opened the conversation; keep it so the next message continues it.
     if (body?.conversationId) local.serverId = body.conversationId;
     if (body?.token) local.token = body.token;
+    // A turn whose tool saved the lead and whose closing reply then failed.
+    if (body?.leadSaved === true) return SAVED;
     if (body?.code === "too_long") return new AgentLimitError("too_long");
     if (body?.code === "too_many_turns") return new AgentLimitError("too_many_turns");
     // The function answers one message per conversation at a time; this one was not run.
