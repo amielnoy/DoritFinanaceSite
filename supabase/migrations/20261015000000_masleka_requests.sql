@@ -61,13 +61,14 @@ create index masleka_requests_agency_status on public.masleka_requests (agency_i
 create trigger masleka_requests_touch before update on public.masleka_requests
   for each row execute function public.touch_updated_at();
 
--- Who revealed which value of which request, and when. user_id has no foreign
--- key on purpose: an audit row outlives the account it names.
+-- Who revealed which value of which request, and when. Append-only: user_id has
+-- no foreign key and request_id is set null (not cascaded) when a request is
+-- deleted, so an audit row outlives both the account and the request it names.
 create table public.masleka_access_log (
   id         bigint generated always as identity primary key,
   agency_id  uuid not null default '00000000-0000-0000-0000-000000000001'
                references public.agencies(id),
-  request_id uuid not null references public.masleka_requests(id) on delete cascade,
+  request_id uuid references public.masleka_requests(id) on delete set null,
   user_id    uuid not null,
   field      text not null check (field in ('id', 'code')),
   at         timestamptz not null default now()
@@ -92,6 +93,9 @@ create policy masleka_access_log_read_member on public.masleka_access_log
 revoke all on public.masleka_requests, public.masleka_access_log from anon, authenticated;
 grant select (id, agency_id, lead_id, client_name, contact_email, status, id_last4, token_expires_at, created_at, client_invited_at, client_reminded_at, code_received_at, submitted_at, clearinghouse_deletes_at, completed_at, expired_at, cancelled_at) on public.masleka_requests to authenticated;
 grant select on public.masleka_access_log to authenticated;
+-- service_role keeps Supabase's default ALL on new tables; take it back so the
+-- log is append-only and a request cannot be deleted or truncated through it.
+revoke all on public.masleka_requests, public.masleka_access_log from service_role;
 grant select, insert, update on public.masleka_requests to service_role;
 grant select, insert on public.masleka_access_log to service_role;
 

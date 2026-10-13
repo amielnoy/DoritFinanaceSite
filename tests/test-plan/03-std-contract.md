@@ -537,6 +537,7 @@ itself is proved by `supabase/tests/masleka_check.sql` against a local
 | CTR-MSK-010 | "creates no storage bucket — no clearinghouse file is ever uploaded" | No `storage.buckets` |
 | CTR-MSK-011 | "hands the two staff lookups to service_role alone" | `staff_role` and `masleka_staff_emails` granted to `service_role`, to no one else |
 | CTR-MSK-012 | "pins an empty search_path on every security definer function" | Every `security definer` function has `set search_path = ''` |
+| CTR-MSK-013 | "keeps the access log append-only, even for service_role" | service_role's default privileges revoked; log granted `select, insert` only; log FK `on delete set null`, no cascade |
 
 ## 5. Runtime counterpart
 
@@ -547,7 +548,7 @@ time.
 
 ## 6. Pass criteria
 
-All 584 cases pass. A failure means either the frontend or the backend definition
+All 585 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

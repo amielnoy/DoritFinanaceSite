@@ -97,4 +97,12 @@ describe("the clearinghouse migration", () => {
       if (/security definer/.test(fn)) expect(fn, fn.slice(0, 60)).toMatch(/set search_path = ''/);
     }
   });
+
+  it("keeps the access log append-only, even for service_role", () => {
+    expect(code).toContain("revoke all on public.masleka_requests, public.masleka_access_log from service_role;");
+    expect(code).toContain("grant select, insert on public.masleka_access_log to service_role;");
+    expect(code).not.toMatch(/grant [^;]*(update|delete|truncate|all)[^;]*on public\.masleka_access_log to service_role/);
+    expect(code).toMatch(/request_id uuid references public\.masleka_requests\(id\) on delete set null/);
+    expect(code).not.toMatch(/on delete cascade/);
+  });
 });

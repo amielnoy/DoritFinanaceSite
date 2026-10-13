@@ -203,6 +203,49 @@ do $$ begin
   end;
 end $$;
 
+-- ── the access log is append-only, even for service_role ───────────────────
+set local role service_role;
+do $$ begin
+  begin
+    update public.masleka_access_log set field = 'code';
+    raise exception 'service_role updated the access log';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    delete from public.masleka_access_log;
+    raise exception 'service_role deleted from the access log';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    truncate public.masleka_access_log;
+    raise exception 'service_role truncated the access log';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    delete from public.masleka_requests;
+    raise exception 'service_role deleted requests';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    truncate public.masleka_requests;
+    raise exception 'service_role truncated requests';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+
+-- Deleting a request (as the owner) keeps its audit rows, unlinked.
+do $$ begin
+  insert into public.masleka_requests (id, client_name, token_hash) values
+    ('cccccccc-0000-0000-0000-000000000007', 'לקוח למחיקה', repeat('7', 64));
+  insert into public.masleka_access_log (request_id, user_id, field) values
+    ('cccccccc-0000-0000-0000-000000000007', 'dddddddd-0000-0000-0000-000000000001', 'code');
+  delete from public.masleka_requests where id = 'cccccccc-0000-0000-0000-000000000007';
+  if (select count(*) from public.masleka_access_log where request_id is null) <> 1 then
+    raise exception 'the access log row did not survive its request with a null request_id';
+  end if;
+end $$;
+
 -- ── the nine-day wipe ───────────────────────────────────────────────────────
 do $$ begin
   if public.masleka_wipe_stale() <> 1 then
