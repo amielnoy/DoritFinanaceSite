@@ -12,11 +12,12 @@
  * Everything here is dark until `MASLEKA_ENABLED` is exactly "true".
  */
 import { sha256Hex } from './guard.ts';
+import { AGENCY } from './agency.ts';
 import { insertRow } from './rest.ts';
 
-export const AGENCY_1 = '00000000-0000-0000-0000-000000000001';
+export const AGENCY_1 = AGENCY.id;
 /** Where a staff notice goes when no staff address can be read. */
-export const AGENCY_MAILBOX = 'dorit@govari-fin.co.il';
+export const AGENCY_MAILBOX = AGENCY.email;
 /** The agency's own page — never derived from a request's Origin. */
 export const MASLEKA_PAGE = 'https://govari-fin.co.il/masleka';
 export const MASLEKA_BOARD = 'https://govari-fin.co.il/admin/masleka';
