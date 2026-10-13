@@ -24,6 +24,7 @@
     "test:contract": "vitest run tests/contract",
     "test:integration": "vitest run tests/integration",
     "test:eval": "vitest run tests/eval",
+    "test:eval:chat": "node scripts/eval-chat.mjs",
     "test:security": "vitest run tests/security",
     "test:vitest": "vitest run",
     "test:watch": "vitest",

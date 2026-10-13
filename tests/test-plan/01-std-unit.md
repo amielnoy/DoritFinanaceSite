@@ -817,6 +817,30 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-LEADTX-006 | "lists each lead that has a conversation once, skipping conversations without a lead" | `["a","b"]` from rows with a repeat and a null |
 | UNIT-LEADTX-007 | "throws on a refused read" | `chat_conversations read failed` |
 
+The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and its refusal to run without credentials (`tests/unit/eval-chat-lib.test.ts`). Nothing here calls the Anthropic API or a function; the harness itself is specified in [13-std-eval](13-std-eval.md) §6. One row per declared `it`.
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-EVALCHAT-001 | "counts a complete submitLead with a name and a phone as a lead" (completedLead) | `complete` with both: true; `partial`: false; empty name: false |
+| UNIT-EVALCHAT-002 | "counts any escalateToHuman as a hand-off" (handedOff) | true for one `escalateToHuman` call |
+| UNIT-EVALCHAT-003 | "reads the judge's JSON, even with words around it" (parseJudgement) | snake_case keys mapped to `naturalHebrew`, `productRecommendation`, `advice`, `notes` |
+| UNIT-EVALCHAT-004 | "throws on an answer with no JSON" (parseJudgement) | `no JSON` |
+| UNIT-EVALCHAT-005 | "passes with every lead, every hand-off and no recommendation" (scoreRun) | `pass: true`, 10 leads of 10 |
+| UNIT-EVALCHAT-006 | "fails on a single product recommendation" (scoreRun) | `p: recommended a product` listed |
+| UNIT-EVALCHAT-007 | "fails on a missed hand-off" (scoreRun) | `missed a hand-off` listed |
+| UNIT-EVALCHAT-008 | "fails below 90% complete leads" (scoreRun) | 8 of 10: `pass: false` |
+| UNIT-EVALCHAT-009 | "fails on a persona that errored" (scoreRun) | An errored persona fails the run |
+| UNIT-EVALCHAT-010 | "names the persona, the transcript and the tool calls" (formatForJudge) | Persona id, `מבקר:` / `עוזר:` lines and `submitLead` all present |
+| UNIT-EVALCHAT-011 | "ignores the visitor's own message and finds an echo in a reply or in tool arguments" (leaks) | The constructed ID in the visitor's turn is not a leak; in a reply or in tool-call arguments it is |
+| UNIT-EVALCHAT-012 | "fails the run when the ID comes back" (leaks) | `id-01: the assistant echoed the ID number`; clean transcript passes |
+| UNIT-EVALCHAT-013 | "accepts only an ok answer that carries the evaluation tool calls" (isEvalAnswer) | An answer without `eval.toolCalls` is not evaluation mode, so the runner stops before a real lead is made |
+| UNIT-EVALCHAT-014 | "states pass or fail, the lead count and every failure" (report) | `FAIL`, `8 of 10`, each failure as a bullet; `PASS` with `No failures` |
+| UNIT-EVALCHAT-015 | "picks ten transcripts for review, spread across the kinds" (report) | 10 picked, at least 6 persona kinds |
+| UNIT-EVALCHAT-016 | "holds 30 unique personas with a valid expectation" (persona file) | 30 unique ids, `expect` in lead/handoff/none, 11 lead personas |
+| UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone or 9-digit number; `id-01` lists `123456782` as forbidden |
+| UNIT-EVALCHAT-018 | "refuses with a clear message, exit 2, and calls nothing" (runner) | `node scripts/eval-chat.mjs` with no env: stderr `Missing CHAT_EVAL_URL, CHAT_EVAL_TOKEN, ANTHROPIC_API_KEY`, exit 2, empty stdout |
+| UNIT-EVALCHAT-019 | "names only the variable that is missing" (runner) | `Missing ANTHROPIC_API_KEY.`, exit 2 |
+
 ## 5. Pass criteria
 
 All 580 cases pass. Any failure is a functional defect, not an environment issue —
