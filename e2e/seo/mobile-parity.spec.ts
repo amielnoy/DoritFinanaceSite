@@ -191,17 +191,45 @@ test.describe("Mobile crawlability", { tag: "@mobile-only" }, () => {
     });
   });
 
+  // The portrait is served as AVIF/WebP at three widths (#158), so the preload
+  // names a responsive set (`imagesrcset`/`imagesizes`), not one `href`. It is
+  // only worth anything if it names exactly what the <picture> renders: a
+  // mismatch makes the browser fetch one file early and then render another.
   test("the LCP hero image is preloaded and eagerly fetched", async ({ page }) => {
     const preload = page.locator('head link[rel="preload"][as="image"]');
+    const avif = page.locator('#top picture source[type="image/avif"]');
+    const img = page.locator("#top picture img");
 
     await test_step("open the home page on a phone", async () => {
       await page.goto("/");
+      await expect(img).toBeAttached();
     });
 
     await test_step("the hero image is preloaded at high priority", async () => {
       await expect(preload).toHaveCount(1);
-      expect(await preload.getAttribute("href")).toMatch(/^https:\/\//);
       expect(await preload.getAttribute("fetchpriority")).toBe("high");
+      expect(await preload.getAttribute("type")).toBe("image/avif");
+    });
+
+    const srcset = await test_step("the preload names exactly what the hero renders", async () => {
+      const set = await preload.getAttribute("imagesrcset");
+      expect(set).toBeTruthy();
+      expect(set).toBe(await avif.getAttribute("srcset"));
+      expect(await preload.getAttribute("imagesizes")).toBe(await avif.getAttribute("sizes"));
+      return set as string;
+    });
+
+    await test_step("every preloaded file is served as an image", async () => {
+      for (const url of srcset.split(",").map((c) => c.trim().split(/\s+/)[0])) {
+        const res = await page.request.get(url);
+        expect(res.status(), url).toBe(200);
+        expect(res.headers()["content-type"], url).toContain("image/avif");
+      }
+    });
+
+    await test_step("the hero <img> is fetched eagerly, not lazily", async () => {
+      expect(await img.getAttribute("loading")).toBe("eager");
+      expect(await img.getAttribute("fetchpriority")).toBe("high");
     });
   });
 

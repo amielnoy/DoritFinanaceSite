@@ -112,7 +112,7 @@ less content than the desktop one loses the desktop version's rankings.
 | SEO-MOB-003 | "declares a responsive viewport that permits zoom" | Mobile projects | `width=device-width`, `initial-scale=1`, no `user-scalable=no`, no `maximum-scale=1` |
 | SEO-MOB-004 | "body copy is legible without pinch-zooming" | Sentence-length prose only (≥60 chars) | No body copy under 12px |
 | SEO-MOB-005 | "reports sub-12px display labels (informational)" | All short labels | Always passes; records the count as an annotation — see [10-known-issues](10-known-issues.md) |
-| SEO-MOB-006 | "the LCP hero image is preloaded and eagerly fetched" | Mobile projects | One `link[rel=preload][as=image]` with `fetchpriority=high` |
+| SEO-MOB-006 | "the LCP hero image is preloaded and eagerly fetched" | Mobile projects | One `link[rel=preload][as=image]` (`type=image/avif`, `fetchpriority=high`) whose `imagesrcset`/`imagesizes` equal the hero's AVIF `<source>`; every file it names answers `200 image/avif`; the hero `<img>` is `loading=eager`, `fetchpriority=high` |
 | SEO-MOB-007 | "fonts are self-hosted and do not block the first paint" | Asserts on the **served HTML** | No `fonts.googleapis.com`/`fonts.gstatic.com`; no font stylesheet link; at least one `rel=preload as=font type=font/woff2` with `crossorigin`; each preloaded `/fonts/…` file answers 200 and starts with `wOF2` |
 
 > SEO-MOB-007 asserts on the HTML source deliberately: that is what a crawler
