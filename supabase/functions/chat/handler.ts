@@ -11,7 +11,7 @@ import { AGENCY } from '../_shared/agency.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { clientIp, sha256Hex } from '../_shared/guard.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
-import { redact } from '../log-support-chat/redact.js';
+import { redactChat } from './redact-chat.ts';
 import type { ModelClient } from './anthropic.ts';
 import { monthKey, monthStartIso, spendUsd } from './budget.ts';
 import { systemBlocks, type ChatRole } from './prompt.ts';
@@ -137,7 +137,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       // Every write below carries the stored row's agency, never anything the request said.
       const id = conversation.id;
       const agencyId = conversation.agency_id;
-      await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'user', content: redact(text) });
+      await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'user', content: redactChat(text) });
       const history = toModelHistory(await deps.store.listMessages(id));
 
       // The runners mutate ctx.conversation (one lead, one hand-off); it is what gets persisted below.
@@ -191,7 +191,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       const status = ctx.conversation.status;
       if (result) {
         // The store clips to the column's 8,000 characters; MAX_REPLY_TOKENS keeps a reply well under it.
-        await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'assistant', content: redact(result.reply) });
+        await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'assistant', content: redactChat(result.reply) });
       }
       await deps.store.updateConversation(id, {
         turns: conversation.turns + 1,

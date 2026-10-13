@@ -372,6 +372,34 @@ describe("privacy", () => {
     expect(JSON.stringify(model.calls[0].messages)).not.toContain("123456782");
   });
 
+  it.each(["050-1234567", "050 1234567", "0501234567", "+972-50-1234567", "+972501234567", "03-1234567", "031234567"])(
+    "keeps the visitor's phone %s, in storage and for the model",
+    async (phone) => {
+      const { chat, store, model } = setup();
+      await chat(post(first(`הטלפון שלי ${phone}`)));
+      expect(store.messages[0].content).toBe(`הטלפון שלי ${phone}`);
+      expect(model.calls[0].messages).toEqual([{ role: "user", content: `הטלפון שלי ${phone}` }]);
+    },
+  );
+
+  it("keeps the phone and redacts the ID and the card in one message", async () => {
+    const { chat, store, model } = setup();
+    await chat(post(first("ת״ז 123456782, כרטיס 4580 1234 5678 9012, טלפון 050-1234567")));
+    const expected = "ת״ז [הושמט — מספר מזהה], כרטיס [הושמט — מספר כרטיס], טלפון 050-1234567";
+    expect(store.messages[0].content).toBe(expected);
+    expect(JSON.stringify(model.calls[0].messages)).toContain(expected);
+  });
+
+  it("stores a 3,000-character reply whole, and the model reads it back whole", async () => {
+    const reply = `${"תודה רבה על הפרטים. ".repeat(160)}נדבר בקרוב.`;
+    expect(reply.length).toBeGreaterThan(3000);
+    const { chat, store, model } = setup({}, [text(reply), text("בהחלט")]);
+    const { body } = await json(await chat(post(first())));
+    expect(store.messages.find((m) => m.role === "assistant")?.content).toBe(reply);
+    await chat(post(next(body.conversationId, "עוד")));
+    expect(model.calls[1].messages[1]).toEqual({ role: "assistant", content: reply });
+  });
+
   it("answers only the wire contract's fields, never the stored row or its token hash", async () => {
     const { chat, store } = setup({}, [text("שלום"), text("ועוד")]);
     const firstAnswer = await json(await chat(post(first())));

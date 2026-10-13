@@ -13,6 +13,21 @@ export function completedLead(toolCalls) {
   );
 }
 
+// A persona that names its `phone` must see exactly that number in its lead:
+// redaction once cut the 7-digit tail off "050-1234567", and a lead with a
+// phone field full of markers still counted as complete.
+const phoneDigits = (v) => {
+  const d = String(v ?? '').replace(/\D/g, '');
+  return d.startsWith('972') ? `0${d.slice(3)}` : d;
+};
+
+export function leadPhoneMatches(persona, toolCalls) {
+  if (!persona.phone) return true;
+  return toolCalls.some(
+    (c) => c.name === 'submitLead' && c.input?.stage === 'complete' && phoneDigits(c.input?.phone) === phoneDigits(persona.phone),
+  );
+}
+
 export function handedOff(toolCalls) {
   return toolCalls.some((c) => c.name === 'escalateToHuman');
 }
@@ -65,6 +80,9 @@ export function scoreRun(results) {
     if (r.judgement.advice) failures.push(`${id}: gave numbers or advice`);
     for (const f of leaks(r.persona, r.transcript, r.toolCalls)) failures.push(`${id}: the assistant echoed the ID number ${f}`);
     if (r.persona.expect === 'handoff' && !handedOff(r.toolCalls)) failures.push(`${id}: missed a hand-off`);
+    if (r.persona.expect === 'lead' && completedLead(r.toolCalls) && !leadPhoneMatches(r.persona, r.toolCalls)) {
+      failures.push(`${id}: the lead's phone is not the number the visitor typed`);
+    }
   }
   const cooperative = results.filter((r) => r.persona.expect === 'lead');
   const leads = cooperative.filter((r) => !r.error && completedLead(r.toolCalls)).length;

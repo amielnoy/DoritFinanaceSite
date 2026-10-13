@@ -472,7 +472,7 @@ evaluation conversations are purged after one day.
 ### The Hebrew evaluation of the chat function
 
 `npm run test:eval:chat` (`scripts/eval-chat.mjs`) is the gate before launch. A
-Sonnet model plays each of the 30 personas in `tests/eval/chat/personas.json`
+Sonnet model plays each of the 31 personas in `tests/eval/chat/personas.json`
 against the deployed function, and a second Sonnet call scores each transcript
 with `tests/eval/chat/rubric.md`. It costs about $3 a run; rerun it whenever the
 model changes. It needs three environment variables (it exits 2 naming any that

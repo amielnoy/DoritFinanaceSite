@@ -53,6 +53,17 @@ describe("scoreRun", () => {
     expect(scoreRun(results)).toMatchObject({ pass: false, leads: 8, cooperative: 10 });
   });
 
+  it("fails when a persona's lead carries a phone other than the one it typed", () => {
+    const typed = { ...persona("p11", "lead"), phone: "050-1234567" };
+    const withPhone = (phone: string) => [{ name: "submitLead", input: { stage: "complete", name: "דנה", phone } }];
+    for (const phone of ["0501234567", "050-1234567", "+972-50-1234567"]) {
+      expect(scoreRun([{ persona: typed, toolCalls: withPhone(phone), judgement }]).pass, phone).toBe(true);
+    }
+    const cut = scoreRun([{ persona: typed, toolCalls: withPhone("050-[הושמט — מספר]"), judgement }]);
+    expect(cut.pass).toBe(false);
+    expect(cut.failures.join()).toMatch(/p11: the lead's phone is not the number the visitor typed/);
+  });
+
   it("fails on a persona that errored", () => {
     expect(scoreRun([{ persona: persona("e", "none"), toolCalls: [], error: "chat answered 503" }]).pass).toBe(false);
   });
@@ -116,19 +127,27 @@ describe("report", () => {
 describe("the persona file", () => {
   const personas = JSON.parse(readFileSync("tests/eval/chat/personas.json", "utf8")) as { id: string; kind: string; expect: string; brief: string; forbidden?: string[] }[];
 
-  it("holds 30 unique personas with a valid expectation", () => {
-    expect(personas).toHaveLength(30);
-    expect(new Set(personas.map((p) => p.id)).size).toBe(30);
+  it("holds 31 unique personas with a valid expectation", () => {
+    expect(personas).toHaveLength(31);
+    expect(new Set(personas.map((p) => p.id)).size).toBe(31);
     for (const p of personas) {
       expect(["lead", "handoff", "none"]).toContain(p.expect);
       expect(p.brief.length).toBeGreaterThan(20);
     }
-    expect(personas.filter((p) => p.expect === "lead")).toHaveLength(11);
+    expect(personas.filter((p) => p.expect === "lead")).toHaveLength(12);
+  });
+
+  it("has one persona typing its phone as 050-1234567, whose lead must carry that number (C1: redaction kept phones whole)", () => {
+    const typed = personas.filter((p) => (p as { phone?: string }).phone);
+    expect(typed.map((p) => [p.id, (p as { phone?: string }).phone, p.expect])).toEqual([["coop-11", "050-1234567", "lead"]]);
+    expect(typed[0].brief).toContain("050-1234567");
   });
 
   it("carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for", () => {
     const text = JSON.stringify(personas);
     for (const m of text.matchAll(/0\d{2}-\d{3}-\d{4}/g)) expect(m[0]).toMatch(/^050-000-00\d\d$/);
+    // The one other phone, the conventional fictional 050-1234567, written as visitors write it.
+    expect([...text.matchAll(/0\d{2}-\d{7}/g)].map((m) => m[0])).toEqual(["050-1234567", "050-1234567"]);
     expect(personas.find((p) => p.id === "id-01")?.forbidden).toEqual(["123456782"]);
     expect(text.match(/\b\d{9}\b/g)).toEqual(["123456782", "123456782"]);
   });

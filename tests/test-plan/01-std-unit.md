@@ -778,6 +778,26 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-035 | "keeps an evaluation conversation for one day" | `delete_after` is now + 24 hours |
 | UNIT-CHHANDLER-036 | "answers a preflight and refuses anything but POST" | OPTIONS 204, GET 405 |
 | UNIT-CHHANDLER-037 | "answers a body that is not JSON as an unknown agent" | 400 `unknown_agent` |
+| UNIT-CHHANDLER-038 | "keeps the visitor's phone %s, in storage and for the model" | `050-1234567`, `050 1234567`, `0501234567`, `+972-50-1234567`, `+972501234567`, `03-1234567`, `031234567`: the stored row and the model's history hold the phone unchanged (C1) |
+| UNIT-CHHANDLER-039 | "keeps the phone and redacts the ID and the card in one message" | ID and card become their markers; `050-1234567` stays, in storage and for the model (C1) |
+| UNIT-CHHANDLER-040 | "stores a 3,000-character reply whole, and the model reads it back whole" | No 2,000-character clip: the stored assistant row and the next turn's history equal the reply (M1) |
+
+### 4.35a The chat's redaction — `tests/unit/chat-redact.test.ts`
+
+`supabase/functions/chat/redact-chat.ts`: `redactChat()` keeps Israeli phone numbers and applies `redact()` (`log-support-chat/redact.js`, unchanged) to everything else, without its 2,000-character clip. One row per declared `it`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHREDACT-001 | "keeps the phone %s whole" | 11 forms: `050-1234567`, `050 1234567`, `0501234567`, `050-123-4567`, `+972-50-1234567`, `+972501234567`, `972501234567`, `03-1234567`, `031234567`, `+972-3-1234567`, `077-1234567` |
+| UNIT-CHREDACT-002 | "still redacts an ID number (123456782)" | `[הושמט — מספר מזהה]` |
+| UNIT-CHREDACT-003 | "redacts a nine-digit landline-shaped number that is a valid ID, written without a dash" | `038888889` passes the ID check digit: redacted as an ID |
+| UNIT-CHREDACT-004 | "still redacts a card number, spaced or not" | `[הושמט — מספר כרטיס]` for both |
+| UNIT-CHREDACT-005 | "still redacts a bank account and an IBAN" | `[הושמט — מספר]` and `[הושמט — חשבון בנק]` |
+| UNIT-CHREDACT-006 | "keeps the phone and redacts the ID in one message" | ID marker, phone unchanged |
+| UNIT-CHREDACT-007 | "does not take a phone-shaped run out of a longer number" | `0501-2345-6789-0123` is a card, redacted whole |
+| UNIT-CHREDACT-008 | "never clips: a 3,000-character text comes back whole" | Output equals input |
+| UNIT-CHREDACT-009 | "redacts past the 2,000th character too" | An ID after 2,500 characters becomes its marker; nothing is cut |
+| UNIT-CHREDACT-010 | "answers an empty string for nothing" | `""` |
 
 ### 4.36 The browser's chat adapter, router and switch — `tests/unit/supabase-agent.test.ts`, `routed-agent.test.ts`, `chat-agents-config.test.ts`, `services-wiring.test.ts`
 
@@ -836,8 +856,8 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-013 | "accepts only an ok answer that carries the evaluation tool calls" (isEvalAnswer) | An answer without `eval.toolCalls` is not evaluation mode, so the runner stops before a real lead is made |
 | UNIT-EVALCHAT-014 | "states pass or fail, the lead count and every failure" (report) | `FAIL`, `8 of 10`, each failure as a bullet; `PASS` with `No failures` |
 | UNIT-EVALCHAT-015 | "picks ten transcripts for review, spread across the kinds" (report) | 10 picked, at least 6 persona kinds |
-| UNIT-EVALCHAT-016 | "holds 30 unique personas with a valid expectation" (persona file) | 30 unique ids, `expect` in lead/handoff/none, 11 lead personas |
-| UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone or 9-digit number; `id-01` lists `123456782` as forbidden |
+| UNIT-EVALCHAT-016 | "holds 31 unique personas with a valid expectation" (persona file) | 31 unique ids, `expect` in lead/handoff/none, 12 lead personas |
+| UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone than `050-000-00NN` and coop-11's `050-1234567`, no other 9-digit number; `id-01` lists `123456782` as forbidden |
 | UNIT-EVALCHAT-018 | "refuses with a clear message, exit 2, and calls nothing" (runner) | `node scripts/eval-chat.mjs` with no env: stderr `Missing CHAT_EVAL_URL, CHAT_EVAL_TOKEN, ANTHROPIC_API_KEY`, exit 2, empty stdout |
 | UNIT-EVALCHAT-019 | "names only the variable that is missing" (runner) | `Missing ANTHROPIC_API_KEY.`, exit 2 |
 | UNIT-EVALCHAT-020 | "accepts an evaluation-mode answer" (preflight) | `ok` |
@@ -848,8 +868,10 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-025 | "stops the run before persona 1 when the preflight fails" (preflight) | Rejects with `nothing else was sent`; no persona ran |
 | UNIT-EVALCHAT-026 | "runs every persona after a good preflight, and lets one persona's ordinary error through" (preflight) | 3 results; the thrown error recorded on persona b |
 | UNIT-EVALCHAT-027 | "stops the whole run when a persona's first turn is not in evaluation mode, or failed" (preflight) | `EvalStop` after persona a; b never ran; `assertEvalFirstTurn` throws on non-eval, not on eval |
+| UNIT-EVALCHAT-028 | "fails when a persona's lead carries a phone other than the one it typed" (scoreRun) | A persona with `phone: 050-1234567` passes with `0501234567`, `050-1234567` or `+972-50-1234567` in its lead; a redacted phone fails with `the lead's phone is not the number the visitor typed` (C1) |
+| UNIT-EVALCHAT-029 | "has one persona typing its phone as 050-1234567, whose lead must carry that number (C1: redaction kept phones whole)" (persona file) | Only `coop-11` names a `phone`; its brief types `050-1234567` |
 
 ## 5. Pass criteria
 
-All 580 cases pass. Any failure is a functional defect, not an environment issue —
+All 611 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

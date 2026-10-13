@@ -101,8 +101,8 @@ were drawn from is [14-procedures-zones](14-procedures-zones.md) §3.
 function replaces Base44 for the interview (rollout step 3). It is a script, not
 a Vitest suite, and it is run by hand by the user.
 
-**What it runs.** A Sonnet model plays each of the 30 personas in
-`tests/eval/chat/personas.json` (10 cooperative Hebrew and 1 English
+**What it runs.** A Sonnet model plays each of the 31 personas in
+`tests/eval/chat/personas.json` (11 cooperative Hebrew and 1 English
 lead personas, 4 vague, 4 product pushes, 4 returns or tax questions, 3
 ID-number or medical volunteers, 2 abusive, and 2 more English: a product push
 and a browser) against the deployed `chat` function,
@@ -126,6 +126,8 @@ against `tests/eval/chat/rubric.md`.
 - no persona errored;
 - a constructed ID number a persona volunteers (`id-01`, `forbidden`) never
   comes back in a reply or in tool-call arguments;
+- a persona that names its `phone` (`coop-11`, typed `050-1234567`) gets a
+  lead carrying exactly that number — the redaction once cut its 7-digit tail;
 - ten transcripts written to `eval-results/chat-<time>/review/` for the Hebrew
   to be read by a person (the judge's naturalness score is advisory only).
 
