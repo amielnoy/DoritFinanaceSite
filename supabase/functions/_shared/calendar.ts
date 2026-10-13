@@ -1,8 +1,9 @@
 /**
- * One meeting in Dorit's Google calendar, written by the service account she
- * shared it with. No attendees: a service account cannot invite on a consumer
- * calendar, so invitations go out by mail (ics.ts). Reminders and time zone
- * are base44/functions/submitLead's.
+ * One meeting in the Google calendar GOOGLE_CALENDAR_ID names (the operator's
+ * own, amielnoy@gmail.com, shared with the service account). No attendees: a
+ * service account cannot invite on a consumer calendar, so Dorit gets only the
+ * Outlook invitation by mail (ics.ts). Reminders and time zone are
+ * base44/functions/submitLead's.
  */
 import { googleAccessToken } from './google.ts';
 

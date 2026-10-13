@@ -2106,6 +2106,15 @@ describe("Edge submit-lead — what only it does", () => {
       }
     });
 
+    it("never shares a UID between leads when the insert returned no id", async () => {
+      const run = () => invokeEdge("submit-lead", consultation, { failGoogle: "calendar", leadWithoutId: true });
+      const uidOf = (r: Awaited<ReturnType<typeof invokeEdge>>) => /UID:(\S+)/.exec(icsOf(r)[0].ics!)![1];
+      const [a, b] = [uidOf(await run()), uidOf(await run())];
+      expect(a).not.toContain("lead-null");
+      expect(a).toMatch(/^lead-.+@govari-fin\.co\.il$/);
+      expect(a).not.toBe(b);
+    });
+
     it("reports ready.google from the service account alone", async () => {
       const r = await invokeEdge("submit-lead", {}, { envPatch: { GOOGLE_CALENDAR_ID: null } });
       expect(r.json.ready).toMatchObject({ google: true });

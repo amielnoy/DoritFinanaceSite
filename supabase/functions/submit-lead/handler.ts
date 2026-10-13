@@ -403,10 +403,11 @@ export async function handler(req: Request): Promise<Response> {
         }
       }
       // One meeting everywhere: the event's own UID when there is one, else a
-      // stable local one. Without an event the instants come from the slot.
+      // stable local one (the request id when the insert returned no id, so two
+      // such leads never share a UID and merge in Outlook). Without an event the instants come from the slot.
       const startAt = ev?.start ?? new Date(israelInstant(calStartIso) ?? Date.now());
       const endAt = ev?.end ?? new Date(startAt.getTime() + 30 * 60000);
-      const uid = ev?.iCalUID ?? `lead-${leadId}@govari-fin.co.il`;
+      const uid = ev?.iCalUID ?? `lead-${leadId ?? rid}@govari-fin.co.il`;
       // With no event, Gmail's calendar would hold nothing: it gets the invitation.
       const invitees = ev ? INVITE_ATTENDEES : [...INVITE_ATTENDEES, INVITE_FALLBACK_GOOGLE];
       const sent = await Promise.all(invitees.map(async (attendee: string) => {
