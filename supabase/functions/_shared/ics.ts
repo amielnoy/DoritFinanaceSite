@@ -2,11 +2,12 @@
  * A meeting invitation (RFC 5545, METHOD:REQUEST) for one booked meeting.
  *
  * Dorit works in her Microsoft 365 desktop calendar, and a Google service
- * account cannot add attendees on a consumer calendar. So the event goes to
- * her Google calendar without attendees, and this file goes to each address
- * by mail; her calendar client offers it as a meeting to accept. The UID is the Google
- * event's iCalUID, so both are one meeting. Times are UTC, which needs no
- * VTIMEZONE block.
+ * account cannot add attendees on a consumer calendar. So the Google event goes
+ * to the calendar GOOGLE_CALENDAR_ID names (the operator's own, amielnoy@gmail.com)
+ * without attendees, and this file goes to Dorit and the Outlook copy by mail;
+ * her calendar client offers it as a meeting to accept. When the event exists
+ * the UID is its iCalUID, so both are one meeting; otherwise a local one. Times
+ * are UTC, which needs no VTIMEZONE block.
  */
 
 export interface Invitation {
