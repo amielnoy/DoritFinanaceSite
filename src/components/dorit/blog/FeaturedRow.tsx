@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import type { Article } from "@/services";
+import { articlePath } from "@/lib/articlePath";
 import ArticleMeta from "./ArticleMeta";
 import { FOCUS_RING } from "./ArticleCard";
 
@@ -44,7 +45,7 @@ export default function FeaturedRow({
         ) : null}
         <ArticleMeta actionTime={featured.action_time} body={featured.body} className="mt-5" />
         <Link
-          to={`/blog/${featured.id}`}
+          to={articlePath(featured)}
           className={`mt-5 self-start inline-flex items-center min-h-11 text-accent font-semibold underline underline-offset-4 decoration-highlight/50 hover:decoration-highlight after:absolute after:inset-0 after:content-[''] ${FOCUS_RING}`}
         >
           לקריאת המדריך ←
@@ -57,7 +58,7 @@ export default function FeaturedRow({
           <ul className="mt-2">
             {fastest.map((p) => (
               <li key={p.id} className="border-t border-border first:border-t-0">
-                <Link to={`/blog/${p.id}`} className={`group block py-3.5 min-h-11 ${FOCUS_RING}`}>
+                <Link to={articlePath(p)} className={`group block py-3.5 min-h-11 ${FOCUS_RING}`}>
                   <span className="text-sm text-accent bg-highlight/15 px-2 py-0.5 rounded-sm">
                     ביצוע: {p.action_time}
                   </span>

@@ -196,6 +196,7 @@ featured row's deadline does not decide the outcome of an unrelated run.
 | CMP-BLOG-021 | "drops a keyword the new topic does not carry" | Switching topic clears it |
 | CMP-BLOG-022 | "keeps a keyword the new topic still carries" | Still pressed after the switch |
 | CMP-BLOG-023 | "hides the featured row while a keyword is chosen" | No featured row; only matching cards |
+| CMP-BLOG-024 | "links each card and the blog's JSON-LD to the slug, or to the id where the store has none" | `/blog/maslul-hashkaa` and `/blog/pen-2` in the cards and in `Blog.blogPost[].url` |
 
 ### 4.13 Reading-recommender filter — `tests/component/blog-recommendation-filter.test.tsx`
 
@@ -228,8 +229,20 @@ The real `AgentChat` with the recommender's descriptor; the agent service is fak
 | CMP-RCH-004 | "shows the approved one line and the licence, not the interview's notice" | The approved sentence and `L-00107009`; exactly two points; no "נאספים שם וטלפון בלבד" |
 | CMP-RCH-005 | "still gates the first message on the checkbox" | Start and send disabled before consent; the pre-filled text waits in the input |
 
+### 4.15 `<BlogPost />` — old addresses — `tests/component/blog-post-redirect.test.tsx`
+
+An address from before slugs (a Base44 id) shows the article, then replaces
+itself with `/blog/<slug>`, keeping the query and hash the link carried. The
+article is cached under the slug first, so the switch reads nothing again.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-POST-001 | "takes its slug address, keeping the query and the hash" | `/blog/horadat-dmei-nihul?utm_source=whatsapp#mah-bodkim`; one read |
+| CMP-POST-002 | "stays where it is when the address already is the slug" | Unchanged |
+| CMP-POST-003 | "stays on the id where the store has no slug (a build reading Base44)" | Unchanged |
+
 ## 5. Pass criteria
 
-All 76 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 80 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

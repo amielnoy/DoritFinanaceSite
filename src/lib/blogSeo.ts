@@ -4,6 +4,7 @@
 // two can never disagree about what a post's title, description or image is.
 
 import type { Article } from "../services/ports.js";
+import { articlePath } from "./articlePath.js";
 import {
   DEFAULT_OG_IMAGE,
   SITE_NAME,
@@ -32,7 +33,7 @@ export function blogTagList(post: Pick<Article, "tags">): string[] {
 export function computeBlogSeoConfig(post: Article): SeoConfig {
   const summary = blogSummary(post);
   const tagList = blogTagList(post);
-  const path = `/blog/${post.id}`;
+  const path = articlePath(post);
 
   return {
     title: `${post.title} | בלוג · דורית גוב ארי`,

@@ -456,6 +456,8 @@ that writes real slugs.
 | CTR-SLUG-002 | "gives a repo article's slug to that file's exact title" | 20 backfill rows name a file; each title equals that file's front matter |
 | CTR-SLUG-003 | "names the two live articles older than the repo files" | `bituach-briut-digitali`, `pensia-beidan-ha-ai` with their exact titles |
 | CTR-SLUG-004 | "maps 22 distinct titles to 22 distinct slugs" | 22 rows, no title or slug twice |
+| CTR-SLUG-005 | "builds no /blog/<…> address by hand" | No `/blog/${` or `"/blog/" +` in `src/` or `api/` outside `articlePath.ts` |
+| CTR-SLUG-006 | "%s links articles through articlePath" (5 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo |
 
 ## 5. Runtime counterpart
 
@@ -466,7 +468,7 @@ time.
 
 ## 6. Pass criteria
 
-All 546 cases pass. A failure means either the frontend or the backend definition
+All 552 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

@@ -485,5 +485,5 @@ or a bracket in it would rewrite the filter.
 
 ## 5. Pass criteria
 
-All 374 cases pass. Any failure is a functional defect, not an environment issue —
+All 375 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

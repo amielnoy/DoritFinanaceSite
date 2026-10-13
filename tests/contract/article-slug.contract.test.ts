@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BASE44_ID_PATTERN, SLUG_PATTERN } from "@/lib/articlePath";
@@ -58,5 +58,33 @@ describe("the backfill names the articles that were live", () => {
     expect(pairs).toHaveLength(22);
     expect(new Set(pairs.map(([title]) => title)).size).toBe(22);
     expect(new Set(pairs.map(([, slug]) => slug)).size).toBe(22);
+  });
+});
+
+describe("every article link goes through articlePath", () => {
+  const walk = (dir: string): string[] =>
+    readdirSync(join(REPO_ROOT, dir)).flatMap((name) => {
+      const p = join(dir, name);
+      if (statSync(join(REPO_ROOT, p)).isDirectory()) return walk(p);
+      return /\.(ts|tsx|js|jsx)$/.test(name) ? [p] : [];
+    });
+  const files = [...walk("src"), ...walk("api")];
+
+  it("builds no /blog/<…> address by hand", () => {
+    // `/blog/${post.id}` in five files is how links to the same article came to
+    // disagree. One builder; a link built anywhere else fails here.
+    const handBuilt = /\/blog\/\$\{|["'`]\/blog\/["'`]\s*\+/;
+    const offenders = files.filter((f) => f !== "src/lib/articlePath.ts" && handBuilt.test(read(f)));
+    expect(offenders).toEqual([]);
+  });
+
+  it.each([
+    "src/components/dorit/blog/ArticleCard.tsx",
+    "src/components/dorit/blog/FeaturedRow.tsx",
+    "src/pages/Blog.tsx",
+    "src/pages/BlogPost.tsx",
+    "src/lib/blogSeo.ts",
+  ])("%s links articles through articlePath", (file) => {
+    expect(read(file)).toMatch(/\barticlePath\(/);
   });
 });

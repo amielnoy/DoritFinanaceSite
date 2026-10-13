@@ -350,3 +350,22 @@ describe("the contact band", () => {
     expect(within(band).getByRole("link", { name: /חייגו/ }).getAttribute("href")).toBe("tel:+972508311776");
   });
 });
+
+describe("article links", () => {
+  it("links each card and the blog's JSON-LD to the slug, or to the id where the store has none", async () => {
+    base44Mock.entities.BlogPost.filter.mockResolvedValue([
+      post("pen-1", "פנסיה", { slug: "maslul-hashkaa" }),
+      post("pen-2", "פנסיה"),
+    ]);
+    renderBlog();
+    await loaded();
+    const hrefs = screen.getAllByTestId("article-card").map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(expect.arrayContaining(["/blog/maslul-hashkaa", "/blog/pen-2"]));
+
+    const blog = Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+      .map((s) => JSON.parse(s.textContent ?? "{}"))
+      .find((b) => b["@type"] === "Blog");
+    const urls = blog.blogPost.map((p: { url: string }) => new URL(p.url).pathname);
+    expect(urls).toEqual(expect.arrayContaining(["/blog/maslul-hashkaa", "/blog/pen-2"]));
+  });
+});
