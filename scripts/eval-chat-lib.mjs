@@ -94,3 +94,46 @@ export function pickForReview(results, count = 10) {
   }
   return picked;
 }
+
+// ---- Evaluation-mode guard -------------------------------------------------
+// Without a matching CHAT_EVAL_TOKEN on the function, a request runs as a real
+// conversation (real model call, real lead, real mail, no one-day purge). So one
+// tool-free greeting goes first; nothing else is sent unless it comes back in
+// evaluation mode.
+
+export const PREFLIGHT_MESSAGE = 'שלום';
+export const NOT_EVAL_MESSAGE =
+  'the function is not in evaluation mode — check CHAT_EVAL_TOKEN on the function; nothing else was sent';
+
+export class EvalStop extends Error {}
+
+export function preflightBody(now = new Date()) {
+  return { agent: 'needs_interview', message: PREFLIGHT_MESSAGE, consentVersion: 'eval', consentAt: now.toISOString(), attribution: { channel: 'direct' } };
+}
+
+export function preflightVerdict(answer) {
+  if (!answer || !answer.ok) return 'failed';
+  return isEvalAnswer(answer) ? 'ok' : 'not_eval';
+}
+
+// A persona's first turn that is not an evaluation-mode success stops the whole run.
+export function assertEvalFirstTurn(answer) {
+  const v = preflightVerdict(answer);
+  if (v !== 'ok') throw new EvalStop(`${NOT_EVAL_MESSAGE} (first turn: ${v}, http ${answer?.httpStatus ?? '?'})`);
+}
+
+export async function runAll({ personas, chat, runPersona, log = () => {} }) {
+  const v = preflightVerdict(await chat(preflightBody()));
+  if (v !== 'ok') throw new EvalStop(`${NOT_EVAL_MESSAGE} (preflight: ${v})`);
+  const results = [];
+  for (const persona of personas) {
+    log(persona.id);
+    try {
+      results.push(await runPersona(persona));
+    } catch (e) {
+      if (e instanceof EvalStop) throw e;
+      results.push({ persona, transcript: [], toolCalls: [], error: String(e?.message ?? e) });
+    }
+  }
+  return results;
+}

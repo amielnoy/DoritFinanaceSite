@@ -840,6 +840,14 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone or 9-digit number; `id-01` lists `123456782` as forbidden |
 | UNIT-EVALCHAT-018 | "refuses with a clear message, exit 2, and calls nothing" (runner) | `node scripts/eval-chat.mjs` with no env: stderr `Missing CHAT_EVAL_URL, CHAT_EVAL_TOKEN, ANTHROPIC_API_KEY`, exit 2, empty stdout |
 | UNIT-EVALCHAT-019 | "names only the variable that is missing" (runner) | `Missing ANTHROPIC_API_KEY.`, exit 2 |
+| UNIT-EVALCHAT-020 | "accepts an evaluation-mode answer" (preflight) | `ok` |
+| UNIT-EVALCHAT-021 | "refuses an ok answer that is not in evaluation mode" (preflight) | `not_eval` |
+| UNIT-EVALCHAT-022 | "refuses a failed answer" (preflight) | `failed` for a non-ok answer and for null |
+| UNIT-EVALCHAT-023 | "sends one canned, tool-free greeting with consent fields" (preflight) | Body is `needs_interview`, message `שלום`, consent `eval` with the given time |
+| UNIT-EVALCHAT-024 | "stops the run before persona 1 when the function is not in evaluation mode" (preflight) | `EvalStop`; exactly one request sent; no persona ran |
+| UNIT-EVALCHAT-025 | "stops the run before persona 1 when the preflight fails" (preflight) | Rejects with `nothing else was sent`; no persona ran |
+| UNIT-EVALCHAT-026 | "runs every persona after a good preflight, and lets one persona's ordinary error through" (preflight) | 3 results; the thrown error recorded on persona b |
+| UNIT-EVALCHAT-027 | "stops the whole run when a persona's first turn is not in evaluation mode, or failed" (preflight) | `EvalStop` after persona a; b never ran; `assertEvalFirstTurn` throws on non-eval, not on eval |
 
 ## 5. Pass criteria
 

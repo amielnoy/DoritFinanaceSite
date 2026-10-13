@@ -16,7 +16,7 @@
 // exits 1 when the run does not pass. About $3 a run.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { completedLead, formatForJudge, handedOff, isEvalAnswer, parseJudgement, pickForReview, scoreRun, summaryMarkdown } from './eval-chat-lib.mjs';
+import { assertEvalFirstTurn, completedLead, EvalStop, formatForJudge, handedOff, isEvalAnswer, parseJudgement, pickForReview, runAll, scoreRun, summaryMarkdown } from './eval-chat-lib.mjs';
 
 const env = process.env;
 const missing = ['CHAT_EVAL_URL', 'CHAT_EVAL_TOKEN', 'ANTHROPIC_API_KEY'].filter((k) => !env[k]);
@@ -71,10 +71,10 @@ async function runPersona(p) {
         ? { agent: 'needs_interview', conversationId, token, message: next }
         : { agent: 'needs_interview', message: next, consentVersion: 'eval', consentAt: new Date().toISOString(), attribution: { channel: 'direct' } },
     );
-    if (!answer.ok) return { persona: p, transcript, toolCalls, error: `chat answered ${answer.httpStatus} ${answer.code ?? ''}`.trim() };
+    if (!conversationId) assertEvalFirstTurn(answer);
     if (!isEvalAnswer(answer)) {
-      console.error('\nThe function did not answer in evaluation mode (no eval.toolCalls): is CHAT_EVAL_TOKEN set on the function and equal to this one? Stopping before any real lead is created.');
-      process.exit(3);
+      if (answer.ok) throw new EvalStop('a later answer was not in evaluation mode; stopping');
+      return { persona: p, transcript, toolCalls, error: `chat answered ${answer.httpStatus} ${answer.code ?? ''}`.trim() };
     }
     conversationId = answer.conversationId;
     token = answer.token ?? token;
@@ -86,18 +86,20 @@ async function runPersona(p) {
   return { persona: p, transcript, toolCalls, judgement: parseJudgement(verdict) };
 }
 
-const results = [];
-for (const p of personas) {
-  process.stdout.write(`${p.id} … `);
-  try {
-    const r = await runPersona(p);
-    results.push(r);
-    console.log(r.error ?? `${completedLead(r.toolCalls) ? 'lead' : handedOff(r.toolCalls) ? 'handoff' : 'none'} · hebrew ${r.judgement.naturalHebrew}`);
-  } catch (e) {
-    results.push({ persona: p, transcript: [], toolCalls: [], error: String(e?.message ?? e) });
-    console.log(`error: ${e?.message ?? e}`);
-  }
+let results;
+try {
+  results = await runAll({
+    personas,
+    chat,
+    runPersona,
+    log: (id) => process.stdout.write(`${id} … `),
+  });
+} catch (e) {
+  if (!(e instanceof EvalStop)) throw e;
+  console.error(`\n${e.message}`);
+  process.exit(3);
 }
+for (const r of results) console.log(`${r.persona.id}: ${r.error ?? `${completedLead(r.toolCalls) ? 'lead' : handedOff(r.toolCalls) ? 'handoff' : 'none'} · hebrew ${r.judgement.naturalHebrew}`}`);
 
 const score = scoreRun(results);
 const dir = join('eval-results', `chat-${new Date().toISOString().replace(/[:.]/g, '-')}`);

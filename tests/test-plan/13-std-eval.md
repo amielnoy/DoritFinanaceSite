@@ -110,8 +110,11 @@ up to 14 visitor turns each. Every request sends `x-chat-eval` with
 `CHAT_EVAL_TOKEN`: the function then simulates its tools, mails no one, returns
 `eval.toolCalls`, bypasses the rate limits and gives the conversation a
 one-day `delete_after`. The function ignores the header when its secret is
-unset, so the runner stops (exit 3) at the first answer without `eval.toolCalls`
-rather than create real leads. A second Sonnet call scores each transcript
+unset (the request would then run for real), so before any persona the runner
+sends one canned greeting (`שלום`) and requires an answer carrying
+`eval.toolCalls`; otherwise it prints "the function is not in evaluation mode"
+and exits 3 with nothing else sent. A persona's first turn that is not an
+evaluation-mode success stops the whole run the same way. A second Sonnet call scores each transcript
 against `tests/eval/chat/rubric.md`.
 
 **Pass criteria** (spec, "Testing"):
@@ -136,5 +139,5 @@ unset it prints what is missing, exits 2 and calls nothing.
 `summary.md`, `review/*.md`. Exit 0 on pass, 1 on fail.
 
 **Cost and timing.** About $3 and several minutes a run. Run manually before
-the switch, never in CI. The pure parts are covered by `UNIT-EVALCHAT-001..019`
+the switch, never in CI. The pure parts are covered by `UNIT-EVALCHAT-001..027`
 in [01-std-unit](01-std-unit.md).

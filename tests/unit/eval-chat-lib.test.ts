@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — plain .mjs tooling.
-import { completedLead, formatForJudge, handedOff, isEvalAnswer, leaks, parseJudgement, pickForReview, scoreRun, summaryMarkdown } from "../../scripts/eval-chat-lib.mjs";
+import { assertEvalFirstTurn, completedLead, EvalStop, formatForJudge, handedOff, isEvalAnswer, leaks, parseJudgement, pickForReview, preflightBody, preflightVerdict, runAll, scoreRun, summaryMarkdown } from "../../scripts/eval-chat-lib.mjs";
 
 const judgement = { naturalHebrew: 5, productRecommendation: false, advice: false, notes: "none" };
 const lead = [{ name: "submitLead", input: { stage: "complete", name: "רונית", phone: "0500000001" } }];
@@ -146,5 +146,59 @@ describe("the runner without credentials", () => {
     const r = spawnSync(process.execPath, ["scripts/eval-chat.mjs"], { env: { PATH: process.env.PATH ?? "", CHAT_EVAL_URL: "http://127.0.0.1:9", CHAT_EVAL_TOKEN: "t" }, encoding: "utf8" });
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/Missing ANTHROPIC_API_KEY\./);
+  });
+});
+
+describe("the preflight", () => {
+  const evalAnswer = { ok: true, reply: "שלום", eval: { toolCalls: [] } };
+
+  it("accepts an evaluation-mode answer", () => expect(preflightVerdict(evalAnswer)).toBe("ok"));
+  it("refuses an ok answer that is not in evaluation mode", () => expect(preflightVerdict({ ok: true, reply: "שלום" })).toBe("not_eval"));
+  it("refuses a failed answer", () => {
+    expect(preflightVerdict({ ok: false, httpStatus: 503, code: "unavailable" })).toBe("failed");
+    expect(preflightVerdict(null)).toBe("failed");
+  });
+
+  it("sends one canned, tool-free greeting with consent fields", () => {
+    const body = preflightBody(new Date("2026-10-13T00:00:00Z"));
+    expect(body).toMatchObject({ agent: "needs_interview", message: "שלום", consentVersion: "eval", consentAt: "2026-10-13T00:00:00.000Z" });
+  });
+
+  it("stops the run before persona 1 when the function is not in evaluation mode", async () => {
+    const sent: unknown[] = [];
+    const ran: string[] = [];
+    const chat = async (body: unknown) => (sent.push(body), { ok: true, reply: "x" });
+    const runPersona = async (p: { id: string }) => (ran.push(p.id), { persona: p });
+    await expect(runAll({ personas: [persona("a", "lead"), persona("b", "lead")], chat, runPersona })).rejects.toBeInstanceOf(EvalStop);
+    expect(sent).toHaveLength(1);
+    expect(ran).toEqual([]);
+  });
+
+  it("stops the run before persona 1 when the preflight fails", async () => {
+    const ran: string[] = [];
+    const chat = async () => ({ ok: false, httpStatus: 401 });
+    await expect(runAll({ personas: [persona("a", "lead")], chat, runPersona: async (p: { id: string }) => (ran.push(p.id), {}) })).rejects.toThrow(/nothing else was sent/);
+    expect(ran).toEqual([]);
+  });
+
+  it("runs every persona after a good preflight, and lets one persona's ordinary error through", async () => {
+    const chat = async () => ({ ok: true, eval: { toolCalls: [] } });
+    const runPersona = async (p: { id: string }) => {
+      if (p.id === "b") throw new Error("anthropic answered 500");
+      return { persona: p };
+    };
+    const results = await runAll({ personas: [persona("a", "lead"), persona("b", "lead"), persona("c", "lead")], chat, runPersona });
+    expect(results).toHaveLength(3);
+    expect(results[1]).toMatchObject({ error: "anthropic answered 500" });
+  });
+
+  it("stops the whole run when a persona's first turn is not in evaluation mode, or failed", async () => {
+    const chat = async () => ({ ok: true, eval: { toolCalls: [] } });
+    const ran: string[] = [];
+    const runPersona = async (p: { id: string }) => (ran.push(p.id), assertEvalFirstTurn({ ok: false, httpStatus: 500 }), {});
+    await expect(runAll({ personas: [persona("a", "lead"), persona("b", "lead")], chat, runPersona })).rejects.toBeInstanceOf(EvalStop);
+    expect(ran).toEqual(["a"]);
+    expect(() => assertEvalFirstTurn({ ok: true, reply: "x" })).toThrow(EvalStop);
+    expect(() => assertEvalFirstTurn({ ok: true, eval: { toolCalls: [] } })).not.toThrow();
   });
 });
