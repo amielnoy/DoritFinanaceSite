@@ -80,6 +80,7 @@ describe("api/og/blog handler", () => {
       tags: "פנסיה",
       image_url: "https://cdn.example/post-1.jpg",
       created_date: "2026-01-01T00:00:00Z",
+      published: true,
     });
     const handler = await loadHandler();
     const { res, state } = makeRes();
@@ -99,6 +100,7 @@ describe("api/og/blog handler", () => {
       title: "בדיקת מקור",
       body: "",
       created_date: "2026-01-01T00:00:00Z",
+      published: true,
     });
     const handler = await loadHandler();
     const { res } = makeRes();
@@ -127,6 +129,35 @@ describe("api/og/blog handler", () => {
     expect(state.status).toBe(404);
     expect(state.headers["X-Robots-Tag"]).toBe("noindex");
     expect(state.body).toContain("המאמר לא נמצא");
+  });
+
+  it("answers a draft exactly as it answers a missing post", async () => {
+    // BlogPost is readable by anyone on Base44, so the id is all a crawler
+    // needs. A draft's title and description must not reach it.
+    getImpl = async (id) => ({
+      id,
+      title: "טיוטה שעוד לא פורסמה",
+      body: "תוכן פנימי",
+      created_date: "2026-01-01T00:00:00Z",
+      published: false,
+    });
+    const handler = await loadHandler();
+    const { res, state } = makeRes();
+
+    await handler({ method: "GET", query: { id: "draft-1" } }, res);
+
+    expect(state.status).toBe(404);
+    expect(state.headers["X-Robots-Tag"]).toBe("noindex");
+    expect(state.body).not.toContain("טיוטה שעוד לא פורסמה");
+    expect(state.body).toContain("המאמר לא נמצא");
+  });
+
+  it("treats a post with no published flag as a draft", async () => {
+    getImpl = async (id) => ({ id, title: "בלי דגל", body: "", created_date: "2026-01-01T00:00:00Z" });
+    const handler = await loadHandler();
+    const { res, state } = makeRes();
+    await handler({ method: "GET", query: { id: "x" } }, res);
+    expect(state.status).toBe(404);
   });
 
   it("returns 502 and noindex when the backend call fails for another reason", async () => {

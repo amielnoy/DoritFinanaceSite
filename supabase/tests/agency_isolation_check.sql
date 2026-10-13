@@ -127,8 +127,9 @@ do $$ begin
 end $$;
 
 -- Crafted insert naming a different agency is refused for contacts too
--- (mirrors the leads crafted-insert test above). Verified by weakening
--- contacts_insert_public's WITH CHECK to `(true)`: this block then raises.
+-- (mirrors the leads crafted-insert test above). Since
+-- 20261013010000 there is no insert grant at all, so this is refused before
+-- any policy is consulted.
 do $$ begin
   begin
     insert into public.contacts (phone, name, agency_id)

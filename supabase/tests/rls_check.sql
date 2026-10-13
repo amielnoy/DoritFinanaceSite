@@ -34,7 +34,20 @@ insert into public.meetings (lead_base44_id, scheduled_at, topic)
 -- ── anonymous visitor ───────────────────────────────────────────────────────
 set local role anon;
 
-insert into public.leads (name, phone) values ('אנונימי','050-000-0002');  -- create: true
+-- No direct inserts: enquiries arrive through server functions only
+-- (20261013010000_no_public_lead_inserts.sql).
+do $$ begin
+  begin
+    insert into public.leads (name, phone) values ('אנונימי','050-000-0002');
+    raise exception 'anon inserted a lead directly — it must go through a server function';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.contacts (phone, name) values ('050-000-0002','אנונימי');
+    raise exception 'anon inserted a contact directly — it must go through a server function';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
 
 do $$ begin
   if (select count(*) from public.leads) <> 0 then
@@ -80,8 +93,8 @@ end $$;
 set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
 do $$ begin
-  if (select count(*) from public.leads) <> 3 then
-    raise exception 'admin cannot read all leads (expected the two seeded plus the anon submission)';
+  if (select count(*) from public.leads) <> 2 then
+    raise exception 'admin cannot read all leads (expected the two seeded; anon can no longer insert)';
   end if;
   if (select count(*) from public.meetings) <> 1 then
     raise exception 'admin cannot read meetings';
