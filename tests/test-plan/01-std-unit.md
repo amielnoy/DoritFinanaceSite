@@ -661,7 +661,15 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-WAIT-005 | "falls back to 'anything but the previous bundle' without an expected one" | `false` for the old bundle, `true` for a new one |
 | UNIT-WAIT-006 | "never counts an unreadable page as served" | `false` with and without an expected bundle |
 
+### 4.32 The ת״ז check digit — `tests/unit/israeli-id.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ILID-001..014 | "accepts %s as %s" (7 values × browser/edge) | Zero-padded nine digits returned; spaces and hyphens ignored |
+| UNIT-ILID-015..036 | "rejects %s" (11 values × browser/edge) | `null` for a wrong check digit, all zeros, 4 or 10 digits, letters, empty, non-strings |
+| UNIT-ILID-037 | "are the same code, so the page and the function never disagree" | The two function bodies match after whitespace normalisation |
+
 ## 5. Pass criteria
 
-All 464 cases pass. Any failure is a functional defect, not an environment issue —
+All 501 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
