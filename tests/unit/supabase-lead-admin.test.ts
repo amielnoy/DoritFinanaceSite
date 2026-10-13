@@ -146,12 +146,23 @@ describe("SupabaseLeadAdminService.documentLink", () => {
 function byTable(answers: Record<string, SupabaseReadResult>) {
   const calls: unknown[][] = [];
   const query = (table: string): SupabaseQuery => {
+    // `not … is null` and `limit` are applied to the canned rows, as PostgREST would; eq/order are only recorded.
+    let rows = answers[table].data;
     const q: SupabaseQuery = {
       eq: (c, v) => (calls.push([table, "eq", c, v]), q),
       or: () => q,
+      not: (c, op, v) => {
+        calls.push([table, "not", c, op, v]);
+        if (rows && op === "is" && v === null) rows = rows.filter((row) => (row as Record<string, unknown>)[c] != null);
+        return q;
+      },
       order: (c, o) => (calls.push([table, "order", c, o]), q),
-      limit: (n) => (calls.push([table, "limit", n]), q),
-      then: (f, r) => Promise.resolve(answers[table]).then(f, r),
+      limit: (n) => {
+        calls.push([table, "limit", n]);
+        if (rows) rows = rows.slice(0, n);
+        return q;
+      },
+      then: (f, r) => Promise.resolve({ ...answers[table], data: rows }).then(f, r),
     };
     return q;
   };
@@ -225,6 +236,13 @@ describe("SupabaseLeadAdminService.transcriptLeadIds", () => {
       chat_messages: { data: [], error: null },
     });
     expect(await new SupabaseLeadAdminService(client).transcriptLeadIds()).toEqual(["a", "b"]);
+  });
+
+  it("finds an older linked conversation behind a thousand newer ones without a lead", async () => {
+    const unlinked = Array.from({ length: 1000 }, () => ({ lead_id: null }));
+    const { client, calls } = byTable({ chat_conversations: { data: [...unlinked, { lead_id: "older" }], error: null }, chat_messages: { data: [], error: null } });
+    expect(await new SupabaseLeadAdminService(client).transcriptLeadIds()).toEqual(["older"]);
+    expect(calls).toContainEqual(["chat_conversations", "not", "lead_id", "is", null]);
   });
 
   it("throws on a refused read", async () => {

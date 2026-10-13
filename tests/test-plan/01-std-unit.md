@@ -435,6 +435,8 @@ either fails here rather than on the home page.
 | UNIT-REST-012 | "asks for the same URL with the same anonymous credentials" | Equal to supabase-js's request |
 | UNIT-REST-013 | "builds an or filter inside PostgREST's brackets" | `or=(slug.eq.a,base44_id.eq.a)` |
 | UNIT-REST-014 | "asks for an or filter exactly as supabase-js does" | Same URL as supabase-js's `.or()` |
+| UNIT-REST-015 | "builds a not filter as PostgREST's not.<op>.<value>, with null spelled out" | `lead_id=not.is.null` |
+| UNIT-REST-016 | "asks for a not filter exactly as supabase-js does" | Same URL as supabase-js's `.not("lead_id", "is", null)` |
 
 ### 4.20 The lazy services front — `tests/unit/lazy-services.test.ts`
 
@@ -852,6 +854,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-LEADTX-005 | "returns message text untouched, markup and all, for the screen to show as text" | A hostile string comes back byte for byte |
 | UNIT-LEADTX-006 | "lists each lead that has a conversation once, skipping conversations without a lead" | `["a","b"]` from rows with a repeat and a null |
 | UNIT-LEADTX-007 | "throws on a refused read" | `chat_conversations read failed` |
+| UNIT-LEADTX-008 | "finds an older linked conversation behind a thousand newer ones without a lead" | The read filters `lead_id not is null` before its 1,000-row limit: `["older"]` (triage 9) |
 
 The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and its refusal to run without credentials (`tests/unit/eval-chat-lib.test.ts`). Nothing here calls the Anthropic API or a function; the harness itself is specified in [13-std-eval](13-std-eval.md) §6. One row per declared `it`.
 
@@ -889,5 +892,5 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 ## 5. Pass criteria
 
-All 630 cases pass. Any failure is a functional defect, not an environment issue —
+All 633 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

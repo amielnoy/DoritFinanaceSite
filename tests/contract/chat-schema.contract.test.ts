@@ -6,6 +6,12 @@ import { REPO_ROOT } from "../helpers/entity-schema";
 const migration = readFileSync(join(REPO_ROOT, "supabase/migrations/20261016000000_chat_conversations.sql"), "utf8");
 const schedule = readFileSync(join(REPO_ROOT, "supabase/migrations/20261016010000_chat_purge_schedule.sql"), "utf8");
 const TABLES = ["chat_conversations", "chat_messages", "chat_usage", "chat_budget_alerts"];
+/** The SQL without its `--` comments, which say "grant … to anon" in prose. */
+const code = (sql: string) => sql.replace(/--.*$/gm, "");
+/** Any grant naming insert, update, delete or all (alone or in a list) to authenticated. */
+const WRITE_TO_AUTHENTICATED = /\bgrant\s[^;]*\b(insert|update|delete|all)\b[^;]*\bto\s[^;]*\bauthenticated\b/i;
+/** Any grant at all to anon. */
+const ANY_TO_ANON = /\bgrant\s[^;]*\bto\s[^;]*\banon\b/i;
 
 describe("the chat tables", () => {
   it.each(TABLES)("%s has row-level security on", (table) => {
@@ -15,7 +21,23 @@ describe("the chat tables", () => {
   it("are closed to anon and to authenticated writes", () => {
     expect(migration).toMatch(/revoke all on public\.chat_conversations, public\.chat_messages, public\.chat_usage, public\.chat_budget_alerts from anon, authenticated;/);
     expect(migration).toMatch(/grant select on public\.chat_conversations, public\.chat_messages, public\.chat_usage to authenticated;/);
-    expect(migration).not.toMatch(/grant (insert|update|delete)[^;]*to authenticated/);
+    expect(code(migration)).not.toMatch(WRITE_TO_AUTHENTICATED);
+    expect(code(migration)).not.toMatch(ANY_TO_ANON);
+  });
+
+  it("guard against write grants hidden in a list and against any grant to anon", () => {
+    // The guards above, proven on the statements they exist to catch.
+    for (const bad of [
+      "grant select, insert on public.chat_messages to authenticated;",
+      "grant all on public.chat_conversations to authenticated;",
+      "grant update (status) on public.chat_conversations to service_role, authenticated;",
+    ]) {
+      expect(bad).toMatch(WRITE_TO_AUTHENTICATED);
+    }
+    expect("grant select on public.chat_usage to anon;").toMatch(ANY_TO_ANON);
+    expect("grant select on public.chat_usage to authenticated;").not.toMatch(WRITE_TO_AUTHENTICATED);
+    expect("grant select, insert, update, delete on public.chat_usage to service_role;").not.toMatch(WRITE_TO_AUTHENTICATED);
+    expect(code("-- the default privileges grant every new table to anon\nselect 1;")).not.toMatch(ANY_TO_ANON);
   });
 
   it("let a member or an admin read their own agency's rows, and nobody else", () => {
@@ -23,6 +45,8 @@ describe("the chat tables", () => {
       expect(migration).toMatch(new RegExp(`create policy ${table}_read_member_or_admin on public\\.${table}\\s+for select to authenticated using \\(public\\.can_see\\(agency_id\\) or public\\.is_admin\\(\\)\\);`));
     }
     expect(migration).not.toMatch(/create policy chat_budget_alerts/);
+    // Exactly those three: a fourth policy would be a door these tests do not describe.
+    expect(code(migration).match(/create policy chat_/g)).toHaveLength(3);
   });
 
   it("delete a transcript with its lead, and messages and usage with their conversation", () => {

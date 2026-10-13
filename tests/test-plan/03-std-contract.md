@@ -523,14 +523,15 @@ transcript and usage rows.
 | ID | Title | Expected result |
 |---|---|---|
 | CTR-CHSCH-001 | "%s has row-level security on" (4 tables) | `enable row level security` for each of the four tables |
-| CTR-CHSCH-002 | "are closed to anon and to authenticated writes" | Table privileges revoked from anon and authenticated; `select` alone granted back; no insert/update/delete grant to authenticated |
-| CTR-CHSCH-003 | "let a member or an admin read their own agency's rows, and nobody else" | One `can_see(agency_id) or is_admin()` select policy on each of the three readable tables; none on `chat_budget_alerts` |
+| CTR-CHSCH-002 | "are closed to anon and to authenticated writes" | Table privileges revoked from anon and authenticated; `select` alone granted back; outside comments, no grant naming insert/update/delete/all (alone or in a list) to authenticated, and no grant at all to anon |
+| CTR-CHSCH-003 | "let a member or an admin read their own agency's rows, and nobody else" | One `can_see(agency_id) or is_admin()` select policy on each of the three readable tables; none on `chat_budget_alerts`; exactly three `create policy chat_` |
 | CTR-CHSCH-004 | "delete a transcript with its lead, and messages and usage with their conversation" | `lead_id` and the two conversation FKs are `on delete cascade` |
 | CTR-CHSCH-005 | "keep transcripts twelve months by default" | `delete_after` defaults to `now() + interval '12 months'` |
 | CTR-CHSCH-006 | "open the usage totals and the purge to the service role only" | `revoke execute` from public, anon, authenticated and `grant execute` to service_role on `chat_month_usage` and `purge_chat_conversations` |
 | CTR-CHSCH-007 | "schedule the purge nightly, after enabling pg_cron" | The schedule migration creates the extension and schedules `chat-purge-nightly` at `15 1 * * *` |
 | CTR-CHSCH-008 | "record a hand-off apart from status, so a lead and a hand-off can both be told" | `chat_conversations.escalated_at timestamptz` is nullable and present |
 | CTR-CHSCH-009 | "hold a conversation for one turn at a time with a lease, free by default (I3)" | `chat_conversations.busy_until timestamptz` is nullable and present |
+| CTR-CHSCH-010 | "guard against write grants hidden in a list and against any grant to anon" | The two guards match `grant select, insert … to authenticated`, `grant all …`, a grant to `service_role, authenticated`, and a grant to anon; not a select grant, not the service-role grant, not a comment (triage 1) |
 
 ### 4.11 The chat prompts — `chat-prompts.contract.test.ts`
 
@@ -571,7 +572,7 @@ time.
 
 ## 6. Pass criteria
 
-All 589 cases pass. A failure means either the frontend or the backend definition
+All 590 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

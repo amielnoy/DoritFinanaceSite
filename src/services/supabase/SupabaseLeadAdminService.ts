@@ -90,10 +90,15 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
       .map((r) => ({ role: r.role as TranscriptLine["role"], content: String(r.content ?? ""), at: String(r.created_at ?? "") }));
   }
 
-  /** Which leads have a conversation: one read of the link column, so the screen can show the tab only where there is something to read. */
+  /**
+   * Which leads have a conversation: one read of the link column, so the screen
+   * can show the tab only where there is something to read. Only linked rows:
+   * conversations without a lead (most of them) would otherwise fill the window
+   * and hide an older lead's tab.
+   */
   async transcriptLeadIds(): Promise<string[]> {
     const rows = await fetchRows(
-      this.client.from("chat_conversations").select("lead_id").order("created_at", { ascending: false }).limit(1000),
+      this.client.from("chat_conversations").select("lead_id").not("lead_id", "is", null).order("created_at", { ascending: false }).limit(1000),
       "chat_conversations",
     );
     return [...new Set(rows.map((r) => r.lead_id).filter((v): v is string => typeof v === "string" && v !== ""))];
