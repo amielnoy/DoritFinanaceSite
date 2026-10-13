@@ -54,7 +54,7 @@ A post-prerender build step `scripts/build-seo-files.mjs` writes into `dist/`:
 - `llms.txt`: today's header, contact, disclosure and limitations **verbatim** from `public/llms.txt` (kept as the template), an "מאמרים" section (title, URL, the article's `excerpt` as the one-sentence summary), and the crawler note rewritten to say articles are served as full HTML.
 - `llms-full.txt`: the FAQ text and every published article's body as plain text, each under its title and URL.
 - `robots.txt`: `Sitemap: https://govari-fin.co.il/sitemap.xml`; the `llms-full.txt` mention.
-- IndexNow key file `public/<key>.txt` (not a secret). A post-deploy CI step submits to `api.indexnow.org` the articles whose `updated_at` is within 48 h plus every static route on a deploy that changed its page source; failure logs `::warning::` and never fails the deploy.
+- IndexNow key file `public/<key>.txt` (not a secret). A post-deploy CI step submits to `api.indexnow.org` the article URLs whose `updated_at` is within the last 48 h (an empty list submits nothing). Static routes are submitted once, by hand, from the launch checklist (PR 6). A failed submission logs `::warning::` and never fails the deploy.
 - `index.html` emits `<meta name="google-site-verification">` and `<meta name="msvalidate.01">` from `VITE_GOOGLE_SITE_VERIFICATION` / `VITE_BING_SITE_VERIFICATION` only when set (via the site-url plugin's HTML transform, not inline script — CSP-neutral).
 
 **Tests.** Unit for the generator (sitemap shape, lastmod, verbatim llms header, articles section, llms-full); contract: llms.txt still passes every existing ai-surface check, IndexNow step cannot fail the deploy, meta tags absent when unset.
