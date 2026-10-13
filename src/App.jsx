@@ -36,6 +36,7 @@ const Claims = lazy(() => import('@/pages/Claims'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const Tools = lazy(() => import('@/pages/Tools'));
 const Perspective = lazy(() => import('@/pages/Perspective'));
+const Masleka = lazy(() => import('@/pages/Masleka'));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -91,6 +92,7 @@ const AuthenticatedApp = () => {
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/tools" element={<Tools />} />
         <Route path="/perspective" element={<Perspective />} />
+        <Route path="/masleka" element={<Masleka />} />
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login?returnTo=/account" replace />} />}>
           <Route path="/account" element={<Account />} />

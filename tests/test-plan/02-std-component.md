@@ -261,8 +261,29 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-BADM-012 | "says nothing when a draft is published" | No note |
 | CMP-BADM-013 | "says it after a published article is deleted, but not a draft" | Note only for the published one |
 
+### 4.17 `<Masleka />` — the client's clearinghouse page — `tests/component/masleka-page.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSK-001 | "says the service is unavailable when the switch is off, and offers no form" | Heading; no form; nothing sent |
+| CMP-MSK-002 | "takes the link's token out of the address bar" | Hash empty, path `/masleka` |
+| CMP-MSK-003 | "does not take the token from a query string" | `?t=` ignored: "הקישור חסר או שגוי"; nothing sent |
+| CMP-MSK-004 | "sends the code and the nine-digit ID with the link's token, then only thanks" | `submit(token, 'AB12-CD34', '000000018')`; thanks; values gone |
+| CMP-MSK-005 | "writes neither value to storage or the console" | No `setItem`; no console call carries either value |
+| CMP-MSK-006 | "refuses an ID that fails the check digit before sending" | Alert; not sent |
+| CMP-MSK-007 | "refuses a code that cannot be one" | Alert; not sent |
+| CMP-MSK-008 | "explains a link that is no longer valid, in clientMessage's words" | `clientMessage(link_invalid)` text |
+| CMP-MSK-009 | "after too many tries says to wait, and that the link is not dead" | "נסו שוב בעוד זמן מה", "הקישור תקין" |
+| CMP-MSK-010 | "after an unknown failure says the code may have arrived, with no invitation to retry" | "ייתכן שהקוד כבר התקבל", "דורית תיצור קשר"; no "נסו שוב" |
+| CMP-MSK-011 | "treats a thrown non-MaslekaError the same way" | Same "ייתכן שהקוד כבר התקבל" |
+| CMP-MSK-012 | "asks for the link when there is no token" | Heading; no form |
+| CMP-MSK-013 | "links to the clearinghouse in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
+| CMP-MSK-014 | "links the privacy policy, since it collects an ID number" | `/privacy` |
+| CMP-MSK-015 | "renders no screenshot slot when none is given, and the given one when it is" | 0 figures; then 1 |
+| CMP-MSK-016 | "is marked noindex" | SeoRouteGuard writes `noindex` on `/masleka` |
+
 ## 5. Pass criteria
 
-All 92 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 108 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
