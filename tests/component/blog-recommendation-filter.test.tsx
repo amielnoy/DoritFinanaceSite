@@ -104,14 +104,16 @@ beforeEach(() => {
 describe("the blog page shows only the recommended posts", () => {
   it("shows every post when no recommendation has arrived yet", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
     expect(shownIds()).toEqual(["post-a", "post-b", "post-c"]);
     expect(screen.queryByText(BACK_TO_ALL)).toBeNull();
   });
 
   it("hides every post the chat did not recommend", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
 
     await recommend(["post-a"]);
 
@@ -123,7 +125,8 @@ describe("the blog page shows only the recommended posts", () => {
 
   it("orders the posts the way the chat ranked them", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
 
     await recommend(["post-c", "post-a"]);
 
@@ -133,7 +136,8 @@ describe("the blog page shows only the recommended posts", () => {
 
   it("brings every post back from the show-all button", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
     await recommend(["post-a"]);
     await waitFor(() => expect(card("post-b")).toBeNull());
 
@@ -145,7 +149,8 @@ describe("the blog page shows only the recommended posts", () => {
 
   it("keeps every post when none of the recommended ids exists, rather than an empty page", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
 
     await recommend(["no-such-post"]);
 
@@ -155,7 +160,8 @@ describe("the blog page shows only the recommended posts", () => {
 
   it("clears a chosen keyword when a recommendation arrives", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
     fireEvent.click(keyword("תביעות"));
     expect(shownIds()).toEqual(["post-c"]);
 
@@ -167,7 +173,8 @@ describe("the blog page shows only the recommended posts", () => {
 
   it("drops the recommendation filter once the visitor picks a keyword", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
     await recommend(["post-a"]);
     await waitFor(() => expect(card("post-b")).toBeNull());
 
@@ -178,7 +185,8 @@ describe("the blog page shows only the recommended posts", () => {
 
   it("drops the recommendation filter once the visitor searches", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
     await recommend(["post-a"]);
     await waitFor(() => expect(card("post-b")).toBeNull());
 
@@ -189,7 +197,8 @@ describe("the blog page shows only the recommended posts", () => {
 
   it("clears an earlier search so the recommendation is not narrowed to nothing", async () => {
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
     const search = screen.getByPlaceholderText("חיפוש מאמרים…") as HTMLInputElement;
     fireEvent.change(search, { target: { value: "ביטוח" } });
     expect(shownIds()).toEqual(["post-b"]);
@@ -203,7 +212,8 @@ describe("the blog page shows only the recommended posts", () => {
   it("scrolls the recommendation into view", async () => {
     const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView");
     renderBlog();
-    await screen.findByText("דמי ניהול בפנסיה");
+    // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
     scrollSpy.mockClear();
 
     await recommend(["post-b"]);

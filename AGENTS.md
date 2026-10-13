@@ -55,6 +55,12 @@ npx skills add base44/skills
   (`leads_update_admin` / `leads_delete_admin`), by Supabase `id`, and ask for
   the row back — a write row-level security filters out changes nothing and
   returns no error, so an empty answer is an error, never a success.
+- `supabase/functions/chat/`: the on-site agents served by our own function (`VITE_CHAT_AGENTS`; the interview first).
+  - The prompts' source of truth is `prompts/*.md`. Run `npm run build:chat-prompts` after editing one; a contract test fails while `prompts.generated.ts` is stale.
+  - `interview.md` must render to `needs_interview.jsonc`'s instructions byte for byte apart from the three lines in `tests/helpers/chat-prompt-sources.mjs`, while the `.jsonc` still serves Base44. Change both, or neither.
+  - `_shared/agency.ts` is a pinned copy of `agencyProfile.ts`.
+  - The tool names stay `submitLead` and `escalateToHuman`, because the prompt names them.
+  - Consent and attribution come from the conversation row, never from the model.
 - **An article's address is `blog_posts.slug`, and its rule is spelled four times.**
   Supabase holds it alone (Base44's `BlogPost` has none), so `contentAdmin` sends
   it to the mirror and never to Base44. It is Latin kebab-case and never 24 hex

@@ -584,7 +584,10 @@ describe("the chat shell enforces what a prompt cannot", () => {
   });
 
   it("stamps every conversation with the consent version it was given under", () => {
-    expect(chat).toMatch(/consent_version: CONSENT_VERSION/);
+    // The shell chooses the stamp — v5, or v6 for an agent on the chat
+    // function — from its own constants; never from the conversation.
+    expect(chat).toMatch(/consent_version: consentVersion/);
+    expect(chat).toMatch(/const consentVersion = viaChatFunction \? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION;/);
   });
 });
 

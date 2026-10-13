@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:chat-prompts": "node scripts/build-chat-prompts.mjs",
     "build:prerender": "vite build && node scripts/prerender.mjs && node scripts/build-seo-files.mjs",
     "prerender": "node scripts/prerender.mjs",
     "lint": "eslint . --quiet",
@@ -23,6 +24,7 @@
     "test:contract": "vitest run tests/contract",
     "test:integration": "vitest run tests/integration",
     "test:eval": "vitest run tests/eval",
+    "test:eval:chat": "node scripts/eval-chat.mjs",
     "test:security": "vitest run tests/security",
     "test:vitest": "vitest run",
     "test:watch": "vitest",
