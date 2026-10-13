@@ -700,6 +700,7 @@ jobs:
       url: ${{ steps.deploy.outputs.url }}
       deployed: ${{ steps.deploy.outputs.deployed }}
       kind: ${{ steps.target.outputs.kind }}
+      asset: ${{ steps.built.outputs.asset }}
     # Also on `builder`, where it deploys a *preview* rather than production.
     # That is the point of the branch: a Builder edit gets a URL you can open
     # and look at before you merge it, instead of being judged from a diff.
@@ -830,6 +831,19 @@ jobs:
             node scripts/check-csp-hashes.mjs .vercel/output/static || echo "::warning::A preview inline script is outside the CSP (see above); production would refuse to deploy it."
           fi
 
+      # The bundle this production deploy serves, read from the output being
+      # deployed. The smoke waits until production serves exactly this, which is
+      # at once when the commit left the frontend unchanged — rather than waiting
+      # for the bundle to *change*, which never happens then and used to cost the
+      # full eight-minute timeout (scripts/wait-for-deployment.mjs).
+      - name: Record the release being deployed
+        id: built
+        if: steps.creds.outputs.ready == 'true' && steps.target.outputs.env == 'production'
+        run: |
+          asset=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' .vercel/output/static/index.html | head -1 || true)
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "This deploy serves: ${asset:-unknown}"
+
       - name: Deploy
         id: deploy
         if: steps.creds.outputs.ready == 'true'
@@ -944,6 +958,7 @@ jobs:
         env:
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
           PREVIOUS_ASSET: ${{ needs.deploy.outputs.previous_asset }}
+          EXPECTED_ASSET: ${{ needs['deploy-vercel'].outputs.asset }}
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium

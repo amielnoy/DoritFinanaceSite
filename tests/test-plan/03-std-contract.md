@@ -363,6 +363,15 @@ requires the "Build for Vercel" step to drop the variable before `vercel build`;
 the other requires the step to refuse a bundle under `.vercel/output` that still
 names the placeholder.
 
+The "waits for the new release to be served" case also pins how long that wait
+can be. The Vercel job records the bundle it is deploying to production (step
+`built`, read from `.vercel/output/static/index.html`, production only, after
+"Build for Vercel"), and the smoke passes it as `EXPECTED_ASSET`. Production is
+then ready the moment it serves that bundle, which is immediately when a commit
+left the frontend unchanged. Before this, the wait asked for the bundle to
+*change* and sat out its whole eight-minute timeout on every backend-, docs- or
+SEO-file merge.
+
 Ten further cases cover the run summary, per writer rather than per file. The
 two writers are split by branch and cannot both fire — "Deployed sites" on
 `main`, "Safe to merge?" on every other ref — which is deliberate, since two
