@@ -619,7 +619,23 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-SVER-004 | "refuses a whole pasted <meta> tag and says what to paste" | Throws "only the content value" |
 | UNIT-SVER-005 | "is what the plugin injects into index.html" | `transformIndexHtml()` equals `verificationTags(env)` |
 
+### 4.30 IndexNow submission — `tests/unit/indexnow.test.ts`
+
+`scripts/indexnow.mjs`: reads the live sitemap, submits articles changed in the last 48 h, and never throws. Fetch is mocked; nothing reaches api.indexnow.org.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-INOW-001 | "returns only articles changed within the window" | `/blog/fresh` and `/blog/yesterday` only |
+| UNIT-INOW-002 | "never submits static routes, even /blog with a fresh lastmod" | `/blog` absent |
+| UNIT-INOW-003 | "is empty when nothing changed" | `[]` |
+| UNIT-INOW-004 | "names the host, the key and where the key file is" | `host`, `key`, `keyLocation`, `urlList` |
+| UNIT-INOW-005 | "posts the recent articles to IndexNow" | POST to `api.indexnow.org/indexnow` with 2 URLs; `{ submitted: 2 }` |
+| UNIT-INOW-006 | "submits nothing when no article changed" | `{ submitted: 0 }`, only the sitemap fetched |
+| UNIT-INOW-007 | "warns and resolves on a refused submission" | HTTP 422 warned; `{ submitted: 0 }` |
+| UNIT-INOW-008 | "warns and resolves when IndexNow cannot be reached" | Network error warned; `{ submitted: 0 }` |
+| UNIT-INOW-009 | "warns and resolves without an origin" | Warns; `{ submitted: 0 }` |
+
 ## 5. Pass criteria
 
-All 436 cases pass. Any failure is a functional defect, not an environment issue —
+All 445 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

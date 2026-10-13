@@ -885,6 +885,16 @@ jobs:
               || { echo "::error::/blog is not served its prebuilt page"; exit 1; }
           fi
 
+      # IndexNow: tell Bing and the other IndexNow engines which articles changed
+      # in the last 48 hours, read from the sitemap now being served. Production
+      # only, and it can never fail the deploy (scripts/indexnow.mjs warns instead).
+      - name: Tell IndexNow about new and changed articles
+        if: steps.creds.outputs.ready == 'true' && steps.target.outputs.env == 'production'
+        continue-on-error: true
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+        run: node scripts/indexnow.mjs
+
   # ── 6. Post-deploy smoke test against the live site ──────────────────────
   #
   # Waits on both publishes and smokes whatever `PRODUCTION_URL` names, rather

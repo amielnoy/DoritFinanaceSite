@@ -498,6 +498,14 @@ that writes real slugs.
 | CTR-SLUG-007 | "contentAdmin's copy is the same" | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
 | CTR-SLUG-008 | "the build's copy is the same" | `scripts/published-articles.mjs` patterns equal `articlePath.ts`'s |
 
+### 4.9 IndexNow — `indexnow.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-INOW-001 | "publishes the key file at the site root, holding the key" | `public/<key>.txt` contains `INDEXNOW_KEY` |
+| CTR-INOW-002 | "is a step of the Vercel deploy job, for production only" | The step is gated on `steps.target.outputs.env == 'production'` and runs `node scripts/indexnow.mjs` |
+| CTR-INOW-003 | "can never fail the deploy" | `continue-on-error: true`; the script has no non-zero `process.exit` / `exitCode` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -507,7 +515,7 @@ time.
 
 ## 6. Pass criteria
 
-All 568 cases pass. A failure means either the frontend or the backend definition
+All 571 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight
