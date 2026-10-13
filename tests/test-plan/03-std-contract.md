@@ -545,6 +545,16 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 | CTR-CHPROMPT-007 | "no longer lists createConsultationEvent as an interview tool" | The stale `createConsultationEvent` row is gone from `COMPLIANCE.md` |
 | CTR-CHPROMPT-008 | "is what the build script writes from the Markdown files today" | `prompts.generated.ts` equals `renderPromptsModule` output; stale means run `npm run build:chat-prompts` |
 
+### 4.12 The chat function's tools — `tests/contract/chat-function.contract.test.ts`
+
+The interview's tools ask the model for nothing their Edge handlers do not read, and offer exactly the hand-off reasons `escalate-to-human` knows. Tasks 6 and 7 add their cases here.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHFN-001 | "submitLead asks the model only for fields submit-lead reads" | Every `submitLead` schema property is destructured by the submit-lead handler |
+| CTR-CHFN-002 | "escalateToHuman asks the model only for fields escalate-to-human reads" | Every `escalateToHuman` schema property is destructured by the escalate-to-human handler |
+| CTR-CHFN-003 | "offers exactly the hand-off reasons escalate-to-human knows" | `ESCALATION_REASONS` equals the keys of `REASONS` in `escalation.js`, in order |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -554,7 +564,7 @@ time.
 
 ## 6. Pass criteria
 
-All 580 cases pass. A failure means either the frontend or the backend definition
+All 583 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

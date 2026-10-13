@@ -662,7 +662,27 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHPROMPT-006 | "leaves no placeholder unfilled" | No `{{agency.` left in any block |
 | UNIT-CHPROMPT-007 | "asks for a submitLead call, never a fenced block" | Role block has no fenced `lead` block and asks for `submitLead` with `stage='complete'` |
 
+### 4.32 The chat function's tools — `tests/unit/chat-tools.test.ts`
+
+`supabase/functions/chat/tools.ts`: the interview's tool schemas and the runners that call `submit-lead` and `escalate-to-human` in-process, with fake handlers. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHTOOL-001 | "are submitLead and escalateToHuman, the names the prompt uses" | `INTERVIEW_TOOLS` names are `submitLead`, `escalateToHuman` |
+| UNIT-CHTOOL-002 | "posts the lead to submit-lead with consent and attribution from the conversation, never from the model" | submit-lead gets `source: interview`, the lead fields, and consent and attribution from the conversation; forged model values ignored; origin and x-forwarded-for forwarded; outcome `ok` with the lead id, `leadSaved` |
+| UNIT-CHTOOL-003 | "saves a partial lead silently: a lead id, but not a saved interview" | Outcome `ok` with a lead id and `leadSaved: false` |
+| UNIT-CHTOOL-004 | "writes one complete lead per conversation: the second call answers already_saved" | Handler called once; second complete call `already_saved`; conversation status `lead_saved` |
+| UNIT-CHTOOL-005 | "hands the model the handler's own Hebrew error, so it can ask again" | A 400 answer becomes `error`, `isError`, `leadSaved: false`, with the handler's Hebrew text in `forModel` |
+| UNIT-CHTOOL-006 | "simulates the save in an evaluation run, without calling the handler" | Evaluation mode: handler not called, outcome `simulated`, `leadSaved: true` |
+| UNIT-CHTOOL-007 | "posts the hand-off with the agent, the consent and the attribution, and reports it" | escalate-to-human gets reason, agent, consent version and channel; outcome `ok`, `escalated: true`, contact in `forModel` |
+| UNIT-CHTOOL-008 | "turns an unknown reason into uncertain before it leaves" | An unknown reason is sent as `uncertain` |
+| UNIT-CHTOOL-009 | "hands off once per conversation: the second call answers already_escalated without calling the handler" | Ruling 4: handler called once; second call `already_escalated`, not an error; conversation status `escalated` |
+| UNIT-CHTOOL-010 | "does not let a failed hand-off block the retry" | Ruling 4: a failed first hand-off leaves status `open`; the retry calls the handler again and succeeds |
+| UNIT-CHTOOL-011 | "exposes the lead id the hand-off recorded, for the conversation's lead_id" | Ruling 4: the handler's `leadId` is the outcome's `leadId` |
+| UNIT-CHTOOL-012 | "has no lead id when the hand-off was anonymous (the handler answers leadId null)" | Ruling 4: handler `leadId: null` gives `leadId` undefined |
+| UNIT-CHTOOL-013 | "is an error the model sees, not a crash" | An unknown tool name gives `error`, `isError` |
+
 ## 5. Pass criteria
 
-All 465 cases pass. Any failure is a functional defect, not an environment issue —
+All 478 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
