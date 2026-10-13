@@ -30,7 +30,7 @@
 
 import { access, cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { duplicateTitles, fixtureArticleFor, planArticles } from './published-articles.mjs'
+import { buildEnv, duplicateTitles, fixtureArticleFor, planArticles } from './published-articles.mjs'
 
 const DIST = join(process.cwd(), 'dist')
 const PORT = Number(process.env.PRERENDER_PORT ?? 4183)
@@ -138,7 +138,7 @@ async function serveFixtureArticles(page, rows) {
 }
 
 async function main() {
-  const { loadEnv, preview } = await import('vite')
+  const { preview } = await import('vite')
   const { chromium } = await import('@playwright/test')
 
   // Keep the shell before anything overwrites index.html — but only when
@@ -163,7 +163,7 @@ async function main() {
   // Which articles to prebuild. The environment is read the way `vite build`
   // read it — the env files, with the process environment winning — so the list
   // comes from the same Supabase project the bundle reads.
-  const env = { ...process.env, ...loadEnv('production', process.cwd(), 'VITE_') }
+  const env = await buildEnv()
   let articles
   try {
     articles = await planArticles(env)

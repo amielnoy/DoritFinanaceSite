@@ -267,7 +267,7 @@ cases extract the step's shell out of the YAML and run it under `bash -e` for
 each combination, since shell embedded in a workflow is covered by nothing else
 here.
 
-**`ai-surface.contract.test.ts` — `CTR-AI-001..014`** — what an AI assistant can
+**`ai-surface.contract.test.ts` — `CTR-AI-001..018`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript
 receives the home page's `<head>` on every route; `public/llms.txt` is therefore
 the only surface such a crawler reads in full, and the one nothing was checking.
@@ -281,7 +281,12 @@ return. It also pins that `llms.txt` links every route the sitemap advertises �
 the two drift in opposite directions, because a new page reaches the sitemap
 when an SEO test asks for it and is forgotten here because nothing does — and
 that `robots.txt` names each AI crawler explicitly rather than leaving them to
-the wildcard.
+the wildcard. `CTR-AI-015..017` pin that `robots.txt` tells a crawler where
+`/llms-full.txt` is, that `build:prerender` runs `scripts/build-seo-files.mjs`
+after the prerender (so Vercel and CI write the sitemap, `llms.txt` and
+`llms-full.txt` with the published articles), and that the Base44 Builder's plain
+`build` stays `vite build`. `CTR-AI-018` pins that the prerender and the SEO
+files both read their environment through `buildEnv`.
 
 **`blog-content.contract.test.ts` — `CTR-ART-001..019`** — the repo-held articles under
 `content/blog/`. Each must parse, be a real article rather than a stub, carry
@@ -494,6 +499,14 @@ that writes real slugs.
 | CTR-SLUG-007 | "contentAdmin's copy is the same" | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
 | CTR-SLUG-008 | "the build's copy is the same" | `scripts/published-articles.mjs` patterns equal `articlePath.ts`'s |
 
+### 4.9 IndexNow — `indexnow.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-INOW-001 | "publishes the key file at the site root, holding the key" | `public/<key>.txt` contains `INDEXNOW_KEY` |
+| CTR-INOW-002 | "is a step of the Vercel deploy job, for production only" | The step is gated on `steps.target.outputs.env == 'production'` and runs `node scripts/indexnow.mjs` |
+| CTR-INOW-003 | "can never fail the deploy" | `continue-on-error: true`; the script has no non-zero `process.exit` / `exitCode` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -503,7 +516,7 @@ time.
 
 ## 6. Pass criteria
 
-All 568 cases pass. A failure means either the frontend or the backend definition
+All 572 cases pass. A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

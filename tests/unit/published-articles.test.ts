@@ -5,6 +5,7 @@ import {
   fetchPublishedArticles,
   fixtureArticleFor,
   isValidSlug,
+  loadPublishedArticles,
   planArticles,
   // @ts-expect-error — plain .mjs tooling, imported for its pure steps.
 } from "../../scripts/published-articles.mjs";
@@ -30,9 +31,15 @@ const FIXTURE = [
   },
 ];
 
-const answer = (body: unknown, status = 200) =>
+const answer = (body: unknown, status = 200, total = Array.isArray(body) ? body.length : 0) =>
   vi.fn(async (_url: string, _init?: RequestInit) =>
-    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }),
+    new Response(JSON.stringify(body), {
+      status,
+      headers: {
+        "content-type": "application/json",
+        "content-range": Array.isArray(body) && body.length ? `0-${body.length - 1}/${total}` : `*/${total}`,
+      },
+    }),
   );
 const readFixture = (rows: unknown) => vi.fn(async (_path: string, _enc: string) => JSON.stringify(rows));
 
@@ -180,5 +187,79 @@ describe("isValidSlug and articleRoute", () => {
     expect(isValidSlug("horadat-dmei-nihul")).toBe(true);
     expect(isValidSlug("64f0a1b2c3d4e5f6a7b8c9d0")).toBe(false);
     expect(articleRoute("horadat-dmei-nihul")).toBe("/blog/horadat-dmei-nihul");
+  });
+});
+
+describe("fetchPublishedArticles — every row, or an error", () => {
+  const row = (i: number) => ({ slug: `article-${i}`, updated_at: "2026-10-01T00:00:00Z" });
+
+  it("asks for an exact count and a range", async () => {
+    const fetchImpl = answer([row(1)]);
+    await fetchPublishedArticles({ url: URL_, key: KEY, fetchImpl });
+    const headers = fetchImpl.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers.Prefer).toBe("count=exact");
+    expect(headers["Range-Unit"]).toBe("items");
+    expect(headers.Range).toBe("0-999");
+  });
+
+  it("reads page after page until the total is reached", async () => {
+    const all = [row(1), row(2), row(3)];
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      const [from] = String((init?.headers as Record<string, string>).Range).split("-").map(Number);
+      const page = all.slice(from, from + 2);
+      return new Response(JSON.stringify(page), {
+        status: 206,
+        headers: { "content-range": `${from}-${from + page.length - 1}/3` },
+      });
+    });
+    const rows = await fetchPublishedArticles({ url: URL_, key: KEY, fetchImpl, pageSize: 2 });
+    expect(rows.map((r: { slug: string }) => r.slug)).toEqual(["article-1", "article-2", "article-3"]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses an answer that has fewer rows than its own total", async () => {
+    const fetchImpl = answer([row(1)], 200, 5);
+    await expect(fetchPublishedArticles({ url: URL_, key: KEY, fetchImpl, pageSize: 1000 })).rejects.toThrow(
+      /incomplete: 1 of 5/,
+    );
+  });
+
+  it("refuses an answer with no total, because a cut-off list would look complete", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify([row(1)]), { status: 200 }));
+    await expect(fetchPublishedArticles({ url: URL_, key: KEY, fetchImpl })).rejects.toThrow(/Content-Range/);
+  });
+
+  it("accepts an empty published list when the total says zero", async () => {
+    await expect(fetchPublishedArticles({ url: URL_, key: KEY, fetchImpl: answer([]) })).resolves.toEqual([]);
+  });
+});
+
+describe("loadPublishedArticles — the same rules for every build step", () => {
+  it("returns the live rows with the columns asked for", async () => {
+    const fetchImpl = answer([{ slug: "a-b", title: "t" }]);
+    const out = await loadPublishedArticles(SUPABASE_ENV, { columns: "slug,title", fetchImpl });
+    expect(out).toEqual({ rows: [{ slug: "a-b", title: "t" }], fromFixture: false, warning: null });
+    expect(String(fetchImpl.mock.calls[0][0])).toContain("select=slug%2Ctitle");
+  });
+
+  it("returns the fixture rows in the e2e build", async () => {
+    const out = await loadPublishedArticles(
+      { PRERENDER_ARTICLES_FIXTURE: "f.json" },
+      { readFileImpl: readFixture(FIXTURE) },
+    );
+    expect(out.fromFixture).toBe(true);
+    expect(out.rows).toEqual(FIXTURE);
+  });
+
+  it("warns and returns no rows when the list cannot be had and is not required", async () => {
+    const out = await loadPublishedArticles(SUPABASE_ENV, { fetchImpl: answer({}, 500) });
+    expect(out.rows).toEqual([]);
+    expect(out.warning).toMatch(/HTTP 500/);
+  });
+
+  it("throws when the list cannot be had and is required", async () => {
+    await expect(
+      loadPublishedArticles({ ...SUPABASE_ENV, PRERENDER_REQUIRED: "1" }, { fetchImpl: answer({}, 500) }),
+    ).rejects.toThrow(/HTTP 500/);
   });
 });

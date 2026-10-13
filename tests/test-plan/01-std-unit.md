@@ -497,6 +497,8 @@ and test articles can never reach a deployment.
 | UNIT-PUBART-022 | "names each title more than one route was rendered with" | `{ title, routes }` |
 | UNIT-PUBART-023 | "is empty when every title is distinct" | `[]` |
 | UNIT-PUBART-024 | "are the app's rule and address" | Same verdicts as `articlePath.ts` |
+| UNIT-PUBART-025..029 | "fetchPublishedArticles — every row, or an error" (asks for an exact count and a range; reads page after page until the total is reached; refuses fewer rows than the total; refuses an answer with no total; accepts an empty list when the total says zero) | `Prefer`, `Range-Unit`, `Range: 0-999`; two pages of a three-row list; `incomplete: 1 of 5`; `Content-Range` error; `[]` |
+| UNIT-PUBART-030..033 | "loadPublishedArticles — the same rules for every build step" (live rows with the columns asked for; fixture rows; warns when not required; throws when required) | `{ rows, fromFixture, warning }`; `select=slug%2Ctitle`; `HTTP 500` warning or throw |
 
 ### 4.23 Reading one article — `tests/unit/supabase-content.test.ts` (`getArticle`)
 
@@ -579,7 +581,74 @@ Tested on the pure resolver: under Vitest `import.meta.env` mirrors
 | UNIT-SURL-004 | "treats a blank value as unset, as the build plugin does" | Empty / whitespace skipped |
 | UNIT-SURL-005 | "strips trailing slashes from whichever source wins" | No trailing `/` |
 
+### 4.28 The sitemap and llms files — `tests/unit/seo-files.test.ts`
+
+Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted copies of `public/sitemap.xml` and `public/llms.txt`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SEOF-001 | "reads the host the site-url plugin already chose" | Origin of the first `<loc>` |
+| UNIT-SEOF-002 | "refuses a sitemap with no https <loc>" | Throws "no <loc>" |
+| UNIT-SEOF-003 | "prefers updated_at, then the created dates, and normalises to ISO" | ISO `.000Z` timestamps |
+| UNIT-SEOF-004 | "is null when there is no usable date" | `null` for `{}` and an unparsable date |
+| UNIT-SEOF-005 | "keeps the static routes without a lastmod" | `<loc>` followed directly by `<changefreq>` |
+| UNIT-SEOF-006 | "dates /blog by its newest article" | `/blog` has the newest `<lastmod>` |
+| UNIT-SEOF-007 | "adds every article at /blog/<slug> with its own lastmod" | One entry per article |
+| UNIT-SEOF-008 | "writes no empty lastmod for an article without a date" | No `<lastmod></lastmod>` |
+| UNIT-SEOF-009 | "stays one well-formed urlset" | One `<urlset>`, ends `</urlset>`, 4 `<url>` |
+| UNIT-SEOF-010 | "leaves /blog undated when there are no articles" | Output equals the template |
+| UNIT-SEOF-011 | "keeps everything before the pages list verbatim" | llms.txt header unchanged |
+| UNIT-SEOF-012 | "adds an articles section before the crawler note, one line per article" | Link lines; brackets in titles become parentheses |
+| UNIT-SEOF-013 | "points at llms-full.txt from the crawler note" | `<origin>/llms-full.txt` present |
+| UNIT-SEOF-014 | "collapses a line break in an excerpt so the list stays a list" | Excerpt on one line |
+| UNIT-SEOF-015 | "refuses a template without the crawler note it inserts before" | Throws |
+| UNIT-SEOF-016 | "opens with the identity, contact, disclosure and limitations, verbatim" | Header kept; no `## דפים` |
+| UNIT-SEOF-017 | "carries every question and answer under its own heading" | `### question` then answer |
+| UNIT-SEOF-018 | "carries every article's text under its title and address" | Title, address and `עודכן` date, then body |
+| UNIT-SEOF-019 | "refuses a template without the pages heading it cuts at" | Throws "## דפים" |
+| UNIT-SEOF-020 | "moves every heading two levels down, stopping at h6" | `##`→`####`, `####`→`######`, `######` stays |
+| UNIT-SEOF-021 | "leaves a heading-looking line inside a fenced block alone" | ``` and ~~~ fences untouched |
+| UNIT-SEOF-022 | "leaves #hashtag (no space) and mid-line hashes alone" | Text unchanged |
+| UNIT-SEOF-023 | "makes a root-relative Markdown link target absolute" | `](/#start)` and `](/blog)` gain the origin |
+| UNIT-SEOF-024 | "leaves absolute and protocol-relative targets alone" | `https://` and `//cdn` unchanged |
+| UNIT-SEOF-025 | "leaves a fenced block alone" | Link inside a fence unchanged |
+| UNIT-SEOF-026 | "keeps only articles whose page exists, and names the rest" | `kept` and `dropped` slugs from a fake `exists` |
+| UNIT-SEOF-027 | "drops nothing when every page exists" | `dropped` empty |
+| UNIT-SEOF-028 | "demotes the body's headings below the article title" | `#### מה בודקים` in llms-full |
+| UNIT-SEOF-029 | "makes the body's root-relative links absolute" | Link carries the origin in llms-full |
+
+### 4.29 Search Console and Bing verification tags — `tests/unit/site-verification.test.ts`
+
+`verificationTags` in `scripts/vite-site-url-plugin.mjs`, injected into `index.html` by the plugin's `transformIndexHtml`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SVER-001 | "emits nothing when neither variable is set" | `[]` |
+| UNIT-SVER-002 | "emits Google's and Bing's tags from their variables" | `google-site-verification` then `msvalidate.01` meta tags, `injectTo: head` |
+| UNIT-SVER-003 | "ignores a variable that is set but blank" | `[]` |
+| UNIT-SVER-004 | "refuses a whole pasted <meta> tag and says what to paste" | Throws "only the content value" |
+| UNIT-SVER-005 | "is what the plugin injects into index.html" | `transformIndexHtml()` equals `verificationTags(env)` |
+
+### 4.30 IndexNow submission — `tests/unit/indexnow.test.ts`
+
+`scripts/indexnow.mjs`: reads the live sitemap, submits articles changed in the last 48 h, and never throws. Fetch is mocked; nothing reaches api.indexnow.org.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-INOW-001 | "returns only articles changed within the window" | `/blog/fresh` and `/blog/yesterday` only |
+| UNIT-INOW-002 | "never submits static routes, even /blog with a fresh lastmod" | `/blog` absent |
+| UNIT-INOW-003 | "is empty when nothing changed" | `[]` |
+| UNIT-INOW-004 | "names the host, the key and where the key file is" | `host`, `key`, `keyLocation`, `urlList` |
+| UNIT-INOW-005 | "posts the recent articles to IndexNow" | POST to `api.indexnow.org/indexnow` with 2 URLs; `{ submitted: 2 }` |
+| UNIT-INOW-006 | "submits nothing when no article changed" | `{ submitted: 0 }`, only the sitemap fetched |
+| UNIT-INOW-007 | "warns and resolves on a refused submission" | HTTP 422 warned; `{ submitted: 0 }` |
+| UNIT-INOW-008 | "warns and resolves when IndexNow cannot be reached" | Network error warned; `{ submitted: 0 }` |
+| UNIT-INOW-009 | "warns and resolves without an origin" | Warns; `{ submitted: 0 }` |
+| UNIT-INOW-010 | "warns when the sitemap's articles are on another host" | Warns "not on <site>"; no "no article changed" info; `{ submitted: 0 }` |
+| UNIT-INOW-011 | "still submits when the origin has a trailing slash" | `{ submitted: 2 }` |
+| UNIT-INOW-012 | "warns and resolves when the sitemap answers with an error" | HTTP 503 warned; `{ submitted: 0 }` |
+
 ## 5. Pass criteria
 
-All 431 cases pass. Any failure is a functional defect, not an environment issue —
+All 458 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

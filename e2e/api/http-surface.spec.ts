@@ -172,6 +172,37 @@ test.describe("HTTP surface — sanity", () => {
     });
   });
 
+  test("the sitemap lists the prebuilt article", async ({ request }) => {
+    const body = await test_step("GET /sitemap.xml", async () => (await request.get("/sitemap.xml")).text());
+    await test_step("the fixture article is listed with a lastmod", async () => {
+      expect(body).toMatch(/<loc>https:\/\/[^<]+\/blog\/bdikat-maslul-e2e<\/loc>\s*<lastmod>[^<]+<\/lastmod>/);
+    });
+  });
+
+  test("llms.txt lists the articles and points at the full text", async ({ request }) => {
+    const body = await test_step("GET /llms.txt", async () => (await request.get("/llms.txt")).text());
+    await test_step("it has an articles section and the llms-full link", async () => {
+      expect(body).toContain("## מאמרים");
+      expect(body).toMatch(/\/blog\/bdikat-maslul-e2e\)/);
+      expect(body).toContain("/llms-full.txt");
+    });
+  });
+
+  test("llms-full.txt carries the questions and the articles as text", async ({ request }) => {
+    const res = await test_step("GET /llms-full.txt", () => request.get("/llms-full.txt"));
+    await test_step("it is served as plain text with both sections", async () => {
+      expect(res.status()).toBe(200);
+      expect(res.headers()["content-type"]).toContain("text/plain");
+      const body = await res.text();
+      expect(body).toContain("## שאלות ותשובות");
+      expect(body).toContain("## מאמרים");
+      expect(body).toContain("L-00107009");
+      // The article's own "##" section is demoted below its "###" title.
+      expect(body).toContain("#### מה בודקים");
+      expect(body).not.toMatch(/^## מה בודקים/m);
+    });
+  });
+
   test("client-side routes fall back to the SPA shell with a 200", async ({ request }) => {
     for (const path of ["/blog", "/claims", "/privacy", "/accessibility", "/blog/some-id"]) {
       await test_step(`${path} is answered with the SPA shell`, async () => {
