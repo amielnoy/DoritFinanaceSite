@@ -31,6 +31,21 @@ const h = vi.hoisted(() => ({
       published: false,
       created_date: "2026-10-02T09:00:00Z",
     },
+    {
+      id: "64f0a1b2c3d4e5f6a7b8c9d2",
+      slug: "post-6ac8eb62b0a953274445869d",
+      title: "ישן עם כתובת חלופית",
+      body: "גוף",
+      published: true,
+      created_date: "2026-09-01T09:00:00Z",
+    },
+    {
+      id: "64f0a1b2c3d4e5f6a7b8c9d3",
+      title: "ישן בלי כתובת",
+      body: "גוף",
+      published: false,
+      created_date: "2026-09-02T09:00:00Z",
+    },
   ],
   save: vi.fn(async (_args: unknown) => {}),
 }));
@@ -56,7 +71,10 @@ const saveButton = () => screen.getByRole("button", { name: /שמירה/ }) as H
 const edit = (i: number) => fireEvent.click(screen.getAllByRole("button", { name: "עריכה" })[i]);
 const typeSlug = (value: string) => fireEvent.change(slugInput(), { target: { value } });
 
-beforeEach(() => h.save.mockClear());
+beforeEach(() => {
+  h.save.mockReset();
+  h.save.mockImplementation(async () => {});
+});
 
 describe("the article's address in the admin form", () => {
   it("prefills an existing article's slug", () => {
@@ -109,5 +127,54 @@ describe("the article's address in the admin form", () => {
       id: "64f0a1b2c3d4e5f6a7b8c9d0",
       draft: expect.objectContaining({ slug: "dmei-nihul-2026" }),
     });
+  });
+
+  it("accepts a legacy fallback slug as it is", () => {
+    renderAdmin();
+    edit(2);
+    expect(slugInput().value).toBe("post-6ac8eb62b0a953274445869d");
+    expect(screen.queryByText(SLUG_PROBLEMS.missing)).toBeNull();
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it("asks a legacy article with no slug for one, and saves once it has one", () => {
+    renderAdmin();
+    edit(3);
+    expect(slugInput().value).toBe("");
+    expect(screen.getByText(SLUG_PROBLEMS.missing)).toBeTruthy();
+    expect(saveButton().disabled).toBe(true);
+    typeSlug("yashan-bli-ktovet");
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it("shows the server's words when the address is taken (409), and the form stays editable", async () => {
+    h.save.mockRejectedValueOnce(Object.assign(new Error(SLUG_TAKEN), { status: 409 }));
+    renderAdmin();
+    edit(0);
+    typeSlug("dmei-nihul-2026");
+    fireEvent.click(saveButton());
+    expect((await screen.findByRole("alert")).textContent).toBe(SLUG_TAKEN);
+    expect(slugInput().disabled).toBe(false);
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it("shows the server's words when the address is invalid (400)", async () => {
+    const text = "כתובת המאמר חסרה או אינה תקינה.";
+    h.save.mockRejectedValueOnce(Object.assign(new Error(text), { status: 400 }));
+    renderAdmin();
+    edit(0);
+    typeSlug("dmei-nihul-2026");
+    fireEvent.click(saveButton());
+    expect((await screen.findByRole("alert")).textContent).toBe(text);
+  });
+
+  it("keeps the generic message for any other failure, never the raw server text", async () => {
+    h.save.mockRejectedValueOnce(Object.assign(new Error("internal: db password"), { status: 500 }));
+    renderAdmin();
+    edit(0);
+    typeSlug("dmei-nihul-2026");
+    fireEvent.click(saveButton());
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("שמירת המאמר נכשלה. ניתן לנסות שוב.");
   });
 });

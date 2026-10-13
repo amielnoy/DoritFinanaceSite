@@ -253,9 +253,13 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-BADM-004 | "warns before a published article's address changes" | `role="status"` naming `/blog/horadat-dmei-nihul` |
 | CMP-BADM-005 | "does not warn for a draft, which nobody links to yet" | No status |
 | CMP-BADM-006 | "sends the slug with the article" | `mutateAsync({ id, draft: { …, slug } })` |
+| CMP-BADM-007 | "accepts a legacy fallback slug as it is" | `post-6ac8eb62b0a953274445869d` valid; save enabled |
+| CMP-BADM-008 | "asks a legacy article with no slug for one, and saves once it has one" | `SLUG_PROBLEMS.missing`; save disabled until a valid slug is typed |
+| CMP-BADM-009 | "shows the server's words when the address is taken (409), …" / "… invalid (400)" (2) | The 409 / 400 text in the alert; inputs and save still enabled |
+| CMP-BADM-010 | "keeps the generic message for any other failure, never the raw server text" | `שמירת המאמר נכשלה. ניתן לנסות שוב.` for a 500 |
 
 ## 5. Pass criteria
 
-All 88 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 92 cases pass. A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

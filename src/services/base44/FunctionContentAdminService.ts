@@ -90,7 +90,11 @@ export class FunctionContentAdminService implements ContentAdminPort {
     // without checking `ok` would let "you are not an admin" land as a silent
     // success and the caller redraw as though the write had happened.
     const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
-    if (!res.ok || data.error) throw new Error(data.error ?? `הפעולה נכשלה (${res.status}).`);
+    // The status rides on the Error so a form can tell a refusal it can explain
+    // (400 invalid slug, 409 taken) from a failure it cannot.
+    if (!res.ok || data.error) {
+      throw Object.assign(new Error(data.error ?? `הפעולה נכשלה (${res.status}).`), { status: res.status });
+    }
     return data.id ?? "";
   }
 }

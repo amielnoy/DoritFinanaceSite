@@ -69,6 +69,19 @@ const toEdit = (p: BlogPostItem): BlogPostEdit => ({
   published: !!p.published,
 });
 
+/** contentAdmin's answers to a slug it will not store (400 invalid, 409 taken). */
+const SLUG_REFUSALS: Record<number, string> = {
+  400: "כתובת המאמר חסרה או אינה תקינה.",
+  409: SLUG_TAKEN,
+};
+
+/** The server's words for a slug refusal, or null for any other failure — unknown text is never shown. */
+const refusalText = (err: unknown): string | null => {
+  const { status, message } = err as { status?: unknown; message?: unknown };
+  if (typeof status !== "number") return null;
+  return SLUG_REFUSALS[status] !== undefined && message === SLUG_REFUSALS[status] ? SLUG_REFUSALS[status] : null;
+};
+
 export default function BlogAdmin() {
   const { data, isPending: loading, isError } = useAdminArticles();
   const saveArticle = useSaveArticle();
@@ -153,8 +166,8 @@ export default function BlogAdmin() {
     try {
       await saveArticle.mutateAsync({ id: editing.id, draft: payload });
       cancel();
-    } catch {
-      setSaveError("שמירת המאמר נכשלה. ניתן לנסות שוב.");
+    } catch (err) {
+      setSaveError(refusalText(err) ?? "שמירת המאמר נכשלה. ניתן לנסות שוב.");
     }
   };
 
