@@ -36,6 +36,9 @@ use the stubbed backend from `e2e/fixtures/app.ts`.
 | API-HTP-009 | "the built JS and CSS bundles are reachable and non-empty" | Every `/assets/*` reference returns 200 with a body |
 | API-HTP-010 | "every same-origin file referenced by index.html actually exists" | 200 **and not `text/html`** — a missing static file is otherwise masked by the SPA fallback |
 | API-HTP-011 | "HEAD on the document does not error" | 200, 204 or 405 |
+| API-HTP-012 | "the sitemap lists the prebuilt article" | The fixture article's `/blog/<slug>` is a `<loc>` followed by a `<lastmod>` (written by `scripts/build-seo-files.mjs`) |
+| API-HTP-013 | "llms.txt lists the articles and points at the full text" | Has the `## מאמרים` section, a link to the fixture article's `/blog/<slug>`, and `/llms-full.txt` |
+| API-HTP-014 | "llms-full.txt carries the questions and the articles as text" | 200, `text/plain`, with the `## שאלות ותשובות` and `## מאמרים` sections and the licence number |
 
 > API-HTP-010 found a real defect on the first run: `index.html` referenced
 > `/manifest.json`, which did not exist and was silently answered with the SPA

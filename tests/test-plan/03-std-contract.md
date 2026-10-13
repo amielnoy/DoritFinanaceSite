@@ -267,7 +267,7 @@ cases extract the step's shell out of the YAML and run it under `bash -e` for
 each combination, since shell embedded in a workflow is covered by nothing else
 here.
 
-**`ai-surface.contract.test.ts` — `CTR-AI-001..014`** — what an AI assistant can
+**`ai-surface.contract.test.ts` — `CTR-AI-001..017`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript
 receives the home page's `<head>` on every route; `public/llms.txt` is therefore
 the only surface such a crawler reads in full, and the one nothing was checking.
@@ -281,7 +281,11 @@ return. It also pins that `llms.txt` links every route the sitemap advertises �
 the two drift in opposite directions, because a new page reaches the sitemap
 when an SEO test asks for it and is forgotten here because nothing does — and
 that `robots.txt` names each AI crawler explicitly rather than leaving them to
-the wildcard.
+the wildcard. `CTR-AI-015..017` pin that `robots.txt` tells a crawler where
+`/llms-full.txt` is, that `build:prerender` runs `scripts/build-seo-files.mjs`
+after the prerender (so Vercel and CI write the sitemap, `llms.txt` and
+`llms-full.txt` with the published articles), and that the Base44 Builder's plain
+`build` stays `vite build`.
 
 **`blog-content.contract.test.ts` — `CTR-ART-001..019`** — the repo-held articles under
 `content/blog/`. Each must parse, be a real article rather than a stub, carry

@@ -143,4 +143,22 @@ describe("robots.txt — who is allowed to read it", () => {
   it("still points at the sitemap", () => {
     expect(ROBOTS).toMatch(/^Sitemap: https?:\/\/\S+\/sitemap\.xml$/m);
   });
+
+  it("tells a crawler where the full text is", () => {
+    expect(ROBOTS).toMatch(/^# .*\/llms-full\.txt/m);
+  });
+});
+
+describe("the SEO files are written by every prerendered build", () => {
+  const pkg = JSON.parse(read(join(REPO_ROOT, "package.json")));
+
+  it("runs build-seo-files after the prerender, in the build Vercel and CI run", () => {
+    expect(pkg.scripts["build:prerender"]).toBe(
+      "vite build && node scripts/prerender.mjs && node scripts/build-seo-files.mjs",
+    );
+  });
+
+  it("leaves the Base44 Builder's plain build alone", () => {
+    expect(pkg.scripts.build).toBe("vite build");
+  });
 });
