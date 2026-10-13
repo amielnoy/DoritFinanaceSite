@@ -86,6 +86,51 @@ export async function upsertRow(table: string, row: Record<string, unknown>, onC
 }
 
 /**
+ * A conditional update: every row the PostgREST query matches, changed, and
+ * returned. The query carries the conditions (`status=eq.invited`, …) and a
+ * `select=` naming the columns to return — always name them, or the answer
+ * echoes every column, ciphertext included.
+ *
+ * One statement, so the condition and the change cannot be split by a second
+ * request: two submissions of one link cannot both find it `invited`.
+ */
+export async function updateWhere(
+  table: string,
+  query: string,
+  fields: Record<string, unknown>,
+): Promise<Record<string, unknown>[]> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?${query}`, {
+    method: 'PATCH',
+    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(fields),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`update_http_${res.status}${await refusal(res)}`);
+  const rows = await res.json().catch(() => []);
+  return Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
+}
+
+/**
+ * Who a Supabase session token belongs to, asked of the auth server now.
+ *
+ * null for a token it refuses (expired, signed out, forged); a throw when it
+ * cannot answer, so an outage is a 500 and never mistaken for "not signed in".
+ */
+export async function authUser(token: string): Promise<{ id: string } | null> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/auth/v1/user`, {
+    method: 'GET',
+    headers: { apikey: auth.apikey, Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (res.status === 401 || res.status === 403) return null;
+  if (!res.ok) throw new Error(`auth_http_${res.status}`);
+  const user = (await res.json().catch(() => null)) as { id?: unknown } | null;
+  return typeof user?.id === 'string' ? { id: user.id } : null;
+}
+
+/**
  * A Postgres function through PostgREST's `/rpc`, with the service key. Used
  * for `allow_submission`, which only the service role may execute. Throws on
  * a refusal with the status alone, like insertRow.

@@ -702,7 +702,31 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-BDAY-005 | "leaves the instant alone for zero days" | Same instant |
 | UNIT-BDAY-006 | "keeps the Israeli wall-clock time and calendar day across the end of daylight saving (25 Oct 2026)" | Thu 22 Oct 00:30 + 4 → Wed 28 Oct 00:30 Israel; Thu 12:00 + 3 → Tue 27 Oct 12:00 Israel |
 
+### 4.35 The clearinghouse pipeline's shared Edge modules — `tests/unit/edge-masleka-shared.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MSKSH-001 | "is off unless MASLEKA_ENABLED is exactly true" | Only `true` (trimmed) turns it on |
+| UNIT-MSKSH-002 | "makes 43-character base64url tokens, never the same twice" | Format and uniqueness |
+| UNIT-MSKSH-003 | "recognises nothing else as a token" | 42 chars, `+`, numbers refused |
+| UNIT-MSKSH-004 | "puts the token in the fragment of the agency's own page" | `https://govari-fin.co.il/masleka#t=…` |
+| UNIT-MSKSH-005 | "expires a token thirty days after it is issued" | +30 days |
+| UNIT-MSKSH-006 | "accepts a code as pasted, and nothing that cannot be one" | Trimmed; short, markup, 65 chars, numbers refused |
+| UNIT-MSKSH-007 | "stores the token's hash, never the token, and returns the one link to it" | Body has `token_hash = sha256(token)` and not the token |
+| UNIT-MSKSH-008 | "patches the rows the query matches and returns them" | PATCH, conditions in the URL, `return=representation` |
+| UNIT-MSKSH-009 | "reports a refusal by status and code only" | `update_http_400:23514`, no message text |
+| UNIT-MSKSH-010 | "answers who the token belongs to, asking the auth server with the service key" | `/auth/v1/user`, apikey + bearer |
+| UNIT-MSKSH-011 | "answers nobody for a token the auth server refuses" | `null` on 401 |
+| UNIT-MSKSH-012 | "throws when the auth server is down, rather than calling it a refusal" | `auth_http_503` |
+| UNIT-MSKSH-013 | "is anonymous without a bearer token, and asks nobody" | No fetch |
+| UNIT-MSKSH-014 | "is an outsider when the database knows no role for the user" | `outsider` |
+| UNIT-MSKSH-015 | "is an outsider for a role it does not recognise" | `outsider` |
+| UNIT-MSKSH-016 | "is staff with the role the database gives" | `staff`, role `staff` |
+| UNIT-MSKSH-017 | "mails each staff address once, in lower case, and skips what is not an address" | Deduplicated list |
+| UNIT-MSKSH-018 | "falls back to Dorit's mailbox when nobody can be read" | `dorit@govari-fin.co.il`, `staff.lookup_failed` |
+| UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the staff list is empty" | `dorit@govari-fin.co.il`, `staff.none` |
+
 ## 5. Pass criteria
 
-All 524 cases pass. Any failure is a functional defect, not an environment issue —
+All 543 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
