@@ -145,6 +145,19 @@ describe('production smoke requires the actual production publisher', () => {
     expect(smoke).toContain('needs.deploy.outputs.previous_asset');
     expect(workflow).toContain('previous_asset: ${{ steps.before.outputs.asset }}');
 
+    // And the asset the Vercel job just built, so an unchanged bundle is
+    // recognised at once instead of waiting out the timeout for a change that
+    // will never come (it cost 8 minutes on every backend- or docs-only merge).
+    expect(smoke).toContain("EXPECTED_ASSET: ${{ needs['deploy-vercel'].outputs.asset }}");
+    expect(workflow).toContain('asset: ${{ steps.built.outputs.asset }}');
+    const vercel = workflow.slice(workflow.indexOf('  deploy-vercel:'), workflow.indexOf('  smoke:'));
+    const built = vercel.slice(vercel.indexOf('id: built'));
+    // Read from the output that was deployed, and only for a production deploy:
+    // a preview's bundle is not what production will serve.
+    expect(built.slice(0, 900)).toContain('.vercel/output/static/index.html');
+    expect(built.slice(0, 900)).toContain("steps.target.outputs.env == 'production'");
+    expect(vercel.indexOf('id: built')).toBeGreaterThan(vercel.indexOf('- name: Build for Vercel'));
+
     // Order is the whole point: publish evidence, then serving evidence, then
     // browsers.
     expect(smoke.indexOf('node scripts/check-production-publish.mjs'))
