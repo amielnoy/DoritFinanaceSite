@@ -131,7 +131,8 @@ export function createToolRunner(handlers: { submitLead: EdgeHandler; escalateTo
 
 async function submitLead(handler: EdgeHandler, input: Record<string, unknown>, ctx: ToolCallContext): Promise<ToolOutcome> {
   const stage = input.stage === 'partial' ? 'partial' : 'complete';
-  if (stage === 'complete' && ctx.conversation.status === 'lead_saved') {
+  // Any stage: submit-lead's dedupe matches only partial leads, so a save after a complete one would insert a second row.
+  if (ctx.conversation.status === 'lead_saved') {
     return { name: 'submitLead', status: 'already_saved', isError: false, forModel: JSON.stringify({ ok: true, alreadySaved: true }) };
   }
   if (ctx.evalMode) {

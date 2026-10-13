@@ -85,6 +85,24 @@ describe("submitLead", () => {
     expect(c.conversation.status).toBe("lead_saved");
   });
 
+  it("refuses a partial save once the lead is saved: already_saved, no second row", async () => {
+    const submitLead = answering(200, { ok: true, leadId: "lead-1" });
+    const run = createToolRunner({ submitLead, escalateToHuman: answering(200, {}) });
+    const c = ctx();
+    await run("submitLead", LEAD, c);
+    const second = await run("submitLead", { ...LEAD, stage: "partial" }, c);
+    expect(second).toMatchObject({ status: "already_saved", isError: false });
+    expect(submitLead).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a partial save after a simulated complete one too", async () => {
+    const submitLead = answering(200, { ok: true });
+    const run = createToolRunner({ submitLead, escalateToHuman: answering(200, {}) });
+    const c = ctx({ evalMode: true });
+    await run("submitLead", LEAD, c);
+    expect(await run("submitLead", { ...LEAD, stage: "partial" }, c)).toMatchObject({ status: "already_saved" });
+  });
+
   it("hands the model the handler's own Hebrew error, so it can ask again", async () => {
     const run = createToolRunner({ submitLead: answering(400, { error: "נדרשים שם וטלפון", rid: "r2" }), escalateToHuman: answering(200, {}) });
     const outcome = await run("submitLead", { ...LEAD, phone: "" }, ctx());

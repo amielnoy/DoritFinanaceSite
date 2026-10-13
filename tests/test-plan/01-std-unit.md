@@ -684,8 +684,10 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-014 | "keeps already_saved after a hand-off: the second complete submitLead writes nothing" | Ruling 9: lead, hand-off, second complete submit: `already_saved`, handler once, status `lead_saved`, `escalated` true |
 | UNIT-CHTOOL-015 | "saves the lead after a hand-off: status becomes lead_saved, escalated stays true" | Ruling 9: hand-off then complete submit saves the lead; status `lead_saved`, `escalated` true |
 | UNIT-CHTOOL-016 | "answers already_escalated to a second hand-off after the lead was saved" | Ruling 9: lead saved, hand-off, second hand-off: `already_escalated`, handler once, status `lead_saved` |
+| UNIT-CHTOOL-017 | "refuses a partial save once the lead is saved: already_saved, no second row" | Ruling 10: complete then partial: second is `already_saved`, handler called once |
+| UNIT-CHTOOL-018 | "refuses a partial save after a simulated complete one too" | Ruling 10: the same in evaluation mode |
 
 ## 5. Pass criteria
 
-All 481 cases pass. Any failure is a functional defect, not an environment issue —
+All 483 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
