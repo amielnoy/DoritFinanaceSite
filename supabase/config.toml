@@ -407,3 +407,6 @@ verify_jwt = false
 # shared secret. The site's sb_publishable_ key is not a JWT either.
 [functions.masleka-code]
 verify_jwt = false
+
+[functions.masleka-reveal]
+verify_jwt = false

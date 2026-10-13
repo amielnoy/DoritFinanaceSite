@@ -544,9 +544,42 @@ between — or any replay — matches nothing.
 | INT-MSKCODE-027 | "reports a database failure with its rid and nothing else" | Answer is exactly `{ error: 'failed', rid }`; no mail |
 | INT-MSKCODE-028 | "answers the browser's preflight and does nothing else" | 204; no fetch |
 
+### 4.26 `masleka-reveal` — a member decrypts one value — `INT-MSKREV-001..020`
+
+`tests/integration/masleka-reveal.integration.test.ts`, through the in-process
+harness with its clearinghouse fakes (`MaslekaFake`: sessions for
+`GET /auth/v1/user`, roles for the `staff_role` RPC). Every call proves its
+caller (`staffCaller`); the request is read by its UUID-checked id and agency 1
+with named columns; the access row (who, which request, which field — its
+agency copied from the request) is written before the value is unsealed with
+`<id>:<field>` as its context, and a failed write reveals nothing.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKREV-001 | "answers disabled while MASLEKA_ENABLED is unset" | 404 exactly `{ error: 'disabled', rid }`; no fetch |
+| INT-MSKREV-002 | "stays dark for anything but exactly true, before reading the body" | `TRUE`, `1`, `yes`, `true1` with a non-JSON body: 404 `disabled` (not `invalid`); no fetch |
+| INT-MSKREV-003 | "refuses a caller with no session" | 401 `unauthorized` + rid; no `masleka_requests` call; no log row |
+| INT-MSKREV-004 | "refuses a session the auth server does not recognise" | 401; no `staff_role` call; no `masleka_requests` call |
+| INT-MSKREV-005 | "refuses a signed-in user who is not staff, and logs no access" | 403 `forbidden` + rid; no log row; no `masleka_requests` call |
+| INT-MSKREV-006 | "a membership removed between two calls is refused on the second" | 200 then 403 with the same session; no value, no log row on the second |
+| INT-MSKREV-007 | "asks the auth server and staff_role about the caller on every call" | One `GET /auth/v1/user` with the bearer token; one `staff_role` with `{ p_user_id }` |
+| INT-MSKREV-008 | "decrypts the ID for a member, never cached, and logs who asked" | `{ ok, value, rid }` in that order; `no-store`; one log row whose keys are exactly agency_id, at, field, id, request_id, user_id |
+| INT-MSKREV-009 | "decrypts the code" | Value; one log row, field `code` |
+| INT-MSKREV-010 | "opens each value only with its own request and field as the context" | The code's ciphertext in the ID column, and an ID sealed for another row: 500 `failed`, no value |
+| INT-MSKREV-011 | "has nothing to give unless the request is waiting with its code" | `invited`, `submitted`, `completed`, `expired`, `cancelled`: 409 `not_available`; no log row |
+| INT-MSKREV-012 | "does not find another agency's request" | 404 `not_found`; no log row |
+| INT-MSKREV-013 | "refuses a field it does not hold, or an id that is not one" | `phone`, a non-UUID, a UUID with a PostgREST filter appended, no id, a non-JSON body: 400 `invalid`; no `masleka_requests` call |
+| INT-MSKREV-014 | "logs the agency the request belongs to and the caller the auth server named, whatever the body says" | Body's `agencyId`/`agency_id`/`userId` ignored: log row agency 1, user the session's |
+| INT-MSKREV-015 | "reads the request once, by its checked id and agency, naming its columns, and never changes it" | One GET; `id=eq.<uuid>`, `agency_id=eq.<agency 1>`; `select=` names columns, never `*` or `token_hash`; no PATCH |
+| INT-MSKREV-016 | "reveals nothing when the access log cannot be written" | 500 exactly `{ error: 'failed', rid }`; no value |
+| INT-MSKREV-017 | "reveals nothing from a value that fails its tag, and the attempt stays logged" | 500; no value; one log row (written before decrypting) |
+| INT-MSKREV-018 | "reveals nothing without the key, or with one that is not 32 bytes" | Missing, 16-byte, non-base64: 503 `unavailable` + rid; no `masleka_requests` call; no log row |
+| INT-MSKREV-019 | "never writes a revealed value or the session token to a log line" | Across success (both fields), log failure, wrong context and an outsider: no code, ID, session token, ciphertext or client name in any line |
+| INT-MSKREV-020 | "answers the browser's preflight and does nothing else" | 204 with the site's origin allowed; no fetch |
+
 ## 5. Pass criteria
 
-All 323 cases pass. These assert behaviour, not shape — a failure means the
+All 343 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
