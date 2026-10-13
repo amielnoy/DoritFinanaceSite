@@ -165,7 +165,17 @@ if has e2e; then
     # exist, so it can be thrown away below.
     BUILT_SENTINEL_DIST=1
   fi
-  run_suite "e2e (web + iOS + Android)" npx playwright test "${EXTRA_ARGS[@]}"
+  # playwright.config.ts marks every project but web-chromium `default: false`,
+  # so a bare `playwright test` would quietly drop to one browser. `*` selects
+  # every project, default or not — unless the caller chose with --project=,
+  # which must narrow, not add (Playwright unions repeated --project flags).
+  E2E_PROJECTS=("--project=*")
+  # `${a[@]+"${a[@]}"}`: an empty array under `set -u` is "unbound" to bash 3.2.
+  for arg in ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}; do
+    if [[ "$arg" == --project=* ]]; then E2E_PROJECTS=(); fi
+  done
+  run_suite "e2e (web + iOS + Android)" npx playwright test \
+    ${E2E_PROJECTS[@]+"${E2E_PROJECTS[@]}"} ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
   # The bundle just tested has `e2e-sanity-app` inlined as the app id — Vite
   # seals that in at build time. dist/ is also what `vite preview` serves, so
   # leaving it here hands the next person a site whose every backend call 404s,

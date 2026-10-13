@@ -256,6 +256,13 @@ async function main() {
           { timeout: 20_000 },
         )
 
+        // The live page marks itself as mounted (src/components/RouteCommitted.tsx).
+        // The saved copy is not live until the browser has run the bundle over it,
+        // and e2e's gotoApp waits for exactly that marker, so it must not ship.
+        await page.evaluate(() => {
+          delete document.documentElement.dataset.routeCommitted
+        })
+
         // Vite's runtime adds `modulepreload` hints for the route's chunks
         // using the *absolute* origin it was loaded from, so capturing the DOM
         // bakes `http://127.0.0.1:4183/assets/…` into the shipped HTML. The
@@ -266,6 +273,9 @@ async function main() {
         )}`
         if (html.includes(`127.0.0.1:${PORT}`)) {
           throw new Error(`${route}: the preview origin survived into the HTML`)
+        }
+        if (html.includes('data-route-committed')) {
+          throw new Error(`${route}: the live-page marker survived into the HTML`)
         }
         // `<route>.html`, not `<route>/index.html`. Measured, not assumed: the
         // directory form is only served at `/faq/` with the trailing slash —

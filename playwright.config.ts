@@ -104,6 +104,11 @@ export default defineConfig({
   // of the describe, which Playwright runs as a hook: allure-playwright reports
   // every such skip as a failed hook, and the report carried 38 "Global Errors"
   // reading "skip modifier failed: Test is skipped: mobile projects only".
+  //
+  // Only web-chromium is `default`, so a bare `npx playwright test` is the
+  // quick local loop. The other three run only when selected: every
+  // `npm run test:e2e*` script and scripts/run-tests.sh pass `--project=*` (or
+  // name theirs), and CI's matrix passes `--project` on every leg.
   projects: [
     {
       name: "web-chromium",
@@ -112,18 +117,21 @@ export default defineConfig({
     },
     {
       name: "web-webkit",
+      default: false,
       use: { ...devices["Desktop Safari"], viewport: { width: 1440, height: 900 } },
       grepInvert: /@mobile-only/,
     },
     {
       // iOS Safari — WebKit with the iPhone 14 device descriptor.
       name: "ios-safari",
+      default: false,
       use: { ...devices["iPhone 14"] },
       grepInvert: /@desktop-only/,
     },
     {
       // Android Chrome — Chromium with the Pixel 7 device descriptor.
       name: "android-chrome",
+      default: false,
       use: { ...devices["Pixel 7"] },
       grepInvert: /@desktop-only/,
     },

@@ -35,6 +35,26 @@ const TRANSPARENT_PNG = Buffer.from(
  * `mockApi` fixture.
  */
 export const test = base.extend<{ mockApi: MockApi }>({
+  // Every `request.get/head/fetch` retries a connection reset twice. Under a
+  // full parallel run, vite preview has reset a reused keep-alive socket on a
+  // test's first GET (ECONNRESET, mobile-parity fonts, 2026-10-13). maxRetries
+  // retries exactly that — network errors, today only ECONNRESET — and never an
+  // HTTP status, so no assertion about a response can be retried away. A spec
+  // that passes its own maxRetries keeps it.
+  request: async ({ request }, use) => {
+    const retried = new Set<PropertyKey>(["get", "head", "fetch"]);
+    await use(
+      new Proxy(request, {
+        get(target, prop) {
+          const value: unknown = Reflect.get(target, prop, target);
+          if (typeof value !== "function") return value;
+          if (!retried.has(prop)) return value.bind(target);
+          return (url: unknown, options: object = {}) => value.call(target, url, { maxRetries: 2, ...options });
+        },
+      }),
+    );
+  },
+
   // `auto` so every spec is stubbed even when it never touches the fixture —
   // an un-stubbed spec would otherwise hit vite preview and 404 on /api.
   mockApi: [async ({ page }, use) => {
@@ -202,7 +222,6 @@ export { expect };
 // one place: `import { expect, gotoApp, test, test_step } from "../fixtures/app"`.
 export { test_step } from "./steps";
 
-/** Waits for the app shell to have booted past the bootstrap spinner. */
 /**
  * The run is pointed at a real deployment — the production smoke job sets
  * PLAYWRIGHT_BASE_URL — rather than at the hermetic build this suite serves.
@@ -218,9 +237,56 @@ export const AGAINST_A_DEPLOYMENT = Boolean(process.env.PLAYWRIGHT_BASE_URL);
 export const STUBS_UNREACHABLE =
   "against a deployment, content comes from Supabase and Base44 directly; the same-origin /api stubs never see it";
 
+/**
+ * Waits until React has committed the current route over whatever the server
+ * sent: src/components/RouteCommitted.tsx sets `<html data-route-committed>` to
+ * the path once the route's real content (or its error screen) is live.
+ *
+ * "#root is not empty" used to stand in for this, and stopped meaning anything
+ * once pages were prerendered: #root is full before any JavaScript runs, and
+ * createRoot throws that markup away on its first commit. A test that scrolled,
+ * clicked or read state in between acted on a page about to vanish — "Element
+ * is not attached to the DOM", taps that did nothing, a token not yet wiped.
+ *
+ * 20s, not the 10s expect timeout: WebKit has measured boots past 10s under CI
+ * contention (see the `workers` note in playwright.config.ts).
+ */
+export async function waitForAppLive(page: Page, timeout = 20_000): Promise<void> {
+  // A bare waitForFunction timeout says nothing. The two ways to get here are
+  // an app that threw before its first commit and a target built before the
+  // marker existed, so name what was seen.
+  const pageErrors: string[] = [];
+  const onPageError = (e: Error) => pageErrors.push(e.message);
+  page.on("pageerror", onPageError);
+  try {
+    await page.waitForFunction(
+      () => document.documentElement.dataset.routeCommitted === window.location.pathname,
+      undefined,
+      { timeout },
+    );
+  } catch (cause) {
+    const seen = await page
+      .evaluate(() => ({ path: window.location.pathname, marker: document.documentElement.dataset.routeCommitted ?? null }))
+      .catch(() => null);
+    throw new Error(
+      [
+        `the app never went live on ${seen?.path ?? page.url()} within ${timeout}ms`,
+        `(data-route-committed = ${JSON.stringify(seen?.marker ?? null)}).`,
+        pageErrors.length
+          ? `Page errors: ${pageErrors.join(" | ")}`
+          : "No page error was raised. Is the target built from a commit that has RouteCommitted?",
+      ].join(" "),
+      { cause },
+    );
+  } finally {
+    page.off("pageerror", onPageError);
+  }
+}
+
+/** Opens a route and waits for the app to be live on it (see waitForAppLive). */
 export async function gotoApp(page: Page, path = "/"): Promise<void> {
   await page.goto(path, { waitUntil: "domcontentloaded" });
-  await expect(page.locator("#root")).not.toBeEmpty();
+  await waitForAppLive(page);
 }
 
 /** Collects page errors and console errors for the lifetime of a test. */

@@ -4,7 +4,7 @@
 `npm run test:e2e:security` (runtime, Playwright)
 **Location:** `tests/security/static-security.test.ts`,
 `tests/security/agent-surface.security.test.ts`, `e2e/security/security.spec.ts`
-**Cases:** 70 static (24 site + 46 agent surface) + 15 runtime (× 4 platforms)
+**Cases:** 70 static (24 site + 46 agent surface) + 16 runtime (× 4 platforms)
 
 ---
 
@@ -49,7 +49,7 @@ lead inbox.
 | SEC-STA-015 | "every `target=_blank` link also sets `noreferrer`" | Zero offenders |
 | SEC-STA-016 | "no source file loads anything over plaintext `http://`" | Zero offenders (localhost excepted) |
 | SEC-STA-017 | "`index.html` loads every external asset over https" | Zero `http://` in `href`/`src` |
-| SEC-STA-018 | "only `app-params.js` touches the stored access token" | Exactly that one file |
+| SEC-STA-018 | "only `clear-access-token.ts` and the SDK touch the stored access token" | Exactly that one file in `src/` (the boot-time wipe; `app-params.js` delegates to it) |
 | SEC-STA-019 | "pages that consume `?returnTo=` go through the shared guard" | `Login` imports `safeReturnTo` (`Register` went with email/password sign-in) |
 | SEC-STA-020 | "no page reads `returnTo` out of the query string without the guard" | Zero offenders outside `authReturnTo.js` |
 | SEC-STA-021 | "redirects derived from `returnTo` are assigned from the guarded value" | `Login` assigns `window.location.href` from `safeReturnTo()` |
@@ -71,7 +71,7 @@ carries a `<script>`, an `<img onerror>`, a `javascript:` markdown link and a
 | SEC-XSS-004 | "a hostile post title is escaped in the heading" | as above | `h1` text contains `<img`; zero `<img>` children |
 | SEC-XSS-005 | "a hostile testimonial cannot inject markup on the home page" | Serve a testimonial with script/img payloads | `window.__xss_t` unset |
 | SEC-TOK-001 | "no access token is written to storage for an anonymous visitor" | Load `/` | No storage key matching `token\|secret\|password`; no JWT-shaped value |
-| SEC-TOK-002 | "`?clear_access_token=true` wipes any stored token" | Seed both token keys, reload with the flag | Both keys `null` |
+| SEC-TOK-002 | "`?clear_access_token=true` wipes any stored token on `/`" and "… on `/faq`" | Seed both token keys, open the route with the flag | Both keys `null`, and the flag is gone from the URL. The wipe runs at boot (`src/lib/clear-access-token.ts`), so it no longer depends on a backend call loading the SDK; `/faq` makes none on load |
 | SEC-RED-001 | "a hostile `?returnTo=` cannot bounce the visitor off-site" | 4 hostile values on `/login` | Page stays on the login screen and on the suite's own origin |
 | SEC-LNK-001 | "every new-tab link is protected against reverse tabnabbing" | Load `/` | Every rendered `target=_blank` anchor has `noopener` |
 | SEC-MIX-001 | "no mixed content: the page loads nothing over plain http" | Load `/`, scroll to the bottom | Zero non-localhost `http://` requests |
@@ -146,5 +146,5 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 
 ## 6. Pass criteria
 
-All 72 static cases pass; all 15 runtime cases pass on all four platforms,
+All 72 static cases pass; all 16 runtime cases pass on all four platforms,
 with `SEC-HDR-001` skipped unless explicitly enabled.

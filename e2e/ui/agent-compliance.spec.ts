@@ -24,6 +24,25 @@ const handoffForm = (section: Locator) =>
 
 const INTERVIEW = "#start";
 
+// Reduced motion for every chat here. Opening a chat scrolls it into view
+// smoothly, and a click whose target moves between pointerdown and mouseup
+// lands on an ancestor: Playwright reports success, React's onClick never runs,
+// and the consent gate looked "stuck disabled" under load. Reduced motion is a
+// supported setting a visitor can have; it takes the moving target away.
+test.use({ reducedMotion: "reduce" });
+
+/**
+ * Ticks the consent box and presses start. The notice closes on accept, so if
+ * it is still there the press never reached React — that fails here, by name,
+ * rather than ten seconds later as a message box that stays disabled.
+ */
+async function acceptConsent(section: Locator, clickTimeout?: number): Promise<void> {
+  await section.getByRole("checkbox").check();
+  const start = section.getByRole("button", { name: "התחלת השיחה" });
+  await start.click(clickTimeout === undefined ? undefined : { timeout: clickTimeout });
+  await expect(start, "the start press was not handled").toBeHidden();
+}
+
 /**
  * The home page with the interview chat open.
  *
@@ -55,8 +74,7 @@ test.describe("Agent chat — regulatory shell", () => {
     });
 
     await test_step("accepting the notice unlocks the box", async () => {
-      await section.getByRole("checkbox").check();
-      await section.getByRole("button", { name: "התחלת השיחה" }).click();
+      await acceptConsent(section);
       await expect(box).toBeEnabled();
     });
   });
@@ -249,8 +267,7 @@ test.describe("Support chat — the open question", () => {
     });
 
     await test_step("accepting it unlocks the box", async () => {
-      await section.getByRole("checkbox").check();
-      await section.getByRole("button", { name: "התחלת השיחה" }).click();
+      await acceptConsent(section);
       await expect(box).toBeEnabled();
     });
   });
@@ -314,8 +331,7 @@ test.describe("Agent chat — when the backend refuses", () => {
     const box = section.getByLabel("הודעה לסוכן ההיכרות");
 
     await test_step("accept the notice so the box unlocks", async () => {
-      await section.getByRole("checkbox").check();
-      await section.getByRole("button", { name: "התחלת השיחה" }).click();
+      await acceptConsent(section);
       await expect(box).toBeEnabled();
     });
 
@@ -433,8 +449,7 @@ test.describe("Procedures chat — reading the regulator's data", () => {
     });
 
     await test_step("accepting it unlocks the box", async () => {
-      await section.getByRole("checkbox").check();
-      await section.getByRole("button", { name: "התחלת השיחה" }).click();
+      await acceptConsent(section);
       await expect(box).toBeEnabled();
     });
   });
@@ -456,8 +471,7 @@ test.describe("Procedures chat — reading the regulator's data", () => {
       const section = page.locator(PROCEDURES);
 
       await test_step("accepting the notice unlocks the box", async () => {
-        await section.getByRole("checkbox").check();
-        await section.getByRole("button", { name: "התחלת השיחה" }).click({ timeout: 5_000 });
+        await acceptConsent(section, 5_000);
         await expect(section.getByLabel("שאלה על התהליך")).toBeEnabled();
       });
     });
