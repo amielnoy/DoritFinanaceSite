@@ -577,9 +577,30 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKREV-019 | "never writes a revealed value or the session token to a log line" | Across success (both fields), log failure, wrong context and an outsider: no code, ID, session token, ciphertext or client name in any line |
 | INT-MSKREV-020 | "answers the browser's preflight and does nothing else" | 204 with the site's origin allowed; no fetch |
 
+### 4.27 `masleka-submitted` — הגשתי wipes the ciphertext — `INT-MSKSUB-001..016`
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKSUB-001 | "answers disabled while MASLEKA_ENABLED is unset, before reading the body" | 404 `disabled` + rid; no `masleka_requests` call; ciphertext untouched |
+| INT-MSKSUB-002 | "refuses a caller with no session, and an outsider" | 401 `unauthorized`, 403 `forbidden`; no PATCH; ciphertext untouched |
+| INT-MSKSUB-003 | "wipes both values, marks the request submitted and records who and when" | Nulls; `submitted`; `submitted_by`; `ciphertext_wiped_at` = `submitted_at` = now |
+| INT-MSKSUB-004 | "sets the clearinghouse's deletion date, business day 7, in the same write" | `clearinghouse_deletes_at` not null, = `addBusinessDays(submitted_at, 7)`, in the one PATCH |
+| INT-MSKSUB-005 | "does it in one write that is conditional on the request still waiting" | One PATCH filtered `id`, `agency_id`, `status=eq.code_received`; exactly the seven wipe fields |
+| INT-MSKSUB-006 | "asks for the updated rows with an explicit select that leaves out the ciphertexts and the token hash" | `select=id`, `return=representation`; no call names a ciphertext, the hash or `*` |
+| INT-MSKSUB-007 | "does not call a second click done: the request is already submitted" | 409 `already_submitted`, no `ok`; times unchanged |
+| INT-MSKSUB-008 | "loses a race gracefully: a concurrent הגשתי that landed first is a refusal, not 'done'" | PATCH matches zero rows: 409 `already_submitted`, no `ok` |
+| INT-MSKSUB-009 | "a failed wipe is reported as a failure, not as done" | 500 `failed`, no `ok`; row still `code_received` with both ciphertexts |
+| INT-MSKSUB-010 | "refuses a request that is not waiting with a code, and changes nothing" | `invited`, `completed`, `expired`, `cancelled`: 409 `not_available`; row unchanged |
+| INT-MSKSUB-011 | "does not find a request that is not there, or not the agency's, and leaves the other agency's values alone" | 404 `not_found`; other agency's ciphertext untouched |
+| INT-MSKSUB-012 | "scopes the write to the agency, whatever the body says" | `agency_id=eq.<AGENCY_1>`; body's agency, status and `submitted_by` ignored |
+| INT-MSKSUB-013 | "refuses an id that is not one, before touching the table" | 400 `invalid` (not a UUID, injection, non-string, missing, bad JSON); no `masleka_requests` call |
+| INT-MSKSUB-014 | "lowercases the id once it is validated, so the filter and the answer agree" | Upper-case UUID: 200; filter `id=eq.<lowercase>` |
+| INT-MSKSUB-015 | "never writes a ciphertext, a name or the session token to a log line" | Across success, failed write and outsider: every line has `rid`; no ciphertext, client name, last4 or session token |
+| INT-MSKSUB-016 | "answers the browser's preflight and does nothing else" | 204, site origin allowed; no fetch |
+
 ## 5. Pass criteria
 
-All 343 cases pass. These assert behaviour, not shape — a failure means the
+All 359 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
