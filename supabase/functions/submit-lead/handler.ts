@@ -16,6 +16,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { deviceLabel } from '../_shared/device.ts';
 import { buildClientHtml, type ClientMail } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
+import { createRequest, maslekaEnabled } from '../_shared/masleka.ts';
+import { buildClientInvite } from '../_shared/masleka-mail.ts';
 import { deliveryWarning, mailerConfigured, sendMail } from '../_shared/mail.ts';
 import { insertRow, selectRows, supabaseConfigured, updateRow, upsertRow } from '../_shared/rest.ts';
 import { isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
@@ -27,7 +29,7 @@ import {
   CALENDAR_ATTENDEES, INTERVIEW_TRACKS, INTERVIEW_WINDOW_MS, LEAD_FIELD_LIMITS, NOTIFY_EMAILS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB,
   buildAgentBody, buildAgentHtml, buildClientText, buildInterviewProfile, buildLinksFooter, buildOpsFooter,
   clientMailFor, completenessLine, eventTypeFor, interviewCompleteness, israelInstant, profileValue,
-  redact, sameInterviewee, subjectFor, tomorrowInIsrael, wallClock,
+  redact, sameInterviewee, subjectFor, tomorrowInIsrael, wallClock, wantsClearinghouse,
 } from './lead.js';
 // lead.js is plain JavaScript, as Base44's file was. The few `as` casts below
 // tell Deno's checker the shapes it cannot infer from it.
@@ -70,6 +72,20 @@ async function findOpenInterview(rid: string, phone: string, name: unknown, emai
     // Best-effort, as Base44's was: a duplicate beats a lost interview.
     log('warn', 'interview.lookup_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
     return null;
+  }
+}
+
+/**
+ * The invitation went out: the request's one client reminder counts from now.
+ * Never throws — the lead is already stored and the mail already sent.
+ */
+async function markMaslekaInvited(rid: string, requestId: string): Promise<boolean> {
+  try {
+    await updateRow('masleka_requests', requestId, { client_invited_at: new Date().toISOString() });
+    return true;
+  } catch (e) {
+    log('warn', 'masleka.invite_mark_failed', { rid, requestId, err: String((e as Error)?.message ?? e).slice(0, 200) });
+    return false;
   }
 }
 
@@ -149,6 +165,10 @@ export async function handler(req: Request): Promise<Response> {
       profile: safeProfile, trackLabel, completeness,
       device: deviceLabel(req.headers.get('user-agent')),
       channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath,
+      // Whether the clearinghouse invitation went out (below), so the
+      // confirmation says where the link is instead of attaching the mandate.
+      // Set only by this handler, never from the request.
+      maslekaInvited: false,
     };
     const agentBody: string = buildAgentBody(source, data);
     const subject: string = subjectFor(source, data);
@@ -277,6 +297,28 @@ export async function handler(req: Request): Promise<Response> {
       return Response.json({ ok: true, rid, leadId, stage: 'partial', notified: false, warnings }, { headers: cors });
     }
 
+    // The clearinghouse request (PR A, dark until MASLEKA_ENABLED): an
+    // interview that asked for the pull gets a request, and its personal link
+    // goes out in the pipeline's own invitation where the mandate link was. If
+    // the request cannot be created, or its invitation cannot be sent, the
+    // confirmation is today's, mandate and all, and a warning says so. The
+    // link stays in this local: never in `data`, a log line or the answer.
+    let masleka: { id: string; link: string } | null = null;
+    if (source === 'interview' && maslekaEnabled() && wantsClearinghouse(safeProfile)) {
+      try {
+        masleka = await createRequest({
+          clientName: String(name).trim().slice(0, 80),
+          contactEmail: email && isEmail(email) ? email : null,
+          leadId,
+          createdBy: null,
+        });
+        log('info', 'masleka.request_created', { rid, requestId: masleka.id });
+      } catch (e) {
+        log('warn', 'masleka.request_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        warnings.push('masleka_request_failed');
+      }
+    }
+
     // אישור ללקוח — רק למשהו שהוא כתובת, ולא יותר מכמה פעמים ביום לכתובת.
     if (email && !isEmail(email)) {
       log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'invalid_address' });
@@ -285,6 +327,18 @@ export async function handler(req: Request): Promise<Response> {
       log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'rate_limited' });
       warnings.push('client_confirmation_rate_limited');
     } else if (email) {
+      // The invitation first, under the same address checks and daily limit
+      // as the confirmation, so the confirmation can tell the truth about it.
+      if (masleka) {
+        try {
+          await sendMail(log, { to: email, ...buildClientInvite(String(name), masleka.link), rid, role: 'visitor' });
+          data.maslekaInvited = true;
+          if (!(await markMaslekaInvited(rid, masleka.id))) warnings.push('masleka_invite_mark_failed');
+        } catch (e) {
+          log('warn', 'mail.failed', { rid, role: 'visitor', err: String((e as Error)?.message ?? e).slice(0, 200) });
+          warnings.push('masleka_invite_failed');
+        }
+      }
       try {
         // הכותרת חייבת לומר את מה שגוף המכתב אומר. clientMailFor פותח ראיון
         // ב"קיבלנו את סיכום השיחה", ונושא שאומר "פנייתכם" הופך את אותו מייל

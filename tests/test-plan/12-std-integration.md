@@ -662,9 +662,30 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-MSKREM-028 | "writes no name, address, token or link to a log line" | Across a clean run and a failing-mail run: none of the names, addresses, secret, link or old token in any line |
 | INT-MSKREM-029 | "answers how many it sent" | `{ready: 1, deadline: 1, clients: 1, warnings: []}` |
 
+### 4.30 `submit-lead` — the clearinghouse request — `INT-LEADMSK-001..014`
+
+`tests/integration/submit-lead-masleka.integration.test.ts`. The dark cases fix the clock (`vi.setSystemTime`, Date only) and compare against the output captured from submit-lead before this change (commit 733c9bd).
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-LEADMSK-001 | "answers, mails and logs an interested interview exactly as before the pipeline, whatever the off value" | For `MASLEKA_ENABLED` unset, "", "false", "TRUE", "1", "yes", "true1": same answer, every mail's halves byte-identical (hash), same log lines; no `masleka` call |
+| INT-LEADMSK-002 | "answers, mails and logs a declined or unasked interview exactly as before the pipeline" | Same, for a declined and a never-asked interview |
+| INT-LEADMSK-003 | "keeps today's mandate mail, and creates no request, while the switch is off" | No `masleka_requests` call; one visitor mail with the POA link in both halves |
+| INT-LEADMSK-004 | "creates a request for an interview that asked for the pull, and sends its invitation instead of the mandate" | One `invited` row in agency 1 tied to the lead, `created_by` null, hash of the mailed token; the invitation is `buildClientInvite` byte for byte, with the https button; `client_invited_at` set; the confirmation has no POA and no link and says "במייל נפרד" |
+| INT-LEADMSK-005 | "says nothing about the clearinghouse to a visitor who declined" | No request call; one visitor mail; no link, no "מסלקה" |
+| INT-LEADMSK-006 | "creates nothing for an interview that is still partial" | No request call; no mail |
+| INT-LEADMSK-007 | "falls back to the mandate when the request cannot be created, and the lead, the staff copies and the calendar still happen" | 200 `ok`; `masleka_request_failed`; lead, calendar event and every staff copy; one visitor mail with the POA link |
+| INT-LEADMSK-008 | "falls back to the mandate when the invitation cannot be sent, and leaves the request not invited" | 200; `masleka_invite_failed`; row with `client_invited_at` null and no PATCH; confirmation carries the POA link; lead, calendar, staff copies |
+| INT-LEADMSK-009 | "still answers 200 when the invitation went out but could not be marked" | Invitation sent; `client_invited_at` null; `masleka_invite_mark_failed` warning and log line |
+| INT-LEADMSK-010 | "never takes the link from the request body" | Interested visitor (Ruling 5), switch off and on: no body-supplied link in any mail; on, the real link is rendered; off, the body cannot suppress the mandate |
+| INT-LEADMSK-011 | "creates the request without mailing when there is no address, or none that is one" | Row with `contact_email` and `client_invited_at` null; no visitor mail |
+| INT-LEADMSK-012 | "sends no invitation to an address over its daily confirmation limit" | Row created, not invited; no visitor mail |
+| INT-LEADMSK-013 | "puts the link only in the client's invitation — never in a log line, the answer, the confirmation or a staff copy" | Token absent from every log line (each with `rid`), the answer, the confirmation, staff and calendar mails; `masleka.request_created` logged |
+| INT-LEADMSK-014 | "keeps the answer's shape: ok, rid, leadId and warnings, nothing more" | Keys exactly `ok`, `rid`, `leadId`, `warnings` (Ruling 8), on success and on a failed request |
+
 ## 5. Pass criteria
 
-All 411 cases pass. These assert behaviour, not shape — a failure means the
+All 425 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

@@ -643,6 +643,28 @@ export function buildAgentHtml(source, data, ops, links = null) {
  */
 export const POA_URL = (Deno.env.get('POA_URL') || '').trim();
 
+/**
+ * Whether the interview's answers asked for the clearinghouse pull.
+ *
+ * `profile` is the redacted [label, value] pairs buildInterviewProfile kept;
+ * it drops an empty answer, so a row at all means the question was answered.
+ */
+export function wantsClearinghouse(profile) {
+  const row = (Array.isArray(profile) ? profile : [])
+    .find(([label]) => String(label).includes('מסלקה'));
+  return Boolean(row) && String(row[1]).startsWith('מעוניין');
+}
+
+/**
+ * The interview confirmation once the clearinghouse invitation has gone out
+ * (PR A, MASLEKA_ENABLED): the personal link travels in that invitation —
+ * buildClientInvite, with its button — so this letter only says where it is.
+ * `data.maslekaInvited` is set by the handler after that mail was sent; it is
+ * never read from the request.
+ */
+export const MASLEKA_INTRO =
+  'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה. ביקשתם שאשלוף עבורכם תמונת מצב פנסיונית מהמסלקה — הקישור האישי למסירת קוד ייפוי הכוח נשלח אליכם במייל נפרד, ובו ההסבר המלא, צעד אחר צעד.';
+
 /** ערך קצר בלי שום דבר שנראה כמו קישור או כתובת, או ברירת המחדל. */
 export function plainOr(value, fallback) {
   const s = typeof value === 'string' ? value.trim() : '';
@@ -677,16 +699,19 @@ export function clientMailFor(source, data) {
     // `data.profile` כבר אינו האובייקט הגולמי אלא מערך זוגות [תווית, ערך]
     // שעבר redact, ולכן הבדיקה היא על התווית. buildInterviewProfile משמיט שדה
     // ריק, כך שעצם קיומה של השורה אומר שנשאל ונענה.
-    const clearinghouseRow = (Array.isArray(data?.profile) ? data.profile : [])
-      .find(([label]) => String(label).includes('מסלקה'));
-    const wantsClearinghouse = Boolean(clearinghouseRow) &&
-      String(clearinghouseRow[1]).startsWith('מעוניין');
-    const poaOffered = wantsClearinghouse && POA_URL;
+    const wants = wantsClearinghouse(data?.profile);
+    // With the clearinghouse pipeline on and its invitation sent, that mail
+    // replaces the mandate; otherwise (switch off, or the request or its
+    // invitation failed) this letter is exactly what it was.
+    const maslekaInvited = wants && data?.maslekaInvited === true;
+    const poaOffered = wants && !maslekaInvited && POA_URL;
     return {
       firstName,
       eyebrow: 'אישור קבלה',
       heading: 'קיבלנו את סיכום השיחה',
-      intro: poaOffered
+      intro: maslekaInvited
+        ? MASLEKA_INTRO
+        : poaOffered
         ? 'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה. ביקשתם שאשלוף עבורכם תמונת מצב פנסיונית מהמסלקה — לשם כך נדרש ייפוי כוח חתום, והוא מצורף כאן למטה. אפשר לחתום עליו לפני הפגישה, וכך נגיע אליה עם התמונה המלאה.'
         : 'תודה על השיחה ועל הזמן. הסיכום שאישרתם הועבר אליי כפי שהוא, ואחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה.',
       panelTitle: 'מה נשמר',
@@ -719,13 +744,14 @@ export function buildClientText(source, data) {
     // התאום של גרסת ה-HTML. שתי המחציות של אותו מייל חייבות לומר אותו דבר —
     // לקוח שאינו מציג HTML מקבל את הטקסט, ואם רק אחת מהן מזכירה את ייפוי הכוח
     // הוא קיים או לא קיים לפי היכולת של תוכנת הדואר שלו.
-    const chRow = (Array.isArray(data?.profile) ? data.profile : [])
-      .find(([label]) => String(label).includes('מסלקה'));
-    const wantsClearinghouse = Boolean(chRow) && String(chRow[1]).startsWith('מעוניין');
+    const wants = wantsClearinghouse(data?.profile);
+    const maslekaInvited = wants && data?.maslekaInvited === true;
     return [
       `${hello}תודה על השיחה. הסיכום שאישרתם הועבר אליי כפי שהוא.`,
       `נושא מרכזי: ${plainOr(data.topic, 'הקשר כללי')}`,
-      ...(wantsClearinghouse && POA_URL
+      ...(maslekaInvited
+        ? [`שליפת נתוני מסלקה — הקישור האישי למסירת קוד ייפוי הכוח נשלח אליכם במייל נפרד.`]
+        : wants && POA_URL
         ? [`ייפוי כוח לשליפת נתוני מסלקה — לחתימה לפני הפגישה: ${POA_URL}`]
         : []),
       `אחזור אליכם אישית תוך יום עסקים אחד לתיאום הפגישה הראשונה.`,

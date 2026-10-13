@@ -62,6 +62,8 @@ export interface EdgeOptions {
   failLeadWrite?: boolean | { status: number; body: string };
   /** Recipients whose delivery the mailer refuses. */
   failEmailTo?: string[];
+  /** The mailer refuses a message with exactly this subject (one mail of several to the same address). */
+  failEmailSubject?: string;
   env?: Record<string, string>;
   method?: string;
   headers?: Record<string, string>;
@@ -227,7 +229,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
 
     // The mailer, not the provider — the same boundary base44-function.ts records.
     if (u === MAILER_URL) {
-      const refused = options.failEmailTo?.includes(parsed.to);
+      const refused = options.failEmailTo?.includes(parsed.to) || (options.failEmailSubject !== undefined && parsed.subject === options.failEmailSubject);
       const status = options.resendStatus ?? (refused ? 422 : 200);
       const ok = status >= 200 && status < 300;
       if (ok) {
