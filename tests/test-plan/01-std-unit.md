@@ -715,6 +715,8 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-MSKSH-007 | "stores the token's hash, never the token, and returns the one link to it" | Body has `token_hash = sha256(token)` and not the token |
 | UNIT-MSKSH-008 | "patches the rows the query matches and returns them" | PATCH, conditions in the URL, `return=representation` |
 | UNIT-MSKSH-009 | "reports a refusal by status and code only" | `update_http_400:23514`, no message text |
+| UNIT-MSKSH-020 | "refuses to patch without a filter, and sends nothing" | `update_without_filter` for an empty query, `select=`/`order=`/`limit=` alone, an empty or operator-less value; no fetch |
+| UNIT-MSKSH-021 | "refuses a success whose body is not a list of rows" | `update_bad_body` for `{}`, `null`, non-JSON and empty bodies on a 200 |
 | UNIT-MSKSH-010 | "answers who the token belongs to, asking the auth server with the service key" | `/auth/v1/user`, apikey + bearer |
 | UNIT-MSKSH-011 | "answers nobody for a token the auth server refuses" | `null` on 401 |
 | UNIT-MSKSH-012 | "throws when the auth server is down, rather than calling it a refusal" | `auth_http_503` |
@@ -744,5 +746,5 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 
 ## 5. Pass criteria
 
-All 554 cases pass. Any failure is a functional defect, not an environment issue —
+All 556 cases pass. Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

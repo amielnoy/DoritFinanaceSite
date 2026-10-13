@@ -118,6 +118,30 @@ describe("updateWhere", () => {
     withFetch(() => new Response(JSON.stringify({ code: "23514", message: "Failing row contains (secret)" }), { status: 400 }));
     await expect(updateWhere("masleka_requests", "id=eq.x", {})).rejects.toThrow(/^update_http_400:23514$/);
   });
+
+  it("refuses to patch without a filter, and sends nothing", async () => {
+    // A PATCH with no condition changes every row in the table.
+    withEnv(BASE_ENV);
+    const calls = withFetch(() => new Response("[]", { status: 200 }));
+    for (const query of ["", "select=id", "select=id&order=created_at.desc&limit=1", "status=", "status=eq.", "status=invited"]) {
+      await expect(updateWhere("masleka_requests", query, { status: "expired" }), query).rejects.toThrow(
+        /^update_without_filter$/,
+      );
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses a success whose body is not a list of rows", async () => {
+    // "Nothing matched" must mean an empty list from PostgREST, not a body
+    // this code could not read.
+    withEnv(BASE_ENV);
+    for (const body of ["{}", "null", "not json", ""]) {
+      withFetch(() => new Response(body, { status: 200 }));
+      await expect(updateWhere("masleka_requests", "id=eq.x&select=id", { status: "expired" }), body).rejects.toThrow(
+        /^update_bad_body$/,
+      );
+    }
+  });
 });
 
 describe("authUser", () => {

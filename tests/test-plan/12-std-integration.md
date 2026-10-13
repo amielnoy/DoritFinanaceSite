@@ -503,9 +503,50 @@ is a failure, never a silently created row.
 | INT-CNT-007 | "fails an update whose mirror row is missing" | 500 |
 | INT-CNT-008 | "refuses to rename an article to a slug another one has" | 409; no Base44 update |
 
+### 4.25 `masleka-code` — the client hands over the code — `INT-MSKCODE-001..028`
+
+`tests/integration/masleka-code.integration.test.ts`, through the in-process
+harness with its clearinghouse fakes (`MaslekaFake`). The function reads the
+request's id by the token's hash, seals both values with that id and the field
+as context (`<id>:code`, `<id>:id`), then accepts through one conditional PATCH
+that repeats the read's conditions (`token_hash`, `status=eq.invited`,
+`token_expires_at=gt.<now>`) plus the id, so a submission that lands in
+between — or any replay — matches nothing.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKCODE-001 | "answers disabled and touches nothing while MASLEKA_ENABLED is unset" | 404 `disabled` + rid; no fetch at all, no mail; row unchanged |
+| INT-MSKCODE-002 | "stays dark for anything but exactly true, before reading the body" | `TRUE`, `1`, `yes`, `true1` with a non-JSON body: 404 `disabled` (not `link_invalid`); no fetch |
+| INT-MSKCODE-003 | "stores both values sealed and moves the request to code_received" | Answer keys are `ok`, `rid` in that order; both open with their own context; `id_last4` 0018 |
+| INT-MSKCODE-004 | "binds each sealed value to its request and its field" | The code under `<id>:id`, the ID under `<id>:code`, the code under another row's id: `sealed_invalid` |
+| INT-MSKCODE-005 | "pads a short ID before sealing it" | `00018` stored as `000000018` |
+| INT-MSKCODE-006 | "accepts only through one conditional update that names its columns and carries nothing the caller typed" | One PATCH; every `masleka_requests` call filters `token_hash=eq.<sha256>`, `status=eq.invited`, `token_expires_at=gt.<ISO>`; `select=` names columns, never `*`, a ciphertext or `token_hash`; no token, code or ID in a URL; the PATCH's keys are exactly id, select, status, token_expires_at, token_hash |
+| INT-MSKCODE-007 | "never echoes the code or the ID — not in the answer, not in any mail" | Neither value in the answer or any mail |
+| INT-MSKCODE-008 | "never writes the code, the ID, the token or the address to a log line" | Across success, `bad_id`, `bad_code` and a DB failure: no code, ID, token, token hash, IP or client name in any line |
+| INT-MSKCODE-009 | "tells every staff member, once each" | One notice per staff address; subject "קוד מסלקה חדש לטיפול — רונית מזרחי" |
+| INT-MSKCODE-010 | "falls back to Dorit's mailbox when the staff list cannot be read, and still accepts the code" | 200; one notice to dorit@ |
+| INT-MSKCODE-011 | "still accepts the code when a notice cannot be delivered" | 200; row `code_received`; the other notice still sent |
+| INT-MSKCODE-012 | "a second submission of the same link is refused and changes nothing" | 404 `link_invalid`; row identical to after the first; first ciphertext kept; no mail |
+| INT-MSKCODE-013 | "loses the race to a submission that lands between its read and its update" | The PATCH is sent and matches nothing: 404 `link_invalid`; the winner's values kept; no mail |
+| INT-MSKCODE-014 | "refuses an expired link" | `link_invalid`; row unchanged |
+| INT-MSKCODE-015 | "refuses a link whose request was already submitted" | `link_invalid` |
+| INT-MSKCODE-016 | "refuses a well-formed token nobody issued" | `link_invalid` |
+| INT-MSKCODE-017 | "refuses the old token once the reminder has rotated the link" | 404 `link_invalid`; row unchanged |
+| INT-MSKCODE-018 | "answers expired, used, rotated and unknown links in exactly the same words" | Expired, `code_received`, `submitted`, `expired`, rotated, unknown and malformed: each 404 `{ error: 'link_invalid', rid }` and nothing else; no PATCH; no mail |
+| INT-MSKCODE-019 | "refuses a malformed token without asking the database" | No `masleka_requests` call |
+| INT-MSKCODE-020 | "refuses an ID that fails the check digit, before storing anything" | 400 `bad_id`; no `masleka_requests` call |
+| INT-MSKCODE-021 | "refuses a code that cannot be one" | 400 `bad_code`; no `masleka_requests` call |
+| INT-MSKCODE-022 | "answers a non-JSON body as a bad link" | `link_invalid` |
+| INT-MSKCODE-023 | "counts every call against its address and its link, never by the raw values" | `allow_submission` with `masleka-ip:<sha256(ip)>` 3600/10, then `masleka-link:<token hash>` 3600/5 |
+| INT-MSKCODE-024 | "refuses a flood from one address" | 429 `rate_limited`; no PATCH |
+| INT-MSKCODE-025 | "refuses a flood on one link" | 429 `rate_limited`; no PATCH |
+| INT-MSKCODE-026 | "stores nothing when there is no key to seal with, or the key is not 32 bytes" | Missing, 16-byte and non-base64 key: 500 `failed` + rid; no `masleka_requests` call; row unchanged; no mail |
+| INT-MSKCODE-027 | "reports a database failure with its rid and nothing else" | Answer is exactly `{ error: 'failed', rid }`; no mail |
+| INT-MSKCODE-028 | "answers the browser's preflight and does nothing else" | 204; no fetch |
+
 ## 5. Pass criteria
 
-All 295 cases pass. These assert behaviour, not shape — a failure means the
+All 323 cases pass. These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
