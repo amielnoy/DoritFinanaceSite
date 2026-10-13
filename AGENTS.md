@@ -55,6 +55,20 @@ npx skills add base44/skills
   (`leads_update_admin` / `leads_delete_admin`), by Supabase `id`, and ask for
   the row back — a write row-level security filters out changes nothing and
   returns no error, so an empty answer is an error, never a success.
+- **An article's address is `blog_posts.slug`, and its rule is spelled four times.**
+  Supabase holds it alone (Base44's `BlogPost` has none), so `contentAdmin` sends
+  it to the mirror and never to Base44. It is Latin kebab-case and never 24 hex
+  characters, because `vercel.json` sends every `/blog/<24 hex>` to
+  `api/og/blog.ts`, which answers an old Base44-id link with a 301 to the slug.
+  The rule lives in `src/lib/articlePath.ts`, the CHECK in
+  `supabase/migrations/20261014000000_blog_slug.sql`, `contentAdmin` and
+  `scripts/published-articles.mjs`; `tests/contract/article-slug.contract.test.ts`
+  fails when they drift, and when an article link is built by hand instead of
+  with `articlePath()`. A partial write to `blog_posts` is a PATCH by
+  `base44_id`, never an upsert: it touches only what changed, and fails when
+  the row is missing instead of creating one. A row inserted without a slug
+  gets `post-<id>` from the `blog_posts_fill_slug` trigger, so the mirror never
+  sends a null slug: with none in the draft, the key is absent.
 - `supabase/functions/<name>/`: Supabase Edge Functions (Deno).
   - **Layout:** `handler.ts` exports `handler`, and `index.ts` is only `Deno.serve(handler)`.
   - **Shared code:** helpers live once in `supabase/functions/_shared/` and are imported, never copied. The Base44 "duplicated helper" rule does not apply here.

@@ -26,6 +26,14 @@ describe("one slug rule, wherever it is spelled", () => {
     expect(sql.match(/check \(slug ~ '([^']+)'\)/)?.[1]).toBe(SLUG_PATTERN.source);
     expect(sql.match(/check \(slug !~ '([^']+)'\)/)?.[1]).toBe(BASE44_ID_PATTERN.source);
   });
+
+  it("contentAdmin's copy is the same", () => {
+    const fn = read("base44/functions/contentAdmin/entry.ts");
+    expect(fn.match(/const SLUG_PATTERN = \/(.+)\/;/)?.[1]).toBe(SLUG_PATTERN.source);
+    expect(fn.match(/const BASE44_ID_PATTERN = \/(.+)\/;/)?.[1]).toBe(BASE44_ID_PATTERN.source);
+    // The slug is the mirror's alone: Base44's BlogPost has no such field.
+    expect(fn.match(/const ARTICLE_FIELDS = \[([^\]]*)\]/)?.[1]).not.toContain("'slug'");
+  });
 });
 
 describe("the backfill names the articles that were live", () => {

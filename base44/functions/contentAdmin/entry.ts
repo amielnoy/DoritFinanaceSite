@@ -97,6 +97,40 @@ const ARTICLE_FIELDS = ['title', 'excerpt', 'body', 'image_url', 'tags', 'publis
 const TESTIMONIAL_FIELDS = ['name', 'role', 'quote', 'image_url', 'rating', 'source'];
 
 /**
+ * כתובת המאמר — `/blog/<slug>`. נשמרת רק בעותק של Supabase: ל-BlogPost של
+ * Base44 אין שדה כזה, ולכן היא לא ב-ARTICLE_FIELDS ולא נכתבת לשם.
+ *
+ * אותה תבנית כמו ב-src/lib/articlePath.ts, במיגרציה 20261014000000_blog_slug.sql
+ * וב-scripts/published-articles.mjs. משוכפל זה בסדר, מפוצל זה לא —
+ * tests/contract/article-slug.contract.test.ts נכשל כשהן נפרדות. כתובת בצורת
+ * מזהה Base44 (24 תווים הקסדצימליים) נדחית: vercel.json שולח כל כתובת כזו
+ * להפניה של קישורים ישנים, והמאמר לא היה נגיש.
+ */
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const BASE44_ID_PATTERN = /^[0-9a-f]{24}$/;
+const isValidSlug = (s) => typeof s === 'string' && SLUG_PATTERN.test(s) && !BASE44_ID_PATTERN.test(s);
+
+/**
+ * האם מאמר אחר כבר משתמש בכתובת.
+ *
+ * נבדק לפני הכתיבה ל-Base44: האילוץ הייחודי ב-Supabase היה דוחה רק את השיקוף,
+ * אחרי שהשורה ב-Base44 כבר נוצרה — וניסיון חוזר עם כתובת אחרת היה יוצר שורה שנייה.
+ */
+async function slugTaken(slug, ownId) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  if (!url || !key) throw new Error('Supabase is not configured');
+  const res = await fetch(
+    `${url}/rest/v1/blog_posts?slug=eq.${encodeURIComponent(slug)}&select=base44_id`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+  );
+  if (!res.ok) throw new Error(`slug lookup ${res.status}`);
+  const rows = await res.json();
+  if (!Array.isArray(rows)) throw new Error('slug lookup: the answer is not a list');
+  return rows.some((r) => r?.base44_id !== ownId);
+}
+
+/**
  * שיקוף ל-Supabase. כשל זורק, והבקשה כולה נכשלת.
  *
  * האתר קורא מ-Supabase, ולכן כתיבה שלא הגיעה לשם היא — מבחינת המבקר — כתיבה
@@ -109,17 +143,27 @@ async function mirror(rid, op, table, id, body, query = '') {
   const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
   if (!url || !key) throw new Error('Supabase is not configured');
   try {
+    // 'update' is a PATCH on the one row, not an upsert. An update should
+    // touch only what changed (a publish toggle sends `published` alone), and
+    // it should fail loudly when the row is missing, not create one.
+    const method = op === 'delete' ? 'DELETE' : op === 'update' ? 'PATCH' : 'POST';
     const res = await fetch(`${url}/rest/v1/${table}${query}`, {
-      method: op === 'delete' ? 'DELETE' : 'POST',
+      method,
       headers: {
         apikey: key,
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=minimal',
+        Prefer: op === 'update' ? 'return=representation' : 'resolution=merge-duplicates,return=minimal',
       },
       body: op === 'delete' ? undefined : JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 140)}`);
+    // A PATCH that matched no row changes nothing and reports no error. The site
+    // reads this copy, so that is a failed write, not a successful one.
+    if (op === 'update') {
+      const rows = await res.json().catch(() => null);
+      if (!Array.isArray(rows) || rows.length === 0) throw new Error('no Supabase row has this base44_id');
+    }
     log('info', 'content.mirrored', { rid, table, op });
   } catch (e) {
     log('error', 'content.mirror_failed', {
@@ -169,17 +213,43 @@ export default async function(req) {
 
     switch (op) {
       case 'createArticle': {
+        const slug = draft?.slug;
+        if (!isValidSlug(slug)) {
+          log('warn', 'article.slug_invalid', { rid, op });
+          return json({ error: 'כתובת המאמר חסרה או אינה תקינה.' }, 400);
+        }
+        if (await slugTaken(slug, null)) {
+          log('warn', 'article.slug_taken', { rid, op });
+          return json({ error: 'הכתובת כבר בשימוש במאמר אחר.' }, 409);
+        }
         const fields = { ...pick(draft, ARTICLE_FIELDS), published: !!draft?.published };
         const row = await base44.asServiceRole.entities.BlogPost.create(fields);
         const newId = row?.id ?? null;
-        await mirror(rid, 'upsert', 'blog_posts?on_conflict=base44_id', newId, { ...fields, base44_id: newId });
+        await mirror(rid, 'upsert', 'blog_posts?on_conflict=base44_id', newId, { ...fields, slug, base44_id: newId });
         result = { ok: true, id: newId };
         break;
       }
       case 'updateArticle': {
         const fields = pick(draft, ARTICLE_FIELDS);
+        // The slug key is absent from the mirror body unless the draft carries a
+        // valid one; a null or empty slug would defeat the NOT NULL column.
+        const slug = draft?.slug;
+        if (slug !== undefined) {
+          if (!isValidSlug(slug)) {
+            log('warn', 'article.slug_invalid', { rid, op });
+            return json({ error: 'כתובת המאמר חסרה או אינה תקינה.' }, 400);
+          }
+          if (await slugTaken(slug, id)) {
+            log('warn', 'article.slug_taken', { rid, op });
+            return json({ error: 'הכתובת כבר בשימוש במאמר אחר.' }, 409);
+          }
+        }
         await base44.asServiceRole.entities.BlogPost.update(id, fields);
-        await mirror(rid, 'upsert', 'blog_posts?on_conflict=base44_id', id, { ...fields, base44_id: id });
+        await mirror(
+          rid, 'update', 'blog_posts', id,
+          slug === undefined ? fields : { ...fields, slug },
+          `?base44_id=eq.${encodeURIComponent(id)}`,
+        );
         break;
       }
       case 'removeArticle': {
