@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 824 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1405 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 826 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1407 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1125,6 +1125,8 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKML-019 | "leaves out an address that is missing or not one" | No "מייל:" line for `null` or a non-address |
 | UNIT-MSKML-020 | "escapes a name that is really markup and keeps it on one line" (wipe) | No `<img` in HTML; no newline in the subject |
 | UNIT-MSKML-021 | "links only to the agency's own domain" (wipe) | Every href host is `govari-fin.co.il` |
+| UNIT-MSKML-022 | "makes the address in the panel a link too, not plain text" | Two anchors to the personal link (button + panel); the panel's is `dir="ltr"` with the address as its text |
+| UNIT-MSKML-023 | "links a detail only for a plain https:// address" | `https://` → anchor; `javascript:`, `http://`, a quote or a space → the value as plain text, no anchor |
 
 ### 4.43 The clearinghouse port and its switch — `tests/unit/masleka-services.test.ts`, `tests/unit/masleka-config.test.ts`, `tests/unit/services-wiring.test.ts`
 

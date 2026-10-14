@@ -392,8 +392,8 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-MSKB-017 | "tells a staff member whose access was removed" | Alert "ההרשאה שלך הוסרה" (`staffMessage`) |
 | CMP-MSKB-018 | "words a failed list or a refused request in the staff vocabulary" | A forbidden list and an `invalid_email` create both say `staffMessage`'s text |
 | CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
-| CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל" |
-| CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown |
+| CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל"; "פתיחת הקישור" opens it in a new tab, `noopener noreferrer` |
+| CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown, and "פתיחת הקישור" points at it |
 | CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves before the answer: never copied, never shown, no "הועתק ✓" when the row returns |
 | CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks in one tick → one `markSubmitted`, one refetch |
 | CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |

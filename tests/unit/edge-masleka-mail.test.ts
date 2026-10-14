@@ -158,6 +158,14 @@ describe("the client invitation", () => {
       expect(mail.text).toContain(LINK);
     }
   });
+
+  it("makes the address in the panel a link too, not plain text", () => {
+    const mail = buildClientInvite("רונית מזרחי", LINK);
+    // The button and the panel: two anchors to the same page.
+    expect(mail.html.split(`<a href="${LINK}"`).length - 1).toBe(2);
+    expect(mail.html).toContain(`<a href="${LINK}" dir="ltr"`);
+    expect(mail.html).toContain(`>${LINK}</a>`);
+  });
 });
 
 describe("the shared client letter without an action", () => {
@@ -173,5 +181,16 @@ describe("the shared client letter without an action", () => {
     expect(createHash("sha256").update(html).digest("hex")).toBe(
       "5b27348d1644dae478801236621605f78733c56f505c95b526b200b7826703a6",
     );
+  });
+
+  it("links a detail only for a plain https:// address", () => {
+    const letter = (href: string) =>
+      buildClientHtml({ firstName: "", eyebrow: "e", heading: "h", intro: "i", panelTitle: "p", details: [["a", "shown", href]] });
+    expect(letter("https://govari-fin.co.il/x")).toContain('<a href="https://govari-fin.co.il/x"');
+    for (const bad of ["javascript:alert(1)", "http://govari-fin.co.il/x", 'https://x.example/" onmouseover="y', "https://x .example"]) {
+      const html = letter(bad);
+      expect(html).not.toContain("<a href");
+      expect(html).toContain(">shown</td>");
+    }
   });
 });
