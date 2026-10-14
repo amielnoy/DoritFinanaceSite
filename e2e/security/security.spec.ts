@@ -172,7 +172,8 @@ test.describe("Client-side security posture", () => {
 
     await test_step("load the whole home page, top to bottom", async () => {
       await gotoApp(page);
-      await page.locator("#quick-contact").scrollIntoViewIfNeeded();
+      // The footer, not #quick-contact: below md the short form is folded.
+      await page.locator("footer").scrollIntoViewIfNeeded();
     });
 
     await test_step("nothing was fetched over plain http", async () => {
@@ -217,7 +218,8 @@ test.describe("Client-side security posture", () => {
 
     await test_step("load the whole home page, top to bottom", async () => {
       await gotoApp(page);
-      await page.locator("#quick-contact").scrollIntoViewIfNeeded();
+      // The footer, not #quick-contact: below md the short form is folded.
+      await page.locator("footer").scrollIntoViewIfNeeded();
     });
 
     await test_step("nothing was thrown", async () => {

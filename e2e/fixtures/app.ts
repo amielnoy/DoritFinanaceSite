@@ -290,6 +290,38 @@ export async function gotoApp(page: Page, path = "/"): Promise<void> {
   await expect(page.locator("#root")).not.toBeEmpty();
 }
 
+/**
+ * Bring the home page's short contact form (#quick-contact) on screen. Below md
+ * it waits, folded, behind the "השארת פרטים" chip under the questionnaire
+ * (stage 3); from md up it stands open and this only scrolls to it.
+ */
+export async function openQuickContact(page: Page): Promise<void> {
+  await waitForLive(page, "#start");
+  const chip = page.locator("#start").getByRole("button", { name: "השארת פרטים" });
+  if ((await chip.isVisible()) && (await chip.getAttribute("aria-expanded")) !== "true") {
+    await chip.click();
+    await expect(chip).toHaveAttribute("aria-expanded", "true");
+  }
+  await page.locator("#quick-contact").scrollIntoViewIfNeeded();
+}
+
+/**
+ * Wait until `selector` is React's own node, not the prerendered copy.
+ *
+ * `/`, `/faq` and the other public routes ship as prerendered HTML, so `#root`
+ * is full before any script runs and `gotoApp` returns at once. React then
+ * mounts with `createRoot` and replaces every node: a locator resolved in
+ * between finds an element that is about to be detached ("Element is not
+ * attached to the DOM"), and a click on a prerendered button reaches no
+ * handler. A node React made carries its fiber; a parsed one does not.
+ */
+export async function waitForLive(page: Page, selector: string): Promise<void> {
+  await page.waitForFunction((s) => {
+    const el = document.querySelector(s);
+    return !!el && Object.keys(el).some((k) => k.startsWith("__reactFiber$"));
+  }, selector);
+}
+
 /** Collects page errors and console errors for the lifetime of a test. */
 export function collectPageErrors(page: Page): { errors: string[] } {
   const errors: string[] = [];

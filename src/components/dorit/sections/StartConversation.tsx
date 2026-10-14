@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MessageCircle, Phone } from "lucide-react";
+import { MessageCircle, MessagesSquare, Phone, Send } from "lucide-react";
 import AgentChat from "@/components/dorit/chat/AgentChat";
 import NeedsWizard from "@/components/dorit/forms/NeedsWizard";
 import QuickContact from "@/components/dorit/forms/QuickContact";
@@ -25,7 +25,19 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
  */
 export default function StartConversation() {
   const [chatOpen, setChatOpen] = useState<boolean>(false);
+  // Below md the short form waits behind "השארת פרטים" in the chip row; from
+  // md up it is always open, as it was. A link to `#quick-contact` opens it.
+  const [formOpen, setFormOpen] = useState<boolean>(false);
   const chatRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const openOnHash = () => {
+      if (window.location.hash === "#quick-contact") setFormOpen(true);
+    };
+    openOnHash();
+    window.addEventListener("hashchange", openOnHash);
+    return () => window.removeEventListener("hashchange", openOnHash);
+  }, []);
 
   // Opened below the link, the chat would start under the fold, with only its
   // first line showing. Bring it into view — without the glide for anyone who
@@ -63,10 +75,57 @@ export default function StartConversation() {
             onClick={() => setChatOpen((v) => !v)}
             aria-expanded={chatOpen}
             aria-controls="interview-chat"
-            className="mt-3 min-h-11 inline-flex items-center text-[15px] text-accent underline decoration-highlight/50 underline-offset-4 hover:decoration-highlight"
+            className="mt-3 min-h-11 inline-flex items-center text-[15px] text-accent underline decoration-highlight/50 underline-offset-4 hover:decoration-highlight max-md:hidden"
           >
             מעדיפ/ה לכתוב במקום ללחוץ? לשיחה עם העוזר
           </button>
+
+          {/* Below md: every other way in, as one row of chips instead of two
+              tiles, a link and a form standing open under the questionnaire.
+              WhatsApp and the phone are the tiles' own links, so click_whatsapp
+              and click_phone still report location "start"; צ'אט is the same
+              toggle as the link above, and השארת פרטים opens the form in place. */}
+          <div className="md:hidden mt-5 flex flex-col gap-2.5">
+            <p id="start-alternatives" className="m-0 text-[15px] text-muted-foreground">מעדיפים אחרת?</p>
+            <ul aria-labelledby="start-alternatives" className="m-0 p-0 list-none flex flex-wrap gap-2">
+              <li>
+                <a href={`https://wa.me/${CONTACT.whatsapp}`} target="_blank" rel="noopener noreferrer" className={CHIP}>
+                  <MessageCircle size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+                  וואטסאפ
+                </a>
+              </li>
+              <li>
+                <a href={`tel:${CONTACT.phoneE164}`} className={CHIP}>
+                  <Phone size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+                  טלפון
+                </a>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setFormOpen((v) => !v)}
+                  aria-expanded={formOpen}
+                  aria-controls="quick-contact"
+                  className={CHIP}
+                >
+                  <Send size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+                  השארת פרטים
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setChatOpen((v) => !v)}
+                  aria-expanded={chatOpen}
+                  aria-controls="interview-chat"
+                  className={CHIP}
+                >
+                  <MessagesSquare size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+                  צ'אט
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
 
         {/* The chat, for anyone who would rather write — with its fence and
@@ -117,7 +176,7 @@ export default function StartConversation() {
         ) : null}
 
         {/* Two ways out of the chat, for a visitor who would rather not use it. */}
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4 max-md:hidden">
           <a
             href={`https://wa.me/${CONTACT.whatsapp}`}
             target="_blank"
@@ -136,12 +195,17 @@ export default function StartConversation() {
           </a>
         </div>
 
-        {/* And the short form: heading and form side by side, on the ground. */}
-        <QuickContact embedded />
+        {/* And the short form: heading and form side by side, on the ground.
+            Below md it stays in the page (and in the document) but hidden until
+            the chip above opens it. */}
+        <QuickContact embedded className={formOpen ? undefined : "max-md:hidden"} />
       </div>
     </section>
   );
 }
+
+const CHIP =
+  "inline-flex items-center gap-2 min-h-11 px-4 rounded-full border border-border text-[16px] text-foreground hover:border-highlight hover:bg-highlight/5 aria-expanded:border-highlight aria-expanded:bg-highlight/10 transition-colors duration-200";
 
 const TILE =
   "flex items-center justify-center gap-3 min-h-16 rounded-md border border-border text-[17px] text-foreground hover:border-highlight hover:bg-highlight/5 transition-colors duration-200";

@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { expect, gotoApp, test, test_step } from "../fixtures/app";
+import { expect, gotoApp, test, test_step, waitForLive } from "../fixtures/app";
 
 /**
  * The handoff form, addressed by its accessible name.
@@ -28,12 +28,30 @@ const INTERVIEW = "#start";
  * The home page with the interview chat open.
  *
  * The needs wizard is the primary path in #start now; the chat it replaced is
- * one press away, behind "לשיחה עם העוזר". Everything below is about the chat's
- * regulatory shell, which is unchanged — it just has to be opened first.
+ * one press away, behind "לשיחה עם העוזר" — on a phone, behind the "צ'אט" chip
+ * in the row under the questionnaire (stage 3), which is the same toggle.
+ * Everything below is about the chat's regulatory shell, which is unchanged —
+ * it just has to be opened first.
  */
 async function openInterviewChat(page: Page): Promise<void> {
   await gotoApp(page, "/");
-  await page.locator(INTERVIEW).getByRole("button", { name: /לשיחה עם העוזר/ }).click();
+  await waitForLive(page, INTERVIEW);
+  await page
+    .locator(INTERVIEW)
+    .getByRole("button", { name: /לשיחה עם העוזר|^צ'אט$/ })
+    .filter({ visible: true })
+    .click();
+  // Opening scrolls the chat into view, smoothly. A click while the page is
+  // still gliding can land where the button was a frame ago (seen on WebKit),
+  // so wait for the scroll to come to rest.
+  await expect(page.locator("#interview-chat")).toBeInViewport();
+  await page.waitForFunction(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const y = window.scrollY;
+        setTimeout(() => resolve(window.scrollY === y), 150);
+      }),
+  );
 }
 
 test.describe("Agent chat — regulatory shell", () => {
@@ -220,8 +238,9 @@ test.describe("Agent chat — regulatory shell", () => {
       await expect(section.getByRole("link", { name: /050-831-1776/ })).toBeVisible();
       // Anchored: the row's name is its title then its label ("וואטסאפ הודעה
       // מיידית"), and the section also carries an "עדיף לי בוואטסאפ"
-      // alternative that a bare substring match would find instead.
-      await expect(section.getByRole("link", { name: /^וואטסאפ/ })).toBeVisible();
+      // alternative that a bare substring match would find instead — and on a
+      // phone a "וואטסאפ" chip under the questionnaire, so: inside the chat.
+      await expect(page.locator("#interview-chat").getByRole("link", { name: /^וואטסאפ/ })).toBeVisible();
     });
   });
 });
@@ -371,7 +390,8 @@ test.describe("Agent chat — when the backend refuses", () => {
       await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
       await section.getByRole("button", { name: "שלחו לדורית" }).click();
       await expect(section.getByRole("link", { name: /050-831-1776/ })).toBeVisible();
-      await expect(section.getByRole("link", { name: /^וואטסאפ/ })).toBeVisible();
+      // Inside the chat: on a phone the section's chip row has a "וואטסאפ" too.
+      await expect(page.locator("#interview-chat").getByRole("link", { name: /^וואטסאפ/ })).toBeVisible();
     });
   });
 

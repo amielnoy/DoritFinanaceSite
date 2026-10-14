@@ -1,5 +1,5 @@
 import { loadEntity, validateAgainstEntity } from "../../tests/helpers/entity-schema";
-import { AGAINST_A_DEPLOYMENT, LEAD_FUNCTION_PATH, LEAD_VIA_SUPABASE, STUBS_UNREACHABLE, expect, gotoApp, test, test_step } from "../fixtures/app";
+import { AGAINST_A_DEPLOYMENT, LEAD_FUNCTION_PATH, LEAD_VIA_SUPABASE, STUBS_UNREACHABLE, expect, gotoApp, openQuickContact, test, test_step } from "../fixtures/app";
 
 /**
  * Runtime contract: what the browser actually puts on the wire, checked against
@@ -44,7 +44,7 @@ test.describe("Base44 API contract (observed traffic)", () => {
 
     await test_step("submit the quick contact form", async () => {
       await gotoApp(page);
-      await form.scrollIntoViewIfNeeded();
+      await openQuickContact(page);
       await form.locator("#qc-name").fill("ישראלה ישראלי");
       await form.locator("#qc-phone").fill("050-1234567");
       await form.getByRole("button", { name: "שליחת הודעה" }).click();
@@ -107,7 +107,7 @@ test.describe("Base44 API contract (observed traffic)", () => {
 
     await test_step("exercise the app until it has talked to the backend", async () => {
       await gotoApp(page);
-      await form.scrollIntoViewIfNeeded();
+      await openQuickContact(page);
       await form.locator("#qc-name").fill("ישראלה");
       await form.locator("#qc-phone").fill("050-1234567");
       await form.getByRole("button", { name: "שליחת הודעה" }).click();
@@ -130,7 +130,7 @@ test.describe("Base44 API contract (observed traffic)", () => {
 
     await test_step("submit a lead carrying a phone number and an email address", async () => {
       await gotoApp(page);
-      await form.scrollIntoViewIfNeeded();
+      await openQuickContact(page);
       await form.locator("#qc-name").fill("ישראלה ישראלי");
       await form.locator("#qc-phone").fill("0501234567");
       await form.locator("#qc-email").fill("secret@example.com");
