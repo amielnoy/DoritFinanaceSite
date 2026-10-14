@@ -67,3 +67,19 @@ export function assessmentMessage(recs: ReadonlyArray<Pick<Recommendation, "titl
   const clause = priority === 0 ? "" : recs.length === 1 ? " (בעדיפות גבוהה)" : ` (${priority} מהם בעדיפות גבוהה)`;
   return `${opening} ${listed}${clause}. ${ASSESSMENT_CLOSE}`;
 }
+
+const RETIREMENT_FALLBACK = "שלום דורית, השתמשתי במחשבון הפרישה באתר. אשמח לחישוב לפי הנתונים האמיתיים שלי.";
+
+/**
+ * The retirement calculator's result as one sentence: the estimated monthly
+ * pension at the retirement age it was worked out for. With nothing to speak
+ * of — no years ahead, no balance — it asks for a check without numbers.
+ */
+export function retirementMessage(input: { retirementAge: number }, result: { monthlyPension: number; finalBalance: number }): string {
+  const pension = result.monthlyPension;
+  if (!Number.isFinite(pension) || !(pension > 0) || !(result.finalBalance > 0)) return RETIREMENT_FALLBACK;
+  return (
+    `שלום דורית, מחשבון הפרישה באתר העריך קצבה חודשית של כ-${formatIls(pension)} בגיל ${input.retirementAge}. ` +
+    `אשמח לחישוב לפי הנתונים האמיתיים שלי.`
+  );
+}

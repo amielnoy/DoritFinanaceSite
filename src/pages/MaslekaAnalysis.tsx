@@ -3,11 +3,12 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Loader2, Printer } from "lucide-react";
 import { analyse, pct, totals, type Severity } from "@/lib/clearinghouse/analysis";
-import { forPrint, pendingCount, withReviews, type ReviewedFinding } from "@/lib/clearinghouse/review";
+import { customRecommendations, forPrint, pendingCount, publishItems, withReviews, type ReviewedFinding } from "@/lib/clearinghouse/review";
 import type { Account } from "@/lib/clearinghouse/snapshot";
 import { formatIls } from "@/lib/pension-fee";
 import { PENSION_MARKETING_DISCLOSURE } from "@/config/compliance";
-import { services, type MaslekaPort, type ReviewDecision } from "@/services";
+import { services, type MaslekaPort, type RecommendationPriority, type ReviewDecision } from "@/services";
+import PublishPanel, { CustomRecommendationForm } from "@/components/dorit/masleka/PublishPanel";
 import { failureText } from "@/lib/masleka";
 
 /**
@@ -24,6 +25,8 @@ export interface MaslekaAnalysisProps {
   /** Tests pass it; the route reads it from the address. */
   snapshotId?: string;
   print?: () => void;
+  /** Asked before a republish replaces what the client sees (tests pass their own). */
+  confirm?: (message: string) => boolean;
 }
 
 const SEVERITY: Record<Severity, { label: string; className: string }> = {
@@ -63,6 +66,12 @@ function FindingCard({
   const fieldId = useId();
   const severity = SEVERITY[finding.severity];
   const headingId = `${fieldId}-title`;
+  // A recommendation Dorit wrote herself: edited or deleted, never "approved" or "rejected".
+  const custom = finding.rule === "custom";
+  const keepText = (text: string): ReviewDecision =>
+    custom
+      ? { status: "approved", finalText: text, title: finding.title }
+      : { status: "approved", finalText: text === finding.body ? null : text };
   return (
     <li
       aria-labelledby={headingId}
@@ -71,11 +80,31 @@ function FindingCard({
       }`}
     >
       <div className="flex flex-wrap items-center gap-2 print:hidden">
-        <span className={`border px-2 py-0.5 text-xs ${severity.className}`}>{severity.label}</span>
+        {custom ? (
+          <span className="border border-highlight px-2 py-0.5 text-xs text-accent">המלצה משלך</span>
+        ) : (
+          <span className={`border px-2 py-0.5 text-xs ${severity.className}`}>{severity.label}</span>
+        )}
         <span className="text-xs text-muted-foreground">
-          {STATE_LABEL[finding.state]}
+          {custom ? "" : STATE_LABEL[finding.state]}
           {finding.edited ? " · בנוסח של דורית" : ""}
         </span>
+        {finding.state === "approved" ? (
+          <label className="ms-auto inline-flex items-center gap-1 text-xs text-muted-foreground">
+            עדיפות
+            <select
+              value={finding.priority}
+              disabled={busy}
+              onChange={(e) =>
+                onDecide({ ...keepText(finding.text), priority: e.target.value as RecommendationPriority })
+              }
+              className="border border-border bg-background px-1 py-0.5 text-foreground"
+            >
+              <option value="important">חשוב</option>
+              <option value="check">כדאי לבדוק</option>
+            </select>
+          </label>
+        ) : null}
       </div>
       <h3 id={headingId} className="mt-2 font-medium">
         {finding.title}
@@ -98,8 +127,7 @@ function FindingCard({
               type="button"
               disabled={busy || !draft.trim()}
               onClick={() => {
-                const text = draft.trim();
-                onDecide({ status: "approved", finalText: text === finding.body ? null : text });
+                onDecide(keepText(draft.trim()));
                 setEditing(false);
               }}
               className={`${buttonClass} border-primary`}
@@ -115,6 +143,16 @@ function FindingCard({
         <p className="mt-2 text-sm leading-relaxed whitespace-pre-line">{finding.text}</p>
       )}
       {editing ? null : (
+        custom ? (
+          <div className="mt-3 flex flex-wrap gap-2 print:hidden">
+            <button type="button" disabled={busy} onClick={() => { setDraft(finding.text); setEditing(true); }} className={buttonClass}>
+              עריכה
+            </button>
+            <button type="button" disabled={busy} onClick={() => onDecide(null)} className={buttonClass}>
+              מחיקה
+            </button>
+          </div>
+        ) : (
         <div className="mt-3 flex flex-wrap gap-2 print:hidden">
           {finding.state !== "approved" || finding.edited ? (
             <button type="button" disabled={busy} onClick={() => onDecide({ status: "approved", finalText: null })} className={`${buttonClass} border-primary`}>
@@ -135,6 +173,7 @@ function FindingCard({
             </button>
           ) : null}
         </div>
+        )
       )}
     </li>
   );
@@ -144,6 +183,7 @@ export default function MaslekaAnalysis({
   service = services.masleka,
   snapshotId: given,
   print = () => window.print(),
+  confirm = (message) => window.confirm(message),
 }: MaslekaAnalysisProps) {
   const params = useParams();
   const snapshotId = given ?? params.snapshotId ?? "";
@@ -199,9 +239,11 @@ export default function MaslekaAnalysis({
 
   const { snapshot, clientName, takenAt } = stored.data;
   const findings = withReviews(analyse(snapshot), reviews.data ?? []);
+  const custom = customRecommendations(reviews.data ?? []);
+  const toPublish = publishItems(findings, custom);
   const sum = totals(snapshot);
   const pending = pendingCount(findings);
-  const approved = forPrint(findings).length;
+  const approved = forPrint(findings).length + custom.length;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background print:bg-white">
@@ -253,16 +295,21 @@ export default function MaslekaAnalysis({
             </p>
           ) : null}
           <ol className="mt-4 space-y-3">
-            {findings.map((f) => (
+            {[...findings, ...custom].map((f) => (
               <FindingCard
-                key={`${f.key}|${f.state}|${f.text}`}
+                key={`${f.key}|${f.state}|${f.text}|${f.priority}`}
                 finding={f}
                 busy={decide.isPending}
                 onDecide={(decision) => decide.mutate({ key: f.key, decision })}
               />
             ))}
           </ol>
+          <div className="mt-4">
+            <CustomRecommendationForm busy={decide.isPending} onAdd={(key, decision) => decide.mutate({ key, decision })} />
+          </div>
         </section>
+
+        <PublishPanel service={service} stored={stored.data} items={toPublish} confirm={confirm} />
 
         <section aria-labelledby="products-title">
           <h2 id="products-title" className="font-heading text-xl">

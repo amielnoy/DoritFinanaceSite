@@ -121,3 +121,105 @@ describe("<MaslekaAnalysis /> — Dorit's review of a client's report", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("הדוח לא נמצא");
   });
 });
+
+describe("<MaslekaAnalysis /> — publishing to the client's area (phase 4)", () => {
+  const [first] = FINDINGS;
+  const approvedFirst: FindingReview[] = [{ findingKey: first.key, status: "approved", finalText: null, reviewedAt: "t" }];
+
+  function renderWith(port: MaslekaPort, confirm: (m: string) => boolean = () => true) {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <MaslekaAnalysis service={port} snapshotId="s1" confirm={confirm} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  const publishing = (over: Partial<MaslekaPort> = {}, reviews = approvedFirst, stored: Record<string, unknown> = {}) =>
+    service(
+      {
+        getSnapshot: vi.fn(async () => ({ ...STORED, clientEmail: null, publishedAt: null, ...stored })),
+        publish: vi.fn(async () => {}),
+        unpublish: vi.fn(async () => {}),
+        markAnswersSeen: vi.fn(async () => {}),
+        listPublishedItems: vi.fn(async () => []),
+        ...over,
+      },
+      reviews,
+    );
+
+  it("changes an approved recommendation's priority, keeping its wording", async () => {
+    const port = publishing();
+    renderWith(port);
+    await screen.findByRole("listitem", { name: first.title });
+    await userEvent.selectOptions(card(first.title).getByRole("combobox", { name: "עדיפות" }), "important");
+    expect(port.decide).toHaveBeenCalledWith("s1", first.key, { status: "approved", finalText: null, priority: "important" });
+  });
+
+  it("adds a recommendation of Dorit's own, approved, with its title and priority", async () => {
+    const port = publishing();
+    renderWith(port);
+    const form = within(await screen.findByRole("form", { name: "הוספת המלצה" }));
+    await userEvent.type(form.getByLabelText("כותרת"), "עדכון מוטבים");
+    await userEvent.selectOptions(form.getByLabelText("עדיפות"), "important");
+    await userEvent.type(form.getByLabelText("הסבר ללקוח"), "נעדכן את המוטבים בקרן.");
+    await userEvent.click(form.getByRole("button", { name: "הוספה ואישור" }));
+    expect(port.decide).toHaveBeenCalledWith("s1", expect.stringMatching(/^custom:/), {
+      status: "approved", finalText: "נעדכן את המוטבים בקרן.", title: "עדכון מוטבים", priority: "important",
+    });
+    expect(await screen.findByRole("listitem", { name: "עדכון מוטבים" })).toBeInTheDocument();
+  });
+
+  it("previews exactly what the client will see, with nothing sent", async () => {
+    const port = publishing();
+    renderWith(port);
+    await userEvent.click(await screen.findByRole("button", { name: "תצוגה כפי שהלקוח רואה" }));
+    const preview = within(screen.getByRole("region", { name: "תצוגה כפי שהלקוח רואה" }));
+    expect(preview.getByRole("heading", { name: first.title })).toBeInTheDocument();
+    expect(preview.getByRole("button", { name: "כן, לטפל בזה" })).toBeDisabled();
+    expect(port.publish).not.toHaveBeenCalled();
+  });
+
+  it("publishes the approved recommendations to the client's address", async () => {
+    const port = publishing();
+    renderWith(port);
+    const publish = await screen.findByRole("button", { name: "פרסום לאזור האישי" });
+    expect(publish).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("המייל שהלקוח מתחבר איתו לאתר"), "ronit@example.com");
+    await userEvent.click(publish);
+    expect(port.publish).toHaveBeenCalledWith("s1", "ronit@example.com", [
+      { title: first.title, body: first.body, priority: first.severity === "high" ? "important" : "check" },
+    ]);
+  });
+
+  it("asks before a republish replaces what the client sees", async () => {
+    const port = publishing({}, approvedFirst, { clientEmail: "ronit@example.com", publishedAt: "2026-10-14T10:00:00Z" });
+    const confirm = vi.fn(() => false);
+    renderWith(port, confirm);
+    await userEvent.click(await screen.findByRole("button", { name: "פרסום מחדש" }));
+    expect(confirm).toHaveBeenCalled();
+    expect(port.publish).not.toHaveBeenCalled();
+  });
+
+  it("shows the client's answers, the new ones counted, and marks them read", async () => {
+    const port = publishing(
+      {
+        listPublishedItems: vi.fn(async () => [
+          { id: "i1", position: 0, title: first.title, body: "b", priority: "check" as const, clientStatus: "question" as const, clientNote: "מה זה אומר?", clientUpdatedAt: "u", staffSeenAt: null },
+          { id: "i2", position: 1, title: "אחר", body: "b", priority: "check" as const, clientStatus: "open" as const, clientNote: null, clientUpdatedAt: null, staffSeenAt: null },
+        ]),
+      },
+      approvedFirst,
+      { clientEmail: "ronit@example.com", publishedAt: "2026-10-14T10:00:00Z" },
+    );
+    renderWith(port);
+    expect(await screen.findByText("1 חדשות")).toBeInTheDocument();
+    expect(screen.getByText("מה זה אומר?")).toBeInTheDocument();
+    expect(screen.queryByText("אחר")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "סימון כנקרא" }));
+    expect(port.markAnswersSeen).toHaveBeenCalledWith("s1");
+    await userEvent.click(screen.getByRole("button", { name: "הסרה מהאזור האישי" }));
+    expect(port.unpublish).toHaveBeenCalledWith("s1");
+  });
+});

@@ -111,6 +111,11 @@ describe("leadEvents", () => {
     expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "contact_form" });
   });
 
+  it("counts the Har HaBituach check's summary as a lead of its own method", () => {
+    leadEvents.coverageCheckSubmitted();
+    expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "coverage_check" });
+  });
+
   it("counts the pension check as a lead of its own method, with where its form sat", () => {
     leadEvents.pensionCheckSubmitted("calculator");
     expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "pension_check", location: "calculator" });

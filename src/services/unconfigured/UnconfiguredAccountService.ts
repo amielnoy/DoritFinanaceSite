@@ -1,4 +1,4 @@
-import { AccountLoadError, type AccountPort, type Enquiry } from "../ports";
+import { AccountLoadError, type AccountPort, type ClientSnapshot, type Enquiry } from "../ports";
 
 /**
  * The personal area for a build with no Supabase credentials.
@@ -8,6 +8,12 @@ import { AccountLoadError, type AccountPort, type Enquiry } from "../ports";
  */
 export class UnconfiguredAccountService implements AccountPort {
   async myEnquiries(): Promise<Enquiry[]> {
+    throw new AccountLoadError("signed_out");
+  }
+  async mySnapshot(): Promise<ClientSnapshot | null> {
+    throw new AccountLoadError("signed_out");
+  }
+  async respondToRecommendation(): Promise<void> {
     throw new AccountLoadError("signed_out");
   }
 }

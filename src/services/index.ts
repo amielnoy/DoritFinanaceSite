@@ -176,6 +176,8 @@ export const services: Services = {
   },
   account: {
     myEnquiries: () => real().then((s) => s.account.myEnquiries()),
+    mySnapshot: () => real().then((s) => s.account.mySnapshot()),
+    respondToRecommendation: (itemId, status, note) => real().then((s) => s.account.respondToRecommendation(itemId, status, note)),
   },
   masleka: {
     submitCode: (token, code, idNumber) => real().then((s) => s.masleka.submitCode(token, code, idNumber)),
@@ -189,6 +191,10 @@ export const services: Services = {
     getSnapshot: (snapshotId) => real().then((s) => s.masleka.getSnapshot(snapshotId)),
     listReviews: (snapshotId) => real().then((s) => s.masleka.listReviews(snapshotId)),
     decide: (snapshotId, findingKey, decision) => real().then((s) => s.masleka.decide(snapshotId, findingKey, decision)),
+    listPublishedItems: (snapshotId) => real().then((s) => s.masleka.listPublishedItems(snapshotId)),
+    publish: (snapshotId, clientEmail, items) => real().then((s) => s.masleka.publish(snapshotId, clientEmail, items)),
+    unpublish: (snapshotId) => real().then((s) => s.masleka.unpublish(snapshotId)),
+    markAnswersSeen: (snapshotId) => real().then((s) => s.masleka.markAnswersSeen(snapshotId)),
   },
 };
 
