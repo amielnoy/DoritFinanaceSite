@@ -783,6 +783,27 @@ no `/en` route, no language switcher, no hreflang. Locally:
   French. The compliance adviser approves the translated licence and
   pension-marketing lines (`compliance.pensionMarketing`; COMPLIANCE.md §11).
 
+### Organization badges — ready, not shown yet
+
+Which organization a user belongs to, as a colour **and** a letter (never the
+colour alone). Built ahead of need: the site has one agency today, so nothing
+renders these until a second one joins.
+
+- **One place:** `src/config/organizations.ts` — each organization's `id`,
+  `name`, `letter`, `color` (badge), `tint` (chip background), `ink` (chip
+  text). The four there are samples; replace them with the real agencies. An
+  organization with no entry gets a palette colour picked by its id (always the
+  same) and its name's first letter: `orgFor(id, name)`.
+- **On an avatar:** `<Avatar org={orgFor(id, name)} size={64}>` — the badge at
+  the bottom corner on the inline end (left in RTL), 26px on a 64px avatar,
+  20px on 40–44px, colour only at 32px and below; the full name as the tooltip
+  and `aria-label`. Without `org`, `Avatar` is unchanged.
+- **As a label:** `<OrgChip org={…} />` — tint, ink, and an 8px square of the
+  colour before the name.
+- **Contrast:** `tests/unit/organizations.test.ts` fails any colour under
+  4.5:1 (white on the colour, ink on the tint) — a new organization's colours
+  are checked the moment they are added.
+
 ## The chat function (Phase 3)
 
 The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents

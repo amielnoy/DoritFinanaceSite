@@ -1,3 +1,8 @@
+/* eslint-disable no-restricted-syntax -- Organization colours are identity
+   data, one set per organization (and, once agencies are many, a table's
+   rows), not the site's design system — the same reasoning as GoogleIcon's
+   brand palette. The components take them from here and use no hex at all.
+   tests/unit/organizations.test.ts holds every one to 4.5:1. */
 /**
  * Which organization a user belongs to, shown as a colour and a letter
  * (OrgBadge on an avatar, OrgChip as a label). Every organization is defined

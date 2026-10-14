@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 933 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1597 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 939 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1606 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1409,6 +1409,20 @@ On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's l
 | UNIT-I18N-018 | "names the categories in each language" | Income tax, Pension & savings, Insurance, General; Hebrew = `FAQ_CATEGORIES` |
 | UNIT-I18N-019 | "keeps the disclosure in the 'are you independent?' answer, in every language" | "שיווק פנסיוני ולא ייעוץ…"; "pension marketing, not objective pension advice"; "et non du conseil en retraite objectif" |
 | UNIT-I18N-020 | "is exactly as typed from the Hebrew site, and carries the note on its own line from English or French" | Hebrew untouched (spaces kept); en/fr trimmed, then "(מולא באנגלית)" / "(מולא בצרפתית)" |
+
+
+### 4.55 Organizations — `tests/unit/organizations.test.ts`
+
+`src/config/organizations.ts`: every organization's colour and letter, and the fallback for one with none.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ORG-001 | "defines each organization once, with a single letter" | Unique ids; one letter each |
+| UNIT-ORG-002 | "reads at 4.5:1 or more — the white letter on the colour, the ink on the tint — for every organization and every fallback" | Every ratio ≥ 4.5 |
+| UNIT-ORG-003 | "returns a defined organization as it is" | `orgFor("beta")` is the defined entry |
+| UNIT-ORG-004 | "gives an unknown organization a palette colour by its id, the same every time, and its name's first letter" | A palette entry; identical on a second call; "א", "Z" |
+| UNIT-ORG-005 | "spreads different ids across the palette" | More than 3 colours over 40 ids |
+| UNIT-ORG-006 | "measures contrast as WCAG does" | Black on white 21; equal colours 1 |
 
 ## 5. Pass criteria
 
