@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import ErrorBoundary from "@/components/ErrorBoundary";
+
+const checkFreshness = vi.fn(async () => "fresh" as const);
+const reloadFresh = vi.fn();
+vi.mock("@/lib/freshness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/freshness")>()),
+  checkFreshness,
+  reloadFresh,
+}));
+
+const { default: ErrorBoundary } = await import("@/components/ErrorBoundary");
 import { CONTACT } from "@/config/contact";
 
 const Boom = () => {
@@ -76,5 +85,37 @@ describe("ErrorBoundary", () => {
     );
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByText("next page")).toBeTruthy();
+  });
+
+  it("offers a fresh load, past the cache, in the fallback", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <ErrorBoundary scope="page">
+        <Boom />
+      </ErrorBoundary>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "לטעון את הדף מחדש" }));
+    expect(reloadFresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks whether the build was replaced when a page chunk failed to load, and only then", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    checkFreshness.mockClear();
+    const ChunkGone = () => {
+      throw new TypeError("Failed to fetch dynamically imported module: https://govari-fin.co.il/assets/Claims-abc.js");
+    };
+    render(
+      <ErrorBoundary scope="page">
+        <ChunkGone />
+      </ErrorBoundary>,
+    );
+    expect(checkFreshness).toHaveBeenCalledTimes(1);
+    checkFreshness.mockClear();
+    render(
+      <ErrorBoundary scope="page">
+        <Boom />
+      </ErrorBoundary>,
+    );
+    expect(checkFreshness).not.toHaveBeenCalled();
   });
 });

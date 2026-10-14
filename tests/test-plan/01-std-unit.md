@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 855 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1441 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 858 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1447 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1281,6 +1281,16 @@ Fixed rules over a `Snapshot` (`src/lib/clearinghouse/`), on the made-up client 
 | UNIT-CHA-018 | "starts every finding as a draft in the draft's own words" | All `draft`; nothing to print |
 | UNIT-CHA-019 | "prints approved findings only, in Dorit's words when she edited them" | One approved (edited) printed; rejected and stale decisions ignored |
 | UNIT-CHA-020 | "does not call a text 'edited' when it is the draft's own" | `edited` false |
+
+### 4.49a Stale builds and page chunks that will not load — `tests/unit/freshness.dom.test.ts` (new cases)
+
+`src/lib/freshness.ts`. The fallback screen's recovery: a tab left open through a deploy asks for a page chunk that is gone (2026-10-12 /faq, 2026-10-14 /claims).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-FRESH-001 | "recognises %s's wording" (4 cases) | Chrome, Safari, Firefox and an HTML-for-JS answer are chunk failures |
+| UNIT-FRESH-002 | "does not take an ordinary render error for one" | A TypeError of the page's own, and `undefined`, are not |
+| UNIT-FRESH-003 | "reloads at an address the cache has never seen, keeping the page and its query" | `?x=1&_v=<now>` on the same path |
 
 ## 5. Pass criteria
 

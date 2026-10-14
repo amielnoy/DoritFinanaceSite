@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 288 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 318 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 290 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 320 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -161,6 +161,8 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 | CMP-ERB-003 | "isolates the failure: sibling trees still render" | Sibling text present; section wording ("החלק הזה") |
 | CMP-ERB-004 | "uses page wording for the app-level boundary" | `scope="page"` message says "הדף" |
 | CMP-ERB-005 | "recovers when its resetKey changes, so leaving a broken page is not a dead end" | After `resetKey` changes (the app passes the path), the fallback is gone and the new children render |
+| CMP-ERB-006 | "offers a fresh load, past the cache, in the fallback" | "לטעון את הדף מחדש" calls `reloadFresh` |
+| CMP-ERB-007 | "asks whether the build was replaced when a page chunk failed to load, and only then" | A chunk error → `checkFreshness` once; an ordinary render error → not at all |
 
 ### 4.11 `<Testimonials />` — `tests/component/testimonials.test.tsx`
 
