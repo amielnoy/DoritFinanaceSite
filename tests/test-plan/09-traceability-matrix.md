@@ -30,7 +30,7 @@ gap is visible and a failure points at a feature.
 | F-25 | Every enquiry reaches the agency by mail | — | — | CTR-AGT-*, CTR-EML-*, CTR-CLK-001/002 | INT-LEAD-*, INT-ESC-*, INT-MAIL-*, INT-CLAIM-* | — | — | — | — | SEC-AGT-* | — |
 | F-16 | No secrets ship to the browser | — | — | CTR-FN-009/010 | — | — | — | — | — | SEC-STA-001..009, SEC-BND-001 | — |
 | F-26 | Visitor runs the insurance self-assessment (/tools) | UNIT-ASM-001..008 | — | — | — | — | — | — | — | — | A11Y-AXE-009 |
-| F-27 | Visitor reads the FAQ library and asks the support chat (/faq) | UNIT-FAQ-001..006 | CMP-FAQ-001, CMP-BAR-002, CMP-FLA-003, CMP-SHEET-001..010 | CTR-AGT-* | INT-SUPPORT-001..012 | — | API-HTP-008 | E2E-NAV-004, E2E-AGT-006..008, E2E-SUP-001..003 | E2E-SUP-001/002, E2E-MOB-011..014 | — | A11Y-AXE-001 |
+| F-27 | Visitor reads the FAQ library and asks the support chat (/faq) | UNIT-FAQ-001..006 | CMP-FAQ-001, CMP-BAR-002, CMP-FLA-003, CMP-SHEET-001..010 | CTR-AGT-* | INT-SUPPORT-001..012 | — | API-HTP-008 | E2E-NAV-004, E2E-AGT-006..008, E2E-SUP-001..003 | E2E-SUP-001/002, E2E-MOB-011..020, E2E-DSK-003 | — | A11Y-AXE-001 |
 | F-28 | Visitor asks how a procedure is carried out, in the procedures chat (/tools) | — | — | CTR-AGT-* | — | EVAL-PRC-001..008 | — | E2E-AGT-009..012 | — | — | A11Y-AXE-008 |
 | F-29 | Signed-in visitor sees their own enquiries (/account) | UNIT-ACC-001..017 | CMP-ACC-001..023, CMP-HDR-001..005 | CTR-ACC-001..006 | INT-ACC-001..010 | — | — | E2E-ACC-001 | — | — | — |
 | F-30 | Admin sees which lead events reach GA4, and marks a browser internal (/admin/leads) | UNIT-GA4-001..014 | CMP-GA4-001..005, CMP-QCF-006 | — | — | — | — | — | — | — | — |

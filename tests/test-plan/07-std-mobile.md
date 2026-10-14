@@ -52,6 +52,12 @@ Test is skipped: mobile projects only".
 | E2E-MOB-012 | "the chat opens full-screen, with room for its messages and one scroll" | Press "שאלו את העוזר", accept the notice, open the hand-off | A `dialog` named "העוזר של דורית" covering the viewport; `body` overflow hidden; the header is one row (title, "אוטומטי · לא דורית עצמה", hand-off, X — each ≥44px); the notice region >300px with checkbox and start button in view; after consent the messages area >50% of the viewport and the layer itself does not scroll; the message box in view at ≥16px; `chat_start` and `chat_handoff` (`method: ai_support`) queued for GA4 |
 | E2E-MOB-013 | "Escape and the X close it, and focus goes back to the button" | Open, press Escape; open, press X | Layer gone, focus on "שאלו את העוזר", `aria-expanded=false`, page scroll unlocked |
 | E2E-MOB-014 | "Tab stays inside the layer while it is open" | Open, press Tab/Shift+Tab 12 times | Focus never leaves the dialog and visits ≥3 controls (Safari's own Tab skips buttons, so the layer moves focus itself) |
+| E2E-MOB-015 | "the heading is one short line, and the document title is the same as before" | Load `/faq` | The `<h1>` reads "שאלות ותשובות" on one line (<60px tall); the first question is on the first screen; `<title>` is still "שאלות ותשובות — פנסיה, גמל, ביטוח ומיסוי \| דורית גוב ארי" |
+| E2E-MOB-016 | "the topics are a bar pinned under the header, scrolling sideways" | Load `/faq`; scroll 120px into the questions | The group "ניווט לפי נושא" holds ≥3 real `<button>`s, each ≥44px tall, on one line, `overflow-x: auto`, the first `aria-pressed=true`; scrolled, the bar's top is within 16px under the header's bottom |
+| E2E-MOB-017 | "a topic chosen from the pinned bar starts at its heading, clear of the bar" | Scroll 150px into the questions, tap the second topic | It is `aria-pressed`; its `<h2>` lands below the bar's bottom edge and within 60px of it — not under the bar, not mid-list |
+| E2E-MOB-018 | "the topics are reachable from the keyboard" | Focus the last topic, press Enter; on Chromium, Tab from the first | The last topic is focusable, scrolls fully inside the bar when focused, and Enter selects it; Tab moves from the first topic to the second (Chromium only: Safari's own Tab skips buttons) |
+| E2E-MOB-019 | "opening a question leaves it where it was, and the one above stays open" | Open the first question; put the second 400px down the screen; open it | The second question's top moves ≤1px; both are `aria-expanded=true` (below md the accordion is `multiple`) |
+| E2E-MOB-020 | "עדיין מתלבטים? has its three buttons on one row, and each still reports to GA4" | Scroll to the CTA band; tap all three (navigation prevented) | "קביעת פגישה", "טלפון" and "WhatsApp" share one row inside the screen, each ≥44×44px, hrefs `/#start`, `tel:+972508311776`, `wa.me/972508311776`; `cta_click`, `click_phone` and `click_whatsapp` queued for GA4 with `location: faq` |
 
 The sticky bar has a third cell since A-64, "תמיכה", which goes to the support
 chat on `/faq`. It is exercised on the phone projects by `E2E-SUP-002` in
@@ -62,12 +68,25 @@ chat on `/faq`. It is exercised on the phone projects by `E2E-SUP-002` in
 
 `mobile.spec.ts` also holds a `Desktop-only chrome` block, tagged
 `@desktop-only` and filtered out of the two mobile projects the same way, so
-each project collects only its own half: 16 cases on a phone, 2 on a desktop. A responsive swap
+each project collects only its own half: 22 cases on a phone, 3 on a desktop. A responsive swap
 has two halves and only one of them is ever asserted by accident: hiding the
 desktop dock on a phone while also hiding it on a desktop passes E2E-MOB-001
 and ships a home page with no call-to-action above the fold. Those two cases
 are specified as `E2E-DSK-001/002` in
 [STD-06 §3.7](06-std-ui-e2e.md), with the rest of the desktop suite.
+
+E2E-MOB-015–020 cover the rest of `/faq` below md. At 390×844 the page was
+4.91 screens after E2E-MOB-011–014, and a screen and a half stood before the
+first question: a kicker repeating the two-line heading, a 70px topics row the
+visitor scrolled away from for good, and a contact box saying what the support
+chat's card says right below it. Opening a question closed the one above it and
+pulled the clicked question 168px up the screen. The heading is now one line
+with a shorter intro (the `<title>` and description are unchanged), the topics
+are a bar pinned under the header, the accordion opens without closing, the
+contact box is hidden below md, and the CTA band's three buttons are one row:
+3.73 screens, of which the site-wide footer is 1.72. From md up nothing
+changes — `E2E-DSK-003` pins the desktop half, and the 1440 screenshots are
+byte-identical.
 
 E2E-MOB-011–014 replace, on a phone, the support chat that used to sit on
 `/faq` in a fixed 560px box: at 390×844 its consent notice got 96px and its
