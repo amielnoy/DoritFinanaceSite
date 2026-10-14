@@ -64,18 +64,17 @@ class MemoryStore implements ChatStore {
     Object.assign(c, { turns: turns + 1, busy_until: leaseUntilIso });
     return { ...c };
   }
-  /** PostgREST's filtered PATCH: role in roles, not eval, unlogged, idle before the cutoff, no live lease. */
-  async claimSheetLogs(roles: readonly string[], cutoffIso: string, nowIso: string) {
+  /** The pick and the filtered PATCH: role in roles, not eval, unlogged, idle before the cutoff, no live lease; longest idle first, `limit` of them. */
+  async claimSheetLogs(roles: readonly string[], cutoffIso: string, nowIso: string, limit: number) {
     this.check();
-    const claimed: ConversationRow[] = [];
-    for (const c of this.conversations.values()) {
-      if (!roles.includes(c.role) || c.is_eval || c.sheet_logged_at != null) continue;
-      if (!(Date.parse(c.last_message_at) < Date.parse(cutoffIso))) continue;
-      if (c.busy_until !== null && Date.parse(c.busy_until) >= Date.parse(nowIso)) continue;
-      c.sheet_logged_at = nowIso;
-      claimed.push({ ...c });
-    }
-    return claimed;
+    const due = [...this.conversations.values()]
+      .filter((c) => roles.includes(c.role) && !c.is_eval && c.sheet_logged_at == null)
+      .filter((c) => Date.parse(c.last_message_at) < Date.parse(cutoffIso))
+      .filter((c) => c.busy_until === null || Date.parse(c.busy_until) < Date.parse(nowIso))
+      .sort((a, b) => Date.parse(a.last_message_at) - Date.parse(b.last_message_at))
+      .slice(0, limit);
+    for (const c of due) c.sheet_logged_at = nowIso;
+    return due.map((c) => ({ ...c }));
   }
   async releaseTurn(id: string, leaseUntilIso: string, lastMessageAt: string) {
     this.check();

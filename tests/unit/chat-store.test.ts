@@ -123,27 +123,62 @@ describe("restStore", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("claims idle, unlogged, non-eval support conversations with one filtered PATCH", async () => {
-    answer = () => new Response(JSON.stringify([{ id: ID, role: "support" }]), { status: 200 });
-    const rows = await restStore.claimSheetLogs(["support"], "2026-10-14T09:00:00.000Z", "2026-10-14T09:30:00.000Z");
-    expect(rows).toMatchObject([{ id: ID }]);
-    const url = new URL(calls[0].url);
-    expect(calls[0].method).toBe("PATCH");
-    expect(url.pathname).toBe("/rest/v1/chat_conversations");
-    const p = url.searchParams;
-    expect(p.get("role")).toBe("in.(support)");
-    expect(p.get("is_eval")).toBe("is.false");
-    expect(p.get("sheet_logged_at")).toBe("is.null");
-    expect(p.get("last_message_at")).toBe("lt.2026-10-14T09:00:00.000Z");
-    expect(p.get("or")).toBe('(busy_until.is.null,busy_until.lt."2026-10-14T09:30:00.000Z")');
-    expect(calls[0].body).toEqual({ sheet_logged_at: "2026-10-14T09:30:00.000Z" });
-  });
+  describe("claimSheetLogs", () => {
+    const CUTOFF = "2026-10-14T09:00:00.000Z";
+    const NOW = "2026-10-14T09:30:00.000Z";
+    const ID2 = "00000000-0000-4000-8000-000000000002";
+    const due = (p: URLSearchParams) => {
+      expect(p.get("role")).toBe("in.(support)");
+      expect(p.get("is_eval")).toBe("is.false");
+      expect(p.get("sheet_logged_at")).toBe("is.null");
+      expect(p.get("last_message_at")).toBe(`lt.${CUTOFF}`);
+      expect(p.get("or")).toBe(`(busy_until.is.null,busy_until.lt."${NOW}")`);
+    };
 
-  it("refuses a role list it would have to escape, claiming nothing", async () => {
-    answer = () => new Response("[]", { status: 200 });
-    expect(await restStore.claimSheetLogs(["support,interview)"], "2026-10-14T09:00:00.000Z", "2026-10-14T09:30:00.000Z")).toEqual([]);
-    expect(await restStore.claimSheetLogs([], "2026-10-14T09:00:00.000Z", "2026-10-14T09:30:00.000Z")).toEqual([]);
-    expect(calls).toHaveLength(0);
+    it("picks a batch of the longest-idle due conversations, then claims them with one filtered PATCH repeating every condition", async () => {
+      answer = (_url, method) =>
+        method === "GET"
+          ? new Response(JSON.stringify([{ id: ID }, { id: ID2 }]), { status: 200 })
+          : new Response(JSON.stringify([{ id: ID, role: "support" }]), { status: 200 });
+      const rows = await restStore.claimSheetLogs(["support"], CUTOFF, NOW, 10);
+      expect(rows).toMatchObject([{ id: ID }]);
+      expect(calls.map((c) => c.method)).toEqual(["GET", "PATCH"]);
+
+      const pick = new URL(calls[0].url);
+      expect(pick.pathname).toBe("/rest/v1/chat_conversations");
+      due(pick.searchParams);
+      expect(pick.searchParams.get("select")).toBe("id");
+      expect(pick.searchParams.get("order")).toBe("last_message_at.asc");
+      expect(pick.searchParams.get("limit")).toBe("10");
+
+      const claim = new URL(calls[1].url);
+      expect(claim.pathname).toBe("/rest/v1/chat_conversations");
+      due(claim.searchParams);
+      expect(claim.searchParams.get("id")).toBe(`in.(${ID},${ID2})`);
+      expect(calls[1].body).toEqual({ sheet_logged_at: NOW });
+    });
+
+    it("claims nothing, and sends no PATCH, when no conversation is due", async () => {
+      answer = () => new Response("[]", { status: 200 });
+      expect(await restStore.claimSheetLogs(["support"], CUTOFF, NOW, 10)).toEqual([]);
+      expect(calls.map((c) => c.method)).toEqual(["GET"]);
+    });
+
+    it("never puts an id that is not a uuid into the claim", async () => {
+      answer = (_url, method) =>
+        method === "GET" ? new Response(JSON.stringify([{ id: "x)&role=eq.interview" }, { id: ID }]), { status: 200 }) : new Response("[]", { status: 200 });
+      await restStore.claimSheetLogs(["support"], CUTOFF, NOW, 10);
+      expect(new URL(calls[1].url).searchParams.get("id")).toBe(`in.(${ID})`);
+    });
+
+    it("refuses a role list it would have to escape, or a batch size that is not a positive integer, querying nothing", async () => {
+      answer = () => new Response("[]", { status: 200 });
+      expect(await restStore.claimSheetLogs(["support,interview)"], CUTOFF, NOW, 10)).toEqual([]);
+      expect(await restStore.claimSheetLogs([], CUTOFF, NOW, 10)).toEqual([]);
+      expect(await restStore.claimSheetLogs(["support"], CUTOFF, NOW, 0)).toEqual([]);
+      expect(await restStore.claimSheetLogs(["support"], CUTOFF, NOW, 2.5)).toEqual([]);
+      expect(calls).toHaveLength(0);
+    });
   });
 
   it("lets go of its own lease only, stamping the last message time", async () => {

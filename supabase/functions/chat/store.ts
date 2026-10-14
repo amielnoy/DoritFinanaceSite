@@ -66,8 +66,13 @@ export interface ChatStore {
    * `leaseUntilIso`. The claimed row, or null when nothing matched.
    */
   claimTurn(id: string, turns: number, nowIso: string, leaseUntilIso: string): Promise<ConversationRow | null>;
-  /** Mark every idle, unlogged, non-eval conversation of these roles as logged now, and return them. One PATCH: what one sweep claims, no other can. */
-  claimSheetLogs(roles: readonly string[], cutoffIso: string, nowIso: string): Promise<ConversationRow[]>;
+  /**
+   * Mark up to `limit` idle, unlogged, non-eval conversations of these roles as
+   * logged now (the longest idle first), and return them. The claim is one
+   * filtered PATCH that repeats every condition: what one sweep claims, no
+   * other can.
+   */
+  claimSheetLogs(roles: readonly string[], cutoffIso: string, nowIso: string, limit: number): Promise<ConversationRow[]>;
   /** End this turn's claim (only while it is still `leaseUntilIso`), stamping last_message_at. */
   releaseTurn(id: string, leaseUntilIso: string, lastMessageAt: string): Promise<void>;
   /** Persist a hand-off: escalated_at = now. */
@@ -134,15 +139,18 @@ export const restStore: ChatStore = {
     );
     return rows.length === 1 ? (rows[0] as unknown as ConversationRow) : null;
   },
-  async claimSheetLogs(roles, cutoffIso, nowIso) {
-    if (roles.length === 0 || roles.some((r) => !/^[a-z]+$/.test(r))) return [];
+  async claimSheetLogs(roles, cutoffIso, nowIso, limit) {
+    if (roles.length === 0 || roles.some((r) => !/^[a-z]+$/.test(r)) || !Number.isInteger(limit) || limit < 1) return [];
     // Values in or=() with `:` or `.` are double-quoted (PostgREST's reserved characters).
     const free = encodeURIComponent(`(busy_until.is.null,busy_until.lt."${nowIso}")`);
-    const rows = await updateRows(
-      'chat_conversations',
-      `role=in.(${roles.join(',')})&is_eval=is.false&sheet_logged_at=is.null&last_message_at=lt.${encodeURIComponent(cutoffIso)}&or=${free}`,
-      { sheet_logged_at: nowIso },
-    );
+    const due = `role=in.(${roles.join(',')})&is_eval=is.false&sheet_logged_at=is.null&last_message_at=lt.${encodeURIComponent(cutoffIso)}&or=${free}`;
+    // A batch, not the whole backlog: every claimed row is logged in this
+    // request, and a row claimed by a request that is cut off is never logged.
+    // The read picks the batch; the PATCH, repeating every condition, is the claim.
+    const picked = await selectRows('chat_conversations', `select=id&${due}&order=last_message_at.asc&limit=${limit}`);
+    const ids = picked.map((r) => String(r.id ?? '')).filter((id) => UUID.test(id));
+    if (ids.length === 0) return [];
+    const rows = await updateRows('chat_conversations', `id=in.(${ids.join(',')})&${due}`, { sheet_logged_at: nowIso });
     return rows as unknown as ConversationRow[];
   },
   async releaseTurn(id, leaseUntilIso, lastMessageAt) {
