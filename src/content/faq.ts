@@ -17,12 +17,13 @@
  * (`src/i18n/locales/<lang>/faq.json`: `<id>.q`, `<id>.a`, `<id>.tip`,
  * `cat.<id>`); this file keeps the structure — which entries exist, their
  * category and tip number. `FAQ_ENTRIES` is the Hebrew, as it always was;
- * `localizeFaq` gives an entry in another language.
+ * `localizeFaq` (src/i18n/faq.ts) gives an entry in another language.
  */
 
-import heFaq from "@/i18n/locales/he/faq.json";
-import { translate } from "@/i18n/LocaleContext";
-import type { Locale } from "@/i18n/locales";
+// Relative, with the attribute, and nothing else imported: the build's
+// scripts/build-seo-files.mjs loads this file under plain Node (llms-full.txt),
+// which resolves neither the "@/" alias nor a JSON import without it.
+import heFaq from "../i18n/locales/he/faq.json" with { type: "json" };
 
 export type FaqCategoryId = "tax" | "pension" | "insurance" | "general";
 
@@ -236,19 +237,3 @@ export const faqByIds = (ids: readonly string[]): FaqEntry[] =>
     if (!entry) throw new Error(`Unknown FAQ entry: ${id}`);
     return entry;
   });
-
-/** An entry in a language: the same entry, with its question, answer and tip title translated. */
-export function localizeFaq<E extends FaqEntry>(entry: E, locale: Locale): E {
-  if (locale === "he") return entry;
-  const text = (field: string) => translate(locale, "faq", `${entry.id}.${field}` as never);
-  return {
-    ...entry,
-    q: text("q"),
-    a: text("a"),
-    ...(entry.tip ? { tip: { ...entry.tip, title: text("tip") } } : {}),
-  };
-}
-
-/** A category's name in a language. */
-export const faqCategoryLabel = (id: FaqCategoryId, locale: Locale): string =>
-  translate(locale, "faq", `cat.${id}` as never);

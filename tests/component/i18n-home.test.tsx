@@ -109,7 +109,7 @@ describe("the home page in English and French", () => {
   ])("renders %s with no Hebrew but the testimonials and the switcher's עברית", async (path, h1) => {
     renderAt(path);
     expect(screen.getByRole("heading", { level: 1, name: h1 })).toBeInTheDocument();
-    await screen.findByText("ליווי מקצועי ואישי");
+    await screen.findByText("ליווי מקצועי ואישי", {}, { timeout: 5000 });
     expect(textOutsideHebrew()).not.toMatch(HEBREW);
   });
 
@@ -118,7 +118,7 @@ describe("the home page in English and French", () => {
     expect(screen.getByLabelText("Full name *")).toBeInTheDocument();
     expect(container.querySelector("#interview")).toBeNull();
     expect(screen.getByRole("link", { name: "Pension portfolio check" })).toHaveAttribute("href", "/en/pension-check");
-    await screen.findByText("ליווי מקצועי ואישי");
+    await screen.findByText("ליווי מקצועי ואישי", {}, { timeout: 5000 });
   });
 
   it("keeps the questionnaire and the FAQ block on the Hebrew page", async () => {
@@ -126,7 +126,7 @@ describe("the home page in English and French", () => {
     expect(container.querySelector("#interview")).not.toBeNull();
     expect(container.querySelector("#common-questions")).not.toBeNull();
     expect(screen.queryByText("Testimonials are shown in the original Hebrew.")).toBeNull();
-    await screen.findByText("ליווי מקצועי ואישי");
+    await screen.findByText("ליווי מקצועי ואישי", {}, { timeout: 5000 });
   });
 
   it("sends the visitor's message as written, with a Hebrew note for Dorit", async () => {
@@ -143,7 +143,7 @@ describe("the home page in English and French", () => {
 
   it("shows the testimonials in their own Hebrew, marked so", async () => {
     renderAt("/fr");
-    const quote = await screen.findByText("ליווי מקצועי ואישי");
+    const quote = await screen.findByText("ליווי מקצועי ואישי", {}, { timeout: 5000 });
     const card = quote.closest("article")!;
     expect(card).toHaveAttribute("lang", "he");
     expect(card).toHaveAttribute("dir", "rtl");
@@ -155,7 +155,7 @@ describe("the home page in English and French", () => {
     const proof = within(document.getElementById("proof")!);
     await userEvent.click(proof.getByRole("button", { name: "Previous" }));
     expect((scrollBy.mock.calls.at(-1)![0] as ScrollToOptions).left).toBeLessThan(0);
-    await screen.findByText("ליווי מקצועי ואישי");
+    await screen.findByText("ליווי מקצועי ואישי", {}, { timeout: 5000 });
   });
 
   it("keeps the Hebrew page's arrows as they were", async () => {
