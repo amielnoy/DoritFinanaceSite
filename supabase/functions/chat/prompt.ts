@@ -7,7 +7,7 @@
 import { AGENCY } from '../_shared/agency.ts';
 import { PROMPTS } from './prompts.generated.ts';
 
-export type ChatRole = 'interview';
+export type ChatRole = 'interview' | 'support';
 
 export interface SystemBlock {
   type: 'text';
