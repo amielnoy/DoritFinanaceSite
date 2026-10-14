@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { Link } from "react-router-dom";
 import {
@@ -22,6 +22,7 @@ import { AGENTS } from "@/config/agents";
 import { FAQ_CATEGORIES, faqByCategory } from "@/content/faq";
 import type { FaqCategory, FaqEntry } from "@/content/faq";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 
 interface FAQCategoryView extends FaqCategory {
   icon: LucideIcon;
@@ -33,6 +34,10 @@ const CATEGORIES: FAQCategoryView[] = FAQ_CATEGORIES.map((c) => ({
   icon: HelpCircle,
   items: faqByCategory(c.id),
 }));
+
+/** One cell of the CTA band's three-across row below md; nothing from md up. */
+const CTA_CELL =
+  "max-md:flex-col max-md:justify-center max-md:gap-1 max-md:min-h-16 max-md:px-1 max-md:py-2 max-md:text-[15px] max-md:leading-tight";
 
 export default function FAQPage() {
   useSeo({
@@ -61,27 +66,75 @@ export default function FAQPage() {
   });
 
   const [activeCat, setActiveCat] = useState<string>(CATEGORIES[0].id);
-  const current = CATEGORIES.find((c) => c.id === activeCat)!;
+  // Below md the topics are a bar pinned under the header, and a question
+  // opens without closing the one above it: closing it pulled the clicked
+  // question up the screen by the height of the answer that vanished.
+  // From md up, nothing about this page changes.
+  const isDesktop = useMediaQuery(MD_UP, true);
+  const topicBarRef = useRef<HTMLElement>(null);
+  const panelRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const switchedTopic = useRef(false);
+
+  /** A chip half off the edge of the bar, tapped or reached by Tab, slides fully into it. */
+  const revealTopic = (chip: HTMLButtonElement) => {
+    if (isDesktop) return;
+    const row = chip.parentElement;
+    if (!row) return;
+    const c = chip.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    const pad = 24;
+    if (c.left < r.left) row.scrollBy({ left: c.left - r.left - pad });
+    else if (c.right > r.right) row.scrollBy({ left: c.right - r.right + pad });
+  };
+
+  const selectTopic = (id: string, chip: HTMLButtonElement) => {
+    switchedTopic.current = true;
+    setActiveCat(id);
+    revealTopic(chip);
+  };
+
+  // A topic chosen from the pinned bar, deep in a long list, starts the new
+  // list at its heading, just under the bar — not somewhere in its middle, or
+  // past its end. Above that point the page is left exactly where it was.
+  useLayoutEffect(() => {
+    if (!switchedTopic.current) return;
+    switchedTopic.current = false;
+    if (isDesktop) return;
+    const panel = panelRefs.current[activeCat];
+    const bar = topicBarRef.current;
+    if (!panel || !bar) return;
+    if (panel.getBoundingClientRect().top < bar.getBoundingClientRect().bottom) {
+      panel.scrollIntoView({ block: "start" });
+    }
+  }, [activeCat, isDesktop]);
 
   return (
     <div className="min-h-screen bg-background">
       <FloatingHeader />
 
-      <main className="pt-32 md:pt-40">
+      <main className="pt-[104px] md:pt-40">
         {/* Hero */}
-        <section className="relative max-w-[1400px] mx-auto px-6 md:px-10 pb-12 md:pb-16">
+        <section className="relative max-w-[1400px] mx-auto px-6 md:px-10 pb-6 md:pb-16">
           <Reveal>
-            <Eyebrow>
+            {/* Below md the kicker repeats the heading word for word, and the
+                heading is one line, not two. The <title> and description are
+                useSeo's above, and do not change. */}
+            <Eyebrow className="max-md:hidden">
               שאלות ותשובות
             </Eyebrow>
-            <h1 className="font-heading text-5xl md:text-6xl mt-5 leading-tight max-w-3xl">
-              שאלות
-              <br />
+            <h1 className="font-heading text-4xl md:text-6xl md:mt-5 leading-tight max-w-3xl">
+              שאלות{" "}
+              <br className="max-md:hidden" />
               ותשובות
             </h1>
-            <p className="mt-8 text-lg text-foreground/70 max-w-2xl leading-relaxed">
-              מענה מהיר לנושאים מרכזיים במס הכנסה, פנסיה וביטוח. בחרו את הנושא
-              שמעניין אתכם — ואם לא מצאתם את התשובה, אשמח לענות אישית.
+            <p className="mt-8 text-lg text-foreground/70 max-w-2xl leading-relaxed max-md:mt-3 max-md:text-base max-md:leading-relaxed">
+              <span className="md:hidden">
+                מענה מהיר במס הכנסה, פנסיה וביטוח — ואם לא מצאתם, אשמח לענות אישית.
+              </span>
+              <span className="max-md:hidden">
+                מענה מהיר לנושאים מרכזיים במס הכנסה, פנסיה וביטוח. בחרו את הנושא
+                שמעניין אתכם — ואם לא מצאתם את התשובה, אשמח לענות אישית.
+              </span>
             </p>
           </Reveal>
         </section>
@@ -91,35 +144,51 @@ export default function FAQPage() {
         </div>
 
         {/* Category tabs + accordion */}
-        <section className="relative py-16 md:py-24">
-          <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
-            {/* Sidebar */}
-            <aside className="lg:col-span-4">
+        <section className="relative pt-4 pb-12 md:py-24">
+          <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 max-md:gap-5 lg:gap-16">
+            {/* Sidebar. Below md it is only the topics, as a bar pinned under
+                the fixed header (79px; 78 tucks it under the header's border)
+                that scrolls sideways. It is the grid's child so that it stays
+                pinned for the length of the questions, and lets go before the
+                support chat. */}
+            <aside
+              ref={topicBarRef}
+              className="lg:col-span-4 max-md:sticky max-md:top-[78px] max-md:z-30 max-md:-mx-6 max-md:px-6 max-md:py-2 max-md:bg-background max-md:border-b max-md:border-border/60"
+            >
               <div className="lg:sticky lg:top-32">
-                <p className="text-sm text-muted-foreground mb-5">
+                <p id="faq-topics-label" className="text-sm text-muted-foreground mb-5 max-md:sr-only">
                   ניווט לפי נושא
                 </p>
-                <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
+                <div
+                  role="group"
+                  aria-labelledby="faq-topics-label"
+                  className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 max-md:pb-0 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden"
+                >
                   {CATEGORIES.map((cat) => {
                     const active = cat.id === activeCat;
                     return (
                       <button
                         key={cat.id}
-                        onClick={() => setActiveCat(cat.id)}
-                        className={`flex items-center gap-3 px-5 py-4 border transition-all duration-300 text-right whitespace-nowrap lg:whitespace-normal ${
+                        type="button"
+                        aria-pressed={active}
+                        onClick={(e) => selectTopic(cat.id, e.currentTarget)}
+                        onFocus={(e) => revealTopic(e.currentTarget)}
+                        className={`flex items-center gap-3 px-5 py-4 border transition-all duration-300 text-right whitespace-nowrap lg:whitespace-normal max-md:shrink-0 max-md:min-h-11 max-md:px-4 max-md:py-2 ${
                           active
                             ? "bg-primary text-primary-foreground border-primary"
                             : "border-border hover:border-accent hover:bg-secondary/40"
                         }`}
                       >
-                        <cat.icon size={18} className={active ? "text-highlight" : "text-accent"} />
-                        <span className="font-heading text-lg">{cat.label}</span>
+                        <cat.icon size={18} className={`max-md:hidden ${active ? "text-highlight" : "text-accent"}`} />
+                        <span className="font-heading text-lg max-md:text-base">{cat.label}</span>
                       </button>
                     );
                   })}
                 </div>
 
-                <div className="mt-8 p-6 border border-border/60 bg-secondary/30">
+                {/* Below md the support chat's card says this directly
+                    underneath, and the CTA band after it. */}
+                <div className="mt-8 p-6 border border-border/60 bg-secondary/30 max-md:hidden">
                   <p className="font-heading text-xl mb-2">לא מצאתם תשובה?</p>
                   <p className="text-sm text-foreground/70 leading-relaxed mb-5">
                     שאלו אותי ישירות — אחזור אליכם אישית תוך יום עסקים אחד.
@@ -142,21 +211,34 @@ export default function FAQPage() {
                   actually in the HTML — see 10-known-issues B-0. Nothing about
                   what a visitor sees changes. */}
               {CATEGORIES.map((cat) => (
-                <div key={cat.id} hidden={cat.id !== activeCat}>
-                  <div className="mb-6">
+                <div
+                  key={cat.id}
+                  hidden={cat.id !== activeCat}
+                  ref={(el) => {
+                    panelRefs.current[cat.id] = el;
+                  }}
+                  // Clear of the header and the pinned topics bar (79 + 61).
+                  className="max-md:scroll-mt-[148px]"
+                >
+                  <div className="mb-6 max-md:mb-4">
                     <h2 className="font-heading text-3xl md:text-4xl">{cat.label}</h2>
                     <p className="text-sm tracking-[0.2em] uppercase text-accent mt-2">
                       {cat.labelEn} · {cat.items.length} שאלות
                     </p>
                   </div>
-                  <Accordion type="single" collapsible className="border-t border-border/60">
+                  <Accordion
+                    {...(isDesktop
+                      ? { type: "single" as const, collapsible: true }
+                      : { type: "multiple" as const })}
+                    className="border-t border-border/60"
+                  >
                     {cat.items.map((item) => (
                       <AccordionItem
                         key={item.id}
                         value={item.id}
                         className="border-b border-border/60"
                       >
-                        <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
+                        <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 max-md:py-4 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
                           {item.q}
                         </AccordionTrigger>
                         <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
@@ -178,37 +260,39 @@ export default function FAQPage() {
         <AgentChat descriptor={AGENTS.support} />
 
         {/* CTA */}
-        <section data-track-location="faq" className="relative py-24 md:py-32 border-t border-border/60 bg-primary text-primary-foreground">
+        <section data-track-location="faq" className="relative py-12 md:py-32 border-t border-border/60 bg-primary text-primary-foreground">
           <div className="max-w-3xl mx-auto px-6 text-center">
             <Reveal>
-              <h2 className="font-heading text-4xl md:text-5xl leading-tight">
+              <h2 className="font-heading text-3xl md:text-5xl leading-tight">
                 עדיין מתלבטים?
               </h2>
-              <p className="mt-6 text-primary-foreground/70 leading-relaxed">
+              <p className="mt-3 md:mt-6 text-primary-foreground/70 leading-relaxed">
                 כל שאלה ראויה לתשובה אישי. נשוחח — ונבנה יחד את התכנון הנכון עבורכם.
               </p>
-              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <CtaLink href="/#start">קביעת פגישה</CtaLink>
+              {/* Below md: one row, a grid of three, each a label under its icon. */}
+              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 max-md:mt-6 max-md:grid max-md:grid-cols-3 max-md:gap-2 max-md:items-stretch">
+                <CtaLink href="/#start" className={CTA_CELL}>קביעת פגישה</CtaLink>
                 <a
                   href={`tel:${CONTACT.phoneE164}`}
-                  className="inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors"
+                  className={`inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors ${CTA_CELL}`}
                 >
-                  <Phone size={18} />
-                  <span dir="ltr">{CONTACT.phoneDisplay}</span>
+                  <Phone size={18} className="shrink-0" />
+                  <span dir="ltr" className="max-md:hidden">{CONTACT.phoneDisplay}</span>
+                  <span className="md:hidden">טלפון</span>
                 </a>
                 <a
                   href={`https://wa.me/${CONTACT.whatsapp}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors"
+                  className={`inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors ${CTA_CELL}`}
                 >
-                  <MessageCircle size={18} />
+                  <MessageCircle size={18} className="shrink-0" />
                   WhatsApp
                 </a>
               </div>
               <Link
                 to="/"
-                className="mt-10 inline-flex items-center gap-1 text-sm text-primary-foreground/60 hover:text-highlight transition-colors"
+                className="mt-10 max-md:mt-6 inline-flex items-center gap-1 text-sm text-primary-foreground/60 hover:text-highlight transition-colors"
               >
                 <ChevronLeft size={16} />
                 חזרה לדף הבית

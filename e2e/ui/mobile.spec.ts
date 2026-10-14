@@ -437,6 +437,217 @@ test.describe("Support chat on a phone (/faq)", { tag: "@mobile-only" }, () => {
   });
 });
 
+/**
+ * The rest of /faq on a phone: a one-line heading, the topics as a bar pinned
+ * under the header, questions that do not move when opened, and the closing
+ * band's three buttons on one row.
+ *
+ * At 390x844 the page was 4.91 screens. A screen and a half of it stood before
+ * the first question: the kicker repeated the two-line heading word for word,
+ * the topics were a 70px row a visitor scrolled away from for good, and a
+ * contact box said what the support chat's card says right below. Opening a
+ * question closed the one above it and pulled the clicked question 168px up
+ * the screen. Desktop is unchanged — see the @desktop-only case after this.
+ */
+test.describe("/faq on a phone", { tag: "@mobile-only" }, () => {
+  type Page = import("@playwright/test").Page;
+  const topics = (page: Page) => page.getByRole("group", { name: "ניווט לפי נושא" });
+  /** The questions of the topic on show; the other topics are in the HTML, hidden. */
+  const questions = (page: Page) => page.locator("main h3 > button[aria-expanded]:visible");
+  const headerBottom = (page: Page) =>
+    page.evaluate(() => document.querySelector("header")!.getBoundingClientRect().bottom);
+  /** Instant: the site scrolls smoothly, and a measurement mid-glide measures nothing. */
+  const scrollIntoList = (page: Page, by: number) =>
+    questions(page)
+      .first()
+      .evaluate((el, dy) => {
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY + dy, behavior: "instant" });
+      }, by);
+
+  test("the heading is one short line, and the document title is the same as before", async ({ page }) => {
+    await gotoApp(page, "/faq");
+
+    await test_step("one heading, on one line, with the first questions on the first screen", async () => {
+      const h1 = page.getByRole("heading", { level: 1 });
+      await expect(h1).toHaveText(/^שאלות\s+ותשובות$/);
+      expect((await h1.boundingBox())!.height, "the heading wraps").toBeLessThan(60);
+      await expect(questions(page).first()).toBeInViewport();
+    });
+
+    await test_step("the <title> is untouched — only the visible heading is shorter", async () => {
+      await expect(page).toHaveTitle("שאלות ותשובות — פנסיה, גמל, ביטוח ומיסוי | דורית גוב ארי");
+    });
+  });
+
+  test("the topics are a bar pinned under the header, scrolling sideways", async ({ page }) => {
+    await gotoApp(page, "/faq");
+    const chips = topics(page).getByRole("button");
+
+    await test_step("every topic is a real button, a thumb-sized target, and the row scrolls sideways", async () => {
+      expect(await chips.count()).toBeGreaterThanOrEqual(3);
+      for (const chip of await chips.all()) {
+        expect(await chip.evaluate((el) => el.tagName)).toBe("BUTTON");
+        expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      }
+      // One row that scrolls sideways when the topics outrun the screen (at
+      // 390px they do; a Pixel 7's 412px just fits them), never a second line.
+      expect(await topics(page).evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
+      const tops = await Promise.all((await chips.all()).map(async (c) => Math.round((await c.boundingBox())!.y)));
+      expect(new Set(tops).size, "the topics wrapped onto a second line").toBe(1);
+      await expect(chips.first()).toHaveAttribute("aria-pressed", "true");
+    });
+
+    await test_step("scrolled into the questions, the bar sits right under the header", async () => {
+      await scrollIntoList(page, 120);
+      const bar = (await topics(page).boundingBox())!;
+      const bottom = await headerBottom(page);
+      expect(bar.y).toBeGreaterThanOrEqual(bottom - 1);
+      expect(bar.y).toBeLessThan(bottom + 16);
+    });
+  });
+
+  test("a topic chosen from the pinned bar starts at its heading, clear of the bar", async ({ page }) => {
+    await gotoApp(page, "/faq");
+    const chips = topics(page).getByRole("button");
+    const second = chips.nth(1);
+    const label = (await second.textContent())!.trim();
+
+    await scrollIntoList(page, 150);
+    await second.click();
+    await expect(second).toHaveAttribute("aria-pressed", "true");
+
+    const heading = page.getByRole("heading", { level: 2, name: label });
+    await expect(heading).toBeVisible();
+    // Smooth scrolling: wait for it to land, then check nothing covers it.
+    await expect
+      .poll(async () => {
+        const bar = (await topics(page).boundingBox())!;
+        const h = (await heading.boundingBox())!;
+        return h.y >= bar.y + bar.height && h.y < bar.y + bar.height + 60;
+      })
+      .toBe(true);
+  });
+
+  test("the topics are reachable from the keyboard", async ({ page, browserName }) => {
+    await gotoApp(page, "/faq");
+    const chips = topics(page).getByRole("button");
+    const last = chips.last();
+
+    await test_step("a topic off the edge of the bar scrolls into it when focused, and Enter opens it", async () => {
+      expect(await last.evaluate((el) => (el as HTMLElement).tabIndex)).toBeGreaterThanOrEqual(0);
+      await last.focus();
+      await expect(last).toBeFocused();
+      const bar = (await topics(page).boundingBox())!;
+      await expect
+        .poll(async () => {
+          const b = (await last.boundingBox())!;
+          return b.x >= bar.x - 1 && b.x + b.width <= bar.x + bar.width + 1;
+        })
+        .toBe(true);
+      await page.keyboard.press("Enter");
+      await expect(last).toHaveAttribute("aria-pressed", "true");
+    });
+
+    // Safari's own Tab skips buttons unless the visitor turns that on, so the
+    // Tab order itself is asserted where Tab moves between buttons by default.
+    if (browserName === "chromium") {
+      await test_step("Tab walks the topics in order", async () => {
+        await chips.first().focus();
+        await page.keyboard.press("Tab");
+        await expect(chips.nth(1)).toBeFocused();
+      });
+    }
+  });
+
+  test("opening a question leaves it where it was, and the one above stays open", async ({ page }) => {
+    await gotoApp(page, "/faq");
+    const first = questions(page).nth(0);
+    const second = questions(page).nth(1);
+
+    await first.click();
+    await expect(first).toHaveAttribute("aria-expanded", "true");
+    // Let its answer finish opening: it is above the question measured next.
+    await page.waitForTimeout(500);
+    await second.evaluate((el) =>
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 400, behavior: "instant" }),
+    );
+    const before = (await second.boundingBox())!.y;
+
+    await second.click();
+    await expect(second).toHaveAttribute("aria-expanded", "true");
+    // Past the answer's opening animation.
+    await page.waitForTimeout(500);
+    expect(Math.abs((await second.boundingBox())!.y - before), "the clicked question moved").toBeLessThanOrEqual(1);
+    await expect(first).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("עדיין מתלבטים? has its three buttons on one row, and each still reports to GA4", async ({ page }) => {
+    await gotoApp(page, "/faq");
+    const band = page.locator('[data-track-location="faq"]');
+    const meeting = band.getByRole("link", { name: "קביעת פגישה" });
+    const phone = band.getByRole("link", { name: "טלפון" });
+    const whatsapp = band.getByRole("link", { name: "WhatsApp" });
+
+    await test_step("one row of three, each a thumb-sized target, inside the screen", async () => {
+      await band.scrollIntoViewIfNeeded();
+      const boxes = await Promise.all([meeting, phone, whatsapp].map(async (l) => (await l.boundingBox())!));
+      const width = page.viewportSize()!.width;
+      for (const b of boxes) {
+        expect(Math.abs(b.y - boxes[0].y), "not on one row").toBeLessThanOrEqual(1);
+        expect(b.height).toBeGreaterThanOrEqual(44);
+        expect(b.width).toBeGreaterThanOrEqual(44);
+        expect(b.x).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.width).toBeLessThanOrEqual(width);
+      }
+      await expect(meeting).toHaveAttribute("href", "/#start");
+      await expect(phone).toHaveAttribute("href", "tel:+972508311776");
+      await expect(whatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776/);
+    });
+
+    await test_step("cta_click, click_phone and click_whatsapp reach GA4's queue, from location faq", async () => {
+      // Keep the page: the tracker listens in the capture phase, before this.
+      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
+      for (const link of [meeting, phone, whatsapp]) await link.click();
+      const events = await page.evaluate(() =>
+        ((window as unknown as { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? [])
+          .map((entry) => Array.from(entry))
+          .filter((args) => args[0] === "event")
+          .map((args) => ({ name: String(args[1]), location: (args[2] as { location?: string } | undefined)?.location })),
+      );
+      for (const name of ["cta_click", "click_phone", "click_whatsapp"]) {
+        expect(events).toContainEqual({ name, location: "faq" });
+      }
+    });
+  });
+});
+
+test.describe("/faq on a desktop", { tag: "@desktop-only" }, () => {
+  test("keeps its sidebar, its contact box and its one-open-at-a-time questions", async ({ page }) => {
+    await gotoApp(page, "/faq");
+
+    await test_step("the sidebar's label and its contact box are there, as before", async () => {
+      await expect(page.getByText("ניווט לפי נושא")).toBeVisible();
+      await expect(page.getByText("לא מצאתם תשובה?")).toBeVisible();
+      await expect(page.getByRole("link", { name: "יצירת קשר" })).toHaveAttribute("href", "/#start");
+    });
+
+    await test_step("opening a question closes the one that was open", async () => {
+      const questions = page.locator("main h3 > button[aria-expanded]:visible");
+      await questions.nth(0).click();
+      await expect(questions.nth(0)).toHaveAttribute("aria-expanded", "true");
+      await questions.nth(1).click();
+      await expect(questions.nth(1)).toHaveAttribute("aria-expanded", "true");
+      await expect(questions.nth(0)).toHaveAttribute("aria-expanded", "false");
+    });
+
+    await test_step("the closing band still shows the phone number itself", async () => {
+      const band = page.locator('[data-track-location="faq"]');
+      await expect(band.getByRole("link", { name: "050-831-1776" })).toBeVisible();
+      await expect(band.getByText("טלפון", { exact: true })).toBeHidden();
+    });
+  });
+});
+
 test.describe("Desktop-only chrome", { tag: "@desktop-only" }, () => {
 
   test("shows the floating WhatsApp/phone dock and hides the mobile bar", async ({ page }) => {
