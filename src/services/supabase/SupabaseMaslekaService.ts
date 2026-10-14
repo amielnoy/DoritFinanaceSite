@@ -40,7 +40,7 @@ export const OPEN_STATUSES: readonly MaslekaStatus[] = ["invited", "code_receive
 const ROLES = new Set<string>(["admin", "owner", "agent", "staff"]);
 const REASONS = new Set<string>([
   "disabled", "link_invalid", "bad_id", "bad_code", "already_submitted", "rate_limited", "unauthorized", "forbidden",
-  "not_found", "not_available", "invalid", "invalid_name", "invalid_email", "unavailable", "failed",
+  "not_found", "not_available", "invalid", "invalid_name", "invalid_email", "unavailable", "not_saved", "failed",
 ]);
 
 /** When a gateway answers without our body: 401/403 ask the staff member to sign in again. */

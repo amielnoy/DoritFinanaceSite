@@ -331,6 +331,7 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-MSK-014 | "links the privacy policy, since it collects an ID number" | `/privacy` |
 | CMP-MSK-015 | "renders no screenshot slot when none is given, and the given one when it is" | 0 figures; then 1 |
 | CMP-MSK-016 | "is marked noindex" | SeoRouteGuard writes `noindex` on `/masleka` |
+| CMP-MSK-017 | "after a send that stored nothing says so plainly, and keeps both values for the retry" | `not_saved`: "השליחה לא עברה והקוד לא נשמר", "נסו לשלוח שוב", no "ייתכן"; a second click resends the same three values and thanks (decision 2026-10-14) |
 
 ### 4.18 `<StaffRoute />` — the clearinghouse board's gate — `tests/component/staff-route.test.tsx`
 
@@ -448,6 +449,6 @@ the cases above it run without one and are the desktop's wizard, unchanged.
 
 ## 5. Pass criteria
 
-All 216 declared cases pass (vitest: 246 with expansions). A `submitLead` or `submitClaim` payload assertion failing
+All 217 declared cases pass (vitest: 247 with expansions). A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

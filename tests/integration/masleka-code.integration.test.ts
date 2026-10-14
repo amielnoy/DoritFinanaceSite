@@ -32,6 +32,7 @@ const invited = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const body = { token: TOKEN, code: "AB12-CD34", idNumber: "000000018" };
+const STAFF = ["dorit@govari-fin.co.il", "staff@example.com"];
 
 function run(b: unknown, o: EdgeOptions & { fake?: MaslekaFake } = {}) {
   const { fake, ...rest } = o;
@@ -300,20 +301,113 @@ describe("masleka-code — when something is missing or down", () => {
       expect(r.json, String(MASLEKA_KEY)).toMatchObject({ error: "unavailable", rid: expect.any(String) });
       expect(r.callsTo("/rest/v1/masleka_requests"), String(MASLEKA_KEY)).toHaveLength(0);
       expect(r.maslekaRequests[0], String(MASLEKA_KEY)).toEqual(invited());
-      expect(r.emails, String(MASLEKA_KEY)).toHaveLength(0);
+      // Nothing was stored, so staff are told (decision 2026-10-14): the cause, never a value.
+      expect(r.emails.map((e) => e.to).sort(), String(MASLEKA_KEY)).toEqual(STAFF);
+      expect(r.emails[0].subject, String(MASLEKA_KEY)).toBe("מסירת קוד מסלקה נכשלה");
+      expect(r.emails[0].text, String(MASLEKA_KEY)).toContain("MASLEKA_KEY");
     }
   });
 
-  it("reports a database failure with its rid and nothing else", async () => {
+  it("reports a refused write as not saved, with its rid and nothing else", async () => {
     const r = await run(body, { fake: { failRequestWrite: true } });
     expect(r.status).toBe(500);
-    expect(r.json).toEqual({ error: "failed", rid: expect.any(String) });
-    expect(r.emails).toHaveLength(0);
+    expect(r.json).toEqual({ error: "not_saved", rid: expect.any(String) });
+    expect(r.maslekaRequests[0]).toEqual(invited());
   });
 
   it("answers the browser's preflight and does nothing else", async () => {
     const r = await run(undefined, { method: "OPTIONS" });
     expect(r.status).toBe(204);
     expect(r.fetches).toHaveLength(0);
+  });
+});
+
+describe("masleka-code — when the code does not go through (decision 2026-10-14)", () => {
+  /** The table's own reads answer 500, as a database outage would. */
+  const failReads: EdgeOptions["upstream"] = (call) =>
+    call.method === "GET" && call.url.includes("/rest/v1/masleka_requests?")
+      ? new Response('{"message":"simulated"}', { status: 500 })
+      : undefined;
+  /** The accepting PATCH never answers: the connection drops, and nobody knows whether it landed. */
+  const dropPatch: EdgeOptions["upstream"] = (call) => {
+    if (call.method === "PATCH" && call.url.includes("/rest/v1/masleka_requests?")) throw new TypeError("network");
+    return undefined;
+  };
+  const alerts = (r: { emails: { subject: string }[] }) => r.emails.filter((e) => e.subject.startsWith("מסירת קוד מסלקה נכשלה"));
+
+  it("answers not_saved when the link cannot be read, and tells every staff member once", async () => {
+    const r = await run(body, { upstream: failReads });
+    expect(r.status).toBe(500);
+    expect(r.json).toEqual({ error: "not_saved", rid: r.json.rid });
+    expect(alerts(r).map((e) => e.to).sort()).toEqual(STAFF);
+    expect(alerts(r)[0].subject).toBe("מסירת קוד מסלקה נכשלה");
+    expect(r.requestPatches).toHaveLength(0);
+  });
+
+  it("names the client in the alert when the link was read before the write was refused", async () => {
+    const r = await run(body, { fake: { failRequestWrite: true } });
+    expect(r.json).toMatchObject({ error: "not_saved" });
+    expect(r.mailTo("staff@example.com").subject).toBe("מסירת קוד מסלקה נכשלה — רונית מזרחי");
+    expect(r.mailTo("staff@example.com").text).toContain("התבקש לנסות שוב");
+    expect(r.mailTo("staff@example.com").text).toContain(String(r.json.rid));
+  });
+
+  it("answers failed, never not_saved, when the write was cut off and may have landed", async () => {
+    const r = await run(body, { upstream: dropPatch });
+    expect(r.status).toBe(500);
+    expect(r.json).toEqual({ error: "failed", rid: r.json.rid });
+    expect(alerts(r).map((e) => e.to).sort()).toEqual(STAFF);
+    expect(r.mailTo("staff@example.com").text).toContain("לא ברור אם הקוד נשמר");
+  });
+
+  it("puts no code, ID, token or link in an alert", async () => {
+    for (const o of [{ upstream: failReads }, { upstream: dropPatch }, { fake: { failRequestWrite: true } }, { envPatch: { MASLEKA_KEY: null } }]) {
+      const r = await run(body, o as EdgeOptions & { fake?: MaslekaFake });
+      expect(alerts(r).length).toBeGreaterThan(0);
+      for (const e of r.emails) {
+        const all = `${e.subject}${e.html}${e.text}`;
+        for (const secret of ["AB12-CD34", "000000018", TOKEN, sha(TOKEN), "masleka#t="]) expect(all).not.toContain(secret);
+      }
+    }
+  });
+
+  it("alerts at most once an hour per link, and at most five times an hour in all", async () => {
+    const r = await run(body, { fake: { failRequestWrite: true } });
+    const limits = r.callsTo("/rest/v1/rpc/allow_submission").map((c) => c.body as Record<string, unknown>);
+    expect(limits).toEqual(
+      expect.arrayContaining([
+        { p_key: `masleka-alert:${sha(TOKEN)}`, p_window_seconds: 3600, p_max: 1 },
+        { p_key: "masleka-alerts", p_window_seconds: 3600, p_max: 5 },
+      ]),
+    );
+  });
+
+  it("sends no alert for a retry inside the hour, and still tells the client it did not go through", async () => {
+    for (const prefix of ["masleka-alert:", "masleka-alerts"]) {
+      const r = await run(body, { fake: { failRequestWrite: true }, overLimit: [prefix] });
+      expect(r.json, prefix).toMatchObject({ error: "not_saved" });
+      expect(r.emails, prefix).toHaveLength(0);
+    }
+  });
+
+  it("still answers not_saved when no alert can be delivered", async () => {
+    const r = await run(body, { fake: { failRequestWrite: true }, failEmailTo: STAFF });
+    expect(r.status).toBe(500);
+    expect(r.json).toMatchObject({ error: "not_saved" });
+  });
+
+  it("raises no alert for what the client got wrong: a bad link, ID or code, or too many tries", async () => {
+    const cases = await Promise.all([
+      run({ ...body, token: "Z".repeat(43) }),
+      run({ ...body, idNumber: "000000019" }),
+      run({ ...body, code: "<b>" }),
+      run(body, { overLimit: ["masleka-link:"] }),
+    ]);
+    for (const r of cases) {
+      expect(r.emails).toHaveLength(0);
+      expect(r.callsTo("allow_submission").map((c) => String((c.body as Record<string, unknown>).p_key))).not.toEqual(
+        expect.arrayContaining([expect.stringMatching(/^masleka-alert/)]),
+      );
+    }
   });
 });

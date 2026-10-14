@@ -157,10 +157,12 @@ export interface Message {
 const reasonOf = (error: unknown): MaslekaFailure => (error instanceof MaslekaError ? error.reason : "failed");
 
 /**
- * What the client's page says after a failed send. Two answers are worded for
+ * What the client's page says after a failed send. Three answers are worded for
  * what they mean, not for their status: a client who typed too many wrong IDs is
- * told to wait and that the link is fine, and a failure after the code may
- * already have been stored never invites a second send.
+ * told to wait and that the link is fine; a send the function knows stored
+ * nothing (`not_saved`) is told so plainly and asked to send again — staff get
+ * an alert either way (decision 2026-10-14); and a failure after which the code
+ * may already have been stored never invites a second send.
  */
 export function clientMessage(error: unknown): Message {
   const reason = reasonOf(error);
@@ -182,6 +184,8 @@ export function clientMessage(error: unknown): Message {
       return say("השירות אינו זמין כרגע. הקוד לא נשמר, נסו שוב מאוחר יותר.");
     case "already_submitted":
       return say("הקוד כבר התקבל. דורית תיצור קשר.");
+    case "not_saved":
+      return say("השליחה לא עברה והקוד לא נשמר. נסו לשלוח שוב בעוד כמה דקות — הקישור עדיין בתוקף.");
     default:
       return say("ייתכן שהקוד כבר התקבל. אין צורך לשלוח שוב, דורית תיצור קשר.");
   }

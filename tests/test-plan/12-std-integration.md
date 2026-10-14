@@ -520,7 +520,7 @@ is a failure, never a silently created row.
 | INT-CNT-007 | "fails an update whose mirror row is missing" | 500 |
 | INT-CNT-008 | "refuses to rename an article to a slug another one has" | 409; no Base44 update |
 
-### 4.25 `masleka-code` — the client hands over the code — `INT-MSKCODE-001..028`
+### 4.25 `masleka-code` — the client hands over the code — `INT-MSKCODE-001..036`
 
 `tests/integration/masleka-code.integration.test.ts`, through the in-process
 harness with its clearinghouse fakes (`MaslekaFake`). The function reads the
@@ -529,6 +529,14 @@ as context (`<id>:code`, `<id>:id`), then accepts through one conditional PATCH
 that repeats the read's conditions (`token_hash`, `status=eq.invited`,
 `token_expires_at=gt.<now>`) plus the id, so a submission that lands in
 between — or any replay — matches nothing.
+
+A failure says what is known (decision 2026-10-14): before the accepting
+write, or a write the database refused with a status of its own
+(`update_http_4xx`/`500`), nothing was stored — `not_saved`, and the page asks
+the client to send again; a write cut off on the way may have landed —
+`failed`. Either way, and when the key is missing, every staff member gets an
+alert, at most once an hour per link (`masleka-alert:<hash>`, after an
+in-isolate check) and five an hour in all (`masleka-alerts`).
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -557,9 +565,17 @@ between — or any replay — matches nothing.
 | INT-MSKCODE-023 | "counts every call against its address and its link, never by the raw values" | `allow_submission` with `masleka-ip:<sha256(ip)>` 3600/10, then `masleka-link:<token hash>` 3600/5 |
 | INT-MSKCODE-024 | "refuses a flood from one address" | 429 `rate_limited`; no PATCH |
 | INT-MSKCODE-025 | "refuses a flood on one link" | 429 `rate_limited`; no PATCH |
-| INT-MSKCODE-026 | "stores nothing when there is no key to seal with, or the key is not 32 bytes" | Missing, 16-byte and non-base64 key: 503 `unavailable` + rid; no `masleka_requests` call; row unchanged; no mail |
-| INT-MSKCODE-027 | "reports a database failure with its rid and nothing else" | Answer is exactly `{ error: 'failed', rid }`; no mail |
+| INT-MSKCODE-026 | "stores nothing when there is no key to seal with, or the key is not 32 bytes" | Missing, 16-byte and non-base64 key: 503 `unavailable` + rid; no `masleka_requests` call; row unchanged; one alert per staff address, "מסירת קוד מסלקה נכשלה", naming `MASLEKA_KEY` |
+| INT-MSKCODE-027 | "reports a refused write as not saved, with its rid and nothing else" | PATCH answers 500: exactly `{ error: 'not_saved', rid }`; row unchanged |
 | INT-MSKCODE-028 | "answers the browser's preflight and does nothing else" | 204; no fetch |
+| INT-MSKCODE-029 | "answers not_saved when the link cannot be read, and tells every staff member once" | The read answers 500: 500 `{ error: 'not_saved', rid }`; one alert per staff address, no name; no PATCH |
+| INT-MSKCODE-030 | "names the client in the alert when the link was read before the write was refused" | Subject "מסירת קוד מסלקה נכשלה — רונית מזרחי"; "התבקש לנסות שוב"; the rid |
+| INT-MSKCODE-031 | "answers failed, never not_saved, when the write was cut off and may have landed" | PATCH throws (no answer): 500 `{ error: 'failed', rid }`; alert says "לא ברור אם הקוד נשמר" |
+| INT-MSKCODE-032 | "puts no code, ID, token or link in an alert" | For all four failure paths: no code, ID, token, token hash or `masleka#t=` in any mail |
+| INT-MSKCODE-033 | "alerts at most once an hour per link, and at most five times an hour in all" | `allow_submission` with `masleka-alert:<token hash>` 3600/1 and `masleka-alerts` 3600/5 |
+| INT-MSKCODE-034 | "sends no alert for a retry inside the hour, and still tells the client it did not go through" | Either limit over: `not_saved`, no mail |
+| INT-MSKCODE-035 | "still answers not_saved when no alert can be delivered" | Every staff address refused: 500 `not_saved` |
+| INT-MSKCODE-036 | "raises no alert for what the client got wrong: a bad link, ID or code, or too many tries" | Unknown token, bad ID, bad code, link flood: no mail, no `masleka-alert` limiter call |
 
 ### 4.26 `masleka-reveal` — a member decrypts one value — `INT-MSKREV-001..020`
 
@@ -643,7 +659,7 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKNEW-022 | "refuses a request that is no longer waiting for a code" | 409; hash unchanged |
 | INT-MSKNEW-023 | "refuses an id that is not one" | 400 `invalid`; no `masleka_requests` call |
 
-### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..029`
+### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..037`
 
 Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Israel.
 
@@ -677,9 +693,17 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-MSKREM-026 | "does not remind a client whose link a person sent by hand, or one whose link has expired" | Hand-sent (marker set) and expired rows: no mail, hash unchanged |
 | INT-MSKREM-027 | "sends nothing to a client when another run has already claimed the reminder" | Rival marker: zero rows back, no mail, `clients: 0` |
 | INT-MSKREM-028 | "writes no name, address, token or link to a log line" | Across a clean run and a failing-mail run: none of the names, addresses, secret, link or old token in any line |
-| INT-MSKREM-029 | "answers how many it sent" | `{ready: 1, deadline: 1, clients: 1, warnings: []}` |
+| INT-MSKREM-029 | "answers how many it sent" | `{ready: 1, deadline: 1, clients: 1, warnings: []}` (and `wiped`) |
+| INT-MSKREM-030 | "tells every staff member once per wiped request, naming the client, and marks it told" | Two requests the nine-day wipe expired before הגשתי (`expired`, `code_received_at` set, no `submitted_at`): one "קוד מסלקה נמחק לפני הגשה — <name>" per request per staff address; address and "קוד חדש" in the text; `wipe_notified_at` = now; `wiped: 2` (decision 2026-10-14) |
+| INT-MSKREM-031 | "says nothing about a request that expired without a code, was submitted, or was already announced" | No code, a submission, a marker already set, still `code_received`: no mail, no claim, `wiped: 0` |
+| INT-MSKREM-032 | "claims each notice in one conditional update that checks it was never sent" | One PATCH setting only `wipe_notified_at`, filtered `id`, `agency_id`, `status=eq.expired`, `wipe_notified_at=is.null`, `code_received_at=not.is.null`, `submitted_at=is.null` |
+| INT-MSKREM-033 | "never repeats a wipe notice" | Second run on the first run's rows: no mail |
+| INT-MSKREM-034 | "sends nothing when another run has already claimed the notice" | Rival marker: zero rows back, no mail, `wiped: 0` |
+| INT-MSKREM-035 | "gives the claim back when no staff address could be mailed, so the next run tries again" | Markers null again; warning `wipe_not_sent` |
+| INT-MSKREM-036 | "one failing claim does not stop the other notices" | The other request still announced; warning `wipe_claim_failed`; `wiped: 1` |
+| INT-MSKREM-037 | "never asks for the ciphertext columns, and writes no name or address to a log line" | No `masleka_requests` URL names a ciphertext column; no name or address in any line |
 
-### 4.30 `submit-lead` — the clearinghouse request — `INT-LEADMSK-001..014`
+### 4.30 `submit-lead` — the clearinghouse request — `INT-LEADMSK-001..024`
 
 `tests/integration/submit-lead-masleka.integration.test.ts`. The dark cases fix the clock (`vi.setSystemTime`, Date only) and compare against the output re-captured from submit-lead after #170 landed, at the merge a8f7a9f.
 
@@ -699,10 +723,20 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-LEADMSK-012 | "sends no link to an address over its daily confirmation limit" | Row created, not invited; no visitor mail |
 | INT-LEADMSK-013 | "puts the link only in the client's confirmation — never in a log line, the answer or a staff copy" | Token absent from every log line (each with `rid`), the answer, staff and calendar mails; `masleka.request_created` logged |
 | INT-LEADMSK-014 | "keeps the answer's shape: ok, rid, leadId and warnings, nothing more" | Keys exactly `ok`, `rid`, `leadId`, `warnings` (Ruling 8), on success and on a failed request |
+| INT-LEADMSK-015 | "reuses the open request: no second row, a new link mailed, the old one replaced, the reminder restarted" | Same contact with an `invited` request: no POST; one row whose hash is the mailed token's; `token_expires_at` later; `client_invited_at` now; `client_reminded_at` null; `lead_id` and name kept; `masleka.request_reused` logged; token in no log line (decision 2026-10-14) |
+| INT-LEADMSK-016 | "rotates only after the confirmation went out, in one conditional update on a still-invited request" | One PATCH filtered `id`, `agency_id`, `status=eq.invited`; fields exactly `client_invited_at`, `client_reminded_at`, `token_expires_at`, `token_hash` |
+| INT-LEADMSK-017 | "keeps the old link working when the confirmation cannot be sent" | Mail refused: row unchanged, no PATCH |
+| INT-LEADMSK-018 | "keeps the old link and sends nothing over the address's daily limit" | Row unchanged; no visitor mail |
+| INT-LEADMSK-019 | "warns when the request stopped being invited before the rotation" | Code arrives during the mail: hash kept; warning `masleka_rotate_failed` |
+| INT-LEADMSK-020 | "matches the contact by phone, address and name, however each was typed" | `+972-54-…`, `972…`, upper-case padded address, first name only: reused |
+| INT-LEADMSK-021 | "opens a new request when anything about the contact differs, or the old one cannot take a code" | Another phone, address, or name; no address on the old request; a hand-made request; a lead that is gone; `code_received`; expired link; another agency: a second row, the first untouched |
+| INT-LEADMSK-022 | "never reuses for an interview with no address: it opens a new request, as before" | Two rows |
+| INT-LEADMSK-023 | "a completed interview sent twice ends with one request and one working link" | Second run over the first's lead and request: one row, hash of the second mail's token |
+| INT-LEADMSK-024 | "falls back to a new request when the lookup fails" | Leads lookup 500: 200, a second row |
 
 ## 5. Pass criteria
 
-All 145 declared cases pass (vitest: 725 with expansions). These assert behaviour, not shape — a failure means the
+All 171 declared cases pass (vitest: 751 with expansions). These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 

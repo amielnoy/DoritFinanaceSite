@@ -47,10 +47,30 @@ describe("the clearinghouse pipeline ships dark", () => {
     );
   });
 
-  it("lets submit-lead create a request only behind the same switch", () => {
-    expect(read("supabase/functions/submit-lead/handler.ts")).toMatch(
-      /if \(source === 'interview' && maslekaEnabled\(\) && wantsClearinghouse\(safeProfile\)\) \{\s*try \{\s*masleka = await createRequest\(/,
-    );
+  it("lets submit-lead create or reuse a request only behind the same switch", () => {
+    const src = read("supabase/functions/submit-lead/handler.ts");
+    const gate = src.indexOf("if (source === 'interview' && maslekaEnabled() && wantsClearinghouse(safeProfile)) {");
+    expect(gate, "no switch around the request").toBeGreaterThan(-1);
+    // The gated block, to its matching brace.
+    let depth = 0;
+    let end = gate;
+    for (let i = src.indexOf("{", gate); i < src.length; i += 1) {
+      if (src[i] === "{") depth += 1;
+      else if (src[i] === "}" && --depth === 0) {
+        end = i;
+        break;
+      }
+    }
+    const block = src.slice(gate, end);
+    // Both ways to a request — a new one, or the contact's open one — are
+    // called inside the block and nowhere else.
+    for (const call of ["await createRequest(", "await findInvitedRequest("]) {
+      expect(block, call).toContain(call);
+      expect(src.split(call).length - 1, `${call} outside the switch`).toBe(1);
+    }
+    // The reused request's rotation runs only for a request that block chose.
+    expect(src.split("await rotateMaslekaLink(").length - 1).toBe(1);
+    expect(src).toMatch(/if \(masleka\?\.reuse\) \{\s*if \(!\(await rotateMaslekaLink\(/);
   });
 
   it("is off in a build that does not set VITE_MASLEKA_ENABLED", async () => {

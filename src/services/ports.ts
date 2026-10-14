@@ -463,6 +463,8 @@ export type MaslekaFailure =
   | "invalid_name"
   | "invalid_email"
   | "unavailable"
+  /** The client's send stored nothing: say so, and that sending again is right (decision 2026-10-14). */
+  | "not_saved"
   | "failed";
 
 export class MaslekaError extends Error {

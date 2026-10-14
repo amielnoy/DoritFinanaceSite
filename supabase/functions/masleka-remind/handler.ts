@@ -10,9 +10,17 @@
  * per kind per run. A request PR B completes is no longer `submitted` and
  * drops out by itself.
  *
+ * Staff, too (decision 2026-10-14): "קוד מסלקה נמחק לפני הגשה", one mail per
+ * request, when the hourly `masleka_wipe_stale` expired a `code_received`
+ * request nobody submitted — `status = 'expired'` with a `code_received_at`
+ * and no `submitted_at`, which only that wipe produces. The mail names the
+ * client (name, address) and says a new code must be requested; the request
+ * has left the board. The wipe runs in SQL at :05 and this run at :20, so a
+ * notice is at most an hour behind it.
+ *
  * Exactly once: each notice is CLAIMED before anything is sent, by one
  * conditional PATCH that sets the marker (`ready_reminded_at`,
- * `deadline_reminded_at`, `client_reminded_at`) only where it is still null,
+ * `deadline_reminded_at`, `wipe_notified_at`, `client_reminded_at`) only where it is still null,
  * and returns the rows it changed. Two overlapping runs cannot both win a row,
  * so only the winner mails it. If nothing could be sent, the claim is given
  * back, so the next run tries again.
@@ -33,7 +41,7 @@ import { addBusinessDays } from '../_shared/business-days.ts';
 import { isEmail, sha256Hex } from '../_shared/guard.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { sendMail } from '../_shared/mail.ts';
-import { buildClientInvite, buildStaffNotice, type StaffNoticeKind } from '../_shared/masleka-mail.ts';
+import { buildClientInvite, buildStaffNotice, buildWipeNotice, type StaffNoticeKind } from '../_shared/masleka-mail.ts';
 import {
   AGENCY_1, CLEARINGHOUSE_RETENTION_BUSINESS_DAYS, CLIENT_REMINDER_DAYS, DEADLINE_REMINDER_BUSINESS_DAY, READY_AFTER_HOURS, UUID,
   maslekaEnabled, maslekaLink, newToken, tokenHash,
@@ -157,6 +165,56 @@ export async function handler(req: Request): Promise<Response> {
       }
     }
 
+    // ── wiped before anyone submitted ──────────────────────────────────────
+    // The filter never names a ciphertext column: "a code arrived, nobody
+    // submitted it, and it expired" is the wipe's own footprint.
+    const unsubmitted = `agency_id=eq.${AGENCY_1}&status=eq.expired&code_received_at=not.is.null&submitted_at=is.null&wipe_notified_at=is.null`;
+    const wipedDue = await selectRows('masleka_requests', `select=id&${unsubmitted}`);
+    let wipedSent = 0;
+    for (const row of wipedDue) {
+      const requestId = String(row.id);
+      if (!UUID.test(requestId)) continue;
+      let claimed: Record<string, unknown>[];
+      try {
+        claimed = await updateWhere(
+          'masleka_requests',
+          `id=eq.${requestId}&${unsubmitted}&select=id,client_name,contact_email,code_received_at`,
+          { wipe_notified_at: nowIso },
+        );
+      } catch (e) {
+        log('warn', 'reminder.claim_failed', { rid, kind: 'wiped', requestId, err: String((e as Error)?.message ?? e).slice(0, 200) });
+        warnings.push('wipe_claim_failed');
+        continue;
+      }
+      if (!claimed.length) continue;
+      recipients ??= await staffRecipients(log, rid);
+      const notice = buildWipeNotice({
+        clientName: String(claimed[0].client_name ?? ''),
+        contactEmail: typeof claimed[0].contact_email === 'string' ? claimed[0].contact_email : null,
+        codeReceivedAt: typeof claimed[0].code_received_at === 'string' ? claimed[0].code_received_at : null,
+      });
+      let sent = 0;
+      for (const to of recipients) {
+        try {
+          await sendMail(log, { to, ...notice, rid, role: 'staff' });
+          sent += 1;
+        } catch (e) {
+          log('warn', 'mail.failed', { rid, role: 'staff', kind: 'wiped', err: String((e as Error)?.message ?? e).slice(0, 200) });
+        }
+      }
+      if (sent) {
+        wipedSent += 1;
+        continue;
+      }
+      // Nobody was told: give the claim back (only where it is still ours).
+      warnings.push('wipe_not_sent');
+      try {
+        await updateWhere('masleka_requests', `id=eq.${requestId}&wipe_notified_at=eq.${nowIso}&select=id`, { wipe_notified_at: null });
+      } catch (e) {
+        log('warn', 'reminder.reset_failed', { rid, kind: 'wiped', requestId, err: String((e as Error)?.message ?? e).slice(0, 200) });
+      }
+    }
+
     // ── clients ────────────────────────────────────────────────────────────
     const since = new Date(now.getTime() - CLIENT_REMINDER_DAYS * DAY_MS).toISOString();
     const waiting = await selectRows(
@@ -225,9 +283,9 @@ export async function handler(req: Request): Promise<Response> {
     }
 
     log('info', 'request.end', {
-      rid, ms: Date.now() - startedAt, ready: readySent, deadline: deadlineSent, clients, warnings: warnings.length,
+      rid, ms: Date.now() - startedAt, ready: readySent, deadline: deadlineSent, wiped: wipedSent, clients, warnings: warnings.length,
     });
-    return Response.json({ ok: true, rid, ready: readySent, deadline: deadlineSent, clients, warnings });
+    return Response.json({ ok: true, rid, ready: readySent, deadline: deadlineSent, wiped: wipedSent, clients, warnings });
   } catch (error) {
     log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String((error as Error)?.message ?? error).slice(0, 200) });
     return Response.json({ error: 'failed', rid }, { status: 500 });

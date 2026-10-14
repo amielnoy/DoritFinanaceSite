@@ -602,7 +602,8 @@ The interview's tools ask the model for nothing their Edge handlers do not read,
 
 ### 4.13 The clearinghouse schema — `masleka-schema.contract.test.ts`
 
-Reads `supabase/migrations/20261015000000_masleka_requests.sql`. The behaviour
+Reads `supabase/migrations/20261015000000_masleka_requests.sql` (applied in
+production; never edited) and `20261019000000_masleka_wipe_notice.sql`. The behaviour
 itself is proved by `supabase/tests/masleka_check.sql` against a local
 `supabase start` (manual, like the other SQL checks):
 `supabase start && supabase db reset && psql "$(supabase status -o env | grep DB_URL | cut -d= -f2- | tr -d '"')" -f supabase/tests/masleka_check.sql`.
@@ -622,6 +623,9 @@ itself is proved by `supabase/tests/masleka_check.sql` against a local
 | CTR-MSK-011 | "hands the two staff lookups to service_role alone" | `staff_role` and `masleka_staff_emails` granted to `service_role`, to no one else |
 | CTR-MSK-012 | "pins an empty search_path on every security definer function" | Every `security definer` function has `set search_path = ''` |
 | CTR-MSK-013 | "keeps the access log append-only, even for service_role" | service_role's default privileges revoked; log granted `select, insert` only; log FK `on delete set null`, no cascade |
+| CTR-MSK-014 | "comes after the clearinghouse migration, which is applied and never edited" | `20261019000000_masleka_wipe_notice.sql` sorts after it; the applied file never names `wipe_notified_at` |
+| CTR-MSK-015 | "adds the one marker column and nothing else" | `add column wipe_notified_at timestamptz`; no drop, grant, revoke, function, policy or schedule |
+| CTR-MSK-016 | "leaves the marker out of the browser's column grant" | `wipe_notified_at` not among the columns granted to `authenticated` |
 
 ### 4.14 The clearinghouse ships dark — `masleka-dark-launch.contract.test.ts`
 
@@ -634,7 +638,7 @@ itself is proved by `supabase/tests/masleka_check.sql` against a local
 | CTR-MSKD-005 | "masleka-reveal refuses before it reads or writes anything while the switch is off" | Same |
 | CTR-MSKD-006 | "masleka-submitted refuses before it reads or writes anything while the switch is off" | Same |
 | CTR-MSKD-007 | "turns the Edge switch on only for exactly \"true\"" | The literal comparison after `trim()` |
-| CTR-MSKD-008 | "lets submit-lead create a request only behind the same switch" | `createRequest` inside the guarded branch |
+| CTR-MSKD-008 | "lets submit-lead create or reuse a request only behind the same switch" | `await createRequest(` and `await findInvitedRequest(` each called once, inside the guarded block; `rotateMaslekaLink` called once, only under `if (masleka?.reuse)` |
 | CTR-MSKD-009 | "is off in a build that does not set VITE_MASLEKA_ENABLED" | `false` |
 | CTR-MSKD-010 | "is turned on by nothing in the repository" | No `MASLEKA_ENABLED=true` (comment lines aside) in Vercel, Playwright, Vitest, Supabase config, package.json or workflows |
 | CTR-MSKD-011 | "registers the staff pages only when switched on, and the client page always (it then says unavailable)" | Guarded `StaffRoute` block; `/masleka` route; page default `enabled = MASLEKA_ENABLED` |
@@ -660,7 +664,7 @@ time.
 
 ## 6. Pass criteria
 
-All 158 declared cases pass (vitest: 887 pass, 1 skipped, of 888 with expansions). A failure means either the frontend or the backend definition
+All 161 declared cases pass (vitest: 890 pass, 1 skipped, of 891 with expansions). A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

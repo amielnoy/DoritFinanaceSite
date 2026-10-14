@@ -68,6 +68,11 @@ describe("SupabaseMaslekaService — the client's page", () => {
     expect(error).toMatchObject({ reason: "link_invalid", rid: "abc123" });
   });
 
+  it("tells a send that stored nothing apart from a failure: not_saved is its own reason", async () => {
+    const { service } = fake({ invoke: async () => failure(500, { error: "not_saved", rid: "n1" }) });
+    await expect(service.submitCode("T".repeat(43), "AB12", "000000018")).rejects.toMatchObject({ reason: "not_saved", rid: "n1" });
+  });
+
   it("calls anything else a failure", async () => {
     const { service } = fake({ invoke: async () => failure(500, { error: "stack trace here" }) });
     await expect(service.submitCode("T".repeat(43), "AB12", "000000018")).rejects.toMatchObject({ reason: "failed" });

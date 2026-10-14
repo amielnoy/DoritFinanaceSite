@@ -106,3 +106,27 @@ describe("the clearinghouse migration", () => {
     expect(code).not.toMatch(/on delete cascade/);
   });
 });
+
+describe("the wipe-notice migration (decision 2026-10-14)", () => {
+  const NOTICE = "20261019000000_masleka_wipe_notice.sql";
+  const notice = readFileSync(join(DIR, NOTICE), "utf8")
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("--"))
+    .join("\n");
+
+  it("comes after the clearinghouse migration, which is applied and never edited", () => {
+    const all = readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort();
+    expect(all.indexOf(NOTICE)).toBeGreaterThan(all.indexOf(FILE));
+    expect(code).not.toContain("wipe_notified_at");
+  });
+
+  it("adds the one marker column and nothing else", () => {
+    expect(notice).toMatch(/alter table public\.masleka_requests\s+add column wipe_notified_at timestamptz;/);
+    expect(notice).not.toMatch(/\b(drop|grant|revoke|create (or replace )?function|create policy|cron\.schedule)\b/i);
+  });
+
+  it("leaves the marker out of the browser's column grant", () => {
+    const grant = code.match(/grant select \(([^)]+)\) on public\.masleka_requests to authenticated;/);
+    expect(grant![1]).not.toContain("wipe_notified_at");
+  });
+});

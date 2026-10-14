@@ -16,9 +16,11 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { deviceLabel } from '../_shared/device.ts';
 import { buildClientHtml, type ClientMail } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
-import { createRequest, maslekaEnabled } from '../_shared/masleka.ts';
+import {
+  AGENCY_1, UUID, createRequest, maslekaEnabled, maslekaLink, newToken, normalizePhone, sameAddress, tokenExpiry, tokenHash,
+} from '../_shared/masleka.ts';
 import { deliveryWarning, mailerConfigured, sendMail } from '../_shared/mail.ts';
-import { insertRow, selectRows, supabaseConfigured, updateRow, upsertRow } from '../_shared/rest.ts';
+import { insertRow, selectRows, supabaseConfigured, updateRow, updateWhere, upsertRow } from '../_shared/rest.ts';
 import { isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { googleConfigured } from '../_shared/google.ts';
 import { calendarConfigured, createCalendarEvent } from '../_shared/calendar.ts';
@@ -85,6 +87,84 @@ async function markMaslekaInvited(rid: string, requestId: string): Promise<boole
     return true;
   } catch (e) {
     log('warn', 'masleka.invite_mark_failed', { rid, requestId, err: String((e as Error)?.message ?? e).slice(0, 200) });
+    return false;
+  }
+}
+
+/**
+ * The contact's clearinghouse request still waiting for its code, if a
+ * completed interview arrives for someone who already has one (decision
+ * 2026-10-14: reuse it rather than open a second).
+ *
+ * "The same contact" is how the pipeline knows a client — the request's
+ * name and address and the phone on the lead that opened it — and all three
+ * must agree, because a false match would send one person's link to another
+ * and file their code under the wrong name; a missed match only leaves a
+ * duplicate on the board. So: an `invited`, unexpired request of agency 1,
+ * opened by an interview (`lead_id` set — a request made by hand has no
+ * phone to compare); its address the same mailbox as this interview's
+ * (sameAddress — no address on either side is no match); its name the same
+ * person by sameInterviewee's rule ("דנה" and "דנה כהן" agree); and its lead's
+ * phone the same digits as this one (normalizePhone). Newest first. Any
+ * lookup failure is "none": a duplicate beats a lost request.
+ */
+async function findInvitedRequest(rid: string, phone: unknown, name: unknown, email: string): Promise<string | null> {
+  try {
+    const now = new Date().toISOString();
+    const open = await selectRows(
+      'masleka_requests',
+      `select=id,lead_id,client_name,contact_email,created_at&agency_id=eq.${AGENCY_1}&status=eq.invited` +
+        `&lead_id=not.is.null&token_expires_at=gt.${encodeURIComponent(now)}&order=created_at.desc&limit=50`,
+    );
+    const candidates = open.filter(
+      (r) =>
+        UUID.test(String(r.id)) && UUID.test(String(r.lead_id)) && sameAddress(r.contact_email, email) &&
+        sameInterviewee({ name: r.client_name, email: r.contact_email }, name, email),
+    );
+    const wanted = normalizePhone(phone);
+    if (!candidates.length || !wanted) return null;
+    const leads = await selectRows(
+      'leads',
+      `select=id,phone&id=in.(${[...new Set(candidates.map((r) => String(r.lead_id)))].join(',')})`,
+    );
+    const samePhone = new Set(leads.filter((l) => normalizePhone(l.phone) === wanted).map((l) => String(l.id)));
+    const match = candidates
+      .filter((r) => samePhone.has(String(r.lead_id)))
+      .sort((a, b) => Date.parse(String(b.created_at)) - Date.parse(String(a.created_at)))[0];
+    return match ? String(match.id) : null;
+  } catch (e) {
+    log('warn', 'masleka.lookup_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+    return null;
+  }
+}
+
+/**
+ * The reused request's new link, stored only once the confirmation carrying
+ * it was accepted — so a mail that never left costs the client nothing: the
+ * link they already hold keeps working. One conditional update on a request
+ * still `invited`: a code that arrived meanwhile through the old link is never
+ * overwritten. Like a fresh link from the board, it restarts the thirty days;
+ * and like a first invitation, it restarts the one reminder a week on.
+ * Never throws.
+ */
+async function rotateMaslekaLink(rid: string, requestId: string, token: string): Promise<boolean> {
+  try {
+    const now = new Date();
+    const rows = await updateWhere(
+      'masleka_requests',
+      `id=eq.${requestId}&agency_id=eq.${AGENCY_1}&status=eq.invited&select=id`,
+      {
+        token_hash: await tokenHash(token),
+        token_expires_at: tokenExpiry(now),
+        client_invited_at: now.toISOString(),
+        client_reminded_at: null,
+      },
+    );
+    if (rows.length) return true;
+    log('warn', 'masleka.rotate_failed', { rid, requestId, reason: 'not_invited' });
+    return false;
+  } catch (e) {
+    log('warn', 'masleka.rotate_failed', { rid, requestId, err: String((e as Error)?.message ?? e).slice(0, 200) });
     return false;
   }
 }
@@ -300,19 +380,32 @@ export async function handler(req: Request): Promise<Response> {
     // confirmation is today's, mandate and all, and a warning says so. The
     // link stays in this local and the confirmation's own copy of `data`:
     // never in what the staff copies read, a log line or the answer.
-    let masleka: { id: string; link: string } | null = null;
+    //
+    // A contact who already has a request waiting for the code gets that
+    // request back (findInvitedRequest), with a new link: its token is made
+    // here and stored only after the confirmation carrying it went out.
+    let masleka: { id: string; link: string; reuse: string | null } | null = null;
     if (source === 'interview' && maslekaEnabled() && wantsClearinghouse(safeProfile)) {
-      try {
-        masleka = await createRequest({
-          clientName: String(name).trim().slice(0, 80),
-          contactEmail: email && isEmail(email) ? email : null,
-          leadId,
-          createdBy: null,
-        });
-        log('info', 'masleka.request_created', { rid, requestId: masleka.id });
-      } catch (e) {
-        log('warn', 'masleka.request_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
-        warnings.push('masleka_request_failed');
+      const contactEmail = email && isEmail(email) ? email : null;
+      const openId = contactEmail ? await findInvitedRequest(rid, phone, name, contactEmail) : null;
+      if (openId) {
+        const token = newToken();
+        masleka = { id: openId, link: maslekaLink(token), reuse: token };
+        log('info', 'masleka.request_reused', { rid, requestId: openId });
+      } else {
+        try {
+          const created = await createRequest({
+            clientName: String(name).trim().slice(0, 80),
+            contactEmail,
+            leadId,
+            createdBy: null,
+          });
+          masleka = { ...created, reuse: null };
+          log('info', 'masleka.request_created', { rid, requestId: created.id });
+        } catch (e) {
+          log('warn', 'masleka.request_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+          warnings.push('masleka_request_failed');
+        }
       }
     }
 
@@ -343,8 +436,13 @@ export async function handler(req: Request): Promise<Response> {
           rid,
           role: 'visitor',
         });
-        // Marked only once the letter carrying the link has gone out.
-        if (masleka && !(await markMaslekaInvited(rid, masleka.id))) warnings.push('masleka_invite_mark_failed');
+        // Marked only once the letter carrying the link has gone out; a reused
+        // request's new link replaces the old one only now, too.
+        if (masleka?.reuse) {
+          if (!(await rotateMaslekaLink(rid, masleka.id, masleka.reuse))) warnings.push('masleka_rotate_failed');
+        } else if (masleka && !(await markMaslekaInvited(rid, masleka.id))) {
+          warnings.push('masleka_invite_mark_failed');
+        }
       } catch (e) {
         log('warn', 'mail.failed', { rid, role: 'visitor', err: String((e as Error)?.message ?? e).slice(0, 200) });
         warnings.push(deliveryWarning('client_confirmation_failed', e));
