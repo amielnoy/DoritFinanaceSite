@@ -68,7 +68,22 @@ describe("runTurn", () => {
     expect(model.calls[1].messages.at(-1)).toMatchObject({ content: [{ is_error: true }] });
   });
 
-  it("allows three tool rounds and fails the fourth", async () => {
+  it("allows three tool rounds, then asks for the reply with tools switched off", async () => {
+    // The evaluation of 2026-10-14: after a confirmed summary the model chained a
+    // hand-off and two saves and asked for a fourth tool; the turn failed with 503
+    // although the lead was saved. The fourth call now forbids tools.
+    const model = scripted([toolUse("a", {}, "1"), toolUse("a", {}, "2"), toolUse("a", {}, "3"), text("הפרטים אצל דורית, והיא תחזור אלייך.")]);
+    const runTool = vi.fn(async () => ok);
+    const out = await runTurn({ ...base, model, runTool });
+    expect(out.reply).toBe("הפרטים אצל דורית, והיא תחזור אלייך.");
+    expect(runTool).toHaveBeenCalledTimes(3);
+    expect(out.tools).toHaveLength(3);
+    expect(model.calls.map((c) => c.toolChoice)).toEqual([undefined, undefined, undefined, "none"]);
+    // The tools stay listed: the conversation holds tool_use blocks that name them.
+    expect(model.calls[3].tools).toBe(base.tools);
+  });
+
+  it("still fails when the model asks for a tool even with tools switched off", async () => {
     const model = scripted([toolUse("a", {}, "1"), toolUse("a", {}, "2"), toolUse("a", {}, "3"), toolUse("a", {}, "4")]);
     const err = await runTurn({ ...base, model, runTool: async () => ok }).catch((e) => e);
     expect(err).toBeInstanceOf(TurnFailure);

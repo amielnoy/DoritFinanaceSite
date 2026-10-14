@@ -24,6 +24,17 @@ describe("createAnthropicClient", () => {
     expect(out).toEqual({ content: [{ type: "text", text: "היי" }], stopReason: "end_turn", model: "claude-haiku-5-5", usage: { input: 15, cached: 100, output: 3 } });
   });
 
+  it("sends tool_choice none only when the request switches tools off", async () => {
+    const fetchImpl = vi.fn(async (_u: string, _i?: RequestInit) =>
+      new Response(JSON.stringify({ model: "m", stop_reason: "end_turn", content: [{ type: "text", text: "היי" }], usage: {} }), { status: 200 }),
+    );
+    const client = createAnthropicClient({ apiKey: "k", model: "m", fetchImpl: fetchImpl as unknown as typeof fetch });
+    await client.complete({ ...REQUEST, toolChoice: "none" }, signal);
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))).toMatchObject({ tools: REQUEST.tools, tool_choice: { type: "none" } });
+    await client.complete(REQUEST, signal);
+    expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body))).not.toHaveProperty("tool_choice");
+  });
+
   it("turns an HTTP refusal into ModelError('http') with its status", async () => {
     const client = createAnthropicClient({ apiKey: "k", model: "m", fetchImpl: (async () => new Response("{}", { status: 529 })) as unknown as typeof fetch });
     await expect(client.complete(REQUEST, signal)).rejects.toMatchObject({ kind: "http", status: 529 });

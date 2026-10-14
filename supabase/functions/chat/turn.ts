@@ -1,7 +1,8 @@
 /**
  * One visitor message, answered: the model, its tool calls (at most three
- * rounds), and the final reply, within a 25-second budget. One retry when the
- * first failure comes within ten seconds; a second failure ends the turn.
+ * rounds, then one last call with tools switched off), and the final reply,
+ * within a 25-second budget. One retry when the first failure comes within ten
+ * seconds; a second failure ends the turn.
  */
 import { ModelError, type ContentBlock, type ModelClient, type ModelMessage, type ModelUsage } from './anthropic.ts';
 import type { SystemBlock } from './prompt.ts';
@@ -80,13 +81,13 @@ export async function runTurn(args: {
   // Asked again once after an empty reply that followed a tool (see below).
   let askedAgain = false;
 
-  const call = async () => {
+  const call = async (toolChoice?: 'none') => {
     for (;;) {
       const remaining = deadline - now();
       if (remaining <= 0) throw new TurnFailure('timeout', tools, usage);
       try {
         return await args.model.complete(
-          { system: args.system, messages, tools: args.tools, maxTokens: MAX_REPLY_TOKENS },
+          { system: args.system, messages, tools: args.tools, maxTokens: MAX_REPLY_TOKENS, ...(toolChoice ? { toolChoice } : {}) },
           AbortSignal.timeout(remaining),
         );
       } catch (e) {
@@ -100,7 +101,10 @@ export async function runTurn(args: {
   };
 
   for (let round = 0; ; round++) {
-    const response = await call();
+    // After MAX_TOOL_ROUNDS the model must answer in words: in the evaluation of
+    // 2026-10-14 it chained a hand-off and two saves, asked for a fourth tool, and
+    // the turn failed with 503 although the lead was saved.
+    const response = await call(round >= MAX_TOOL_ROUNDS ? 'none' : undefined);
     usage.push({ model: response.model, ...response.usage });
     const reply = response.content
       .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
