@@ -43,6 +43,7 @@ const Perspective = lazy(() => import('@/pages/Perspective'));
 const Masleka = lazy(() => import('@/pages/Masleka'));
 const MaslekaBoard = lazy(() => import('@/pages/MaslekaBoard'));
 const MaslekaGuide = lazy(() => import('@/pages/MaslekaGuide'));
+const MaslekaAnalysis = lazy(() => import('@/pages/MaslekaAnalysis'));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -114,6 +115,7 @@ const AuthenticatedApp = () => {
           <Route element={<StaffRoute unauthenticatedElement={<LoginRedirect />} />}>
             <Route path="/admin/masleka" element={<MaslekaBoard />} />
             <Route path="/admin/masleka/guide" element={<MaslekaGuide />} />
+            <Route path="/admin/masleka/analysis/:snapshotId" element={<MaslekaAnalysis />} />
           </Route>
         ) : null}
         <Route path="*" element={<PageNotFound />} />

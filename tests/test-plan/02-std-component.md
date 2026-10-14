@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 300 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 330 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 310 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 340 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -398,6 +398,8 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks in one tick → one `markSubmitted`, one refetch |
 | CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |
 | CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | "הועתק ✓" gone right after `markSubmitted('r2')`, with the refetch rejecting |
+| CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | "לניתוח ולהמלצות" → `/admin/masleka/analysis/s7`; region "ניתוחים" lists a report with no request |
+| CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | A quiet "לא הצלחנו לטעון את הניתוחים."; the columns still work; no alert |
 | CMP-MSKB-026 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
 | CMP-MSKB-027 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
 
@@ -521,6 +523,21 @@ or while there are no deposits to compute from (`useCalculatorResultEvent`). Fak
 | CMP-ACTA-005 | "falls back to the general headline" | `ARTICLE_CTA_FALLBACK` |
 | CMP-ACTA-006 | "offers /tools on a fees article and not on a tax one" | "לבדיקה במחשבון" → `/tools` |
 | CMP-ACTA-007 | "does not offer /tools on an article no tool covers" | No such link |
+
+### 4.28 `<MaslekaAnalysis />` — Dorit's review of a client's report — `tests/component/masleka-analysis.test.tsx`
+
+Over an in-memory port (decisions stored and read back) and the made-up client in `tests/fixtures/clearinghouse-snapshot.ts`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSKA-001 | "shows the client, the totals, every finding as a draft, and the products" | Heading with the name; 493,000; one card per finding; "N ממתינות לבדיקה · 0 אושרו"; a row per account; the pension-marketing disclosure |
+| CMP-MSKA-002 | "will not print before anything is approved" | "הדפסה" disabled |
+| CMP-MSKA-003 | "approves a finding, then prints" | `decide(s1, key, {approved, null})`; "אושר"; `print()` |
+| CMP-MSKA-004 | "approves in Dorit's own words, and stores them only when they differ from the draft" | Edited text stored and shown; "בנוסח של דורית" |
+| CMP-MSKA-005 | "rejects a finding and can put it back to draft" | `rejected`, then `decide(…, null)`; "טיוטה" |
+| CMP-MSKA-006 | "keeps drafts and rejected findings off the printout" | Approved card printable; rejected and draft cards `print:hidden` |
+| CMP-MSKA-007 | "says so when a decision could not be saved" | Alert with the rid |
+| CMP-MSKA-008 | "says plainly when the report is gone or cannot be read" | Alert "הדוח לא נמצא" |
 
 ### 4.29 `<SnapshotHome />` — the personal snapshot on the home page — `tests/component/snapshot-home.test.tsx`
 
