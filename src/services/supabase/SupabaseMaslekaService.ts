@@ -1,7 +1,10 @@
 import { readSnapshot } from "@/lib/clearinghouse/snapshot";
+import { priorityOf, toPublishedRecommendation } from "../account-mapping";
 import {
   MaslekaError,
   type FindingReview,
+  type PublishItem,
+  type StaffPublishedItem,
   type ReviewDecision,
   type SnapshotSummary,
   type StoredSnapshot,
@@ -20,6 +23,17 @@ type PostgrestError = { message: string; code?: string } | null;
 /** Just the calls this adapter makes — narrowed for the reason SupabaseAuthClient is. */
 export interface SupabaseMaslekaClient {
   rpc(fn: "my_staff_role"): PromiseLike<{ data: unknown; error: PostgrestError }>;
+  rpc(
+    fn: "clearinghouse_publish" | "clearinghouse_unpublish" | "clearinghouse_mark_answers_seen",
+    args: Record<string, unknown>,
+  ): PromiseLike<{ data: unknown; error: PostgrestError }>;
+  from(table: "clearinghouse_published_items"): {
+    select(columns: string): {
+      eq(column: "snapshot_id", value: string): {
+        order(column: "position", options: { ascending: boolean }): PromiseLike<{ data: unknown[] | null; error: PostgrestError }>;
+      };
+    };
+  };
   from(table: "masleka_requests"): {
     select(columns: string): {
       in(column: "status", values: string[]): {
@@ -86,6 +100,8 @@ export function toSnapshotSummary(row: Record<string, unknown>): SnapshotSummary
 const BY_STATUS: Record<number, MaslekaFailure> = { 401: "unauthorized", 403: "forbidden", 429: "rate_limited", 503: "unavailable" };
 
 const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
+
+
 
 export function toMaslekaRequest(row: Record<string, unknown>): MaslekaRequest {
   return {
@@ -190,20 +206,22 @@ export class SupabaseMaslekaService implements MaslekaPort {
   async getSnapshot(snapshotId: string): Promise<StoredSnapshot | null> {
     const { data, error } = await this.client
       .from("clearinghouse_snapshots")
-      .select(`${SNAPSHOT_SUMMARY_COLUMNS},data`)
+      .select(`${SNAPSHOT_SUMMARY_COLUMNS},data,client_email,published_at`)
       .eq("id", snapshotId)
       .maybeSingle();
     if (error) throw new MaslekaError("failed");
     if (!data) return null;
     const row = data as Record<string, unknown>;
     const snapshot = readSnapshot(row.data);
-    return snapshot ? { ...toSnapshotSummary(row), snapshot } : null;
+    return snapshot
+      ? { ...toSnapshotSummary(row), snapshot, clientEmail: text(row.client_email), publishedAt: text(row.published_at) }
+      : null;
   }
 
   async listReviews(snapshotId: string): Promise<FindingReview[]> {
     const { data, error } = await this.client
       .from("clearinghouse_reviews")
-      .select("finding_key,status,final_text,reviewed_at")
+      .select("finding_key,status,final_text,title,priority,reviewed_at")
       .eq("snapshot_id", snapshotId);
     if (error) throw new MaslekaError("failed");
     return (data ?? []).flatMap((raw) => {
@@ -213,6 +231,8 @@ export class SupabaseMaslekaService implements MaslekaPort {
         findingKey: row.finding_key,
         status: row.status,
         finalText: text(row.final_text),
+        title: text(row.title),
+        priority: priorityOf(row.priority),
         reviewedAt: text(row.reviewed_at) ?? "",
       }];
     });
@@ -222,10 +242,53 @@ export class SupabaseMaslekaService implements MaslekaPort {
     const reviews = this.client.from("clearinghouse_reviews");
     const { error } = decision
       ? await reviews.upsert(
-          { snapshot_id: snapshotId, finding_key: findingKey, status: decision.status, final_text: decision.finalText },
+          {
+            snapshot_id: snapshotId,
+            finding_key: findingKey,
+            status: decision.status,
+            final_text: decision.finalText,
+            // Sent only when given: approving a rule's finding keeps any title or priority Dorit set before.
+            ...("title" in decision ? { title: decision.title ?? null } : {}),
+            ...("priority" in decision ? { priority: decision.priority ?? null } : {}),
+          },
           { onConflict: "snapshot_id,finding_key" },
         )
       : await reviews.delete().eq("snapshot_id", snapshotId).eq("finding_key", findingKey);
+    if (error) throw new MaslekaError("failed");
+  }
+
+  async listPublishedItems(snapshotId: string): Promise<StaffPublishedItem[]> {
+    const { data, error } = await this.client
+      .from("clearinghouse_published_items")
+      .select("id,position,title,body,priority,client_status,client_note,client_updated_at,staff_seen_at")
+      .eq("snapshot_id", snapshotId)
+      .order("position", { ascending: true });
+    if (error) throw new MaslekaError("failed");
+    return (data ?? []).flatMap((raw) => {
+      const row = raw as Record<string, unknown>;
+      const item = toPublishedRecommendation(row);
+      return item
+        ? [{ ...item, position: Number(row.position) || 0, clientUpdatedAt: text(row.client_updated_at), staffSeenAt: text(row.staff_seen_at) }]
+        : [];
+    });
+  }
+
+  async publish(snapshotId: string, clientEmail: string, items: PublishItem[]): Promise<void> {
+    const { error } = await this.client.rpc("clearinghouse_publish", {
+      p_snapshot: snapshotId,
+      p_client_email: clientEmail,
+      p_items: items.map(({ title, body, priority }) => ({ title, body, priority })),
+    });
+    if (error) throw new MaslekaError(error.code === "22023" ? (/email/.test(error.message) ? "invalid_email" : "invalid") : "failed");
+  }
+
+  async unpublish(snapshotId: string): Promise<void> {
+    const { error } = await this.client.rpc("clearinghouse_unpublish", { p_snapshot: snapshotId });
+    if (error) throw new MaslekaError("failed");
+  }
+
+  async markAnswersSeen(snapshotId: string): Promise<void> {
+    const { error } = await this.client.rpc("clearinghouse_mark_answers_seen", { p_snapshot: snapshotId });
     if (error) throw new MaslekaError("failed");
   }
 }
