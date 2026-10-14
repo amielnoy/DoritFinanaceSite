@@ -121,6 +121,10 @@ desktop's does (`mobile-parity.spec.ts`). From md up nothing changes —
 whole page) and `/faq` are byte-identical. The shared footer brings `/faq` from
 3,148 to 2,522px (3.73 → 2.99 screens).
 
+E2E-MOB-021 reads the hero's boxes once its 0.9 s fade-up has landed: two boxes
+read one after the other mid-glide differed by up to 1.8px, and android-chrome
+failed the WhatsApp/call row check 4 runs in 10 (20 in 20 after).
+
 Prerendered pages are replaced, not hydrated, so a tap before React's first
 commit reaches a node with no handler. `gotoApp` waits for the
 `data-route-committed` marker (#169), so the stage-3 cases and the

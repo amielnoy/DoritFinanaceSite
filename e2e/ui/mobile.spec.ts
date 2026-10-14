@@ -786,6 +786,17 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     const hero = page.locator("#top");
     const portrait = hero.locator("figure .plate");
     const licence = hero.locator("figcaption").getByText("L-00107009");
+    // The hero's rows fade up for 0.9 s (`animate-fade-up`), and two boxes read
+    // one after the other mid-glide differ by a pixel or two (android-chrome
+    // failed 4 runs in 10 that way): let every finite animation land first.
+    await hero.evaluate((el) =>
+      Promise.all(
+        el
+          .getAnimations({ subtree: true })
+          .filter((a) => Number.isFinite(Number(a.effect?.getComputedTiming().endTime)))
+          .map((a) => a.finished.catch(() => undefined)),
+      ),
+    );
 
     await test_step("the portrait is an 88px circle, on the licence line's row, above the headline", async () => {
       const box = (await portrait.boundingBox())!;
