@@ -199,8 +199,9 @@ Base44's own host has no equivalent — it answers `405` to any path it does not
 
 `VITE_SITE_URL` sets the canonical origin: `src/lib/seo.ts` reads it at runtime, and a
 build plugin rewrites `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` to match.
-Unset, the build emits the Base44 origin, so a builder without it keeps declaring
-the old host canonical.
+Unset, the build emits `https://govari-fin.co.il` — the default since 2026-10-14. It
+used to be the Base44 origin, which is how a builder without the variable kept
+declaring the old host canonical.
 
 `index.html` is on that list because the document a crawler is served is the one that
 matters, and it was the one being missed: the sitemap moved hosts while the served HTML
@@ -274,11 +275,12 @@ does not resolve is worse than one pointing at the old site.
    from a `.env` file, and the build plugin reads the same resolved value the
    application does, so the two cannot disagree.
 
-   *Status, 2026-10-12: Vercel done, Base44 open.* The Vercel copy names
+   *Status, 2026-10-14: done in the repo.* The Vercel copy names
    `https://govari-fin.co.il/` in its canonical tag, `og:url`, JSON-LD, robots.txt and
-   sitemap. The Base44 copy still names `safe-arch-plan.base44.app` in its JSON-LD and
-   robots.txt. The Builder's environment is set only in the Base44 dashboard; the CLI
-   has no command for it. Set the variable there, then Publish.
+   sitemap. The Base44 half no longer needs the dashboard: the default origin is now
+   the production domain, so a Builder build without the variable names it too, and
+   the copy Base44 serves also goes `noindex` and sends its visitors on — see [The old
+   Base44 host](#the-old-base44-host). It takes effect on the next Base44 publish.
 5. **Set the `PRODUCTION_URL` repository variable** to the same origin, and
    `BASE44_URL` to `https://safe-arch-plan.base44.app`. The smoke test targets
    `PRODUCTION_URL`, so this is what repoints it; the two were one variable while the
@@ -288,7 +290,8 @@ does not resolve is worse than one pointing at the old site.
    2026-10-12.
 6. **Resubmit the sitemap** in Search Console for the new property, and keep the old
    one until it stops receiving traffic. Base44 cannot `301` to Vercel — you do not
-   control its routing — so the old URL ages out rather than redirecting.
+   control its routing — so the page does the next best thing itself: see [The old
+   Base44 host](#the-old-base44-host).
 
    *Status, 2026-10-12: open.* The verification TXT record
    (`google-site-verification=pSXd…aiI`) is live at DTNT. What remains is to verify
@@ -313,10 +316,42 @@ the failure would appear after a publish, on production. The build job therefore
 second time with those unset, the way the Builder runs it. If that step goes red, a
 dashboard publish is broken even though everything else is green.
 
-The one thing to remember when publishing from the GUI: the Builder has its own
-environment, so `VITE_SITE_URL` has to be set there too (step 4). Without it that build
-keeps emitting the old canonical, and the copy Base44 serves starts competing with the
-production domain for the same content.
+The Builder has its own environment, set only in its dashboard. It no longer needs
+`VITE_SITE_URL`: the default is the production domain (step 4). Leave the variable unset
+there, or set it to `https://govari-fin.co.il` — never to the Base44 host, which would
+make that copy canonical again and switch its redirect off (the redirect will not send a
+visitor to the host they are already on).
+
+### The old Base44 host
+
+Base44 keeps serving a complete copy of the site at `safe-arch-plan.base44.app`, and it
+cannot answer that copy with a `301`. Its site config has four fields — install, build,
+serve and output directory — and nothing for routes, redirects or headers; the CLI's
+deploy, when it meets a `_redirects` or `_headers` file, warns that they are "not
+supported yet" and ignores them. So a page booted on that host deals with it itself,
+first thing in `main.jsx` (`src/lib/legacy-host.ts`, `src/lib/legacy-host-boot.ts`):
+
+| Request on `safe-arch-plan.base44.app` | What happens |
+| --- | --- |
+| A page (`/`, `/faq`, `/blog/…`, `/login`, `/admin/…`, …), top-level, no sign-in in flight | The head gets `noindex` and a canonical/`og:url` on `https://govari-fin.co.il/<path>`; the page renders nothing but a one-line notice and `location.replace`s to `https://govari-fin.co.il/<path><query><fragment>`. No React, no API call, no chat. |
+| A page carrying a sign-in (`code`, `error`, `access_token` in the query or fragment, `token`, `token_hash`, `from_url`, `clear_access_token`, Base44's `app_id`/`app_base_url`/`functions_version`) | Stays, so the sign-in completes on the origin whose storage holds its state. Still `noindex`, canonical on production. |
+| `/register`, `/forgot-password`, `/reset-password`, `/oauth/*` (the platform's own auth pages) | Stays, for the same reason. Still `noindex`. |
+| A page inside a frame (the Base44 dashboard showing the app) | Stays: production refuses to be framed, so a redirect would only blank the frame. Still `noindex`. |
+| `/api/*`, `/ws-user-apps/*`, the agents' socket, assets, images, any non-HTML response | Untouched. None of it runs the app's HTML, so none of it runs this code — and the page refuses those paths too, in case one is ever opened in a tab. |
+
+A conversation already open in a tab is not cut off: this runs once, at boot. (A tab
+that reloads itself after a deploy — `freshness.ts` — reboots there, and a reload
+already loses an open chat today; the difference is that it now lands on production.)
+The Builder's preview runs on other hosts and is left alone: the match is exact.
+
+`VITE_LEGACY_HOSTS` (comma-separated hostnames) replaces the host list; `none` turns all
+of it off — the switch, set in the Builder's environment and published, if it ever
+misbehaves.
+
+A crawler that does not run JavaScript still gets the plain `index.html` from Base44,
+which now names production in its canonical, `og:url` and JSON-LD (measured on
+2026-10-05, Base44 served the canonical and `og:url` tags with their values stripped;
+that is Base44's doing and the runtime tags cover it).
 
 ## The home page, and the one conversation
 
