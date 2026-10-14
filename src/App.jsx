@@ -15,6 +15,7 @@ import SeoRouteGuard from '@/components/SeoRouteGuard';
 // `/react`, not `/next`: Vercel's docs lead with the Next entry, which pulls
 // `next/navigation` and has nothing to bind to in a Vite SPA.
 import { Analytics } from '@vercel/analytics/react';
+import { stripFragment } from '@/lib/vercel-analytics';
 // Add page imports here
 // The home page is the marketing entry point and the LCP path, so it stays in
 // the main chunk. Everything else is split out: mobile-first indexing scores
@@ -23,6 +24,8 @@ import { Analytics } from '@vercel/analytics/react';
 import Home from '@/pages/Home';
 import FloatingActions from '@/components/dorit/layout/FloatingActions';
 import AdminRoute from '@/components/AdminRoute';
+import StaffRoute from '@/components/StaffRoute';
+import { MASLEKA_ENABLED } from '@/config/masleka';
 
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
 const Accessibility = lazy(() => import('@/pages/Accessibility'));
@@ -36,6 +39,9 @@ const Claims = lazy(() => import('@/pages/Claims'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const Tools = lazy(() => import('@/pages/Tools'));
 const Perspective = lazy(() => import('@/pages/Perspective'));
+const Masleka = lazy(() => import('@/pages/Masleka'));
+const MaslekaBoard = lazy(() => import('@/pages/MaslekaBoard'));
+const MaslekaGuide = lazy(() => import('@/pages/MaslekaGuide'));
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -91,6 +97,7 @@ const AuthenticatedApp = () => {
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/tools" element={<Tools />} />
         <Route path="/perspective" element={<Perspective />} />
+        <Route path="/masleka" element={<Masleka />} />
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login?returnTo=/account" replace />} />}>
           <Route path="/account" element={<Account />} />
@@ -99,6 +106,15 @@ const AuthenticatedApp = () => {
           <Route path="/admin/leads" element={<Leads />} />
           <Route path="/admin/blog" element={<BlogAdmin />} />
         </Route>
+        {/* The clearinghouse board: the admin or an agency member (StaffRoute).
+            Not registered at all until VITE_MASLEKA_ENABLED — a dark build
+            answers 404 here. */}
+        {MASLEKA_ENABLED ? (
+          <Route element={<StaffRoute unauthenticatedElement={<LoginRedirect />} />}>
+            <Route path="/admin/masleka" element={<MaslekaBoard />} />
+            <Route path="/admin/masleka/guide" element={<MaslekaGuide />} />
+          </Route>
+        ) : null}
         <Route path="*" element={<PageNotFound />} />
       </Routes>
       </ErrorBoundary>
@@ -134,7 +150,7 @@ function App() {
               every page load while reporting no data at all. The flag is
               derived from `VERCEL` in `vite.config.js`, so there is nothing to
               set per environment and nothing to forget. */}
-          {import.meta.env.VITE_VERCEL_ANALYTICS ? <Analytics /> : null}
+          {import.meta.env.VITE_VERCEL_ANALYTICS ? <Analytics beforeSend={stripFragment} /> : null}
           <AuthenticatedApp />
         </Router>
         <Toaster />

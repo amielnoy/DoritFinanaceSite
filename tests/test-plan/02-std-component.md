@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/sanity.test.tsx` · **Cases:** 24 · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 206 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 246 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -130,6 +130,7 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-HDR-003 | "gives an admin both admin pages" | "ניהול פניות" points to `/admin/leads` and "ניהול בלוג" to `/admin/blog` |
 | CMP-HDR-004 | "offers no sign-out to a signed-out visitor" | No "יציאה" button |
 | CMP-HDR-005 | "signs a visitor out and sends them home" | "יציאה" calls `logout(true, <origin>/)` |
+| CMP-HDR-006 | "offers no clearinghouse board link, even to an admin, while the switch is off" | No "בקשות מסלקה" link with `VITE_MASLEKA_ENABLED` unset |
 
 ### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
@@ -284,8 +285,96 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-LEADTX-003 | "shows the visitor's markup as text, never as elements" | The hostile string is in `textContent`; no `img`, no `b` element |
 | CMP-LEADTX-004 | "offers no control to write from the tab" | No textbox; only the hide button |
 
+### 4.17 `<Masleka />` — the client's clearinghouse page — `tests/component/masleka-page.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSK-001 | "says the service is unavailable when the switch is off, and offers no form" | Heading; no form; nothing sent |
+| CMP-MSK-002 | "takes the link's token out of the address bar" | Hash empty, path `/masleka` |
+| CMP-MSK-003 | "does not take the token from a query string" | `?t=` ignored: "הקישור חסר או שגוי"; nothing sent |
+| CMP-MSK-004 | "sends the code and the nine-digit ID with the link's token, then only thanks" | `submit(token, 'AB12-CD34', '000000018')`; thanks; values gone |
+| CMP-MSK-005 | "writes neither value to storage or the console" | No `setItem`; no console call carries either value |
+| CMP-MSK-006 | "refuses an ID that fails the check digit before sending" | Alert; not sent |
+| CMP-MSK-007 | "refuses a code that cannot be one" | Alert; not sent |
+| CMP-MSK-008 | "explains a link that is no longer valid, in clientMessage's words" | `clientMessage(link_invalid)` text |
+| CMP-MSK-009 | "after too many tries says to wait, and that the link is not dead" | "נסו שוב בעוד זמן מה", "הקישור תקין" |
+| CMP-MSK-010 | "after an unknown failure says the code may have arrived, with no invitation to retry" | "ייתכן שהקוד כבר התקבל", "דורית תיצור קשר"; no "נסו שוב" |
+| CMP-MSK-011 | "treats a thrown non-MaslekaError the same way" | Same "ייתכן שהקוד כבר התקבל" |
+| CMP-MSK-012 | "asks for the link when there is no token" | Heading; no form |
+| CMP-MSK-013 | "links to the clearinghouse in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
+| CMP-MSK-014 | "links the privacy policy, since it collects an ID number" | `/privacy` |
+| CMP-MSK-015 | "renders no screenshot slot when none is given, and the given one when it is" | 0 figures; then 1 |
+| CMP-MSK-016 | "is marked noindex" | SeoRouteGuard writes `noindex` on `/masleka` |
+
+### 4.18 `<StaffRoute />` — the clearinghouse board's gate — `tests/component/staff-route.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-STF-001 | "sends a signed-out visitor to sign in" | `unauthenticatedElement`; no role lookup |
+| CMP-STF-002 | "admits the platform admin without asking for a membership" | Outlet; no lookup |
+| CMP-STF-003 | "admits a member of the agency" | Outlet |
+| CMP-STF-004 | "turns away a signed-in user with no membership" | Redirect to `/` |
+| CMP-STF-005 | "says so when the role cannot be read, rather than guessing either way" | Alert; no outlet |
+| CMP-STF-006 | "waits while sign-in is still being checked" | Neither outlet nor redirect |
+| CMP-STF-007 | "turns away a membership answer of %s, never rendering the outlet" (3 cases: empty string, `superuser`, `Staff`) | Redirect to `/`; no outlet |
+| CMP-STF-008 | "alerts, never renders the outlet, when the membership answer is undefined" | Alert; no outlet |
+| CMP-STF-009 | "turns away a signed-in user who has no id, without asking" | Redirect to `/`; no lookup |
+| CMP-STF-010 | "does not take %s on the user for the platform admin" (3: `ADMIN`, no role, `owner`) | One lookup, then redirect to `/`; no outlet |
+| CMP-STF-011 | "does not let one user's role reach the next user who signs in" | Second user never sees the outlet; two lookups |
+
+### 4.19 `<MaslekaBoard />` — the staff board — `tests/component/masleka-board.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSKB-001 | "lays the requests out by status, with the third column empty until PR B" | Each name in its region; empty-state text in "הושלם" |
+| CMP-MSKB-002 | "says when the files should be ready, and how long the clearinghouse keeps them" | Readiness and deletion labels per card |
+| CMP-MSKB-003 | "reports a list that failed to load" | Alert text |
+| CMP-MSKB-004 | "copies the ID to the clipboard, revealing it only on the click" | No reveal before the click; `writeText('000000018')`; "הועתק ✓" |
+| CMP-MSKB-005 | "falls back to a selected field when there is no clipboard" | Read-only field with the value; "העתק ידנית" |
+| CMP-MSKB-006 | "falls back when the browser refuses the clipboard" | Read-only field with the value |
+| CMP-MSKB-007 | "hides a manually-copied value when asked" | Value gone after "הסתר" |
+| CMP-MSKB-008 | "clears a manually-copied value after a minute" | `REVEAL_MS` is 60 000; value still shown at 59 s, gone at 60 s |
+| CMP-MSKB-009 | "clears a manually-copied value on the next click elsewhere, but not on a click in its field" | A click in the field keeps it; a click on the heading clears it |
+| CMP-MSKB-010 | "shows one value at a time: revealing another client's clears the first" | The second client's field shown; the first client's gone |
+| CMP-MSKB-011 | "drops a value that arrives after a newer reveal was asked for" | A slower answer for the first click never reaches the screen |
+| CMP-MSKB-012 | "copies nothing when a value arrives after the board is gone" | Unmounted before the answer: `writeText` never called |
+| CMP-MSKB-013 | "forgets a shown value once its row leaves the column, so it never comes back with the row" | Row moves to submitted and back on two refetches; value not shown again |
+| CMP-MSKB-014 | "keeps the revealed value out of the query cache, storage, the console and the address" | Not in any query or mutation state, any storage write, any console call, `location.href` |
+| CMP-MSKB-015 | "wipes on הגשתי only after asking first" | Declined confirm → nothing; accepted → `markSubmitted('r2')` and a refetch |
+| CMP-MSKB-016 | "shows a second הגשתי as already submitted, not as an error, and refreshes the row" | `already_submitted` → `role="status"` "כבר סומן כהוגש", no alert; refetch (Ruling 18) |
+| CMP-MSKB-017 | "tells a staff member whose access was removed" | Alert "ההרשאה שלך הוסרה" (`staffMessage`) |
+| CMP-MSKB-018 | "words a failed list or a refused request in the staff vocabulary" | A forbidden list and an `invalid_email` create both say `staffMessage`'s text |
+| CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
+| CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל" |
+| CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown |
+| CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves before the answer: never copied, never shown, no "הועתק ✓" when the row returns |
+| CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks in one tick → one `markSubmitted`, one refetch |
+| CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |
+| CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | "הועתק ✓" gone right after `markSubmitted('r2')`, with the refetch rejecting |
+| CMP-MSKB-026 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
+| CMP-MSKB-027 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
+
+### 4.20 `<FloatingHeader />` — the clearinghouse board link, switched on — `tests/component/floating-header-masleka.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSKH-001 | "links the admin to the board without asking for a membership" | "בקשות מסלקה" → `/admin/masleka`; no `myRole` call |
+| CMP-MSKH-002 | "links a member of the agency to the board" | `myRole` → `staff`: link shown |
+| CMP-MSKH-003 | "offers no board link to a signed-in client with no membership, or when the role cannot be read" | `myRole` → `null`, then rejecting: no link |
+| CMP-MSKH-004 | "asks nothing for a signed-out visitor" | No link; no `myRole` call |
+
+### 4.21 `<MaslekaGuide />` — registering as an advisor — `tests/component/masleka-guide.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSKG-001 | "walks through registering, submitting and downloading, in order" | Four step headings in order |
+| CMP-MSKG-002 | "names the licence the registration is made under" | `LICENCE.number` shown |
+| CMP-MSKG-003 | "links to the clearinghouse in a new tab without a referrer, and back to the board" | `href` is `CLEARINGHOUSE_ADVISOR_URL`, `_blank` + `noopener noreferrer`; back link `/admin/masleka` |
+| CMP-MSKG-004 | "shows no screenshot unless one is given" | 0 figures; then the given image |
+| CMP-MSKG-005 | "is marked noindex" | `/admin/masleka/guide` through `SeoRouteGuard` sets `robots` to `noindex` |
+
 ## 5. Pass criteria
 
-All 110 cases pass. A `submitLead` or `submitClaim` payload assertion failing
+All 206 declared cases pass (vitest: 246 with expansions). A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

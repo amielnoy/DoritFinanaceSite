@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { transformSync } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
+import { buildClientHtml as buildSharedClientHtml } from "../../supabase/functions/_shared/html.ts";
 import { read, sourceFiles, backendFiles } from "../helpers/source-scan";
 
 /**
@@ -207,7 +208,9 @@ const MAIL_IMPLEMENTATIONS = [
   { label: "Edge _shared/html.ts", src: HTML_MAIL, ts: true },
   { label: "Base44 submitClaim", src: CLAIM, ts: false },
 ].map(({ label, src, ts }) => {
-  const code = `${wholeFn(src, "escapeHtml")}\n${wholeFn(src, "buildClientHtml")}`.replace(/^export /gm, "");
+  // actionBlock (the letter's one button) exists only in the Edge copy; buildClientHtml calls it.
+  const action = src.includes("function actionBlock(") ? `${wholeFn(src, "actionBlock")}\n` : "";
+  const code = `${wholeFn(src, "escapeHtml")}\n${action}${wholeFn(src, "buildClientHtml")}`.replace(/^export /gm, "");
   const js = ts ? transformSync(code, { loader: "ts" }).code : code;
   const load = new Function(`${js}; return { escapeHtml, buildClientHtml };`)() as {
     escapeHtml: (s: unknown) => string;
@@ -254,6 +257,17 @@ describe.each(MAIL_IMPLEMENTATIONS)("XSS — the HTML email: $label", ({ src, te
     });
     expect(html).not.toContain("<script>alert(1)");
     expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("renders the button only for a plain https:// link, and escapes its label", () => {
+    if (!src.includes("function actionBlock(")) return;
+    const base = { firstName: "דנה", eyebrow: "e", heading: "h", intro: "i", panelTitle: "p", details: [] };
+    const hostile = buildClientHtml({ ...base, action: { label: '<img src=x onerror=alert(1)>', href: "https://govari-fin.co.il/masleka#t=abc" } });
+    expect(hostile).not.toContain("<img src=x");
+    expect(hostile).toContain("&lt;img src=x");
+    for (const href of ["javascript:alert(1)", 'https://evil.example/"><script>', "http://govari-fin.co.il"]) {
+      expect(buildClientHtml({ ...base, action: { label: "x", href } }), href).not.toContain(`href="${href}`);
+    }
   });
 
   it("binds nothing else from `data` straight into the HTML body", () => {
@@ -550,5 +564,36 @@ describe("DLP — what may leave, and in whose hands", () => {
   it("names in the consent exactly the fields that are collected", () => {
     expect(COMPLIANCE).toMatch(/נאספים שם וטלפון בלבד/);
     expect(COMPLIANCE).toMatch(/אין למסור בצ׳אט תעודת זהות/);
+  });
+});
+
+describe("XSS — the shared letter's button", () => {
+  const letter = (href: string) =>
+    buildSharedClientHtml({
+      firstName: "",
+      eyebrow: "e",
+      heading: "h",
+      intro: "i",
+      panelTitle: "p",
+      details: [],
+      action: { label: "<b>go</b>", href },
+    });
+
+  it("renders no anchor for a javascript:, data: or relative href", () => {
+    for (const href of ["javascript:alert(1)", "data:text/html,x", "/masleka", "http://govari-fin.co.il/"]) {
+      expect(letter(href)).not.toMatch(/<a /);
+    }
+  });
+
+  it("cannot be broken out of the attribute by a quote or a tag", () => {
+    const html = letter('https://govari-fin.co.il/"><script>alert(1)</script>');
+    expect(html).not.toContain("<script");
+    expect(html).not.toMatch(/<a /);
+  });
+
+  it("escapes the label", () => {
+    const html = letter("https://govari-fin.co.il/masleka#t=abc");
+    expect(html).toContain("&lt;b&gt;go&lt;/b&gt;");
+    expect(html).toContain('<a href="https://govari-fin.co.il/masleka#t=abc"');
   });
 });

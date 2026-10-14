@@ -3,6 +3,7 @@ import { supabase } from "@/api/supabaseClient";
 import { CHAT_AGENTS } from "@/config/chat-agents";
 import { CONTENT_WRITES } from "@/config/content-writes";
 import { LEAD_FUNCTIONS } from "@/config/lead-functions";
+import { MASLEKA_ENABLED } from "@/config/masleka";
 import { CONTENT_IMAGES, UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
@@ -22,10 +23,12 @@ import { EdgeContentAdminService, type ContentFunctionsClient } from "./supabase
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
 import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
 import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
+import { SupabaseMaslekaService, type SupabaseMaslekaClient } from "./supabase/SupabaseMaslekaService";
 import { SupabaseSupportService } from "./supabase/SupabaseSupportService";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
+import { UnconfiguredMaslekaService } from "./unconfigured/UnconfiguredMaslekaService";
 import { RoutedAgentService } from "./RoutedAgentService";
 import type { Services } from "./index";
 import type {
@@ -36,6 +39,7 @@ import type {
   ContentPort,
   LeadAdminPort,
   LeadPort,
+  MaslekaPort,
   SupportPort,
   UploadPort,
 } from "./ports";
@@ -154,6 +158,16 @@ const supportPort: SupportPort =
     : base44Support;
 
 /**
+ * The clearinghouse pipeline: on Supabase only when the switch is on AND a
+ * client exists. Otherwise a stand-in that is never available and never
+ * touches the network, so a dark build calls no `masleka-*` function.
+ */
+const maslekaPort: MaslekaPort =
+  MASLEKA_ENABLED && supabase
+    ? new SupabaseMaslekaService(supabase as unknown as SupabaseMaslekaClient)
+    : new UnconfiguredMaslekaService();
+
+/**
  * The on-site agents: the `chat` Edge Function for those named in
  * `VITE_CHAT_AGENTS` (empty by default), Base44 for the rest.
  */
@@ -174,5 +188,6 @@ export const services: Services = {
   leadsAdmin: leadsAdminPort,
   contentAdmin,
   account: accountPort,
+  masleka: maslekaPort,
 };
 

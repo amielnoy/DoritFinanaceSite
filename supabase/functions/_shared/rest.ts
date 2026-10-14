@@ -102,6 +102,51 @@ export async function upsertRow(table: string, row: Record<string, unknown>, onC
   if (!res.ok) throw new Error(`upsert_http_${res.status}${await refusal(res)}`);
 }
 
+/** PostgREST parameters that shape the answer and filter nothing. */
+const NOT_FILTERS = ['select', 'order', 'limit', 'offset', 'on_conflict', 'columns'];
+
+/** Whether a query string has at least one `col=op.value` filter term. */
+function hasFilter(query: string): boolean {
+  for (const [column, value] of new URLSearchParams(query)) {
+    if (NOT_FILTERS.includes(column) || !/^[a-z_][a-z0-9_]*$/.test(column)) continue;
+    if (/^(?:not\.)?[a-z]+\.\S/.test(value)) return true;
+  }
+  return false;
+}
+
+/**
+ * A conditional update: every row the PostgREST query matches, changed, and
+ * returned. The query carries the conditions (`status=eq.invited`, …) and a
+ * `select=` naming the columns to return — always name them, or the answer
+ * echoes every column, ciphertext included.
+ *
+ * One statement, so the condition and the change cannot be split by a second
+ * request: two submissions of one link cannot both find it `invited`.
+ *
+ * Refuses, before sending anything, a query with no filter term (`col=op.value`
+ * — `select=`, `order=` and `limit=` are not filters): PostgREST would apply
+ * that PATCH to every row in the table. And a success whose body is not a
+ * list of rows is a throw, never "nothing matched".
+ */
+export async function updateWhere(
+  table: string,
+  query: string,
+  fields: Record<string, unknown>,
+): Promise<Record<string, unknown>[]> {
+  if (!hasFilter(query)) throw new Error('update_without_filter');
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?${query}`, {
+    method: 'PATCH',
+    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(fields),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`update_http_${res.status}${await refusal(res)}`);
+  const rows = await res.json().catch(() => null);
+  if (!Array.isArray(rows)) throw new Error('update_bad_body');
+  return rows as Record<string, unknown>[];
+}
+
 /** Every row a PostgREST filter matches, deleted. Matching none is not an error: the row is already gone. */
 export async function deleteRows(table: string, filter: string): Promise<void> {
   const { url, auth } = target();

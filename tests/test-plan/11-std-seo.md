@@ -171,6 +171,12 @@ and the IndexNow unit cases (section 4.30), the build wiring, the ai-surface and
 `indexnow.contract.test.ts` rows (CTR-INOW-*) in `03-std-contract.md`, and
 API-HTP-013 and API-HTP-014 in `05-std-api.md` for the served files.
 
+### The clearinghouse page stays out of search
+
+| Route | How it is kept out | Pinned by |
+|---|---|---|
+| `/masleka` | `noindex` from SeoRouteGuard; `Disallow: /masleka` in the `*` group of robots.txt; absent from the sitemap, prerender `ROUTES` and `llms.txt`; the link's token rides in the fragment | CMP-MSK-016; `ai-surface.contract.test.ts` "keeps the private routes out for everyone"; E2E-MSK-001 |
+
 ## 6. Pass criteria
 
 All 19 unit and 50 e2e cases pass, with SEO-MOB-005 reporting rather than

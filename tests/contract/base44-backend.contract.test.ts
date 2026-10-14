@@ -142,6 +142,6 @@ describe("the analytics beacon is mounted only where its endpoint exists", () =>
     expect(app, "<Analytics /> is still mounted unconditionally").not.toMatch(
       /^\s*<Analytics \/>/m,
     );
-    expect(app).toMatch(/import\.meta\.env\.VITE_VERCEL_ANALYTICS \? <Analytics \/> : null/);
+    expect(app).toMatch(/import\.meta\.env\.VITE_VERCEL_ANALYTICS \? <Analytics beforeSend=\{stripFragment\} \/> : null/);
   });
 });

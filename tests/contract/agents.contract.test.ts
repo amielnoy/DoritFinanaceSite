@@ -1304,10 +1304,22 @@ describe("the letter a customer gets", () => {
         // the pre-built fragments assembled above it. Anything else is a value
         // reaching the HTML raw.
         const bindings = template.match(/\$\{([^}]*)\}/g) ?? [];
-        const allowed = /^\$\{(escapeHtml\(|detailRows|detailsBlock|divider)/;
+        const allowed = /^\$\{(escapeHtml\(|detailRows|detailsBlock|divider|actionBlock\()/;
         for (const binding of bindings) {
           expect(binding, `${fn}: unescaped binding`).toMatch(allowed);
         }
+      });
+
+      it("builds its button only from escaped values and a plain https:// address", () => {
+        // actionBlock is a pre-built fragment like detailsBlock, but it is a
+        // function, so the bindings above cannot see inside it. Its own must be
+        // escapeHtml calls, behind the https-only check.
+        if (!src.includes("function actionBlock(")) return;
+        const block = fnSource(src, "actionBlock");
+        for (const binding of block.match(/\$\{([^}]*)\}/g) ?? []) {
+          expect(binding, `${fn}: actionBlock binds a raw value`).toMatch(/^\$\{escapeHtml\(/);
+        }
+        expect(block).toMatch(/\^https:/);
       });
 
       it("signs with the one contact identity", () => {

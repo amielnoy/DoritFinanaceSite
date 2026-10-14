@@ -6,6 +6,7 @@ Allow: /
 Disallow: /admin/
 Disallow: /login
 Disallow: /oauth/
+Disallow: /masleka
 
 # AI assistants and their crawlers are allowed, deliberately.
 #

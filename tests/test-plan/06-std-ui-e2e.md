@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 69 in `e2e/ui`, of 180 across the whole e2e suite, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 71 in `e2e/ui`, of 182 across the whole e2e suite, run on all four platforms
 
 ---
 
@@ -165,6 +165,19 @@ does.
 The signed-in path is covered by the component cases CMP-ACC-*: the e2e fixture
 answers `/entities/User/me` with 401 unconditionally and has no session path.
 Giving it one is a separate change.
+
+### 3.10 Clearinghouse, dark — `masleka.spec.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| E2E-MSK-001 | "the client page says the service is unavailable, offers no form, and is not indexed" | Opening `/masleka#t=<43 characters>` shows the heading "השירות אינו זמין כרגע" and no `form`; the URL ends exactly `/masleka` (no fragment, so the token is out of the address bar); `meta[name=robots]` contains `noindex`; no `/functions/v1/` request is made |
+| E2E-MSK-002 | "the staff board does not exist in a dark build" | `/admin/masleka` renders the 404 page |
+
+The enabled flow is covered in-process (CMP-MSK-*, the `INT-MSK*` cases); an
+e2e of one request end to end needs the switch on in a test build and belongs
+to PR B. Run once with `VITE_MASLEKA_ENABLED=true` the two cases above must
+fail (the page asks for the link; the board exists) — that is how they are
+known to bite.
 
 ## 4. Pass criteria
 

@@ -91,6 +91,15 @@ describe("the lead functions on Edge", () => {
     }
   });
 
+  it("registers each clearinghouse function without the gateway's JWT check, because each checks its caller itself", () => {
+    const toml = readFileSync(join(REPO_ROOT, "supabase/config.toml"), "utf8");
+    const masleka = names.filter((n) => n.startsWith("masleka-"));
+    expect(masleka.length).toBeGreaterThan(0);
+    for (const fn of masleka) {
+      expect(toml).toMatch(new RegExp(`\\[functions\\.${fn}\\]\\s*\\nverify_jwt = false`));
+    }
+  });
+
   it("ask Google for exactly two scopes", () => {
     const google = readFileSync(join(dir, "_shared/google.ts"), "utf8");
     const scopes = [...google.matchAll(/'(https:\/\/www\.googleapis\.com\/auth\/[^']+)'/g)].map((m) => m[1]);

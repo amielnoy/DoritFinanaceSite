@@ -26,7 +26,38 @@ const TEST_SA = (() => {
   });
 })();
 
+/** The clearinghouse tables, Supabase Auth and the staff RPCs, for the masleka functions. */
+export interface MaslekaFake {
+  /** Rows of `masleka_requests` as stored (copied; read the result's `maslekaRequests`). */
+  requests?: Record<string, unknown>[];
+  /** Bearer token → the user id `GET /auth/v1/user` answers; any other token gets Auth's own refusal (403 bad_jwt). */
+  sessions?: Record<string, string>;
+  /** User id → what `staff_role` answers; absent means null (no membership). */
+  roles?: Record<string, string | null>;
+  /** What `masleka_staff_emails` answers. */
+  staffEmails?: string[];
+  /** `masleka_staff_emails` answers 500. */
+  failStaffEmails?: boolean;
+  /** Inserts into `masleka_access_log` answer 500. */
+  failAccessLog?: boolean;
+  /** Inserts into and updates of `masleka_requests` answer 500. */
+  failRequestWrite?: boolean;
+  /**
+   * A concurrent request wins the race: these fields are merged into every
+   * stored request just before the first PATCH to `masleka_requests` is
+   * matched, as if another submission had landed between this call's read
+   * and its conditional update.
+   */
+  raceBeforePatch?: Record<string, unknown>;
+  /** These fields are merged into every stored request each time a mail is accepted (a write landing mid-run). */
+  afterMail?: Record<string, unknown>;
+  /** PATCHes to `masleka_requests` whose query contains this text answer 500. */
+  failPatchMatching?: string;
+}
+
 export interface EdgeOptions {
+  /** The clearinghouse fakes — see MaslekaFake. */
+  masleka?: MaslekaFake;
   /** PostgREST refuses the insert: `true` for a 500, or a status and body of your own. */
   failLeadWrite?: boolean | { status: number; body: string };
   /** The insert answers a row with no `id`. */
@@ -83,6 +114,12 @@ export interface EdgeInvocation {
   meetings: Record<string, unknown>[];
   calendarEvents: Record<string, unknown>[];
   sheetRows: { tab: string; row: unknown[] }[];
+  /** `masleka_requests` after the call, every write applied. */
+  maslekaRequests: Record<string, unknown>[];
+  /** Rows written to `masleka_access_log`. */
+  accessLog: Record<string, unknown>[];
+  /** Each PATCH to `masleka_requests`: its query string and the fields it set. */
+  requestPatches: { query: string; fields: Record<string, unknown> }[];
   callsTo(fragment: string): FetchCall[];
 }
 
@@ -116,6 +153,54 @@ function compile(name: string): Factory {
   ) as Factory;
 }
 
+/**
+ * Whether a row satisfies a PostgREST filter string — the operators the
+ * masleka functions use, and nothing else: an unknown one throws, so a
+ * function that starts filtering differently fails its tests instead of
+ * matching everything.
+ */
+function postgrestMatch(row: Record<string, unknown>, q: URLSearchParams): boolean {
+  for (const [column, raw] of q.entries()) {
+    if (["select", "order", "limit", "on_conflict"].includes(column)) continue;
+    const value = row[column];
+    if (raw === "is.null") {
+      if (value !== null && value !== undefined) return false;
+      continue;
+    }
+    if (raw === "not.is.null") {
+      if (value === null || value === undefined) return false;
+      continue;
+    }
+    const dot = raw.indexOf(".");
+    const op = raw.slice(0, dot);
+    const operand = raw.slice(dot + 1);
+    const compare = () => {
+      const a = Date.parse(String(value));
+      const b = Date.parse(operand);
+      return Number.isNaN(a) || Number.isNaN(b) ? String(value ?? "").localeCompare(operand) : a - b;
+    };
+    if (op === "eq") {
+      if (String(value) !== operand) return false;
+    } else if (op === "in") {
+      if (!operand.replace(/^\(|\)$/g, "").split(",").includes(String(value))) return false;
+    } else if (op === "gt" || op === "gte" || op === "lt" || op === "lte") {
+      if (value === null || value === undefined) return false;
+      const c = compare();
+      const ok = op === "gt" ? c > 0 : op === "gte" ? c >= 0 : op === "lt" ? c < 0 : c <= 0;
+      if (!ok) return false;
+    } else {
+      throw new Error(`unsupported PostgREST filter in an Edge Function test: ${column}=${raw}`);
+    }
+  }
+  return true;
+}
+
+/** A row cut down to `select=a,b,c`, as PostgREST answers it. */
+function postgrestProject(row: Record<string, unknown>, select: string | null): Record<string, unknown> {
+  if (!select || select === "*") return { ...row };
+  return Object.fromEntries(select.split(",").map((c) => [c, row[c] ?? null]));
+}
+
 /** Invoke an Edge Function with recording upstreams, and report what it did. */
 export async function invokeEdge(name: string, body: unknown, options: EdgeOptions = {}): Promise<EdgeInvocation> {
   if (!compiled.has(name)) compiled.set(name, compile(name));
@@ -129,6 +214,11 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
   // Copies: a PATCH writes into the stored row, and a suite that runs the same
   // fixture against Base44 and then Edge must not see the first run's update.
   const stored: Record<string, unknown>[] = (options.existingLeads ?? []).map((l) => ({ ...l }));
+  const masleka = options.masleka ?? {};
+  const maslekaRequests: Record<string, unknown>[] = (masleka.requests ?? []).map((r) => ({ ...r }));
+  const accessLog: Record<string, unknown>[] = [];
+  const requestPatches: { query: string; fields: Record<string, unknown> }[] = [];
+  let raced = false;
 
   const fetchImpl = async (url: string, init: RequestInit = {}) => {
     const u = String(url);
@@ -153,6 +243,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       const ok = status >= 200 && status < 300;
       if (ok) {
         emails.push({ to: parsed.to, subject: parsed.subject, html: parsed.html, text: parsed.text, body: parsed.text, ics: parsed.ics });
+        if (masleka.afterMail) for (const r of maslekaRequests) Object.assign(r, masleka.afterMail);
       }
       const answer = options.resendResponse ?? (ok ? { ok: true, ids: ["mailer-test-id"] } : { ok: false, failed: ["http_422"] });
       return new Response(JSON.stringify(answer), { status });
@@ -244,6 +335,67 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       else meetings.push({ ...parsed });
       return new Response(null, { status: 201 });
     }
+    if (u === `${SUPABASE_URL}/auth/v1/user` && method === "GET") {
+      const header = String((init.headers as Record<string, string> | undefined)?.Authorization ?? "");
+      const userId = masleka.sessions?.[header.replace(/^Bearer /, "")];
+      return userId
+        ? new Response(JSON.stringify({ id: userId, aud: "authenticated" }), { status: 200 })
+        // As Supabase Auth refuses a bad token: with an error_code. authUser
+        // (_shared/rest.ts) reads a 401/403 without one as a broken service key.
+        : new Response('{"code":403,"error_code":"bad_jwt","msg":"invalid JWT"}', { status: 403 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/rpc/staff_role` && method === "POST") {
+      return new Response(JSON.stringify(masleka.roles?.[parsed.p_user_id] ?? null), { status: 200 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/rpc/masleka_staff_emails` && method === "POST") {
+      if (masleka.failStaffEmails) return new Response('{"message":"simulated"}', { status: 500 });
+      return new Response(JSON.stringify(masleka.staffEmails ?? []), { status: 200 });
+    }
+    const requestsUrl = `${SUPABASE_URL}/rest/v1/masleka_requests`;
+    if (u === requestsUrl && method === "POST") {
+      if (masleka.failRequestWrite) return new Response('{"message":"simulated"}', { status: 500 });
+      const row: Record<string, unknown> = {
+        id: `22222222-2222-4222-8222-${String(maslekaRequests.length + 1).padStart(12, "0")}`,
+        status: "invited",
+        created_at: new Date().toISOString(),
+        code_ciphertext: null,
+        id_ciphertext: null,
+        client_invited_at: null,
+        client_reminded_at: null,
+        ...parsed,
+      };
+      maslekaRequests.push(row);
+      return new Response(JSON.stringify([row]), { status: 201 });
+    }
+    if (u.startsWith(`${requestsUrl}?`)) {
+      const query = u.split("?")[1];
+      const q = new URLSearchParams(query);
+      if (method === "GET") {
+        const rows = maslekaRequests.filter((r) => postgrestMatch(r, q)).map((r) => postgrestProject(r, q.get("select")));
+        return new Response(JSON.stringify(rows), { status: 200 });
+      }
+      if (method === "PATCH") {
+        if (masleka.failRequestWrite) return new Response('{"message":"simulated"}', { status: 500 });
+        if (masleka.failPatchMatching && query.includes(masleka.failPatchMatching)) return new Response('{"message":"simulated"}', { status: 500 });
+        if (masleka.raceBeforePatch && !raced) {
+          raced = true;
+          for (const r of maslekaRequests) Object.assign(r, masleka.raceBeforePatch);
+        }
+        requestPatches.push({ query, fields: parsed });
+        const hit = maslekaRequests.filter((r) => postgrestMatch(r, q));
+        for (const r of hit) Object.assign(r, parsed);
+        const representation = /return=representation/.test(JSON.stringify(init.headers ?? {}));
+        return representation
+          ? new Response(JSON.stringify(hit.map((r) => postgrestProject(r, q.get("select")))), { status: 200 })
+          : new Response(null, { status: 204 });
+      }
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/masleka_access_log` && method === "POST") {
+      if (masleka.failAccessLog) return new Response('{"message":"simulated"}', { status: 500 });
+      const row = { id: accessLog.length + 1, at: new Date().toISOString(), ...parsed };
+      accessLog.push(row);
+      return new Response(JSON.stringify([row]), { status: 201 });
+    }
     throw new Error(`unexpected fetch in an Edge Function test: ${method} ${u}`);
   };
 
@@ -286,6 +438,9 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     meetings,
     calendarEvents,
     sheetRows,
+    maslekaRequests,
+    accessLog,
+    requestPatches,
     callsTo: (fragment) => fetches.filter((f) => f.url.includes(fragment)),
     mailTo(address) {
       const found = emails.filter((e) => e.to === address);

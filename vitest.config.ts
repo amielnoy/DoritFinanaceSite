@@ -26,8 +26,11 @@ export default defineConfig({
     // machine — without this, a component test that mocks the Base44 client
     // would read the live Supabase project instead, and pass or fail on
     // whatever production holds that day. Tests that want a Supabase client
-    // mock `@/api/supabaseClient` explicitly.
-    env: { VITE_SUPABASE_URL: "", VITE_SUPABASE_PUBLISHABLE_KEY: "" },
+    // mock `@/api/supabaseClient` explicitly. The clearinghouse switch is
+    // pinned off the same way: a developer's VITE_MASLEKA_ENABLED=true must not
+    // turn on the header's board link (and its role lookup) in every suite.
+    // Tests that want it on mock `@/config/masleka`.
+    env: { VITE_SUPABASE_URL: "", VITE_SUPABASE_PUBLISHABLE_KEY: "", VITE_MASLEKA_ENABLED: "" },
     // Allure results are written on every run, CI or not: they are what the
     // published report and `npm run allure:open` are built from, and without
     // this the report showed only the Playwright legs — the 174 unit,
