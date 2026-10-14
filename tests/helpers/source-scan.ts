@@ -148,13 +148,20 @@ export function edgeFunctionFiles(): string[] {
 }
 
 /**
- * A handler and the shared modules it imports, as one text — what a scan of
- * "this function's source" means once helpers stop being duplicated into it.
+ * A handler, the modules beside it and the shared modules any of them import,
+ * as one text — what a scan of "this function's source" means once helpers
+ * stop being duplicated into it. The siblings count because a function's
+ * logic lives there too: the chat function logs from turn.ts and sweep.ts,
+ * and a log line there is as much this function's as one in handler.ts.
  */
 export function edgeSource(handler: string): string {
-  const src = read(handler);
-  const shared = [...src.matchAll(/from '\.\.\/_shared\/([a-z-]+\.ts)'/g)].map((m) =>
-    read(join(REPO_ROOT, "supabase/functions/_shared", m[1])),
-  );
-  return [src, ...shared].join("\n");
+  const dir = join(handler, "..");
+  const siblings = readdirSync(dir)
+    .filter((f) => f.endsWith(".ts") && f !== "handler.ts" && f !== "index.ts" && !f.endsWith(".generated.ts"))
+    .sort()
+    .map((f) => read(join(dir, f)));
+  const own = [read(handler), ...siblings];
+  const names = new Set(own.flatMap((src) => [...src.matchAll(/from '\.\.\/_shared\/([a-z-]+\.ts)'/g)].map((m) => m[1])));
+  const shared = [...names].sort().map((name) => read(join(REPO_ROOT, "supabase/functions/_shared", name)));
+  return [...own, ...shared].join("\n");
 }

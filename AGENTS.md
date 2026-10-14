@@ -57,7 +57,8 @@ npx skills add base44/skills
   returns no error, so an empty answer is an error, never a success.
 - `supabase/functions/chat/`: the on-site agents served by our own function (`VITE_CHAT_AGENTS`; the interview first).
   - The prompts' source of truth is `prompts/*.md`. Run `npm run build:chat-prompts` after editing one; a contract test fails while `prompts.generated.ts` is stale.
-  - `interview.md` must render to `needs_interview.jsonc`'s instructions byte for byte apart from the three lines in `tests/helpers/chat-prompt-sources.mjs`, while the `.jsonc` still serves Base44. Change both, or neither.
+  - `interview.md` must render to `needs_interview.jsonc`'s instructions byte for byte apart from the three lines in `tests/helpers/chat-prompt-sources.mjs`, while the `.jsonc` still serves Base44. Change both, or neither. `support.md` is held to `support_agent.jsonc` the same way, apart from `SUPPORT_TOOL_SECTION`.
+  - Each role gets only its own tools (`ROLE_TOOLS` in `handler.ts`); a tool outside the set answers `unknown_tool` and never runs. The FAQ chat's Support-tab row is written by the 15-minute sweep (`sweep.ts`, the `x-chat-sweep` route), never by the model.
   - `_shared/agency.ts` is a pinned copy of `agencyProfile.ts`.
   - The tool names stay `submitLead` and `escalateToHuman`, because the prompt names them.
   - Consent and attribution come from the conversation row, never from the model.
@@ -81,7 +82,7 @@ npx skills add base44/skills
   - **JWT:** every function has a `[functions.<name>]` block with `verify_jwt` in `supabase/config.toml`.
   - **Tests:** `tests/helpers/edge-function.ts` runs a handler in-process, as `base44-function.ts` does for Base44.
   - **Deploy:** CI deploys every function on green `main`, before either production goes out.
-  - **Contracts:** the logging, clock and rid contracts scan them, with the shared modules each one imports.
+  - **Contracts:** the logging, clock and rid contracts scan them, with the modules beside each handler and the shared modules they import. A module that logs through an injected `deps.log` should bind it to a bare `log` first: the scan reads `log(` calls only.
 - `src/lib/analytics.ts`: every event the site sends to GA4, and the one place
   that sends it. Three rules. **Never send personal data:** `track` keeps only
   `location`, `cta`, `method` and `channel` and drops every other parameter, so a

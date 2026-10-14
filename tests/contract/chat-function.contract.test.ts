@@ -6,6 +6,7 @@ import { MAX_MESSAGE_CHARS as CLIENT_MAX_CHARS, MAX_TURNS_PER_CONVERSATION } fro
 import { SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
 import { MAX_CONSENT_VERSION_CHARS, MAX_MESSAGE_CHARS, MAX_TURNS } from "../../supabase/functions/chat/handler.ts";
 import { ESCALATION_REASONS, INTERVIEW_TOOLS } from "../../supabase/functions/chat/tools.ts";
+import { SHEET_OUTCOMES, sheetRow } from "../../supabase/functions/chat/sweep.ts";
 
 const read = (p: string) => readFileSync(join(REPO_ROOT, p), "utf8");
 
@@ -34,6 +35,23 @@ describe("the chat function's tools", () => {
     const block = src.slice(src.indexOf("export const REASONS = {"), src.indexOf("};", src.indexOf("export const REASONS = {")));
     const known = [...block.matchAll(/^\s+([a-z_]+):/gm)].map((m) => m[1]);
     expect([...ESCALATION_REASONS]).toEqual(known);
+  });
+});
+
+describe("the sheet-log sweep → log-support-chat", () => {
+  const src = read("supabase/functions/log-support-chat/handler.ts");
+
+  it("sends only fields log-support-chat reads, and never a phone", () => {
+    const reads = destructured(src);
+    const row = sheetRow([{ role: "user", content: "q" }, { role: "assistant", content: "a" }], false)!;
+    for (const field of ["channel", ...Object.keys(row)]) expect(reads, field).toContain(field);
+    expect(Object.keys(row)).not.toContain("phone");
+  });
+
+  it("files only outcomes log-support-chat knows, so none lands as 'לא ידוע'", () => {
+    const block = src.slice(src.indexOf("const OUTCOMES"), src.indexOf("};", src.indexOf("const OUTCOMES")));
+    const known = [...block.matchAll(/^\s+([a-z_]+):/gm)].map((m) => m[1]);
+    expect([...SHEET_OUTCOMES].sort()).toEqual(known.sort());
   });
 });
 

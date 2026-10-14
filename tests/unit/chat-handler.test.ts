@@ -5,6 +5,7 @@ import type { UsageTotals } from "../../supabase/functions/chat/budget.ts";
 import { createChatHandler, MAX_CONSENT_VERSION_CHARS, type ChatDeps } from "../../supabase/functions/chat/handler.ts";
 import { toFacts, type ChatStore, type ConversationRow, type NewConversation, type UpdateOptions } from "../../supabase/functions/chat/store.ts";
 import { createToolRunner, type EdgeHandler, type ToolCallContext, type ToolOutcome } from "../../supabase/functions/chat/tools.ts";
+import { createSheetLogSweep } from "../../supabase/functions/chat/sweep.ts";
 
 const TOKEN = "a".repeat(64);
 const clock = { now: Date.UTC(2026, 9, 13, 9, 0) };
@@ -63,6 +64,18 @@ class MemoryStore implements ChatStore {
     if (c.busy_until !== null && Date.parse(c.busy_until) >= Date.parse(nowIso)) return null;
     Object.assign(c, { turns: turns + 1, busy_until: leaseUntilIso });
     return { ...c };
+  }
+  /** The pick and the filtered PATCH: role in roles, not eval, unlogged, idle before the cutoff, no live lease; longest idle first, `limit` of them. */
+  async claimSheetLogs(roles: readonly string[], cutoffIso: string, nowIso: string, limit: number) {
+    this.check();
+    const due = [...this.conversations.values()]
+      .filter((c) => roles.includes(c.role) && !c.is_eval && c.sheet_logged_at == null)
+      .filter((c) => Date.parse(c.last_message_at) < Date.parse(cutoffIso))
+      .filter((c) => c.busy_until === null || Date.parse(c.busy_until) < Date.parse(nowIso))
+      .sort((a, b) => Date.parse(a.last_message_at) - Date.parse(b.last_message_at))
+      .slice(0, limit);
+    for (const c of due) c.sheet_logged_at = nowIso;
+    return due.map((c) => ({ ...c }));
   }
   async releaseTurn(id: string, leaseUntilIso: string, lastMessageAt: string) {
     this.check();
@@ -128,6 +141,8 @@ function setup(over: Partial<ChatDeps> = {}, steps: (ModelResponse | Error)[] = 
     evalToken: "eval-secret",
     newToken: () => TOKEN,
     notifyBudgetReached: vi.fn(async () => undefined),
+    sweepToken: "sweep-secret",
+    sweepSheetLogs: vi.fn(async () => 2),
     ...over,
   };
   return { deps, store, model, chat: createChatHandler(deps) };
@@ -183,7 +198,7 @@ describe("the first message", () => {
 
   it("refuses an agent the function does not serve, an empty message, and a long one", async () => {
     const { chat } = setup();
-    expect((await json(await chat(post({ ...first(), agent: "support_agent" })))).body.code).toBe("unknown_agent");
+    expect((await json(await chat(post({ ...first(), agent: "no_such_agent" })))).body.code).toBe("unknown_agent");
     expect((await json(await chat(post(first("   "))))).body.code).toBe("empty");
     expect((await json(await chat(post(first("א".repeat(1001)))))).body.code).toBe("too_long");
   });
@@ -718,5 +733,176 @@ describe("HTTP", () => {
     const { chat } = setup();
     const res = await chat(new Request("https://edge.test/functions/v1/chat", { method: "POST", body: "not json" }));
     expect([res.status, ((await res.json()) as Record<string, unknown>).code]).toEqual([400, "unknown_agent"]);
+  });
+});
+
+describe("the support role", () => {
+  const firstSupport = (message = "מה זה דמי ניהול?") => ({ ...first(message), agent: "support_agent" });
+
+  it("serves support_agent with the support prompt and tools", async () => {
+    const { chat, model, store } = setup({}, [text("דמי ניהול הם…")]);
+    const { status } = await json(await chat(post(firstSupport())));
+    expect(status).toBe(200);
+    const [conv] = [...store.conversations.values()];
+    expect(conv.role).toBe("support");
+    expect(model.calls[0].tools.map((t) => t.name)).toEqual(["listArticles", "readArticle", "escalateToHuman"]);
+    expect(model.calls[0].system[1].text).toContain("listArticles");
+  });
+
+  it("never runs a tool its role was not given, even when the model names one", async () => {
+    const runTool = vi.fn();
+    const { chat, store } = setup({ runTool }, [toolUse("submitLead", { stage: "complete", name: "x", phone: "0500000000" }), text("…")]);
+    await chat(post(firstSupport()));
+    expect(runTool).not.toHaveBeenCalled();
+    expect(store.messages.map((m) => m.content)).toContain("submitLead: error");
+    expect([...store.conversations.values()][0].status).toBe("open");
+  });
+
+  it("stores a made-up tool name no longer than the log line keeps it", async () => {
+    const { chat, store } = setup({}, [toolUse("x".repeat(500), {}), text("…")]);
+    await chat(post(firstSupport()));
+    expect(store.messages.find((m) => m.role === "tool")?.content).toBe(`${"x".repeat(40)}: error`);
+  });
+
+  it("the interview is gated the same way: it never reads articles, whatever the model names", async () => {
+    const runTool = vi.fn();
+    const { chat, store } = setup({ runTool }, [toolUse("listArticles", {}), toolUse("readArticle", { slug: "dmei-nihul" }), text("…")]);
+    await chat(post(first()));
+    expect(runTool).not.toHaveBeenCalled();
+    expect(store.messages.filter((m) => m.role === "tool").map((m) => m.content)).toEqual(["listArticles: error", "readArticle: error"]);
+  });
+});
+
+describe("the sweep route", () => {
+  const sweepReq = (token: string | null, method = "POST") =>
+    new Request("https://edge.test/functions/v1/chat", {
+      method,
+      headers: { "content-type": "application/json", ...(token === null ? {} : { "x-chat-sweep": token }) },
+      ...(method === "POST" ? { body: JSON.stringify(first()) } : {}),
+    });
+
+  it("runs the sweep for the right token, and nothing of the chat", async () => {
+    const { chat, deps, model, store } = setup();
+    const { status, body } = await json(await chat(sweepReq("sweep-secret")));
+    expect([status, body.ok, body.logged]).toEqual([200, true, 2]);
+    expect(typeof body.rid).toBe("string");
+    expect(deps.sweepSheetLogs).toHaveBeenCalledTimes(1);
+    expect(deps.sweepSheetLogs).toHaveBeenCalledWith(body.rid);
+    expect(model.calls).toHaveLength(0);
+    expect(store.conversations.size).toBe(0);
+    expect(deps.allow).not.toHaveBeenCalled();
+  });
+
+  it.each([["a wrong token", "nope"], ["an empty token", ""], ["the eval token", "eval-secret"]])("refuses %s with 401 and runs nothing", async (_n, token) => {
+    const { chat, deps, model, store } = setup();
+    const { status, body } = await json(await chat(sweepReq(token)));
+    expect([status, body.ok, body.code]).toEqual([401, false, "unauthorized"]);
+    expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
+    expect(model.calls).toHaveLength(0);
+    expect(store.conversations.size).toBe(0);
+  });
+
+  it("refuses every sweep when the function has no token configured", async () => {
+    const { chat, deps } = setup({ sweepToken: "" });
+    expect((await chat(sweepReq(""))).status).toBe(401);
+    expect((await chat(sweepReq("anything"))).status).toBe(401);
+    expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
+  });
+
+  it("is a POST route only", async () => {
+    const { chat, deps } = setup();
+    expect((await chat(sweepReq("sweep-secret", "GET"))).status).toBe(405);
+    expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
+  });
+
+  it("answers 500, not a chat reply, when the sweep itself throws", async () => {
+    const { chat, model } = setup({ sweepSheetLogs: vi.fn(async () => { throw new Error("select_http_500"); }) });
+    const { status, body } = await json(await chat(sweepReq("sweep-secret")));
+    expect([status, body.ok, body.code]).toEqual([500, false, "unavailable"]);
+    expect(body).not.toHaveProperty("reply");
+    expect(JSON.stringify(body)).not.toContain("select_http_500");
+    expect(model.calls).toHaveLength(0);
+  });
+
+  it("leaves a chat request without the header to the chat", async () => {
+    const { chat, deps } = setup();
+    expect((await json(await chat(post(first())))).status).toBe(200);
+    expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
+  });
+});
+
+describe("the sheet-log sweep over the store (Review Focus 3 and 4)", () => {
+  const ago = (minutes: number) => new Date(clock.now - minutes * 60_000).toISOString();
+  const later = (minutes: number) => new Date(clock.now + minutes * 60_000).toISOString();
+
+  async function seeded() {
+    const store = new MemoryStore();
+    const ids: Record<string, string> = {};
+    const add = async (name: string, over: Partial<ConversationRow>) => {
+      const c = await store.createConversation({
+        agency_id: "a",
+        role: "support",
+        token_hash: "h",
+        consent_version: "2026-10-agents-v6",
+        consent_at: ago(120),
+        attribution: { channel: "", campaign: "", landingPath: "" },
+        is_eval: false,
+        turns: 1,
+        busy_until: ago(100),
+      });
+      Object.assign(store.conversations.get(c.id)!, { busy_until: null, last_message_at: ago(126), ...over });
+      store.messages.push({ conversation_id: c.id, agency_id: "a", role: "user", content: `שאלה ${name}` }, { conversation_id: c.id, agency_id: "a", role: "assistant", content: "תשובה" });
+      ids[name] = c.id;
+    };
+    await add("idle", {});
+    await add("lapsed_lease", { busy_until: ago(1) });
+    await add("recent", { last_message_at: ago(10) });
+    await add("not_yet_closed", { last_message_at: ago(119) });
+    await add("within_margin", { last_message_at: ago(124) });
+    await add("in_a_turn", { busy_until: later(2) });
+    await add("eval", { is_eval: true });
+    await add("interview", { role: "interview" });
+    await add("already_logged", { sheet_logged_at: ago(20) });
+    const logSupportChat = vi.fn(async (_req: Request) => Response.json({ ok: true, rid: "l", sheet: "נרשם" }));
+    const sweep = () => createSheetLogSweep({ store, logSupportChat, sheetConfigured: () => true, now: () => clock.now, log: () => undefined })("r");
+    return { store, ids, logSupportChat, sweep };
+  }
+
+  it("logs only support conversations idle past the 2-hour close and its margin that no turn holds, never an evaluation or a logged one", async () => {
+    const { store, ids, logSupportChat, sweep } = await seeded();
+    expect(await sweep()).toBe(2);
+    const topics = await Promise.all(logSupportChat.mock.calls.map(async ([req]) => ((await (req as Request).json()) as { topic: string }).topic));
+    expect(topics.sort()).toEqual(["שאלה idle", "שאלה lapsed_lease"]);
+    expect(store.conversations.get(ids.idle)!.sheet_logged_at).toBe(new Date(clock.now).toISOString());
+    for (const name of ["recent", "not_yet_closed", "within_margin", "in_a_turn", "eval", "interview"]) expect(store.conversations.get(ids[name])!.sheet_logged_at ?? null, name).toBeNull();
+  });
+
+  it("logs each conversation once when two sweeps overlap", async () => {
+    const { logSupportChat, sweep } = await seeded();
+    const [a, b] = await Promise.all([sweep(), sweep()]);
+    expect(a + b).toBe(2);
+    expect(logSupportChat).toHaveBeenCalledTimes(2);
+    expect(await sweep()).toBe(0);
+  });
+
+  it("logs the whole conversation: once logged, its next message is refused as closed", async () => {
+    const started = clock.now;
+    try {
+      const { chat, store } = setup({}, [text("דמי ניהול הם…")]);
+      const opened = await json(await chat(post({ ...first("מה זה דמי ניהול?"), agent: "support_agent" })));
+      const logSupportChat = vi.fn(async (_req: Request) => Response.json({ ok: true, rid: "l", sheet: "נרשם" }));
+      const sweep = createSheetLogSweep({ store, logSupportChat, sheetConfigured: () => true, now: () => clock.now, log: () => undefined });
+
+      clock.now = started + 124 * 60_000;
+      expect(await sweep("r1")).toBe(0);
+      clock.now = started + 126 * 60_000;
+      expect(await sweep("r2")).toBe(1);
+
+      const again = await json(await chat(post({ agent: "support_agent", conversationId: opened.body.conversationId, token: TOKEN, message: "ועוד שאלה" })));
+      expect([again.status, again.body.code]).toEqual([409, "closed"]);
+      expect(store.messages.filter((m) => m.role === "user")).toHaveLength(1);
+    } finally {
+      clock.now = started;
+    }
   });
 });

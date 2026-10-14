@@ -1,6 +1,10 @@
 /**
  * The chat function: one visitor message in, one reply out, for the agents it
- * serves (the interview, so far). docs/superpowers/specs/2026-10-13-chat-off-base44-design.md.
+ * serves (the interview and the FAQ chat). docs/superpowers/specs/2026-10-13-chat-off-base44-design.md.
+ *
+ * One more route shares the URL: a POST carrying `x-chat-sweep` is the
+ * 15-minute cron's (migration 20261018000000), answered by the sheet-log sweep
+ * alone and never read as a chat message.
  *
  * Everything with a side effect comes in through ChatDeps, so the flow below
  * is tested with fakes; deps.ts wires the real ones and is loaded on the first
@@ -16,14 +20,14 @@ import type { ModelClient } from './anthropic.ts';
 import { monthKey, monthStartIso, spendUsd } from './budget.ts';
 import { systemBlocks, type ChatRole } from './prompt.ts';
 import { toFacts, type ChatStore, type ConversationRow } from './store.ts';
-import { INTERVIEW_TOOLS, type ConversationStatus, type ToolCallContext, type ToolDefinition, type ToolOutcome, type ToolRunner } from './tools.ts';
+import { INTERVIEW_TOOLS, SUPPORT_TOOLS, type ConversationStatus, type ToolCallContext, type ToolDefinition, type ToolOutcome, type ToolRunner } from './tools.ts';
 import { runTurn, toModelHistory, TurnFailure, type TurnResult } from './turn.ts';
 
 const FN = 'chat';
 const log = createLog(FN);
 
-export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview' };
-const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS };
+export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview', support_agent: 'support' };
+const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS, support: SUPPORT_TOOLS };
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_TURNS = 40;
 export const IDLE_MS = 2 * 60 * 60 * 1000;
@@ -56,6 +60,10 @@ export interface ChatDeps {
   evalToken: string;
   newToken(): string;
   notifyBudgetReached(rid: string): Promise<void>;
+  /** CHAT_SWEEP_TOKEN: the Vault-held header the 15-minute cron sends. Empty refuses every sweep. */
+  sweepToken: string;
+  /** One sheet-log tick (sweep.ts); resolves to how many conversations reached the sheet. */
+  sweepSheetLogs(rid: string): Promise<number>;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -78,6 +86,21 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
     try {
       log('info', 'request.start', { rid });
       if (req.method !== 'POST') return refuse(405, 'method');
+
+      // The cron's route, decided by the header alone, before the body is read:
+      // a request carrying it never reaches the chat, whatever else it holds.
+      const sweepHeader = req.headers.get('x-chat-sweep');
+      if (sweepHeader !== null) {
+        if (!deps.sweepToken || sweepHeader !== deps.sweepToken) return refuse(401, 'unauthorized');
+        try {
+          const logged = await deps.sweepSheetLogs(rid);
+          log('info', 'request.end', { rid, ms: Date.now() - startedAt, sweep: true, logged });
+          return respond(200, { ok: true, logged });
+        } catch (e) {
+          log('error', 'sweep.failed', { rid, ms: Date.now() - startedAt, err: String((e as Error)?.message ?? e).slice(0, 200) });
+          return respond(500, { ok: false, code: 'unavailable' });
+        }
+      }
 
       const input = ((await req.json().catch(() => null)) ?? {}) as Record<string, unknown>;
       const agent = str(input.agent);
@@ -207,7 +230,13 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
             tools: ROLE_TOOLS[role],
             history,
             runTool: async (name, args) => {
-              const outcome = await deps.runTool(name, args, ctx);
+              // A tool outside this conversation's role is never run, whatever the model names.
+              const offered = ROLE_TOOLS[role].some((t) => t.name === name);
+              if (!offered) log('warn', 'tool.not_offered', { rid, conversation: id, tool: String(name).slice(0, 40) });
+              // A name the model made up is stored as the tool row's label: as short as the log keeps it.
+              const outcome: ToolOutcome = offered
+                ? await deps.runTool(name, args, ctx)
+                : { name: String(name).slice(0, 40), status: 'error', isError: true, forModel: JSON.stringify({ ok: false, error: 'unknown_tool' }) };
               await persistOutcome(outcome);
               return outcome;
             },
