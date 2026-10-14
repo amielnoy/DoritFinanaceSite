@@ -63,6 +63,11 @@ describe("computeBlogSeoConfig", () => {
     expect(config.tags).toEqual(["פנסיה", "חיסכון"]);
   });
 
+  it("shares the article's own og_image ahead of its cover image", () => {
+    const { image } = computeBlogSeoConfig({ ...post, og_image: "https://cdn.example/share.jpg" });
+    expect(image).toBe("https://cdn.example/share.jpg");
+  });
+
   it("falls back to the default OG image when the post has none", () => {
     const { image } = computeBlogSeoConfig({ ...post, image_url: undefined });
     expect(image).not.toBe(post.image_url);

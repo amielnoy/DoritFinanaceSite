@@ -57,6 +57,9 @@ function parseArticle(raw) {
     tags: meta.tags ?? "",
     action_time: meta.action_time ?? "",
     image_url: meta.image_url ?? "",
+    // Supabase only (mirrorRow), like the slug: Base44's BlogPost has neither.
+    cta_headline: meta.cta_headline ?? "",
+    og_image: meta.og_image ?? "",
     published: meta.published === "true",
     body: m[2].trim(),
   };
@@ -101,7 +104,15 @@ export function planSeed(articles, existing) {
 
 /** The Supabase row for a step, once Base44 has given it an id. */
 export function mirrorRow(step, base44Id) {
-  return { ...step.payload, published: step.published, slug: step.article.slug, base44_id: base44Id };
+  return {
+    ...step.payload,
+    published: step.published,
+    slug: step.article.slug,
+    // null, not "": the columns refuse an empty string (20261020000000_blog_cta_og.sql).
+    cta_headline: step.article.cta_headline || null,
+    og_image: step.article.og_image || null,
+    base44_id: base44Id,
+  };
 }
 
 function loadArticles() {

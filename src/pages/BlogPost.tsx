@@ -13,6 +13,8 @@ import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { useSeo } from "@/lib/seo";
 import { articlePath } from "@/lib/articlePath";
 import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "@/lib/blogSeo";
+import { splitAfterParagraph } from "@/lib/articleCta";
+import ArticleContactBox from "@/components/dorit/blog/ArticleContactBox";
 
 export default function BlogPost() {
   /** A slug, or — from a link made before slugs — a Base44 id or a uuid. */
@@ -114,9 +116,8 @@ export default function BlogPost() {
             </div>
           )}
 
-          <div className="mt-10 blog-body">
-            <ReactMarkdown>{post.body || ""}</ReactMarkdown>
-          </div>
+          <ArticleBody post={post} />
+          <ArticleContactBox post={post} placement="article_end" />
 
           <div className="mt-10">
             <CredentialsStrip />
@@ -127,5 +128,24 @@ export default function BlogPost() {
       </div>
       <Footer />
     </article>
+  );
+}
+
+/** The body, with a contact box after its third paragraph when more follows. */
+function ArticleBody({ post }: { post: Article }) {
+  const split = splitAfterParagraph(post.body || "", 3);
+  if (!split) {
+    return (
+      <div className="mt-10 blog-body">
+        <ReactMarkdown>{post.body || ""}</ReactMarkdown>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-10 blog-body">
+      <ReactMarkdown>{split[0]}</ReactMarkdown>
+      <ArticleContactBox post={post} placement="article_inline" />
+      <ReactMarkdown>{split[1]}</ReactMarkdown>
+    </div>
   );
 }

@@ -70,6 +70,24 @@ describe("mirrorRow", () => {
   it("sends an empty action time for an article that has none", () => {
     expect(parseArticle('---\ntitle: "כותרת"\n---\nגוף').action_time).toBe("");
   });
+
+  it("carries cta_headline and og_image to Supabase only (Base44's BlogPost has neither)", () => {
+    const parsed = parseArticle(
+      '---\ntitle: "כותרת"\ncta_headline: "רוצים לדעת כמה אתם משלמים?"\nog_image: "https://cdn.example/share.jpg"\n---\nגוף',
+    );
+    const [step] = planSeed([{ ...article(), ...parsed }], []);
+    expect(step.payload).not.toHaveProperty("cta_headline");
+    expect(step.payload).not.toHaveProperty("og_image");
+    expect(mirrorRow(step, "b44-new")).toMatchObject({
+      cta_headline: "רוצים לדעת כמה אתם משלמים?",
+      og_image: "https://cdn.example/share.jpg",
+    });
+  });
+
+  it("mirrors an article without them as null, which the column checks accept (an empty string is refused)", () => {
+    const [step] = planSeed([{ ...article(), ...parseArticle('---\ntitle: "כותרת"\n---\nגוף') }], []);
+    expect(mirrorRow(step, "b44-new")).toMatchObject({ cta_headline: null, og_image: null });
+  });
 });
 
 describe("readExecResult", () => {
