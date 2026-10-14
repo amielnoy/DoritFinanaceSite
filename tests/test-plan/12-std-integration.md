@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 151 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 614 including `it.each` / `describe.each` expansions
+**Location:** `tests/integration/` · **Cases:** 154 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 617 including `it.each` / `describe.each` expansions
 
 ---
 
@@ -352,6 +352,17 @@ rather than lost. Edge only: the Base44 rollback backend reports
 | INT-LEAD-103 | "does not fill in a lead older than half an hour" |
 | INT-LEAD-104 | "does not fill in another person's lead on the same phone" |
 | INT-LEAD-105 | "does not fill in a lead that was never an interview" |
+
+### 4.12c `submit-lead` — urgency and the clearinghouse report — `INT-LEAD-106..108`
+
+The questionnaire's `urgency` and `clearinghouse_report` (2026-10-14) are in the
+profile and the mail (`INTERVIEW_EXTRA`), outside the completeness count.
+
+| ID | Title |
+|---|---|
+| INT-LEAD-106 | "puts 🔴 דחוף at the head of Dorit's mail when the visitor said it is urgent" |
+| INT-LEAD-107 | "leaves the subject as it was for any other urgency" |
+| INT-LEAD-108 | "records whether a clearinghouse report exists, without taking it for the pull" |
 
 ### 4.13 `submitLead` — how complete the interview was — `INT-LEAD-073..075`
 
