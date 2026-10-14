@@ -46,6 +46,10 @@ function service(over: Partial<MaslekaPort> = {}): MaslekaPort {
     relink: vi.fn(async () => ({ requestId: "r1", link: LINK2, invited: false })),
     reveal: vi.fn(async (_id: string, field: "id" | "code") => (field === "id" ? "000000018" : "AB12-CD34")),
     markSubmitted: vi.fn(async () => {}),
+    listSnapshots: vi.fn(async () => []),
+    getSnapshot: vi.fn(async () => null),
+    listReviews: vi.fn(async () => []),
+    decide: vi.fn(async () => {}),
     ...over,
   };
 }
@@ -359,6 +363,10 @@ describe("<MaslekaBoard /> — acting", () => {
     expect(svc.create).toHaveBeenCalledWith({ clientName: "משה כהן", contactEmail: "moshe@example.com", sendInvite: true });
     expect(await screen.findByDisplayValue(LINK)).toBeInTheDocument();
     expect(screen.getByText(/הקישור נשלח במייל ללקוח/)).toBeInTheDocument();
+    const open = screen.getByRole("link", { name: "פתיחת הקישור" });
+    expect(open).toHaveAttribute("href", LINK);
+    expect(open).toHaveAttribute("target", "_blank");
+    expect(open).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("makes one הגשתי call for a double click that lands before the button is disabled", async () => {
@@ -430,11 +438,34 @@ describe("<MaslekaBoard /> — acting", () => {
     expect(screen.queryByText(/הקישור נשלח במייל ללקוח/)).not.toBeInTheDocument();
   });
 
+  it("links a completed request to its analysis, and lists every stored report", async () => {
+    const done = row({ id: "r7", clientName: "אורי לוי", status: "completed", completedAt: iso(-HOUR) });
+    const svc = service({
+      list: vi.fn(async () => [...ROWS, done]),
+      listSnapshots: vi.fn(async () => [
+        { id: "s7", requestId: "r7", clientName: "אורי לוי", takenAt: iso(-2 * HOUR) },
+        { id: "s8", requestId: null, clientName: "לקוח מהטלפון", takenAt: iso(-3 * HOUR) },
+      ]),
+    });
+    renderBoard({ service: svc, clipboard: null });
+    expect(await column("הושלם").findByRole("link", { name: "לניתוח ולהמלצות" })).toHaveAttribute("href", "/admin/masleka/analysis/s7");
+    const analyses = within(screen.getByRole("region", { name: "ניתוחים" }));
+    expect(analyses.getByRole("link", { name: "לקוח מהטלפון" })).toHaveAttribute("href", "/admin/masleka/analysis/s8");
+  });
+
+  it("keeps the board working when the reports cannot be read", async () => {
+    renderBoard({ service: service({ listSnapshots: vi.fn(async () => Promise.reject(new Error("no table"))) }), clipboard: null });
+    expect(await screen.findByText("לא הצלחנו לטעון את הניתוחים.")).toBeInTheDocument();
+    expect(await column("ממתין להגשה").findByRole("button", { name: "העתק ת״ז" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("issues a fresh link for an invited client", async () => {
     const svc = service();
     renderBoard({ service: svc, clipboard: null });
     await userEvent.click(await column("הוזמנו — ממתינים לקוד").findByRole("button", { name: "קישור חדש" }));
     expect(svc.relink).toHaveBeenCalledWith("r1");
     expect(await screen.findByDisplayValue(LINK2)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "פתיחת הקישור" })).toHaveAttribute("href", LINK2);
   });
 });

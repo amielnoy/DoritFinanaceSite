@@ -3,6 +3,7 @@ import { MaslekaError } from "@/services/ports";
 import {
   MASLEKA_COLUMNS,
   OPEN_STATUSES,
+  SNAPSHOT_SUMMARY_COLUMNS,
   SupabaseMaslekaService,
   type SupabaseMaslekaClient,
 } from "@/services/supabase/SupabaseMaslekaService";
@@ -211,5 +212,102 @@ describe("UnconfiguredMaslekaService", () => {
     await expect(service.submitCode("t", "c", "i")).rejects.toMatchObject({ reason: "unavailable" });
     await expect(service.list()).rejects.toMatchObject({ reason: "unavailable" });
     expect(await service.myRole()).toBeNull();
+  });
+});
+
+/**
+ * A recording stand-in for the clearinghouse tables: every builder call is
+ * logged, and the chain ends in `answer`.
+ */
+function tables(answer: { data?: unknown; error: { message: string } | null }) {
+  const calls: unknown[][] = [];
+  const chain = (): unknown =>
+    new Proxy(
+      {},
+      {
+        get: (_t, name: string) => {
+          if (name === "then") return (resolve: (v: unknown) => void) => resolve(answer);
+          return (...args: unknown[]) => {
+            calls.push([name, ...args]);
+            return chain();
+          };
+        },
+      },
+    );
+  const client = { from: (table: string) => (calls.push(["from", table]), chain()) } as unknown as SupabaseMaslekaClient;
+  return { calls, service: new SupabaseMaslekaService(client) };
+}
+
+const SNAPSHOT_DATA = {
+  takenAt: "2026-10-12T09:00:00.000Z",
+  interfaceVersion: "9.0",
+  client: { idLast4: "0018", age: 40, hasDependants: false },
+  accounts: [{ id: "p1", kind: "pension", provider: "מגדל", planName: "x", active: true, balance: 1000, coverage: {} }],
+};
+
+describe("SupabaseMaslekaService — analyses", () => {
+  it("lists snapshots by their summary columns, newest first, without the report itself", async () => {
+    const { calls, service } = tables({
+      data: [{ id: "s1", request_id: "r1", client_name: "רונית", taken_at: "2026-10-12T09:00:00Z", data: { secret: 1 } }],
+      error: null,
+    });
+    expect(await service.listSnapshots()).toEqual([
+      { id: "s1", requestId: "r1", clientName: "רונית", takenAt: "2026-10-12T09:00:00Z" },
+    ]);
+    expect(calls).toContainEqual(["from", "clearinghouse_snapshots"]);
+    expect(calls).toContainEqual(["select", SNAPSHOT_SUMMARY_COLUMNS]);
+    expect(SNAPSHOT_SUMMARY_COLUMNS).not.toContain("data");
+    expect(calls).toContainEqual(["order", "created_at", { ascending: false }]);
+  });
+
+  it("reads one snapshot through readSnapshot, and calls an unreadable one missing", async () => {
+    const good = tables({ data: { id: "s1", request_id: null, client_name: "רונית", taken_at: "t", data: SNAPSHOT_DATA }, error: null });
+    const stored = await good.service.getSnapshot("s1");
+    expect(stored?.snapshot.accounts).toHaveLength(1);
+    expect(good.calls).toContainEqual(["eq", "id", "s1"]);
+
+    const bad = tables({ data: { id: "s1", client_name: "x", taken_at: "t", data: { accounts: "no" } }, error: null });
+    expect(await bad.service.getSnapshot("s1")).toBeNull();
+    expect(await tables({ data: null, error: null }).service.getSnapshot("s1")).toBeNull();
+  });
+
+  it("reads decisions, dropping a row that is not one", async () => {
+    const { service } = tables({
+      data: [
+        { finding_key: "a:", status: "approved", final_text: null, reviewed_at: "t" },
+        { finding_key: "b:", status: "maybe", final_text: null, reviewed_at: "t" },
+      ],
+      error: null,
+    });
+    expect(await service.listReviews("s1")).toEqual([{ findingKey: "a:", status: "approved", finalText: null, reviewedAt: "t" }]);
+  });
+
+  it("upserts a decision on (snapshot, finding), and deletes it to go back to draft", async () => {
+    const up = tables({ error: null });
+    await up.service.decide("s1", "a:", { status: "approved", finalText: "נוסח" });
+    expect(up.calls).toContainEqual([
+      "upsert",
+      { snapshot_id: "s1", finding_key: "a:", status: "approved", final_text: "נוסח" },
+      { onConflict: "snapshot_id,finding_key" },
+    ]);
+    const down = tables({ error: null });
+    await down.service.decide("s1", "a:", null);
+    expect(down.calls).toEqual([["from", "clearinghouse_reviews"], ["delete"], ["eq", "snapshot_id", "s1"], ["eq", "finding_key", "a:"]]);
+  });
+
+  it("throws rather than showing an empty screen when the database refuses", async () => {
+    const refused = { error: { message: "permission denied" } };
+    await expect(tables(refused).service.listSnapshots()).rejects.toBeInstanceOf(MaslekaError);
+    await expect(tables(refused).service.getSnapshot("s1")).rejects.toBeInstanceOf(MaslekaError);
+    await expect(tables(refused).service.listReviews("s1")).rejects.toBeInstanceOf(MaslekaError);
+    await expect(tables(refused).service.decide("s1", "a:", null)).rejects.toBeInstanceOf(MaslekaError);
+  });
+
+  it("is never available without Supabase", async () => {
+    const service = new UnconfiguredMaslekaService();
+    await expect(service.listSnapshots()).rejects.toMatchObject({ reason: "unavailable" });
+    await expect(service.getSnapshot()).rejects.toMatchObject({ reason: "unavailable" });
+    await expect(service.listReviews()).rejects.toMatchObject({ reason: "unavailable" });
+    await expect(service.decide()).rejects.toMatchObject({ reason: "unavailable" });
   });
 });

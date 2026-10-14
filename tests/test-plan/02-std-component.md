@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 280 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 310 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 301 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 331 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -161,6 +161,8 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 | CMP-ERB-003 | "isolates the failure: sibling trees still render" | Sibling text present; section wording ("החלק הזה") |
 | CMP-ERB-004 | "uses page wording for the app-level boundary" | `scope="page"` message says "הדף" |
 | CMP-ERB-005 | "recovers when its resetKey changes, so leaving a broken page is not a dead end" | After `resetKey` changes (the app passes the path), the fallback is gone and the new children render |
+| CMP-ERB-006 | "offers a fresh load, past the cache, in the fallback" | "לטעון את הדף מחדש" calls `reloadFresh` |
+| CMP-ERB-007 | "asks whether the build was replaced when a page chunk failed to load, and only then" | A chunk error → `checkFreshness` once; an ordinary render error → not at all |
 
 ### 4.11 `<Testimonials />` — `tests/component/testimonials.test.tsx`
 
@@ -392,12 +394,14 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-MSKB-017 | "tells a staff member whose access was removed" | Alert "ההרשאה שלך הוסרה" (`staffMessage`) |
 | CMP-MSKB-018 | "words a failed list or a refused request in the staff vocabulary" | A forbidden list and an `invalid_email` create both say `staffMessage`'s text |
 | CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
-| CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל" |
-| CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown |
+| CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל"; "פתיחת הקישור" opens it in a new tab, `noopener noreferrer` |
+| CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown, and "פתיחת הקישור" points at it |
 | CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves before the answer: never copied, never shown, no "הועתק ✓" when the row returns |
 | CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks in one tick → one `markSubmitted`, one refetch |
 | CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |
 | CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | "הועתק ✓" gone right after `markSubmitted('r2')`, with the refetch rejecting |
+| CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | "לניתוח ולהמלצות" → `/admin/masleka/analysis/s7`; region "ניתוחים" lists a report with no request |
+| CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | A quiet "לא הצלחנו לטעון את הניתוחים."; the columns still work; no alert |
 | CMP-MSKB-026 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
 | CMP-MSKB-027 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
 
@@ -448,40 +452,37 @@ renders as on a desktop, which is what every other component test relies on.
 | CMP-CHSUP-001 | "shows the FAQ chat's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS` entry is on screen; the interview's fourth point, `CONSENT.points[2]` and the old support fourth point are not |
 | CMP-CHSUP-002 | "sends the first message as support_agent with the v6 stamp, and shows the reply" | After consent, start and send: `invoke("chat", …)` with `agent: support_agent` and `consentVersion: CHAT_FUNCTION_CONSENT_VERSION`; the reply is shown |
 
-### 4.24 `<NeedsWizard />` — two steps to a lead, then four optional questions — `tests/component/needs-wizard.test.tsx`
+### 4.24 `<NeedsWizard />` — three taps, the contact step, then three optional questions — `tests/component/needs-wizard.test.tsx`
 
-The lead-generation brief of 2026-10-14: the concern, then a name and a mobile,
-and the lead is saved (`stage: "complete"`, Dorit mailed); then, offered only
-when `services.leads.updatesInterviews`, life stage, goal, clearinghouse and
-time, saved as `stage: "details"` into the same lead (submit-lead, INT §
-"the questionnaire's details"). Below md a single-choice step (the concern, life
-stage, goal) moves on when an answer is chosen by a tap, Space or Enter, 250 ms
-later and through `forward`; never by an arrow key. `services` is mocked
-(`submitInterview`, `escalate`, a switchable `updatesInterviews`).
+The brief of 2026-10-14: the concern, life stage and urgency (each moves on 250 ms
+after a tap, on every width), then a name and a mobile — the lead is saved
+(`stage: "complete"`) and Dorit mailed; then, offered only when
+`services.leads.updatesInterviews`, goal, the clearinghouse report (with the
+pull offered only without one) and a time of day plus notes, saved as
+`stage: "details"` into the same lead. No list of step names: a progress bar and
+"שאלה N מתוך 3". `services` is mocked.
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-NWZ-001 | "asks what is on the visitor's mind first" | Heading "מה מעסיק אותך?", "שלב 1 מתוך 2" |
-| CMP-NWZ-002 | "saves the lead when the second step is sent — the topic, the name, the mobile — and counts it once" | One `submitInterview` with `stage: "complete"`, name, phone, `profile.concern`; `wizardCompleted` once; heading "נשמר — תודה" |
-| CMP-NWZ-003 | "reports each required step to GA4 by its number only" | `wizardStep` 1, 2 |
-| CMP-NWZ-004 | "has no back button on the first step, and a real one on the second" | Back from contact keeps the concern checked |
-| CMP-NWZ-005 | "marks the current stage for assistive tech" | Two stages; the first `aria-current="step"` |
-| CMP-NWZ-006 | "asks for a mobile the way a phone keyboard expects, and a name autofill knows" | `type=tel`, `inputmode=tel`, `autocomplete=tel`, placeholder `05X-XXXXXXX`; name `autocomplete=name` |
-| CMP-NWZ-007 | "says under the field what is wrong with the phone, linked to it, and saves nothing" | A landline: `aria-invalid`, `aria-describedby` → "נא להזין מספר נייד ישראלי…"; nothing sent; the button still enabled |
-| CMP-NWZ-008 | "says when the name is missing" | "נא למלא שם."; nothing sent |
-| CMP-NWZ-009 | "accepts a +972 mobile" | Sent |
-| CMP-NWZ-010 | "shows where the details go before they are sent" | `TRANSPARENCY` on the contact step |
-| CMP-NWZ-011 | "offers them once the lead is saved, and they fill in the same lead" | "עוד 4 שאלות קצרות" → life stage, goal, clearinghouse (+ email), time → a second `submitInterview` with `stage: "details"` carrying all of them; `wizardCompleted` still once; `wizardStep` 1–6; heading "תודה — דורית תגיע מוכנה" |
-| CMP-NWZ-012 | "asks for an email only when the visitor wants the clearinghouse link" | Field only for "מעוניין/ת"; a bad address → "כתובת המייל לא נראית תקינה." |
-| CMP-NWZ-013 | "are not offered by a backend that cannot fill a lead in" | `updatesInterviews` false → no offer |
-| CMP-NWZ-014 | "when their save fails, says the lead itself is already with Dorit" | "התשובות הנוספות לא נשמרו" + "הפרטים שלך כבר אצל דורית" |
-| CMP-NWZ-015 | "shows Dorit's direct channels and keeps the answers for a retry" | Failed lead save → channels; retry keeps the name and saves |
-| CMP-NWZ-016 | "escalates with reason claim_or_policy and never submits an interview" | Claim → `escalate` (`claim_or_policy`, `needs_wizard`); no `submitInterview`; `wizardClaimHandoff` once |
-| CMP-NWZ-101 | "a tap on the concern moves to the contact step through the same path as המשך" | Phone: no "המשך"; tap → contact heading focused; `wizardStep(1)` |
-| CMP-NWZ-102 | "an arrow key chooses without moving on; Enter then moves on" | ArrowDown → click → keyup: stays; Enter → contact |
-| CMP-NWZ-103 | "the claim option still leaves for a person, with no interview" | Tap on the claim option → claim screen; no `submitInterview` |
-| CMP-NWZ-104 | "in the optional part a tap moves on, but the clearinghouse step waits — it may ask for an email" | Life stage and goal move on by tap; "מעוניין/ת" stays and shows the email field |
-| CMP-NWZ-105 | "from md up nothing moves until המשך" | At 1440 a click checks the radio and nothing else |
+| CMP-NWZ-001 | "opens on the concern with the short promise and a counter, and no list of steps" | "מה הכי מעסיק אותך כרגע?", "3 שאלות קצרות — פחות מדקה", "שאלה 1 מתוך 3"; no "שלבי השאלון" list |
+| CMP-NWZ-002 | "each tap moves on by itself, and the contact step says it is nearly done" | Three taps → "איך דורית תחזור אליך?" focused, "כמעט סיימנו" |
+| CMP-NWZ-003 | "saves the lead with the three answers, and reports it with its topic and urgency only" | `stage: "complete"`, profile concern/life_stage/urgency; `wizardCompleted(concern, urgency)`; "תודה רונית! דורית תחזור אליך בקרוב." |
+| CMP-NWZ-004 | "reports each step by its number, and a skipped one as a skip" | `wizardSkipped(2)`; `wizardStep` 1, 3, 4 |
+| CMP-NWZ-005 | "goes back with the answer kept" | "הקודם" → the concern checked, "המשך" offered |
+| CMP-NWZ-006 | "an arrow key chooses without moving on; Enter then moves on" | ArrowDown → click → keyup: stays; Enter → next |
+| CMP-NWZ-007 | "asks for a mobile the way a phone keyboard expects, and a name autofill knows" | `type/inputmode/autocomplete=tel`, placeholder `05X-XXXXXXX`; name `autocomplete=name` |
+| CMP-NWZ-008 | "answers a wrong number under the field, reports which field, and saves nothing" | "מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות" via `aria-describedby`; `formError("phone")`; nothing sent |
+| CMP-NWZ-009 | "answers a missing name, and reports it" | "נא למלא שם."; `formError("name")` |
+| CMP-NWZ-010 | "says when Dorit answers, under the button" | "דורית חוזרת תוך יום עסקים" |
+| CMP-NWZ-011 | "offers WhatsApp instead, written from the three answers and tracked as wizard_step4" | `wa.me` link whose text names the concern, life stage and urgency; inside `data-track-location="wizard_step4"` |
+| CMP-NWZ-012 | "are offered after the lead, and fill in the same lead" | "בטח" → `wizardFollowupStarted`; goal, report "לא" + opt-in "מעוניין/ת" + email, "ערב" + notes → `stage: "details"` with all of them, `timing: "ערב"`; `wizardFollowupCompleted(3)`; "מעולה, דורית תגיע מוכנה." |
+| CMP-NWZ-013 | "offers the clearinghouse pull only to someone without a report" | "כן" → no opt-in; "לא יודע/ת מה זה" → "מעוניין/ת" offered |
+| CMP-NWZ-014 | "'לא עכשיו' leaves the thanks without the offer" | The thanks stay; no "בטח" |
+| CMP-NWZ-015 | "are not offered by a backend that cannot fill a lead in" | `updatesInterviews` false → no offer |
+| CMP-NWZ-016 | "when their save fails, says the lead itself is already with Dorit" | "התשובות הנוספות לא נשמרו" |
+| CMP-NWZ-017 | "a failed save shows Dorit's direct channels and keeps the answers for a retry" | Channels; retry keeps the name and saves |
+| CMP-NWZ-018 | "the claim option escalates with claim_or_policy and never submits an interview" | `escalate` (`claim_or_policy`, `needs_wizard`); no `submitInterview`; `wizardClaimHandoff` once |
+| CMP-NWZ-019 | "each tap question is a named radio group, though the heading is what shows" | Group "איפה את/ה בחיים כרגע?" (legend `sr-only`) with 6 radios |
 
 ### 4.25 The calculator → lead box — `tests/component/calculator-lead.test.tsx`
 
@@ -522,11 +523,44 @@ or while there are no deposits to compute from (`useCalculatorResultEvent`). Fak
 | CMP-ACTA-003 | "pre-fills WhatsApp with the article's title" | `?text=` decodes to the title sentence; opens in a new tab |
 | CMP-ACTA-004 | "uses the article's cta_headline, else the general line" | The article's headline |
 | CMP-ACTA-005 | "falls back to the general headline" | `ARTICLE_CTA_FALLBACK` |
-| CMP-ACTA-006 | "offers /tools on a fees article and not on a tax one" | "לבדיקה במחשבון" → `/tools` |
-| CMP-ACTA-007 | "does not offer /tools on an article no tool covers" | No such link |
+| CMP-ACTA-006 | "offers the clearinghouse check on a pension or fees article" | "נבדוק לך במסלקה" → `/pension-check` |
+| CMP-ACTA-007 | "offers the year-end page to the self-employed" | "מה להפקיד עד 31.12" → `/atzmaim-31-12` |
+| CMP-ACTA-008 | "offers nothing but WhatsApp on an article no offer covers" | One link in the box |
+
+### 4.28 `<MaslekaAnalysis />` — Dorit's review of a client's report — `tests/component/masleka-analysis.test.tsx`
+
+Over an in-memory port (decisions stored and read back) and the made-up client in `tests/fixtures/clearinghouse-snapshot.ts`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MSKA-001 | "shows the client, the totals, every finding as a draft, and the products" | Heading with the name; 493,000; one card per finding; "N ממתינות לבדיקה · 0 אושרו"; a row per account; the pension-marketing disclosure |
+| CMP-MSKA-002 | "will not print before anything is approved" | "הדפסה" disabled |
+| CMP-MSKA-003 | "approves a finding, then prints" | `decide(s1, key, {approved, null})`; "אושר"; `print()` |
+| CMP-MSKA-004 | "approves in Dorit's own words, and stores them only when they differ from the draft" | Edited text stored and shown; "בנוסח של דורית" |
+| CMP-MSKA-005 | "rejects a finding and can put it back to draft" | `rejected`, then `decide(…, null)`; "טיוטה" |
+| CMP-MSKA-006 | "keeps drafts and rejected findings off the printout" | Approved card printable; rejected and draft cards `print:hidden` |
+| CMP-MSKA-007 | "says so when a decision could not be saved" | Alert with the rid |
+| CMP-MSKA-008 | "says plainly when the report is gone or cannot be read" | Alert "הדוח לא נמצא" |
+
+### 4.32 The growth brief: "בדיקת תיק פנסיוני", Cal.com and the WhatsApp channel — `tests/component/lead-growth.test.tsx`
+
+`services.leads.submitInterview` mocked; `CAL_LINK` and `WHATSAPP_CHANNEL_URL` set per test.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-GROW-001 | "sends the questionnaire's lead with the clearinghouse opt-in ticked, and counts it once saved" | `track: pension`, `profile: {clearinghouse: "מעוניין/ת"}`, `stage: complete`, the context in the summary; "במייל שלך מחכה קישור אישי"; `generate_lead {method: pension_check, location}` once |
+| CMP-GROW-002 | "takes no email too, and says Dorit will send the link herself" | `email` undefined; the no-email thank-you |
+| CMP-GROW-003 | "asks for a name, a mobile number and a real address before sending" | Three alerts in turn; nothing sent |
+| CMP-GROW-004 | "says so, and counts nothing, when the save fails" | Alert; no `generate_lead` |
+| CMP-GROW-005 | "/pension-check: one h1, three steps, the form and the disclosure, and no 'חינם'" | As titled |
+| CMP-GROW-006 | "/atzmaim-31-12: the article's figures, a link to it, and the form with the campaign as its context" | 38,400; link to `/blog/sof-shana-atzmaim`; summary names the campaign; `location: year_end` |
+| CMP-GROW-007 | "the hero leads with the check; the conversation is the second button, hidden on a phone" | `/pension-check`; `#start` with `max-md:hidden` |
+| CMP-GROW-008 | "the fee calculator offers the check right after its result" | The calculator headline |
+| CMP-GROW-009 | "the footer names the WhatsApp channel only once its address is set" | Absent unset; then the link, `noopener noreferrer`, and the reminder line |
+| CMP-GROW-010 | "#start offers the 15-minute call first once Cal.com is set, the questionnaire second" | Absent unset; then "לבחירת מועד" → the Cal.com link, new tab; the questionnaire's lead-in |
 
 ## 5. Pass criteria
 
-All 280 declared cases pass (vitest: 310 with expansions). A `submitLead` or `submitClaim` payload assertion failing
+All 278 declared cases pass (vitest: 308 with expansions). A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

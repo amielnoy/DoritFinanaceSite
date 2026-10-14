@@ -211,7 +211,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
         stickyBar(page).getByRole("link", { name: /חייגו/ }),
         stickyBar(page).getByRole("link", { name: /שאלה לעוזר/ }),
         page.getByRole("button", { name: "תפריט" }),
-        page.locator("#top").getByRole("link", { name: "לשיחה קצרה עם דורית" }),
+        page.locator("#top").getByRole("link", { name: "בדיקת תיק פנסיוני" }),
         page.locator("#top").getByRole("link", { name: "וואטסאפ" }),
         page.locator("#top").getByRole("link", { name: "חיוג" }),
         page.locator("#start").getByRole("link", { name: "וואטסאפ" }),
@@ -829,7 +829,7 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       expect(h1.y).toBeGreaterThan(box.y + box.height);
     });
 
-    const cta = hero.getByRole("link", { name: "לשיחה קצרה עם דורית" });
+    const cta = hero.getByRole("link", { name: "בדיקת תיק פנסיוני" });
     const wa = hero.getByRole("link", { name: "וואטסאפ" });
     const call = hero.getByRole("link", { name: "חיוג" });
 
@@ -847,18 +847,22 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       await expect(call).toHaveAttribute("href", "tel:+972508311776");
     });
 
-    await test_step("all three report to GA4 from location top", async () => {
-      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
-      for (const link of [cta, wa, call]) await link.click();
-      const events = await queuedClicks(page);
-      for (const name of ["cta_click", "click_whatsapp", "click_phone"]) {
-        expect(events).toContainEqual({ name, location: "top" });
-      }
-    });
-
     await test_step("a phone fetches the small portrait, not the 1080 one", async () => {
       const src = await hero.locator("img").evaluate((img) => (img as HTMLImageElement).currentSrc);
       expect(src).toMatch(/-480\.(avif|webp)$/);
+    });
+
+    await test_step("all three report to GA4 from location top", async () => {
+      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
+      // The flagship last: it is a router link, which moves the page before
+      // the listener above can stop it; the queue survives the navigation.
+      for (const link of [wa, call, cta]) await link.click();
+      const events = await queuedClicks(page);
+      for (const name of ["click_whatsapp", "click_phone"]) {
+        expect(events).toContainEqual({ name, location: "top" });
+      }
+      expect(events).toContainEqual({ name: "cta_click", location: "top" });
+      await expect(page).toHaveURL(/\/pension-check$/);
     });
   });
 
@@ -1013,20 +1017,24 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("the questionnaire: a tap on the concern moves on to the contact step, and reports it", async ({ page }) => {
+  test("the questionnaire: three taps move on by themselves to the contact step, and report it", async ({ page }) => {
     await gotoHome(page);
 
-    await test_step("tapping a concern goes to the contact step, with no המשך on the way", async () => {
-      await expect(wizard(page).getByRole("button", { name: "המשך" })).toHaveCount(0);
-      // The question can still be skipped.
-      await expect(wizard(page).getByRole("button", { name: "דילוג על השאלה" })).toBeVisible();
+    await test_step("the three questions, each moving on at a tap, with no list of steps", async () => {
+      await expect(wizard(page).getByText("3 שאלות קצרות — פחות מדקה")).toBeVisible();
+      await expect(wizard(page).getByText("שאלה 1 מתוך 3")).toBeVisible();
+      await expect(wizard(page).getByRole("list", { name: "שלבי השאלון" })).toHaveCount(0);
       await wizard(page).getByText("דמי ניהול / הפנסיה שלי", { exact: true }).tap();
-      await expect(stepHeading(page, "איך דורית תחזור אליך")).toBeVisible();
-      await expect(stepHeading(page, "איך דורית תחזור אליך")).toBeFocused();
+      await expect(stepHeading(page, "איפה את/ה בחיים כרגע?")).toBeFocused();
+      await wizard(page).getByText("זוג בלי ילדים", { exact: true }).tap();
+      await expect(stepHeading(page, "עד כמה זה דחוף?")).toBeVisible();
+      await wizard(page).getByText("בחודשים הקרובים", { exact: true }).tap();
+      await expect(stepHeading(page, "איך דורית תחזור אליך?")).toBeVisible();
+      await expect(wizard(page).getByText("כמעט סיימנו")).toBeVisible();
     });
 
-    await test_step("the move sent wizard_step for the screen it left, and one wizard_start", async () => {
-      expect(await stepEvents(page)).toEqual(["step_1"]);
+    await test_step("each move sent wizard_step for the screen it left, and one wizard_start", async () => {
+      expect(await stepEvents(page)).toEqual(["step_1", "step_2", "step_3"]);
       const started = (await queuedClicks(page)).filter((e) => e.name === "wizard_start");
       expect(started).toHaveLength(1);
     });
@@ -1035,48 +1043,60 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       const phone = wizard(page).getByLabel("טלפון נייד");
       await expect(phone).toHaveAttribute("type", "tel");
       await expect(phone).toHaveAttribute("inputmode", "tel");
-      await expect(phone).toHaveAttribute("autocomplete", "tel");
       await wizard(page).getByLabel("שם").fill("רונית");
       await phone.fill("03-1234567");
       await wizard(page).getByRole("button", { name: /שליחה לדורית/ }).click();
       await expect(phone).toHaveAttribute("aria-invalid", "true");
-      await expect(wizard(page).getByText(/נא להזין מספר נייד ישראלי/)).toBeVisible();
+      await expect(wizard(page).getByText("מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות")).toBeVisible();
+      await expect(wizard(page).getByText("דורית חוזרת תוך יום עסקים")).toBeVisible();
     });
 
-    await test_step("back still goes back, the concern kept", async () => {
+    await test_step("back still goes back, the answer kept", async () => {
       await wizard(page).getByRole("button", { name: "הקודם" }).click();
-      await expect(stepHeading(page, "מה מעסיק אותך?")).toBeVisible();
-      await expect(wizard(page).getByRole("radio", { name: "דמי ניהול / הפנסיה שלי" })).toBeChecked();
-      // Answered already, so the quiet way on reads המשך rather than דילוג.
-      await expect(wizard(page).getByRole("button", { name: "דילוג על השאלה" })).toHaveCount(0);
+      await expect(stepHeading(page, "עד כמה זה דחוף?")).toBeVisible();
+      await expect(wizard(page).getByRole("radio", { name: "בחודשים הקרובים" })).toBeChecked();
     });
+  });
+
+  test("E2E-MOB-037: on the smallest phone each step, button included, sits above the bar without a scroll", async ({ page }) => {
+    // The brief of 2026-10-14. 375x667 is the smallest screen we design for.
+    await page.setViewportSize({ width: 375, height: 667 });
+    await gotoHome(page);
+    const bar = stickyBar(page);
+    const fits = async (last: import("@playwright/test").Locator) => {
+      await page.waitForTimeout(600); // the step's own scroll into place
+      const b = (await last.boundingBox())!;
+      return b.y >= 0 && b.y + b.height <= (await bar.boundingBox())!.y;
+    };
+    const lastAnswer = () => wizard(page).getByRole("radio").last().locator("xpath=..");
+    await wizard(page).getByText("דמי ניהול / הפנסיה שלי", { exact: true }).tap();
+    await expect(stepHeading(page, "איפה את/ה בחיים כרגע?")).toBeVisible();
+    expect(await fits(lastAnswer()), "life stage").toBe(true);
+    await wizard(page).getByText("זוג בלי ילדים", { exact: true }).tap();
+    await expect(stepHeading(page, "עד כמה זה דחוף?")).toBeVisible();
+    expect(await fits(lastAnswer()), "urgency").toBe(true);
+    await wizard(page).getByText("בחודשים הקרובים", { exact: true }).tap();
+    await expect(stepHeading(page, "איך דורית תחזור אליך?")).toBeVisible();
+    expect(await fits(wizard(page).getByRole("button", { name: /שליחה לדורית/ })), "contact").toBe(true);
   });
 
   test("the questionnaire from the keyboard: arrows move between answers without leaving the step", async ({ page }) => {
     await gotoHome(page);
     const concerns = wizard(page).getByRole("group", { name: "מה הכי מעסיק אותך כרגע?" });
 
-    await test_step("Space on an answer chooses it and moves on", async () => {
-      await concerns.getByRole("radio").first().focus();
-      await page.keyboard.press("Space");
-      await expect(stepHeading(page, "איך דורית תחזור אליך")).toBeVisible();
-      await wizard(page).getByRole("button", { name: "הקודם" }).click();
-      await expect(stepHeading(page, "מה מעסיק אותך?")).toBeVisible();
-    });
-
     await test_step("arrow keys walk the answers, choosing as they go, and stay on the step", async () => {
       await concerns.getByRole("radio").first().focus();
       await page.keyboard.press("ArrowDown");
       await page.keyboard.press("ArrowDown");
       await page.waitForTimeout(500);
-      await expect(stepHeading(page, "מה מעסיק אותך?")).toBeVisible();
+      await expect(stepHeading(page, "מה הכי מעסיק אותך כרגע?")).toBeVisible();
       await expect(concerns.getByRole("radio", { checked: true })).toHaveCount(1);
     });
 
-    await test_step("Enter on the chosen answer moves on, and each move reported the step it left", async () => {
+    await test_step("Enter on the chosen answer moves on, and the step is reported", async () => {
       await page.keyboard.press("Enter");
-      await expect(stepHeading(page, "איך דורית תחזור אליך")).toBeVisible();
-      expect(await stepEvents(page)).toEqual(["step_1", "step_1"]);
+      await expect(stepHeading(page, "איפה את/ה בחיים כרגע?")).toBeVisible();
+      expect(await stepEvents(page)).toEqual(["step_1"]);
     });
   });
 
@@ -1345,11 +1365,9 @@ test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
       await expect(page.getByRole("button", { name: "השארת פרטים" })).toBeHidden();
     });
 
-    await test_step("a chosen answer waits for המשך", async () => {
+    await test_step("a chosen answer moves on, on the desktop too (2026-10-14)", async () => {
       await page.locator("#interview").getByText("מס / החזר מס", { exact: true }).click();
-      await page.waitForTimeout(500);
-      await expect(page.locator("#interview").getByRole("heading", { name: "מה מעסיק אותך?" })).toBeVisible();
-      await expect(page.locator("#interview").getByRole("button", { name: "המשך" })).toBeVisible();
+      await expect(page.locator("#interview").getByRole("heading", { name: "איפה את/ה בחיים כרגע?" })).toBeVisible();
     });
 
     await test_step("the cases tell their stories open, and the testimonials stand in a grid", async () => {

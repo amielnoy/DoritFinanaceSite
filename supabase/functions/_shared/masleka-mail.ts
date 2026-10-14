@@ -157,7 +157,7 @@ export function buildClientInvite(clientName: string, link: string, reminder = f
     intro,
     panelTitle: 'הקישור האישי שלך',
     details: [
-      ['קישור', link],
+      ['קישור', link, link],
       ['תוקף', '30 יום מיום ההזמנה'],
     ],
     action: { label: reminder ? 'להמשך — מסירת הקוד' : 'למסירת הקוד', href: link },

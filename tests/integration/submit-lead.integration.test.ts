@@ -2108,3 +2108,28 @@ describe.each(IMPLEMENTATIONS)("$label — the questionnaire's details, after th
     expect(r.leads).toHaveLength(1);
   });
 });
+
+/** The questionnaire's urgency and clearinghouse report (2026-10-14). */
+describe.each(IMPLEMENTATIONS)("$label — urgency and the clearinghouse report", ({ run }) => {
+  const lead = {
+    name: "אורי לוי", phone: "0541112233", email: "", source: "interview", stage: "complete", track: "pension",
+    profile: { concern: "דמי ניהול / הפנסיה שלי", life_stage: "בן 52" },
+  };
+
+  it("puts 🔴 דחוף at the head of Dorit's mail when the visitor said it is urgent", async () => {
+    const r = await run({ ...lead, profile: { ...lead.profile, urgency: "דחוף — אשמח לשיחה השבוע" } });
+    expect(r.mailTo(AGENCY).subject).toBe("🔴 דחוף — סיכום ראיון היכרות — אורי לוי");
+    expect(r.leads[0].message as string).toContain("דחיפות: דחוף — אשמח לשיחה השבוע");
+  });
+
+  it("leaves the subject as it was for any other urgency", async () => {
+    const r = await run({ ...lead, profile: { ...lead.profile, urgency: "בחודשים הקרובים" } });
+    expect(r.mailTo(AGENCY).subject).toBe("סיכום ראיון היכרות — אורי לוי");
+  });
+
+  it("records whether a clearinghouse report exists, without taking it for the pull", async () => {
+    const r = await run({ ...lead, profile: { ...lead.profile, clearinghouse_report: "כן" } });
+    expect(r.leads[0].message as string).toContain("דוח מסלקה פנסיונית: כן");
+    expect(r.json).not.toHaveProperty("masleka");
+  });
+});

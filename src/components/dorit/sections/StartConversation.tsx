@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MessageCircle, MessagesSquare, Phone, Send } from "lucide-react";
+import { CalendarDays, MessageCircle, MessagesSquare, Phone, Send } from "lucide-react";
 import AgentChat from "@/components/dorit/chat/AgentChat";
 import NeedsWizard from "@/components/dorit/forms/NeedsWizard";
 import QuickContact from "@/components/dorit/forms/QuickContact";
 import { AGENTS } from "@/config/agents";
 import { CONTACT } from "@/config/contact";
+import { CAL_LINK } from "@/config/offers";
+import { ctaClass } from "@/components/dorit/primitives/Cta";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
@@ -63,9 +65,25 @@ export default function StartConversation() {
           </h2>
         </Reveal>
 
+        {/* A 15-minute phone call on Dorit's diary, first, once VITE_CAL_LINK is
+            set (growth brief, 2026-10-14); the questionnaire below becomes the
+            second path. Unset, the section is as it was. */}
+        {CAL_LINK ? (
+          <div data-track-location="start_booking" className="max-w-[880px] w-full rounded-[4px] border border-highlight p-5 md:p-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="m-0 font-heading text-xl md:text-2xl">שיחת טלפון של 15 דקות עם דורית</p>
+              <p className="m-0 mt-1 text-[15px] text-muted-foreground">בוחרים מועד ביומן שלה ועונים על שתי שאלות קצרות.</p>
+            </div>
+            <a href={CAL_LINK} target="_blank" rel="noopener noreferrer" className={ctaClass("max-sm:w-full")}>
+              <CalendarDays size={18} aria-hidden="true" /> לבחירת מועד
+            </a>
+          </div>
+        ) : null}
+
         {/* The wizard, where the interview chat used to be. `#interview` keeps
             the interview's anchor alive; `#start`, above, is what the CTAs use. */}
         <div id="interview" className="max-w-[880px] w-full">
+          {CAL_LINK ? <p className="m-0 mb-4 text-[15px] text-muted-foreground">או, אם נוח יותר — שלוש שאלות קצרות, ודורית חוזרת אליכם:</p> : null}
           <NeedsWizard />
           <p className="m-0 mt-6 text-[15px] leading-[1.7] text-muted-foreground">
             השאלון אוסף מידע לקראת הפגישה ואינו נותן ייעוץ.

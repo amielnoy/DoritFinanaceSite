@@ -249,6 +249,16 @@ export const INTERVIEW_COMMON = [
   ['clearinghouse', 'שליפת נתוני מסלקה — מעוניין/ת'],
 ];
 
+// The short questionnaire's own answers (2026-10-14): how soon, and whether a
+// clearinghouse report already exists — a fact for Dorit; the pull itself is
+// still only the flag above. Kept in the profile and the mail, but outside
+// interviewCompleteness: the AI interview never asks them, and they must not
+// make its answers look fewer.
+export const INTERVIEW_EXTRA = [
+  ['urgency', 'דחיפות'],
+  ['clearinghouse_report', 'דוח מסלקה פנסיונית'],
+];
+
 export const INTERVIEW_TRACKS = {
   pension: {
     label: 'פנסיה, גמל והשתלמות',
@@ -354,7 +364,11 @@ export function sameInterviewee(lead, name, email) {
  * נספר כתשובה — זו אינפורמציה על המבקר — ושדה חסר אינו נספר כלל.
  */
 export function interviewCompleteness(rows, track) {
-  const total = interviewFields(track).length;
+  const fields = interviewFields(track);
+  const counted = new Set(fields.map(([, label]) => label));
+  const total = fields.length;
+  // INTERVIEW_EXTRA rows are in the profile, not in the count.
+  rows = rows.filter(([label]) => counted.has(label));
   const answered = rows.length;
   const unknown = rows.filter(([, value]) => /^לא ידוע/.test(String(value))).length;
   return { answered, total, unknown };
@@ -393,7 +407,7 @@ export function profileValue(pairs, label) {
 
 export function buildInterviewProfile(profile, track) {
   const given = profile && typeof profile === 'object' ? profile : {};
-  return interviewFields(track)
+  return [...interviewFields(track), ...INTERVIEW_EXTRA]
     .map(([key, label]) => [label, redact(given[key])])
     .filter(([, value]) => value);
 }
@@ -669,8 +683,10 @@ export const POA_URL = (Deno.env.get('POA_URL') || '').trim();
  * it drops an empty answer, so a row at all means the question was answered.
  */
 export function wantsClearinghouse(profile) {
+  // The flag's own label exactly: "דוח מסלקה פנסיונית" (whether a report
+  // exists) also names the clearinghouse and must never start a request.
   const row = (Array.isArray(profile) ? profile : [])
-    .find(([label]) => String(label).includes('מסלקה'));
+    .find(([label]) => String(label) === 'שליפת נתוני מסלקה — מעוניין/ת');
   return Boolean(row) && String(row[1]).startsWith('מעוניין');
 }
 
@@ -797,8 +813,17 @@ export function buildClientText(source, data) {
   ].join('\n');
 }
 
+/**
+ * Whether the visitor said it is urgent — the questionnaire's "דחוף" answer.
+ * `profile` is the [label, value] pairs buildInterviewProfile kept.
+ */
+export function isUrgent(profile) {
+  const row = (Array.isArray(profile) ? profile : []).find(([label]) => String(label) === 'דחיפות');
+  return Boolean(row) && String(row[1]).startsWith('דחוף');
+}
+
 export function subjectFor(source, data) {
-  if (source === 'interview') return `סיכום ראיון היכרות — ${data.name}`;
+  if (source === 'interview') return `${isUrgent(data.profile) ? '🔴 דחוף — ' : ''}סיכום ראיון היכרות — ${data.name}`;
   if (source === 'consultation') return `בקשת ייעוץ חדשה — ${data.name}`;
   if (source === 'detailed') return `פנייה מפורטת — ${data.name} (${data.topic || 'כללי'})`;
   return `פנייה חדשה מהאתר — ${data.name}`;

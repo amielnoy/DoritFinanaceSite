@@ -1,4 +1,11 @@
-import { MaslekaError, type MaslekaPort, type MaslekaRequest, type StaffRole } from "../ports";
+import {
+  MaslekaError,
+  type FindingReview,
+  type MaslekaPort,
+  type MaslekaRequest,
+  type SnapshotSummary,
+  type StaffRole,
+} from "../ports";
 
 /**
  * The clearinghouse pipeline for a build with no Supabase credentials: never
@@ -25,6 +32,18 @@ export class UnconfiguredMaslekaService implements MaslekaPort {
     throw new MaslekaError("unavailable");
   }
   async markSubmitted(): Promise<void> {
+    throw new MaslekaError("unavailable");
+  }
+  async listSnapshots(): Promise<SnapshotSummary[]> {
+    throw new MaslekaError("unavailable");
+  }
+  async getSnapshot(): Promise<never> {
+    throw new MaslekaError("unavailable");
+  }
+  async listReviews(): Promise<FindingReview[]> {
+    throw new MaslekaError("unavailable");
+  }
+  async decide(): Promise<void> {
     throw new MaslekaError("unavailable");
   }
 }

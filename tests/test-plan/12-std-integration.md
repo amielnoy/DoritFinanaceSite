@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 151 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 614 including `it.each` / `describe.each` expansions
+**Location:** `tests/integration/` · **Cases:** 161 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 624 including `it.each` / `describe.each` expansions
 
 ---
 
@@ -352,6 +352,17 @@ rather than lost. Edge only: the Base44 rollback backend reports
 | INT-LEAD-103 | "does not fill in a lead older than half an hour" |
 | INT-LEAD-104 | "does not fill in another person's lead on the same phone" |
 | INT-LEAD-105 | "does not fill in a lead that was never an interview" |
+
+### 4.12c `submit-lead` — urgency and the clearinghouse report — `INT-LEAD-106..108`
+
+The questionnaire's `urgency` and `clearinghouse_report` (2026-10-14) are in the
+profile and the mail (`INTERVIEW_EXTRA`), outside the completeness count.
+
+| ID | Title |
+|---|---|
+| INT-LEAD-106 | "puts 🔴 דחוף at the head of Dorit's mail when the visitor said it is urgent" |
+| INT-LEAD-107 | "leaves the subject as it was for any other urgency" |
+| INT-LEAD-108 | "records whether a clearinghouse report exists, without taking it for the pull" |
 
 ### 4.13 `submitLead` — how complete the interview was — `INT-LEAD-073..075`
 
@@ -753,6 +764,20 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-LEADMSK-022 | "never reuses for an interview with no address: it opens a new request, as before" | Two rows |
 | INT-LEADMSK-023 | "a completed interview sent twice ends with one request and one working link" | Second run over the first's lead and request: one row, hash of the second mail's token |
 | INT-LEADMSK-024 | "falls back to a new request when the lookup fails" | Leads lookup 500: 200, a second row |
+
+### 4.31 `claim-documents-purge` — claim files kept two months — `INT-CDP-001..007`
+
+`claim-documents-purge.integration.test.ts` fakes the rpc `claim_documents_expired` and the Storage API's bulk delete; the last two cases are in `submit-claim.integration.test.ts`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CDP-001 | "refuses a call without the cron secret, and one when no secret is configured" | 401 / 503; nothing deleted |
+| INT-CDP-002 | "deletes what is past retention through the Storage API, and says how many" | `DELETE /storage/v1/object/claim-documents` with the names; `{deleted: 3, batches: 1}` |
+| INT-CDP-003 | "drains a backlog in batches of 500, and stops at ten a night" | 1,200 → 500 + 500 + 200; 6,000 → 5,000 deleted, 1,000 left for the next night |
+| INT-CDP-004 | "does nothing when nothing is due" | No delete call |
+| INT-CDP-005 | "reports a refused delete as a failure, and never logs a file's name" | 500; no path in any log line |
+| INT-CDP-006 | "tells Dorit to keep a stored file, since the site deletes it after two months" | The staff mail carries the line for a `storage:claim-documents/…` file |
+| INT-CDP-007 | "says nothing of it when no file is stored on the site" | No such line — the Base44 and Edge mails still match |
 
 ## 5. Pass criteria
 

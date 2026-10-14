@@ -208,8 +208,11 @@ const MAIL_IMPLEMENTATIONS = [
   { label: "Edge _shared/html.ts", src: HTML_MAIL, ts: true },
   { label: "Base44 submitClaim", src: CLAIM, ts: false },
 ].map(({ label, src, ts }) => {
-  // actionBlock (the letter's one button) exists only in the Edge copy; buildClientHtml calls it.
-  const action = src.includes("function actionBlock(") ? `${wholeFn(src, "actionBlock")}\n` : "";
+  // The letter's button (actionBlock) and linked details (detailValue), and the
+  // https-only check both use, exist only in the Edge copy; buildClientHtml calls them.
+  const action = src.includes("function actionBlock(")
+    ? ["isPlainHttps", "actionBlock", "detailValue"].map((name) => `${wholeFn(src, name)}\n`).join("")
+    : "";
   const code = `${wholeFn(src, "escapeHtml")}\n${action}${wholeFn(src, "buildClientHtml")}`.replace(/^export /gm, "");
   const js = ts ? transformSync(code, { loader: "ts" }).code : code;
   const load = new Function(`${js}; return { escapeHtml, buildClientHtml };`)() as {
@@ -267,6 +270,17 @@ describe.each(MAIL_IMPLEMENTATIONS)("XSS — the HTML email: $label", ({ src, te
     expect(hostile).toContain("&lt;img src=x");
     for (const href of ["javascript:alert(1)", 'https://evil.example/"><script>', "http://govari-fin.co.il"]) {
       expect(buildClientHtml({ ...base, action: { label: "x", href } }), href).not.toContain(`href="${href}`);
+    }
+  });
+
+  it("links a detail only for a plain https:// address, and escapes its text", () => {
+    if (!src.includes("function detailValue(")) return;
+    const base = { firstName: "דנה", eyebrow: "e", heading: "h", intro: "i", panelTitle: "p" };
+    const hostile = buildClientHtml({ ...base, details: [["קישור", "<img src=x onerror=alert(1)>", "https://govari-fin.co.il/masleka#t=abc"]] });
+    expect(hostile).toContain('href="https://govari-fin.co.il/masleka#t=abc"');
+    expect(hostile).not.toContain("<img src=x");
+    for (const href of ["javascript:alert(1)", 'https://evil.example/"><script>', "http://govari-fin.co.il"]) {
+      expect(buildClientHtml({ ...base, details: [["קישור", "x", href]] }), href).not.toContain(`href="${href}`);
     }
   });
 

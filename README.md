@@ -369,21 +369,25 @@ biography at [`/perspective`](src/pages/Perspective.tsx), the reading
 recommender at the top of `/blog`. Only the duplicate routes to the same
 conversation were deleted.
 
-**The questionnaire is two steps to a lead** (`NeedsWizard`, 2026-10-14): what
-is on the visitor's mind, then a name and an Israeli mobile (`isIsraeliMobile`;
-an invalid field is answered under it) — and the lead is saved
-(`submitInterview`, `stage: "complete"`), Dorit mailed and `generate_lead`
-sent. The thank-you screen then offers "רוצים לעזור לדורית להתכונן? עוד 4
-שאלות קצרות": life stage, goal, the clearinghouse (with an optional email for
-its link) and a preferred time, sent as `stage: "details"`. `submit-lead` fills
-in the lead it saved minutes ago — same phone, same person, an interview, `new`,
-within 30 minutes — books the time if one was chosen, and mails Dorit once more
-under "פרטים נוספים — …"; with no such lead the details are saved as a lead of
-their own. Only the Edge `submit-lead` can do that, so the offer shows only when
-`services.leads.updatesInterviews` (`VITE_LEAD_FUNCTIONS=supabase`). The claim
-option still leaves for a person (`escalateToHuman`, `claim_or_policy`). The
-questionnaire has no consent checkbox (none existed); the contact step shows
-where the details go (`TRANSPARENCY`).
+**The questionnaire is three taps to a lead** (`NeedsWizard`, 2026-10-14): what
+is on the visitor's mind, where they are in life, how soon (each moves on 250 ms
+after a tap; "דילוג על השאלה" and "הקודם" stay), then a name and an Israeli
+mobile ("מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות" under the field; a
+WhatsApp link written from the three answers above them) — and the lead is saved
+(`stage: "complete"`), Dorit mailed ("🔴 דחוף —" at the head of the subject when
+the visitor chose "דחוף") and `generate_lead` sent with `topic` and `urgency`
+(nothing else from the answers reaches GA4). Each step scrolls to the top of the
+screen, so on a 375×667 phone its button sits above the bottom bar. The thanks
+then offer "עוד 3 שאלות (לא חובה)": goal, whether a clearinghouse report exists
+(and, without one, the offer to pull it, with an optional email for the link),
+and a time of day with notes — sent as `stage: "details"`, which `submit-lead`
+matches to the lead it saved minutes ago (same phone, same person, an
+interview, `new`, within 30 minutes) and mails Dorit once more under "פרטים
+נוספים — …". Only the Edge `submit-lead` can do that, so the offer shows only
+when `services.leads.updatesInterviews`. The claim option still leaves for a
+person. Events: `wizard_start`, `wizard_step` (number only), `wizard_skip`,
+`form_error` (field only), `generate_lead`, `wizard_followup_start`,
+`wizard_followup_complete` (how many answered).
 
 Anchors into those sections work from every route — `useSectionNav` routes home
 first and then scrolls, because a bare `#services` on `/blog` sets the URL and
@@ -597,6 +601,88 @@ runs in CI):
 - [ ] Staff memberships added (SQL above), Dorit's own `owner` row confirmed: `select * from public.memberships;`. **Blocked 2026-10-14:** Dorit has never signed in, so she has no `auth.users` row to attach a membership to.
 - [ ] Switch on: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED=true` and `VITE_MASLEKA_ENABLED=true` on Vercel (production and preview), then redeploy. Smoke with a hand-made request to a staff member's own address: the client page, a reveal (a row appears in `masleka_access_log`), **הגשתי** (`select count(*) from masleka_requests where (code_ciphertext is not null or id_ciphertext is not null) and status <> 'code_received';` is 0).
 - [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days — but with the switch off `masleka-remind` answers 404, so a wipe in that time is not announced.
+
+### Clearinghouse analysis — Dorit's review
+
+`/admin/masleka/analysis/:snapshotId` turns a stored report into draft
+recommendations and lets Dorit approve each one (as written or in her own
+words) or reject it; **הדפסה** prints the approved ones only, with the
+pension-marketing disclosure. The board links a completed request to its
+analysis and lists every stored report under "ניתוחים".
+
+- **Rules, not a model.** `src/lib/clearinghouse/analysis.ts` — fixed rules and
+  fixed Hebrew wording with the client's numbers filled in; no client data goes
+  to any AI service. The numbers it compares against are in
+  `src/lib/clearinghouse/reference.ts`, each with its source and the day it was
+  checked (legal maximum fees; the default funds' 1% / 0.22%, selection to
+  October 2028); Dorit's own thresholds (`SAVINGS_FEE_WORTH_RAISING`,
+  `SMALL_INACTIVE_BALANCE`, `costSeverity`) sit beside them, marked as policy.
+- **Drafts are computed, decisions are stored.** Findings are recomputed from
+  the snapshot on every visit; `clearinghouse_reviews` keeps only Dorit's
+  decision per finding key, so a better rule reaches every client at once.
+- **Built ahead of the parser.** Nothing writes a snapshot until PR B (the ZIP
+  parser and drop zone), which waits for a real clearinghouse report. Until
+  then the screen is exercised by tests on a made-up client
+  (`tests/fixtures/clearinghouse-snapshot.ts`).
+- **Release:** apply `20261021000000_clearinghouse_analysis.sql` to production
+  **before** this deploys — the board reads `clearinghouse_snapshots` on load;
+  without the table it shows a quiet "לא הצלחנו לטעון את הניתוחים." and the rest
+  of the board works. Run `supabase/tests/clearinghouse_analysis_check.sql`
+  against a local `supabase start` first; after applying, `select jobname from
+  cron.job where jobname = 'clearinghouse-purge';` returns one row. Applied in
+  the SQL editor → `supabase migration repair --status applied 20261021000000`.
+
+### The flagship and the lead paths (growth brief, 2026-10-14)
+
+- **"בדיקת תיק פנסיוני"** (`/pension-check`, `src/config/offers.ts`): name,
+  mobile and an optional address — the questionnaire's lead with the
+  clearinghouse opt-in (`profile.clearinghouse = "מעוניין/ת"`), so
+  `submit-lead` opens the request on the board and mails the personal link (no
+  address: Dorit sends it from the board). One form (`PensionCheckForm`) in
+  four places: its page, the hero's main button (the conversation is the
+  secondary button, hidden below md), right after the fee calculator's result
+  ("רוצים לדעת כמה אתם משלמים בפועל?"), and the year-end page. GA4:
+  `generate_lead {method: pension_check, location}` once saved; the hero's
+  button is `cta_click {cta: pension_check}`.
+- **No "חינם" yet.** The clearinghouse charges an advisor ₪14 a request; the
+  word goes into `PENSION_CHECK` once Dorit confirms she absorbs it.
+- **Year-end campaign** (`/atzmaim-31-12`): the published article's 2026
+  figures, its caveat, a link to it, and the form. Every figure is the
+  article's — update both together.
+- **One next step per article** (`articleOffer`, by tags): "עצמאים" → the
+  year-end page; pension, savings or fees → "נבדוק לך במסלקה"; insurance →
+  /tools; anything else, WhatsApp alone.
+- **Switches, unset by default** (Vercel env, then a CI deploy — production is
+  prebuilt):
+  - `VITE_CAL_LINK` — Dorit's Cal.com event (15 minutes, two screening
+    questions set in Cal.com). Set, #start leads with "שיחת טלפון של 15 דקות"
+    and the questionnaire follows. GA4 `click_booking`.
+  - `VITE_WHATSAPP_CHANNEL_URL` — her WhatsApp channel; the footer offers
+    "תזכורת אחת בחודש לפני דדליינים של מס". The site keeps no list. GA4
+    `join_channel`.
+- **Not code, waiting on the regulatory adviser:** paid claims advocacy on
+  success, employer talks, accountant referrals.
+
+### Claim documents: kept two months
+
+Files attached to a claim report (`claim-documents` bucket, up to 10 MB each —
+the largest thing the site stores) are deleted two months after upload (user,
+2026-10-14). The claim's text record and each document's path stay. The staff
+mail for a claim with stored files says so: "הקישורים בתוקף שבוע, והקבצים
+נמחקים מהאתר אחרי חודשיים — כדאי לשמור אותם בתיק הלקוח".
+
+- `public.claim_documents_expired()` (migration
+  `20261023000000_claim_documents_retention.sql`) lists what is due; the
+  `claim-documents-purge` Edge Function deletes it through the Storage API
+  (SQL cannot delete a stored file), 500 at a time, at most 5,000 a night.
+- Nightly at 03:15 by `pg_cron` → `claim_documents_call_purge()` → pg_net,
+  with the same Vault entries as masleka-remind (`masleka_functions_url`,
+  `masleka_cron_secret`) — nothing new to set. The function checks
+  `MASLEKA_CRON_SECRET` in `x-site-cron`.
+- **Release:** apply the migration by hand (CI deploys the function), then
+  `select jobname from cron.job where jobname = 'claim-documents-purge';` → one
+  row. Run `supabase/tests/claim_documents_retention_check.sql` locally first.
+  The first night deletes every file already past two months.
 
 ## The chat function (Phase 3)
 

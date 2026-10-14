@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 827 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1409 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 865 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1470 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -70,6 +70,9 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-PFC-010 | "floors fractional years to whole months rather than looping oddly" | `years = 1.5` | 18 monthly contributions |
 | UNIT-PFC-011 | "renders whole shekels with the ILS symbol" | `formatIls(1234.6)` | Contains `₪` and `1,235`; no decimal part |
 | UNIT-PFC-012 | "survives NaN and undefined-ish values" | `formatIls(NaN)`, `formatIls(0)` | Returns a `₪` string, never throws |
+| UNIT-PFC-013 | "grows existing savings alone when nothing is deposited" | `startingBalance` 100,000, 12% a year, 1 y, no deposits | `100,000 × 1.01¹²`; nothing deposited |
+| UNIT-PFC-014 | "charges the balance fee on the opening balance and counts it in what fees cost" | 200,000 opening, 0.5% a year, 10 y | Balance fees > 0; `lostToFees` ≥ them |
+| UNIT-PFC-015 | "is the calculator's own result when the opening balance is left out or not positive" | `startingBalance` 0 or −5 | Equal to the result without one |
 
 ### 4.2 Helpers — `tests/unit/utils.dom.test.ts`
 
@@ -382,6 +385,8 @@ only with a value from `CALCULATOR_TOOLS`, so a figure cannot travel in it.
 | UNIT-GA4-025 | "watches the support agent's own section id" | `SUPPORT_CHAT_HASH === "#" + AGENTS.support.sectionId` |
 | UNIT-GA4-026 | "every event it sends is in the catalogue the admin panel shows" | `calculator_result` and `click_chat` are in `LEAD_EVENTS` |
 | UNIT-GA4-027 | "marks click_chat a key event and calculator_result a plain one" | `keyEvent` true / false |
+| UNIT-GA4-028 | "reports a Cal.com booking link, the flagship check and the WhatsApp channel by name" | `click_booking`, `cta_click {cta: pension_check}`, `join_channel`, each with its location |
+| UNIT-GA4-029 | "counts the pension check as a lead of its own method, with where its form sat" | `generate_lead {method: pension_check, location}` |
 
 ### 4.16 Reconciling the lead mirror — `tests/unit/reconcile-leads.test.ts`
 
@@ -1128,6 +1133,8 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKML-019 | "leaves out an address that is missing or not one" | No "מייל:" line for `null` or a non-address |
 | UNIT-MSKML-020 | "escapes a name that is really markup and keeps it on one line" (wipe) | No `<img` in HTML; no newline in the subject |
 | UNIT-MSKML-021 | "links only to the agency's own domain" (wipe) | Every href host is `govari-fin.co.il` |
+| UNIT-MSKML-022 | "makes the address in the panel a link too, not plain text" | Two anchors to the personal link (button + panel); the panel's is `dir="ltr"` with the address as its text |
+| UNIT-MSKML-023 | "links a detail only for a plain https:// address" | `https://` → anchor; `javascript:`, `http://`, a quote or a space → the value as plain text, no anchor |
 
 ### 4.43 The clearinghouse port and its switch — `tests/unit/masleka-services.test.ts`, `tests/unit/masleka-config.test.ts`, `tests/unit/services-wiring.test.ts`
 
@@ -1152,6 +1159,12 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSVC-017 | "passes a removed membership through as forbidden" | `forbidden` with rid |
 | UNIT-MSKSVC-018 | "is never available and gives nobody a role" | Unconfigured: `unavailable`, `null` |
 | UNIT-MSKSVC-019 | "tells a send that stored nothing apart from a failure: not_saved is its own reason" | 500 with `not_saved` → `MaslekaError('not_saved', rid)` (decision 2026-10-14) |
+| UNIT-MSKSVC-020 | "lists snapshots by their summary columns, newest first, without the report itself" | `clearinghouse_snapshots`, `SNAPSHOT_SUMMARY_COLUMNS` (no `data`), `created_at` descending |
+| UNIT-MSKSVC-021 | "reads one snapshot through readSnapshot, and calls an unreadable one missing" | `eq('id')`; a report that fails `readSnapshot`, or no row → `null` |
+| UNIT-MSKSVC-022 | "reads decisions, dropping a row that is not one" | Unknown status dropped |
+| UNIT-MSKSVC-023 | "upserts a decision on (snapshot, finding), and deletes it to go back to draft" | `upsert(…, {onConflict: 'snapshot_id,finding_key'})`; `null` → `delete().eq().eq()` |
+| UNIT-MSKSVC-024 | "throws rather than showing an empty screen when the database refuses" | All four calls → `MaslekaError` |
+| UNIT-MSKSVC-025 | "is never available without Supabase" (analyses) | Unconfigured: all four `unavailable` |
 | UNIT-MSKCFG-001 | "is off when unset" | `false` |
 | UNIT-MSKCFG-002..005 | "is off for %j" (TRUE, 1, yes, tru) | `false` |
 | UNIT-MSKCFG-006..007 | "is on for %j" (true, " true ") | `true` (trim, then `=== "true"`) |
@@ -1220,11 +1233,6 @@ opens. The message goes from the visitor's phone to Dorit; GA4 hears only
 | UNIT-CLD-007 | "still asks for a check when the result is empty" | The fixed sentence |
 | UNIT-CLD-008 | "waits long enough to outlast typing, short enough to catch a reader" | `RESULT_SETTLE_MS` is 1500 |
 
-## 5. Pass criteria
-
-All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —
-these tests have no external dependencies.
-
 ### 4.47 The article contact boxes — `tests/unit/article-cta.test.ts`, and the share image — `tests/unit/blogSeo.test.ts`
 
 `src/lib/articleCta.ts`: where the first box goes, what it says, when it offers /tools. The share image: `computeBlogSeoConfig` prefers `og_image`.
@@ -1239,7 +1247,8 @@ these tests have no external dependencies.
 | UNIT-ACTA-006 | "uses the article's own headline when it has one" | Trimmed `cta_headline` |
 | UNIT-ACTA-007 | "falls back to the general line for %j" (3 cases) | "יש לך שאלה על הנושא הזה? דורית עונה אישית בוואטסאפ" |
 | UNIT-ACTA-008 | "names the article the visitor read" | `שלום דורית, קראתי את המאמר "<title>" ואשמח לשאלה קצרה` |
-| UNIT-ACTA-009 | "tags %j → %s (a tool on /tools covers fees and insurance only)" (4 cases) | True for a "דמי ניהול" or "ביטוח" tag only |
+| UNIT-ACTA-009 | "tags %j → %s" (6 cases) | `articleOffer`: "עצמאים" → `/atzmaim-31-12`; "פנסיה" / "גמל והשתלמות" / "דמי ניהול" → `/pension-check`; "ביטוח" → `/tools`; else none |
+| UNIT-ACTA-011 | "words the clearinghouse check as the brief does" | "נבדוק לך במסלקה" |
 | UNIT-ACTA-010 | "shares the article's own og_image ahead of its cover image" (`blogSeo.test.ts`) | `image` is `og_image` |
 
 ### 4.48 Israeli phone numbers — `tests/unit/phone.test.ts`
@@ -1251,3 +1260,55 @@ these tests have no external dependencies.
 | UNIT-PHONE-001 | "accepts %s" (6 cases) | `050-1234567`, `0521234567`, `054 123 4567`, `+972-50-1234567`, `972501234567`, `+972 58 123 4567` |
 | UNIT-PHONE-002 | "refuses %s (%s)" (6 cases) | A landline, 9 or 11 digits, letters, empty, a foreign number |
 | UNIT-PHONE-003 | "still accepts a landline — escalateToHuman's rule, unchanged" | `isIsraeliPhone("03-1234567")` |
+
+### 4.49 The clearinghouse analysis — `tests/unit/clearinghouse-analysis.test.ts`
+
+Fixed rules over a `Snapshot` (`src/lib/clearinghouse/`), on the made-up client in `tests/fixtures/clearinghouse-snapshot.ts`: two active pension funds (one at 1.49% / 0.25%), a study fund at 0.8%, two small dormant accounts, age 40, dependants.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHA-001 | "finds what the made-up client's report holds, and nothing it does not" | Two `duplicate_cover`, `pension_fee_above_default`, two `savings_fee_high`, `several_active_pensions`, `small_inactive_accounts` — no more |
+| UNIT-CHA-002 | "adds up the balance and this year's fees" | 493,000; 5 accounts, 3 active; fees = Σ balance × balance fee + 12 × deposit × deposit fee |
+| UNIT-CHA-003 | "prices a pension fund above the default funds' fee by retirement" | `p1`; cost > ₪10,000; body quotes 1.49%, 0.22% and "27 שנים עד גיל 67" |
+| UNIT-CHA-004 | "leaves the cost out, rather than guessing, when the report has no age" | `costToRetirement` null; no "עד הפרישה" |
+| UNIT-CHA-005 | "does not raise a pension fund at or below the default funds' fee, or one with no deposits" | None |
+| UNIT-CHA-006 | "flags a fee above the legal maximum, for pension and provident funds only" | Pension and provident flagged, `high`; insurance never |
+| UNIT-CHA-007 | "asks about disability cover when no product has it, below retirement age" | One finding at 40; none at 67 |
+| UNIT-CHA-008 | "asks about survivors' cover only when there are dependants" | One with dependants; none without |
+| UNIT-CHA-009 | "words duplicate disability and duplicate survivors' cover differently" | Only disability says "התגמול מכמה מקורות מוגבל"; the monthly cost is quoted |
+| UNIT-CHA-010 | "gathers small dormant accounts that still pay fees into one finding" | `g1`, `i1`; `low` |
+| UNIT-CHA-011 | "keys a finding by rule and accounts, whatever order the report lists them in" | Same keys reversed; keys unique |
+| UNIT-CHA-012 | "puts the most serious first" | Severities non-decreasing |
+| UNIT-CHA-013 | "writes a percentage the way people read it" | "0.22%", "1%", "1.05%" |
+| UNIT-CHA-014 | "reads back exactly what the parser's shape holds" | `readSnapshot(JSON round-trip)` equals the fixture |
+| UNIT-CHA-015 | "drops an account that does not fit, rather than guessing its values" | An unknown kind and a non-numeric balance dropped |
+| UNIT-CHA-016 | "refuses a report without its header or with more than the ID's last four digits" | `null` |
+| UNIT-CHA-017 | "reads a missing or impossible age as unknown" | −3 and "40" → `null` |
+| UNIT-CHA-018 | "starts every finding as a draft in the draft's own words" | All `draft`; nothing to print |
+| UNIT-CHA-019 | "prints approved findings only, in Dorit's words when she edited them" | One approved (edited) printed; rejected and stale decisions ignored |
+| UNIT-CHA-020 | "does not call a text 'edited' when it is the draft's own" | `edited` false |
+
+### 4.49a Stale builds and page chunks that will not load — `tests/unit/freshness.dom.test.ts` (new cases)
+
+`src/lib/freshness.ts`. The fallback screen's recovery: a tab left open through a deploy asks for a page chunk that is gone (2026-10-12 /faq, 2026-10-14 /claims).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-FRESH-001 | "recognises %s's wording" (4 cases) | Chrome, Safari, Firefox and an HTML-for-JS answer are chunk failures |
+| UNIT-FRESH-002 | "does not take an ordinary render error for one" | A TypeError of the page's own, and `undefined`, are not |
+| UNIT-FRESH-003 | "reloads at an address the cache has never seen, keeping the page and its query" | `?x=1&_v=<now>` on the same path |
+
+### 4.49b The offers' wording and outside links — `tests/unit/offers.test.ts`
+
+`src/config/offers.ts` (growth brief, 2026-10-14).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-OFFER-001 | "says no 'חינם' until Dorit confirms she absorbs the clearinghouse's cost" | No "חינם"/"ללא עלות"; the calculator headline word for word |
+| UNIT-OFFER-002 | "points the year-end page at the article its figures come from" | `/atzmaim-31-12` ↔ `/blog/sof-shana-atzmaim` |
+| UNIT-OFFER-003 | "takes %j only as an https link to its own host" (8 cases) | `httpsUrl`: https on cal.com / whatsapp.com kept (trimmed); http, another host, a look-alike, empty → null |
+
+## 5. Pass criteria
+
+All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —
+these tests have no external dependencies.

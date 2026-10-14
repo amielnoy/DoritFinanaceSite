@@ -4,18 +4,33 @@ export interface ClientMail {
   heading: string;
   intro: string;
   panelTitle: string;
-  details: [label: string, value: string][];
+  /** A row's optional third element makes its value a link — same https:// rule as `action`. */
+  details: [label: string, value: string, href?: string][];
   /** One button under the panel. Rendered only for an https:// href with no quote, angle bracket or space. */
   action?: { label: string; href: string };
 }
 
+/** A plain https:// address: no quote, angle bracket or space can break out of the attribute. */
+function isPlainHttps(href: string | undefined): href is string {
+  return !!href && /^https:\/\/[^\s"'<>]+$/.test(href);
+}
+
 /** The button-style anchor for `action`, or '' when the href is not a plain https:// address. */
 function actionBlock(action: ClientMail['action']): string {
-  if (!action || !/^https:\/\/[^\s"'<>]+$/.test(action.href)) return '';
+  if (!action || !isPlainHttps(action.href)) return '';
   return `
         <p style="margin:0 0 32px; text-align:center;"><a href="${escapeHtml(action.href)}" style="display:inline-block; padding:14px 32px; background:#1A1A1B; color:#F9F7F2; font-family:Arial,sans-serif; font-size:15px; font-weight:bold; text-decoration:none; border-radius:4px;">${escapeHtml(action.label)}</a></p>`;
 }
 
+/**
+ * A detail's value, escaped; with a plain https:// href it is that link. An
+ * address is left-to-right and may be long, so it breaks anywhere rather than
+ * widening the 600px letter. A row without an href renders as it always did.
+ */
+function detailValue(value: string, href: string | undefined): string {
+  if (!isPlainHttps(href)) return escapeHtml(value);
+  return `<a href="${escapeHtml(href)}" dir="ltr" style="color:#1A1A1B; font-family:Arial,sans-serif; font-size:13px; font-weight:normal; word-break:break-all;">${escapeHtml(value)}</a>`;
+}
 
 /**
  * בריחת תווים לפני שילוב טקסט מהמבקר בגוף HTML.
@@ -63,10 +78,10 @@ export function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle
                 <td colspan="2" style="padding:0; font-size:0; line-height:0; border-top:1px solid #E0D4C6;">&nbsp;</td>
               </tr>`;
   const detailRows = rows
-    .map(([label, value]) => `
+    .map(([label, value, href]) => `
               <tr>
                 <td style="padding:10px 0; font-size:13px; color:#7D6B5D; font-family:Arial,sans-serif; width:130px; text-align:right;">${escapeHtml(label)}</td>
-                <td style="padding:10px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold; text-align:right;">${escapeHtml(value)}</td>
+                <td style="padding:10px 0; font-size:15px; color:#1A1A1B; font-family:Georgia,serif; font-weight:bold; text-align:right;">${detailValue(value, href)}</td>
               </tr>`)
     .join(divider);
 
