@@ -787,6 +787,9 @@ export default function NeedsWizard() {
               {submitting ? <Loader2 size={18} className="motion-safe:animate-spin" aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
             </CtaButton>
           </div>
+          {/* What happens after the button (user feedback, 2026-10-14) — the
+              same promise as CONFIRMATION_FOLLOW_UP. */}
+          <p className="m-0 -mt-2 text-[15px] text-muted-foreground text-end">דורית חוזרת אליך תוך יום עסקים אחד.</p>
         </form>
       ) : null}
 

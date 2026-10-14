@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, MessageCircle } from "lucide-react";
+import { CONTACT } from "@/config/contact";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -29,7 +30,7 @@ const BRIEFS: Brief[] = [
     tag: "תביעת חיים",
     title: "מ-דחייה לאישור מלא תוך 11 ימים",
     body: "משפחה שנתקלה בסירוב ראשוני לתביעת חיים. ניהלתי את ההליך מול החברה, השלמתי תיעוד והבאתי את הכיסוי המלא — בלי שהמשפחה נאלצה להרים טלפון.",
-    metric: "₪850K שולמו",
+    metric: "850 אלף ₪ שולמו",
   },
   {
     tag: "תכנון פנסיה",
@@ -58,9 +59,9 @@ const BRIEFS: Brief[] = [
   },
   {
     tag: "חיסכון פנסיוני",
-    title: "חיסכון מוערך של ₪420K בדמי ניהול",
+    title: "חיסכון מוערך של 420 אלף ₪ בדמי ניהול",
     body: "שכירה בת 39 שהפקידה לארבעה מוצרים שונים עם דמי ניהול גבוהים. איחדתי לשני מסלולים ממוקדים, ניהלתי משא ומתן מול הגופים המוסדיים והורדתי את דמי הניהול — החיסכון המצטבר עד הפרישה מוערך ב-₪420 אלף.",
-    metric: "₪420K בהערכה",
+    metric: "420 אלף ₪ בהערכה",
     basis: "הערכה המבוססת על הנחות של תשואה ודמי ניהול",
   },
   {
@@ -151,7 +152,7 @@ export default function ProofCarousel() {
         tabIndex={0}
         role="region"
         aria-label="תיקי הצלחה — גלילה אופקית"
-        className="flex gap-5 overflow-x-auto px-[clamp(20px,4vw,40px)] pb-[clamp(72px,9vw,120px)] snap-x snap-mandatory [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight max-md:gap-4 max-md:pb-10"
+        className="flex gap-5 overflow-x-auto px-[clamp(20px,4vw,40px)] pb-[clamp(72px,9vw,120px)] snap-x snap-mandatory max-md:items-start [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight max-md:gap-4 max-md:pb-10"
         style={{ scrollbarWidth: "none" }}
       >
         {BRIEFS.map((b, i) => {
@@ -172,10 +173,14 @@ export default function ProofCarousel() {
               <h3 className="font-heading font-medium text-[26px] leading-[1.3] max-md:text-[21px]">
                 {b.title}
               </h3>
+              {/* Below md the story shows its first two lines until "פרטי המקרה"
+                  opens it: hidden outright, half of each card stood empty
+                  (user feedback, 2026-10-14). The whole text stays in the page. */}
               <p
                 id={isDesktop ? undefined : `proof-${i}-story`}
-                hidden={isDesktop ? undefined : !expanded}
-                className="text-base leading-[1.75] text-foreground/80 flex-1 max-md:text-[15px] max-md:leading-[1.7]"
+                className={`text-base leading-[1.75] text-foreground/80 flex-1 max-md:text-[15px] max-md:leading-[1.7] ${
+                  !isDesktop && !expanded ? "line-clamp-2" : ""
+                }`}
               >
                 {b.body}
               </p>
@@ -215,9 +220,26 @@ export default function ProofCarousel() {
           );
         })}
       </div>
+
+      {/* The step after the cases (user feedback, 2026-10-14): one line, to
+          WhatsApp. Reported by the site-wide click listener as click_whatsapp,
+          location "proof". */}
+      <div data-track-location="proof" className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] -mt-[clamp(40px,6vw,80px)] pb-[clamp(56px,7vw,96px)] max-md:-mt-4 max-md:pb-10">
+        <a
+          href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(SIMILAR_CASE_TEXT)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 min-h-11 font-heading text-xl text-accent underline decoration-highlight/50 underline-offset-[6px] hover:decoration-highlight"
+        >
+          <MessageCircle size={20} strokeWidth={1.5} aria-hidden="true" />
+          יש לך מקרה דומה? ספרו לדורית בוואטסאפ
+        </a>
+      </div>
     </section>
   );
 }
+
+const SIMILAR_CASE_TEXT = "שלום דורית, ראיתי את תיקי ההצלחה באתר, ויש לי מקרה דומה";
 
 const ARROW =
   "w-12 h-12 rounded-md border border-border flex items-center justify-center text-foreground hover:border-highlight hover:text-accent transition-colors duration-200 max-md:w-11 max-md:h-11";
