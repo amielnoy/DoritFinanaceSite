@@ -55,5 +55,6 @@
   "submit.request": "votre demande",
   "submit.report": "le signalement",
   "nav.call": "Appeler",
-  "nav.phone": "Téléphone"
+  "nav.phone": "Téléphone",
+  "credentials.licence": "Licence d'agent de l'Autorité des marchés des capitaux, n°"
 }

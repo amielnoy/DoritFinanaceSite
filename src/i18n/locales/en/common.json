@@ -55,5 +55,6 @@
   "submit.request": "your request",
   "submit.report": "the report",
   "nav.call": "Call",
-  "nav.phone": "Phone"
+  "nav.phone": "Phone",
+  "credentials.licence": "Agent licence from the Capital Market Authority, no."
 }

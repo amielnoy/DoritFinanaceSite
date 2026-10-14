@@ -20,9 +20,14 @@ import { CONTACT } from "@/config/contact";
 import AgentChat from "@/components/dorit/chat/AgentChat";
 import { AGENTS } from "@/config/agents";
 import { FAQ_CATEGORIES, faqByCategory } from "@/content/faq";
+import { faqCategoryLabel, localizeFaq } from "@/i18n/faq";
 import type { FaqCategory, FaqEntry } from "@/content/faq";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
+import type { Locale } from "@/i18n/locales";
+
+const IN_LANGUAGE: Record<Locale, string> = { he: "he-IL", en: "en", fr: "fr" };
 
 interface FAQCategoryView extends FaqCategory {
   icon: LucideIcon;
@@ -40,32 +45,43 @@ const CTA_CELL =
   "max-md:flex-col max-md:justify-center max-md:gap-1 max-md:min-h-16 max-md:px-1 max-md:py-2 max-md:text-[15px] max-md:leading-tight";
 
 export default function FAQPage() {
+  const t = useT("faq");
+  const locale = useLocale();
+  const lp = useLocalePath();
+  const he = locale === "he";
+  // The same categories and entries, in the page's language.
+  const categories = CATEGORIES.map((c) => ({
+    ...c,
+    label: faqCategoryLabel(c.id, locale),
+    items: c.items.map((e) => localizeFaq(e, locale)),
+  }));
   useSeo({
-    title: "שאלות ותשובות — פנסיה, גמל, ביטוח ומיסוי | דורית גוב ארי",
-    description:
-      "תשובות ברורות לשאלות הנפוצות על פנסיה, קרנות השתלמות, דמי ניהול, קיבוע זכויות, תיקון 190 וביטוחי חיים ובריאות.",
+    title: t("page.seoTitle"),
+    description: t("page.seoDescription"),
     path: "/faq",
+    locale,
+    translated: true,
     jsonLd: [
       breadcrumbLd([
-        { name: "ראשי", path: "/" },
-        { name: "שאלות ותשובות", path: "/faq" },
+        { name: t("page.crumbHome"), path: lp("/") },
+        { name: t("page.name"), path: lp("/faq") },
       ]),
       {
         "@context": "https://schema.org",
         "@type": "CollectionPage",
-        name: "שאלות ותשובות",
-        url: absoluteUrl("/faq"),
-        inLanguage: "he-IL",
+        name: t("page.name"),
+        url: absoluteUrl(lp("/faq")),
+        inLanguage: IN_LANGUAGE[locale],
       },
       // Built from the same array rendered below, so the markup cannot claim a
       // question the page does not show. This is the only URL on the site that
       // declares FAQPage — the home page used to as well, for questions it
       // never displayed.
-      faqLd(CATEGORIES.flatMap((c) => c.items)),
+      faqLd(categories.flatMap((c) => c.items)),
     ],
   });
 
-  const [activeCat, setActiveCat] = useState<string>(CATEGORIES[0].id);
+  const [activeCat, setActiveCat] = useState<string>(categories[0].id);
   // Below md the topics are a bar pinned under the header, and a question
   // opens without closing the one above it: closing it pulled the clicked
   // question up the screen by the height of the answer that vanished.
@@ -120,20 +136,19 @@ export default function FAQPage() {
                 heading is one line, not two. The <title> and description are
                 useSeo's above, and do not change. */}
             <Eyebrow className="max-md:hidden">
-              שאלות ותשובות
+              {t("page.name")}
             </Eyebrow>
             <h1 className="font-heading text-4xl md:text-6xl md:mt-5 leading-tight max-w-3xl">
-              שאלות{" "}
+              {t("page.titleLine1")}{" "}
               <br className="max-md:hidden" />
-              ותשובות
+              {t("page.titleLine2")}
             </h1>
             <p className="mt-8 text-lg text-foreground/70 max-w-2xl leading-relaxed max-md:mt-3 max-md:text-base max-md:leading-relaxed">
               <span className="md:hidden">
-                מענה מהיר במס הכנסה, פנסיה וביטוח — ואם לא מצאתם, אשמח לענות אישית.
+                {t("page.introPhone")}
               </span>
               <span className="max-md:hidden">
-                מענה מהיר לנושאים מרכזיים במס הכנסה, פנסיה וביטוח. בחרו את הנושא
-                שמעניין אתכם — ואם לא מצאתם את התשובה, אשמח לענות אישית.
+                {t("page.intro")}
               </span>
             </p>
           </Reveal>
@@ -157,14 +172,14 @@ export default function FAQPage() {
             >
               <div className="lg:sticky lg:top-32">
                 <p id="faq-topics-label" className="text-sm text-muted-foreground mb-5 max-md:sr-only">
-                  ניווט לפי נושא
+                  {t("page.topics")}
                 </p>
                 <div
                   role="group"
                   aria-labelledby="faq-topics-label"
                   className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 max-md:pb-0 max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden"
                 >
-                  {CATEGORIES.map((cat) => {
+                  {categories.map((cat) => {
                     const active = cat.id === activeCat;
                     return (
                       <button
@@ -173,7 +188,7 @@ export default function FAQPage() {
                         aria-pressed={active}
                         onClick={(e) => selectTopic(cat.id, e.currentTarget)}
                         onFocus={(e) => revealTopic(e.currentTarget)}
-                        className={`flex items-center gap-3 px-5 py-4 border transition-all duration-300 text-right whitespace-nowrap lg:whitespace-normal max-md:shrink-0 max-md:min-h-11 max-md:px-4 max-md:py-2 ${
+                        className={`flex items-center gap-3 px-5 py-4 border transition-all duration-300 text-start whitespace-nowrap lg:whitespace-normal max-md:shrink-0 max-md:min-h-11 max-md:px-4 max-md:py-2 ${
                           active
                             ? "bg-primary text-primary-foreground border-primary"
                             : "border-border hover:border-accent hover:bg-secondary/40"
@@ -189,15 +204,15 @@ export default function FAQPage() {
                 {/* Below md the support chat's card says this directly
                     underneath, and the CTA band after it. */}
                 <div className="mt-8 p-6 border border-border/60 bg-secondary/30 max-md:hidden">
-                  <p className="font-heading text-xl mb-2">לא מצאתם תשובה?</p>
+                  <p className="font-heading text-xl mb-2">{t("page.notFoundTitle")}</p>
                   <p className="text-sm text-foreground/70 leading-relaxed mb-5">
-                    שאלו אותי ישירות — אחזור אליכם אישית תוך יום עסקים אחד.
+                    {t("page.notFoundText")}
                   </p>
                   <a
-                    href="/#start"
+                    href={lp("/#start")}
                     className={ctaClass("w-full")}
                   >
-                    יצירת קשר
+                    {t("page.contact")}
                   </a>
                 </div>
               </div>
@@ -210,7 +225,7 @@ export default function FAQPage() {
                   for all of them, and markup may only describe content that is
                   actually in the HTML — see 10-known-issues B-0. Nothing about
                   what a visitor sees changes. */}
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <div
                   key={cat.id}
                   hidden={cat.id !== activeCat}
@@ -223,7 +238,7 @@ export default function FAQPage() {
                   <div className="mb-6 max-md:mb-4">
                     <h2 className="font-heading text-3xl md:text-4xl">{cat.label}</h2>
                     <p className="text-sm tracking-[0.2em] uppercase text-accent mt-2">
-                      {cat.labelEn} · {cat.items.length} שאלות
+                      {he ? `${cat.labelEn} · ` : ""}{t("page.count", { count: cat.items.length })}
                     </p>
                   </div>
                   <Accordion
@@ -238,7 +253,7 @@ export default function FAQPage() {
                         value={item.id}
                         className="border-b border-border/60"
                       >
-                        <AccordionTrigger className="text-right text-lg md:text-xl font-heading py-6 max-md:py-4 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
+                        <AccordionTrigger className="text-start text-lg md:text-xl font-heading py-6 max-md:py-4 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
                           {item.q}
                         </AccordionTrigger>
                         <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
@@ -257,28 +272,29 @@ export default function FAQPage() {
             A visitor who has just read every answer on the page and not found
             theirs is the one person on the site who definitely has a question,
             and until now the only thing offered to them was a phone number. */}
-        <AgentChat descriptor={AGENTS.support} />
+        {/* The support chat answers in Hebrew: on the Hebrew page only. */}
+        {he ? <AgentChat descriptor={AGENTS.support} /> : null}
 
         {/* CTA */}
         <section data-track-location="faq" className="relative py-12 md:py-32 border-t border-border/60 bg-primary text-primary-foreground">
           <div className="max-w-3xl mx-auto px-6 text-center">
             <Reveal>
               <h2 className="font-heading text-3xl md:text-5xl leading-tight">
-                עדיין מתלבטים?
+                {t("page.ctaTitle")}
               </h2>
               <p className="mt-3 md:mt-6 text-primary-foreground/70 leading-relaxed">
-                כל שאלה ראויה לתשובה אישי. נשוחח — ונבנה יחד את התכנון הנכון עבורכם.
+                {t("page.ctaText")}
               </p>
               {/* Below md: one row, a grid of three, each a label under its icon. */}
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 max-md:mt-6 max-md:grid max-md:grid-cols-3 max-md:gap-2 max-md:items-stretch">
-                <CtaLink href="/#start" className={CTA_CELL}>קביעת פגישה</CtaLink>
+                <CtaLink href={lp("/#start")} className={CTA_CELL}>{t("page.ctaMeeting")}</CtaLink>
                 <a
                   href={`tel:${CONTACT.phoneE164}`}
                   className={`inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors ${CTA_CELL}`}
                 >
                   <Phone size={18} className="shrink-0" />
                   <span dir="ltr" className="max-md:hidden">{CONTACT.phoneDisplay}</span>
-                  <span className="md:hidden">טלפון</span>
+                  <span className="md:hidden">{t("page.ctaPhone")}</span>
                 </a>
                 <a
                   href={`https://wa.me/${CONTACT.whatsapp}`}
@@ -291,11 +307,11 @@ export default function FAQPage() {
                 </a>
               </div>
               <Link
-                to="/"
+                to={lp("/")}
                 className="mt-10 max-md:mt-6 inline-flex items-center gap-1 text-sm text-primary-foreground/60 hover:text-highlight transition-colors"
               >
-                <ChevronLeft size={16} />
-                חזרה לדף הבית
+                <ChevronLeft size={16} className="ltr:rotate-180" />
+                {t("page.backHome")}
               </Link>
             </Reveal>
           </div>
