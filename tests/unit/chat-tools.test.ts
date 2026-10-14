@@ -321,4 +321,10 @@ describe("listArticles / readArticle", () => {
     const out = await run(articleSource({ list: vi.fn(async () => { throw new Error("select_http_500"); }) }))("listArticles", {}, supportCtx());
     expect(JSON.parse(out.forModel)).toEqual({ ok: false, error: "tool_failed" });
   });
+
+  it("turns a failing read into tool_failed too, never not_found", async () => {
+    const out = await run(articleSource({ read: vi.fn(async () => { throw new Error("select_http_503"); }) }))("readArticle", { slug: "dmei-nihul" }, supportCtx());
+    expect(out).toMatchObject({ name: "readArticle", isError: true });
+    expect(JSON.parse(out.forModel)).toEqual({ ok: false, error: "tool_failed" });
+  });
 });

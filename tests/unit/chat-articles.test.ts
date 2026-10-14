@@ -42,6 +42,19 @@ describe("the chat's article source", () => {
     expect(p.get("limit")).toBe("1");
   });
 
+  it("keeps a body of exactly the limit whole", async () => {
+    const { articles } = source([{ slug: "a", title: "T", body: "א".repeat(ARTICLE_BODY_LIMIT) }]);
+    const read = await articles.read("a");
+    expect(read?.body).toHaveLength(ARTICLE_BODY_LIMIT);
+    expect(read?.truncated).toBe(false);
+  });
+
+  it("queries for a slug of 200 characters, the longest it accepts", async () => {
+    const { select, articles } = source([]);
+    await articles.read("x".repeat(200));
+    expect(select).toHaveBeenCalledTimes(1);
+  });
+
   it("cuts a long body and says so", async () => {
     const { articles } = source([{ slug: "a", title: "T", body: "א".repeat(ARTICLE_BODY_LIMIT + 50) }]);
     const read = await articles.read("a");
