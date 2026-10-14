@@ -1304,22 +1304,25 @@ describe("the letter a customer gets", () => {
         // the pre-built fragments assembled above it. Anything else is a value
         // reaching the HTML raw.
         const bindings = template.match(/\$\{([^}]*)\}/g) ?? [];
-        const allowed = /^\$\{(escapeHtml\(|detailRows|detailsBlock|divider|actionBlock\()/;
+        const allowed = /^\$\{(escapeHtml\(|detailRows|detailsBlock|divider|actionBlock\(|detailValue\()/;
         for (const binding of bindings) {
           expect(binding, `${fn}: unescaped binding`).toMatch(allowed);
         }
       });
 
-      it("builds its button only from escaped values and a plain https:// address", () => {
-        // actionBlock is a pre-built fragment like detailsBlock, but it is a
-        // function, so the bindings above cannot see inside it. Its own must be
-        // escapeHtml calls, behind the https-only check.
+      it("builds its button and its linked details only from escaped values and a plain https:// address", () => {
+        // actionBlock and detailValue are pre-built fragments like detailsBlock,
+        // but they are functions, so the bindings above cannot see inside them.
+        // Their own must be escapeHtml calls, behind the https-only check.
         if (!src.includes("function actionBlock(")) return;
-        const block = fnSource(src, "actionBlock");
-        for (const binding of block.match(/\$\{([^}]*)\}/g) ?? []) {
-          expect(binding, `${fn}: actionBlock binds a raw value`).toMatch(/^\$\{escapeHtml\(/);
+        expect(fnSource(src, "isPlainHttps")).toMatch(/\^https:/);
+        for (const name of ["actionBlock", "detailValue"]) {
+          const block = fnSource(src, name);
+          for (const binding of block.match(/\$\{([^}]*)\}/g) ?? []) {
+            expect(binding, `${fn}: ${name} binds a raw value`).toMatch(/^\$\{escapeHtml\(/);
+          }
+          expect(block, `${fn}: ${name} skips the https-only check`).toMatch(/isPlainHttps\(/);
         }
-        expect(block).toMatch(/\^https:/);
       });
 
       it("signs with the one contact identity", () => {
