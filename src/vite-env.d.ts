@@ -29,6 +29,8 @@ interface ImportMetaEnv {
   /** Hosts the page leaves for the canonical one, comma-separated; `none` turns it off — see `src/lib/legacy-host.ts`. */
   readonly VITE_LEGACY_HOSTS?: string;
   readonly VITE_SUPABASE_URL?: string;
+  readonly VITE_CAL_LINK?: string;
+  readonly VITE_WHATSAPP_CHANNEL_URL?: string;
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
   /**
    * A boolean, not a string, and the one name here that never comes from a

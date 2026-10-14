@@ -211,7 +211,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
         stickyBar(page).getByRole("link", { name: /חייגו/ }),
         stickyBar(page).getByRole("link", { name: /שאלה לעוזר/ }),
         page.getByRole("button", { name: "תפריט" }),
-        page.locator("#top").getByRole("link", { name: "לשיחה קצרה עם דורית" }),
+        page.locator("#top").getByRole("link", { name: "בדיקת תיק פנסיוני" }),
         page.locator("#top").getByRole("link", { name: "וואטסאפ" }),
         page.locator("#top").getByRole("link", { name: "חיוג" }),
         page.locator("#start").getByRole("link", { name: "וואטסאפ" }),
@@ -829,7 +829,7 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       expect(h1.y).toBeGreaterThan(box.y + box.height);
     });
 
-    const cta = hero.getByRole("link", { name: "לשיחה קצרה עם דורית" });
+    const cta = hero.getByRole("link", { name: "בדיקת תיק פנסיוני" });
     const wa = hero.getByRole("link", { name: "וואטסאפ" });
     const call = hero.getByRole("link", { name: "חיוג" });
 
@@ -847,18 +847,22 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       await expect(call).toHaveAttribute("href", "tel:+972508311776");
     });
 
-    await test_step("all three report to GA4 from location top", async () => {
-      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
-      for (const link of [cta, wa, call]) await link.click();
-      const events = await queuedClicks(page);
-      for (const name of ["cta_click", "click_whatsapp", "click_phone"]) {
-        expect(events).toContainEqual({ name, location: "top" });
-      }
-    });
-
     await test_step("a phone fetches the small portrait, not the 1080 one", async () => {
       const src = await hero.locator("img").evaluate((img) => (img as HTMLImageElement).currentSrc);
       expect(src).toMatch(/-480\.(avif|webp)$/);
+    });
+
+    await test_step("all three report to GA4 from location top", async () => {
+      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
+      // The flagship last: it is a router link, which moves the page before
+      // the listener above can stop it; the queue survives the navigation.
+      for (const link of [wa, call, cta]) await link.click();
+      const events = await queuedClicks(page);
+      for (const name of ["click_whatsapp", "click_phone"]) {
+        expect(events).toContainEqual({ name, location: "top" });
+      }
+      expect(events).toContainEqual({ name: "cta_click", location: "top" });
+      await expect(page).toHaveURL(/\/pension-check$/);
     });
   });
 

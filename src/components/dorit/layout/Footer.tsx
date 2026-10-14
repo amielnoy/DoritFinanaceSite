@@ -3,6 +3,7 @@ import { Image } from "@/components/ui/image";
 import { ChevronDown, Phone, Mail, MapPin, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CONTACT } from "@/config/contact";
+import { WHATSAPP_CHANNEL_URL } from "@/config/offers";
 import { useSectionNav } from "@/hooks/useSectionNav";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 
@@ -142,6 +143,16 @@ export default function Footer() {
               <span>תל אביב · פגישות גם בזום</span>
             </li>
           </ul>
+          {/* Dorit's WhatsApp channel, on every page, once VITE_WHATSAPP_CHANNEL_URL
+              is set (growth brief, 2026-10-14). The site only links to it. */}
+          {WHATSAPP_CHANNEL_URL ? (
+            <p data-track-location="footer_channel" className="mt-5 text-[15px] text-[hsl(0_3%_84%)] leading-relaxed max-md:mt-4">
+              תזכורת אחת בחודש לפני דדליינים של מס —{" "}
+              <a href={WHATSAPP_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                להצטרפות לערוץ הוואטסאפ
+              </a>
+            </p>
+          ) : null}
         </div>
       </div>
 

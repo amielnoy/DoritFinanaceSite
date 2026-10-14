@@ -63,6 +63,8 @@ const ROUTES = [
   '/',
   '/faq',
   '/tools',
+  '/pension-check',
+  '/atzmaim-31-12',
   '/perspective',
   '/claims',
   '/blog',
