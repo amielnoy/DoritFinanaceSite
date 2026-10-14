@@ -62,6 +62,12 @@ export interface EdgeOptions {
   resendStatus?: number;
   /** …with this body instead of the default. */
   resendResponse?: unknown;
+  /**
+   * Answers any upstream call before the built-in stubs, for a function whose
+   * upstreams this harness does not model (content-admin's auth and tables).
+   * Return undefined to fall through to them.
+   */
+  upstream?: (call: FetchCall) => Response | undefined;
 }
 
 export interface EdgeInvocation {
@@ -135,7 +141,10 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
         : form
           ? Object.fromEntries(new URLSearchParams(init.body))
           : JSON.parse(init.body);
-    fetches.push({ url: u, method, headers: (init.headers ?? {}) as Record<string, string>, body: parsed });
+    const call = { url: u, method, headers: (init.headers ?? {}) as Record<string, string>, body: parsed };
+    fetches.push(call);
+    const custom = options.upstream?.(call);
+    if (custom) return custom;
 
     // The mailer, not the provider — the same boundary base44-function.ts records.
     if (u === MAILER_URL) {
