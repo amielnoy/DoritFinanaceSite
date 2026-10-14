@@ -232,6 +232,28 @@ export async function signStorageUrl(bucket: string, path: string, expiresIn: nu
 }
 
 /**
+ * Deletes objects from a bucket through the Storage API — the only way that
+ * removes the file as well as its row. `names` are paths inside the bucket.
+ * Answers how many Storage reports deleted; throws on a refusal, by status.
+ */
+export async function deleteStorageObjects(bucket: string, names: string[]): Promise<number> {
+  if (names.length === 0) return 0;
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const auth = serviceAuth();
+  if (!url || !auth) throw new Error('supabase_not_configured');
+
+  const res = await fetch(`${url}/storage/v1/object/${bucket}`, {
+    method: 'DELETE',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prefixes: names }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`storage_delete_http_${res.status}`);
+  const deleted = await res.json().catch(() => null);
+  return Array.isArray(deleted) ? deleted.length : 0;
+}
+
+/**
  * The headers that let a function write past row-level security.
  *
  * Supabase injects the project's new secret key as `SUPABASE_SECRET_KEYS`, a
