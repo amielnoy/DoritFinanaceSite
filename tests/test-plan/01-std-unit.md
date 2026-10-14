@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 841 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1432 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 856 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1452 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -358,6 +358,7 @@ one; a blocked or throwing tag never breaks the page.
 | UNIT-GA4-005 | "marks the agency's own browsing as internal" | `traffic_type: internal` added |
 | UNIT-GA4-006 | "is set by ?internal=1 and cleared by ?internal=0" | Flag toggles |
 | UNIT-GA4-007 | "counts a submitted form as a lead" | `generate_lead {method: contact_form}` |
+| UNIT-GA4-007a | "counts the Har HaBituach check's summary as a lead of its own method" | `generate_lead {method: coverage_check}` |
 | UNIT-GA4-008 | "names the chat that started and the one that asked for a person" | `chat_start` / `chat_handoff` carry `method` |
 | UNIT-GA4-009 | "every event it sends is in the catalogue the admin panel shows" | Every sent name is in `LEAD_EVENTS` |
 | UNIT-GA4-010 | "reports a phone link with the section it sits in" | `click_phone {location: <section id>}` |
@@ -1277,3 +1278,24 @@ these tests have no external dependencies.
 | UNIT-RET-007 | "keeps a value inside its range" | `clampTo` per the slider ranges |
 | UNIT-RET-008 | "adds ₪500 a month, even past the slider's top" | At ₪10,000 the variation still grows the balance |
 | UNIT-RET-009 | "lowers the fee to 0.15%, and never raises one already below it" | At 0.1 % the variation equals the base |
+
+### 4.52 Har HaBituach — reading the export and the double-coverage check — `tests/unit/har-habituach.dom.test.ts`
+
+On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's layout, invented values), written as an .xlsx inside the test.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-HB-001 | "reads Har HaBituach's prefixed XML (x:row) and Excel's plain XML alike" | Header and a policy row read back; an inline string read |
+| UNIT-HB-002 | "refuses a file that is not an xlsx, and an xlsx with no sheet" | `XlsxError` `not_xlsx` / `no_sheet` |
+| UNIT-HB-003 | "finds the header below the title and reads one policy per row, in its section" | 8 policies in their three sections |
+| UNIT-HB-004 | "reads the premium as a number and its period as monthly or yearly" | 1800 yearly; 45.5 monthly |
+| UNIT-HB-005 | "never reads the ID number, the policy number or the free text into a policy" | Neither fake value anywhere in the policies |
+| UNIT-HB-006 | "skips a repeated header and reads an unreadable premium as unknown" | 9 policies; premium `null` |
+| UNIT-HB-007 | "says so when the file has no Har HaBituach table" | `MappingError` |
+| UNIT-HB-008 | "flags a type held in two policies, but never per-asset car or home policies" | Only "תרופות - בסיס"; "רכב חובה" ×2 not flagged |
+| UNIT-HB-009 | "keeps a service rider apart from the policy it rides on" | "כתב שירות שמשות" its own group |
+| UNIT-HB-010 | "lists the expected coverages no policy has" | ניתוחים, השתלות…, אובדן כושר עבודה |
+| UNIT-HB-011 | "totals every premium as a monthly amount" | Yearly ÷ 12 plus monthly |
+| UNIT-HB-012 | "puts possible duplicates first" | First group flagged |
+| UNIT-HB-013 | "names counts, the flagged types with their companies and the missing types — and no identifier" | Summary lines; ≤ 1800 chars; no ID or policy number |
+| UNIT-HB-014 | "says when nothing looks duplicated" | "לא נמצא כפל אפשרי." |

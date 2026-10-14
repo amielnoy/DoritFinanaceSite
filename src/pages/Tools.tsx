@@ -5,6 +5,7 @@ import Footer from "@/components/dorit/layout/Footer";
 import InsuranceAssessment from "@/components/dorit/sections/InsuranceAssessment";
 import PensionFeeCalculator from "@/components/dorit/sections/PensionFeeCalculator";
 import RetirementCalculator from "@/components/dorit/sections/RetirementCalculator";
+import HarHabituachCheck from "@/components/dorit/sections/HarHabituachCheck";
 import { SNAPSHOT_HOME } from "@/config/snapshot";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import { SITE_NAME, breadcrumbLd, useSeo } from "@/lib/seo";
@@ -65,6 +66,7 @@ export default function Tools() {
         <PensionFeeCalculator />
         {/* The snapshot programme's new tools ship with its switch (VITE_SNAPSHOT_HOME). */}
         {SNAPSHOT_HOME ? <RetirementCalculator /> : null}
+        {SNAPSHOT_HOME ? <HarHabituachCheck /> : null}
         <AgentChat descriptor={AGENTS.procedures} />
       </main>
       <Footer />

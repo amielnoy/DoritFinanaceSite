@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 294 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 324 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 300 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 330 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -551,6 +551,19 @@ On /tools only with `VITE_SNAPSHOT_HOME=true`.
 | CMP-RET-006 | "keeps the disclaimer word for word, and sends the CTA to the questionnaire" | The brief's sentence; CTA → `/#start` |
 | CMP-RET-007 | "sends no calculator_result for the untouched defaults" | None |
 | CMP-RET-008 | "sends calculator_result once the inputs settle, with the tool's name and no figure" | `{tool: "retirement_projection"}` once |
+
+### 4.31 `<HarHabituachCheck />` — /tools, בדיקת כפל ביטוחים — `tests/component/har-habituach-check.test.tsx`
+
+`services.leads.submitLead` mocked; the file is the fixture written as an .xlsx. On /tools only with `VITE_SNAPSHOT_HOME=true`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-HB-001 | "shows the three steps, linking to Har HaBituach in a new tab, and the disclaimer" | `https://harb.cma.gov.il/`, `noopener noreferrer`; "לא נשלח לשום מקום"; the disclaimer |
+| CMP-HB-002 | "reads the file into tiles and a list, a duplicate tagged, without sending anything" | Tiles 1 / 3; "כפל אפשרי" on the drugs group only; the note; `submitLead` not called |
+| CMP-HB-003 | "counts the check for GA4 once, by the tool's name only" | `calculator_result {tool: coverage_check}` once |
+| CMP-HB-004 | "refuses a file that is not an xlsx, and an xlsx that is not Har HaBituach's" | The two alerts |
+| CMP-HB-005 | "sends Dorit only the summary, through the lead pipeline, and counts a lead once it is saved" | `source: quick`, topic "בדיקת כפל ביטוחים", the summary; no identifier; `generate_lead {method: coverage_check}` |
+| CMP-HB-006 | "asks for a name and a mobile number before sending" | "נא למלא שם."; the mobile rule; nothing sent |
 
 ## 5. Pass criteria
 

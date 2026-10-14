@@ -23,7 +23,7 @@ export type TrackParams = Partial<Record<Param, string>>;
  * may carry only one of these: anything else is dropped, so a figure the
  * calculator showed cannot reach Google in it.
  */
-export const CALCULATOR_TOOLS = ["fee_calculator", "insurance_assessment", "retirement_projection"] as const;
+export const CALCULATOR_TOOLS = ["fee_calculator", "insurance_assessment", "retirement_projection", "coverage_check"] as const;
 export type CalculatorTool = (typeof CALCULATOR_TOOLS)[number];
 
 /** Parameters whose value must come from a closed list. */
@@ -165,6 +165,8 @@ export type ChatMethod = "ai_interview" | "ai_support" | "ai_procedures" | "ai_b
 export const leadEvents = {
   /** The short contact form, once the lead is saved — not on the click. */
   formSubmitted: () => track("generate_lead", { method: "contact_form" }),
+  /** The Har HaBituach check's summary sent to Dorit, once it is saved (/tools, בדיקת כפל ביטוחים). */
+  coverageCheckSubmitted: () => track("generate_lead", { method: "coverage_check" }),
   /** A claim report, once it is saved — ClaimForm fired no GA4 event at all before this. */
   claimSubmitted: () => track("generate_lead", { method: "claim" }),
   /** The interview's summary, once the page has submitted it and it saved. */
@@ -220,7 +222,7 @@ export const LEAD_EVENTS: ReadonlyArray<{
   when: string;
   keyEvent: boolean;
 }> = [
-  { name: "generate_lead", meaning: "ליד שנשמר", when: "טופס יצירת קשר, סיכום ראיון, שאלון ההיכרות או בקשת מעבר לדורית שנשמרו בהצלחה (method מבחין ביניהם; מהשאלון גם topic ו-urgency)", keyEvent: true },
+  { name: "generate_lead", meaning: "ליד שנשמר", when: "טופס יצירת קשר, סיכום ראיון, שאלון ההיכרות, בדיקת כפל ביטוחים או בקשת מעבר לדורית שנשמרו בהצלחה (method מבחין ביניהם; מהשאלון גם topic ו-urgency)", keyEvent: true },
   { name: "click_phone", meaning: "לחיצה על טלפון", when: "כל קישור חיוג באתר (location אומר מאיפה)", keyEvent: true },
   { name: "click_whatsapp", meaning: "לחיצה על וואטסאפ", when: "כל קישור וואטסאפ באתר", keyEvent: true },
   { name: "click_email", meaning: "לחיצה על מייל", when: "כל קישור מייל באתר", keyEvent: true },

@@ -618,7 +618,18 @@ retirement calculator on /tools, (3) a Har HaBituach double-coverage check on
   `src/lib/retirement-projection.ts` — monthly compounding at return − fee,
   pension = balance / 200; "ומה אם?" (₪500 more, fee 0.15%). GA4:
   `calculator_result` with `tool: retirement_projection`, never a figure.
-- **Waiting on Dorit:** `SNAPSHOT_REVIEW_BUSINESS_DAYS` (null → step 3 states no
+- **Phase 3 (/tools, `#har-habituach`):** `HarHabituachCheck.tsx`. The
+  export is read in the browser (`src/lib/har-habituach/xlsx.ts` — fflate and
+  DOMParser, .xlsx only; the real export writes `x:`-prefixed XML) and mapped
+  in one module (`mapping.ts`, which never reads the ID or policy number).
+  Coverage type = a service rider's product type, else the sub-branch; "כפל
+  אפשרי" for 2+ policies of a type outside "תחום - כללי" (car and home are per
+  asset); "כדאי לבדוק" for `EXPECTED_COVERAGE` (`src/config/har-habituach.ts`)
+  missing. "לשלוח לדורית לבדיקה" sends only `checkSummary` through
+  `submitLead` (`source: quick`, topic "בדיקת כפל ביטוחים") and counts
+  `generate_lead {method: coverage_check}` once saved.
+- **Waiting on Dorit:** `EXPECTED_COVERAGE` (the list and its wording);
+  `SNAPSHOT_REVIEW_BUSINESS_DAYS` (null → step 3 states no
   timing).
 
 ## The chat function (Phase 3)
@@ -1902,11 +1913,11 @@ enquiry. Everything goes through `src/lib/analytics.ts`:
 |---|---|---|
 | `click_phone`, `click_whatsapp`, `click_email` | any matching link, through one capture-phase listener | `location` |
 | `cta_click` | any link to `#start` | `location`, `cta: start_conversation` |
-| `generate_lead` | the contact form **after the save succeeds**; an interview's summary after the page's submit succeeds | `method: contact_form \| ai_interview` |
+| `generate_lead` | the contact form **after the save succeeds**; an interview's summary after the page's submit succeeds | `method: contact_form \| ai_interview \| coverage_check` (the Har HaBituach check's summary) |
 | `chat_start` | consent accepted and "התחלת השיחה" pressed | `method`: which chat |
 | `chat_handoff` | "מעבר לדורית" opened | `method`: which chat |
 | `click_chat` | any link to `/faq#support-chat` (header menu `header_menu`, sticky bar, desktop dock), and the phone's card on /faq opening the support chat | `location`; `method` when the chat itself opened |
-| `calculator_result` | once per result a visitor produced on /tools: the self-check's last answer; the fee calculator once its inputs have been changed and then left alone for 1.5 s, once per distinct set of inputs, never for the untouched defaults | `tool: fee_calculator \| insurance_assessment \| retirement_projection` — never a figure |
+| `calculator_result` | once per result a visitor produced on /tools: the self-check's last answer; the fee calculator once its inputs have been changed and then left alone for 1.5 s, once per distinct set of inputs, never for the untouched defaults | `tool: fee_calculator \| insurance_assessment \| retirement_projection \| coverage_check` — never a figure |
 
 `location` comes from `data-track-location`, otherwise the nearest `section[id]`,
 `header`, `footer` or `nav`; `mobile_sticky_bar`, `floating_dock` and `faq` are
