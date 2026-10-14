@@ -175,7 +175,7 @@ async function submitLead(handler: EdgeHandler, input: Record<string, unknown>, 
   const stage = input.stage;
   // Any stage: submit-lead's dedupe matches only partial leads, so a save after a complete one would insert a second row.
   if (ctx.conversation.status === 'lead_saved') {
-    return { name: 'submitLead', status: 'already_saved', isError: false, forModel: JSON.stringify({ ok: true, alreadySaved: true }) };
+    return { name: 'submitLead', status: 'already_saved', isError: false, forModel: JSON.stringify({ ok: true, alreadySaved: true, next: ALREADY_DONE_NEXT }) };
   }
   if (ctx.evalMode) {
     // The simulation answers as submit-lead would: it refuses a lead with no contact.
@@ -225,15 +225,23 @@ function refusedSave(error: string): ToolOutcome {
 }
 
 /**
- * What a successful save tells the model. A partial save says what to do next:
- * "a silent save" alone was read as "say nothing", and the empty reply after it
- * failed the turn.
+ * What a successful save tells the model — always what to write next. A bare
+ * answer was read as "say nothing": "a silent save" ended turns in an empty
+ * reply (#181), and so did a bare { ok, stage: 'complete' } in the evaluation
+ * of 2026-10-14, at the very end of an interview.
  */
 function savedForModel(stage: 'partial' | 'complete'): string {
   return stage === 'partial'
     ? JSON.stringify({ ok: true, stage, next: 'נשמר בשקט. אל תזכיר את השמירה; המשך באותה הודעה לשאלה הבאה בראיון.' })
-    : JSON.stringify({ ok: true, stage });
+    : JSON.stringify({
+        ok: true,
+        stage,
+        next: 'נשמר, והסיכום נשלח לדורית. כתוב עכשיו למבקר הודעת סיום קצרה: הפרטים אצל דורית, והיא תחזור אליו בעצמה. בלי שאלות נוספות.',
+      });
 }
+
+/** A second save or hand-off changes nothing; the model still owes the visitor a reply. */
+const ALREADY_DONE_NEXT = 'זה כבר נעשה קודם בשיחה, ולא נשלח שוב. ענה למבקר על מה שכתב עכשיו, בקצרה.';
 
 /** The hand-off is a fact of its own; status becomes 'escalated' only from 'open', never over 'lead_saved' or 'closed'. */
 function markEscalated(c: ConversationFacts): void {
@@ -244,7 +252,7 @@ function markEscalated(c: ConversationFacts): void {
 async function escalateToHuman(handler: EdgeHandler, input: Record<string, unknown>, ctx: ToolCallContext): Promise<ToolOutcome> {
   // One successful hand-off per conversation: a second call mails no one.
   if (ctx.conversation.escalated) {
-    return { name: 'escalateToHuman', status: 'already_escalated', isError: false, forModel: JSON.stringify({ ok: true, alreadyEscalated: true }) };
+    return { name: 'escalateToHuman', status: 'already_escalated', isError: false, forModel: JSON.stringify({ ok: true, alreadyEscalated: true, next: ALREADY_DONE_NEXT }) };
   }
   const reason = (ESCALATION_REASONS as readonly string[]).includes(str(input.reason)) ? str(input.reason) : 'uncertain';
   if (ctx.evalMode) {
