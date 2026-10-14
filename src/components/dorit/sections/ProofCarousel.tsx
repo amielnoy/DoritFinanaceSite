@@ -75,7 +75,8 @@ export default function ProofCarousel() {
 
   const scroll = (dir: number) => {
     if (!ref.current) return;
-    // RTL: scrollLeft decreases when scrolling visually-right; invert direction
+    // RTL: scrollLeft runs from 0 at the start down to negative values, so a
+    // positive step goes back towards the first case and a negative one on.
     const amount = 420;
     ref.current.scrollBy({ left: dir * amount, behavior: "smooth" });
   };
@@ -97,18 +98,20 @@ export default function ProofCarousel() {
             </p>
           </Reveal>
         </div>
+        {/* In RTL the right-hand button (→) goes back towards the first case
+            and the left-hand one (←) on to the next — the names say so. */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => scroll(1)}
             className={ARROW}
-            aria-label="הבא"
+            aria-label="הקודם"
           >
             <ArrowRight size={18} strokeWidth={1.5} />
           </button>
           <button
             onClick={() => scroll(-1)}
             className={ARROW}
-            aria-label="הקודם"
+            aria-label="הבא"
           >
             <ArrowLeft size={18} strokeWidth={1.5} />
           </button>
