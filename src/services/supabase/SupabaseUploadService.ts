@@ -36,6 +36,14 @@ const AGENCY_1_ID = "00000000-0000-0000-0000-000000000001";
 const sanitizeFilename = (name: string): string => name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
 
 /**
+ * Where an uploaded file is stored: the fixed agency's folder, a fresh uuid so
+ * two uploads never collide, then the sanitized name. Shared with
+ * SupabaseImageUploadService so both buckets lay files out the same way.
+ */
+export const agencyObjectPath = (file: File): string =>
+  `${AGENCY_1_ID}/${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
+
+/**
  * Claim documents into the private bucket, uploaded by an anonymous visitor.
  *
  * Returns the object's path, not a link. The visitor may insert into the
@@ -49,7 +57,7 @@ export class SupabaseUploadService implements UploadPort {
   constructor(private readonly client: SupabaseStorageClient) {}
 
   async upload(file: File): Promise<{ url: string }> {
-    const path = `${AGENCY_1_ID}/${crypto.randomUUID()}-${sanitizeFilename(file.name)}`;
+    const path = agencyObjectPath(file);
 
     const { error } = await this.client.storage.from(CLAIM_DOCUMENTS_BUCKET).upload(path, file);
     if (error) throw new Error(`claim document upload failed: ${error.message}`);
