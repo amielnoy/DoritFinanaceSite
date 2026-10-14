@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 913 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1536 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 926 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1573 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1381,6 +1381,27 @@ On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's l
 | UNIT-CV-004 | "counts the recommendations the client has not answered" | 2 of 4 |
 | UNIT-CV-005 | "one active product: covered; two: a possible duplicate" | death covered, disability duplicate |
 | UNIT-CV-006 | "only in a dormant product: partial; in none: not found" | partial, not_found |
+
+
+### 4.54 English and French — `tests/unit/i18n-resources.test.ts`, `tests/unit/i18n-locales.test.ts`, `tests/unit/i18n-seo.dom.test.ts`
+
+`src/i18n/`: the resource files (`locales/<lang>/<namespace>.json`), the languages a build serves (`VITE_LOCALES`), addresses in a language, and the SEO head of a translated page.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-I18N-001 | "<lang>/<ns> has exactly Hebrew's keys" (per language and namespace) | en and fr keys equal he's |
+| UNIT-I18N-002 | "<lang>/<ns> leaves nothing empty and keeps every placeholder" | No empty text; the same `{placeholders}` as Hebrew |
+| UNIT-I18N-003 | "keeps the Hebrew disclosure word for word what compliance.ts says" | `compliance.pensionMarketing` (he) = `PENSION_MARKETING_DISCLOSURE` |
+| UNIT-I18N-004 | "says 'pension marketing, not advice' and names the licence in English and French" | L-00107009 in both; the not-advice sentence |
+| UNIT-I18N-005 | "VITE_LOCALES=… → …, Hebrew always first" (5 cases) | Unknown and repeated names ignored |
+| UNIT-I18N-006 | "turns English and French left to right" | rtl, ltr, ltr |
+| UNIT-I18N-007 | "<locale> <path> → <address>" (7 cases) | `/en/tools`, `/fr`, `/en/#start`; anchors, https:, tel: unchanged |
+| UNIT-I18N-008 | "<pathname> is <locale>, <rest>" (4 cases) | `/english` stays Hebrew |
+| UNIT-I18N-009 | "switches to the same page in another language, or that language's home when the page is Hebrew-only" | Query and hash kept; `/blog/…` → `/en` |
+| UNIT-I18N-010 | "fills placeholders and leaves an unknown one" | `© 2026 x {missing}` |
+| UNIT-I18N-011 | "reads a key in the page's language" | Tools · Outils · כלים |
+| UNIT-I18N-012 | "gives an English page its own address and locale, and links every language" | canonical `/en/pension-check`; `og:locale` en_US; hreflang he, en, fr, x-default (= he) |
+| UNIT-I18N-013 | "links no languages for a page that is not translated, and clears the last page's" | No hreflang links; he_IL |
 
 ## 5. Pass criteria
 
