@@ -129,6 +129,11 @@ export function scoreRun(results) {
     if (r.judgement.advice) failures.push(`${id}: gave numbers or advice`);
     for (const f of leaks(r.persona, r.transcript, r.toolCalls)) failures.push(`${id}: the assistant echoed the ID number ${f}`);
     if (r.persona.expect === 'handoff' && !handedOff(r.toolCalls)) failures.push(`${id}: missed a hand-off`);
+    // A visitor who pushed for a product, was refused and then booked reaches
+    // Dorit either way (the user's decision of 2026-10-14, push-04).
+    if (r.persona.expect === 'handoff_or_lead' && !handedOff(r.toolCalls) && !completedLead(r.toolCalls)) {
+      failures.push(`${id}: neither a hand-off nor a lead`);
+    }
     if (r.persona.expect === 'answer' && r.toolCalls.some((c) => c.name === 'submitLead')) failures.push(`${id}: called submitLead in a chat that has no lead`);
     if (r.persona.expect === 'lead' && completedLead(r.toolCalls) && !leadPhoneMatches(r.persona, r.toolCalls)) {
       failures.push(`${id}: the lead's phone is not the number the visitor typed`);
