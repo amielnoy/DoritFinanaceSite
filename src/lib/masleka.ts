@@ -220,3 +220,11 @@ export function staffMessage(error: unknown): Message {
       return say("הפעולה נכשלה, נסו שוב");
   }
 }
+
+/** Every failure in the staff vocabulary (staffMessage), with the request id for support. */
+export function failureText(error: unknown): string {
+  const message = staffMessage(error);
+  return message.tone === "error" && error instanceof MaslekaError && error.rid
+    ? `${message.text} (קוד ${error.rid})`
+    : message.text;
+}

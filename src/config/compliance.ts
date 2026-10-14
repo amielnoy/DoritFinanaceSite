@@ -40,6 +40,10 @@ export const LICENCE = {
   regulator: AGENCY_PROFILE.licenceRegulator,
 } as const;
 
+/** The pension-marketing disclosure, on anything prepared for a client meeting (the clearinghouse printout). */
+export const PENSION_MARKETING_DISCLOSURE =
+  `${LICENCE.entity} בעלת רישיון סוכן מ${LICENCE.regulator} מס' ${LICENCE.number}, ולה זיקה לגופים מוסדיים. הפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.`;
+
 /** Shown before a conversation may start. */
 export const BOT_DISCLOSURE =
   "זהו עוזר אוטומטי (בינה מלאכותית) של דורית גוב ארי — לא דורית עצמה ולא בעל רישיון.";

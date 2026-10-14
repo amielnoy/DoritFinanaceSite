@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 159 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 895 including `it.each` / `describe.each` expansions (887 pass, 1 skipped)
+**Location:** `tests/contract/` · **Cases:** 166 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 902 including `it.each` / `describe.each` expansions (901 pass, 1 skipped)
 
 ---
 
@@ -655,6 +655,20 @@ itself is proved by `supabase/tests/masleka_check.sql` against a local
 | CTR-MSKD-021 | "recognises # MASLEKA_ENABLED=true as switch-on: false" | Not detected |
 | CTR-MSKD-022 | "recognises // VITE_MASLEKA_ENABLED=true as switch-on: false" | Not detected |
 | CTR-MSKD-023 | "recognises the `=== 'true'` comparison in code as switch-on: false" | Not detected |
+
+### 4.15 The clearinghouse analysis schema — `clearinghouse-analysis-schema.contract.test.ts`
+
+Reads `supabase/migrations/20261021000000_clearinghouse_analysis.sql`. The behaviour is proved by `supabase/tests/clearinghouse_analysis_check.sql` against a local `supabase start`, as in §4.13.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHA-001 | "sorts after the clearinghouse pipeline's migrations" | After `20261019000000_masleka_wipe_notice.sql` |
+| CTR-CHA-002 | "turns row-level security on for both tables, and grants anon nothing" | Both enabled; no grant names `anon` |
+| CTR-CHA-003 | "scopes both tables to the snapshot's agency" | Two policies, each through `can_see(agency_id)` |
+| CTR-CHA-004 | "never lets the browser edit a snapshot, set its retention or say who wrote it" | No update grant; the insert column list leaves out `delete_after`, `created_by`, `created_at`, `id` |
+| CTR-CHA-005 | "lets the browser change a decision's status and wording only — the database stamps who and when" | Update grant is exactly `status`, `final_text`; the stamp trigger sets `reviewed_by` |
+| CTR-CHA-006 | "purges snapshots past retention nightly, their decisions with them, and only the service role may run it" | The delete, `on delete cascade`, the revoke, `cron.schedule('clearinghouse-purge'` |
+| CTR-CHA-007 | "stores the report as an object, capped in size, and no raw file anywhere" | `jsonb_typeof = 'object'`, `< 262144`; no bucket, `bytea` or `xml` |
 
 ## 5. Runtime counterpart
 

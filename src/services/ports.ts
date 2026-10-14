@@ -1,4 +1,5 @@
 import type { InterviewSummary } from "@/lib/interview-handoff";
+import type { Snapshot } from "@/lib/clearinghouse/snapshot";
 
 export type { InterviewSummary };
 
@@ -501,4 +502,36 @@ export interface MaslekaPort {
   reveal(requestId: string, field: MaslekaField): Promise<string>;
   /** הגשתי: wipes the code and the ID. */
   markSubmitted(requestId: string): Promise<void>;
+  /** Parsed reports kept for analysis, newest first. */
+  listSnapshots(): Promise<SnapshotSummary[]>;
+  /** One report, checked by `readSnapshot`; null when it is gone or unreadable. */
+  getSnapshot(snapshotId: string): Promise<StoredSnapshot | null>;
+  /** Dorit's decisions on a report's findings. A finding with none is a draft. */
+  listReviews(snapshotId: string): Promise<FindingReview[]>;
+  /** Approve (optionally in her own words) or reject a finding; null puts it back to draft. */
+  decide(snapshotId: string, findingKey: string, decision: ReviewDecision | null): Promise<void>;
+}
+
+export interface SnapshotSummary {
+  id: string;
+  requestId: string | null;
+  clientName: string;
+  takenAt: string;
+}
+
+export interface StoredSnapshot extends SnapshotSummary {
+  snapshot: Snapshot;
+}
+
+export type ReviewStatus = "approved" | "rejected";
+
+export interface ReviewDecision {
+  status: ReviewStatus;
+  /** Dorit's wording; null keeps the draft's. */
+  finalText: string | null;
+}
+
+export interface FindingReview extends ReviewDecision {
+  findingKey: string;
+  reviewedAt: string;
 }
