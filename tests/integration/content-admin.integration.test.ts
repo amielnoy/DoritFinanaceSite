@@ -86,6 +86,20 @@ describe("contentAdmin — retrying a delete after a failed mirror", () => {
   });
 });
 
+describe("contentAdmin — rows only Supabase has (written while VITE_CONTENT_WRITES=supabase)", () => {
+  const uuid = "11111111-2222-4333-8444-555555555555";
+  it.each([
+    ["updateArticle", { op: "updateArticle", id: uuid, draft: { title: "x" } }],
+    ["removeArticle", { op: "removeArticle", id: uuid }],
+    ["removeTestimonial", { op: "removeTestimonial", id: uuid }],
+  ])("%s on a Supabase uuid is refused with 409, touching neither store", async (_name, body) => {
+    const r = await invokeFunction("contentAdmin", body, { env, headers, routes: asAdminWithBlog });
+    expect(r.status).toBe(409);
+    expect(r.callsTo("/rest/v1/blog_posts")).toHaveLength(0);
+    expect(r.callsTo("/rest/v1/testimonials")).toHaveLength(0);
+  });
+});
+
 describe("contentAdmin — the article's address (slug)", () => {
   it.each([
     ["no slug", undefined],

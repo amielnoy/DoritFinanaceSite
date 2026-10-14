@@ -1,6 +1,7 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
 import { CHAT_AGENTS } from "@/config/chat-agents";
+import { CONTENT_WRITES } from "@/config/content-writes";
 import { LEAD_FUNCTIONS } from "@/config/lead-functions";
 import { CONTENT_IMAGES, UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
@@ -17,6 +18,7 @@ import { SupabaseAgentService } from "./supabase/SupabaseAgentService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
 import { SupabaseImageUploadService, type SupabaseImageStorageClient } from "./supabase/SupabaseImageUploadService";
+import { EdgeContentAdminService, type ContentFunctionsClient } from "./supabase/EdgeContentAdminService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
 import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
 import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
@@ -74,11 +76,18 @@ const contentPort: ContentPort = tables ? new SupabaseContentService(tables) : n
  * backend function, which holds both credentials and needs no browser identity
  * — only proof of who is asking.
  */
-const contentAdmin: ContentAdminPort = new FunctionContentAdminService(
-  client as unknown as FunctionsClient,
-  tables ? new SupabaseContentAdminService(tables) : new Base44ContentAdminService(client),
-  async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
-);
+const adminReads: ContentAdminPort = tables ? new SupabaseContentAdminService(tables) : new Base44ContentAdminService(client);
+const sessionToken = async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null;
+
+/**
+ * …and with `VITE_CONTENT_WRITES=supabase`, the writes go to the `content-admin`
+ * Edge Function instead, Supabase only — see src/config/content-writes.ts for
+ * why that waits for Phase 3.
+ */
+const contentAdmin: ContentAdminPort =
+  CONTENT_WRITES === "supabase" && supabase
+    ? new EdgeContentAdminService(supabase as unknown as ContentFunctionsClient, adminReads, sessionToken)
+    : new FunctionContentAdminService(client as unknown as FunctionsClient, adminReads, sessionToken);
 
 /** The admin's leads: read and written in Supabase when it is configured, else through Base44 as before. */
 const leadsAdminPort: LeadAdminPort = tables

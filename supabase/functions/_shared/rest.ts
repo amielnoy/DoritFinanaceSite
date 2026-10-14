@@ -102,6 +102,47 @@ export async function upsertRow(table: string, row: Record<string, unknown>, onC
   if (!res.ok) throw new Error(`upsert_http_${res.status}${await refusal(res)}`);
 }
 
+/** Every row a PostgREST filter matches, deleted. Matching none is not an error: the row is already gone. */
+export async function deleteRows(table: string, filter: string): Promise<void> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?${filter}`, {
+    method: 'DELETE',
+    headers: { ...auth, Prefer: 'return=minimal' },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`delete_http_${res.status}${await refusal(res)}`);
+}
+
+/**
+ * Who a Supabase access token belongs to, as Supabase Auth says — the
+ * signature is checked there, not here. `null` for a token Auth refuses
+ * (forged, expired, or the anon key, which names no user); a throw for
+ * anything else, which must not read as "signed out".
+ *
+ * A refusal is told apart by its body, not its status alone: Auth's own
+ * carries an `error_code` (bad_jwt, session_not_found, …), while the gateway
+ * answers a revoked or wrong-project service key with a 401 that has none
+ * ("Invalid API key"). Read as "not signed in", that told every admin their
+ * session had expired — advice signing in again could never fix.
+ */
+export async function authUser(token: string): Promise<{ id: string } | null> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/auth/v1/user`, {
+    method: 'GET',
+    headers: { apikey: auth.apikey, Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  const body = (await res.json().catch(() => null)) as { id?: unknown; error_code?: unknown } | null;
+  if (res.status === 401 || res.status === 403) {
+    if (typeof body?.error_code === 'string' && body.error_code) return null;
+    throw new Error(`auth_http_${res.status}_not_an_auth_refusal`);
+  }
+  if (!res.ok) throw new Error(`auth_http_${res.status}`);
+  const id = body?.id;
+  if (typeof id !== 'string' || !id) throw new Error('auth_returned_no_user');
+  return { id };
+}
+
 /**
  * A Postgres function through PostgREST's `/rpc`, with the service key. Used
  * for `allow_submission`, which only the service role may execute. Throws on

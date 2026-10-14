@@ -17,6 +17,8 @@ interface ImportMetaEnv {
   /** Who stores article and testimonial images — see `src/config/upload-provider.ts`. */
   readonly VITE_CONTENT_IMAGES?: "base44" | "supabase";
   readonly VITE_LEAD_FUNCTIONS?: "base44" | "supabase";
+  /** Who writes articles and testimonials — see `src/config/content-writes.ts`. */
+  readonly VITE_CONTENT_WRITES?: "base44" | "supabase";
   /** Agents served by the `chat` Edge Function — see `src/config/chat-agents.ts`. */
   readonly VITE_CHAT_AGENTS?: string;
   readonly VITE_BASE44_APP_ID?: string;

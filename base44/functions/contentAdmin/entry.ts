@@ -108,6 +108,7 @@ const TESTIMONIAL_FIELDS = ['name', 'role', 'quote', 'image_url', 'rating', 'sou
  */
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const BASE44_ID_PATTERN = /^[0-9a-f]{24}$/;
+const SUPABASE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const isValidSlug = (s) => typeof s === 'string' && SLUG_PATTERN.test(s) && !BASE44_ID_PATTERN.test(s);
 
 /**
@@ -208,6 +209,16 @@ export default async function(req) {
 
     const gate = await requireAdmin(req, rid);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
+
+    // A Supabase uuid is a row the Supabase-only content-admin wrote
+    // (VITE_CONTENT_WRITES=supabase) — it has no Base44 copy. Here an update
+    // would fail and a remove would answer 200 with the article still live
+    // (Base44's 404 reads as "already gone", the mirror's filter matches no
+    // base44_id). Refused, so switching back is loud instead of silent.
+    if (op !== 'createArticle' && op !== 'createTestimonial' && SUPABASE_UUID.test(String(id ?? ''))) {
+      log('warn', 'content.supabase_only_row', { rid, op });
+      return json({ error: 'הפריט נוצר אחרי המעבר ל-Supabase, ואפשר לערוך אותו רק כשהמעבר פעיל.' }, 409);
+    }
 
     let result = { ok: true };
 
