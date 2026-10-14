@@ -663,6 +663,27 @@ analysis and lists every stored report under "ניתוחים".
 - **Not code, waiting on the regulatory adviser:** paid claims advocacy on
   success, employer talks, accountant referrals.
 
+### Claim documents: kept two months
+
+Files attached to a claim report (`claim-documents` bucket, up to 10 MB each —
+the largest thing the site stores) are deleted two months after upload (user,
+2026-10-14). The claim's text record and each document's path stay. The staff
+mail for a claim with stored files says so: "הקישורים בתוקף שבוע, והקבצים
+נמחקים מהאתר אחרי חודשיים — כדאי לשמור אותם בתיק הלקוח".
+
+- `public.claim_documents_expired()` (migration
+  `20261023000000_claim_documents_retention.sql`) lists what is due; the
+  `claim-documents-purge` Edge Function deletes it through the Storage API
+  (SQL cannot delete a stored file), 500 at a time, at most 5,000 a night.
+- Nightly at 03:15 by `pg_cron` → `claim_documents_call_purge()` → pg_net,
+  with the same Vault entries as masleka-remind (`masleka_functions_url`,
+  `masleka_cron_secret`) — nothing new to set. The function checks
+  `MASLEKA_CRON_SECRET` in `x-site-cron`.
+- **Release:** apply the migration by hand (CI deploys the function), then
+  `select jobname from cron.job where jobname = 'claim-documents-purge';` → one
+  row. Run `supabase/tests/claim_documents_retention_check.sql` locally first.
+  The first night deletes every file already past two months.
+
 ### The personal snapshot (תמונת מצב) — phased, behind `VITE_SNAPSHOT_HOME`
 
 A four-phase programme: (1) home-page sections introducing the snapshot, (2) a
@@ -689,6 +710,23 @@ retirement calculator on /tools, (3) a Har HaBituach double-coverage check on
   missing. "לשלוח לדורית לבדיקה" sends only `checkSummary` through
   `submitLead` (`source: quick`, topic "בדיקת כפל ביטוחים") and counts
   `generate_lead {method: coverage_check}` once saved.
+- **Phase 4 (the personal snapshot):** built on the clearinghouse analysis.
+  On `/admin/masleka/analysis/:id` Dorit sets each approved recommendation's
+  priority ("חשוב" / "כדאי לבדוק"), adds her own ("הוספת המלצה משלך"), enters
+  the address the client signs in with, opens "תצוגה כפי שהלקוח רואה" (the
+  client's own component, buttons inert) and presses "פרסום לאזור האישי".
+  A publish freezes the approved list into `clearinghouse_published_items`
+  (migration `20261024000000_clearinghouse_publish.sql`); a republish replaces
+  it and asks first, since the client's answers go with it. The account page's
+  first tab, "תמונת מצב" (`SnapshotView`), reads `my_snapshot()` — the newest
+  snapshot published to the signed-in user's **verified** address, four
+  fields, each item six (contract-tested) — and the client answers each
+  recommendation "כן, לטפל בזה" or "יש לי שאלה" (`respond_to_recommendation`);
+  the review screen counts the new answers until "סימון כנקרא". Apply the
+  migration by hand before the switch goes on; run
+  `supabase/tests/clearinghouse_publish_check.sql` locally first. Still
+  waiting: the parser (a real clearinghouse ZIP), and the compliance adviser
+  (COMPLIANCE.md §11) before `VITE_SNAPSHOT_HOME` is turned on.
 - **Waiting on Dorit:** `EXPECTED_COVERAGE` (the list and its wording);
   `SNAPSHOT_REVIEW_BUSINESS_DAYS` (null → step 3 states no
   timing).

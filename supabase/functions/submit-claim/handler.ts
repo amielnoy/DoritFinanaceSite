@@ -131,7 +131,16 @@ export async function handler(req: Request): Promise<Response> {
       }
     }));
     const docLines = docList.length
-      ? [``, `מסמכים מצורפים (${docList.length}):`, ...docLinks.map((d, i) => `${i + 1}. ${d}`)]
+      ? [
+          ``,
+          `מסמכים מצורפים (${docList.length}):`,
+          ...docLinks.map((d, i) => `${i + 1}. ${d}`),
+          // Only files in Supabase Storage expire (claim_documents_expired,
+          // migration 20261023000000): two months, then gone.
+          ...(docList.some((d) => d.startsWith(STORAGE_REF_PREFIX))
+            ? [`הקישורים בתוקף שבוע, והקבצים נמחקים מהאתר אחרי חודשיים — כדאי לשמור אותם בתיק הלקוח.`]
+            : []),
+        ]
       : ['', 'מסמכים מצורפים: אין'];
 
     const claimChannelText = channelLine({ channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath });

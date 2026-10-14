@@ -260,3 +260,18 @@ describe("the two implementations say the same thing", () => {
     }
   });
 });
+
+describe("Edge submit-claim — files kept two months (claim_documents_expired)", () => {
+  it("tells Dorit to keep a stored file, since the site deletes it after two months", async () => {
+    const r = await invokeEdge("submit-claim", {
+      ...claim,
+      documents: ["storage:claim-documents/00000000-0000-0000-0000-000000000001/police.pdf"],
+    });
+    expect(r.mailTo(AGENCY).text).toContain("הקבצים נמחקים מהאתר אחרי חודשיים — כדאי לשמור אותם בתיק הלקוח");
+  });
+
+  it("says nothing of it when no file is stored on the site", async () => {
+    const r = await invokeEdge("submit-claim", claim);
+    expect(r.mailTo(AGENCY).text).not.toContain("נמחקים מהאתר");
+  });
+});
