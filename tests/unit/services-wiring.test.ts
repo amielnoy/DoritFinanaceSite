@@ -107,6 +107,38 @@ describe("composition root", () => {
     expect(supabase.rpc).not.toHaveBeenCalled();
   });
 
+  describe("the content-writes switch (VITE_CONTENT_WRITES)", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    const supabaseFake = () => ({
+      ...tableFake({ data: [], error: null }).client,
+      auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+      storage: { from: () => ({}) },
+      rpc: async () => ({ data: [], error: null }),
+      functions: { invoke: vi.fn() },
+    });
+
+    it("writes through Base44's contentAdmin by default", async () => {
+      const m = await load(supabaseFake(), base44Fake().client);
+      const { FunctionContentAdminService } = await import("@/services/base44/FunctionContentAdminService");
+      expect(m.services.contentAdmin).toBeInstanceOf(FunctionContentAdminService);
+    });
+
+    it("writes through the content-admin Edge Function when switched to supabase", async () => {
+      vi.stubEnv("VITE_CONTENT_WRITES", "supabase");
+      const m = await load(supabaseFake(), base44Fake().client);
+      const { EdgeContentAdminService } = await import("@/services/supabase/EdgeContentAdminService");
+      expect(m.services.contentAdmin).toBeInstanceOf(EdgeContentAdminService);
+    });
+
+    it("stays on Base44 when switched on without a Supabase client", async () => {
+      vi.stubEnv("VITE_CONTENT_WRITES", "supabase");
+      const m = await load(null, base44Fake().client);
+      const { FunctionContentAdminService } = await import("@/services/base44/FunctionContentAdminService");
+      expect(m.services.contentAdmin).toBeInstanceOf(FunctionContentAdminService);
+    });
+  });
+
   describe("the chat switch (VITE_CHAT_AGENTS)", () => {
     afterEach(() => vi.unstubAllEnvs());
 

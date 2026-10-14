@@ -37,9 +37,13 @@ describe("the slogan", () => {
   });
 
   it("says the current one in the mails a visitor receives", () => {
-    for (const fn of ["submitLead", "submitClaim"]) {
-      const src = readFileSync(join(REPO_ROOT, "base44/functions", fn, "entry.ts"), "utf8");
-      expect(src, fn).toContain("התכנון שלי — השקט שלך");
+    const sources = {
+      submitClaim: "base44/functions/submitClaim/entry.ts",
+      // The visitor's copy of a lead is built here since submitLead became a forwarder.
+      "submit-lead": "supabase/functions/_shared/html.ts",
+    };
+    for (const [fn, file] of Object.entries(sources)) {
+      expect(readFileSync(join(REPO_ROOT, file), "utf8"), fn).toContain("התכנון שלי — השקט שלך");
     }
   });
 });

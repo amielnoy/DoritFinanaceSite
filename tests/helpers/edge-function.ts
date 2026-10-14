@@ -30,7 +30,7 @@ const TEST_SA = (() => {
 export interface MaslekaFake {
   /** Rows of `masleka_requests` as stored (copied; read the result's `maslekaRequests`). */
   requests?: Record<string, unknown>[];
-  /** Bearer token → the user id `GET /auth/v1/user` answers; any other token is a 401. */
+  /** Bearer token → the user id `GET /auth/v1/user` answers; any other token gets Auth's own refusal (403 bad_jwt). */
   sessions?: Record<string, string>;
   /** User id → what `staff_role` answers; absent means null (no membership). */
   roles?: Record<string, string | null>;
@@ -93,6 +93,12 @@ export interface EdgeOptions {
   resendStatus?: number;
   /** …with this body instead of the default. */
   resendResponse?: unknown;
+  /**
+   * Answers any upstream call before the built-in stubs, for a function whose
+   * upstreams this harness does not model (content-admin's auth and tables).
+   * Return undefined to fall through to them.
+   */
+  upstream?: (call: FetchCall) => Response | undefined;
 }
 
 export interface EdgeInvocation {
@@ -225,7 +231,10 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
         : form
           ? Object.fromEntries(new URLSearchParams(init.body))
           : JSON.parse(init.body);
-    fetches.push({ url: u, method, headers: (init.headers ?? {}) as Record<string, string>, body: parsed });
+    const call = { url: u, method, headers: (init.headers ?? {}) as Record<string, string>, body: parsed };
+    fetches.push(call);
+    const custom = options.upstream?.(call);
+    if (custom) return custom;
 
     // The mailer, not the provider — the same boundary base44-function.ts records.
     if (u === MAILER_URL) {
@@ -331,7 +340,9 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       const userId = masleka.sessions?.[header.replace(/^Bearer /, "")];
       return userId
         ? new Response(JSON.stringify({ id: userId, aud: "authenticated" }), { status: 200 })
-        : new Response('{"msg":"invalid JWT"}', { status: 401 });
+        // As Supabase Auth refuses a bad token: with an error_code. authUser
+        // (_shared/rest.ts) reads a 401/403 without one as a broken service key.
+        : new Response('{"code":403,"error_code":"bad_jwt","msg":"invalid JWT"}', { status: 403 });
     }
     if (u === `${SUPABASE_URL}/rest/v1/rpc/staff_role` && method === "POST") {
       return new Response(JSON.stringify(masleka.roles?.[parsed.p_user_id] ?? null), { status: 200 });

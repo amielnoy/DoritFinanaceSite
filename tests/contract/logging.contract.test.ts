@@ -30,7 +30,12 @@ import { backendFiles, edgeFunctionFiles, edgeSource, read, rel } from "../helpe
  */
 
 const FUNCTIONS_DIR = join(REPO_ROOT, "base44/functions");
-const functionNames = readdirSync(FUNCTIONS_DIR).sort();
+/**
+ * The agents' three tools only pass a request to an Edge Function and its answer
+ * back (agents.contract.test.ts pins that). The diary is the Edge function's.
+ */
+const FORWARDERS = ["submitLead", "escalateToHuman", "logSupportChat"];
+const functionNames = readdirSync(FUNCTIONS_DIR).filter((n) => !FORWARDERS.includes(n)).sort();
 const sources = Object.fromEntries(
   functionNames.map((name) => [name, read(join(FUNCTIONS_DIR, name, "entry.ts"))]),
 );
@@ -155,7 +160,7 @@ describe("what the diary may not contain", () => {
   });
 
   it("passes a role, not an address, into the mail helper", () => {
-    for (const name of ["submitLead", "submitClaim", "escalateToHuman"]) {
+    for (const name of ["submitClaim"]) {
       const send = sources[name].slice(sources[name].indexOf("async function sendMail("));
       expect(send.slice(0, send.indexOf("\n}")), `${name}`).toMatch(
         /log\('info', 'mail\.sent', \{ rid, role, transport/,
@@ -394,7 +399,7 @@ describe("the publish gate chooses a credential", () => {
  * Eight characters turn that into one search.
  */
 describe("a failure you can look up", () => {
-  const fns = [...backendFiles(), ...edgeFunctionFiles()];
+  const fns = [...backendFiles().filter((f) => !FORWARDERS.some((n) => f.includes(`/${n}/`))), ...edgeFunctionFiles()];
 
   it("returns the request id with every answer", () => {
     for (const f of fns) {

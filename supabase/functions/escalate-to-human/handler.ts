@@ -1,19 +1,18 @@
 /**
  * A conversation handed to a person — the agent has decided it may not answer.
  *
- * The Supabase twin of base44/functions/escalateToHuman, transcribed top to
- * bottom: same input, same checks, same mail, same answer. What differs is
- * decided in docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md:
+ * Where base44/functions/escalateToHuman used to do this work, and now forwards
+ * here. Decided in docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md:
  * Supabase is the only store (no entity write, no mirror), and the sheet row
  * goes in through the service account. tests/integration/
- * escalate-to-human.integration.test.ts runs both against one set of cases
- * while both exist.
+ * escalate-to-human.integration.test.ts runs it.
  */
 import { validCampaign, validChannel, validLandingPath } from '../_shared/attribution.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { deviceLabel } from '../_shared/device.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, sendMail } from '../_shared/mail.ts';
+import { withinLimit } from '../_shared/guard.ts';
 import { insertRow } from '../_shared/rest.ts';
 import { appendSheetRow } from '../_shared/sheets.ts';
 import {
@@ -25,6 +24,10 @@ import {
 
 const FN = 'escalate-to-human';
 const log = createLog(FN);
+
+// A global cap, not a per-caller one: every agent call reaches this function
+// from Base44's server, so one address would stand for every visitor.
+const NOTIFY_PER_HOUR = 60;
 
 // Every `err:` below is truncated inline: tests/contract/logging.contract.test.ts
 // reads each log call's text and requires the `.slice(0, N)` to be visible there.
@@ -39,6 +42,16 @@ export async function handler(req: Request): Promise<Response> {
     log('info', 'request.start', { rid });
     const body = await req.json();
     const { reason, summary, name, phone, email, agent, topic, consentVersion, consentAt, channel, campaign, landingPath } = body || {};
+
+    // An empty request is not a hand-off: nobody to call back and nothing said.
+    // It would mail staff a blank message, so it stops here. A summary alone is
+    // enough — an anonymous visitor may still ask to be put through to a person.
+    const present = (v: unknown) => String(v ?? '').trim() !== '';
+    if (!present(summary) && !present(name) && !present(phone) && !present(email)) {
+      log('warn', 'request.rejected', { rid, reason: 'nothing_to_hand_over' });
+      return Response.json({ error: 'אין מה להעביר', rid }, { status: 400, headers: cors });
+    }
+
     const safeChannel = validChannel(channel) || 'unknown';
     const safeCampaign = validCampaign(campaign);
     const safeLandingPath = validLandingPath(landingPath);
@@ -98,8 +111,15 @@ export async function handler(req: Request): Promise<Response> {
     });
 
     let notified = false;
+    // Checked once per hand-off, not once per recipient. Over the cap the lead
+    // and the sheet row are still written; only the staff mail is held back.
+    const mayNotify = await withinLimit(log, rid, 'escalate:notify', 3600, NOTIFY_PER_HOUR);
+    if (!mayNotify) {
+      log('warn', 'mail.skipped', { rid, role: 'ops', reason: 'rate_limited' });
+      warnings.push('notify_rate_limited');
+    }
     // One sender for all three, through the mailer.
-    for (const to of [...NOTIFY_EMAILS, SECONDARY_EMAIL]) {
+    for (const to of mayNotify ? [...NOTIFY_EMAILS, SECONDARY_EMAIL] : []) {
       try {
         await sendMail(log, {
           to,

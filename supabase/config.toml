@@ -424,3 +424,9 @@ verify_jwt = false
 # its own input and holds a conversation by its own token.
 [functions.chat]
 verify_jwt = false
+
+# The admin's content writes. Off at the gateway like the others — the
+# publishable key is not a JWT — because the function's own gate is stricter
+# than "any valid JWT": a session Supabase Auth accepts, whose profile is admin.
+[functions.content-admin]
+verify_jwt = false

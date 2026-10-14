@@ -155,8 +155,15 @@ describe("authUser", () => {
 
   it("answers nobody for a token the auth server refuses", async () => {
     withEnv(BASE_ENV);
-    withFetch(() => new Response("{}", { status: 401 }));
+    // Supabase Auth's own refusal carries an error_code.
+    withFetch(() => new Response('{"code":403,"error_code":"bad_jwt","msg":"invalid JWT"}', { status: 403 }));
     expect(await authUser("stale-token-0123456789")).toBeNull();
+  });
+
+  it("throws on a 401 that is not Auth's refusal (a revoked service key), rather than calling it signed out", async () => {
+    withEnv(BASE_ENV);
+    withFetch(() => new Response('{"message":"Invalid API key"}', { status: 401 }));
+    await expect(authUser("user-token-0123456789")).rejects.toThrow("not_an_auth_refusal");
   });
 
   it("throws when the auth server is down, rather than calling it a refusal", async () => {
