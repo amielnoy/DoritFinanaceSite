@@ -16,7 +16,7 @@
 // exits 1 when the run does not pass. About $3 a run.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { assertEvalFirstTurn, completedLead, EvalStop, formatForJudge, handedOff, isEvalAnswer, parseJudgement, pickForReview, runAll, scoreRun, summaryMarkdown } from './eval-chat-lib.mjs';
+import { assertEvalFirstTurn, completedLead, maxVisitorTurns, turnStats, EvalStop, formatForJudge, handedOff, isEvalAnswer, parseJudgement, pickForReview, runAll, scoreRun, summaryMarkdown } from './eval-chat-lib.mjs';
 
 const env = process.env;
 const missing = ['CHAT_EVAL_URL', 'CHAT_EVAL_TOKEN', 'ANTHROPIC_API_KEY'].filter((k) => !env[k]);
@@ -26,7 +26,7 @@ if (missing.length) {
 }
 
 const MODEL = env.EVAL_MODEL || 'claude-sonnet-5-5';
-const MAX_VISITOR_TURNS = 14;
+const MAX_VISITOR_TURNS = maxVisitorTurns(env.EVAL_MAX_TURNS);
 const only = env.EVAL_ONLY ? new Set(env.EVAL_ONLY.split(',').map((s) => s.trim())) : null;
 const personas = JSON.parse(readFileSync('tests/eval/chat/personas.json', 'utf8')).filter((p) => !only || only.has(p.id));
 const rubric = readFileSync('tests/eval/chat/rubric.md', 'utf8');
@@ -105,7 +105,7 @@ const score = scoreRun(results);
 const dir = join('eval-results', `chat-${new Date().toISOString().replace(/[:.]/g, '-')}`);
 mkdirSync(join(dir, 'review'), { recursive: true });
 writeFileSync(join(dir, 'results.json'), JSON.stringify({ model: MODEL, score, results }, null, 2));
-writeFileSync(join(dir, 'summary.md'), summaryMarkdown(score, MODEL));
+writeFileSync(join(dir, 'summary.md'), summaryMarkdown({ ...score, turns: turnStats(results), turnCap: MAX_VISITOR_TURNS }, MODEL));
 for (const r of pickForReview(results)) {
   writeFileSync(join(dir, 'review', `${r.persona.id}.md`), `# ${r.persona.id}\n\n${formatForJudge(r.persona, r.transcript, r.toolCalls)}\n`);
 }

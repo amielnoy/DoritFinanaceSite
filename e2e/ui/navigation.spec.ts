@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { collectPageErrors, expect, gotoApp, test, test_step, waitForLive } from "../fixtures/app";
+import { collectPageErrors, expect, gotoApp, test, test_step } from "../fixtures/app";
 
 /**
  * Reach the header's navigation on whatever platform is running.
@@ -20,8 +20,6 @@ async function openHeaderNav(page: Page, isMobile: boolean | undefined): Promise
  * open it when it is there. From md up there is no <details> and this is a no-op.
  */
 async function openFooterMenu(page: Page): Promise<void> {
-  // The prerendered footer is the desktop's; wait for React's before asking.
-  await waitForLive(page, "footer");
   const summary = page.locator("footer details > summary");
   if (!(await summary.isVisible())) return;
   if ((await page.locator("footer details").getAttribute("open")) === null) await summary.click();

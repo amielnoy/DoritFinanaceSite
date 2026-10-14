@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 688 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1164 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 699 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1175 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -102,6 +102,21 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-RET-013 | "never returns a value that could become protocol-relative" | all of the above | Result starts with exactly one `/`, contains no `\`, has no scheme |
 | UNIT-RET-014..019 | "drops ?`<param>`=" (6 cases) | `access_token`, `clear_access_token`, `app_id`, `app_base_url`, `functions_version`, `from_url` | Param absent from the result |
 | UNIT-RET-020 | "strips the bootstrap params but preserves the rest of the query" | `/oauth/consent?ctx=abc123&access_token=pwned` | `ctx` kept, `access_token` gone |
+
+### Token wipe at boot — `tests/unit/clear-access-token.dom.test.ts`
+
+`?clear_access_token=true` is honoured at boot by `src/lib/clear-access-token.ts` (SEC-TOK-002). It used to run only when the lazily loaded SDK did.
+
+| ID | Title | Input | Expected result |
+|---|---|---|---|
+| UNIT-TOK-001 | "wipes both token keys when the flag is set" | both keys seeded, `/faq?clear_access_token=true` | returns `true`; both keys `null` |
+| UNIT-TOK-002 | "leaves unrelated storage alone" | a Supabase session key beside the tokens | the Supabase key survives |
+| UNIT-TOK-003 | "removes only the flag from the URL, keeping the path, other params and hash" | `/blog/x?access_token=new&clear_access_token=true&utm_source=mail#faq` | `/blog/x?access_token=new&utm_source=mail#faq` |
+| UNIT-TOK-004 | "drops the `?` when the flag was the only parameter" | `/tools?clear_access_token=true` | `/tools` |
+| UNIT-TOK-005..008 | "does nothing for …" (4 cases) | no query, `=false`, `=1`, `=` | returns `false`; token kept; URL unchanged |
+| UNIT-TOK-009 | "strips the flag from a path that starts with // without leaving the origin" | `<origin>//evil.example/x?clear_access_token=true` | same origin; path `//evil.example/x`; tokens gone (a relative `//…` would be protocol-relative and make `replaceState` throw at boot) |
+| UNIT-TOK-010 | "still wipes, and does not throw, when replaceState throws" | `replaceState` throws `SecurityError` | no throw; both keys `null` |
+| UNIT-TOK-011 | "still removes the flag when storage throws" | `removeItem` throws `SecurityError` | returns `true`; flag gone |
 
 ### 4.4 Contact configuration — `tests/unit/contact-config.test.ts`
 

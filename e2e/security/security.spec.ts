@@ -107,27 +107,36 @@ test.describe("Client-side security posture", () => {
     });
   });
 
-  test("?clear_access_token=true wipes any stored token", async ({ page }) => {
-    await test_step("plant a stale token in local storage", async () => {
-      await page.goto("/");
-      await page.evaluate(() => {
-        localStorage.setItem("base44_access_token", "stale-token");
-        localStorage.setItem("token", "stale-token");
+  // On every route, not only where a backend call happens to load the SDK: the
+  // wipe runs at boot (src/lib/clear-access-token.ts). /faq calls no backend
+  // port on load, so it is the route that used to keep the stale token.
+  for (const route of ["/", "/faq"]) {
+    test(`?clear_access_token=true wipes any stored token on ${route}`, async ({ page }) => {
+      await test_step("plant a stale token in local storage", async () => {
+        await page.goto("/");
+        await page.evaluate(() => {
+          localStorage.setItem("base44_access_token", "stale-token");
+          localStorage.setItem("token", "stale-token");
+        });
+      });
+
+      await test_step(`open ${route} with ?clear_access_token=true`, async () => {
+        await gotoApp(page, `${route}?clear_access_token=true`);
+      });
+
+      await test_step("both stored tokens are gone", async () => {
+        const left = await page.evaluate(() => [
+          localStorage.getItem("base44_access_token"),
+          localStorage.getItem("token"),
+        ]);
+        expect(left).toEqual([null, null]);
+      });
+
+      await test_step("the flag is gone from the address bar", async () => {
+        expect(new URL(page.url()).searchParams.has("clear_access_token")).toBe(false);
       });
     });
-
-    await test_step("reload with ?clear_access_token=true", async () => {
-      await gotoApp(page, "/?clear_access_token=true");
-    });
-
-    await test_step("both stored tokens are gone", async () => {
-      const left = await page.evaluate(() => [
-        localStorage.getItem("base44_access_token"),
-        localStorage.getItem("token"),
-      ]);
-      expect(left).toEqual([null, null]);
-    });
-  });
+  }
 
   test("a hostile ?returnTo= cannot bounce the visitor off-site", async ({ page, baseURL }) => {
     for (const hostile of ["https://evil.example", "//evil.example", "/\\evil.example", "/.//evil.example"]) {

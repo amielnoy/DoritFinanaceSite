@@ -440,8 +440,23 @@ jobs:
       # the split itself — the shards do not need to agree with each other about
       # anything beyond n. A single-shard leg (feature branches) passes 1/1,
       # which is a no-op.
+      #
+      # The nightly run also shuffles, to surface a test that passes only because
+      # of what ran before it. PRs keep the fixed order so a red PR means the
+      # change. Shuffling happens after sharding (it reorders only the shard's
+      # own tests), so shards still cover the suite exactly once. The seed is the
+      # run id: it shows in the log ("shuffle seed …"), and `--shuffle=<id>`
+      # replays that order locally; a re-run of the job replays it too.
+      #
+      # Such a test usually fails once and passes on retry in a fresh worker, so
+      # it surfaces as *flaky* (job annotations, the nightly Allure report), not
+      # as a red run. That is deliberate: --fail-on-flaky-tests would also turn
+      # every ordinary timing flake red, and a red test-e2e stops the nightly
+      # production promotion.
       - name: Run e2e suite
-        run: npx playwright test --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
+        run: >-
+          npx playwright test --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
+          ${{ github.event_name == 'schedule' && format('--shuffle={0}', github.run_id) || '' }}
         env:
           SKIP_BUILD: "1"
 
@@ -561,7 +576,9 @@ jobs:
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
           echo "Production currently serves: ${asset:-unknown}"
 
-      # Absent credentials skip the publish; *wrong* ones fail it.
+      # Absent credentials skip the publish; *wrong* ones fail it. A skip on
+      # main still stops the site: Deploy to Vercel will not promote production
+      # without `published=true` from this job, and fails the run instead.
       #
       # The CLI only treats BASE44_API_KEY as a key when it starts with `b44k_`:
       #
@@ -589,8 +606,9 @@ jobs:
       #      way to refresh.
       #
       # The second is a wider credential than the first: it acts as the user,
-      # across every app in the workspace, and it expires. When it does, this
-      # step skips with a notice and production stays where it is.
+      # across every app in the workspace, and it expires. When it does, the
+      # publish fails or skips, and neither the agents nor the site reach
+      # production until it is re-seeded.
       - name: Check publish credentials
         id: creds
         env:
@@ -693,7 +711,12 @@ jobs:
   deploy-vercel:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
-    needs: [build, test-node, test-e2e, deploy-supabase]
+    # `deploy` (the Base44 publish) too: the site and the agents' instructions
+    # go live together. The FAQ chat's answers are written by a Base44 agent,
+    # and a site that links to something the agent was told about must not
+    # reach customers while the agent still says the old thing. See the
+    # "Choose production or preview" step for the gate itself.
+    needs: [build, test-node, test-e2e, deploy-supabase, deploy]
     outputs:
       url: ${{ steps.deploy.outputs.url }}
       deployed: ${{ steps.deploy.outputs.deployed }}
@@ -769,22 +792,41 @@ jobs:
       #
       # So a red run still deploys — as a preview, on its own URL, which is the
       # artefact you actually wanted. Only `--prod` waits for green.
+      #
+      # It also waits for the Base44 publish, which carries the agents'
+      # instructions (base44/agents/). Without that, an expired Base44 session
+      # skipped the agents with a notice while the site went live anyway, and
+      # the run stayed green. The nightly `schedule` run is exempt: the Base44
+      # job does not run on it, and nothing in base44/ changed since the push
+      # that already passed this gate.
+      #
+      # When the agents are what held production back, the job deploys the
+      # preview and then fails (last step), so the run is red, not quiet.
       - name: Choose production or preview
         id: target
         env:
           UNIT: ${{ needs.test-node.result }}
           E2E: ${{ needs.test-e2e.result }}
           FUNCTIONS: ${{ needs.deploy-supabase.result }}
+          AGENTS: ${{ needs.deploy.outputs.published }}
         run: |
+          agents_ok=false
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$AGENTS" = "true" ]; then
+            agents_ok=true
+          fi
           if [ "$GITHUB_REF" = "refs/heads/main" ] \
             && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ] \
-            && [ "$FUNCTIONS" = "success" ]; then
+            && [ "$FUNCTIONS" = "success" ] && [ "$agents_ok" = "true" ]; then
             echo "prod=--prod" >> "$GITHUB_OUTPUT"
             echo "env=production" >> "$GITHUB_OUTPUT"
             echo "kind=production" >> "$GITHUB_OUTPUT"
           else
             if [ "$GITHUB_REF" = "refs/heads/main" ]; then
-              echo "::warning::Not promoting (unit: ${UNIT}, e2e: ${E2E}, functions: ${FUNCTIONS}) — deploying this as a preview instead of production."
+              echo "::warning::Not promoting (unit: ${UNIT}, e2e: ${E2E}, functions: ${FUNCTIONS}, agents published: ${AGENTS:-no}) — deploying this as a preview instead of production."
+              if [ "$UNIT" = "success" ] && [ "$E2E" = "success" ] \
+                && [ "$FUNCTIONS" = "success" ] && [ "$agents_ok" != "true" ]; then
+                echo "held_for_agents=true" >> "$GITHUB_OUTPUT"
+              fi
             fi
             echo "prod=" >> "$GITHUB_OUTPUT"
             echo "env=preview" >> "$GITHUB_OUTPUT"
@@ -906,6 +948,13 @@ jobs:
         env:
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
         run: node scripts/indexnow.mjs
+
+      # Last, so the preview above is still deployed and linked from the run.
+      - name: Fail when production waited for the agents
+        if: steps.creds.outputs.ready == 'true' && steps.target.outputs.held_for_agents == 'true'
+        run: |
+          echo "::error::Tests and functions are green, but the Base44 publish did not run, so production was NOT updated (deployed as a preview). The agents' instructions and the site go live together. Usually the Base44 session expired: run \`base44 login\` and copy the new pair from ~/.base44/auth/auth.json into BASE44_ACCESS_TOKEN and BASE44_REFRESH_TOKEN, then re-run this workflow."
+          exit 1
 
   # ── 6. Post-deploy smoke test against the live site ──────────────────────
   #

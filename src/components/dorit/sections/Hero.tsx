@@ -38,7 +38,12 @@ export default function Hero() {
                 height={1402}
                 className="w-full h-full object-cover object-[center_20%]"
                 loading="eager"
-                fetchPriority="high"
+                // Lowercase, through a spread: React 18 does not know the
+                // camelCase `fetchPriority` prop and warns in development (which
+                // fails home.spec's "no console error" in the dev-mode Docker
+                // build), while it passes a lowercase attribute straight through.
+                // React 19 knows `fetchPriority`; switch back when upgrading.
+                {...{ fetchpriority: "high" }}
                 decoding="async"
               />
             </picture>

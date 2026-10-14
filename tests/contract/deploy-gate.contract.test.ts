@@ -40,7 +40,7 @@ describe("production has one promoter", () => {
 
   it("keeps CI the thing that deploys", () => {
     expect(workflow).toContain("vercel deploy --prebuilt");
-    expect(workflow).toMatch(/deploy-vercel:[\s\S]*?needs: \[build, test-node, test-e2e, deploy-supabase\]/);
+    expect(workflow).toMatch(/deploy-vercel:[\s\S]*?needs: \[build, test-node, test-e2e, deploy-supabase, deploy\]/);
   });
 
   it("promotes to production only when the suites went green", () => {
@@ -324,6 +324,45 @@ describe("the Vercel build gets the real app id", () => {
 
   it("refuses to deploy a bundle that still names the placeholder", () => {
     expect(step).toMatch(/grep[^\n]*e2e-sanity-app[^\n]*\.vercel\/output/);
+  });
+});
+
+describe("the site and the agents go live together", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const vercel = workflow.slice(workflow.indexOf("  deploy-vercel:"), workflow.indexOf("  smoke:"));
+  const step = workflow.slice(
+    workflow.indexOf("- name: Choose production or preview"),
+    workflow.indexOf("- name: Build for Vercel"),
+  );
+
+  it("orders the Vercel deploy after the Base44 publish", () => {
+    expect(vercel).toMatch(/needs: \[[^\]]*\bdeploy\]/);
+  });
+
+  it("promotes production only when the agents were published", () => {
+    // An expired Base44 session used to skip the agents with a notice while the
+    // site went live and the run stayed green — the FAQ chat kept its old
+    // instructions next to a site that had moved on.
+    expect(step).toContain("AGENTS: ${{ needs.deploy.outputs.published }}");
+    expect(step).toMatch(/\$AGENTS" = "true"[\s\S]*?agents_ok=true[\s\S]*?\$agents_ok" = "true"[\s\S]*?prod=--prod/);
+  });
+
+  it("lets the nightly rebuild promote without a Base44 publish", () => {
+    // The Base44 job does not run on `schedule`; holding the nightly rebuild
+    // for it would stop prebuilt article pages from ever refreshing.
+    expect(step).toMatch(/GITHUB_EVENT_NAME" = "schedule" \] \|\| \[ "\$AGENTS" = "true"/);
+  });
+
+  it("deploys the preview, then fails the run when only the agents held it back", () => {
+    expect(step).toContain('echo "held_for_agents=true"');
+    const fail = vercel.slice(vercel.indexOf("- name: Fail when production waited for the agents"));
+    expect(fail).toContain("steps.target.outputs.held_for_agents == 'true'");
+    expect(fail).toMatch(/::error::[\s\S]*?exit 1/);
+    // Last in the job, after the preview is deployed and verified.
+    expect(vercel.indexOf("- name: Fail when production waited for the agents"))
+      .toBeGreaterThan(vercel.indexOf("- name: Deploy\n"));
+    expect(vercel.indexOf("- name: Fail when production waited for the agents"))
+      .toBeGreaterThan(vercel.indexOf("- name: Verify the deployment serves the app"));
   });
 });
 

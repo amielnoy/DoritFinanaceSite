@@ -108,11 +108,11 @@ desktop's does (`mobile-parity.spec.ts`). From md up nothing changes —
 whole page) and `/faq` are byte-identical. The shared footer brings `/faq` from
 3,148 to 2,522px (3.73 → 2.99 screens).
 
-Prerendered pages are replaced, not hydrated: `#root` is full before any script
-runs, so `gotoApp` returns before React has mounted, and a tap in between
-reaches a node with no handler. The stage-3 cases (and `openQuickContact`, the
-footer-menu and interview-chat helpers) wait for `waitForLive` — the selector's
-node carrying React's fiber — before they press anything.
+Prerendered pages are replaced, not hydrated, so a tap before React's first
+commit reaches a node with no handler. `gotoApp` waits for the
+`data-route-committed` marker (#169), so the stage-3 cases and the
+`openQuickContact`, footer-menu and interview-chat helpers press nothing before
+the page is live.
 
 E2E-MOB-015–020 cover the rest of `/faq` below md. At 390×844 the page was
 4.91 screens after E2E-MOB-011–014, and a screen and a half stood before the

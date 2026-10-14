@@ -1,5 +1,5 @@
 import { devices } from "@playwright/test";
-import { expect, test, test_step } from "../fixtures/app";
+import { expect, gotoApp, test, test_step, waitForAppLive } from "../fixtures/app";
 
 /**
  * Google indexes and ranks the site from its *mobile* render. If the phone
@@ -42,8 +42,12 @@ test.describe("Mobile-first indexing parity", { tag: "@desktop-only" }, () => {
     const out: Record<string, { title: string; description: string; canonical: string; robots: string; ldTypes: string[]; text: number }> = {};
     for (const path of ROUTES) {
       await page.goto(path, { waitUntil: "domcontentloaded" });
-      await expect(page.locator("#root")).not.toBeEmpty();
+      await waitForAppLive(page);
       await page.waitForFunction(() => !!document.querySelector('link[rel="canonical"]'));
+      // Live is not loaded: /blog commits with its article loader (no text) and
+      // only then shows the list or the empty state. Measured mid-load, one
+      // viewport read 487 characters and the other 535 — "mobile shows 91%".
+      await expect(page.locator(".animate-spin")).toHaveCount(0);
 
       out[path] = await page.evaluate(() => ({
         title: document.title,
@@ -136,7 +140,7 @@ test.describe("Mobile crawlability", { tag: "@mobile-only" }, () => {
 
   test("body copy is legible without pinch-zooming", async ({ page }) => {
     await test_step("open the home page on a phone", async () => {
-      await page.goto("/");
+      await gotoApp(page, "/");
       await expect(page.locator("#about")).toBeAttached();
     });
 
@@ -163,7 +167,7 @@ test.describe("Mobile crawlability", { tag: "@mobile-only" }, () => {
 
   test("reports sub-12px display labels (informational)", async ({ page }) => {
     await test_step("open the home page on a phone", async () => {
-      await page.goto("/");
+      await gotoApp(page, "/");
       await expect(page.locator("#about")).toBeAttached();
     });
 
@@ -201,7 +205,7 @@ test.describe("Mobile crawlability", { tag: "@mobile-only" }, () => {
     const img = page.locator("#top picture img");
 
     await test_step("open the home page on a phone", async () => {
-      await page.goto("/");
+      await gotoApp(page, "/");
       await expect(img).toBeAttached();
     });
 

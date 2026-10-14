@@ -1,4 +1,4 @@
-import { expect, gotoApp, test, test_step, waitForLive } from "../fixtures/app";
+import { expect, gotoApp, test, test_step } from "../fixtures/app";
 
 /**
  * Mobile-web sanity for the two platforms that matter to this site's traffic:
@@ -64,7 +64,6 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
 
   test("each of the bar's three contact cells reports to GA4 from location mobile_sticky_bar", async ({ page }) => {
     await gotoApp(page);
-    await waitForLive(page, "#start");
     // Keep the page: the tracker listens in the capture phase, before this.
     await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
     for (const name of ["לשיחה קצרה", /וואטסאפ/, /חייגו/] as const) {
@@ -96,7 +95,6 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
   test("a link to /#quick-contact opens the short form, which a phone otherwise keeps folded", async ({ page }) => {
     // The bar used to link here; the address still works for anyone holding it.
     await gotoApp(page, "/#quick-contact");
-    await waitForLive(page, "#start");
     await expect(page.locator("#qc-name")).toBeVisible();
     await expect(page.getByRole("button", { name: "השארת פרטים" })).toHaveAttribute("aria-expanded", "true");
   });
@@ -105,9 +103,8 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     for (const path of ["/", "/blog"]) {
       await test_step(`${path}: the footer's last line ends above the bar`, async () => {
         await gotoApp(page, path);
-        // React replaces the prerendered page and /blog's list arrives after
-        // it, so the bottom moves: scroll again on every try until it holds.
-        await waitForLive(page, "footer");
+        // /blog's list arrives after the route commits, so the bottom moves:
+        // scroll again on every try until it holds.
         await expect
           .poll(async () => {
             await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
@@ -222,7 +219,6 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
 
     await test_step("open the home page and open the quick contact form from its chip", async () => {
       await gotoApp(page);
-      await waitForLive(page, "#start");
       await page.locator("#start").getByRole("button", { name: "השארת פרטים" }).click();
       await form.scrollIntoViewIfNeeded();
     });
@@ -238,7 +234,6 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
 
     await test_step("open the home page and tap השארת פרטים under the questionnaire", async () => {
       await gotoApp(page);
-      await waitForLive(page, "#start");
       // tap() scrolls the chip into view itself, and retries while it settles.
       await page.locator("#start").getByRole("button", { name: "השארת פרטים" }).tap();
       await expect(form).toBeVisible();
@@ -767,10 +762,9 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
   type Page = import("@playwright/test").Page;
   const wizard = (page: Page) => page.locator("#interview");
   const stepHeading = (page: Page, name: string) => wizard(page).getByRole("heading", { name });
-  /** The home page, once React has replaced the prerendered copy (see waitForLive). */
+  /** The home page, live (gotoApp waits for the route to commit). */
   const gotoHome = async (page: Page, path = "/") => {
     await gotoApp(page, path);
-    await waitForLive(page, "#start");
   };
   const stepEvents = async (page: Page) =>
     (await queuedClicks(page)).filter((e) => e.name === "wizard_step").map((e) => e.location);
@@ -1106,7 +1100,6 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
 test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
   test("keeps its portrait, its open services, its standing form, eight questions and its open footer menu", async ({ page }) => {
     await gotoApp(page);
-    await waitForLive(page, "#start");
 
     await test_step("the hero's portrait is the plate, not a circle, and no extra buttons", async () => {
       const plate = (await page.locator("#top figure .plate").boundingBox())!;
