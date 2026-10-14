@@ -35,8 +35,8 @@ Test is skipped: mobile projects only".
 
 | ID | Title | Steps | Expected result |
 |---|---|---|---|
-| E2E-MOB-001 | "renders one 64px sticky bar — לשיחה קצרה, WhatsApp, a call — instead of the desktop dock" | Load `/` | Exactly 3 links: "לשיחה קצרה" → `/#start`, WhatsApp → `wa.me/972508311776?text=…`, "חייגו" → `tel:+972508311776`; the bar is 64px tall, the CTA wider than the other two together, all three centred in it; the desktop dock (`floating_dock`) hidden |
-| E2E-MOB-001a | "each of the bar's three reports to GA4 from location mobile_sticky_bar" | Tap all three (navigation prevented) | `cta_click`, `click_whatsapp`, `click_phone` queued with `location: mobile_sticky_bar` |
+| E2E-MOB-001 | "renders one 64px sticky bar — לשיחה קצרה, WhatsApp, a call, support — instead of the desktop dock" | Load `/` | Exactly 4 links: "לשיחה קצרה" → `/#start`, WhatsApp → `wa.me/972508311776?text=…`, "חייגו" → `tel:+972508311776`, "תמיכה" → `/faq#support-chat`; the bar is 64px tall, the CTA the widest cell, all four centred in it and ≥44px tall; the desktop dock (`floating_dock`) hidden |
+| E2E-MOB-001a | "each of the bar's three contact cells reports to GA4 from location mobile_sticky_bar" | Tap "לשיחה קצרה", WhatsApp and "חייגו" (navigation prevented) | `cta_click`, `click_whatsapp`, `click_phone` queued with `location: mobile_sticky_bar` |
 | E2E-MOB-001b | "the sticky bar's לשיחה קצרה reaches the conversation from another route" | Load `/blog`, tap it | URL `/#start`, the section in view — a bare `#…` did nothing off home |
 | E2E-MOB-001c | "a link to /#quick-contact opens the short form, which a phone otherwise keeps folded" | Load `/#quick-contact` | `#qc-name` visible; the "השארת פרטים" chip `aria-expanded=true` |
 | E2E-MOB-001d | "nothing at the bottom of the page hides under the bar" | Load `/` and `/blog`, scroll to the end | The footer's last line ends at or above the bar's top (the page wrappers carry `pb-[calc(4rem+safe-area)]`) |
@@ -44,12 +44,12 @@ Test is skipped: mobile projects only".
 | E2E-MOB-003 | "opens and closes the burger menu and navigates from it" | Tap burger → tap "בלוג" | Drawer opens with a close button; navigation lands on `/blog` |
 | E2E-MOB-004 | "the burger menu closes on Escape and on backdrop tap" | Tap burger, press Escape | Close button gone |
 | E2E-MOB-005 | "no page scrolls horizontally on a phone viewport" | Load `/`, `/blog`, `/claims`, `/privacy`, `/accessibility`, `/faq` | `scrollWidth − clientWidth ≤ 1px` on every page |
-| E2E-MOB-006 | "primary tap targets meet the 44px minimum" | Load `/` | The bar's three links, the burger, the hero's CTA / WhatsApp / "חיוג", the start chips (וואטסאפ, טלפון, השארת פרטים, צ'אט), a services accordion button, "עוד עליי", "לכל השאלות" and the footer's "ניווט באתר" each ≥44px on the long edge and ≥36px on the short edge (WCAG 2.5.5 / iOS HIG) |
+| E2E-MOB-006 | "primary tap targets meet the 44px minimum" | Load `/` | The bar's four links, the burger, the hero's CTA / WhatsApp / "חיוג", the start chips (וואטסאפ, טלפון, השארת פרטים, צ'אט), a services accordion button, "עוד עליי", "לכל השאלות" and the footer's "ניווט באתר" each ≥44px on the long edge and ≥36px on the short edge (WCAG 2.5.5 / iOS HIG) |
 | E2E-MOB-007 | "the phone keyboard gets the right input types" | Open the form from its "השארת פרטים" chip | Phone field `type=tel`, email field `type=email` |
 | E2E-MOB-008 | "a visitor can submit the quick contact form by touch" | Tap "השארת פרטים", fill, tap submit | Form appears; confirmation shown; `submitLead` with `source: quick` |
 | E2E-MOB-009 | "the calculator is usable on a narrow screen" | Scroll to `#fee-calculator`, set deposit | Field visible and editable; no `NaN` |
 | E2E-MOB-009a | "the hero caption and phrase list stay aligned, even with enlarged text" | Load `/`; repeat at body zoom 1 and 1.3 (a phone's large-text setting) | `L-00107009` on one line; the six phrases are a list of 6 items, each with its own diamond, starting at exactly two right edges (two aligned columns) |
-| E2E-MOB-009b | "every sticky-bar label fits on one line, even with enlarged text" | Load `/`, wait for `document.fonts.ready`; repeat at body zoom 1 and 1.3 | The bar has 3 links; each label's text occupies exactly one line (distinct line tops of its text nodes = 1). Measured in the real, self-hosted fonts (A-74) |
+| E2E-MOB-009b | "every sticky-bar label fits on one line, even with enlarged text" | Load `/`, wait for `document.fonts.ready`; repeat at 390 and 360px wide, at body zoom 1 and 1.3 | The bar has 4 links; each label's text occupies exactly one line (distinct line tops of its text nodes = 1). Measured in the real, self-hosted fonts (A-74) |
 | E2E-MOB-010 | "the viewport meta allows pinch-zoom" | Load `/` | `width=device-width` present; no `user-scalable=no` or `maximum-scale=1` |
 | E2E-MOB-011 | "the page shows a short card, with the fence closed behind <details>" | Load `/faq`, scroll to `#support-chat` | Heading "לא מצאתם את התשובה?", one full-width "שאלו את העוזר" button (≥44px, `aria-expanded=false`), no message box; the section is under ¾ of a screen; the fence is in a closed `<details>` and reads word for word once opened |
 | E2E-MOB-012 | "the chat opens full-screen, with room for its messages and one scroll" | Press "שאלו את העוזר", accept the notice, open the hand-off | A `dialog` named "העוזר של דורית" covering the viewport; `body` overflow hidden; the header is one row (title, "אוטומטי · לא דורית עצמה", hand-off, X — each ≥44px); the notice region >300px with checkbox and start button in view; after consent the messages area >50% of the viewport and the layer itself does not scroll; the message box in view at ≥16px; `chat_start` and `chat_handoff` (`method: ai_support`) queued for GA4 |
@@ -72,12 +72,12 @@ Test is skipped: mobile projects only".
 | E2E-MOB-030 | "the home page stays under 7,000px — it was 10,260" | Load `/` at 390×844 | `scrollHeight` < 7000px (10,260 before stage 3) |
 | E2E-MOB-020 | "עדיין מתלבטים? has its three buttons on one row, and each still reports to GA4" | Scroll to the CTA band; tap all three (navigation prevented) | "קביעת פגישה", "טלפון" and "WhatsApp" share one row inside the screen, each ≥44×44px, hrefs `/#start`, `tel:+972508311776`, `wa.me/972508311776`; `cta_click`, `click_phone` and `click_whatsapp` queued for GA4 with `location: faq` |
 
-The sticky bar had a "תמיכה" cell from A-64 to stage 3. It is now one 64px bar
-— "לשיחה קצרה", WhatsApp, a call — and the support chat is "תמיכה — שאלה
-לעוזר" in the header menu, under שאלות ותשובות; `E2E-SUP-002` drives it from
-there on the phone projects. "השאירו פרטים" left the bar too: the short form
-opens from the chip row under the questionnaire, and `/#quick-contact` still
-opens it (E2E-MOB-001c).
+Stage 3 made the sticky bar 64px of four phone tabs — "לשיחה קצרה", WhatsApp,
+a call and "תמיכה". Support keeps the cell it has had since A-64
+(`E2E-SUP-002` still presses it on the phone projects), and the header menu
+lists it as well, as "תמיכה — שאלה לעוזר" under שאלות ותשובות (CMP-HDR-009).
+"השאירו פרטים" left the bar: the short form opens from the chip row under the
+questionnaire, and `/#quick-contact` still opens it (E2E-MOB-001c).
 
 ### 2.1 The desktop half of the same switch
 

@@ -98,7 +98,7 @@ describe("<FloatingHeader /> account links", () => {
 });
 
 describe("<FloatingHeader /> phone menu", () => {
-  it("lists the support chat, which left the phone's sticky bar", () => {
+  it("lists the support chat as well as the sticky bar's תמיכה", () => {
     renderHeader({ user: null, isAuthenticated: false });
     fireEvent.click(screen.getByRole("button", { name: "תפריט" }));
     const support = screen.getByRole("link", { name: /תמיכה — שאלה לעוזר/ });

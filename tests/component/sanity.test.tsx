@@ -113,10 +113,14 @@ describe("<MobileStickyBar />", () => {
     expect(screen.getByRole("link", { name: "לשיחה קצרה" })).toHaveAttribute("href", "/#start");
   });
 
-  it("holds those three and nothing else — support moved to the header menu", () => {
+  it("offers a way to the support chat", () => {
     withProviders(<MobileStickyBar />);
-    expect(screen.getAllByRole("link")).toHaveLength(3);
-    expect(screen.queryByRole("link", { name: /תמיכה/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /תמיכה/ })).toHaveAttribute("href", "/faq#support-chat");
+  });
+
+  it("holds those four and nothing else — the short form opens from #start's chip row", () => {
+    withProviders(<MobileStickyBar />);
+    expect(screen.getAllByRole("link")).toHaveLength(4);
     expect(screen.queryByRole("link", { name: /השאירו פרטים/ })).toBeNull();
   });
 });

@@ -284,10 +284,9 @@ export default function FloatingHeader() {
                     </a>
                   )
                 )}
-          {/* The support chat, by name. On a phone it had a cell in the sticky
-              bar; the bar is now the conversation, WhatsApp and a call, so it
-              lives here, right under שאלות ותשובות — the drawer is md:hidden,
-              and the desktop keeps its round button in the floating dock. */}
+          {/* The support chat, by name, right under שאלות ותשובות — a second
+              way in beside the sticky bar's "תמיכה". The drawer is md:hidden;
+              the desktop keeps its round button in the floating dock. */}
           <SupportLink
             onClick={() => setOpen(false)}
             className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, gotoApp, test, test_step, waitForLive } from "../fixtures/app";
+import { expect, gotoApp, test, test_step } from "../fixtures/app";
 
 /**
  * The support chat has to be findable from where a visitor already is.
@@ -7,15 +7,13 @@ import { expect, gotoApp, test, test_step, waitForLive } from "../fixtures/app";
  * It lives at the bottom of /faq, and the only ways there were two footer
  * links. Dorit could not find it herself, on a phone or on a desktop. These
  * cases pin the two ways in that are now on screen without scrolling: the
- * header menu, and a support button beside the other ways to reach her — the
- * round dock on a desktop, and on a phone the menu's own "תמיכה" item, since
- * the sticky bar became לשיחה קצרה, WhatsApp and a call (stage 3).
+ * header menu, and a support button beside the other ways to reach her.
  */
 
 const SUPPORT = "#support-chat";
 
-/** The phone's drawer — the last <nav> once the burger is open. */
-const drawer = (page: Page) => page.getByRole("navigation").last();
+/** The phone's sticky bar; its labels repeat ones used elsewhere on the page. */
+const stickyBar = (page: Page) => page.locator("div.md\\:hidden.fixed.bottom-0");
 
 test.describe("Support chat — reachable from the header and a button", () => {
   test("the header menu lists שאלות ותשובות and it opens the page", async ({ page, isMobile }) => {
@@ -49,14 +47,9 @@ test.describe("Support chat — reachable from the header and a button", () => {
 
     await test_step("press the support button where the platform shows it", async () => {
       // Desktop: the round dock beside WhatsApp and the phone. Phone: the
-      // menu, where שאלות ותשובות already is, one tap from any screen.
-      if (isMobile) {
-        // A tap on the prerendered burger reaches no handler; wait for React's.
-        await waitForLive(page, "header");
-        await page.getByRole("button", { name: "תפריט" }).click();
-      }
+      // sticky bar along the bottom, which is where the thumb already is.
       const button = isMobile
-        ? drawer(page).getByRole("link", { name: /תמיכה/ })
+        ? stickyBar(page).getByRole("link", { name: /תמיכה/ })
         : page.getByRole("link", { name: /^תמיכה/ });
       await expect(button).toBeVisible();
       await button.click();
@@ -75,7 +68,7 @@ test.describe("Support chat — reachable from the header and a button", () => {
     page,
     isMobile,
   }) => {
-    test.skip(isMobile, "the phone's support item is in the menu, which closes as it navigates — the desktop dock is what stays on screen");
+    test.skip(isMobile, "the phone's support button lives on the home page's bar");
 
     await test_step("open /faq and stay at the top", async () => {
       await gotoApp(page, "/faq");

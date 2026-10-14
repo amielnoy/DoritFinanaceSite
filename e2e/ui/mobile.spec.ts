@@ -24,32 +24,36 @@ const queuedClicks = (page: import("@playwright/test").Page) =>
   );
 
 test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
-  test("renders one 64px sticky bar — לשיחה קצרה, WhatsApp, a call — instead of the desktop dock", async ({ page }) => {
+  test("renders one 64px sticky bar — לשיחה קצרה, WhatsApp, a call, support — instead of the desktop dock", async ({ page }) => {
     await test_step("open the home page on a phone viewport", async () => {
       await gotoApp(page);
     });
 
-    await test_step("the bar offers the conversation, WhatsApp and a call, and nothing else", async () => {
+    await test_step("the bar offers the conversation, WhatsApp, a call and support, and nothing else", async () => {
       const cta = stickyBar(page).getByRole("link", { name: "לשיחה קצרה" });
       const stickyWhatsapp = stickyBar(page).getByRole("link", { name: /וואטסאפ/ });
       const stickyCall = stickyBar(page).getByRole("link", { name: /חייגו/ });
-      await expect(stickyBar(page).getByRole("link")).toHaveCount(3);
-      await expect(cta).toBeVisible();
-      await expect(stickyWhatsapp).toBeVisible();
-      await expect(stickyCall).toBeVisible();
+      const stickySupport = stickyBar(page).getByRole("link", { name: /תמיכה/ });
+      await expect(stickyBar(page).getByRole("link")).toHaveCount(4);
+      for (const link of [cta, stickyWhatsapp, stickyCall, stickySupport]) await expect(link).toBeVisible();
       await expect(cta).toHaveAttribute("href", "/#start");
       await expect(stickyWhatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776\?text=/);
       await expect(stickyCall).toHaveAttribute("href", "tel:+972508311776");
+      await expect(stickySupport).toHaveAttribute("href", "/faq#support-chat");
     });
 
-    await test_step("one 64px bar, the CTA wider than the other two together", async () => {
+    await test_step("one 64px bar, four cells in a row, the CTA the widest", async () => {
       const bar = (await stickyBar(page).boundingBox())!;
       expect(Math.round(bar.height)).toBe(64);
-      const cta = (await stickyBar(page).getByRole("link", { name: "לשיחה קצרה" }).boundingBox())!;
-      const wa = (await stickyBar(page).getByRole("link", { name: /וואטסאפ/ }).boundingBox())!;
-      const call = (await stickyBar(page).getByRole("link", { name: /חייגו/ }).boundingBox())!;
-      expect(cta.width).toBeGreaterThan(wa.width + call.width);
-      for (const b of [cta, wa, call]) expect(Math.round(Math.abs(b.y + b.height / 2 - (bar.y + bar.height / 2)))).toBeLessThanOrEqual(1);
+      const boxes = await Promise.all(
+        ["לשיחה קצרה", /וואטסאפ/, /חייגו/, /תמיכה/].map(async (name) => (await stickyBar(page).getByRole("link", { name }).boundingBox())!),
+      );
+      const [cta, ...rest] = boxes;
+      for (const b of rest) expect(cta.width).toBeGreaterThan(b.width);
+      for (const b of boxes) {
+        expect(Math.round(Math.abs(b.y + b.height / 2 - (bar.y + bar.height / 2)))).toBeLessThanOrEqual(1);
+        expect(b.height).toBeGreaterThanOrEqual(44);
+      }
     });
 
     await test_step("no other button floats over the page: the desktop dock is hidden below md", async () => {
@@ -58,7 +62,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("each of the bar's three reports to GA4 from location mobile_sticky_bar", async ({ page }) => {
+  test("each of the bar's three contact cells reports to GA4 from location mobile_sticky_bar", async ({ page }) => {
     await gotoApp(page);
     await waitForLive(page, "#start");
     // Keep the page: the tracker listens in the capture phase, before this.
@@ -189,6 +193,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
         stickyBar(page).getByRole("link", { name: "לשיחה קצרה" }),
         stickyBar(page).getByRole("link", { name: /וואטסאפ/ }),
         stickyBar(page).getByRole("link", { name: /חייגו/ }),
+        stickyBar(page).getByRole("link", { name: /תמיכה/ }),
         page.getByRole("button", { name: "תפריט" }),
         page.locator("#top").getByRole("link", { name: "לשיחה קצרה עם דורית" }),
         page.locator("#top").getByRole("link", { name: "וואטסאפ" }),
@@ -301,13 +306,15 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     });
 
     // 1.3 stands in for a phone's large-text setting, which scales px sizes too.
-    for (const zoom of [1, 1.3]) {
-      await test_step(`at ${zoom}x text`, async () => {
+    // 360 is the narrowest common Android width; four cells must fit it too.
+    for (const [width, zoom] of [[390, 1], [390, 1.3], [360, 1], [360, 1.3]] as const) {
+      await test_step(`at ${width}px wide, ${zoom}x text`, async () => {
+        await page.setViewportSize({ width, height: 800 });
         await page.evaluate((z) => {
           (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(z);
         }, zoom);
         const links = stickyBar(page).getByRole("link");
-        await expect(links).toHaveCount(3);
+        await expect(links).toHaveCount(4);
         const lines = await links.evaluateAll((els) =>
           els.map((el) => {
             // Count the distinct line tops the label's text actually occupies.

@@ -45,7 +45,8 @@ on, and calls the Base44 client with the payload the backend contract expects.
 | CMP-BAR-001 | "offers a dial link and the conversation" | `tel:+972508311776` and "לשיחה קצרה" → `/#start` — a home-page anchor from every route, never a bare `#…`, and the shape the click listener reports as `cta_click` |
 | CMP-FLA-001 | "links to WhatsApp with a prefilled Hebrew message and a safe rel" | `wa.me/<number>`, `target=_blank`, `rel` contains `noopener`, message decodes to Hebrew |
 | CMP-FLA-002 | "links to the phone number in E.164 form" | `href === tel:${CONTACT.phoneE164}` |
-| CMP-BAR-002 | "holds those three and nothing else — support moved to the header menu" | Exactly 3 links; no "תמיכה" and no "השאירו פרטים" (stage 3: the bar is the conversation, WhatsApp and a call; support is CMP-HDR-009) |
+| CMP-BAR-002 | "offers a way to the support chat" | "תמיכה" → `/faq#support-chat` (A-64) |
+| CMP-BAR-003 | "holds those four and nothing else — the short form opens from #start's chip row" | Exactly 4 links; no "השאירו פרטים" (stage 3: the conversation, WhatsApp, a call and support) |
 | CMP-FLA-003 | "links to the support chat" | "תמיכה — …" → `/faq#support-chat` |
 
 Both components now hold a router link, so every case renders them inside
@@ -131,7 +132,7 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-HDR-004 | "offers no sign-out to a signed-out visitor" | No "יציאה" button |
 | CMP-HDR-005 | "signs a visitor out and sends them home" | "יציאה" calls `logout(true, <origin>/)` |
 | CMP-HDR-006 | "offers no clearinghouse board link, even to an admin, while the switch is off" | No "בקשות מסלקה" link with `VITE_MASLEKA_ENABLED` unset |
-| CMP-HDR-009 | "lists the support chat, which left the phone's sticky bar" (`describe` "phone menu") | Opening "תפריט" shows "תמיכה — שאלה לעוזר" → `/faq#support-chat`; pressing it closes the menu (`SupportLink` now runs the caller's `onClick` before its own scroll) |
+| CMP-HDR-009 | "lists the support chat as well as the sticky bar's תמיכה" (`describe` "phone menu") | Opening "תפריט" shows "תמיכה — שאלה לעוזר" → `/faq#support-chat`; pressing it closes the menu (`SupportLink` now runs the caller's `onClick` before its own scroll) |
 
 ### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
