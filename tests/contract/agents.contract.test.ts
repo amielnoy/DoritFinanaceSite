@@ -1818,7 +1818,11 @@ describe("what the head claims the practice is", () => {
   it("describes the same five pillars the site displays", () => {
     // `llms.txt` is the only surface a non-JS crawler reads in full, and it
     // used to list a set of pillars the page had stopped showing.
-    const matrix = read(join(REPO_ROOT, "src/components/dorit/sections/ServiceMatrix.tsx"));
+    // The pillars' words live in the resource file since English and French
+    // (src/i18n/locales/he/home.json); the component says which ones exist.
+    const matrix =
+      read(join(REPO_ROOT, "src/components/dorit/sections/ServiceMatrix.tsx")) +
+      read(join(REPO_ROOT, "src/i18n/locales/he/home.json"));
     for (const pillar of [
       "פנסיה, גמל והשתלמות",
       "מיסוי וקיבוע זכויות",
@@ -1835,9 +1839,17 @@ describe("what the head claims the practice is", () => {
     // §2 binds the marketing copy exactly as it binds the agents.
     const matrix = read(join(REPO_ROOT, "src/components/dorit/sections/ServiceMatrix.tsx"));
     const hero = read(join(REPO_ROOT, "src/components/dorit/sections/Hero.tsx"));
-    for (const [name, src] of Object.entries({ matrix, hero, html })) {
+    // The home page's words, in every language (src/i18n/locales/<lang>/home.json).
+    const homeHe = read(join(REPO_ROOT, "src/i18n/locales/he/home.json"));
+    for (const [name, src] of Object.entries({ matrix, hero, html, homeHe })) {
       expect(src, `${name} promises a return`).not.toMatch(/נחסוך לך|תחסכו|מובטח|רווח מובטח/);
     }
+    const homeEn = read(join(REPO_ROOT, "src/i18n/locales/en/home.json"));
+    const homeFr = read(join(REPO_ROOT, "src/i18n/locales/fr/home.json"));
+    // "garanties" is French for insurance cover, and the disclaimer says results
+    // are "not guaranteed": the patterns name a promised return, not the word.
+    expect(homeEn, "home.json (en) promises a return").not.toMatch(/we(?:'ll| will) save you|you(?:'ll| will) save|guaranteed (?:return|saving|profit)/i);
+    expect(homeFr, "home.json (fr) promises a return").not.toMatch(/vous fera économiser|vous économiserez|(?:rendement|gain|économie)s? garanti/i);
   });
 });
 /**
