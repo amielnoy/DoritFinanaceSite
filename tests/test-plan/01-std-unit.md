@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 704 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1314 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 716 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1334 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -299,6 +299,8 @@ published. See [A-65](10-known-issues.md).
 | UNIT-SEED-010 | "mirrors the file name as the slug, and keeps it out of the Base44 payload" | Mirror row `slug`; payload has none |
 | UNIT-SEED-011 | "takes the slug from the file name" | `horadat-dmei-nihul` |
 | UNIT-SEED-012 | "refuses a file name that cannot be an address" | Throws naming kebab-case |
+| UNIT-SEED-013 | "carries cta_headline and og_image to Supabase only (Base44's BlogPost has neither)" | In the mirror row; not in the Base44 payload |
+| UNIT-SEED-014 | "mirrors an article without them as null, which the column checks accept (an empty string is refused)" | `cta_headline: null`, `og_image: null` |
 
 ### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
 
@@ -1181,3 +1183,20 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
+
+### 4.46 The article contact boxes — `tests/unit/article-cta.test.ts`, and the share image — `tests/unit/blogSeo.test.ts`
+
+`src/lib/articleCta.ts`: where the first box goes, what it says, when it offers /tools. The share image: `computeBlogSeoConfig` prefers `og_image`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ACTA-001 | "splits after the third paragraph, keeping both halves' Markdown intact" | Head = paragraphs 1–3, tail = 4–5 |
+| UNIT-ACTA-002 | "does not count headings, lists, quotes or tables as paragraphs" | The split lands after the third real paragraph |
+| UNIT-ACTA-003 | "never splits inside a fenced block" | A fence with a blank line stays whole |
+| UNIT-ACTA-004 | "returns null when nothing follows the third paragraph (%i more blocks)" (2 cases) | `null` for exactly three paragraphs; a split when a heading follows |
+| UNIT-ACTA-005 | "returns null for a short or empty body" | `null` |
+| UNIT-ACTA-006 | "uses the article's own headline when it has one" | Trimmed `cta_headline` |
+| UNIT-ACTA-007 | "falls back to the general line for %j" (3 cases) | "יש לך שאלה על הנושא הזה? דורית עונה אישית בוואטסאפ" |
+| UNIT-ACTA-008 | "names the article the visitor read" | `שלום דורית, קראתי את המאמר "<title>" ואשמח לשאלה קצרה` |
+| UNIT-ACTA-009 | "tags %j → %s (a tool on /tools covers fees and insurance only)" (4 cases) | True for a "דמי ניהול" or "ביטוח" tag only |
+| UNIT-ACTA-010 | "shares the article's own og_image ahead of its cover image" (`blogSeo.test.ts`) | `image` is `og_image` |

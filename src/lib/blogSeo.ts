@@ -40,7 +40,7 @@ export function computeBlogSeoConfig(post: Article): SeoConfig {
     description: summary || `מאמר מאת דורית גוב ארי — ${post.title}`,
     path,
     type: "article",
-    image: post.image_url || DEFAULT_OG_IMAGE,
+    image: post.og_image || post.image_url || DEFAULT_OG_IMAGE,
     imageAlt: post.title,
     publishedTime: post.created_date,
     tags: tagList,

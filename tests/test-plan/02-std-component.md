@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 206 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 246 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 213 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 289 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -469,3 +469,17 @@ the cases above it run without one and are the desktop's wizard, unchanged.
 All 217 declared cases pass (vitest: 247 with expansions). A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
+
+### 4.25 The article contact boxes — `tests/component/article-contact-boxes.test.tsx`
+
+`BlogPost` over the Base44 mock (as in §blog-post-redirect); `framer-motion` stubbed.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ACTA-001 | "puts one box after the third paragraph and one at the end, each tracked at its place" | `article_inline` between paragraphs 3 and 4, `article_end` after the body; each carries its `data-track-location` |
+| CMP-ACTA-002 | "shows only the box at the end when nothing follows the third paragraph" | No `article_inline` |
+| CMP-ACTA-003 | "pre-fills WhatsApp with the article's title" | `?text=` decodes to the title sentence; opens in a new tab |
+| CMP-ACTA-004 | "uses the article's cta_headline, else the general line" | The article's headline |
+| CMP-ACTA-005 | "falls back to the general headline" | `ARTICLE_CTA_FALLBACK` |
+| CMP-ACTA-006 | "offers /tools on a fees article and not on a tax one" | "לבדיקה במחשבון" → `/tools` |
+| CMP-ACTA-007 | "does not offer /tools on an article no tool covers" | No such link |

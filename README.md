@@ -1338,6 +1338,24 @@ named in Latin kebab-case (`horadat-dmei-nihul.md`); the script refuses any
 other. The slug goes to Supabase only — Base44's `BlogPost` has no such field —
 and a re-seed writes the file name back over a slug changed in `/admin/blog`.
 
+### Contact boxes inside an article
+
+Every article shows a contact box after its third paragraph (when more
+follows) and another after its body (`ArticleContactBox`, placement rules in
+`src/lib/articleCta.ts`): a headline, one line, a WhatsApp button pre-filled
+with `שלום דורית, קראתי את המאמר "<title>" ואשמח לשאלה קצרה`, and
+"לבדיקה במחשבון" → `/tools` when the article is tagged "דמי ניהול" or "ביטוח"
+(what the two tools there cover). The clicks are `click_whatsapp` with
+location `article_inline` / `article_end`. The headline is the article's
+`cta_headline`, else "יש לך שאלה על הנושא הזה? דורית עונה אישית בוואטסאפ".
+
+`cta_headline` and `og_image` (the image a shared link shows; else
+`image_url`, else the portrait) are Supabase-only columns, like the slug, set
+from a repo article's front matter by the seed script. Migration
+`20261020000000_blog_cta_og.sql` must be applied **before** the code that
+selects them is deployed: the site selects columns by name, and a missing one
+fails every article query.
+
 ### Article addresses
 
 An article lives at `/blog/<slug>`: Latin kebab-case (`horadat-dmei-nihul`),

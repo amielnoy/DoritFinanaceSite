@@ -103,6 +103,13 @@ export interface Article {
   tags?: string;
   /** How long acting on the article takes, as a reader would say it ("רבע שעה"). */
   action_time?: string;
+  /**
+   * The headline of the article's contact boxes (src/lib/articleCta.ts); unset,
+   * the general line. Supabase only, like `slug`.
+   */
+  cta_headline?: string;
+  /** The image shared links show (og:image / twitter:image); unset, `image_url`, then the portrait. Supabase only. */
+  og_image?: string;
   published?: boolean;
   created_date: string;
 }
