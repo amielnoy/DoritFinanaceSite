@@ -4,10 +4,8 @@ import {
   ArrowRight,
   CalendarClock,
   Check,
-  ClipboardCheck,
   Compass,
   FileSearch,
-  ListChecks,
   Loader2,
   Phone,
   Send,
@@ -27,7 +25,6 @@ import {
   ACKNOWLEDGEMENTS,
   CLEARINGHOUSE,
   CLEARINGHOUSE_TEXT,
-  CONCERN_LABEL,
   CONCERN_LEGEND,
   CONCERNS,
   CONFIRMATION_FOLLOW_UP,
@@ -35,15 +32,11 @@ import {
   DAY_LABELS,
   GOAL,
   LIFE_STAGE,
-  MEETING_TOPICS,
-  NOTES_HINT,
   SLOTS,
   TIME_NOTE,
-  TRACK_QUESTIONS,
   TRANSPARENCY,
   UNKNOWN_LABEL,
   type DayChoice,
-  type MeetingTopic,
   type Question,
   type SlotKey,
 } from "@/config/needs-wizard";
@@ -53,42 +46,54 @@ import {
   meetingTopicOf,
   timingOf,
   toInterviewSummary,
-  trackOf,
   valueOf,
   type Answer,
   type WizardState,
 } from "@/lib/needs-wizard";
 import { dayChoices, isWorkingDay } from "@/lib/wall-clock";
-import { isIsraeliPhone } from "@/lib/phone";
+import { isIsraeliMobile, isIsraeliPhone } from "@/lib/phone";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 
 /**
- * The needs interview as eight short screens of choices.
+ * The needs interview, short first (the lead-generation brief of 2026-10-14).
  *
- * It replaces the free-text interview chat as the primary path: the same fields
- * Dorit receives, in about two minutes and without a model in the loop, saved
- * through the same `submitInterview` the chat's close uses. The chat stays one
- * link away for anyone who would rather write. See `config/needs-wizard.ts`.
+ * Two required steps — what is on the visitor's mind, then a name and a phone —
+ * and the lead is saved and Dorit mailed. Then, optionally, four more questions
+ * that fill in that same lead (`stage: "details"`, which submit-lead matches to
+ * the lead it just saved) so she arrives prepared. A backend that cannot fill a
+ * lead in (`services.leads.updatesInterviews`) is never offered them. The chat
+ * stays one link away for anyone who would rather write. See
+ * `config/needs-wizard.ts`.
  */
 
-/**
- * The eight stages, each with an icon that says what it is about — so a visitor
- * sees at a glance where they are, what is behind them and what is left.
- */
-const STAGES: readonly { label: string; icon: LucideIcon }[] = [
-  { label: "שלב חיים", icon: Users },
-  { label: "מה מעסיק", icon: Compass },
-  { label: "יעד", icon: Target },
-  { label: "פרטים", icon: ListChecks },
-  { label: "מסלקה", icon: FileSearch },
-  { label: "מועד", icon: CalendarClock },
-  { label: "פרטי קשר", icon: Phone },
-  { label: "סיכום", icon: ClipboardCheck },
+type StepId = "concern" | "contact" | "life" | "goal" | "clearinghouse" | "time";
+type Stage = { id: StepId; label: string; icon: LucideIcon };
+
+/** The required part: the lead is saved when its last step is sent. */
+const MAIN: readonly Stage[] = [
+  { id: "concern", label: "מה מעסיק", icon: Compass },
+  { id: "contact", label: "פרטי קשר", icon: Phone },
 ];
-const STEP_COUNT = STAGES.length;
+/** The optional part, after the lead is saved. */
+const EXTRAS: readonly Stage[] = [
+  { id: "life", label: "שלב חיים", icon: Users },
+  { id: "goal", label: "יעד", icon: Target },
+  { id: "clearinghouse", label: "מסלקה", icon: FileSearch },
+  { id: "time", label: "מועד", icon: CalendarClock },
+];
+type Segment = "main" | "extras";
+const stagesOf = (segment: Segment) => (segment === "main" ? MAIN : EXTRAS);
+/** `wizard_step`'s location: the step's place in the whole questionnaire, a number only. */
+const globalStep = (segment: Segment, step: number) => (segment === "main" ? step : MAIN.length + step);
+
 /** Long enough to see the chip chosen, short enough not to feel like a wait. */
 const ADVANCE_DELAY_MS = 250;
-type Phase = "steps" | "claim" | "done" | "failed";
+type Phase = "steps" | "claim" | "saved" | "done" | "failed" | "detailsFailed";
+
+const PHONE_ERROR = "נא להזין מספר נייד ישראלי — למשל 050-1234567.";
+const NAME_ERROR = "נא למלא שם.";
+const EMAIL_ERROR = "כתובת המייל לא נראית תקינה.";
+const EXTRAS_OFFER = "רוצים לעזור לדורית להתכונן? עוד 4 שאלות קצרות";
 
 const CHIP =
   "inline-flex min-h-11 items-center rounded-md border border-border px-4 py-2 text-[16px] leading-snug text-foreground cursor-pointer " +
@@ -102,19 +107,20 @@ const LINK =
 /**
  * Where the visitor is. Done stages carry a check and lead back to themselves;
  * the current one is marked for assistive tech with aria-current; the rest wait.
- * Labels show beside the icons from the tablet width up — on a phone eight
- * icons fit in a row, and the labels stay for screen readers.
+ * Labels show beside the icons from the tablet width up; on a phone the
+ * labels stay for screen readers.
  */
-function Stepper({ step, onJump }: { step: number; onJump: (n: number) => void }) {
+function Stepper({ stages, step, onJump }: { stages: readonly Stage[]; step: number; onJump: (n: number) => void }) {
   return (
-    <ol aria-label="שלבי השאלון" className="m-0 p-0 list-none grid grid-cols-8 gap-1 md:gap-2">
-      {STAGES.map(({ label, icon: Icon }, i) => {
+    <ol
+      aria-label="שלבי השאלון"
+      className={`m-0 p-0 list-none grid gap-1 md:gap-2 ${stages.length === 2 ? "grid-cols-2 max-w-[260px]" : "grid-cols-4 max-w-[520px]"}`}
+    >
+      {stages.map(({ label, icon: Icon }, i) => {
         const n = i + 1;
         const done = n < step;
         const current = n === step;
         const circle =
-          // 32px on a phone: eight 40px circles and their gaps overflow a 375px
-          // screen's content width and clip the outermost stages.
           "mx-auto flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full border motion-safe:transition-colors " +
           (current
             ? "border-highlight bg-highlight/15 text-accent"
@@ -226,12 +232,12 @@ function Choices({
 
 export default function NeedsWizard() {
   const [state, setState] = useState<WizardState>(emptyState);
+  const [segment, setSegment] = useState<Segment>("main");
   const [step, setStep] = useState<number>(1);
   const [phase, setPhase] = useState<Phase>("steps");
   const [ack, setAck] = useState<string>("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [changingTopic, setChangingTopic] = useState<boolean>(false);
   const [claim, setClaim] = useState<{ name: string; phone: string; error: string; sending: boolean; result: string }>({
     name: "",
     phone: "",
@@ -251,9 +257,10 @@ export default function NeedsWizard() {
   // load the wizard must not pull the page down to itself.
   useEffect(() => {
     if (moved.current) headingRef.current?.focus();
-  }, [step, phase]);
+  }, [step, phase, segment]);
 
-  const track = trackOf(state);
+  const stages = stagesOf(segment);
+  const id: StepId = stages[step - 1].id;
   const days = dayChoices(new Date());
 
   const begin = () => {
@@ -277,19 +284,17 @@ export default function NeedsWizard() {
     setState((s) => ({ ...s, ...next }));
   };
 
-  /** The questions a step asks, for the acknowledgement it earns. */
-  const questionsOf = (n: number): Question[] =>
-    n === 1 ? [LIFE_STAGE] : n === 3 ? [GOAL] : n === 4 ? [...TRACK_QUESTIONS[track]] : n === 5 ? [CLEARINGHOUSE] : [];
+  /** The one question a step asks, for the acknowledgement it earns and the auto-advance. */
+  const questionOf = (s: StepId): Question | null =>
+    s === "life" ? LIFE_STAGE : s === "goal" ? GOAL : s === "clearinghouse" ? CLEARINGHOUSE : null;
 
-  const acknowledgementFor = (n: number): string => {
-    if (n === 2) return state.concern ? nextAnswered() : ACKNOWLEDGEMENTS.skipped;
-    const qs = questionsOf(n);
-    if (!qs.length) return "";
-    const answers = qs.map((q) => state.answers[q.key]);
-    const anyUnknown = answers.some((a) => a === UNKNOWN_LABEL || (Array.isArray(a) && a.includes(UNKNOWN_LABEL)));
-    if (anyUnknown) return ACKNOWLEDGEMENTS.unknown;
-    const anyAnswered = qs.some((q) => valueOf(q, state.answers[q.key], state));
-    return anyAnswered ? nextAnswered() : ACKNOWLEDGEMENTS.skipped;
+  const acknowledgementFor = (s: StepId): string => {
+    if (s === "concern") return state.concern ? nextAnswered() : ACKNOWLEDGEMENTS.skipped;
+    const q = questionOf(s);
+    if (!q) return "";
+    const a = state.answers[q.key];
+    if (a === UNKNOWN_LABEL) return ACKNOWLEDGEMENTS.unknown;
+    return valueOf(q, a, state) ? nextAnswered() : ACKNOWLEDGEMENTS.skipped;
   };
 
   function nextAnswered(): string {
@@ -304,28 +309,90 @@ export default function NeedsWizard() {
     setStep(n);
   };
 
+  /** What submit-lead receives: everything answered so far, and where the visitor came from. */
+  const summaryFor = (stage: "complete" | "details") => {
+    const attribution = getAttribution();
+    return {
+      ...toInterviewSummary(state, new Date()),
+      stage,
+      channel: attribution?.channel,
+      campaign: attribution?.campaign ?? undefined,
+      landingPath: window.location.pathname,
+    };
+  };
+
+  /** The second step: the lead is saved here, and Dorit mailed. */
+  const saveLead = async () => {
+    setSubmitting(true);
+    try {
+      const receipt = await services.leads.submitInterview(summaryFor("complete"));
+      if (!receipt?.ok) throw new Error(`rejected${receipt?.rid ? ` rid=${receipt.rid}` : ""}`);
+      leadEvents.wizardStep(globalStep("main", MAIN.length));
+      leadEvents.wizardCompleted();
+      moved.current = true;
+      setAck("");
+      setPhase("saved");
+    } catch (e) {
+      // The answers stay where they are: a retry must not cost the visitor what
+      // they already typed.
+      console.warn("[wizard] submitInterview failed — showing direct channels", String(e));
+      moved.current = true;
+      setPhase("failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /** The optional questions, filling in the lead saved a moment ago. */
+  const saveDetails = async () => {
+    setSubmitting(true);
+    try {
+      const receipt = await services.leads.submitInterview(summaryFor("details"));
+      if (!receipt?.ok) throw new Error(`rejected${receipt?.rid ? ` rid=${receipt.rid}` : ""}`);
+      // The last step's wizard_step went out from `forward`.
+      moved.current = true;
+      setPhase("done");
+    } catch (e) {
+      console.warn("[wizard] details failed — the lead itself is saved", String(e));
+      moved.current = true;
+      setPhase("detailsFailed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const contactErrors = (): Record<string, string> => {
+    const found: Record<string, string> = {};
+    if (!state.name.trim()) found.name = NAME_ERROR;
+    if (!isIsraeliMobile(state.phone)) found.phone = PHONE_ERROR;
+    return found;
+  };
+
   const forward = () => {
     begin();
-    if (step === 2 && isClaim(state.concern)) {
+    if (id === "concern" && isClaim(state.concern)) {
       moved.current = true;
       setAck("");
       setPhase("claim");
       return;
     }
-    if (step === 7) {
-      const found: Record<string, string> = {};
-      if (!state.name.trim()) found.name = "נא למלא שם.";
-      if (!isIsraeliPhone(state.phone)) found.phone = "נא להזין מספר טלפון ישראלי — מתחיל ב-0, 9–10 ספרות.";
-      if (state.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) {
-        found.email = "כתובת המייל לא נראית תקינה.";
-      }
-      if (Object.keys(found).length) {
-        setErrors(found);
-        return;
-      }
+    if (id === "contact") {
+      const found = contactErrors();
+      setErrors(found);
+      if (Object.keys(found).length) return;
+      void saveLead();
+      return;
     }
-    leadEvents.wizardStep(step);
-    setAck(acknowledgementFor(step));
+    if (id === "clearinghouse" && state.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) {
+      setErrors({ email: EMAIL_ERROR });
+      return;
+    }
+    leadEvents.wizardStep(globalStep(segment, step));
+    if (segment === "extras" && step === EXTRAS.length) {
+      void saveDetails();
+      return;
+    }
+    setAck(acknowledgementFor(id));
     goTo(step + 1);
   };
 
@@ -335,34 +402,30 @@ export default function NeedsWizard() {
   };
 
   /**
-   * Steps that are one single-choice question — life stage, the concern, the
-   * goal, the clearinghouse. The track's step asks several and the meeting
-   * step two plus a date, so they keep "המשך".
+   * Steps that are one single-choice question — the concern, life stage, the
+   * goal. The clearinghouse step may open an email field, and the meeting step
+   * asks two things, so they keep "המשך".
    */
-  const advancesOnPick = (n: number): boolean => {
-    if (isDesktop) return false;
-    if (n === 2) return true;
-    const qs = questionsOf(n);
-    return qs.length === 1 && !qs[0].multi && !qs[0].textOnly && !qs[0].revealsText;
-  };
+  const advancesOnPick = (s: StepId): boolean => !isDesktop && (s === "concern" || s === "life" || s === "goal");
 
   // The advance runs a beat after the tap, through `forward` — so the chosen
   // chip is seen chosen, the answer is in state when the acknowledgement and
   // the claim check read it, and `wizard_step` fires exactly as it does for
   // "המשך". It is dropped if the visitor has left the step meanwhile.
-  const latest = useRef({ forward, step, phase });
-  latest.current = { forward, step, phase };
+  const latest = useRef({ forward, step, phase, segment });
+  latest.current = { forward, step, phase, segment };
   const arrowing = useRef<boolean>(false);
   const advanceTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(advanceTimer.current), []);
   const scheduleAdvance = () => {
-    const from = step;
+    const from = { step, segment };
     window.clearTimeout(advanceTimer.current);
     advanceTimer.current = window.setTimeout(() => {
-      if (latest.current.step === from && latest.current.phase === "steps") latest.current.forward();
+      const now = latest.current;
+      if (now.step === from.step && now.segment === from.segment && now.phase === "steps") now.forward();
     }, ADVANCE_DELAY_MS);
   };
-  const pick: PickHandlers | undefined = advancesOnPick(step)
+  const pick: PickHandlers | undefined = advancesOnPick(id)
     ? {
         onKeyDown: (e) => {
           if (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End") arrowing.current = true;
@@ -384,32 +447,6 @@ export default function NeedsWizard() {
         },
       }
     : undefined;
-
-  const submit = async () => {
-    setSubmitting(true);
-    try {
-      const attribution = getAttribution();
-      const receipt = await services.leads.submitInterview({
-        ...toInterviewSummary(state, new Date()),
-        channel: attribution?.channel,
-        campaign: attribution?.campaign ?? undefined,
-        landingPath: window.location.pathname,
-      });
-      if (!receipt?.ok) throw new Error(`rejected${receipt?.rid ? ` rid=${receipt.rid}` : ""}`);
-      leadEvents.wizardStep(STEP_COUNT);
-      leadEvents.wizardCompleted();
-      moved.current = true;
-      setPhase("done");
-    } catch (e) {
-      // The answers stay where they are: a retry must not cost the visitor the
-      // two minutes they just spent.
-      console.warn("[wizard] submitInterview failed — showing direct channels", String(e));
-      moved.current = true;
-      setPhase("failed");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const sendClaim = async () => {
     if (!isIsraeliPhone(claim.phone)) {
@@ -463,7 +500,7 @@ export default function NeedsWizard() {
     </div>
   );
 
-  const continueButton = (props: { type?: "button" | "submit" } = {}) =>
+  const continueButton = (label = "המשך") =>
     pick ? (
       // A tap on an answer already moves on, so this is the way past the
       // question without one — or onward with the answer given earlier.
@@ -472,16 +509,17 @@ export default function NeedsWizard() {
         <ArrowLeft size={16} aria-hidden="true" className="ms-1.5" />
       </button>
     ) : (
-      <CtaButton type={props.type ?? "button"} onClick={props.type === "submit" ? undefined : forward}>
-        המשך
-        <ArrowLeft size={18} aria-hidden="true" />
+      <CtaButton type="button" onClick={forward} disabled={submitting}>
+        {label}
+        {submitting ? <Loader2 size={18} className="motion-safe:animate-spin" aria-hidden="true" /> : <ArrowLeft size={18} aria-hidden="true" />}
       </CtaButton>
     );
 
   /** Whether the current single-choice step already holds an answer. */
   function answeredHere(): boolean {
-    if (step === 2) return Boolean(state.concern);
-    return questionsOf(step).some((q) => state.answers[q.key] !== undefined);
+    if (id === "concern") return Boolean(state.concern);
+    const q = questionOf(id);
+    return q ? state.answers[q.key] !== undefined : false;
   }
 
   if (phase === "claim") {
@@ -540,7 +578,8 @@ export default function NeedsWizard() {
             onClick={() => {
               moved.current = true;
               setPhase("steps");
-              setStep(2);
+              setSegment("main");
+              setStep(1);
             }}
           >
             <ArrowRight size={18} aria-hidden="true" />
@@ -551,17 +590,60 @@ export default function NeedsWizard() {
     );
   }
 
+  if (phase === "saved") {
+    return (
+      <div className="flex flex-col gap-4">
+        <div role="status" className="flex flex-col gap-4">
+          {heading("נשמר — תודה")}
+          <p className="m-0 text-[17px] leading-relaxed">הפרטים נשלחו לדורית. נושא הפגישה: {meetingTopicOf(state)}.</p>
+          <p className="m-0 text-[17px] leading-relaxed">{CONFIRMATION_FOLLOW_UP}</p>
+          <p className="m-0 text-[15px] leading-relaxed text-muted-foreground">{TRANSPARENCY}</p>
+        </div>
+        {services.leads.updatesInterviews ? (
+          <div className="border-t border-border pt-5">
+            <CtaButton
+              onClick={() => {
+                moved.current = true;
+                setSegment("extras");
+                setStep(1);
+                setPhase("steps");
+              }}
+            >
+              {EXTRAS_OFFER}
+              <ArrowLeft size={18} aria-hidden="true" />
+            </CtaButton>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   if (phase === "done") {
     const timing = timingOf(state);
     return (
       <div className="flex flex-col gap-4" role="status">
-        {heading("נשמר — תודה")}
+        {heading("תודה — דורית תגיע מוכנה")}
         <p className="m-0 text-[17px] leading-relaxed">
-          השאלון נשמר ונשלח לדורית. נושא הפגישה: {meetingTopicOf(state)}
+          התשובות נוספו לפנייה שלך. נושא הפגישה: {meetingTopicOf(state)}
           {timing ? `. מועד מבוקש: ${timing}` : ""}.
         </p>
         <p className="m-0 text-[17px] leading-relaxed">{CONFIRMATION_FOLLOW_UP}</p>
-        <p className="m-0 text-[15px] leading-relaxed text-muted-foreground">{TRANSPARENCY}</p>
+      </div>
+    );
+  }
+
+  if (phase === "detailsFailed") {
+    return (
+      <div className="flex flex-col gap-4">
+        {heading("התשובות הנוספות לא נשמרו")}
+        <p className="m-0 text-[17px] leading-relaxed">
+          הפרטים שלך כבר אצל דורית, והיא תחזור אליך. את התשובות האלה אפשר לספר לה בשיחה.
+        </p>
+        <div>
+          <CtaButton muted onClick={() => void saveDetails()} disabled={submitting}>
+            ניסיון נוסף
+          </CtaButton>
+        </div>
       </div>
     );
   }
@@ -578,30 +660,39 @@ export default function NeedsWizard() {
             onClick={() => {
               moved.current = true;
               setPhase("steps");
-              setStep(STEP_COUNT);
+              setSegment("main");
+              setStep(MAIN.length);
             }}
           >
-            חזרה לסיכום ולניסיון נוסף
+            חזרה לניסיון נוסף
           </CtaButton>
         </div>
       </div>
     );
   }
 
-  const progress = Math.round((step / STEP_COUNT) * 100);
+  const progress = Math.round((step / stages.length) * 100);
+  const fieldError = (key: string) =>
+    errors[key] ? (
+      <p id={`nw-${key}-error`} role="alert" className="m-0 mt-1.5 text-destructive text-[15px]">
+        {errors[key]}
+      </p>
+    ) : null;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <Stepper step={step} onJump={(n) => { setAck(""); goTo(n); }} />
+        <Stepper stages={stages} step={step} onJump={(n) => { setAck(""); goTo(n); }} />
         <p className="m-0 text-[14px] text-muted-foreground">
-          שלב {step} מתוך {STEP_COUNT} · {STAGES[step - 1].label} · אפשר לדלג על כל שאלה
+          {segment === "main"
+            ? `שלב ${step} מתוך ${stages.length} · ${stages[step - 1].label}`
+            : `שאלה ${step} מתוך ${stages.length} · ${stages[step - 1].label} · אפשר לדלג על כל שאלה`}
         </p>
         <div
           role="progressbar"
           aria-label="התקדמות בשאלון"
           aria-valuemin={1}
-          aria-valuemax={STEP_COUNT}
+          aria-valuemax={stages.length}
           aria-valuenow={step}
           className="h-1 w-full rounded-full bg-border overflow-hidden"
         >
@@ -613,17 +704,9 @@ export default function NeedsWizard() {
         {ack}
       </p>
 
-      {step === 1 ? (
+      {id === "concern" ? (
         <div className="flex flex-col gap-5">
-          {heading("נכיר קצת")}
-          <Choices question={LIFE_STAGE} value={state.answers[LIFE_STAGE.key]} onChange={(v) => setAnswer(LIFE_STAGE.key, v)} withUnknown={false} pick={pick} />
-          {navigation(continueButton())}
-        </div>
-      ) : null}
-
-      {step === 2 ? (
-        <div className="flex flex-col gap-5">
-          {heading("מה מביא אותך")}
+          {heading("מה מעסיק אותך?")}
           <fieldset className="flex flex-col gap-3 border-0 p-0 m-0 min-w-0">
             <legend className="font-heading text-[19px] md:text-[21px] mb-1">{CONCERN_LEGEND}</legend>
             <div className="flex flex-wrap gap-2.5">
@@ -647,7 +730,75 @@ export default function NeedsWizard() {
         </div>
       ) : null}
 
-      {step === 3 ? (
+      {id === "contact" ? (
+        <form
+          aria-label="פרטי קשר"
+          className="flex flex-col gap-5"
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            forward();
+          }}
+        >
+          {heading("איך דורית תחזור אליך")}
+          <p className="m-0 text-[16px] leading-relaxed text-foreground/80">{CONTACT_INTRO}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Field label="שם">
+                <input
+                  className={inputClass()}
+                  value={state.name}
+                  onChange={(e) => patch({ name: e.target.value })}
+                  autoComplete="name"
+                  required
+                  aria-invalid={errors.name ? true : undefined}
+                  aria-describedby={errors.name ? "nw-name-error" : undefined}
+                />
+              </Field>
+              {fieldError("name")}
+            </div>
+            <div>
+              <Field label="טלפון נייד">
+                <input
+                  type="tel"
+                  className={inputClass()}
+                  value={state.phone}
+                  onChange={(e) => patch({ phone: e.target.value })}
+                  placeholder="05X-XXXXXXX"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  dir="ltr"
+                  required
+                  aria-invalid={errors.phone ? true : undefined}
+                  aria-describedby={errors.phone ? "nw-phone-error" : undefined}
+                />
+              </Field>
+              {fieldError("phone")}
+            </div>
+          </div>
+          <p className="m-0 text-[15px] leading-relaxed text-muted-foreground">{TRANSPARENCY}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <CtaButton muted onClick={back}>
+              <ArrowRight size={18} aria-hidden="true" />
+              הקודם
+            </CtaButton>
+            <CtaButton type="submit" disabled={submitting}>
+              שליחה לדורית
+              {submitting ? <Loader2 size={18} className="motion-safe:animate-spin" aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
+            </CtaButton>
+          </div>
+        </form>
+      ) : null}
+
+      {id === "life" ? (
+        <div className="flex flex-col gap-5">
+          {heading("נכיר קצת")}
+          <Choices question={LIFE_STAGE} value={state.answers[LIFE_STAGE.key]} onChange={(v) => setAnswer(LIFE_STAGE.key, v)} withUnknown={false} pick={pick} />
+          {navigation(continueButton())}
+        </div>
+      ) : null}
+
+      {id === "goal" ? (
         <div className="flex flex-col gap-5">
           {heading("מה היית רוצה לקחת מהפגישה")}
           <Choices question={GOAL} value={state.answers[GOAL.key]} onChange={(v) => setAnswer(GOAL.key, v)} withUnknown={false} pick={pick} />
@@ -655,51 +806,33 @@ export default function NeedsWizard() {
         </div>
       ) : null}
 
-      {step === 4 ? (
-        <div className="flex flex-col gap-7">
-          {heading("כמה פרטים, כדי שדורית תגיע מוכנה")}
-          {TRACK_QUESTIONS[track].map((q) =>
-            q.textOnly ? (
-              <Field key={q.key} label={q.legend}>
-                <input
-                  className={inputClass()}
-                  value={typeof state.answers[q.key] === "string" ? (state.answers[q.key] as string) : ""}
-                  onChange={(e) => setAnswer(q.key, e.target.value || undefined)}
-                  placeholder={q.textOnly.placeholder}
-                  maxLength={300}
-                />
-              </Field>
-            ) : (
-              <div key={q.key} className="flex flex-col gap-3">
-                <Choices question={q} value={state.answers[q.key]} onChange={(v) => setAnswer(q.key, v)} withUnknown />
-                {q.revealsText && state.answers[q.key] === q.revealsText.option ? (
-                  <Field label="אם תרצה/י לציין (לא חובה)">
-                    <input
-                      className={inputClass("max-w-[320px]")}
-                      value={state.feesText ?? ""}
-                      onChange={(e) => patch({ feesText: e.target.value })}
-                      placeholder={q.revealsText.placeholder}
-                      maxLength={60}
-                    />
-                  </Field>
-                ) : null}
-              </div>
-            )
-          )}
-          {navigation(continueButton())}
-        </div>
-      ) : null}
-
-      {step === 5 ? (
+      {id === "clearinghouse" ? (
         <div className="flex flex-col gap-5">
           {heading("תמונת מצב מהמסלקה")}
           <p className="m-0 text-[17px] leading-relaxed text-foreground/80">{CLEARINGHOUSE_TEXT}</p>
-          <Choices question={CLEARINGHOUSE} value={state.answers[CLEARINGHOUSE.key]} onChange={(v) => setAnswer(CLEARINGHOUSE.key, v)} withUnknown={false} pick={pick} />
+          <Choices question={CLEARINGHOUSE} value={state.answers[CLEARINGHOUSE.key]} onChange={(v) => setAnswer(CLEARINGHOUSE.key, v)} withUnknown={false} />
+          {state.answers[CLEARINGHOUSE.key] === CLEARINGHOUSE.options[0] ? (
+            <div>
+              <Field label="אימייל לשליחת הקישור — לבחירתך" className="max-w-[420px]">
+                <input
+                  type="email"
+                  className={inputClass()}
+                  value={state.email}
+                  onChange={(e) => patch({ email: e.target.value })}
+                  autoComplete="email"
+                  dir="ltr"
+                  aria-invalid={errors.email ? true : undefined}
+                  aria-describedby={errors.email ? "nw-email-error" : undefined}
+                />
+              </Field>
+              {fieldError("email")}
+            </div>
+          ) : null}
           {navigation(continueButton())}
         </div>
       ) : null}
 
-      {step === 6 ? (
+      {id === "time" ? (
         <div className="flex flex-col gap-6">
           {heading("מתי נוח להיפגש?")}
           <fieldset className="flex flex-col gap-3 border-0 p-0 m-0 min-w-0">
@@ -763,158 +896,9 @@ export default function NeedsWizard() {
             </div>
           </fieldset>
           <p className="m-0 text-[15px] text-muted-foreground">{TIME_NOTE}</p>
-          {navigation(continueButton())}
-        </div>
-      ) : null}
-
-      {step === 7 ? (
-        <form
-          aria-label="פרטי קשר"
-          className="flex flex-col gap-5"
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault();
-            forward();
-          }}
-        >
-          {heading("איך דורית תחזור אליך")}
-          <p className="m-0 text-[16px] leading-relaxed text-foreground/80">{CONTACT_INTRO}</p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="שם">
-              <input
-                className={inputClass()}
-                value={state.name}
-                onChange={(e) => patch({ name: e.target.value })}
-                autoComplete="name"
-                required
-                aria-invalid={errors.name ? true : undefined}
-              />
-            </Field>
-            <Field label="טלפון">
-              <input
-                className={inputClass()}
-                value={state.phone}
-                onChange={(e) => patch({ phone: e.target.value })}
-                placeholder={HUMAN_HANDOFF.phonePlaceholder}
-                inputMode="tel"
-                autoComplete="tel"
-                dir="ltr"
-                required
-                aria-invalid={errors.phone ? true : undefined}
-              />
-            </Field>
-            <Field label="אימייל — לבחירתך" className="sm:col-span-2">
-              <input
-                type="email"
-                className={inputClass()}
-                value={state.email}
-                onChange={(e) => patch({ email: e.target.value })}
-                autoComplete="email"
-                dir="ltr"
-                aria-invalid={errors.email ? true : undefined}
-              />
-            </Field>
-          </div>
-          {Object.values(errors).length ? (
-            <ul role="alert" className="m-0 ps-5 text-destructive text-[15px]">
-              {Object.entries(errors).map(([k, v]) => (
-                <li key={k}>{v}</li>
-              ))}
-            </ul>
-          ) : null}
-          {navigation(continueButton({ type: "submit" }))}
-        </form>
-      ) : null}
-
-      {step === 8 ? (
-        <div className="flex flex-col gap-6">
-          {heading("סיכום לפני שליחה")}
-          <SummaryList state={state} onEdit={goTo} />
-          <div className="flex flex-col gap-2 border-t border-border pt-5">
-            <p className="m-0 text-[16px]">
-              נושא הפגישה: <span className="font-medium">{meetingTopicOf(state)}</span>{" "}
-              <button type="button" className={LINK} onClick={() => setChangingTopic((v) => !v)} aria-expanded={changingTopic}>
-                שינוי
-              </button>
-            </p>
-            {changingTopic ? (
-              <fieldset className="flex flex-col gap-3 border-0 p-0 m-0 min-w-0">
-                <legend className="text-[15px] text-foreground/80 mb-1">באיזה נושא להיפגש?</legend>
-                <div className="flex flex-wrap gap-2.5">
-                  {MEETING_TOPICS.map((t) => (
-                    <label key={t}>
-                      <input
-                        type="radio"
-                        name="nw-topic"
-                        value={t}
-                        checked={meetingTopicOf(state) === t}
-                        onChange={() => patch({ topic: t as MeetingTopic })}
-                        className="peer sr-only"
-                      />
-                      <span className={CHIP}>{t}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ) : null}
-          </div>
-          <Field label="משהו נוסף שחשוב שדורית תדע?">
-            <textarea
-              className={inputClass("min-h-24 resize-y")}
-              value={state.notes}
-              onChange={(e) => patch({ notes: e.target.value })}
-              maxLength={600}
-              aria-describedby="nw-notes-hint"
-            />
-          </Field>
-          <p id="nw-notes-hint" className="-mt-4 m-0 text-[14px] text-muted-foreground">
-            {NOTES_HINT}
-          </p>
-          {navigation(
-            <CtaButton onClick={() => void submit()} disabled={submitting}>
-              אישור ושליחה
-              {submitting ? (
-                <Loader2 size={18} className="motion-safe:animate-spin" aria-hidden="true" />
-              ) : (
-                <Send size={18} aria-hidden="true" />
-              )}
-            </CtaButton>
-          )}
+          {navigation(continueButton("שמירת התשובות"))}
         </div>
       ) : null}
     </div>
-  );
-}
-
-/** Every answered field, labelled — a list, never prose — with a way back to it. */
-function SummaryList({ state, onEdit }: { state: WizardState; onEdit: (step: number) => void }) {
-  const rows: { label: string; value: string; step: number }[] = [];
-  const add = (label: string, value: string | undefined, step: number) => {
-    if (value) rows.push({ label, value, step });
-  };
-  add(LIFE_STAGE.label, valueOf(LIFE_STAGE, state.answers[LIFE_STAGE.key], state), 1);
-  add(CONCERN_LABEL, state.concern, 2);
-  add(GOAL.label, valueOf(GOAL, state.answers[GOAL.key], state), 3);
-  for (const q of TRACK_QUESTIONS[trackOf(state)]) add(q.label, valueOf(q, state.answers[q.key], state), 4);
-  add(CLEARINGHOUSE.label, valueOf(CLEARINGHOUSE, state.answers[CLEARINGHOUSE.key], state), 5);
-  add("מועד מבוקש", timingOf(state), 6);
-  add("שם", state.name.trim(), 7);
-  add("טלפון", state.phone.trim(), 7);
-  add("אימייל", state.email.trim(), 7);
-
-  return (
-    <dl className="m-0 flex flex-col divide-y divide-border border-y border-border">
-      {rows.map((r) => (
-        <div key={`${r.label}-${r.step}`} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3">
-          <dt className="text-[15px] text-muted-foreground min-w-[160px]">{r.label}</dt>
-          <dd className="m-0 flex-1 text-[16px]">{r.value}</dd>
-          <dd className="m-0">
-            <button type="button" className={LINK} onClick={() => onEdit(r.step)}>
-              עריכה<span className="sr-only"> — {r.label}</span>
-            </button>
-          </dd>
-        </div>
-      ))}
-    </dl>
   );
 }

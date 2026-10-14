@@ -30,6 +30,13 @@ export interface InterviewSummary {
   summary?: string;
   profile?: Record<string, string>;
   /**
+   * "details": the short questionnaire's optional answers, filling in the lead
+   * its second step saved a few minutes ago (submit-lead finds it; a backend
+   * that cannot — see `LeadPort.updatesInterviews` — is never sent one).
+   * Absent means a complete interview.
+   */
+  stage?: "complete" | "details";
+  /**
    * Marketing channel attribution — see src/lib/attribution.ts. Never parsed
    * out of the agent's fenced block: the model has no way to know this, so
    * `readHandoff` below never sets these. `AgentChat.tsx` merges them in from

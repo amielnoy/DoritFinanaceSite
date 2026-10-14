@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 145 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 725 including `it.each` / `describe.each` expansions
+**Location:** `tests/integration/` · **Cases:** 151 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 614 including `it.each` / `describe.each` expansions
 
 ---
 
@@ -332,6 +332,26 @@ interview, and — when the lookup itself fails — a created row rather than a 
 one, because a duplicate is a nuisance and a dropped interview is not
 recoverable. A last case pins that every other source still takes the create
 path untouched.
+
+### 4.12b `submit-lead` — the questionnaire's details, after its lead was saved — `INT-LEAD-100..105`
+
+The short questionnaire (2026-10-14) saves its lead — and mails Dorit — at its
+second step, then sends its four optional answers as `stage: "details"`. These
+pin that the details fill in that lead (the visitor's: same phone, same person,
+an interview, saved as `new` within 30 minutes) with one follow-up mail whose
+subject starts "פרטים נוספים — ", and that anything else — no recent lead, an
+older one, another person's, a non-interview — is saved as a lead of its own
+rather than lost. Edge only: the Base44 rollback backend reports
+`updatesInterviews` false, and the questionnaire never sends it details.
+
+| ID | Title |
+|---|---|
+| INT-LEAD-100 | "fills in the visitor's lead from a few minutes ago instead of creating a second" |
+| INT-LEAD-101 | "tells Dorit once more, under a subject that says these are further details" |
+| INT-LEAD-102 | "saves the details as a lead of their own when there is no recent one to fill in" |
+| INT-LEAD-103 | "does not fill in a lead older than half an hour" |
+| INT-LEAD-104 | "does not fill in another person's lead on the same phone" |
+| INT-LEAD-105 | "does not fill in a lead that was never an interview" |
 
 ### 4.13 `submitLead` — how complete the interview was — `INT-LEAD-073..075`
 

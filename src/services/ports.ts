@@ -86,6 +86,13 @@ export interface LeadPort {
    * A-59. This is the path that actually reaches Dorit.
    */
   submitInterview(summary: InterviewSummary): Promise<SubmissionReceipt>;
+  /**
+   * Whether `submitInterview` with `stage: "details"` fills in the visitor's
+   * just-saved lead. Only the Edge `submit-lead` does; elsewhere the
+   * questionnaire does not offer its optional questions (they would save a
+   * second lead).
+   */
+  readonly updatesInterviews?: boolean;
 }
 
 export interface Article {
