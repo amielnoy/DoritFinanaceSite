@@ -124,6 +124,50 @@ describe("submitLead", () => {
   });
 });
 
+describe("a save without a stage is refused, not taken for a complete one", () => {
+  // The evaluation of 2026-10-14: Haiku called submitLead({}) mid-interview. A
+  // missing stage counted as "complete", so in an evaluation run the conversation
+  // became lead_saved with no name or phone, and every real save after it was
+  // already_saved — no lead. In production the same call with a name and a phone
+  // would have closed the interview early.
+  it.each([
+    ["no input at all", {}],
+    ["a name and a phone but no stage", { name: "רונית אבני", phone: "0527654321" }],
+    ["a stage the tool does not have", { ...LEAD, stage: "final" }],
+  ])("%s: an error the model can act on, nothing saved, in both modes", async (_label, input) => {
+    for (const evalMode of [false, true]) {
+      const submitLead = answering(200, { ok: true, leadId: "lead-1" });
+      const run = createToolRunner({ submitLead, escalateToHuman: answering(200, {}) });
+      const c = ctx({ evalMode });
+      const outcome = await run("submitLead", input, c);
+      expect(submitLead).not.toHaveBeenCalled();
+      expect(outcome).toMatchObject({ name: "submitLead", status: "error", isError: true, leadSaved: false });
+      expect(JSON.parse(outcome.forModel)).toMatchObject({ ok: false });
+      expect(outcome.forModel).toMatch(/stage/);
+      expect(c.conversation.status).toBe("open");
+    }
+  });
+
+  it("after a refused empty call, the real complete save still goes through", async () => {
+    const run = createToolRunner({ submitLead: answering(200, { ok: true }), escalateToHuman: answering(200, {}) });
+    const c = ctx({ evalMode: true });
+    await run("submitLead", {}, c);
+    expect(await run("submitLead", LEAD, c)).toMatchObject({ status: "simulated", leadSaved: true });
+  });
+
+  it.each([
+    ["no name", { ...LEAD, name: "" }],
+    ["no phone", { ...LEAD, phone: "  " }],
+  ])("an evaluation run refuses %s as submit-lead does: its own Hebrew error, nothing saved", async (_label, input) => {
+    const run = createToolRunner({ submitLead: answering(200, { ok: true }), escalateToHuman: answering(200, {}) });
+    const c = ctx({ evalMode: true });
+    const outcome = await run("submitLead", input, c);
+    expect(outcome).toMatchObject({ status: "error", isError: true, leadSaved: false });
+    expect(outcome.forModel).toContain("נדרשים שם וטלפון");
+    expect(c.conversation.status).toBe("open");
+  });
+});
+
 describe("escalateToHuman", () => {
   it("posts the hand-off with the agent, the consent and the attribution, and reports it", async () => {
     const escalateToHuman = answering(200, { ok: true, contact: { phoneDisplay: "050-831-1776" }, acknowledgement: "הפרטים הועברו" });

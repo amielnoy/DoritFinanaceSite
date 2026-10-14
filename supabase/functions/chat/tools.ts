@@ -166,12 +166,20 @@ export function createToolRunner(handlers: { submitLead: EdgeHandler; escalateTo
 }
 
 async function submitLead(handler: EdgeHandler, input: Record<string, unknown>, ctx: ToolCallContext): Promise<ToolOutcome> {
-  const stage = input.stage === 'partial' ? 'partial' : 'complete';
+  // The model has called this with no input at all (the evaluation of 2026-10-14).
+  // A missing stage must not read as "complete": that would end the interview —
+  // and in an evaluation run mark the lead saved with no name or phone.
+  if (input.stage !== 'partial' && input.stage !== 'complete') {
+    return refusedSave('חסר stage. שלח שוב עם stage ("partial" או "complete"), name ו-phone.');
+  }
+  const stage = input.stage;
   // Any stage: submit-lead's dedupe matches only partial leads, so a save after a complete one would insert a second row.
   if (ctx.conversation.status === 'lead_saved') {
     return { name: 'submitLead', status: 'already_saved', isError: false, forModel: JSON.stringify({ ok: true, alreadySaved: true }) };
   }
   if (ctx.evalMode) {
+    // The simulation answers as submit-lead would: it refuses a lead with no contact.
+    if (!str(input.name).trim() || !str(input.phone).trim()) return refusedSave('נדרשים שם וטלפון');
     if (stage === 'complete') ctx.conversation.status = 'lead_saved';
     return { name: 'submitLead', status: 'simulated', isError: false, leadSaved: stage === 'complete', forModel: savedForModel(stage) };
   }
@@ -209,6 +217,11 @@ async function submitLead(handler: EdgeHandler, input: Record<string, unknown>, 
   const leadId = typeof answer.leadId === 'string' ? answer.leadId : undefined;
   if (stage === 'complete') ctx.conversation.status = 'lead_saved';
   return { name: 'submitLead', status: 'ok', isError: false, leadId, leadSaved: stage === 'complete', forModel: savedForModel(stage) };
+}
+
+/** A save refused before it reached submit-lead: the conversation is left as it was. */
+function refusedSave(error: string): ToolOutcome {
+  return { name: 'submitLead', status: 'error', isError: true, leadSaved: false, forModel: JSON.stringify({ ok: false, error }) };
 }
 
 /**
