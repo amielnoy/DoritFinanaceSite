@@ -30,10 +30,10 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     });
 
     await test_step("the bar offers the conversation, WhatsApp, a call and support, and nothing else", async () => {
-      const cta = stickyBar(page).getByRole("link", { name: "לשיחה קצרה" });
+      const cta = stickyBar(page).getByRole("link", { name: "קביעת שיחה" });
       const stickyWhatsapp = stickyBar(page).getByRole("link", { name: /וואטסאפ/ });
       const stickyCall = stickyBar(page).getByRole("link", { name: /חייגו/ });
-      const stickySupport = stickyBar(page).getByRole("link", { name: /תמיכה/ });
+      const stickySupport = stickyBar(page).getByRole("link", { name: /שאלה לעוזר/ });
       await expect(stickyBar(page).getByRole("link")).toHaveCount(4);
       for (const link of [cta, stickyWhatsapp, stickyCall, stickySupport]) await expect(link).toBeVisible();
       await expect(cta).toHaveAttribute("href", "/#start");
@@ -46,10 +46,11 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
       const bar = (await stickyBar(page).boundingBox())!;
       expect(Math.round(bar.height)).toBe(64);
       const boxes = await Promise.all(
-        ["לשיחה קצרה", /וואטסאפ/, /חייגו/, /תמיכה/].map(async (name) => (await stickyBar(page).getByRole("link", { name }).boundingBox())!),
+        ["קביעת שיחה", /וואטסאפ/, /חייגו/, /שאלה לעוזר/].map(async (name) => (await stickyBar(page).getByRole("link", { name }).boundingBox())!),
       );
       const [cta, ...rest] = boxes;
-      for (const b of rest) expect(cta.width).toBeGreaterThan(b.width);
+      // The two-word cells (קביעת שיחה, שאלה לעוזר) share the widest width.
+      for (const b of rest) expect(cta.width).toBeGreaterThanOrEqual(b.width - 0.5);
       for (const b of boxes) {
         expect(Math.round(Math.abs(b.y + b.height / 2 - (bar.y + bar.height / 2)))).toBeLessThanOrEqual(1);
         expect(b.height).toBeGreaterThanOrEqual(44);
@@ -66,7 +67,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     await gotoApp(page);
     // Keep the page: the tracker listens in the capture phase, before this.
     await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
-    for (const name of ["לשיחה קצרה", /וואטסאפ/, /חייגו/] as const) {
+    for (const name of ["קביעת שיחה", /וואטסאפ/, /חייגו/] as const) {
       await stickyBar(page).getByRole("link", { name }).click();
     }
     const events = await queuedClicks(page);
@@ -83,7 +84,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     });
 
     await test_step("tap לשיחה קצרה in the sticky bar", async () => {
-      await stickyBar(page).getByRole("link", { name: "לשיחה קצרה" }).click();
+      await stickyBar(page).getByRole("link", { name: "קביעת שיחה" }).click();
     });
 
     await test_step("it lands on the home page at the conversation", async () => {
@@ -205,10 +206,10 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
 
     await test_step("every primary control is big enough to hit with a thumb", async () => {
       const targets = [
-        stickyBar(page).getByRole("link", { name: "לשיחה קצרה" }),
+        stickyBar(page).getByRole("link", { name: "קביעת שיחה" }),
         stickyBar(page).getByRole("link", { name: /וואטסאפ/ }),
         stickyBar(page).getByRole("link", { name: /חייגו/ }),
-        stickyBar(page).getByRole("link", { name: /תמיכה/ }),
+        stickyBar(page).getByRole("link", { name: /שאלה לעוזר/ }),
         page.getByRole("button", { name: "תפריט" }),
         page.locator("#top").getByRole("link", { name: "לשיחה קצרה עם דורית" }),
         page.locator("#top").getByRole("link", { name: "וואטסאפ" }),
@@ -1152,7 +1153,7 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       await expect(cta).toHaveCount(1);
       await expect(cta).toBeHidden();
       await expect(cta).toHaveAttribute("href", "#start");
-      await expect(page.locator("[data-track-location='mobile_sticky_bar']").getByRole("link", { name: "לשיחה קצרה" })).toBeVisible();
+      await expect(page.locator("[data-track-location='mobile_sticky_bar']").getByRole("link", { name: "קביעת שיחה" })).toBeVisible();
     });
   });
 
@@ -1212,31 +1213,41 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       await expect(toggles).toHaveCount(7);
       for (let i = 0; i < 7; i++) await expect(toggles.nth(i)).toHaveAttribute("aria-expanded", "false");
       await expect(proof.getByRole("heading", { name: "מ-דחייה לאישור מלא תוך 11 ימים" })).toBeVisible();
-      await expect(proof.getByText("₪850K שולמו")).toBeVisible();
+      await expect(proof.getByText("850 אלף ₪ שולמו")).toBeVisible();
       // A projected figure keeps the basis it rests on, folded or not.
       for (const basis of await proof.getByText("הערכה המבוססת על הנחות של תשואה ודמי ניהול").all()) {
         await expect(basis).toBeVisible();
       }
-      await expect(story).toBeHidden();
+      // Two lines of the story show (2026-10-14: hidden, half of each card
+      // stood empty); the rest waits for פרטי המקרה.
+      await expect(story).toBeVisible();
+      await expect(story).toHaveClass(/line-clamp-2/);
       await expect(story).toHaveCount(1);
     });
 
     await test_step("פרטי המקרה unfolds its own story in place, and folds it again", async () => {
       await toggles.first().click();
       await expect(toggles.first()).toHaveAttribute("aria-expanded", "true");
-      await expect(story).toBeVisible();
+      await expect(story).not.toHaveClass(/line-clamp-2/);
       await expect(toggles.nth(1)).toHaveAttribute("aria-expanded", "false");
       await toggles.first().click();
       await expect(toggles.first()).toHaveAttribute("aria-expanded", "false");
-      await expect(story).toBeHidden();
+      await expect(story).toHaveClass(/line-clamp-2/);
     });
 
     await test_step("הבא brings the second case into the strip, and הקודם takes it back", async () => {
-      await expect(cards.nth(1)).not.toBeInViewport({ ratio: 0.5 });
+      // Horizontally only: the cards size to their own content now, so a tall
+      // one can reach below the screen while sitting fully in the strip.
+      const width = page.viewportSize()!.width;
+      const inStrip = async (i: number) => {
+        const b = (await cards.nth(i).boundingBox())!;
+        return b.x >= -1 && b.x + b.width <= width + 1;
+      };
+      expect(await inStrip(1)).toBe(false);
       await proof.getByRole("button", { name: "הבא" }).click();
-      await expect(cards.nth(1)).toBeInViewport({ ratio: 0.9 });
+      await expect.poll(() => inStrip(1)).toBe(true);
       await proof.getByRole("button", { name: "הקודם" }).click();
-      await expect(cards.first()).toBeInViewport({ ratio: 0.9 });
+      await expect.poll(() => inStrip(0)).toBe(true);
     });
   });
 
@@ -1290,10 +1301,12 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("the home page stays under 5,550px — it was 10,260", async ({ page }) => {
+  test("the home page stays under 5,750px — it was 10,260", async ({ page }) => {
     // 10,260px before stage 3 at 390x844, 6,590 after it, 5,841 after 3b,
-    // 5,321 after 3c and 5,483 once the short questionnaire opened on its eight
-    // concerns rather than six life stages (Chromium and WebKit alike). Not the brief's 4.5 screens —
+    // 5,321 after 3c, 5,483 once the short questionnaire opened on its eight
+    // concerns rather than six life stages, and 5,659 with the two-line
+    // headline and the cases' two-line stories (2026-10-14; Chromium and
+    // WebKit alike). Not the brief's 4.5 screens —
     // see tests/test-plan/07-std-mobile.md for where the rest is — but a
     // regression of a section's worth should fail here.
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1304,7 +1317,9 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       await expect(page.locator("#testimonials article")).toHaveCount(2);
       const proof = (await page.locator("#proof").boundingBox())!.height;
       const testimonials = (await page.locator("#testimonials").boundingBox())!.height;
-      expect(proof, "#proof was 898px").toBeLessThan(600);
+      // 521 after 3b; ~652 once each card showed two lines of its story and a
+      // WhatsApp line followed the strip (2026-10-14).
+      expect(proof, "#proof was 898px").toBeLessThan(700);
       expect(testimonials, "#testimonials was 791px").toBeLessThan(480);
     });
 
@@ -1317,7 +1332,7 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
 
     await test_step("and so is the page", async () => {
       const height = await page.evaluate(() => document.documentElement.scrollHeight);
-      expect(height).toBeLessThan(5550);
+      expect(height).toBeLessThan(5750);
     });
   });
 });

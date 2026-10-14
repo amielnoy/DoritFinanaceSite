@@ -49,7 +49,7 @@ test.describe("Support chat — reachable from the header and a button", () => {
       // Desktop: the round dock beside WhatsApp and the phone. Phone: the
       // sticky bar along the bottom, which is where the thumb already is.
       const button = isMobile
-        ? stickyBar(page).getByRole("link", { name: /תמיכה/ })
+        ? stickyBar(page).getByRole("link", { name: /שאלה לעוזר/ })
         : page.getByRole("link", { name: /^תמיכה/ });
       await expect(button).toBeVisible();
       await button.click();
@@ -120,7 +120,7 @@ test.describe("Support chat — every way in reports click_chat", () => {
 
     await test_step("the sticky bar's תמיכה, from the home page", async () => {
       await gotoApp(page, "/");
-      await stickyBar(page).getByRole("link", { name: /תמיכה/ }).click();
+      await stickyBar(page).getByRole("link", { name: /שאלה לעוזר/ }).click();
       await expect(page).toHaveURL(/\/faq#support-chat$/);
       expect(await queuedChats(page)).toEqual([{ location: "mobile_sticky_bar" }]);
     });

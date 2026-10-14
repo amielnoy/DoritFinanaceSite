@@ -3,7 +3,7 @@
  *
  * The home page's cases (#proof). From md up, seven open cards in a strip. Below
  * md (stage 3b), the same strip with each case's story folded behind
- * "פרטי המקרה" — hidden, never removed — and the disclaimer still in view.
+ * "פרטי המקרה" — two lines shown, the rest clamped, never removed — and the disclaimer still in view.
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
@@ -50,17 +50,18 @@ const DISCLAIMER = /תוצאות עבר אינן מבטיחות תוצאות ד�
 const STORY = /ניהלתי את ההליך מול החברה/;
 
 describe("<ProofCarousel />", () => {
-  it("on a phone, folds every story behind its own פרטי המקרה, keeping it in the document", () => {
+  it("on a phone, shows every story's first two lines until its own פרטי המקרה opens it", () => {
     viewport(390);
     const { container } = render(<ProofCarousel />);
     const toggles = screen.getAllByRole("button", { name: "פרטי המקרה" });
     expect(toggles).toHaveLength(7);
     for (const t of toggles) expect(t.getAttribute("aria-expanded")).toBe("false");
     const story = screen.getByText(STORY);
-    expect(story.hidden).toBe(true);
+    // A two-line teaser, not hidden: hidden, half of each card stood empty.
+    expect(story.hidden).toBe(false);
+    expect(story.className).toContain("line-clamp-2");
     expect(toggles[0].getAttribute("aria-controls")).toBe(story.id);
-    // Every story is still there, folded.
-    expect(container.querySelectorAll("#proof article p[hidden]")).toHaveLength(7);
+    expect(container.querySelectorAll("#proof article p.line-clamp-2")).toHaveLength(7);
   });
 
   it("on a phone, keeps the headline, the figure, its basis and the disclaimer on show", () => {
@@ -68,7 +69,7 @@ describe("<ProofCarousel />", () => {
     render(<ProofCarousel />);
     expect(screen.getByText(DISCLAIMER)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "מ-דחייה לאישור מלא תוך 11 ימים" })).toBeTruthy();
-    expect(screen.getByText("₪850K שולמו")).toBeTruthy();
+    expect(screen.getByText("850 אלף ₪ שולמו")).toBeTruthy();
     // The figure never loses the basis it rests on.
     expect(screen.getAllByText("הערכה המבוססת על הנחות של תשואה ודמי ניהול")).toHaveLength(2);
     for (const basis of screen.getAllByText("הערכה המבוססת על הנחות של תשואה ודמי ניהול")) {
@@ -82,11 +83,11 @@ describe("<ProofCarousel />", () => {
     const [first, second] = screen.getAllByRole("button", { name: "פרטי המקרה" });
     fireEvent.click(first);
     expect(first.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText(STORY).hidden).toBe(false);
+    expect(screen.getByText(STORY).className).not.toContain("line-clamp-2");
     // The others stay as they were.
     expect(second.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(first);
-    expect(screen.getByText(STORY).hidden).toBe(true);
+    expect(screen.getByText(STORY).className).toContain("line-clamp-2");
   });
 
   it("names the arrows by where they go in RTL: → back to the first case, ← on to the next", () => {

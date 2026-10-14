@@ -190,9 +190,9 @@ nothing changes. `matchMedia` is stubbed as in §4.24.
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-PRF-001 | "on a phone, folds every story behind its own פרטי המקרה, keeping it in the document" | 7 buttons, all `aria-expanded="false"`, each `aria-controls` its story; 7 stories `hidden`, none removed |
-| CMP-PRF-002 | "on a phone, keeps the headline, the figure, its basis and the disclaimer on show" | The disclaimer, the first headline and "₪850K שולמו" present; both "הערכה המבוססת על הנחות…" outside anything `hidden` |
-| CMP-PRF-003 | "on a phone, פרטי המקרה unfolds its own story in place and folds it again" | First pressed: `aria-expanded="true"`, its story shown, the second still folded; pressed again: hidden |
+| CMP-PRF-001 | "on a phone, shows every story's first two lines until its own פרטי המקרה opens it" | 7 buttons, all `aria-expanded="false"`, each `aria-controls` its story; every story present, not hidden, clamped (`line-clamp-2`) — hidden, half of each card stood empty (user feedback, 2026-10-14) |
+| CMP-PRF-002 | "on a phone, keeps the headline, the figure, its basis and the disclaimer on show" | The disclaimer, the first headline and "850 אלף ₪ שולמו" present; both "הערכה המבוססת על הנחות…" outside anything `hidden` |
+| CMP-PRF-003 | "on a phone, פרטי המקרה unfolds its own story in place and folds it again" | First pressed: `aria-expanded="true"`, its story unclamped, the second untouched; pressed again: clamped |
 | CMP-PRF-004 | "names the arrows by where they go in RTL: → back to the first case, ← on to the next" | "הבא" calls `scrollBy` with a negative `left`, "הקודם" with a positive one (A-80) |
 | CMP-PRF-005 | "from md up, every story is open and there is no פרטי המקרה" | At 1440: no button, nothing `hidden`, the disclaimer present |
 

@@ -110,12 +110,12 @@ describe("<MobileStickyBar />", () => {
     // `/#…`, not `#…`: the bar is on every route and `#start` only on home —
     // a bare hash on /blog points at nothing (see useSectionNav). Ending in
     // `/#start` is also what makes the click listener report cta_click.
-    expect(screen.getByRole("link", { name: "לשיחה קצרה" })).toHaveAttribute("href", "/#start");
+    expect(screen.getByRole("link", { name: "קביעת שיחה" })).toHaveAttribute("href", "/#start");
   });
 
   it("offers a way to the support chat", () => {
     withProviders(<MobileStickyBar />);
-    expect(screen.getByRole("link", { name: /תמיכה/ })).toHaveAttribute("href", "/faq#support-chat");
+    expect(screen.getByRole("link", { name: /שאלה לעוזר/ })).toHaveAttribute("href", "/faq#support-chat");
   });
 
   it("holds those four and nothing else — the short form opens from #start's chip row", () => {
