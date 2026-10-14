@@ -324,19 +324,41 @@ describe("one turn at a time (I3)", () => {
     };
     const { status } = await json(await chat(post(next(id))));
     expect(status).toBe(503);
-    expect(during[0]).toBe(new Date(clock.now + 60_000).toISOString());
+    expect(during[0]).toBe(new Date(clock.now + 180_000).toISOString());
     expect(store.conversations.get(id)!.busy_until).toBeNull();
   });
 
-  it("lets a crashed turn's hold lapse after sixty seconds", async () => {
+  it("keeps the conversation held through a slow tool: a message sent 150 s into the turn is answered busy", async () => {
+    // Tools run outside the 25 s model budget, and a lead's save is several
+    // sequential upstream calls of up to 10 s each. Under the old 60 s lease
+    // this second message claimed the conversation and ran a parallel turn —
+    // two turns, each able to save a lead.
+    const { chat, deps, id } = await opened();
+    const start = clock.now;
+    let during: number | undefined;
+    deps.runTool = vi.fn(async (name: string): Promise<ToolOutcome> => {
+      clock.now += 150_000;
+      during = (await chat(post(next(id, "ב")))).status;
+      return { name, status: "ok", forModel: '{"ok":true}', isError: false };
+    });
+    deps.model = scripted([toolUse("escalateToHuman", { reason: "other", summary: "x" }), text("נמסר.")]);
+    try {
+      await chat(post(next(id, "א")));
+      expect(during).toBe(409);
+    } finally {
+      clock.now = start;
+    }
+  });
+
+  it("lets a crashed turn's hold lapse after three minutes", async () => {
     const { chat, deps, store, id } = await opened();
     deps.model = scripted([text("חזרתי")]);
     // A turn that died without letting go: its lease is all that is left.
-    store.conversations.get(id)!.busy_until = new Date(clock.now + 60_000).toISOString();
+    store.conversations.get(id)!.busy_until = new Date(clock.now + 180_000).toISOString();
     const held = await json(await chat(post(next(id))));
     expect([held.status, held.body.code]).toEqual([409, "busy"]);
     const start = clock.now;
-    clock.now += 60_001;
+    clock.now += 180_001;
     try {
       expect((await json(await chat(post(next(id))))).status).toBe(200);
     } finally {
