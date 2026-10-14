@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FAQ_CATEGORIES, FAQ_ENTRIES, faqCategoryLabel, localizeFaq } from "@/content/faq";
+import { FAQ_CATEGORIES, FAQ_ENTRIES } from "@/content/faq";
+import { faqCategoryLabel, localizeFaq } from "@/i18n/faq";
 import { RESOURCES } from "@/i18n/resources";
 
 /**

@@ -8,7 +8,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import Reveal from "@/components/dorit/primitives/Reveal";
-import { HOME_COMMON_QUESTION_IDS, faqByIds, localizeFaq } from "@/content/faq";
+import { HOME_COMMON_QUESTION_IDS, faqByIds } from "@/content/faq";
+import { localizeFaq } from "@/i18n/faq";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
