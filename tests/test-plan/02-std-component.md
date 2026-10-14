@@ -42,10 +42,11 @@ on, and calls the Base44 client with the payload the backend contract expects.
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-BAR-001 | "offers a dial link and the short contact form" | `tel:+972508311776` and `/#quick-contact` — a home-page anchor from every route, never a bare `#…` |
+| CMP-BAR-001 | "offers a dial link and the conversation" | `tel:+972508311776` and "לשיחה קצרה" → `/#start` — a home-page anchor from every route, never a bare `#…`, and the shape the click listener reports as `cta_click` |
 | CMP-FLA-001 | "links to WhatsApp with a prefilled Hebrew message and a safe rel" | `wa.me/<number>`, `target=_blank`, `rel` contains `noopener`, message decodes to Hebrew |
 | CMP-FLA-002 | "links to the phone number in E.164 form" | `href === tel:${CONTACT.phoneE164}` |
-| CMP-BAR-002 | "offers a way to the support chat" | "תמיכה" → `/faq#support-chat` |
+| CMP-BAR-002 | "offers a way to the support chat" | "תמיכה" → `/faq#support-chat` (A-64) |
+| CMP-BAR-003 | "holds those four and nothing else — the short form opens from #start's chip row" | Exactly 4 links; no "השאירו פרטים" (stage 3: the conversation, WhatsApp, a call and support) |
 | CMP-FLA-003 | "links to the support chat" | "תמיכה — …" → `/faq#support-chat` |
 
 Both components now hold a router link, so every case renders them inside
@@ -131,6 +132,7 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-HDR-004 | "offers no sign-out to a signed-out visitor" | No "יציאה" button |
 | CMP-HDR-005 | "signs a visitor out and sends them home" | "יציאה" calls `logout(true, <origin>/)` |
 | CMP-HDR-006 | "offers no clearinghouse board link, even to an admin, while the switch is off" | No "בקשות מסלקה" link with `VITE_MASLEKA_ENABLED` unset |
+| CMP-HDR-009 | "lists the support chat as well as the sticky bar's תמיכה" (`describe` "phone menu") | Opening "תפריט" shows "תמיכה — שאלה לעוזר" → `/faq#support-chat`; pressing it closes the menu (`SupportLink` now runs the caller's `onClick` before its own scroll) |
 
 ### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
@@ -399,6 +401,26 @@ renders as on a desktop, which is what every other component test relies on.
 |---|---|---|
 | CMP-CHSUP-001 | "shows the FAQ chat's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS` entry is on screen; the interview's fourth point, `CONSENT.points[2]` and the old support fourth point are not |
 | CMP-CHSUP-002 | "sends the first message as support_agent with the v6 stamp, and shows the reply" | After consent, start and send: `invoke("chat", …)` with `agent: support_agent` and `consentVersion: CHAT_FUNCTION_CONSENT_VERSION`; the reply is shown |
+
+### 4.24 `<NeedsWizard />` on a phone — answers that move on — `tests/component/needs-wizard.test.tsx`
+
+The `describe` "on a phone, a single-choice answer moves on by itself". Below md
+a step that is one single-choice question (life stage, concern, goal,
+clearinghouse) moves on when an answer is chosen by a tap, Space or Enter,
+250 ms later and through `forward` — so `wizard_step` and the claim route are
+the same as with "המשך". An arrow key never moves on: in a radio group the
+arrows move the choice and fire a click. `matchMedia` is stubbed as in §4.22;
+the cases above it run without one and are the desktop's wizard, unchanged.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-NWZ-101 | "a tap moves to the next step through the same path as המשך: wizard_step, focus on the new heading" | No "המשך" on step 1; after the click the radio is checked, step 2's heading appears and has focus; `wizardStep(1)` once, `wizardStarted` once |
+| CMP-NWZ-102 | "an arrow key chooses without moving on; Enter then moves on" | keydown ArrowDown → click on the next radio → keyup: it is checked, still step 1, no `wizardStep`; Enter on it → step 2, `wizardStep(1)` |
+| CMP-NWZ-103 | "the concern's claim option still leaves for a person, with no interview" | Tapping "תביעה או בעיה בפוליסה קיימת" opens the claim screen; `submitInterview` not called |
+| CMP-NWZ-104 | "every question can still be skipped, and an answered one shows המשך on the way back" | "דילוג על השאלה" moves on with no answer; back on an answered step the quiet button reads "המשך" and moves on |
+| CMP-NWZ-105 | "a step of several questions keeps המשך, and choosing in it stays put" | On the track step a choice does not move on; the "המשך" button is there |
+| CMP-NWZ-106 | "leaving the step before the beat is up cancels the move" | Tap, then "הקודם" within 250 ms: the wizard stays on step 1 |
+| CMP-NWZ-107 | "from md up nothing moves until המשך" | At 1440 a click checks the radio and nothing else; "המשך" is there |
 
 ## 5. Pass criteria
 

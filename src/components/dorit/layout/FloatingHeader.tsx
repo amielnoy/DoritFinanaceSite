@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft, User } from "lucide-react";
+import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft, User, LifeBuoy } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
 import { useAuth } from "@/lib/AuthContext";
@@ -9,6 +9,7 @@ import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { useQuery } from "@tanstack/react-query";
 import { MASLEKA_ENABLED } from "@/config/masleka";
 import { services } from "@/services";
+import SupportLink from "./SupportLink";
 
 interface NavItem {
   label: string;
@@ -283,6 +284,16 @@ export default function FloatingHeader() {
                     </a>
                   )
                 )}
+          {/* The support chat, by name, right under שאלות ותשובות — a second
+              way in beside the sticky bar's "תמיכה". The drawer is md:hidden;
+              the desktop keeps its round button in the floating dock. */}
+          <SupportLink
+            onClick={() => setOpen(false)}
+            className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"
+          >
+            <span className="inline-flex items-center gap-2"><LifeBuoy size={18} aria-hidden="true" className="text-accent" />תמיכה — שאלה לעוזר</span>
+            <ChevronLeft size={18} className="text-muted-foreground" />
+          </SupportLink>
           {isAuthenticated ? (
             <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>האזור שלי</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
           ) : showLogin ? (

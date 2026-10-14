@@ -27,7 +27,7 @@ function missingFieldsMessage(form: QuickContactForm): string | null {
   return null;
 }
 
-export default function QuickContact({ embedded = false }: { embedded?: boolean }) {
+export default function QuickContact({ embedded = false, className }: { embedded?: boolean; className?: string }) {
   const [form, setForm] = useState<QuickContactForm>({ name: "", phone: "", email: "", message: "" });
   const [validationError, setValidationError] = useState<string | null>(null);
   const { sending: busy, sent, error, submit, reset } = useSubmission("message");
@@ -156,7 +156,7 @@ export default function QuickContact({ embedded = false }: { embedded?: boolean 
     return (
       <div
         id="quick-contact"
-        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-x-16 gap-y-8 border-t border-border pt-14 mt-4"
+        className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-x-16 gap-y-8 border-t border-border pt-14 mt-4 max-md:pt-8 max-md:mt-0 max-md:gap-y-5${className ? ` ${className}` : ""}`}
       >
         <h3 className="font-heading font-normal text-[clamp(28px,3vw,36px)] leading-[1.2]">
           מעדיפים להשאיר פרטים?

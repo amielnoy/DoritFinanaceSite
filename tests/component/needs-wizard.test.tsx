@@ -233,3 +233,125 @@ describe("a failed save", () => {
   });
 });
 
+
+/**
+ * Below md (stage 3): a single-choice step moves on when an answer is chosen by
+ * a tap, Space or Enter — never by an arrow key, which in a radio group moves
+ * the choice and fires a click as it goes. `matchMedia` is stubbed to a width;
+ * without it (jsdom's default, every case above) the wizard is the desktop's.
+ */
+describe("on a phone, a single-choice answer moves on by itself", () => {
+  function phone(width = 390) {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => {
+        const min = /min-width:\s*(\d+)px/.exec(query);
+        return {
+          matches: min ? width >= Number(min[1]) : false,
+          media: query,
+          onchange: null,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          addListener: () => undefined,
+          removeListener: () => undefined,
+          dispatchEvent: () => false,
+        };
+      },
+    });
+  }
+  afterEach(() => {
+    delete (window as unknown as { matchMedia?: unknown }).matchMedia;
+  });
+  const radio = (name: string) => screen.getByRole("radio", { name });
+
+  it("a tap moves to the next step through the same path as המשך: wizard_step, focus on the new heading", async () => {
+    phone();
+    const step = vi.spyOn(leadEvents, "wizardStep");
+    const started = vi.spyOn(leadEvents, "wizardStarted");
+    render(<NeedsWizard />);
+    expect(screen.queryByRole("button", { name: "המשך" })).not.toBeInTheDocument();
+    fireEvent.click(radio("זוג בלי ילדים"));
+    expect(radio("זוג בלי ילדים")).toBeChecked();
+    const heading = await screen.findByRole("heading", { name: "מה מביא אותך" });
+    expect(document.activeElement).toBe(heading);
+    expect(step).toHaveBeenCalledTimes(1);
+    expect(step).toHaveBeenCalledWith(1);
+    expect(started).toHaveBeenCalledTimes(1);
+  });
+
+  it("an arrow key chooses without moving on; Enter then moves on", async () => {
+    phone();
+    const step = vi.spyOn(leadEvents, "wizardStep");
+    render(<NeedsWizard />);
+    // What a browser does for ArrowDown in a radio group: keydown on the
+    // focused radio, then a click (and the change) on the next one, keyup there.
+    fireEvent.keyDown(radio("רווק/ה"), { key: "ArrowDown" });
+    fireEvent.click(radio("זוג בלי ילדים"));
+    fireEvent.keyUp(radio("זוג בלי ילדים"), { key: "ArrowDown" });
+    await new Promise((r) => setTimeout(r, 400));
+    expect(radio("זוג בלי ילדים")).toBeChecked();
+    expect(screen.getByRole("heading", { name: "נכיר קצת" })).toBeInTheDocument();
+    expect(step).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(radio("זוג בלי ילדים"), { key: "Enter" });
+    expect(await screen.findByRole("heading", { name: "מה מביא אותך" })).toBeInTheDocument();
+    expect(step).toHaveBeenCalledWith(1);
+  });
+
+  it("the concern's claim option still leaves for a person, with no interview", async () => {
+    phone();
+    render(<NeedsWizard />);
+    fireEvent.click(screen.getByRole("button", { name: "דילוג על השאלה" }));
+    fireEvent.click(radio("תביעה או בעיה בפוליסה קיימת"));
+    expect(await screen.findByRole("heading", { name: /תביעה או בעיה בפוליסה/ })).toBeInTheDocument();
+    expect(submitInterview).not.toHaveBeenCalled();
+  });
+
+  it("every question can still be skipped, and an answered one shows המשך on the way back", async () => {
+    phone();
+    render(<NeedsWizard />);
+    fireEvent.click(screen.getByRole("button", { name: "דילוג על השאלה" }));
+    expect(screen.getByRole("heading", { name: "מה מביא אותך" })).toBeInTheDocument();
+    fireEvent.click(radio("מס / החזר מס"));
+    await screen.findByRole("heading", { name: "מה היית רוצה לקחת מהפגישה" });
+    fireEvent.click(screen.getByRole("button", { name: "הקודם" }));
+    expect(radio("מס / החזר מס")).toBeChecked();
+    expect(screen.queryByRole("button", { name: "דילוג על השאלה" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "המשך" }));
+    expect(screen.getByRole("heading", { name: "מה היית רוצה לקחת מהפגישה" })).toBeInTheDocument();
+  });
+
+  it("a step of several questions keeps המשך, and choosing in it stays put", async () => {
+    phone();
+    render(<NeedsWizard />);
+    fireEvent.click(screen.getByRole("button", { name: "דילוג על השאלה" }));
+    fireEvent.click(radio("דמי ניהול / הפנסיה שלי"));
+    await screen.findByRole("heading", { name: "מה היית רוצה לקחת מהפגישה" });
+    fireEvent.click(screen.getByRole("button", { name: "דילוג על השאלה" }));
+    expect(screen.getByRole("heading", { name: "כמה פרטים, כדי שדורית תגיע מוכנה" })).toBeInTheDocument();
+    pick("שכיר/ה", "מה המעמד התעסוקתי שלך?");
+    await new Promise((r) => setTimeout(r, 400));
+    expect(screen.getByRole("heading", { name: "כמה פרטים, כדי שדורית תגיע מוכנה" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "המשך" })).toBeInTheDocument();
+  });
+
+  it("leaving the step before the beat is up cancels the move", async () => {
+    phone();
+    render(<NeedsWizard />);
+    fireEvent.click(screen.getByRole("button", { name: "דילוג על השאלה" }));
+    fireEvent.click(radio("מס / החזר מס"));
+    fireEvent.click(screen.getByRole("button", { name: "הקודם" }));
+    await new Promise((r) => setTimeout(r, 400));
+    expect(screen.getByRole("heading", { name: "נכיר קצת" })).toBeInTheDocument();
+  });
+
+  it("from md up nothing moves until המשך", async () => {
+    phone(1440);
+    render(<NeedsWizard />);
+    fireEvent.click(radio("זוג בלי ילדים"));
+    await new Promise((r) => setTimeout(r, 400));
+    expect(screen.getByRole("heading", { name: "נכיר קצת" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "המשך" })).toBeInTheDocument();
+  });
+});

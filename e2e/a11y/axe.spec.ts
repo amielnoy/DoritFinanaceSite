@@ -157,6 +157,11 @@ test.describe("Accessibility — axe (WCAG 2.1 AA)", () => {
       await gotoApp(page);
     });
 
+    await test_step("below md, open the short form from its chip, so the scan has it to read", async () => {
+      const chip = page.locator("#start").getByRole("button", { name: "השארת פרטים" });
+      if (await chip.isVisible()) await chip.click();
+    });
+
     for (const section of ["#start", "#quick-contact"]) {
       await test_step(`scan ${section} on its own`, async () => {
         await page.locator(section).scrollIntoViewIfNeeded();
@@ -183,7 +188,9 @@ test.describe("Accessibility — structural sanity", () => {
   test("every form control has an accessible name", async ({ page }) => {
     await test_step("open the home page and scroll through its forms", async () => {
       await gotoApp(page);
-      await page.locator("#quick-contact").scrollIntoViewIfNeeded();
+      // #start, not #quick-contact: below md the short form is folded (but in
+      // the document, so its inputs are still checked below).
+      await page.locator("#start").scrollIntoViewIfNeeded();
     });
 
     await test_step("no input, select or textarea is left unlabelled", async () => {

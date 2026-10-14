@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { expect, gotoApp, test, test_step } from "../fixtures/app";
+import { expect, gotoApp, openQuickContact, test, test_step } from "../fixtures/app";
 
 const LEAD = { name: "ישראלה ישראלי", phone: "050-1234567", email: "test@example.com" };
 
@@ -20,7 +20,8 @@ class QuickContactForm {
   @test_step("open the home page and scroll to the quick contact form")
   async open() {
     await gotoApp(this.page);
-    await this.root.scrollIntoViewIfNeeded();
+    // Below md the form waits behind the "השארת פרטים" chip (stage 3).
+    await openQuickContact(this.page);
   }
 
   @test_step("fill in the visitor's details")

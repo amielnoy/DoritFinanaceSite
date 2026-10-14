@@ -60,6 +60,7 @@ import {
 } from "@/lib/needs-wizard";
 import { dayChoices, isWorkingDay } from "@/lib/wall-clock";
 import { isIsraeliPhone } from "@/lib/phone";
+import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 
 /**
  * The needs interview as eight short screens of choices.
@@ -85,6 +86,8 @@ const STAGES: readonly { label: string; icon: LucideIcon }[] = [
   { label: "סיכום", icon: ClipboardCheck },
 ];
 const STEP_COUNT = STAGES.length;
+/** Long enough to see the chip chosen, short enough not to feel like a wait. */
+const ADVANCE_DELAY_MS = 250;
 type Phase = "steps" | "claim" | "done" | "failed";
 
 const CHIP =
@@ -152,17 +155,37 @@ function Stepper({ step, onJump }: { step: number; onJump: (n: number) => void }
   );
 }
 
+/**
+ * What a single-choice chip does on a phone, besides being chosen: a tap, Space
+ * or Enter on it moves to the next step. An arrow key does not — in a radio
+ * group the arrows move the selection *and* fire a click, and a keyboard user
+ * walking the options must be able to pass one without leaving the screen.
+ * Absent from md up, and on steps with more than one question or a text field.
+ */
+export interface PickHandlers {
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onKeyUp: () => void;
+  onClick: () => void;
+  onPointerDown: () => void;
+}
+
+/** A radio chip's handlers, split between the <input> and its <label>. */
+const inputHandlers = (h?: PickHandlers) => (h ? { onKeyDown: h.onKeyDown, onKeyUp: h.onKeyUp, onClick: h.onClick } : {});
+const labelHandlers = (h?: PickHandlers) => (h ? { onPointerDown: h.onPointerDown } : {});
+
 /** One question as a real radio group or checkbox group, inside a fieldset with its legend. */
 function Choices({
   question,
   value,
   onChange,
   withUnknown,
+  pick,
 }: {
   question: Question;
   value: Answer | undefined;
   onChange: (next: Answer | undefined) => void;
   withUnknown: boolean;
+  pick?: PickHandlers;
 }) {
   const options = withUnknown && !question.options.includes(UNKNOWN_LABEL)
     ? [...question.options, UNKNOWN_LABEL]
@@ -183,13 +206,14 @@ function Choices({
       <legend className="font-heading text-[19px] md:text-[21px] mb-1">{question.legend}</legend>
       <div className="flex flex-wrap gap-2.5">
         {options.map((option) => (
-          <label key={option}>
+          <label key={option} {...labelHandlers(question.multi ? undefined : pick)}>
             <input
               type={question.multi ? "checkbox" : "radio"}
               name={`nw-${question.key}`}
               value={option}
               checked={chosen.includes(option)}
               onChange={() => toggle(option)}
+              {...inputHandlers(question.multi ? undefined : pick)}
               className="peer sr-only"
             />
             <span className={CHIP}>{option}</span>
@@ -215,6 +239,9 @@ export default function NeedsWizard() {
     sending: false,
     result: "",
   });
+  // Below md a single-choice step moves on when an answer is tapped. From md up
+  // nothing changes: every step waits for "המשך".
+  const isDesktop = useMediaQuery(MD_UP, true);
   const started = useRef<boolean>(false);
   const ackIndex = useRef<number>(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -307,6 +334,57 @@ export default function NeedsWizard() {
     goTo(Math.max(1, step - 1));
   };
 
+  /**
+   * Steps that are one single-choice question — life stage, the concern, the
+   * goal, the clearinghouse. The track's step asks several and the meeting
+   * step two plus a date, so they keep "המשך".
+   */
+  const advancesOnPick = (n: number): boolean => {
+    if (isDesktop) return false;
+    if (n === 2) return true;
+    const qs = questionsOf(n);
+    return qs.length === 1 && !qs[0].multi && !qs[0].textOnly && !qs[0].revealsText;
+  };
+
+  // The advance runs a beat after the tap, through `forward` — so the chosen
+  // chip is seen chosen, the answer is in state when the acknowledgement and
+  // the claim check read it, and `wizard_step` fires exactly as it does for
+  // "המשך". It is dropped if the visitor has left the step meanwhile.
+  const latest = useRef({ forward, step, phase });
+  latest.current = { forward, step, phase };
+  const arrowing = useRef<boolean>(false);
+  const advanceTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(advanceTimer.current), []);
+  const scheduleAdvance = () => {
+    const from = step;
+    window.clearTimeout(advanceTimer.current);
+    advanceTimer.current = window.setTimeout(() => {
+      if (latest.current.step === from && latest.current.phase === "steps") latest.current.forward();
+    }, ADVANCE_DELAY_MS);
+  };
+  const pick: PickHandlers | undefined = advancesOnPick(step)
+    ? {
+        onKeyDown: (e) => {
+          if (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End") arrowing.current = true;
+          else if (e.key === "Enter") {
+            // Enter does nothing on a radio natively; here it chooses and moves on.
+            e.preventDefault();
+            e.currentTarget.click();
+          }
+        },
+        onKeyUp: () => {
+          arrowing.current = false;
+        },
+        onClick: () => {
+          if (arrowing.current) return;
+          scheduleAdvance();
+        },
+        onPointerDown: () => {
+          arrowing.current = false;
+        },
+      }
+    : undefined;
+
   const submit = async () => {
     setSubmitting(true);
     try {
@@ -385,12 +463,26 @@ export default function NeedsWizard() {
     </div>
   );
 
-  const continueButton = (props: { type?: "button" | "submit" } = {}) => (
-    <CtaButton type={props.type ?? "button"} onClick={props.type === "submit" ? undefined : forward}>
-      המשך
-      <ArrowLeft size={18} aria-hidden="true" />
-    </CtaButton>
-  );
+  const continueButton = (props: { type?: "button" | "submit" } = {}) =>
+    pick ? (
+      // A tap on an answer already moves on, so this is the way past the
+      // question without one — or onward with the answer given earlier.
+      <button type="button" onClick={forward} className={LINK}>
+        {answeredHere() ? "המשך" : "דילוג על השאלה"}
+        <ArrowLeft size={16} aria-hidden="true" className="ms-1.5" />
+      </button>
+    ) : (
+      <CtaButton type={props.type ?? "button"} onClick={props.type === "submit" ? undefined : forward}>
+        המשך
+        <ArrowLeft size={18} aria-hidden="true" />
+      </CtaButton>
+    );
+
+  /** Whether the current single-choice step already holds an answer. */
+  function answeredHere(): boolean {
+    if (step === 2) return Boolean(state.concern);
+    return questionsOf(step).some((q) => state.answers[q.key] !== undefined);
+  }
 
   if (phase === "claim") {
     return (
@@ -524,7 +616,7 @@ export default function NeedsWizard() {
       {step === 1 ? (
         <div className="flex flex-col gap-5">
           {heading("נכיר קצת")}
-          <Choices question={LIFE_STAGE} value={state.answers[LIFE_STAGE.key]} onChange={(v) => setAnswer(LIFE_STAGE.key, v)} withUnknown={false} />
+          <Choices question={LIFE_STAGE} value={state.answers[LIFE_STAGE.key]} onChange={(v) => setAnswer(LIFE_STAGE.key, v)} withUnknown={false} pick={pick} />
           {navigation(continueButton())}
         </div>
       ) : null}
@@ -536,13 +628,14 @@ export default function NeedsWizard() {
             <legend className="font-heading text-[19px] md:text-[21px] mb-1">{CONCERN_LEGEND}</legend>
             <div className="flex flex-wrap gap-2.5">
               {CONCERNS.map((c) => (
-                <label key={c.label}>
+                <label key={c.label} {...labelHandlers(pick)}>
                   <input
                     type="radio"
                     name="nw-concern"
                     value={c.label}
                     checked={state.concern === c.label}
                     onChange={() => patch({ concern: c.label })}
+                    {...inputHandlers(pick)}
                     className="peer sr-only"
                   />
                   <span className={CHIP}>{c.label}</span>
@@ -557,7 +650,7 @@ export default function NeedsWizard() {
       {step === 3 ? (
         <div className="flex flex-col gap-5">
           {heading("מה היית רוצה לקחת מהפגישה")}
-          <Choices question={GOAL} value={state.answers[GOAL.key]} onChange={(v) => setAnswer(GOAL.key, v)} withUnknown={false} />
+          <Choices question={GOAL} value={state.answers[GOAL.key]} onChange={(v) => setAnswer(GOAL.key, v)} withUnknown={false} pick={pick} />
           {navigation(continueButton())}
         </div>
       ) : null}
@@ -601,7 +694,7 @@ export default function NeedsWizard() {
         <div className="flex flex-col gap-5">
           {heading("תמונת מצב מהמסלקה")}
           <p className="m-0 text-[17px] leading-relaxed text-foreground/80">{CLEARINGHOUSE_TEXT}</p>
-          <Choices question={CLEARINGHOUSE} value={state.answers[CLEARINGHOUSE.key]} onChange={(v) => setAnswer(CLEARINGHOUSE.key, v)} withUnknown={false} />
+          <Choices question={CLEARINGHOUSE} value={state.answers[CLEARINGHOUSE.key]} onChange={(v) => setAnswer(CLEARINGHOUSE.key, v)} withUnknown={false} pick={pick} />
           {navigation(continueButton())}
         </div>
       ) : null}

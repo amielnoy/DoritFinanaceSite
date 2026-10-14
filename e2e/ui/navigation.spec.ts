@@ -15,6 +15,16 @@ async function openHeaderNav(page: Page, isMobile: boolean | undefined): Promise
   await page.getByRole("button", { name: "תפריט" }).click();
 }
 
+/**
+ * Below md the footer's menu folds into a <details> "ניווט באתר" (stage 3);
+ * open it when it is there. From md up there is no <details> and this is a no-op.
+ */
+async function openFooterMenu(page: Page): Promise<void> {
+  const summary = page.locator("footer details > summary");
+  if (!(await summary.isVisible())) return;
+  if ((await page.locator("footer details").getAttribute("open")) === null) await summary.click();
+}
+
 const PUBLIC_ROUTES = [
   { path: "/", heading: /דורית גוב ארי|אדריכלות/ },
   { path: "/blog", heading: /בלוג|מאמרים/ },
@@ -120,6 +130,7 @@ test.describe("Routing — sanity", () => {
     });
 
     await test_step("click the about link in the footer", async () => {
+      await openFooterMenu(page);
       await page.locator("footer").getByRole("link", { name: "אודות" }).first().click();
     });
 
@@ -191,6 +202,7 @@ test.describe("Routing — sanity", () => {
     for (const [label, url] of EXPECTED) {
       await test_step(`${label} reaches its target from /blog`, async () => {
         await gotoApp(page, "/blog");
+        await openFooterMenu(page);
         await page.locator("footer").getByRole("link", { name: label, exact: true }).first().click();
         await expect(page).toHaveURL(url);
       });
@@ -205,6 +217,7 @@ test.describe("Routing — sanity", () => {
     });
 
     await test_step("follow the blog link from deep down the page", async () => {
+      await openFooterMenu(page);
       await page.getByRole("link", { name: "בלוג" }).first().click();
       await expect(page).toHaveURL(/\/blog$/);
     });
@@ -217,6 +230,7 @@ test.describe("Routing — sanity", () => {
   test("browser back returns to the previous route", async ({ page }) => {
     await test_step("go from the home page to the blog", async () => {
       await gotoApp(page);
+      await openFooterMenu(page);
       await page.getByRole("link", { name: "בלוג" }).first().click();
       await expect(page).toHaveURL(/\/blog$/);
     });

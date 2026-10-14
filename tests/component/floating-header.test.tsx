@@ -96,3 +96,15 @@ describe("<FloatingHeader /> account links", () => {
     expect(linksNamed("כניסה ללקוחות")).toHaveLength(0);
   });
 });
+
+describe("<FloatingHeader /> phone menu", () => {
+  it("lists the support chat as well as the sticky bar's תמיכה", () => {
+    renderHeader({ user: null, isAuthenticated: false });
+    fireEvent.click(screen.getByRole("button", { name: "תפריט" }));
+    const support = screen.getByRole("link", { name: /תמיכה — שאלה לעוזר/ });
+    expect(support).toHaveAttribute("href", "/faq#support-chat");
+    // Pressing it closes the menu as well as going to the chat.
+    fireEvent.click(support);
+    expect(screen.queryByRole("button", { name: "סגירת תפריט" })).toBeNull();
+  });
+});

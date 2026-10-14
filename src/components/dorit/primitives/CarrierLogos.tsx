@@ -28,12 +28,15 @@ const CARRIERS: Carrier[] = [
 export default function CarrierLogos() {
   return (
     <section className="bg-secondary border-b border-border">
-      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-14 flex flex-col items-center gap-8">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-14 flex flex-col items-center gap-8 max-md:py-8 max-md:gap-5">
         <p className="text-center font-heading italic text-[15px] normal-case text-accent">
           עובדת מול מיטב חברות הפנסיה והביטוח בישראל
         </p>
 
-        <div className="w-full grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 border-y border-border">
+        {/* Below md: one strip that scrolls sideways — four rows of a 2-column
+            grid was most of a screen. The links stay in the tab order, and a
+            focused one off the edge scrolls into the strip. */}
+        <div className="w-full grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 border-y border-border max-md:flex max-md:overflow-x-auto max-md:[scrollbar-width:none] max-md:-mx-[clamp(20px,4vw,40px)] max-md:w-auto max-md:self-stretch max-md:px-[clamp(20px,4vw,40px)] max-md:border-x-0">
           {CARRIERS.map((c) => (
             <a
               key={c.en}
@@ -41,7 +44,7 @@ export default function CarrierLogos() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`אתר ${c.he}`}
-              className="group flex flex-col items-center gap-1 px-2 py-[22px] text-center text-foreground/80 hover:text-foreground hover:bg-highlight/5 transition-colors duration-200"
+              className="group flex flex-col items-center gap-1 px-2 py-[22px] text-center text-foreground/80 hover:text-foreground hover:bg-highlight/5 transition-colors duration-200 max-md:shrink-0 max-md:px-4 max-md:py-3 max-md:min-h-11 max-md:justify-center"
             >
               <span className="font-heading text-[21px] leading-[1.1]">
                 {c.he}

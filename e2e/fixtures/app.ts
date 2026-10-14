@@ -356,6 +356,20 @@ export async function gotoApp(page: Page, path = "/"): Promise<void> {
   await waitForAppLive(page);
 }
 
+/**
+ * Bring the home page's short contact form (#quick-contact) on screen. Below md
+ * it waits, folded, behind the "השארת פרטים" chip under the questionnaire
+ * (stage 3); from md up it stands open and this only scrolls to it.
+ */
+export async function openQuickContact(page: Page): Promise<void> {
+  const chip = page.locator("#start").getByRole("button", { name: "השארת פרטים" });
+  if ((await chip.isVisible()) && (await chip.getAttribute("aria-expanded")) !== "true") {
+    await chip.click();
+    await expect(chip).toHaveAttribute("aria-expanded", "true");
+  }
+  await page.locator("#quick-contact").scrollIntoViewIfNeeded();
+}
+
 /** Collects page errors and console errors for the lifetime of a test. */
 export function collectPageErrors(page: Page): { errors: string[] } {
   const errors: string[] = [];
