@@ -183,7 +183,7 @@ describe("the first message", () => {
 
   it("refuses an agent the function does not serve, an empty message, and a long one", async () => {
     const { chat } = setup();
-    expect((await json(await chat(post({ ...first(), agent: "support_agent" })))).body.code).toBe("unknown_agent");
+    expect((await json(await chat(post({ ...first(), agent: "blog_agent" })))).body.code).toBe("unknown_agent");
     expect((await json(await chat(post(first("   "))))).body.code).toBe("empty");
     expect((await json(await chat(post(first("א".repeat(1001)))))).body.code).toBe("too_long");
   });
