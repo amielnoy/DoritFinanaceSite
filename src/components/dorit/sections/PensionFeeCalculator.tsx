@@ -12,6 +12,8 @@ import CalculatorLeadBox from "@/components/dorit/sections/CalculatorLeadBox";
 import { feeCalculatorMessage } from "@/lib/calculator-lead";
 import { useCalculatorResultEvent } from "@/hooks/useCalculatorResultEvent";
 import { TOOL_SECTION } from "@/config/tools";
+import PensionCheckForm from "@/components/dorit/forms/PensionCheckForm";
+import { PENSION_CHECK } from "@/config/offers";
 
 interface NumFieldProps {
   label: string;
@@ -166,6 +168,12 @@ export default function PensionFeeCalculator() {
               </span>{" "}
               שנשאר ברשות הגוף המנהל במקום אצלכם.
             </p>
+          </div>
+
+          {/* The strongest moment on the site, turned into a lead: right after
+              the result, the clearinghouse check that shows the real fees. */}
+          <div className="mt-8">
+            <PensionCheckForm location="calculator_check" context="אחרי מחשבון דמי הניהול" heading={PENSION_CHECK.calculatorHeadline} />
           </div>
 
           <CalculatorLeadBox className="mt-8" message={feeCalculatorMessage({ monthlyDeposit, years }, result)}>

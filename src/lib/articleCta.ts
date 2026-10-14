@@ -1,8 +1,9 @@
 /**
  * The contact boxes inside an article (src/components/dorit/blog/ArticleContactBox.tsx):
- * where the first one goes, what it says, and when it also offers /tools.
+ * where the first one goes, what it says, and which next step it offers.
  */
 import type { Article } from "@/services";
+import { PENSION_CHECK, YEAR_END } from "@/config/offers";
 
 export const ARTICLE_CTA_FALLBACK = "יש לך שאלה על הנושא הזה? דורית עונה אישית בוואטסאפ";
 
@@ -16,14 +17,26 @@ export function articleWhatsappText(title: string): string {
   return `שלום דורית, קראתי את המאמר "${title}" ואשמח לשאלה קצרה`;
 }
 
+export interface ArticleOffer {
+  href: string;
+  label: string;
+  kind: "year_end" | "pension_check" | "tools";
+}
+
 /**
- * /tools has two tools — the pension fee calculator and the insurance check —
- * so the link is offered only on an article tagged with what one of them covers.
+ * The one next step that fits the article's topic, beside WhatsApp (growth
+ * brief, 2026-10-14), by its tags, most specific first: the self-employed get
+ * the year-end page; pension, savings and fees get the clearinghouse check
+ * ("המעסיק באמת מפקיד?" → "נבדוק לך במסלקה"); insurance gets /tools' self-check.
+ * Anything else — tax refunds, Form 101 — gets WhatsApp alone.
  */
-const TOOL_TAGS = ["דמי ניהול", "ביטוח"];
-export function showsToolsLink(post: Pick<Article, "tags">): boolean {
+export function articleOffer(post: Pick<Article, "tags">): ArticleOffer | null {
   const tags = (post.tags ?? "").split(",").map((t) => t.trim());
-  return tags.some((t) => TOOL_TAGS.includes(t));
+  if (tags.includes("עצמאים")) return { href: YEAR_END.path, label: "מה להפקיד עד 31.12", kind: "year_end" };
+  if (tags.some((t) => ["פנסיה", "גמל והשתלמות", "דמי ניהול"].includes(t)))
+    return { href: PENSION_CHECK.path, label: "נבדוק לך במסלקה", kind: "pension_check" };
+  if (tags.includes("ביטוח")) return { href: "/tools", label: "לבדיקה במחשבון", kind: "tools" };
+  return null;
 }
 
 /** A block that is not a paragraph: a heading, list, quote, table, rule or HTML. */

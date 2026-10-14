@@ -116,6 +116,11 @@ describe("leadEvents", () => {
     expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "coverage_check" });
   });
 
+  it("counts the pension check as a lead of its own method, with where its form sat", () => {
+    leadEvents.pensionCheckSubmitted("calculator");
+    expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "pension_check", location: "calculator" });
+  });
+
   it("counts a submitted claim as a lead", () => {
     leadEvents.claimSubmitted();
     expect(w.gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "claim" });
@@ -214,6 +219,15 @@ describe("initClickTracking", () => {
   it("ignores every other link", () => {
     click('<nav><a href="/blog">בלוג</a></nav>');
     expect(w.gtag).not.toHaveBeenCalled();
+  });
+
+  it("reports a Cal.com booking link, the flagship check and the WhatsApp channel by name", () => {
+    click('<section id="start"><div data-track-location="start_booking"><a href="https://cal.com/dorit/15min">לבחירת מועד</a></div></section>');
+    expect(w.gtag).toHaveBeenCalledWith("event", "click_booking", { location: "start_booking" });
+    click('<section id="top"><a href="/pension-check">בדיקת תיק פנסיוני</a></section>');
+    expect(w.gtag).toHaveBeenCalledWith("event", "cta_click", { location: "top", cta: "pension_check" });
+    click('<footer><p data-track-location="footer_channel"><a href="https://whatsapp.com/channel/abc">ערוץ</a></p></footer>');
+    expect(w.gtag).toHaveBeenCalledWith("event", "join_channel", { location: "footer_channel" });
   });
 
   it("registers once, however often it is called", () => {

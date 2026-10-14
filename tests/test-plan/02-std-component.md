@@ -161,6 +161,8 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 | CMP-ERB-003 | "isolates the failure: sibling trees still render" | Sibling text present; section wording ("החלק הזה") |
 | CMP-ERB-004 | "uses page wording for the app-level boundary" | `scope="page"` message says "הדף" |
 | CMP-ERB-005 | "recovers when its resetKey changes, so leaving a broken page is not a dead end" | After `resetKey` changes (the app passes the path), the fallback is gone and the new children render |
+| CMP-ERB-006 | "offers a fresh load, past the cache, in the fallback" | "לטעון את הדף מחדש" calls `reloadFresh` |
+| CMP-ERB-007 | "asks whether the build was replaced when a page chunk failed to load, and only then" | A chunk error → `checkFreshness` once; an ordinary render error → not at all |
 
 ### 4.11 `<Testimonials />` — `tests/component/testimonials.test.tsx`
 
@@ -521,8 +523,9 @@ or while there are no deposits to compute from (`useCalculatorResultEvent`). Fak
 | CMP-ACTA-003 | "pre-fills WhatsApp with the article's title" | `?text=` decodes to the title sentence; opens in a new tab |
 | CMP-ACTA-004 | "uses the article's cta_headline, else the general line" | The article's headline |
 | CMP-ACTA-005 | "falls back to the general headline" | `ARTICLE_CTA_FALLBACK` |
-| CMP-ACTA-006 | "offers /tools on a fees article and not on a tax one" | "לבדיקה במחשבון" → `/tools` |
-| CMP-ACTA-007 | "does not offer /tools on an article no tool covers" | No such link |
+| CMP-ACTA-006 | "offers the clearinghouse check on a pension or fees article" | "נבדוק לך במסלקה" → `/pension-check` |
+| CMP-ACTA-007 | "offers the year-end page to the self-employed" | "מה להפקיד עד 31.12" → `/atzmaim-31-12` |
+| CMP-ACTA-008 | "offers nothing but WhatsApp on an article no offer covers" | One link in the box |
 
 ### 4.28 `<MaslekaAnalysis />` — Dorit's review of a client's report — `tests/component/masleka-analysis.test.tsx`
 
@@ -538,6 +541,23 @@ Over an in-memory port (decisions stored and read back) and the made-up client i
 | CMP-MSKA-006 | "keeps drafts and rejected findings off the printout" | Approved card printable; rejected and draft cards `print:hidden` |
 | CMP-MSKA-007 | "says so when a decision could not be saved" | Alert with the rid |
 | CMP-MSKA-008 | "says plainly when the report is gone or cannot be read" | Alert "הדוח לא נמצא" |
+
+### 4.32 The growth brief: "בדיקת תיק פנסיוני", Cal.com and the WhatsApp channel — `tests/component/lead-growth.test.tsx`
+
+`services.leads.submitInterview` mocked; `CAL_LINK` and `WHATSAPP_CHANNEL_URL` set per test.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-GROW-001 | "sends the questionnaire's lead with the clearinghouse opt-in ticked, and counts it once saved" | `track: pension`, `profile: {clearinghouse: "מעוניין/ת"}`, `stage: complete`, the context in the summary; "במייל שלך מחכה קישור אישי"; `generate_lead {method: pension_check, location}` once |
+| CMP-GROW-002 | "takes no email too, and says Dorit will send the link herself" | `email` undefined; the no-email thank-you |
+| CMP-GROW-003 | "asks for a name, a mobile number and a real address before sending" | Three alerts in turn; nothing sent |
+| CMP-GROW-004 | "says so, and counts nothing, when the save fails" | Alert; no `generate_lead` |
+| CMP-GROW-005 | "/pension-check: one h1, three steps, the form and the disclosure, and no 'חינם'" | As titled |
+| CMP-GROW-006 | "/atzmaim-31-12: the article's figures, a link to it, and the form with the campaign as its context" | 38,400; link to `/blog/sof-shana-atzmaim`; summary names the campaign; `location: year_end` |
+| CMP-GROW-007 | "the hero leads with the check; the conversation is the second button, hidden on a phone" | `/pension-check`; `#start` with `max-md:hidden` |
+| CMP-GROW-008 | "the fee calculator offers the check right after its result" | The calculator headline |
+| CMP-GROW-009 | "the footer names the WhatsApp channel only once its address is set" | Absent unset; then the link, `noopener noreferrer`, and the reminder line |
+| CMP-GROW-010 | "#start offers the 15-minute call first once Cal.com is set, the questionnaire second" | Absent unset; then "לבחירת מועד" → the Cal.com link, new tab; the questionnaire's lead-in |
 
 ### 4.29 `<SnapshotHome />` — the personal snapshot on the home page — `tests/component/snapshot-home.test.tsx`
 

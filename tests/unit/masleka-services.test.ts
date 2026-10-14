@@ -279,7 +279,9 @@ describe("SupabaseMaslekaService — analyses", () => {
       ],
       error: null,
     });
-    expect(await service.listReviews("s1")).toEqual([{ findingKey: "a:", status: "approved", finalText: null, reviewedAt: "t" }]);
+    expect(await service.listReviews("s1")).toEqual([
+      { findingKey: "a:", status: "approved", finalText: null, title: null, priority: null, reviewedAt: "t" },
+    ]);
   });
 
   it("upserts a decision on (snapshot, finding), and deletes it to go back to draft", async () => {
@@ -309,5 +311,61 @@ describe("SupabaseMaslekaService — analyses", () => {
     await expect(service.getSnapshot()).rejects.toMatchObject({ reason: "unavailable" });
     await expect(service.listReviews()).rejects.toMatchObject({ reason: "unavailable" });
     await expect(service.decide()).rejects.toMatchObject({ reason: "unavailable" });
+  });
+});
+
+describe("SupabaseMaslekaService — publishing (phase 4)", () => {
+  const rpcClient = (error: { message: string; code?: string } | null = null) => {
+    const calls: unknown[][] = [];
+    const client = {
+      rpc: (fn: string, args: unknown) => (calls.push([fn, args]), Promise.resolve({ data: null, error })),
+    } as unknown as SupabaseMaslekaClient;
+    return { calls, service: new SupabaseMaslekaService(client) };
+  };
+
+  it("publishes the address and the items, in order, through clearinghouse_publish", async () => {
+    const { calls, service } = rpcClient();
+    await service.publish("s1", "client@example.com", [
+      { title: "דמי ניהול", body: "נבקש הפחתה", priority: "important" },
+      { title: "כיסוי", body: "נבדוק", priority: "check" },
+    ]);
+    expect(calls).toEqual([
+      ["clearinghouse_publish", {
+        p_snapshot: "s1",
+        p_client_email: "client@example.com",
+        p_items: [
+          { title: "דמי ניהול", body: "נבקש הפחתה", priority: "important" },
+          { title: "כיסוי", body: "נבדוק", priority: "check" },
+        ],
+      }],
+    ]);
+  });
+
+  it("tells an address the database refused apart from a failure", async () => {
+    await expect(rpcClient({ message: "invalid_email", code: "22023" }).service.publish("s1", "x", [])).rejects.toMatchObject({ reason: "invalid_email" });
+    await expect(rpcClient({ message: "invalid_items", code: "22023" }).service.publish("s1", "a@b.co", [])).rejects.toMatchObject({ reason: "invalid" });
+    await expect(rpcClient({ message: "boom" }).service.publish("s1", "a@b.co", [])).rejects.toMatchObject({ reason: "failed" });
+  });
+
+  it("unpublishes and marks the answers seen by snapshot", async () => {
+    const { calls, service } = rpcClient();
+    await service.unpublish("s1");
+    await service.markAnswersSeen("s1");
+    expect(calls).toEqual([["clearinghouse_unpublish", { p_snapshot: "s1" }], ["clearinghouse_mark_answers_seen", { p_snapshot: "s1" }]]);
+  });
+
+  it("reads the published items with the client's answers, in position order", async () => {
+    const { calls, service } = tables({
+      data: [
+        { id: "i1", position: 0, title: "t", body: "b", priority: "important", client_status: "question", client_note: "מה זה?", client_updated_at: "u", staff_seen_at: null },
+        { id: "i2", position: 1, title: "t2", body: "b2", priority: "nonsense" },
+      ],
+      error: null,
+    });
+    expect(await service.listPublishedItems("s1")).toEqual([
+      { id: "i1", title: "t", body: "b", priority: "important", clientStatus: "question", clientNote: "מה זה?", position: 0, clientUpdatedAt: "u", staffSeenAt: null },
+    ]);
+    expect(calls).toContainEqual(["from", "clearinghouse_published_items"]);
+    expect(calls).toContainEqual(["order", "position", { ascending: true }]);
   });
 });

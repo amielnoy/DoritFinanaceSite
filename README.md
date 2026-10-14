@@ -632,6 +632,37 @@ analysis and lists every stored report under "ניתוחים".
   cron.job where jobname = 'clearinghouse-purge';` returns one row. Applied in
   the SQL editor → `supabase migration repair --status applied 20261021000000`.
 
+### The flagship and the lead paths (growth brief, 2026-10-14)
+
+- **"בדיקת תיק פנסיוני"** (`/pension-check`, `src/config/offers.ts`): name,
+  mobile and an optional address — the questionnaire's lead with the
+  clearinghouse opt-in (`profile.clearinghouse = "מעוניין/ת"`), so
+  `submit-lead` opens the request on the board and mails the personal link (no
+  address: Dorit sends it from the board). One form (`PensionCheckForm`) in
+  four places: its page, the hero's main button (the conversation is the
+  secondary button, hidden below md), right after the fee calculator's result
+  ("רוצים לדעת כמה אתם משלמים בפועל?"), and the year-end page. GA4:
+  `generate_lead {method: pension_check, location}` once saved; the hero's
+  button is `cta_click {cta: pension_check}`.
+- **No "חינם" yet.** The clearinghouse charges an advisor ₪14 a request; the
+  word goes into `PENSION_CHECK` once Dorit confirms she absorbs it.
+- **Year-end campaign** (`/atzmaim-31-12`): the published article's 2026
+  figures, its caveat, a link to it, and the form. Every figure is the
+  article's — update both together.
+- **One next step per article** (`articleOffer`, by tags): "עצמאים" → the
+  year-end page; pension, savings or fees → "נבדוק לך במסלקה"; insurance →
+  /tools; anything else, WhatsApp alone.
+- **Switches, unset by default** (Vercel env, then a CI deploy — production is
+  prebuilt):
+  - `VITE_CAL_LINK` — Dorit's Cal.com event (15 minutes, two screening
+    questions set in Cal.com). Set, #start leads with "שיחת טלפון של 15 דקות"
+    and the questionnaire follows. GA4 `click_booking`.
+  - `VITE_WHATSAPP_CHANNEL_URL` — her WhatsApp channel; the footer offers
+    "תזכורת אחת בחודש לפני דדליינים של מס". The site keeps no list. GA4
+    `join_channel`.
+- **Not code, waiting on the regulatory adviser:** paid claims advocacy on
+  success, employer talks, accountant referrals.
+
 ### The personal snapshot (תמונת מצב) — phased, behind `VITE_SNAPSHOT_HOME`
 
 A four-phase programme: (1) home-page sections introducing the snapshot, (2) a

@@ -154,9 +154,17 @@ test.describe("Home — sanity", () => {
 
     await test_step("the consultation CTA is visible", async () => {
       // :visible — the same hrefs also exist in the desktop nav / mobile drawer,
-      // only one set of which is rendered per viewport.
-      const cta = page.locator('a[href="#start"]:visible').first();
+      // only one set of which is rendered per viewport. On a phone the hero's
+      // "לשיחה קצרה עם דורית" is hidden (2026-10-14) and the sticky bar's
+      // "קביעת שיחה" — `/#start`, so it works from every route — is the one.
+      const cta = page.locator('a[href="#start"]:visible, a[href="/#start"]:visible').first();
       await expect(cta).toBeVisible();
+    });
+
+    await test_step("the flagship, בדיקת תיק פנסיוני, leads the hero", async () => {
+      const check = page.locator("#top").getByRole("link", { name: "בדיקת תיק פנסיוני" });
+      await expect(check).toBeVisible();
+      await expect(check).toHaveAttribute("href", "/pension-check");
     });
 
     await test_step("the call CTA dials the adviser's real number", async () => {
