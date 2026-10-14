@@ -1105,6 +1105,68 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
   });
 
+  test("common questions: a one-sentence intro, and no closing button — the bar's first cell is the same link", async ({ page }) => {
+    await gotoHome(page);
+    const section = page.locator("#common-questions");
+    await section.scrollIntoViewIfNeeded();
+
+    await test_step("the intro's first sentence shows; the second is hidden, not dropped", async () => {
+      await expect(section.getByText(/לפני פגישת הראשונה\./)).toBeVisible();
+      const more = section.getByText("אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.");
+      await expect(more).toHaveCount(1);
+      await expect(more).toBeHidden();
+    });
+
+    await test_step("לשיחה קצרה עם דורית is hidden here but still in the document; the bar's לשיחה קצרה is in view", async () => {
+      const cta = section.getByRole("link", { name: "לשיחה קצרה עם דורית", includeHidden: true });
+      await expect(cta).toHaveCount(1);
+      await expect(cta).toBeHidden();
+      await expect(cta).toHaveAttribute("href", "#start");
+      await expect(page.locator("[data-track-location='mobile_sticky_bar']").getByRole("link", { name: "לשיחה קצרה" })).toBeVisible();
+    });
+  });
+
+  test("the footer: no quote band and no name or slogan — the header has both — with the licence, contact and legal links in view", async ({ page }) => {
+    await gotoHome(page);
+    const footer = page.locator("footer");
+    await footer.scrollIntoViewIfNeeded();
+
+    await test_step("the quote and the repeated name and slogan are hidden, each still there once", async () => {
+      for (const text of [/ביטחון אמיתי מתחיל/, "— דורית גוב ארי", "התכנון שלי — השקט שלך"]) {
+        const el = footer.getByText(text);
+        await expect(el).toHaveCount(1);
+        await expect(el).toBeHidden();
+      }
+    });
+
+    await test_step("what she does, the licence line, contact, the legal links and the copyright are in view", async () => {
+      await expect(footer.getByText(/שיווק פנסיוני ותכנון פיננסי/)).toBeVisible();
+      await expect(footer.getByText(/רישיון סוכן מרשות שוק ההון מספר/)).toBeVisible();
+      await expect(footer.getByRole("link", { name: "050-831-1776" })).toBeVisible();
+      await expect(footer.getByRole("link", { name: "WhatsApp" })).toBeVisible();
+      await expect(footer.getByRole("link", { name: "מדיניות פרטיות" })).toBeVisible();
+      await expect(footer.getByRole("link", { name: "הצהרת נגישות" })).toBeVisible();
+      await expect(footer.getByText(/כל הזכויות שמורות/)).toBeVisible();
+    });
+  });
+
+  test("the home sections below the hero pad 40px top and bottom", async ({ page }) => {
+    await gotoHome(page);
+    // Testimonials arrive after the route commits; wait for the section.
+    await expect(page.locator("#testimonials article")).toHaveCount(2);
+    // Each section's content box: the first child of the <section>.
+    const paddings = await page.evaluate(() =>
+      ["#about", "#services", "#start", "#testimonials", "#common-questions"].map((id) => {
+        const box = document.querySelector(`${id} > div`)!;
+        const s = getComputedStyle(box);
+        return { id, top: parseFloat(s.paddingTop), bottom: parseFloat(s.paddingBottom) };
+      }),
+    );
+    for (const p of paddings) {
+      expect(p, p.id).toEqual({ id: p.id, top: 40, bottom: 40 });
+    }
+  });
+
   test("the cases: short cards in a strip, each story folded behind פרטי המקרה, the disclaimer in view", async ({ page }) => {
     await gotoHome(page);
     const proof = page.locator("#proof");
@@ -1198,10 +1260,11 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("the home page stays under 6,200px — it was 10,260", async ({ page }) => {
-    // 10,260px before stage 3 at 390x844, 6,590 after it, 5,855 after 3b. Not
-    // the brief's 4.5 screens — see tests/test-plan/07-std-mobile.md for where
-    // the rest is — but a regression back towards eight screens should fail here.
+  test("the home page stays under 5,450px — it was 10,260", async ({ page }) => {
+    // 10,260px before stage 3 at 390x844, 6,590 after it, 5,841 after 3b and
+    // 5,321 after 3c (Chromium and WebKit alike). Not the brief's 4.5 screens —
+    // see tests/test-plan/07-std-mobile.md for where the rest is — but a
+    // regression of a section's worth should fail here.
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoHome(page);
 
@@ -1214,9 +1277,16 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       expect(testimonials, "#testimonials was 791px").toBeLessThan(480);
     });
 
+    await test_step("so are the common questions and the footer", async () => {
+      const questions = (await page.locator("#common-questions").boundingBox())!.height;
+      const footer = (await page.locator("footer").boundingBox())!.height;
+      expect(questions, "#common-questions was 767px").toBeLessThan(700);
+      expect(footer, "the footer was 828px").toBeLessThan(600);
+    });
+
     await test_step("and so is the page", async () => {
       const height = await page.evaluate(() => document.documentElement.scrollHeight);
-      expect(height).toBeLessThan(6200);
+      expect(height).toBeLessThan(5450);
     });
   });
 });
@@ -1266,6 +1336,15 @@ test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
       await expect(page.getByRole("link", { name: "לכל השאלות" })).toBeHidden();
       await expect(page.locator("footer details")).toHaveCount(0);
       await expect(page.locator("footer").getByRole("link", { name: "מדריך תביעות" })).toBeVisible();
+    });
+
+    await test_step("the common questions keep their whole intro and their closing link; the footer its quote, name and slogan", async () => {
+      const questions = page.locator("#common-questions");
+      await expect(questions.getByText(/אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית\./)).toBeVisible();
+      await expect(questions.getByRole("link", { name: "לשיחה קצרה עם דורית" })).toBeVisible();
+      const footer = page.locator("footer");
+      await expect(footer.getByText(/ביטחון אמיתי מתחיל/)).toBeVisible();
+      await expect(footer.getByText("התכנון שלי — השקט שלך")).toBeVisible();
     });
   });
 });

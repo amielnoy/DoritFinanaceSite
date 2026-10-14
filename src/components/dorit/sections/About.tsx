@@ -50,7 +50,7 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
   const [more, setMore] = useState<boolean>(false);
   return (
     <section id="about" className="relative border-b border-border">
-      <div className={`max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] grid grid-cols-1 lg:grid-cols-2 gap-[clamp(40px,6vw,96px)] items-center${brief ? " max-md:py-12" : ""}`}>
+      <div className={`max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] grid grid-cols-1 lg:grid-cols-2 gap-[clamp(40px,6vw,96px)] items-center${brief ? " max-md:py-10" : ""}`}>
         <div className={`order-2 lg:order-1 grid grid-cols-[3fr_2fr] gap-4${brief ? " max-md:hidden" : ""}`}>
           <div className="plate h-[clamp(220px,28vw,360px)]">
             <Image
