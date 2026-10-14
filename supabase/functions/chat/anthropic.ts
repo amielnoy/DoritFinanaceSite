@@ -25,6 +25,8 @@ export interface ModelRequest {
   messages: ModelMessage[];
   tools: ToolDefinition[];
   maxTokens: number;
+  /** 'none': the tools stay listed (the conversation names them) but the model may not call one. */
+  toolChoice?: 'none';
 }
 
 export interface ModelUsage {
@@ -67,7 +69,14 @@ export function createAnthropicClient(opts: { apiKey: string; model: string; fet
         res = await fetchImpl(ANTHROPIC_URL, {
           method: 'POST',
           headers: { 'x-api-key': opts.apiKey, 'anthropic-version': ANTHROPIC_VERSION, 'content-type': 'application/json' },
-          body: JSON.stringify({ model: opts.model, max_tokens: req.maxTokens, system: req.system, messages: req.messages, tools: req.tools }),
+          body: JSON.stringify({
+            model: opts.model,
+            max_tokens: req.maxTokens,
+            system: req.system,
+            messages: req.messages,
+            tools: req.tools,
+            ...(req.toolChoice ? { tool_choice: { type: req.toolChoice } } : {}),
+          }),
           signal,
         });
       } catch (e) {

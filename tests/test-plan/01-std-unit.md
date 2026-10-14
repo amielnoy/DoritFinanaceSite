@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 702 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1295 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 704 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1314 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -743,17 +743,19 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHMODEL-002 | "turns an HTTP refusal into ModelError('http') with its status" | `kind: http`, `status: 529` |
 | UNIT-CHMODEL-003 | "turns an abort into ModelError('timeout')" | `kind: timeout` |
 | UNIT-CHMODEL-004 | "turns an answer without content into ModelError('shape')" | Rejects with `ModelError` |
+| UNIT-CHMODEL-005 | "sends tool_choice none only when the request switches tools off" | `toolChoice: "none"` → body has `tool_choice: { type: "none" }` beside `tools`; without it the body has no `tool_choice` |
 | UNIT-CHTURN-001 | "drops tool rows, merges consecutive turns of one side, and starts with the visitor" | Alternating user/assistant history, leading assistant and tool rows dropped, consecutive user rows joined by a blank line |
 | UNIT-CHTURN-002 | "returns the reply when the model answers in words" | `reply` is the text; one usage record |
 | UNIT-CHTURN-003 | "runs a tool, hands the result back, and returns the closing reply" | `runTool` called with the model's input; second request ends with a `tool_result`; result carries `tools` and `toolCalls` |
 | UNIT-CHTURN-004 | "marks a failed tool as an error for the model" | `tool_result` has `is_error: true` |
-| UNIT-CHTURN-005 | "allows three tool rounds and fails the fourth" | `TurnFailure` `too_many_tool_rounds`, three tool outcomes kept |
+| UNIT-CHTURN-005 | "allows three tool rounds, then asks for the reply with tools switched off" | Three tool rounds run; the fourth call carries `toolChoice: "none"` with the tools still listed and its text is the reply (the evaluation of 2026-10-14: a hand-off and two saves, then a fourth tool asked for → 503 with the lead saved) |
 | UNIT-CHTURN-006 | "retries once when the first failure comes early" | A 529 then a reply gives the reply |
 | UNIT-CHTURN-007 | "fails without a retry when the first failure comes after ten seconds" | `TurnFailure` `model_http_529` |
 | UNIT-CHTURN-008 | "fails on a second failure, keeping what the tools already did" | `TurnFailure` `model_timeout`, `tools` equals the earlier outcome |
 | UNIT-CHTURN-009 | "refuses an empty reply" | `TurnFailure` `empty_reply` |
 | UNIT-CHTURN-010 | "fails a reply cut off at max_tokens inside a tool call, without running the tool or returning its text" | `stop_reason: max_tokens` with a partial `submitLead`: `TurnFailure` `truncated_tool_call`, usage kept, `runTool` never called (I1) |
 | UNIT-CHTURN-011 | "asks for up to 2,048 reply tokens, room for a Hebrew profile summary" | `MAX_REPLY_TOKENS` is 2048 and the request carries it (I1) |
+| UNIT-CHTURN-012 | "still fails when the model asks for a tool even with tools switched off" | `TurnFailure` `too_many_tool_rounds`, three tool outcomes kept |
 | UNIT-CHBUDGET-001 | "prices Haiku tokens per million" | 1M input + 1M cached + 1M output = $0.61 |
 | UNIT-CHBUDGET-002 | "prices an unknown model at the most expensive known rate, never at zero" | 1M input tokens = $2 |
 | UNIT-CHBUDGET-003 | "accepts the totals as PostgREST sends bigints" | String token counts are summed as numbers |
