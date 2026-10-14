@@ -23,10 +23,11 @@
 #
 # The two deployment targets are gated differently, on purpose:
 #
-#   Vercel (staging, login-protected) — deploys whenever the build succeeds,
-#   green or red. A failing run is when you most want to open the thing.
+#   Vercel — production (govari-fin.co.il) since 2026-10-11, promoted only
+#   when every test passed; a red `main` run deploys a login-protected
+#   preview instead, because a failing run is when you most want to open it.
 #
-#   Base44 (production, client-facing) — deploys only when every test passed.
+#   Base44 — the agents and functions, published only when every test passed.
 #
 # So a test failure costs you production, never staging.
 #
@@ -45,25 +46,22 @@ name: CI
 
 on:
   push:
-    # Every branch, so work in progress is tested where it is cheap to fix
-    # rather than at the merge. `main` and `builder` are not special here —
-    # they are special further down, where the deploy jobs check the ref. A
-    # feature branch runs the full battery and deploys nothing.
+    # Only the branches that deploy. `main` publishes production; `builder` is
+    # named ahead of being used: the day the Base44 Builder is pointed at it,
+    # its pushes are previewed and judged with no change here.
     #
-    # (`builder` is named ahead of being used: the day the Base44 Builder is
-    # pointed at it, its pushes are previewed and judged with no change here.)
-    branches: ['**']
+    # Feature branches used to run here too, on every push, with the PR event
+    # firing only on `opened`. Every new PR then started two runs for one
+    # commit; the concurrency group cancelled one, and the cancelled run's
+    # jobs sat in the PR's checks as failures ("UNSTABLE") next to the real,
+    # green run. Branches are now tested through their PR, below.
+    branches: [main, builder]
   pull_request:
     branches: [main]
-    # Only the moment the PR appears. New commits on the branch already
-    # trigger the push event above, and checks attach to the commit either
-    # way, so reacting to `synchronize` as well would run the whole matrix
-    # twice for every push to an open PR.
-    #
-    # Opening a PR still fires both events for one commit — the push that
-    # created the branch, and this. The concurrency group above is what makes
-    # that one run rather than two.
-    types: [opened, reopened]
+    # Every commit of an open PR, once: `synchronize` is a new push to it.
+    # "Safe to merge?" — the check the `protect-main` ruleset requires — comes
+    # from these runs, so a PR whose latest commit has none cannot merge.
+    types: [opened, reopened, synchronize]
   schedule:
     # 19:00 UTC — **22:00 in Israel while IDT is in force** (UTC+3, late March
     # to late October). GitHub cron has no timezone, so between late October
@@ -1535,7 +1533,7 @@ jobs:
             echo "| Where to look | URL | This run |"
             echo "| --- | --- | --- |"
 
-            echo "| **Base44** (production — client-facing) | ${PRODUCTION_URL:-${BASE44_URL:-https://safe-arch-plan.base44.app}} | unchanged — publishing runs only from a green \`main\` |"
+            echo "| **Production** (Vercel — client-facing) | ${PRODUCTION_URL:-https://govari-fin.co.il} | unchanged — production deploys only from a green \`main\` |"
 
             if [ -n "$ALLURE_URL" ]; then
               echo "| **Allure — test report** (behind Cloudflare Access) | ${ALLURE_ALIAS:-$ALLURE_URL} | [this run's copy](${ALLURE_URL}) |"
