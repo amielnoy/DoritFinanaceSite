@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Loader2, RotateCcw, Send, Sparkles, UserRound } from "lucide-react";
+import { ChevronDown, Loader2, MessageCircle, RotateCcw, Send, Sparkles, UserRound, X } from "lucide-react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { AnimatePresence, motion } from "framer-motion";
 import { services } from "@/services";
@@ -25,6 +25,7 @@ import ContactChannels from "./ContactChannels";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { inputClass } from "@/components/dorit/primitives/Field";
+import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 
 /**
  * Keeps `tel:` dialable.
@@ -104,6 +105,29 @@ export interface AgentDescriptor {
     forbidden: string[];
     handoff: string;
   };
+  /**
+   * Below `md`, show a short card that opens the chat full-screen, instead of
+   * the chat itself at a fixed 560px.
+   *
+   * A 560px box on an 844px phone left the messages about 100px between a
+   * header that wrapped one word per line and an input pinned under it, and
+   * the box scrolled inside a page that scrolled too. On a phone the chat is
+   * now a layer of its own, the height of the screen; on a desktop nothing
+   * changes. Opt-in per agent, because the interview on the home page is
+   * embedded in a flow of its own and is not this shape.
+   */
+  mobileSheet?: {
+    /** The one sentence under the heading on the card. */
+    cardText: string;
+    /** The full-width button that opens the layer. */
+    openLabel: string;
+    /** The layer's header, on one line. */
+    layerTitle: string;
+    /** Under the title, never wrapped: the disclosure that this is not Dorit. */
+    layerSubtitle: string;
+    /** The closed <details> that holds the blurb, the note and the fence. */
+    detailsLabel: string;
+  };
 }
 
 // Keyed on the union rather than on `string`: `noUncheckedIndexedAccess` is
@@ -132,6 +156,10 @@ const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
  * the one place left to catch it.
  */
 export const NO_REPLY_TIMEOUT_MS = 20_000;
+
+/** What Tab may land on inside the full-screen layer. */
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 const NO_REPLY_COPY = "מצטערת, נראה שההודעה לא התקבלה כראוי. אפשר לנסות שוב, או לעבור ישירות לדורית.";
 
 /**
@@ -228,6 +256,14 @@ export default function AgentChat({
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [handoffSent, setHandoffSent] = useState<boolean>(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** Below md with `mobileSheet`: whether the chat is open as a full-screen layer. */
+  const [layerOpen, setLayerOpen] = useState<boolean>(false);
+  /** The visual viewport while the layer is open — the screen less the keyboard. */
+  const [visibleBox, setVisibleBox] = useState<{ height: number; top: number } | null>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+  const layerTitleId = useId();
   /** Set the moment a closing payload is accepted, so it is submitted once. */
   const submittedRef = useRef<boolean>(false);
   /** The last assistant message already handed to `onAssistantMessage`, so a
@@ -501,6 +537,152 @@ export default function AgentChat({
 
   const Icon = descriptor.icon;
 
+  /*
+   * Below md, an agent with `mobileSheet` is a card on the page and a layer
+   * over it. `sheet` is null on a desktop, for an embedded chat and for an
+   * agent without it — and then everything below renders exactly as before.
+   *
+   * The layer is this same panel, restyled, not a copy: the conversation, the
+   * consent and a half-typed message survive closing and reopening it. It stays
+   * inside the section, so `#support-chat` still finds the chat and a click
+   * inside it is still located there for GA4. That relies on no ancestor
+   * carrying a transform, which would make `fixed` relative to it.
+   */
+  const isDesktop = useMediaQuery(MD_UP, true);
+  const sheet = descriptor.mobileSheet && !embedded && !isDesktop ? descriptor.mobileSheet : null;
+  const asLayer = sheet !== null && layerOpen;
+
+  // A phone turned past md is laid out as a desktop: the chat goes back in place.
+  useEffect(() => {
+    if (isDesktop) setLayerOpen(false);
+  }, [isDesktop]);
+
+  useEffect(() => {
+    if (!asLayer) return;
+    const opener = openerRef.current;
+    const layer = layerRef.current;
+    const html = document.documentElement;
+    const before = { html: html.style.overflow, body: document.body.style.overflow };
+    // One scroll at a time: the page behind the layer stays where it was.
+    html.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    // The dialog itself, not the message box: focusing a field would raise the
+    // phone's keyboard over the consent notice before it has been read.
+    layer?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setLayerOpen(false);
+        return;
+      }
+      if (e.key !== "Tab" || !layer) return;
+      const items = Array.from(layer.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.getClientRects().length > 0,
+      );
+      // Every Tab is moved here rather than left to the browser: Safari's
+      // default Tab skips buttons and links, so from the dialog itself it
+      // jumped straight out of the layer to a field on the page behind it.
+      e.preventDefault();
+      if (items.length === 0) return;
+      const at = items.indexOf(document.activeElement as HTMLElement);
+      const step = e.shiftKey ? -1 : 1;
+      const next = at === -1 ? (e.shiftKey ? items.length - 1 : 0) : (at + step + items.length) % items.length;
+      items[next].focus();
+    };
+    document.addEventListener("keydown", onKey);
+
+    // The input stays above the keyboard: iOS shrinks the visual viewport, not
+    // the layout one `fixed` is measured against, so 100dvh alone would leave
+    // the message box under the keyboard.
+    const vv = window.visualViewport;
+    const fit = () => {
+      if (vv) setVisibleBox({ height: Math.round(vv.height), top: Math.round(vv.offsetTop) });
+    };
+    fit();
+    vv?.addEventListener("resize", fit);
+    vv?.addEventListener("scroll", fit);
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      vv?.removeEventListener("resize", fit);
+      vv?.removeEventListener("scroll", fit);
+      html.style.overflow = before.html;
+      document.body.style.overflow = before.body;
+      setVisibleBox(null);
+      opener?.focus();
+    };
+  }, [asLayer]);
+
+  /** The route to a person, in the panel's header and in the layer's. */
+  const handoffButton = (compact: boolean) => (
+    <button
+      onClick={() => {
+        setHandoffError(null);
+        if (!handoffOpen) leadEvents.chatHandoff(chatMethod);
+        setHandoffOpen((open) => !open);
+      }}
+      disabled={handingOff || handoffSent}
+      title={HUMAN_HANDOFF.buttonTitle}
+      aria-label={HUMAN_HANDOFF.buttonTitle}
+      aria-expanded={compact ? handoffOpen : undefined}
+      className={
+        compact
+          ? "inline-flex items-center gap-1.5 min-h-11 shrink-0 whitespace-nowrap border border-border rounded-md text-foreground hover:border-highlight hover:text-accent disabled:opacity-45 transition-colors duration-200 px-3 text-[15px]"
+          : "inline-flex items-center gap-2 min-h-11 border border-border rounded-md text-foreground hover:border-highlight hover:text-accent disabled:opacity-45 transition-colors duration-200 px-4 text-[15px]"
+      }
+    >
+      {handingOff ? (
+        <Loader2 size={15} className="animate-spin" />
+      ) : compact ? null : (
+        <UserRound size={15} className="text-accent" />
+      )}
+      {HUMAN_HANDOFF.buttonLabel}
+    </button>
+  );
+
+  const resetButton = (
+    <button
+      onClick={reset}
+      aria-label="התחלה מחדש"
+      className="w-11 h-11 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-accent transition-colors duration-200"
+    >
+      <RotateCcw size={16} />
+    </button>
+  );
+
+  /** "כללי הגדר" — beside the chat on a desktop, inside the card's <details> on a phone. */
+  const fence = (className: string) =>
+    descriptor.guardrails ? (
+      <div className={className}>
+        <p className="text-sm text-accent">כללי הגדר</p>
+        <dl className="mt-4 space-y-3.5 text-[15px] leading-[1.7]">
+          <div>
+            <dt className="text-sm text-accent">מה הוא עושה</dt>
+            <dd className="text-foreground/80">
+              {descriptor.guardrails.allowed.join(" · ")}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-accent">מה הוא לא עושה</dt>
+            <dd className="text-foreground/80">
+              {descriptor.guardrails.forbidden.join(" · ")}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-accent">מתי עובר לאדם</dt>
+            <dd className="text-foreground/80">{descriptor.guardrails.handoff}</dd>
+          </div>
+        </dl>
+      </div>
+    ) : null;
+
+  const panelClass = asLayer
+    ? "fixed inset-x-0 top-0 z-[100] h-[100dvh] flex flex-col overflow-y-auto overscroll-contain bg-background outline-none"
+    : sheet
+      ? "hidden"
+      : `${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px] overflow-y-auto`;
+
   // The chat itself. Rendered alone when embedded, or beside the heading
   // column below when the agent is the whole section.
   const panel = (
@@ -513,7 +695,46 @@ export default function AgentChat({
     // text rendering on top of the hand-off form's instead of being cut off
     // or scrollable. A fixed box that cannot fit everything scrolls now,
     // rather than silently losing the "everything" part.
-    <div className={`${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px] overflow-y-auto`}>
+    // In the layer (`asLayer`) the same element is a full-screen dialog: it is
+    // the screen's height, its messages take whatever the header and the input
+    // leave, and it still scrolls as a whole only when the hand-off form and
+    // an open keyboard together leave no room.
+    <div
+      ref={layerRef}
+      id={sheet ? panelId : undefined}
+      className={panelClass}
+      {...(asLayer
+        ? {
+            role: "dialog",
+            "aria-modal": true,
+            "aria-labelledby": layerTitleId,
+            tabIndex: -1,
+            style: visibleBox ? { height: visibleBox.height, top: visibleBox.top } : undefined,
+          }
+        : {})}
+    >
+          {asLayer && sheet ? (
+            /* One row: who this is, the way to a person, start again, close.
+               The panel's own header wrapped one word per line at 390px. */
+            <div className="shrink-0 flex items-center gap-1 px-4 py-2 border-b border-border">
+              <div className="min-w-0 flex-1 leading-tight">
+                <h2 id={layerTitleId} className="font-heading text-[19px] font-medium whitespace-nowrap">
+                  {sheet.layerTitle}
+                </h2>
+                <p className="text-[13px] text-muted-foreground whitespace-nowrap">{sheet.layerSubtitle}</p>
+              </div>
+              {handoffButton(true)}
+              {resetButton}
+              <button
+                type="button"
+                onClick={() => setLayerOpen(false)}
+                aria-label="סגירת הצ׳אט"
+                className="w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-md text-foreground hover:text-accent transition-colors duration-200"
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
           <div className="flex items-center justify-between px-6 py-[18px] border-b border-border gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="w-9 h-9 flex items-center justify-center border border-highlight text-accent shrink-0">
@@ -539,33 +760,11 @@ export default function AgentChat({
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => {
-                  setHandoffError(null);
-                  if (!handoffOpen) leadEvents.chatHandoff(chatMethod);
-                  setHandoffOpen((open) => !open);
-                }}
-                disabled={handingOff || handoffSent}
-                title={HUMAN_HANDOFF.buttonTitle}
-                aria-label={HUMAN_HANDOFF.buttonTitle}
-                className="inline-flex items-center gap-2 min-h-11 border border-border rounded-md text-foreground hover:border-highlight hover:text-accent disabled:opacity-45 transition-colors duration-200 px-4 text-[15px]"
-              >
-                {handingOff ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <UserRound size={15} className="text-accent" />
-                )}
-                {HUMAN_HANDOFF.buttonLabel}
-              </button>
-              <button
-                onClick={reset}
-                aria-label="התחלה מחדש"
-                className="w-11 h-11 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-accent transition-colors duration-200"
-              >
-                <RotateCcw size={16} />
-              </button>
+              {handoffButton(false)}
+              {resetButton}
             </div>
           </div>
+          )}
 
           {!started ? (
             /*
@@ -601,9 +800,9 @@ export default function AgentChat({
              * can never be shorter than heading-room plus the row, at any
              * width. When the panel cannot fit that, the panel scrolls.
              */
-            <div className="flex-1 flex flex-col">
+            <div className={asLayer ? "flex-1 min-h-0 flex flex-col" : "flex-1 flex flex-col"}>
               <div className="relative flex-1 min-h-24">
-                <div className="absolute inset-0 overflow-y-auto px-6 pt-7 pb-5">
+                <div data-chat-region="notice" className="absolute inset-0 overflow-y-auto px-6 pt-7 pb-5">
                   <div className="max-w-[820px] flex flex-col gap-[18px]">
                     <div className="flex flex-col gap-1">
                       <p className="font-heading text-[22px] font-medium">{CONSENT.heading}</p>
@@ -663,7 +862,15 @@ export default function AgentChat({
               </div>
             </div>
           ) : (
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-3.5">
+            <div
+              ref={scrollRef}
+              data-chat-region="messages"
+              className={
+                asLayer
+                  ? "flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 space-y-3.5"
+                  : "flex-1 overflow-y-auto px-6 py-6 space-y-3.5"
+              }
+            >
               <AnimatePresence initial={false}>
                 {messages.map((m, i) => {
                   const isUser = m.role === "user";
@@ -748,7 +955,8 @@ export default function AgentChat({
                       onChange={(e) => setHandoffName(e.target.value)}
                       placeholder={HUMAN_HANDOFF.namePlaceholder}
                       autoComplete="name"
-                      className={inputClass("mt-1 min-h-11 px-3 py-2 text-[15px]")}
+                      // 16px in the layer: iOS zooms into any field smaller than that.
+                      className={inputClass(asLayer ? "mt-1 min-h-11 px-3 py-2 text-base" : "mt-1 min-h-11 px-3 py-2 text-[15px]")}
                     />
                   </label>
                   <label className="flex-1 text-[12px] text-muted-foreground">
@@ -764,7 +972,7 @@ export default function AgentChat({
                       placeholder={HUMAN_HANDOFF.phonePlaceholder}
                       autoComplete="tel"
                       aria-invalid={handoffError ? true : undefined}
-                      className={inputClass("mt-1 min-h-11 px-3 py-2 text-[15px] text-right")}
+                      className={inputClass(asLayer ? "mt-1 min-h-11 px-3 py-2 text-base text-right" : "mt-1 min-h-11 px-3 py-2 text-[15px] text-right")}
                     />
                   </label>
                 </div>
@@ -806,7 +1014,13 @@ export default function AgentChat({
             </div>
           ) : null}
 
-          <div className="px-5 py-4 border-t border-border">
+          <div
+            className={
+              asLayer
+                ? "shrink-0 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-border"
+                : "px-5 py-4 border-t border-border"
+            }
+          >
             <div className="flex items-end gap-2">
               <textarea
                 aria-label={descriptor.inputLabel}
@@ -852,55 +1066,78 @@ export default function AgentChat({
           only), and without this reserved clearance its top button clips the
           chat panel's own left border at common desktop widths. */}
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 md:pl-20 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
-        <div className="lg:col-span-5 flex flex-col justify-center">
-          <Eyebrow>
-            {descriptor.eyebrow}
-          </Eyebrow>
-          <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-5 leading-[1.12]">
-            {line1?.trim()}
-            {line2 ? (
-              <>
-                <br />
-                {line2.trim()}
-              </>
-            ) : null}
-          </h2>
-          <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">{descriptor.blurb}</p>
-          <div className="mt-8 flex items-start gap-3 text-sm text-muted-foreground">
-            <Sparkles size={18} strokeWidth={1.5} className="text-highlight mt-0.5 shrink-0" />
-            <p className="leading-relaxed">{descriptor.note}</p>
+        {sheet ? (
+          /*
+           * The phone's card: the question, one sentence, one button. The
+           * explanation that stood here — a screen of it — is one tap away in
+           * the <details>, word for word, and the chat is a layer of its own.
+           */
+          <div className="border border-border/60 bg-secondary/30 px-5 py-6">
+            <h2 className="font-heading font-normal text-[28px] leading-[1.2]">
+              {[line1, line2].filter(Boolean).map((l) => l!.trim()).join(" ")}
+            </h2>
+            <p className="mt-3 text-base leading-relaxed text-foreground/75">{sheet.cardText}</p>
+            <button
+              ref={openerRef}
+              type="button"
+              onClick={() => setLayerOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={layerOpen}
+              aria-controls={panelId}
+              className={ctaClass("mt-5 w-full")}
+            >
+              <MessageCircle size={18} aria-hidden="true" />
+              {sheet.openLabel}
+            </button>
+            <details className="group mt-5 border-t border-border pt-1">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-[15px] text-accent [&::-webkit-details-marker]:hidden">
+                {sheet.detailsLabel}
+                <ChevronDown size={18} aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="pb-2 pt-2">
+                <p className="text-foreground/70 leading-relaxed">{descriptor.blurb}</p>
+                <div className="mt-4 flex items-start gap-3 text-sm text-muted-foreground">
+                  <Sparkles size={18} strokeWidth={1.5} className="text-highlight mt-0.5 shrink-0" />
+                  <p className="leading-relaxed">{descriptor.note}</p>
+                </div>
+                {descriptor.tagline ? (
+                  <p className="mt-4 border-r border-highlight pr-[14px] font-heading text-[19px] leading-[1.6]">
+                    {descriptor.tagline}
+                  </p>
+                ) : null}
+                {fence("mt-4 border-t border-border pt-4")}
+              </div>
+            </details>
           </div>
-
-          {descriptor.tagline ? (
-            <p className="mt-8 border-r border-highlight pr-[18px] font-heading text-[21px] leading-[1.6]">
-              {descriptor.tagline}
-            </p>
-          ) : null}
-
-          {descriptor.guardrails ? (
-            <div className="mt-6 border-t border-border pt-[18px]">
-              <p className="text-sm text-accent">כללי הגדר</p>
-              <dl className="mt-4 space-y-3.5 text-[15px] leading-[1.7]">
-                <div>
-                  <dt className="text-sm text-accent">מה הוא עושה</dt>
-                  <dd className="text-foreground/80">
-                    {descriptor.guardrails.allowed.join(" · ")}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-accent">מה הוא לא עושה</dt>
-                  <dd className="text-foreground/80">
-                    {descriptor.guardrails.forbidden.join(" · ")}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-accent">מתי עובר לאדם</dt>
-                  <dd className="text-foreground/80">{descriptor.guardrails.handoff}</dd>
-                </div>
-              </dl>
+        ) : (
+          <div className="lg:col-span-5 flex flex-col justify-center">
+            <Eyebrow>
+              {descriptor.eyebrow}
+            </Eyebrow>
+            <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-5 leading-[1.12]">
+              {line1?.trim()}
+              {line2 ? (
+                <>
+                  <br />
+                  {line2.trim()}
+                </>
+              ) : null}
+            </h2>
+            <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">{descriptor.blurb}</p>
+            <div className="mt-8 flex items-start gap-3 text-sm text-muted-foreground">
+              <Sparkles size={18} strokeWidth={1.5} className="text-highlight mt-0.5 shrink-0" />
+              <p className="leading-relaxed">{descriptor.note}</p>
             </div>
-          ) : null}
-        </div>
+
+            {descriptor.tagline ? (
+              <p className="mt-8 border-r border-highlight pr-[18px] font-heading text-[21px] leading-[1.6]">
+                {descriptor.tagline}
+              </p>
+            ) : null}
+
+            {fence("mt-6 border-t border-border pt-[18px]")}
+          </div>
+        )}
 
         {panel}
       </div>
