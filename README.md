@@ -1848,11 +1848,15 @@ enquiry. Everything goes through `src/lib/analytics.ts`:
 | `generate_lead` | the contact form **after the save succeeds**; an interview's summary after the page's submit succeeds | `method: contact_form \| ai_interview` |
 | `chat_start` | consent accepted and "התחלת השיחה" pressed | `method`: which chat |
 | `chat_handoff` | "מעבר לדורית" opened | `method`: which chat |
+| `click_chat` | any link to `/faq#support-chat` (header menu `header_menu`, sticky bar, desktop dock), and the phone's card on /faq opening the support chat | `location`; `method` when the chat itself opened |
+| `calculator_result` | once per result a visitor produced on /tools: the self-check's last answer; the fee calculator once its inputs have been changed and then left alone for 1.5 s, once per distinct set of inputs, never for the untouched defaults | `tool: fee_calculator \| insurance_assessment` — never a figure |
 
 `location` comes from `data-track-location`, otherwise the nearest `section[id]`,
 `header`, `footer` or `nav`; `mobile_sticky_bar`, `floating_dock` and `faq` are
-set explicitly. `track` passes on only `location`, `cta`, `method` and `channel`,
-so personal data cannot leak through a parameter added later. A blocked or
+set explicitly; the lead box under each /tools calculator is `calculator`.
+`track` passes on only `location`, `cta`, `method`, `channel`, the attribution's
+`lead_source`/`lead_campaign`, and `tool` — the last only with a value from
+`CALCULATOR_TOOLS` — so personal data cannot leak through a parameter added later. A blocked or
 throwing `gtag` does not throw.
 
 `?internal=1` marks a browser as the agency's own (`traffic_type: internal`,

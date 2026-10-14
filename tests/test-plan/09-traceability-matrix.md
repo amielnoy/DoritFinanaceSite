@@ -7,7 +7,7 @@ gap is visible and a failure points at a feature.
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | F-01 | Landing page renders in Hebrew RTL | — | — | — | — | — | API-HTP-001/002 | E2E-HOM-001..004 | E2E-MOB-005 | — | A11Y-AXE-001, A11Y-STR-001 |
 | F-02 | Visitor reads adviser profile, services, proof, testimonials | — | CMP-RVW-001..003, CMP-TST-001..003/006..009, CMP-PRF-001..005, CMP-HTR-001..005 | CTR-TST-001..003 | — | — | API-CTR-002 | E2E-HOM-003/005/008 | E2E-MOB-022/023/024/028/029/030/031/032/033/034/035, E2E-DSK-004 | SEC-XSS-005 | A11Y-AXE-001 |
-| F-03 | Visitor models pension management fees (/tools) | UNIT-PFC-001..012 | CMP-PFC-001..004 | — | — | — | — | E2E-CAL-001..006 | E2E-MOB-009 | — | A11Y-AXE-008 |
+| F-03 | Visitor models pension management fees (/tools) | UNIT-PFC-001..012, UNIT-CLD-001..004, UNIT-CLD-008, UNIT-GA4-020/021 | CMP-PFC-001..004, CMP-CLD-001..010 | — | — | — | — | E2E-CAL-001..007 | E2E-MOB-009, E2E-CAL-009 | — | A11Y-AXE-008 |
 | F-04 | Visitor submits the quick contact form, beside the chat in `#start` | UNIT-SUB-001..008 | CMP-QCF-001..005 | CTR-LED-001..013, CTR-EML-001/002 | INT-LEAD-001..024 | — | API-CTR-003/005/006 | E2E-FRM-001..004 | E2E-MOB-008, E2E-MOB-001c/007/025 | SEC-RLS-001 | A11Y-AXE-008, A11Y-STR-002 |
 | F-06 | Visitor books the first meeting inside the interview chat | UNIT-RCP-001..003 | CMP-NWZ-101..107 | CTR-FN-001..011 | INT-LEAD-025..030, INT-LEAD-080..087 | — | API-LIV-004 | E2E-AGT-001..005 | E2E-MOB-026/027 | — | A11Y-AXE-008 |
 | F-07 | Visitor calls / opens WhatsApp | UNIT-CNT-001..005 | CMP-BAR-001, CMP-FLA-001/002 | — | — | — | — | E2E-HOM-007 | E2E-MOB-001/001a/002/006/021/025, E2E-DSK-004 | SEC-LNK-001 | A11Y-STR-003 |
@@ -29,8 +29,8 @@ gap is visible and a failure points at a feature.
 | F-24 | Interview hands the agency a structured summary, not free text | — | — | CTR-AGT-* (profile schema) | INT-LEAD-039..064 | EVAL-INT-002..005/007 | — | — | — | SEC-AGT-* | — |
 | F-25 | Every enquiry reaches the agency by mail | — | — | CTR-AGT-*, CTR-EML-*, CTR-CLK-001/002 | INT-LEAD-*, INT-ESC-*, INT-MAIL-*, INT-CLAIM-* | — | — | — | — | SEC-AGT-* | — |
 | F-16 | No secrets ship to the browser | — | — | CTR-FN-009/010 | — | — | — | — | — | SEC-STA-001..009, SEC-BND-001 | — |
-| F-26 | Visitor runs the insurance self-assessment (/tools) | UNIT-ASM-001..008 | — | — | — | — | — | — | — | — | A11Y-AXE-009 |
-| F-27 | Visitor reads the FAQ library and asks the support chat (/faq) | UNIT-FAQ-001..006 | CMP-FAQ-001, CMP-BAR-002/003, CMP-FLA-003, CMP-HDR-009, CMP-SHEET-001..010 | CTR-AGT-* | INT-SUPPORT-001..012 | — | API-HTP-008 | E2E-NAV-004, E2E-AGT-006..008, E2E-SUP-001..003 | E2E-SUP-001/002, E2E-MOB-011..020, E2E-DSK-003/004 | — | A11Y-AXE-001 |
+| F-26 | Visitor runs the insurance self-assessment (/tools) | UNIT-ASM-001..008, UNIT-CLD-005..007 | CMP-CLD-011..015 | — | — | — | — | E2E-CAL-008 | E2E-CAL-009 | — | A11Y-AXE-009 |
+| F-27 | Visitor reads the FAQ library and asks the support chat (/faq) | UNIT-FAQ-001..006, UNIT-GA4-022..027 | CMP-FAQ-001, CMP-BAR-002/003, CMP-FLA-003, CMP-HDR-009/010, CMP-SHEET-001..011 | CTR-AGT-* | INT-SUPPORT-001..012 | — | API-HTP-008 | E2E-NAV-004, E2E-AGT-006..008, E2E-SUP-001..005 | E2E-SUP-001/002, E2E-MOB-011..020, E2E-DSK-003/004 | — | A11Y-AXE-001 |
 | F-28 | Visitor asks how a procedure is carried out, in the procedures chat (/tools) | — | — | CTR-AGT-* | — | EVAL-PRC-001..008 | — | E2E-AGT-009..012 | — | — | A11Y-AXE-008 |
 | F-29 | Signed-in visitor sees their own enquiries (/account) | UNIT-ACC-001..017 | CMP-ACC-001..023, CMP-HDR-001..005 | CTR-ACC-001..006 | INT-ACC-001..010 | — | — | E2E-ACC-001 | — | — | — |
 | F-30 | Admin sees which lead events reach GA4, and marks a browser internal (/admin/leads) | UNIT-GA4-001..014 | CMP-GA4-001..005, CMP-QCF-006 | — | — | — | — | — | — | — | — |

@@ -73,7 +73,11 @@ being committed.
 | E2E-CAL-003 | "higher management fees shrink the projected balance" | annual fee → 1.5% | Balance strictly lower |
 | E2E-CAL-004 | "never renders NaN or ₪NaN when fields are cleared" | clear all five inputs | No `NaN`/`Infinity` on screen; no console errors |
 | E2E-CAL-005 | "shrugs off absurd input instead of hanging the tab" | 120 years at 99% | No `NaN`; inputs still editable |
-| E2E-CAL-006 | "its CTA points at the contact form" | — | `a[href="#quick-contact"]` visible |
+| E2E-CAL-006 | "its CTA points at the contact form" | — | `a[href="/#start"]` visible |
+| E2E-CAL-007 | "the fee calculator offers Dorit's check on WhatsApp, its result written in, and counts it once" | open /tools; wait 2 s; type into the deposit, then 3000; press the box's button (navigation prevented) | Box heading, "not advice" line and the calculator's disclaimer visible; `wa.me/972508311776?text=` with "לאורך 25 שנות חיסכון"; no `calculator_result` for the defaults; exactly one `{tool: fee_calculator}` after typing, no digit in any queued parameter; the message now says 3,000; `click_whatsapp` with `location: calculator` |
+| E2E-CAL-008 | "the insurance self-check ends with the same box, its result in the message, counted once" | answer the four questions | No box before; then the box, a message listing "…סוגי ביטוח לבחון: …ביטוח חיים…"; both disclaimers visible; `calculator_result` tools are exactly `[insurance_assessment]` |
+
+E2E-CAL-009 (`@mobile-only`, phone projects) is in [STD-07](07-std-mobile.md).
 
 ### 3.4 Lead form — `forms.spec.ts`
 
@@ -157,6 +161,16 @@ its transcript while showing the interview's notice would look entirely correct
 — it is a real consent notice, precisely describing a different chat — and
 consent to processing that does not happen is not consent to the processing that
 does.
+
+### 3.8a Support chat entry points — `support-entry.spec.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| E2E-SUP-001 | "the header menu lists שאלות ותשובות and it opens the page" | From `/blog`, the item reaches `/faq` (the drawer on a phone) |
+| E2E-SUP-002 | "the support button lands on the chat, not the top of the page" | Dock (desktop) or sticky bar (phone) → `/faq#support-chat`, the chat's heading in view |
+| E2E-SUP-003 | "pressed again on /faq, it still brings the chat back into view" | Desktop: scrolled away, the dock button scrolls back |
+| E2E-SUP-004 | "the desktop dock's support button is click_chat from floating_dock" | Desktop only: queued `click_chat` is exactly `[{location: floating_dock}]` |
+| E2E-SUP-005 | "on a phone: the sticky bar, the header menu and the card's button each report where they were" | Phone only: `click_chat` from `mobile_sticky_bar`, then `header_menu`, then `{location: support-chat, method: ai_support}` with the layer open — three in all |
 
 ### 3.9 Personal area — `account.spec.ts`
 

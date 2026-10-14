@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 709 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1326 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 809 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1372 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -365,6 +365,21 @@ one; a blocked or throwing tag never breaks the page.
 | UNIT-GA4-014 | "registers once, however often it is called" | One listener |
 | UNIT-GA4-015 | "marks %s a key event" (7 cases) | `generate_lead`, `click_phone`, `click_whatsapp`, `click_email`, `cta_click`, `chat_start`, `chat_handoff` have `keyEvent: true` in `LEAD_EVENTS` (the user's decision of 2026-10-14) |
 | UNIT-GA4-016 | "leaves %s a plain event" (3 cases) | `wizard_start`, `wizard_step`, `preferred_channel_click` have `keyEvent: false` |
+
+The `describe` "calculator_result and click_chat" — the calculator → lead box
+on /tools and the ways into the support chat. `tool` is on the allow-list, but
+only with a value from `CALCULATOR_TOOLS`, so a figure cannot travel in it.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-GA4-020 | "sends calculator_result with the tool's name and nothing else" | `calculator_result {tool: fee_calculator}` / `{tool: insurance_assessment}` |
+| UNIT-GA4-021 | "drops a tool value that is not one of the calculators, so a figure cannot ride in it" | `tool: "12000"`, `"₪12,000"`, `"fee_calculator 12000"` all dropped — params `{}` |
+| UNIT-GA4-022 | "counts a link to the support chat as click_chat, with where it was" | `/faq#support-chat` and `#support-chat` → `click_chat {location}` (`mobile_sticky_bar`, `header_menu`, a section id) |
+| UNIT-GA4-023 | "does not count a link to /faq itself as click_chat" | Nothing sent |
+| UNIT-GA4-024 | "counts a chat opened on the page as click_chat, naming the chat and where" | `click_chat {method: ai_support, location: support-chat}` |
+| UNIT-GA4-025 | "watches the support agent's own section id" | `SUPPORT_CHAT_HASH === "#" + AGENTS.support.sectionId` |
+| UNIT-GA4-026 | "every event it sends is in the catalogue the admin panel shows" | `calculator_result` and `click_chat` are in `LEAD_EVENTS` |
+| UNIT-GA4-027 | "marks click_chat a key event and calculator_result a plain one" | `keyEvent` true / false |
 
 ### 4.16 Reconciling the lead mirror — `tests/unit/reconcile-leads.test.ts`
 
@@ -1182,6 +1197,23 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-VANA-001 | "drops the #t= token from a /masleka url" | `https://govari-fin.co.il/masleka`; the token appears nowhere in the event |
 | UNIT-VANA-002 | "leaves a url without a hash unchanged" | Same url |
 | UNIT-VANA-003 | "keeps the query and drops only the hash" | `…/masleka?utm=x&a=1` |
+
+### 4.46 The calculator → lead message — `tests/unit/calculator-lead.test.ts`
+
+What each /tools calculator writes into the WhatsApp message its lead box
+opens. The message goes from the visitor's phone to Dorit; GA4 hears only
+`calculator_result {tool}`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CLD-001 | "opens a chat with the number from config, the text encoded" | `https://wa.me/${CONTACT.whatsapp}?text=…`, decodes back to the text |
+| UNIT-CLD-002 | "says what the calculator showed: a year's fees on average, the total, the span and the deposit" | "…הראה שאני משלם/ת כ-X בשנה דמי ניהול בממוצע — כ-T לאורך 25 שנות חיסכון, בהפקדה חודשית של D. אשמח לבדיקה של הנתונים האמיתיים שלי." |
+| UNIT-CLD-003 | "asks for a check without figures when there is nothing to report" | Empty deposit, empty or zero years → the fixed sentence with no numbers |
+| UNIT-CLD-004 | "never writes NaN, Infinity or undefined" | `years: "abc"`, `monthlyDeposit: "1e400"` |
+| UNIT-CLD-005 | "lists the kinds of insurance the self-check showed, and how many are high priority" | "…ויצאו 3 סוגי ביטוח לבחון: A, B, C (2 מהם בעדיפות גבוהה). אשמח לבדיקה של מה שיש לי היום בפועל." |
+| UNIT-CLD-006 | "speaks of one kind in the singular, and leaves out the priority clause when none is" | "ויצא סוג ביטוח אחד לבחון: …" |
+| UNIT-CLD-007 | "still asks for a check when the result is empty" | The fixed sentence |
+| UNIT-CLD-008 | "waits long enough to outlast typing, short enough to catch a reader" | `RESULT_SETTLE_MS` is 1500 |
 
 ## 5. Pass criteria
 
