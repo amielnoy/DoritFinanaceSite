@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 865 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1470 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 913 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1536 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -361,6 +361,7 @@ one; a blocked or throwing tag never breaks the page.
 | UNIT-GA4-005 | "marks the agency's own browsing as internal" | `traffic_type: internal` added |
 | UNIT-GA4-006 | "is set by ?internal=1 and cleared by ?internal=0" | Flag toggles |
 | UNIT-GA4-007 | "counts a submitted form as a lead" | `generate_lead {method: contact_form}` |
+| UNIT-GA4-007a | "counts the Har HaBituach check's summary as a lead of its own method" | `generate_lead {method: coverage_check}` |
 | UNIT-GA4-008 | "names the chat that started and the one that asked for a person" | `chat_start` / `chat_handoff` carry `method` |
 | UNIT-GA4-009 | "every event it sends is in the catalogue the admin panel shows" | Every sent name is in `LEAD_EVENTS` |
 | UNIT-GA4-010 | "reports a phone link with the section it sits in" | `click_phone {location: <section id>}` |
@@ -1161,10 +1162,19 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSVC-019 | "tells a send that stored nothing apart from a failure: not_saved is its own reason" | 500 with `not_saved` → `MaslekaError('not_saved', rid)` (decision 2026-10-14) |
 | UNIT-MSKSVC-020 | "lists snapshots by their summary columns, newest first, without the report itself" | `clearinghouse_snapshots`, `SNAPSHOT_SUMMARY_COLUMNS` (no `data`), `created_at` descending |
 | UNIT-MSKSVC-021 | "reads one snapshot through readSnapshot, and calls an unreadable one missing" | `eq('id')`; a report that fails `readSnapshot`, or no row → `null` |
-| UNIT-MSKSVC-022 | "reads decisions, dropping a row that is not one" | Unknown status dropped |
+| UNIT-MSKSVC-022 | "reads decisions, dropping a row that is not one" | Unknown status dropped; `title` and `priority` read (null when unset) |
 | UNIT-MSKSVC-023 | "upserts a decision on (snapshot, finding), and deletes it to go back to draft" | `upsert(…, {onConflict: 'snapshot_id,finding_key'})`; `null` → `delete().eq().eq()` |
 | UNIT-MSKSVC-024 | "throws rather than showing an empty screen when the database refuses" | All four calls → `MaslekaError` |
 | UNIT-MSKSVC-025 | "is never available without Supabase" (analyses) | Unconfigured: all four `unavailable` |
+| UNIT-MSKSVC-026 | "publishes the address and the items, in order, through clearinghouse_publish" | `rpc('clearinghouse_publish', {p_snapshot, p_client_email, p_items})` |
+| UNIT-MSKSVC-027 | "tells an address the database refused apart from a failure" | 22023 + `invalid_email` → `invalid_email`; 22023 otherwise → `invalid`; else `failed` |
+| UNIT-MSKSVC-028 | "unpublishes and marks the answers seen by snapshot" | The two rpcs with `p_snapshot` |
+| UNIT-MSKSVC-029 | "reads the published items with the client's answers, in position order" | Items mapped; an unknown priority dropped; `order('position')` |
+| UNIT-ACC-SNAP-001 | "reads my_snapshot's answer, dropping an item that does not fit" (`account-services.test.ts`) | Two of three items; statuses and notes kept |
+| UNIT-ACC-SNAP-002 | "is null when nothing is published, or the report cannot be read" | `null` for null, an unreadable report, no `published_at` |
+| UNIT-ACC-SNAP-003 | "reads my_snapshot over RPC" | `rpc('my_snapshot')`; null passes through |
+| UNIT-ACC-SNAP-004 | "sends an answer to respond_to_recommendation" | `{p_item, p_status, p_note}` |
+| UNIT-ACC-SNAP-005 | "tells an unconfirmed address, another's recommendation and a sign-out apart" | `unverified` / `failed` / `signed_out` |
 | UNIT-MSKCFG-001 | "is off when unset" | `false` |
 | UNIT-MSKCFG-002..005 | "is off for %j" (TRUE, 1, yes, tru) | `false` |
 | UNIT-MSKCFG-006..007 | "is on for %j" (true, " true ") | `true` (trim, then `=== "true"`) |
@@ -1232,6 +1242,8 @@ opens. The message goes from the visitor's phone to Dorit; GA4 hears only
 | UNIT-CLD-006 | "speaks of one kind in the singular, and leaves out the priority clause when none is" | "ויצא סוג ביטוח אחד לבחון: …" |
 | UNIT-CLD-007 | "still asks for a check when the result is empty" | The fixed sentence |
 | UNIT-CLD-008 | "waits long enough to outlast typing, short enough to catch a reader" | `RESULT_SETTLE_MS` is 1500 |
+| UNIT-CLD-009 | "names the estimated monthly pension and the retirement age" | `retirementMessage`: "כ-₪9,000 בגיל 67" |
+| UNIT-CLD-010 | "asks without numbers when there is no result to speak of" | The fixed sentence for 0 and NaN |
 
 ### 4.47 The article contact boxes — `tests/unit/article-cta.test.ts`, and the share image — `tests/unit/blogSeo.test.ts`
 
@@ -1287,6 +1299,9 @@ Fixed rules over a `Snapshot` (`src/lib/clearinghouse/`), on the made-up client 
 | UNIT-CHA-018 | "starts every finding as a draft in the draft's own words" | All `draft`; nothing to print |
 | UNIT-CHA-019 | "prints approved findings only, in Dorit's words when she edited them" | One approved (edited) printed; rejected and stale decisions ignored |
 | UNIT-CHA-020 | "does not call a text 'edited' when it is the draft's own" | `edited` false |
+| UNIT-CHA-021 | "takes a finding's priority from its severity until Dorit sets one" | high → important, else check; her title and priority win |
+| UNIT-CHA-022 | "reads her own recommendations in the order she wrote them, skipping one without a title or text" | `custom:` keys by `reviewedAt`; `rule: "custom"` |
+| UNIT-CHA-023 | "publishes the approved rule findings first, in Dorit's words, then hers" | `publishItems`: rejected left out |
 
 ### 4.49a Stale builds and page chunks that will not load — `tests/unit/freshness.dom.test.ts` (new cases)
 
@@ -1307,6 +1322,65 @@ Fixed rules over a `Snapshot` (`src/lib/clearinghouse/`), on the made-up client 
 | UNIT-OFFER-001 | "says no 'חינם' until Dorit confirms she absorbs the clearinghouse's cost" | No "חינם"/"ללא עלות"; the calculator headline word for word |
 | UNIT-OFFER-002 | "points the year-end page at the article its figures come from" | `/atzmaim-31-12` ↔ `/blog/sof-shana-atzmaim` |
 | UNIT-OFFER-003 | "takes %j only as an https link to its own host" (8 cases) | `httpsUrl`: https on cal.com / whatsapp.com kept (trimmed); http, another host, a look-alike, empty → null |
+
+### 4.50 The snapshot switch and its copy — `tests/unit/snapshot-config.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SNAP-001 | "reads %j as %s — on only for exactly \"true\"" (6 cases) | `isSnapshotOn`: "true" and " true " on; "TRUE", "1", "", unset off |
+| UNIT-SNAP-002 | "shows no timing until Dorit has confirmed one" | `SNAPSHOT_REVIEW_BUSINESS_DAYS` null; `stepTiming` null for null, 0, 2.5 |
+| UNIT-SNAP-003 | "words a confirmed timing in Hebrew" | "תוך יום עסקים אחד"; "תוך 5 ימי עסקים" |
+| UNIT-SNAP-004 | "links every tool to its own section on /tools" | Four `/tools#…` addresses from `TOOL_SECTION` |
+
+### 4.51 The retirement projection — `tests/unit/retirement-projection.test.ts`
+
+`src/lib/retirement-projection.ts`: monthly compounding at return − fee, deposit at each month's end, conversion factor 200.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-RET-001 | "compounds monthly at the return less the fee, deposit at each month's end" | One year, 59 → 60, equals the hand-rolled loop |
+| UNIT-RET-002 | "turns the balance into a pension at a factor of 200" | `monthlyPension = finalBalance / 200` |
+| UNIT-RET-003 | "adds up every month's fee, and none when the fee is 0" | Fees > 0; 0 % fee → 0 and a larger balance |
+| UNIT-RET-004 | "charts one point per birthday, today first and retirement last" | 28 points, 40 → 67 |
+| UNIT-RET-005 | "projects nothing forward when retirement is not after today" | Balance unchanged, one point |
+| UNIT-RET-006 | "reads a value below its minimum, or not a number, as the minimum" | NaN, −5 and 0 % return read as the minimums |
+| UNIT-RET-007 | "keeps a value inside its range" | `clampTo` per the slider ranges |
+| UNIT-RET-008 | "adds ₪500 a month, even past the slider's top" | At ₪10,000 the variation still grows the balance |
+| UNIT-RET-009 | "lowers the fee to 0.15%, and never raises one already below it" | At 0.1 % the variation equals the base |
+
+### 4.52 Har HaBituach — reading the export and the double-coverage check — `tests/unit/har-habituach.dom.test.ts`
+
+On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's layout, invented values), written as an .xlsx inside the test.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-HB-001 | "reads Har HaBituach's prefixed XML (x:row) and Excel's plain XML alike" | Header and a policy row read back; an inline string read |
+| UNIT-HB-002 | "refuses a file that is not an xlsx, and an xlsx with no sheet" | `XlsxError` `not_xlsx` / `no_sheet` |
+| UNIT-HB-003 | "finds the header below the title and reads one policy per row, in its section" | 8 policies in their three sections |
+| UNIT-HB-004 | "reads the premium as a number and its period as monthly or yearly" | 1800 yearly; 45.5 monthly |
+| UNIT-HB-005 | "never reads the ID number, the policy number or the free text into a policy" | Neither fake value anywhere in the policies |
+| UNIT-HB-006 | "skips a repeated header and reads an unreadable premium as unknown" | 9 policies; premium `null` |
+| UNIT-HB-007 | "says so when the file has no Har HaBituach table" | `MappingError` |
+| UNIT-HB-008 | "flags a type held in two policies, but never per-asset car or home policies" | Only "תרופות - בסיס"; "רכב חובה" ×2 not flagged |
+| UNIT-HB-009 | "keeps a service rider apart from the policy it rides on" | "כתב שירות שמשות" its own group |
+| UNIT-HB-010 | "lists the expected coverages no policy has" | ניתוחים, השתלות…, אובדן כושר עבודה |
+| UNIT-HB-011 | "totals every premium as a monthly amount" | Yearly ÷ 12 plus monthly |
+| UNIT-HB-012 | "puts possible duplicates first" | First group flagged |
+| UNIT-HB-013 | "names counts, the flagged types with their companies and the missing types — and no identifier" | Summary lines; ≤ 1800 chars; no ID or policy number |
+| UNIT-HB-014 | "says when nothing looks duplicated" | "לא נמצא כפל אפשרי." |
+
+### 4.53 The client's snapshot — `tests/unit/clearinghouse-client-view.test.ts`
+
+`src/lib/clearinghouse/client-view.ts`: the tiles and the cover lines of the "תמונת מצב" tab (and of Dorit's preview of it).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CV-001 | "adds up savings and this year's fees as the analysis does" | Equal to `totals()` |
+| UNIT-CV-002 | "projects each pension fund to 67 on its own fee and deposit, and nothing without an age" | Equal to `projectRetirement`; `null` with no age |
+| UNIT-CV-003 | "prices only what is above the yardsticks: default funds for pensions, Dorit's threshold for savings, never insurance" | 320 for the four-account case |
+| UNIT-CV-004 | "counts the recommendations the client has not answered" | 2 of 4 |
+| UNIT-CV-005 | "one active product: covered; two: a possible duplicate" | death covered, disability duplicate |
+| UNIT-CV-006 | "only in a dormant product: partial; in none: not found" | partial, not_found |
 
 ## 5. Pass criteria
 

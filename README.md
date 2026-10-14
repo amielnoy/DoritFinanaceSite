@@ -684,6 +684,53 @@ mail for a claim with stored files says so: "הקישורים בתוקף שבו�
   row. Run `supabase/tests/claim_documents_retention_check.sql` locally first.
   The first night deletes every file already past two months.
 
+### The personal snapshot (תמונת מצב) — phased, behind `VITE_SNAPSHOT_HOME`
+
+A four-phase programme: (1) home-page sections introducing the snapshot, (2) a
+retirement calculator on /tools, (3) a Har HaBituach double-coverage check on
+/tools, (4) the personal snapshot in the account page with Dorit's admin.
+
+- **Switch:** `VITE_SNAPSHOT_HOME` (`src/config/snapshot.ts`), on only for
+  exactly `true`. Off in production until phase 4 exists — the sections promise
+  a personal area and two tools. Locally: `VITE_SNAPSHOT_HOME=true npm run dev`.
+- **Phase 1 (home):** `SnapshotHome.tsx`, between the services and `#start`.
+  Its main button goes to the questionnaire (`#start`), whose follow-up offers
+  the clearinghouse link — a visitor cannot open `/masleka` without one.
+- **Phase 2 (/tools, `#retirement`):** `RetirementCalculator.tsx` over
+  `src/lib/retirement-projection.ts` — monthly compounding at return − fee,
+  pension = balance / 200; "ומה אם?" (₪500 more, fee 0.15%). GA4:
+  `calculator_result` with `tool: retirement_projection`, never a figure.
+- **Phase 3 (/tools, `#har-habituach`):** `HarHabituachCheck.tsx`. The
+  export is read in the browser (`src/lib/har-habituach/xlsx.ts` — fflate and
+  DOMParser, .xlsx only; the real export writes `x:`-prefixed XML) and mapped
+  in one module (`mapping.ts`, which never reads the ID or policy number).
+  Coverage type = a service rider's product type, else the sub-branch; "כפל
+  אפשרי" for 2+ policies of a type outside "תחום - כללי" (car and home are per
+  asset); "כדאי לבדוק" for `EXPECTED_COVERAGE` (`src/config/har-habituach.ts`)
+  missing. "לשלוח לדורית לבדיקה" sends only `checkSummary` through
+  `submitLead` (`source: quick`, topic "בדיקת כפל ביטוחים") and counts
+  `generate_lead {method: coverage_check}` once saved.
+- **Phase 4 (the personal snapshot):** built on the clearinghouse analysis.
+  On `/admin/masleka/analysis/:id` Dorit sets each approved recommendation's
+  priority ("חשוב" / "כדאי לבדוק"), adds her own ("הוספת המלצה משלך"), enters
+  the address the client signs in with, opens "תצוגה כפי שהלקוח רואה" (the
+  client's own component, buttons inert) and presses "פרסום לאזור האישי".
+  A publish freezes the approved list into `clearinghouse_published_items`
+  (migration `20261024000000_clearinghouse_publish.sql`); a republish replaces
+  it and asks first, since the client's answers go with it. The account page's
+  first tab, "תמונת מצב" (`SnapshotView`), reads `my_snapshot()` — the newest
+  snapshot published to the signed-in user's **verified** address, four
+  fields, each item six (contract-tested) — and the client answers each
+  recommendation "כן, לטפל בזה" or "יש לי שאלה" (`respond_to_recommendation`);
+  the review screen counts the new answers until "סימון כנקרא". Apply the
+  migration by hand before the switch goes on; run
+  `supabase/tests/clearinghouse_publish_check.sql` locally first. Still
+  waiting: the parser (a real clearinghouse ZIP), and the compliance adviser
+  (COMPLIANCE.md §11) before `VITE_SNAPSHOT_HOME` is turned on.
+- **Waiting on Dorit:** `EXPECTED_COVERAGE` (the list and its wording);
+  `SNAPSHOT_REVIEW_BUSINESS_DAYS` (null → step 3 states no
+  timing).
+
 ## The chat function (Phase 3)
 
 The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents
@@ -1965,11 +2012,11 @@ enquiry. Everything goes through `src/lib/analytics.ts`:
 |---|---|---|
 | `click_phone`, `click_whatsapp`, `click_email` | any matching link, through one capture-phase listener | `location` |
 | `cta_click` | any link to `#start` | `location`, `cta: start_conversation` |
-| `generate_lead` | the contact form **after the save succeeds**; an interview's summary after the page's submit succeeds | `method: contact_form \| ai_interview` |
+| `generate_lead` | the contact form **after the save succeeds**; an interview's summary after the page's submit succeeds | `method: contact_form \| ai_interview \| coverage_check` (the Har HaBituach check's summary) |
 | `chat_start` | consent accepted and "התחלת השיחה" pressed | `method`: which chat |
 | `chat_handoff` | "מעבר לדורית" opened | `method`: which chat |
 | `click_chat` | any link to `/faq#support-chat` (header menu `header_menu`, sticky bar, desktop dock), and the phone's card on /faq opening the support chat | `location`; `method` when the chat itself opened |
-| `calculator_result` | once per result a visitor produced on /tools: the self-check's last answer; the fee calculator once its inputs have been changed and then left alone for 1.5 s, once per distinct set of inputs, never for the untouched defaults | `tool: fee_calculator \| insurance_assessment` — never a figure |
+| `calculator_result` | once per result a visitor produced on /tools: the self-check's last answer; the fee calculator once its inputs have been changed and then left alone for 1.5 s, once per distinct set of inputs, never for the untouched defaults | `tool: fee_calculator \| insurance_assessment \| retirement_projection \| coverage_check` — never a figure |
 
 `location` comes from `data-track-location`, otherwise the nearest `section[id]`,
 `header`, `footer` or `nav`; `mobile_sticky_bar`, `floating_dock` and `faq` are

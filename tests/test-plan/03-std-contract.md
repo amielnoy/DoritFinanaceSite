@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 170 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 921 including `it.each` / `describe.each` expansions (920 pass, 1 skipped)
+**Location:** `tests/contract/` · **Cases:** 175 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 926 including `it.each` / `describe.each` expansions (925 pass, 1 skipped)
 
 ---
 
@@ -680,6 +680,18 @@ Reads `supabase/migrations/20261023000000_claim_documents_retention.sql`, the pu
 | CTR-CDR-002 | "never deletes in SQL — the files go through the Storage API" | No `delete from storage.`; the function calls `deleteStorageObjects('claim-documents'` |
 | CTR-CDR-003 | "lets only the service role list them or start the purge" | Revoked from public, anon, authenticated; every grant to `service_role` |
 | CTR-CDR-004 | "runs nightly, and the function checks the cron secret rather than a JWT" | `cron.schedule('claim-documents-purge', '15 3 * * *'`; `verify_jwt = false`; `x-site-cron` on both sides |
+
+### 4.17 Publishing a snapshot to the client — `clearinghouse-publish-schema.contract.test.ts`
+
+Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behaviour is proved by `supabase/tests/clearinghouse_publish_check.sql` against a local `supabase start`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-PUB-001 | "sorts after every migration already applied" | The last file |
+| CTR-PUB-002 | "shows the client exactly four fields, and each recommendation exactly six" | `taken_at, published_at, data, items`; `id, title, body, priority, client_status, client_note`; never the address, the publisher or the seen-marks |
+| CTR-PUB-003 | "answers only for the signed-in user's verified address, and only published snapshots" | `snapshot_for(my_email())`; `published_at is not null`; answers only on the caller's own |
+| CTR-PUB-004 | "lets only the service role call snapshot_for, and nobody anonymous call anything" | As titled |
+| CTR-PUB-005 | "lets staff publish only their own agency's snapshots, and never write the items directly" | `can_see(v_agency) or is_admin()` in all three; items: select only |
 
 ## 5. Runtime counterpart
 

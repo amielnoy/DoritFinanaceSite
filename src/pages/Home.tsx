@@ -13,6 +13,8 @@ import DetailedFAQ from "@/components/dorit/sections/DetailedFAQ";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Footer from "@/components/dorit/layout/Footer";
 import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
+import SnapshotHome from "@/components/dorit/sections/SnapshotHome";
+import { SNAPSHOT_HOME } from "@/config/snapshot";
 
 /**
  * The home page, as one argument rather than a catalogue.
@@ -54,6 +56,8 @@ export default function Home() {
         <ErrorBoundary><CarrierLogos /></ErrorBoundary>
         <ErrorBoundary><About variant="brief" /></ErrorBoundary>
         <ErrorBoundary><ServiceMatrix /></ErrorBoundary>
+        {/* The personal snapshot, before the conversation its first button opens (VITE_SNAPSHOT_HOME). */}
+        {SNAPSHOT_HOME ? <ErrorBoundary><SnapshotHome /></ErrorBoundary> : null}
         <ErrorBoundary><StartConversation /></ErrorBoundary>
         <ErrorBoundary><ProofCarousel /></ErrorBoundary>
         <ErrorBoundary><Testimonials /></ErrorBoundary>

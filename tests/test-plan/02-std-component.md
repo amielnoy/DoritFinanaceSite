@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 301 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 331 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 335 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 365 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -541,6 +541,12 @@ Over an in-memory port (decisions stored and read back) and the made-up client i
 | CMP-MSKA-006 | "keeps drafts and rejected findings off the printout" | Approved card printable; rejected and draft cards `print:hidden` |
 | CMP-MSKA-007 | "says so when a decision could not be saved" | Alert with the rid |
 | CMP-MSKA-008 | "says plainly when the report is gone or cannot be read" | Alert "הדוח לא נמצא" |
+| CMP-MSKA-009 | "changes an approved recommendation's priority, keeping its wording" | `decide(…, {approved, finalText: null, priority: important})` |
+| CMP-MSKA-010 | "adds a recommendation of Dorit's own, approved, with its title and priority" | `decide('custom:…', {approved, finalText, title, priority})`; the card appears |
+| CMP-MSKA-011 | "previews exactly what the client will see, with nothing sent" | The client's component in a region; answer buttons disabled; no publish |
+| CMP-MSKA-012 | "publishes the approved recommendations to the client's address" | Disabled without an address; then `publish('s1', email, items)` |
+| CMP-MSKA-013 | "asks before a republish replaces what the client sees" | Declined → no publish |
+| CMP-MSKA-014 | "shows the client's answers, the new ones counted, and marks them read" | "1 חדשות", the note; `markAnswersSeen`; `unpublish` |
 
 ### 4.32 The growth brief: "בדיקת תיק פנסיוני", Cal.com and the WhatsApp channel — `tests/component/lead-growth.test.tsx`
 
@@ -558,6 +564,62 @@ Over an in-memory port (decisions stored and read back) and the made-up client i
 | CMP-GROW-008 | "the fee calculator offers the check right after its result" | The calculator headline |
 | CMP-GROW-009 | "the footer names the WhatsApp channel only once its address is set" | Absent unset; then the link, `noopener noreferrer`, and the reminder line |
 | CMP-GROW-010 | "#start offers the 15-minute call first once Cal.com is set, the questionnaire second" | Absent unset; then "לבחירת מועד" → the Cal.com link, new tab; the questionnaire's lead-in |
+
+### 4.29 `<SnapshotHome />` — the personal snapshot on the home page — `tests/component/snapshot-home.test.tsx`
+
+Rendered on its own: on the home page it appears only with `VITE_SNAPSHOT_HOME=true`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-SNAP-001 | "leads with the headline as an h2 — the page keeps its one h1" | No h1; the headline is an h2; eyebrow "חדש באתר · תמונת מצב אישית" |
+| CMP-SNAP-002 | "starts at the questionnaire, and explains first if asked" | Primary → `#start`; secondary → `#how-it-works`, which exists |
+| CMP-SNAP-003 | "labels the preview's numbers as sample data" | Figure "תצוגה מקדימה — נתוני דוגמה" with the "נתוני דוגמה" tag |
+| CMP-SNAP-004 | "walks through three steps, with no timing until Dorit confirms one" | 01–03 titles; no "ימי עסקים" |
+| CMP-SNAP-005 | "names the four things the personal area shows" | The four tile titles, in order |
+| CMP-SNAP-006 | "reaches Dorit directly from the dark band, by the numbers in the contact config" | `tel:` + `CONTACT.phoneE164`; `wa.me/` + `CONTACT.whatsapp`, `noopener noreferrer` |
+| CMP-SNAP-007 | "lists four tools, the two new ones tagged חדש" | Four `/tools#…` links; "חדש" on the last two only |
+| CMP-SNAP-008 | "makes no claim of a free check and counts no users or savings" | No "חינם"/"ללא עלות", no counters |
+
+### 4.30 `<RetirementCalculator />` — /tools, מחשבון פרישה — `tests/component/retirement-calculator.test.tsx`
+
+On /tools only with `VITE_SNAPSHOT_HOME=true`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-RET-001 | "pairs every slider with a number field, in the brief's ranges" | Six sliders with their min/max; a "— ערך" field each |
+| CMP-RET-002 | "shows the monthly pension highlighted, the final balance and the fees" | The projection's figures; the pension card has the gold border; the chart's label names both ends |
+| CMP-RET-003 | "answers 'ומה אם?' with ₪500 more a month and a 0.15% fee" | Both variations' pensions |
+| CMP-RET-004 | "lets a two-digit age be typed, clamping only when the field is left" | "4" stays while typing; "45" moves the slider; "90" → 64 on blur |
+| CMP-RET-005 | "says so when retirement is not after today" | Status "גיל הפרישה צריך להיות אחרי הגיל היום." |
+| CMP-RET-006 | "keeps the disclaimer word for word, and sends the CTA to the questionnaire" | The brief's sentence; CTA → `/#start` |
+| CMP-RET-007 | "sends no calculator_result for the untouched defaults" | None |
+| CMP-RET-008 | "sends calculator_result once the inputs settle, with the tool's name and no figure" | `{tool: "retirement_projection"}` once |
+
+### 4.31 `<HarHabituachCheck />` — /tools, בדיקת כפל ביטוחים — `tests/component/har-habituach-check.test.tsx`
+
+`services.leads.submitLead` mocked; the file is the fixture written as an .xlsx. On /tools only with `VITE_SNAPSHOT_HOME=true`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-HB-001 | "shows the three steps, linking to Har HaBituach in a new tab, and the disclaimer" | `https://harb.cma.gov.il/`, `noopener noreferrer`; "לא נשלח לשום מקום"; the disclaimer |
+| CMP-HB-002 | "reads the file into tiles and a list, a duplicate tagged, without sending anything" | Tiles 1 / 3; "כפל אפשרי" on the drugs group only; the note; `submitLead` not called |
+| CMP-HB-003 | "counts the check for GA4 once, by the tool's name only" | `calculator_result {tool: coverage_check}` once |
+| CMP-HB-004 | "refuses a file that is not an xlsx, and an xlsx that is not Har HaBituach's" | The two alerts |
+| CMP-HB-005 | "sends Dorit only the summary, through the lead pipeline, and counts a lead once it is saved" | `source: quick`, topic "בדיקת כפל ביטוחים", the summary; no identifier; `generate_lead {method: coverage_check}` |
+| CMP-HB-006 | "asks for a name and a mobile number before sending" | "נא למלא שם."; the mobile rule; nothing sent |
+
+### 4.33 `<Account />` — the "תמונת מצב" tab — `tests/component/account-snapshot.test.tsx`
+
+`snapshotEnabled` passed explicitly; the snapshot from the fixture, answers kept in memory.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ACCS-001 | "opens on תמונת מצב, with the dates, the four tiles, the products and the recommendations" | Tab selected; "נתוני המסלקה מתאריך … · נבדקו על ידי דורית ב־…"; four tiles (2 open); a row per account; "חשוב"; the disclosure |
+| CMP-ACCS-002 | "answers 'כן, לטפל בזה' and says so" | `respond('i1', 'accepted')`; "ביקשת לטפל בזה" |
+| CMP-ACCS-003 | "sends a question with its text" | `respond('i2', 'question', text)`; "שאלת את דורית" |
+| CMP-ACCS-004 | "offers the clearinghouse check when nothing is published yet" | "עוד אין כאן תמונת מצב"; link to `/pension-check` |
+| CMP-ACCS-005 | "keeps the enquiries in their own tab" | "הפניות שלי" panel with the enquiries |
+| CMP-ACCS-006 | "is the page it was when the switch is off: no tabs, no snapshot" | No tablist; the enquiries as before |
 
 ## 5. Pass criteria
 

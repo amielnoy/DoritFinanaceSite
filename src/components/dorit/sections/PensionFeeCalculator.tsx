@@ -11,6 +11,7 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import CalculatorLeadBox from "@/components/dorit/sections/CalculatorLeadBox";
 import { feeCalculatorMessage } from "@/lib/calculator-lead";
 import { useCalculatorResultEvent } from "@/hooks/useCalculatorResultEvent";
+import { TOOL_SECTION } from "@/config/tools";
 import PensionCheckForm from "@/components/dorit/forms/PensionCheckForm";
 import { PENSION_CHECK } from "@/config/offers";
 
@@ -64,7 +65,7 @@ export default function PensionFeeCalculator() {
   );
 
   return (
-    <section id="fee-calculator" className="relative py-24 md:py-32 border-t border-border/60">
+    <section id={TOOL_SECTION.feeCalculator} className="relative py-24 md:py-32 border-t border-border/60">
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
           <Eyebrow>

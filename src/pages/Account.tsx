@@ -1,9 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { services } from "@/services";
-import { AccountLoadError, type Enquiry } from "@/services/ports";
+import { AccountLoadError, type ClientAnswer, type ClientSnapshot, type Enquiry } from "@/services/ports";
+import SnapshotView from "@/components/dorit/account/SnapshotView";
+import { SNAPSHOT_HOME } from "@/config/snapshot";
+import { PENSION_CHECK } from "@/config/offers";
 
 // A row with no stored date arrives as "" — print nothing rather than "Invalid Date".
 const fmt = (iso?: string) => {
@@ -27,6 +30,51 @@ const time = (iso?: string) => {
   return Number.isNaN(t) ? null : t;
 };
 
+/**
+ * The "תמונת מצב" tab: the snapshot Dorit published to this address, or a way
+ * to ask for one. Answers go straight to her (respond_to_recommendation).
+ */
+function SnapshotTab({ userKey, load, respond }: {
+  userKey: string;
+  load: () => Promise<ClientSnapshot | null>;
+  respond: (itemId: string, status: ClientAnswer, note?: string) => Promise<void>;
+}) {
+  const client = useQueryClient();
+  const key = ["account", "snapshot", userKey] as const;
+  const query = useQuery<ClientSnapshot | null, unknown>({ queryKey: key, queryFn: load, retry: false });
+  if (query.isPending) return <p role="status" className="text-muted-foreground">טוען…</p>;
+  if (query.isError) {
+    return (
+      <div role="alert">
+        לא הצלחנו לטעון את תמונת המצב.{" "}
+        <button type="button" className="underline" onClick={() => void query.refetch()}>ניסיון נוסף</button>
+      </div>
+    );
+  }
+  if (!query.data) {
+    return (
+      <div className="rounded-[4px] border border-border p-6">
+        <p className="font-heading text-xl">עוד אין כאן תמונת מצב</p>
+        <p className="mt-2 text-muted-foreground">
+          אחרי שתמסרו קוד מהמסלקה ודורית תעבור על הנתונים, תמונת המצב וההמלצות שלה יופיעו כאן.
+        </p>
+        <a href={PENSION_CHECK.path} className="mt-4 inline-flex min-h-11 items-center rounded-md border border-highlight px-5 text-accent">
+          ל{PENSION_CHECK.name}
+        </a>
+      </div>
+    );
+  }
+  return (
+    <SnapshotView
+      data={query.data}
+      onAnswer={async (itemId, status, note) => {
+        await respond(itemId, status, note);
+        await client.invalidateQueries({ queryKey: key });
+      }}
+    />
+  );
+}
+
 // Upcoming (soonest first), then past (most recent first), then undated (as given).
 function orderMeetings(list: Enquiry[], now: Date): Enquiry[] {
   const at = now.getTime();
@@ -45,10 +93,21 @@ function orderMeetings(list: Enquiry[], now: Date): Enquiry[] {
  * Everything is rendered as text — never markdown or HTML — so nothing stored
  * can turn into markup on this page.
  */
-export default function Account({ loadEnquiries = () => services.account.myEnquiries(), now = new Date() }: {
+export default function Account({
+  loadEnquiries = () => services.account.myEnquiries(),
+  loadSnapshot = () => services.account.mySnapshot(),
+  respond = (itemId, status, note) => services.account.respondToRecommendation(itemId, status, note),
+  snapshotEnabled = SNAPSHOT_HOME,
+  now = new Date(),
+}: {
   loadEnquiries?: () => Promise<Enquiry[]>;
+  loadSnapshot?: () => Promise<ClientSnapshot | null>;
+  respond?: (itemId: string, status: ClientAnswer, note?: string) => Promise<void>;
+  /** VITE_SNAPSHOT_HOME: the "תמונת מצב" tab comes first; off, the page is as it was. */
+  snapshotEnabled?: boolean;
   now?: Date;
 }) {
+  const [tab, setTab] = useState<"snapshot" | "enquiries">(snapshotEnabled ? "snapshot" : "enquiries");
   const { user, logout } = useAuth();
   const query = useQuery<Enquiry[], unknown>({
     // Keyed by the signed-in user, so a session switch cannot show the previous user's rows.
@@ -87,6 +146,32 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
           </button>
         </section>
 
+        {snapshotEnabled ? (
+          <div role="tablist" aria-label="האזור שלי" className="flex gap-2 border-b border-border">
+            {([["snapshot", "תמונת מצב"], ["enquiries", "הפניות שלי"]] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`tab-${id}`}
+                aria-selected={tab === id}
+                aria-controls={`panel-${id}`}
+                onClick={() => setTab(id)}
+                className={`min-h-11 px-4 -mb-px border-b-2 ${tab === id ? "border-highlight text-accent" : "border-transparent text-muted-foreground"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {snapshotEnabled && tab === "snapshot" ? (
+          <div role="tabpanel" id="panel-snapshot" aria-labelledby="tab-snapshot">
+            <SnapshotTab userKey={String(user?.id ?? user?.email ?? "anonymous")} load={loadSnapshot} respond={respond} />
+          </div>
+        ) : (
+        // The enquiries, as they were; a tab panel only when there are tabs.
+        <div {...(snapshotEnabled ? { role: "tabpanel", id: "panel-enquiries", "aria-labelledby": "tab-enquiries" } : {})} className="space-y-12">
         {query.isPending ? <p role="status" className="text-muted-foreground">טוען…</p> : null}
 
         {error?.reason === "unverified" ? (
@@ -161,6 +246,8 @@ export default function Account({ loadEnquiries = () => services.account.myEnqui
             ) : null}
           </>
         ) : null}
+        </div>
+        )}
 
         <section aria-labelledby="rights" className="text-sm text-muted-foreground space-y-2">
           <h2 id="rights" className="sr-only">פרטיות</h2>

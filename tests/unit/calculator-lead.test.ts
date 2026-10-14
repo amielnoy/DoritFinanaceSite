@@ -6,6 +6,7 @@ import {
   assessmentMessage,
   feeCalculatorMessage,
   whatsappHref,
+  retirementMessage,
 } from "@/lib/calculator-lead";
 
 /**
@@ -90,5 +91,20 @@ describe("assessmentMessage", () => {
 describe("RESULT_SETTLE_MS", () => {
   it("waits long enough to outlast typing, short enough to catch a reader", () => {
     expect(RESULT_SETTLE_MS).toBe(1500);
+  });
+});
+
+describe("retirementMessage — the retirement calculator's WhatsApp text", () => {
+  it("names the estimated monthly pension and the retirement age", () => {
+    const text = retirementMessage({ retirementAge: 67 }, { monthlyPension: 9_000, finalBalance: 1_800_000 });
+    expect(text).toContain(`כ-${formatIls(9_000)} בגיל 67`);
+    expect(text).toContain("לפי הנתונים האמיתיים שלי");
+  });
+
+  it("asks without numbers when there is no result to speak of", () => {
+    for (const result of [{ monthlyPension: 0, finalBalance: 0 }, { monthlyPension: Number.NaN, finalBalance: 1 }]) {
+      const text = retirementMessage({ retirementAge: 67 }, result);
+      expect(text).toBe("שלום דורית, השתמשתי במחשבון הפרישה באתר. אשמח לחישוב לפי הנתונים האמיתיים שלי.");
+    }
   });
 });

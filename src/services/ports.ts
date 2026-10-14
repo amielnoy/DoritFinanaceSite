@@ -409,6 +409,44 @@ export interface Enquiry {
 export interface AccountPort {
   /** The signed-in user's enquiries, newest first. Rejects with `AccountLoadError`. */
   myEnquiries(): Promise<Enquiry[]>;
+  /** The snapshot Dorit published to the signed-in user's verified address, or null. Rejects with `AccountLoadError`. */
+  mySnapshot(): Promise<ClientSnapshot | null>;
+  /** "כן, לטפל בזה" / "יש לי שאלה" (or back to open) on one of the user's own recommendations. */
+  respondToRecommendation(itemId: string, status: ClientAnswer, note?: string): Promise<void>;
+}
+
+export type RecommendationPriority = "important" | "check";
+export type ClientAnswer = "open" | "accepted" | "question";
+
+/** A recommendation as published to the client: a frozen copy of what Dorit approved. */
+export interface PublishedRecommendation {
+  id: string;
+  title: string;
+  body: string;
+  priority: RecommendationPriority;
+  clientStatus: ClientAnswer;
+  clientNote: string | null;
+}
+
+/** What the personal area shows: exactly the fields `my_snapshot()` returns. */
+export interface ClientSnapshot {
+  takenAt: string;
+  publishedAt: string;
+  snapshot: Snapshot;
+  items: PublishedRecommendation[];
+}
+
+/** The staff's view of a published item, with the client's answer and whether Dorit saw it. */
+export interface StaffPublishedItem extends PublishedRecommendation {
+  position: number;
+  clientUpdatedAt: string | null;
+  staffSeenAt: string | null;
+}
+
+export interface PublishItem {
+  title: string;
+  body: string;
+  priority: RecommendationPriority;
 }
 
 export class AccountLoadError extends Error {
@@ -510,6 +548,12 @@ export interface MaslekaPort {
   listReviews(snapshotId: string): Promise<FindingReview[]>;
   /** Approve (optionally in her own words) or reject a finding; null puts it back to draft. */
   decide(snapshotId: string, findingKey: string, decision: ReviewDecision | null): Promise<void>;
+  /** The items published from a snapshot, with the client's answers. */
+  listPublishedItems(snapshotId: string): Promise<StaffPublishedItem[]>;
+  /** Publish (or republish) to the client's personal area. A republish replaces the items. */
+  publish(snapshotId: string, clientEmail: string, items: PublishItem[]): Promise<void>;
+  unpublish(snapshotId: string): Promise<void>;
+  markAnswersSeen(snapshotId: string): Promise<void>;
 }
 
 export interface SnapshotSummary {
@@ -521,6 +565,9 @@ export interface SnapshotSummary {
 
 export interface StoredSnapshot extends SnapshotSummary {
   snapshot: Snapshot;
+  /** Who it is (or would be) published to, and when it was; null while unpublished. */
+  clientEmail: string | null;
+  publishedAt: string | null;
 }
 
 export type ReviewStatus = "approved" | "rejected";
@@ -529,6 +576,10 @@ export interface ReviewDecision {
   status: ReviewStatus;
   /** Dorit's wording; null keeps the draft's. */
   finalText: string | null;
+  /** Her title — a rule's finding keeps its own when null; a recommendation of her own needs one. */
+  title?: string | null;
+  /** Her priority — a rule's finding takes it from its severity when null. */
+  priority?: RecommendationPriority | null;
 }
 
 export interface FindingReview extends ReviewDecision {

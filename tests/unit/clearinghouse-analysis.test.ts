@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { analyse, pct, totals, type Finding } from "@/lib/clearinghouse/analysis";
 import { DEFAULT_FUND_FEES, LEGAL_MAX } from "@/lib/clearinghouse/reference";
 import { readSnapshot, type Snapshot } from "@/lib/clearinghouse/snapshot";
-import { forPrint, pendingCount, withReviews } from "@/lib/clearinghouse/review";
+import { customRecommendations, forPrint, pendingCount, priorityOfSeverity, publishItems, withReviews } from "@/lib/clearinghouse/review";
 import { account, SNAPSHOT } from "../fixtures/clearinghouse-snapshot";
 
 const rules = (findings: Finding[]) => findings.map((f) => f.rule);
@@ -159,5 +159,40 @@ describe("withReviews — Dorit's decisions on the drafts", () => {
   it("does not call a text 'edited' when it is the draft's own", () => {
     const [merged] = withReviews([first], [{ findingKey: first.key, status: "approved", finalText: first.body, reviewedAt: "t" }]);
     expect(merged.edited).toBe(false);
+  });
+});
+
+describe("review — priorities, Dorit's own recommendations, what a publish sends (phase 4)", () => {
+  const findings = analyse(SNAPSHOT);
+
+  it("takes a finding's priority from its severity until Dorit sets one", () => {
+    const merged = withReviews(findings, []);
+    expect(merged.every((f) => f.priority === (f.severity === "high" ? "important" : "check"))).toBe(true);
+    const [first] = findings;
+    const [set] = withReviews([first], [{ findingKey: first.key, status: "approved", finalText: null, title: "כותרת שלה", priority: "important", reviewedAt: "t" }]);
+    expect(set).toMatchObject({ priority: "important", title: "כותרת שלה" });
+  });
+
+  it("reads her own recommendations in the order she wrote them, skipping one without a title or text", () => {
+    const custom = customRecommendations([
+      { findingKey: "custom:b", status: "approved", finalText: "גוף ב", title: "ב", priority: "important", reviewedAt: "2026-10-15T10:00:00Z" },
+      { findingKey: "custom:a", status: "approved", finalText: "גוף א", title: "א", priority: null, reviewedAt: "2026-10-15T09:00:00Z" },
+      { findingKey: "custom:c", status: "approved", finalText: null, title: "ג", priority: null, reviewedAt: "t" },
+      { findingKey: findings[0].key, status: "approved", finalText: null, reviewedAt: "t" },
+    ]);
+    expect(custom.map((c) => [c.title, c.priority, c.rule])).toEqual([["א", "check", "custom"], ["ב", "important", "custom"]]);
+  });
+
+  it("publishes the approved rule findings first, in Dorit's words, then hers", () => {
+    const [first, second] = findings;
+    const merged = withReviews(findings, [
+      { findingKey: first.key, status: "approved", finalText: "נוסח שלה", reviewedAt: "t" },
+      { findingKey: second.key, status: "rejected", finalText: null, reviewedAt: "t" },
+    ]);
+    const custom = customRecommendations([{ findingKey: "custom:x", status: "approved", finalText: "שלה", title: "שלה", priority: "check", reviewedAt: "t" }]);
+    expect(publishItems(merged, custom)).toEqual([
+      { title: first.title, body: "נוסח שלה", priority: priorityOfSeverity(first.severity) },
+      { title: "שלה", body: "שלה", priority: "check" },
+    ]);
   });
 });

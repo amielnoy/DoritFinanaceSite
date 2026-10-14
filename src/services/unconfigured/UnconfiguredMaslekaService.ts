@@ -46,4 +46,16 @@ export class UnconfiguredMaslekaService implements MaslekaPort {
   async decide(): Promise<void> {
     throw new MaslekaError("unavailable");
   }
+  async listPublishedItems(): Promise<never> {
+    throw new MaslekaError("unavailable");
+  }
+  async publish(): Promise<void> {
+    throw new MaslekaError("unavailable");
+  }
+  async unpublish(): Promise<void> {
+    throw new MaslekaError("unavailable");
+  }
+  async markAnswersSeen(): Promise<void> {
+    throw new MaslekaError("unavailable");
+  }
 }
