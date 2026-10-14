@@ -757,9 +757,6 @@ export default function NeedsWizard() {
               <p className="m-0 text-[14px] text-muted-foreground">דורית חוזרת תוך יום עסקים</p>
             </div>
           </div>
-          {/* What happens after the button (user feedback, 2026-10-14) — the
-              same promise as CONFIRMATION_FOLLOW_UP. */}
-          <p className="m-0 -mt-2 text-[15px] text-muted-foreground text-end">דורית חוזרת אליך תוך יום עסקים אחד.</p>
         </form>
       ) : null}
 
