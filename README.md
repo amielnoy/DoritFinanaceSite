@@ -1329,8 +1329,21 @@ docker compose -f docker-compose.test.yml run --rm e2e-ios
 | Integration | `npm run test:integration` | `tests/integration/` |
 | Security (static) | `npm run test:security` | `tests/security/` |
 | Eval (opt-in, needs credentials) | `npm run test:eval` | `tests/eval/` |
-| e2e — UI, API, security, a11y, SEO | `npm run test:e2e` | `e2e/` |
+| e2e — UI, API, security, a11y, SEO (all four devices) | `npm run test:e2e` | `e2e/` |
+| e2e — desktop Chromium + WebKit | `npm run test:e2e:web` | `e2e/` |
+| e2e — iOS / Android | `npm run test:e2e:ios` / `test:e2e:android` | `e2e/` |
 | SEO only | `npm run test:e2e:seo` | `e2e/seo/` |
+
+Every `npm run test:e2e*` script covers all four devices (or the ones its name
+says). Only a bare `npx playwright test` is narrower: `web-chromium` is the one
+default Playwright project, so that runs desktop Chromium alone, the quick
+local loop. Add `--project='*'` for all four or `--project=<name>` for one, and
+the same for `--last-failed`. A bare `--last-failed` after a four-device run
+retries only the Chromium failures. CI names one project per matrix leg. The
+nightly CI run also shuffles the order (`--shuffle=<run id>`, printed as
+"shuffle seed …" in the log). A test that fails only in that order usually
+passes on retry, so it shows up as *flaky* in the nightly Allure report rather
+than as a red run. Pass the same seed locally to replay it.
 
 `npm test` is `test:vitest` followed by `test:e2e`. The five gated Vitest
 suites used to run as five separate `vitest run` invocations, which paid the

@@ -252,6 +252,42 @@ describe("the workflow tests every PR commit once and deploys from only two bran
     }
   });
 
+  it("selects projects explicitly in every e2e entry point", () => {
+    // Only web-chromium is `default`; the rest run only when selected. A bare
+    // `playwright test` behind an npm script or run-tests.sh would quietly
+    // drop WebKit, iOS and Android from a run that promises all four.
+    const config = readFileSync(join(REPO_ROOT, "playwright.config.ts"), "utf8");
+    const declared = [...config.matchAll(/^\s{6}name:\s*"([a-z-]+)"/gm)].map((m) => m[1]);
+    expect(declared.length, "found no Playwright projects to compare against").toBeGreaterThan(1);
+
+    const scripts: Record<string, string> = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")).scripts;
+    const e2e = Object.entries(scripts).filter(([, cmd]) => /^playwright test\b/.test(cmd));
+    expect(e2e.length, "found no `playwright test` npm scripts").toBeGreaterThan(1);
+    for (const [name, cmd] of e2e) {
+      const picked = [...cmd.matchAll(/--project=(?:'([^']+)'|(\S+))/g)].map((m) => m[1] ?? m[2]);
+      expect(picked.length, `npm script "${name}" selects no project`).toBeGreaterThan(0);
+      for (const p of picked) {
+        if (p !== "*") expect(declared, `npm script "${name}" names unknown project "${p}"`).toContain(p);
+      }
+    }
+
+    // Code, not comments: the usage block at the top mentions --project= too.
+    const sh = readFileSync(join(REPO_ROOT, "scripts/run-tests.sh"), "utf8")
+      .split("\n")
+      .filter((l) => !/^\s*#/.test(l))
+      .join("\n");
+    expect(sh).toMatch(/^\s*E2E_PROJECTS=\("--project=\*"\)/m);
+    expect(sh).toMatch(/npx playwright test \\\n\s*\$\{E2E_PROJECTS\[@\]/);
+  });
+
+  it("shuffles the e2e order on the nightly run only", () => {
+    // PRs keep the fixed order, so a red PR is about the change, not the dice.
+    const run = stepsOf(workflow.jobs["test-e2e"]).find((s) => s.name === "Run e2e suite");
+    const cmd = String((run as { run?: string } | undefined)?.run ?? "");
+    expect(cmd).toMatch(/github\.event_name == 'schedule' && format\('--shuffle=\{0\}', github\.run_id\)/);
+    expect(cmd.replace(/\$\{\{[\s\S]*?\}\}/g, "")).not.toContain("--shuffle");
+  });
+
   it("keeps the report deploy off feature branches while still building it", () => {
     // The job runs everywhere — a red feature-branch run is worth reading —
     // but a repository has one Pages site, so only main/builder may publish.

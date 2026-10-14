@@ -121,9 +121,11 @@ describe("outbound links are safe", () => {
 });
 
 describe("auth and token handling", () => {
-  it("only app-params.js and the SDK touch the stored access token", () => {
+  it("only clear-access-token.ts and the SDK touch the stored access token", () => {
+    // One place in src/ may name the stored token: the boot-time wipe for
+    // ?clear_access_token=true (SEC-TOK-002). app-params.js delegates to it.
     const touchers = FILES.filter((f) => /base44_access_token|localStorage\.(get|set|remove)Item\(\s*["']token["']/.test(read(f))).map(rel);
-    expect(touchers).toEqual(["src/lib/app-params.js"]);
+    expect(touchers).toEqual(["src/lib/clear-access-token.ts"]);
   });
 
   it("pages that consume ?returnTo= go through the shared open-redirect guard", () => {

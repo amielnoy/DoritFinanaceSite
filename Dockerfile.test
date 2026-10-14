@@ -4,7 +4,7 @@
 #
 # The tag must track the @playwright/test version in package.json — a mismatch
 # makes Playwright refuse to launch the preinstalled browsers.
-FROM mcr.microsoft.com/playwright:v1.62.1-noble
+FROM mcr.microsoft.com/playwright:v1.64.0-noble
 
 ENV CI=1 \
     NODE_ENV=development \

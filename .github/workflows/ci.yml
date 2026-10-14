@@ -440,8 +440,23 @@ jobs:
       # the split itself — the shards do not need to agree with each other about
       # anything beyond n. A single-shard leg (feature branches) passes 1/1,
       # which is a no-op.
+      #
+      # The nightly run also shuffles, to surface a test that passes only because
+      # of what ran before it. PRs keep the fixed order so a red PR means the
+      # change. Shuffling happens after sharding (it reorders only the shard's
+      # own tests), so shards still cover the suite exactly once. The seed is the
+      # run id: it shows in the log ("shuffle seed …"), and `--shuffle=<id>`
+      # replays that order locally; a re-run of the job replays it too.
+      #
+      # Such a test usually fails once and passes on retry in a fresh worker, so
+      # it surfaces as *flaky* (job annotations, the nightly Allure report), not
+      # as a red run. That is deliberate: --fail-on-flaky-tests would also turn
+      # every ordinary timing flake red, and a red test-e2e stops the nightly
+      # production promotion.
       - name: Run e2e suite
-        run: npx playwright test --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
+        run: >-
+          npx playwright test --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
+          ${{ github.event_name == 'schedule' && format('--shuffle={0}', github.run_id) || '' }}
         env:
           SKIP_BUILD: "1"
 
