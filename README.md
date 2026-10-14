@@ -1805,6 +1805,14 @@ means, when it is sent, and whether it is recommended as a Key Event. The table
 is `LEAD_EVENTS` from the same module, and a unit test fails if the code sends an
 event that is not in it.
 
+**Key events (decided 2026-10-14).** Every lead-intent event is marked
+"מומלץ": `generate_lead`, `click_phone`, `click_whatsapp`, `click_email`,
+`cta_click`, `chat_start` and `chat_handoff`; the wizard's progress events
+(`wizard_start`, `wizard_step`) are not. A completed hand-off sends both
+`chat_handoff` and `generate_lead`, so one hand-off counts twice in GA4's key
+event total. The marking itself is a GA4 setting, not code: Admin ← Data
+display ← Events (or Key events ← New key event), once per name.
+
 **Open:** the privacy policy does not mention Google Analytics or cookies, and
 there is no consent banner. That is a question for Dorit's compliance adviser
 (`base44/agents/COMPLIANCE.md`, section 8), not something the code decides.
