@@ -282,6 +282,37 @@ do $$ begin
   end if;
 end $$;
 
+-- ── the wipe's footprint, which masleka-remind announces (20261019000000) ──
+-- After the wipe and the expiry, exactly the stale code matches the remind
+-- run's filter; the expired link (no code) and the old submission do not.
+set local role service_role;
+do $$ begin
+  if (select array_agg(id) from public.masleka_requests
+       where status = 'expired' and code_received_at is not null
+         and submitted_at is null and wipe_notified_at is null)
+     is distinct from array['cccccccc-0000-0000-0000-000000000003'::uuid] then
+    raise exception 'the wipe notice would not name exactly the stale unsubmitted request';
+  end if;
+  update public.masleka_requests set wipe_notified_at = now()
+   where id = 'cccccccc-0000-0000-0000-000000000003' and wipe_notified_at is null;
+  if not found then
+    raise exception 'service_role could not claim the wipe notice';
+  end if;
+end $$;
+reset role;
+
+-- The board's role cannot read the marker: it is not among the granted columns.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"dddddddd-0000-0000-0000-000000000001","role":"authenticated"}';
+do $$ begin
+  begin
+    perform wipe_notified_at from public.masleka_requests limit 1;
+    raise exception 'staff member read wipe_notified_at, which is not granted';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+
 -- ── the remind call does nothing without its Vault secrets ─────────────────
 do $$ begin
   perform public.masleka_call_remind();

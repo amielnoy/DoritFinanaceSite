@@ -11,7 +11,7 @@
  *
  * Everything here is dark until `MASLEKA_ENABLED` is exactly "true".
  */
-import { sha256Hex } from './guard.ts';
+import { isEmail, sha256Hex } from './guard.ts';
 import { AGENCY } from './agency.ts';
 import { insertRow } from './rest.ts';
 
@@ -76,6 +76,41 @@ export function normalizeCode(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const code = value.trim();
   return /^[A-Za-z0-9-]{4,64}$/.test(code) ? code : null;
+}
+
+/**
+ * A phone number as its local digits — `+972-54-111-2233` and `054 111 2233`
+ * are both `0541112233` — or '' for anything with fewer than nine digits,
+ * which then matches nothing. Leads keep the phone as it was typed, so two
+ * interviews from one person can spell it differently.
+ */
+export function normalizePhone(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  let digits = value.replace(/\D/g, '');
+  if (digits.startsWith('972')) digits = `0${digits.slice(3)}`;
+  return digits.length >= 9 ? digits : '';
+}
+
+/** One mailbox on both sides: each a real address, equal ignoring case and outer spaces. */
+export function sameAddress(a: unknown, b: unknown): boolean {
+  const left = typeof a === 'string' ? a.trim().toLowerCase() : '';
+  const right = typeof b === 'string' ? b.trim().toLowerCase() : '';
+  return isEmail(left) && left === right;
+}
+
+/**
+ * Whether `key` may raise an alert now, as far as this isolate knows: at most
+ * once per `windowMs`. It is the first layer of masleka-code's alert throttle,
+ * in front of the database limiter, because that limiter fails open — and a
+ * database outage is exactly when a client retries and every retry fails.
+ * Stale keys are dropped on the way, so the map never outgrows one window.
+ */
+export function firstInWindow(memo: Map<string, number>, key: string, now: number, windowMs: number): boolean {
+  for (const [k, at] of memo) if (now - at >= windowMs) memo.delete(k);
+  const last = memo.get(key);
+  if (last !== undefined && now - last < windowMs) return false;
+  memo.set(key, now);
+  return true;
 }
 
 export interface NewRequest {

@@ -353,3 +353,109 @@ describe("masleka-remind — the client", () => {
     expect(r.json).toMatchObject({ ok: true, ready: 1, deadline: 1, clients: 1, warnings: [] });
   });
 });
+
+describe("masleka-remind — a code wiped before anyone submitted it (decision 2026-10-14)", () => {
+  const W1 = "33333333-0000-4000-8000-000000000001";
+  const W2 = "33333333-0000-4000-8000-000000000002";
+  // What masleka_wipe_stale leaves behind at day 9: expired, values gone, the arrival kept.
+  const wipedRow = (id: string, over: Record<string, unknown> = {}) =>
+    req(id, {
+      status: "expired",
+      code_received_at: "2026-10-09T08:00:00.000Z",
+      ciphertext_wiped_at: "2026-10-18T08:05:00.000Z",
+      expired_at: "2026-10-18T08:05:00.000Z",
+      wipe_notified_at: null,
+      ...over,
+    });
+  const WIPED = () => [
+    wipedRow(W1, { client_name: "נועה ברק", contact_email: "noa@example.com" }),
+    wipedRow(W2, { client_name: "גיל שמש" }),
+  ];
+  const wipeMails = (r: { emails: { subject: string }[] }) => r.emails.filter((e) => e.subject.startsWith("קוד מסלקה נמחק"));
+
+  it("tells every staff member once per wiped request, naming the client, and marks it told", async () => {
+    const r = await run({ fake: { requests: WIPED() } });
+    expect(r.status).toBe(200);
+    expect(wipeMails(r).map((e) => `${e.to} ${e.subject}`).sort()).toEqual([
+      "dorit@govari-fin.co.il קוד מסלקה נמחק לפני הגשה — גיל שמש",
+      "dorit@govari-fin.co.il קוד מסלקה נמחק לפני הגשה — נועה ברק",
+      "staff@example.com קוד מסלקה נמחק לפני הגשה — גיל שמש",
+      "staff@example.com קוד מסלקה נמחק לפני הגשה — נועה ברק",
+    ]);
+    const noa = wipeMails(r).find((e) => e.subject.endsWith("נועה ברק")) as { text: string };
+    expect(noa.text).toContain("noa@example.com");
+    expect(noa.text).toContain("קוד חדש");
+    for (const id of [W1, W2]) expect(byId(r.maslekaRequests, id).wipe_notified_at).toBe(NOW.toISOString());
+    expect(r.json).toMatchObject({ ok: true, wiped: 2, warnings: [] });
+  });
+
+  it("says nothing about a request that expired without a code, was submitted, or was already announced", async () => {
+    const rows = [
+      wipedRow(W1, { code_received_at: null }),
+      wipedRow(W2, { submitted_at: "2026-10-10T08:00:00.000Z" }),
+      wipedRow("33333333-0000-4000-8000-000000000003", { wipe_notified_at: "2026-10-17T10:20:00.000Z" }),
+      wipedRow("33333333-0000-4000-8000-000000000004", { status: "code_received" }),
+    ];
+    const r = await run({ fake: { requests: rows } });
+    expect(wipeMails(r)).toHaveLength(0);
+    expect(r.requestPatches.filter((p) => "wipe_notified_at" in p.fields)).toHaveLength(0);
+    expect(r.json).toMatchObject({ wiped: 0 });
+  });
+
+  it("claims each notice in one conditional update that checks it was never sent", async () => {
+    const r = await run({ fake: { requests: [WIPED()[0]] } });
+    const claims = r.requestPatches.filter((p) => "wipe_notified_at" in p.fields);
+    expect(claims).toHaveLength(1);
+    expect(claims[0].fields).toEqual({ wipe_notified_at: NOW.toISOString() });
+    const q = new URLSearchParams(claims[0].query);
+    expect(q.get("id")).toBe(`eq.${W1}`);
+    expect(q.get("agency_id")).toBe(`eq.${AGENCY_1}`);
+    expect(q.get("status")).toBe("eq.expired");
+    expect(q.get("wipe_notified_at")).toBe("is.null");
+    expect(q.get("code_received_at")).toBe("not.is.null");
+    expect(q.get("submitted_at")).toBe("is.null");
+  });
+
+  it("never repeats a wipe notice", async () => {
+    const first = await run({ fake: { requests: WIPED() } });
+    const second = await run({ fake: { requests: first.maslekaRequests } });
+    expect(wipeMails(first)).toHaveLength(4);
+    expect(wipeMails(second)).toHaveLength(0);
+  });
+
+  it("sends nothing when another run has already claimed the notice", async () => {
+    const r = await run({ fake: { requests: WIPED(), raceBeforePatch: { wipe_notified_at: "2026-10-18T09:59:00.000Z" } } });
+    expect(wipeMails(r)).toHaveLength(0);
+    expect(r.json).toMatchObject({ wiped: 0 });
+  });
+
+  it("gives the claim back when no staff address could be mailed, so the next run tries again", async () => {
+    const r = await run({ fake: { requests: WIPED() }, failEmailTo: STAFF_EMAILS });
+    for (const id of [W1, W2]) expect(byId(r.maslekaRequests, id).wipe_notified_at).toBeNull();
+    expect(r.json.warnings).toContain("wipe_not_sent");
+    expect(r.json).toMatchObject({ wiped: 0 });
+  });
+
+  it("one failing claim does not stop the other notices", async () => {
+    const r = await run({ fake: { requests: WIPED(), failPatchMatching: `id=eq.${W1}` } });
+    expect(wipeMails(r).map((e) => e.subject)).toEqual([
+      "קוד מסלקה נמחק לפני הגשה — גיל שמש",
+      "קוד מסלקה נמחק לפני הגשה — גיל שמש",
+    ]);
+    expect(r.json.warnings).toContain("wipe_claim_failed");
+    expect(r.json).toMatchObject({ wiped: 1 });
+  });
+
+  it("never asks for the ciphertext columns, and writes no name or address to a log line", async () => {
+    const lines: string[] = [];
+    const spies = (["log", "info", "warn", "error"] as const).map((m) =>
+      vi.spyOn(console, m).mockImplementation((...a) => { lines.push(a.join(" ")); }),
+    );
+    const r = await run({ fake: { requests: WIPED() } });
+    await run({ fake: { requests: WIPED() }, failEmailTo: STAFF_EMAILS });
+    spies.forEach((s) => s.mockRestore());
+    for (const f of r.callsTo("masleka_requests")) expect(f.url).not.toContain("ciphertext");
+    const all = lines.join("\n");
+    for (const secret of ["נועה", "גיל שמש", "noa@example.com", "staff@example.com"]) expect(all).not.toContain(secret);
+  });
+});

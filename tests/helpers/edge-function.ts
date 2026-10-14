@@ -75,7 +75,7 @@ export interface EdgeOptions {
   failLimiter?: number;
   /** Storage refuses to sign links with this HTTP status. */
   failSign?: number;
-  /** Rows `selectRows('leads', …)` answers, filtered by phone=eq., source=eq., status=eq. (and created_at=gte.). */
+  /** Rows `selectRows('leads', …)` answers, filtered by id=in.(…), phone=eq., source=eq., status=eq. (and created_at=gte.). */
   existingLeads?: Record<string, unknown>[];
   /** That Google call answers 500. */
   failGoogle?: "token" | "calendar" | "sheets";
@@ -312,9 +312,12 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       const q = new URLSearchParams(u.split("?")[1]);
       const eq = (k: string) => q.get(k)?.replace(/^eq\./, "");
       const since = q.get("created_at")?.replace(/^gte\./, ""); // rows older than this bound are not returned; undated rows are kept
+      // `id=in.(a,b)`: the clearinghouse's same-contact check reads leads by id.
+      const ids = q.get("id")?.match(/^in\.\((.*)\)$/)?.[1].split(",");
       const rows = stored.filter((l) => {
         const at = (l.created_at ?? l.created_date) as string | undefined;
         return (
+          (!ids || ids.includes(String(l.id))) &&
           (!eq("phone") || l.phone === eq("phone")) &&
           (!eq("source") || l.source === eq("source")) &&
           (!eq("status") || l.status === eq("status")) &&

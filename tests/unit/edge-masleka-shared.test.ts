@@ -3,11 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AGENCY_1,
   createRequest,
+  firstInWindow,
   isToken,
   maslekaEnabled,
   maslekaLink,
   newToken,
   normalizeCode,
+  normalizePhone,
+  sameAddress,
   tokenExpiry,
 } from "../../supabase/functions/_shared/masleka.ts";
 import { authUser, updateWhere } from "../../supabase/functions/_shared/rest.ts";
@@ -77,6 +80,43 @@ describe("tokens and links", () => {
     expect(normalizeCode("<script>")).toBeNull();
     expect(normalizeCode("A".repeat(65))).toBeNull();
     expect(normalizeCode(1234)).toBeNull();
+  });
+});
+
+describe("who the same contact is (decision 2026-10-14)", () => {
+  it("reads a phone as its local digits, however it was typed", () => {
+    for (const typed of ["0541112233", "054-111-2233", "054 111 2233", "+972-54-111-2233", "972541112233", "+972 (54) 111 2233"]) {
+      expect(normalizePhone(typed), typed).toBe("0541112233");
+    }
+    expect(normalizePhone("03-1234567")).toBe("031234567");
+  });
+
+  it("reads nothing too short, or not a string, as a phone", () => {
+    for (const value of ["", "12345678", "abc", null, undefined, 541112233]) expect(normalizePhone(value), String(value)).toBe("");
+  });
+
+  it("matches two addresses only when both are addresses, ignoring case and spaces at the ends", () => {
+    expect(sameAddress(" URI@Example.com ", "uri@example.com")).toBe(true);
+    expect(sameAddress("uri@example.com", "uri2@example.com")).toBe(false);
+    for (const [a, b] of [["", ""], [null, null], ["x", "x"], ["uri@example.com", null]] as const) {
+      expect(sameAddress(a, b), `${a} ${b}`).toBe(false);
+    }
+  });
+});
+
+describe("the alert throttle's first layer", () => {
+  it("lets the first alert for a key through and holds the rest for the window", () => {
+    const memo = new Map<string, number>();
+    expect(firstInWindow(memo, "k", 0, 1000)).toBe(true);
+    expect(firstInWindow(memo, "k", 999, 1000)).toBe(false);
+    expect(firstInWindow(memo, "other", 999, 1000)).toBe(true);
+    expect(firstInWindow(memo, "k", 1000, 1000)).toBe(true);
+  });
+
+  it("forgets keys whose window has passed", () => {
+    const memo = new Map<string, number>([["old", 0]]);
+    firstInWindow(memo, "new", 5000, 1000);
+    expect([...memo.keys()]).toEqual(["new"]);
   });
 });
 

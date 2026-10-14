@@ -243,7 +243,8 @@ describe("copyOrFallback leaves nothing behind", () => {
 describe("what the page says when a request fails", () => {
   const ALL: MaslekaFailure[] = [
     "disabled", "link_invalid", "bad_id", "bad_code", "already_submitted", "rate_limited", "unauthorized",
-    "forbidden", "not_found", "not_available", "invalid", "invalid_name", "invalid_email", "unavailable", "failed",
+    "forbidden", "not_found", "not_available", "invalid", "invalid_name", "invalid_email", "unavailable", "not_saved",
+    "failed",
   ];
 
   it("has Hebrew copy for every reason, on both pages", () => {
@@ -275,6 +276,14 @@ describe("what the page says when a request fails", () => {
     expect(text).toContain("ייתכן שהקוד כבר התקבל");
     expect(text).toContain("דורית תיצור קשר");
     expect(text).not.toMatch(/נסו שוב/);
+  });
+
+  it("tells a client plainly that a send which stored nothing did not go through, and to send again", () => {
+    // Decision 2026-10-14: not "the code may have arrived" — it did not.
+    const { text, tone } = clientMessage(new MaslekaError("not_saved"));
+    expect(tone).toBe("error");
+    expect(text).toBe("השליחה לא עברה והקוד לא נשמר. נסו לשלוח שוב בעוד כמה דקות — הקישור עדיין בתוקף.");
+    expect(text).not.toContain("ייתכן");
   });
 
   it("says a dead link is dead, and a switched-off service is unavailable", () => {

@@ -133,6 +133,23 @@ describe("<Masleka /> — on", () => {
     expect(alert).not.toHaveTextContent("נסו שוב");
   });
 
+  it("after a send that stored nothing says so plainly, and keeps both values for the retry", async () => {
+    const submit = vi
+      .fn<(token: string, code: string, idNumber: string) => Promise<void>>()
+      .mockRejectedValueOnce(new MaslekaError("not_saved", "r1"))
+      .mockResolvedValueOnce(undefined);
+    renderPage({ enabled: true, submit });
+    await fill();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("השליחה לא עברה והקוד לא נשמר");
+    expect(alert).toHaveTextContent("נסו לשלוח שוב");
+    expect(alert).not.toHaveTextContent("ייתכן");
+    await userEvent.click(screen.getByRole("button", { name: "שליחה" }));
+    expect(submit).toHaveBeenCalledTimes(2);
+    expect(submit.mock.calls[1]).toEqual(submit.mock.calls[0]);
+    expect(await screen.findByRole("heading", { name: "תודה — דורית תטפל בזה" })).toBeInTheDocument();
+  });
+
   it("treats a thrown non-MaslekaError the same way", async () => {
     const submit = vi.fn(async () => {
       throw new TypeError("network");

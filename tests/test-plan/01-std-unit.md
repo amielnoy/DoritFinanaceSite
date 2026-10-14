@@ -1066,6 +1066,11 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSH-017 | "mails each staff address once, in lower case, and skips what is not an address" | Deduplicated list |
 | UNIT-MSKSH-018 | "falls back to Dorit's mailbox when nobody can be read" | `dorit@govari-fin.co.il`, `staff.lookup_failed` |
 | UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the staff list is empty" | `dorit@govari-fin.co.il`, `staff.none` |
+| UNIT-MSKSH-022 | "reads a phone as its local digits, however it was typed" | `054-111-2233`, `+972-54-111-2233`, `972541112233`, spaces and brackets all → `0541112233`; a landline keeps its 9 digits (decision 2026-10-14, the same contact) |
+| UNIT-MSKSH-023 | "reads nothing too short, or not a string, as a phone" | `''` for fewer than 9 digits, letters, `null`, `undefined`, a number — and `''` matches nothing |
+| UNIT-MSKSH-024 | "matches two addresses only when both are addresses, ignoring case and spaces at the ends" | Equal mailboxes match; two blanks, two nulls, two non-addresses, or one missing never match |
+| UNIT-MSKSH-025 | "lets the first alert for a key through and holds the rest for the window" | `firstInWindow`: first true, same key inside the window false, another key true, at the window's end true again |
+| UNIT-MSKSH-026 | "forgets keys whose window has passed" | Stale keys dropped on the next call; the map never outgrows one window |
 
 ### 4.42 The clearinghouse mails — `tests/unit/edge-masleka-mail.test.ts`
 
@@ -1082,6 +1087,16 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKML-009 | "greets without a name that is not a name" | "שלום,"; no foreign link |
 | UNIT-MSKML-010 | "offers the link as a clickable button, and keeps it in the text too" | `<a href="…#t=…">` in the invitation and the reminder; link also in text |
 | UNIT-MSKML-011 | "is byte-for-byte what it was before the button existed" | The shared letter without an `action` hashes to its pre-change SHA-256 |
+| UNIT-MSKML-012 | "names the client, says nothing was stored and that the client was asked to retry" | Failure alert (`not_saved`): subject "מסירת קוד מסלקה נכשלה — רונית מזרחי"; both halves say "לפני שנשמר דבר", "התבקש לנסות שוב", name the "ממתין להגשה" column and carry the rid; board link |
+| UNIT-MSKML-013 | "says when the cause is the missing encryption key" | `unavailable`, no name: subject "מסירת קוד מסלקה נכשלה"; text names `MASLEKA_KEY` |
+| UNIT-MSKML-014 | "says plainly when it is not known whether the code was stored" | `uncertain`: "לא ברור אם הקוד נשמר", "דורית תיצור קשר"; never "התבקש לנסות שוב" |
+| UNIT-MSKML-015 | "escapes a name that is really markup and keeps it on one line" (alert) | No `<img` in HTML; no newline in the subject |
+| UNIT-MSKML-016 | "links only to the agency's own domain" (alert) | Every href host is `govari-fin.co.il`, for all three causes |
+| UNIT-MSKML-017 | "names the client and says a new code must be requested" | Wipe notice: subject "קוד מסלקה נמחק לפני הגשה — אורי לוי"; both halves carry the name, the address, "9 ימים" and "קוד חדש" |
+| UNIT-MSKML-018 | "dates the code's arrival on the Israeli calendar" | 21:30 UTC on 8 Oct is "9.10.2026" (`timeZone: 'Asia/Jerusalem'`) |
+| UNIT-MSKML-019 | "leaves out an address that is missing or not one" | No "מייל:" line for `null` or a non-address |
+| UNIT-MSKML-020 | "escapes a name that is really markup and keeps it on one line" (wipe) | No `<img` in HTML; no newline in the subject |
+| UNIT-MSKML-021 | "links only to the agency's own domain" (wipe) | Every href host is `govari-fin.co.il` |
 
 ### 4.43 The clearinghouse port and its switch — `tests/unit/masleka-services.test.ts`, `tests/unit/masleka-config.test.ts`, `tests/unit/services-wiring.test.ts`
 
@@ -1105,6 +1120,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSVC-016 | "never lets the revealed value reach storage or the console" | No storage write, value absent from every console method, on success and on failure |
 | UNIT-MSKSVC-017 | "passes a removed membership through as forbidden" | `forbidden` with rid |
 | UNIT-MSKSVC-018 | "is never available and gives nobody a role" | Unconfigured: `unavailable`, `null` |
+| UNIT-MSKSVC-019 | "tells a send that stored nothing apart from a failure: not_saved is its own reason" | 500 with `not_saved` → `MaslekaError('not_saved', rid)` (decision 2026-10-14) |
 | UNIT-MSKCFG-001 | "is off when unset" | `false` |
 | UNIT-MSKCFG-002..005 | "is off for %j" (TRUE, 1, yes, tru) | `false` |
 | UNIT-MSKCFG-006..007 | "is on for %j" (true, " true ") | `true` (trim, then `=== "true"`) |
@@ -1140,12 +1156,13 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKBD-019 | "says manual, with no field left, when the browser refuses the copy command or throws" | `manual`; nothing attached |
 | UNIT-MSKBD-020 | "says manual when there is no document at all" | `manual` |
 | UNIT-MSKBD-021 | "never writes the value to storage or the console, on any path" | No storage write, no console call |
-| UNIT-MSKBD-022 | "has Hebrew copy for every reason, on both pages" | All 15 reasons, both helpers |
+| UNIT-MSKBD-022 | "has Hebrew copy for every reason, on both pages" | All 16 reasons (with `not_saved`), both helpers |
 | UNIT-MSKBD-023 | "shows a second הגשתי as a state, not an error (Ruling 18)" | `state` "כבר סומן כהוגש"; every other reason `error` |
 | UNIT-MSKBD-024 | "tells a client who tried too often to wait a while, and that the link is not dead" | 429 copy: wait, link valid |
 | UNIT-MSKBD-025 | "does not invite a retry after a failure that may have stored the code" | "ייתכן שהקוד כבר התקבל", Dorit will be in touch, no retry |
 | UNIT-MSKBD-026 | "says a dead link is dead, and a switched-off service is unavailable" | link_invalid / disabled copy |
 | UNIT-MSKBD-027 | "treats anything that is not a MaslekaError as a failure" | Same as `failed` |
+| UNIT-MSKBD-028 | "tells a client plainly that a send which stored nothing did not go through, and to send again" | `not_saved`: exactly "השליחה לא עברה והקוד לא נשמר. נסו לשלוח שוב בעוד כמה דקות — הקישור עדיין בתוקף."; no "ייתכן" (decision 2026-10-14) |
 
 ### 4.45 Vercel Analytics beforeSend — `tests/unit/vercel-analytics.test.ts`
 
@@ -1157,5 +1174,5 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 ## 5. Pass criteria
 
-All 688 declared cases pass (vitest: 1164 with expansions). Any failure is a functional defect, not an environment issue —
+All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

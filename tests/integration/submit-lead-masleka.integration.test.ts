@@ -324,3 +324,152 @@ describe("submit-lead — the clearinghouse request, with the switch on", () => 
     }
   });
 });
+
+describe("submit-lead — a second interview from the same contact (decision 2026-10-14)", () => {
+  const OPEN_ID = "44444444-0000-4000-8000-000000000001";
+  const OLD_TOKEN = "Old_-".repeat(8) + "tok";
+  const LEAD_1 = "55555555-0000-4000-8000-000000000001";
+  // Five days left on the old link, whenever this runs.
+  const EXPIRES = new Date(Date.now() + 5 * 86_400_000).toISOString();
+  /** The first interview's lead: the same person, the phone as it was typed then. */
+  const firstLead = (over: Record<string, unknown> = {}) => ({
+    id: LEAD_1,
+    name: "אורי לוי",
+    phone: "054-111-2233",
+    email: "uri@example.com",
+    source: "interview",
+    status: "new",
+    created_at: "2026-10-10T09:00:00.000Z",
+    ...over,
+  });
+  /** The request that first interview opened, still waiting for the code. */
+  const openRequest = (over: Record<string, unknown> = {}) => ({
+    id: OPEN_ID,
+    agency_id: AGENCY_1,
+    lead_id: LEAD_1,
+    client_name: "אורי לוי",
+    contact_email: "Uri@Example.com",
+    token_hash: sha(OLD_TOKEN),
+    token_expires_at: EXPIRES,
+    status: "invited",
+    created_by: null,
+    created_at: "2026-10-10T09:00:05.000Z",
+    client_invited_at: "2026-10-10T09:00:06.000Z",
+    client_reminded_at: null,
+    ...over,
+  });
+  const again = (o: { lead?: Record<string, unknown>; request?: Record<string, unknown> } = {}, extra: EdgeOptions = {}) =>
+    run(interested, ON, {
+      ...extra,
+      existingLeads: [firstLead(o.lead)],
+      masleka: { requests: [openRequest(o.request)], ...(extra.masleka ?? {}) },
+    });
+
+  it("reuses the open request: no second row, a new link mailed, the old one replaced, the reminder restarted", async () => {
+    const { r, lines } = await withLogs(interested, ON, {
+      existingLeads: [firstLead()],
+      masleka: { requests: [openRequest()] },
+    });
+    expect(r.status).toBe(200);
+    expect(r.callsTo("/rest/v1/masleka_requests").filter((c) => c.method === "POST")).toHaveLength(0);
+    expect(r.maslekaRequests).toHaveLength(1);
+    const token = confirmation(r).text!.match(LINK)![1];
+    expect(token).not.toBe(OLD_TOKEN);
+    const row = r.maslekaRequests[0];
+    expect(row.token_hash).toBe(sha(token));
+    expect(Date.parse(String(row.token_expires_at))).toBeGreaterThan(Date.parse(EXPIRES));
+    expect(row.client_invited_at).not.toBe("2026-10-10T09:00:06.000Z");
+    expect(row.client_reminded_at).toBeNull();
+    expect(row).toMatchObject({ id: OPEN_ID, lead_id: LEAD_1, client_name: "אורי לוי", status: "invited" });
+    expect(r.json.warnings).toEqual([]);
+    expect(lines.some((l) => l.includes('"masleka.request_reused"'))).toBe(true);
+    for (const line of lines) expect(line).not.toContain(token);
+  });
+
+  it("rotates only after the confirmation went out, in one conditional update on a still-invited request", async () => {
+    const r = await again();
+    expect(r.requestPatches).toHaveLength(1);
+    const q = new URLSearchParams(r.requestPatches[0].query);
+    expect(q.get("id")).toBe(`eq.${OPEN_ID}`);
+    expect(q.get("agency_id")).toBe(`eq.${AGENCY_1}`);
+    expect(q.get("status")).toBe("eq.invited");
+    expect(Object.keys(r.requestPatches[0].fields).sort()).toEqual([
+      "client_invited_at", "client_reminded_at", "token_expires_at", "token_hash",
+    ]);
+  });
+
+  it("keeps the old link working when the confirmation cannot be sent", async () => {
+    const r = await again({}, { failEmailTo: [base.email] });
+    expect(r.maslekaRequests).toEqual([openRequest()]);
+    expect(r.requestPatches).toHaveLength(0);
+  });
+
+  it("keeps the old link and sends nothing over the address's daily limit", async () => {
+    const r = await again({}, { overLimit: ["confirm-to:"] });
+    expect(r.maslekaRequests).toEqual([openRequest()]);
+    expect(toVisitor(r)).toHaveLength(0);
+  });
+
+  it("warns when the request stopped being invited before the rotation", async () => {
+    // The client handed over the code with the old link while the new mail was on its way.
+    const r = await again({}, { masleka: { afterMail: { status: "code_received" } } });
+    expect(r.maslekaRequests).toHaveLength(1);
+    expect(r.maslekaRequests[0].token_hash).toBe(sha(OLD_TOKEN));
+    expect(r.json.warnings).toContain("masleka_rotate_failed");
+  });
+
+  it("matches the contact by phone, address and name, however each was typed", async () => {
+    const variants: [Record<string, unknown>, Record<string, unknown>][] = [
+      [{ phone: "+972-54-111-2233" }, {}],
+      [{ phone: "972541112233" }, { contact_email: " URI@EXAMPLE.COM " }],
+      [{}, { client_name: "אורי" }],
+    ];
+    for (const [lead, request] of variants) {
+      const r = await again({ lead, request });
+      expect(r.maslekaRequests, JSON.stringify({ lead, request })).toHaveLength(1);
+      expect(r.requestPatches, JSON.stringify({ lead, request })).toHaveLength(1);
+    }
+  });
+
+  it("opens a new request when anything about the contact differs, or the old one cannot take a code", async () => {
+    const cases: [string, { lead?: Record<string, unknown>; request?: Record<string, unknown> }][] = [
+      ["another phone", { lead: { phone: "0549998877" } }],
+      ["another address", { request: { contact_email: "someone@example.com" } }],
+      ["no address on the old request", { request: { contact_email: null } }],
+      ["another name", { request: { client_name: "דנה כהן" } }],
+      ["a request made by hand", { request: { lead_id: null } }],
+      ["a lead that is gone", { lead: { id: "55555555-0000-4000-8000-000000000099" } }],
+      ["a code already received", { request: { status: "code_received", code_received_at: "2026-10-11T09:00:00.000Z" } }],
+      ["an expired link", { request: { token_expires_at: "2026-10-01T00:00:00.000Z" } }],
+      ["another agency", { request: { agency_id: "aaaaaaaa-0000-0000-0000-000000000002" } }],
+    ];
+    for (const [label, o] of cases) {
+      const r = await again(o);
+      expect(r.maslekaRequests, label).toHaveLength(2);
+      expect(r.maslekaRequests[0], label).toEqual(openRequest(o.request));
+    }
+  });
+
+  it("never reuses for an interview with no address: it opens a new request, as before", async () => {
+    const r = await run({ ...interested, email: "" }, ON, { existingLeads: [firstLead()], masleka: { requests: [openRequest()] } });
+    expect(r.maslekaRequests).toHaveLength(2);
+    expect(r.maslekaRequests[0]).toEqual(openRequest());
+  });
+
+  it("a completed interview sent twice ends with one request and one working link", async () => {
+    const first = await run(interested, ON);
+    const second = await run(interested, ON, {
+      existingLeads: first.leads.map((l) => ({ ...l, created_at: "2026-10-13T09:00:00.000Z" })),
+      masleka: { requests: first.maslekaRequests },
+    });
+    expect(second.maslekaRequests).toHaveLength(1);
+    const token = confirmation(second).text!.match(LINK)![1];
+    expect(second.maslekaRequests[0].token_hash).toBe(sha(token));
+  });
+
+  it("falls back to a new request when the lookup fails", async () => {
+    const r = await again({}, { failLeadLookup: true });
+    expect(r.status).toBe(200);
+    expect(r.maslekaRequests).toHaveLength(2);
+  });
+});

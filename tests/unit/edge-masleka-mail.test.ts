@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { buildClientHtml } from "../../supabase/functions/_shared/html.ts";
-import { buildClientInvite, buildStaffNotice } from "../../supabase/functions/_shared/masleka-mail.ts";
+import {
+  buildClientInvite,
+  buildCodeFailureAlert,
+  buildStaffNotice,
+  buildWipeNotice,
+} from "../../supabase/functions/_shared/masleka-mail.ts";
 
 const LINK = `https://govari-fin.co.il/masleka#t=${"T".repeat(43)}`;
 const hrefHosts = (html: string) => [...html.matchAll(/href="https?:\/\/([^/"]+)/g)].map((m) => m[1]);
@@ -40,6 +45,87 @@ describe("staff notices", () => {
     for (const kind of ["code_received", "ready", "deadline"] as const) {
       for (const host of hrefHosts(buildStaffNotice(kind, ["א"]).html)) expect(host).toBe("govari-fin.co.il");
     }
+  });
+});
+
+describe("the alert when a client's code did not go through", () => {
+  const RID = "a1b2c3d4";
+
+  it("names the client, says nothing was stored and that the client was asked to retry", () => {
+    const mail = buildCodeFailureAlert({ clientName: "רונית מזרחי", failure: "not_saved", rid: RID });
+    expect(mail.subject).toBe("מסירת קוד מסלקה נכשלה — רונית מזרחי");
+    for (const half of [mail.html, mail.text]) {
+      expect(half).toContain("לפני שנשמר דבר");
+      expect(half).toContain("התבקש לנסות שוב");
+      expect(half).toContain("ממתין להגשה");
+      expect(half).toContain(RID);
+    }
+    expect(mail.html).toContain('href="https://govari-fin.co.il/admin/masleka"');
+  });
+
+  it("says when the cause is the missing encryption key", () => {
+    const mail = buildCodeFailureAlert({ clientName: null, failure: "unavailable", rid: RID });
+    expect(mail.subject).toBe("מסירת קוד מסלקה נכשלה");
+    expect(mail.text).toContain("MASLEKA_KEY");
+  });
+
+  it("says plainly when it is not known whether the code was stored", () => {
+    const mail = buildCodeFailureAlert({ clientName: "יעל כהן", failure: "uncertain", rid: RID });
+    expect(mail.text).toContain("לא ברור אם הקוד נשמר");
+    expect(mail.text).toContain("דורית תיצור קשר");
+    expect(mail.text).not.toContain("התבקש לנסות שוב");
+  });
+
+  it("escapes a name that is really markup and keeps it on one line", () => {
+    const mail = buildCodeFailureAlert({ clientName: '<img src=x>\nBcc: x@example.com', failure: "not_saved", rid: RID });
+    expect(mail.html).not.toContain("<img");
+    expect(mail.subject).not.toMatch(/\n/);
+  });
+
+  it("links only to the agency's own domain", () => {
+    for (const failure of ["not_saved", "unavailable", "uncertain"] as const) {
+      for (const host of hrefHosts(buildCodeFailureAlert({ clientName: "א", failure, rid: RID }).html)) {
+        expect(host).toBe("govari-fin.co.il");
+      }
+    }
+  });
+});
+
+describe("the notice when an unsubmitted code was wiped", () => {
+  const wiped = { clientName: "אורי לוי", contactEmail: "uri@example.com", codeReceivedAt: "2026-10-08T21:30:00.000Z" };
+
+  it("names the client and says a new code must be requested", () => {
+    const mail = buildWipeNotice(wiped);
+    expect(mail.subject).toBe("קוד מסלקה נמחק לפני הגשה — אורי לוי");
+    for (const half of [mail.html, mail.text]) {
+      expect(half).toContain("אורי לוי");
+      expect(half).toContain("uri@example.com");
+      expect(half).toContain("9 ימים");
+      expect(half).toContain("קוד חדש");
+    }
+  });
+
+  it("dates the code's arrival on the Israeli calendar", () => {
+    // 21:30 UTC on the 8th is 00:30 on the 9th in Israel.
+    expect(buildWipeNotice(wiped).text).toContain("9.10.2026");
+  });
+
+  it("leaves out an address that is missing or not one", () => {
+    for (const contactEmail of [null, "not an address"]) {
+      const mail = buildWipeNotice({ ...wiped, contactEmail });
+      expect(mail.text).not.toContain("מייל:");
+      expect(mail.text).not.toContain("not an address");
+    }
+  });
+
+  it("escapes a name that is really markup and keeps it on one line", () => {
+    const mail = buildWipeNotice({ ...wiped, clientName: '<img src=x>\nBcc: x@example.com' });
+    expect(mail.html).not.toContain("<img");
+    expect(mail.subject).not.toMatch(/\n/);
+  });
+
+  it("links only to the agency's own domain", () => {
+    for (const host of hrefHosts(buildWipeNotice(wiped).html)) expect(host).toBe("govari-fin.co.il");
   });
 });
 

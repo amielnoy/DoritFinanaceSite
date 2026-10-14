@@ -490,22 +490,42 @@ Removing them is the matching `delete`; every board action re-checks
 membership, so it takes effect on their next click. Staff notices go to the
 profile e-mail of every admin and member (`masleka_staff_emails()`), or to
 `dorit@govari-fin.co.il` if none can be read — not to `dorit-mailer`'s
-`MAIL_TO`, which a rendered message cannot address.
+`MAIL_TO`, which a rendered message cannot address. Besides the new-code,
+files-ready and day-5 notices, staff are alerted when a client's code did not
+go through (`masleka-code`: "מסירת קוד מסלקה נכשלה", at most once an hour per
+link and five an hour in all), and told once per request when the 9-day wipe
+expired a code nobody submitted (`masleka-remind`: "קוד מסלקה נמחק לפני הגשה",
+marked in `wipe_notified_at`). Neither mail carries the code, the ID number or
+the link.
 
 **Automatic invitations** come from `submit-lead`, so they need
 `VITE_LEAD_FUNCTIONS=supabase` as well; until then, staff create requests by
-hand on the board and copy the link. Business days are Sunday–Thursday;
+hand on the board and copy the link. A second completed interview from a
+contact who already has an `invited` request reuses it: the confirmation
+carries a new link, and the old one stops working once that mail is accepted.
+"The same contact" is all three of: the request's address (case and outer
+spaces ignored), the client's name by the interview's own rule ("דנה" and
+"דנה כהן" agree), and the phone on the lead that opened the request (digits
+only, `+972` read as `0`). An interview with no address, or a request made by
+hand, never matches — a duplicate on the board is the safe failure. Business days are Sunday–Thursday;
 holidays are not modelled, so a holiday week's day-5 warning arrives early,
 never late.
 
-**Release:** the migration `20261015000000_masleka_requests.sql` is applied to
+**Release:** the migrations `20261015000000_masleka_requests.sql` (applied
+2026-10-14) and `20261019000000_masleka_wipe_notice.sql` (one nullable column,
+`masleka_requests.wipe_notified_at`; **not yet applied**) are applied to
 production by hand and only on request (CI deploys functions only); run
 `supabase/tests/masleka_check.sql` against a local `supabase start` first.
+Apply the wipe-notice migration **before** the functions that read it are
+deployed: `masleka-remind` selects and sets `wipe_notified_at`, and without the
+column every hourly run fails at that query (with the switch off it answers 404
+before reading anything, so the order matters only once the switch is on).
 
 **Launch checklist** (every box before `MASLEKA_ENABLED` is set; none of it
 runs in CI):
 
 - [ ] Migration applied, then `select jobname, schedule from cron.job where jobname like 'masleka-%';` returns **2 rows** (`masleka-housekeeping`, `masleka-remind`). A missing `pg_net` only raises a NOTICE in the migration, so also run `select extname from pg_extension where extname in ('pg_cron','pg_net');` and expect both; if `pg_net` is missing, enable it (Dashboard, Database, Extensions) and re-run the `masleka-remind` scheduling block.
+- [ ] Migration `20261019000000_masleka_wipe_notice.sql` applied, then `select column_name from information_schema.columns where table_schema = 'public' and table_name = 'masleka_requests' and column_name = 'wipe_notified_at';` returns **1 row**. If it is applied in the SQL editor, follow it with `supabase migration repair --status applied 20261019000000`.
 - [ ] Edge secrets set: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_KEY="$(openssl rand -base64 32)" MASLEKA_CRON_SECRET="$(openssl rand -hex 32)"`. Functions deployed (the CI deploy job does this on merge).
 - [ ] Vault `masleka_cron_secret` is the same value as `MASLEKA_CRON_SECRET` and has **at least 32 characters** (a shorter one makes every reminder call answer 503): `select length(decrypted_secret) from vault.decrypted_secrets where name = 'masleka_cron_secret';` must be at least 32. Confirm `masleka_call_remind()` sends the header `x-masleka-cron` with that secret: `select pg_get_functiondef('public.masleka_call_remind'::regproc);` and look for `'x-masleka-cron'`.
 - [ ] The gateway's `x-forwarded-for`, once, on a deployed function (the per-IP limit of `masleka-code` keys on the header's first entry, so a client that can forge it defeats the limit). With the switch on for the smoke, post one bad submission twice, the second time with a forged header: `curl -s -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-code -H 'content-type: application/json' -H 'x-forwarded-for: 198.51.100.7' -d '{"token":"x","code":"x","idNumber":"x"}'`. Then `select key, count(*) from public.submission_limits where key like 'masleka-ip:%' and at > now() - interval '10 minutes' group by key;` and compare with `printf %s "$(curl -s https://api.ipify.org)" | shasum -a 256`. Expected: the key is `masleka-ip:` plus the hash of your real address, not of 198.51.100.7. If it is the forged one, derive the IP from the last entry instead, in `clientIp` (`supabase/functions/_shared/guard.ts`), before launch.
@@ -513,10 +533,10 @@ runs in CI):
 - [ ] **Migration order.** `20261015000000_masleka_requests.sql` sorts before main's `20261016*` chat migrations. If those are applied to production first, `supabase db push` refuses the older file: use `supabase db push --include-all`. If the migration is applied by hand in the SQL editor instead, follow it with `supabase migration repair --status applied 20261015000000` so the history matches.
 - [ ] **The XFF check, both commands.** (1) With your real address: `curl -s -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-code -H 'content-type: application/json' -d '{"token":"x","code":"x","idNumber":"x"}'`; (2) the same with `-H 'x-forwarded-for: 198.51.100.7'` added. Both bodies are bad (a malformed token), so nothing is stored. Compare the two `masleka-ip:` keys in `submission_limits` as in the XFF line above: they must be the same key, the hash of your real address.
 - [ ] **DST check, once** (Task 3's case: the 25 Oct 2026 clock change must not move the wall time). On any machine with Deno, from the repo root: `deno eval --no-config 'import { addBusinessDays } from "./supabase/functions/_shared/business-days.ts"; const r = addBusinessDays(new Date("2026-10-21T21:30:00Z"), 4); console.log(r.toLocaleString("en-GB", { timeZone: "Asia/Jerusalem" }))'` must print `28/10/2026, 00:30:00` (Thursday 22 Oct 00:30 Israel time plus 4 business days is Wednesday 28 Oct 00:30). The same case runs in CI as `UNIT-BDAY-006`; this confirms it on the Edge runtime's Deno.
-- [ ] **Product decision: the failure copy.** When `masleka-code` fails before storing anything, the client's default failure message says the code may have arrived, so the client does not retry and staff are not alerted. Decide whether that is acceptable or whether a failure should also raise a staff notice, and settle the wording.
-- [ ] **Product decision: an unsubmitted wipe.** When the hourly job wipes a `code_received` request on day 9 that nobody submitted, no staff member is told. Decide whether a notice is sent (and to whom) before switch-on.
-- [ ] **Product decision: the remind-rotation corner.** If staff relink a request between a reminder mail and its rotation, the client's reminder link is dead and they see "link_invalid". Rare; decide whether to accept it or to make the rotation skip a request that was relinked after the reminder was claimed.
-- [ ] Decide the resubmitted-interview duplicate: a completed interview submitted twice creates a second request for the same contact. Reuse or rotate the existing `invited` request in `submit-lead`, or accept the duplicate knowingly.
+- [x] **Product decision: the failure copy** — decided 2026-10-14, implemented. When `masleka-code` knows nothing was stored (it failed before the accepting write, or the database refused that write), it answers `not_saved` and the page says: "השליחה לא עברה והקוד לא נשמר. נסו לשלוח שוב בעוד כמה דקות — הקישור עדיין בתוקף." Every staff member gets "מסירת קוד מסלקה נכשלה" (the client's name when the link was read, and the rid — never the code, the ID or the link), at most once an hour per link and five an hour in all. A write cut off on the way may have landed, so it still answers `failed` ("ייתכן שהקוד כבר התקבל…") — and staff are alerted for that too, since the client was told Dorit will be in touch. A missing `MASLEKA_KEY` alerts staff as well.
+- [x] **Product decision: an unsubmitted wipe** — decided 2026-10-14, implemented. The hourly `masleka-remind` run mails every staff member (the same `masleka_staff_emails()` recipients) "קוד מסלקה נמחק לפני הגשה — <name>", once per request, naming the client (name, address, the day the code arrived) and saying a new code must be requested. Exactly once across runs through `wipe_notified_at` — needs migration `20261019000000_masleka_wipe_notice.sql` applied (see **Release**).
+- [x] **Product decision: the remind-rotation corner** — decided 2026-10-14: accepted: rare; client asks for a new link. (If staff relink a request between a reminder mail and its rotation, the client's reminder link is dead and they see "link_invalid".)
+- [x] **The resubmitted-interview duplicate** — decided 2026-10-14, implemented. `submit-lead` reuses the contact's open `invited` request (see **Automatic invitations** for "the same contact"): it mails a new link in the confirmation and rotates the request's token only once that mail is accepted, restarting the thirty days and the one reminder. No second request.
 - [ ] Verify at swiftness.co.il whether the advisor portal needs the ID number besides the code; if not, a later PR drops `id_ciphertext`, `id_last4` and the form field. Confirm the saver-registration and advisor-portal URLs (`CLEARINGHOUSE_SAVER_URL` / `CLEARINGHOUSE_ADVISOR_URL`).
 - [ ] When the step screenshots are captured, confirm the portal's wording in `/admin/masleka/guide` against the real screens (the guide quotes no portal menu label until then).
 - [ ] **Privacy policy gate:** the privacy policy is updated to cover collecting the Israeli ID number and the clearinghouse code (purpose, retention of at most 9 days, access by staff, wipe) and the compliance adviser has approved the wording (`base44/agents/COMPLIANCE.md` §10, point 7). Not before switch-on, no switch-on.
@@ -525,7 +545,7 @@ runs in CI):
 - [ ] After switch-on, open one test link with the browser's network tab open and confirm the Vercel Web Analytics beacon (`/_vercel/insights/view`) carries a url with no `#t=`.
 - [ ] Staff memberships added (SQL above), Dorit's own `owner` row confirmed: `select * from public.memberships;`.
 - [ ] Switch on: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED=true` and `VITE_MASLEKA_ENABLED=true` on Vercel (production and preview), then redeploy. Smoke with a hand-made request to a staff member's own address: the client page, a reveal (a row appears in `masleka_access_log`), **הגשתי** (`select count(*) from masleka_requests where (code_ciphertext is not null or id_ciphertext is not null) and status <> 'code_received';` is 0).
-- [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days.
+- [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days — but with the switch off `masleka-remind` answers 404, so a wipe in that time is not announced.
 
 ## The chat function (Phase 3)
 

@@ -16,14 +16,24 @@
  * ciphertexts can only land on the row they were sealed for, and only while
  * it is still waiting for them. A link that died between the two matches
  * nothing and is answered like any other dead link.
+ *
+ * When it fails (decision 2026-10-14), the answer says what is known. Before
+ * the accepting write, or when the database refused that write, nothing was
+ * stored: `not_saved`, and the page tells the client plainly to send again.
+ * A write cut off on the way (a dropped connection, a timeout) may have
+ * landed: `failed`, and the page says the code may have arrived. Either way,
+ * and when the sealing key is missing, every staff member gets an alert —
+ * the client's name if the link was read, and the rid; never a value. A
+ * retry storm is one alert: once an hour per link (in this isolate first,
+ * then in `submission_limits`) and five an hour in all.
  */
 import { corsHeaders } from '../_shared/cors.ts';
 import { clientIp, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { normalizeIsraeliId } from '../_shared/israeli-id.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { sendMail } from '../_shared/mail.ts';
-import { buildStaffNotice } from '../_shared/masleka-mail.ts';
-import { isToken, maslekaEnabled, normalizeCode, tokenHash, UUID } from '../_shared/masleka.ts';
+import { buildCodeFailureAlert, buildStaffNotice, type CodeFailure } from '../_shared/masleka-mail.ts';
+import { firstInWindow, isToken, maslekaEnabled, normalizeCode, tokenHash, UUID } from '../_shared/masleka.ts';
 import { selectRows, updateWhere } from '../_shared/rest.ts';
 import { seal, sealKeyFromEnv } from '../_shared/seal.ts';
 import { staffRecipients } from '../_shared/staff.ts';
@@ -32,6 +42,19 @@ const FN = 'masleka-code';
 const log = createLog(FN);
 const PER_IP_PER_HOUR = 10;
 const PER_LINK_PER_HOUR = 5;
+const ALERTS_PER_LINK_PER_HOUR = 1;
+const ALERTS_PER_HOUR = 5;
+const HOUR_MS = 3_600_000;
+/** Links alerted on by this isolate, and when: the throttle's first layer. */
+const alerted = new Map<string, number>();
+
+/**
+ * A refusal the database answered with a status of its own: the statement
+ * ran and was rolled back, so nothing was stored. Anything else thrown by
+ * the accepting write (no answer, a gateway timeout, an unreadable body)
+ * leaves it unknown whether the row changed.
+ */
+const refusedByDatabase = (e: unknown): boolean => /^update_http_(4\d\d|500)\b/.test(String((e as Error)?.message ?? ''));
 
 // Every `err:` below is truncated inline: tests/contract/logging.contract.test.ts
 // reads each log call's text and requires the `.slice(0, N)` to be visible there.
@@ -42,6 +65,11 @@ export async function handler(req: Request): Promise<Response> {
 
   const rid = newRequestId();
   const startedAt = Date.now();
+  // What a failure can say: the link's hash and the client's name once known,
+  // and whether the accepting write was under way when it happened.
+  let hash: string | null = null;
+  let clientName: string | null = null;
+  let storing = false;
   try {
     log('info', 'request.start', { rid });
     if (!maslekaEnabled()) {
@@ -62,7 +90,7 @@ export async function handler(req: Request): Promise<Response> {
       log('warn', 'request.rejected', { rid, reason: 'malformed_token' });
       return Response.json({ error: 'link_invalid', rid }, { status: 404, headers: cors });
     }
-    const hash = await tokenHash(token);
+    hash = await tokenHash(token);
     if (!(await withinLimit(log, rid, `masleka-link:${hash}`, 3600, PER_LINK_PER_HOUR))) {
       log('warn', 'request.rejected', { rid, reason: 'rate_limited_link' });
       return Response.json({ error: 'rate_limited', rid }, { status: 429, headers: cors });
@@ -83,6 +111,7 @@ export async function handler(req: Request): Promise<Response> {
     const key = await sealKeyFromEnv();
     if (!key) {
       log('error', 'seal.not_configured', { rid });
+      await alertStaff(rid, hash, null, 'unavailable');
       return Response.json({ error: 'unavailable', rid }, { status: 503, headers: cors });
     }
 
@@ -90,7 +119,7 @@ export async function handler(req: Request): Promise<Response> {
     // are fixed literals, and `select=` never names a ciphertext or the hash.
     const now = new Date().toISOString();
     const waiting = `token_hash=eq.${hash}&status=eq.invited&token_expires_at=gt.${encodeURIComponent(now)}`;
-    const found = await selectRows('masleka_requests', `select=id&${waiting}&limit=1`);
+    const found = await selectRows('masleka_requests', `select=id,client_name&${waiting}&limit=1`);
     const requestId = String(found[0]?.id ?? '');
     if (!UUID.test(requestId)) {
       // Unknown, used, rotated and expired links all look the same from here,
@@ -98,18 +127,22 @@ export async function handler(req: Request): Promise<Response> {
       log('warn', 'request.rejected', { rid, reason: 'link_invalid' });
       return Response.json({ error: 'link_invalid', rid }, { status: 404, headers: cors });
     }
+    clientName = typeof found[0]?.client_name === 'string' ? found[0].client_name : null;
 
+    const sealed = {
+      status: 'code_received',
+      code_ciphertext: await seal(key, code, `${requestId}:code`),
+      id_ciphertext: await seal(key, idNumber, `${requestId}:id`),
+      id_last4: idNumber.slice(-4),
+      code_received_at: now,
+    };
+    storing = true;
     const rows = await updateWhere(
       'masleka_requests',
       `id=eq.${requestId}&${waiting}&select=id,client_name`,
-      {
-        status: 'code_received',
-        code_ciphertext: await seal(key, code, `${requestId}:code`),
-        id_ciphertext: await seal(key, idNumber, `${requestId}:id`),
-        id_last4: idNumber.slice(-4),
-        code_received_at: now,
-      },
+      sealed,
     );
+    storing = false;
     if (rows.length !== 1 || rows[0].id !== requestId) {
       // Another submission of this link got there between the read and the
       // update (a double click, a second tab): it holds the code, this one
@@ -120,22 +153,74 @@ export async function handler(req: Request): Promise<Response> {
     log('info', 'masleka.code_received', { rid, requestId });
 
     // The notice is best-effort: the code is stored, and the board shows it
-    // whether or not a mail went out.
-    const notice = buildStaffNotice('code_received', [String(rows[0].client_name ?? '')]);
+    // whether or not a mail went out. Nothing after the store may turn the
+    // answer into a failure, so this block keeps its own errors.
     let notified = 0;
-    for (const to of await staffRecipients(log, rid)) {
-      try {
-        await sendMail(log, { to, ...notice, rid, role: 'staff' });
-        notified += 1;
-      } catch (e) {
-        log('warn', 'mail.failed', { rid, role: 'staff', err: String((e as Error)?.message ?? e).slice(0, 200) });
+    try {
+      const notice = buildStaffNotice('code_received', [String(rows[0].client_name ?? '')]);
+      for (const to of await staffRecipients(log, rid)) {
+        try {
+          await sendMail(log, { to, ...notice, rid, role: 'staff' });
+          notified += 1;
+        } catch (e) {
+          log('warn', 'mail.failed', { rid, role: 'staff', err: String((e as Error)?.message ?? e).slice(0, 200) });
+        }
       }
+    } catch (e) {
+      log('warn', 'notice.failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
     }
 
     log('info', 'request.end', { rid, ms: Date.now() - startedAt, requestId, notified });
     return Response.json({ ok: true, rid }, { headers: cors });
   } catch (error) {
-    log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String((error as Error)?.message ?? error).slice(0, 200) });
-    return Response.json({ error: 'failed', rid }, { status: 500, headers: cors });
+    // Before the accepting write, or refused by the database: nothing stored.
+    // Cut off during it: unknown, so the client is never told to send again.
+    const outcome: CodeFailure = storing && !refusedByDatabase(error) ? 'uncertain' : 'not_saved';
+    log('error', 'request.failed', {
+      rid, ms: Date.now() - startedAt, outcome, err: String((error as Error)?.message ?? error).slice(0, 200),
+    });
+    await alertStaff(rid, hash, clientName, outcome);
+    return Response.json({ error: outcome === 'not_saved' ? 'not_saved' : 'failed', rid }, { status: 500, headers: cors });
+  }
+}
+
+/**
+ * Tell every staff member a client's code did not go through. Best-effort and
+ * never throws: the client's answer is the same whether or not it arrives. Below
+ * the handler on purpose: masleka-dark-launch.contract.test.ts reads the
+ * source in order and wants the switch ahead of every mail.
+ */
+async function alertStaff(rid: string, hash: string | null, clientName: string | null, failure: CodeFailure): Promise<number> {
+  try {
+    const key = `masleka-alert:${hash ?? 'unknown'}`;
+    if (!firstInWindow(alerted, key, Date.now(), HOUR_MS)) {
+      log('info', 'alert.skipped', { rid, failure, reason: 'isolate' });
+      return 0;
+    }
+    if (
+      !(await withinLimit(log, rid, key, 3600, ALERTS_PER_LINK_PER_HOUR)) ||
+      !(await withinLimit(log, rid, 'masleka-alerts', 3600, ALERTS_PER_HOUR))
+    ) {
+      log('info', 'alert.skipped', { rid, failure, reason: 'rate_limited' });
+      return 0;
+    }
+    const alert = buildCodeFailureAlert({ clientName, failure, rid });
+    const sent = await Promise.all(
+      (await staffRecipients(log, rid)).map(async (to) => {
+        try {
+          await sendMail(log, { to, ...alert, rid, role: 'staff' });
+          return 1;
+        } catch (e) {
+          log('warn', 'mail.failed', { rid, role: 'staff', failure, err: String((e as Error)?.message ?? e).slice(0, 200) });
+          return 0;
+        }
+      }),
+    );
+    const alertedCount = sent.reduce((a: number, b: number) => a + b, 0);
+    log('info', 'alert.sent', { rid, failure, notified: alertedCount });
+    return alertedCount;
+  } catch (e) {
+    log('warn', 'alert.failed', { rid, failure, err: String((e as Error)?.message ?? e).slice(0, 200) });
+    return 0;
   }
 }
