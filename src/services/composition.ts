@@ -2,7 +2,7 @@ import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
 import { CHAT_AGENTS } from "@/config/chat-agents";
 import { LEAD_FUNCTIONS } from "@/config/lead-functions";
-import { UPLOAD_PROVIDER } from "@/config/upload-provider";
+import { CONTENT_IMAGES, UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
 import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
@@ -16,6 +16,7 @@ import { Base44UploadService } from "./base44/Base44UploadService";
 import { SupabaseAgentService } from "./supabase/SupabaseAgentService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
+import { SupabaseImageUploadService, type SupabaseImageStorageClient } from "./supabase/SupabaseImageUploadService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
 import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
 import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
@@ -106,11 +107,15 @@ const accountPort: AccountPort = supabase
   : new UnconfiguredAccountService();
 
 /**
- * Public images (blog covers, testimonial photos) stay on Base44: the only
- * Supabase bucket is the private claim-documents one, and an image put there
+ * Public images (blog covers, testimonial photos), into the public
+ * content-images bucket when `VITE_CONTENT_IMAGES=supabase`, else Base44.
+ * Never the claim-documents bucket: it is private, and an image put there
  * would be unreadable to every visitor.
  */
-const uploadPort: UploadPort = new Base44UploadService(client);
+const uploadPort: UploadPort =
+  CONTENT_IMAGES === "supabase" && supabase
+    ? new SupabaseImageUploadService(supabase as unknown as SupabaseImageStorageClient)
+    : new Base44UploadService(client);
 
 /**
  * Where a claim document lands, from whichever provider is switched on.
