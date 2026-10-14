@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 69 in `e2e/ui`, of 180 across the whole e2e suite, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 71 in `e2e/ui`, of 182 across the whole e2e suite, run on all four platforms
 
 ---
 
@@ -121,6 +121,7 @@ because the backend still accepts leads recorded under them.
 |---|---|---|
 | E2E-DSK-001 | "shows the floating WhatsApp/phone dock and hides the mobile bar" | Dock visible; sticky bar hidden. The dock holds a third button since A-64, support — see §3.9 |
 | E2E-DSK-002 | "shows the full desktop nav rather than a burger" | Burger hidden; "שירותים" link visible |
+| E2E-DSK-003 | "keeps its sidebar, its contact box and its one-open-at-a-time questions" (`/faq`) | "ניווט לפי נושא" and the "לא מצאתם תשובה?" box with "יצירת קשר" → `/#start` visible; opening a second question closes the first; the CTA band shows the phone number, not the phone-only "טלפון" label — the desktop half of E2E-MOB-015–020 |
 
 ### 3.8 Agent chat — regulatory shell — `agent-compliance.spec.ts`
 
@@ -135,7 +136,7 @@ model does — the part that is a gate rather than an instruction.
 | E2E-AGT-003 | "the fence is published beside the interview agent" | The tagline and the כללי הגדר block (what it does / does not do / when it hands over) visible in `#interview` |
 | E2E-AGT-004 | "a standing disclaimer sits under every message box" | The "אינו ייעוץ, שיווק פנסיוני או המלצה אישית" line visible in all three sections |
 | E2E-AGT-005 | "the route to a person works without the model, and before consent" | Handoff button present on first frame; pressing it POSTs to `escalateToHuman`; phone and WhatsApp links render even though the visitor never consented and no conversation exists |
-| E2E-AGT-006 | "a visitor cannot type before accepting the notice" (support) | The support chat on `/faq` gates the same way: box disabled, **zero** requests to `/agents/`, accepting unlocks it |
+| E2E-AGT-006 | "a visitor cannot type before accepting the notice" (support) | The support chat on `/faq` gates the same way: box disabled, **zero** requests to `/agents/`, accepting unlocks it. On the phone projects E2E-AGT-006–008 first open the chat from the card ("שאלו את העוזר"), where it is a full-screen layer — see E2E-MOB-011–014 |
 | E2E-AGT-007 | "the notice describes this chat and not the interview" | The support notice states the conversation itself is kept and why; the interview's "נאספים שם וטלפון בלבד" is **absent**; the licence and affiliation still present |
 | E2E-AGT-008 | "the route to a person is here too" | The handoff button on `/faq` POSTs to `escalateToHuman` |
 
@@ -165,6 +166,19 @@ does.
 The signed-in path is covered by the component cases CMP-ACC-*: the e2e fixture
 answers `/entities/User/me` with 401 unconditionally and has no session path.
 Giving it one is a separate change.
+
+### 3.10 Clearinghouse, dark — `masleka.spec.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| E2E-MSK-001 | "the client page says the service is unavailable, offers no form, and is not indexed" | Opening `/masleka#t=<43 characters>` shows the heading "השירות אינו זמין כרגע" and no `form`; the URL ends exactly `/masleka` (no fragment, so the token is out of the address bar); `meta[name=robots]` contains `noindex`; no `/functions/v1/` request is made |
+| E2E-MSK-002 | "the staff board does not exist in a dark build" | `/admin/masleka` renders the 404 page |
+
+The enabled flow is covered in-process (CMP-MSK-*, the `INT-MSK*` cases); an
+e2e of one request end to end needs the switch on in a test build and belongs
+to PR B. Run once with `VITE_MASLEKA_ENABLED=true` the two cases above must
+fail (the page asks for the link; the board exists) — that is how they are
+known to bite.
 
 ## 4. Pass criteria
 

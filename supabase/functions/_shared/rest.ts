@@ -102,6 +102,92 @@ export async function upsertRow(table: string, row: Record<string, unknown>, onC
   if (!res.ok) throw new Error(`upsert_http_${res.status}${await refusal(res)}`);
 }
 
+/** PostgREST parameters that shape the answer and filter nothing. */
+const NOT_FILTERS = ['select', 'order', 'limit', 'offset', 'on_conflict', 'columns'];
+
+/** Whether a query string has at least one `col=op.value` filter term. */
+function hasFilter(query: string): boolean {
+  for (const [column, value] of new URLSearchParams(query)) {
+    if (NOT_FILTERS.includes(column) || !/^[a-z_][a-z0-9_]*$/.test(column)) continue;
+    if (/^(?:not\.)?[a-z]+\.\S/.test(value)) return true;
+  }
+  return false;
+}
+
+/**
+ * A conditional update: every row the PostgREST query matches, changed, and
+ * returned. The query carries the conditions (`status=eq.invited`, …) and a
+ * `select=` naming the columns to return — always name them, or the answer
+ * echoes every column, ciphertext included.
+ *
+ * One statement, so the condition and the change cannot be split by a second
+ * request: two submissions of one link cannot both find it `invited`.
+ *
+ * Refuses, before sending anything, a query with no filter term (`col=op.value`
+ * — `select=`, `order=` and `limit=` are not filters): PostgREST would apply
+ * that PATCH to every row in the table. And a success whose body is not a
+ * list of rows is a throw, never "nothing matched".
+ */
+export async function updateWhere(
+  table: string,
+  query: string,
+  fields: Record<string, unknown>,
+): Promise<Record<string, unknown>[]> {
+  if (!hasFilter(query)) throw new Error('update_without_filter');
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?${query}`, {
+    method: 'PATCH',
+    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify(fields),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`update_http_${res.status}${await refusal(res)}`);
+  const rows = await res.json().catch(() => null);
+  if (!Array.isArray(rows)) throw new Error('update_bad_body');
+  return rows as Record<string, unknown>[];
+}
+
+/** Every row a PostgREST filter matches, deleted. Matching none is not an error: the row is already gone. */
+export async function deleteRows(table: string, filter: string): Promise<void> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/rest/v1/${table}?${filter}`, {
+    method: 'DELETE',
+    headers: { ...auth, Prefer: 'return=minimal' },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`delete_http_${res.status}${await refusal(res)}`);
+}
+
+/**
+ * Who a Supabase access token belongs to, as Supabase Auth says — the
+ * signature is checked there, not here. `null` for a token Auth refuses
+ * (forged, expired, or the anon key, which names no user); a throw for
+ * anything else, which must not read as "signed out".
+ *
+ * A refusal is told apart by its body, not its status alone: Auth's own
+ * carries an `error_code` (bad_jwt, session_not_found, …), while the gateway
+ * answers a revoked or wrong-project service key with a 401 that has none
+ * ("Invalid API key"). Read as "not signed in", that told every admin their
+ * session had expired — advice signing in again could never fix.
+ */
+export async function authUser(token: string): Promise<{ id: string } | null> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/auth/v1/user`, {
+    method: 'GET',
+    headers: { apikey: auth.apikey, Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  const body = (await res.json().catch(() => null)) as { id?: unknown; error_code?: unknown } | null;
+  if (res.status === 401 || res.status === 403) {
+    if (typeof body?.error_code === 'string' && body.error_code) return null;
+    throw new Error(`auth_http_${res.status}_not_an_auth_refusal`);
+  }
+  if (!res.ok) throw new Error(`auth_http_${res.status}`);
+  const id = body?.id;
+  if (typeof id !== 'string' || !id) throw new Error('auth_returned_no_user');
+  return { id };
+}
+
 /**
  * A Postgres function through PostgREST's `/rpc`, with the service key. Used
  * for `allow_submission`, which only the service role may execute. Throws on

@@ -156,15 +156,24 @@ describe("the CI workflow is internally consistent", () => {
   });
 });
 
-describe("the workflow tests every branch and deploys from only two", () => {
-  it("runs on a push to any branch", () => {
-    expect((workflow.on as { push: { branches: string[] } }).push.branches).toEqual(["**"]);
+describe("the workflow tests every PR commit once and deploys from only two branches", () => {
+  it("runs on a push only to the branches that deploy", () => {
+    // A feature branch is tested through its PR. Pushing it ran CI twice for
+    // the PR's first commit, and the cancelled twin showed as failed checks.
+    expect((workflow.on as { push: { branches: string[] } }).push.branches).toEqual(["main", "builder"]);
   });
 
-  it("does not also run the whole matrix on every push to an open PR", () => {
-    // push already covers new commits; reacting to `synchronize` would double.
-    const pr = (workflow.on as { pull_request: { types: string[] } }).pull_request;
-    expect(pr.types).not.toContain("synchronize");
+  it("runs on every commit of an open PR, which is where 'Safe to merge?' comes from", () => {
+    const pr = (workflow.on as { pull_request: { branches: string[]; types: string[] } }).pull_request;
+    expect(pr.branches).toEqual(["main"]);
+    expect(pr.types).toEqual(expect.arrayContaining(["opened", "reopened", "synchronize"]));
+    expect(workflow.jobs["merge-readiness"].name).toBe("Safe to merge?");
+  });
+
+  it("names Vercel as production in the PR verdict, not Base44", () => {
+    const verdict = JSON.stringify(workflow.jobs["merge-readiness"]);
+    expect(verdict).not.toContain("**Base44** (production");
+    expect(verdict).toContain("**Production** (Vercel");
   });
 
   it("gates every deploying job on the ref, so a feature branch ships nothing", () => {
@@ -210,6 +219,16 @@ describe("the workflow tests every branch and deploys from only two", () => {
     expect(smoke?.env?.E2E_SKIP_AGENT_PROBES).toContain("github.event_name != 'schedule'");
     const spec = readFileSync(join(REPO_ROOT, "e2e/api/base44-contract.spec.ts"), "utf8");
     expect(spec).toMatch(/E2E_SKIP_AGENT_PROBES === "1"/);
+  });
+
+  it("tells the smoke which lead function the deployment posts to", () => {
+    const smoke = stepsOf(workflow.jobs.smoke).find((s) => s.name === "Smoke the deployment");
+    expect(smoke?.env?.E2E_LEAD_FUNCTIONS).toBe("${{ vars.LEAD_FUNCTIONS }}");
+    const spec = readFileSync(join(REPO_ROOT, "e2e/api/base44-contract.spec.ts"), "utf8");
+    expect(spec).toContain("LEAD_VIA_SUPABASE");
+    const fixture = readFileSync(join(REPO_ROOT, "e2e/fixtures/app.ts"), "utf8");
+    expect(fixture).toContain("process.env.E2E_LEAD_FUNCTIONS");
+    expect(fixture).toContain("process.env.VITE_LEAD_FUNCTIONS");
   });
 
   it("builds the e2e matrix from the plan job rather than hard-coding it", () => {

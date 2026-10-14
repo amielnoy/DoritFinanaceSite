@@ -412,11 +412,19 @@ PR makes them forwarders.
 
 In **Supabase Edge Function secrets** (set by hand — the CI token cannot write
 secrets): `GOOGLE_SERVICE_ACCOUNT_JSON` (the service account's JSON key),
-`GOOGLE_CALENDAR_ID` (`govaridorit@gmail.com`) and `SHEET_ID` (the leads sheet),
-next to the `MAILER_URL` and `MAILER_TOKEN` above. Dorit must share her calendar
-("make changes to events") and the leads sheet (editor) with the service
-account's address. The meeting invitation goes by mail as an `.ics` file
-through `dorit-mailer`; there is no Outlook or Google Docs step any more.
+`GOOGLE_CALENDAR_ID` (amielnoy@gmail.com — the operator's own Google calendar,
+not Dorit's) and `SHEET_ID` (the leads sheet), next to the `MAILER_URL` and
+`MAILER_TOKEN` above. Share that calendar with the service account's address
+("make changes to events"), and the leads sheet (editor). Dorit does not need to
+share anything. A meeting arrives as an event in that Google calendar (no
+attendees) **and** as an `.ics` invitation by mail through `dorit-mailer` to
+`dorit@govari-fin.co.il` (her Outlook) and `amielnoy@outlook.com`, from
+`notifications@mail.govari-fin.co.il`; none goes to the Gmail address, which already holds the
+event. The invitations do not depend on the event: with `GOOGLE_CALENDAR_ID`
+unset, or the Google call failing (a `calendar_google_*` warning), they still go
+out, under a local `lead-<id>@govari-fin.co.il` UID instead of the event's; in that
+case `amielnoy@gmail.com` is invited too, so his Google calendar still gets the meeting.
+There is no Outlook or Google Docs step any more.
 Release order: apply `supabase/migrations/20261013000000_meetings_lead_id.sql` to
 the production database by hand after merge (CI deploys functions only) and before
 switching `VITE_LEAD_FUNCTIONS` — a Supabase-only lead has no Base44 id, so its
@@ -430,6 +438,94 @@ the key.
 `MAIL_FROM` must be on the domain verified in Resend — the subdomain
 `mail.govari-fin.co.il`, never the apex, which points at Microsoft 365 with an
 SPF ending in `-all`.
+
+### The clearinghouse requests (dark until the compliance review)
+
+`/masleka` collects a client's clearinghouse power-of-attorney code and ID
+number; `/admin/masleka` is the staff board that submits them in the
+clearinghouse portal (spec: `docs/superpowers/specs/2026-10-13-clearinghouse-route2-design.md`,
+PR A). Both values are AES-GCM ciphertext made by the Edge Functions with
+`MASLEKA_KEY`; they are wiped when a staff member presses **הגשתי**, and by
+the hourly `masleka-housekeeping` job after 9 days at the latest. The client's
+link is `https://govari-fin.co.il/masleka#t=<token>`: the token rides in the
+fragment, which is never sent in the HTTP request or in a Referer; GA4's
+`page_location` drops it (checked with real gtag.js: the collect hits carried
+`dl=…/masleka` with no fragment); Vercel Web Analytics would record it, so
+`<Analytics beforeSend={stripFragment} />` (`src/lib/vercel-analytics.ts`) cuts
+the fragment from every event; and the page removes it from the address bar
+after load.
+
+**Two switches, both off by default** and both on only when exactly `true`:
+`MASLEKA_ENABLED` (Supabase Edge Function secret) and `VITE_MASLEKA_ENABLED`
+(Vercel build env). Off: `/masleka` says "השירות אינו זמין כרגע", every
+`masleka-*` function answers 404 `disabled`, `submit-lead` sends today's
+`POA_URL` mail and creates no request, and `/admin/masleka` is a 404.
+`tests/contract/masleka-dark-launch.contract.test.ts` fails if either default
+changes or anything in the repo turns them on, and `e2e/ui/masleka.spec.ts`
+proves the dark page in the built site. Do not turn them on before Dorit's
+compliance adviser has signed off (`base44/agents/COMPLIANCE.md` §10).
+
+**Secrets** (Supabase Edge Function secrets, set by hand):
+`MASLEKA_KEY` — `openssl rand -base64 32` (exactly 32 bytes; losing it makes
+waiting codes unreadable, nothing else; rotate it only when no row is in
+`code_received`, or re-invite those clients); `MASLEKA_CRON_SECRET` —
+`openssl rand -hex 32`. The hourly reminder call reads two Vault secrets:
+`select vault.create_secret('https://hjowdyiwjjrqceumkvgt.supabase.co', 'masleka_functions_url');`
+and `select vault.create_secret('<the same MASLEKA_CRON_SECRET>', 'masleka_cron_secret');`.
+Until both exist, `masleka_call_remind()` does nothing.
+
+**Staff.** The board admits the platform admin (`profiles.role = 'admin'`) and
+anyone with a `memberships` row in agency 1; the blog and `/admin/leads` stay
+admin-only. Adding a staff member is one statement, after they have signed in
+once (so `auth.users` has them):
+
+```sql
+insert into public.memberships (user_id, agency_id, role)
+select id, '00000000-0000-0000-0000-000000000001', 'staff'
+  from auth.users where email = 'new.staff@example.com'
+on conflict do nothing;
+```
+
+Removing them is the matching `delete`; every board action re-checks
+membership, so it takes effect on their next click. Staff notices go to the
+profile e-mail of every admin and member (`masleka_staff_emails()`), or to
+`dorit@govari-fin.co.il` if none can be read — not to `dorit-mailer`'s
+`MAIL_TO`, which a rendered message cannot address.
+
+**Automatic invitations** come from `submit-lead`, so they need
+`VITE_LEAD_FUNCTIONS=supabase` as well; until then, staff create requests by
+hand on the board and copy the link. Business days are Sunday–Thursday;
+holidays are not modelled, so a holiday week's day-5 warning arrives early,
+never late.
+
+**Release:** the migration `20261015000000_masleka_requests.sql` is applied to
+production by hand and only on request (CI deploys functions only); run
+`supabase/tests/masleka_check.sql` against a local `supabase start` first.
+
+**Launch checklist** (every box before `MASLEKA_ENABLED` is set; none of it
+runs in CI):
+
+- [ ] Migration applied, then `select jobname, schedule from cron.job where jobname like 'masleka-%';` returns **2 rows** (`masleka-housekeeping`, `masleka-remind`). A missing `pg_net` only raises a NOTICE in the migration, so also run `select extname from pg_extension where extname in ('pg_cron','pg_net');` and expect both; if `pg_net` is missing, enable it (Dashboard, Database, Extensions) and re-run the `masleka-remind` scheduling block.
+- [ ] Edge secrets set: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_KEY="$(openssl rand -base64 32)" MASLEKA_CRON_SECRET="$(openssl rand -hex 32)"`. Functions deployed (the CI deploy job does this on merge).
+- [ ] Vault `masleka_cron_secret` is the same value as `MASLEKA_CRON_SECRET` and has **at least 32 characters** (a shorter one makes every reminder call answer 503): `select length(decrypted_secret) from vault.decrypted_secrets where name = 'masleka_cron_secret';` must be at least 32. Confirm `masleka_call_remind()` sends the header `x-masleka-cron` with that secret: `select pg_get_functiondef('public.masleka_call_remind'::regproc);` and look for `'x-masleka-cron'`.
+- [ ] The gateway's `x-forwarded-for`, once, on a deployed function (the per-IP limit of `masleka-code` keys on the header's first entry, so a client that can forge it defeats the limit). With the switch on for the smoke, post one bad submission twice, the second time with a forged header: `curl -s -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-code -H 'content-type: application/json' -H 'x-forwarded-for: 198.51.100.7' -d '{"token":"x","code":"x","idNumber":"x"}'`. Then `select key, count(*) from public.submission_limits where key like 'masleka-ip:%' and at > now() - interval '10 minutes' group by key;` and compare with `printf %s "$(curl -s https://api.ipify.org)" | shasum -a 256`. Expected: the key is `masleka-ip:` plus the hash of your real address, not of 198.51.100.7. If it is the forged one, derive the IP from the last entry instead, in `clientIp` (`supabase/functions/_shared/guard.ts`), before launch.
+- [ ] `masleka-reveal` keeps `Cache-Control: no-store` through the gateway. Only the 200 answer carries it, so use the smoke's hand-made `code_received` request and a staff session: `curl -i -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-reveal -H 'content-type: application/json' -H "authorization: Bearer $STAFF_JWT" -d '{"requestId":"<id>","field":"code"}'` and read `Cache-Control: no-store` in the response headers (a CDN or gateway that rewrites it is a launch blocker).
+- [ ] **Migration order.** `20261015000000_masleka_requests.sql` sorts before main's `20261016*` chat migrations. If those are applied to production first, `supabase db push` refuses the older file: use `supabase db push --include-all`. If the migration is applied by hand in the SQL editor instead, follow it with `supabase migration repair --status applied 20261015000000` so the history matches.
+- [ ] **The XFF check, both commands.** (1) With your real address: `curl -s -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-code -H 'content-type: application/json' -d '{"token":"x","code":"x","idNumber":"x"}'`; (2) the same with `-H 'x-forwarded-for: 198.51.100.7'` added. Both bodies are bad (a malformed token), so nothing is stored. Compare the two `masleka-ip:` keys in `submission_limits` as in the XFF line above: they must be the same key, the hash of your real address.
+- [ ] **DST check, once** (Task 3's case: the 25 Oct 2026 clock change must not move the wall time). On any machine with Deno, from the repo root: `deno eval --no-config 'import { addBusinessDays } from "./supabase/functions/_shared/business-days.ts"; const r = addBusinessDays(new Date("2026-10-21T21:30:00Z"), 4); console.log(r.toLocaleString("en-GB", { timeZone: "Asia/Jerusalem" }))'` must print `28/10/2026, 00:30:00` (Thursday 22 Oct 00:30 Israel time plus 4 business days is Wednesday 28 Oct 00:30). The same case runs in CI as `UNIT-BDAY-006`; this confirms it on the Edge runtime's Deno.
+- [ ] **Product decision: the failure copy.** When `masleka-code` fails before storing anything, the client's default failure message says the code may have arrived, so the client does not retry and staff are not alerted. Decide whether that is acceptable or whether a failure should also raise a staff notice, and settle the wording.
+- [ ] **Product decision: an unsubmitted wipe.** When the hourly job wipes a `code_received` request on day 9 that nobody submitted, no staff member is told. Decide whether a notice is sent (and to whom) before switch-on.
+- [ ] **Product decision: the remind-rotation corner.** If staff relink a request between a reminder mail and its rotation, the client's reminder link is dead and they see "link_invalid". Rare; decide whether to accept it or to make the rotation skip a request that was relinked after the reminder was claimed.
+- [ ] Decide the resubmitted-interview duplicate: a completed interview submitted twice creates a second request for the same contact. Reuse or rotate the existing `invited` request in `submit-lead`, or accept the duplicate knowingly.
+- [ ] Verify at swiftness.co.il whether the advisor portal needs the ID number besides the code; if not, a later PR drops `id_ciphertext`, `id_last4` and the form field. Confirm the saver-registration and advisor-portal URLs (`CLEARINGHOUSE_SAVER_URL` / `CLEARINGHOUSE_ADVISOR_URL`).
+- [ ] When the step screenshots are captured, confirm the portal's wording in `/admin/masleka/guide` against the real screens (the guide quotes no portal menu label until then).
+- [ ] **Privacy policy gate:** the privacy policy is updated to cover collecting the Israeli ID number and the clearinghouse code (purpose, retention of at most 9 days, access by staff, wipe) and the compliance adviser has approved the wording (`base44/agents/COMPLIANCE.md` §10, point 7). Not before switch-on, no switch-on.
+- [ ] The compliance adviser has approved the points in `base44/agents/COMPLIANCE.md` §10, including the interview and wizard wording that still promises a signed mandate.
+- [ ] After switch-on, open one test link with GA4 DebugView and confirm no `#t=` appears in `page_location`.
+- [ ] After switch-on, open one test link with the browser's network tab open and confirm the Vercel Web Analytics beacon (`/_vercel/insights/view`) carries a url with no `#t=`.
+- [ ] Staff memberships added (SQL above), Dorit's own `owner` row confirmed: `select * from public.memberships;`.
+- [ ] Switch on: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED=true` and `VITE_MASLEKA_ENABLED=true` on Vercel (production and preview), then redeploy. Smoke with a hand-made request to a staff member's own address: the client page, a reveal (a row appears in `masleka_access_log`), **הגשתי** (`select count(*) from masleka_requests where (code_ciphertext is not null or id_ciphertext is not null) and status <> 'code_received';` is 0).
+- [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days.
 
 ## The chat function (Phase 3)
 
@@ -456,10 +552,12 @@ What it stores and how a turn runs:
   interview exists to take it. A bare nine digits starting 0[2-489] that passes
   the ID check digit is treated as an ID. Nothing is clipped below the column's
   8,000 characters.
-- **One turn at a time.** A message claims its conversation (`busy_until`, 60 s)
+- **One turn at a time.** A message claims its conversation (`busy_until`, 180 s)
   in the same write that counts the turn; a second message sent while the first
   is being answered gets `409 busy` ("הודעה קודמת עדיין בטיפול — רגע אחד."), and
-  a crashed turn's claim lapses after 60 s.
+  a crashed turn's claim lapses after 180 s. The hold is that long because tools
+  run outside the 25 s model budget, and a lead's save can outlast 60 s when a
+  provider is slow.
 - **A saved lead is written the moment the tool answers**, before the model is
   called again; the tool and usage rows after it are best-effort (logged as
   `store.tool_row_failed` / `store.usage_failed`). If the model then fails, the
@@ -505,8 +603,12 @@ npm run test:eval:chat
 ```
 
 Optional: `EVAL_MODEL` (default `claude-sonnet-5-5`), `EVAL_ONLY` (comma-separated
-persona ids; a subset run can pass vacuously, so do not use it as the gate) and
-`VITE_SUPABASE_PUBLISHABLE_KEY` (sent as `apikey`).
+persona ids; a subset run can pass vacuously, so do not use it as the gate),
+`EVAL_MAX_TURNS` (visitor messages per persona, 1–100, default 24 — at 14 the
+interview was still asking questions when the cap cut it off) and
+`VITE_SUPABASE_PUBLISHABLE_KEY` (sent as `apikey`). The summary reports the
+median and longest number of visitor turns to a complete lead: the measure of
+how long the interview is for a real visitor.
 
 **The preflight.** Without a matching `CHAT_EVAL_TOKEN` on the function, a request
 runs as a real conversation: a real model call and a real lead and mail. So the
@@ -541,8 +643,9 @@ in this order:
    for agents served by `chat`), the transcript storage and the "שיחה" tab. The
    v6 sentence carries `TODO(compliance): adviser to approve` in
    `src/config/compliance.ts`; that TODO is a release gate, not a code gap.
-5. Phase 2 step 6 done (Dorit's calendar shared, a test lead seen end to end),
-   because the interview books through the same `submit-lead` handler.
+5. Phase 2 step 6 done (a test lead seen end to end), because the interview
+   books through the same `submit-lead` handler. Done 2026-10-14: an interview,
+   a hand-off and the Outlook invitations were verified on production.
 6. Only then set `VITE_CHAT_AGENTS=needs_interview` on Vercel, redeploy, and run
    one real interview: the lead, the mail, the event, the sheet row, the tab.
 
@@ -553,6 +656,13 @@ Checks that remain before or at the switch:
   id: a dated snapshot id (`claude-haiku-5-5-2026…`) falls back to the most
   expensive known rate, so the budget would overcount. Add the id the API
   actually reports.
+- Once, after the migrations are applied, check the turn claim against the real
+  PostgREST, not the unit tests' fake: send two messages to one conversation at
+  the same moment (e.g. two `curl`s in the evaluation mode). Exactly one should
+  answer 200 and the other `409 busy`, and afterwards the row's `busy_until`
+  should be empty and `turns` up by one. A claim filter PostgREST reads
+  differently from the fake would show here as two 200s or a stuck
+  `busy_until`.
 - Once, after the function is deployed, confirm how Supabase's gateway sets
   `x-forwarded-for`: the per-IP limit (`clientIp` in `_shared/guard.ts`) takes
   its first entry, which is only safe if a client cannot prepend its own. Send

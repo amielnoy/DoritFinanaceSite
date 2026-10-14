@@ -401,3 +401,88 @@ export class AccountLoadError extends Error {
     super(reason);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * The clearinghouse request pipeline (PR A).
+ *
+ * The public page calls `submitCode`; the staff board calls the rest.
+ * Everything that changes a request is an Edge Function, which checks who is
+ * asking on every call; the browser itself only reads, and only the columns
+ * the migration grants — never a ciphertext or a token hash.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+export type StaffRole = "admin" | "owner" | "agent" | "staff";
+export type MaslekaStatus = "invited" | "code_received" | "submitted" | "completed" | "expired" | "cancelled";
+export type MaslekaField = "id" | "code";
+
+export interface MaslekaRequest {
+  id: string;
+  clientName: string;
+  contactEmail: string | null;
+  status: MaslekaStatus;
+  leadId: string | null;
+  /** Kept after the wipe, for matching a downloaded file (PR B). */
+  idLast4: string | null;
+  createdAt: string;
+  tokenExpiresAt: string | null;
+  clientInvitedAt: string | null;
+  codeReceivedAt: string | null;
+  submittedAt: string | null;
+  /** When the clearinghouse deletes the download: business day 7 after submission. */
+  clearinghouseDeletesAt: string | null;
+  completedAt: string | null;
+}
+
+/** A link to the client's page, shown once to the staff member who asked for it. */
+export interface MaslekaLink {
+  requestId: string;
+  link: string;
+  /** Whether it also went to the client by mail. */
+  invited: boolean;
+}
+
+export interface NewMaslekaRequest {
+  clientName: string;
+  contactEmail?: string;
+  sendInvite: boolean;
+}
+
+export type MaslekaFailure =
+  | "disabled"
+  | "link_invalid"
+  | "bad_id"
+  | "bad_code"
+  /** A second הגשתי: a state to show ("כבר סומן כהוגש"), not an error (Ruling 18). */
+  | "already_submitted"
+  | "rate_limited"
+  | "unauthorized"
+  | "forbidden"
+  | "not_found"
+  | "not_available"
+  | "invalid"
+  | "invalid_name"
+  | "invalid_email"
+  | "unavailable"
+  | "failed";
+
+export class MaslekaError extends Error {
+  constructor(readonly reason: MaslekaFailure, readonly rid?: string) {
+    super(reason);
+  }
+}
+
+export interface MaslekaPort {
+  /** The client's page: the link's token, their code and their ID. */
+  submitCode(token: string, code: string, idNumber: string): Promise<void>;
+  /** The signed-in user's staff role, or null — decides which screens to offer, nothing more. */
+  myRole(): Promise<StaffRole | null>;
+  /** Requests still on the board (invited, waiting, submitted, completed), newest first. */
+  list(): Promise<MaslekaRequest[]>;
+  create(input: NewMaslekaRequest): Promise<MaslekaLink>;
+  /** A fresh link for a request still waiting for its code. */
+  relink(requestId: string): Promise<MaslekaLink>;
+  /** One decrypted value, logged server-side. */
+  reveal(requestId: string, field: MaslekaField): Promise<string>;
+  /** הגשתי: wipes the code and the ID. */
+  markSubmitted(requestId: string): Promise<void>;
+}

@@ -1,8 +1,10 @@
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
 import { CHAT_AGENTS } from "@/config/chat-agents";
+import { CONTENT_WRITES } from "@/config/content-writes";
 import { LEAD_FUNCTIONS } from "@/config/lead-functions";
-import { UPLOAD_PROVIDER } from "@/config/upload-provider";
+import { MASLEKA_ENABLED } from "@/config/masleka";
+import { CONTENT_IMAGES, UPLOAD_PROVIDER } from "@/config/upload-provider";
 import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
 import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
@@ -16,13 +18,17 @@ import { Base44UploadService } from "./base44/Base44UploadService";
 import { SupabaseAgentService } from "./supabase/SupabaseAgentService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
+import { SupabaseImageUploadService, type SupabaseImageStorageClient } from "./supabase/SupabaseImageUploadService";
+import { EdgeContentAdminService, type ContentFunctionsClient } from "./supabase/EdgeContentAdminService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
 import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
 import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
+import { SupabaseMaslekaService, type SupabaseMaslekaClient } from "./supabase/SupabaseMaslekaService";
 import { SupabaseSupportService } from "./supabase/SupabaseSupportService";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
+import { UnconfiguredMaslekaService } from "./unconfigured/UnconfiguredMaslekaService";
 import { RoutedAgentService } from "./RoutedAgentService";
 import type { Services } from "./index";
 import type {
@@ -33,6 +39,7 @@ import type {
   ContentPort,
   LeadAdminPort,
   LeadPort,
+  MaslekaPort,
   SupportPort,
   UploadPort,
 } from "./ports";
@@ -73,11 +80,18 @@ const contentPort: ContentPort = tables ? new SupabaseContentService(tables) : n
  * backend function, which holds both credentials and needs no browser identity
  * — only proof of who is asking.
  */
-const contentAdmin: ContentAdminPort = new FunctionContentAdminService(
-  client as unknown as FunctionsClient,
-  tables ? new SupabaseContentAdminService(tables) : new Base44ContentAdminService(client),
-  async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null,
-);
+const adminReads: ContentAdminPort = tables ? new SupabaseContentAdminService(tables) : new Base44ContentAdminService(client);
+const sessionToken = async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null;
+
+/**
+ * …and with `VITE_CONTENT_WRITES=supabase`, the writes go to the `content-admin`
+ * Edge Function instead, Supabase only — see src/config/content-writes.ts for
+ * why that waits for Phase 3.
+ */
+const contentAdmin: ContentAdminPort =
+  CONTENT_WRITES === "supabase" && supabase
+    ? new EdgeContentAdminService(supabase as unknown as ContentFunctionsClient, adminReads, sessionToken)
+    : new FunctionContentAdminService(client as unknown as FunctionsClient, adminReads, sessionToken);
 
 /** The admin's leads: read and written in Supabase when it is configured, else through Base44 as before. */
 const leadsAdminPort: LeadAdminPort = tables
@@ -106,11 +120,15 @@ const accountPort: AccountPort = supabase
   : new UnconfiguredAccountService();
 
 /**
- * Public images (blog covers, testimonial photos) stay on Base44: the only
- * Supabase bucket is the private claim-documents one, and an image put there
+ * Public images (blog covers, testimonial photos), into the public
+ * content-images bucket when `VITE_CONTENT_IMAGES=supabase`, else Base44.
+ * Never the claim-documents bucket: it is private, and an image put there
  * would be unreadable to every visitor.
  */
-const uploadPort: UploadPort = new Base44UploadService(client);
+const uploadPort: UploadPort =
+  CONTENT_IMAGES === "supabase" && supabase
+    ? new SupabaseImageUploadService(supabase as unknown as SupabaseImageStorageClient)
+    : new Base44UploadService(client);
 
 /**
  * Where a claim document lands, from whichever provider is switched on.
@@ -140,6 +158,16 @@ const supportPort: SupportPort =
     : base44Support;
 
 /**
+ * The clearinghouse pipeline: on Supabase only when the switch is on AND a
+ * client exists. Otherwise a stand-in that is never available and never
+ * touches the network, so a dark build calls no `masleka-*` function.
+ */
+const maslekaPort: MaslekaPort =
+  MASLEKA_ENABLED && supabase
+    ? new SupabaseMaslekaService(supabase as unknown as SupabaseMaslekaClient)
+    : new UnconfiguredMaslekaService();
+
+/**
  * The on-site agents: the `chat` Edge Function for those named in
  * `VITE_CHAT_AGENTS` (empty by default), Base44 for the rest.
  */
@@ -160,5 +188,6 @@ export const services: Services = {
   leadsAdmin: leadsAdminPort,
   contentAdmin,
   account: accountPort,
+  masleka: maslekaPort,
 };
 

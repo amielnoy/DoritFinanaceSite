@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 439
+**Location:** `tests/contract/` · **Cases:** 158 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 888 including `it.each` / `describe.each` expansions (887 pass, 1 skipped)
 
 ---
 
@@ -481,6 +481,7 @@ Regenerate the files with `node scripts/self-host-fonts.mjs`; never edit
 | CTR-EDGE-001 | "mention no Docs, no Outlook and no Base44 connector" | No file under `supabase/functions` names `googledocs`, `graph.microsoft.com`, `connectors.` or `createClientFromRequest` |
 | CTR-EDGE-002 | "are each registered without JWT verification, as submit-claim is" | `verify_jwt = false` for `submit-claim`, `submit-lead`, `escalate-to-human`, `log-support-chat` in `config.toml` |
 | CTR-EDGE-003 | "ask Google for exactly two scopes" | `_shared/google.ts` lists only `calendar.events` and `spreadsheets` |
+| CTR-EDGE-004 | "registers each clearinghouse function without the gateway's JWT check, because each checks its caller itself" | `verify_jwt = false` for every `masleka-*` directory |
 
 ### 4.8 Article addresses — `article-slug.contract.test.ts`
 
@@ -572,6 +573,57 @@ The interview's tools ask the model for nothing their Edge handlers do not read,
 | CTR-CHFN-008 | "stamps every conversation with the consent version it was given under" (changed pin, `agents.contract.test.ts`) | `consent_version: consentVersion`, chosen as `viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION` |
 | CTR-CHFN-007 | "sends only fields the function reads" | Every key the browser adapter posts, on the first and the following message, is read by `handler.ts` as `input.<key>` |
 
+### 4.13 The clearinghouse schema — `masleka-schema.contract.test.ts`
+
+Reads `supabase/migrations/20261015000000_masleka_requests.sql`. The behaviour
+itself is proved by `supabase/tests/masleka_check.sql` against a local
+`supabase start` (manual, like the other SQL checks):
+`supabase start && supabase db reset && psql "$(supabase status -o env | grep DB_URL | cut -d= -f2- | tr -d '"')" -f supabase/tests/masleka_check.sql`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-MSK-001 | "sorts after every migration that came before it" | After `20261014000000_blog_slug.sql` |
+| CTR-MSK-002 | "turns row-level security on for both tables" | Both `enable row level security` |
+| CTR-MSK-003 | "grants anon nothing at all" | No grant names `anon` |
+| CTR-MSK-004 | "lets the browser read neither the ciphertext nor the token hash" | Column grant without `code_ciphertext`, `id_ciphertext`, `token_hash`; no table-wide select; no writes |
+| CTR-MSK-005 | "keeps the service-only functions away from anon and authenticated, by name" | Five revokes `from public, anon, authenticated`; `my_staff_role` to authenticated only |
+| CTR-MSK-006 | "refuses ciphertext outside code_received, in the table itself" | The check constraint |
+| CTR-MSK-007 | "wipes at nine days and expires links at thirty" | Both intervals present |
+| CTR-MSK-008 | "schedules its jobs only where pg_cron and pg_net exist" | Both `cron.schedule` calls after the `pg_available_extensions` guard |
+| CTR-MSK-009 | "keeps the remind call's address and secret in Vault, not in the migration" | Vault names present; no URL |
+| CTR-MSK-010 | "creates no storage bucket — no clearinghouse file is ever uploaded" | No `storage.buckets` |
+| CTR-MSK-011 | "hands the two staff lookups to service_role alone" | `staff_role` and `masleka_staff_emails` granted to `service_role`, to no one else |
+| CTR-MSK-012 | "pins an empty search_path on every security definer function" | Every `security definer` function has `set search_path = ''` |
+| CTR-MSK-013 | "keeps the access log append-only, even for service_role" | service_role's default privileges revoked; log granted `select, insert` only; log FK `on delete set null`, no cascade |
+
+### 4.14 The clearinghouse ships dark — `masleka-dark-launch.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-MSKD-001 | "has the five functions to check" | Exactly the five `masleka-*` directories |
+| CTR-MSKD-002 | "masleka-code refuses before it reads or writes anything while the switch is off" | `if (!maslekaEnabled())` precedes every read, write and mail |
+| CTR-MSKD-003 | "masleka-create refuses before it reads or writes anything while the switch is off" | Same |
+| CTR-MSKD-004 | "masleka-remind refuses before it reads or writes anything while the switch is off" | Same |
+| CTR-MSKD-005 | "masleka-reveal refuses before it reads or writes anything while the switch is off" | Same |
+| CTR-MSKD-006 | "masleka-submitted refuses before it reads or writes anything while the switch is off" | Same |
+| CTR-MSKD-007 | "turns the Edge switch on only for exactly \"true\"" | The literal comparison after `trim()` |
+| CTR-MSKD-008 | "lets submit-lead create a request only behind the same switch" | `createRequest` inside the guarded branch |
+| CTR-MSKD-009 | "is off in a build that does not set VITE_MASLEKA_ENABLED" | `false` |
+| CTR-MSKD-010 | "is turned on by nothing in the repository" | No `MASLEKA_ENABLED=true` (comment lines aside) in Vercel, Playwright, Vitest, Supabase config, package.json or workflows |
+| CTR-MSKD-011 | "registers the staff pages only when switched on, and the client page always (it then says unavailable)" | Guarded `StaffRoute` block; `/masleka` route; page default `enabled = MASLEKA_ENABLED` |
+| CTR-MSKD-012 | "recognises "VITE_MASLEKA_ENABLED": "true" as switch-on: true" | Detected (JSON-quoted key with a string true) |
+| CTR-MSKD-013 | "recognises "MASLEKA_ENABLED":true as switch-on: true" | Detected (JSON-quoted key with a bare true) |
+| CTR-MSKD-014 | "recognises MASLEKA_ENABLED: true as switch-on: true" | Detected (unquoted YAML) |
+| CTR-MSKD-015 | "recognises MASLEKA_ENABLED=true as switch-on: true" | Detected (env style) |
+| CTR-MSKD-016 | "recognises VITE_MASLEKA_ENABLED: "true" as switch-on: true" | Detected (YAML with a quoted value) |
+| CTR-MSKD-017 | "recognises VITE_MASLEKA_ENABLED = 'true' as switch-on: true" | Detected (spaced, single-quoted) |
+| CTR-MSKD-018 | "recognises MASLEKA_ENABLED=false as switch-on: false" | Not detected |
+| CTR-MSKD-019 | "recognises MASLEKA_ENABLED="" as switch-on: false" | Not detected |
+| CTR-MSKD-020 | "recognises "VITE_MASLEKA_ENABLED": "" as switch-on: false" | Not detected |
+| CTR-MSKD-021 | "recognises # MASLEKA_ENABLED=true as switch-on: false" | Not detected |
+| CTR-MSKD-022 | "recognises // VITE_MASLEKA_ENABLED=true as switch-on: false" | Not detected |
+| CTR-MSKD-023 | "recognises the `=== 'true'` comparison in code as switch-on: false" | Not detected |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
@@ -581,7 +633,7 @@ time.
 
 ## 6. Pass criteria
 
-All 590 cases pass. A failure means either the frontend or the backend definition
+All 158 declared cases pass (vitest: 887 pass, 1 skipped, of 888 with expansions). A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 ### Production smoke publish preflight

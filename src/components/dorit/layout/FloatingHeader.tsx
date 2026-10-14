@@ -6,6 +6,9 @@ import { CONTACT } from "@/config/contact";
 import { useAuth } from "@/lib/AuthContext";
 import { useSectionNav } from "@/hooks/useSectionNav";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
+import { useQuery } from "@tanstack/react-query";
+import { MASLEKA_ENABLED } from "@/config/masleka";
+import { services } from "@/services";
 
 interface NavItem {
   label: string;
@@ -49,6 +52,41 @@ const NAV_LINK =
  * admin address and letting the guard bounce you there.
  */
 const LOGIN_HREF = "/login?returnTo=/account";
+
+/**
+ * The clearinghouse board's link, for the people its gate (StaffRoute) lets
+ * in: the platform admin, or a member of the agency — asked of the database
+ * (`my_staff_role`), since the token carries no membership. Mounted only while
+ * VITE_MASLEKA_ENABLED is on, so a dark build neither shows it nor asks.
+ * Only the link depends on this answer; the route and every action on the
+ * board check again for themselves.
+ */
+function MaslekaMenuLink({
+  className,
+  onClick,
+  children,
+}: {
+  className: string;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
+  const { user } = useAuth();
+  const userId = typeof user?.id === "string" ? user.id : "";
+  const isAdmin = user?.role === "admin";
+  const role = useQuery({
+    queryKey: ["admin", "staff-role-menu", userId],
+    queryFn: () => services.masleka.myRole(),
+    enabled: !isAdmin && userId !== "",
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  if (!isAdmin && !(typeof role.data === "string" && role.data)) return null;
+  return (
+    <Link to="/admin/masleka" className={className} onClick={onClick}>
+      {children}
+    </Link>
+  );
+}
 
 export default function FloatingHeader() {
   const [open, setOpen] = useState<boolean>(false);
@@ -180,6 +218,9 @@ export default function FloatingHeader() {
                 <Link to="/admin/blog" className={NAV_LINK}>ניהול בלוג</Link>
               </>
             ) : null}
+            {MASLEKA_ENABLED && isAuthenticated ? (
+              <MaslekaMenuLink className={NAV_LINK}>בקשות מסלקה</MaslekaMenuLink>
+            ) : null}
             {isAuthenticated ? (
               <button type="button" onClick={signOut} className={NAV_LINK}>
                 יציאה
@@ -252,6 +293,9 @@ export default function FloatingHeader() {
               <Link to="/admin/leads" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול פניות</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
               <Link to="/admin/blog" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול בלוג</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
             </>
+          ) : null}
+          {MASLEKA_ENABLED && isAuthenticated ? (
+            <MaslekaMenuLink className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>בקשות מסלקה</span><ChevronLeft size={18} className="text-muted-foreground" /></MaslekaMenuLink>
           ) : null}
           {isAuthenticated ? (
             <button type="button" onClick={signOut} className="w-full flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200 text-start">

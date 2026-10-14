@@ -400,7 +400,33 @@ verify_jwt = false
 [functions.log-support-chat]
 verify_jwt = false
 
+# The clearinghouse functions (PR A). None asks the gateway to check a JWT:
+# masleka-code is reached from a link without signing in, the members-only
+# ones prove the caller themselves (auth server + staff_role on every call,
+# see _shared/staff.ts), and masleka-remind is called by pg_cron with a
+# shared secret. The site's sb_publishable_ key is not a JWT either.
+[functions.masleka-code]
+verify_jwt = false
+
+[functions.masleka-reveal]
+verify_jwt = false
+
+[functions.masleka-submitted]
+verify_jwt = false
+
+[functions.masleka-create]
+verify_jwt = false
+
+[functions.masleka-remind]
+verify_jwt = false
+
 # The site's chat posts without signing in, like the forms; the function checks
 # its own input and holds a conversation by its own token.
 [functions.chat]
+verify_jwt = false
+
+# The admin's content writes. Off at the gateway like the others — the
+# publishable key is not a JWT — because the function's own gate is stricter
+# than "any valid JWT": a session Supabase Auth accepts, whose profile is admin.
+[functions.content-admin]
 verify_jwt = false

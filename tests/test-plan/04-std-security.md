@@ -4,7 +4,7 @@
 `npm run test:e2e:security` (runtime, Playwright)
 **Location:** `tests/security/static-security.test.ts`,
 `tests/security/agent-surface.security.test.ts`, `e2e/security/security.spec.ts`
-**Cases:** 71 static (24 site + 47 agent surface) + 16 runtime (× 4 platforms)
+**Cases:** 76 static declared (26 site + 50 agent surface; `npm run test:security` runs 79 including `it.each` expansions) + 16 runtime (× 4 platforms)
 
 ---
 
@@ -105,13 +105,13 @@ logs show the admin pages clean.
 
 ## 4a. Agent surface — `tests/security/agent-surface.security.test.ts`
 
-47 cases over the four surfaces the agents introduced. A model's behaviour
+50 cases over the four surfaces the agents introduced. A model's behaviour
 cannot be asserted, so none of them try: every case pins something that holds
 whatever the model does.
 
 | Group | Cases | What it holds |
 |---|---|---|
-| `SEC-AGT-XSS-*` | 9 + 6 | Dorit's "שיחה" tab shows a stored transcript as plain text with no write path (`SEC-AGT-XSS-009` is the tab; the email cases keep their IDs by title). The chat renders replies through `react-markdown` with no raw-HTML plugin and no `dangerouslySetInnerHTML`; the confirmation email escapes every visitor-supplied binding. The escaping helper is **lifted out of the Deno source and executed** here, so these assert behaviour rather than the presence of a call. |
+| `SEC-AGT-XSS-*` | 9 + 6 + 3 | Dorit's "שיחה" tab shows a stored transcript as plain text with no write path (`SEC-AGT-XSS-009` is the tab; the email cases keep their IDs by title). The chat renders replies through `react-markdown` with no raw-HTML plugin and no `dangerouslySetInnerHTML`; the confirmation email escapes every visitor-supplied binding; the shared letter's button (`SEC-AGT-XSS-017..019`) renders only an `https://` href with no quote, bracket or space, never as `javascript:`/`data:`/relative, and escapes its label. The escaping helper is **lifted out of the Deno source and executed** here, so these assert behaviour rather than the presence of a call. |
 | `SEC-AGT-PHI-*` | 8 | No visitor value reaches an `href`; template links stay on the agency domain; recipients resolve from constants; every `tel:`/`mailto:` target binds from the contact config or the server's escalation receipt; the chat's contact block comes from the backend, not from a reply that merely claims a number; no request body may widen a recipient list. |
 | `SEC-AGT-INJ-*` | 10 + 1 | Each prompt declares its compliance block to override any later instruction and routes doubt to `escalateToHuman`; the shell never parses a reply for commands; the consent stamp is the shell's (v5, or v6 for an agent on the chat function, chosen from its own constants), so a persuaded model cannot backdate what a visitor agreed to; and no `...body` is spread into an entity write. |
 | `SEC-AGT-DLP-*` | 13 | `redact()` is **executed against real payloads** — ID numbers, spaced and hyphenated card numbers, an Israeli IBAN, account-length digits — and asserted to leave ordinary prose intact and cap its output. Plus: the `Lead` schema carries no sensitive field, the sheet has no sensitive column, no token is echoed or logged, and the consent notice names exactly the fields that are collected. |
@@ -138,6 +138,13 @@ Two findings came out of writing these, one of them a defect that is now fixed:
   lint step sees them. These tests read the source as text, which is the only
   check that currently exists on the code holding the compliance logic.
 
+## 4c. The clearinghouse board's gate — `tests/security/static-security.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| SEC-STAFF-001 | "keeps the clearinghouse board behind a gate that requires sign-in and a staff role, and only when switched on" | `/admin/masleka` and `/admin/masleka/guide` inside `<StaffRoute>` under `MASLEKA_ENABLED ?`, and nowhere else in `App.jsx`; StaffRoute falls back to ProtectedRoute, redirects a non-member to `/`, asks `myRole()` |
+| SEC-STAFF-002 | "the clearinghouse board keeps a revealed value out of storage, logs and the access log" | `MaslekaBoard.tsx` names no `masleka_access_log` (the server writes it, Ruling 17), no Web Storage or IndexedDB, no `console.`, no analytics call, no history/navigation write |
+
 ## 5. Deviations
 
 `SEC-HDR-001` is opt-in because transport hardening is set by the host
@@ -146,5 +153,5 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 
 ## 6. Pass criteria
 
-All 73 static cases pass; all 16 runtime cases pass on all four platforms,
+All 76 static declared cases pass (vitest: 79 with expansions); all 16 runtime cases pass on all four platforms,
 with `SEC-HDR-001` skipped unless explicitly enabled.

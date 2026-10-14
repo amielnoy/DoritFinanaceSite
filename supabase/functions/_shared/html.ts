@@ -5,6 +5,15 @@ export interface ClientMail {
   intro: string;
   panelTitle: string;
   details: [label: string, value: string][];
+  /** One button under the panel. Rendered only for an https:// href with no quote, angle bracket or space. */
+  action?: { label: string; href: string };
+}
+
+/** The button-style anchor for `action`, or '' when the href is not a plain https:// address. */
+function actionBlock(action: ClientMail['action']): string {
+  if (!action || !/^https:\/\/[^\s"'<>]+$/.test(action.href)) return '';
+  return `
+        <p style="margin:0 0 32px; text-align:center;"><a href="${escapeHtml(action.href)}" style="display:inline-block; padding:14px 32px; background:#1A1A1B; color:#F9F7F2; font-family:Arial,sans-serif; font-size:15px; font-weight:bold; text-decoration:none; border-radius:4px;">${escapeHtml(action.label)}</a></p>`;
 }
 
 
@@ -44,7 +53,7 @@ export function escapeHtml(text: unknown): string {
  * Callers pass raw values. Escaping happens here, at the binding site, so a new
  * field cannot be added without it.
  */
-export function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, details }: ClientMail): string {
+export function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle, details, action }: ClientMail): string {
   const rows = (details || []).filter(([, value]) => value);
   // No name rather than a doubtful one: greetingName returns '' for anything not made of letters.
   const greeting = firstName ? 'שלום ' + firstName + ',' : 'שלום,';
@@ -88,7 +97,7 @@ export function buildClientHtml({ firstName, eyebrow, heading, intro, panelTitle
           <h1 style="margin:0 0 24px; font-family:Georgia,serif; font-size:28px; font-weight:bold; color:#1A1A1B; line-height:1.3; letter-spacing:-0.02em; text-align:right;">${escapeHtml(heading)}</h1>
           <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(greeting)}</p>
           <p style="margin:0 0 16px; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">${escapeHtml(intro)}</p>
-          ${detailsBlock}
+          ${detailsBlock}${actionBlock(action)}
           <div style="height:2px; width:48px; background:#C3AD96; margin:32px 0 20px;"></div>
           <p style="margin:0; font-size:15px; color:#3D3D3F; line-height:1.8; text-align:right;">לכל שאלה או עדכון — ניתן להשיב ישירות למייל זה.</p>
         </td></tr>

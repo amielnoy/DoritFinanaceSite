@@ -34,11 +34,14 @@ async function load(supabase: unknown, base44: unknown) {
     Base44LeadAdminService: (await import("@/services/base44/Base44LeadAdminService")).Base44LeadAdminService,
     SupabaseLeadService: (await import("@/services/supabase/SupabaseLeadService")).SupabaseLeadService,
     Base44LeadService: (await import("@/services/base44/Base44LeadService")).Base44LeadService,
+    SupabaseMaslekaService: (await import("@/services/supabase/SupabaseMaslekaService")).SupabaseMaslekaService,
+    UnconfiguredMaslekaService: (await import("@/services/unconfigured/UnconfiguredMaslekaService")).UnconfiguredMaslekaService,
   };
 }
 
 describe("composition root", () => {
   beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => vi.unstubAllEnvs());
 
   it("reads content and leads from Supabase when a client is configured", async () => {
     const fake = tableFake({ data: [], error: null });
@@ -67,9 +70,73 @@ describe("composition root", () => {
     expect(m.services.content).toBeInstanceOf(m.Base44ContentService);
     expect(m.services.leadsAdmin).toBeInstanceOf(m.Base44LeadAdminService);
     expect(m.services.leads).toBeInstanceOf(m.Base44LeadService);
+    expect(m.services.masleka).toBeInstanceOf(m.UnconfiguredMaslekaService);
 
     await m.services.contentAdmin.listArticles();
     expect(b.blogList).toHaveBeenCalled();
+  });
+
+  const maslekaSupabase = () => ({
+    ...tableFake({ data: [], error: null }).client,
+    auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+    storage: { from: () => ({}) },
+    rpc: vi.fn(async () => ({ data: "staff", error: null })),
+    functions: { invoke: vi.fn(async () => ({ data: { ok: true }, error: null })) },
+  });
+
+  it("uses the Supabase clearinghouse adapter only when the switch is on and a client exists", async () => {
+    vi.stubEnv("VITE_MASLEKA_ENABLED", "true");
+    const m = await load(maslekaSupabase(), base44Fake().client);
+    expect(m.services.masleka).toBeInstanceOf(m.SupabaseMaslekaService);
+  });
+
+  it("ships dark: with the switch off and a client, no masleka-* function or staff RPC is ever called", async () => {
+    vi.stubEnv("VITE_MASLEKA_ENABLED", "");
+    const supabase = maslekaSupabase();
+    const m = await load(supabase, base44Fake().client);
+    expect(m.services.masleka).toBeInstanceOf(m.UnconfiguredMaslekaService);
+    const port = m.services.masleka;
+    await port.submitCode("t", "c", "i").catch(() => {});
+    await port.list().catch(() => {});
+    await port.create({ clientName: "x", sendInvite: false }).catch(() => {});
+    await port.relink("r").catch(() => {});
+    await port.reveal("r", "code").catch(() => {});
+    await port.markSubmitted("r").catch(() => {});
+    expect(await port.myRole()).toBeNull();
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  describe("the content-writes switch (VITE_CONTENT_WRITES)", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    const supabaseFake = () => ({
+      ...tableFake({ data: [], error: null }).client,
+      auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+      storage: { from: () => ({}) },
+      rpc: async () => ({ data: [], error: null }),
+      functions: { invoke: vi.fn() },
+    });
+
+    it("writes through Base44's contentAdmin by default", async () => {
+      const m = await load(supabaseFake(), base44Fake().client);
+      const { FunctionContentAdminService } = await import("@/services/base44/FunctionContentAdminService");
+      expect(m.services.contentAdmin).toBeInstanceOf(FunctionContentAdminService);
+    });
+
+    it("writes through the content-admin Edge Function when switched to supabase", async () => {
+      vi.stubEnv("VITE_CONTENT_WRITES", "supabase");
+      const m = await load(supabaseFake(), base44Fake().client);
+      const { EdgeContentAdminService } = await import("@/services/supabase/EdgeContentAdminService");
+      expect(m.services.contentAdmin).toBeInstanceOf(EdgeContentAdminService);
+    });
+
+    it("stays on Base44 when switched on without a Supabase client", async () => {
+      vi.stubEnv("VITE_CONTENT_WRITES", "supabase");
+      const m = await load(null, base44Fake().client);
+      const { FunctionContentAdminService } = await import("@/services/base44/FunctionContentAdminService");
+      expect(m.services.contentAdmin).toBeInstanceOf(FunctionContentAdminService);
+    });
   });
 
   describe("the chat switch (VITE_CHAT_AGENTS)", () => {

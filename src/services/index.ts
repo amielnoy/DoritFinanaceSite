@@ -10,6 +10,7 @@ import type {
   ContentPort,
   LeadAdminPort,
   LeadPort,
+  MaslekaPort,
   SupportPort,
   UploadPort,
 } from "./ports";
@@ -54,6 +55,8 @@ export interface Services {
   contentAdmin: ContentAdminPort;
   /** The signed-in visitor's own enquiries — the personal area. */
   account: AccountPort;
+  /** The clearinghouse requests: the client's page and the staff board. */
+  masleka: MaslekaPort;
 }
 
 let loading: Promise<Services> | null = null;
@@ -173,6 +176,15 @@ export const services: Services = {
   },
   account: {
     myEnquiries: () => real().then((s) => s.account.myEnquiries()),
+  },
+  masleka: {
+    submitCode: (token, code, idNumber) => real().then((s) => s.masleka.submitCode(token, code, idNumber)),
+    myRole: () => real().then((s) => s.masleka.myRole()),
+    list: () => real().then((s) => s.masleka.list()),
+    create: (input) => real().then((s) => s.masleka.create(input)),
+    relink: (requestId) => real().then((s) => s.masleka.relink(requestId)),
+    reveal: (requestId, field) => real().then((s) => s.masleka.reveal(requestId, field)),
+    markSubmitted: (requestId) => real().then((s) => s.masleka.markSubmitted(requestId)),
   },
 };
 

@@ -32,7 +32,7 @@ export const INTERVIEW_TOOLS: ToolDefinition[] = [
   {
     name: 'submitLead',
     description:
-      "שמירת הראיון. stage='partial' בשלב 5 — שמירה שקטה. stage='complete' בסיום, אחרי שהמבקר אישר את הסיכום — שולחת את הסיכום לדורית.",
+      "שמירת הראיון. stage='partial' בשלב 5 — שמירה שקטה: אל תזכיר אותה למבקר, אבל המשך באותה הודעה לשאלה הבאה בראיון. stage='complete' בסיום, אחרי שהמבקר אישר את הסיכום — שולחת את הסיכום לדורית.",
     input_schema: {
       type: 'object',
       properties: {
@@ -144,7 +144,7 @@ async function submitLead(handler: EdgeHandler, input: Record<string, unknown>, 
   }
   if (ctx.evalMode) {
     if (stage === 'complete') ctx.conversation.status = 'lead_saved';
-    return { name: 'submitLead', status: 'simulated', isError: false, leadSaved: stage === 'complete', forModel: JSON.stringify({ ok: true, stage }) };
+    return { name: 'submitLead', status: 'simulated', isError: false, leadSaved: stage === 'complete', forModel: savedForModel(stage) };
   }
   const { attribution } = ctx.conversation;
   const res = await handler(
@@ -179,7 +179,18 @@ async function submitLead(handler: EdgeHandler, input: Record<string, unknown>, 
   }
   const leadId = typeof answer.leadId === 'string' ? answer.leadId : undefined;
   if (stage === 'complete') ctx.conversation.status = 'lead_saved';
-  return { name: 'submitLead', status: 'ok', isError: false, leadId, leadSaved: stage === 'complete', forModel: JSON.stringify({ ok: true, stage }) };
+  return { name: 'submitLead', status: 'ok', isError: false, leadId, leadSaved: stage === 'complete', forModel: savedForModel(stage) };
+}
+
+/**
+ * What a successful save tells the model. A partial save says what to do next:
+ * "a silent save" alone was read as "say nothing", and the empty reply after it
+ * failed the turn.
+ */
+function savedForModel(stage: 'partial' | 'complete'): string {
+  return stage === 'partial'
+    ? JSON.stringify({ ok: true, stage, next: 'נשמר בשקט. אל תזכיר את השמירה; המשך באותה הודעה לשאלה הבאה בראיון.' })
+    : JSON.stringify({ ok: true, stage });
 }
 
 /** The hand-off is a fact of its own; status becomes 'escalated' only from 'open', never over 'lead_saved' or 'closed'. */

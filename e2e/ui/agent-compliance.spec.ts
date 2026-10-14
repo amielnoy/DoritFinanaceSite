@@ -256,8 +256,22 @@ test.describe("Agent chat — regulatory shell", () => {
 test.describe("Support chat — the open question", () => {
   const SUPPORT = "#support-chat";
 
-  test("a visitor cannot type before accepting the notice", async ({ page, mockApi }) => {
+  /**
+   * /faq with the support chat on screen. On a desktop it is embedded in the
+   * page; below md it is a card, and the chat opens as a full-screen layer
+   * from "שאלו את העוזר" (see `mobileSheet`). The layer is the same panel and
+   * stays inside the section, so everything below addresses it the same way.
+   */
+  async function openSupportChat(page: Page, isMobile: boolean): Promise<void> {
     await gotoApp(page, "/faq");
+    if (isMobile) {
+      await page.locator(SUPPORT).getByRole("button", { name: "שאלו את העוזר" }).click();
+      await expect(page.getByRole("dialog", { name: "העוזר של דורית" })).toBeVisible();
+    }
+  }
+
+  test("a visitor cannot type before accepting the notice", async ({ page, mockApi, isMobile }) => {
+    await openSupportChat(page, isMobile);
     const section = page.locator(SUPPORT);
     const box = section.getByLabel("הודעה לסוכן התמיכה");
 
@@ -272,8 +286,8 @@ test.describe("Support chat — the open question", () => {
     });
   });
 
-  test("the notice describes this chat and not the interview", async ({ page }) => {
-    await gotoApp(page, "/faq");
+  test("the notice describes this chat and not the interview", async ({ page, isMobile }) => {
+    await openSupportChat(page, isMobile);
     const section = page.locator(SUPPORT);
 
     await test_step("it says the conversation itself is kept, and why", async () => {
@@ -295,12 +309,12 @@ test.describe("Support chat — the open question", () => {
     });
   });
 
-  test("the route to a person is here too", async ({ page, mockApi }) => {
+  test("the route to a person is here too", async ({ page, mockApi, isMobile }) => {
     const section = page.locator(SUPPORT);
     await test_step("open the support chat, which is a different agent", async () => {
       // The promise is the agent's, not the interview's — so it has to hold on
       // every chat, not only the one it was built for.
-      await gotoApp(page, "/faq");
+      await openSupportChat(page, isMobile);
     });
 
     await test_step("ask for a person and leave a number", async () => {

@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 248 · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 699 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1175 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -918,7 +918,162 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-WAIT-005 | "falls back to 'anything but the previous bundle' without an expected one" | `false` for the old bundle, `true` for a new one |
 | UNIT-WAIT-006 | "never counts an unreadable page as served" | `false` with and without an expected bundle |
 
+### 4.38 The ת״ז check digit — `tests/unit/israeli-id.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ILID-001..016 | "accepts %s as %s" (8 values × browser/edge; `123456782` reaches the carry branch) | Zero-padded nine digits returned; spaces and hyphens ignored |
+| UNIT-ILID-017..040 | "rejects %s" (12 values × browser/edge; `123456789` has a wrong check digit) | `null` for a wrong check digit, all zeros, 4 or 10 digits, letters, empty, non-strings |
+| UNIT-ILID-041 | "are the same code, so the page and the function never disagree" | The two function bodies match after whitespace normalisation |
+
+### 4.39 Sealing the clearinghouse values — `tests/unit/edge-seal.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SEAL-001 | "round-trips a value" | `unseal(seal(x, aad), aad) === x` |
+| UNIT-SEAL-002 | "uses a fresh IV every time, so equal values never look equal" | Two seals of one value differ |
+| UNIT-SEAL-003 | "stores the IV, then the ciphertext and its 16-byte tag" | Decoded length = 12 + plaintext + 16 |
+| UNIT-SEAL-004 | "refuses a value that was changed after sealing" | `sealed_invalid` |
+| UNIT-SEAL-005 | "refuses a value sealed with another key" | `sealed_invalid` |
+| UNIT-SEAL-006 | "refuses a value too short to hold an IV and a tag" | `sealed_invalid` |
+| UNIT-SEAL-007 | "refuses text that is not base64" | `sealed_invalid`, nothing echoed |
+| UNIT-SEAL-008 | "refuses a value unsealed with a different aad" | `sealed_invalid` for another request id and for the other field |
+| UNIT-SEAL-009 | "refuses a changed IV byte" | `sealed_invalid` for each of bytes 0-11 |
+| UNIT-SEAL-010 | "refuses a changed tag byte" | `sealed_invalid` for each of the last 16 bytes |
+| UNIT-SEAL-011 | "refuses a truncation that is still long enough to look sealed" | 28 bytes: fails on the tag, `sealed_invalid` |
+| UNIT-SEAL-012 | "imports a key that cannot be exported and only encrypts and decrypts" | `extractable === false`; usages exactly encrypt, decrypt |
+| UNIT-SEAL-013 | "refuses a key that is not base64" | `seal_key_length` |
+| UNIT-SEAL-014 | "refuses a key that is not 32 bytes" | `seal_key_length` |
+| UNIT-SEAL-015 | "is not configured when MASLEKA_KEY is missing" | `false`, `null` |
+| UNIT-SEAL-016 | "is not configured when MASLEKA_KEY is short or not base64" | `false`, `null` |
+| UNIT-SEAL-017 | "is configured with 32 bytes, and the key it gives works" | `true`; round trip through the env key |
+
+### 4.40 Israeli business days — `tests/unit/edge-business-days.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-BDAY-001 | "skips Friday and Saturday: day 5 after a Sunday is the next Sunday" | 2026-10-18 |
+| UNIT-BDAY-002 | "puts day 7 after a Sunday on the Tuesday after" | 2026-10-20 |
+| UNIT-BDAY-003 | "goes from a Thursday straight to Sunday" | 2026-10-18 |
+| UNIT-BDAY-004 | "reads the weekday in Israel, not in UTC" | Israel Friday 01:30 + 1 → Israel Sunday 01:30 |
+| UNIT-BDAY-005 | "leaves the instant alone for zero days" | Same instant |
+| UNIT-BDAY-006 | "keeps the Israeli wall-clock time and calendar day across the end of daylight saving (25 Oct 2026)" | Thu 22 Oct 00:30 + 4 → Wed 28 Oct 00:30 Israel; Thu 12:00 + 3 → Tue 27 Oct 12:00 Israel |
+
+### 4.41 The clearinghouse pipeline's shared Edge modules — `tests/unit/edge-masleka-shared.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MSKSH-001 | "is off unless MASLEKA_ENABLED is exactly true" | Only `true` (trimmed) turns it on |
+| UNIT-MSKSH-002 | "makes 43-character base64url tokens, never the same twice" | Format and uniqueness |
+| UNIT-MSKSH-003 | "recognises nothing else as a token" | 42 chars, `+`, numbers refused |
+| UNIT-MSKSH-004 | "puts the token in the fragment of the agency's own page" | `https://govari-fin.co.il/masleka#t=…` |
+| UNIT-MSKSH-005 | "expires a token thirty days after it is issued" | +30 days |
+| UNIT-MSKSH-006 | "accepts a code as pasted, and nothing that cannot be one" | Trimmed; short, markup, 65 chars, numbers refused |
+| UNIT-MSKSH-007 | "stores the token's hash, never the token, and returns the one link to it" | Body has `token_hash = sha256(token)` and not the token |
+| UNIT-MSKSH-008 | "patches the rows the query matches and returns them" | PATCH, conditions in the URL, `return=representation` |
+| UNIT-MSKSH-009 | "reports a refusal by status and code only" | `update_http_400:23514`, no message text |
+| UNIT-MSKSH-020 | "refuses to patch without a filter, and sends nothing" | `update_without_filter` for an empty query, `select=`/`order=`/`limit=` alone, an empty or operator-less value; no fetch |
+| UNIT-MSKSH-021 | "refuses a success whose body is not a list of rows" | `update_bad_body` for `{}`, `null`, non-JSON and empty bodies on a 200 |
+| UNIT-MSKSH-010 | "answers who the token belongs to, asking the auth server with the service key" | `/auth/v1/user`, apikey + bearer |
+| UNIT-MSKSH-011 | "answers nobody for a token the auth server refuses" | `null` on 401 |
+| UNIT-MSKSH-012 | "throws when the auth server is down, rather than calling it a refusal" | `auth_http_503` |
+| UNIT-MSKSH-013 | "is anonymous without a bearer token, and asks nobody" | No fetch |
+| UNIT-MSKSH-014 | "is an outsider when the database knows no role for the user" | `outsider` |
+| UNIT-MSKSH-015 | "is an outsider for a role it does not recognise" | `outsider` |
+| UNIT-MSKSH-016 | "is staff with the role the database gives" | `staff`, role `staff` |
+| UNIT-MSKSH-017 | "mails each staff address once, in lower case, and skips what is not an address" | Deduplicated list |
+| UNIT-MSKSH-018 | "falls back to Dorit's mailbox when nobody can be read" | `dorit@govari-fin.co.il`, `staff.lookup_failed` |
+| UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the staff list is empty" | `dorit@govari-fin.co.il`, `staff.none` |
+
+### 4.42 The clearinghouse mails — `tests/unit/edge-masleka-mail.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MSKML-001 | "names the client in the subject and links the board" | Subject with the name; board link in both halves |
+| UNIT-MSKML-002 | "lists every client in one digest when there are several" | "— 2 לקוחות"; both names |
+| UNIT-MSKML-003 | "says the deadline plainly" | "נמחק במסלקה בעוד יומיים — …" |
+| UNIT-MSKML-004 | "escapes a name that is really markup" | `&lt;img`, no `<img` |
+| UNIT-MSKML-005 | "keeps a line break in a name out of the subject" | No newline in the subject |
+| UNIT-MSKML-006 | "links only to the agency's own domain" | Every href host is `govari-fin.co.il` |
+| UNIT-MSKML-007 | "carries the personal link in both halves" | Link in HTML and text; greeting by first name |
+| UNIT-MSKML-008 | "says a reminder replaces the earlier link" | Reminder subject; "מחליף" |
+| UNIT-MSKML-009 | "greets without a name that is not a name" | "שלום,"; no foreign link |
+| UNIT-MSKML-010 | "offers the link as a clickable button, and keeps it in the text too" | `<a href="…#t=…">` in the invitation and the reminder; link also in text |
+| UNIT-MSKML-011 | "is byte-for-byte what it was before the button existed" | The shared letter without an `action` hashes to its pre-change SHA-256 |
+
+### 4.43 The clearinghouse port and its switch — `tests/unit/masleka-services.test.ts`, `tests/unit/masleka-config.test.ts`, `tests/unit/services-wiring.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MSKSVC-001 | "posts the token, the code and the ID to masleka-code" | One invoke with exactly those three |
+| UNIT-MSKSVC-002 | "turns the function's error into a reason the page can word, with the rid" | `MaslekaError('link_invalid', 'abc123')` |
+| UNIT-MSKSVC-003 | "calls anything else a failure" | Unknown reason or no Response → `failed` |
+| UNIT-MSKSVC-004 | "asks the database for the caller's role" | `rpc('my_staff_role')` |
+| UNIT-MSKSVC-005 | "knows no role for null or an unknown answer" | `null` |
+| UNIT-MSKSVC-006 | "fails rather than guessing when the role cannot be read" | Rejects `failed` |
+| UNIT-MSKSVC-007 | "reads the open requests by the granted columns only, newest first" | `MASLEKA_COLUMNS` (no ciphertext/hash), four statuses, `created_at desc`, camelCase |
+| UNIT-MSKSVC-008 | "throws when the list cannot be read, so an outage never looks like an empty board" | Rejects |
+| UNIT-MSKSVC-009 | "creates a request and hands back its link" | Body and `MaslekaLink` |
+| UNIT-MSKSVC-010 | "asks for a fresh link by request id" | `{ requestId }` |
+| UNIT-MSKSVC-011 | "returns a revealed value, and fails on an answer without one" | Value; `failed` |
+| UNIT-MSKSVC-012 | "marks a request submitted" | `masleka-submitted` |
+| UNIT-MSKSVC-013 | "tells a second הגשתי apart from a failure: already_submitted is its own reason" | 409 → `already_submitted` with rid (a state for the board to show, Ruling 18) |
+| UNIT-MSKSVC-014 | "maps 409 not_available, 404 disabled, 429 and 503 unavailable to their own reasons" | Each status/body → its own reason with rid |
+| UNIT-MSKSVC-015 | "falls back to the status when a gateway answers without our body" | 401 `unauthorized`, 403 `forbidden`, 429 `rate_limited`, 503 `unavailable`, else `failed` |
+| UNIT-MSKSVC-016 | "never lets the revealed value reach storage or the console" | No storage write, value absent from every console method, on success and on failure |
+| UNIT-MSKSVC-017 | "passes a removed membership through as forbidden" | `forbidden` with rid |
+| UNIT-MSKSVC-018 | "is never available and gives nobody a role" | Unconfigured: `unavailable`, `null` |
+| UNIT-MSKCFG-001 | "is off when unset" | `false` |
+| UNIT-MSKCFG-002..005 | "is off for %j" (TRUE, 1, yes, tru) | `false` |
+| UNIT-MSKCFG-006..007 | "is on for %j" (true, " true ") | `true` (trim, then `=== "true"`) |
+| UNIT-MSKCFG-008 | "sends people to the clearinghouse operator over https" | Both URLs on `https://www.swiftness.co.il/` |
+| UNIT-MSKCFG-009 | "agrees with the Edge switch for every input, so the site and the functions cannot disagree" | `isMaslekaOn` equals `maslekaEnabled` over true, " true ", TRUE, 1, "", unset |
+| UNIT-LAZY-007 | "loads the composition root on its first call and delegates to it" | `services.masleka.myRole()` reaches the root once |
+| UNIT-WIRING-001 | "falls back to Base44 when Supabase is not configured" (extended) | `services.masleka` is `UnconfiguredMaslekaService` |
+| UNIT-WIRING-002 | "uses the Supabase clearinghouse adapter only when the switch is on and a client exists" | `SupabaseMaslekaService` |
+| UNIT-WIRING-003 | "ships dark: with the switch off and a client, no masleka-* function or staff RPC is ever called" | Unconfigured adapter; zero `functions.invoke` and zero `rpc` calls |
+
+### 4.44 The clearinghouse board's and page's helpers — `tests/unit/masleka-board.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MSKBD-001 | "puts each request in its column, oldest waiting first, and drops what left the board" | Four columns; expired/cancelled absent |
+| UNIT-MSKBD-002 | "says when the files should be ready, then that they are" | 4-hour threshold |
+| UNIT-MSKBD-003 | "counts the days the clearinghouse still keeps the files" | 5 / 1 / partial day = 1 |
+| UNIT-MSKBD-004 | "says when they are gone, and nothing when there is no date" | "נמחק במסלקה"; "" |
+| UNIT-MSKBD-005 | "copies when the clipboard works" | `copied` |
+| UNIT-MSKBD-006 | "falls back when there is no clipboard (a non-secure page, an old browser)" | `manual` without a document |
+| UNIT-MSKBD-007 | "falls back when the browser refuses, however it refuses" | `manual` for a rejection and a throw |
+| UNIT-MSKBD-008 | "reads a token from the link's fragment" | The token |
+| UNIT-MSKBD-009 | "reads nothing else" | `null` for empty, short, other key, extra params |
+| UNIT-MSKBD-010 | "accepts what the clearinghouse could issue and nothing that carries markup" | Shape check |
+| UNIT-MSKBD-011 | "accepts and refuses the same codes (isPlausibleCode is normalizeCode's pattern)" | Equal to the Edge `normalizeCode` over 16 samples (Ruling 6) |
+| UNIT-MSKBD-012 | "waits the same time before the files are ready" | `READY_AFTER_MS` = Edge `READY_AFTER_HOURS` hours |
+| UNIT-MSKBD-013 | "counts days to the deletion date the way the server set it, across a daylight-saving end" | Edge `addBusinessDays` from 22 Oct 2026 00:30, +7 → 11 Israeli calendar days, not 12 |
+| UNIT-MSKBD-014 | "reads the day in Israel, not in UTC" | Friday 00:30 in Israel is the next day for a Thursday-evening UTC date |
+| UNIT-MSKBD-015 | "is business day 5 and 7 after submission for any weekday, counted in calendar days" | 9–11 calendar days to business day 7 from every weekday |
+| UNIT-MSKBD-016 | "copies through a temporary field when the clipboard is missing, and takes the field away at once" | append, copy, remove; nothing attached |
+| UNIT-MSKBD-017 | "copies through the field when the clipboard refuses" | `copied`; nothing attached |
+| UNIT-MSKBD-018 | "clears the field's value before it is removed" | Value empty |
+| UNIT-MSKBD-019 | "says manual, with no field left, when the browser refuses the copy command or throws" | `manual`; nothing attached |
+| UNIT-MSKBD-020 | "says manual when there is no document at all" | `manual` |
+| UNIT-MSKBD-021 | "never writes the value to storage or the console, on any path" | No storage write, no console call |
+| UNIT-MSKBD-022 | "has Hebrew copy for every reason, on both pages" | All 15 reasons, both helpers |
+| UNIT-MSKBD-023 | "shows a second הגשתי as a state, not an error (Ruling 18)" | `state` "כבר סומן כהוגש"; every other reason `error` |
+| UNIT-MSKBD-024 | "tells a client who tried too often to wait a while, and that the link is not dead" | 429 copy: wait, link valid |
+| UNIT-MSKBD-025 | "does not invite a retry after a failure that may have stored the code" | "ייתכן שהקוד כבר התקבל", Dorit will be in touch, no retry |
+| UNIT-MSKBD-026 | "says a dead link is dead, and a switched-off service is unavailable" | link_invalid / disabled copy |
+| UNIT-MSKBD-027 | "treats anything that is not a MaslekaError as a failure" | Same as `failed` |
+
+### 4.45 Vercel Analytics beforeSend — `tests/unit/vercel-analytics.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-VANA-001 | "drops the #t= token from a /masleka url" | `https://govari-fin.co.il/masleka`; the token appears nowhere in the event |
+| UNIT-VANA-002 | "leaves a url without a hash unchanged" | Same url |
+| UNIT-VANA-003 | "keeps the query and drops only the hash" | `…/masleka?utm=x&a=1` |
+
 ## 5. Pass criteria
 
-All 639 cases pass. Any failure is a functional defect, not an environment issue —
+All 688 declared cases pass (vitest: 1164 with expansions). Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.

@@ -23,10 +23,11 @@
 #
 # The two deployment targets are gated differently, on purpose:
 #
-#   Vercel (staging, login-protected) — deploys whenever the build succeeds,
-#   green or red. A failing run is when you most want to open the thing.
+#   Vercel — production (govari-fin.co.il) since 2026-10-11, promoted only
+#   when every test passed; a red `main` run deploys a login-protected
+#   preview instead, because a failing run is when you most want to open it.
 #
-#   Base44 (production, client-facing) — deploys only when every test passed.
+#   Base44 — the agents and functions, published only when every test passed.
 #
 # So a test failure costs you production, never staging.
 #
@@ -45,25 +46,22 @@ name: CI
 
 on:
   push:
-    # Every branch, so work in progress is tested where it is cheap to fix
-    # rather than at the merge. `main` and `builder` are not special here —
-    # they are special further down, where the deploy jobs check the ref. A
-    # feature branch runs the full battery and deploys nothing.
+    # Only the branches that deploy. `main` publishes production; `builder` is
+    # named ahead of being used: the day the Base44 Builder is pointed at it,
+    # its pushes are previewed and judged with no change here.
     #
-    # (`builder` is named ahead of being used: the day the Base44 Builder is
-    # pointed at it, its pushes are previewed and judged with no change here.)
-    branches: ['**']
+    # Feature branches used to run here too, on every push, with the PR event
+    # firing only on `opened`. Every new PR then started two runs for one
+    # commit; the concurrency group cancelled one, and the cancelled run's
+    # jobs sat in the PR's checks as failures ("UNSTABLE") next to the real,
+    # green run. Branches are now tested through their PR, below.
+    branches: [main, builder]
   pull_request:
     branches: [main]
-    # Only the moment the PR appears. New commits on the branch already
-    # trigger the push event above, and checks attach to the commit either
-    # way, so reacting to `synchronize` as well would run the whole matrix
-    # twice for every push to an open PR.
-    #
-    # Opening a PR still fires both events for one commit — the push that
-    # created the branch, and this. The concurrency group above is what makes
-    # that one run rather than two.
-    types: [opened, reopened]
+    # Every commit of an open PR, once: `synchronize` is a new push to it.
+    # "Safe to merge?" — the check the `protect-main` ruleset requires — comes
+    # from these runs, so a PR whose latest commit has none cannot merge.
+    types: [opened, reopened, synchronize]
   schedule:
     # 19:00 UTC — **22:00 in Israel while IDT is in force** (UTC+3, late March
     # to late October). GitHub cron has no timezone, so between late October
@@ -578,7 +576,9 @@ jobs:
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
           echo "Production currently serves: ${asset:-unknown}"
 
-      # Absent credentials skip the publish; *wrong* ones fail it.
+      # Absent credentials skip the publish; *wrong* ones fail it. A skip on
+      # main still stops the site: Deploy to Vercel will not promote production
+      # without `published=true` from this job, and fails the run instead.
       #
       # The CLI only treats BASE44_API_KEY as a key when it starts with `b44k_`:
       #
@@ -606,8 +606,9 @@ jobs:
       #      way to refresh.
       #
       # The second is a wider credential than the first: it acts as the user,
-      # across every app in the workspace, and it expires. When it does, this
-      # step skips with a notice and production stays where it is.
+      # across every app in the workspace, and it expires. When it does, the
+      # publish fails or skips, and neither the agents nor the site reach
+      # production until it is re-seeded.
       - name: Check publish credentials
         id: creds
         env:
@@ -710,7 +711,12 @@ jobs:
   deploy-vercel:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
-    needs: [build, test-node, test-e2e, deploy-supabase]
+    # `deploy` (the Base44 publish) too: the site and the agents' instructions
+    # go live together. The FAQ chat's answers are written by a Base44 agent,
+    # and a site that links to something the agent was told about must not
+    # reach customers while the agent still says the old thing. See the
+    # "Choose production or preview" step for the gate itself.
+    needs: [build, test-node, test-e2e, deploy-supabase, deploy]
     outputs:
       url: ${{ steps.deploy.outputs.url }}
       deployed: ${{ steps.deploy.outputs.deployed }}
@@ -786,22 +792,41 @@ jobs:
       #
       # So a red run still deploys — as a preview, on its own URL, which is the
       # artefact you actually wanted. Only `--prod` waits for green.
+      #
+      # It also waits for the Base44 publish, which carries the agents'
+      # instructions (base44/agents/). Without that, an expired Base44 session
+      # skipped the agents with a notice while the site went live anyway, and
+      # the run stayed green. The nightly `schedule` run is exempt: the Base44
+      # job does not run on it, and nothing in base44/ changed since the push
+      # that already passed this gate.
+      #
+      # When the agents are what held production back, the job deploys the
+      # preview and then fails (last step), so the run is red, not quiet.
       - name: Choose production or preview
         id: target
         env:
           UNIT: ${{ needs.test-node.result }}
           E2E: ${{ needs.test-e2e.result }}
           FUNCTIONS: ${{ needs.deploy-supabase.result }}
+          AGENTS: ${{ needs.deploy.outputs.published }}
         run: |
+          agents_ok=false
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$AGENTS" = "true" ]; then
+            agents_ok=true
+          fi
           if [ "$GITHUB_REF" = "refs/heads/main" ] \
             && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ] \
-            && [ "$FUNCTIONS" = "success" ]; then
+            && [ "$FUNCTIONS" = "success" ] && [ "$agents_ok" = "true" ]; then
             echo "prod=--prod" >> "$GITHUB_OUTPUT"
             echo "env=production" >> "$GITHUB_OUTPUT"
             echo "kind=production" >> "$GITHUB_OUTPUT"
           else
             if [ "$GITHUB_REF" = "refs/heads/main" ]; then
-              echo "::warning::Not promoting (unit: ${UNIT}, e2e: ${E2E}, functions: ${FUNCTIONS}) — deploying this as a preview instead of production."
+              echo "::warning::Not promoting (unit: ${UNIT}, e2e: ${E2E}, functions: ${FUNCTIONS}, agents published: ${AGENTS:-no}) — deploying this as a preview instead of production."
+              if [ "$UNIT" = "success" ] && [ "$E2E" = "success" ] \
+                && [ "$FUNCTIONS" = "success" ] && [ "$agents_ok" != "true" ]; then
+                echo "held_for_agents=true" >> "$GITHUB_OUTPUT"
+              fi
             fi
             echo "prod=" >> "$GITHUB_OUTPUT"
             echo "env=preview" >> "$GITHUB_OUTPUT"
@@ -924,6 +949,13 @@ jobs:
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
         run: node scripts/indexnow.mjs
 
+      # Last, so the preview above is still deployed and linked from the run.
+      - name: Fail when production waited for the agents
+        if: steps.creds.outputs.ready == 'true' && steps.target.outputs.held_for_agents == 'true'
+        run: |
+          echo "::error::Tests and functions are green, but the Base44 publish did not run, so production was NOT updated (deployed as a preview). The agents' instructions and the site go live together. Usually the Base44 session expired: run \`base44 login\` and copy the new pair from ~/.base44/auth/auth.json into BASE44_ACCESS_TOKEN and BASE44_REFRESH_TOKEN, then re-run this workflow."
+          exit 1
+
   # ── 6. Post-deploy smoke test against the live site ──────────────────────
   #
   # Waits on both publishes and smokes whatever `PRODUCTION_URL` names, rather
@@ -1021,6 +1053,9 @@ jobs:
           # "supabase" once the lead functions are switched on: the smoke then
           # requires submit-lead to report Google ready. Unset, it is not asked.
           E2E_EXPECT_GOOGLE: ${{ vars.LEAD_FUNCTIONS }}
+          # The same variable tells base44-contract.spec.ts which function the
+          # form posts to: submit-lead on Supabase, or submitLead on Base44.
+          E2E_LEAD_FUNCTIONS: ${{ vars.LEAD_FUNCTIONS }}
           # The nightly run has nobody watching it and publishes no Base44, so
           # it skips the probes that open (empty) agent conversations.
           E2E_SKIP_AGENT_PROBES: ${{ github.event_name != 'schedule' && '0' || '1' }}
@@ -1547,7 +1582,7 @@ jobs:
             echo "| Where to look | URL | This run |"
             echo "| --- | --- | --- |"
 
-            echo "| **Base44** (production — client-facing) | ${PRODUCTION_URL:-${BASE44_URL:-https://safe-arch-plan.base44.app}} | unchanged — publishing runs only from a green \`main\` |"
+            echo "| **Production** (Vercel — client-facing) | ${PRODUCTION_URL:-https://govari-fin.co.il} | unchanged — production deploys only from a green \`main\` |"
 
             if [ -n "$ALLURE_URL" ]; then
               echo "| **Allure — test report** (behind Cloudflare Access) | ${ALLURE_ALIAS:-$ALLURE_URL} | [this run's copy](${ALLURE_URL}) |"

@@ -18,6 +18,14 @@ export interface MockApi {
   setEntityDoc(name: string, id: string, row: unknown): void;
   /** Force a status + payload for the next matching path fragment. */
   failOn(pathFragment: string, status: number, payload?: unknown): void;
+  /**
+   * Every Supabase Edge function call (`/functions/v1/`) the page made. Kept
+   * apart from `requests` because it leaves the origin by design, which the
+   * same-origin /api check must not trip over.
+   */
+  readonly edgeRequests: CapturedRequest[];
+  /** Wait until an Edge function call whose path contains the fragment is captured. */
+  waitForEdgeRequest(pathFragment: string, timeout?: number): Promise<CapturedRequest>;
   /** Requests whose path contains the fragment. */
   requestsTo(pathFragment: string): CapturedRequest[];
   /** Wait until a request matching the fragment has been captured. */
@@ -59,6 +67,7 @@ export const test = base.extend<{ mockApi: MockApi }>({
   // an un-stubbed spec would otherwise hit vite preview and 404 on /api.
   mockApi: [async ({ page }, use) => {
     const requests: CapturedRequest[] = [];
+    const edgeRequests: CapturedRequest[] = [];
     const entities = new Map<string, unknown[]>([
       ["Testimonial", [...TESTIMONIALS]],
       ["BlogPost", [...BLOG_POSTS]],
@@ -81,6 +90,39 @@ export const test = base.extend<{ mockApi: MockApi }>({
     await page.route(/media\.base44\.com|base44\.com\/logo/, (route) =>
       route.fulfill({ status: 200, contentType: "image/png", body: TRANSPARENT_PNG })
     );
+
+    // --- the Supabase Edge functions --------------------------------------
+    // A build with VITE_LEAD_FUNCTIONS=supabase posts leads here, cross-origin,
+    // not to /api. Stub and record it so a form submission never reaches a real
+    // project (it would create a real lead), and so specs can read the body.
+    await page.route("**/functions/v1/**", async (route) => {
+      const request = route.request();
+      const cors = {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "*",
+        "access-control-allow-methods": "POST, OPTIONS",
+      };
+      if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+      let body: unknown = null;
+      try {
+        body = request.postDataJSON();
+      } catch {
+        body = request.postData();
+      }
+      edgeRequests.push({
+        method: request.method(),
+        url: request.url(),
+        path: new URL(request.url()).pathname,
+        headers: request.headers(),
+        body,
+      });
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: cors,
+        body: JSON.stringify({ ok: true }),
+      });
+    });
 
     // --- the Base44 API ---------------------------------------------------
     await page.route("**/api/**", async (route) => {
@@ -194,6 +236,20 @@ export const test = base.extend<{ mockApi: MockApi }>({
 
     const api: MockApi = {
       requests,
+      edgeRequests,
+      waitForEdgeRequest: async (fragment, timeout = 10_000) => {
+        const deadline = Date.now() + timeout;
+        for (;;) {
+          const hit = edgeRequests.find((r) => r.path.includes(fragment));
+          if (hit) return hit;
+          if (Date.now() > deadline) {
+            throw new Error(
+              `No Edge request to "${fragment}" within ${timeout}ms. Saw: ${edgeRequests.map((r) => `${r.method} ${r.path}`).join(", ") || "none"}`
+            );
+          }
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      },
       setEntity: (name, rows) => entities.set(name, rows),
       setEntityDoc: (name, id, row) => docs.set(`${name}:${id}`, row),
       failOn: (fragment, status, payload) => failures.set(fragment, { status, payload }),
@@ -234,6 +290,17 @@ export { test_step } from "./steps";
  * on every hermetic CI build; the live probes beside it cover the deployment.
  */
 export const AGAINST_A_DEPLOYMENT = Boolean(process.env.PLAYWRIGHT_BASE_URL);
+
+/**
+ * Where the build under test posts leads. Against a deployment the smoke step
+ * passes the repo variable LEAD_FUNCTIONS as E2E_LEAD_FUNCTIONS; a local build
+ * is compiled with VITE_LEAD_FUNCTIONS, normally unset, which means Base44.
+ * Mirrors src/config/lead-functions.ts: only the exact value "supabase" counts.
+ */
+export const LEAD_VIA_SUPABASE =
+  (AGAINST_A_DEPLOYMENT ? process.env.E2E_LEAD_FUNCTIONS : process.env.VITE_LEAD_FUNCTIONS) === "supabase";
+/** The function the quick-contact form posts to. */
+export const LEAD_FUNCTION_PATH = LEAD_VIA_SUPABASE ? "/functions/v1/submit-lead" : "/functions/submitLead";
 export const STUBS_UNREACHABLE =
   "against a deployment, content comes from Supabase and Base44 directly; the same-origin /api stubs never see it";
 

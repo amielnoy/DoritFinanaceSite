@@ -123,7 +123,8 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
     agent: "support_agent",
     icon: LifeBuoy,
     sectionId: "support-chat",
-    sectionClassName: "py-24 md:py-32 border-t border-border/60",
+    // py-12 below md: on a phone this section is a short card, not the chat.
+    sectionClassName: "py-12 md:py-32 border-t border-border/60",
     eyebrow: "שאלה חופשית",
     heading: "לא מצאתם <br /> את התשובה?",
     blurb: "שאלו כאן בחופשיות. העוזר של דורית עונה על שאלות כלליות מתוך התוכן שפורסם באתר — מסביר מונחים ומפנה למאמר הרלוונטי. לשאלה שנוגעת למקרה שלכם, הוא מעביר לדורית עצמה.",
@@ -150,6 +151,13 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
       ],
       handoff:
         "בכל שאלה שדורשת בעל רישיון, בכל ספק — וברגע שתבקשו, בכפתור שבראש הצ׳אט.",
+    },
+    mobileSheet: {
+      cardText: "העוזר האוטומטי של דורית עונה על שאלות כלליות מתוך מה שפורסם באתר, ומעביר לדורית כל שאלה על המקרה שלכם.",
+      openLabel: "שאלו את העוזר",
+      layerTitle: "העוזר של דורית",
+      layerSubtitle: "אוטומטי · לא דורית עצמה",
+      detailsLabel: "מה העוזר עושה, ומה לא",
     },
   },
   blogRecommender: {

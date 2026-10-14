@@ -181,6 +181,35 @@ describe("auth and token handling", () => {
     );
     expect(gate, "AdminRoute must turn away non-admin roles").toMatch(/role\s*!==\s*['"]admin['"]/);
   });
+
+  it("keeps the clearinghouse board behind a gate that requires sign-in and a staff role, and only when switched on", () => {
+    const app = read(join(REPO_ROOT, "src/App.jsx"));
+    const gateStart = app.indexOf("<StaffRoute");
+    expect(gateStart, "the clearinghouse pages must be wrapped in StaffRoute").toBeGreaterThan(-1);
+    const gateBlock = app.slice(gateStart, app.indexOf("</Route>", gateStart));
+    expect(gateBlock).toContain('path="/admin/masleka"');
+    expect(gateBlock).toContain('path="/admin/masleka/guide"');
+    expect(app.slice(Math.max(0, gateStart - 80), gateStart)).toMatch(/MASLEKA_ENABLED \?/);
+    // Registered nowhere else: no /admin/masleka route outside the switched StaffRoute block.
+    expect(app.split('path="/admin/masleka').length - 1).toBe(gateBlock.split('path="/admin/masleka').length - 1);
+
+    const gate = read(join(REPO_ROOT, "src/components/StaffRoute.tsx"));
+    expect(gate, "StaffRoute must fall back to the auth gate when signed out").toContain("<ProtectedRoute");
+    expect(gate, "StaffRoute must turn away a user with no staff role").toMatch(/<Navigate to="\/" replace \/>/);
+    expect(gate, "StaffRoute must ask the database, not the token").toContain("myRole()");
+  });
+
+  it("the clearinghouse board keeps a revealed value out of storage, logs and the access log", () => {
+    // The access log is written by masleka-reveal, server-side, before it
+    // decrypts (Ruling 17); the page never writes it, never persists what it
+    // was shown, and never logs.
+    const board = read(join(REPO_ROOT, "src/pages/MaslekaBoard.tsx"));
+    expect(board).not.toMatch(/masleka_access_log/);
+    expect(board).not.toMatch(/\b(localStorage|sessionStorage|indexedDB)\b/);
+    expect(board).not.toMatch(/\bconsole\./);
+    expect(board).not.toMatch(/\b(gtag|dataLayer|trackEvent|track)\s*\(/);
+    expect(board).not.toMatch(/history\.(push|replace)State|navigate\(/);
+  });
 });
 
 describe("data exposure via entity RLS", () => {

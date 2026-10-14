@@ -38,10 +38,9 @@ describe("adapter → submitLead", () => {
     /export function (?:leadBody|interviewBody)\([^)]*\)[^{]*\{\s*return\s*/,
     [join(REPO_ROOT, "src/services/lead-bodies.ts")]
   );
-  const accepted = destructuredBody(backendSource("submitLead"));
-  // The same body is also sent to the Edge function when VITE_LEAD_FUNCTIONS
-  // picks Supabase, so the Edge handler is a second source of truth.
-  const acceptedByEdge = destructuredBody(
+  // submitLead is a forwarder now; the Edge handler is the source of truth for
+  // what the body may carry.
+  const accepted = destructuredBody(
     readFileSync(join(REPO_ROOT, "supabase/functions/submit-lead/handler.ts"), "utf8"),
   );
 
@@ -94,15 +93,6 @@ describe("adapter → submitLead", () => {
     }
   });
 
-  it("sends nothing the Edge function does not read either", () => {
-    for (const c of calls) {
-      expect(
-        c.keys.filter((k) => !acceptedByEdge.includes(k)),
-        "a field the Edge handler never destructures",
-      ).toEqual([]);
-    }
-  });
-
   it("the form's payload is exactly the form's fields", () => {
     const form = calls.find((c) => !c.keys.includes("stage"));
     expect(form, "no browser-form payload found").toBeDefined();
@@ -123,7 +113,6 @@ describe("adapter → submitLead", () => {
     // Guards the escape hatch above: a name listed there that the backend does
     // not actually destructure would silently excuse a real mismatch.
     for (const field of AGENT_ONLY) expect(accepted).toContain(field);
-    for (const field of AGENT_ONLY) expect(acceptedByEdge).toContain(field);
   });
 
   it("sends the two fields the function requires", () => {
@@ -352,7 +341,7 @@ describe("backend → Lead entity", () => {
   it("only the backend functions create leads — the browser no longer does", () => {
     const fromBrowser = findObjectLiteralCalls(/base44\.entities\.Lead\.create\(\s*/);
     expect(fromBrowser, "a component still writes Lead directly").toEqual([]);
-    expect(writes.length).toBe(3); // submitLead, submitClaim, escalateToHuman
+    expect(writes.length).toBe(1); // submitClaim; the other two are forwarders to Edge
   });
 
   for (const write of writes) {

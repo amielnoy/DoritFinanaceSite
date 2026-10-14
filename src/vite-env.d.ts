@@ -14,7 +14,13 @@
 interface ImportMetaEnv {
   /** Who stores a claim document — see `src/config/upload-provider.ts`. */
   readonly VITE_UPLOAD_PROVIDER?: "base44" | "supabase";
+  /** Who stores article and testimonial images — see `src/config/upload-provider.ts`. */
+  readonly VITE_CONTENT_IMAGES?: "base44" | "supabase";
   readonly VITE_LEAD_FUNCTIONS?: "base44" | "supabase";
+  /** The clearinghouse pipeline — on only when exactly "true"; see `src/config/masleka.ts`. */
+  readonly VITE_MASLEKA_ENABLED?: string;
+  /** Who writes articles and testimonials — see `src/config/content-writes.ts`. */
+  readonly VITE_CONTENT_WRITES?: "base44" | "supabase";
   /** Agents served by the `chat` Edge Function — see `src/config/chat-agents.ts`. */
   readonly VITE_CHAT_AGENTS?: string;
   readonly VITE_BASE44_APP_ID?: string;

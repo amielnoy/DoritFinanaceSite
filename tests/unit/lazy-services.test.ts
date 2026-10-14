@@ -152,3 +152,13 @@ describe("what every page load asks, without the SDKs", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("the clearinghouse port", () => {
+  it("loads the composition root on its first call and delegates to it", async () => {
+    const myRole = vi.fn(async () => "staff");
+    vi.doMock("@/services/composition", async () => ({ services: { masleka: { myRole } } }));
+    const services = await loadFront();
+    await expect(services.masleka.myRole()).resolves.toBe("staff");
+    expect(myRole).toHaveBeenCalledTimes(1);
+  });
+});

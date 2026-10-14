@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 216
+**Location:** `tests/integration/` · **Cases:** 145 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 725 including `it.each` / `describe.each` expansions
 
 ---
 
@@ -469,8 +469,10 @@ answer, none for a stranger's.
 over Base44 and Edge, as §4.22 does for the claim, so the Edge functions keep
 the guards, answers, mail and sheet rows the Base44 ones have. Differences are
 their own cases: Edge `submit-lead` writes the Google event and sheet row
-through the service account, mails the visitor and Dorit an `.ics` invitation
-instead of using Outlook, and answers an empty request with `400` and
+through the service account (the event in the calendar `GOOGLE_CALENDAR_ID`
+names, without attendees), mails Dorit and `amielnoy@outlook.com` an `.ics`
+invitation by mail instead of using Outlook — independently of the Google event
+— and answers an empty request with `400` and
 `ready: { db, mailer, google }`; `log-support-chat` answers `200` with
 `sheet: "לא מוגדר"` when `SHEET_ID` is unset; each Edge function has a "what
 only it does" block. `dorit-mailer.integration.test.ts` adds the invitation
@@ -482,6 +484,21 @@ the endpoint's words), `edge-ics.test.ts` (the invitation: UTC, escaping,
 75-octet folding, size limit) and `edge-google-apis.test.ts` (calendar event,
 sheet append, PostgREST helpers). The live smoke asks `submit-lead` and
 `log-support-chat` an empty question in production.
+
+Invitations independent of the Google event — `INT-INV-001..007`, in the Edge
+"what only it does" block of `submit-lead.integration.test.ts`:
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-INV-001 | "sends both with a local UID and a warning when the Google call fails; the lead is saved" | 200; one lead; `.ics` to Dorit, `amielnoy@outlook.com` and the Gmail fallback with `UID:lead-<id>@govari-fin.co.il`; `calendar_google_failed`; ops mail `אירוע ביומן Google לא נוצר`, `נשלחו 3/3` |
+| INT-INV-002 | "sends both, with no Google request for the event, when GOOGLE_CALENDAR_ID is unset" | 3 invitations (Gmail fallback included); no call to `/calendar/v3/calendars/` |
+| INT-INV-003 | "keeps the other invitation, says 1/2 and saves the lead when one invitation fails" | 200; lead saved; invitation to Dorit only; `נשלחו 1/2`; an `invite_failed` warning |
+| INT-INV-004 | "is organised by the site, never by an attendee" | ORGANIZER `notifications@mail.govari-fin.co.il` (the mailer's From), not an attendee |
+| INT-INV-005..006 | "puts a 10:00 Israel slot at the right instant in %s" (2) | Summer `07:00Z`–`07:30Z`; winter `08:00Z`–`08:30Z` |
+| INT-INV-007 | "reports ready.google from the service account alone" | `ready.google: true` with `GOOGLE_CALENDAR_ID` unset |
+
+With the Google event created, the one existing case asserts that the two
+invitations carry the event's own UID and that none goes to `amielnoy@gmail.com`.
 
 ### 4.24 `contentAdmin` — the article's address — `INT-CNT-001..008`
 
@@ -503,9 +520,189 @@ is a failure, never a silently created row.
 | INT-CNT-007 | "fails an update whose mirror row is missing" | 500 |
 | INT-CNT-008 | "refuses to rename an article to a slug another one has" | 409; no Base44 update |
 
+### 4.25 `masleka-code` — the client hands over the code — `INT-MSKCODE-001..028`
+
+`tests/integration/masleka-code.integration.test.ts`, through the in-process
+harness with its clearinghouse fakes (`MaslekaFake`). The function reads the
+request's id by the token's hash, seals both values with that id and the field
+as context (`<id>:code`, `<id>:id`), then accepts through one conditional PATCH
+that repeats the read's conditions (`token_hash`, `status=eq.invited`,
+`token_expires_at=gt.<now>`) plus the id, so a submission that lands in
+between — or any replay — matches nothing.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKCODE-001 | "answers disabled and touches nothing while MASLEKA_ENABLED is unset" | 404 `disabled` + rid; no fetch at all, no mail; row unchanged |
+| INT-MSKCODE-002 | "stays dark for anything but exactly true, before reading the body" | `TRUE`, `1`, `yes`, `true1` with a non-JSON body: 404 `disabled` (not `link_invalid`); no fetch |
+| INT-MSKCODE-003 | "stores both values sealed and moves the request to code_received" | Answer keys are `ok`, `rid` in that order; both open with their own context; `id_last4` 0018 |
+| INT-MSKCODE-004 | "binds each sealed value to its request and its field" | The code under `<id>:id`, the ID under `<id>:code`, the code under another row's id: `sealed_invalid` |
+| INT-MSKCODE-005 | "pads a short ID before sealing it" | `00018` stored as `000000018` |
+| INT-MSKCODE-006 | "accepts only through one conditional update that names its columns and carries nothing the caller typed" | One PATCH; every `masleka_requests` call filters `token_hash=eq.<sha256>`, `status=eq.invited`, `token_expires_at=gt.<ISO>`; `select=` names columns, never `*`, a ciphertext or `token_hash`; no token, code or ID in a URL; the PATCH's keys are exactly id, select, status, token_expires_at, token_hash |
+| INT-MSKCODE-007 | "never echoes the code or the ID — not in the answer, not in any mail" | Neither value in the answer or any mail |
+| INT-MSKCODE-008 | "never writes the code, the ID, the token or the address to a log line" | Across success, `bad_id`, `bad_code` and a DB failure: no code, ID, token, token hash, IP or client name in any line |
+| INT-MSKCODE-009 | "tells every staff member, once each" | One notice per staff address; subject "קוד מסלקה חדש לטיפול — רונית מזרחי" |
+| INT-MSKCODE-010 | "falls back to Dorit's mailbox when the staff list cannot be read, and still accepts the code" | 200; one notice to dorit@ |
+| INT-MSKCODE-011 | "still accepts the code when a notice cannot be delivered" | 200; row `code_received`; the other notice still sent |
+| INT-MSKCODE-012 | "a second submission of the same link is refused and changes nothing" | 404 `link_invalid`; row identical to after the first; first ciphertext kept; no mail |
+| INT-MSKCODE-013 | "loses the race to a submission that lands between its read and its update" | The PATCH is sent and matches nothing: 404 `link_invalid`; the winner's values kept; no mail |
+| INT-MSKCODE-014 | "refuses an expired link" | `link_invalid`; row unchanged |
+| INT-MSKCODE-015 | "refuses a link whose request was already submitted" | `link_invalid` |
+| INT-MSKCODE-016 | "refuses a well-formed token nobody issued" | `link_invalid` |
+| INT-MSKCODE-017 | "refuses the old token once the reminder has rotated the link" | 404 `link_invalid`; row unchanged |
+| INT-MSKCODE-018 | "answers expired, used, rotated and unknown links in exactly the same words" | Expired, `code_received`, `submitted`, `expired`, rotated, unknown and malformed: each 404 `{ error: 'link_invalid', rid }` and nothing else; no PATCH; no mail |
+| INT-MSKCODE-019 | "refuses a malformed token without asking the database" | No `masleka_requests` call |
+| INT-MSKCODE-020 | "refuses an ID that fails the check digit, before storing anything" | 400 `bad_id`; no `masleka_requests` call |
+| INT-MSKCODE-021 | "refuses a code that cannot be one" | 400 `bad_code`; no `masleka_requests` call |
+| INT-MSKCODE-022 | "answers a non-JSON body as a bad link" | `link_invalid` |
+| INT-MSKCODE-023 | "counts every call against its address and its link, never by the raw values" | `allow_submission` with `masleka-ip:<sha256(ip)>` 3600/10, then `masleka-link:<token hash>` 3600/5 |
+| INT-MSKCODE-024 | "refuses a flood from one address" | 429 `rate_limited`; no PATCH |
+| INT-MSKCODE-025 | "refuses a flood on one link" | 429 `rate_limited`; no PATCH |
+| INT-MSKCODE-026 | "stores nothing when there is no key to seal with, or the key is not 32 bytes" | Missing, 16-byte and non-base64 key: 503 `unavailable` + rid; no `masleka_requests` call; row unchanged; no mail |
+| INT-MSKCODE-027 | "reports a database failure with its rid and nothing else" | Answer is exactly `{ error: 'failed', rid }`; no mail |
+| INT-MSKCODE-028 | "answers the browser's preflight and does nothing else" | 204; no fetch |
+
+### 4.26 `masleka-reveal` — a member decrypts one value — `INT-MSKREV-001..020`
+
+`tests/integration/masleka-reveal.integration.test.ts`, through the in-process
+harness with its clearinghouse fakes (`MaslekaFake`: sessions for
+`GET /auth/v1/user`, roles for the `staff_role` RPC). Every call proves its
+caller (`staffCaller`); the request is read by its UUID-checked id and agency 1
+with named columns; the access row (who, which request, which field — its
+agency copied from the request) is written before the value is unsealed with
+`<id>:<field>` as its context, and a failed write reveals nothing.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKREV-001 | "answers disabled while MASLEKA_ENABLED is unset" | 404 exactly `{ error: 'disabled', rid }`; no fetch |
+| INT-MSKREV-002 | "stays dark for anything but exactly true, before reading the body" | `TRUE`, `1`, `yes`, `true1` with a non-JSON body: 404 `disabled` (not `invalid`); no fetch |
+| INT-MSKREV-003 | "refuses a caller with no session" | 401 `unauthorized` + rid; no `masleka_requests` call; no log row |
+| INT-MSKREV-004 | "refuses a session the auth server does not recognise" | 401; no `staff_role` call; no `masleka_requests` call |
+| INT-MSKREV-005 | "refuses a signed-in user who is not staff, and logs no access" | 403 `forbidden` + rid; no log row; no `masleka_requests` call |
+| INT-MSKREV-006 | "a membership removed between two calls is refused on the second" | 200 then 403 with the same session; no value, no log row on the second |
+| INT-MSKREV-007 | "asks the auth server and staff_role about the caller on every call" | One `GET /auth/v1/user` with the bearer token; one `staff_role` with `{ p_user_id }` |
+| INT-MSKREV-008 | "decrypts the ID for a member, never cached, and logs who asked" | `{ ok, value, rid }` in that order; `no-store`; one log row whose keys are exactly agency_id, at, field, id, request_id, user_id |
+| INT-MSKREV-009 | "decrypts the code" | Value; one log row, field `code` |
+| INT-MSKREV-010 | "opens each value only with its own request and field as the context" | The code's ciphertext in the ID column, and an ID sealed for another row: 500 `failed`, no value |
+| INT-MSKREV-011 | "has nothing to give unless the request is waiting with its code" | `invited`, `submitted`, `completed`, `expired`, `cancelled`: 409 `not_available`; no log row |
+| INT-MSKREV-012 | "does not find another agency's request" | 404 `not_found`; no log row |
+| INT-MSKREV-013 | "refuses a field it does not hold, or an id that is not one" | `phone`, a non-UUID, a UUID with a PostgREST filter appended, no id, a non-JSON body: 400 `invalid`; no `masleka_requests` call |
+| INT-MSKREV-014 | "logs the agency the request belongs to and the caller the auth server named, whatever the body says" | Body's `agencyId`/`agency_id`/`userId` ignored: log row agency 1, user the session's |
+| INT-MSKREV-015 | "reads the request once, by its checked id and agency, naming its columns, and never changes it" | One GET; `id=eq.<uuid>`, `agency_id=eq.<agency 1>`; `select=` names columns, never `*` or `token_hash`; no PATCH |
+| INT-MSKREV-016 | "reveals nothing when the access log cannot be written" | 500 exactly `{ error: 'failed', rid }`; no value |
+| INT-MSKREV-017 | "reveals nothing from a value that fails its tag, and the attempt stays logged" | 500; no value; one log row (written before decrypting) |
+| INT-MSKREV-018 | "reveals nothing without the key, or with one that is not 32 bytes" | Missing, 16-byte, non-base64: 503 `unavailable` + rid; no `masleka_requests` call; no log row |
+| INT-MSKREV-019 | "never writes a revealed value or the session token to a log line" | Across success (both fields), log failure, wrong context and an outsider: no code, ID, session token, ciphertext or client name in any line |
+| INT-MSKREV-020 | "answers the browser's preflight and does nothing else" | 204 with the site's origin allowed; no fetch |
+
+### 4.27 `masleka-submitted` — הגשתי wipes the ciphertext — `INT-MSKSUB-001..016`
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKSUB-001 | "answers disabled while MASLEKA_ENABLED is unset, before reading the body" | 404 `disabled` + rid; no `masleka_requests` call; ciphertext untouched |
+| INT-MSKSUB-002 | "refuses a caller with no session, and an outsider" | 401 `unauthorized`, 403 `forbidden`; no PATCH; ciphertext untouched |
+| INT-MSKSUB-003 | "wipes both values, marks the request submitted and records who and when" | Nulls; `submitted`; `submitted_by`; `ciphertext_wiped_at` = `submitted_at` = now |
+| INT-MSKSUB-004 | "sets the clearinghouse's deletion date, business day 7, in the same write" | `clearinghouse_deletes_at` not null, = `addBusinessDays(submitted_at, 7)`, in the one PATCH |
+| INT-MSKSUB-005 | "does it in one write that is conditional on the request still waiting" | One PATCH filtered `id`, `agency_id`, `status=eq.code_received`; exactly the seven wipe fields |
+| INT-MSKSUB-006 | "asks for the updated rows with an explicit select that leaves out the ciphertexts and the token hash" | `select=id`, `return=representation`; no call names a ciphertext, the hash or `*` |
+| INT-MSKSUB-007 | "does not call a second click done: the request is already submitted" | 409 `already_submitted`, no `ok`; times unchanged |
+| INT-MSKSUB-008 | "loses a race gracefully: a concurrent הגשתי that landed first is a refusal, not 'done'" | PATCH matches zero rows: 409 `already_submitted`, no `ok` |
+| INT-MSKSUB-009 | "a failed wipe is reported as a failure, not as done" | 500 `failed`, no `ok`; row still `code_received` with both ciphertexts |
+| INT-MSKSUB-010 | "refuses a request that is not waiting with a code, and changes nothing" | `invited`, `completed`, `expired`, `cancelled`: 409 `not_available`; row unchanged |
+| INT-MSKSUB-011 | "does not find a request that is not there, or not the agency's, and leaves the other agency's values alone" | 404 `not_found`; other agency's ciphertext untouched |
+| INT-MSKSUB-012 | "scopes the write to the agency, whatever the body says" | `agency_id=eq.<AGENCY_1>`; body's agency, status and `submitted_by` ignored |
+| INT-MSKSUB-013 | "refuses an id that is not one, before touching the table" | 400 `invalid` (not a UUID, injection, non-string, missing, bad JSON); no `masleka_requests` call |
+| INT-MSKSUB-014 | "lowercases the id once it is validated, so the filter and the answer agree" | Upper-case UUID: 200; filter `id=eq.<lowercase>` |
+| INT-MSKSUB-015 | "never writes a ciphertext, a name or the session token to a log line" | Across success, failed write and outsider: every line has `rid`; no ciphertext, client name, last4 or session token |
+| INT-MSKSUB-016 | "answers the browser's preflight and does nothing else" | 204, site origin allowed; no fetch |
+
+### 4.28 `masleka-create` — a hand-made request, or a fresh link — `INT-MSKNEW-001..023`
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKNEW-001 | "answers disabled while MASLEKA_ENABLED is unset" | 404 |
+| INT-MSKNEW-002 | "refuses a caller with no session, and an outsider" | 401, 403; no row; an outsider cannot rotate a link |
+| INT-MSKNEW-003 | "answers disabled before reading the body or calling anything" | 404 `disabled` + rid; no fetch |
+| INT-MSKNEW-004 | "creates an invited request, mails the client the link, and returns it for copying" | Row with hash of the returned token; invitation carries the link; `no-store` |
+| INT-MSKNEW-005 | "only returns the link when the staff member will send it themselves" | No mail; `client_invited_at` null |
+| INT-MSKNEW-006 | "mails nobody when there is no address" | `contact_email` null; no mail |
+| INT-MSKNEW-007 | "still returns the link when the invitation mail fails" | 200, `invited: false` |
+| INT-MSKNEW-008 | "refuses an empty or overlong name" | 400 `invalid_name` |
+| INT-MSKNEW-009 | "refuses an address that is not one" | 400 `invalid_email`; no row |
+| INT-MSKNEW-010 | "takes the agency and the creator from the server, never the body" | `agency_id` = agency 1, `created_by` = caller; body's agency, creator, status, lead and hash ignored |
+| INT-MSKNEW-011 | "mails the invitation with a clickable https button to the link, as the client's role" | `href` = the https link; one mail |
+| INT-MSKNEW-012 | "keeps the name and address within their limits" | 80-char name ok; non-string name/address and 254+ address refused |
+| INT-MSKNEW-013 | "answers 500 without a link when the request cannot be stored" | 500 `failed`, no `ok`, no link, no mail |
+| INT-MSKNEW-014 | "never writes the link, the token, the name or the address to a log line" | Across create, mail failure, fresh link, outsider and failed write: every line has `rid`; none carries them |
+| INT-MSKNEW-015 | "answers the browser's preflight and does nothing else" | 204, site origin allowed; no fetch |
+| INT-MSKNEW-016 | "replaces the token, restarts its thirty days and stops the automatic reminder" | New hash; expiry >= 29 days on; `client_reminded_at` set |
+| INT-MSKNEW-017 | "writes one conditional update scoped to the agency, naming the columns it gets back" | One PATCH: `id` (lowercased), `agency_id`, `status=eq.invited`, `select=id`, `return=representation`; three fields |
+| INT-MSKNEW-018 | "makes the old link stop working: the stored hash no longer matches it" | Stored hash is the new token's only |
+| INT-MSKNEW-019 | "extends the expiry, never shortens it: thirty days from now whatever was left" | Near and lapsed expiries both become >= 29 days on |
+| INT-MSKNEW-020 | "does not touch another agency's request, or one that is not there" | 409; hash unchanged |
+| INT-MSKNEW-021 | "answers 500 and no link when the update fails" | 500 `failed`; no link |
+| INT-MSKNEW-022 | "refuses a request that is no longer waiting for a code" | 409; hash unchanged |
+| INT-MSKNEW-023 | "refuses an id that is not one" | 400 `invalid`; no `masleka_requests` call |
+
+### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..029`
+
+Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Israel.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MSKREM-001 | "answers disabled while MASLEKA_ENABLED is unset" | 404 |
+| INT-MSKREM-002 | "refuses everything when no secret is configured" | 503; no table read |
+| INT-MSKREM-003 | "refuses everything when the secret is shorter than 32 characters" | 503 for a 31-character secret even when the header matches; no table read, no staff lookup, no mail |
+| INT-MSKREM-004 | "refuses a caller without the secret, or with another" | 401 for none, a wrong one, a prefix and a longer string; no table read, no mail |
+| INT-MSKREM-005 | "does nothing at all while the switch is off, even for the right secret" | 404 `disabled`; no fetch, no mail |
+| INT-MSKREM-006 | "tells staff the files are ready four hours after הגשתי" | One notice per staff address for the 5-hour-old submission only; marked |
+| INT-MSKREM-007 | "sends one digest when several are ready" | One mail per address, "— 2 לקוחות" |
+| INT-MSKREM-008 | "tells staff on business day 5 that the clearinghouse deletes in two days" | Deadline notice for the Sunday-before submission; marked |
+| INT-MSKREM-009 | "does not warn before business day 5" | No deadline notice at 08:00 UTC |
+| INT-MSKREM-010 | "ignores requests PR B has completed" | Completed row untouched |
+| INT-MSKREM-011 | "claims each staff notice in one conditional update that checks it was never sent" | One PATCH per kind, filtered on `status=eq.submitted` and the marker `is.null` |
+| INT-MSKREM-012 | "sends nothing when another run has already claimed the notice" | Marker set by a rival run before the claim: zero rows back, no staff mail |
+| INT-MSKREM-013 | "gives the claim back when no staff address could be mailed, so the next run tries again" | Both markers null again; warnings `ready_not_sent`, `deadline_not_sent` |
+| INT-MSKREM-014 | "takes business day 5 from the business calendar: a Thursday submission is due the next Thursday" | Not due at 08:00 UTC Thursday 15 Oct, due at 09:00 (`addBusinessDays`) |
+| INT-MSKREM-015 | "never carries a code, an ID or ciphertext in a mail, and never asks for the ciphertext columns" | No ciphertext marker in any mail; no `masleka_requests` URL names a ciphertext column |
+| INT-MSKREM-016 | "does not say 'deleted in two days' at or after business day 7" | No notice and no marker at business day 7 (Tue 20 Oct); still sent the day before |
+| INT-MSKREM-017 | "never repeats a reminder" | Second run sends nothing |
+| INT-MSKREM-018 | "reminds a client once, a week after the invitation, with a new link" | One reminder; stored hash = new token (rotated after the send); original `token_expires_at` kept; others untouched |
+| INT-MSKREM-019 | "the old link stops working once the reminder has rotated it" | `masleka-code` refuses the old token, accepts the new |
+| INT-MSKREM-020 | "puts the reminder back when the client's mail fails, so the next run tries again" | `client_reminded_at` null; warning |
+| INT-MSKREM-021 | "pins the claim and the rotation as two updates: the claim never touches the hash, the rotation only follows our own marker" | Two PATCHes: the claim sets only `client_reminded_at` (filtered `is.null`, `status=eq.invited`); the rotation sets only `token_hash`, filtered `client_reminded_at=eq.<now>` |
+| INT-MSKREM-022 | "keeps the old link working when the reminder mail fails" | Hash still the old token's, marker null; `masleka-code` still accepts the old token |
+| INT-MSKREM-023 | "leaves the hash alone and warns when the row stopped being invited before the rotation" | A code arriving after the mail: hash untouched; warning `client_rotate_failed` |
+| INT-MSKREM-024 | "warns, and the old link still works, when the rotation update fails" | Hash untouched; warning `client_rotate_failed` |
+| INT-MSKREM-025 | "one failing client claim does not stop the other clients" | Other client reminded; warning `client_claim_failed`; `clients: 1` |
+| INT-MSKREM-026 | "does not remind a client whose link a person sent by hand, or one whose link has expired" | Hand-sent (marker set) and expired rows: no mail, hash unchanged |
+| INT-MSKREM-027 | "sends nothing to a client when another run has already claimed the reminder" | Rival marker: zero rows back, no mail, `clients: 0` |
+| INT-MSKREM-028 | "writes no name, address, token or link to a log line" | Across a clean run and a failing-mail run: none of the names, addresses, secret, link or old token in any line |
+| INT-MSKREM-029 | "answers how many it sent" | `{ready: 1, deadline: 1, clients: 1, warnings: []}` |
+
+### 4.30 `submit-lead` — the clearinghouse request — `INT-LEADMSK-001..014`
+
+`tests/integration/submit-lead-masleka.integration.test.ts`. The dark cases fix the clock (`vi.setSystemTime`, Date only) and compare against the output re-captured from submit-lead after #170 landed, at the merge a8f7a9f.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-LEADMSK-001 | "answers, mails and logs an interested interview exactly as before the pipeline, whatever the off value" | For `MASLEKA_ENABLED` unset, "", "false", "TRUE", "1", "yes", "true1": same answer, every mail's halves byte-identical (hash), same log lines; no `masleka` call |
+| INT-LEADMSK-002 | "answers, mails and logs a declined or unasked interview exactly as before the pipeline" | Same, for a declined and a never-asked interview |
+| INT-LEADMSK-003 | "keeps today's mandate mail, and creates no request, while the switch is off" | No `masleka_requests` call; one visitor mail with the POA link in both halves |
+| INT-LEADMSK-004 | "creates a request for an interview that asked for the pull, and its one confirmation carries the link as a button instead of the mandate" | One `invited` row in agency 1 tied to the lead, `created_by` null, hash of the mailed token; exactly one visitor mail (Ruling 21) with `<a href="https://govari-fin.co.il/masleka#t=…"` (Ruling 13) and the plain link in the text half; no POA; `client_invited_at` set |
+| INT-LEADMSK-005 | "says nothing about the clearinghouse to a visitor who declined" | No request call; one visitor mail; no link, no "מסלקה" |
+| INT-LEADMSK-006 | "creates nothing for an interview that is still partial" | No request call; no mail |
+| INT-LEADMSK-007 | "falls back to the mandate when the request cannot be created, and the lead, the staff copies and the calendar still happen" | 200 `ok`; `masleka_request_failed`; lead, calendar event and every staff copy; one visitor mail with the POA link and no `masleka#t=` |
+| INT-LEADMSK-008 | "leaves the request not invited when the confirmation carrying the link cannot be sent, and the lead still lands" | 200; `client_confirmation_failed…`; row with `client_invited_at` null and no PATCH; lead, calendar, staff copies |
+| INT-LEADMSK-009 | "still answers 200 when the confirmation went out but could not be marked" | Confirmation carries the link; `client_invited_at` null; `masleka_invite_mark_failed` warning and log line |
+| INT-LEADMSK-010 | "never takes the link from the request body" | Interested visitor (Ruling 5), switch off and on: no body-supplied link in any mail; on, the real link is rendered; off, the body cannot suppress the mandate |
+| INT-LEADMSK-011 | "creates the request without mailing when there is no address, or none that is one" | Row with `contact_email` and `client_invited_at` null; no visitor mail |
+| INT-LEADMSK-012 | "sends no link to an address over its daily confirmation limit" | Row created, not invited; no visitor mail |
+| INT-LEADMSK-013 | "puts the link only in the client's confirmation — never in a log line, the answer or a staff copy" | Token absent from every log line (each with `rid`), the answer, staff and calendar mails; `masleka.request_created` logged |
+| INT-LEADMSK-014 | "keeps the answer's shape: ok, rid, leadId and warnings, nothing more" | Keys exactly `ok`, `rid`, `leadId`, `warnings` (Ruling 8), on success and on a failed request |
+
 ## 5. Pass criteria
 
-All 295 cases pass. These assert behaviour, not shape — a failure means the
+All 145 declared cases pass (vitest: 725 with expansions). These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
