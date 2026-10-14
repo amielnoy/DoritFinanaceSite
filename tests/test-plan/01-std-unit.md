@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 699 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1175 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 702 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1295 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -713,6 +713,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-026 | "reads real articles in evaluation mode too: reading changes nothing" | With `evalMode`, `listArticles` still calls the source |
 | UNIT-CHTOOL-027 | "turns a failing article store into tool_failed, not a crashed turn" | A throwing `list` gives `{ ok: false, error: "tool_failed" }` |
 | UNIT-CHTOOL-028 | "turns a failing read into tool_failed too, never not_found" | A throwing `read` gives `isError` and `tool_failed`, not `not_found` (Review Focus 2) |
+| UNIT-CHTOOL-029 | "%s: an error the model can act on, nothing saved, in both modes" (3 cases) | `{}`, a name and phone with no `stage`, and `stage: "final"`: in live and evaluation mode the handler is not called, the outcome is `error` / `isError` / not `leadSaved`, the answer is `{ ok: false }` naming `stage`, and the conversation stays `open` (the evaluation of 2026-10-14: `submitLead({})` counted as complete) |
+| UNIT-CHTOOL-030 | "after a refused empty call, the real complete save still goes through" | Evaluation mode: `{}` then a full lead → `simulated`, `leadSaved` |
+| UNIT-CHTOOL-031 | "an evaluation run refuses %s as submit-lead does: its own Hebrew error, nothing saved" (2 cases) | No name / a blank phone in evaluation mode → `error`, "נדרשים שם וטלפון", conversation `open` — the simulation answers as `submit-lead` would |
 
 ### 4.32a The chat's article source — `tests/unit/chat-articles.test.ts`
 
