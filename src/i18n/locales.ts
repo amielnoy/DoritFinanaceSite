@@ -26,6 +26,15 @@ export const ENABLED_LOCALES: Locale[] = enabledLocales(env?.VITE_LOCALES);
 
 export const dirOf = (locale: Locale): "rtl" | "ltr" => (locale === "he" ? "rtl" : "ltr");
 
+/**
+ * What Dorit reads stays Hebrew whatever the page's language — a lead's
+ * summary, a message's text. This is the note that says the visitor wrote
+ * from the English or French site ("" for Hebrew), so she answers in kind.
+ */
+export function filledInNote(locale: Locale): string {
+  return { he: "", en: "מולא באנגלית", fr: "מולא בצרפתית" }[locale];
+}
+
 /** The language a pathname is in, and the path without its prefix. */
 export function splitLocale(pathname: string): { locale: Locale; rest: string } {
   const m = pathname.match(/^\/(en|fr)(?=\/|$|#|\?)/);

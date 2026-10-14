@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { CONTACT } from "@/config/contact";
+import { translate, useLocale } from "@/i18n/LocaleContext";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/locales";
 
 /**
  * מצב שליחה משותף לכל הטפסים באתר.
@@ -16,19 +18,15 @@ export type SubmissionState = "idle" | "sending" | "sent" | "error";
 /** What the visitor was trying to send, so the message can name it. */
 export type SubmissionSubject = "message" | "form" | "request" | "report";
 
-const NOUN: Record<SubmissionSubject, string> = {
-  message: "את ההודעה",
-  form: "את הטופס",
-  request: "את הבקשה",
-  report: "את הדיווח",
-};
-
 /**
- * The failure message, with the address interpolated from config rather than
- * embedded in the copy.
+ * The failure message in the page's language (common.json, `submit.*`), with
+ * the address interpolated from config rather than embedded in the copy.
  */
-export function submissionErrorMessage(subject: SubmissionSubject): string {
-  return `לא הצלחנו לשלוח ${NOUN[subject]} כרגע. ניתן לשלוח מייל ישירות ל-${CONTACT.email} או לנסות שוב.`;
+export function submissionErrorMessage(subject: SubmissionSubject, locale: Locale = DEFAULT_LOCALE): string {
+  return translate(locale, "common", "submit.failed", {
+    what: translate(locale, "common", `submit.${subject}`),
+    email: CONTACT.email,
+  });
 }
 
 export interface UseSubmissionResult {
@@ -54,6 +52,7 @@ export function useSubmission(subject: SubmissionSubject = "message"): UseSubmis
   // updater runs at render time, so two clicks in the same tick would both
   // read "idle" and both submit.
   const inFlight = useRef(false);
+  const locale = useLocale();
 
   const submit = useCallback(
     async (task: () => Promise<unknown>): Promise<boolean> => {
@@ -69,14 +68,14 @@ export function useSubmission(subject: SubmissionSubject = "message"): UseSubmis
         setState("sent");
         return true;
       } catch {
-        setError(submissionErrorMessage(subject));
+        setError(submissionErrorMessage(subject, locale));
         setState("error");
         return false;
       } finally {
         inFlight.current = false;
       }
     },
-    [subject]
+    [subject, locale]
   );
 
   const reset = useCallback(() => {

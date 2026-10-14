@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dirOf, enabledLocales, localePath, splitLocale } from "@/i18n/locales";
+import { dirOf, enabledLocales, filledInNote, localePath, splitLocale } from "@/i18n/locales";
+import { submissionErrorMessage } from "@/hooks/useSubmission";
 import { interpolate, translate } from "@/i18n/LocaleContext";
 import { switchTarget } from "@/components/dorit/layout/LanguageSwitcher";
 
@@ -58,5 +59,21 @@ describe("text in a language", () => {
     expect(translate("en", "common", "nav.tools")).toBe("Tools");
     expect(translate("fr", "common", "nav.tools")).toBe("Outils");
     expect(translate("he", "common", "nav.tools")).toBe("כלים");
+  });
+});
+
+describe("what Dorit reads, and what the visitor reads when sending fails", () => {
+  it("notes in Hebrew that a visitor wrote from the English or French site, and nothing for Hebrew", () => {
+    expect([filledInNote("he"), filledInNote("en"), filledInNote("fr")]).toEqual(["", "מולא באנגלית", "מולא בצרפתית"]);
+  });
+
+  it("says sending failed in the page's language, naming what and where to write instead", () => {
+    expect(submissionErrorMessage("message")).toBe(
+      "לא הצלחנו לשלוח את ההודעה כרגע. ניתן לשלוח מייל ישירות ל-dorit@govari-fin.co.il או לנסות שוב.",
+    );
+    expect(submissionErrorMessage("request", "en")).toBe(
+      "We couldn't send your request just now. You can email dorit@govari-fin.co.il directly or try again.",
+    );
+    expect(submissionErrorMessage("form", "fr")).toMatch(/^Impossible d'envoyer le formulaire .*dorit@govari-fin\.co\.il/);
   });
 });

@@ -5,26 +5,22 @@ import { Image } from "@/components/ui/image";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useLocale, useT } from "@/i18n/LocaleContext";
 
 const ATMOS =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/5b05202dd_generated_7c8e0421.jpg";
 const PEN =
   "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/199524e64_generated_35057100.jpg";
 
-interface Stat {
-  num: string;
-  label: string;
-}
-
 // Three, not four. "97% שיעור תביעות שאושרו" was here and is gone: a licensed
 // agent quoting a performance figure is a regulated claim, and nothing in this
 // repo could substantiate it. The grid below is sized to this list — keep the
 // two in step, or the bordered strip renders with an empty cell.
-const STATS: Stat[] = [
-  { num: "30", label: "שנות ניסיון" },
-  { num: "מאות", label: "לקוחות מרוצים" },
-  { num: "1:1", label: "ליווי אישי" },
-];
+const STATS = [
+  ["about.stat1Num", "about.stat1"],
+  ["about.stat2Num", "about.stat2"],
+  ["about.stat3Num", "about.stat3"],
+] as const;
 
 /**
  * `brief` keeps the first paragraph and the numbers, and drops the career
@@ -48,6 +44,8 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
   const isDesktop = useMediaQuery(MD_UP, true);
   const oneSentence = brief && !isDesktop;
   const [more, setMore] = useState<boolean>(false);
+  const t = useT("home");
+  const he = useLocale() === "he";
   return (
     <section id="about" className="relative border-b border-border">
       <div className={`max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] grid grid-cols-1 lg:grid-cols-2 gap-[clamp(40px,6vw,96px)] items-center${brief ? " max-md:py-10" : ""}`}>
@@ -55,7 +53,7 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
           <div className="plate h-[clamp(220px,28vw,360px)]">
             <Image
               src={ATMOS}
-              alt="פרט אדריכלי — אור על זכוכית"
+              alt={t("about.imgAtmos")}
               className="w-full h-full object-cover"
               fittingType="fill"
             />
@@ -63,7 +61,7 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
           <div className="plate h-[clamp(220px,28vw,360px)]">
             <Image
               src={PEN}
-              alt="עט נוצה על משטח אבן"
+              alt={t("about.imgPen")}
               className="w-full h-full object-cover"
               fittingType="fill"
             />
@@ -73,12 +71,12 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
         <div className="order-1 lg:order-2 flex flex-col justify-center">
           <Reveal>
             <Eyebrow>
-              01 · מתכננת פיננסית וסוכנת ביטוח
+              {t("about.eyebrow")}
             </Eyebrow>
             <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-5 leading-[1.12]">
-              מתכננת פיננסית
+              {t("about.titleLine1")}
               <br />
-              וסוכנת ביטוח.
+              {t("about.titleLine2")}
             </h2>
           </Reveal>
           <div className={`mt-6 space-y-5 text-foreground/80 max-w-[600px] text-justify text-[19px] leading-[1.8] hyphens-none${brief ? " max-md:mt-4 max-md:text-start max-md:text-[17px] max-md:leading-[1.7]" : ""}`}>
@@ -88,34 +86,22 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
               // text node, because a run boundary moves the justified line by
               // a pixel.
               <p id="about-more">
-                <span className={more ? undefined : "hidden"}>שמי דורית גוב ארי, נשואה לניב ואמא לשגיא, עדן וירין. </span>
-                ותיקה בתחומי הפיננסים והביטוח, בעלת רישיון סוכן ותואר אקדמאי במדעי ההתנהגות, ניהול וכלכלה.
+                <span className={more ? undefined : "hidden"}>{t("about.family")} </span>
+                {t("about.credentials")}
               </p>
             ) : (
               <p>
-                שמי דורית גוב ארי, נשואה לניב ואמא לשגיא, עדן וירין. ותיקה בתחומי
-                הפיננסים והביטוח, בעלת רישיון סוכן ותואר אקדמאי
-                במדעי ההתנהגות, ניהול וכלכלה.
+                {`${t("about.family")} ${t("about.credentials")}`}
               </p>
             )}
             {brief ? null : <p>
-              עבדתי שנים ארוכות כמתכננת פיננסית וביטוח עצמאית, 12 שנים בבנק
-              מזרחי טפחות כיועצת פנסיונית, ותקופה ארוכה כמתכננת פנסיה ומיסוי
-              במרכז לתכנון כלכלי מתקדם בחברת הראל. בשנים האחרונות אני עובדת
-              כמתכננת פיננסית בכירה עם התמחות בהיבטי המיסוי השונים, בשיתוף עם
-              חברת ארבע עונות — בין חברות התכנון הפיננסי הגדולות בארץ.
+              {t("about.career")}
             </p>}
             {brief ? null : <p>
-              במהלך השנים הבנתי כמה דברים בתחום הפנסיוני: הבלבול, תחושת חוסר
-              האונים מול קופות הגמל, ההשתלמות והמוצרים הפנסיוניים השונים, וחוסר
-              הידע של האנשים מביא לטעויות משמעותיות דווקא בקשר לכספים הגדולים
-              והמשמעותיים ביותר שלהם. הלקוחות זקוקים לפתרונות מותאמים לצרכים
-              האישיים שלהם ושל בן/בת הזוג.
+              {t("about.insight")}
             </p>}
             {brief ? null : <p>
-              מה שמייחד אותי כאשת מקצוע: שילוב בין מקצועיות וניסיון רבים מאד,
-              אכפתיות ויושר אמיתיים כלפי הלקוחות, הסברים בגובה העיניים המובנים
-              לכולם בתחום המורכב הזה — ובעיקר אנושיות, יחס חם וחיוך תמיד.
+              {t("about.unique")}
             </p>}
           </div>
           {oneSentence ? (
@@ -129,7 +115,7 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
                 aria-controls="about-more"
                 className={ABOUT_LINK}
               >
-                עוד עליי
+                {t("about.more")}
                 <ChevronDown
                   size={16}
                   strokeWidth={1.5}
@@ -137,9 +123,10 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
                   className={`motion-safe:transition-transform duration-200 ${more ? "rotate-180" : ""}`}
                 />
               </button>
-              {more ? (
+              {/* /perspective is Hebrew only: no link to it from English or French. */}
+              {more && he ? (
                 <Link to="/perspective" className={ABOUT_LINK}>
-                  הסיפור המלא
+                  {t("about.fullStory")}
                   <ChevronLeft size={16} strokeWidth={1.5} aria-hidden="true" />
                 </Link>
               ) : null}
@@ -147,21 +134,21 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
           ) : null}
           {brief ? null : (
             <p className="mt-6 font-heading italic text-2xl text-accent">
-              — דורית
+              {t("about.signature")}
             </p>
           )}
 
           <div className={`mt-8 grid grid-cols-3 border-y border-border${brief ? " max-md:mt-6" : ""}`}>
-            {STATS.map((s, i) => (
+            {STATS.map(([num, label], i) => (
               <div
                 key={i}
                 className={`px-2 py-6 flex flex-col items-center gap-2 text-center ${i > 0 ? "border-s border-border" : ""}${brief ? " max-md:py-4" : ""}`}
               >
                 <p className="font-heading text-[clamp(36px,4vw,52px)] text-accent leading-none lining-nums tabular-nums">
-                  {s.num}
+                  {t(num)}
                 </p>
                 <p className="text-[15px] text-muted-foreground">
-                  {s.label}
+                  {t(label)}
                 </p>
               </div>
             ))}

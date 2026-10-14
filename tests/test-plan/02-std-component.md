@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 341 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 371 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 348 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 379 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -634,6 +634,20 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-004 | "keeps the visitor in their language: prefixed links, and no Hebrew-only pages in the menu" | `/en/tools`, `/en/#start`; no Blog or Perspective; "Privacy policy (in Hebrew)" → `/privacy` |
 | CMP-I18N-005 | "offers the same page in the other languages" | עברית → `/pension-check`; Français → `/fr/pension-check`; English `aria-current` |
 | CMP-I18N-006 | "asks in English, but sends Dorit the Hebrew summary, noting the language" | "Please enter your name."; the summary in Hebrew with "· מולא באנגלית" |
+
+### 4.35 The home page in English and French — `tests/component/i18n-home.test.tsx`
+
+`<Home />` through `LocaleLayout` at `/en`, `/fr` and `/`; Base44 mocked (one Hebrew testimonial), `submitLead` mocked, a desktop `matchMedia`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-I18N-007 | "renders %s with no Hebrew but the testimonials and the switcher's עברית" (/en, /fr) | The h1 in the language; no Hebrew outside `lang="he"` in text, aria-label, alt, placeholder or title |
+| CMP-I18N-008 | "leads with the short form: no questionnaire, no chat, and no FAQ block until /faq is translated" | "Full name *"; no `#interview`, no `#common-questions`; the hero's check → `/en/pension-check` |
+| CMP-I18N-009 | "keeps the questionnaire and the FAQ block on the Hebrew page" | `#interview` and `#common-questions` present; no original-language note |
+| CMP-I18N-010 | "sends the visitor's message as written, with a Hebrew note for Dorit" | "Please enter your name and phone."; `message` "About my pension\n(מולא באנגלית)" |
+| CMP-I18N-011 | "shows the testimonials in their own Hebrew, marked so" | The card `lang="he" dir="rtl"`; the French note |
+| CMP-I18N-012 | "turns the cases' arrows with the page: back is to the left in English, to the right in Hebrew" | "Previous" scrolls by a negative `left` |
+| CMP-I18N-013 | "keeps the Hebrew page's arrows as they were" | "הקודם" scrolls by a positive `left` |
 
 ## 5. Pass criteria
 

@@ -4,15 +4,8 @@ import { CONTACT } from "@/config/contact";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
-
-interface Brief {
-  tag: string;
-  title: string;
-  body: string;
-  metric: string;
-  /** Under the figure, when the figure is a projection rather than a fact. */
-  basis?: string;
-}
+import { useLocale, useT } from "@/i18n/LocaleContext";
+import { dirOf } from "@/i18n/locales";
 
 /**
  * Cases, not promises.
@@ -25,52 +18,20 @@ interface Brief {
  * named no source.
  */
 
-const BRIEFS: Brief[] = [
-  {
-    tag: "תביעת חיים",
-    title: "מ-דחייה לאישור מלא תוך 11 ימים",
-    body: "משפחה שנתקלה בסירוב ראשוני לתביעת חיים. ניהלתי את ההליך מול החברה, השלמתי תיעוד והבאתי את הכיסוי המלא — בלי שהמשפחה נאלצה להרים טלפון.",
-    metric: "850 אלף ₪ שולמו",
-  },
-  {
-    tag: "תכנון פנסיה",
-    title: "תכנון שהכפיל את ההכנסה הצפויה בפרישה",
-    body: "לקוח עצמאי בן 47 עם תיק מפוזר. איחדתי מוצרים, בניתי מסלול מותאם והתאמתי את החשיפה — לפי התחזית, הכנסה חודשית בפרישה גבוהה פי שניים מזו שבתיק המקורי.",
-    metric: "פי 2 בתחזית",
-    basis: "הערכה המבוססת על הנחות של תשואה ודמי ניהול",
-  },
-  {
-    tag: "ביטוח משכנתא",
-    title: "חיסכון של 38% בפרמיה",
-    body: "זוג עם משכנתא חדשה קיבל הצעה סטנדרטית. בדקתי את הכיסויים מול פרופיל הסיכון האמיתי, הסרתי כפילויות והוזלתי את העלות משמעותית.",
-    metric: "38% פחות בפרמיה",
-  },
-  {
-    tag: "בריאות",
-    title: "כיסוי ניתוח שאושר תוך 48 שעות",
-    body: "לקוחה שנזקקה לניתוח דחוף ונדחתה פעמיים. התערבתי ישירות מול מחלקת האישורים, והכיסוי אושר בטרם הניתוח.",
-    metric: "48 שעות",
-  },
-  {
-    tag: "עסק",
-    title: "כיסוי לשותפים בעסק",
-    body: "שותפים בעסק בינוני ללא הסכם שותפים. בניתי מערך כיסויים שנועד לתמוך בהמשכיות העסק ובמשפחות במקרה של אובדן כושר עבודה או פטירה.",
-    metric: "המשכיות עסקית",
-  },
-  {
-    tag: "חיסכון פנסיוני",
-    title: "חיסכון מוערך של 420 אלף ₪ בדמי ניהול",
-    body: "שכירה בת 39 שהפקידה לארבעה מוצרים שונים עם דמי ניהול גבוהים. איחדתי לשני מסלולים ממוקדים, ניהלתי משא ומתן מול הגופים המוסדיים והורדתי את דמי הניהול — החיסכון המצטבר עד הפרישה מוערך ב-₪420 אלף.",
-    metric: "420 אלף ₪ בהערכה",
-    basis: "הערכה המבוססת על הנחות של תשואה ודמי ניהול",
-  },
-  {
-    tag: "תכנון פיננסי",
-    title: "יציאה לעצמאות עם כרית ביטחון בת 3 שנים",
-    body: "זוג בשנות ה-40 שרצה לעבור לעצמאות אך חשש מאי-הוודאות. בניתי תכנון פיננסי רב-שנתי: קרן חירום, מיפוי סיכונים ומסלול השקעה מדורג. כעבור שלוש שנים יצאו לעצמאות עם כרית ביטחון מלאה.",
-    metric: "3 שנים לעצמאות",
-  },
-];
+/**
+ * Each case's keys in home.json (`proof.c<n>.tag/title/body/metric`). `basis`
+ * puts `proof.basis` under the figure, where the figure is a projection rather
+ * than a fact.
+ */
+const BRIEFS = [
+  { id: "c1" },
+  { id: "c2", basis: true },
+  { id: "c3" },
+  { id: "c4" },
+  { id: "c5" },
+  { id: "c6", basis: true },
+  { id: "c7" },
+] as const satisfies readonly { id: string; basis?: boolean }[];
 
 /**
  * Below md the strip stays a strip, made shorter: each case shows its tag, its
@@ -84,6 +45,12 @@ const BRIEFS: Brief[] = [
  */
 export default function ProofCarousel() {
   const ref = useRef<HTMLDivElement>(null);
+  const t = useT("home");
+  const tc = useT("common");
+  const locale = useLocale();
+  // Which way is back: towards the first case — the right in Hebrew (a
+  // positive scrollBy), the left in English and French.
+  const back = dirOf(locale) === "rtl" ? 1 : -1;
   const isDesktop = useMediaQuery(MD_UP, true);
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set());
   const toggle = (i: number) =>
@@ -114,14 +81,13 @@ export default function ProofCarousel() {
         <div className="max-md:contents">
           <Reveal className="max-md:contents">
             <Eyebrow>
-              04 · מקרים מהשטח
+              {t("proof.eyebrow")}
             </Eyebrow>
             <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px] max-md:mt-3 max-md:col-span-2">
-              תיקי הצלחה
+              {tc("nav.proof")}
             </h2>
             <p className="mt-[18px] text-[15px] text-muted-foreground max-w-xl max-md:mt-3 max-md:col-span-2">
-              תוצאות עבר אינן מבטיחות תוצאות דומות — כל מקרה תלוי בנתונים
-              האישיים.
+              {t("proof.disclaimer")}
             </p>
           </Reveal>
         </div>
@@ -129,18 +95,18 @@ export default function ProofCarousel() {
             and the left-hand one (←) on to the next — the names say so. */}
         <div className="flex items-center gap-2 max-md:col-start-2 max-md:row-start-1">
           <button
-            onClick={() => scroll(1)}
+            onClick={() => scroll(back)}
             className={ARROW}
-            aria-label="הקודם"
+            aria-label={t("proof.prev")}
           >
-            <ArrowRight size={18} strokeWidth={1.5} />
+            <ArrowRight size={18} strokeWidth={1.5} className="ltr:rotate-180" />
           </button>
           <button
-            onClick={() => scroll(-1)}
+            onClick={() => scroll(-back)}
             className={ARROW}
-            aria-label="הבא"
+            aria-label={t("proof.next")}
           >
-            <ArrowLeft size={18} strokeWidth={1.5} />
+            <ArrowLeft size={18} strokeWidth={1.5} className="ltr:rotate-180" />
           </button>
         </div>
       </div>
@@ -151,7 +117,7 @@ export default function ProofCarousel() {
            access (axe: scrollable-region-focusable). */
         tabIndex={0}
         role="region"
-        aria-label="תיקי הצלחה — גלילה אופקית"
+        aria-label={t("proof.region")}
         className="flex gap-5 overflow-x-auto px-[clamp(20px,4vw,40px)] pb-[clamp(72px,9vw,120px)] snap-x snap-mandatory max-md:items-start [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight max-md:gap-4 max-md:pb-10"
         style={{ scrollbarWidth: "none" }}
       >
@@ -164,14 +130,14 @@ export default function ProofCarousel() {
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm px-2.5 py-0.5 rounded-sm bg-[hsl(33_100%_95%)] text-[hsl(37_80%_20%)]">
-                  {b.tag}
+                  {t(`proof.${b.id}.tag`)}
                 </span>
                 <span className="font-heading text-xl lining-nums tabular-nums text-muted-foreground">
                   0{i + 1}
                 </span>
               </div>
               <h3 className="font-heading font-medium text-[26px] leading-[1.3] max-md:text-[21px]">
-                {b.title}
+                {t(`proof.${b.id}.title`)}
               </h3>
               {/* Below md the story shows its first two lines until "פרטי המקרה"
                   opens it: hidden outright, half of each card stood empty
@@ -182,21 +148,21 @@ export default function ProofCarousel() {
                   !isDesktop && !expanded ? "line-clamp-2" : ""
                 }`}
               >
-                {b.body}
+                {t(`proof.${b.id}.body`)}
               </p>
               <div className="pt-[18px] border-t border-border flex items-center justify-between max-md:pt-3 max-md:flex-wrap max-md:gap-x-3">
                 <span className="flex flex-col gap-1.5 max-md:gap-1">
                   <span className="block font-heading text-[32px] text-accent leading-[1.1] max-md:text-[26px]">
-                    {b.metric}
+                    {t(`proof.${b.id}.metric`)}
                   </span>
-                  {b.basis ? (
-                    <span className="block text-[13px] text-muted-foreground">{b.basis}</span>
+                  {"basis" in b ? (
+                    <span className="block text-[13px] text-muted-foreground">{t("proof.basis")}</span>
                   ) : null}
                 </span>
                 {/* Below md the case number is the one at the top; this place
                     takes the button that unfolds the story. */}
                 <span className="text-sm text-muted-foreground max-md:hidden">
-                  מקרה 0{i + 1}
+                  {t("proof.case", { n: i + 1 })}
                 </span>
                 {isDesktop ? null : (
                   <button
@@ -206,7 +172,7 @@ export default function ProofCarousel() {
                     aria-controls={`proof-${i}-story`}
                     className={STORY}
                   >
-                    פרטי המקרה
+                    {t("proof.details")}
                     <ChevronDown
                       size={16}
                       strokeWidth={1.5}
@@ -226,20 +192,18 @@ export default function ProofCarousel() {
           location "proof". */}
       <div data-track-location="proof" className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] -mt-[clamp(40px,6vw,80px)] pb-[clamp(56px,7vw,96px)] max-md:-mt-4 max-md:pb-10">
         <a
-          href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(SIMILAR_CASE_TEXT)}`}
+          href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(t("proof.similarText"))}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 min-h-11 font-heading text-xl text-accent underline decoration-highlight/50 underline-offset-[6px] hover:decoration-highlight"
         >
           <MessageCircle size={20} strokeWidth={1.5} aria-hidden="true" />
-          יש לך מקרה דומה? ספרו לדורית בוואטסאפ
+          {t("proof.similar")}
         </a>
       </div>
     </section>
   );
 }
-
-const SIMILAR_CASE_TEXT = "שלום דורית, ראיתי את תיקי ההצלחה באתר, ויש לי מקרה דומה";
 
 const ARROW =
   "w-12 h-12 rounded-md border border-border flex items-center justify-center text-foreground hover:border-highlight hover:text-accent transition-colors duration-200 max-md:w-11 max-md:h-11";

@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale, useT } from "@/i18n/LocaleContext";
 
 interface Carrier {
   he: string;
@@ -26,11 +27,14 @@ const CARRIERS: Carrier[] = [
 ];
 
 export default function CarrierLogos() {
+  const t = useT("home");
+  // English and French read the companies' English names; Hebrew shows both.
+  const he = useLocale() === "he";
   return (
     <section className="bg-secondary border-b border-border">
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-14 flex flex-col items-center gap-8 max-md:py-8 max-md:gap-5">
         <p className="text-center font-heading italic text-[15px] normal-case text-accent">
-          עובדת מול מיטב חברות הפנסיה והביטוח בישראל
+          {t("carriers.title")}
         </p>
 
         {/* Below md: one strip that scrolls sideways — four rows of a 2-column
@@ -43,13 +47,13 @@ export default function CarrierLogos() {
               href={c.url}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`אתר ${c.he}`}
+              aria-label={t("carriers.site", { name: he ? c.he : c.en })}
               className="group flex flex-col items-center gap-1 px-2 py-[22px] text-center text-foreground/80 hover:text-foreground hover:bg-highlight/5 transition-colors duration-200 max-md:shrink-0 max-md:px-4 max-md:py-3 max-md:min-h-11 max-md:justify-center"
             >
               <span className="font-heading text-[21px] leading-[1.1]">
-                {c.he}
+                {he ? c.he : c.en}
               </span>
-              {c.en && c.en !== c.he && (
+              {he && c.en && c.en !== c.he && (
                 <span dir="ltr" className="font-heading italic text-[15px] normal-case text-muted-foreground">
                   {c.en}
                 </span>
@@ -59,8 +63,7 @@ export default function CarrierLogos() {
         </div>
 
         <p className="m-0 text-center text-[15px] text-muted-foreground max-w-[480px] leading-[1.85] [text-wrap:pretty]">
-          עובדת מול מגוון חברות ביטוח ופנסיה כדי להתאים פתרון לצורך שלך. כסוכנת
-          ביטוח, יש לי זיקה לגופים מוסדיים — כמפורט בגילוי הנאות.
+          {t("carriers.disclosure")}
         </p>
       </div>
     </section>

@@ -48,5 +48,12 @@
   "lang.hebrewOnly": "(in Hebrew)",
   "contact.whatsappDefault": "Hello Dorit, I'd like to hear more about financial and insurance planning.",
   "nav.home": "Home",
-  "compliance.pensionMarketing": "Dorit Gov Ari — financial planner & insurance agent — holds an agent licence from the Capital Market, Insurance and Savings Authority, no. L-00107009, and has ties to institutional bodies. Her activity is pension marketing, not objective pension advice."
+  "compliance.pensionMarketing": "Dorit Gov Ari — financial planner & insurance agent — holds an agent licence from the Capital Market, Insurance and Savings Authority, no. L-00107009, and has ties to institutional bodies. Her activity is pension marketing, not objective pension advice.",
+  "submit.failed": "We couldn't send {what} just now. You can email {email} directly or try again.",
+  "submit.message": "your message",
+  "submit.form": "the form",
+  "submit.request": "your request",
+  "submit.report": "the report",
+  "nav.call": "Call",
+  "nav.phone": "Phone"
 }

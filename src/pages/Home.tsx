@@ -15,6 +15,7 @@ import Footer from "@/components/dorit/layout/Footer";
 import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
 import SnapshotHome from "@/components/dorit/sections/SnapshotHome";
 import { SNAPSHOT_HOME } from "@/config/snapshot";
+import { useLocale, useT } from "@/i18n/LocaleContext";
 
 /**
  * The home page, as one argument rather than a catalogue.
@@ -34,11 +35,15 @@ import { SNAPSHOT_HOME } from "@/config/snapshot";
  * routes to the same conversation.
  */
 export default function Home() {
+  const t = useT("home");
+  const locale = useLocale();
+  const he = locale === "he";
   useSeo({
-    title: "דורית גוב ארי | מתכננת פיננסית וסוכנת ביטוח",
-    description:
-      "מתכננת פיננסית וסוכנת ביטוח עם 30 שנות ניסיון. תכנון פנסיה, גמל והשתלמות, ביטוח חיים ובריאות וליווי תביעות — אישי, שקוף ובגובה העיניים. מחשבון דמי ניהול חינם.",
+    title: t("seo.title"),
+    description: t("seo.description"),
     path: "/",
+    locale,
+    translated: true,
     // No FAQPage block here. A `HOME_FAQ_LD` constant once carried six pension questions
     // that `/faq` renders in full — the home page never displayed them, it
     // displayed a list of tips — so the markup described content that was not
@@ -57,11 +62,13 @@ export default function Home() {
         <ErrorBoundary><About variant="brief" /></ErrorBoundary>
         <ErrorBoundary><ServiceMatrix /></ErrorBoundary>
         {/* The personal snapshot, before the conversation its first button opens (VITE_SNAPSHOT_HOME). */}
-        {SNAPSHOT_HOME ? <ErrorBoundary><SnapshotHome /></ErrorBoundary> : null}
+        {/* Hebrew only for now, like the tools its buttons open. */}
+        {SNAPSHOT_HOME && he ? <ErrorBoundary><SnapshotHome /></ErrorBoundary> : null}
         <ErrorBoundary><StartConversation /></ErrorBoundary>
         <ErrorBoundary><ProofCarousel /></ErrorBoundary>
         <ErrorBoundary><Testimonials /></ErrorBoundary>
-        <ErrorBoundary><DetailedFAQ /></ErrorBoundary>
+        {/* The questions are /faq's content, translated with /faq; until then, Hebrew only. */}
+        {he ? <ErrorBoundary><DetailedFAQ /></ErrorBoundary> : null}
       </main>
       <ErrorBoundary><MobileStickyBar /></ErrorBoundary>
       <ErrorBoundary><Footer /></ErrorBoundary>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useT } from "@/i18n/LocaleContext";
 
 /**
  * The headline: what Dorit does for the visitor, in light display type, a short
@@ -7,14 +8,15 @@ import React from "react";
  * the headline now names the work, and promises clarity rather than a saving.
  */
 export default function ArchStatement() {
+  const t = useT("home");
   return (
     <div className="animate-fade-up">
       <h1 className="font-heading font-normal text-[clamp(40px,5.2vw,72px)] leading-[1.06] tracking-[-0.01em] [text-wrap:balance]">
-        תכנון פנסיה וביטוח בלי אותיות קטנות
+        {t("arch.title")}
       </h1>
       <span aria-hidden="true" className="block w-[72px] h-px bg-highlight my-[22px] max-md:my-4" />
       <p className="m-0 font-heading text-[clamp(22px,2.4vw,32px)] leading-snug text-foreground/80">
-        מקצועיות, יושר ואנושיות נפגשים
+        {t("arch.sub")}
       </p>
     </div>
   );

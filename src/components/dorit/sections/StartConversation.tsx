@@ -9,6 +9,7 @@ import { CAL_LINK } from "@/config/offers";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { useLocale, useT } from "@/i18n/LocaleContext";
 
 /**
  * The one place on the home page where a visitor makes contact.
@@ -31,6 +32,8 @@ export default function StartConversation() {
   // md up it is always open, as it was. A link to `#quick-contact` opens it.
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const chatRef = useRef<HTMLDivElement>(null);
+  const t = useT("home");
+  const he = useLocale() === "he";
 
   useEffect(() => {
     const openOnHash = () => {
@@ -59,9 +62,9 @@ export default function StartConversation() {
           below the 1400px breakpoint. */}
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] md:pl-20 py-[clamp(72px,9vw,120px)] flex flex-col gap-10 max-md:py-10">
         <Reveal>
-          <Eyebrow>03 · ההקשבה</Eyebrow>
+          <Eyebrow>{t("start.eyebrow")}</Eyebrow>
           <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-[18px] leading-[1.12] max-w-[880px] [text-wrap:balance]">
-            נתחיל בשיחה קצרה — כדי שדורית תגיע מוכנה
+            {t("start.title")}
           </h2>
         </Reveal>
 
@@ -71,17 +74,18 @@ export default function StartConversation() {
         {CAL_LINK ? (
           <div data-track-location="start_booking" className="max-w-[880px] w-full rounded-[4px] border border-highlight p-5 md:p-6 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="m-0 font-heading text-xl md:text-2xl">שיחת טלפון של 15 דקות עם דורית</p>
-              <p className="m-0 mt-1 text-[15px] text-muted-foreground">בוחרים מועד ביומן שלה ועונים על שתי שאלות קצרות.</p>
+              <p className="m-0 font-heading text-xl md:text-2xl">{t("start.calTitle")}</p>
+              <p className="m-0 mt-1 text-[15px] text-muted-foreground">{t("start.calText")}</p>
             </div>
             <a href={CAL_LINK} target="_blank" rel="noopener noreferrer" className={ctaClass("max-sm:w-full")}>
-              <CalendarDays size={18} aria-hidden="true" /> לבחירת מועד
+              <CalendarDays size={18} aria-hidden="true" /> {t("start.calButton")}
             </a>
           </div>
         ) : null}
 
         {/* The wizard, where the interview chat used to be. `#interview` keeps
             the interview's anchor alive; `#start`, above, is what the CTAs use. */}
+        {he ? (
         <div id="interview" className="max-w-[880px] w-full">
           {CAL_LINK ? <p className="m-0 mb-4 text-[15px] text-muted-foreground">או, אם נוח יותר — שלוש שאלות קצרות, ודורית חוזרת אליכם:</p> : null}
           <NeedsWizard />
@@ -145,10 +149,15 @@ export default function StartConversation() {
             </ul>
           </div>
         </div>
+        ) : (
+          // English and French: the wizard and the chat speak Hebrew (their answers
+          // are Hebrew values Dorit reads), so the short form below leads instead.
+          <p className="m-0 max-w-[880px] text-[17px] leading-[1.7] text-foreground/80">{t("start.formFirst")}</p>
+        )}
 
         {/* The chat, for anyone who would rather write — with its fence and
             disclaimer, which describe the agent and so travel with it. */}
-        {chatOpen ? (
+        {he && chatOpen ? (
           <div id="interview-chat" ref={chatRef} className="flex flex-col gap-10 scroll-mt-28">
             <AgentChat descriptor={AGENTS.needsInterview} embedded />
             {/* The fence, published beside the chat.
@@ -194,7 +203,7 @@ export default function StartConversation() {
         ) : null}
 
         {/* Two ways out of the chat, for a visitor who would rather not use it. */}
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4 max-md:hidden">
+        <div className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4${he ? " max-md:hidden" : ""}`}>
           <a
             href={`https://wa.me/${CONTACT.whatsapp}`}
             target="_blank"
@@ -202,21 +211,21 @@ export default function StartConversation() {
             className={TILE}
           >
             <MessageCircle size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-            עדיף לי בוואטסאפ
+            {t("start.preferWhatsapp")}
           </a>
           <a
             href={`tel:${CONTACT.phoneE164}`}
             className={TILE}
           >
             <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-            עדיף לי בטלפון
+            {t("start.preferPhone")}
           </a>
         </div>
 
         {/* And the short form: heading and form side by side, on the ground.
             Below md it stays in the page (and in the document) but hidden until
             the chip above opens it. */}
-        <QuickContact embedded className={formOpen ? undefined : "max-md:hidden"} />
+        <QuickContact embedded className={!he || formOpen ? undefined : "max-md:hidden"} />
       </div>
     </section>
   );
