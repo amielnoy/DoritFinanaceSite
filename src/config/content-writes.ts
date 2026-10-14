@@ -7,7 +7,10 @@
  * Do not set `VITE_CONTENT_WRITES=supabase` before Phase 3 has moved
  * support_agent, procedures_agent and blog_recommender off Base44: they read
  * Base44's BlogPost, and would never see an article written only to Supabase.
- * Unset it to switch back.
+ *
+ * Unset it to switch back. Articles and testimonials created while it was on
+ * exist only in Supabase; Base44's contentAdmin refuses to edit or remove them
+ * (409) rather than pretend to, so switch it on again to change those.
  */
 export type ContentWrites = "base44" | "supabase";
 

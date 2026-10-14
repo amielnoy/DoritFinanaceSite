@@ -34,8 +34,8 @@ describe("one slug rule, wherever it is spelled", () => {
     expect(sql.match(/check \(slug !~ '([^']+)'\)/)?.[1]).toBe(BASE44_ID_PATTERN.source);
   });
 
-  it("contentAdmin's copy is the same", () => {
-    const fn = read("base44/functions/contentAdmin/entry.ts");
+  it.each(["base44/functions/contentAdmin/entry.ts", "supabase/functions/content-admin/handler.ts"])("%s has the same copy", (file) => {
+    const fn = read(file);
     expect(fn.match(/const SLUG_PATTERN = \/(.+)\/;/)?.[1]).toBe(SLUG_PATTERN.source);
     expect(fn.match(/const BASE44_ID_PATTERN = \/(.+)\/;/)?.[1]).toBe(BASE44_ID_PATTERN.source);
     // The slug is the mirror's alone: Base44's BlogPost has no such field.
@@ -106,21 +106,26 @@ describe("every article link goes through articlePath", () => {
   });
 });
 
-describe("the slug refusals the form shows are the ones contentAdmin sends (M8)", () => {
+describe.each([
+  // The 409 count is the slug check on create and on update — plus, on Supabase,
+  // the unique key refusing a save that raced past that check.
+  { file: "base44/functions/contentAdmin/entry.ts", invalid: 2, taken: 2 },
+  { file: "supabase/functions/content-admin/handler.ts", invalid: 2, taken: 3 },
+])("the slug refusals the form shows are the ones $file sends (M8)", ({ file, invalid, taken }) => {
   // BlogAdmin shows a refusal only when the server's text equals its own copy,
   // so a reworded message on either side would silently fall back to the
-  // generic "save failed". Both are pinned to the function's source.
-  const fn = read("base44/functions/contentAdmin/entry.ts");
+  // generic "save failed". Both are pinned to each function's source.
+  const fn = read(file);
   const form = read("src/pages/BlogAdmin.tsx");
   const INVALID = "כתובת המאמר חסרה או אינה תקינה.";
 
   it("400: invalid or missing", () => {
     expect(form).toContain(`400: "${INVALID}"`);
     expect([...fn.matchAll(/error: '([^']+)' \}, 400\)/g)].map((m) => m[1])).toContain(INVALID);
-    expect(fn.match(new RegExp(`error: '${INVALID}' \\}, 400\\)`, "g"))).toHaveLength(2);
+    expect(fn.match(new RegExp(`error: '${INVALID}' \\}, 400\\)`, "g"))).toHaveLength(invalid);
   });
 
   it("409: taken", () => {
-    expect(fn.match(new RegExp(`error: '${SLUG_TAKEN}' \\}, 409\\)`, "g"))).toHaveLength(2);
+    expect(fn.match(new RegExp(`error: '${SLUG_TAKEN}' \\}, 409\\)`, "g"))).toHaveLength(taken);
   });
 });

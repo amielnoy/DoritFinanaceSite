@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { FetchCall } from "../helpers/base44-function";
 import { invokeEdge, SUPABASE_URL } from "../helpers/edge-function";
 
+/** The harness's default env carries this legacy service key (tests/helpers/edge-function.ts). */
+const serviceKeyOf = (f: FetchCall) => String(f.headers.apikey ?? "");
+
 /**
  * content-admin: the Edge twin of base44/functions/contentAdmin, writing
  * Supabase only. Same gate (a Supabase session whose profile is `admin`), same
@@ -19,7 +22,17 @@ const UUID = "11111111-2222-4333-8444-555555555555";
 
 type Row = Record<string, unknown>;
 
-function fakeSupabase(seed: { posts?: Row[]; testimonials?: Row[]; profileStatus?: number } = {}) {
+function fakeSupabase(
+  seed: {
+    posts?: Row[];
+    testimonials?: Row[];
+    profileStatus?: number;
+    /** Auth answers this instead of looking at the token: a status and body. */
+    auth?: { status: number; body: unknown };
+    /** The slug lookup sees none of the rows — a second save racing the first. */
+    staleSlugLookup?: boolean;
+  } = {},
+) {
   const tables: Record<string, Row[]> = {
     blog_posts: (seed.posts ?? []).map((r) => ({ ...r })),
     testimonials: (seed.testimonials ?? []).map((r) => ({ ...r })),
@@ -38,10 +51,12 @@ function fakeSupabase(seed: { posts?: Row[]; testimonials?: Row[]; profileStatus
     if (!call.url.startsWith(SUPABASE_URL)) return undefined;
 
     if (url.pathname === "/auth/v1/user") {
+      if (seed.auth) return json(seed.auth.body, seed.auth.status);
       const token = String(call.headers.Authorization ?? "").replace(/^Bearer /, "");
       if (token === ADMIN) return json({ id: "user-admin" });
       if (token === MEMBER) return json({ id: "user-member" });
-      return json({ msg: "invalid JWT" }, 401);
+      // Auth's own refusal carries an error_code; the gateway's "Invalid API key" does not.
+      return json({ code: 403, error_code: "bad_jwt", msg: "invalid JWT" }, 403);
     }
     if (url.pathname === "/rest/v1/profiles") {
       if (seed.profileStatus) return json({}, seed.profileStatus);
@@ -53,8 +68,12 @@ function fakeSupabase(seed: { posts?: Row[]; testimonials?: Row[]; profileStatus
     const rows = tables[table];
     if (!rows) return undefined;
     const query = url.search.slice(1);
-    if (call.method === "GET") return json(rows.filter((r) => matches(r, query)));
+    if (call.method === "GET") return json(seed.staleSlugLookup ? [] : rows.filter((r) => matches(r, query)));
     if (call.method === "POST") {
+      const slug = (call.body as Row).slug;
+      if (slug !== undefined && rows.some((r) => r.slug === slug)) {
+        return json({ code: "23505", message: `duplicate key value violates unique constraint "blog_posts_slug_key"` }, 409);
+      }
       const row = { id: `00000000-0000-4000-8000-00000000000${next++}`, ...(call.body as Row) };
       rows.push(row);
       return json([row], 201);
@@ -115,6 +134,55 @@ describe("content-admin — the gate", () => {
     expect(r.json.rid).toEqual(expect.any(String));
   });
 
+  const OPS: Record<string, unknown>[] = [
+    { op: "createArticle", draft },
+    { op: "updateArticle", id: UUID, draft: { title: "x" } },
+    { op: "removeArticle", id: UUID },
+    { op: "createTestimonial", draft: { name: "n", quote: "q" } },
+    { op: "removeTestimonial", id: UUID },
+  ];
+  const CALLERS: [string, string | null, number][] = [
+    ["no session", null, 401],
+    ["a forged token", "forged", 401],
+    ["a signed-in non-admin", MEMBER, 403],
+  ];
+
+  it.each(OPS.flatMap((body) => CALLERS.map(([who, token, status]) => [body.op, who, token, status, body] as const)))(
+    "%s from %s is refused with %s, and no table is touched",
+    async (_op, _who, token, status, body) => {
+      const db = fakeSupabase({ posts: [{ id: UUID, base44_id: null, slug: "s" }], testimonials: [{ id: UUID }] });
+      const r = await call(body as Record<string, unknown>, token as string | null, db);
+      expect(r.status).toBe(status);
+      expect(r.callsTo("/rest/v1/blog_posts")).toEqual([]);
+      expect(r.callsTo("/rest/v1/testimonials")).toEqual([]);
+      expect(db.tables.blog_posts).toHaveLength(1);
+      expect(db.tables.testimonials).toHaveLength(1);
+    },
+  );
+
+  it("asks Auth with the service key on apikey and the caller's token on Authorization", async () => {
+    const r = await call({ op: "createArticle", draft }, ADMIN);
+    const [auth] = r.callsTo("/auth/v1/user");
+    expect(auth.headers.Authorization).toBe(`Bearer ${ADMIN}`);
+    expect(serviceKeyOf(auth)).not.toBe("");
+    expect(serviceKeyOf(auth)).not.toBe(ADMIN);
+  });
+
+  it.each([
+    ["a revoked or wrong-project service key (the gateway's 401, no error_code)", { status: 401, body: { message: "Invalid API key" } }],
+    ["an Auth outage", { status: 503, body: { message: "upstream" } }],
+    ["a 200 that names no user", { status: 200, body: {} }],
+  ])("answers 500, not 'session expired', for %s", async (_name, auth) => {
+    const r = await call({ op: "createArticle", draft }, ADMIN, fakeSupabase({ auth }));
+    expect(r.status).toBe(500);
+    expect(r.callsTo("/rest/v1/blog_posts")).toEqual([]);
+  });
+
+  it("answers 401 for Auth's own refusal, on 401 as on 403", async () => {
+    const r = await call({ op: "createArticle", draft }, ADMIN, fakeSupabase({ auth: { status: 401, body: { error_code: "session_not_found" } } }));
+    expect(r.status).toBe(401);
+  });
+
   it("refuses an unknown op with 400", async () => {
     const r = await call({ op: "dropTable" }, ADMIN);
     expect(r.status).toBe(400);
@@ -156,6 +224,31 @@ describe("content-admin — articles, on Supabase only", () => {
     expect(patch.url).toContain(`base44_id=eq.${B44_ID}`);
     expect(patch.body).toEqual({ published: true });
     expect(db.tables.blog_posts[0]).toMatchObject({ published: true, slug: "old" });
+  });
+
+  it("answers 409, not 500, when a racing save took the slug between the check and the insert", async () => {
+    const db = fakeSupabase({ posts: [{ id: UUID, base44_id: null, slug: "my-post" }], staleSlugLookup: true });
+    const r = await call({ op: "createArticle", draft }, ADMIN, db);
+    expect(r.status).toBe(409);
+    expect(r.json.error).toBe("הכתובת כבר בשימוש במאמר אחר.");
+  });
+
+  it("updates only the allowed fields: ids, agency and unknown keys fall away", async () => {
+    const db = fakeSupabase({ posts: [{ id: UUID, base44_id: null, slug: "s", title: "old" }] });
+    const r = await call(
+      { op: "updateArticle", id: UUID, draft: { title: "new", agency_id: null, id: "x", base44_id: "y", created_at: "z", role: "admin" } },
+      ADMIN,
+      db,
+    );
+    expect(r.status).toBe(200);
+    expect(r.callsTo("/rest/v1/blog_posts").find((f) => f.method === "PATCH")!.body).toEqual({ title: "new" });
+  });
+
+  it("refuses a null or empty slug on update with 400, rather than nulling the column", async () => {
+    for (const slug of [null, ""]) {
+      const r = await call({ op: "updateArticle", id: UUID, draft: { slug } }, ADMIN, fakeSupabase({ posts: [{ id: UUID, slug: "s" }] }));
+      expect(r.status, String(slug)).toBe(400);
+    }
   });
 
   it("updates an article written since, found by its Supabase id", async () => {

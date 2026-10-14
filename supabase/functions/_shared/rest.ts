@@ -115,9 +115,15 @@ export async function deleteRows(table: string, filter: string): Promise<void> {
 
 /**
  * Who a Supabase access token belongs to, as Supabase Auth says — the
- * signature is checked there, not here. `null` for a token it refuses
- * (forged, expired, or the anon key, which names no user); a throw when Auth
- * itself fails, which is not the same thing and must not read as "signed out".
+ * signature is checked there, not here. `null` for a token Auth refuses
+ * (forged, expired, or the anon key, which names no user); a throw for
+ * anything else, which must not read as "signed out".
+ *
+ * A refusal is told apart by its body, not its status alone: Auth's own
+ * carries an `error_code` (bad_jwt, session_not_found, …), while the gateway
+ * answers a revoked or wrong-project service key with a 401 that has none
+ * ("Invalid API key"). Read as "not signed in", that told every admin their
+ * session had expired — advice signing in again could never fix.
  */
 export async function authUser(token: string): Promise<{ id: string } | null> {
   const { url, auth } = target();
@@ -126,10 +132,15 @@ export async function authUser(token: string): Promise<{ id: string } | null> {
     headers: { apikey: auth.apikey, Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(10000),
   });
-  if (res.status === 401 || res.status === 403) return null;
+  const body = (await res.json().catch(() => null)) as { id?: unknown; error_code?: unknown } | null;
+  if (res.status === 401 || res.status === 403) {
+    if (typeof body?.error_code === 'string' && body.error_code) return null;
+    throw new Error(`auth_http_${res.status}_not_an_auth_refusal`);
+  }
   if (!res.ok) throw new Error(`auth_http_${res.status}`);
-  const id = ((await res.json().catch(() => null)) as { id?: unknown } | null)?.id;
-  return typeof id === 'string' && id ? { id } : null;
+  const id = body?.id;
+  if (typeof id !== 'string' || !id) throw new Error('auth_returned_no_user');
+  return { id };
 }
 
 /**

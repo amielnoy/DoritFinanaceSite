@@ -9,6 +9,9 @@
  *
  * Writes go with the service key, which bypasses row-level security, so the
  * gate below is the whole of the access control. It runs before every op.
+ *
+ * Once switched on, rows written here exist in Supabase only, so
+ * scripts/reconcile-stores.mjs reports them as drift — expected, not a fault.
  */
 import { corsHeaders } from '../_shared/cors.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
@@ -142,7 +145,16 @@ export async function handler(req: Request): Promise<Response> {
           log('warn', 'article.slug_taken', { rid, op });
           return json({ error: 'הכתובת כבר בשימוש במאמר אחר.' }, 409);
         }
-        const row = await insertRow('blog_posts', { ...pick(draft, ARTICLE_FIELDS), published: !!draft?.published, slug });
+        let row: Record<string, unknown>;
+        try {
+          row = await insertRow('blog_posts', { ...pick(draft, ARTICLE_FIELDS), published: !!draft?.published, slug });
+        } catch (e) {
+          // Two saves with one slug can both pass slugTaken; the unique key
+          // refuses the second (23505), and it deserves the same answer.
+          if (!String((e as Error)?.message).endsWith(':23505')) throw e;
+          log('warn', 'article.slug_taken', { rid, op, race: true });
+          return json({ error: 'הכתובת כבר בשימוש במאמר אחר.' }, 409);
+        }
         result = { ok: true, id: row.id };
         break;
       }
