@@ -203,7 +203,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
         try {
           result = await runTurn({
             model: deps.model,
-            system: systemBlocks(role),
+            system: systemBlocks(role, deps.now()),
             tools: ROLE_TOOLS[role],
             history,
             runTool: async (name, args) => {
