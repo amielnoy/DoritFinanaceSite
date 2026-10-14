@@ -8,6 +8,7 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import CalculatorLeadBox from "@/components/dorit/sections/CalculatorLeadBox";
 import { assessmentMessage } from "@/lib/calculator-lead";
 import { leadEvents } from "@/lib/analytics";
+import { TOOL_SECTION } from "@/config/tools";
 
 export default function InsuranceAssessment() {
   const [step, setStep] = useState(0);
@@ -44,7 +45,7 @@ export default function InsuranceAssessment() {
   const priorityCount = recs.filter((r) => r.priority).length;
 
   return (
-    <section id="assessment" className="py-24 md:py-32 bg-background border-t border-border">
+    <section id={TOOL_SECTION.assessment} className="py-24 md:py-32 bg-background border-t border-border">
       <div className="max-w-[1100px] mx-auto px-6 md:px-10">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <Eyebrow>

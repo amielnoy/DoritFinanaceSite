@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 278 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 308 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 286 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 316 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -521,6 +521,21 @@ or while there are no deposits to compute from (`useCalculatorResultEvent`). Fak
 | CMP-ACTA-005 | "falls back to the general headline" | `ARTICLE_CTA_FALLBACK` |
 | CMP-ACTA-006 | "offers /tools on a fees article and not on a tax one" | "לבדיקה במחשבון" → `/tools` |
 | CMP-ACTA-007 | "does not offer /tools on an article no tool covers" | No such link |
+
+### 4.29 `<SnapshotHome />` — the personal snapshot on the home page — `tests/component/snapshot-home.test.tsx`
+
+Rendered on its own: on the home page it appears only with `VITE_SNAPSHOT_HOME=true`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-SNAP-001 | "leads with the headline as an h2 — the page keeps its one h1" | No h1; the headline is an h2; eyebrow "חדש באתר · תמונת מצב אישית" |
+| CMP-SNAP-002 | "starts at the questionnaire, and explains first if asked" | Primary → `#start`; secondary → `#how-it-works`, which exists |
+| CMP-SNAP-003 | "labels the preview's numbers as sample data" | Figure "תצוגה מקדימה — נתוני דוגמה" with the "נתוני דוגמה" tag |
+| CMP-SNAP-004 | "walks through three steps, with no timing until Dorit confirms one" | 01–03 titles; no "ימי עסקים" |
+| CMP-SNAP-005 | "names the four things the personal area shows" | The four tile titles, in order |
+| CMP-SNAP-006 | "reaches Dorit directly from the dark band, by the numbers in the contact config" | `tel:` + `CONTACT.phoneE164`; `wa.me/` + `CONTACT.whatsapp`, `noopener noreferrer` |
+| CMP-SNAP-007 | "lists four tools, the two new ones tagged חדש" | Four `/tools#…` links; "חדש" on the last two only |
+| CMP-SNAP-008 | "makes no claim of a free check and counts no users or savings" | No "חינם"/"ללא עלות", no counters |
 
 ## 5. Pass criteria
 

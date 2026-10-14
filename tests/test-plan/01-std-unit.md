@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 826 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1407 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 830 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1419 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1250,3 +1250,12 @@ these tests have no external dependencies.
 | UNIT-PHONE-001 | "accepts %s" (6 cases) | `050-1234567`, `0521234567`, `054 123 4567`, `+972-50-1234567`, `972501234567`, `+972 58 123 4567` |
 | UNIT-PHONE-002 | "refuses %s (%s)" (6 cases) | A landline, 9 or 11 digits, letters, empty, a foreign number |
 | UNIT-PHONE-003 | "still accepts a landline — escalateToHuman's rule, unchanged" | `isIsraeliPhone("03-1234567")` |
+
+### 4.50 The snapshot switch and its copy — `tests/unit/snapshot-config.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-SNAP-001 | "reads %j as %s — on only for exactly \"true\"" (6 cases) | `isSnapshotOn`: "true" and " true " on; "TRUE", "1", "", unset off |
+| UNIT-SNAP-002 | "shows no timing until Dorit has confirmed one" | `SNAPSHOT_REVIEW_BUSINESS_DAYS` null; `stepTiming` null for null, 0, 2.5 |
+| UNIT-SNAP-003 | "words a confirmed timing in Hebrew" | "תוך יום עסקים אחד"; "תוך 5 ימי עסקים" |
+| UNIT-SNAP-004 | "links every tool to its own section on /tools" | Four `/tools#…` addresses from `TOOL_SECTION` |

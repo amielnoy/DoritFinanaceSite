@@ -602,6 +602,21 @@ runs in CI):
 - [ ] Switch on: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED=true` and `VITE_MASLEKA_ENABLED=true` on Vercel (production and preview), then redeploy. Smoke with a hand-made request to a staff member's own address: the client page, a reveal (a row appears in `masleka_access_log`), **הגשתי** (`select count(*) from masleka_requests where (code_ciphertext is not null or id_ciphertext is not null) and status <> 'code_received';` is 0).
 - [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days — but with the switch off `masleka-remind` answers 404, so a wipe in that time is not announced.
 
+### The personal snapshot (תמונת מצב) — phased, behind `VITE_SNAPSHOT_HOME`
+
+A four-phase programme: (1) home-page sections introducing the snapshot, (2) a
+retirement calculator on /tools, (3) a Har HaBituach double-coverage check on
+/tools, (4) the personal snapshot in the account page with Dorit's admin.
+
+- **Switch:** `VITE_SNAPSHOT_HOME` (`src/config/snapshot.ts`), on only for
+  exactly `true`. Off in production until phase 4 exists — the sections promise
+  a personal area and two tools. Locally: `VITE_SNAPSHOT_HOME=true npm run dev`.
+- **Phase 1 (home):** `SnapshotHome.tsx`, between the services and `#start`.
+  Its main button goes to the questionnaire (`#start`), whose follow-up offers
+  the clearinghouse link — a visitor cannot open `/masleka` without one.
+- **Waiting on Dorit:** `SNAPSHOT_REVIEW_BUSINESS_DAYS` (null → step 3 states no
+  timing).
+
 ## The chat function (Phase 3)
 
 The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents
