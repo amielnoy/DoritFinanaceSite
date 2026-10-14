@@ -63,7 +63,7 @@ afterEach(() => {
 /** Whether `el` or an ancestor is hidden below md by class, or hidden outright. */
 const hiddenOnPhone = (el: Element) => Boolean(el.closest(".max-md\\:hidden, .hidden, [hidden]"));
 
-const FIRST = "התשובות לשאלות שלקוחות שואלים אותי לעיתים קרובות — לפני פגישת הראשונה.";
+const FIRST = "התשובות לשאלות שלקוחות שואלים אותי לעיתים קרובות — לפני הפגישה הראשונה.";
 const SECOND = "אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.";
 
 describe("<DetailedFAQ /> — the home page's common questions", () => {
