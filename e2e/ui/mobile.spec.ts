@@ -1111,7 +1111,7 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     await section.scrollIntoViewIfNeeded();
 
     await test_step("the intro's first sentence shows; the second is hidden, not dropped", async () => {
-      await expect(section.getByText(/לפני פגישת הראשונה\./)).toBeVisible();
+      await expect(section.getByText(/לפני הפגישה הראשונה\./)).toBeVisible();
       const more = section.getByText("אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.");
       await expect(more).toHaveCount(1);
       await expect(more).toBeHidden();

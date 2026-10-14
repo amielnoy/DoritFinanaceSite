@@ -22,7 +22,7 @@ const QA = faqByIds(HOME_COMMON_QUESTION_IDS);
  */
 const PHONE_QUESTIONS = 4;
 
-const INTRO = "התשובות לשאלות שלקוחות שואלים אותי לעיתים קרובות — לפני פגישת הראשונה.";
+const INTRO = "התשובות לשאלות שלקוחות שואלים אותי לעיתים קרובות — לפני הפגישה הראשונה.";
 const INTRO_MORE = "אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.";
 
 export default function DetailedFAQ() {
