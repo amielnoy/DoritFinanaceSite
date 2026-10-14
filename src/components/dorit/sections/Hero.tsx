@@ -75,6 +75,10 @@ export default function Hero() {
             <span>בעלת רישיון סוכן</span>
             <span aria-hidden="true" className="w-1.5 h-1.5 rotate-45 border border-highlight" />
             <span>ליווי אישי 1:1</span>
+            {/* The FAQ already says it ("פגישת ההיכרות הראשונה ללא עלות וללא
+                התחייבות"); it belongs where the decision to write is made. */}
+            <span aria-hidden="true" className="w-1.5 h-1.5 rotate-45 border border-highlight" />
+            <span>פגישת היכרות ללא עלות</span>
           </div>
           {/* The financial work, named. "מתכננת עתיד" is true and says nothing
               a visitor can act on; most people arrive holding a pension, a
