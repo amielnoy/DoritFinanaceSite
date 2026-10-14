@@ -169,6 +169,30 @@ CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a fail
 | CMP-TST-004 | "shows a signed-in visitor who is not an admin no add or delete controls" | Since the personal area, ordinary visitors sign in: the quote shows, no "הוספת המלצה" and no delete button |
 | CMP-TST-005 | "hides the empty section from a signed-in visitor who is not an admin" | No `#testimonials` |
 
+The `describe` "<Testimonials /> on a phone" (stage 3b) stubs `matchMedia` to a
+width, as §4.24 does; the cases above it run without one and are the desktop's
+grid.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-TST-006 | "shows two or more as a focusable strip, every card in it, with prev and next buttons" | At 390: a region "לקוחות מספרים — גלילה אופקית" with `tabindex=0` and `id=testimonials-strip`, both cards and quotes in it, the first named "המלצה 1 מתוך 2"; "ההמלצה הקודמת" and "ההמלצה הבאה" control the strip; the first `aria-disabled="true"`, the second `"false"` |
+| CMP-TST-007 | "next scrolls the strip by one card; prev at the first card does nothing" | Prev: no `scrollTo`; next: one `scrollTo` |
+| CMP-TST-008 | "shows a single testimonial as it is, with no strip and no buttons" | At 390 with one: the quote, no region, no button |
+| CMP-TST-009 | "from md up, the grid: no strip and no buttons" | At 1440: no region, no button, the `.grid` |
+
+### 4.25 `<ProofCarousel />` — the cases — `tests/component/proof-carousel.test.tsx`
+
+Below md (stage 3b) each case's story is folded behind "פרטי המקרה"; from md up
+nothing changes. `matchMedia` is stubbed as in §4.24.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-PRF-001 | "on a phone, folds every story behind its own פרטי המקרה, keeping it in the document" | 7 buttons, all `aria-expanded="false"`, each `aria-controls` its story; 7 stories `hidden`, none removed |
+| CMP-PRF-002 | "on a phone, keeps the headline, the figure, its basis and the disclaimer on show" | The disclaimer, the first headline and "₪850K שולמו" present; both "הערכה המבוססת על הנחות…" outside anything `hidden` |
+| CMP-PRF-003 | "on a phone, פרטי המקרה unfolds its own story in place and folds it again" | First pressed: `aria-expanded="true"`, its story shown, the second still folded; pressed again: hidden |
+| CMP-PRF-004 | "names the arrows by where they go in RTL: → back to the first case, ← on to the next" | "הבא" calls `scrollBy` with a negative `left`, "הקודם" with a positive one (A-80) |
+| CMP-PRF-005 | "from md up, every story is open and there is no פרטי המקרה" | At 1440: no button, nothing `hidden`, the disclaimer present |
+
 ### 4.12 `<Blog />` — the blog index — `tests/component/blog-page.test.tsx`
 
 `AgentChat` is stubbed; the date is fixed with `vi.setSystemTime`, so the

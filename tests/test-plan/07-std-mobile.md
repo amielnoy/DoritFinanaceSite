@@ -44,7 +44,7 @@ Test is skipped: mobile projects only".
 | E2E-MOB-003 | "opens and closes the burger menu and navigates from it" | Tap burger → tap "בלוג" | Drawer opens with a close button; navigation lands on `/blog` |
 | E2E-MOB-004 | "the burger menu closes on Escape and on backdrop tap" | Tap burger, press Escape | Close button gone |
 | E2E-MOB-005 | "no page scrolls horizontally on a phone viewport" | Load `/`, `/blog`, `/claims`, `/privacy`, `/accessibility`, `/faq` | `scrollWidth − clientWidth ≤ 1px` on every page |
-| E2E-MOB-006 | "primary tap targets meet the 44px minimum" | Load `/` | The bar's four links, the burger, the hero's CTA / WhatsApp / "חיוג", the start chips (וואטסאפ, טלפון, השארת פרטים, צ'אט), a services accordion button, "עוד עליי", "לכל השאלות" and the footer's "ניווט באתר" each ≥44px on the long edge and ≥36px on the short edge (WCAG 2.5.5 / iOS HIG) |
+| E2E-MOB-006 | "primary tap targets meet the 44px minimum" | Load `/` | The bar's four links, the burger, the hero's CTA / WhatsApp / "חיוג", the start chips (וואטסאפ, טלפון, השארת פרטים, צ'אט), a services accordion button, "עוד עליי", "לכל השאלות", the footer's "ניווט באתר", the cases' "הבא" and first "פרטי המקרה", and "ההמלצה הבאה" each ≥44px on the long edge and ≥36px on the short edge (WCAG 2.5.5 / iOS HIG) |
 | E2E-MOB-007 | "the phone keyboard gets the right input types" | Open the form from its "השארת פרטים" chip | Phone field `type=tel`, email field `type=email` |
 | E2E-MOB-008 | "a visitor can submit the quick contact form by touch" | Tap "השארת פרטים", fill, tap submit | Form appears; confirmation shown; `submitLead` with `source: quick` |
 | E2E-MOB-009 | "the calculator is usable on a narrow screen" | Scroll to `#fee-calculator`, set deposit | Field visible and editable; no `NaN` |
@@ -69,7 +69,9 @@ Test is skipped: mobile projects only".
 | E2E-MOB-027 | "the questionnaire from the keyboard: arrows move between answers without leaving the step" | Space on a life stage; ArrowDown ×2 on the concerns; Enter | Space moves on; the arrows choose but stay on step 2; Enter moves on; `wizard_step` is step_1, step_2 only |
 | E2E-MOB-028 | "common questions: the first four, and לכל השאלות to /faq" | Load `/` | 4 visible of 8 in the document; one opens; "לכל השאלות" → `/faq` |
 | E2E-MOB-029 | "the footer: the menu folded into ניווט באתר, contact two to a row, the licence line in view" | Scroll to the footer | A closed `<details>` "ניווט באתר" whose links appear when opened; phone and WhatsApp on one row, ≥44px; the licence line and `L-00107009` visible |
-| E2E-MOB-030 | "the home page stays under 7,000px — it was 10,260" | Load `/` at 390×844 | `scrollHeight` < 7000px (10,260 before stage 3) |
+| E2E-MOB-030 | "the home page stays under 6,200px — it was 10,260" | Load `/` at 390×844 | Once both testimonials are in, `#proof` < 600px (was 898) and `#testimonials` < 480px (was 791); `scrollHeight` < 6200px (10,260 before stage 3, 6,590 after it, 5,841 after 3b) |
+| E2E-MOB-031 | "the cases: short cards in a strip, each story folded behind פרטי המקרה, the disclaimer in view" | Scroll to `#proof` | "תוצאות עבר אינן מבטיחות תוצאות דומות — כל מקרה תלוי בנתונים האישיים." in view; 7 cards, 7 "פרטי המקרה" buttons all `aria-expanded="false"`; the first headline, "₪850K שולמו" and both "הערכה המבוססת על הנחות…" bases visible; the first story hidden but present once — pressed, it shows in place and the second stays folded, pressed again it folds; "הבא" brings the second card ≥90% into view, "הקודם" the first |
+| E2E-MOB-032 | "testimonials: one card at a time, sideways, with prev and next — and nothing moves by itself" | Scroll to `#testimonials` | 2 cards on one row in a region "לקוחות מספרים — גלילה אופקית" (`tabindex=0`, `overflow-x: auto`, `scroll-snap-type` mandatory, wider than the screen); the first ≥90% in view, the second <50%; "ההמלצה הקודמת" `aria-disabled="true"`; `scrollLeft` unchanged after 1.5 s; "ההמלצה הבאה" by keyboard (focus, Enter) brings the second ≥90% into view and is then `aria-disabled`; "ההמלצה הקודמת" goes back |
 | E2E-MOB-020 | "עדיין מתלבטים? has its three buttons on one row, and each still reports to GA4" | Scroll to the CTA band; tap all three (navigation prevented) | "קביעת פגישה", "טלפון" and "WhatsApp" share one row inside the screen, each ≥44×44px, hrefs `/#start`, `tel:+972508311776`, `wa.me/972508311776`; `cta_click`, `click_phone` and `click_whatsapp` queued for GA4 with `location: faq` |
 
 Stage 3 made the sticky bar 64px of four phone tabs — "לשיחה קצרה", WhatsApp,
@@ -83,7 +85,7 @@ questionnaire, and `/#quick-contact` still opens it (E2E-MOB-001c).
 
 `mobile.spec.ts` also holds a `Desktop-only chrome` block, tagged
 `@desktop-only` and filtered out of the two mobile projects the same way, so
-each project collects only its own half: 36 cases on a phone, 4 on a desktop. A responsive swap
+each project collects only its own half: 38 cases on a phone, 4 on a desktop. A responsive swap
 has two halves and only one of them is ever asserted by accident: hiding the
 desktop dock on a phone while also hiding it on a desktop passes E2E-MOB-001
 and ships a home page with no call-to-action above the fold. Those two cases
@@ -100,13 +102,28 @@ sideways strip, one sentence and the figures (the rest folded behind
 "עוד עליי"), an accordion, a chip row, four
 questions with "לכל השאלות", and a footer whose menu folds ("ניווט באתר") and
 whose photo is hidden below md — 6,590px, 7.81 screens (`playwright.measure.config.ts`).
-The brief's 4.5 screens is not reached: `#proof` (898px) and `#testimonials`
-(791px) were outside it and are unchanged. Folded content is hidden with CSS
+`#proof` (898px) and `#testimonials` (791px) were outside stage 3; stage 3b
+(E2E-MOB-031/032) shortens them below md. The cases stay one sideways strip,
+each card down to its tag, headline and figure (a projected figure keeps its
+basis beside it), the story folded behind "פרטי המקרה"; the header's arrows
+share the kicker's row and are named for where they go in RTL (A-80). The
+testimonials, two or more, become a strip that snaps one card at a time, with
+"ההמלצה הקודמת" / "ההמלצה הבאה" beside the heading and no autoplay; one stays
+as it is. `#proof` is 521px and `#testimonials` 420px: the page is 5,841px,
+6.92 screens. The brief's 4.5 screens (3,798px) is still not reached — the
+two sections together were 1,689px, less than the 2,792px between, so no
+treatment of them alone could reach it; what is left is spread over `#start`
+(995px), the footer (828px), `#common-questions` (767px) and `#services`
+(750px). Folded content is hidden with CSS
 or `hidden`, never left out, so the phone's document still carries what the
 desktop's does (`mobile-parity.spec.ts`). From md up nothing changes —
 `E2E-DSK-004` pins the desktop half, and the 1440 screenshots of `/` (top and
 whole page) and `/faq` are byte-identical. The shared footer brings `/faq` from
 3,148 to 2,522px (3.73 → 2.99 screens).
+
+E2E-MOB-021 reads the hero's boxes once its 0.9 s fade-up has landed: two boxes
+read one after the other mid-glide differed by up to 1.8px, and android-chrome
+failed the WhatsApp/call row check 4 runs in 10 (20 in 20 after).
 
 Prerendered pages are replaced, not hydrated, so a tap before React's first
 commit reaches a node with no handler. `gotoApp` waits for the

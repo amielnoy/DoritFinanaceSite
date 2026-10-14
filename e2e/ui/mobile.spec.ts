@@ -203,6 +203,9 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
         page.locator("#about").getByRole("button", { name: "עוד עליי" }),
         page.locator("#common-questions").getByRole("link", { name: "לכל השאלות" }),
         page.locator("footer").getByText("ניווט באתר"),
+        page.locator("#proof").getByRole("button", { name: "הבא" }),
+        page.locator("#proof").getByRole("button", { name: "פרטי המקרה" }).first(),
+        page.locator("#testimonials").getByRole("button", { name: "ההמלצה הבאה" }),
       ];
 
       for (const target of targets) {
@@ -783,6 +786,17 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     const hero = page.locator("#top");
     const portrait = hero.locator("figure .plate");
     const licence = hero.locator("figcaption").getByText("L-00107009");
+    // The hero's rows fade up for 0.9 s (`animate-fade-up`), and two boxes read
+    // one after the other mid-glide differ by a pixel or two (android-chrome
+    // failed 4 runs in 10 that way): let every finite animation land first.
+    await hero.evaluate((el) =>
+      Promise.all(
+        el
+          .getAnimations({ subtree: true })
+          .filter((a) => Number.isFinite(Number(a.effect?.getComputedTiming().endTime)))
+          .map((a) => a.finished.catch(() => undefined)),
+      ),
+    );
 
     await test_step("the portrait is an 88px circle, on the licence line's row, above the headline", async () => {
       const box = (await portrait.boundingBox())!;
@@ -1091,20 +1105,125 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("the home page stays under 7,000px — it was 10,260", async ({ page }) => {
-    // 10,260px before stage 3 at 390x844. Not the brief's 4.5 screens — see
-    // tests/test-plan/07-std-mobile.md for where the rest is — but a
-    // regression back towards twelve screens should fail here.
+  test("the cases: short cards in a strip, each story folded behind פרטי המקרה, the disclaimer in view", async ({ page }) => {
+    await gotoHome(page);
+    const proof = page.locator("#proof");
+    await proof.scrollIntoViewIfNeeded();
+    const strip = proof.getByRole("region", { name: "תיקי הצלחה — גלילה אופקית" });
+    const cards = strip.locator("article");
+    const toggles = proof.getByRole("button", { name: "פרטי המקרה" });
+    const story = proof.getByText(/ניהלתי את ההליך מול החברה/);
+
+    await test_step("the disclaimer, the headlines and the figures show; every story is folded, not removed", async () => {
+      await expect(proof.getByText(/תוצאות עבר אינן מבטיחות תוצאות דומות — כל מקרה תלוי בנתונים\s+האישיים\./)).toBeInViewport();
+      await expect(cards).toHaveCount(7);
+      await expect(toggles).toHaveCount(7);
+      for (let i = 0; i < 7; i++) await expect(toggles.nth(i)).toHaveAttribute("aria-expanded", "false");
+      await expect(proof.getByRole("heading", { name: "מ-דחייה לאישור מלא תוך 11 ימים" })).toBeVisible();
+      await expect(proof.getByText("₪850K שולמו")).toBeVisible();
+      // A projected figure keeps the basis it rests on, folded or not.
+      for (const basis of await proof.getByText("הערכה המבוססת על הנחות של תשואה ודמי ניהול").all()) {
+        await expect(basis).toBeVisible();
+      }
+      await expect(story).toBeHidden();
+      await expect(story).toHaveCount(1);
+    });
+
+    await test_step("פרטי המקרה unfolds its own story in place, and folds it again", async () => {
+      await toggles.first().click();
+      await expect(toggles.first()).toHaveAttribute("aria-expanded", "true");
+      await expect(story).toBeVisible();
+      await expect(toggles.nth(1)).toHaveAttribute("aria-expanded", "false");
+      await toggles.first().click();
+      await expect(toggles.first()).toHaveAttribute("aria-expanded", "false");
+      await expect(story).toBeHidden();
+    });
+
+    await test_step("הבא brings the second case into the strip, and הקודם takes it back", async () => {
+      await expect(cards.nth(1)).not.toBeInViewport({ ratio: 0.5 });
+      await proof.getByRole("button", { name: "הבא" }).click();
+      await expect(cards.nth(1)).toBeInViewport({ ratio: 0.9 });
+      await proof.getByRole("button", { name: "הקודם" }).click();
+      await expect(cards.first()).toBeInViewport({ ratio: 0.9 });
+    });
+  });
+
+  test("testimonials: one card at a time, sideways, with prev and next — and nothing moves by itself", async ({ page }) => {
+    await gotoHome(page);
+    const section = page.locator("#testimonials");
+    await section.scrollIntoViewIfNeeded();
+    const strip = section.getByRole("region", { name: "לקוחות מספרים — גלילה אופקית" });
+    const cards = strip.locator("article");
+    const prev = section.getByRole("button", { name: "ההמלצה הקודמת" });
+    const next = section.getByRole("button", { name: "ההמלצה הבאה" });
+
+    await test_step("both cards on one row, in a strip that snaps and scrolls inside itself; the first in view", async () => {
+      await expect(cards).toHaveCount(2);
+      const tops = await cards.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+      expect(new Set(tops).size).toBe(1);
+      const { scrollWidth, clientWidth, overflowX, snap } = await strip.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        overflowX: getComputedStyle(el).overflowX,
+        snap: getComputedStyle(el).scrollSnapType,
+      }));
+      expect(scrollWidth).toBeGreaterThan(clientWidth);
+      expect(overflowX).toBe("auto");
+      expect(snap).toContain("mandatory");
+      await expect(strip).toHaveAttribute("tabindex", "0");
+      await expect(cards.first()).toBeInViewport({ ratio: 0.9 });
+      await expect(cards.nth(1)).not.toBeInViewport({ ratio: 0.5 });
+      await expect(prev).toHaveAttribute("aria-disabled", "true");
+      await expect(next).toHaveAttribute("aria-disabled", "false");
+    });
+
+    await test_step("nothing moves on its own", async () => {
+      const before = await strip.evaluate((el) => el.scrollLeft);
+      await page.waitForTimeout(1500);
+      expect(await strip.evaluate((el) => el.scrollLeft)).toBe(before);
+    });
+
+    await test_step("ההמלצה הבאה, pressed from the keyboard, shows the second", async () => {
+      await next.focus();
+      await page.keyboard.press("Enter");
+      await expect(cards.nth(1)).toBeInViewport({ ratio: 0.9 });
+      await expect(next).toHaveAttribute("aria-disabled", "true");
+      await expect(prev).toHaveAttribute("aria-disabled", "false");
+    });
+
+    await test_step("ההמלצה הקודמת goes back to the first", async () => {
+      await prev.click();
+      await expect(cards.first()).toBeInViewport({ ratio: 0.9 });
+      await expect(prev).toHaveAttribute("aria-disabled", "true");
+    });
+  });
+
+  test("the home page stays under 6,200px — it was 10,260", async ({ page }) => {
+    // 10,260px before stage 3 at 390x844, 6,590 after it, 5,855 after 3b. Not
+    // the brief's 4.5 screens — see tests/test-plan/07-std-mobile.md for where
+    // the rest is — but a regression back towards eight screens should fail here.
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoHome(page);
-    const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    expect(height).toBeLessThan(7000);
+
+    await test_step("the cases and the testimonials are short", async () => {
+      // Testimonials arrive after the route commits; wait for the section.
+      await expect(page.locator("#testimonials article")).toHaveCount(2);
+      const proof = (await page.locator("#proof").boundingBox())!.height;
+      const testimonials = (await page.locator("#testimonials").boundingBox())!.height;
+      expect(proof, "#proof was 898px").toBeLessThan(600);
+      expect(testimonials, "#testimonials was 791px").toBeLessThan(480);
+    });
+
+    await test_step("and so is the page", async () => {
+      const height = await page.evaluate(() => document.documentElement.scrollHeight);
+      expect(height).toBeLessThan(6200);
+    });
   });
 });
 
 /** The same page from md up: what stage 3 must not have touched. */
 test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
-  test("keeps its portrait, its open services, its standing form, eight questions and its open footer menu", async ({ page }) => {
+  test("keeps its portrait, its open services, its standing form, its open cases, its testimonials grid, eight questions and its open footer menu", async ({ page }) => {
     await gotoApp(page);
 
     await test_step("the hero's portrait is the plate, not a circle, and no extra buttons", async () => {
@@ -1131,6 +1250,15 @@ test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
       await page.waitForTimeout(500);
       await expect(page.locator("#interview").getByRole("heading", { name: "נכיר קצת" })).toBeVisible();
       await expect(page.locator("#interview").getByRole("button", { name: "המשך" })).toBeVisible();
+    });
+
+    await test_step("the cases tell their stories open, and the testimonials stand in a grid", async () => {
+      await expect(page.locator("#proof").getByRole("button", { name: "פרטי המקרה" })).toHaveCount(0);
+      await expect(page.locator("#proof").getByText(/ניהלתי את ההליך מול החברה/)).toBeVisible();
+      await expect(page.locator("#proof").getByText(/מקרה 01/)).toBeVisible();
+      await expect(page.locator("#testimonials article")).toHaveCount(2);
+      await expect(page.locator("#testimonials").getByRole("button", { name: /ההמלצה/ })).toHaveCount(0);
+      await expect(page.locator("#testimonials").getByRole("region")).toHaveCount(0);
     });
 
     await test_step("eight questions, no לכל השאלות, an open footer menu", async () => {
