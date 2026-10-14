@@ -118,6 +118,24 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
     }
   });
 
+  test("E2E-MOB-036: an article's contact box fits the phone and nothing covers it", async ({ page }) => {
+    await gotoApp(page, "/blog/post-1");
+    const box = page.getByTestId("article_end");
+    await expect(box).toBeVisible();
+    await test_step("an article has no sticky bar to sit under (only / and /blog mount it)", async () => {
+      await expect(stickyBar(page)).toHaveCount(0);
+    });
+    await test_step("the box fits the screen's width", async () => {
+      const b = (await box.boundingBox())!;
+      const width = page.viewportSize()!.width;
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width).toBeLessThanOrEqual(width);
+    });
+    await test_step("its WhatsApp button is tappable", async () => {
+      await box.getByRole("link", { name: /וואטסאפ/ }).click({ trial: true });
+    });
+  });
+
   test("the sticky bar stays pinned while scrolling", async ({ page }) => {
     await test_step("open the home page and scroll down to the testimonials", async () => {
       await gotoApp(page);

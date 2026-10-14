@@ -10,7 +10,7 @@ import { fetchRows, toPortRow, type SupabaseTableClient } from "./SupabaseTableC
  * `slug` is the article's address, `/blog/<slug>` — see src/lib/articlePath.ts.
  */
 export const ARTICLE_COLUMNS =
-  "id,base44_id,slug,title,excerpt,body,image_url,tags,action_time,published,created_at";
+  "id,base44_id,slug,title,excerpt,body,image_url,tags,action_time,cta_headline,og_image,published,created_at";
 export const TESTIMONIAL_COLUMNS = "id,base44_id,name,role,quote,image_url,rating,source,created_at";
 
 export const toArticle = (row: Record<string, unknown>): Article => toPortRow(row) as unknown as Article;
