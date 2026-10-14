@@ -616,9 +616,10 @@ to. On the function the model is not asked: a sweep writes the Support tab.
 - **When:** pg_cron runs `public.chat_sweep_tick()` every 15 minutes, which
   posts to the `chat` function with the `x-chat-sweep` header (pg_net, 30 s
   timeout). The function claims support conversations whose last message is
-  more than 2 hours old — the handler's own idle close (`IDLE_MS`), so a
-  logged conversation is refused as closed on any later message and its row is
-  the whole conversation. Never one a turn holds (`busy_until`), never an evaluation
+  more than 2 hours 5 minutes old — the handler's own idle close (`IDLE_MS`)
+  plus a 5-minute margin (`SHEET_LOG_MARGIN_MS`) for a message caught mid-check
+  — so a logged conversation is refused as closed on any later message and its
+  row is the whole conversation. Never one a turn holds (`busy_until`), never an evaluation
   one, and each at most once (`sheet_logged_at`; the claim is one filtered
   PATCH, so overlapping sweeps cannot both take a row). At most 10 a tick, the
   longest idle first.
@@ -630,7 +631,7 @@ to. On the function the model is not asked: a sweep writes the Support tab.
   `abandoned` if the visitor's message was last, `referred_to_interview` if a
   reply linked `/#start`, else `answered`. No phone: the chat has none. The
   row's time is the sweep's: about 2 hours after the chat's last message, at
-  most 2 h 15 min. A hand-off does not wait for it: `escalateToHuman` mails
+  most about 2 h 20 min. A hand-off does not wait for it: `escalateToHuman` mails
   Dorit during the turn that calls it, and the "מעבר לדורית" button from the
   page.
 - **What it does not do:** retry. A claimed row whose append fails stays

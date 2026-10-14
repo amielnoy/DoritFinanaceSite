@@ -1,8 +1,8 @@
 /**
  * The FAQ chat's Support-tab row, written by the function. Base44's agent
  * called logSupportChat itself at the end of a chat, when it remembered; this
- * logs every support conversation once, when the function closes it — after
- * IDLE_MS (2 hours) without a message — through the existing log-support-chat
+ * logs every support conversation once, after the function has closed it —
+ * IDLE_MS (2 hours) without a message, plus SHEET_LOG_MARGIN_MS — through the existing log-support-chat
  * handler (in-process), which redacts the text and knows the sheet. A
  * conversation that idle is refused as closed on its next message, so the row
  * is the whole conversation. A hand-off does not wait for this: escalateToHuman
@@ -25,8 +25,15 @@ import type { StoredMessage } from './turn.ts';
 
 /** The roles whose conversations go to the Support tab. PR 3 adds 'procedures'. */
 export const SHEET_LOGGED_ROLES: readonly string[] = ['support'];
-/** The handler's idle close: a conversation is logged only once no message can extend it. */
-export const SHEET_LOG_IDLE_MS = IDLE_MS;
+/**
+ * Past the handler's idle close. The handler reads last_message_at, checks it
+ * against IDLE_MS and only then claims the turn; a sweep cutting at exactly
+ * IDLE_MS could claim the conversation inside that window, and the turn would
+ * run on a row already logged. Five minutes is far longer than the window.
+ */
+export const SHEET_LOG_MARGIN_MS = 5 * 60 * 1000;
+/** A conversation is logged only once no message can extend it. */
+export const SHEET_LOG_IDLE_MS = IDLE_MS + SHEET_LOG_MARGIN_MS;
 /** A sheet append is one token fetch and one append, each up to 10 s but usually well under one. */
 export const SHEET_LOG_BATCH = 10;
 const TOPIC_LIMIT = 200;
