@@ -21,14 +21,17 @@ describe("resolveSiteUrl — where the canonical origin comes from", () => {
     expect(resolveSiteUrl({}, { VITE_SITE_URL: PROD })).toBe(PROD);
   });
 
-  it("falls back to the default host when neither names one", () => {
-    expect(resolveSiteUrl(undefined, undefined)).toBe(OLD);
-    expect(resolveSiteUrl({}, {})).toBe(OLD);
+  it("falls back to the production domain when neither names one — never the old Base44 host", () => {
+    // The Base44 Builder builds without the variable, and the copy it serves on
+    // the old host must name production as canonical, not itself.
+    expect(resolveSiteUrl(undefined, undefined)).toBe(PROD);
+    expect(resolveSiteUrl({}, {})).toBe(PROD);
+    expect(resolveSiteUrl(undefined, undefined)).not.toBe(OLD);
   });
 
   it("treats a blank value as unset, as the build plugin does", () => {
     expect(resolveSiteUrl({ VITE_SITE_URL: "" }, { VITE_SITE_URL: PROD })).toBe(PROD);
-    expect(resolveSiteUrl({ VITE_SITE_URL: "  " }, { VITE_SITE_URL: "" })).toBe(OLD);
+    expect(resolveSiteUrl({ VITE_SITE_URL: "  " }, { VITE_SITE_URL: "" })).toBe(PROD);
   });
 
   it("strips trailing slashes from whichever source wins", () => {

@@ -1,42 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://safe-arch-plan.base44.app/</loc>
+    <loc>https://govari-fin.co.il/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://safe-arch-plan.base44.app/blog</loc>
+    <loc>https://govari-fin.co.il/blog</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://safe-arch-plan.base44.app/claims</loc>
+    <loc>https://govari-fin.co.il/claims</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://safe-arch-plan.base44.app/faq</loc>
+    <loc>https://govari-fin.co.il/faq</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://safe-arch-plan.base44.app/tools</loc>
+    <loc>https://govari-fin.co.il/tools</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://safe-arch-plan.base44.app/perspective</loc>
+    <loc>https://govari-fin.co.il/perspective</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://safe-arch-plan.base44.app/privacy</loc>
+    <loc>https://govari-fin.co.il/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://safe-arch-plan.base44.app/accessibility</loc>
+    <loc>https://govari-fin.co.il/accessibility</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

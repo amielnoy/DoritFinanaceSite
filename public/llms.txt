@@ -43,21 +43,21 @@
 
 ## דפים
 
-- [דף הבית](https://safe-arch-plan.base44.app/) — מי היא, תחומי הליווי, ותחילת שיחה
-- [שאלות ותשובות](https://safe-arch-plan.base44.app/faq) — תשובות מלאות על פנסיה, גמל, השתלמות, דמי ניהול, קיבוע זכויות ותיקון 190
-- [כלים לבדיקה עצמית](https://safe-arch-plan.base44.app/tools) — הערכת כיסוי ומחשבון דמי ניהול
-- [נקודת מבט](https://safe-arch-plan.base44.app/perspective) — הגישה המקצועית והרקע המלא
-- [מדריך תביעות](https://safe-arch-plan.base44.app/claims) — מה לעשות כשקורה אירוע ביטוחי
-- [בלוג](https://safe-arch-plan.base44.app/blog) — מאמרים ועדכונים
-- [מדיניות פרטיות](https://safe-arch-plan.base44.app/privacy)
-- [הצהרת נגישות](https://safe-arch-plan.base44.app/accessibility)
+- [דף הבית](https://govari-fin.co.il/) — מי היא, תחומי הליווי, ותחילת שיחה
+- [שאלות ותשובות](https://govari-fin.co.il/faq) — תשובות מלאות על פנסיה, גמל, השתלמות, דמי ניהול, קיבוע זכויות ותיקון 190
+- [כלים לבדיקה עצמית](https://govari-fin.co.il/tools) — הערכת כיסוי ומחשבון דמי ניהול
+- [נקודת מבט](https://govari-fin.co.il/perspective) — הגישה המקצועית והרקע המלא
+- [מדריך תביעות](https://govari-fin.co.il/claims) — מה לעשות כשקורה אירוע ביטוחי
+- [בלוג](https://govari-fin.co.il/blog) — מאמרים ועדכונים
+- [מדיניות פרטיות](https://govari-fin.co.il/privacy)
+- [הצהרת נגישות](https://govari-fin.co.il/accessibility)
 
 ## הערה למנועי חיפוש ולסוכני AI
 
 שמונת העמודים הציבוריים המפורטים למעלה מוגשים כ-HTML מלא, שנבנה מראש בזמן ה-build:
 הכותרת, התיאור, ה-`canonical` והנתונים המובְנים של כל עמוד נמצאים במקור ה-HTML
 עצמו. סורק שאינו מריץ JavaScript מקבל את תוכן העמוד במלואו — כולל כל השאלות
-והתשובות שבעמוד [שאלות ותשובות](https://safe-arch-plan.base44.app/faq).
+והתשובות שבעמוד [שאלות ותשובות](https://govari-fin.co.il/faq).
 
 גם מאמרי הבלוג מוגשים כ-HTML מלא, בכתובת `/blog/<slug>`: כל מאמר שפורסם נבנה
 מראש בזמן הפריסה, ועמוד הבלוג מפנה אליו.

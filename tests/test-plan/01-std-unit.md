@@ -586,7 +586,8 @@ gets the shell with its head; anything else is 404 + noindex.
 ### 4.27 Where the canonical origin comes from — `tests/unit/seo-site-url.test.ts` (`resolveSiteUrl`)
 
 `SITE_URL` in `src/lib/seo.ts` is Vite's `VITE_SITE_URL`, else the server's
-(`process.env`, the only one a Vercel function has), else the default host.
+(`process.env`, the only one a Vercel function has), else the production
+domain `https://govari-fin.co.il` (the old Base44 host until 2026-10-14).
 Tested on the pure resolver: under Vitest `import.meta.env` mirrors
 `process.env`, so the end-to-end case is UNIT-OG-018.
 
@@ -594,7 +595,7 @@ Tested on the pure resolver: under Vitest `import.meta.env` mirrors
 |---|---|---|
 | UNIT-SURL-001 | "takes Vite's VITE_SITE_URL first, over the server's" | Vite's value |
 | UNIT-SURL-002 | "falls back to the server's VITE_SITE_URL when Vite's env lacks it — a Vercel function" | Server's value, for an absent or empty Vite env |
-| UNIT-SURL-003 | "falls back to the default host when neither names one" | `https://safe-arch-plan.base44.app` |
+| UNIT-SURL-003 | "falls back to the production domain when neither names one — never the old Base44 host" | `https://govari-fin.co.il`, and not `https://safe-arch-plan.base44.app` |
 | UNIT-SURL-004 | "treats a blank value as unset, as the build plugin does" | Empty / whitespace skipped |
 | UNIT-SURL-005 | "strips trailing slashes from whichever source wins" | No trailing `/` |
 
