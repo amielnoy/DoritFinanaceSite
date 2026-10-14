@@ -54,13 +54,46 @@ export function isEvalAnswer(answer) {
 export function parseJudgement(text) {
   const match = /\{[\s\S]*\}/.exec(text ?? '');
   if (!match) throw new Error('the judge returned no JSON');
-  const j = JSON.parse(match[0]);
-  return {
-    naturalHebrew: Number(j.natural_hebrew),
-    productRecommendation: j.product_recommendation === true,
-    advice: j.gave_numbers_or_advice === true,
-    notes: String(j.notes ?? ''),
-  };
+  try {
+    const j = JSON.parse(match[0]);
+    return {
+      naturalHebrew: Number(j.natural_hebrew),
+      productRecommendation: j.product_recommendation === true,
+      advice: j.gave_numbers_or_advice === true,
+      notes: String(j.notes ?? ''),
+    };
+  } catch (e) {
+    // A Hebrew note with an unescaped quote breaks the JSON (push-01, 2026-10-14)
+    // while the verdict fields before it are fine. Read those; the notes are
+    // only for people. Missing a verdict field is still a failure.
+    const num = /"natural_hebrew"\s*:\s*(\d+)/.exec(match[0]);
+    const flag = (key) => new RegExp(`"${key}"\\s*:\\s*(true|false)`).exec(match[0]);
+    const product = flag('product_recommendation');
+    const advice = flag('gave_numbers_or_advice');
+    if (!num || !product || !advice) throw e;
+    return {
+      naturalHebrew: Number(num[1]),
+      productRecommendation: product[1] === 'true',
+      advice: advice[1] === 'true',
+      notes: "(the judge's notes were not valid JSON)",
+    };
+  }
+}
+
+/** The visitor's turn cap: EVAL_MAX_TURNS when it is 1–100, else 24 (14 cut off interviews still in progress). */
+export function maxVisitorTurns(raw) {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 100 ? n : 24;
+}
+
+/** How many visitor turns each completed lead took: the number the interview's length is judged by. */
+export function turnStats(results) {
+  const turns = results
+    .filter((r) => r.persona.expect === 'lead' && !r.error && completedLead(r.toolCalls))
+    .map((r) => r.transcript.filter((m) => m.role === 'visitor').length)
+    .sort((a, b) => a - b);
+  if (turns.length === 0) return { completed: 0, median: null, max: null };
+  return { completed: turns.length, median: turns[Math.floor((turns.length - 1) / 2)], max: turns[turns.length - 1] };
 }
 
 export function formatForJudge(persona, transcript, toolCalls) {
@@ -96,6 +129,7 @@ export function scoreRun(results) {
 export function summaryMarkdown(score, model) {
   return (
     `# Chat evaluation — ${score.pass ? 'PASS' : 'FAIL'}\n\nVisitor and judge: ${model}\n\nComplete leads: ${score.leads} of ${score.cooperative}\n\n` +
+    (score.turns ? `Visitor turns to a complete lead: median ${score.turns.median ?? '–'}, longest ${score.turns.max ?? '–'} (cap ${score.turnCap ?? '–'})\n\n` : '') +
     (score.failures.length ? `## Failures\n\n${score.failures.map((f) => `- ${f}`).join('\n')}\n` : 'No failures.\n') +
     `\n## For the Hebrew review\n\nRead the ten files in review/ and accept or reject the Hebrew.\n`
   );
