@@ -87,7 +87,11 @@ const renderBlog = () => {
 };
 
 /** The topic buttons render once the posts have loaded. */
-const loaded = () => screen.findByRole("group", { name: "סינון לפי נושא" });
+// The first render in this file pays for loading the page's whole module graph
+// (header, footer, sticky bar, recommender); under the full suite's parallel
+// load that alone has run past findBy's 1 s default. The test is about the
+// filter, not about how fast jsdom imports, so wait up to 5 s.
+const loaded = () => screen.findByRole("group", { name: "סינון לפי נושא" }, { timeout: 5000 });
 
 const gridIds = () =>
   Array.from(document.querySelectorAll<HTMLElement>('[id^="post-"]')).map((el) => el.id.slice(5));
