@@ -89,6 +89,10 @@ async function settle(page: Page) {
       await new Promise((r) => setTimeout(r, 40));
     }
     window.scrollTo({ top: 0, behavior: "instant" });
+    // The desktop's scroll-progress line (SecurityScroll) can keep the value
+    // of a scroll event from the loop above; one more, at the top, settles it.
+    await new Promise((r) => setTimeout(r, 100));
+    window.dispatchEvent(new Event("scroll"));
   });
   await page.waitForTimeout(1200);
 }
@@ -170,6 +174,49 @@ async function topicsWhenScrolled(page: Page) {
   });
 }
 
+/**
+ * The home page's parts below md: what each section spends, and the pieces the
+ * stage-3 brief names. Selectors hold before and after, so the two runs compare.
+ */
+async function homeParts(page: Page) {
+  return page.evaluate(() => {
+    const h = (el: Element | null | undefined) => (el ? Math.round(el.getBoundingClientRect().height) : null);
+    const vh = window.innerHeight;
+    const hero = document.querySelector("#top");
+    const visible = (el: Element) => (el as HTMLElement).offsetParent !== null;
+    const portrait = Array.from(hero?.querySelectorAll("img") ?? []).filter(visible)[0];
+    const carriers = document.querySelector("main > section:nth-of-type(2)");
+    const start = document.querySelector("#start");
+    const bar = document.querySelector("[data-track-location='mobile_sticky_bar']");
+    const main = document.querySelector("main");
+    const body = document.body;
+    const firstCta = Array.from(hero?.querySelectorAll("a[href$='#start']") ?? []).find(visible);
+    const ctaTop = firstCta ? Math.round(firstCta.getBoundingClientRect().bottom) : null;
+    return {
+      hero: h(hero),
+      heroPortrait: portrait ? `${Math.round(portrait.getBoundingClientRect().width)}x${Math.round(portrait.getBoundingClientRect().height)}` : null,
+      heroCtaBottom: ctaTop,
+      heroCtaAboveFold: ctaTop !== null && ctaTop <= vh,
+      carriers: h(carriers),
+      about: h(document.querySelector("#about")),
+      services: h(document.querySelector("#services")),
+      start: h(start),
+      wizard: h(document.querySelector("#interview")),
+      quickContact: h(document.querySelector("#quick-contact")),
+      proof: h(document.querySelector("#proof")),
+      testimonials: h(document.querySelector("#testimonials")),
+      commonQuestions: h(document.querySelector("#common-questions")),
+      footer: h(document.querySelector("footer")),
+      stickyBar: h(bar),
+      bottomClearance: Math.max(
+        main ? parseFloat(getComputedStyle(main).paddingBottom) : 0,
+        body ? parseFloat(getComputedStyle(body).paddingBottom) : 0,
+        parseFloat(getComputedStyle(main?.parentElement ?? body).paddingBottom) || 0,
+      ),
+    };
+  });
+}
+
 const results: Record<string, unknown> = {};
 
 test.afterAll(() => {
@@ -185,6 +232,17 @@ test.describe("phone, 390x844", () => {
     await localhostOnly(page);
     await gotoApp(page, "/");
     results["/ @390"] = await sections(page);
+  });
+
+  test("/ anatomy: each section, and whole-page shots", async ({ page }) => {
+    await localhostOnly(page);
+    await gotoApp(page, "/");
+    await settle(page);
+    results["/ @390 parts"] = await homeParts(page);
+    if (SHOTS) {
+      await page.screenshot({ path: path.join(SHOTS, `${LABEL}-390-home-top.png`) });
+      await page.screenshot({ path: path.join(SHOTS, `${LABEL}-390-home-full.png`), fullPage: true });
+    }
   });
 
   test("/faq and its support chat", async ({ page }) => {
@@ -226,6 +284,21 @@ test.describe("phone, 390x844", () => {
 
 test.describe("desktop, 1440x900", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("/ whole page, for a byte-for-byte comparison", async ({ page }) => {
+    await localhostOnly(page);
+    await gotoApp(page, "/");
+    await settle(page);
+    if (SHOTS) {
+      // animations: "disabled" ends the hero's fade-up where it lands, so two
+      // runs of the same build are byte-identical and a diff means a change.
+      // Shot before `sections`, whose own scroll-through can leave the
+      // scroll-progress line (SecurityScroll) at the bottom's value.
+      await page.screenshot({ path: path.join(SHOTS, `${LABEL}-1440-home-top.png`), animations: "disabled" });
+      await page.screenshot({ path: path.join(SHOTS, `${LABEL}-1440-home-full.png`), fullPage: true, animations: "disabled" });
+    }
+    results["/ @1440"] = await sections(page);
+  });
 
   test("/faq and its support chat", async ({ page }) => {
     await localhostOnly(page);

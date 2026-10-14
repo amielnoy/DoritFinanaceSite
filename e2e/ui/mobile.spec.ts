@@ -1,4 +1,4 @@
-import { expect, gotoApp, test, test_step } from "../fixtures/app";
+import { expect, gotoApp, test, test_step, waitForLive } from "../fixtures/app";
 
 /**
  * Mobile-web sanity for the two platforms that matter to this site's traffic:
@@ -14,46 +14,107 @@ import { expect, gotoApp, test, test_step } from "../fixtures/app";
 const stickyBar = (page: import("@playwright/test").Page) =>
   page.locator("div.md\\:hidden.fixed.bottom-0");
 
+/** The GA4 events the page queued (the inline gtag stub; the real tag is blocked), with their location. */
+const queuedClicks = (page: import("@playwright/test").Page) =>
+  page.evaluate(() =>
+    ((window as unknown as { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? [])
+      .map((entry) => Array.from(entry))
+      .filter((args) => args[0] === "event")
+      .map((args) => ({ name: String(args[1]), location: (args[2] as { location?: string } | undefined)?.location })),
+  );
+
 test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
-  test("renders the sticky WhatsApp/call/contact/support bar instead of the desktop dock", async ({ page }) => {
+  test("renders one 64px sticky bar — לשיחה קצרה, WhatsApp, a call — instead of the desktop dock", async ({ page }) => {
     await test_step("open the home page on a phone viewport", async () => {
       await gotoApp(page);
     });
 
-    await test_step("the sticky bar offers WhatsApp, a call, the short contact form and support", async () => {
+    await test_step("the bar offers the conversation, WhatsApp and a call, and nothing else", async () => {
+      const cta = stickyBar(page).getByRole("link", { name: "לשיחה קצרה" });
       const stickyWhatsapp = stickyBar(page).getByRole("link", { name: /וואטסאפ/ });
       const stickyCall = stickyBar(page).getByRole("link", { name: /חייגו/ });
-      const stickyForm = stickyBar(page).getByRole("link", { name: /השאירו פרטים/ });
-      const stickySupport = stickyBar(page).getByRole("link", { name: /תמיכה/ });
+      await expect(stickyBar(page).getByRole("link")).toHaveCount(3);
+      await expect(cta).toBeVisible();
       await expect(stickyWhatsapp).toBeVisible();
       await expect(stickyCall).toBeVisible();
-      await expect(stickyForm).toBeVisible();
-      await expect(stickySupport).toBeVisible();
+      await expect(cta).toHaveAttribute("href", "/#start");
       await expect(stickyWhatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776\?text=/);
       await expect(stickyCall).toHaveAttribute("href", "tel:+972508311776");
-      await expect(stickyForm).toHaveAttribute("href", "/#quick-contact");
     });
 
-    await test_step("the desktop floating dock is hidden below md", async () => {
+    await test_step("one 64px bar, the CTA wider than the other two together", async () => {
+      const bar = (await stickyBar(page).boundingBox())!;
+      expect(Math.round(bar.height)).toBe(64);
+      const cta = (await stickyBar(page).getByRole("link", { name: "לשיחה קצרה" }).boundingBox())!;
+      const wa = (await stickyBar(page).getByRole("link", { name: /וואטסאפ/ }).boundingBox())!;
+      const call = (await stickyBar(page).getByRole("link", { name: /חייגו/ }).boundingBox())!;
+      expect(cta.width).toBeGreaterThan(wa.width + call.width);
+      for (const b of [cta, wa, call]) expect(Math.round(Math.abs(b.y + b.height / 2 - (bar.y + bar.height / 2)))).toBeLessThanOrEqual(1);
+    });
+
+    await test_step("no other button floats over the page: the desktop dock is hidden below md", async () => {
       await expect(page.getByRole("link", { name: "פתיחת שיחה בוואטסאפ" })).toBeHidden();
+      await expect(page.locator('[data-track-location="floating_dock"]')).toBeHidden();
     });
   });
 
-  test("the sticky bar's השאירו פרטים reaches the form from another route", async ({ page }) => {
-    // The bar is on every route and the form only on home. As a bare
-    // `#quick-contact` it did nothing at all on /blog.
+  test("each of the bar's three reports to GA4 from location mobile_sticky_bar", async ({ page }) => {
+    await gotoApp(page);
+    await waitForLive(page, "#start");
+    // Keep the page: the tracker listens in the capture phase, before this.
+    await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
+    for (const name of ["לשיחה קצרה", /וואטסאפ/, /חייגו/] as const) {
+      await stickyBar(page).getByRole("link", { name }).click();
+    }
+    const events = await queuedClicks(page);
+    for (const name of ["cta_click", "click_whatsapp", "click_phone"]) {
+      expect(events).toContainEqual({ name, location: "mobile_sticky_bar" });
+    }
+  });
+
+  test("the sticky bar's לשיחה קצרה reaches the conversation from another route", async ({ page }) => {
+    // The bar is on every route and `#start` only on home. As a bare `#start`
+    // it would do nothing at all on /blog.
     await test_step("open the blog on a phone viewport", async () => {
       await gotoApp(page, "/blog");
     });
 
-    await test_step("tap השאירו פרטים in the sticky bar", async () => {
-      await stickyBar(page).getByRole("link", { name: /השאירו פרטים/ }).click();
+    await test_step("tap לשיחה קצרה in the sticky bar", async () => {
+      await stickyBar(page).getByRole("link", { name: "לשיחה קצרה" }).click();
     });
 
-    await test_step("it lands on the home page at the short contact form", async () => {
-      await expect(page).toHaveURL(/\/#quick-contact$/);
-      await expect(page.locator("#quick-contact")).toBeInViewport({ ratio: 0.05 });
+    await test_step("it lands on the home page at the conversation", async () => {
+      await expect(page).toHaveURL(/\/#start$/);
+      await expect(page.locator("#start")).toBeInViewport({ ratio: 0.05 });
     });
+  });
+
+  test("a link to /#quick-contact opens the short form, which a phone otherwise keeps folded", async ({ page }) => {
+    // The bar used to link here; the address still works for anyone holding it.
+    await gotoApp(page, "/#quick-contact");
+    await waitForLive(page, "#start");
+    await expect(page.locator("#qc-name")).toBeVisible();
+    await expect(page.getByRole("button", { name: "השארת פרטים" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("nothing at the bottom of the page hides under the bar", async ({ page }) => {
+    for (const path of ["/", "/blog"]) {
+      await test_step(`${path}: the footer's last line ends above the bar`, async () => {
+        await gotoApp(page, path);
+        // React replaces the prerendered page and /blog's list arrives after
+        // it, so the bottom moves: scroll again on every try until it holds.
+        await waitForLive(page, "footer");
+        await expect
+          .poll(async () => {
+            await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+            const last = await page.locator("footer p").last().boundingBox();
+            const bar = await stickyBar(page).boundingBox();
+            // The gap between the footer's last line and the top of the bar.
+            return last && bar ? bar.y - (last.y + last.height) : -1;
+          })
+          .toBeGreaterThanOrEqual(0);
+      });
+    }
   });
 
   test("the sticky bar stays pinned while scrolling", async ({ page }) => {
@@ -125,11 +186,21 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
 
     await test_step("every primary control is big enough to hit with a thumb", async () => {
       const targets = [
+        stickyBar(page).getByRole("link", { name: "לשיחה קצרה" }),
         stickyBar(page).getByRole("link", { name: /וואטסאפ/ }),
         stickyBar(page).getByRole("link", { name: /חייגו/ }),
-        stickyBar(page).getByRole("link", { name: /השאירו פרטים/ }),
-        stickyBar(page).getByRole("link", { name: /תמיכה/ }),
         page.getByRole("button", { name: "תפריט" }),
+        page.locator("#top").getByRole("link", { name: "לשיחה קצרה עם דורית" }),
+        page.locator("#top").getByRole("link", { name: "וואטסאפ" }),
+        page.locator("#top").getByRole("link", { name: "חיוג" }),
+        page.locator("#start").getByRole("link", { name: "וואטסאפ" }),
+        page.locator("#start").getByRole("link", { name: "טלפון" }),
+        page.locator("#start").getByRole("button", { name: "השארת פרטים" }),
+        page.locator("#start").getByRole("button", { name: "צ'אט" }),
+        page.locator("#services").getByRole("button", { name: /מיסוי וקיבוע זכויות/ }),
+        page.locator("#about").getByRole("button", { name: "עוד עליי" }),
+        page.locator("#common-questions").getByRole("link", { name: "לכל השאלות" }),
+        page.locator("footer").getByText("ניווט באתר"),
       ];
 
       for (const target of targets) {
@@ -144,8 +215,10 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
   test("the phone keyboard gets the right input types", async ({ page }) => {
     const form = page.locator("#quick-contact");
 
-    await test_step("open the home page and scroll to the quick contact form", async () => {
+    await test_step("open the home page and open the quick contact form from its chip", async () => {
       await gotoApp(page);
+      await waitForLive(page, "#start");
+      await page.locator("#start").getByRole("button", { name: "השארת פרטים" }).click();
       await form.scrollIntoViewIfNeeded();
     });
 
@@ -158,9 +231,12 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
   test("a visitor can submit the quick contact form by touch", async ({ page, mockApi }) => {
     const form = page.locator("#quick-contact");
 
-    await test_step("open the home page and scroll to the quick contact form", async () => {
+    await test_step("open the home page and tap השארת פרטים under the questionnaire", async () => {
       await gotoApp(page);
-      await form.scrollIntoViewIfNeeded();
+      await waitForLive(page, "#start");
+      // tap() scrolls the chip into view itself, and retries while it settles.
+      await page.locator("#start").getByRole("button", { name: "השארת פרטים" }).tap();
+      await expect(form).toBeVisible();
     });
 
     await test_step("fill the form using taps only", async () => {
@@ -231,7 +307,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
           (document.body.style as CSSStyleDeclaration & { zoom: string }).zoom = String(z);
         }, zoom);
         const links = stickyBar(page).getByRole("link");
-        await expect(links).toHaveCount(4);
+        await expect(links).toHaveCount(3);
         const lines = await links.evaluateAll((els) =>
           els.map((el) => {
             // Count the distinct line tops the label's text actually occupies.
@@ -669,6 +745,393 @@ test.describe("Desktop-only chrome", { tag: "@desktop-only" }, () => {
     await test_step("the burger is hidden and the full navigation is visible", async () => {
       await expect(page.getByRole("button", { name: "תפריט" })).toBeHidden();
       await expect(page.getByRole("link", { name: "שירותים" }).first()).toBeVisible();
+    });
+  });
+});
+
+/**
+ * The home page on a phone (stage 3). At 390x844 it was 12.2 screens; below md
+ * each section now says the same in less: a byline instead of a portrait taller
+ * than the screen, one strip of carriers, one sentence about her, the services
+ * folded, the alternatives to the questionnaire as chips, four questions, and a
+ * footer whose menu folds. Desktop is pinned by "Home on a desktop" below.
+ */
+test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
+  type Page = import("@playwright/test").Page;
+  const wizard = (page: Page) => page.locator("#interview");
+  const stepHeading = (page: Page, name: string) => wizard(page).getByRole("heading", { name });
+  /** The home page, once React has replaced the prerendered copy (see waitForLive). */
+  const gotoHome = async (page: Page, path = "/") => {
+    await gotoApp(page, path);
+    await waitForLive(page, "#start");
+  };
+  const stepEvents = async (page: Page) =>
+    (await queuedClicks(page)).filter((e) => e.name === "wizard_step").map((e) => e.location);
+
+  test("the hero: an 88px round portrait beside the licence line, a full-width CTA, WhatsApp and a call under it", async ({ page }) => {
+    // The brief's screen, 390x844: the device descriptors' own heights differ
+    // (an iPhone 14 in Playwright is 390x664, browser chrome taken off).
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoHome(page);
+    const hero = page.locator("#top");
+    const portrait = hero.locator("figure .plate");
+    const licence = hero.locator("figcaption").getByText("L-00107009");
+
+    await test_step("the portrait is an 88px circle, on the licence line's row, above the headline", async () => {
+      const box = (await portrait.boundingBox())!;
+      expect(Math.round(box.width)).toBe(88);
+      expect(Math.round(box.height)).toBe(88);
+      expect(await portrait.evaluate((el) => getComputedStyle(el).borderRadius)).not.toBe("0px");
+      const l = (await licence.boundingBox())!;
+      expect(l.y).toBeGreaterThanOrEqual(box.y);
+      expect(l.y + l.height).toBeLessThanOrEqual(box.y + box.height);
+      const h1 = (await hero.getByRole("heading", { level: 1 }).boundingBox())!;
+      expect(h1.y).toBeGreaterThan(box.y + box.height);
+    });
+
+    const cta = hero.getByRole("link", { name: "לשיחה קצרה עם דורית" });
+    const wa = hero.getByRole("link", { name: "וואטסאפ" });
+    const call = hero.getByRole("link", { name: "חיוג" });
+
+    await test_step("the CTA spans the column, and WhatsApp and the call sit side by side under it, on the first screen", async () => {
+      const c = (await cta.boundingBox())!;
+      const column = (await hero.locator("h1").boundingBox())!;
+      expect(c.width).toBeGreaterThanOrEqual(column.width - 1);
+      const w = (await wa.boundingBox())!;
+      const p = (await call.boundingBox())!;
+      expect(Math.abs(w.y - p.y)).toBeLessThanOrEqual(1);
+      expect(w.y).toBeGreaterThan(c.y + c.height);
+      const bar = (await stickyBar(page).boundingBox())!;
+      expect(w.y + w.height).toBeLessThanOrEqual(bar.y);
+      await expect(wa).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776/);
+      await expect(call).toHaveAttribute("href", "tel:+972508311776");
+    });
+
+    await test_step("all three report to GA4 from location top", async () => {
+      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
+      for (const link of [cta, wa, call]) await link.click();
+      const events = await queuedClicks(page);
+      for (const name of ["cta_click", "click_whatsapp", "click_phone"]) {
+        expect(events).toContainEqual({ name, location: "top" });
+      }
+    });
+
+    await test_step("a phone fetches the small portrait, not the 1080 one", async () => {
+      const src = await hero.locator("img").evaluate((img) => (img as HTMLImageElement).currentSrc);
+      expect(src).toMatch(/-480\.(avif|webp)$/);
+    });
+  });
+
+  test("the carriers are one strip that scrolls sideways, and the keyboard reaches all of them", async ({ page }) => {
+    await gotoHome(page);
+    const strip = page.locator("main > section").nth(1).locator('a[href^="https://"]').first().locator("..");
+
+    await test_step("one row, wider than the screen, scrolling inside itself", async () => {
+      const links = strip.locator("a");
+      await expect(links).toHaveCount(8);
+      const tops = await links.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+      expect(new Set(tops).size).toBe(1);
+      const { scrollWidth, clientWidth, overflowX } = await strip.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        overflowX: getComputedStyle(el).overflowX,
+      }));
+      expect(scrollWidth).toBeGreaterThan(clientWidth);
+      expect(overflowX).toBe("auto");
+    });
+
+    await test_step("the compliance line under it is still there", async () => {
+      await expect(page.getByText(/כסוכנת\s+ביטוח, יש לי זיקה לגופים מוסדיים/)).toBeVisible();
+    });
+
+    await test_step("focusing the last carrier brings it into the strip", async () => {
+      // focus() rather than Tab: WebKit does not tab to links by default, and
+      // the scroll a focused link gets is the same either way.
+      const last = strip.locator("a").last();
+      await last.focus();
+      await expect(last).toBeInViewport();
+    });
+  });
+
+  test("about: one sentence, the three figures and the rest folded behind עוד עליי", async ({ page }) => {
+    await gotoHome(page);
+    const about = page.locator("#about");
+    await about.scrollIntoViewIfNeeded();
+
+    await test_step("the professional sentence shows, the personal one and the pictures do not", async () => {
+      await expect(about.getByText(/ותיקה בתחומי\s+הפיננסים והביטוח/)).toBeVisible();
+      await expect(about.getByText(/שמי דורית גוב ארי/)).toBeHidden();
+      await expect(about.getByText(/שמי דורית גוב ארי/)).toHaveCount(1);
+      expect(await about.locator("img").count()).toBeGreaterThanOrEqual(2);
+      for (const img of await about.locator("img").all()) await expect(img).toBeHidden();
+    });
+
+    await test_step("a row of three figures", async () => {
+      for (const n of ["30", "מאות", "1:1"]) await expect(about.getByText(n, { exact: true })).toBeVisible();
+    });
+
+    await test_step("עוד עליי unfolds the personal sentence in place, and offers the full story", async () => {
+      const more = about.getByRole("button", { name: "עוד עליי" });
+      await expect(more).toHaveAttribute("aria-expanded", "false");
+      await expect(about.getByRole("link", { name: "הסיפור המלא" })).toHaveCount(0);
+      await more.click();
+      await expect(more).toHaveAttribute("aria-expanded", "true");
+      await expect(about.getByText(/שמי דורית גוב ארי/)).toBeVisible();
+      // Pressed again, it folds back.
+      await more.click();
+      await expect(about.getByText(/שמי דורית גוב ארי/)).toBeHidden();
+      await more.click();
+    });
+
+    await test_step("הסיפור המלא goes to /perspective", async () => {
+      await about.getByRole("link", { name: "הסיפור המלא" }).click();
+      await expect(page).toHaveURL(/\/perspective$/);
+    });
+  });
+
+  test("services: an accordion, the first open and the others closed, with the copy unchanged", async ({ page }) => {
+    await gotoHome(page);
+    const services = page.locator("#services");
+    const triggers = services.locator("h3 > button[aria-expanded]");
+
+    await test_step("five real buttons in headings; only the first is open", async () => {
+      await expect(triggers).toHaveCount(5);
+      await expect(triggers.nth(0)).toHaveAttribute("aria-expanded", "true");
+      for (let i = 1; i < 5; i++) await expect(triggers.nth(i)).toHaveAttribute("aria-expanded", "false");
+      await expect(services.getByText(/בחינת המוצרים הקיימים/)).toBeVisible();
+      await expect(services.getByText(/תכנון מס לקראת פרישה/)).toBeHidden();
+      // Folded, not removed: every description is still in the document.
+      await expect(services.getByText(/ליווי צמוד ברגע האמת/)).toHaveCount(1);
+    });
+
+    await test_step("opening the second leaves the first open, and nothing above it moves", async () => {
+      await triggers.nth(1).evaluate((el) =>
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 300, behavior: "instant" }),
+      );
+      const before = (await triggers.nth(1).boundingBox())!.y;
+      await triggers.nth(1).click();
+      await expect(triggers.nth(1)).toHaveAttribute("aria-expanded", "true");
+      await expect(triggers.nth(0)).toHaveAttribute("aria-expanded", "true");
+      await expect(services.getByText(/תכנון מס לקראת פרישה/)).toBeVisible();
+      expect(Math.round((await triggers.nth(1).boundingBox())!.y - before)).toBe(0);
+    });
+
+    await test_step("and it closes again", async () => {
+      await triggers.nth(1).click();
+      await expect(triggers.nth(1)).toHaveAttribute("aria-expanded", "false");
+      await expect(services.getByText(/תכנון מס לקראת פרישה/)).toBeHidden();
+    });
+  });
+
+  test("start: the form waits behind a chip row — וואטסאפ · טלפון · השארת פרטים · צ'אט", async ({ page }) => {
+    await gotoHome(page);
+    const start = page.locator("#start");
+    const form = page.locator("#quick-contact");
+    const chips = start.getByRole("list", { name: "מעדיפים אחרת?" });
+
+    await test_step("the short form is not standing open under the questionnaire", async () => {
+      await expect(form).toBeHidden();
+      await expect(start.getByRole("link", { name: "עדיף לי בוואטסאפ" })).toBeHidden();
+    });
+
+    await test_step("the row holds the four, in order", async () => {
+      await expect(chips.getByRole("listitem")).toHaveText(["וואטסאפ", "טלפון", "השארת פרטים", "צ'אט"]);
+      await expect(chips.getByRole("link", { name: "וואטסאפ" })).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776/);
+      await expect(chips.getByRole("link", { name: "טלפון" })).toHaveAttribute("href", "tel:+972508311776");
+    });
+
+    await test_step("השארת פרטים opens the form in place, and closes it", async () => {
+      const chip = chips.getByRole("button", { name: "השארת פרטים" });
+      await expect(chip).toHaveAttribute("aria-expanded", "false");
+      await expect(chip).toHaveAttribute("aria-controls", "quick-contact");
+      await chip.click();
+      await expect(chip).toHaveAttribute("aria-expanded", "true");
+      await expect(form.locator("#qc-name")).toBeVisible();
+      const chipBox = (await chip.boundingBox())!;
+      const formBox = (await form.boundingBox())!;
+      expect(formBox.y).toBeGreaterThan(chipBox.y);
+      expect(formBox.y - (chipBox.y + chipBox.height)).toBeLessThan(120);
+      await chip.click();
+      await expect(form).toBeHidden();
+    });
+
+    await test_step("צ'אט opens the interview chat that was behind the link", async () => {
+      const chip = chips.getByRole("button", { name: "צ'אט" });
+      await expect(chip).toHaveAttribute("aria-controls", "interview-chat");
+      await chip.click();
+      await expect(chip).toHaveAttribute("aria-expanded", "true");
+      await expect(page.locator("#interview-chat")).toBeVisible();
+    });
+
+    await test_step("WhatsApp and the phone report to GA4 from location start, as the tiles did", async () => {
+      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
+      await chips.getByRole("link", { name: "וואטסאפ" }).click();
+      await chips.getByRole("link", { name: "טלפון" }).click();
+      const events = await queuedClicks(page);
+      expect(events).toContainEqual({ name: "click_whatsapp", location: "start" });
+      expect(events).toContainEqual({ name: "click_phone", location: "start" });
+    });
+  });
+
+  test("the questionnaire: a tap on a single-choice answer moves on, and reports the step", async ({ page }) => {
+    await gotoHome(page);
+
+    await test_step("tapping a life stage goes to the next step, with no המשך on the way", async () => {
+      await expect(wizard(page).getByRole("button", { name: "המשך" })).toHaveCount(0);
+      // Every question can still be skipped.
+      await expect(wizard(page).getByRole("button", { name: "דילוג על השאלה" })).toBeVisible();
+      await wizard(page).getByText("זוג בלי ילדים", { exact: true }).tap();
+      await expect(stepHeading(page, "מה מביא אותך")).toBeVisible();
+      await expect(stepHeading(page, "מה מביא אותך")).toBeFocused();
+    });
+
+    await test_step("so does the concern, and the goal", async () => {
+      await wizard(page).getByText("דמי ניהול / הפנסיה שלי", { exact: true }).tap();
+      await expect(stepHeading(page, "מה היית רוצה לקחת מהפגישה")).toBeVisible();
+      await wizard(page).getByText("להוריד עלויות", { exact: true }).tap();
+      await expect(stepHeading(page, "כמה פרטים, כדי שדורית תגיע מוכנה")).toBeVisible();
+    });
+
+    await test_step("each move sent wizard_step for the screen it left, as המשך does", async () => {
+      expect(await stepEvents(page)).toEqual(["step_1", "step_2", "step_3"]);
+      const started = (await queuedClicks(page)).filter((e) => e.name === "wizard_start");
+      expect(started).toHaveLength(1);
+    });
+
+    await test_step("a step of several questions keeps המשך, and picking in it does not move on", async () => {
+      await wizard(page).getByRole("group", { name: "מה המעמד התעסוקתי שלך?" }).getByText("שכיר/ה", { exact: true }).tap();
+      await wizard(page).getByRole("group", { name: "אילו מוצרים יש לך היום?" }).getByText("פנסיה", { exact: true }).tap();
+      await page.waitForTimeout(400);
+      await expect(stepHeading(page, "כמה פרטים, כדי שדורית תגיע מוכנה")).toBeVisible();
+      await expect(wizard(page).getByRole("button", { name: "המשך" })).toBeVisible();
+    });
+
+    await test_step("back still goes back, the earlier answer kept", async () => {
+      await wizard(page).getByRole("button", { name: "הקודם" }).click();
+      await expect(stepHeading(page, "מה היית רוצה לקחת מהפגישה")).toBeVisible();
+      await expect(wizard(page).getByRole("radio", { name: "להוריד עלויות" })).toBeChecked();
+      // Answered already, so the quiet way on reads המשך rather than דילוג.
+      await expect(wizard(page).getByRole("button", { name: "דילוג על השאלה" })).toHaveCount(0);
+      await wizard(page).getByRole("button", { name: "המשך" }).click();
+      await expect(stepHeading(page, "כמה פרטים, כדי שדורית תגיע מוכנה")).toBeVisible();
+    });
+  });
+
+  test("the questionnaire from the keyboard: arrows move between answers without leaving the step", async ({ page }) => {
+    await gotoHome(page);
+    const lifeStage = wizard(page).getByRole("group", { name: "איפה את/ה בחיים כרגע?" });
+    const concerns = wizard(page).getByRole("group", { name: "מה הכי מעסיק אותך כרגע?" });
+
+    await test_step("Space on an answer chooses it and moves on", async () => {
+      await lifeStage.getByRole("radio").first().focus();
+      await page.keyboard.press("Space");
+      await expect(stepHeading(page, "מה מביא אותך")).toBeVisible();
+    });
+
+    await test_step("arrow keys walk the answers, choosing as they go, and stay on the step", async () => {
+      await concerns.getByRole("radio").first().focus();
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("ArrowDown");
+      await page.waitForTimeout(500);
+      await expect(stepHeading(page, "מה מביא אותך")).toBeVisible();
+      await expect(concerns.getByRole("radio", { checked: true })).toHaveCount(1);
+    });
+
+    await test_step("Enter on the chosen answer moves on, and the steps reported are the two left", async () => {
+      await page.keyboard.press("Enter");
+      await expect(stepHeading(page, "מה היית רוצה לקחת מהפגישה")).toBeVisible();
+      expect(await stepEvents(page)).toEqual(["step_1", "step_2"]);
+    });
+  });
+
+  test("common questions: the first four, and לכל השאלות to /faq", async ({ page }) => {
+    await gotoHome(page);
+    const section = page.locator("#common-questions");
+    const visible = section.locator("h3 button[aria-expanded]:visible");
+    await expect(visible).toHaveCount(4);
+    // The other four are hidden, not dropped — the phone's document matches the desktop's.
+    await expect(section.locator("h3 button[aria-expanded]")).toHaveCount(8);
+    await visible.first().click();
+    await expect(visible.first()).toHaveAttribute("aria-expanded", "true");
+    await section.getByRole("link", { name: "לכל השאלות" }).click();
+    await expect(page).toHaveURL(/\/faq$/);
+  });
+
+  test("the footer: the menu folded into ניווט באתר, contact two to a row, the licence line in view", async ({ page }) => {
+    await gotoHome(page);
+    const footer = page.locator("footer");
+    await footer.scrollIntoViewIfNeeded();
+
+    await test_step("the menu is a closed <details>, and opening it shows the links", async () => {
+      const summary = footer.locator("details > summary");
+      await expect(summary).toHaveText("ניווט באתר");
+      await expect(footer.getByRole("link", { name: "מדריך תביעות" })).toBeHidden();
+      await summary.click();
+      await expect(footer.locator("details")).toHaveAttribute("open", "");
+      await expect(footer.getByRole("link", { name: "מדריך תביעות" })).toBeVisible();
+    });
+
+    await test_step("phone and WhatsApp share a row", async () => {
+      const phone = (await footer.getByRole("link", { name: "050-831-1776" }).boundingBox())!;
+      const wa = (await footer.getByRole("link", { name: "WhatsApp" }).boundingBox())!;
+      expect(Math.abs(phone.y - wa.y)).toBeLessThanOrEqual(2);
+      expect(phone.height).toBeGreaterThanOrEqual(44);
+    });
+
+    await test_step("the licence line is shown in full", async () => {
+      await expect(footer.getByText(/רישיון סוכן מרשות שוק ההון מספר/)).toBeVisible();
+      await expect(footer.getByText("L-00107009")).toBeVisible();
+    });
+  });
+
+  test("the home page stays under 7,000px — it was 10,260", async ({ page }) => {
+    // 10,260px before stage 3 at 390x844. Not the brief's 4.5 screens — see
+    // tests/test-plan/07-std-mobile.md for where the rest is — but a
+    // regression back towards twelve screens should fail here.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoHome(page);
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(height).toBeLessThan(7000);
+  });
+});
+
+/** The same page from md up: what stage 3 must not have touched. */
+test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
+  test("keeps its portrait, its open services, its standing form, eight questions and its open footer menu", async ({ page }) => {
+    await gotoApp(page);
+    await waitForLive(page, "#start");
+
+    await test_step("the hero's portrait is the plate, not a circle, and no extra buttons", async () => {
+      const plate = (await page.locator("#top figure .plate").boundingBox())!;
+      expect(plate.height).toBeGreaterThan(300);
+      await expect(page.locator("#top").getByRole("link", { name: "חיוג" })).toBeHidden();
+      await expect(page.locator("#top").getByRole("link", { name: "לצפייה בשירותים" })).toBeVisible();
+    });
+
+    await test_step("the five services are open rows, with no accordion buttons", async () => {
+      await expect(page.locator("#services button[aria-expanded]")).toHaveCount(0);
+      await expect(page.locator("#services").getByText(/ליווי צמוד ברגע האמת/)).toBeVisible();
+    });
+
+    await test_step("the form stands open, the tiles and the chat link are there, the chips are not", async () => {
+      await expect(page.locator("#qc-name")).toBeVisible();
+      await expect(page.getByRole("link", { name: "עדיף לי בוואטסאפ" })).toBeVisible();
+      await expect(page.getByRole("button", { name: /לשיחה עם העוזר/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: "השארת פרטים" })).toBeHidden();
+    });
+
+    await test_step("a chosen answer waits for המשך", async () => {
+      await page.locator("#interview").getByText("זוג בלי ילדים", { exact: true }).click();
+      await page.waitForTimeout(500);
+      await expect(page.locator("#interview").getByRole("heading", { name: "נכיר קצת" })).toBeVisible();
+      await expect(page.locator("#interview").getByRole("button", { name: "המשך" })).toBeVisible();
+    });
+
+    await test_step("eight questions, no לכל השאלות, an open footer menu", async () => {
+      await expect(page.locator("#common-questions h3 button[aria-expanded]:visible")).toHaveCount(8);
+      await expect(page.getByRole("link", { name: "לכל השאלות" })).toBeHidden();
+      await expect(page.locator("footer details")).toHaveCount(0);
+      await expect(page.locator("footer").getByRole("link", { name: "מדריך תביעות" })).toBeVisible();
     });
   });
 });

@@ -121,6 +121,7 @@ because the backend still accepts leads recorded under them.
 |---|---|---|
 | E2E-DSK-001 | "shows the floating WhatsApp/phone dock and hides the mobile bar" | Dock visible; sticky bar hidden. The dock holds a third button since A-64, support — see §3.9 |
 | E2E-DSK-002 | "shows the full desktop nav rather than a burger" | Burger hidden; "שירותים" link visible |
+| E2E-DSK-004 | "keeps its portrait, its open services, its standing form, eight questions and its open footer menu" (`/`) | The hero plate >300px tall, no hero "חיוג", "לצפייה בשירותים" visible; no `aria-expanded` in `#services` and every description visible; `#qc-name`, "עדיף לי בוואטסאפ" and "לשיחה עם העוזר" visible, the "השארת פרטים" chip hidden; a chosen life stage waits for "המשך"; 8 common questions, no "לכל השאלות", no `<details>` in the footer — the desktop half of E2E-MOB-021–029 |
 | E2E-DSK-003 | "keeps its sidebar, its contact box and its one-open-at-a-time questions" (`/faq`) | "ניווט לפי נושא" and the "לא מצאתם תשובה?" box with "יצירת קשר" → `/#start` visible; opening a second question closes the first; the CTA band shows the phone number, not the phone-only "טלפון" label — the desktop half of E2E-MOB-015–020 |
 
 ### 3.8 Agent chat — regulatory shell — `agent-compliance.spec.ts`
