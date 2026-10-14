@@ -363,6 +363,10 @@ describe("<MaslekaBoard /> — acting", () => {
     expect(svc.create).toHaveBeenCalledWith({ clientName: "משה כהן", contactEmail: "moshe@example.com", sendInvite: true });
     expect(await screen.findByDisplayValue(LINK)).toBeInTheDocument();
     expect(screen.getByText(/הקישור נשלח במייל ללקוח/)).toBeInTheDocument();
+    const open = screen.getByRole("link", { name: "פתיחת הקישור" });
+    expect(open).toHaveAttribute("href", LINK);
+    expect(open).toHaveAttribute("target", "_blank");
+    expect(open).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("makes one הגשתי call for a double click that lands before the button is disabled", async () => {
@@ -462,5 +466,6 @@ describe("<MaslekaBoard /> — acting", () => {
     await userEvent.click(await column("הוזמנו — ממתינים לקוד").findByRole("button", { name: "קישור חדש" }));
     expect(svc.relink).toHaveBeenCalledWith("r1");
     expect(await screen.findByDisplayValue(LINK2)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "פתיחת הקישור" })).toHaveAttribute("href", LINK2);
   });
 });

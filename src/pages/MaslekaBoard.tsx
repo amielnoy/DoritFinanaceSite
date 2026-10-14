@@ -140,9 +140,16 @@ function LinkPanel({
         onFocus={(e) => e.currentTarget.select()}
         className="mt-2 w-full border border-border bg-background px-2 py-1 font-mono text-xs"
       />
-      <button type="button" onClick={async () => setCopied(await copyOrFallback(link.link, clipboard))} className={`${buttonClass} mt-2`}>
-        {copied === "copied" ? "הועתק ✓" : "העתק קישור"}
-      </button>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" onClick={async () => setCopied(await copyOrFallback(link.link, clipboard))} className={buttonClass}>
+          {copied === "copied" ? "הועתק ✓" : "העתק קישור"}
+        </button>
+        {/* The client's page, as the client will see it. A new tab and no
+            referrer: the board's address stays out of the page's requests. */}
+        <a href={link.link} target="_blank" rel="noopener noreferrer" className={buttonClass}>
+          פתיחת הקישור
+        </a>
+      </div>
       {copied === "manual" ? (
         <p className="mt-1 text-xs text-muted-foreground">העתק ידנית: סמנו את הקישור והעתיקו (Ctrl+C או ⌘C).</p>
       ) : null}
