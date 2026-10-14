@@ -1,15 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { services, type Testimonial } from "@/services";
 import { useAuth } from "@/lib/AuthContext";
 import { useTestimonials } from "@/hooks/useContent";
 import { useCreateTestimonial, useRemoveTestimonial } from "@/hooks/useAdmin";
 import { Image } from "@/components/ui/image";
-import { Plus, X, Quote, Trash2, Loader2, Upload } from "lucide-react";
+import { Plus, X, Quote, Trash2, Loader2, Upload, ArrowLeft, ArrowRight } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Stars from "@/components/dorit/primitives/Stars";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { inputClass } from "@/components/dorit/primitives/Field";
+import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 
 type TestimonialItem = Testimonial;
 
@@ -22,6 +23,13 @@ interface TestimonialForm {
   source: string;
 }
 
+/**
+ * From md up, a grid. Below md, with more than one testimonial, a strip that
+ * scrolls sideways one card at a time (scroll-snap): "ההמלצה הקודמת" and
+ * "ההמלצה הבאה" beside the heading are real buttons, the strip itself is a
+ * focusable region the arrow keys scroll, and nothing moves on its own. Every
+ * card stays in the document — the others are beside it, not removed.
+ */
 export default function Testimonials() {
   const { isAuthenticated, user } = useAuth();
   // Adding and deleting are Dorit's. Since the personal area, ordinary visitors
@@ -36,6 +44,9 @@ export default function Testimonials() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [uploading, setUploading] = useState<boolean>(false);
+  const isDesktop = useMediaQuery(MD_UP, true);
+  const strip = useRef<HTMLDivElement>(null);
+  const [index, setIndex] = useState<number>(0);
 
   const items: TestimonialItem[] = data ?? [];
   const busy = uploading || createTestimonial.isPending;
@@ -84,6 +95,39 @@ export default function Testimonials() {
 
   const remove = (id: string) => removeTestimonial.mutate(id);
 
+  const carousel = !isDesktop && items.length > 1;
+  // The strip mounts at its first card: when it goes (a wider screen, a
+  // deleted testimonial) the position goes with it.
+  useEffect(() => {
+    if (!carousel) setIndex(0);
+  }, [carousel]);
+  const at = Math.min(index, items.length - 1);
+
+  /** One card and the gap after it, and which way "on" is (RTL scrolls negative). */
+  const geometry = (el: HTMLDivElement) => {
+    const first = el.firstElementChild as HTMLElement | null;
+    const step = (first?.offsetWidth ?? el.clientWidth) + (parseFloat(getComputedStyle(el).columnGap) || 0);
+    const sign = getComputedStyle(el).direction === "rtl" ? -1 : 1;
+    return { step, sign };
+  };
+
+  const onStripScroll = () => {
+    const el = strip.current;
+    if (!el) return;
+    const { step } = geometry(el);
+    const x = Math.abs(el.scrollLeft);
+    const atEnd = x >= el.scrollWidth - el.clientWidth - 2;
+    setIndex(atEnd ? items.length - 1 : Math.min(items.length - 1, Math.round(x / step)));
+  };
+
+  const go = (to: number) => {
+    const el = strip.current;
+    if (!el || to < 0 || to > items.length - 1) return;
+    const { step, sign } = geometry(el);
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    el.scrollTo({ left: sign * to * step, behavior: reduce ? "auto" : "smooth" });
+  };
+
   // The section exists only when there is something to show. Nothing while the
   // list loads (so it cannot flash in and out) and nothing when it is empty —
   // the home page carries no "coming soon" placeholder. An admin is the
@@ -93,9 +137,9 @@ export default function Testimonials() {
 
   return (
     <section id="testimonials" className="relative bg-secondary border-b border-border">
-      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-10">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div>
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-10 max-md:py-10 max-md:gap-6">
+        <div className="flex flex-wrap items-end justify-between gap-6 max-md:gap-4">
+          <div className="max-md:min-w-0">
             <Reveal>
               <Eyebrow>
                 05 · לקוחות מספרים
@@ -103,6 +147,30 @@ export default function Testimonials() {
               <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px]">לקוחות מספרים</h2>
             </Reveal>
           </div>
+          {carousel && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => go(at - 1)}
+                aria-label="ההמלצה הקודמת"
+                aria-controls="testimonials-strip"
+                aria-disabled={at <= 0}
+                className={NAV}
+              >
+                <ArrowRight size={18} strokeWidth={1.5} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => go(at + 1)}
+                aria-label="ההמלצה הבאה"
+                aria-controls="testimonials-strip"
+                aria-disabled={at >= items.length - 1}
+                className={NAV}
+              >
+                <ArrowLeft size={18} strokeWidth={1.5} aria-hidden="true" />
+              </button>
+            </div>
+          )}
           {isAdmin && (
             <button
               onClick={() => setOpen((v) => !v)}
@@ -208,9 +276,27 @@ export default function Testimonials() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items.map((t) => (
-              <article key={t.id} className="group relative rounded-md border border-border p-7 flex flex-col">
+          <div
+            className={carousel ? STRIP : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"}
+            {...(carousel
+              ? {
+                  ref: strip,
+                  id: "testimonials-strip",
+                  // A strip that scrolls needs a keyboard way in (axe:
+                  // scrollable-region-focusable), as the cases' strip has.
+                  tabIndex: 0,
+                  role: "region",
+                  "aria-label": "לקוחות מספרים — גלילה אופקית",
+                  onScroll: onStripScroll,
+                }
+              : {})}
+          >
+            {items.map((t, i) => (
+              <article
+                key={t.id}
+                aria-label={carousel ? `המלצה ${i + 1} מתוך ${items.length}` : undefined}
+                className={carousel ? "group relative rounded-md border border-border p-5 flex flex-col shrink-0 w-[88%] snap-start" : "group relative rounded-md border border-border p-7 flex flex-col"}
+              >
                 {isAdmin && (
                   <button
                     onClick={() => remove(t.id)}
@@ -220,7 +306,7 @@ export default function Testimonials() {
                     <Trash2 size={16} />
                   </button>
                 )}
-                <div className="flex items-center gap-4 mb-5">
+                <div className={`flex items-center gap-4 ${carousel ? "mb-4" : "mb-5"}`}>
                   <div className="w-14 h-14 rounded-full overflow-hidden border border-border bg-secondary shrink-0">
                     {t.image_url ? (
                       <Image src={t.image_url} alt={t.name} className="w-full h-full object-cover" fittingType="fill" />
@@ -253,3 +339,9 @@ export default function Testimonials() {
     </section>
   );
 }
+
+const NAV =
+  "w-11 h-11 rounded-md border border-border flex items-center justify-center text-foreground hover:border-highlight hover:text-accent transition-colors duration-200 aria-disabled:opacity-40 aria-disabled:cursor-default";
+
+const STRIP =
+  "flex gap-4 overflow-x-auto snap-x snap-mandatory -mx-[clamp(20px,4vw,40px)] px-[clamp(20px,4vw,40px)] scroll-px-[clamp(20px,4vw,40px)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight";
