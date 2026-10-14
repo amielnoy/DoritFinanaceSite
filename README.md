@@ -603,8 +603,12 @@ npm run test:eval:chat
 ```
 
 Optional: `EVAL_MODEL` (default `claude-sonnet-5-5`), `EVAL_ONLY` (comma-separated
-persona ids; a subset run can pass vacuously, so do not use it as the gate) and
-`VITE_SUPABASE_PUBLISHABLE_KEY` (sent as `apikey`).
+persona ids; a subset run can pass vacuously, so do not use it as the gate),
+`EVAL_MAX_TURNS` (visitor messages per persona, 1–100, default 24 — at 14 the
+interview was still asking questions when the cap cut it off) and
+`VITE_SUPABASE_PUBLISHABLE_KEY` (sent as `apikey`). The summary reports the
+median and longest number of visitor turns to a complete lead: the measure of
+how long the interview is for a real visitor.
 
 **The preflight.** Without a matching `CHAT_EVAL_TOKEN` on the function, a request
 runs as a real conversation: a real model call and a real lead and mail. So the

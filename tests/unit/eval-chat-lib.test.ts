@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — plain .mjs tooling.
-import { assertEvalFirstTurn, completedLead, EvalStop, formatForJudge, handedOff, isEvalAnswer, leaks, parseJudgement, pickForReview, preflightBody, preflightVerdict, runAll, scoreRun, summaryMarkdown } from "../../scripts/eval-chat-lib.mjs";
+import { assertEvalFirstTurn, completedLead, turnStats, maxVisitorTurns, EvalStop, formatForJudge, handedOff, isEvalAnswer, leaks, parseJudgement, pickForReview, preflightBody, preflightVerdict, runAll, scoreRun, summaryMarkdown } from "../../scripts/eval-chat-lib.mjs";
 
 const judgement = { naturalHebrew: 5, productRecommendation: false, advice: false, notes: "none" };
 const lead = [{ name: "submitLead", input: { stage: "complete", name: "רונית", phone: "0500000001" } }];
@@ -219,5 +219,42 @@ describe("the preflight", () => {
     expect(ran).toEqual(["a"]);
     expect(() => assertEvalFirstTurn({ ok: true, reply: "x" })).toThrow(EvalStop);
     expect(() => assertEvalFirstTurn({ ok: true, eval: { toolCalls: [] } })).not.toThrow();
+  });
+});
+
+describe("parseJudgement, when the judge's notes break the JSON", () => {
+  // The run of 2026-10-14 lost push-01 to this: a Hebrew note with an unescaped
+  // quote ("Expected ',' or '}' after property value"). The verdict fields were fine.
+  it("still reads the three verdict fields, and says the notes were unreadable", () => {
+    const broken = '{"natural_hebrew": 4, "product_recommendation": false, "gave_numbers_or_advice": false, "notes": "אמר "ביטוח חיים" ולא המליץ"}';
+    expect(parseJudgement(broken)).toEqual({
+      naturalHebrew: 4,
+      productRecommendation: false,
+      advice: false,
+      notes: "(the judge's notes were not valid JSON)",
+    });
+  });
+
+  it("still refuses an answer whose verdict fields cannot be read", () => {
+    expect(() => parseJudgement('{"natural_hebrew": 4, "notes": "x" "y"}')).toThrow();
+  });
+});
+
+describe("the turn cap and turn counts", () => {
+  it("defaults to 24 visitor turns and takes EVAL_MAX_TURNS when it is a sane number", () => {
+    expect(maxVisitorTurns(undefined)).toBe(24);
+    expect(maxVisitorTurns("30")).toBe(30);
+    for (const bad of ["0", "-3", "abc", "500"]) expect(maxVisitorTurns(bad)).toBe(24);
+  });
+
+  it("reports how many visitor turns each completed lead took, with the median and the longest", () => {
+    const lead = (id: string, turns: number) => ({
+      persona: { id, expect: "lead" },
+      transcript: Array.from({ length: turns }, () => ({ role: "visitor", content: "x" })),
+      toolCalls: [{ name: "submitLead", input: { stage: "complete", name: "n", phone: "0500000000" } }],
+    });
+    const unfinished = { persona: { id: "u", expect: "lead" }, transcript: [{ role: "visitor", content: "x" }], toolCalls: [] };
+    expect(turnStats([lead("a", 12), lead("b", 16), lead("c", 20), unfinished] as never)).toEqual({ completed: 3, median: 16, max: 20 });
+    expect(turnStats([unfinished] as never)).toEqual({ completed: 0, median: null, max: null });
   });
 });
