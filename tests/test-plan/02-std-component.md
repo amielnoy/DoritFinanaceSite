@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 357 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 392 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 362 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 401 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -671,6 +671,17 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-020 | "offers the claim types in English, and sends Dorit the Hebrew type and a note" | `claimType` "אובדן כושר עבודה"; `description` "…\n(מולא באנגלית)" |
 | CMP-I18N-021 | "sends a Hebrew report exactly as typed" | `description` keeps its trailing space |
 | CMP-I18N-022 | "keeps the year-end figures exact, and marks the Hebrew-only guide" | 16.5%, ₪38,400, ₪13,203, ₪20,566; "(in Hebrew)" → `/blog/sof-shana-atzmaim`; the disclosure |
+
+
+### 4.38 `<OrgBadge />`, `<OrgChip />` and `<Avatar org>` — `tests/component/org-badge.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ORG-001 | "on a %ipx avatar: a %ipx badge, letter shown: %s" (64, 44, 40, 32, 24) | 26 / 20 / 20 / 12 / 12 px; the letter from 40px up; the name as `aria-label` |
+| CMP-ORG-002 | "sits at the inline-end bottom corner, with a white rim" | `inset-inline-end` and `bottom` −3px; 3px white border |
+| CMP-ORG-003 | "writes the name on the chip, in the ink on the tint, with the colour's square first" | Ink on tint; an `aria-hidden` square in the colour |
+| CMP-ORG-004 | "puts the badge on an avatar given an organization, sized to the avatar" | 26px with the fallback's letter on a 64px avatar |
+| CMP-ORG-005 | "leaves an avatar without an organization exactly as it was" | No badge; the original classes; no `style` |
 
 ## 5. Pass criteria
 
