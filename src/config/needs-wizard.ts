@@ -64,9 +64,37 @@ export const CONCERNS: readonly Concern[] = [
 
 export const GOAL: Question = {
   key: "goal",
-  legend: "מה היית רוצה שיצא מהפגישה?",
+  legend: "מה היית רוצה להשיג?",
   label: "יעד עיקרי",
-  options: ["לדעת שאני מסודר/ת", "להוריד עלויות", "לתכנן פרישה", "להגן על המשפחה", "לחסוך למטרה"],
+  options: ["הורדת עלויות", "ביטחון למשפחה", "פרישה מוקדמת/בטוחה", "סדר בתיק", "אחר"],
+};
+
+/**
+ * The questionnaire's third tap (2026-10-14): how soon. "דחוף" puts "🔴 דחוף"
+ * at the head of Dorit's mail (submit-lead) and goes to GA4 with the lead.
+ */
+export const URGENCY: Question = {
+  key: "urgency",
+  legend: "עד כמה זה דחוף?",
+  label: "דחיפות",
+  options: ["רק בודק/ת כרגע", "בחודשים הקרובים", "דחוף — אשמח לשיחה השבוע"],
+};
+export const URGENT = URGENCY.options[2];
+
+/** An optional question after the lead: whether the visitor already has a clearinghouse report. */
+export const CLEARINGHOUSE_REPORT: Question = {
+  key: "clearinghouse_report",
+  legend: "יש לך דוח מסלקה פנסיונית?",
+  label: "דוח מסלקה פנסיונית",
+  options: ["כן", "לא", "לא יודע/ת מה זה"],
+};
+
+/** An optional question after the lead: when a call suits. Goes to the lead's `timing`. */
+export const CALL_TIME: Question = {
+  key: "call_time",
+  legend: "מתי נוח לדבר?",
+  label: "זמן נוח לשיחה",
+  options: ["בוקר", "צהריים", "ערב"],
 };
 
 const PRODUCTS = ["פנסיה", "גמל", "השתלמות"] as const;

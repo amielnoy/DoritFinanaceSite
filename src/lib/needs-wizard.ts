@@ -1,11 +1,14 @@
 import type { InterviewSummary } from "@/lib/interview-handoff";
 import {
+  CALL_TIME,
   CLEARINGHOUSE,
+  CLEARINGHOUSE_REPORT,
   CLEARINGHOUSE_VALUES,
   CONCERNS,
   DAY_LABELS,
   GOAL,
   LIFE_STAGE,
+  URGENCY,
   SLOTS,
   TOPIC_BY_TRACK,
   TRACK_QUESTIONS,
@@ -97,6 +100,8 @@ export function buildProfile(state: WizardState): Record<string, string> {
   if (state.concern) put("concern", state.concern);
   for (const q of TRACK_QUESTIONS[trackOf(state)]) put(q.key, valueOf(q, state.answers[q.key], state));
   put(CLEARINGHOUSE.key, valueOf(CLEARINGHOUSE, state.answers[CLEARINGHOUSE.key], state));
+  put(URGENCY.key, valueOf(URGENCY, state.answers[URGENCY.key], state));
+  put(CLEARINGHOUSE_REPORT.key, valueOf(CLEARINGHOUSE_REPORT, state.answers[CLEARINGHOUSE_REPORT.key], state));
   return profile;
 }
 
@@ -127,6 +132,10 @@ export function scheduledAtOf(state: WizardState, now: Date): string {
 
 /** The requested time as a person would say it: "השבוע הבא, בוקר 09:00–12:00". */
 export function timingOf(state: WizardState): string {
+  // The questionnaire asks a time of day only (2026-10-14); a day and a slot are
+  // still read for anyone holding the older answers.
+  const callTime = valueOf(CALL_TIME, state.answers[CALL_TIME.key], state);
+  if (callTime && !state.day) return callTime;
   const day = state.day === "date" && state.date ? hebrewDay(state.date) : state.day && state.day !== "date" ? DAY_LABELS[state.day] : "";
   const slot = slotOf(state.slot)?.label ?? "";
   return [day, slot].filter(Boolean).join(", ");

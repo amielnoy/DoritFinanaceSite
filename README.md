@@ -369,21 +369,25 @@ biography at [`/perspective`](src/pages/Perspective.tsx), the reading
 recommender at the top of `/blog`. Only the duplicate routes to the same
 conversation were deleted.
 
-**The questionnaire is two steps to a lead** (`NeedsWizard`, 2026-10-14): what
-is on the visitor's mind, then a name and an Israeli mobile (`isIsraeliMobile`;
-an invalid field is answered under it) — and the lead is saved
-(`submitInterview`, `stage: "complete"`), Dorit mailed and `generate_lead`
-sent. The thank-you screen then offers "רוצים לעזור לדורית להתכונן? עוד 4
-שאלות קצרות": life stage, goal, the clearinghouse (with an optional email for
-its link) and a preferred time, sent as `stage: "details"`. `submit-lead` fills
-in the lead it saved minutes ago — same phone, same person, an interview, `new`,
-within 30 minutes — books the time if one was chosen, and mails Dorit once more
-under "פרטים נוספים — …"; with no such lead the details are saved as a lead of
-their own. Only the Edge `submit-lead` can do that, so the offer shows only when
-`services.leads.updatesInterviews` (`VITE_LEAD_FUNCTIONS=supabase`). The claim
-option still leaves for a person (`escalateToHuman`, `claim_or_policy`). The
-questionnaire has no consent checkbox (none existed); the contact step shows
-where the details go (`TRANSPARENCY`).
+**The questionnaire is three taps to a lead** (`NeedsWizard`, 2026-10-14): what
+is on the visitor's mind, where they are in life, how soon (each moves on 250 ms
+after a tap; "דילוג על השאלה" and "הקודם" stay), then a name and an Israeli
+mobile ("מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות" under the field; a
+WhatsApp link written from the three answers above them) — and the lead is saved
+(`stage: "complete"`), Dorit mailed ("🔴 דחוף —" at the head of the subject when
+the visitor chose "דחוף") and `generate_lead` sent with `topic` and `urgency`
+(nothing else from the answers reaches GA4). Each step scrolls to the top of the
+screen, so on a 375×667 phone its button sits above the bottom bar. The thanks
+then offer "עוד 3 שאלות (לא חובה)": goal, whether a clearinghouse report exists
+(and, without one, the offer to pull it, with an optional email for the link),
+and a time of day with notes — sent as `stage: "details"`, which `submit-lead`
+matches to the lead it saved minutes ago (same phone, same person, an
+interview, `new`, within 30 minutes) and mails Dorit once more under "פרטים
+נוספים — …". Only the Edge `submit-lead` can do that, so the offer shows only
+when `services.leads.updatesInterviews`. The claim option still leaves for a
+person. Events: `wizard_start`, `wizard_step` (number only), `wizard_skip`,
+`form_error` (field only), `generate_lead`, `wizard_followup_start`,
+`wizard_followup_complete` (how many answered).
 
 Anchors into those sections work from every route — `useSectionNav` routes home
 first and then scrolls, because a bare `#services` on `/blog` sets the URL and
