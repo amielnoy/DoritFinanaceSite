@@ -99,11 +99,14 @@ export function createSheetLogSweep(deps: SheetLogSweepDeps): (rid: string) => P
         );
         // log-support-chat answers 200 with warnings when the append itself
         // failed (it must not fail the chat it logs), and 4xx/5xx otherwise.
-        const answer = (await res.json().catch(() => null)) as { warnings?: unknown } | null;
+        // Its rid names its own lines (support.logged, sheet.append_failed): one search finds both sides.
+        const answer = (await res.json().catch(() => null)) as { rid?: unknown; warnings?: unknown } | null;
+        const logRid = typeof answer?.rid === 'string' ? answer.rid.slice(0, 16) : '';
         if (!res.ok || (Array.isArray(answer?.warnings) && answer.warnings.length > 0)) {
-          log('warn', 'sweep.not_logged', { rid, conversation: conversation.id, status: res.status, outcome: row.outcome });
+          log('warn', 'sweep.not_logged', { rid, conversation: conversation.id, logRid, status: res.status, outcome: row.outcome });
           continue;
         }
+        log('info', 'sweep.logged', { rid, conversation: conversation.id, logRid, outcome: row.outcome });
         logged += 1;
       } catch (e) {
         log('error', 'sweep.log_failed', { rid, conversation: conversation.id, err: String((e as Error)?.message ?? e).slice(0, 200) });

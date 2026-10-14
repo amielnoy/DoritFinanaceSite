@@ -140,6 +140,8 @@ function setup(over: Partial<ChatDeps> = {}, steps: (ModelResponse | Error)[] = 
     evalToken: "eval-secret",
     newToken: () => TOKEN,
     notifyBudgetReached: vi.fn(async () => undefined),
+    sweepToken: "sweep-secret",
+    sweepSheetLogs: vi.fn(async () => 2),
     ...over,
   };
   return { deps, store, model, chat: createChatHandler(deps) };
@@ -195,7 +197,7 @@ describe("the first message", () => {
 
   it("refuses an agent the function does not serve, an empty message, and a long one", async () => {
     const { chat } = setup();
-    expect((await json(await chat(post({ ...first(), agent: "blog_agent" })))).body.code).toBe("unknown_agent");
+    expect((await json(await chat(post({ ...first(), agent: "no_such_agent" })))).body.code).toBe("unknown_agent");
     expect((await json(await chat(post(first("   "))))).body.code).toBe("empty");
     expect((await json(await chat(post(first("א".repeat(1001)))))).body.code).toBe("too_long");
   });
@@ -753,5 +755,77 @@ describe("the support role", () => {
     expect(runTool).not.toHaveBeenCalled();
     expect(store.messages.map((m) => m.content)).toContain("submitLead: error");
     expect([...store.conversations.values()][0].status).toBe("open");
+  });
+
+  it("stores a made-up tool name no longer than the log line keeps it", async () => {
+    const { chat, store } = setup({}, [toolUse("x".repeat(500), {}), text("…")]);
+    await chat(post(firstSupport()));
+    expect(store.messages.find((m) => m.role === "tool")?.content).toBe(`${"x".repeat(40)}: error`);
+  });
+
+  it("the interview is gated the same way: it never reads articles, whatever the model names", async () => {
+    const runTool = vi.fn();
+    const { chat, store } = setup({ runTool }, [toolUse("listArticles", {}), toolUse("readArticle", { slug: "dmei-nihul" }), text("…")]);
+    await chat(post(first()));
+    expect(runTool).not.toHaveBeenCalled();
+    expect(store.messages.filter((m) => m.role === "tool").map((m) => m.content)).toEqual(["listArticles: error", "readArticle: error"]);
+  });
+});
+
+describe("the sweep route", () => {
+  const sweepReq = (token: string | null, method = "POST") =>
+    new Request("https://edge.test/functions/v1/chat", {
+      method,
+      headers: { "content-type": "application/json", ...(token === null ? {} : { "x-chat-sweep": token }) },
+      ...(method === "POST" ? { body: JSON.stringify(first()) } : {}),
+    });
+
+  it("runs the sweep for the right token, and nothing of the chat", async () => {
+    const { chat, deps, model, store } = setup();
+    const { status, body } = await json(await chat(sweepReq("sweep-secret")));
+    expect([status, body.ok, body.logged]).toEqual([200, true, 2]);
+    expect(typeof body.rid).toBe("string");
+    expect(deps.sweepSheetLogs).toHaveBeenCalledTimes(1);
+    expect(deps.sweepSheetLogs).toHaveBeenCalledWith(body.rid);
+    expect(model.calls).toHaveLength(0);
+    expect(store.conversations.size).toBe(0);
+    expect(deps.allow).not.toHaveBeenCalled();
+  });
+
+  it.each([["a wrong token", "nope"], ["an empty token", ""], ["the eval token", "eval-secret"]])("refuses %s with 401 and runs nothing", async (_n, token) => {
+    const { chat, deps, model, store } = setup();
+    const { status, body } = await json(await chat(sweepReq(token)));
+    expect([status, body.ok, body.code]).toEqual([401, false, "unauthorized"]);
+    expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
+    expect(model.calls).toHaveLength(0);
+    expect(store.conversations.size).toBe(0);
+  });
+
+  it("refuses every sweep when the function has no token configured", async () => {
+    const { chat, deps } = setup({ sweepToken: "" });
+    expect((await chat(sweepReq(""))).status).toBe(401);
+    expect((await chat(sweepReq("anything"))).status).toBe(401);
+    expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
+  });
+
+  it("is a POST route only", async () => {
+    const { chat, deps } = setup();
+    expect((await chat(sweepReq("sweep-secret", "GET"))).status).toBe(405);
+    expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
+  });
+
+  it("answers 500, not a chat reply, when the sweep itself throws", async () => {
+    const { chat, model } = setup({ sweepSheetLogs: vi.fn(async () => { throw new Error("select_http_500"); }) });
+    const { status, body } = await json(await chat(sweepReq("sweep-secret")));
+    expect([status, body.ok, body.code]).toEqual([500, false, "unavailable"]);
+    expect(body).not.toHaveProperty("reply");
+    expect(JSON.stringify(body)).not.toContain("select_http_500");
+    expect(model.calls).toHaveLength(0);
+  });
+
+  it("leaves a chat request without the header to the chat", async () => {
+    const { chat, deps } = setup();
+    expect((await json(await chat(post(first())))).status).toBe(200);
+    expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
   });
 });

@@ -57,7 +57,7 @@ describe("the sweep", () => {
   const sent = async (fn: ReturnType<typeof vi.fn>, call = 0) => (fn.mock.calls[call][0] as Request).json();
 
   it("claims a batch of support conversations idle for 30 minutes, then logs each through log-support-chat", async () => {
-    const { store, logSupportChat, sweep } = setup([conv("c1")], { c1: [m("user", "q"), m("assistant", "a")] });
+    const { store, logSupportChat, log, sweep } = setup([conv("c1")], { c1: [m("user", "q"), m("assistant", "a")] });
     expect(await sweep("rid1")).toBe(1);
     const [roles, cutoff, now, limit] = store.claimSheetLogs.mock.calls[0];
     expect(roles).toEqual(["support"]);
@@ -65,6 +65,7 @@ describe("the sweep", () => {
     expect(now).toBe("2026-10-14T10:00:00.000Z");
     expect(Date.parse(now) - Date.parse(cutoff)).toBe(SHEET_LOG_IDLE_MS);
     expect(limit).toBe(SHEET_LOG_BATCH);
+    expect(log).toHaveBeenCalledWith("info", "sweep.logged", { rid: "rid1", conversation: "c1", logRid: "x", outcome: "answered" });
     const req = logSupportChat.mock.calls[0][0] as Request;
     expect(req.method).toBe("POST");
     expect(await req.json()).toEqual({ channel: "site", topic: "q", transcript: "מבקר: q\nעוזר: a", outcome: "answered", messageCount: 2 });
@@ -105,7 +106,7 @@ describe("the sweep", () => {
     const { logSupportChat, log, sweep } = setup([conv("c1")], { c1: [m("user", "q"), m("assistant", "a")] });
     logSupportChat.mockImplementationOnce(async () => answer());
     expect(await sweep("r")).toBe(0);
-    expect(log).toHaveBeenCalledWith("warn", "sweep.not_logged", { rid: "r", conversation: "c1", status, outcome: "answered" });
+    expect(log).toHaveBeenCalledWith("warn", "sweep.not_logged", { rid: "r", conversation: "c1", logRid: "x", status, outcome: "answered" });
   });
 
   it("logs nothing when nothing is claimed — a second overlapping sweep finds the rows already taken", async () => {
