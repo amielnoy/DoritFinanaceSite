@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 932 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1588 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 933 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1597 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1407,6 +1407,7 @@ On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's l
 | UNIT-I18N-016 | "translates every entry and keeps its id, category and tip number" (`tests/unit/i18n-faq.test.ts`) | All 24 entries in en and fr; no Hebrew in an answer or a tip |
 | UNIT-I18N-017 | "returns the Hebrew entry itself for Hebrew" | `localizeFaq(e, "he") === e` |
 | UNIT-I18N-018 | "names the categories in each language" | Income tax, Pension & savings, Insurance, General; Hebrew = `FAQ_CATEGORIES` |
+| UNIT-I18N-020 | "is exactly as typed from the Hebrew site, and carries the note on its own line from English or French" | Hebrew untouched (spaces kept); en/fr trimmed, then "(מולא באנגלית)" / "(מולא בצרפתית)" |
 | UNIT-I18N-019 | "keeps the disclosure in the 'are you independent?' answer, in every language" | "שיווק פנסיוני ולא ייעוץ…"; "pension marketing, not objective pension advice"; "et non du conseil en retraite objectif" |
 
 ## 5. Pass criteria

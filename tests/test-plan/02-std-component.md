@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 353 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 385 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 357 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 392 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -660,6 +660,17 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-016 | "declares its questions in English to search engines, and no Hebrew-only chat" | FAQPage JSON-LD: 24 English questions, no Hebrew; no chat; canonical `/en/faq` |
 | CMP-I18N-017 | "keeps the Hebrew page Hebrew, its English subtitles and its JSON-LD" | "Income Tax · 5 שאלות"; the chat; the Hebrew first question |
 | CMP-I18N-018 | "brings the common questions back to the English home page, linking to /en/faq" | "Common questions"; "All the questions" → `/en/faq` |
+
+### 4.37 /claims and /atzmaim-31-12 in English and French — `tests/component/i18n-claims.test.tsx`
+
+`<Claims />` and `<YearEndSelfEmployed />` through `LocaleLayout`; `submitClaim` mocked.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-I18N-019 | "renders %s with no Hebrew but the switcher's עברית" (/en and /fr of both pages) | A heading in the language; no Hebrew outside `lang="he"` |
+| CMP-I18N-020 | "offers the claim types in English, and sends Dorit the Hebrew type and a note" | `claimType` "אובדן כושר עבודה"; `description` "…\n(מולא באנגלית)" |
+| CMP-I18N-021 | "sends a Hebrew report exactly as typed" | `description` keeps its trailing space |
+| CMP-I18N-022 | "keeps the year-end figures exact, and marks the Hebrew-only guide" | 16.5%, ₪38,400, ₪13,203, ₪20,566; "(in Hebrew)" → `/blog/sof-shana-atzmaim`; the disclosure |
 
 ## 5. Pass criteria
 

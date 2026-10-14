@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dirOf, enabledLocales, filledInNote, localePath, splitLocale } from "@/i18n/locales";
+import { dirOf, enabledLocales, filledInNote, localePath, splitLocale, withFilledInNote } from "@/i18n/locales";
 import { submissionErrorMessage } from "@/hooks/useSubmission";
 import { interpolate, translate } from "@/i18n/LocaleContext";
 import { switchTarget } from "@/components/dorit/layout/LanguageSwitcher";
@@ -75,5 +75,14 @@ describe("what Dorit reads, and what the visitor reads when sending fails", () =
       "We couldn't send your request just now. You can email dorit@govari-fin.co.il directly or try again.",
     );
     expect(submissionErrorMessage("form", "fr")).toMatch(/^Impossible d'envoyer le formulaire .*dorit@govari-fin\.co\.il/);
+  });
+});
+
+describe("a visitor's free text, as Dorit receives it", () => {
+  it("is exactly as typed from the Hebrew site, and carries the note on its own line from English or French", () => {
+    expect(withFilledInNote("  כמו שנכתב ", "he")).toBe("  כמו שנכתב ");
+    expect(withFilledInNote("", "he")).toBe("");
+    expect(withFilledInNote(" About my claim ", "en")).toBe("About my claim\n(מולא באנגלית)");
+    expect(withFilledInNote("", "fr")).toBe("(מולא בצרפתית)");
   });
 });
