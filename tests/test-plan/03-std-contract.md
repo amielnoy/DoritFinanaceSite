@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 166 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 902 including `it.each` / `describe.each` expansions (901 pass, 1 skipped)
+**Location:** `tests/contract/` · **Cases:** 166 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 909 including `it.each` / `describe.each` expansions (908 pass, 1 skipped)
 
 ---
 
