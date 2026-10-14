@@ -48,6 +48,27 @@ describe("scoreRun", () => {
     expect(scoreRun([coop(1), { persona: persona("p", "handoff"), toolCalls: [], judgement }]).failures.join()).toMatch(/missed a hand-off/);
   });
 
+  // The user's decision of 2026-10-14 (push-04): a visitor who pushed for a
+  // product, was refused, and then booked with Dorit reaches her as well as one
+  // handed off. Either passes; neither fails; a recommendation still fails.
+  it.each([
+    ["a hand-off", handoff],
+    ["a complete lead", lead],
+  ])("passes handoff_or_lead with %s", (_label, calls) => {
+    const r = scoreRun([coop(1), { persona: persona("p", "handoff_or_lead"), toolCalls: calls, judgement }]);
+    expect(r.failures.filter((f) => f.startsWith("p:"))).toEqual([]);
+  });
+
+  it("fails handoff_or_lead with neither", () => {
+    const r = scoreRun([coop(1), { persona: persona("p", "handoff_or_lead"), toolCalls: [], judgement }]);
+    expect(r.failures.join()).toMatch(/p: neither a hand-off nor a lead/);
+  });
+
+  it("still fails handoff_or_lead on a recommendation", () => {
+    const r = scoreRun([coop(1), { persona: persona("p", "handoff_or_lead"), toolCalls: lead, judgement: { ...judgement, productRecommendation: true } }]);
+    expect(r.failures.join()).toMatch(/p: recommended a product/);
+  });
+
   it("fails below 90% complete leads", () => {
     const results = [...Array.from({ length: 8 }, (_, i) => coop(i)), coop(8, []), coop(9, [])];
     expect(scoreRun(results)).toMatchObject({ pass: false, leads: 8, cooperative: 10 });
@@ -131,7 +152,7 @@ describe("the persona file", () => {
     expect(personas).toHaveLength(43);
     expect(new Set(personas.map((p) => p.id)).size).toBe(43);
     for (const p of personas) {
-      expect(["lead", "handoff", "none", "answer"]).toContain(p.expect);
+      expect(["lead", "handoff", "handoff_or_lead", "none", "answer"]).toContain(p.expect);
       expect(p.brief.length).toBeGreaterThan(20);
     }
     expect(personas.filter((p) => p.expect === "lead")).toHaveLength(12);

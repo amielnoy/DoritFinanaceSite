@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 912 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1532 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 913 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1536 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -985,6 +985,9 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-005 | "passes with every lead, every hand-off and no recommendation" (scoreRun) | `pass: true`, 10 leads of 10 |
 | UNIT-EVALCHAT-006 | "fails on a single product recommendation" (scoreRun) | `p: recommended a product` listed |
 | UNIT-EVALCHAT-007 | "fails on a missed hand-off" (scoreRun) | `missed a hand-off` listed |
+| UNIT-EVALCHAT-043 | "passes handoff_or_lead with %s" (2 cases, scoreRun) | A hand-off or a complete lead: no failure for that persona (the user's decision of 2026-10-14: push-04 refused, then booked) |
+| UNIT-EVALCHAT-044 | "fails handoff_or_lead with neither" | `neither a hand-off nor a lead` listed |
+| UNIT-EVALCHAT-045 | "still fails handoff_or_lead on a recommendation" | `recommended a product` listed |
 | UNIT-EVALCHAT-008 | "fails below 90% complete leads" (scoreRun) | 8 of 10: `pass: false` |
 | UNIT-EVALCHAT-009 | "fails on a persona that errored" (scoreRun) | An errored persona fails the run |
 | UNIT-EVALCHAT-010 | "names the persona, the transcript and the tool calls" (formatForJudge) | Persona id, `מבקר:` / `עוזר:` lines and `submitLead` all present |
