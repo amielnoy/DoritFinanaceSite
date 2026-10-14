@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 206 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 246 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 220 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 286 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -444,28 +444,38 @@ renders as on a desktop, which is what every other component test relies on.
 | CMP-CHSUP-001 | "shows the FAQ chat's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS` entry is on screen; the interview's fourth point, `CONSENT.points[2]` and the old support fourth point are not |
 | CMP-CHSUP-002 | "sends the first message as support_agent with the v6 stamp, and shows the reply" | After consent, start and send: `invoke("chat", …)` with `agent: support_agent` and `consentVersion: CHAT_FUNCTION_CONSENT_VERSION`; the reply is shown |
 
-### 4.24 `<NeedsWizard />` on a phone — answers that move on — `tests/component/needs-wizard.test.tsx`
+### 4.24 `<NeedsWizard />` — two steps to a lead, then four optional questions — `tests/component/needs-wizard.test.tsx`
 
-The `describe` "on a phone, a single-choice answer moves on by itself". Below md
-a step that is one single-choice question (life stage, concern, goal,
-clearinghouse) moves on when an answer is chosen by a tap, Space or Enter,
-250 ms later and through `forward` — so `wizard_step` and the claim route are
-the same as with "המשך". An arrow key never moves on: in a radio group the
-arrows move the choice and fire a click. `matchMedia` is stubbed as in §4.22;
-the cases above it run without one and are the desktop's wizard, unchanged.
+The lead-generation brief of 2026-10-14: the concern, then a name and a mobile,
+and the lead is saved (`stage: "complete"`, Dorit mailed); then, offered only
+when `services.leads.updatesInterviews`, life stage, goal, clearinghouse and
+time, saved as `stage: "details"` into the same lead (submit-lead, INT §
+"the questionnaire's details"). Below md a single-choice step (the concern, life
+stage, goal) moves on when an answer is chosen by a tap, Space or Enter, 250 ms
+later and through `forward`; never by an arrow key. `services` is mocked
+(`submitInterview`, `escalate`, a switchable `updatesInterviews`).
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-NWZ-101 | "a tap moves to the next step through the same path as המשך: wizard_step, focus on the new heading" | No "המשך" on step 1; after the click the radio is checked, step 2's heading appears and has focus; `wizardStep(1)` once, `wizardStarted` once |
-| CMP-NWZ-102 | "an arrow key chooses without moving on; Enter then moves on" | keydown ArrowDown → click on the next radio → keyup: it is checked, still step 1, no `wizardStep`; Enter on it → step 2, `wizardStep(1)` |
-| CMP-NWZ-103 | "the concern's claim option still leaves for a person, with no interview" | Tapping "תביעה או בעיה בפוליסה קיימת" opens the claim screen; `submitInterview` not called |
-| CMP-NWZ-104 | "every question can still be skipped, and an answered one shows המשך on the way back" | "דילוג על השאלה" moves on with no answer; back on an answered step the quiet button reads "המשך" and moves on |
-| CMP-NWZ-105 | "a step of several questions keeps המשך, and choosing in it stays put" | On the track step a choice does not move on; the "המשך" button is there |
-| CMP-NWZ-106 | "leaving the step before the beat is up cancels the move" | Tap, then "הקודם" within 250 ms: the wizard stays on step 1 |
-| CMP-NWZ-107 | "from md up nothing moves until המשך" | At 1440 a click checks the radio and nothing else; "המשך" is there |
+| CMP-NWZ-001 | "asks what is on the visitor's mind first" | Heading "מה מעסיק אותך?", "שלב 1 מתוך 2" |
+| CMP-NWZ-002 | "saves the lead when the second step is sent — the topic, the name, the mobile — and counts it once" | One `submitInterview` with `stage: "complete"`, name, phone, `profile.concern`; `wizardCompleted` once; heading "נשמר — תודה" |
+| CMP-NWZ-003 | "reports each required step to GA4 by its number only" | `wizardStep` 1, 2 |
+| CMP-NWZ-004 | "has no back button on the first step, and a real one on the second" | Back from contact keeps the concern checked |
+| CMP-NWZ-005 | "marks the current stage for assistive tech" | Two stages; the first `aria-current="step"` |
+| CMP-NWZ-006 | "asks for a mobile the way a phone keyboard expects, and a name autofill knows" | `type=tel`, `inputmode=tel`, `autocomplete=tel`, placeholder `05X-XXXXXXX`; name `autocomplete=name` |
+| CMP-NWZ-007 | "says under the field what is wrong with the phone, linked to it, and saves nothing" | A landline: `aria-invalid`, `aria-describedby` → "נא להזין מספר נייד ישראלי…"; nothing sent; the button still enabled |
+| CMP-NWZ-008 | "says when the name is missing" | "נא למלא שם."; nothing sent |
+| CMP-NWZ-009 | "accepts a +972 mobile" | Sent |
+| CMP-NWZ-010 | "shows where the details go before they are sent" | `TRANSPARENCY` on the contact step |
+| CMP-NWZ-011 | "offers them once the lead is saved, and they fill in the same lead" | "עוד 4 שאלות קצרות" → life stage, goal, clearinghouse (+ email), time → a second `submitInterview` with `stage: "details"` carrying all of them; `wizardCompleted` still once; `wizardStep` 1–6; heading "תודה — דורית תגיע מוכנה" |
+| CMP-NWZ-012 | "asks for an email only when the visitor wants the clearinghouse link" | Field only for "מעוניין/ת"; a bad address → "כתובת המייל לא נראית תקינה." |
+| CMP-NWZ-013 | "are not offered by a backend that cannot fill a lead in" | `updatesInterviews` false → no offer |
+| CMP-NWZ-014 | "when their save fails, says the lead itself is already with Dorit" | "התשובות הנוספות לא נשמרו" + "הפרטים שלך כבר אצל דורית" |
+| CMP-NWZ-015 | "shows Dorit's direct channels and keeps the answers for a retry" | Failed lead save → channels; retry keeps the name and saves |
+| CMP-NWZ-016 | "escalates with reason claim_or_policy and never submits an interview" | Claim → `escalate` (`claim_or_policy`, `needs_wizard`); no `submitInterview`; `wizardClaimHandoff` once |
+| CMP-NWZ-101 | "a tap on the concern moves to the contact step through the same path as המשך" | Phone: no "המשך"; tap → contact heading focused; `wizardStep(1)` |
+| CMP-NWZ-102 | "an arrow key chooses without moving on; Enter then moves on" | ArrowDown → click → keyup: stays; Enter → contact |
+| CMP-NWZ-103 | "the claim option still leaves for a person, with no interview" | Tap on the claim option → claim screen; no `submitInterview` |
+| CMP-NWZ-104 | "in the optional part a tap moves on, but the clearinghouse step waits — it may ask for an email" | Life stage and goal move on by tap; "מעוניין/ת" stays and shows the email field |
+| CMP-NWZ-105 | "from md up nothing moves until המשך" | At 1440 a click checks the radio and nothing else |
 
-## 5. Pass criteria
-
-All 217 declared cases pass (vitest: 247 with expansions). A `submitLead` or `submitClaim` payload assertion failing
-here is a contract break — cross-check [STD-03](03-std-contract.md) before
-changing the test.

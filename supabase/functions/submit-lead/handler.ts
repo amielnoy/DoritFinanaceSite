@@ -54,18 +54,30 @@ interface OpenInterview {
 }
 
 /**
+ * How long after the questionnaire saved a lead its optional details may still
+ * fill that lead in (stage "details"): the visitor answers them right after.
+ */
+const DETAILS_WINDOW_MS = 30 * 60_000;
+
+/**
  * The visitor's open interview, if one is in the window: partial, on this
  * phone, and the same person by name and address (sameInterviewee). Newest
  * first, so a rerun joins the latest. Base44's findOpenInterview, as a query.
  */
-async function findOpenInterview(rid: string, phone: string, name: unknown, email: unknown): Promise<OpenInterview | null> {
+async function findOpenInterview(
+  rid: string,
+  phone: string,
+  name: unknown,
+  email: unknown,
+  { status = 'partial', windowMs = INTERVIEW_WINDOW_MS }: { status?: 'partial' | 'new'; windowMs?: number } = {},
+): Promise<OpenInterview | null> {
   if (!phone) return null;
   try {
-    const since = new Date(Date.now() - INTERVIEW_WINDOW_MS).toISOString();
+    const since = new Date(Date.now() - windowMs).toISOString();
     const rows = await selectRows(
       'leads',
       `select=id,name,email,timing,consent_version,consent_at,status,created_at` +
-        `&phone=eq.${encodeURIComponent(phone)}&source=eq.interview&status=eq.partial` +
+        `&phone=eq.${encodeURIComponent(phone)}&source=eq.interview&status=eq.${status}` +
         `&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc`,
     );
     return (rows.find((lead) => sameInterviewee(lead, name, email)) as OpenInterview | undefined) ?? null;
@@ -238,6 +250,9 @@ export async function handler(req: Request): Promise<Response> {
     // ראיון חלקי: הרשומה נשמרת ואיש אינו מקבל הודעה. ההודעה שייכת לראיון
     // שהושלם — מייל על כל מי שהתחיל לענות היה הופך את התיבה לרעש.
     const partial = source === 'interview' && stage === 'partial';
+    // The short questionnaire's optional answers, after its lead was saved and
+    // Dorit mailed: they fill in that lead (found below) and mail her once more.
+    const details = source === 'interview' && stage === 'details';
 
     const data = {
       name, phone, email, topic: effectiveTopic, timing,
@@ -247,7 +262,7 @@ export async function handler(req: Request): Promise<Response> {
       channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath,
     };
     const agentBody: string = buildAgentBody(source, data);
-    const subject: string = subjectFor(source, data);
+    const baseSubject: string = subjectFor(source, data);
     const leadMessage = profileText || safeMessage || notes || '';
 
     // ── סדר הפעולות ─────────────────────────────────────────────────────
@@ -261,10 +276,17 @@ export async function handler(req: Request): Promise<Response> {
     let leadId: string | null = null;
 
     // ראיון שכבר נפתח בשיחה הזו מתעדכן במקום להיווצר מחדש.
-    const openInterview = source === 'interview' ? await findOpenInterview(rid, phone, name, email) : null;
+    const openInterview = source !== 'interview'
+      ? null
+      : details
+        ? await findOpenInterview(rid, phone, name, email, { status: 'new', windowMs: DETAILS_WINDOW_MS })
+        : await findOpenInterview(rid, phone, name, email);
+    // Only a details save that found its lead is "further details"; one that did
+    // not is the visitor's lead, and is announced as one.
+    const subject: string = details && openInterview ? `פרטים נוספים — ${baseSubject}` : baseSubject;
     // האם השיחה הזו כבר פתחה רשומה. זה מה שמבדיל עדכון מכפילות, וזה השדה
     // שמסביר בדיעבד למה ראיון אחד הופיע פעמיים במסך הפניות.
-    log('info', 'lead.resolved', { rid, source: source || 'quick', track: track || '', stage: partial ? 'partial' : 'complete', upsert: Boolean(openInterview?.id) });
+    log('info', 'lead.resolved', { rid, source: source || 'quick', track: track || '', stage: partial ? 'partial' : details ? 'details' : 'complete', upsert: Boolean(openInterview?.id) });
     // שם ומועד: מועד שכבר נשמר נשמר, אם הסיום לא שלח חדש; ריק לא דורס אותו.
     const storedName = name || openInterview?.name || '';
     const storedTiming = timing || openInterview?.timing || '';

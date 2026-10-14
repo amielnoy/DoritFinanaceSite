@@ -2051,3 +2051,60 @@ describe("Edge submit-lead — what only it does", () => {
     expect(r.leadUpdates[0].fields).toMatchObject({ status: "new" });
   });
 });
+
+/**
+ * The short questionnaire (2026-10-14): the lead is saved — and Dorit mailed — at
+ * its second step; the optional questions after it arrive as stage "details" and
+ * fill in that same lead, with one short follow-up mail.
+ */
+describe.each(IMPLEMENTATIONS)("$label — the questionnaire's details, after the lead was saved", ({ run }) => {
+  const details = {
+    name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
+    stage: "details", track: "pension",
+    profile: { concern: "דמי ניהול", life_stage: "בן 52", goal: "פרישה" },
+  };
+  const saved = (over: Record<string, unknown> = {}) => [{
+    id: "LEAD-SAVED", name: "אורי לוי", phone: "0541112233", source: "interview",
+    status: "new", email: "", created_date: new Date().toISOString(), ...over,
+  }];
+
+  it("fills in the visitor's lead from a few minutes ago instead of creating a second", async () => {
+    const r = await run(details, { existingLeads: saved() });
+    expect(r.status).toBe(200);
+    expect(r.leads, "a second row was created").toHaveLength(0);
+    expect(r.leadUpdates.map((u) => u.id)).toEqual(["LEAD-SAVED"]);
+    expect(r.leadUpdates[0].fields).toMatchObject({ status: "new" });
+    expect(r.leadUpdates[0].fields.message).toContain("שלב חיים: בן 52");
+    expect(r.json).toMatchObject({ ok: true, leadId: "LEAD-SAVED" });
+  });
+
+  it("tells Dorit once more, under a subject that says these are further details", async () => {
+    const r = await run(details, { existingLeads: saved() });
+    expect(r.mailTo(AGENCY).subject.startsWith("פרטים נוספים — ")).toBe(true);
+  });
+
+  it("saves the details as a lead of their own when there is no recent one to fill in", async () => {
+    const r = await run(details, { existingLeads: [] });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
+    expect(r.leads[0]).toMatchObject({ source: "interview", status: "new" });
+  });
+
+  it("does not fill in a lead older than half an hour", async () => {
+    const r = await run(details, { existingLeads: saved({ created_date: new Date(Date.now() - 31 * 60_000).toISOString() }) });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
+  });
+
+  it("does not fill in another person's lead on the same phone", async () => {
+    const r = await run(details, { existingLeads: saved({ name: "מישהו אחר" }) });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
+  });
+
+  it("does not fill in a lead that was never an interview", async () => {
+    const r = await run(details, { existingLeads: saved({ source: "consultation" }) });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
+  });
+});

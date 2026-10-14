@@ -369,6 +369,22 @@ biography at [`/perspective`](src/pages/Perspective.tsx), the reading
 recommender at the top of `/blog`. Only the duplicate routes to the same
 conversation were deleted.
 
+**The questionnaire is two steps to a lead** (`NeedsWizard`, 2026-10-14): what
+is on the visitor's mind, then a name and an Israeli mobile (`isIsraeliMobile`;
+an invalid field is answered under it) — and the lead is saved
+(`submitInterview`, `stage: "complete"`), Dorit mailed and `generate_lead`
+sent. The thank-you screen then offers "רוצים לעזור לדורית להתכונן? עוד 4
+שאלות קצרות": life stage, goal, the clearinghouse (with an optional email for
+its link) and a preferred time, sent as `stage: "details"`. `submit-lead` fills
+in the lead it saved minutes ago — same phone, same person, an interview, `new`,
+within 30 minutes — books the time if one was chosen, and mails Dorit once more
+under "פרטים נוספים — …"; with no such lead the details are saved as a lead of
+their own. Only the Edge `submit-lead` can do that, so the offer shows only when
+`services.leads.updatesInterviews` (`VITE_LEAD_FUNCTIONS=supabase`). The claim
+option still leaves for a person (`escalateToHuman`, `claim_or_policy`). The
+questionnaire has no consent checkbox (none existed); the contact step shows
+where the details go (`TRANSPARENCY`).
+
 Anchors into those sections work from every route — `useSectionNav` routes home
 first and then scrolls, because a bare `#services` on `/blog` sets the URL and
 does nothing.

@@ -994,59 +994,55 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("the questionnaire: a tap on a single-choice answer moves on, and reports the step", async ({ page }) => {
+  test("the questionnaire: a tap on the concern moves on to the contact step, and reports it", async ({ page }) => {
     await gotoHome(page);
 
-    await test_step("tapping a life stage goes to the next step, with no המשך on the way", async () => {
+    await test_step("tapping a concern goes to the contact step, with no המשך on the way", async () => {
       await expect(wizard(page).getByRole("button", { name: "המשך" })).toHaveCount(0);
-      // Every question can still be skipped.
+      // The question can still be skipped.
       await expect(wizard(page).getByRole("button", { name: "דילוג על השאלה" })).toBeVisible();
-      await wizard(page).getByText("זוג בלי ילדים", { exact: true }).tap();
-      await expect(stepHeading(page, "מה מביא אותך")).toBeVisible();
-      await expect(stepHeading(page, "מה מביא אותך")).toBeFocused();
-    });
-
-    await test_step("so does the concern, and the goal", async () => {
       await wizard(page).getByText("דמי ניהול / הפנסיה שלי", { exact: true }).tap();
-      await expect(stepHeading(page, "מה היית רוצה לקחת מהפגישה")).toBeVisible();
-      await wizard(page).getByText("להוריד עלויות", { exact: true }).tap();
-      await expect(stepHeading(page, "כמה פרטים, כדי שדורית תגיע מוכנה")).toBeVisible();
+      await expect(stepHeading(page, "איך דורית תחזור אליך")).toBeVisible();
+      await expect(stepHeading(page, "איך דורית תחזור אליך")).toBeFocused();
     });
 
-    await test_step("each move sent wizard_step for the screen it left, as המשך does", async () => {
-      expect(await stepEvents(page)).toEqual(["step_1", "step_2", "step_3"]);
+    await test_step("the move sent wizard_step for the screen it left, and one wizard_start", async () => {
+      expect(await stepEvents(page)).toEqual(["step_1"]);
       const started = (await queuedClicks(page)).filter((e) => e.name === "wizard_start");
       expect(started).toHaveLength(1);
     });
 
-    await test_step("a step of several questions keeps המשך, and picking in it does not move on", async () => {
-      await wizard(page).getByRole("group", { name: "מה המעמד התעסוקתי שלך?" }).getByText("שכיר/ה", { exact: true }).tap();
-      await wizard(page).getByRole("group", { name: "אילו מוצרים יש לך היום?" }).getByText("פנסיה", { exact: true }).tap();
-      await page.waitForTimeout(400);
-      await expect(stepHeading(page, "כמה פרטים, כדי שדורית תגיע מוכנה")).toBeVisible();
-      await expect(wizard(page).getByRole("button", { name: "המשך" })).toBeVisible();
+    await test_step("the mobile field is a phone keyboard's, and a wrong number is answered under it", async () => {
+      const phone = wizard(page).getByLabel("טלפון נייד");
+      await expect(phone).toHaveAttribute("type", "tel");
+      await expect(phone).toHaveAttribute("inputmode", "tel");
+      await expect(phone).toHaveAttribute("autocomplete", "tel");
+      await wizard(page).getByLabel("שם").fill("רונית");
+      await phone.fill("03-1234567");
+      await wizard(page).getByRole("button", { name: /שליחה לדורית/ }).click();
+      await expect(phone).toHaveAttribute("aria-invalid", "true");
+      await expect(wizard(page).getByText(/נא להזין מספר נייד ישראלי/)).toBeVisible();
     });
 
-    await test_step("back still goes back, the earlier answer kept", async () => {
+    await test_step("back still goes back, the concern kept", async () => {
       await wizard(page).getByRole("button", { name: "הקודם" }).click();
-      await expect(stepHeading(page, "מה היית רוצה לקחת מהפגישה")).toBeVisible();
-      await expect(wizard(page).getByRole("radio", { name: "להוריד עלויות" })).toBeChecked();
+      await expect(stepHeading(page, "מה מעסיק אותך?")).toBeVisible();
+      await expect(wizard(page).getByRole("radio", { name: "דמי ניהול / הפנסיה שלי" })).toBeChecked();
       // Answered already, so the quiet way on reads המשך rather than דילוג.
       await expect(wizard(page).getByRole("button", { name: "דילוג על השאלה" })).toHaveCount(0);
-      await wizard(page).getByRole("button", { name: "המשך" }).click();
-      await expect(stepHeading(page, "כמה פרטים, כדי שדורית תגיע מוכנה")).toBeVisible();
     });
   });
 
   test("the questionnaire from the keyboard: arrows move between answers without leaving the step", async ({ page }) => {
     await gotoHome(page);
-    const lifeStage = wizard(page).getByRole("group", { name: "איפה את/ה בחיים כרגע?" });
     const concerns = wizard(page).getByRole("group", { name: "מה הכי מעסיק אותך כרגע?" });
 
     await test_step("Space on an answer chooses it and moves on", async () => {
-      await lifeStage.getByRole("radio").first().focus();
+      await concerns.getByRole("radio").first().focus();
       await page.keyboard.press("Space");
-      await expect(stepHeading(page, "מה מביא אותך")).toBeVisible();
+      await expect(stepHeading(page, "איך דורית תחזור אליך")).toBeVisible();
+      await wizard(page).getByRole("button", { name: "הקודם" }).click();
+      await expect(stepHeading(page, "מה מעסיק אותך?")).toBeVisible();
     });
 
     await test_step("arrow keys walk the answers, choosing as they go, and stay on the step", async () => {
@@ -1054,14 +1050,14 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       await page.keyboard.press("ArrowDown");
       await page.keyboard.press("ArrowDown");
       await page.waitForTimeout(500);
-      await expect(stepHeading(page, "מה מביא אותך")).toBeVisible();
+      await expect(stepHeading(page, "מה מעסיק אותך?")).toBeVisible();
       await expect(concerns.getByRole("radio", { checked: true })).toHaveCount(1);
     });
 
-    await test_step("Enter on the chosen answer moves on, and the steps reported are the two left", async () => {
+    await test_step("Enter on the chosen answer moves on, and each move reported the step it left", async () => {
       await page.keyboard.press("Enter");
-      await expect(stepHeading(page, "מה היית רוצה לקחת מהפגישה")).toBeVisible();
-      expect(await stepEvents(page)).toEqual(["step_1", "step_2"]);
+      await expect(stepHeading(page, "איך דורית תחזור אליך")).toBeVisible();
+      expect(await stepEvents(page)).toEqual(["step_1", "step_1"]);
     });
   });
 
@@ -1260,9 +1256,10 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("the home page stays under 5,450px — it was 10,260", async ({ page }) => {
-    // 10,260px before stage 3 at 390x844, 6,590 after it, 5,841 after 3b and
-    // 5,321 after 3c (Chromium and WebKit alike). Not the brief's 4.5 screens —
+  test("the home page stays under 5,550px — it was 10,260", async ({ page }) => {
+    // 10,260px before stage 3 at 390x844, 6,590 after it, 5,841 after 3b,
+    // 5,321 after 3c and 5,483 once the short questionnaire opened on its eight
+    // concerns rather than six life stages (Chromium and WebKit alike). Not the brief's 4.5 screens —
     // see tests/test-plan/07-std-mobile.md for where the rest is — but a
     // regression of a section's worth should fail here.
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1286,7 +1283,7 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
 
     await test_step("and so is the page", async () => {
       const height = await page.evaluate(() => document.documentElement.scrollHeight);
-      expect(height).toBeLessThan(5450);
+      expect(height).toBeLessThan(5550);
     });
   });
 });
@@ -1316,9 +1313,9 @@ test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
     });
 
     await test_step("a chosen answer waits for המשך", async () => {
-      await page.locator("#interview").getByText("זוג בלי ילדים", { exact: true }).click();
+      await page.locator("#interview").getByText("מס / החזר מס", { exact: true }).click();
       await page.waitForTimeout(500);
-      await expect(page.locator("#interview").getByRole("heading", { name: "נכיר קצת" })).toBeVisible();
+      await expect(page.locator("#interview").getByRole("heading", { name: "מה מעסיק אותך?" })).toBeVisible();
       await expect(page.locator("#interview").getByRole("button", { name: "המשך" })).toBeVisible();
     });
 

@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 709 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1326 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 712 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1366 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1187,3 +1187,13 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
+
+### 4.47 Israeli phone numbers — `tests/unit/phone.test.ts`
+
+`isIsraeliMobile` (the questionnaire's contact step) and `isIsraeliPhone` (escalateToHuman's rule, unchanged).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-PHONE-001 | "accepts %s" (6 cases) | `050-1234567`, `0521234567`, `054 123 4567`, `+972-50-1234567`, `972501234567`, `+972 58 123 4567` |
+| UNIT-PHONE-002 | "refuses %s (%s)" (6 cases) | A landline, 9 or 11 digits, letters, empty, a foreign number |
+| UNIT-PHONE-003 | "still accepts a landline — escalateToHuman's rule, unchanged" | `isIsraeliPhone("03-1234567")` |

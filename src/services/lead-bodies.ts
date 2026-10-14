@@ -25,7 +25,7 @@ export function leadBody(lead: Lead): Record<string, unknown> {
 export function interviewBody(summary: InterviewSummary): Record<string, unknown> {
   return {
     source: "interview",
-    stage: "complete",
+    stage: summary.stage ?? "complete",
     name: summary.name,
     phone: summary.phone,
     email: summary.email ?? "",

@@ -26,6 +26,10 @@ export class SupabaseLeadService implements LeadPort {
     private readonly useEdge: boolean = false,
   ) {}
 
+  get updatesInterviews(): boolean {
+    return this.useEdge;
+  }
+
   submitLead(lead: Lead): Promise<SubmissionReceipt> {
     return this.useEdge ? this.edge("submit-lead", leadBody(lead)) : this.rest.submitLead(lead);
   }
