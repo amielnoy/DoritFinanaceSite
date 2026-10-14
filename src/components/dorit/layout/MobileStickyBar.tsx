@@ -26,7 +26,7 @@ import SupportLink from "./SupportLink";
  * last of the footer.
  */
 const CELL =
-  "flex flex-col items-center justify-center gap-0.5 min-w-0 min-h-[52px] px-1 rounded-md text-[13px] leading-tight font-medium text-center [text-wrap:balance]";
+  "flex flex-col items-center justify-center gap-0.5 min-w-0 min-h-[52px] px-0.5 rounded-md text-[13px] leading-tight font-medium text-center [text-wrap:balance]";
 
 export default function MobileStickyBar() {
   // The bar is on every route, `#start` only on the home page.
@@ -37,7 +37,7 @@ export default function MobileStickyBar() {
       className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]"
     >
       {/* 63px + the 1px rule above it: the bar is 64px tall. */}
-      <div className="h-[63px] grid grid-cols-[1.4fr_1fr_1fr_1fr] items-center gap-1.5 px-2">
+      <div className="h-[63px] grid grid-cols-[1.6fr_1fr_1fr_1fr] items-center gap-1 px-1.5">
         <a
           href="/#start"
           onClick={(e) => goToSection(e, "#start")}

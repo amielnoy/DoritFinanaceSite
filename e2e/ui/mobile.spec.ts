@@ -325,6 +325,12 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
           }),
         );
         for (const line of lines) expect(line, "one line per label").toMatch(/: 1$/);
+        // A one-word label cannot wrap, so it would spill instead: none may be
+        // wider than its cell.
+        const spills = await links.evaluateAll((els) =>
+          els.filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent?.trim()),
+        );
+        expect(spills, "labels wider than their cells").toEqual([]);
       });
     }
   });
