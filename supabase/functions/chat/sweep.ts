@@ -1,9 +1,12 @@
 /**
  * The FAQ chat's Support-tab row, written by the function. Base44's agent
  * called logSupportChat itself at the end of a chat, when it remembered; this
- * logs every support conversation once, after 30 idle minutes, through the
- * existing log-support-chat handler (in-process), which redacts the text and
- * knows the sheet.
+ * logs every support conversation once, when the function closes it — after
+ * IDLE_MS (2 hours) without a message — through the existing log-support-chat
+ * handler (in-process), which redacts the text and knows the sheet. A
+ * conversation that idle is refused as closed on its next message, so the row
+ * is the whole conversation. A hand-off does not wait for this: escalateToHuman
+ * reaches Dorit during the turn that calls it.
  *
  * A claimed row stays claimed even if its log fails: the transcript is still
  * in the database, and a retry loop on a broken sheet would mail nobody and
@@ -15,13 +18,15 @@
  * A backlog drains over the next ticks instead.
  */
 import type { Log } from '../_shared/log.ts';
+import { IDLE_MS } from './handler.ts';
 import type { ChatStore } from './store.ts';
 import type { EdgeHandler } from './tools.ts';
 import type { StoredMessage } from './turn.ts';
 
 /** The roles whose conversations go to the Support tab. PR 3 adds 'procedures'. */
 export const SHEET_LOGGED_ROLES: readonly string[] = ['support'];
-export const SHEET_LOG_IDLE_MS = 30 * 60 * 1000;
+/** The handler's idle close: a conversation is logged only once no message can extend it. */
+export const SHEET_LOG_IDLE_MS = IDLE_MS;
 /** A sheet append is one token fetch and one append, each up to 10 s but usually well under one. */
 export const SHEET_LOG_BATCH = 10;
 const TOPIC_LIMIT = 200;

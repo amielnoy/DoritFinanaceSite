@@ -8,6 +8,7 @@ import {
   createSheetLogSweep,
   sheetRow,
 } from "../../supabase/functions/chat/sweep.ts";
+import { IDLE_MS } from "../../supabase/functions/chat/handler.ts";
 
 const m = (role: "user" | "assistant" | "tool", content: string) => ({ role, content });
 
@@ -77,7 +78,7 @@ describe("the sweep", () => {
   };
   const sent = async (fn: ReturnType<typeof vi.fn>, call = 0) => (fn.mock.calls[call][0] as Request).json();
 
-  it("claims a batch of support conversations idle for 30 minutes, then logs each through log-support-chat", async () => {
+  it("claims a batch of support conversations idle until the handler closes them (2 h), then logs each through log-support-chat", async () => {
     const { store, logSupportChat, log, sweep } = setup([conv("c1")], { c1: [m("user", "q"), m("assistant", "a")] });
     expect(await sweep("rid1")).toBe(1);
     const [roles, cutoff, now, limit] = store.claimSheetLogs.mock.calls[0];
@@ -85,6 +86,8 @@ describe("the sweep", () => {
     expect(SHEET_LOGGED_ROLES).toEqual(["support"]);
     expect(now).toBe("2026-10-14T10:00:00.000Z");
     expect(Date.parse(now) - Date.parse(cutoff)).toBe(SHEET_LOG_IDLE_MS);
+    expect(SHEET_LOG_IDLE_MS).toBe(IDLE_MS);
+    expect(SHEET_LOG_IDLE_MS).toBe(2 * 60 * 60 * 1000);
     expect(limit).toBe(SHEET_LOG_BATCH);
     expect(log).toHaveBeenCalledWith("info", "sweep.logged", { rid: "rid1", conversation: "c1", logRid: "x", outcome: "answered" });
     const req = logSupportChat.mock.calls[0][0] as Request;

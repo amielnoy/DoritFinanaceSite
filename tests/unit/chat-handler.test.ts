@@ -850,13 +850,14 @@ describe("the sheet-log sweep over the store (Review Focus 3 and 4)", () => {
         turns: 1,
         busy_until: ago(100),
       });
-      Object.assign(store.conversations.get(c.id)!, { busy_until: null, last_message_at: ago(45), ...over });
+      Object.assign(store.conversations.get(c.id)!, { busy_until: null, last_message_at: ago(121), ...over });
       store.messages.push({ conversation_id: c.id, agency_id: "a", role: "user", content: `שאלה ${name}` }, { conversation_id: c.id, agency_id: "a", role: "assistant", content: "תשובה" });
       ids[name] = c.id;
     };
     await add("idle", {});
     await add("lapsed_lease", { busy_until: ago(1) });
     await add("recent", { last_message_at: ago(10) });
+    await add("not_yet_closed", { last_message_at: ago(119) });
     await add("in_a_turn", { busy_until: later(2) });
     await add("eval", { is_eval: true });
     await add("interview", { role: "interview" });
@@ -866,13 +867,13 @@ describe("the sheet-log sweep over the store (Review Focus 3 and 4)", () => {
     return { store, ids, logSupportChat, sweep };
   }
 
-  it("logs only support conversations idle for 30 minutes that no turn holds, never an evaluation or a logged one", async () => {
+  it("logs only support conversations idle past the 2-hour close that no turn holds, never an evaluation or a logged one", async () => {
     const { store, ids, logSupportChat, sweep } = await seeded();
     expect(await sweep()).toBe(2);
     const topics = await Promise.all(logSupportChat.mock.calls.map(async ([req]) => ((await (req as Request).json()) as { topic: string }).topic));
     expect(topics.sort()).toEqual(["שאלה idle", "שאלה lapsed_lease"]);
     expect(store.conversations.get(ids.idle)!.sheet_logged_at).toBe(new Date(clock.now).toISOString());
-    for (const name of ["recent", "in_a_turn", "eval", "interview"]) expect(store.conversations.get(ids[name])!.sheet_logged_at ?? null, name).toBeNull();
+    for (const name of ["recent", "not_yet_closed", "in_a_turn", "eval", "interview"]) expect(store.conversations.get(ids[name])!.sheet_logged_at ?? null, name).toBeNull();
   });
 
   it("logs each conversation once when two sweeps overlap", async () => {
@@ -881,5 +882,26 @@ describe("the sheet-log sweep over the store (Review Focus 3 and 4)", () => {
     expect(a + b).toBe(2);
     expect(logSupportChat).toHaveBeenCalledTimes(2);
     expect(await sweep()).toBe(0);
+  });
+
+  it("logs the whole conversation: once logged, its next message is refused as closed", async () => {
+    const started = clock.now;
+    try {
+      const { chat, store } = setup({}, [text("דמי ניהול הם…")]);
+      const opened = await json(await chat(post({ ...first("מה זה דמי ניהול?"), agent: "support_agent" })));
+      const logSupportChat = vi.fn(async (_req: Request) => Response.json({ ok: true, rid: "l", sheet: "נרשם" }));
+      const sweep = createSheetLogSweep({ store, logSupportChat, sheetConfigured: () => true, now: () => clock.now, log: () => undefined });
+
+      clock.now = started + 119 * 60_000;
+      expect(await sweep("r1")).toBe(0);
+      clock.now = started + 121 * 60_000;
+      expect(await sweep("r2")).toBe(1);
+
+      const again = await json(await chat(post({ agent: "support_agent", conversationId: opened.body.conversationId, token: TOKEN, message: "ועוד שאלה" })));
+      expect([again.status, again.body.code]).toEqual([409, "closed"]);
+      expect(store.messages.filter((m) => m.role === "user")).toHaveLength(1);
+    } finally {
+      clock.now = started;
+    }
   });
 });

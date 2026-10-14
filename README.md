@@ -616,7 +616,9 @@ to. On the function the model is not asked: a sweep writes the Support tab.
 - **When:** pg_cron runs `public.chat_sweep_tick()` every 15 minutes, which
   posts to the `chat` function with the `x-chat-sweep` header (pg_net, 30 s
   timeout). The function claims support conversations whose last message is
-  30 minutes old, never one a turn holds (`busy_until`), never an evaluation
+  more than 2 hours old — the handler's own idle close (`IDLE_MS`), so a
+  logged conversation is refused as closed on any later message and its row is
+  the whole conversation. Never one a turn holds (`busy_until`), never an evaluation
   one, and each at most once (`sheet_logged_at`; the claim is one filtered
   PATCH, so overlapping sweeps cannot both take a row). At most 10 a tick, the
   longest idle first.
@@ -627,13 +629,14 @@ to. On the function the model is not asked: a sweep writes the Support tab.
   `redact()` keeps only 2,000. Outcome: `escalated` if the chat handed off,
   `abandoned` if the visitor's message was last, `referred_to_interview` if a
   reply linked `/#start`, else `answered`. No phone: the chat has none. The
-  row's time is the sweep's, up to 45 minutes after the chat.
+  row's time is the sweep's: about 2 hours after the chat's last message, at
+  most 2 h 15 min. A hand-off does not wait for it: `escalateToHuman` mails
+  Dorit during the turn that calls it, and the "מעבר לדורית" button from the
+  page.
 - **What it does not do:** retry. A claimed row whose append fails stays
   claimed, and the failure is logged (`sweep.not_logged`, `sweep.log_failed`);
   the transcript is still in the database. Without `SHEET_ID` the sweep claims
-  nothing (`sweep.sheet_unconfigured`). A visitor who comes back between 30
-  minutes and the 2-hour close continues a conversation already logged: those
-  later turns are in the transcript, not in the sheet.
+  nothing (`sweep.sheet_unconfigured`).
 
 Setup, by hand and only when asked (the migration is already applied):
 
@@ -718,7 +721,7 @@ The FAQ chat follows the same gate, separately:
 - the sheet-log setup above is done and one tick answered 200;
 - then `VITE_CHAT_AGENTS=needs_interview,support_agent` and a redeploy, and one
   real FAQ chat: a reply that links an article, and its Support-tab row about
-  45 minutes later.
+  2 hours after its last message.
 
 Rollback is removing `support_agent` from `VITE_CHAT_AGENTS` and redeploying;
 the FAQ chat is then back on Base44 with its v5 notice.

@@ -44,7 +44,7 @@ gap is visible and a failure points at a feature.
 | 1 | The support model naming `submitLead` gets `unknown_tool`-style refusal: nothing is run, the conversation stays open (and the interview is gated the same way for the article tools) | UNIT-CHHANDLER-049, UNIT-CHHANDLER-051, UNIT-CHTOOL-020 |
 | 2 | An invented or mangled slug answers `not_found` with no query; a failing store answers `tool_failed`, never `not_found` | UNIT-CHART-007, UNIT-CHART-008, UNIT-CHTOOL-024, UNIT-CHTOOL-025, UNIT-CHTOOL-028 |
 | 3 | Two overlapping sweeps log each conversation once | UNIT-CHHANDLER-059, UNIT-CHSWEEP-012, UNIT-CHSTORE-016 |
-| 4 | A conversation in a turn, active in the last 30 minutes, or an evaluation one is not logged | UNIT-CHHANDLER-058, UNIT-CHSWEEP-007, UNIT-CHSTORE-016 |
+| 4 | A conversation in a turn, one the handler has not yet closed (active in the last 2 hours), or an evaluation one is not logged; a logged one cannot continue | UNIT-CHHANDLER-058, UNIT-CHHANDLER-060, UNIT-CHSWEEP-007, UNIT-CHSTORE-016 |
 | 5 | The sweep route refuses a missing or wrong token and runs no chat logic | UNIT-CHHANDLER-052..054, CTR-CHSCH-012 |
 
 ## Coverage gaps (accepted)
