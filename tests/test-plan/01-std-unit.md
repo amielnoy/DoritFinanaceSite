@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 885 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1486 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 912 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1532 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1159,10 +1159,19 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSVC-019 | "tells a send that stored nothing apart from a failure: not_saved is its own reason" | 500 with `not_saved` → `MaslekaError('not_saved', rid)` (decision 2026-10-14) |
 | UNIT-MSKSVC-020 | "lists snapshots by their summary columns, newest first, without the report itself" | `clearinghouse_snapshots`, `SNAPSHOT_SUMMARY_COLUMNS` (no `data`), `created_at` descending |
 | UNIT-MSKSVC-021 | "reads one snapshot through readSnapshot, and calls an unreadable one missing" | `eq('id')`; a report that fails `readSnapshot`, or no row → `null` |
-| UNIT-MSKSVC-022 | "reads decisions, dropping a row that is not one" | Unknown status dropped |
+| UNIT-MSKSVC-022 | "reads decisions, dropping a row that is not one" | Unknown status dropped; `title` and `priority` read (null when unset) |
 | UNIT-MSKSVC-023 | "upserts a decision on (snapshot, finding), and deletes it to go back to draft" | `upsert(…, {onConflict: 'snapshot_id,finding_key'})`; `null` → `delete().eq().eq()` |
 | UNIT-MSKSVC-024 | "throws rather than showing an empty screen when the database refuses" | All four calls → `MaslekaError` |
 | UNIT-MSKSVC-025 | "is never available without Supabase" (analyses) | Unconfigured: all four `unavailable` |
+| UNIT-MSKSVC-026 | "publishes the address and the items, in order, through clearinghouse_publish" | `rpc('clearinghouse_publish', {p_snapshot, p_client_email, p_items})` |
+| UNIT-MSKSVC-027 | "tells an address the database refused apart from a failure" | 22023 + `invalid_email` → `invalid_email`; 22023 otherwise → `invalid`; else `failed` |
+| UNIT-MSKSVC-028 | "unpublishes and marks the answers seen by snapshot" | The two rpcs with `p_snapshot` |
+| UNIT-MSKSVC-029 | "reads the published items with the client's answers, in position order" | Items mapped; an unknown priority dropped; `order('position')` |
+| UNIT-ACC-SNAP-001 | "reads my_snapshot's answer, dropping an item that does not fit" (`account-services.test.ts`) | Two of three items; statuses and notes kept |
+| UNIT-ACC-SNAP-002 | "is null when nothing is published, or the report cannot be read" | `null` for null, an unreadable report, no `published_at` |
+| UNIT-ACC-SNAP-003 | "reads my_snapshot over RPC" | `rpc('my_snapshot')`; null passes through |
+| UNIT-ACC-SNAP-004 | "sends an answer to respond_to_recommendation" | `{p_item, p_status, p_note}` |
+| UNIT-ACC-SNAP-005 | "tells an unconfirmed address, another's recommendation and a sign-out apart" | `unverified` / `failed` / `signed_out` |
 | UNIT-MSKCFG-001 | "is off when unset" | `false` |
 | UNIT-MSKCFG-002..005 | "is off for %j" (TRUE, 1, yes, tru) | `false` |
 | UNIT-MSKCFG-006..007 | "is on for %j" (true, " true ") | `true` (trim, then `=== "true"`) |
@@ -1287,6 +1296,9 @@ Fixed rules over a `Snapshot` (`src/lib/clearinghouse/`), on the made-up client 
 | UNIT-CHA-018 | "starts every finding as a draft in the draft's own words" | All `draft`; nothing to print |
 | UNIT-CHA-019 | "prints approved findings only, in Dorit's words when she edited them" | One approved (edited) printed; rejected and stale decisions ignored |
 | UNIT-CHA-020 | "does not call a text 'edited' when it is the draft's own" | `edited` false |
+| UNIT-CHA-021 | "takes a finding's priority from its severity until Dorit sets one" | high → important, else check; her title and priority win |
+| UNIT-CHA-022 | "reads her own recommendations in the order she wrote them, skipping one without a title or text" | `custom:` keys by `reviewedAt`; `rule: "custom"` |
+| UNIT-CHA-023 | "publishes the approved rule findings first, in Dorit's words, then hers" | `publishItems`: rejected left out |
 
 ### 4.49a Stale builds and page chunks that will not load — `tests/unit/freshness.dom.test.ts` (new cases)
 
@@ -1353,6 +1365,19 @@ On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's l
 | UNIT-HB-012 | "puts possible duplicates first" | First group flagged |
 | UNIT-HB-013 | "names counts, the flagged types with their companies and the missing types — and no identifier" | Summary lines; ≤ 1800 chars; no ID or policy number |
 | UNIT-HB-014 | "says when nothing looks duplicated" | "לא נמצא כפל אפשרי." |
+
+### 4.53 The client's snapshot — `tests/unit/clearinghouse-client-view.test.ts`
+
+`src/lib/clearinghouse/client-view.ts`: the tiles and the cover lines of the "תמונת מצב" tab (and of Dorit's preview of it).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CV-001 | "adds up savings and this year's fees as the analysis does" | Equal to `totals()` |
+| UNIT-CV-002 | "projects each pension fund to 67 on its own fee and deposit, and nothing without an age" | Equal to `projectRetirement`; `null` with no age |
+| UNIT-CV-003 | "prices only what is above the yardsticks: default funds for pensions, Dorit's threshold for savings, never insurance" | 320 for the four-account case |
+| UNIT-CV-004 | "counts the recommendations the client has not answered" | 2 of 4 |
+| UNIT-CV-005 | "one active product: covered; two: a possible duplicate" | death covered, disability duplicate |
+| UNIT-CV-006 | "only in a dormant product: partial; in none: not found" | partial, not_found |
 
 ## 5. Pass criteria
 
