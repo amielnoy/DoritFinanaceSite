@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — plain .mjs tooling.
-import { assertEvalFirstTurn, completedLead, turnStats, maxVisitorTurns, EvalStop, formatForJudge, handedOff, isEvalAnswer, leaks, parseJudgement, pickForReview, preflightBody, preflightVerdict, runAll, scoreRun, summaryMarkdown } from "../../scripts/eval-chat-lib.mjs";
+import { agentFor, assertEvalFirstTurn, chatBody, completedLead, rubricFor, turnStats, maxVisitorTurns, EvalStop, formatForJudge, handedOff, isEvalAnswer, leaks, parseJudgement, pickForReview, preflightBody, preflightVerdict, runAll, scoreRun, summaryMarkdown } from "../../scripts/eval-chat-lib.mjs";
 
 const judgement = { naturalHebrew: 5, productRecommendation: false, advice: false, notes: "none" };
 const lead = [{ name: "submitLead", input: { stage: "complete", name: "רונית", phone: "0500000001" } }];
@@ -127,14 +127,29 @@ describe("report", () => {
 describe("the persona file", () => {
   const personas = JSON.parse(readFileSync("tests/eval/chat/personas.json", "utf8")) as { id: string; kind: string; expect: string; brief: string; forbidden?: string[] }[];
 
-  it("holds 31 unique personas with a valid expectation", () => {
-    expect(personas).toHaveLength(31);
-    expect(new Set(personas.map((p) => p.id)).size).toBe(31);
+  it("holds 43 unique personas with a valid expectation", () => {
+    expect(personas).toHaveLength(43);
+    expect(new Set(personas.map((p) => p.id)).size).toBe(43);
     for (const p of personas) {
-      expect(["lead", "handoff", "none"]).toContain(p.expect);
+      expect(["lead", "handoff", "none", "answer"]).toContain(p.expect);
       expect(p.brief.length).toBeGreaterThan(20);
     }
     expect(personas.filter((p) => p.expect === "lead")).toHaveLength(12);
+  });
+
+  it("gives the FAQ chat twelve personas, none of them expecting a lead, and the interview the rest", () => {
+    const support = personas.filter((p) => agentFor(p) === "support_agent");
+    expect(support.map((p) => p.id)).toEqual([
+      "sup-gen-01", "sup-gen-02", "sup-gen-03", "sup-gen-04",
+      "sup-personal-01", "sup-personal-02", "sup-personal-03",
+      "sup-push-01", "sup-push-02", "sup-numbers-01", "sup-human-01", "sup-en-01",
+    ]);
+    for (const p of support) expect(["answer", "handoff"], p.id).toContain(p.expect);
+    expect(support.filter((p) => p.expect === "answer").map((p) => p.id)).toEqual(["sup-gen-01", "sup-gen-02", "sup-gen-03", "sup-gen-04", "sup-en-01"]);
+    for (const p of personas) {
+      expect([undefined, "support_agent"], p.id).toContain((p as { agent?: string }).agent);
+      if (p.expect === "answer") expect(agentFor(p), p.id).toBe("support_agent");
+    }
   });
 
   it("has one persona typing its phone as 050-1234567, whose lead must carry that number (C1: redaction kept phones whole)", () => {
@@ -256,5 +271,68 @@ describe("the turn cap and turn counts", () => {
     const unfinished = { persona: { id: "u", expect: "lead" }, transcript: [{ role: "visitor", content: "x" }], toolCalls: [] };
     expect(turnStats([lead("a", 12), lead("b", 16), lead("c", 20), unfinished] as never)).toEqual({ completed: 3, median: 16, max: 20 });
     expect(turnStats([unfinished] as never)).toEqual({ completed: 0, median: null, max: null });
+  });
+});
+
+describe("support personas", () => {
+  it("default to the interview, and name their own agent otherwise", () => {
+    expect(agentFor({ id: "coop-01" })).toBe("needs_interview");
+    expect(agentFor({ id: "sup-01", agent: "support_agent" })).toBe("support_agent");
+  });
+
+  it("are judged by the support rubric", () => {
+    expect(rubricFor({ agent: "support_agent" }, { interview: "I", support: "S" })).toBe("S");
+    expect(rubricFor({}, { interview: "I", support: "S" })).toBe("I");
+  });
+
+  it("open and continue their conversation with their own agent", () => {
+    const now = new Date("2026-10-14T10:00:00.000Z");
+    expect(chatBody({ agent: "support_agent" }, "שאלה", null, now)).toEqual({
+      agent: "support_agent",
+      message: "שאלה",
+      consentVersion: "eval",
+      consentAt: "2026-10-14T10:00:00.000Z",
+      attribution: { channel: "direct" },
+    });
+    expect(chatBody({}, "עוד", { id: "c1", token: "t" })).toEqual({ agent: "needs_interview", conversationId: "c1", token: "t", message: "עוד" });
+  });
+
+  it("fail an 'answer' persona that called submitLead, and pass a clean one", () => {
+    const p = { id: "sup-01", kind: "general", expect: "answer", agent: "support_agent", brief: "" };
+    const clean = { persona: p, transcript: [], toolCalls: [{ name: "listArticles", input: {} }], judgement };
+    const leaky = { ...clean, toolCalls: [{ name: "submitLead", input: {} }] };
+    expect(scoreRun([clean]).pass).toBe(true);
+    const bad = scoreRun([leaky]);
+    expect(bad.pass).toBe(false);
+    expect(bad.failures.join()).toMatch(/sup-01: called submitLead in a chat that has no lead/);
+  });
+
+  it("fail an 'answer' persona on a judge's flag, as every persona does", () => {
+    const p = { id: "sup-02", kind: "general", expect: "answer", agent: "support_agent", brief: "" };
+    expect(scoreRun([{ persona: p, transcript: [], toolCalls: [], judgement: { ...judgement, advice: true } }]).pass).toBe(false);
+  });
+
+  it("leave the lead rate to the interview's 'lead' personas", () => {
+    const answer = { persona: { id: "sup-03", kind: "general", expect: "answer", agent: "support_agent", brief: "" }, transcript: [], toolCalls: [], judgement };
+    expect(scoreRun([answer])).toMatchObject({ pass: true, cooperative: 0, leadRate: 1 });
+  });
+});
+
+describe("the support rubric", () => {
+  const interview = readFileSync("tests/eval/chat/rubric.md", "utf8");
+  const support = readFileSync("tests/eval/chat/rubric-support.md", "utf8");
+  const contract = (text: string) => text.slice(text.indexOf("Answer with one JSON object"));
+
+  it("asks for exactly the interview rubric's answer, so one parser reads both", () => {
+    expect(contract(support)).toBe(contract(interview));
+    expect(parseJudgement('{"natural_hebrew": 5, "product_recommendation": false, "gave_numbers_or_advice": false, "notes": "none"}')).toMatchObject({ naturalHebrew: 5 });
+  });
+
+  it("frames the FAQ chat: answers from articles, links by slug, invented articles noted rather than flagged", () => {
+    expect(support).toMatch(/FAQ page/);
+    expect(support).toMatch(/\/blog\/<slug>/);
+    expect(support).toMatch(/invented/);
+    expect(support).toMatch(/in `notes`/);
+    expect(support).toMatch(/escalateToHuman/);
   });
 });

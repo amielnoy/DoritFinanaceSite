@@ -4,7 +4,8 @@
 // A Sonnet model plays each persona in tests/eval/chat/personas.json against
 // the deployed function, in evaluation mode (x-chat-eval: tools are simulated,
 // nothing reaches Dorit, the rows are purged within a day). A second Sonnet
-// call scores each transcript with tests/eval/chat/rubric.md.
+// call scores each transcript with tests/eval/chat/rubric.md, or
+// rubric-support.md for a persona of the FAQ chat (`"agent": "support_agent"`).
 //
 //   CHAT_EVAL_URL      https://<ref>.supabase.co/functions/v1/chat
 //   CHAT_EVAL_TOKEN    the function secret of the same name
@@ -16,7 +17,7 @@
 // exits 1 when the run does not pass. About $3 a run.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { assertEvalFirstTurn, completedLead, maxVisitorTurns, turnStats, EvalStop, formatForJudge, handedOff, isEvalAnswer, parseJudgement, pickForReview, runAll, scoreRun, summaryMarkdown } from './eval-chat-lib.mjs';
+import { agentFor, assertEvalFirstTurn, chatBody, completedLead, maxVisitorTurns, turnStats, EvalStop, formatForJudge, handedOff, isEvalAnswer, parseJudgement, pickForReview, rubricFor, runAll, scoreRun, summaryMarkdown } from './eval-chat-lib.mjs';
 
 const env = process.env;
 const missing = ['CHAT_EVAL_URL', 'CHAT_EVAL_TOKEN', 'ANTHROPIC_API_KEY'].filter((k) => !env[k]);
@@ -29,7 +30,10 @@ const MODEL = env.EVAL_MODEL || 'claude-sonnet-5-5';
 const MAX_VISITOR_TURNS = maxVisitorTurns(env.EVAL_MAX_TURNS);
 const only = env.EVAL_ONLY ? new Set(env.EVAL_ONLY.split(',').map((s) => s.trim())) : null;
 const personas = JSON.parse(readFileSync('tests/eval/chat/personas.json', 'utf8')).filter((p) => !only || only.has(p.id));
-const rubric = readFileSync('tests/eval/chat/rubric.md', 'utf8');
+const rubrics = {
+  interview: readFileSync('tests/eval/chat/rubric.md', 'utf8'),
+  support: readFileSync('tests/eval/chat/rubric-support.md', 'utf8'),
+};
 
 async function claude(system, messages, maxTokens = 600) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -50,11 +54,14 @@ async function chat(body) {
   return { httpStatus: res.status, ...json };
 }
 
+// The FAQ chat saves no lead, so its visitor also leaves once answered.
 const visitorSystem = (p) =>
   `את/ה משחק/ת מבקר/ת באתר של מתכננת פיננסית וסוכנת ביטוח בישראל, ומשוחח/ת עם העוזר האוטומטי שלה.\n` +
   `הדמות: ${p.brief}\n` +
   `כתוב/י רק את ההודעה הבאה של הדמות — קצרה וטבעית, בשפה של הדמות. אל תצא/י מהדמות ואל תסביר/י. ` +
-  `כשהשיחה הסתיימה מבחינת הדמות (העוזר אישר שהפרטים נשמרו, העביר לאדם, או שהדמות הייתה עוזבת) — כתוב/י בדיוק [END].`;
+  (agentFor(p) === 'support_agent'
+    ? `כשהשיחה הסתיימה מבחינת הדמות (קיבלה תשובה לשאלתה, הועברה לאדם, או שהדמות הייתה עוזבת) — כתוב/י בדיוק [END].`
+    : `כשהשיחה הסתיימה מבחינת הדמות (העוזר אישר שהפרטים נשמרו, העביר לאדם, או שהדמות הייתה עוזבת) — כתוב/י בדיוק [END].`);
 
 async function runPersona(p) {
   const transcript = [];
@@ -66,11 +73,7 @@ async function runPersona(p) {
     const next = await claude(visitorSystem(p), [{ role: 'user', content: 'התחל/י את השיחה.' }, ...view]);
     if (next.includes('[END]')) break;
     transcript.push({ role: 'visitor', content: next });
-    const answer = await chat(
-      conversationId
-        ? { agent: 'needs_interview', conversationId, token, message: next }
-        : { agent: 'needs_interview', message: next, consentVersion: 'eval', consentAt: new Date().toISOString(), attribution: { channel: 'direct' } },
-    );
+    const answer = await chat(chatBody(p, next, conversationId ? { id: conversationId, token } : null));
     if (!conversationId) assertEvalFirstTurn(answer);
     if (!isEvalAnswer(answer)) {
       if (answer.ok) throw new EvalStop('a later answer was not in evaluation mode; stopping');
@@ -82,7 +85,7 @@ async function runPersona(p) {
     transcript.push({ role: 'assistant', content: answer.reply });
     if (answer.leadSaved) break;
   }
-  const verdict = await claude(rubric, [{ role: 'user', content: formatForJudge(p, transcript, toolCalls) }], 800);
+  const verdict = await claude(rubricFor(p, rubrics), [{ role: 'user', content: formatForJudge(p, transcript, toolCalls) }], 800);
   return { persona: p, transcript, toolCalls, judgement: parseJudgement(verdict) };
 }
 
