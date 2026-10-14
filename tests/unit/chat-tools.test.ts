@@ -237,3 +237,25 @@ describe("anything else", () => {
     expect(c.conversation).toMatchObject({ status: "open", escalated: false });
   });
 });
+
+describe("a partial save tells the model to keep talking", () => {
+  // "שמירה שקטה" (a silent save) was read as "say nothing": the reply after it was
+  // empty and the turn failed with 503. The answer now says what to do next.
+  it.each([false, true])("in evaluation mode %s, the partial answer asks for the next question in the same message", async (evalMode) => {
+    const run = createToolRunner({ submitLead: answering(200, { ok: true, leadId: "l1" }), escalateToHuman: answering(200, {}) });
+    const out = await run("submitLead", { ...LEAD, stage: "partial" }, ctx({ evalMode }));
+    const answer = JSON.parse(out.forModel);
+    expect(answer).toMatchObject({ ok: true, stage: "partial" });
+    expect(answer.next).toMatch(/המשך/);
+  });
+
+  it("a complete save says nothing of the kind: the interview is over", async () => {
+    const run = createToolRunner({ submitLead: answering(200, { ok: true, leadId: "l1" }), escalateToHuman: answering(200, {}) });
+    const answer = JSON.parse((await run("submitLead", LEAD, ctx())).forModel);
+    expect(answer).toEqual({ ok: true, stage: "complete" });
+  });
+
+  it("the tool's description says the partial save is not mentioned but the conversation goes on", () => {
+    expect(INTERVIEW_TOOLS[0].description).toMatch(/המשך באותה הודעה/);
+  });
+});

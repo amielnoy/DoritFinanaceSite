@@ -129,4 +129,25 @@ describe("runTurn", () => {
     const err = await runTurn({ ...base, model: scripted([text("   ")]), runTool: vi.fn() }).catch((e) => e);
     expect(err.reason).toBe("empty_reply");
   });
+
+  // The evaluation of 2026-10-14: after a quiet partial save the model twice
+  // answered with nothing (one output token), and the visitor got a 503 mid-interview.
+  it("asks once more when the reply after a tool is empty, and returns the second answer", async () => {
+    const model = scripted([toolUse("submitLead", { stage: "partial" }), text(""), text("תודה. ולכמה זמן הכסף מיועד?")]);
+    const runTool = vi.fn(async () => ok);
+    const result = await runTurn({ ...base, model, runTool });
+    expect(result.reply).toBe("תודה. ולכמה זמן הכסף מיועד?");
+    expect(runTool).toHaveBeenCalledTimes(1);
+    expect(model.calls).toHaveLength(3);
+    // The retry sends the same conversation: nothing invented on the visitor's behalf.
+    expect(model.calls[2].messages).toEqual(model.calls[1].messages);
+    expect(result.usage).toHaveLength(3);
+  });
+
+  it("still fails when the reply after a tool is empty twice", async () => {
+    const model = scripted([toolUse("submitLead", { stage: "partial" }), text(""), text(" ")]);
+    const err = await runTurn({ ...base, model, runTool: vi.fn(async () => ok) }).catch((e) => e);
+    expect(err.reason).toBe("empty_reply");
+    expect(model.calls).toHaveLength(3);
+  });
 });
