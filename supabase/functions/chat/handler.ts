@@ -29,8 +29,16 @@ export const MAX_TURNS = 40;
 export const IDLE_MS = 2 * 60 * 60 * 1000;
 export const PER_IP_PER_MINUTE = 20;
 export const NEW_CONVERSATIONS_PER_HOUR = 300;
-/** How long a turn holds its conversation: past the 25 s turn budget and its tools. A crashed turn's hold lapses after it. */
-export const TURN_LEASE_MS = 60_000;
+/**
+ * How long a turn holds its conversation. The 25 s budget covers only the
+ * model calls; tools run outside it, and saving a lead is several sequential
+ * upstream calls (the row, the mailer, the calendar, the sheet) of up to 10 s
+ * each, over up to MAX_TOOL_ROUNDS rounds. At 60 s a slow provider let the hold
+ * lapse mid-turn, and a second message then ran a parallel turn. The cost of
+ * the longer hold: a turn that crashes without letting go keeps its
+ * conversation answering "busy" for up to three minutes.
+ */
+export const TURN_LEASE_MS = 180_000;
 /** submit-lead's `LEAD_FIELD_LIMITS.consent_version`: a longer version would open a chat whose every save fails. */
 export const MAX_CONSENT_VERSION_CHARS = 40;
 const EVAL_RETENTION_MS = 24 * 60 * 60 * 1000;

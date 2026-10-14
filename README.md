@@ -464,10 +464,12 @@ What it stores and how a turn runs:
   interview exists to take it. A bare nine digits starting 0[2-489] that passes
   the ID check digit is treated as an ID. Nothing is clipped below the column's
   8,000 characters.
-- **One turn at a time.** A message claims its conversation (`busy_until`, 60 s)
+- **One turn at a time.** A message claims its conversation (`busy_until`, 180 s)
   in the same write that counts the turn; a second message sent while the first
   is being answered gets `409 busy` ("הודעה קודמת עדיין בטיפול — רגע אחד."), and
-  a crashed turn's claim lapses after 60 s.
+  a crashed turn's claim lapses after 180 s. The hold is that long because tools
+  run outside the 25 s model budget, and a lead's save can outlast 60 s when a
+  provider is slow.
 - **A saved lead is written the moment the tool answers**, before the model is
   called again; the tool and usage rows after it are best-effort (logged as
   `store.tool_row_failed` / `store.usage_failed`). If the model then fails, the
@@ -549,8 +551,9 @@ in this order:
    for agents served by `chat`), the transcript storage and the "שיחה" tab. The
    v6 sentence carries `TODO(compliance): adviser to approve` in
    `src/config/compliance.ts`; that TODO is a release gate, not a code gap.
-5. Phase 2 step 6 done (Dorit's calendar shared, a test lead seen end to end),
-   because the interview books through the same `submit-lead` handler.
+5. Phase 2 step 6 done (a test lead seen end to end), because the interview
+   books through the same `submit-lead` handler. Done 2026-10-14: an interview,
+   a hand-off and the Outlook invitations were verified on production.
 6. Only then set `VITE_CHAT_AGENTS=needs_interview` on Vercel, redeploy, and run
    one real interview: the lead, the mail, the event, the sheet row, the tab.
 
@@ -561,6 +564,13 @@ Checks that remain before or at the switch:
   id: a dated snapshot id (`claude-haiku-5-5-2026…`) falls back to the most
   expensive known rate, so the budget would overcount. Add the id the API
   actually reports.
+- Once, after the migrations are applied, check the turn claim against the real
+  PostgREST, not the unit tests' fake: send two messages to one conversation at
+  the same moment (e.g. two `curl`s in the evaluation mode). Exactly one should
+  answer 200 and the other `409 busy`, and afterwards the row's `busy_until`
+  should be empty and `turns` up by one. A claim filter PostgREST reads
+  differently from the fake would show here as two 200s or a stuck
+  `busy_until`.
 - Once, after the function is deployed, confirm how Supabase's gateway sets
   `x-forwarded-for`: the per-IP limit (`clientIp` in `_shared/guard.ts`) takes
   its first entry, which is only safe if a client cannot prepend its own. Send
