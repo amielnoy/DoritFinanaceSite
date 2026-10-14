@@ -123,6 +123,29 @@ describe("restStore", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("claims idle, unlogged, non-eval support conversations with one filtered PATCH", async () => {
+    answer = () => new Response(JSON.stringify([{ id: ID, role: "support" }]), { status: 200 });
+    const rows = await restStore.claimSheetLogs(["support"], "2026-10-14T09:00:00.000Z", "2026-10-14T09:30:00.000Z");
+    expect(rows).toMatchObject([{ id: ID }]);
+    const url = new URL(calls[0].url);
+    expect(calls[0].method).toBe("PATCH");
+    expect(url.pathname).toBe("/rest/v1/chat_conversations");
+    const p = url.searchParams;
+    expect(p.get("role")).toBe("in.(support)");
+    expect(p.get("is_eval")).toBe("is.false");
+    expect(p.get("sheet_logged_at")).toBe("is.null");
+    expect(p.get("last_message_at")).toBe("lt.2026-10-14T09:00:00.000Z");
+    expect(p.get("or")).toBe('(busy_until.is.null,busy_until.lt."2026-10-14T09:30:00.000Z")');
+    expect(calls[0].body).toEqual({ sheet_logged_at: "2026-10-14T09:30:00.000Z" });
+  });
+
+  it("refuses a role list it would have to escape, claiming nothing", async () => {
+    answer = () => new Response("[]", { status: 200 });
+    expect(await restStore.claimSheetLogs(["support,interview)"], "2026-10-14T09:00:00.000Z", "2026-10-14T09:30:00.000Z")).toEqual([]);
+    expect(await restStore.claimSheetLogs([], "2026-10-14T09:00:00.000Z", "2026-10-14T09:30:00.000Z")).toEqual([]);
+    expect(calls).toHaveLength(0);
+  });
+
   it("lets go of its own lease only, stamping the last message time", async () => {
     answer = () => new Response(null, { status: 204 });
     await restStore.releaseTurn(ID, "2026-10-13T09:01:00.000Z", "2026-10-13T09:00:20.000Z");

@@ -64,6 +64,19 @@ class MemoryStore implements ChatStore {
     Object.assign(c, { turns: turns + 1, busy_until: leaseUntilIso });
     return { ...c };
   }
+  /** PostgREST's filtered PATCH: role in roles, not eval, unlogged, idle before the cutoff, no live lease. */
+  async claimSheetLogs(roles: readonly string[], cutoffIso: string, nowIso: string) {
+    this.check();
+    const claimed: ConversationRow[] = [];
+    for (const c of this.conversations.values()) {
+      if (!roles.includes(c.role) || c.is_eval || c.sheet_logged_at != null) continue;
+      if (!(Date.parse(c.last_message_at) < Date.parse(cutoffIso))) continue;
+      if (c.busy_until !== null && Date.parse(c.busy_until) >= Date.parse(nowIso)) continue;
+      c.sheet_logged_at = nowIso;
+      claimed.push({ ...c });
+    }
+    return claimed;
+  }
   async releaseTurn(id: string, leaseUntilIso: string, lastMessageAt: string) {
     this.check();
     const c = this.conversations.get(id)!;

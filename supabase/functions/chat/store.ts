@@ -30,6 +30,8 @@ export interface ConversationRow {
   attribution: Attribution;
   is_eval: boolean;
   last_message_at: string;
+  /** When the sheet sweep claimed this conversation; null until then. */
+  sheet_logged_at?: string | null;
 }
 
 export interface NewConversation {
@@ -64,6 +66,8 @@ export interface ChatStore {
    * `leaseUntilIso`. The claimed row, or null when nothing matched.
    */
   claimTurn(id: string, turns: number, nowIso: string, leaseUntilIso: string): Promise<ConversationRow | null>;
+  /** Mark every idle, unlogged, non-eval conversation of these roles as logged now, and return them. One PATCH: what one sweep claims, no other can. */
+  claimSheetLogs(roles: readonly string[], cutoffIso: string, nowIso: string): Promise<ConversationRow[]>;
   /** End this turn's claim (only while it is still `leaseUntilIso`), stamping last_message_at. */
   releaseTurn(id: string, leaseUntilIso: string, lastMessageAt: string): Promise<void>;
   /** Persist a hand-off: escalated_at = now. */
@@ -129,6 +133,17 @@ export const restStore: ChatStore = {
       { turns: turns + 1, busy_until: leaseUntilIso },
     );
     return rows.length === 1 ? (rows[0] as unknown as ConversationRow) : null;
+  },
+  async claimSheetLogs(roles, cutoffIso, nowIso) {
+    if (roles.length === 0 || roles.some((r) => !/^[a-z]+$/.test(r))) return [];
+    // Values in or=() with `:` or `.` are double-quoted (PostgREST's reserved characters).
+    const free = encodeURIComponent(`(busy_until.is.null,busy_until.lt."${nowIso}")`);
+    const rows = await updateRows(
+      'chat_conversations',
+      `role=in.(${roles.join(',')})&is_eval=is.false&sheet_logged_at=is.null&last_message_at=lt.${encodeURIComponent(cutoffIso)}&or=${free}`,
+      { sheet_logged_at: nowIso },
+    );
+    return rows as unknown as ConversationRow[];
   },
   async releaseTurn(id, leaseUntilIso, lastMessageAt) {
     await updateRow('chat_conversations', id, { busy_until: null, last_message_at: lastMessageAt }, `busy_until=eq.${encodeURIComponent(leaseUntilIso)}`);
