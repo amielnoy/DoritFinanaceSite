@@ -78,3 +78,32 @@ describe("the chat tables", () => {
     expect(schedule).toMatch(/cron\.schedule\(\s*'chat-purge-nightly',\s*'15 1 \* \* \*',\s*\$\$select public\.purge_chat_conversations\(\)\$\$\s*\)/);
   });
 });
+
+describe("the support sheet-log sweep (20261018000000)", () => {
+  const read = (path: string) => readFileSync(join(REPO_ROOT, path), "utf8");
+  const sql = read("supabase/migrations/20261018000000_chat_support_sheet_log.sql");
+  const code = sql.replace(/--[^\n]*/g, "");
+
+  it("marks a logged conversation with a nullable timestamp, indexed for the sweep", () => {
+    expect(code).toMatch(/alter table public\.chat_conversations\s+add column sheet_logged_at timestamptz;/);
+    expect(code).toMatch(/create index [a-z_]+ on public\.chat_conversations \(last_message_at\)\s+where sheet_logged_at is null/);
+  });
+
+  it("calls the function only with both Vault secrets, and never hard-codes the project URL", () => {
+    expect(code).toMatch(/vault\.decrypted_secrets where name = 'chat_sweep_url'/);
+    expect(code).toMatch(/vault\.decrypted_secrets where name = 'chat_sweep_token'/);
+    expect(code).toMatch(/if base_url is null or token is null then\s+return;/);
+    expect(code).toMatch(/net\.http_post\(/);
+    expect(code).toMatch(/'x-chat-sweep', token/);
+    expect(code).not.toMatch(/hjowdyiwjjrqceumkvgt/);
+  });
+
+  it("is security definer with an empty search path, and executable by no API role", () => {
+    expect(code).toMatch(/create function public\.chat_sweep_tick\(\)[\s\S]*?security definer[\s\S]*?set search_path = ''/);
+    expect(code).toMatch(/revoke execute on function public\.chat_sweep_tick\(\) from public, anon, authenticated, service_role;/);
+  });
+
+  it("runs every 15 minutes", () => {
+    expect(code).toMatch(/cron\.schedule\(\s*'chat-support-sheet-log',\s*'\*\/15 \* \* \* \*',\s*\$\$select public\.chat_sweep_tick\(\)\$\$\s*\)/);
+  });
+});
