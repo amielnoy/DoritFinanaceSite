@@ -1,8 +1,9 @@
-import React from "react";
-import { Calculator, Heart, Landmark, HeartHandshake, TrendingDown } from "lucide-react";
+import React, { useState } from "react";
+import { Calculator, ChevronDown, Heart, Landmark, HeartHandshake, TrendingDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 
 interface Pillar {
   icon: LucideIcon;
@@ -63,10 +64,26 @@ const PILLARS: Pillar[] = [
   },
 ];
 
+/**
+ * From md up, five open rows. Below md, the same five as an accordion — the
+ * first open, the others one tap away, each opening on its own without closing
+ * another (so nothing above a row moves when it opens). The descriptions stay
+ * in the document when closed: the copy is unchanged, only folded.
+ */
 export default function ServiceMatrix() {
+  const isDesktop = useMediaQuery(MD_UP, true);
+  const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set([0]));
+  const toggle = (i: number) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+
   return (
     <section id="services" className="relative border-b border-border">
-      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-14">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] flex flex-col gap-14 max-md:py-12 max-md:gap-8">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <Reveal>
@@ -78,7 +95,7 @@ export default function ServiceMatrix() {
               </h2>
             </Reveal>
           </div>
-          <p className="max-w-[420px] text-lg leading-[1.75] text-muted-foreground">
+          <p className="max-w-[420px] text-lg leading-[1.75] text-muted-foreground max-md:text-[17px] max-md:leading-[1.7]">
             רוב הכסף שלכם כבר מופקד במקום כלשהו — פנסיה, גמל, השתלמות. כאן בודקים
             מה יש, מה הוא עולה, ומה הוא אמור לעשות עבורכם.
           </p>
@@ -87,6 +104,47 @@ export default function ServiceMatrix() {
         <div className="border-t border-foreground">
           {PILLARS.map((p, i) => {
             const Icon = p.icon;
+            if (!isDesktop) {
+              const expanded = open.has(i);
+              return (
+                <div key={i} className="border-b border-border">
+                  <h3 className="m-0 font-heading font-medium">
+                    <button
+                      type="button"
+                      id={`service-${i}-trigger`}
+                      aria-expanded={expanded}
+                      aria-controls={`service-${i}-panel`}
+                      onClick={() => toggle(i)}
+                      className="w-full min-h-14 flex items-center gap-4 py-3.5 text-start hover:bg-highlight/5 transition-colors duration-200"
+                    >
+                      <span className="font-heading text-[24px] leading-none text-accent lining-nums tabular-nums w-8 shrink-0">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <Icon size={22} strokeWidth={1.25} className="text-highlight shrink-0" aria-hidden="true" />
+                      <span className="flex-1 min-w-0 text-[22px] leading-[1.25]">{p.title}</span>
+                      <ChevronDown
+                        size={20}
+                        strokeWidth={1.5}
+                        aria-hidden="true"
+                        className={`shrink-0 text-accent motion-safe:transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  </h3>
+                  <div
+                    id={`service-${i}-panel`}
+                    role="region"
+                    aria-labelledby={`service-${i}-trigger`}
+                    hidden={!expanded}
+                    className="pb-5 ps-12"
+                  >
+                    <p dir="ltr" className="m-0 text-end font-heading italic text-base text-muted-foreground">
+                      {p.sub}
+                    </p>
+                    <p className="m-0 mt-1.5 text-[17px] leading-[1.7] text-foreground/80">{p.desc}</p>
+                  </div>
+                </div>
+              );
+            }
             return (
               <div
                 key={i}
