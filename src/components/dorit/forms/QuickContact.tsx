@@ -10,7 +10,7 @@ import { Field, inputClass } from "@/components/dorit/primitives/Field";
 import { Send, Loader2, Check, Mail, MessageCircle } from "lucide-react";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { useLocale, useT } from "@/i18n/LocaleContext";
-import { filledInNote } from "@/i18n/locales";
+import { withFilledInNote } from "@/i18n/locales";
 
 interface QuickContactForm {
   name: string;
@@ -52,7 +52,7 @@ export default function QuickContact({ embedded = false, className }: { embedded
         source: "quick",
         // The visitor's words as written, and — from the English or French
         // site — a Hebrew note for Dorit saying so.
-        message: [form.message.trim(), filledInNote(locale) && `(${filledInNote(locale)})`].filter(Boolean).join("\n"),
+        message: withFilledInNote(form.message, locale),
         channel: attribution?.channel,
         campaign: attribution?.campaign ?? undefined,
         landingPath: window.location.pathname,
