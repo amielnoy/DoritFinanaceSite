@@ -123,3 +123,141 @@ test.describe("Pension fee calculator — sanity", () => {
     });
   });
 });
+
+/** The GA4 events the page queued (the inline gtag stub; the real tag is blocked by the fixture). */
+const queued = (page: import("@playwright/test").Page) =>
+  page.evaluate(() =>
+    ((window as unknown as { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? [])
+      .map((entry) => Array.from(entry))
+      .filter((args) => args[0] === "event")
+      .map((args) => ({ name: String(args[1]), params: (args[2] ?? {}) as Record<string, string> })),
+  );
+
+const LEAD_HEADING = "רוצים שדורית תבדוק את הנתונים האמיתיים שלכם?";
+const leadBox = (page: import("@playwright/test").Page, section: string) =>
+  page.locator(`${section} [data-track-location="calculator"]`);
+const waText = async (box: import("@playwright/test").Locator) =>
+  decodeURIComponent(((await box.getByRole("link", { name: /וואטסאפ/ }).getAttribute("href")) ?? "").split("?text=")[1] ?? "");
+
+/** Answers the self-check: single, employed, a mortgage, no health risk. */
+async function completeAssessment(page: import("@playwright/test").Page) {
+  const section = page.locator("#assessment");
+  await section.scrollIntoViewIfNeeded();
+  for (const [question, answer] of [
+    ["באיזה שלב חיים את/ה?", "רווק/ה"],
+    ["איך את/ה עובד/ת?", "שכיר/ה"],
+    ["יש משכנתא או הלוואות משמעותיות?", "כן"],
+    ["יש מחלות כרוניות או סיכון משפחתי?", "לא / לא יודע/ת"],
+  ]) {
+    await expect(section.getByRole("heading", { name: question })).toBeVisible();
+    await section.getByRole("button", { name: answer, exact: true }).click();
+  }
+  await expect(section.getByText("התוצאה שלך")).toBeVisible();
+}
+
+test.describe("Calculator → lead: the box after a result", () => {
+  test("the fee calculator offers Dorit's check on WhatsApp, its result written in, and counts it once", async ({ page }) => {
+    await openCalculator(page);
+    const box = leadBox(page, "#fee-calculator");
+
+    await test_step("the box sits under the result, beside the calculator's own disclaimer", async () => {
+      await expect(box.getByRole("heading", { name: LEAD_HEADING })).toBeVisible();
+      await expect(box.getByText(/הערכה כללית בלבד ואינה ייעוץ או המלצה/)).toBeVisible();
+      await expect(page.locator("#fee-calculator").getByText("הערכה כללית בלבד — אינה מחליפה ייעוץ אישי.")).toBeVisible();
+      const href = await box.getByRole("link", { name: /וואטסאפ/ }).getAttribute("href");
+      expect(href).toMatch(/^https:\/\/wa\.me\/972508311776\?text=/);
+      expect(await waText(box)).toContain("לאורך 25 שנות חיסכון");
+    });
+
+    await test_step("the defaults nobody touched send no calculator_result", async () => {
+      await page.waitForTimeout(2_000);
+      expect((await queued(page)).filter((e) => e.name === "calculator_result")).toEqual([]);
+    });
+
+    await test_step("typing a deposit sends one calculator_result once it settles, with the tool's name and no figure", async () => {
+      await field(page, "הפקדה חודשית (₪)").pressSequentially("3", { delay: 50 });
+      await field(page, "הפקדה חודשית (₪)").fill("3000");
+      await expect
+        .poll(async () => (await queued(page)).filter((e) => e.name === "calculator_result").length, { timeout: 6_000 })
+        .toBe(1);
+      await page.waitForTimeout(2_000);
+      const results = (await queued(page)).filter((e) => e.name === "calculator_result");
+      expect(results).toHaveLength(1);
+      expect(results[0].params.tool).toBe("fee_calculator");
+      for (const e of await queued(page)) expect(JSON.stringify(e.params)).not.toMatch(/\d/);
+      expect(await waText(box)).toMatch(/בהפקדה חודשית של .*3,000/);
+    });
+
+    await test_step("the button is click_whatsapp from location calculator", async () => {
+      // Keep the page: the tracker listens in the capture phase, before this.
+      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
+      await box.getByRole("link", { name: /וואטסאפ/ }).click();
+      expect(await queued(page)).toContainEqual(
+        expect.objectContaining({ name: "click_whatsapp", params: expect.objectContaining({ location: "calculator" }) }),
+      );
+    });
+  });
+
+  test("the insurance self-check ends with the same box, its result in the message, counted once", async ({ page }) => {
+    await gotoApp(page, "/tools");
+
+    await test_step("no box before the last answer", async () => {
+      await expect(leadBox(page, "#assessment")).toHaveCount(0);
+    });
+
+    await test_step("answer the four questions", () => completeAssessment(page));
+
+    const box = leadBox(page, "#assessment");
+    await test_step("the box names the kinds of insurance the check showed, and both disclaimers stay", async () => {
+      await expect(box.getByRole("heading", { name: LEAD_HEADING })).toBeVisible();
+      expect(await waText(box)).toMatch(/סוגי ביטוח לבחון: .*ביטוח חיים/);
+      await expect(page.locator("#assessment").getByText(/ההערכה כאן היא כללית בלבד/)).toBeVisible();
+      await expect(page.locator("#assessment").getByText(/אינו מהווה ייעוץ פיננסי/)).toBeVisible();
+    });
+
+    await test_step("one calculator_result, tool insurance_assessment", async () => {
+      const results = (await queued(page)).filter((e) => e.name === "calculator_result");
+      expect(results.map((e) => e.params.tool)).toEqual(["insurance_assessment"]);
+    });
+  });
+});
+
+test.describe("Calculator → lead on a 375px phone", { tag: "@mobile-only" }, () => {
+  test("the box sits clear of the 64px sticky-bar band, with no sideways scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await gotoApp(page, "/tools");
+    await completeAssessment(page);
+    // The sticky bar is on the home page and the blog, not on /tools today. The
+    // box must clear the 64px band at the bottom of the screen either way, so
+    // the bar's own top is used when it is there and the band's otherwise.
+    const bar = page.locator("div.md\\:hidden.fixed.bottom-0");
+    const barTop = async () =>
+      (await bar.count()) > 0 && (await bar.isVisible()) ? (await bar.boundingBox())!.y : 667 - 64;
+
+    for (const section of ["#fee-calculator", "#assessment"]) {
+      await test_step(`${section}: the box, centred, ends above the band and its button is not covered`, async () => {
+        const box = leadBox(page, section);
+        expect(await box.evaluate((el) => getComputedStyle(el).position)).toBe("static");
+        // `instant`: the page scrolls smoothly, and a box read mid-glide is not where it lands.
+        await box.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+        await expect(box).toBeInViewport({ ratio: 1 });
+        const b = (await box.boundingBox())!;
+        expect(b.y).toBeGreaterThanOrEqual(0);
+        expect(b.y + b.height).toBeLessThanOrEqual(await barTop());
+        expect(b.x).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.width).toBeLessThanOrEqual(375);
+        const link = box.getByRole("link", { name: /וואטסאפ/ });
+        const l = (await link.boundingBox())!;
+        const hit = await page.evaluate(
+          ([x, y]) => document.elementFromPoint(x, y)?.closest("a")?.getAttribute("href") ?? "",
+          [l.x + l.width / 2, l.y + l.height / 2],
+        );
+        expect(hit).toMatch(/^https:\/\/wa\.me\//);
+      });
+    }
+
+    await test_step("no sideways scroll", async () => {
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    });
+  });
+});

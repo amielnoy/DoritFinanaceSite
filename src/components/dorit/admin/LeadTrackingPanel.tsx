@@ -112,7 +112,7 @@ export default function LeadTrackingPanel() {
           לראות לידים: ב-Google Analytics ← Reports ← Engagement ← Events. לסמן Key Event: Admin ← Events,
           ולהפעיל את המתג ליד כל אירוע שמסומן כאן "מומלץ".
         </p>
-        <p>לא נשלחים ל-Google שם, טלפון, מייל, תוכן הודעה או תוכן שיחה — רק שם האירוע ומאיפה בדף הוא קרה.</p>
+        <p>לא נשלחים ל-Google שם, טלפון, מייל, תוכן הודעה או תוכן שיחה — רק שם האירוע, מאיפה בדף הוא קרה ובאיזה כלי.</p>
       </div>
     </section>
   );

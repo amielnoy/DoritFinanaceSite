@@ -5,6 +5,9 @@ import { QUESTIONS, buildRecommendations } from "@/lib/insurance-assessment";
 import type { Answers } from "@/lib/insurance-assessment";
 import { CtaLink } from "@/components/dorit/primitives/Cta";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import CalculatorLeadBox from "@/components/dorit/sections/CalculatorLeadBox";
+import { assessmentMessage } from "@/lib/calculator-lead";
+import { leadEvents } from "@/lib/analytics";
 
 export default function InsuranceAssessment() {
   const [step, setStep] = useState(0);
@@ -21,6 +24,9 @@ export default function InsuranceAssessment() {
       setStep(step + 1);
     } else {
       setDone(true);
+      // The last answer is the explicit action that shows a result: one
+      // `calculator_result` per completed self-check, the tool's name only.
+      leadEvents.calculatorResult("insurance_assessment");
     }
   };
 
@@ -191,11 +197,14 @@ export default function InsuranceAssessment() {
                     })}
                   </div>
 
-                  <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-5">
+                  <CalculatorLeadBox className="mt-12" message={assessmentMessage(recs)} />
+
+                  <div className="mt-8 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-5">
                     <p className="text-sm text-muted-foreground text-center sm:text-right">
                       ההערכה כאן היא כללית בלבד. להמלצות מדויקות — כדאי לשוחח עם דורית.
                     </p>
-                    <CtaLink href="#start" className="whitespace-nowrap">
+                    {/* `/#start`, not `#start`: there is no #start on /tools. */}
+                    <CtaLink href="/#start" className="whitespace-nowrap">
                       <Calendar size={18} />
                       לשיחה קצרה עם דורית
                     </CtaLink>
