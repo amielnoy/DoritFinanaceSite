@@ -10,7 +10,7 @@ import { getAttribution } from "@/lib/attribution";
 import { isIsraeliMobile } from "@/lib/phone";
 import { services } from "@/services";
 import { useLocale, useT } from "@/i18n/LocaleContext";
-import type { Locale } from "@/i18n/locales";
+import { filledInNote } from "@/i18n/locales";
 
 /**
  * "בדיקת תיק פנסיוני" — name, mobile, and the address the personal
@@ -23,8 +23,6 @@ import type { Locale } from "@/i18n/locales";
 
 type Problem = "form.errorName" | "form.errorPhone" | "form.errorEmail";
 
-/** How the summary names the visitor's language for Dorit, who reads it in Hebrew. */
-const LANGUAGE_NOTE: Record<Locale, string> = { he: "", en: " · מולא באנגלית", fr: " · מולא בצרפתית" };
 const isEmail = (v: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
 
 export interface PensionCheckFormProps {
@@ -63,7 +61,7 @@ export default function PensionCheckForm({ location, context, heading }: Pension
         track: "pension",
         meetingTopic: PENSION_CHECK.name,
         // Hebrew whatever the page's language — Dorit reads it — with a note when it was not.
-        summary: `${PENSION_CHECK.name} — בקשה מהאתר (${context}${LANGUAGE_NOTE[locale]}).`,
+        summary: `${PENSION_CHECK.name} — בקשה מהאתר (${[context, filledInNote(locale)].filter(Boolean).join(" · ")}).`,
         profile: { clearinghouse: "מעוניין/ת" },
         stage: "complete",
         channel: attribution?.channel,

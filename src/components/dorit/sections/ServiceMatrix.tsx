@@ -4,12 +4,14 @@ import type { LucideIcon } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useLocale, useT } from "@/i18n/LocaleContext";
 
 interface Pillar {
   icon: LucideIcon;
-  title: string;
+  /** The pillar's keys in home.json: `services.<id>.title` and `.desc`. */
+  id: "p1" | "p2" | "p3" | "p4" | "p5";
+  /** The English subtitle the Hebrew page shows under each title. */
   sub: string;
-  desc: string;
 }
 
 // The five pillars, financial work first.
@@ -34,33 +36,28 @@ interface Pillar {
 const PILLARS: Pillar[] = [
   {
     icon: Landmark,
-    title: "פנסיה, גמל והשתלמות",
+    id: "p1",
     sub: "Pension & Provident",
-    desc: "בחינת המוצרים הקיימים, מסלולי ההשקעה והניוד — והתאמתם לשלב החיים ולטווח שבו הכסף אמור לעבוד.",
   },
   {
     icon: Calculator,
-    title: "מיסוי וקיבוע זכויות",
+    id: "p2",
     sub: "Tax & Rights",
-    desc: "תכנון מס לקראת פרישה, קיבוע זכויות, תיקון 190 ומיצוי הטבות המס שעל ההפקדות.",
   },
   {
     icon: TrendingDown,
-    title: "דמי ניהול ועלויות",
+    id: "p3",
     sub: "Fees & Costs",
-    desc: "בדיקת העלויות שנגבות לאורך שנות החיסכון, והתנהלות מול הגופים המוסדיים בשמכם.",
   },
   {
     icon: Heart,
-    title: "ביטוחי חיים ובריאות",
+    id: "p4",
     sub: "Life & Health",
-    desc: "כיסוי למשפחה, אובדן כושר עבודה, בריאות וכיסוי למשכנתא — מותאמים למי שתלוי בכם בפועל.",
   },
   {
     icon: HeartHandshake,
-    title: "סנגור תביעות",
+    id: "p5",
     sub: "Claims Advocacy",
-    desc: "ליווי צמוד ברגע האמת — ניהול התביעה מול החברה בשמכם, מהדיווח ועד ההכרעה.",
   },
 ];
 
@@ -72,6 +69,10 @@ const PILLARS: Pillar[] = [
  */
 export default function ServiceMatrix() {
   const isDesktop = useMediaQuery(MD_UP, true);
+  const t = useT("home");
+  // The English subtitle repeats the title on an English page and is out of
+  // place on a French one: Hebrew only.
+  const showSub = useLocale() === "he";
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set([0]));
   const toggle = (i: number) =>
     setOpen((prev) => {
@@ -88,16 +89,15 @@ export default function ServiceMatrix() {
           <div>
             <Reveal>
               <Eyebrow>
-                02 · תחומי הליווי
+                {t("services.eyebrow")}
               </Eyebrow>
               <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px] max-w-xl">
-                חמישה עמודי התכנון
+                {t("services.title")}
               </h2>
             </Reveal>
           </div>
           <p className="max-w-[420px] text-lg leading-[1.75] text-muted-foreground max-md:text-[17px] max-md:leading-[1.7]">
-            רוב הכסף שלכם כבר מופקד במקום כלשהו — פנסיה, גמל, השתלמות. כאן בודקים
-            מה יש, מה הוא עולה, ומה הוא אמור לעשות עבורכם.
+            {t("services.intro")}
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export default function ServiceMatrix() {
                         {String(i + 1).padStart(2, "0")}
                       </span>
                       <Icon size={22} strokeWidth={1.25} className="text-highlight shrink-0" aria-hidden="true" />
-                      <span className="flex-1 min-w-0 text-[22px] leading-[1.25]">{p.title}</span>
+                      <span className="flex-1 min-w-0 text-[22px] leading-[1.25]">{t(`services.${p.id}.title`)}</span>
                       <ChevronDown
                         size={20}
                         strokeWidth={1.5}
@@ -137,10 +137,12 @@ export default function ServiceMatrix() {
                     hidden={!expanded}
                     className="pb-5 ps-12"
                   >
-                    <p dir="ltr" className="m-0 text-end font-heading italic text-base text-muted-foreground">
-                      {p.sub}
-                    </p>
-                    <p className="m-0 mt-1.5 text-[17px] leading-[1.7] text-foreground/80">{p.desc}</p>
+                    {showSub ? (
+                      <p dir="ltr" className="m-0 text-end font-heading italic text-base text-muted-foreground">
+                        {p.sub}
+                      </p>
+                    ) : null}
+                    <p className="m-0 mt-1.5 text-[17px] leading-[1.7] text-foreground/80">{t(`services.${p.id}.desc`)}</p>
                   </div>
                 </div>
               );
@@ -157,18 +159,20 @@ export default function ServiceMatrix() {
                   <Icon size={26} strokeWidth={1.25} className="text-highlight shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="flex flex-col gap-1">
                     <h3 className="font-heading font-medium text-[clamp(24px,2.4vw,30px)] leading-[1.2]">
-                      {p.title}
+                      {t(`services.${p.id}.title`)}
                     </h3>
-                    <p dir="ltr" className="self-start font-heading italic text-lg text-muted-foreground">
-                      {p.sub}
-                    </p>
+                    {showSub ? (
+                      <p dir="ltr" className="self-start font-heading italic text-lg text-muted-foreground">
+                        {p.sub}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 {/* Always visible. The ink is `text-foreground/80`, set once and
                     left alone: a fade stacked on a fade measured 3.98:1 here
                     once, and neither class looked wrong on its own. */}
                 <p className="max-w-[560px] text-lg leading-[1.75] text-foreground/80">
-                  {p.desc}
+                  {t(`services.${p.id}.desc`)}
                 </p>
               </div>
             );

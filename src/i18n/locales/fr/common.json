@@ -48,5 +48,12 @@
   "lang.hebrewOnly": "(en hébreu)",
   "contact.whatsappDefault": "Bonjour Dorit, j'aimerais en savoir plus sur la planification financière et l'assurance.",
   "nav.home": "Accueil",
-  "compliance.pensionMarketing": "Dorit Gov Ari — planificatrice financière et agente d'assurance — est titulaire d'une licence d'agent délivrée par l'Autorité des marchés des capitaux, de l'assurance et de l'épargne, n° L-00107009, et entretient des liens avec des organismes institutionnels. Son activité relève de la commercialisation de produits de retraite, et non du conseil en retraite objectif."
+  "compliance.pensionMarketing": "Dorit Gov Ari — planificatrice financière et agente d'assurance — est titulaire d'une licence d'agent délivrée par l'Autorité des marchés des capitaux, de l'assurance et de l'épargne, n° L-00107009, et entretient des liens avec des organismes institutionnels. Son activité relève de la commercialisation de produits de retraite, et non du conseil en retraite objectif.",
+  "submit.failed": "Impossible d'envoyer {what} pour le moment. Vous pouvez écrire directement à {email} ou réessayer.",
+  "submit.message": "votre message",
+  "submit.form": "le formulaire",
+  "submit.request": "votre demande",
+  "submit.report": "le signalement",
+  "nav.call": "Appeler",
+  "nav.phone": "Téléphone"
 }

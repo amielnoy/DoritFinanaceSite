@@ -11,6 +11,7 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { inputClass } from "@/components/dorit/primitives/Field";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useLocale, useT } from "@/i18n/LocaleContext";
 
 type TestimonialItem = Testimonial;
 
@@ -32,6 +33,9 @@ interface TestimonialForm {
  */
 export default function Testimonials() {
   const { isAuthenticated, user } = useAuth();
+  // `tr`, not `t`: each testimonial below is `t`.
+  const tr = useT("home");
+  const he = useLocale() === "he";
   // Adding and deleting are Dorit's. Since the personal area, ordinary visitors
   // sign in too, and "signed in" no longer means "owner" — the writes were
   // refused server-side, but the controls were on show.
@@ -142,9 +146,12 @@ export default function Testimonials() {
           <div className="max-md:min-w-0">
             <Reveal>
               <Eyebrow>
-                05 · לקוחות מספרים
+                {tr("testimonials.eyebrow")}
               </Eyebrow>
-              <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px]">לקוחות מספרים</h2>
+              <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px]">{tr("testimonials.title")}</h2>
+              {/* The quotes are the clients' own words, in Hebrew; on the English
+                  and French pages each card keeps Hebrew's language and direction. */}
+              {he ? null : <p className="mt-3 text-[15px] text-muted-foreground">{tr("testimonials.original")}</p>}
             </Reveal>
           </div>
           {carousel && (
@@ -152,22 +159,22 @@ export default function Testimonials() {
               <button
                 type="button"
                 onClick={() => go(at - 1)}
-                aria-label="ההמלצה הקודמת"
+                aria-label={tr("testimonials.prev")}
                 aria-controls="testimonials-strip"
                 aria-disabled={at <= 0}
                 className={NAV}
               >
-                <ArrowRight size={18} strokeWidth={1.5} aria-hidden="true" />
+                <ArrowRight size={18} strokeWidth={1.5} aria-hidden="true" className="ltr:rotate-180" />
               </button>
               <button
                 type="button"
                 onClick={() => go(at + 1)}
-                aria-label="ההמלצה הבאה"
+                aria-label={tr("testimonials.next")}
                 aria-controls="testimonials-strip"
                 aria-disabled={at >= items.length - 1}
                 className={NAV}
               >
-                <ArrowLeft size={18} strokeWidth={1.5} aria-hidden="true" />
+                <ArrowLeft size={18} strokeWidth={1.5} aria-hidden="true" className="ltr:rotate-180" />
               </button>
             </div>
           )}
@@ -286,7 +293,7 @@ export default function Testimonials() {
                   // scrollable-region-focusable), as the cases' strip has.
                   tabIndex: 0,
                   role: "region",
-                  "aria-label": "לקוחות מספרים — גלילה אופקית",
+                  "aria-label": tr("testimonials.region"),
                   onScroll: onStripScroll,
                 }
               : {})}
@@ -294,7 +301,8 @@ export default function Testimonials() {
             {items.map((t, i) => (
               <article
                 key={t.id}
-                aria-label={carousel ? `המלצה ${i + 1} מתוך ${items.length}` : undefined}
+                aria-label={carousel ? tr("testimonials.item", { n: i + 1, total: items.length }) : undefined}
+                {...(he ? {} : { lang: "he", dir: "rtl" })}
                 className={carousel ? "group relative rounded-md border border-border p-5 flex flex-col shrink-0 w-[88%] snap-start" : "group relative rounded-md border border-border p-7 flex flex-col"}
               >
                 {isAdmin && (

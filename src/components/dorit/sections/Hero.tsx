@@ -5,6 +5,7 @@ import { CONTACT } from "@/config/contact";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { PENSION_CHECK } from "@/config/offers";
+import { useLocalePath, useT } from "@/i18n/LocaleContext";
 
 /**
  * The portrait, pre-sized. The original PNG was 1.85 MB — 79% of the home
@@ -22,6 +23,10 @@ const srcset = (ext: string) => WIDTHS.map((w) => `${HERO}-${w}.${ext} ${w}w`).j
 const HERO_SIZES = "(min-width: 1024px) 490px, (min-width: 768px) calc(100vw - 40px), 88px";
 
 export default function Hero() {
+  const t = useT("home");
+  const tc = useT("common");
+  const tp = useT("pension");
+  const lp = useLocalePath();
   return (
     <section id="top" className="relative border-b border-border pt-[80px] md:pt-[127px]">
       <div className="max-w-[1200px] mx-auto w-full px-[clamp(20px,4vw,40px)] py-[clamp(32px,5vw,64px)] grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-[clamp(32px,4vw,56px)] items-center">
@@ -35,7 +40,7 @@ export default function Hero() {
               <source type="image/webp" srcSet={srcset("webp")} sizes={HERO_SIZES} />
               <img
                 src={`${HERO}-768.webp`}
-                alt="דורית גוב ארי — דיוקן מקצועי"
+                alt={t("hero.portraitAlt")}
                 width={1122}
                 height={1402}
                 className="w-full h-full object-cover object-[center_20%]"
@@ -54,7 +59,7 @@ export default function Hero() {
               squeezed the title onto two ragged lines and broke the licence
               number at its hyphen ("L-" / "00107009"). The number never wraps. */}
           <figcaption className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3 max-md:flex-col max-md:items-start max-md:gap-0.5 max-md:min-w-0 text-sm leading-relaxed text-muted-foreground">
-            <span className="max-md:[text-wrap:balance]">דורית גוב ארי · מתכננת פיננסית וסוכנת ביטוח</span>
+            <span className="max-md:[text-wrap:balance]">{t("hero.byline")}</span>
             <bdi dir="ltr" className="self-start sm:self-auto whitespace-nowrap lining-nums tabular-nums">L-00107009</bdi>
           </figcaption>
         </figure>
@@ -66,7 +71,7 @@ export default function Hero() {
               side — it is a double-read of the same name before the fold.
               Hidden under `sm`, still shown wherever there is room to spare. */}
           <span className="hidden text-sm text-accent animate-fade-up sm:block">
-            דורית גוב ארי · מתכננת פיננסית וסוכנת ביטוח
+            {t("hero.byline")}
           </span>
           <ArchStatement />
           {/* Claims of equal weight, a gold diamond between them.
@@ -74,13 +79,13 @@ export default function Hero() {
               licensed agent quoting a performance figure is a regulated claim,
               and nothing here could substantiate it. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-heading text-xl text-accent animate-fade-up">
-            <span>בעלת רישיון סוכן</span>
+            <span>{t("hero.claimLicence")}</span>
             <span aria-hidden="true" className="w-1.5 h-1.5 rotate-45 border border-highlight" />
-            <span>ליווי אישי 1:1</span>
+            <span>{t("hero.claimPersonal")}</span>
             {/* The FAQ already says it ("פגישת ההיכרות הראשונה ללא עלות וללא
                 התחייבות"); it belongs where the decision to write is made. */}
             <span aria-hidden="true" className="w-1.5 h-1.5 rotate-45 border border-highlight" />
-            <span>פגישת היכרות ללא עלות</span>
+            <span>{t("hero.claimMeeting")}</span>
           </div>
           {/* The financial work, named. "מתכננת עתיד" is true and says nothing
               a visitor can act on; most people arrive holding a pension, a
@@ -88,8 +93,7 @@ export default function Hero() {
               the conversation. Still no figure and no promise — §2 binds this
               copy as it binds the agents. */}
           <p className="max-w-[480px] text-lg leading-[1.6] text-foreground/80 [text-wrap:pretty] animate-fade-up">
-            תכנון פיננסי וביטוחי שמתחיל בתמונה המלאה — פנסיה, גמל והשתלמות,
-            מיסוי וקיבוע זכויות, ודמי הניהול שנגבים מהחיסכון לאורך השנים.
+            {t("hero.lead")}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-5 max-md:gap-3 animate-fade-up">
             {/* `ctaClass`'s own comment is explicit: "an outline, never a
@@ -101,33 +105,33 @@ export default function Hero() {
                 check through the clearinghouse. The conversation stays one tap
                 away, as the secondary button. */}
             <Link
-              to={PENSION_CHECK.path}
+              to={lp(PENSION_CHECK.path)}
               className={ctaClass("border-2 bg-highlight/[0.08] hover:bg-highlight/[0.18] max-md:w-full", { size: "lg" })}
             >
-              {PENSION_CHECK.name}
+              {tp("page.title")}
             </Link>
             {/* Below md the sticky bar's "קביעת שיחה" is the way to #start, and a
                 second full-width button would push WhatsApp and the call below
                 the first screen. */}
             <a href="#start" className={ctaClass("max-md:hidden", { size: "lg", muted: true })}>
-              לשיחה קצרה עם דורית
+              {tc("cta.shortCall")}
             </a>
             {/* Below md: WhatsApp and the phone side by side under the CTA. The
                 global click listener reports them as click_whatsapp and
                 click_phone, location "top". */}
             <div className="md:hidden grid w-full grid-cols-2 gap-3">
               <a
-                href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(CONTACT.defaultWhatsappMessage)}`}
+                href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(tc("contact.whatsappDefault"))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={HERO_ALT}
               >
                 <MessageCircle size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-                וואטסאפ
+                {tc("sticky.whatsapp")}
               </a>
               <a href={`tel:${CONTACT.phoneE164}`} className={HERO_ALT}>
                 <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-                חיוג
+                {tc("nav.call")}
               </a>
             </div>
             {/* The services start a short scroll below on a phone; the link is
@@ -136,7 +140,7 @@ export default function Hero() {
               href="#services"
               className="inline-flex items-center gap-2 min-h-11 text-[17px] text-accent underline decoration-highlight/50 underline-offset-[6px] hover:decoration-highlight transition-colors duration-200 group max-md:hidden"
             >
-              לצפייה בשירותים
+              {t("hero.services")}
               <ArrowDown size={16} strokeWidth={1.5} />
             </a>
           </div>

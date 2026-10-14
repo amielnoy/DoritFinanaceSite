@@ -755,9 +755,18 @@ no `/en` route, no language switcher, no hreflang. Locally:
   That covers a lead's topic and summary (Dorit reads them, with
   "· מולא באנגלית" / "· מולא בצרפתית" appended), questionnaire answers and
   GA4's closed values.
-- **Still Hebrew under `/en` and `/fr`:** the home sections, /tools, /claims,
-  /faq and /atzmaim-31-12. They follow in their own slices, with the sitemap
-  and prerender for the new addresses.
+- **Done in slice 2:** the home page (`home.json`) — hero, headline, the
+  companies, About, the five pillars, the cases, the testimonials' frame and
+  the short contact form; and `useSubmission`'s failure message. On `/en` and
+  `/fr` the short form leads the "start" section: the questionnaire and the
+  interview chat speak Hebrew (their answers are Hebrew values Dorit reads),
+  so they stay on the Hebrew page, as do the FAQ block (it is /faq's content)
+  and the snapshot section. Testimonials are the clients' own Hebrew words,
+  shown as written with `lang="he"`. A message sent from English or French
+  reaches Dorit with "(מולא באנגלית)" / "(מולא בצרפתית)" after it.
+- **Still Hebrew under `/en` and `/fr`:** /tools, /claims, /faq and
+  /atzmaim-31-12. They follow in their own slices, with the sitemap and
+  prerender for the new addresses.
 - **Before the switch goes on:** a native speaker reviews the English and
   French. The compliance adviser approves the translated licence and
   pension-marketing lines (`compliance.pensionMarketing`; COMPLIANCE.md §11).
