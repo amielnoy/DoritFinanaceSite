@@ -771,8 +771,13 @@ no `/en` route, no language switcher, no hreflang. Locally:
   included. The home page's common questions are back on `/en` and `/fr`.
   The support chat at the bottom of /faq answers in Hebrew, so it stays on the
   Hebrew page.
-- **Still Hebrew under `/en` and `/fr`:** /tools, /claims and
-  /atzmaim-31-12. They follow in their own slices, with the sitemap and
+- **Done in slice 4:** /claims with the claim form (`claims.json`) and
+  /atzmaim-31-12 (`yearend.json`), its tax figures carried exactly. The claim
+  types' values stay Hebrew (the backend and a contract test compare them);
+  only their labels are translated. The Hebrew in `claims.json` was taken from
+  the source by script, not retyped. `withFilledInNote()` sends a Hebrew
+  visitor's text exactly as typed, and adds the language note otherwise.
+- **Still Hebrew under `/en` and `/fr`:** /tools. They follow in their own slices, with the sitemap and
   prerender for the new addresses.
 - **Before the switch goes on:** a native speaker reviews the English and
   French. The compliance adviser approves the translated licence and

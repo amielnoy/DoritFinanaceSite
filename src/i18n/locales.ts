@@ -35,6 +35,15 @@ export function filledInNote(locale: Locale): string {
   return { he: "", en: "מולא באנגלית", fr: "מולא בצרפתית" }[locale];
 }
 
+/**
+ * A visitor's free text as Dorit receives it: exactly as typed from the
+ * Hebrew site, and with the note on a line of its own from English or French.
+ */
+export function withFilledInNote(text: string, locale: Locale): string {
+  const note = filledInNote(locale);
+  return note ? [text.trim(), `(${note})`].filter(Boolean).join("\n") : text;
+}
+
 /** The language a pathname is in, and the path without its prefix. */
 export function splitLocale(pathname: string): { locale: Locale; rest: string } {
   const m = pathname.match(/^\/(en|fr)(?=\/|$|#|\?)/);
