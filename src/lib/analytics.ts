@@ -149,7 +149,10 @@ export function initClickTracking(): void {
         else if (href.includes("wa.me") || href.includes("api.whatsapp.com")) track("click_whatsapp", { location });
         else if (href.startsWith("mailto:")) track("click_email", { location });
         else if (href === "#start" || href.endsWith("/#start")) track("cta_click", { location, cta: "start_conversation" });
+        else if (/^(https:\/\/[^/]+)?\/pension-check\/?$/.test(href)) track("cta_click", { location, cta: "pension_check" });
         else if (href.endsWith(SUPPORT_CHAT_HASH)) track("click_chat", { location });
+        else if (/^https:\/\/([a-z0-9-]+\.)*cal\.com\//i.test(href)) track("click_booking", { location });
+        else if (/^https:\/\/(www\.)?whatsapp\.com\/channel\//i.test(href)) track("join_channel", { location });
       } catch {
         /* ignore */
       }
@@ -165,6 +168,8 @@ export type ChatMethod = "ai_interview" | "ai_support" | "ai_procedures" | "ai_b
 export const leadEvents = {
   /** The short contact form, once the lead is saved — not on the click. */
   formSubmitted: () => track("generate_lead", { method: "contact_form" }),
+  /** "בדיקת תיק פנסיוני", once saved — the flagship's own method, from wherever its form sat. */
+  pensionCheckSubmitted: (location: string) => track("generate_lead", { method: "pension_check", location }),
   /** A claim report, once it is saved — ClaimForm fired no GA4 event at all before this. */
   claimSubmitted: () => track("generate_lead", { method: "claim" }),
   /** The interview's summary, once the page has submitted it and it saved. */
@@ -220,9 +225,11 @@ export const LEAD_EVENTS: ReadonlyArray<{
   when: string;
   keyEvent: boolean;
 }> = [
-  { name: "generate_lead", meaning: "ליד שנשמר", when: "טופס יצירת קשר, סיכום ראיון, שאלון ההיכרות או בקשת מעבר לדורית שנשמרו בהצלחה (method מבחין ביניהם; מהשאלון גם topic ו-urgency)", keyEvent: true },
+  { name: "generate_lead", meaning: "ליד שנשמר", when: "טופס יצירת קשר, סיכום ראיון, שאלון ההיכרות, בדיקת תיק פנסיוני או בקשת מעבר לדורית שנשמרו בהצלחה (method מבחין ביניהם; מהשאלון גם topic ו-urgency)", keyEvent: true },
   { name: "click_phone", meaning: "לחיצה על טלפון", when: "כל קישור חיוג באתר (location אומר מאיפה)", keyEvent: true },
   { name: "click_whatsapp", meaning: "לחיצה על וואטסאפ", when: "כל קישור וואטסאפ באתר", keyEvent: true },
+  { name: "click_booking", meaning: "לחיצה על קביעת שיחה ביומן", when: "כל קישור ל-Cal.com (שיחת טלפון של 15 דקות) — location אומר מאיפה", keyEvent: true },
+  { name: "join_channel", meaning: "הצטרפות לערוץ הוואטסאפ", when: "קישור ערוץ התזכורות החודשיות בכותרת התחתונה", keyEvent: false },
   { name: "click_email", meaning: "לחיצה על מייל", when: "כל קישור מייל באתר", keyEvent: true },
   { name: "cta_click", meaning: "לחיצה על \"לשיחה קצרה עם דורית\"", when: "כל קישור לראיון ההיכרות", keyEvent: true },
   { name: "chat_start", meaning: "התחלת שיחה עם עוזר", when: "אישור ההסכמה ולחיצה על \"התחלת השיחה\" (method: איזה צ׳אט)", keyEvent: true },

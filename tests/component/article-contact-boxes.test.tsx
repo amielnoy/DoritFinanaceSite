@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The contact boxes inside an article: one after the third paragraph when more
- * follows, one at the end; WhatsApp pre-filled with the title; /tools only on
+ * follows, one at the end; WhatsApp pre-filled with the title; the topic's offer only on
  * an article a tool there covers.
  */
 import { render, screen, within } from "@testing-library/react";
@@ -106,13 +106,19 @@ describe("ArticleContactBox in an article", () => {
     expect(within(screen.getByTestId("article_end")).getByText(ARTICLE_CTA_FALLBACK)).toBeInTheDocument();
   });
 
-  it("offers /tools on a fees article and not on a tax one", async () => {
+  it("offers the clearinghouse check on a pension or fees article", async () => {
     await renderArticle();
-    expect(within(screen.getByTestId("article_end")).getByRole("link", { name: /לבדיקה במחשבון/ })).toHaveAttribute("href", "/tools");
+    expect(within(screen.getByTestId("article_end")).getByRole("link", { name: /נבדוק לך במסלקה/ })).toHaveAttribute("href", "/pension-check");
   });
 
-  it("does not offer /tools on an article no tool covers", async () => {
+  it("offers the year-end page to the self-employed", async () => {
+    await renderArticle({ tags: "מיסוי, עצמאים, פנסיה" });
+    expect(within(screen.getByTestId("article_end")).getByRole("link", { name: /מה להפקיד עד 31.12/ })).toHaveAttribute("href", "/atzmaim-31-12");
+  });
+
+  it("offers nothing but WhatsApp on an article no offer covers", async () => {
     await renderArticle({ tags: "מיסוי, החזר מס" });
-    expect(within(screen.getByTestId("article_end")).queryByRole("link", { name: /לבדיקה במחשבון/ })).toBeNull();
+    const box = within(screen.getByTestId("article_end"));
+    expect(box.getAllByRole("link")).toHaveLength(1);
   });
 });

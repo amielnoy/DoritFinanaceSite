@@ -1,8 +1,10 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { ArrowDown, MessageCircle, Phone } from "lucide-react";
 import { CONTACT } from "@/config/contact";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
+import { PENSION_CHECK } from "@/config/offers";
 
 /**
  * The portrait, pre-sized. The original PNG was 1.85 MB — 79% of the home
@@ -95,10 +97,19 @@ export default function Hero() {
                 does not go solid. A heavier border and a translucent tint
                 (no opaque fill) is the compromise: more weight than every
                 other outline CTA on the site without breaking the rule. */}
-            <a
-              href="#start"
+            {/* The flagship leads (growth brief, 2026-10-14): the pension-portfolio
+                check through the clearinghouse. The conversation stays one tap
+                away, as the secondary button. */}
+            <Link
+              to={PENSION_CHECK.path}
               className={ctaClass("border-2 bg-highlight/[0.08] hover:bg-highlight/[0.18] max-md:w-full", { size: "lg" })}
             >
+              {PENSION_CHECK.name}
+            </Link>
+            {/* Below md the sticky bar's "קביעת שיחה" is the way to #start, and a
+                second full-width button would push WhatsApp and the call below
+                the first screen. */}
+            <a href="#start" className={ctaClass("max-md:hidden", { size: "lg", muted: true })}>
               לשיחה קצרה עם דורית
             </a>
             {/* Below md: WhatsApp and the phone side by side under the CTA. The

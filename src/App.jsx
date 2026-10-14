@@ -39,6 +39,8 @@ const BlogAdmin = lazy(() => import('@/pages/BlogAdmin'));
 const Claims = lazy(() => import('@/pages/Claims'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const Tools = lazy(() => import('@/pages/Tools'));
+const PensionCheck = lazy(() => import('@/pages/PensionCheck'));
+const YearEndSelfEmployed = lazy(() => import('@/pages/YearEndSelfEmployed'));
 const Perspective = lazy(() => import('@/pages/Perspective'));
 const Masleka = lazy(() => import('@/pages/Masleka'));
 const MaslekaBoard = lazy(() => import('@/pages/MaslekaBoard'));
@@ -98,6 +100,8 @@ const AuthenticatedApp = () => {
         <Route path="/claims" element={<Claims />} />
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/tools" element={<Tools />} />
+        <Route path="/pension-check" element={<PensionCheck />} />
+        <Route path="/atzmaim-31-12" element={<YearEndSelfEmployed />} />
         <Route path="/perspective" element={<Perspective />} />
         <Route path="/masleka" element={<Masleka />} />
         <Route path="/login" element={<Login />} />

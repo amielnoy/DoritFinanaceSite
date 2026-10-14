@@ -3,7 +3,7 @@ import {
   ARTICLE_CTA_FALLBACK,
   articleCtaHeadline,
   articleWhatsappText,
-  showsToolsLink,
+  articleOffer,
   splitAfterParagraph,
 } from "@/lib/articleCta";
 
@@ -57,13 +57,19 @@ describe("articleWhatsappText", () => {
   });
 });
 
-describe("showsToolsLink", () => {
+describe("articleOffer — one next step per article, by its tags", () => {
   it.each([
-    ["פנסיה, דמי ניהול, ניוד", true],
-    ["ביטוח, משכנתא, ביטוח חיים", true],
-    ["מיסוי, החזר מס, שכירים", false],
-    [undefined, false],
-  ])("tags %j → %s (a tool on /tools covers fees and insurance only)", (tags, expected) => {
-    expect(showsToolsLink({ tags })).toBe(expected);
+    ["מיסוי, עצמאים, פנסיה, גמל והשתלמות, סוף שנה", "/atzmaim-31-12"],
+    ["פנסיה, שכירים, גמל והשתלמות", "/pension-check"],
+    ["פנסיה, דמי ניהול, ניוד", "/pension-check"],
+    ["ביטוח, משכנתא, ביטוח חיים", "/tools"],
+    ["מיסוי, החזר מס, שכירים", null],
+    [undefined, null],
+  ])("tags %j → %s", (tags, href) => {
+    expect(articleOffer({ tags })?.href ?? null).toBe(href);
+  });
+
+  it("words the clearinghouse check as the brief does", () => {
+    expect(articleOffer({ tags: "פנסיה" })?.label).toBe("נבדוק לך במסלקה");
   });
 });
