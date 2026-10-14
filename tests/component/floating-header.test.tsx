@@ -107,4 +107,11 @@ describe("<FloatingHeader /> phone menu", () => {
     fireEvent.click(support);
     expect(screen.queryByRole("button", { name: "סגירת תפריט" })).toBeNull();
   });
+
+  it("tags its support link header_menu, so click_chat says the menu sent the visitor", () => {
+    renderHeader({ user: null, isAuthenticated: false });
+    fireEvent.click(screen.getByRole("button", { name: "תפריט" }));
+    const support = screen.getByRole("link", { name: /תמיכה — שאלה לעוזר/ });
+    expect(support.closest("[data-track-location]")).toHaveAttribute("data-track-location", "header_menu");
+  });
 });

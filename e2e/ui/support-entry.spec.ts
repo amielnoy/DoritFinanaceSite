@@ -90,3 +90,52 @@ test.describe("Support chat — reachable from the header and a button", () => {
     });
   });
 });
+
+/** The GA4 events the page queued (the inline gtag stub; the real tag is blocked by the fixture). */
+const queuedChats = (page: Page) =>
+  page.evaluate(() =>
+    ((window as unknown as { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? [])
+      .map((entry) => Array.from(entry))
+      .filter((args) => args[0] === "event" && args[1] === "click_chat")
+      .map((args) => {
+        const p = (args[2] ?? {}) as { location?: string; method?: string };
+        return p.method ? { location: p.location, method: p.method } : { location: p.location };
+      }),
+  );
+
+test.describe("Support chat — every way in reports click_chat", () => {
+  test("the desktop dock's support button is click_chat from floating_dock", async ({ page, isMobile }) => {
+    test.skip(isMobile, "the dock is hidden below md; the phone's ways in are the next case");
+    await gotoApp(page, "/");
+    await page.getByRole("link", { name: /^תמיכה/ }).click();
+    await expect(page).toHaveURL(/\/faq#support-chat$/);
+    expect(await queuedChats(page)).toEqual([{ location: "floating_dock" }]);
+  });
+
+  test("on a phone: the sticky bar, the header menu and the card's button each report where they were", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(!isMobile, "the sticky bar, the drawer and the card are the phone's");
+
+    await test_step("the sticky bar's תמיכה, from the home page", async () => {
+      await gotoApp(page, "/");
+      await stickyBar(page).getByRole("link", { name: /תמיכה/ }).click();
+      await expect(page).toHaveURL(/\/faq#support-chat$/);
+      expect(await queuedChats(page)).toEqual([{ location: "mobile_sticky_bar" }]);
+    });
+
+    await test_step("the header menu's תמיכה — שאלה לעוזר", async () => {
+      await page.getByRole("button", { name: "תפריט" }).click();
+      await page.getByRole("link", { name: /תמיכה — שאלה לעוזר/ }).click();
+      expect(await queuedChats(page)).toContainEqual({ location: "header_menu" });
+    });
+
+    await test_step("the card's שאלו את העוזר opens the chat and says which one", async () => {
+      await page.locator(SUPPORT).getByRole("button", { name: "שאלו את העוזר" }).click();
+      await expect(page.getByRole("dialog", { name: "העוזר של דורית" })).toBeVisible();
+      expect(await queuedChats(page)).toContainEqual({ location: "support-chat", method: "ai_support" });
+      expect(await queuedChats(page)).toHaveLength(3);
+    });
+  });
+});

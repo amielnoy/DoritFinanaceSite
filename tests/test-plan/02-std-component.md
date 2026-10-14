@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 220 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 286 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 273 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 303 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -61,6 +61,8 @@ before asserting anything.
 | CMP-PFC-002 | "recomputes the totals when an input changes" | clear + type `4000` | First result card changes |
 | CMP-PFC-003 | "never shows NaN when every field is cleared" | clear all 5 inputs | Rendered text contains no `NaN` |
 | CMP-PFC-004 | "labels every input for assistive tech" | render | Every `spinbutton` has an accessible name |
+
+The lead box under both /tools calculators is §4.25.
 
 ### 4.4 `<QuickContact />` — the primary lead form
 
@@ -133,6 +135,7 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-HDR-005 | "signs a visitor out and sends them home" | "יציאה" calls `logout(true, <origin>/)` |
 | CMP-HDR-006 | "offers no clearinghouse board link, even to an admin, while the switch is off" | No "בקשות מסלקה" link with `VITE_MASLEKA_ENABLED` unset |
 | CMP-HDR-009 | "lists the support chat as well as the sticky bar's תמיכה" (`describe` "phone menu") | Opening "תפריט" shows "תמיכה — שאלה לעוזר" → `/faq#support-chat`; pressing it closes the menu (`SupportLink` now runs the caller's `onClick` before its own scroll) |
+| CMP-HDR-010 | "tags its support link header_menu, so click_chat says the menu sent the visitor" (`describe` "phone menu") | The drawer's "תמיכה — שאלה לעוזר" sits in `data-track-location="header_menu"` |
 
 ### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
@@ -434,6 +437,7 @@ renders as on a desktop, which is what every other component test relies on.
 | CMP-SHEET-008 | "renders the embedded panel and no card, with no matchMedia at all" | Desktop as before |
 | CMP-SHEET-009 | "renders the same at 1440px with matchMedia present" | Desktop as before |
 | CMP-SHEET-010 | "leaves the home page's interview, which has no mobileSheet, as it was on a phone" | The interview keeps its 560px panel at 390 |
+| CMP-SHEET-011 | "counts each opening of the layer as click_chat, from the chat's own section" | "שאלו את העוזר" → `click_chat {method: ai_support, location: support-chat}`; closed and reopened, two |
 
 ### 4.23 `<AgentChat />` — the FAQ chat on the chat function — `tests/component/chat-function-support.test.tsx`
 
@@ -479,3 +483,36 @@ later and through `forward`; never by an arrow key. `services` is mocked
 | CMP-NWZ-104 | "in the optional part a tap moves on, but the clearinghouse step waits — it may ask for an email" | Life stage and goal move on by tap; "מעוניין/ת" stays and shows the email field |
 | CMP-NWZ-105 | "from md up nothing moves until המשך" | At 1440 a click checks the radio and nothing else |
 
+### 4.25 The calculator → lead box — `tests/component/calculator-lead.test.tsx`
+
+`<PensionFeeCalculator />` and `<InsuranceAssessment />` with `CalculatorLeadBox`.
+The rule for `calculator_result`: the self-check sends one when its last answer
+shows the result (and again only after "התחלה מחדש" and a new result); the fee
+calculator, which recomputes on every keystroke, sends one when the visitor has
+changed an input and then left the inputs alone for `RESULT_SETTLE_MS` (1.5 s),
+once per distinct set of inputs per visit, and never for the untouched defaults
+or while there are no deposits to compute from (`useCalculatorResultEvent`). Fake timers drive the 1.5 s.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CLD-001 | "shows the box under the result, tagged calculator, with the result in the WhatsApp message" | Heading "רוצים שדורית תבדוק את הנתונים האמיתיים שלכם?"; `data-track-location="calculator"`; `wa.me/${CONTACT.whatsapp}?text=` holding "…לאורך 25 שנות חיסכון"; new tab, `noopener` |
+| CMP-CLD-002 | "keeps the calculator's disclaimer, and says the box is not advice" | "הערכה כללית בלבד — אינה מחליפה ייעוץ אישי." visible; the box says "הערכה כללית בלבד ואינה ייעוץ או המלצה" |
+| CMP-CLD-003 | "has one WhatsApp button, the box's, and keeps the link to the conversation" | One `wa.me` link in the calculator; `/#start` still there |
+| CMP-CLD-004 | "reports the box's button as click_whatsapp from location calculator" | `click_whatsapp {location: calculator}` |
+| CMP-CLD-005 | "updates the message as the visitor changes an input" | Years → 10: "לאורך 10 שנות חיסכון" |
+| CMP-CLD-006 | "sends no calculator_result for the defaults nobody touched" | None after 4.5 s |
+| CMP-CLD-007 | "sends calculator_result once the inputs settle — not per keystroke — and with the tool's name only" | Four changes 200 ms apart: none; 1.5 s later exactly `{tool: fee_calculator}`; nothing more after |
+| CMP-CLD-008 | "sends again for a new result, but not for one already counted" | 10 → 20 → 10 years: two events |
+| CMP-CLD-009 | "sends nothing while there is no result to speak of" | Deposit cleared: none |
+| CMP-CLD-010 | "never sends a figure to GA4" | No digit in any `gtag` parameter |
+| CMP-CLD-011 | "shows no box before the result" | Self-check: no box, no event before the last answer |
+| CMP-CLD-012 | "shows the box with the result in the message once the last answer is in" | Every recommended title and "ויצאו N סוגי ביטוח לבחון" in the message |
+| CMP-CLD-013 | "keeps both disclaimers in view" | "ההערכה כאן היא כללית בלבד…" and "…אינו מהווה ייעוץ פיננסי או המלצה לרכישת…" |
+| CMP-CLD-014 | "sends calculator_result once per completed assessment" | One `{tool: insurance_assessment}`; restart → still one; complete again → two |
+| CMP-CLD-015 | "sends its call to the conversation to /#start, which works from /tools" | "לשיחה קצרה עם דורית" → `/#start` (was a bare `#start`, inert on /tools) |
+
+## 5. Pass criteria
+
+All 273 declared cases pass (vitest: 303 with expansions). A `submitLead` or `submitClaim` payload assertion failing
+here is a contract break — cross-check [STD-03](03-std-contract.md) before
+changing the test.

@@ -289,6 +289,7 @@ export default function FloatingHeader() {
               the desktop keeps its round button in the floating dock. */}
           <SupportLink
             onClick={() => setOpen(false)}
+            data-track-location="header_menu"
             className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"
           >
             <span className="inline-flex items-center gap-2"><LifeBuoy size={18} aria-hidden="true" className="text-accent" />תמיכה — שאלה לעוזר</span>

@@ -1083,7 +1083,11 @@ export default function AgentChat({
             <button
               ref={openerRef}
               type="button"
-              onClick={() => setLayerOpen(true)}
+              onClick={() => {
+                setLayerOpen(true);
+                // The card is a way into the chat like the links to it: click_chat.
+                leadEvents.chatOpened(chatMethod, descriptor.sectionId);
+              }}
               aria-haspopup="dialog"
               aria-expanded={layerOpen}
               aria-controls={panelId}

@@ -87,7 +87,9 @@ npx skills add base44/skills
   that sends it. Three rules. **Never send personal data:** `track` keeps only
   `location`, `cta`, `method` and `channel` and drops every other parameter, so a
   name, phone or email cannot leak through one added later — do not widen the
-  allow-list for convenience. **A lead counts only after a successful save:**
+  allow-list for convenience. (`lead_source`/`lead_campaign` come from the
+  attribution, and `tool` takes only a name from `CALCULATOR_TOOLS`, so a figure
+  cannot travel in it.) **A lead counts only after a successful save:**
   `generate_lead` fires from the form's and the interview's success path
   (`leadEvents`), never on the click, or a failed send is reported as a lead.
   **Add every new event to `LEAD_EVENTS`:** it is also the table in the admin
