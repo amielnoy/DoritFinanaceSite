@@ -81,7 +81,7 @@ npx skills add base44/skills
   - **JWT:** every function has a `[functions.<name>]` block with `verify_jwt` in `supabase/config.toml`.
   - **Tests:** `tests/helpers/edge-function.ts` runs a handler in-process, as `base44-function.ts` does for Base44.
   - **Deploy:** CI deploys every function on green `main`, before either production goes out.
-  - **Contracts:** the logging, clock and rid contracts scan them, with the shared modules each one imports.
+  - **Contracts:** the logging, clock and rid contracts scan them, with the modules beside each handler and the shared modules they import. A module that logs through an injected `deps.log` should bind it to a bare `log` first: the scan reads `log(` calls only.
 - `src/lib/analytics.ts`: every event the site sends to GA4, and the one place
   that sends it. Three rules. **Never send personal data:** `track` keeps only
   `location`, `cta`, `method` and `channel` and drops every other parameter, so a
