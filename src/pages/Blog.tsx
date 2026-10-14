@@ -177,8 +177,8 @@ export default function Blog() {
     : `${topic === "all" ? "כל המאמרים" : TOPIC_LABEL[topic]}${tag ? ` · ${tag}` : ""}`;
 
   return (
-    // `pb-14`: room for the phone's sticky bar under the footer, as on Home.
-    <div className="relative bg-background min-h-screen pb-14 md:pb-0">
+    // `pb-16` plus the safe area: room for the phone's 64px sticky bar under the footer, as on Home.
+    <div className="relative bg-background min-h-screen pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
       <FloatingHeader />
 
       <main>

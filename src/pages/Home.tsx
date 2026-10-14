@@ -46,7 +46,7 @@ export default function Home() {
   });
 
   return (
-    <div className="relative bg-background pb-14 md:pb-0">
+    <div className="relative bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
       <ErrorBoundary><SecurityScroll /></ErrorBoundary>
       <ErrorBoundary><FloatingHeader /></ErrorBoundary>
       <main>

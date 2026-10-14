@@ -16,9 +16,13 @@ const SECTION = AGENTS.support.sectionId;
 export default function SupportLink({
   className,
   children,
+  onClick: onClickProp,
   ...rest
 }: Omit<React.ComponentProps<typeof Link>, "to">) {
   const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // The caller's handler first (the phone's menu closes itself), then ours —
+    // spread after ours, a caller's onClick would replace the scroll, not join it.
+    onClickProp?.(e);
     // Leave modified clicks to the browser, or new-tab stops working.
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const section = document.getElementById(SECTION);

@@ -100,21 +100,24 @@ describe("<MobileStickyBar />", () => {
     expect(decodeURIComponent(wa.getAttribute("href") ?? "")).toContain("שלום דורית");
   });
 
-  it("offers a dial link and the short contact form", () => {
+  it("offers a dial link and the conversation", () => {
     withProviders(<MobileStickyBar />);
 
     expect(screen.getByRole("link", { name: /חייגו/ })).toHaveAttribute(
       "href",
       `tel:${CONTACT.phoneE164}`
     );
-    // `/#…`, not `#…`: the bar is on every route and the form only on home —
-    // a bare hash on /blog points at nothing (see useSectionNav).
-    expect(screen.getByRole("link", { name: /השאירו פרטים/ })).toHaveAttribute("href", "/#quick-contact");
+    // `/#…`, not `#…`: the bar is on every route and `#start` only on home —
+    // a bare hash on /blog points at nothing (see useSectionNav). Ending in
+    // `/#start` is also what makes the click listener report cta_click.
+    expect(screen.getByRole("link", { name: "לשיחה קצרה" })).toHaveAttribute("href", "/#start");
   });
 
-  it("offers a way to the support chat", () => {
+  it("holds those three and nothing else — support moved to the header menu", () => {
     withProviders(<MobileStickyBar />);
-    expect(screen.getByRole("link", { name: /תמיכה/ })).toHaveAttribute("href", "/faq#support-chat");
+    expect(screen.getAllByRole("link")).toHaveLength(3);
+    expect(screen.queryByRole("link", { name: /תמיכה/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /השאירו פרטים/ })).toBeNull();
   });
 });
 
