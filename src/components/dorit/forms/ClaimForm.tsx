@@ -6,6 +6,9 @@ import { leadEvents } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
+import { useLocale, useT } from "@/i18n/LocaleContext";
+import { withFilledInNote } from "@/i18n/locales";
+import type { KeyOf } from "@/i18n/resources";
 
 const CLAIM_TYPES = [
   "ביטוח בריאות משלים",
@@ -61,6 +64,8 @@ export default function ClaimForm() {
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const { name, phone, email, claimType, eventDate, policyNumber, description } = form;
+  const t = useT("claims");
+  const locale = useLocale();
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -72,7 +77,7 @@ export default function ClaimForm() {
         setDocs((d) => [...d, { name: file.name, url: file_url }]);
       }
     } catch {
-      setUploadError("העלאת מסמך נכשלה. ניתן לנסות שוב.");
+      setUploadError(t("form.uploadError"));
     } finally {
       setUploading(false);
     }
@@ -102,7 +107,9 @@ export default function ClaimForm() {
         claimType,
         eventDate,
         policyNumber,
-        description,
+        // The visitor's words as written, and — from the English or French
+        // site — a Hebrew note for Dorit saying so.
+        description: withFilledInNote(description, locale),
         documents: docs.map((d) => d.url),
         channel: attribution?.channel,
         campaign: attribution?.campaign ?? undefined,
@@ -118,16 +125,15 @@ export default function ClaimForm() {
         <div className="w-16 h-16 mx-auto rounded-full border border-highlight flex items-center justify-center mb-8">
           <Check size={28} className="text-highlight" />
         </div>
-        <h3 className="font-heading text-3xl md:text-4xl">הדיווח התקבל</h3>
+        <h3 className="font-heading text-3xl md:text-4xl">{t("form.sentTitle")}</h3>
         <p className="mt-6 text-foreground/70 leading-relaxed max-w-md mx-auto">
-          קיבלתי את דיווח האירוע והמסמכים. אחזור אליכם אישית בהקדם האפשרי
-          להמשך טיפול התביעה. במקרה דחוף — ניתן לחייג גם עכשיו.
+          {t("form.sentText")}
         </p>
         <button
           onClick={startAnother}
           className="mt-8 text-sm tracking-wide underline underline-offset-4 hover:text-accent transition-colors"
         >
-          שליחת דיווח נוסף
+          {t("form.again")}
         </button>
       </div>
     );
@@ -138,17 +144,16 @@ export default function ClaimForm() {
       <div className="flex items-start gap-4 mb-8 p-5 bg-secondary/50 border border-border/60">
         <AlertTriangle size={22} className="text-highlight mt-0.5 shrink-0" />
         <p className="text-sm text-foreground/75 leading-relaxed">
-          במקרה חירום רפואי או מיידי — חייגו עכשיו. טופס זה מיועד לדיווח מתועד
-          ומסודר של אירוע ביטוחי, עם צירוף מסמכים.
+          {t("form.emergency")}
         </p>
       </div>
 
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="שם מלא *">
+          <Field label={t("form.name")}>
             <input value={name} onChange={set("name")} className={inputClass()} autoComplete="name" />
           </Field>
-          <Field label="טלפון *">
+          <Field label={t("form.phone")}>
             <input
               value={phone}
               onChange={set("phone")}
@@ -162,7 +167,7 @@ export default function ClaimForm() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="אימייל (לא חובה)">
+          <Field label={t("form.email")}>
             <input
               value={email}
               onChange={set("email")}
@@ -172,43 +177,44 @@ export default function ClaimForm() {
               autoComplete="email"
             />
           </Field>
-          <Field label="מספר פוליסה (לא חובה)">
+          <Field label={t("form.policy")}>
             <input value={policyNumber} onChange={set("policyNumber")} className={inputClass()} />
           </Field>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="סוג אירוע">
+          <Field label={t("form.type")}>
             <select value={claimType} onChange={set("claimType")} className={inputClass()}>
-              <option value="">בחירת סוג…</option>
-              {CLAIM_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+              <option value="">{t("form.choose")}</option>
+              {/* The value Dorit and the backend read stays Hebrew; the label is the page's language. */}
+              {CLAIM_TYPES.map((type, i) => (
+                <option key={type} value={type}>{t(`form.type${i + 1}` as KeyOf<"claims">)}</option>
               ))}
             </select>
           </Field>
-          <Field label="תאריך האירוע">
+          <Field label={t("form.date")}>
             <input type="date" value={eventDate} onChange={set("eventDate")} className={inputClass()} dir="ltr" />
           </Field>
         </div>
 
-        <Field label="תיאור האירוע">
+        <Field label={t("form.description")}>
           <textarea
             value={description}
             onChange={set("description")}
             rows={4}
-            placeholder="תארו את האירוע: מה, מתי, איפה, מי מעורב, וכל פרט רלוונטי."
+            placeholder={t("form.descriptionPlaceholder")}
             className={inputClass("resize-none")}
           />
         </Field>
 
         <div>
           <span className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
-            צירוף מסמכים (תעודות, דוחות, קבלות, תמונות)
+            {t("form.attach")}
           </span>
           <label className="flex flex-col items-center justify-center gap-2 p-8 border border-dashed border-border hover:border-accent transition-colors cursor-pointer text-center">
             <Upload size={22} className="text-accent" />
             <span className="text-sm text-foreground/70">
-              {uploading ? "מעלה מסמכים…" : "לחצו לבחירת קבצים, או גררו לכאן"}
+              {uploading ? t("form.uploading") : t("form.pick")}
             </span>
             <input
               type="file"
@@ -231,7 +237,7 @@ export default function ClaimForm() {
                     onClick={() => removeDoc(i)}
                     disabled={sending}
                     className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                    aria-label="הסרה"
+                    aria-label={t("form.remove")}
                   >
                     <X size={16} />
                   </button>
@@ -242,13 +248,13 @@ export default function ClaimForm() {
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-border/60">
-          <p className="text-xs text-muted-foreground">המסמכים מועלים בצורה מאובטחת וזמינים לדורית בלבד.</p>
+          <p className="text-xs text-muted-foreground">{t("form.secure")}</p>
           <CtaButton onClick={submit} disabled={sending || uploading || !valid}>
             {sending && <Loader2 size={16} className="animate-spin" />}
-            {sending ? "שולח…" : "שליחת דיווח"}
+            {sending ? t("form.sending") : t("form.send")}
           </CtaButton>
         </div>
-        {error && <p className="text-sm text-destructive text-right">{error}</p>}
+        {error && <p className="text-sm text-destructive text-start">{error}</p>}
       </div>
     </div>
   );
