@@ -1,8 +1,9 @@
 // How the chat function's Markdown prompts relate to their sources:
 //   interview.md  = base44/agents/needs_interview.jsonc's instructions, with the
-//                   agency's details as {{agency.*}} placeholders and the three
+//                   agency's details as {{agency.*}} placeholders, the three
 //                   tool-section lines replaced (the fenced `lead` block becomes a
-//                   real submitLead call);
+//                   real submitLead call) and the two language lines replaced
+//                   (English visitors are interviewed in English);
 //   support.md    = base44/agents/support_agent.jsonc's instructions, placeholders
 //                   likewise; the BlogPost line names listArticles/readArticle and
 //                   the logSupportChat lines are removed (the function logs itself);
@@ -39,6 +40,18 @@ export const INTERVIEW_TOOL_SECTION = [
     startsWith: '- אל תאמר למבקר שלא הצלחת לשמור.',
     replacement:
       '- אם submitLead החזירה שגיאה — אמור למבקר במשפט אחד שהשמירה לא הצליחה, ומסור את הטלפון {{agency.phoneDisplay}} ואת האימייל {{agency.email}}. אם השגיאה מבקשת לתקן פרט (למשל מספר טלפון) — בקש אותו שוב ונסה פעם נוספת. אל תמציא הצלחה ואל תמציא כשל: דווח רק על מה שהפונקציה החזירה.',
+  },
+  // The language lines (the user's decision of 2026-10-14): a visitor who writes in
+  // English is interviewed in English, not handed off; what reaches Dorit stays Hebrew.
+  {
+    startsWith: 'אתה סוכן ההיכרות האוטומטי של',
+    replacement:
+      "אתה סוכן ההיכרות האוטומטי של {{agency.displayName}}, מתכננת פיננסית בכירה עם 30 שנות ניסיון. תפקידך לראיין מבקרים באתר בעברית — ומבקר שכותב באנגלית, באנגלית — בטון רגוע, חם, מקצועי ואנושי — ברוח העיצוב 'שלווה מבנית'.",
+  },
+  {
+    startsWith: '- דבר רק בעברית.',
+    replacement:
+      '- דבר בעברית. מבקר שכותב באנגלית — ראיין אותו באנגלית מההודעה הבאה ועד הסוף, באותם כללים, באותן שאלות ובאותן אזהרות (גם הגילוי שאתה עוזר אוטומטי ולא דורית). אל תעביר מבקר לדורית רק משום שהוא כותב באנגלית. מה שנשלח לדורית — summary וערכי profile ב-submitLead, וה-summary ב-escalateToHuman — נכתב תמיד בעברית.',
   },
 ];
 
