@@ -244,6 +244,25 @@ Where the build differs from the text above, the build wins:
 - **One turn at a time per conversation** (final review, I3). `chat_conversations.busy_until` holds a conversation for a running turn: a filtered PATCH (`turns` still the count read, status `open` or `escalated`, `busy_until` null or past) both claims it for 180 s (60 s in PR 1; raised before switch-on because tools run outside the 25 s budget) and counts the turn, so the 40-turn cap holds under concurrency; no match is `409 busy`, which the page shows as "הודעה קודמת עדיין בטיפול — רגע אחד." A new conversation is created claimed; the claim is released when the turn ends, and a crashed turn's lapses.
 - **A tool's effect is written when the tool answers** (final review, I2): status, `lead_id` and `escalated_at` are persisted before the model is called again; tool and usage rows are best-effort. A 503 that carries `leadSaved: true` is shown to the visitor as a saved lead with Dorit's channels (I5), and a `max_tokens` stop inside a tool call fails the turn without running it (I1).
 
+## Amendments during PR 2 (2026-10-14)
+
+PR 2 serves `support_agent` (the FAQ chat). Three decisions taken with the user on 2026-10-14 extend the text above:
+
+- **The split.** PR 2 adds the shared article tools and `support_agent`; PR 3 is `procedures_agent`; PR 4 is `blog_recommender`.
+- **The sheet log stays, and the function writes it.** Base44's agent called `logSupportChat` at the end of a chat when it remembered to. On the function it is not a model tool: a pg_cron job (`chat-support-sheet-log`, every 15 minutes, Vault-held URL and token, migration `20261018000000`) posts to the `chat` function's sweep route (`x-chat-sweep`, `CHAT_SWEEP_TOKEN`), which claims idle support conversations and logs each through the `log-support-chat` handler in-process.
+- **The blog recommender's hidden block** becomes a `recommend_articles` tool in PR 4, not here.
+
+Where the build differs from the plan, the build wins:
+
+- **The article tools** (`listArticles`, `readArticle`) read only `blog_posts` rows with `published = true` and `agency_id` null or agency 1, and refuse a slug outside `src/lib/articlePath.ts`'s pattern before any query. A store failure is `tool_failed`, never `not_found`.
+- **A per-role tool gate.** A tool name outside the conversation's role set answers `unknown_tool` and runs nothing, for every role: the FAQ chat can never save a lead, and the interview never reads articles.
+- **The sweep claims a batch.** A read picks at most 10 of the longest-idle due conversations; one PATCH by those ids, repeating every condition (role, not eval, `sheet_logged_at` null, idle 30 minutes, no live `busy_until`), claims them. The whole backlog in one claim would have marked logged rows that a request cut off at pg_net's 30 s never reached.
+- **A row counts as logged only when `log-support-chat` says so** (it answers 200 with a warning when the append fails). A claimed row is never retried. Without `SHEET_ID` nothing is claimed.
+- **The transcript is fitted** to 1,800 characters (opening, `[…]`, close), because `log-support-chat`'s `redact()` keeps only the first 2,000.
+- **Open:** a visitor who returns between the 30-minute log and the 2-hour close continues a conversation already logged; those turns stay out of the sheet. The alternative is logging at the 2-hour close (a final row, 2 hours late).
+- **The FAQ chat's v6 notice is its own** (`CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`): its v5 points 1–3 and a fourth naming the AI provider outside Israel and the 12-month transcript. The interview's v6 points promise a name, a phone and a meeting, which the FAQ chat does not collect. The adviser approves it with the interview's.
+- **The evaluation** gains 12 FAQ personas, a rubric of its own with the same JSON answer, and an `answer` expectation that fails on any `submitLead` call.
+
 ## Rollout
 
 Each step is reversible on its own.

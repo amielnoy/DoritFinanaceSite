@@ -34,7 +34,12 @@ Two helpers do the work:
   enum, minimum/maximum, no undeclared properties).
 - `tests/helpers/source-scan.ts` — a balanced-brace scanner that extracts the
   object literal passed to a call matching a pattern, returning its top-level
-  keys and string-literal values.
+  keys and string-literal values; `edgeSource()` reads an Edge function's
+  handler, its sibling modules and the `_shared` modules they import.
+- `tests/helpers/chat-prompt-sources.mjs` — the rules that turn a Base44
+  agent's instructions into the chat function's Markdown prompts
+  (`INTERVIEW_TOOL_SECTION`, `SUPPORT_TOOL_SECTION`, `withToolSection`,
+  `collapseBlankRuns`).
 
 ## 4. Test cases
 
@@ -423,6 +428,13 @@ line a real outage produces — "מצטערת, לא הצלחתי לשלוח את
 **`carriers.contract.test.ts`** — every insurer link resolves to a domain that
 exists, and each carrier's name and URL agree.
 
+Since the FAQ chat's sweep, `edgeSource()` in `tests/helpers/source-scan.ts`
+returns a function's `handler.ts`, **its sibling `.ts` modules** (not `index.ts`
+or `*.generated.ts`) and the `_shared` modules any of them import. The logging
+and function-clock contracts therefore scan `chat/turn.ts` and `chat/sweep.ts`
+too: a log line or a date format there is held to the same rules as one in
+`handler.ts`. The test cases themselves are unchanged; what they scan grew.
+
 **`function-clock.contract.test.ts`** — that a time a person reads is Israel
 time. The functions run in UTC and `toLocaleString("he-IL")` takes the zone from
 the runtime, which put every interview summary three hours early (A-63).
@@ -542,6 +554,10 @@ transcript and usage rows.
 | CTR-CHSCH-008 | "record a hand-off apart from status, so a lead and a hand-off can both be told" | `chat_conversations.escalated_at timestamptz` is nullable and present |
 | CTR-CHSCH-009 | "hold a conversation for one turn at a time with a lease, free by default (I3)" | `chat_conversations.busy_until timestamptz` is nullable and present |
 | CTR-CHSCH-010 | "guard against write grants hidden in a list and against any grant to anon" | The two guards match `grant select, insert … to authenticated`, `grant all …`, a grant to `service_role, authenticated`, and a grant to anon; not a select grant, not the service-role grant, not a comment (triage 1) |
+| CTR-CHSCH-011 | "marks a logged conversation with a nullable timestamp, indexed for the sweep" (`20261018000000_chat_support_sheet_log.sql`) | `alter table public.chat_conversations add column sheet_logged_at timestamptz;` and a partial index on `last_message_at` where `sheet_logged_at is null` |
+| CTR-CHSCH-012 | "calls the function only with both Vault secrets, and never hard-codes the project URL" | Reads `chat_sweep_url` and `chat_sweep_token` from `vault.decrypted_secrets`; returns when either is null; `net.http_post` with the `x-chat-sweep` header; the project ref appears nowhere (Review Focus 5) |
+| CTR-CHSCH-013 | "is security definer with an empty search path, and executable by no API role" | `chat_sweep_tick()` is `security definer` with `set search_path = ''`; execute revoked from public, anon, authenticated and service_role |
+| CTR-CHSCH-014 | "runs every 15 minutes" | `cron.schedule('chat-support-sheet-log', '*/15 * * * *', …chat_sweep_tick…)` |
 
 ### 4.11 The chat prompts — `chat-prompts.contract.test.ts`
 
@@ -558,6 +574,15 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 | CTR-CHPROMPT-007 | "no longer lists createConsultationEvent as an interview tool" | The stale `createConsultationEvent` row is gone from `COMPLIANCE.md` |
 | CTR-CHPROMPT-008 | "is what the build script writes from the Markdown files today" | `prompts.generated.ts` equals `renderPromptsModule` output; stale means run `npm run build:chat-prompts` |
 
+`support.md` is the FAQ agent's prompt (`base44/agents/support_agent.jsonc`) with the tool section changed: the BlogPost line names `listArticles` / `readArticle` and links by slug, and the five `logSupportChat` lines are removed because the function logs the sheet itself (see `SUPPORT_TOOL_SECTION` in `tests/helpers/chat-prompt-sources.mjs`).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHPROMPT-009 | "each replaced or removed line exists exactly once today" (support.md against the prompt Base44 runs today) | Each of the six `SUPPORT_TOOL_SECTION` prefixes matches one line of `support_agent.jsonc` |
+| CTR-CHPROMPT-010 | "equals today's instructions with only the tool section changed" | `PROMPTS.support` filled equals today's instructions with the six lines replaced or dropped and blank runs collapsed |
+| CTR-CHPROMPT-011 | "names its real tools and no Base44 one" | Names `listArticles`, `readArticle`, `escalateToHuman` and the `(/blog/<slug>)` link form; not `BlogPost` or `logSupportChat` |
+| CTR-CHPROMPT-012 | "carries the agency's details as placeholders, not literals" | No `050-831-1776`, `dorit@govari-fin.co.il` or `L-00107009` in `PROMPTS.support` |
+
 ### 4.12 The chat function's tools — `tests/contract/chat-function.contract.test.ts`
 
 The interview's tools ask the model for nothing their Edge handlers do not read, and offer exactly the hand-off reasons `escalate-to-human` knows. Tasks 6 and 7 add their cases here.
@@ -572,6 +597,8 @@ The interview's tools ask the model for nothing their Edge handlers do not read,
 | CTR-CHFN-006 | "accepts no consent version longer than submit-lead's column holds" | `MAX_CONSENT_VERSION_CHARS` equals `LEAD_FIELD_LIMITS.consent_version` in `submit-lead/lead.js` |
 | CTR-CHFN-008 | "stamps every conversation with the consent version it was given under" (changed pin, `agents.contract.test.ts`) | `consent_version: consentVersion`, chosen as `viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION` |
 | CTR-CHFN-007 | "sends only fields the function reads" | Every key the browser adapter posts, on the first and the following message, is read by `handler.ts` as `input.<key>` |
+| CTR-CHFN-009 | "sends only fields log-support-chat reads, and never a phone" (the sheet-log sweep → log-support-chat) | `channel` and every key of `sheetRow()`'s output are destructured by `log-support-chat/handler.ts`; no `phone` key |
+| CTR-CHFN-010 | "files only outcomes log-support-chat knows, so none lands as 'לא ידוע'" | `SHEET_OUTCOMES` equals the keys of `OUTCOMES` in `log-support-chat/handler.ts` |
 
 ### 4.13 The clearinghouse schema — `masleka-schema.contract.test.ts`
 

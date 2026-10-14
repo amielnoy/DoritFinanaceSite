@@ -34,6 +34,18 @@ gap is visible and a failure points at a feature.
 | F-28 | Visitor asks how a procedure is carried out, in the procedures chat (/tools) | — | — | CTR-AGT-* | — | EVAL-PRC-001..008 | — | E2E-AGT-009..012 | — | — | A11Y-AXE-008 |
 | F-29 | Signed-in visitor sees their own enquiries (/account) | UNIT-ACC-001..017 | CMP-ACC-001..023, CMP-HDR-001..005 | CTR-ACC-001..006 | INT-ACC-001..010 | — | — | E2E-ACC-001 | — | — | — |
 | F-30 | Admin sees which lead events reach GA4, and marks a browser internal (/admin/leads) | UNIT-GA4-001..014 | CMP-GA4-001..005, CMP-QCF-006 | — | — | — | — | — | — | — | — |
+| F-31 | The FAQ chat runs on the chat function: its own tools, its own notice, no lead tool | UNIT-CHTOOL-020..028, UNIT-CHART-001..009, UNIT-CHHANDLER-048..051, UNIT-CHCONFIG-005..009 | CMP-CHSUP-001/002 | CTR-CHPROMPT-009..012 | — | EVAL-CHAT (UNIT-EVALCHAT-034..042; `npm run test:eval:chat`, manual) | — | — | — | — | — |
+| F-32 | A finished FAQ conversation is logged to the sheet by the function itself, once | UNIT-CHSWEEP-001..014, UNIT-CHSTORE-016..019, UNIT-CHHANDLER-052..059 | — | CTR-CHSCH-011..014, CTR-CHFN-009/010 | — | — | — | — | — | — | — |
+
+### Review Focus of the FAQ-chat branch (feat/chat-pr2-support)
+
+| # | Review Focus | Cases |
+|---|---|---|
+| 1 | The support model naming `submitLead` gets `unknown_tool`-style refusal: nothing is run, the conversation stays open (and the interview is gated the same way for the article tools) | UNIT-CHHANDLER-049, UNIT-CHHANDLER-051, UNIT-CHTOOL-020 |
+| 2 | An invented or mangled slug answers `not_found` with no query; a failing store answers `tool_failed`, never `not_found` | UNIT-CHART-007, UNIT-CHART-008, UNIT-CHTOOL-024, UNIT-CHTOOL-025, UNIT-CHTOOL-028 |
+| 3 | Two overlapping sweeps log each conversation once | UNIT-CHHANDLER-059, UNIT-CHSWEEP-012, UNIT-CHSTORE-016 |
+| 4 | A conversation in a turn, active in the last 30 minutes, or an evaluation one is not logged | UNIT-CHHANDLER-058, UNIT-CHSWEEP-007, UNIT-CHSTORE-016 |
+| 5 | The sweep route refuses a missing or wrong token and runs no chat logic | UNIT-CHHANDLER-052..054, CTR-CHSCH-012 |
 
 ## Coverage gaps (accepted)
 

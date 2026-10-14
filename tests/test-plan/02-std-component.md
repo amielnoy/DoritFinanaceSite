@@ -391,6 +391,15 @@ renders as on a desktop, which is what every other component test relies on.
 | CMP-SHEET-009 | "renders the same at 1440px with matchMedia present" | Desktop as before |
 | CMP-SHEET-010 | "leaves the home page's interview, which has no mobileSheet, as it was on a phone" | The interview keeps its 560px panel at 390 |
 
+### 4.23 `<AgentChat />` — the FAQ chat on the chat function — `tests/component/chat-function-support.test.tsx`
+
+`@/config/chat-agents` is mocked so `support_agent` is served by the chat function; `services.agents` is a real `SupabaseAgentService` over a fake `functions.invoke`; `framer-motion` is stubbed. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CHSUP-001 | "shows the FAQ chat's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS` entry is on screen; the interview's fourth point, `CONSENT.points[2]` and the old support fourth point are not |
+| CMP-CHSUP-002 | "sends the first message as support_agent with the v6 stamp, and shows the reply" | After consent, start and send: `invoke("chat", …)` with `agent: support_agent` and `consentVersion: CHAT_FUNCTION_CONSENT_VERSION`; the reply is shown |
+
 ## 5. Pass criteria
 
 All 216 declared cases pass (vitest: 246 with expansions). A `submitLead` or `submitClaim` payload assertion failing

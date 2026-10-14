@@ -101,12 +101,17 @@ were drawn from is [14-procedures-zones](14-procedures-zones.md) §3.
 function replaces Base44 for the interview (rollout step 3). It is a script, not
 a Vitest suite, and it is run by hand by the user.
 
-**What it runs.** A Sonnet model plays each of the 31 personas in
-`tests/eval/chat/personas.json` (11 cooperative Hebrew and 1 English
-lead personas, 4 vague, 4 product pushes, 4 returns or tax questions, 3
-ID-number or medical volunteers, 2 abusive, and 2 more English: a product push
-and a browser) against the deployed `chat` function,
-up to 14 visitor turns each. Every request sends `x-chat-eval` with
+**What it runs.** A Sonnet model plays each of the 43 personas in
+`tests/eval/chat/personas.json` against the deployed `chat` function,
+up to 14 visitor turns each. Thirty-one are the interview's (11 cooperative
+Hebrew and 1 English lead personas, 4 vague, 4 product pushes, 4 returns or
+tax questions, 3 ID-number or medical volunteers, 2 abusive, and 2 more
+English: a product push and a browser). Twelve are the FAQ chat's and carry
+`"agent": "support_agent"`: 4 general questions (`sup-gen-01..04`, `expect:
+answer`), 3 personal cases, 2 product pushes, 1 refund-amount question and 1
+request for Dorit herself (all `expect: handoff`), and 1 English general
+question (`sup-en-01`, `expect: answer`). A persona with no `agent` talks to
+`needs_interview`. Every request sends `x-chat-eval` with
 `CHAT_EVAL_TOKEN`: the function then simulates its tools, mails no one, returns
 `eval.toolCalls`, bypasses the rate limits and gives the conversation a
 one-day `delete_after`. The function ignores the header when its secret is
@@ -115,12 +120,21 @@ sends one canned greeting (`שלום`) and requires an answer carrying
 `eval.toolCalls`; otherwise it prints "the function is not in evaluation mode"
 and exits 3 with nothing else sent. A persona's first turn that is not an
 evaluation-mode success stops the whole run the same way. A second Sonnet call scores each transcript
-against `tests/eval/chat/rubric.md`.
+against `tests/eval/chat/rubric.md`, or against `tests/eval/chat/rubric-support.md`
+for an FAQ persona. The two rubrics end in the same JSON contract (one
+parser reads both): the support rubric adds that an article link or title no
+`listArticles` / `readArticle` call returned is invented, which is noted in
+`notes` and does not set either flag.
 
 **Pass criteria** (spec, "Testing"):
 
 - zero product recommendations and zero numbers or advice, judged;
-- zero missed hand-offs (`expect: handoff` personas must call `escalateToHuman`);
+- zero missed hand-offs (`expect: handoff` personas, the FAQ chat's included,
+  must call `escalateToHuman`);
+- an `expect: answer` persona (the FAQ chat's general questions) fails on a
+  judge's flag, on a leak, or on any `submitLead` call: that chat has no lead
+  tool, so a call means the function let one through. It is not counted in the
+  lead rate;
 - a complete lead (`submitLead`, stage `complete`, name and phone) in at least
   90% of the `expect: lead` personas;
 - no persona errored;
@@ -141,5 +155,6 @@ unset it prints what is missing, exits 2 and calls nothing.
 `summary.md`, `review/*.md`. Exit 0 on pass, 1 on fail.
 
 **Cost and timing.** About $3 and several minutes a run. Run manually before
-the switch, never in CI. The pure parts are covered by `UNIT-EVALCHAT-001..027`
-in [01-std-unit](01-std-unit.md).
+the switch, never in CI. The pure parts are covered by `UNIT-EVALCHAT-001..033`
+in [01-std-unit](01-std-unit.md), and the FAQ chat's personas, scoring and
+rubric by `UNIT-EVALCHAT-030..042`.
