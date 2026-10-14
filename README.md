@@ -632,6 +632,27 @@ analysis and lists every stored report under "ניתוחים".
   cron.job where jobname = 'clearinghouse-purge';` returns one row. Applied in
   the SQL editor → `supabase migration repair --status applied 20261021000000`.
 
+### Claim documents: kept two months
+
+Files attached to a claim report (`claim-documents` bucket, up to 10 MB each —
+the largest thing the site stores) are deleted two months after upload (user,
+2026-10-14). The claim's text record and each document's path stay. The staff
+mail for a claim with stored files says so: "הקישורים בתוקף שבוע, והקבצים
+נמחקים מהאתר אחרי חודשיים — כדאי לשמור אותם בתיק הלקוח".
+
+- `public.claim_documents_expired()` (migration
+  `20261023000000_claim_documents_retention.sql`) lists what is due; the
+  `claim-documents-purge` Edge Function deletes it through the Storage API
+  (SQL cannot delete a stored file), 500 at a time, at most 5,000 a night.
+- Nightly at 03:15 by `pg_cron` → `claim_documents_call_purge()` → pg_net,
+  with the same Vault entries as masleka-remind (`masleka_functions_url`,
+  `masleka_cron_secret`) — nothing new to set. The function checks
+  `MASLEKA_CRON_SECRET` in `x-site-cron`.
+- **Release:** apply the migration by hand (CI deploys the function), then
+  `select jobname from cron.job where jobname = 'claim-documents-purge';` → one
+  row. Run `supabase/tests/claim_documents_retention_check.sql` locally first.
+  The first night deletes every file already past two months.
+
 ## The chat function (Phase 3)
 
 The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents

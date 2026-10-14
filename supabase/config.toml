@@ -420,6 +420,11 @@ verify_jwt = false
 [functions.masleka-remind]
 verify_jwt = false
 
+# Called nightly by pg_cron (claim_documents_call_purge) with the site's cron
+# secret in x-site-cron, as masleka-remind is.
+[functions.claim-documents-purge]
+verify_jwt = false
+
 # The site's chat posts without signing in, like the forms; the function checks
 # its own input and holds a conversation by its own token.
 [functions.chat]

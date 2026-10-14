@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 166 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 902 including `it.each` / `describe.each` expansions (901 pass, 1 skipped)
+**Location:** `tests/contract/` · **Cases:** 166 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 914 including `it.each` / `describe.each` expansions (913 pass, 1 skipped)
 
 ---
 
@@ -669,6 +669,17 @@ Reads `supabase/migrations/20261021000000_clearinghouse_analysis.sql`. The behav
 | CTR-CHA-005 | "lets the browser change a decision's status and wording only — the database stamps who and when" | Update grant is exactly `status`, `final_text`; the stamp trigger sets `reviewed_by` |
 | CTR-CHA-006 | "purges snapshots past retention nightly, their decisions with them, and only the service role may run it" | The delete, `on delete cascade`, the revoke, `cron.schedule('clearinghouse-purge'` |
 | CTR-CHA-007 | "stores the report as an object, capped in size, and no raw file anywhere" | `jsonb_typeof = 'object'`, `< 262144`; no bucket, `bytea` or `xml` |
+
+### 4.16 Claim-document retention — `claim-documents-retention.contract.test.ts`
+
+Reads `supabase/migrations/20261023000000_claim_documents_retention.sql`, the purge function and `config.toml`. The behaviour is proved by `supabase/tests/claim_documents_retention_check.sql` against a local `supabase start`, and by §4.31 of the integration plan.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CDR-001 | "lists only the claim-documents bucket, past two months" | `bucket_id = 'claim-documents'`, `interval '2 months'` |
+| CTR-CDR-002 | "never deletes in SQL — the files go through the Storage API" | No `delete from storage.`; the function calls `deleteStorageObjects('claim-documents'` |
+| CTR-CDR-003 | "lets only the service role list them or start the purge" | Revoked from public, anon, authenticated; every grant to `service_role` |
+| CTR-CDR-004 | "runs nightly, and the function checks the cron secret rather than a JWT" | `cron.schedule('claim-documents-purge', '15 3 * * *'`; `verify_jwt = false`; `x-site-cron` on both sides |
 
 ## 5. Runtime counterpart
 
