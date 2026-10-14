@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 858 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1447 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 864 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1466 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -385,6 +385,8 @@ only with a value from `CALCULATOR_TOOLS`, so a figure cannot travel in it.
 | UNIT-GA4-025 | "watches the support agent's own section id" | `SUPPORT_CHAT_HASH === "#" + AGENTS.support.sectionId` |
 | UNIT-GA4-026 | "every event it sends is in the catalogue the admin panel shows" | `calculator_result` and `click_chat` are in `LEAD_EVENTS` |
 | UNIT-GA4-027 | "marks click_chat a key event and calculator_result a plain one" | `keyEvent` true / false |
+| UNIT-GA4-028 | "reports a Cal.com booking link, the flagship check and the WhatsApp channel by name" | `click_booking`, `cta_click {cta: pension_check}`, `join_channel`, each with its location |
+| UNIT-GA4-029 | "counts the pension check as a lead of its own method, with where its form sat" | `generate_lead {method: pension_check, location}` |
 
 ### 4.16 Reconciling the lead mirror — `tests/unit/reconcile-leads.test.ts`
 
@@ -1242,7 +1244,8 @@ opens. The message goes from the visitor's phone to Dorit; GA4 hears only
 | UNIT-ACTA-006 | "uses the article's own headline when it has one" | Trimmed `cta_headline` |
 | UNIT-ACTA-007 | "falls back to the general line for %j" (3 cases) | "יש לך שאלה על הנושא הזה? דורית עונה אישית בוואטסאפ" |
 | UNIT-ACTA-008 | "names the article the visitor read" | `שלום דורית, קראתי את המאמר "<title>" ואשמח לשאלה קצרה` |
-| UNIT-ACTA-009 | "tags %j → %s (a tool on /tools covers fees and insurance only)" (4 cases) | True for a "דמי ניהול" or "ביטוח" tag only |
+| UNIT-ACTA-009 | "tags %j → %s" (6 cases) | `articleOffer`: "עצמאים" → `/atzmaim-31-12`; "פנסיה" / "גמל והשתלמות" / "דמי ניהול" → `/pension-check`; "ביטוח" → `/tools`; else none |
+| UNIT-ACTA-011 | "words the clearinghouse check as the brief does" | "נבדוק לך במסלקה" |
 | UNIT-ACTA-010 | "shares the article's own og_image ahead of its cover image" (`blogSeo.test.ts`) | `image` is `og_image` |
 
 ### 4.48 Israeli phone numbers — `tests/unit/phone.test.ts`
@@ -1291,6 +1294,16 @@ Fixed rules over a `Snapshot` (`src/lib/clearinghouse/`), on the made-up client 
 | UNIT-FRESH-001 | "recognises %s's wording" (4 cases) | Chrome, Safari, Firefox and an HTML-for-JS answer are chunk failures |
 | UNIT-FRESH-002 | "does not take an ordinary render error for one" | A TypeError of the page's own, and `undefined`, are not |
 | UNIT-FRESH-003 | "reloads at an address the cache has never seen, keeping the page and its query" | `?x=1&_v=<now>` on the same path |
+
+### 4.49b The offers' wording and outside links — `tests/unit/offers.test.ts`
+
+`src/config/offers.ts` (growth brief, 2026-10-14).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-OFFER-001 | "says no 'חינם' until Dorit confirms she absorbs the clearinghouse's cost" | No "חינם"/"ללא עלות"; the calculator headline word for word |
+| UNIT-OFFER-002 | "points the year-end page at the article its figures come from" | `/atzmaim-31-12` ↔ `/blog/sof-shana-atzmaim` |
+| UNIT-OFFER-003 | "takes %j only as an https link to its own host" (8 cases) | `httpsUrl`: https on cal.com / whatsapp.com kept (trimmed); http, another host, a look-alike, empty → null |
 
 ## 5. Pass criteria
 

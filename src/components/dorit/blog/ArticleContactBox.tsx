@@ -1,17 +1,17 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Calculator, MessageCircle } from "lucide-react";
+import { Calculator, FileSearch, MessageCircle } from "lucide-react";
 import { CONTACT } from "@/config/contact";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import type { Article } from "@/services";
-import { articleCtaHeadline, articleWhatsappText, showsToolsLink } from "@/lib/articleCta";
+import { articleCtaHeadline, articleOffer, articleWhatsappText } from "@/lib/articleCta";
 
 type Placement = "article_inline" | "article_end";
 
 /**
  * A contact box inside an article: after its third paragraph and again at its
  * end. One question, one way to ask it — WhatsApp, pre-filled with the
- * article's title — and /tools when a tool there covers the topic. The click
+ * article's title — and the one next step its topic calls for (articleOffer). The click
  * is counted by initClickTracking as click_whatsapp at this placement.
  */
 export default function ArticleContactBox({
@@ -22,6 +22,7 @@ export default function ArticleContactBox({
   placement: Placement;
 }) {
   const titleId = `article-cta-${placement}`;
+  const offer = articleOffer(post);
   return (
     <aside
       aria-labelledby={titleId}
@@ -45,12 +46,12 @@ export default function ArticleContactBox({
           <MessageCircle size={20} aria-hidden="true" />
           שאלה לדורית בוואטסאפ
         </a>
-        {showsToolsLink(post) && (
-          <Link to="/tools" className={ctaClass(undefined, { muted: true })}>
-            <Calculator size={18} aria-hidden="true" />
-            לבדיקה במחשבון
+        {offer ? (
+          <Link to={offer.href} className={ctaClass(undefined, { muted: true })}>
+            {offer.kind === "tools" ? <Calculator size={18} aria-hidden="true" /> : <FileSearch size={18} aria-hidden="true" />}
+            {offer.label}
           </Link>
-        )}
+        ) : null}
       </div>
     </aside>
   );
