@@ -602,6 +602,36 @@ runs in CI):
 - [ ] Switch on: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED=true` and `VITE_MASLEKA_ENABLED=true` on Vercel (production and preview), then redeploy. Smoke with a hand-made request to a staff member's own address: the client page, a reveal (a row appears in `masleka_access_log`), **הגשתי** (`select count(*) from masleka_requests where (code_ciphertext is not null or id_ciphertext is not null) and status <> 'code_received';` is 0).
 - [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days — but with the switch off `masleka-remind` answers 404, so a wipe in that time is not announced.
 
+### Clearinghouse analysis — Dorit's review
+
+`/admin/masleka/analysis/:snapshotId` turns a stored report into draft
+recommendations and lets Dorit approve each one (as written or in her own
+words) or reject it; **הדפסה** prints the approved ones only, with the
+pension-marketing disclosure. The board links a completed request to its
+analysis and lists every stored report under "ניתוחים".
+
+- **Rules, not a model.** `src/lib/clearinghouse/analysis.ts` — fixed rules and
+  fixed Hebrew wording with the client's numbers filled in; no client data goes
+  to any AI service. The numbers it compares against are in
+  `src/lib/clearinghouse/reference.ts`, each with its source and the day it was
+  checked (legal maximum fees; the default funds' 1% / 0.22%, selection to
+  October 2028); Dorit's own thresholds (`SAVINGS_FEE_WORTH_RAISING`,
+  `SMALL_INACTIVE_BALANCE`, `costSeverity`) sit beside them, marked as policy.
+- **Drafts are computed, decisions are stored.** Findings are recomputed from
+  the snapshot on every visit; `clearinghouse_reviews` keeps only Dorit's
+  decision per finding key, so a better rule reaches every client at once.
+- **Built ahead of the parser.** Nothing writes a snapshot until PR B (the ZIP
+  parser and drop zone), which waits for a real clearinghouse report. Until
+  then the screen is exercised by tests on a made-up client
+  (`tests/fixtures/clearinghouse-snapshot.ts`).
+- **Release:** apply `20261021000000_clearinghouse_analysis.sql` to production
+  **before** this deploys — the board reads `clearinghouse_snapshots` on load;
+  without the table it shows a quiet "לא הצלחנו לטעון את הניתוחים." and the rest
+  of the board works. Run `supabase/tests/clearinghouse_analysis_check.sql`
+  against a local `supabase start` first; after applying, `select jobname from
+  cron.job where jobname = 'clearinghouse-purge';` returns one row. Applied in
+  the SQL editor → `supabase migration repair --status applied 20261021000000`.
+
 ## The chat function (Phase 3)
 
 The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents

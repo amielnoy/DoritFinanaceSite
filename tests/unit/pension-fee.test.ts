@@ -69,6 +69,26 @@ describe("computePensionFees — sanity", () => {
   });
 });
 
+describe("computePensionFees — an opening balance", () => {
+  it("grows existing savings alone when nothing is deposited", () => {
+    const r = computePensionFees({ monthlyDeposit: 0, depositFee: 0, annualFee: 0, years: 1, annualReturn: 12, startingBalance: 100_000 });
+    // 1% a month for 12 months.
+    expect(r.balance).toBeCloseTo(100_000 * 1.01 ** 12, 6);
+    expect(r.totalDeposited).toBe(0);
+  });
+
+  it("charges the balance fee on the opening balance and counts it in what fees cost", () => {
+    const r = computePensionFees({ monthlyDeposit: 0, depositFee: 0, annualFee: 0.5, years: 10, annualReturn: 4, startingBalance: 200_000 });
+    expect(r.totalAnnualFees).toBeGreaterThan(0);
+    expect(r.lostToFees).toBeGreaterThan(r.totalAnnualFees * 0.99);
+  });
+
+  it("is the calculator's own result when the opening balance is left out or not positive", () => {
+    expect(computePensionFees({ ...BASE, startingBalance: 0 })).toEqual(computePensionFees(BASE));
+    expect(computePensionFees({ ...BASE, startingBalance: -5 })).toEqual(computePensionFees(BASE));
+  });
+});
+
 describe("computePensionFees — hostile input", () => {
   it("treats empty strings, junk and undefined as zero instead of NaN", () => {
     const r = computePensionFees({

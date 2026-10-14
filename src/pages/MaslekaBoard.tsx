@@ -7,6 +7,7 @@ import {
   boardColumns,
   copyOrFallback,
   deletionLabel,
+  failureText,
   readinessLabel,
   staffMessage,
   type ClipboardLike,
@@ -44,6 +45,7 @@ export interface MaslekaBoardProps {
 }
 
 export const BOARD_KEY = ["admin", "masleka"] as const;
+export const SNAPSHOTS_KEY = ["admin", "masleka", "snapshots"] as const;
 
 /** How long a revealed value stays on the screen. */
 export const REVEAL_MS = 60_000;
@@ -62,13 +64,6 @@ const when = (iso: string | null): string =>
       })
     : "";
 
-/** Every failure in the staff vocabulary (staffMessage), with the request id for support. */
-export function failureText(error: unknown): string {
-  const message = staffMessage(error);
-  return message.tone === "error" && error instanceof MaslekaError && error.rid
-    ? `${message.text} (קוד ${error.rid})`
-    : message.text;
-}
 
 const buttonClass =
   "inline-flex items-center gap-1 border border-border/60 px-3 py-1.5 text-sm hover:border-accent disabled:opacity-60";
@@ -393,6 +388,8 @@ export default function MaslekaBoard({
 }: MaslekaBoardProps) {
   const client = useQueryClient();
   const requests = useQuery({ queryKey: BOARD_KEY, queryFn: () => service.list(), refetchInterval: 60_000 });
+  const snapshots = useQuery({ queryKey: SNAPSHOTS_KEY, queryFn: () => service.listSnapshots() });
+  const analysisOf = new Map((snapshots.data ?? []).flatMap((s) => (s.requestId ? [[s.requestId, s.id] as const] : [])));
   const [notice, setNotice] = useState<Message | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: BOARD_KEY });
   const report = (e: unknown) => setNotice({ tone: staffMessage(e).tone, text: failureText(e) });
@@ -552,10 +549,36 @@ export default function MaslekaBoard({
               <li key={r.id} className="border border-border/60 p-3">
                 <p className="font-medium">{r.clientName}</p>
                 <p className="text-xs text-muted-foreground">הושלם {when(r.completedAt)}</p>
+                {analysisOf.has(r.id) ? (
+                  <Link to={`/admin/masleka/analysis/${analysisOf.get(r.id)}`} className="mt-2 inline-block text-sm underline">
+                    לניתוח ולהמלצות
+                  </Link>
+                ) : null}
               </li>
             ))}
           </Column>
         </div>
+
+        {/* Every stored report, newest first — also those made by hand or whose
+            request has gone. Quiet when there are none or they cannot be read:
+            the board's own work does not depend on them. */}
+        {snapshots.isError ? (
+          <p className="text-xs text-muted-foreground">לא הצלחנו לטעון את הניתוחים.</p>
+        ) : snapshots.data && snapshots.data.length > 0 ? (
+          <section aria-labelledby="analyses-title">
+            <h2 id="analyses-title" className="font-heading text-xl">ניתוחים</h2>
+            <ul className="mt-3 space-y-2">
+              {snapshots.data.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-baseline gap-3 text-sm">
+                  <Link to={`/admin/masleka/analysis/${s.id}`} className="underline">
+                    {s.clientName}
+                  </Link>
+                  <span className="text-xs text-muted-foreground">דוח מ־{when(s.takenAt)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </main>
     </div>
   );

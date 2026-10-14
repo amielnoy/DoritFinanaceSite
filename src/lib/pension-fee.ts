@@ -12,6 +12,8 @@ export interface PensionFeeInput {
   years: number | string;
   /** תשואה שנתית צפויה, באחוזים */
   annualReturn: number | string;
+  /** יתרה פתיחה בש״ח — חיסכון קיים. ברירת מחדל 0, כמו במחשבון. */
+  startingBalance?: number;
 }
 
 export interface PensionFeeResult {
@@ -47,7 +49,8 @@ export function computePensionFees(input: PensionFeeInput): PensionFeeResult {
   const monthlyReturn = returnRate / 12;
   const monthlyAnnualFee = annualFeeRate / 12;
 
-  let balance = 0;
+  const opening = Math.max(0, num(input.startingBalance));
+  let balance = opening;
   let totalDeposited = 0;
   let totalDepositFees = 0;
   let totalAnnualFees = 0;
@@ -63,7 +66,7 @@ export function computePensionFees(input: PensionFeeInput): PensionFeeResult {
     totalAnnualFees += mgmtFee;
   }
 
-  let optimal = 0;
+  let optimal = opening;
   for (let m = 1; m <= months; m++) {
     optimal *= 1 + monthlyReturn;
     optimal += monthly;
