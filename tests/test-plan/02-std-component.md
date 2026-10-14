@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 348 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 379 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 353 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 385 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -642,12 +642,24 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | ID | Title | Expected result |
 |---|---|---|
 | CMP-I18N-007 | "renders %s with no Hebrew but the testimonials and the switcher's עברית" (/en, /fr) | The h1 in the language; no Hebrew outside `lang="he"` in text, aria-label, alt, placeholder or title |
-| CMP-I18N-008 | "leads with the short form: no questionnaire, no chat, and no FAQ block until /faq is translated" | "Full name *"; no `#interview`, no `#common-questions`; the hero's check → `/en/pension-check` |
+| CMP-I18N-008 | "leads with the short form: no questionnaire and no chat" | "Full name *"; no `#interview`; the hero's check → `/en/pension-check` |
 | CMP-I18N-009 | "keeps the questionnaire and the FAQ block on the Hebrew page" | `#interview` and `#common-questions` present; no original-language note |
 | CMP-I18N-010 | "sends the visitor's message as written, with a Hebrew note for Dorit" | "Please enter your name and phone."; `message` "About my pension\n(מולא באנגלית)" |
 | CMP-I18N-011 | "shows the testimonials in their own Hebrew, marked so" | The card `lang="he" dir="rtl"`; the French note |
 | CMP-I18N-012 | "turns the cases' arrows with the page: back is to the left in English, to the right in Hebrew" | "Previous" scrolls by a negative `left` |
 | CMP-I18N-013 | "keeps the Hebrew page's arrows as they were" | "הקודם" scrolls by a positive `left` |
+
+### 4.36 /faq in English and French — `tests/component/i18n-faq.test.tsx`
+
+`<FAQPage />` and `<Home />` through `LocaleLayout`; the support chat mocked as a marker.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-I18N-014 | "renders %s with no Hebrew but the switcher's עברית" (/en/faq, /fr/faq) | The category heading and the first question in the language; no Hebrew outside `lang="he"` |
+| CMP-I18N-015 | "opens an answer, and moves between topics" | "General" pressed; the first-meeting answer visible |
+| CMP-I18N-016 | "declares its questions in English to search engines, and no Hebrew-only chat" | FAQPage JSON-LD: 24 English questions, no Hebrew; no chat; canonical `/en/faq` |
+| CMP-I18N-017 | "keeps the Hebrew page Hebrew, its English subtitles and its JSON-LD" | "Income Tax · 5 שאלות"; the chat; the Hebrew first question |
+| CMP-I18N-018 | "brings the common questions back to the English home page, linking to /en/faq" | "Common questions"; "All the questions" → `/en/faq` |
 
 ## 5. Pass criteria
 

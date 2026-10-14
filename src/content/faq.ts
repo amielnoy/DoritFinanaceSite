@@ -12,7 +12,17 @@
  * Every surface now selects from this list. Edit an answer here and it
  * changes everywhere at once, structured data included.
  * `tests/unit/faq-content.test.ts` pins the invariants.
+ *
+ * The words live in the resource files, one per language
+ * (`src/i18n/locales/<lang>/faq.json`: `<id>.q`, `<id>.a`, `<id>.tip`,
+ * `cat.<id>`); this file keeps the structure — which entries exist, their
+ * category and tip number. `FAQ_ENTRIES` is the Hebrew, as it always was;
+ * `localizeFaq` gives an entry in another language.
  */
+
+import heFaq from "@/i18n/locales/he/faq.json";
+import { translate } from "@/i18n/LocaleContext";
+import type { Locale } from "@/i18n/locales";
 
 export type FaqCategoryId = "tax" | "pension" | "insurance" | "general";
 
@@ -37,162 +47,162 @@ export interface FaqEntry {
 }
 
 export const FAQ_CATEGORIES: readonly FaqCategory[] = [
-  { id: "tax", label: "מס הכנסה", labelEn: "Income Tax" },
-  { id: "pension", label: "פנסיה וחיסכון", labelEn: "Pension & Savings" },
-  { id: "insurance", label: "ביטוח", labelEn: "Insurance" },
-  { id: "general", label: "כללי", labelEn: "General" },
+  { id: "tax", label: heFaq["cat.tax"], labelEn: "Income Tax" },
+  { id: "pension", label: heFaq["cat.pension"], labelEn: "Pension & Savings" },
+  { id: "insurance", label: heFaq["cat.insurance"], labelEn: "Insurance" },
+  { id: "general", label: heFaq["cat.general"], labelEn: "General" },
 ];
 
 export const FAQ_ENTRIES: readonly FaqEntry[] = [
   {
     id: "tax-planning",
     category: "tax",
-    q: "כיצד תכנון מס נכון חוסך בחיסכון הפנסיוני?",
-    a: "תכנון מס נכון כולל ניצול הטבות מס בהפקדות לפנסיה, גמל והשתלמות, מיצוי זיכויים במס, ובחירת מוצרי חיסכון עם יחס מס נמוך. הפקדה לפנסיה מזכה בהטבת מס משמעותית עד לתקרה שנתית, ומשיכה כקצבה מזכה בהטבת מס נוספת. תכנון נכון יכול לחסוך עשרות אלפי שקלים בשנה.",
+    q: heFaq["tax-planning.q"],
+    a: heFaq["tax-planning.a"],
   },
   {
     id: "amendment-190",
     category: "tax",
-    q: "מהו תיקון 190 וכיצד הוא חוסך בדמי ניהול ופרמיה?",
-    a: "תיקון 190 לחוק הפיקוח על שירותים פיננסיים מאפשר העברת כספים בין ביטוחי מנהלים ומוצרים פנסיוניים תוך הורדת דמי ניהול ופרמיה. באמצעות משא ומתן מול הגוף המוסדי ניתן להפחית משמעותית את עלויות החיסכון הפנסיוני ולשפר את התשואה לטווח ארוך.",
+    q: heFaq["amendment-190.q"],
+    a: heFaq["amendment-190.a"],
   },
   {
     id: "marginal-tax",
     category: "tax",
-    q: "מה זה מס שולי ואיך הוא משפיע על החיסכון שלי?",
-    a: "מס שולי הוא האחוז שאתם משלמים על כל שקל נוסף שאתם מרוויחים. ככל שההכנסה גבוהה יותר, כך המס השולי גבוה יותר. הפקדה לפנסיה מזכה בזיכוי מס בשיעור המס השולי שלכם — כלומר ככל שהמס השולי גבוה יותר, כך ההטבה גדולה יותר. לשכירים במס שולי גבוה, ההפקדה לפנסיה היא אחד הכלים היעילים ביותר לחיסכון במס.",
+    q: heFaq["marginal-tax.q"],
+    a: heFaq["marginal-tax.a"],
   },
   {
     id: "severance-lump-or-annuity",
     category: "tax",
-    q: "האם כדאי למשוך פיצויים כסכום חד-פעמי או כקצבה?",
-    a: "משיכת פיצויים כקצבה (מגיל 60) מזכה בהטבת מס משמעותית — פטור עד 8,880 ₪ לחודש (נכון ל-2026) ויתרה במס מופחת. משיכה כסכום חד-פעמי צמוד למס רגיל. ברוב המקרים, המשיכה כקצבה כדאית יותר מבחינת מס — אך ההחלטה תלויה במצב האישי, בגיל ובצרכי הון מיידיים.",
+    q: heFaq["severance-lump-or-annuity.q"],
+    a: heFaq["severance-lump-or-annuity.a"],
   },
   {
     id: "pension-tax-refund",
     category: "tax",
-    q: "איך מקבלים החזר מס על הפקדות לפנסיה?",
-    a: "שכירים שמפקידים לפנסיה דרך המעסיק מקבלים את ההטבה באופן אוטומטי בתלוש השכר. עצמאים ושכירים שמפקידים באופן עצמאי צריכים לדרוש את הזיכוי במס בדוח השנתי (שנתי או דו-שנתי). ניתן לקבל החזר מס רטרואקטיבי על הפקדות שלא תואמו בעבר — עד 6 שנים אחורה.",
+    q: heFaq["pension-tax-refund.q"],
+    a: heFaq["pension-tax-refund.a"],
   },
   {
     id: "pension-vs-gemel-vs-hishtalmut",
     category: "pension",
-    q: "מה ההבדל בין פנסיה, גמל והשתלמות?",
-    a: "פנסיה מיועדת לחיסכון ארוך טווח לגיל פרישה ומשלמת קצבה חודשית. קרן גמל היא חיסכון לטווח בינוני-ארוך עם אפשרות משיכה הונית מגיל 60. קרן השתלמות היא חיסכון לטווח קצר-בינוני (6 שנים לפחות) עם פטור ממס על הרווחים. כל מוצר מתאים למטרות חיסכון שונות.",
+    q: heFaq["pension-vs-gemel-vs-hishtalmut.q"],
+    a: heFaq["pension-vs-gemel-vs-hishtalmut.a"],
   },
   {
     id: "lower-management-fees",
     category: "pension",
-    q: "כיצד ניתן להוריד דמי ניהול בפנסיה, גמל והשתלמות?",
-    a: "דמי ניהול מצטברים לעשרות אלפי שקלים לאורך שנות החיסכון. ניתן להורידם באמצעות משא ומתן עם הגוף המוסדי — קרנות פנסיה, קרנות גמל וקרנות השתלמות — העברת כספים לגוף עם דמי ניהול נמוכים יותר, או ניצול תיקון 190. גם הפרש של אחוז אחד בלבד מצטבר לסכום משמעותי לאורך השנים.",
+    q: heFaq["lower-management-fees.q"],
+    a: heFaq["lower-management-fees.a"],
   },
   {
     id: "fees-in-every-product",
     category: "pension",
-    q: "האם צריך לבדוק דמי ניהול גם מחוץ לפנסיה?",
-    a: "הפרש של אחוז אחד בלבד בדמי ניהול מצטבר לעשרות אלפי שקלים לאורך השנים. בקשו מכל גוף מוסדי פירוט מדויק של דמי הניהול בקרן, בביטוח המנהלים ובקרן ההשתלמות, והשוו. במקרים רבים ניתן להוריד את העמלה במשא ומתן פשוט — גם מבלי לעבור קרן.",
-    tip: { n: 1, title: "בדקו את דמי הניהול בכל מוצר — ולא רק בפנסיה" },
+    q: heFaq["fees-in-every-product.q"],
+    a: heFaq["fees-in-every-product.a"],
+    tip: { n: 1, title: heFaq["fees-in-every-product.tip"] },
   },
   {
     id: "improve-returns",
     category: "pension",
-    q: "כיצד משפרים תשואות בקרנות פנסיה וגמל?",
-    a: "שיפור תשואות מושג באמצעות בחירת מסלולי השקעה המתאימים לגיל ולמצב הכלכלי, הפחתת דמי ניהול, פיזור נכון של הנכסים ומעקב שוטף אחר ביצועי הקרן. התאמה אישית של מסלול ההשקעה יכולה להוסיף אחוזי תשואה משמעותיים לאורך זמן.",
+    q: heFaq["improve-returns.q"],
+    a: heFaq["improve-returns.a"],
   },
   {
     id: "merge-funds",
     category: "pension",
-    q: "מתי כדאי לאחד קרנות פנסיה וגמל?",
-    a: "איחוד קרנות כדאי כאשר יש מספר קרנות עם דמי ניהול גבוהים, קושי במעקב אחר התיק, או כאשר ניתן לקבל תנאים טובים יותר בקרן אחת. איחוד מפחית עלויות, מקל על ניהול ומעקב, ומאפשר התאמה מדויקת יותר של מסלול ההשקעה. עם זאת, לפעמים פיזור בין קרנות עדיף — ההחלטה תלויה בנסיבות האישיות.",
+    q: heFaq["merge-funds.q"],
+    a: heFaq["merge-funds.a"],
   },
   {
     id: "child-savings",
     category: "pension",
-    q: "חיסכון לילדים — כדאי להתחיל מהלידה?",
-    a: "בהחלט. הפקדה חודשית קטנה לחיסכון לילד מגיל חודשיים צומחת לאורך 20+ שנה לסכום משמעותי הודות לריבית דריבית. בחרו במוצר עם דמי ניהול נמוכים ונזילות גבוהה, והגדירו מראש את המטרה (לימודים, דירה, צבירת הון). ככל שמתחילים מוקדם יותר, ההון עובד זמן רב יותר לטובתכם.",
-    tip: { n: 4, title: "חיסכון לילדים — כדאי להתחיל מהלידה" },
+    q: heFaq["child-savings.q"],
+    a: heFaq["child-savings.a"],
+    tip: { n: 4, title: heFaq["child-savings.tip"] },
   },
   {
     id: "self-employed-pension",
     category: "pension",
-    q: "עצמאים — אל תדחו את ההפרשה הפנסיונית",
-    a: "עצמאים שדוחים הפקדות 'עד שיהיה רווחי יותר' מפסידים הטבות מס משמעותיות ושנות צבירת הון שאינן חוזרות. התחילו בהפקדה חודשית קבועה, גם צנועה, והגדילו אותה עם הזמן. בנוסף, ודאו כיסוי אובדן כושר עבודה — ללא מעסיק שמפרנס, הוא קריטי פי כמה.",
-    tip: { n: 6, title: "עצמאים — אל תדחו את ההפרשה הפנסיונית" },
+    q: heFaq["self-employed-pension.q"],
+    a: heFaq["self-employed-pension.a"],
+    tip: { n: 6, title: heFaq["self-employed-pension.tip"] },
   },
   {
     id: "supplementary-health",
     category: "insurance",
-    q: "ביטוח בריאות משלים — כדאי, ואיך נמנעים כפילויות?",
-    a: "לפני רכישת ביטוח בריאות משלים, בדקו מה כבר מכסה קופת החולים שלכם והפנסיה הקיימת. רבים משלמים על כיסויים חופפים מבלי לדעת. המפתח הוא השלמה מדויקת של פערים — ניתוחים פרטיים, תרופות יקרות, אשפוז במחלקה סגורה — ולא רכישה גורפת של פוליסות נוספות.",
-    tip: { n: 5, title: "כיסוי בריאות משלים — לא כפילות מיותרת" },
+    q: heFaq["supplementary-health.q"],
+    a: heFaq["supplementary-health.a"],
+    tip: { n: 5, title: heFaq["supplementary-health.tip"] },
   },
   {
     id: "rights-fixing",
     category: "insurance",
-    q: "מה זה קיבוע זכויות ולמה זה חשוב?",
-    a: "קיבוע זכויות הוא תהליך שבו מבוטח מקבע את הזכויות הרפואיות שלו בביטוח בריאות וביטוח חיים, כך ששינויים במצב הבריאותי בעתיד לא יפגעו בכיסוי הביטוחי. קיבוע זכויות חשוב כי הוא מבטיח כיסוי מלא גם אם מצב הבריאות משתנה, ומונע דחיית תביעות עקב מצב רפואי קודם.",
+    q: heFaq["rights-fixing.q"],
+    a: heFaq["rights-fixing.a"],
   },
   {
     id: "disability-cover",
     category: "insurance",
-    q: "אל תוותרו על כיסוי אובדן כושר עבודה",
-    a: "ביטוח אובדן כושר עבודה הוא קו ההגנה הראשון שלכם — לא פחות חשוב מהחיסכון עצמו. ודאו שגובה הכיסוי תואם את ההכנסה הנוכחית, שתקופת ההמתנה מתאימה ליכולת הכלכלית שלכם, ושההגדרה 'עיסוק אובייקטיבי' מופיעה בפוליסה. רבים מגלים רק בעת תביעה שהכיסוי שלהם צר או לא רלוונטי.",
-    tip: { n: 2, title: "אל תוותרו על כיסוי אובדן כושר עבודה" },
+    q: heFaq["disability-cover.q"],
+    a: heFaq["disability-cover.a"],
+    tip: { n: 2, title: heFaq["disability-cover.tip"] },
   },
   {
     id: "switch-agent",
     category: "insurance",
-    q: "האם ניתן לעבור אלייך מסוכן קודם?",
-    a: "בהחלט. מעבר סוכן הוא תהליך פשוט שאינו כרוך בעלות ואינו פוגע ברצף הכיסויים שלכם. אני מטפלת בכל ההעברה וההסברה מול הגופים המוסדיים.",
+    q: heFaq["switch-agent.q"],
+    a: heFaq["switch-agent.a"],
   },
   {
     id: "life-changes",
     category: "insurance",
-    q: "מה קורה כשמשתנה מצב משפחתי או מקצועי?",
-    a: "כל שינוי משפיע על הכיסויים הנכונים. בכל שינוי — נישואין, לידה, גירושין, דירה חדשה או מעבר לעצמאות — נשב יחד ונתאים את התיק למציאות החדשה.",
+    q: heFaq["life-changes.q"],
+    a: heFaq["life-changes.a"],
   },
   {
     id: "first-meeting-cost",
     category: "general",
-    q: "האם פגישת ההיכרות הראשונה כרוכה בעלות?",
-    a: "פגישת ההיכרות הראשונה ללא עלות וללא התחייבות. מטרתה להכיר את הצורך שלכם ולהציע כיוון ברור — רק אם תבחרו להמשיך, נתקדם יחד.",
+    q: heFaq["first-meeting-cost.q"],
+    a: heFaq["first-meeting-cost.a"],
   },
   {
     id: "independent-agent",
     category: "general",
-    q: "האם את עצמאית או משויכת לחברת ביטוח מסוימת?",
-    a: "אני מתכננת פיננסית וסוכנת ביטוח, ועובדת מול מגוון חברות ביטוח ופנסיה כדי להתאים פתרון לצורך שלכם. כסוכנת יש לי זיקה לגופים מוסדיים, והפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.",
+    q: heFaq["independent-agent.q"],
+    a: heFaq["independent-agent.a"],
   },
   {
     id: "lifelong-service",
     category: "general",
-    q: "מה כולל הליווי לאורך החיים?",
-    a: "ביקורת תיק שנתית, עדכון כיסויים בכל שינוי חיים (נישואין, לידה, דירה, עצמאות), מו\\\"ב מול החברות על דמי ניהול ותנאים, וליווי צמוד בעת תביעה — הכל תחת קורת גג אחת.",
+    q: heFaq["lifelong-service.q"],
+    a: heFaq["lifelong-service.a"],
   },
   {
     id: "claims-support",
     category: "general",
-    q: "כיצד מתנהל הליווי בעת תביעה?",
-    a: "אני נוטלת את ניהול התביעה מול החברה על עצמי — השלמת תיעוד, מעקב והופעה בשמכם עד לקבלת הכיסוי המלא. ברוב המקרים לא תצטרכו להרים טלפון.",
+    q: heFaq["claims-support.q"],
+    a: heFaq["claims-support.a"],
   },
   {
     id: "remote-meetings",
     category: "general",
-    q: "האם ניתן לקיים פגישות גם מרחוק?",
-    a: "כן. פגישות ניתן לקיים במשרד בתל אביב, בזום או בטלפון — לפי הנוחות שלכם. הליווי עצמו זהה בכל פורמט.",
+    q: heFaq["remote-meetings.q"],
+    a: heFaq["remote-meetings.a"],
   },
   {
     id: "confidentiality",
     category: "general",
-    q: "כיצד נשמרת סודיות המידע שלי?",
-    a: "כל המידע שאתם מוסרים נשמר בסודיות מלאה, בכפוף לחוק הגנת הפרטיות ולמדיניות הפרטיות של המשרד. אינו מועבר לצד ג' ללא הסכמתכם.",
+    q: heFaq["confidentiality.q"],
+    a: heFaq["confidentiality.a"],
   },
   {
     id: "annual-review",
     category: "general",
-    q: "באיזו תדירות כדאי לבצע ביקורת תיק מסכמת?",
-    a: "מצב משפחתי, מקום עבודה ומצב בריאותי משתנים — ואיתם גם הכיסויים הנכונים. כדאי לקבוע פגישת סיכום שנתית שבה עוברים יחד על כל המוצרים: פנסיה, גמל, השתלמות וביטוחים. עדכון שגרתי מונע פערים יקרים ומאפשר הורדת עלויות ושיפור תשואות.",
-    tip: { n: 3, title: "מקדישים שעה בשנה לביקורת תיק מסכמת" },
+    q: heFaq["annual-review.q"],
+    a: heFaq["annual-review.a"],
+    tip: { n: 3, title: heFaq["annual-review.tip"] },
   },
 ];
 
@@ -226,3 +236,19 @@ export const faqByIds = (ids: readonly string[]): FaqEntry[] =>
     if (!entry) throw new Error(`Unknown FAQ entry: ${id}`);
     return entry;
   });
+
+/** An entry in a language: the same entry, with its question, answer and tip title translated. */
+export function localizeFaq<E extends FaqEntry>(entry: E, locale: Locale): E {
+  if (locale === "he") return entry;
+  const text = (field: string) => translate(locale, "faq", `${entry.id}.${field}` as never);
+  return {
+    ...entry,
+    q: text("q"),
+    a: text("a"),
+    ...(entry.tip ? { tip: { ...entry.tip, title: text("tip") } } : {}),
+  };
+}
+
+/** A category's name in a language. */
+export const faqCategoryLabel = (id: FaqCategoryId, locale: Locale): string =>
+  translate(locale, "faq", `cat.${id}` as never);

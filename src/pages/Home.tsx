@@ -67,8 +67,7 @@ export default function Home() {
         <ErrorBoundary><StartConversation /></ErrorBoundary>
         <ErrorBoundary><ProofCarousel /></ErrorBoundary>
         <ErrorBoundary><Testimonials /></ErrorBoundary>
-        {/* The questions are /faq's content, translated with /faq; until then, Hebrew only. */}
-        {he ? <ErrorBoundary><DetailedFAQ /></ErrorBoundary> : null}
+        <ErrorBoundary><DetailedFAQ /></ErrorBoundary>
       </main>
       <ErrorBoundary><MobileStickyBar /></ErrorBoundary>
       <ErrorBoundary><Footer /></ErrorBoundary>

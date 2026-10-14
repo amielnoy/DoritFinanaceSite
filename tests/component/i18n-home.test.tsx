@@ -113,11 +113,10 @@ describe("the home page in English and French", () => {
     expect(textOutsideHebrew()).not.toMatch(HEBREW);
   });
 
-  it("leads with the short form: no questionnaire, no chat, and no FAQ block until /faq is translated", async () => {
+  it("leads with the short form: no questionnaire and no chat", async () => {
     const { container } = renderAt("/en");
     expect(screen.getByLabelText("Full name *")).toBeInTheDocument();
     expect(container.querySelector("#interview")).toBeNull();
-    expect(container.querySelector("#common-questions")).toBeNull();
     expect(screen.getByRole("link", { name: "Pension portfolio check" })).toHaveAttribute("href", "/en/pension-check");
     await screen.findByText("ליווי מקצועי ואישי");
   });

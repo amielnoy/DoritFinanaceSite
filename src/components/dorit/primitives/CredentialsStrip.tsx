@@ -1,17 +1,19 @@
 import React from "react";
 import { Phone, Mail, MessageCircle, BadgeCheck } from "lucide-react";
 import { CONTACT } from "@/config/contact";
+import { useT } from "@/i18n/LocaleContext";
 
 const LICENSE = "L-00107009";
 
 export default function CredentialsStrip() {
+  const t = useT("common");
   return (
     <div className="border-y border-border/60 bg-secondary/40">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-5 px-6 md:px-10">
         <div className="flex items-center gap-3">
           <BadgeCheck size={20} className="text-highlight shrink-0" />
           <span className="text-sm text-foreground/80">
-            רישיון סוכן מרשות שוק ההון מספר{" "}
+            {t("credentials.licence")}{" "}
             <bdi className="whitespace-nowrap font-medium text-foreground tracking-wide lining-nums tabular-nums" dir="ltr">
               {LICENSE}
             </bdi>

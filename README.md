@@ -764,7 +764,14 @@ no `/en` route, no language switcher, no hreflang. Locally:
   and the snapshot section. Testimonials are the clients' own Hebrew words,
   shown as written with `lang="he"`. A message sent from English or French
   reaches Dorit with "(מולא באנגלית)" / "(מולא בצרפתית)" after it.
-- **Still Hebrew under `/en` and `/fr`:** /tools, /claims, /faq and
+- **Done in slice 3:** /faq (`faq.json`). `src/content/faq.ts` keeps the
+  structure (ids, categories, tip numbers) and reads its Hebrew from
+  `he/faq.json`, so each answer still has one copy per language;
+  `localizeFaq()` gives an entry in English or French, structured data
+  included. The home page's common questions are back on `/en` and `/fr`.
+  The support chat at the bottom of /faq answers in Hebrew, so it stays on the
+  Hebrew page.
+- **Still Hebrew under `/en` and `/fr`:** /tools, /claims and
   /atzmaim-31-12. They follow in their own slices, with the sitemap and
   prerender for the new addresses.
 - **Before the switch goes on:** a native speaker reviews the English and
