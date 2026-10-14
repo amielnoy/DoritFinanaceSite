@@ -69,9 +69,12 @@ Test is skipped: mobile projects only".
 | E2E-MOB-027 | "the questionnaire from the keyboard: arrows move between answers without leaving the step" | Space on a life stage; ArrowDown ×2 on the concerns; Enter | Space moves on; the arrows choose but stay on step 2; Enter moves on; `wizard_step` is step_1, step_2 only |
 | E2E-MOB-028 | "common questions: the first four, and לכל השאלות to /faq" | Load `/` | 4 visible of 8 in the document; one opens; "לכל השאלות" → `/faq` |
 | E2E-MOB-029 | "the footer: the menu folded into ניווט באתר, contact two to a row, the licence line in view" | Scroll to the footer | A closed `<details>` "ניווט באתר" whose links appear when opened; phone and WhatsApp on one row, ≥44px; the licence line and `L-00107009` visible |
-| E2E-MOB-030 | "the home page stays under 6,200px — it was 10,260" | Load `/` at 390×844 | Once both testimonials are in, `#proof` < 600px (was 898) and `#testimonials` < 480px (was 791); `scrollHeight` < 6200px (10,260 before stage 3, 6,590 after it, 5,841 after 3b) |
+| E2E-MOB-030 | "the home page stays under 5,450px — it was 10,260" | Load `/` at 390×844 | Once both testimonials are in, `#proof` < 600px (was 898) and `#testimonials` < 480px (was 791); `#common-questions` < 700px (was 767) and the footer < 600px (was 828); `scrollHeight` < 5450px (10,260 before stage 3, 6,590 after it, 5,841 after 3b, 5,321 after 3c on Chromium and WebKit alike) |
 | E2E-MOB-031 | "the cases: short cards in a strip, each story folded behind פרטי המקרה, the disclaimer in view" | Scroll to `#proof` | "תוצאות עבר אינן מבטיחות תוצאות דומות — כל מקרה תלוי בנתונים האישיים." in view; 7 cards, 7 "פרטי המקרה" buttons all `aria-expanded="false"`; the first headline, "₪850K שולמו" and both "הערכה המבוססת על הנחות…" bases visible; the first story hidden but present once — pressed, it shows in place and the second stays folded, pressed again it folds; "הבא" brings the second card ≥90% into view, "הקודם" the first |
 | E2E-MOB-032 | "testimonials: one card at a time, sideways, with prev and next — and nothing moves by itself" | Scroll to `#testimonials` | 2 cards on one row in a region "לקוחות מספרים — גלילה אופקית" (`tabindex=0`, `overflow-x: auto`, `scroll-snap-type` mandatory, wider than the screen); the first ≥90% in view, the second <50%; "ההמלצה הקודמת" `aria-disabled="true"`; `scrollLeft` unchanged after 1.5 s; "ההמלצה הבאה" by keyboard (focus, Enter) brings the second ≥90% into view and is then `aria-disabled`; "ההמלצה הקודמת" goes back |
+| E2E-MOB-033 | "common questions: a one-sentence intro, and no closing button — the bar's first cell is the same link" | Scroll to `#common-questions` | The intro's first sentence visible; "אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית." present once and hidden; "לשיחה קצרה עם דורית" present once in the section, hidden, `href="#start"`; the sticky bar's "לשיחה קצרה" visible |
+| E2E-MOB-034 | "the footer: no quote band and no name or slogan — the header has both — with the licence, contact and legal links in view" | Scroll to the footer | "ביטחון אמיתי מתחיל…", "— דורית גוב ארי" and "התכנון שלי — השקט שלך" each present once and hidden; "שיווק פנסיוני ותכנון פיננסי…", the licence line, the phone and WhatsApp links, "מדיניות פרטיות", "הצהרת נגישות" and "כל הזכויות שמורות" visible |
+| E2E-MOB-035 | "the home sections below the hero pad 40px top and bottom" | Load `/`, wait for the testimonials | The content box (first `div` child) of `#about`, `#services`, `#start`, `#testimonials` and `#common-questions` has a computed padding of 40px top and 40px bottom |
 | E2E-MOB-020 | "עדיין מתלבטים? has its three buttons on one row, and each still reports to GA4" | Scroll to the CTA band; tap all three (navigation prevented) | "קביעת פגישה", "טלפון" and "WhatsApp" share one row inside the screen, each ≥44×44px, hrefs `/#start`, `tel:+972508311776`, `wa.me/972508311776`; `cta_click`, `click_phone` and `click_whatsapp` queued for GA4 with `location: faq` |
 
 Stage 3 made the sticky bar 64px of four phone tabs — "לשיחה קצרה", WhatsApp,
@@ -85,7 +88,7 @@ questionnaire, and `/#quick-contact` still opens it (E2E-MOB-001c).
 
 `mobile.spec.ts` also holds a `Desktop-only chrome` block, tagged
 `@desktop-only` and filtered out of the two mobile projects the same way, so
-each project collects only its own half: 38 cases on a phone, 4 on a desktop. A responsive swap
+each project collects only its own half: 41 cases on a phone, 4 on a desktop. A responsive swap
 has two halves and only one of them is ever asserted by accident: hiding the
 desktop dock on a phone while also hiding it on a desktop passes E2E-MOB-001
 and ships a home page with no call-to-action above the fold. Those two cases
@@ -114,7 +117,20 @@ as it is. `#proof` is 521px and `#testimonials` 420px: the page is 5,841px,
 two sections together were 1,689px, less than the 2,792px between, so no
 treatment of them alone could reach it; what is left is spread over `#start`
 (995px), the footer (828px), `#common-questions` (767px) and `#services`
-(750px). Folded content is hidden with CSS
+(750px). Stage 3c (E2E-MOB-033–035) takes the low-risk trims from those:
+`#common-questions` keeps the first sentence of its intro and hides its
+closing "לשיחה קצרה עם דורית" (the sticky bar's first cell is the same link to
+`#start`; from md up the link and its `cta_click` are unchanged); the footer
+hides its quote band and the name and slogan the header already shows, and
+keeps the line saying what she does, contact, the licence line, the legal
+links and the copyright in view; and every home section below the hero pads
+40px top and bottom (`#about` and `#services` were 48, `#start` 72). The intro
+is split into two runs only below md, chosen by `useMediaQuery` as in
+`About`: a span boundary in the desktop's paragraph re-shapes the glyphs after
+it, and the 1440 screenshot of `/` then differed in 135×12 pixels. `#common-questions`
+is 637px, the footer 533px, `#start` 931px, `#services` 734px and `#about`
+492px: the page is 5,321px, 6.30 screens, and `/faq` (same footer) 2,227px,
+2.64 screens. Folded content is hidden with CSS
 or `hidden`, never left out, so the phone's document still carries what the
 desktop's does (`mobile-parity.spec.ts`). From md up nothing changes —
 `E2E-DSK-004` pins the desktop half, and the 1440 screenshots of `/` (top and

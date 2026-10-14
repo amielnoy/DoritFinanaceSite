@@ -193,6 +193,23 @@ nothing changes. `matchMedia` is stubbed as in §4.24.
 | CMP-PRF-004 | "names the arrows by where they go in RTL: → back to the first case, ← on to the next" | "הבא" calls `scrollBy` with a negative `left`, "הקודם" with a positive one (A-80) |
 | CMP-PRF-005 | "from md up, every story is open and there is no פרטי המקרה" | At 1440: no button, nothing `hidden`, the disclaimer present |
 
+### 4.26 `<DetailedFAQ />` and `<Footer />` on a phone — `tests/component/home-phone-trims.test.tsx`
+
+Below md (stage 3c) the common questions' intro is one sentence and their
+closing "לשיחה קצרה עם דורית" is hidden, and the footer hides its quote band and
+the name and slogan the header shows — all hidden, never removed. jsdom applies
+no Tailwind, so "hidden below md" is the `max-md:hidden` class (or `hidden`) on
+the element or an ancestor; E2E-MOB-033/034 check what a phone shows.
+`matchMedia` is stubbed as in §4.24, the footer's `Image` with a plain `<img>`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-HTR-001 | "on a phone, the intro is its first sentence; the second is hidden, not dropped" | At 390 the paragraph's text is both sentences; the second is a `<span class="hidden">`; the first is not hidden |
+| CMP-HTR-002 | "on a phone, the closing לשיחה קצרה עם דורית is hidden by CSS but still in the document, still a link to #start" | The link exists with `href="#start"` and `max-md:hidden`; "לכל השאלות" is not hidden |
+| CMP-HTR-003 | "from md up, the intro is one text node and the closing link is there" | At 1440 the paragraph has exactly one child node holding both sentences (a run boundary would re-shape the desktop's glyphs); the link to `#start` present |
+| CMP-HTR-004 | "hides the quote band and the name and slogan the header repeats, keeping them in the document" | At 390 "ביטחון אמיתי מתחיל…", "— דורית גוב ארי", "התכנון שלי — השקט שלך" and the footer's name are each under a `max-md:hidden` |
+| CMP-HTR-005 | "keeps the licence line, the line saying what she does, contact and the legal links in view" | The licence line, `L-00107009`, "שיווק פנסיוני ותכנון פיננסי…", the phone, WhatsApp and email links, "מדיניות פרטיות", "הצהרת נגישות" and the copyright are under nothing hidden |
+
 ### 4.12 `<Blog />` — the blog index — `tests/component/blog-page.test.tsx`
 
 `AgentChat` is stubbed; the date is fixed with `vi.setSystemTime`, so the

@@ -55,7 +55,7 @@ export default function StartConversation() {
           panel's own left border at common desktop widths — worse the
           narrower the viewport, since centering stops adding its own margin
           below the 1400px breakpoint. */}
-      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] md:pl-20 py-[clamp(72px,9vw,120px)] flex flex-col gap-10">
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] md:pl-20 py-[clamp(72px,9vw,120px)] flex flex-col gap-10 max-md:py-10">
         <Reveal>
           <Eyebrow>03 · ההקשבה</Eyebrow>
           <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-[18px] leading-[1.12] max-w-[880px] [text-wrap:balance]">

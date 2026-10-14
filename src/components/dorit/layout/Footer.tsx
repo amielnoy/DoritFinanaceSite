@@ -64,9 +64,9 @@ export default function Footer() {
   return (
     <footer className="relative bg-primary text-primary-foreground">
       {/* The colophon: the handshake in a dark plate beside the quote. Below
-          md the quote stands alone — the photo is decoration, and stacked
-          above it, it was a third of a phone screen on every page. */}
-      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,112px)] grid grid-cols-1 md:grid-cols-2 gap-12 items-center border-b border-primary-foreground/[0.14] max-md:py-10">
+          md the whole band is hidden, not removed — the photo is decoration,
+          and the quote alone was still 200px of a phone screen on every page. */}
+      <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,112px)] grid grid-cols-1 md:grid-cols-2 gap-12 items-center border-b border-primary-foreground/[0.14] max-md:hidden">
         <div className="plate plate-dark h-[280px] max-md:hidden">
           <Image
             src={HANDSHAKE}
@@ -86,12 +86,15 @@ export default function Footer() {
       </div>
 
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-14 grid grid-cols-1 md:grid-cols-3 gap-10 max-md:py-8 max-md:gap-6">
+        {/* Below md the name and the slogan are hidden: the header above says
+            both, on every page. The line saying what she does stays, and the
+            licence line at the bottom names her in full. */}
         <div>
-          <p className="font-heading font-medium text-[26px] mb-2.5">דורית גוב ארי</p>
-          <p className="text-sm text-muted-foreground-on-dark">
+          <p className="font-heading font-medium text-[26px] mb-2.5 max-md:hidden">דורית גוב ארי</p>
+          <p className="text-sm text-muted-foreground-on-dark max-md:hidden">
             התכנון שלי — השקט שלך
           </p>
-          <p className="mt-3.5 text-base text-[hsl(0_3%_84%)] leading-[1.7] max-w-[300px]">
+          <p className="mt-3.5 text-base text-[hsl(0_3%_84%)] leading-[1.7] max-w-[300px] max-md:mt-0">
             שיווק פנסיוני ותכנון פיננסי. ליווי לקוחות לאורך כל החיים.
           </p>
         </div>
