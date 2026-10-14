@@ -149,7 +149,7 @@ export function initClickTracking(): void {
         else if (href.includes("wa.me") || href.includes("api.whatsapp.com")) track("click_whatsapp", { location });
         else if (href.startsWith("mailto:")) track("click_email", { location });
         else if (href === "#start" || href.endsWith("/#start")) track("cta_click", { location, cta: "start_conversation" });
-        else if (/^(https:\/\/[^/]+)?\/pension-check\/?$/.test(href)) track("cta_click", { location, cta: "pension_check" });
+        else if (/^(https:\/\/[^/]+)?(\/(en|fr))?\/pension-check\/?$/.test(href)) track("cta_click", { location, cta: "pension_check" });
         else if (href.endsWith(SUPPORT_CHAT_HASH)) track("click_chat", { location });
         else if (/^https:\/\/([a-z0-9-]+\.)*cal\.com\//i.test(href)) track("click_booking", { location });
         else if (/^https:\/\/(www\.)?whatsapp\.com\/channel\//i.test(href)) track("join_channel", { location });

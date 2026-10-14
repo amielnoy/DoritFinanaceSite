@@ -1,5 +1,7 @@
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useLocale } from "@/i18n/LocaleContext";
+import { localePath } from "@/i18n/locales";
 
 /**
  * ניווט לעוגן שנמצא רק בדף הבית, מכל מסלול שהוא.
@@ -24,6 +26,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 export function useSectionNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // Home is "/" in Hebrew and "/en" or "/fr" in English and French: the
+  // sections live on the home page of the language the visitor is reading.
+  const home = localePath(useLocale(), "/");
 
   /**
    * `hash` is the fragment with its `#`, e.g. `"#about"`.
@@ -38,8 +43,8 @@ export function useSectionNav() {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
 
-      if (pathname !== "/") {
-        navigate(`/${hash}`);
+      if (pathname !== home && pathname !== `${home}/`) {
+        navigate(home === "/" ? `/${hash}` : `${home}/${hash}`);
         return;
       }
 
@@ -47,7 +52,7 @@ export function useSectionNav() {
       // Keep the address bar honest without letting the browser jump-scroll.
       window.history.replaceState(null, "", hash);
     },
-    [navigate, pathname]
+    [navigate, pathname, home]
   );
 }
 

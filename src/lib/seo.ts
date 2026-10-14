@@ -8,6 +8,7 @@
 import { useEffect } from "react";
 import { isLegacyHost } from "./legacy-host.js";
 import { jsonLdText } from "./trusted-types.js";
+import { DEFAULT_LOCALE, ENABLED_LOCALES, localePath, type Locale } from "@/i18n/locales";
 
 type Env = Record<string, string | undefined> | undefined;
 
@@ -89,7 +90,13 @@ export interface SeoConfig {
   tags?: string[];
   /** JSON-LD objects to inject for this route only. */
   jsonLd?: Array<Record<string, unknown>>;
+  /** The page's language; `path` stays unprefixed and gets "/en" or "/fr" here. Hebrew when absent. */
+  locale?: Locale;
+  /** The page exists in every enabled language: link them to each other (hreflang). */
+  translated?: boolean;
 }
+
+const OG_LOCALE: Record<Locale, string> = { he: "he_IL", en: "en_US", fr: "fr_FR" };
 
 const MANAGED = "data-seo";
 
@@ -163,7 +170,7 @@ export function applyLegacyHostHead(path: string): void {
 /** Drop the previous route's multi-valued and route-scoped tags. */
 function clearRouteScoped() {
   const stale = document.head.querySelectorAll(
-    `meta[property="article:tag"], meta[property="article:published_time"], script[${MANAGED}-jsonld]`
+    `meta[property="article:tag"], meta[property="article:published_time"], script[${MANAGED}-jsonld], link[rel="alternate"][hreflang][${MANAGED}]`
   );
   Array.from(stale).forEach((el) => el.remove());
 }
@@ -187,9 +194,11 @@ export function applySeo(config: SeoConfig): void {
     publishedTime,
     tags,
     jsonLd,
+    locale = DEFAULT_LOCALE,
+    translated = false,
   } = config;
 
-  const url = absoluteUrl(path);
+  const url = absoluteUrl(localePath(locale, path));
   const desc = clampDescription(description);
 
   clearRouteScoped();
@@ -207,7 +216,23 @@ export function applySeo(config: SeoConfig): void {
   og("og:image", image);
   og("og:image:alt", imageAlt);
   og("og:site_name", SITE_NAME);
-  og("og:locale", "he_IL");
+  og("og:locale", OG_LOCALE[locale]);
+
+  // Each language's address for the same page, and Hebrew as the default —
+  // only for pages that are translated, and only languages the build serves.
+  if (translated && ENABLED_LOCALES.length > 1) {
+    for (const [lang, href] of [
+      ...ENABLED_LOCALES.map((l) => [l, absoluteUrl(localePath(l, path))] as const),
+      ["x-default", absoluteUrl(path)] as const,
+    ]) {
+      const el = document.createElement("link");
+      el.setAttribute("rel", "alternate");
+      el.setAttribute("hreflang", lang);
+      el.setAttribute("href", href);
+      el.setAttribute(MANAGED, "");
+      document.head.appendChild(el);
+    }
+  }
 
   meta("twitter:card", "summary_large_image");
   meta("twitter:title", title);
