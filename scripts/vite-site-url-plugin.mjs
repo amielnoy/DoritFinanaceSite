@@ -13,8 +13,13 @@ import { join } from "node:path";
  * The checked-in files keep a real, working URL rather than a placeholder token, so
  * they are still correct on their own and readable in a diff. This rewrites the
  * emitted copies when — and only when — a different origin is configured.
+ *
+ * The default is the production domain, and was the old Base44 host until
+ * 2026-10-14: a builder without the variable (the Base44 Builder, whose
+ * environment is set only in its dashboard) shipped a copy that called itself
+ * canonical. `src/lib/seo.ts` names the same default.
  */
-export const DEFAULT_SITE_URL = "https://safe-arch-plan.base44.app";
+export const DEFAULT_SITE_URL = "https://govari-fin.co.il";
 
 /**
  * Emitted files that spell the origin out, by their path in the build output.

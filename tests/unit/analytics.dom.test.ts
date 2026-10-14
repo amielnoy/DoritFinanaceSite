@@ -155,9 +155,18 @@ describe("the needs wizard's events", () => {
 });
 
 describe("LEAD_EVENTS catalogue", () => {
-  it("does not mark chat_handoff a key event — generate_lead already covers the completed hand-off", () => {
-    const chatHandoff = LEAD_EVENTS.find((e) => e.name === "chat_handoff");
-    expect(chatHandoff?.keyEvent).toBe(false);
+  // The user's decision of 2026-10-14: every lead-intent event is a key event,
+  // the hand-off request too (it is counted again as generate_lead once it is
+  // done — the panel says so). The wizard's progress events stay plain events.
+  it.each(["generate_lead", "click_phone", "click_whatsapp", "click_email", "cta_click", "chat_start", "chat_handoff"])(
+    "marks %s a key event",
+    (name) => {
+      expect(LEAD_EVENTS.find((e) => e.name === name)?.keyEvent).toBe(true);
+    },
+  );
+
+  it.each(["wizard_start", "wizard_step", "preferred_channel_click"])("leaves %s a plain event", (name) => {
+    expect(LEAD_EVENTS.find((e) => e.name === name)?.keyEvent).toBe(false);
   });
 
   it("includes claim as a generate_lead method, same catalogue entry as the others", () => {
@@ -206,5 +215,75 @@ describe("initClickTracking", () => {
     initClickTracking();
     click('<section id="x"><a href="tel:+972500000000">חייגו</a></section>');
     expect(w.gtag).toHaveBeenCalledTimes(1);
+  });
+});
+
+/*
+ * The calculator → lead box and the ways into the chat (feat/calc-lead-analytics).
+ * Kept in a block of their own, below the catalogue cases, so the key-event
+ * decisions above can change without touching these lines.
+ */
+describe("calculator_result and click_chat", () => {
+  beforeAll(() => {
+    // Idempotent: the block above may already have registered the listener.
+    initClickTracking();
+  });
+
+  const click = (html: string) => {
+    document.body.innerHTML = html;
+    document.querySelector("a")!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  };
+
+  it("sends calculator_result with the tool's name and nothing else", () => {
+    leadEvents.calculatorResult("fee_calculator");
+    leadEvents.calculatorResult("insurance_assessment");
+    expect(w.gtag).toHaveBeenCalledWith("event", "calculator_result", { tool: "fee_calculator" });
+    expect(w.gtag).toHaveBeenCalledWith("event", "calculator_result", { tool: "insurance_assessment" });
+  });
+
+  it("drops a tool value that is not one of the calculators, so a figure cannot ride in it", () => {
+    track("calculator_result", { tool: "12000" });
+    track("calculator_result", { tool: "₪12,000" });
+    track("calculator_result", { tool: "fee_calculator 12000" });
+    for (const [, , params] of w.gtag!.mock.calls) expect(params).toEqual({});
+  });
+
+  it("counts a link to the support chat as click_chat, with where it was", () => {
+    click('<div data-track-location="mobile_sticky_bar"><a href="/faq#support-chat">תמיכה</a></div>');
+    expect(w.gtag).toHaveBeenCalledWith("event", "click_chat", { location: "mobile_sticky_bar" });
+    click('<div data-track-location="header_menu"><a href="/faq#support-chat">תמיכה — שאלה לעוזר</a></div>');
+    expect(w.gtag).toHaveBeenCalledWith("event", "click_chat", { location: "header_menu" });
+    click('<section id="faq"><a href="#support-chat">לצ׳אט</a></section>');
+    expect(w.gtag).toHaveBeenCalledWith("event", "click_chat", { location: "faq" });
+  });
+
+  it("does not count a link to /faq itself as click_chat", () => {
+    click('<nav><a href="/faq">שאלות ותשובות</a></nav>');
+    expect(w.gtag).not.toHaveBeenCalled();
+  });
+
+  it("counts a chat opened on the page as click_chat, naming the chat and where", () => {
+    leadEvents.chatOpened("ai_support", "support-chat");
+    expect(w.gtag).toHaveBeenCalledWith("event", "click_chat", { method: "ai_support", location: "support-chat" });
+  });
+
+  it("watches the support agent's own section id", async () => {
+    const { SUPPORT_CHAT_HASH } = await import("@/lib/analytics");
+    const { AGENTS } = await import("@/config/agents");
+    expect(SUPPORT_CHAT_HASH).toBe(`#${AGENTS.support.sectionId}`);
+  });
+
+  it("every event it sends is in the catalogue the admin panel shows", () => {
+    leadEvents.calculatorResult("fee_calculator");
+    leadEvents.chatOpened("ai_support", "support-chat");
+    click('<div data-track-location="floating_dock"><a href="/faq#support-chat">תמיכה</a></div>');
+    const names = new Set(LEAD_EVENTS.map((e) => e.name));
+    expect(w.gtag).toHaveBeenCalledTimes(3);
+    for (const [, event] of w.gtag!.mock.calls) expect(names.has(event)).toBe(true);
+  });
+
+  it("marks click_chat a key event and calculator_result a plain one", () => {
+    expect(LEAD_EVENTS.find((e) => e.name === "click_chat")?.keyEvent).toBe(true);
+    expect(LEAD_EVENTS.find((e) => e.name === "calculator_result")?.keyEvent).toBe(false);
   });
 });

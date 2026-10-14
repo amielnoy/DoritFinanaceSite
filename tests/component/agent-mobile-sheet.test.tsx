@@ -188,6 +188,19 @@ describe("on a phone, the support chat is a card that opens a layer", () => {
     expect((window as any).gtag).toHaveBeenCalledWith("event", "generate_lead", { method: "ai_support" });
   });
 
+  it("counts each opening of the layer as click_chat, from the chat's own section", async () => {
+    const user = renderSupport();
+    await user.click(opener());
+    expect((window as any).gtag).toHaveBeenCalledWith("event", "click_chat", {
+      method: "ai_support",
+      location: "support-chat",
+    });
+    await user.click(screen.getByRole("button", { name: "סגירת הצ׳אט" }));
+    await user.click(opener());
+    const opened = (window as any).gtag.mock.calls.filter((c: unknown[]) => c[1] === "click_chat");
+    expect(opened).toHaveLength(2);
+  });
+
   it("keeps the conversation, and the consent, across closing and reopening", async () => {
     const user = renderSupport();
     await user.click(opener());

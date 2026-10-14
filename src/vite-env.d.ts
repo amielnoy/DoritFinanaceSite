@@ -26,6 +26,8 @@ interface ImportMetaEnv {
   readonly VITE_BASE44_APP_ID?: string;
   readonly VITE_BASE44_FUNCTIONS_VERSION?: string;
   readonly VITE_BASE44_APP_BASE_URL?: string;
+  /** Hosts the page leaves for the canonical one, comma-separated; `none` turns it off — see `src/lib/legacy-host.ts`. */
+  readonly VITE_LEGACY_HOSTS?: string;
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
   /**

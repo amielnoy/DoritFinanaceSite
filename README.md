@@ -199,8 +199,9 @@ Base44's own host has no equivalent — it answers `405` to any path it does not
 
 `VITE_SITE_URL` sets the canonical origin: `src/lib/seo.ts` reads it at runtime, and a
 build plugin rewrites `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` to match.
-Unset, the build emits the Base44 origin, so a builder without it keeps declaring
-the old host canonical.
+Unset, the build emits `https://govari-fin.co.il` — the default since 2026-10-14. It
+used to be the Base44 origin, which is how a builder without the variable kept
+declaring the old host canonical.
 
 `index.html` is on that list because the document a crawler is served is the one that
 matters, and it was the one being missed: the sitemap moved hosts while the served HTML
@@ -274,11 +275,12 @@ does not resolve is worse than one pointing at the old site.
    from a `.env` file, and the build plugin reads the same resolved value the
    application does, so the two cannot disagree.
 
-   *Status, 2026-10-12: Vercel done, Base44 open.* The Vercel copy names
+   *Status, 2026-10-14: done in the repo.* The Vercel copy names
    `https://govari-fin.co.il/` in its canonical tag, `og:url`, JSON-LD, robots.txt and
-   sitemap. The Base44 copy still names `safe-arch-plan.base44.app` in its JSON-LD and
-   robots.txt. The Builder's environment is set only in the Base44 dashboard; the CLI
-   has no command for it. Set the variable there, then Publish.
+   sitemap. The Base44 half no longer needs the dashboard: the default origin is now
+   the production domain, so a Builder build without the variable names it too, and
+   the copy Base44 serves also goes `noindex` and sends its visitors on — see [The old
+   Base44 host](#the-old-base44-host). It takes effect on the next Base44 publish.
 5. **Set the `PRODUCTION_URL` repository variable** to the same origin, and
    `BASE44_URL` to `https://safe-arch-plan.base44.app`. The smoke test targets
    `PRODUCTION_URL`, so this is what repoints it; the two were one variable while the
@@ -288,7 +290,8 @@ does not resolve is worse than one pointing at the old site.
    2026-10-12.
 6. **Resubmit the sitemap** in Search Console for the new property, and keep the old
    one until it stops receiving traffic. Base44 cannot `301` to Vercel — you do not
-   control its routing — so the old URL ages out rather than redirecting.
+   control its routing — so the page does the next best thing itself: see [The old
+   Base44 host](#the-old-base44-host).
 
    *Status, 2026-10-12: open.* The verification TXT record
    (`google-site-verification=pSXd…aiI`) is live at DTNT. What remains is to verify
@@ -313,10 +316,42 @@ the failure would appear after a publish, on production. The build job therefore
 second time with those unset, the way the Builder runs it. If that step goes red, a
 dashboard publish is broken even though everything else is green.
 
-The one thing to remember when publishing from the GUI: the Builder has its own
-environment, so `VITE_SITE_URL` has to be set there too (step 4). Without it that build
-keeps emitting the old canonical, and the copy Base44 serves starts competing with the
-production domain for the same content.
+The Builder has its own environment, set only in its dashboard. It no longer needs
+`VITE_SITE_URL`: the default is the production domain (step 4). Leave the variable unset
+there, or set it to `https://govari-fin.co.il` — never to the Base44 host, which would
+make that copy canonical again and switch its redirect off (the redirect will not send a
+visitor to the host they are already on).
+
+### The old Base44 host
+
+Base44 keeps serving a complete copy of the site at `safe-arch-plan.base44.app`, and it
+cannot answer that copy with a `301`. Its site config has four fields — install, build,
+serve and output directory — and nothing for routes, redirects or headers; the CLI's
+deploy, when it meets a `_redirects` or `_headers` file, warns that they are "not
+supported yet" and ignores them. So a page booted on that host deals with it itself,
+first thing in `main.jsx` (`src/lib/legacy-host.ts`, `src/lib/legacy-host-boot.ts`):
+
+| Request on `safe-arch-plan.base44.app` | What happens |
+| --- | --- |
+| A page (`/`, `/faq`, `/blog/…`, `/login`, `/admin/…`, …), top-level, no sign-in in flight | The head gets `noindex` and a canonical/`og:url` on `https://govari-fin.co.il/<path>`; the page renders nothing but a one-line notice and `location.replace`s to `https://govari-fin.co.il/<path><query><fragment>`. No React, no API call, no chat. |
+| A page carrying a sign-in (`code`, `error`, `access_token` in the query or fragment, `token`, `token_hash`, `from_url`, `clear_access_token`, Base44's `app_id`/`app_base_url`/`functions_version`) | Stays, so the sign-in completes on the origin whose storage holds its state. Still `noindex`, canonical on production. |
+| `/register`, `/forgot-password`, `/reset-password`, `/oauth/*` (the platform's own auth pages) | Stays, for the same reason. Still `noindex`. |
+| A page inside a frame (the Base44 dashboard showing the app) | Stays: production refuses to be framed, so a redirect would only blank the frame. Still `noindex`. |
+| `/api/*`, `/ws-user-apps/*`, the agents' socket, assets, images, any non-HTML response | Untouched. None of it runs the app's HTML, so none of it runs this code — and the page refuses those paths too, in case one is ever opened in a tab. |
+
+A conversation already open in a tab is not cut off: this runs once, at boot. (A tab
+that reloads itself after a deploy — `freshness.ts` — reboots there, and a reload
+already loses an open chat today; the difference is that it now lands on production.)
+The Builder's preview runs on other hosts and is left alone: the match is exact.
+
+`VITE_LEGACY_HOSTS` (comma-separated hostnames) replaces the host list; `none` turns all
+of it off — the switch, set in the Builder's environment and published, if it ever
+misbehaves.
+
+A crawler that does not run JavaScript still gets the plain `index.html` from Base44,
+which now names production in its canonical, `og:url` and JSON-LD (measured on
+2026-10-05, Base44 served the canonical and `og:url` tags with their values stripped;
+that is Base44's doing and the runtime tags cover it).
 
 ## The home page, and the one conversation
 
@@ -524,15 +559,15 @@ before reading anything, so the order matters only once the switch is on).
 **Launch checklist** (every box before `MASLEKA_ENABLED` is set; none of it
 runs in CI):
 
-- [ ] Migration applied, then `select jobname, schedule from cron.job where jobname like 'masleka-%';` returns **2 rows** (`masleka-housekeeping`, `masleka-remind`). A missing `pg_net` only raises a NOTICE in the migration, so also run `select extname from pg_extension where extname in ('pg_cron','pg_net');` and expect both; if `pg_net` is missing, enable it (Dashboard, Database, Extensions) and re-run the `masleka-remind` scheduling block.
+- [x] Migration applied, then `select jobname, schedule from cron.job where jobname like 'masleka-%';` returns **2 rows** (`masleka-housekeeping`, `masleka-remind`). A missing `pg_net` only raises a NOTICE in the migration, so also run `select extname from pg_extension where extname in ('pg_cron','pg_net');` and expect both; if `pg_net` is missing, enable it (Dashboard, Database, Extensions) and re-run the `masleka-remind` scheduling block. **Done 2026-10-14:** applied by hand (`psql -1`, then `migration repair`); both jobs listed active.
 - [ ] Migration `20261019000000_masleka_wipe_notice.sql` applied, then `select column_name from information_schema.columns where table_schema = 'public' and table_name = 'masleka_requests' and column_name = 'wipe_notified_at';` returns **1 row**. If it is applied in the SQL editor, follow it with `supabase migration repair --status applied 20261019000000`.
-- [ ] Edge secrets set: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_KEY="$(openssl rand -base64 32)" MASLEKA_CRON_SECRET="$(openssl rand -hex 32)"`. Functions deployed (the CI deploy job does this on merge).
-- [ ] Vault `masleka_cron_secret` is the same value as `MASLEKA_CRON_SECRET` and has **at least 32 characters** (a shorter one makes every reminder call answer 503): `select length(decrypted_secret) from vault.decrypted_secrets where name = 'masleka_cron_secret';` must be at least 32. Confirm `masleka_call_remind()` sends the header `x-masleka-cron` with that secret: `select pg_get_functiondef('public.masleka_call_remind'::regproc);` and look for `'x-masleka-cron'`.
+- [x] Edge secrets set: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_KEY="$(openssl rand -base64 32)" MASLEKA_CRON_SECRET="$(openssl rand -hex 32)"`. Functions deployed (the CI deploy job does this on merge). **Done 2026-10-14.**
+- [ ] Vault `masleka_cron_secret` is the same value as `MASLEKA_CRON_SECRET` and has **at least 32 characters** (a shorter one makes every reminder call answer 503): `select length(decrypted_secret) from vault.decrypted_secrets where name = 'masleka_cron_secret';` must be at least 32. Confirm `masleka_call_remind()` sends the header `x-masleka-cron` with that secret: `select pg_get_functiondef('public.masleka_call_remind'::regproc);` and look for `'x-masleka-cron'`. **2026-10-14:** created with the same value as the function secret (digests match, 64 characters); the `pg_get_functiondef` header check is still to do.
 - [ ] The gateway's `x-forwarded-for`, once, on a deployed function (the per-IP limit of `masleka-code` keys on the header's first entry, so a client that can forge it defeats the limit). With the switch on for the smoke, post one bad submission twice, the second time with a forged header: `curl -s -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-code -H 'content-type: application/json' -H 'x-forwarded-for: 198.51.100.7' -d '{"token":"x","code":"x","idNumber":"x"}'`. Then `select key, count(*) from public.submission_limits where key like 'masleka-ip:%' and at > now() - interval '10 minutes' group by key;` and compare with `printf %s "$(curl -s https://api.ipify.org)" | shasum -a 256`. Expected: the key is `masleka-ip:` plus the hash of your real address, not of 198.51.100.7. If it is the forged one, derive the IP from the last entry instead, in `clientIp` (`supabase/functions/_shared/guard.ts`), before launch.
 - [ ] `masleka-reveal` keeps `Cache-Control: no-store` through the gateway. Only the 200 answer carries it, so use the smoke's hand-made `code_received` request and a staff session: `curl -i -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-reveal -H 'content-type: application/json' -H "authorization: Bearer $STAFF_JWT" -d '{"requestId":"<id>","field":"code"}'` and read `Cache-Control: no-store` in the response headers (a CDN or gateway that rewrites it is a launch blocker).
-- [ ] **Migration order.** `20261015000000_masleka_requests.sql` sorts before main's `20261016*` chat migrations. If those are applied to production first, `supabase db push` refuses the older file: use `supabase db push --include-all`. If the migration is applied by hand in the SQL editor instead, follow it with `supabase migration repair --status applied 20261015000000` so the history matches.
+- [x] **Migration order.** `20261015000000_masleka_requests.sql` sorts before main's `20261016*` chat migrations. If those are applied to production first, `supabase db push` refuses the older file: use `supabase db push --include-all`. If the migration is applied by hand in the SQL editor instead, follow it with `supabase migration repair --status applied 20261015000000` so the history matches. **Done 2026-10-14:** `20261015000000` applied by hand after the chat migrations, then `supabase migration repair --status applied 20261015000000`.
 - [ ] **The XFF check, both commands.** (1) With your real address: `curl -s -X POST https://hjowdyiwjjrqceumkvgt.supabase.co/functions/v1/masleka-code -H 'content-type: application/json' -d '{"token":"x","code":"x","idNumber":"x"}'`; (2) the same with `-H 'x-forwarded-for: 198.51.100.7'` added. Both bodies are bad (a malformed token), so nothing is stored. Compare the two `masleka-ip:` keys in `submission_limits` as in the XFF line above: they must be the same key, the hash of your real address.
-- [ ] **DST check, once** (Task 3's case: the 25 Oct 2026 clock change must not move the wall time). On any machine with Deno, from the repo root: `deno eval --no-config 'import { addBusinessDays } from "./supabase/functions/_shared/business-days.ts"; const r = addBusinessDays(new Date("2026-10-21T21:30:00Z"), 4); console.log(r.toLocaleString("en-GB", { timeZone: "Asia/Jerusalem" }))'` must print `28/10/2026, 00:30:00` (Thursday 22 Oct 00:30 Israel time plus 4 business days is Wednesday 28 Oct 00:30). The same case runs in CI as `UNIT-BDAY-006`; this confirms it on the Edge runtime's Deno.
+- [x] **DST check, once** (Task 3's case: the 25 Oct 2026 clock change must not move the wall time). On any machine with Deno, from the repo root: `deno eval --no-config 'import { addBusinessDays } from "./supabase/functions/_shared/business-days.ts"; const r = addBusinessDays(new Date("2026-10-21T21:30:00Z"), 4); console.log(r.toLocaleString("en-GB", { timeZone: "Asia/Jerusalem" }))'` must print `28/10/2026, 00:30:00` (Thursday 22 Oct 00:30 Israel time plus 4 business days is Wednesday 28 Oct 00:30). The same case runs in CI as `UNIT-BDAY-006`; this confirms it on the Edge runtime's Deno. **Done 2026-10-14:** printed `28/10/2026, 00:30:00` (Deno 2.9.6).
 - [x] **Product decision: the failure copy** — decided 2026-10-14, implemented. When `masleka-code` knows nothing was stored (it failed before the accepting write, or the database refused that write), it answers `not_saved` and the page says: "השליחה לא עברה והקוד לא נשמר. נסו לשלוח שוב בעוד כמה דקות — הקישור עדיין בתוקף." Every staff member gets "מסירת קוד מסלקה נכשלה" (the client's name when the link was read, and the rid — never the code, the ID or the link), at most once an hour per link and five an hour in all. A write cut off on the way may have landed, so it still answers `failed` ("ייתכן שהקוד כבר התקבל…") — and staff are alerted for that too, since the client was told Dorit will be in touch. A missing `MASLEKA_KEY` alerts staff as well.
 - [x] **Product decision: an unsubmitted wipe** — decided 2026-10-14, implemented. The hourly `masleka-remind` run mails every staff member (the same `masleka_staff_emails()` recipients) "קוד מסלקה נמחק לפני הגשה — <name>", once per request, naming the client (name, address, the day the code arrived) and saying a new code must be requested. Exactly once across runs through `wipe_notified_at` — needs migration `20261019000000_masleka_wipe_notice.sql` applied (see **Release**).
 - [x] **Product decision: the remind-rotation corner** — decided 2026-10-14: accepted: rare; client asks for a new link. (If staff relink a request between a reminder mail and its rotation, the client's reminder link is dead and they see "link_invalid".)
@@ -543,7 +578,7 @@ runs in CI):
 - [ ] The compliance adviser has approved the points in `base44/agents/COMPLIANCE.md` §10, including the interview and wizard wording that still promises a signed mandate.
 - [ ] After switch-on, open one test link with GA4 DebugView and confirm no `#t=` appears in `page_location`.
 - [ ] After switch-on, open one test link with the browser's network tab open and confirm the Vercel Web Analytics beacon (`/_vercel/insights/view`) carries a url with no `#t=`.
-- [ ] Staff memberships added (SQL above), Dorit's own `owner` row confirmed: `select * from public.memberships;`.
+- [ ] Staff memberships added (SQL above), Dorit's own `owner` row confirmed: `select * from public.memberships;`. **Blocked 2026-10-14:** Dorit has never signed in, so she has no `auth.users` row to attach a membership to.
 - [ ] Switch on: `supabase secrets set --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED=true` and `VITE_MASLEKA_ENABLED=true` on Vercel (production and preview), then redeploy. Smoke with a hand-made request to a staff member's own address: the client page, a reveal (a row appears in `masleka_access_log`), **הגשתי** (`select count(*) from masleka_requests where (code_ciphertext is not null or id_ciphertext is not null) and status <> 'code_received';` is 0).
 - [ ] **Rollback:** `supabase secrets unset --project-ref hjowdyiwjjrqceumkvgt MASLEKA_ENABLED`, unset `VITE_MASLEKA_ENABLED` on Vercel and redeploy. Links then say the service is unavailable and `submit-lead` returns to the `POA_URL` mail; the hourly wipe and expiry keep running regardless, so no waiting code outlives 9 days — but with the switch off `masleka-remind` answers 404, so a wipe in that time is not announced.
 
@@ -585,6 +620,16 @@ What it stores and how a turn runs:
   `store.tool_row_failed` / `store.usage_failed`). If the model then fails, the
   answer is a 503 with `leadSaved: true`, and the page shows the saved
   confirmation and Dorit's channels, not a failure.
+- **A save needs a stage.** `submitLead` without `stage: "partial"` or
+  `"complete"` is answered with an error the model can act on and saves nothing
+  (#188): the model once called it with no input at all, and a missing stage
+  used to count as complete. In evaluation mode the simulated save also refuses
+  a missing name or phone, as `submit-lead` does.
+- **Three tool rounds, then words.** A turn runs at most three rounds of tools;
+  the call after the third goes out with `tool_choice: none` (the tools stay
+  listed, the model may not call one), so the visitor gets a reply rather than a
+  503 (#192). Only a model that still asks for a tool fails the turn
+  (`too_many_tool_rounds`).
 
 ### Switch and secrets
 
@@ -606,8 +651,8 @@ What it stores and how a turn runs:
 Migrations, applied to production by hand after merge (CI deploys functions
 only): `20261016000000_chat_conversations.sql`, then
 `20261016010000_chat_purge_schedule.sql`, then
-`20261018000000_chat_support_sheet_log.sql` (already applied to production on
-2026-10-14). `pg_cron` is already enabled in
+`20261018000000_chat_support_sheet_log.sql`. All three are applied to
+production (2026-10-14). `pg_cron` is already enabled in
 production (1.6.4); on a fresh project enable it first (Dashboard, Database,
 Extensions). A transcript is kept 12 months and deleted with its lead;
 evaluation conversations are purged after one day.
@@ -658,6 +703,11 @@ to. On the function the model is not asked: a sweep writes the Support tab.
   claimed, and the failure is logged (`sweep.not_logged`, `sweep.log_failed`);
   the transcript is still in the database. Without `SHEET_ID` the sweep claims
   nothing (`sweep.sheet_unconfigured`).
+
+**Status: on since 2026-10-14.** `CHAT_SWEEP_TOKEN` and both Vault secrets are
+set; the first tick (11:00 UTC) answered `200 {"ok":true,"logged":0}`. It logs
+nothing until `VITE_CHAT_AGENTS` names `support_agent`, since no FAQ chat runs on
+the function before then.
 
 Setup, by hand and only when asked (the migration is already applied):
 
@@ -721,13 +771,21 @@ Each step is reversible. Shipping the PR is step 1 (dark); the rest is by hand,
 in this order:
 
 1. The two migrations applied (`pg_cron` is already enabled in production).
+   **Done 2026-10-14.**
 2. `ANTHROPIC_API_KEY` set, the provider's business terms confirmed to exclude
-   training on API data, and the `CHAT_MODEL` id checked.
-3. The evaluation passed and its 10 transcripts read with Dorit.
+   training on API data, and the `CHAT_MODEL` id checked. **Key set 2026-10-14;
+   `chat_usage.model` reads `claude-haiku-5-5`, which is in the price table.**
+3. The evaluation passed and its 10 transcripts read with Dorit. **Open.** Run 4
+   (2026-10-14, all 43 personas) failed: 7 of 12 complete leads (median 11 /
+   longest 19 visitor turns), from an empty `submitLead` taken as complete
+   (fixed, #188) and turns that hit the tool-round cap (fixed, #192); en-01, an
+   English-only visitor, was handed off instead of interviewed.
 4. The compliance adviser approved consent v6 (`2026-10-agents-v6`, shown only
    for agents served by `chat`), the transcript storage and the "שיחה" tab. The
    v6 sentence carries `TODO(compliance): adviser to approve` in
    `src/config/compliance.ts`; that TODO is a release gate, not a code gap.
+   **Open:** both v6 notices went to Dorit on 2026-10-14 to forward to her
+   adviser.
 5. Phase 2 step 6 done (a test lead seen end to end), because the interview
    books through the same `submit-lead` handler. Done 2026-10-14: an interview,
    a hand-off and the Outlook invitations were verified on production.
@@ -739,7 +797,8 @@ The FAQ chat follows the same gate, separately:
 - the compliance adviser approved its v6 notice too
   (`CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`, the same `TODO(compliance)`);
 - the FAQ personas pass (`EVAL_ONLY` is not the gate: run all 43);
-- the sheet-log setup above is done and one tick answered 200;
+- the sheet-log setup above is done and one tick answered 200 (**done
+  2026-10-14**);
 - then `VITE_CHAT_AGENTS=needs_interview,support_agent` and a redeploy, and one
   real FAQ chat: a reply that links an article, and its Support-tab row about
   2 hours after its last message.
@@ -753,19 +812,21 @@ Checks that remain before or at the switch:
   the price table in `supabase/functions/chat/budget.ts`. The lookup is by exact
   id: a dated snapshot id (`claude-haiku-5-5-2026…`) falls back to the most
   expensive known rate, so the budget would overcount. Add the id the API
-  actually reports.
+  actually reports. **Done 2026-10-14:** the API reports `claude-haiku-5-5`.
 - Once, after the migrations are applied, check the turn claim against the real
   PostgREST, not the unit tests' fake: send two messages to one conversation at
   the same moment (e.g. two `curl`s in the evaluation mode). Exactly one should
   answer 200 and the other `409 busy`, and afterwards the row's `busy_until`
   should be empty and `turns` up by one. A claim filter PostgREST reads
   differently from the fake would show here as two 200s or a stuck
-  `busy_until`.
+  `busy_until`. **Done 2026-10-14:** one 200, one `409 busy`; `busy_until`
+  empty and `turns` up by one afterwards.
 - Once, after the function is deployed, confirm how Supabase's gateway sets
   `x-forwarded-for`: the per-IP limit (`clientIp` in `_shared/guard.ts`) takes
   its first entry, which is only safe if a client cannot prepend its own. Send
   one request with a made-up `X-Forwarded-For` and check the `chat-ip:` key the
-  limiter counted.
+  limiter counted. **Done 2026-10-14:** the gateway puts the real address first;
+  the spoofed one was not counted.
 
 **Rollback:** remove the agent from `VITE_CHAT_AGENTS` and redeploy; it is back on
 Base44 with the fenced block. `CHAT_MONTHLY_BUDGET_USD=0` stops new conversations
@@ -1805,11 +1866,15 @@ enquiry. Everything goes through `src/lib/analytics.ts`:
 | `generate_lead` | the contact form **after the save succeeds**; an interview's summary after the page's submit succeeds | `method: contact_form \| ai_interview` |
 | `chat_start` | consent accepted and "התחלת השיחה" pressed | `method`: which chat |
 | `chat_handoff` | "מעבר לדורית" opened | `method`: which chat |
+| `click_chat` | any link to `/faq#support-chat` (header menu `header_menu`, sticky bar, desktop dock), and the phone's card on /faq opening the support chat | `location`; `method` when the chat itself opened |
+| `calculator_result` | once per result a visitor produced on /tools: the self-check's last answer; the fee calculator once its inputs have been changed and then left alone for 1.5 s, once per distinct set of inputs, never for the untouched defaults | `tool: fee_calculator \| insurance_assessment` — never a figure |
 
 `location` comes from `data-track-location`, otherwise the nearest `section[id]`,
 `header`, `footer` or `nav`; `mobile_sticky_bar`, `floating_dock` and `faq` are
-set explicitly. `track` passes on only `location`, `cta`, `method` and `channel`,
-so personal data cannot leak through a parameter added later. A blocked or
+set explicitly; the lead box under each /tools calculator is `calculator`.
+`track` passes on only `location`, `cta`, `method`, `channel`, the attribution's
+`lead_source`/`lead_campaign`, and `tool` — the last only with a value from
+`CALCULATOR_TOOLS` — so personal data cannot leak through a parameter added later. A blocked or
 throwing `gtag` does not throw.
 
 `?internal=1` marks a browser as the agency's own (`traffic_type: internal`,
@@ -1822,6 +1887,14 @@ the property ID with a link to the reports, and a table of every event — what 
 means, when it is sent, and whether it is recommended as a Key Event. The table
 is `LEAD_EVENTS` from the same module, and a unit test fails if the code sends an
 event that is not in it.
+
+**Key events (decided 2026-10-14).** Every lead-intent event is marked
+"מומלץ": `generate_lead`, `click_phone`, `click_whatsapp`, `click_email`,
+`cta_click`, `chat_start` and `chat_handoff`; the wizard's progress events
+(`wizard_start`, `wizard_step`) are not. A completed hand-off sends both
+`chat_handoff` and `generate_lead`, so one hand-off counts twice in GA4's key
+event total. The marking itself is a GA4 setting, not code: Admin ← Data
+display ← Events (or Key events ← New key event), once per name.
 
 **Open:** the privacy policy does not mention Google Analytics or cookies, and
 there is no consent banner. That is a question for Dorit's compliance adviser

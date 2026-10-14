@@ -11,8 +11,12 @@ import type { ToolDefinition, ToolOutcome } from './tools.ts';
 export const MAX_TOOL_ROUNDS = 3;
 export const TURN_BUDGET_MS = 25_000;
 export const RETRY_WINDOW_MS = 10_000;
-/** Room for a closing reply and a full submitLead (a Hebrew profile summary) in one response. */
-export const MAX_REPLY_TOKENS = 2048;
+/**
+ * Room for a closing reply and a full submitLead (a Hebrew profile summary) in
+ * one response. 2,048 cut a complete save off mid-profile (truncated_tool_call)
+ * in the evaluation of 2026-10-14; a reply that short costs no more at 4,096.
+ */
+export const MAX_REPLY_TOKENS = 4096;
 
 export interface StoredMessage {
   role: 'user' | 'assistant' | 'tool';

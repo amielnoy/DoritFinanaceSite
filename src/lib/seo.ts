@@ -6,6 +6,7 @@
 // homepage. This module gives each route its own head.
 
 import { useEffect } from "react";
+import { isLegacyHost } from "./legacy-host.js";
 import { jsonLdText } from "./trusted-types.js";
 
 type Env = Record<string, string | undefined> | undefined;
@@ -27,17 +28,21 @@ const serverEnv: Env =
 
 /**
  * The canonical origin, in order: the build's `VITE_SITE_URL` (Vite's env), the
- * server's `VITE_SITE_URL` (process env, set in the Vercel project), the old
- * default. A blank value counts as unset, as it does in the build plugin.
- * Deploy-time configuration only — never anything from a request (a Host header
- * would let a visitor choose the origin the server fetches from and links to).
+ * server's `VITE_SITE_URL` (process env, set in the Vercel project), the
+ * production domain. A blank value counts as unset, as it does in the build
+ * plugin. Deploy-time configuration only — never anything from a request (a
+ * Host header would let a visitor choose the origin the server fetches from and
+ * links to).
+ *
+ * The default was the old Base44 host until 2026-10-14. Every builder that did
+ * not set the variable — the Base44 Builder above all, whose environment lives
+ * only in its dashboard — kept declaring that host canonical, so the copy it
+ * serves competed with the real site. A build now has to opt *out* of the
+ * production domain rather than remember to opt in.
  */
 export function resolveSiteUrl(fromVite: Env, fromServer: Env): string {
   const pick = (env: Env) => env?.VITE_SITE_URL?.trim() || undefined;
-  return (pick(fromVite) ?? pick(fromServer) ?? "https://safe-arch-plan.base44.app").replace(
-    /\/+$/,
-    "",
-  );
+  return (pick(fromVite) ?? pick(fromServer) ?? "https://govari-fin.co.il").replace(/\/+$/, "");
 }
 
 /** Canonical origin. Override per environment with VITE_SITE_URL. */
@@ -116,6 +121,45 @@ function upsertLink(rel: string, href: string) {
   el.setAttribute("href", href);
 }
 
+/**
+ * Is this document being served on the old Base44 host? Read per call, not
+ * once: it is the page's own address, and tests move it.
+ */
+function onLegacyHost(): boolean {
+  return typeof window !== "undefined" && isLegacyHost(window.location.hostname);
+}
+
+/**
+ * The robots directive for a route. On the old host every page is `noindex`
+ * whatever the route says: it is a copy, and the copy must leave the index
+ * while the canonical names the production URL. `follow` is kept for public
+ * routes there (its links all lead to pages that are themselves canonicalised
+ * to production) and `nofollow` stays on the private ones, as everywhere.
+ */
+function robotsFor(noIndex: boolean, legacy = onLegacyHost()): string {
+  if (legacy) return noIndex ? "noindex, nofollow" : "noindex";
+  return noIndex ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1";
+}
+
+/**
+ * The head a page served on the old host needs before anything else runs:
+ * canonical and `og:url` on the production URL of the same path, and
+ * `noindex` for every crawler that reads robots meta. It runs at boot, so it
+ * covers the page that redirects away before React ever renders and the
+ * moment before a route applies its own SEO. `applySeo` keeps the same
+ * answers afterwards.
+ */
+export function applyLegacyHostHead(path: string): void {
+  if (typeof document === "undefined") return;
+  const url = absoluteUrl(path);
+  upsertLink("canonical", url);
+  og("og:url", url);
+  meta("robots", robotsFor(false, true));
+  // index.html also ships a googlebot-specific `index`. Google takes the most
+  // restrictive of the two, but a page should not say both.
+  meta("googlebot", "noindex");
+}
+
 /** Drop the previous route's multi-valued and route-scoped tags. */
 function clearRouteScoped() {
   const stale = document.head.querySelectorAll(
@@ -154,12 +198,7 @@ export function applySeo(config: SeoConfig): void {
   meta("description", desc);
   upsertLink("canonical", url);
 
-  meta(
-    "robots",
-    noIndex
-      ? "noindex, nofollow"
-      : "index, follow, max-image-preview:large, max-snippet:-1"
-  );
+  meta("robots", robotsFor(noIndex));
 
   og("og:title", title);
   og("og:description", desc);

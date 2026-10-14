@@ -18,7 +18,7 @@ was not known when the step was planned.
 | 1 · point DNS at Vercel | **done** (2026-10-11) — DTNT applied the records; apex `200`, `www` `308` to it, valid certificates | — |
 | 2 · production out from behind login | **done** — the Vercel production URL answers `200` anonymously | — |
 | 3 · the site answers, including `/api/*` | **verified** on `govari-fin.co.il` (2026-10-12): `submitLead` returns its own `400` guard | — |
-| 4 · set `VITE_SITE_URL` in both builders | **Vercel done** (2026-10-11); **Base44 open** — its copy still names itself in JSON-LD and robots.txt | you |
+| 4 · set `VITE_SITE_URL` in both builders | **Vercel done** (2026-10-11); **Base44 no longer needed** (2026-10-14) — the default origin is now production, and the Base44 copy goes `noindex` and redirects (README, "The old Base44 host"); live on the next Base44 publish | — |
 
 ### What was measured on 2026-10-05
 
@@ -121,14 +121,12 @@ The apex answers `200`, and `www` answers `308` to it.
    deployment list.
 2. ~~**Add `govari-fin.co.il` and `www` to the Vercel project** and set the records
    at the registrar.~~ Done 2026-10-11.
-3. **Set `VITE_SITE_URL`** to the canonical origin, in **both** builders: the
-   Vercel project's Production scope and Base44's app settings. The Vercel half
-   is done. The Base44 half is still open: it is the one that is easy to forget,
-   and without it the copy Base44 keeps serving goes on declaring itself canonical
-   and competes with the real site. It is set in the Base44 dashboard only, then
-   Publish.
-
-Everything in the repo is done; only the Base44 setting remains.
+3. ~~**Set `VITE_SITE_URL`** in Base44's app settings.~~ Not needed since
+   2026-10-14: an unset variable now means the production domain, and a page on
+   the Base44 host marks itself `noindex` and moves the visitor to the same
+   address on `govari-fin.co.il` (Base44 cannot `301` — its site config has no
+   redirects and its CLI ignores `_redirects`). Do not set the variable there to
+   the Base44 host.
 
 ---
 

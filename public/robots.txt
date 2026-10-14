@@ -54,4 +54,4 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
-Sitemap: https://safe-arch-plan.base44.app/sitemap.xml
+Sitemap: https://govari-fin.co.il/sitemap.xml
