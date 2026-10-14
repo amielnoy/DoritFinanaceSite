@@ -16,14 +16,14 @@ import type { ModelClient } from './anthropic.ts';
 import { monthKey, monthStartIso, spendUsd } from './budget.ts';
 import { systemBlocks, type ChatRole } from './prompt.ts';
 import { toFacts, type ChatStore, type ConversationRow } from './store.ts';
-import { INTERVIEW_TOOLS, type ConversationStatus, type ToolCallContext, type ToolDefinition, type ToolOutcome, type ToolRunner } from './tools.ts';
+import { INTERVIEW_TOOLS, SUPPORT_TOOLS, type ConversationStatus, type ToolCallContext, type ToolDefinition, type ToolOutcome, type ToolRunner } from './tools.ts';
 import { runTurn, toModelHistory, TurnFailure, type TurnResult } from './turn.ts';
 
 const FN = 'chat';
 const log = createLog(FN);
 
-export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview' };
-const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS };
+export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview', support_agent: 'support' };
+const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS, support: SUPPORT_TOOLS };
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_TURNS = 40;
 export const IDLE_MS = 2 * 60 * 60 * 1000;
@@ -207,7 +207,12 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
             tools: ROLE_TOOLS[role],
             history,
             runTool: async (name, args) => {
-              const outcome = await deps.runTool(name, args, ctx);
+              // A tool outside this conversation's role is never run, whatever the model names.
+              const offered = ROLE_TOOLS[role].some((t) => t.name === name);
+              if (!offered) log('warn', 'tool.not_offered', { rid, conversation: id, tool: String(name).slice(0, 40) });
+              const outcome: ToolOutcome = offered
+                ? await deps.runTool(name, args, ctx)
+                : { name, status: 'error', isError: true, forModel: JSON.stringify({ ok: false, error: 'unknown_tool' }) };
               await persistOutcome(outcome);
               return outcome;
             },

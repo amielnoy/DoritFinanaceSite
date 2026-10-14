@@ -9,6 +9,7 @@ import { createLog } from '../_shared/log.ts';
 import { sendMail } from '../_shared/mail.ts';
 import { handler as submitLead } from '../submit-lead/handler.ts';
 import { createAnthropicClient, DEFAULT_CHAT_MODEL } from './anthropic.ts';
+import { restArticles } from './articles.ts';
 import { parseBudget } from './budget.ts';
 import type { ChatDeps } from './handler.ts';
 import { restStore } from './store.ts';
@@ -29,7 +30,7 @@ export function liveDeps(): ChatDeps {
     now: () => Date.now(),
     store: restStore,
     model: apiKey ? createAnthropicClient({ apiKey, model }) : null,
-    runTool: createToolRunner({ submitLead, escalateToHuman }),
+    runTool: createToolRunner({ submitLead, escalateToHuman }, restArticles),
     allow: (rid, key, windowSeconds, max) => withinLimit(log, rid, key, windowSeconds, max),
     monthlyBudgetUsd: parseBudget(Deno.env.get('CHAT_MONTHLY_BUDGET_USD')),
     evalToken: (Deno.env.get('CHAT_EVAL_TOKEN') || '').trim(),

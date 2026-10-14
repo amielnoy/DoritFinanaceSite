@@ -720,3 +720,26 @@ describe("HTTP", () => {
     expect([res.status, ((await res.json()) as Record<string, unknown>).code]).toEqual([400, "unknown_agent"]);
   });
 });
+
+describe("the support role", () => {
+  const firstSupport = (message = "מה זה דמי ניהול?") => ({ ...first(message), agent: "support_agent" });
+
+  it("serves support_agent with the support prompt and tools", async () => {
+    const { chat, model, store } = setup({}, [text("דמי ניהול הם…")]);
+    const { status } = await json(await chat(post(firstSupport())));
+    expect(status).toBe(200);
+    const [conv] = [...store.conversations.values()];
+    expect(conv.role).toBe("support");
+    expect(model.calls[0].tools.map((t) => t.name)).toEqual(["listArticles", "readArticle", "escalateToHuman"]);
+    expect(model.calls[0].system[1].text).toContain("listArticles");
+  });
+
+  it("never runs a tool its role was not given, even when the model names one", async () => {
+    const runTool = vi.fn();
+    const { chat, store } = setup({ runTool }, [toolUse("submitLead", { stage: "complete", name: "x", phone: "0500000000" }), text("…")]);
+    await chat(post(firstSupport()));
+    expect(runTool).not.toHaveBeenCalled();
+    expect(store.messages.map((m) => m.content)).toContain("submitLead: error");
+    expect([...store.conversations.values()][0].status).toBe("open");
+  });
+});
