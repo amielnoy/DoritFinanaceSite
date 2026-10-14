@@ -106,6 +106,31 @@ export async function checkFreshness(): Promise<"fresh" | "unknown" | "stale"> {
   return "stale";
 }
 
+/**
+ * A lazy page (or one of its parts) that could not be loaded, as each browser
+ * words it: Chrome "Failed to fetch dynamically imported module", Safari
+ * "Importing a module script failed", Firefox "error loading dynamically
+ * imported module", and a chunk answered with the SPA's HTML instead of
+ * JavaScript (a removed chunk, which Vercel serves as app.html).
+ */
+export function isChunkLoadError(error: unknown): boolean {
+  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error ?? "");
+  return /failed to fetch dynamically imported module|importing a module script failed|error loading dynamically imported module|chunkloaderror|loading (css )?chunk .* failed|is not a valid javascript mime type/i.test(
+    text,
+  );
+}
+
+/**
+ * The fallback's "לטעון את הדף מחדש": a URL the cache has never seen, for the
+ * reason `checkFreshness` gives — a plain reload can be answered from the very
+ * cache entry that broke the page.
+ */
+export function reloadFresh(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("_v", String(Date.now()));
+  window.location.replace(url.toString());
+}
+
 /** Wires the check to load, to the tab being brought back, and to a lazy page failing to load. */
 export function watchFreshness(): void {
   void checkFreshness();

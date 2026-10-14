@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { checkFreshness, watchFreshness } from "@/lib/freshness";
+import { checkFreshness, isChunkLoadError, reloadFresh, watchFreshness } from "@/lib/freshness";
 
 /**
  * The check that notices a browser is running a build the server has replaced.
@@ -112,5 +112,32 @@ describe("freshness — leaving a build the server has replaced", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(replaced).toHaveLength(1);
     expect(replaced[0]).toMatch(/[?&]_v=77/);
+  });
+});
+
+describe("freshness — a page chunk that would not load", () => {
+  it.each([
+    ["Chrome", new TypeError("Failed to fetch dynamically imported module: https://govari-fin.co.il/assets/Claims-x.js")],
+    ["Safari", new TypeError("Importing a module script failed.")],
+    ["Firefox", new TypeError("error loading dynamically imported module: https://govari-fin.co.il/assets/Claims-x.js")],
+    ["a chunk answered with HTML", new TypeError("'text/html' is not a valid JavaScript MIME type.")],
+  ])("recognises %s's wording", (_browser, error) => {
+    expect(isChunkLoadError(error)).toBe(true);
+  });
+
+  it("does not take an ordinary render error for one", () => {
+    expect(isChunkLoadError(new Error("Cannot read properties of undefined (reading 'map')"))).toBe(false);
+    expect(isChunkLoadError(undefined)).toBe(false);
+  });
+
+  it("reloads at an address the cache has never seen, keeping the page and its query", () => {
+    const replaced: string[] = [];
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { href: "https://example.test/claims?x=1", replace: (url: string) => replaced.push(url) },
+    });
+    vi.spyOn(Date, "now").mockReturnValue(1234);
+    reloadFresh();
+    expect(replaced).toEqual(["https://example.test/claims?x=1&_v=1234"]);
   });
 });
