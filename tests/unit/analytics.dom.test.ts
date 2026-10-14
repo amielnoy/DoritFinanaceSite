@@ -155,9 +155,18 @@ describe("the needs wizard's events", () => {
 });
 
 describe("LEAD_EVENTS catalogue", () => {
-  it("does not mark chat_handoff a key event — generate_lead already covers the completed hand-off", () => {
-    const chatHandoff = LEAD_EVENTS.find((e) => e.name === "chat_handoff");
-    expect(chatHandoff?.keyEvent).toBe(false);
+  // The user's decision of 2026-10-14: every lead-intent event is a key event,
+  // the hand-off request too (it is counted again as generate_lead once it is
+  // done — the panel says so). The wizard's progress events stay plain events.
+  it.each(["generate_lead", "click_phone", "click_whatsapp", "click_email", "cta_click", "chat_start", "chat_handoff"])(
+    "marks %s a key event",
+    (name) => {
+      expect(LEAD_EVENTS.find((e) => e.name === name)?.keyEvent).toBe(true);
+    },
+  );
+
+  it.each(["wizard_start", "wizard_step", "preferred_channel_click"])("leaves %s a plain event", (name) => {
+    expect(LEAD_EVENTS.find((e) => e.name === name)?.keyEvent).toBe(false);
   });
 
   it("includes claim as a generate_lead method, same catalogue entry as the others", () => {

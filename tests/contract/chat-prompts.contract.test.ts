@@ -42,8 +42,17 @@ describe("interview.md against the prompt Base44 runs today", () => {
     }
   });
 
-  it("renders, for Dorit, to today's text byte for byte apart from the three tool-section lines", () => {
+  it("renders, for Dorit, to today's text byte for byte apart from the three tool-section lines and the two language lines", () => {
     expect(fillPlaceholders(PROMPTS.interview)).toBe(withToolSection(instructions, (s: string) => fillPlaceholders(s)));
+  });
+
+  it("interviews a visitor who writes in English in English, and keeps what reaches Dorit in Hebrew", () => {
+    // The user's decision of 2026-10-14: en-01 (an English-only visitor) was handed
+    // off under "דבר רק בעברית" instead of being interviewed.
+    expect(PROMPTS.interview).not.toContain("דבר רק בעברית");
+    expect(PROMPTS.interview).toMatch(/מבקר שכותב באנגלית — ראיין אותו באנגלית/);
+    expect(PROMPTS.interview).toMatch(/אל תעביר מבקר לדורית רק משום שהוא כותב באנגלית/);
+    expect(PROMPTS.interview).toMatch(/נכתב תמיד בעברית/);
   });
 
   it("asks for submitLead and never for a fenced block", () => {

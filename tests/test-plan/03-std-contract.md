@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 158 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 888 including `it.each` / `describe.each` expansions (887 pass, 1 skipped)
+**Location:** `tests/contract/` · **Cases:** 159 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 895 including `it.each` / `describe.each` expansions (887 pass, 1 skipped)
 
 ---
 
@@ -567,9 +567,10 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 |---|---|---|
 | CTR-CHPROMPT-001 | "%s equals agencyProfile.ts" | `AGENCY` (the function's copy) equals `AGENCY_PROFILE`, field by field (6 cases) |
 | CTR-CHPROMPT-002 | "names the agency the tenant migration seeds" | The tenant migration inserts `AGENCY.id` |
-| CTR-CHPROMPT-003 | "each tool-section change matches exactly one line of today's instructions" | The three `startsWith` prefixes each match one line of `needs_interview.jsonc` |
-| CTR-CHPROMPT-004 | "renders, for Dorit, to today's text byte for byte apart from the three tool-section lines" | `interview.md` filled for agency 1 equals today's instructions with only the three lines replaced |
+| CTR-CHPROMPT-003 | "each tool-section change matches exactly one line of today's instructions" | The five `startsWith` prefixes (three tool-section, two language) each match one line of `needs_interview.jsonc` |
+| CTR-CHPROMPT-004 | "renders, for Dorit, to today's text byte for byte apart from the three tool-section lines and the two language lines" | `interview.md` filled for agency 1 equals today's instructions with only the three lines replaced |
 | CTR-CHPROMPT-005 | "asks for submitLead and never for a fenced block" | `interview.md` has no fenced `lead` block and requests the `submitLead` call |
+| CTR-CHPROMPT-013 | "interviews a visitor who writes in English in English, and keeps what reaches Dorit in Hebrew" | `PROMPTS.interview` has no "דבר רק בעברית"; it says to interview an English writer in English, not to hand them off for the language alone, and that summary/profile sent to Dorit are always Hebrew (the user's decision of 2026-10-14; en-01) |
 | CTR-CHPROMPT-006 | "is COMPLIANCE.md §3 and §5, verbatim" | `compliance.md` equals the §3 + §5 excerpt of `COMPLIANCE.md` |
 | CTR-CHPROMPT-007 | "no longer lists createConsultationEvent as an interview tool" | The stale `createConsultationEvent` row is gone from `COMPLIANCE.md` |
 | CTR-CHPROMPT-008 | "is what the build script writes from the Markdown files today" | `prompts.generated.ts` equals `renderPromptsModule` output; stale means run `npm run build:chat-prompts` |

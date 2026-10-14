@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 704 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1314 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 706 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1323 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -363,6 +363,8 @@ one; a blocked or throwing tag never breaks the page.
 | UNIT-GA4-012 | "reports mail links and the start-conversation call to action" | `click_email`, `cta_click` |
 | UNIT-GA4-013 | "ignores every other link" | Nothing sent |
 | UNIT-GA4-014 | "registers once, however often it is called" | One listener |
+| UNIT-GA4-015 | "marks %s a key event" (7 cases) | `generate_lead`, `click_phone`, `click_whatsapp`, `click_email`, `cta_click`, `chat_start`, `chat_handoff` have `keyEvent: true` in `LEAD_EVENTS` (the user's decision of 2026-10-14) |
+| UNIT-GA4-016 | "leaves %s a plain event" (3 cases) | `wizard_start`, `wizard_step`, `preferred_channel_click` have `keyEvent: false` |
 
 ### 4.16 Reconciling the lead mirror — `tests/unit/reconcile-leads.test.ts`
 
