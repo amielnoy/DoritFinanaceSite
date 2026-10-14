@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ESCALATE_TOOL,
   INTERVIEW_TOOLS,
+  LIST_ARTICLES_TOOL,
+  READ_ARTICLE_TOOL,
+  SUPPORT_TOOLS,
   createToolRunner,
   type ToolCallContext,
 } from "../../supabase/functions/chat/tools.ts";
+import type { ArticleSource } from "../../supabase/functions/chat/articles.ts";
 
 const ctx = (over: Partial<ToolCallContext> = {}): ToolCallContext => ({
   conversation: {
@@ -257,5 +262,69 @@ describe("a partial save tells the model to keep talking", () => {
 
   it("the tool's description says the partial save is not mentioned but the conversation goes on", () => {
     expect(INTERVIEW_TOOLS[0].description).toMatch(/המשך באותה הודעה/);
+  });
+});
+
+const articleSource = (over: Partial<ArticleSource> = {}): ArticleSource => ({
+  list: vi.fn(async () => [{ slug: "dmei-nihul", title: "דמי ניהול", excerpt: "מה הם", tags: "פנסיה" }]),
+  read: vi.fn(async (slug: string) => (slug === "dmei-nihul" ? { slug, title: "דמי ניהול", body: "גוף המאמר", truncated: false } : null)),
+  ...over,
+});
+const supportCtx = (over: Partial<ToolCallContext> = {}) => ctx({ agent: "support_agent", ...over });
+
+describe("the support tool set", () => {
+  it("is the two article tools and the hand-off, and never submitLead", () => {
+    expect(SUPPORT_TOOLS.map((t) => t.name)).toEqual(["listArticles", "readArticle", "escalateToHuman"]);
+    expect(SUPPORT_TOOLS).toContain(ESCALATE_TOOL);
+    expect(INTERVIEW_TOOLS).toContain(ESCALATE_TOOL);
+  });
+
+  it("asks the model for nothing but a slug when reading", () => {
+    expect(LIST_ARTICLES_TOOL.input_schema).toEqual({ type: "object", properties: {} });
+    expect(READ_ARTICLE_TOOL.input_schema).toMatchObject({ required: ["slug"], properties: { slug: { type: "string" } } });
+  });
+});
+
+describe("listArticles / readArticle", () => {
+  const run = (articles: ArticleSource) => createToolRunner({ submitLead: answering(200, {}), escalateToHuman: answering(200, {}) }, articles);
+
+  it("lists the published articles for the model, with their slugs", async () => {
+    const out = await run(articleSource())("listArticles", {}, supportCtx());
+    expect(out).toMatchObject({ name: "listArticles", status: "ok", isError: false });
+    expect(JSON.parse(out.forModel)).toEqual({ ok: true, articles: [{ slug: "dmei-nihul", title: "דמי ניהול", excerpt: "מה הם", tags: "פנסיה" }] });
+  });
+
+  it("reads an article by slug, saying when it was cut", async () => {
+    const out = await run(articleSource())("readArticle", { slug: "dmei-nihul" }, supportCtx());
+    expect(JSON.parse(out.forModel)).toEqual({ ok: true, slug: "dmei-nihul", title: "דמי ניהול", body: "גוף המאמר", truncated: false });
+  });
+
+  it("answers not_found for a slug no published article has, as a tool error the model can handle", async () => {
+    const out = await run(articleSource())("readArticle", { slug: "invented-slug" }, supportCtx());
+    expect(out).toMatchObject({ name: "readArticle", status: "error", isError: true });
+    expect(JSON.parse(out.forModel)).toEqual({ ok: false, error: "not_found" });
+  });
+
+  it("passes a non-string slug through as nothing, never as text", async () => {
+    const articles = articleSource();
+    await run(articles)("readArticle", { slug: { $ne: 1 } }, supportCtx());
+    expect(articles.read).toHaveBeenCalledWith("");
+  });
+
+  it("reads real articles in evaluation mode too: reading changes nothing", async () => {
+    const articles = articleSource();
+    await run(articles)("listArticles", {}, supportCtx({ evalMode: true }));
+    expect(articles.list).toHaveBeenCalled();
+  });
+
+  it("turns a failing article store into tool_failed, not a crashed turn", async () => {
+    const out = await run(articleSource({ list: vi.fn(async () => { throw new Error("select_http_500"); }) }))("listArticles", {}, supportCtx());
+    expect(JSON.parse(out.forModel)).toEqual({ ok: false, error: "tool_failed" });
+  });
+
+  it("turns a failing read into tool_failed too, never not_found", async () => {
+    const out = await run(articleSource({ read: vi.fn(async () => { throw new Error("select_http_503"); }) }))("readArticle", { slug: "dmei-nihul" }, supportCtx());
+    expect(out).toMatchObject({ name: "readArticle", isError: true });
+    expect(JSON.parse(out.forModel)).toEqual({ ok: false, error: "tool_failed" });
   });
 });

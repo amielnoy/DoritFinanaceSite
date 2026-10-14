@@ -10,6 +10,7 @@ import {
   BOT_DISCLOSURE,
   CHAT_DISCLAIMER,
   CHAT_FUNCTION_CONSENT_POINTS,
+  CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT,
   CHAT_FUNCTION_CONSENT_VERSION,
   CONSENT,
   CONSENT_VERSION,
@@ -284,7 +285,9 @@ export default function AgentChat({
   /** On the `chat` function (VITE_CHAT_AGENTS), not Base44: its own notice, no fenced block, no watchdog. */
   const viaChatFunction = servedByChatFunction(descriptor.agent);
   const consentVersion = viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION;
-  const consentPoints = viaChatFunction ? CHAT_FUNCTION_CONSENT_POINTS : (descriptor.consentPoints ?? CONSENT.points);
+  const consentPoints = viaChatFunction
+    ? (CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT[descriptor.agent] ?? CHAT_FUNCTION_CONSENT_POINTS)
+    : (descriptor.consentPoints ?? CONSENT.points);
 
   useEffect(() => {
     if (!conversationId) return;

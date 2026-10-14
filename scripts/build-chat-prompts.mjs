@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const PROMPT_DIR = 'supabase/functions/chat/prompts';
-export const PROMPT_NAMES = ['compliance', 'interview', 'profile'];
+export const PROMPT_NAMES = ['compliance', 'interview', 'profile', 'support'];
 export const OUTPUT = 'supabase/functions/chat/prompts.generated.ts';
 
 const stripFinalNewline = (s) => (s.endsWith('\n') ? s.slice(0, -1) : s);

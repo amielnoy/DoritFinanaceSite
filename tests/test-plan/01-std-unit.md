@@ -681,7 +681,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 
 ### 4.32 The chat function's tools — `tests/unit/chat-tools.test.ts`
 
-`supabase/functions/chat/tools.ts`: the interview's tool schemas and the runners that call `submit-lead` and `escalate-to-human` in-process, with fake handlers. No network.
+`supabase/functions/chat/tools.ts`: the interview's tool schemas and the runners that call `submit-lead` and `escalate-to-human` in-process, with fake handlers; the FAQ chat's tool set and its two article tools, over a fake `ArticleSource`. No network.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -704,6 +704,31 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-017 | "refuses a partial save once the lead is saved: already_saved, no second row" | Ruling 10: complete then partial: second is `already_saved`, handler called once |
 | UNIT-CHTOOL-018 | "refuses a partial save after a simulated complete one too" | Ruling 10: the same in evaluation mode |
 | UNIT-CHTOOL-019 | "turns a %s handler that throws into an error outcome, leaving the conversation as it was" | `submitLead` and `escalateToHuman`: `status: error`, `isError`, no `leadSaved`/`escalated`, `{ ok: false }` for the model; status `open`, `escalated` false (I2) |
+| UNIT-CHTOOL-020 | "is the two article tools and the hand-off, and never submitLead" (the support tool set) | `SUPPORT_TOOLS` names are `listArticles`, `readArticle`, `escalateToHuman`; the hand-off is the same `ESCALATE_TOOL` object the interview has |
+| UNIT-CHTOOL-021 | "asks the model for nothing but a slug when reading" (the support tool set) | `listArticles` takes no properties; `readArticle` requires one string `slug` |
+| UNIT-CHTOOL-022 | "lists the published articles for the model, with their slugs" | `listArticles`: outcome `ok`; `forModel` carries each article's `slug`, `title`, `excerpt`, `tags` |
+| UNIT-CHTOOL-023 | "reads an article by slug, saying when it was cut" | `readArticle`: `forModel` carries `slug`, `title`, `body` and `truncated` |
+| UNIT-CHTOOL-024 | "answers not_found for a slug no published article has, as a tool error the model can handle" | Invented slug: outcome `error`, `isError`, `{ ok: false, error: "not_found" }` (Review Focus 2) |
+| UNIT-CHTOOL-025 | "passes a non-string slug through as nothing, never as text" | `{ $ne: 1 }` reaches the source as `""` |
+| UNIT-CHTOOL-026 | "reads real articles in evaluation mode too: reading changes nothing" | With `evalMode`, `listArticles` still calls the source |
+| UNIT-CHTOOL-027 | "turns a failing article store into tool_failed, not a crashed turn" | A throwing `list` gives `{ ok: false, error: "tool_failed" }` |
+| UNIT-CHTOOL-028 | "turns a failing read into tool_failed too, never not_found" | A throwing `read` gives `isError` and `tool_failed`, not `not_found` (Review Focus 2) |
+
+### 4.32a The chat's article source — `tests/unit/chat-articles.test.ts`
+
+`supabase/functions/chat/articles.ts`: `createArticleSource(select, agencyId)` reads the published `blog_posts` for the FAQ chat through a fake PostgREST `select`. No network.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHART-001 | "lists only published articles of this agency or shared ones, newest first, capped" | Table `blog_posts`; `published=eq.true`, `or=(agency_id.is.null,agency_id.eq.<agency>)`, `order=created_at.desc`, `limit=ARTICLE_LIST_LIMIT`, `select=slug,title,excerpt,tags` |
+| UNIT-CHART-002 | "turns missing columns into empty strings rather than undefined" | Null `excerpt` and `tags` come back as `""` |
+| UNIT-CHART-003 | "reads one published article by slug, with the same agency filter" | `slug=eq.dmei-nihul`, `published=eq.true`, the agency `or`, `limit=1`; `truncated: false` |
+| UNIT-CHART-004 | "keeps a body of exactly the limit whole" | `ARTICLE_BODY_LIMIT` characters kept; `truncated: false` |
+| UNIT-CHART-005 | "queries for a slug of 200 characters, the longest it accepts" | One query sent |
+| UNIT-CHART-006 | "cuts a long body and says so" | Body cut to `ARTICLE_BODY_LIMIT`; `truncated: true` |
+| UNIT-CHART-007 | "refuses %j as a slug without querying" | `""`, `"Has Spaces"`, `"a--b"`, `"../etc"`, `"a&published=eq.false"`, 201 characters: `null`, no query (Review Focus 2) |
+| UNIT-CHART-008 | "answers null for a slug no published article has" | An empty answer gives `null` |
+| UNIT-CHART-009 | "uses the site's slug rule" | `SLUG_PATTERN` has the same source as `@/lib/articlePath`'s |
 
 ### 4.33 The chat function's model client, turn loop and budget — `tests/unit/chat-anthropic.test.ts`, `chat-turn.test.ts`, `chat-budget.test.ts`
 
@@ -738,7 +763,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 
 ### 4.34 The chat function's store — `tests/unit/chat-store.test.ts`
 
-`supabase/functions/chat/store.ts`: reads and writes of the chat tables over PostgREST with a fake `fetch`. No network.
+`supabase/functions/chat/store.ts`: reads and writes of the chat tables over PostgREST with a fake `fetch`, including `claimSheetLogs`, the claim the sheet-log sweep takes its conversations with. No network.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -757,16 +782,20 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHSTORE-013 | "claims a turn with one filtered PATCH: this turn count, open or escalated, no live lease" | PATCH with `id=eq`, `turns=eq.2`, `status=in.(open,escalated)`, `or=(busy_until.is.null,busy_until.lt."<now>")`; body `turns: 3`, `busy_until`; the row returned (I3) |
 | UNIT-CHSTORE-014 | "answers null when no row matched the claim (another turn holds it, or the count moved)" | `[]` gives `null`; a non-uuid sends nothing (I3) |
 | UNIT-CHSTORE-015 | "lets go of its own lease only, stamping the last message time" | PATCH filtered on `busy_until=eq.<lease>` with `busy_until: null`, `last_message_at` (I3) |
+| UNIT-CHSTORE-016 | "picks a batch of the longest-idle due conversations, then claims them with one filtered PATCH repeating every condition" (`claimSheetLogs`) | GET then PATCH on `chat_conversations`; both filter `role=in.(support)`, `is_eval=is.false`, `sheet_logged_at=is.null`, `last_message_at=lt.<cutoff>` and the lease `or`; the pick is `select=id`, `order=last_message_at.asc`, `limit=10`; the PATCH adds `id=in.(…)` and sets `sheet_logged_at` to now; the claimed rows returned |
+| UNIT-CHSTORE-017 | "claims nothing, and sends no PATCH, when no conversation is due" | `[]` returned; only the GET sent |
+| UNIT-CHSTORE-018 | "never puts an id that is not a uuid into the claim" | A picked id `x)&role=eq.interview` is dropped from `id=in.(…)` |
+| UNIT-CHSTORE-019 | "refuses a role list it would have to escape, or a batch size that is not a positive integer, querying nothing" | `support,interview)`, `[]`, 0 and 2.5 give `[]` and no request |
 
 ### 4.35 The chat function's handler — `tests/unit/chat-handler.test.ts`
 
-`supabase/functions/chat/handler.ts`: the HTTP flow with fakes for the store, the model, the limiter and the mail; the real tool runner over fake Edge handlers where the lead and hand-off rules are under test. No network.
+`supabase/functions/chat/handler.ts`: the HTTP flow with fakes for the store, the model, the limiter and the mail; the real tool runner over fake Edge handlers where the lead and hand-off rules are under test; the FAQ chat's role (`support_agent`), the `x-chat-sweep` route and, for the last two rows, the real sweep over the in-memory store. No network.
 
 | ID | Title | Expected result |
 |---|---|---|
 | UNIT-CHHANDLER-001 | "creates the conversation, stores both sides, and hands the page its token once" | 200 with the reply and token; the row has role, consent, attribution, turns 1, a 64-hex token_hash that is not the token; user and assistant rows; one usage row |
 | UNIT-CHHANDLER-002 | "refuses a first message without consent, writing nothing" | 400 `consent_required`; no conversation |
-| UNIT-CHHANDLER-003 | "refuses an agent the function does not serve, an empty message, and a long one" | `unknown_agent`, `empty`, `too_long` (1,001 characters) |
+| UNIT-CHHANDLER-003 | "refuses an agent the function does not serve, an empty message, and a long one" | `no_such_agent` gives `unknown_agent` (the FAQ chat's `support_agent` is served now); `empty`, `too_long` (1,001 characters) |
 | UNIT-CHHANDLER-004 | "accepts a consent version only as long as submit-lead's column (40), so every later save can succeed" | `MAX_CONSENT_VERSION_CHARS` is 40; 41 characters gives 400 `consent_required` and no row; 40 gives 200 |
 | UNIT-CHHANDLER-005 | "answers 429 when the visitor's address is over its limit" | 429 `rate_limited` when the `chat-ip:` key is refused |
 | UNIT-CHHANDLER-006 | "answers 429 when the site is over its new-conversation limit" | 429 when the `chat-new` key is refused |
@@ -808,9 +837,23 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-042 | "carries on when a tool's handler throws: the model hears it failed, the visitor gets a reply, the row stays open" | Real runner over a throwing handler: 200 with the model's reply, an `is_error` tool result, status `open`, tool row `submitLead: error` (I2) |
 | UNIT-CHHANDLER-043 | "persists lead_saved and lead_id the moment the tool succeeds, before the model's closing reply" | At the second model call the row is already `lead_saved` with `lead_id`; that call failing gives 503 with `leadSaved: true` (I2) |
 | UNIT-CHHANDLER-044 | "runs the model for exactly one of two messages sent at once; the other is answered busy" | Two sends on one conversation: one 200, one 409 `busy`; the model called once; turns 2 and the hold released (I3) |
-| UNIT-CHHANDLER-045 | "holds the conversation while a turn runs and lets it go after, even when the turn fails" | During the model call `busy_until` is now + 60 s; after a 503 it is null (I3) |
-| UNIT-CHHANDLER-046 | "lets a crashed turn's hold lapse after sixty seconds" | A live `busy_until` left behind gives 409 `busy`; 60 s later the message is answered 200 (I3) |
+| UNIT-CHHANDLER-045 | "holds the conversation while a turn runs and lets it go after, even when the turn fails" | During the model call `busy_until` is now + 180 s (`TURN_LEASE_MS`); after a 503 it is null (I3) |
+| UNIT-CHHANDLER-046 | "lets a crashed turn's hold lapse after three minutes" | A live `busy_until` left behind gives 409 `busy`; 180 s later the message is answered 200 (I3) |
+| UNIT-CHHANDLER-046a | "keeps the conversation held through a slow tool: a message sent 150 s into the turn is answered busy" | A tool that runs past 150 s still holds the conversation: the second message is 409 `busy`, and the model runs once (I3, the 180 s lease) |
 | UNIT-CHHANDLER-047 | "holds the forty-turn cap when the thirty-ninth and fortieth messages arrive together" | At 39 turns two sends at once: one 200, one 409; turns 40; the next send is 400 `too_many_turns` (I3) |
+| UNIT-CHHANDLER-048 | "serves support_agent with the support prompt and tools" | 200; the conversation's `role` is `support`; the model gets `listArticles`, `readArticle`, `escalateToHuman`; the role block names `listArticles` |
+| UNIT-CHHANDLER-049 | "never runs a tool its role was not given, even when the model names one" | The model names `submitLead` in a support chat: the runner is not called, the tool row is `submitLead: error`, the conversation stays `open` (Review Focus 1) |
+| UNIT-CHHANDLER-050 | "stores a made-up tool name no longer than the log line keeps it" | A 500-character tool name is stored as 40 characters plus `: error` |
+| UNIT-CHHANDLER-051 | "the interview is gated the same way: it never reads articles, whatever the model names" | `listArticles` and `readArticle` named in an interview: the runner is not called; tool rows `listArticles: error`, `readArticle: error` |
+| UNIT-CHHANDLER-052 | "runs the sweep for the right token, and nothing of the chat" | `x-chat-sweep` with the right token: 200, `ok`, `logged: 2`, an `rid` passed to `sweepSheetLogs`; no model call, no conversation, no rate-limit check (Review Focus 5) |
+| UNIT-CHHANDLER-053 | "refuses %s with 401 and runs nothing" | A wrong token, an empty token and the evaluation token: 401 `unauthorized`; the sweep, the model and the store untouched (Review Focus 5) |
+| UNIT-CHHANDLER-054 | "refuses every sweep when the function has no token configured" | With `sweepToken` empty, an empty and an arbitrary header both give 401; the sweep never runs (Review Focus 5) |
+| UNIT-CHHANDLER-055 | "is a POST route only" | A GET with the right token gives 405; the sweep does not run |
+| UNIT-CHHANDLER-056 | "answers 500, not a chat reply, when the sweep itself throws" | 500 `unavailable`; no `reply`; the thrown text is not in the body; the model not called |
+| UNIT-CHHANDLER-057 | "leaves a chat request without the header to the chat" | A normal first message is answered 200; the sweep does not run |
+| UNIT-CHHANDLER-058 | "logs only support conversations idle past the 2-hour close and its margin that no turn holds, never an evaluation or a logged one" (the real sweep over the in-memory store) | Nine conversations: only `idle` and `lapsed_lease` (126 minutes) reach `log-support-chat` (2 logged), each marked `sheet_logged_at`; `recent` (10 minutes), `not_yet_closed` (119 minutes), `within_margin` (124 minutes: closed, but inside the 5-minute margin), `in_a_turn` (live lease), `eval`, `interview` untouched; `already_logged` skipped (Review Focus 4) |
+| UNIT-CHHANDLER-059 | "logs each conversation once when two sweeps overlap" | Two sweeps at once log 2 between them and call `log-support-chat` twice; a third logs 0 (Review Focus 3) |
+| UNIT-CHHANDLER-060 | "logs the whole conversation: once logged, its next message is refused as closed" | A support conversation opened through the handler: a sweep at 124 minutes logs nothing, one at 126 minutes logs it; the visitor's next message is 409 `closed` and stores nothing, so the row is final |
 
 ### 4.35a The chat's redaction — `tests/unit/chat-redact.test.ts`
 
@@ -829,9 +872,30 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHREDACT-009 | "redacts past the 2,000th character too" | An ID after 2,500 characters becomes its marker; nothing is cut |
 | UNIT-CHREDACT-010 | "answers an empty string for nothing" | `""` |
 
+### 4.35b The chat's sheet-log sweep — `tests/unit/chat-sweep.test.ts`
+
+`supabase/functions/chat/sweep.ts`: `sheetRow()` shapes a finished support conversation into the row `log-support-chat` writes, and `createSheetLogSweep()` claims idle conversations from a fake store and logs each through a fake `log-support-chat`. No network. The route that triggers it is UNIT-CHHANDLER-052..057; the claim is UNIT-CHSTORE-016..019.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHSWEEP-001 | "is the visitor's first question as the topic, the transcript without tool rows, and the count" (`sheetRow`) | Topic trimmed; transcript lines `מבקר:` / `עוזר:` with no tool row; outcome `answered`; `messageCount` 2 |
+| UNIT-CHSWEEP-002 | "outcome %s" (`sheetRow`) | `escalated` (flag set, with or without a last visitor message), `referred_to_interview` (reply links `/#start`), `abandoned` (the last message is the visitor's), `answered` (a `/blog/` link is not a referral) |
+| UNIT-CHSWEEP-003 | "cuts the topic to 200 characters" | 300 characters give 200 |
+| UNIT-CHSWEEP-004 | "fits a long transcript under log-support-chat's 2,000-character cut, keeping the opening and the close" | Exactly `TRANSCRIPT_LIMIT` characters; starts with the first question, ends with the last reply, `[…]` between; `messageCount` 32 |
+| UNIT-CHSWEEP-005 | "leaves a transcript that fits as it is, and never splits a character" (`fitTranscript`) | A short text unchanged; emoji cut on code points, no lone surrogate |
+| UNIT-CHSWEEP-006 | "is nothing for a conversation with no visitor message" | `null` for an assistant-only or empty conversation |
+| UNIT-CHSWEEP-007 | "claims a batch of support conversations idle past the handler's close (2 h + a margin), then logs each through log-support-chat" | `claimSheetLogs(["support"], cutoff, now, SHEET_LOG_BATCH)` with now minus cutoff equal to `SHEET_LOG_IDLE_MS` = the handler's `IDLE_MS` + `SHEET_LOG_MARGIN_MS` (125 minutes, more than `IDLE_MS`, margin at least a minute); a `sweep.logged` info line; one POST with `channel: site`, topic, transcript, outcome, count (Review Focus 4) |
+| UNIT-CHSWEEP-008 | "counts an escalated conversation as escalated" | `escalated_at` set gives outcome `escalated` |
+| UNIT-CHSWEEP-009 | "sends no phone: the chat has none, and the model is never asked for one" | The body has no `phone` |
+| UNIT-CHSWEEP-010 | "skips a claimed conversation with nothing to log, and keeps going after one that throws" | Of three claimed, one logged; `sweep.nothing_to_log` info, `sweep.log_failed` error naming the conversation, `sweep.done` with `claimed: 3, logged: 1` |
+| UNIT-CHSWEEP-011 | "does not count %s as logged, and says so" | A 400 refusal, and a 200 with `sheet_append_failed` in `warnings`: sweep returns 0; a `sweep.not_logged` warn line with the status |
+| UNIT-CHSWEEP-012 | "logs nothing when nothing is claimed — a second overlapping sweep finds the rows already taken" | 0; no message read, nothing posted (Review Focus 3) |
+| UNIT-CHSWEEP-013 | "claims nothing while there is no sheet: the rows wait for one rather than being marked logged" | Sheet unconfigured: 0, `claimSheetLogs` not called, a `sweep.sheet_unconfigured` warn line |
+| UNIT-CHSWEEP-014 | "lets a failed claim fail the sweep, so the route reports it" | A rejected claim rejects the sweep with `select_http_503` |
+
 ### 4.36 The browser's chat adapter, router and switch — `tests/unit/supabase-agent.test.ts`, `routed-agent.test.ts`, `chat-agents-config.test.ts`, `services-wiring.test.ts`
 
-`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort`; `RoutedAgentService` sends each agent to its adapter; `src/config/chat-agents.ts` reads `VITE_CHAT_AGENTS`. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
+`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort`; `RoutedAgentService` sends each agent to its adapter; `src/config/chat-agents.ts` reads `VITE_CHAT_AGENTS` and serves `needs_interview` and `support_agent`; `src/config/compliance.ts` holds each agent's v6 notice. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -853,8 +917,13 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
 | UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
-| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | `support_agent` is dropped |
+| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | `procedures_agent` and `blog_recommender` are dropped from `procedures_agent,needs_interview,blog_recommender`; `needs_interview` stays |
 | UNIT-CHCONFIG-004 | "is empty without Supabase, whatever it says" | Not configured gives no agents |
+| UNIT-CHCONFIG-005 | "may serve the FAQ chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `support_agent`; empty switch gives none; `support_agent` and `needs_interview,support_agent` are read in order; without Supabase none; `procedures_agent,blog_recommender` none |
+| UNIT-CHCONFIG-006 | "exists for every one of them" (the v6 notice of each agent the function may serve) | `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` has an entry for every `CHAT_FUNCTION_AGENTS` name |
+| UNIT-CHCONFIG-007 | "is the interview's for the interview" | `needs_interview` maps to `CHAT_FUNCTION_CONSENT_POINTS` |
+| UNIT-CHCONFIG-008 | "is the FAQ chat's own for the FAQ chat: its first three points, never the interview's promise of a name, a phone and a meeting" | `support_agent` maps to `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`; its first three equal the first three of `SUPPORT_CONSENT_POINTS`; neither of the interview's points 1 and 3 appears; no "name and phone collected" or "arranges a meeting" wording |
+| UNIT-CHCONFIG-009 | "says, for the FAQ chat as for the interview, who processes the conversation and how long it is kept" | The FAQ chat's fourth point names the AI provider outside Israel and 12 months; the interview's names the provider; the FAQ point is not the old one |
 | UNIT-CHWIRE-001 | "sends the named agent to the chat function and every other agent to Base44" | With `VITE_CHAT_AGENTS=needs_interview`, the composed `services.agents` start/send/subscribe for it reach the Supabase `chat` invoke and never Base44; `support_agent` reaches Base44 and never `chat` (Ruling 8) |
 | UNIT-CHWIRE-002 | "sends every agent to Base44 when the switch is empty" | With `VITE_CHAT_AGENTS` empty, `needs_interview` goes to Base44 and `chat` is never invoked (Ruling 8) |
 
@@ -871,7 +940,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-LEADTX-007 | "throws on a refused read" | `chat_conversations read failed` |
 | UNIT-LEADTX-008 | "finds an older linked conversation behind a thousand newer ones without a lead" | The read filters `lead_id not is null` before its 1,000-row limit: `["older"]` (triage 9) |
 
-The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and its refusal to run without credentials (`tests/unit/eval-chat-lib.test.ts`). Nothing here calls the Anthropic API or a function; the harness itself is specified in [13-std-eval](13-std-eval.md) §6. One row per declared `it`.
+The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and its refusal to run without credentials (`tests/unit/eval-chat-lib.test.ts`). Nothing here calls the Anthropic API or a function; the harness itself is specified in [13-std-eval](13-std-eval.md) §6. The FAQ chat's personas and rubric (`tests/eval/chat/rubric-support.md`) are covered by 034..042. One row per declared `it`.
 
 | ID | Test | Expect |
 |---|---|---|
@@ -890,7 +959,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-013 | "accepts only an ok answer that carries the evaluation tool calls" (isEvalAnswer) | An answer without `eval.toolCalls` is not evaluation mode, so the runner stops before a real lead is made |
 | UNIT-EVALCHAT-014 | "states pass or fail, the lead count and every failure" (report) | `FAIL`, `8 of 10`, each failure as a bullet; `PASS` with `No failures` |
 | UNIT-EVALCHAT-015 | "picks ten transcripts for review, spread across the kinds" (report) | 10 picked, at least 6 persona kinds |
-| UNIT-EVALCHAT-016 | "holds 31 unique personas with a valid expectation" (persona file) | 31 unique ids, `expect` in lead/handoff/none, 12 lead personas |
+| UNIT-EVALCHAT-016 | "holds 43 unique personas with a valid expectation" (persona file) | 43 unique ids (31 interview + 12 FAQ), `expect` in lead/handoff/none/answer, 12 lead personas |
 | UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone than `050-000-00NN` and coop-11's `050-1234567`, no other 9-digit number; `id-01` lists `123456782` as forbidden |
 | UNIT-EVALCHAT-018 | "refuses with a clear message, exit 2, and calls nothing" (runner) | `node scripts/eval-chat.mjs` with no env: stderr `Missing CHAT_EVAL_URL, CHAT_EVAL_TOKEN, ANTHROPIC_API_KEY`, exit 2, empty stdout |
 | UNIT-EVALCHAT-019 | "names only the variable that is missing" (runner) | `Missing ANTHROPIC_API_KEY.`, exit 2 |
@@ -904,6 +973,19 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-027 | "stops the whole run when a persona's first turn is not in evaluation mode, or failed" (preflight) | `EvalStop` after persona a; b never ran; `assertEvalFirstTurn` throws on non-eval, not on eval |
 | UNIT-EVALCHAT-028 | "fails when a persona's lead carries a phone other than the one it typed" (scoreRun) | A persona with `phone: 050-1234567` passes with `0501234567`, `050-1234567` or `+972-50-1234567` in its lead; a redacted phone fails with `the lead's phone is not the number the visitor typed` (C1) |
 | UNIT-EVALCHAT-029 | "has one persona typing its phone as 050-1234567, whose lead must carry that number (C1: redaction kept phones whole)" (persona file) | Only `coop-11` names a `phone`; its brief types `050-1234567` |
+| UNIT-EVALCHAT-030 | "still reads the three verdict fields, and says the notes were unreadable" (parseJudgement; already on main, first documented here) | A judge's note with an unescaped quote: the verdict fields are read, `notes` is `(the judge's notes were not valid JSON)` |
+| UNIT-EVALCHAT-031 | "still refuses an answer whose verdict fields cannot be read" (parseJudgement; as above) | Throws |
+| UNIT-EVALCHAT-032 | "defaults to 24 visitor turns and takes EVAL_MAX_TURNS when it is a sane number" (`maxVisitorTurns`; as above) | 24 by default; `"30"` gives 30; `"0"`, `"-3"`, `"abc"`, `"500"` give 24 |
+| UNIT-EVALCHAT-033 | "reports how many visitor turns each completed lead took, with the median and the longest" (`turnStats`; as above) | Three completed leads of 12, 16, 20 turns: median 16, max 20; none completed gives nulls |
+| UNIT-EVALCHAT-034 | "gives the FAQ chat twelve personas, none of them expecting a lead, and the interview the rest" (persona file) | The twelve `sup-*` ids in order, each `agent: support_agent` and `expect` `answer` or `handoff`; `answer` for `sup-gen-01..04` and `sup-en-01`; any other persona has no `agent`; every `answer` persona is an FAQ one |
+| UNIT-EVALCHAT-035 | "default to the interview, and name their own agent otherwise" (`agentFor`) | No `agent` gives `needs_interview`; `support_agent` as named |
+| UNIT-EVALCHAT-036 | "are judged by the support rubric" (`rubricFor`) | A support persona gets the support rubric; others the interview's |
+| UNIT-EVALCHAT-037 | "open and continue their conversation with their own agent" (`chatBody`) | First body carries `agent: support_agent`, the message, consent `eval` with the given time, attribution `direct`; a continuation carries `conversationId` and `token` and defaults to `needs_interview` |
+| UNIT-EVALCHAT-038 | "fail an 'answer' persona that called submitLead, and pass a clean one" (scoreRun) | A clean `answer` run passes; one with `submitLead` fails with `sup-01: called submitLead in a chat that has no lead` |
+| UNIT-EVALCHAT-039 | "fail an 'answer' persona on a judge's flag, as every persona does" (scoreRun) | `advice: true` fails the run |
+| UNIT-EVALCHAT-040 | "leave the lead rate to the interview's 'lead' personas" (scoreRun) | A lone `answer` persona: `pass: true`, `cooperative: 0`, `leadRate: 1` |
+| UNIT-EVALCHAT-041 | "asks for exactly the interview rubric's answer, so one parser reads both" (rubric-support.md) | The text from "Answer with one JSON object" is identical in both rubrics; `parseJudgement` reads that shape |
+| UNIT-EVALCHAT-042 | "frames the FAQ chat: answers from articles, links by slug, invented articles noted rather than flagged" (rubric-support.md) | The rubric names the FAQ page, `/blog/<slug>`, "invented", "in `notes`" and `escalateToHuman` |
 
 ### 4.37 When the smoke may open a browser — `tests/unit/wait-for-deployment.test.ts`
 

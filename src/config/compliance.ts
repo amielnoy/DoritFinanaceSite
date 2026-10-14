@@ -208,3 +208,31 @@ export const CHAT_FUNCTION_CONSENT_POINTS = [
   CONSENT.points[2],
   "הפרטים ותוכן השיחה נשמרים אצל דורית ואצל הצוות שמתפעל את האתר מטעמה, ואינם משמשים לשיווק. השיחה מעובדת אצל ספק שירותי בינה מלאכותית מחוץ לישראל, שאינו משתמש בה לאימון מודלים. תמליל השיחה נשמר 12 חודשים ונמחק; מזהים שנמסרו בטעות מושמטים לפני השמירה. אפשר לבקש עיון, תיקון או מחיקה בכל עת.",
 ] as const;
+
+/**
+ * v6 for the FAQ chat. The interview's v6 points above describe the interview
+ * — "נאספים שם וטלפון… מתאם פגישה" — which is exactly the wrong notice
+ * SUPPORT_CONSENT_POINTS exists to avoid. So the FAQ chat keeps its own first
+ * three points, and only the fourth changes, for the same two reasons: an AI
+ * provider outside Israel processes the conversation, and the transcript is
+ * kept for 12 months.
+ *
+ * TODO(compliance): adviser to approve with the interview's fourth point —
+ * the same release gate, before VITE_CHAT_AGENTS names support_agent.
+ */
+export const CHAT_FUNCTION_SUPPORT_CONSENT_POINTS = [
+  SUPPORT_CONSENT_POINTS[0],
+  SUPPORT_CONSENT_POINTS[1],
+  SUPPORT_CONSENT_POINTS[2],
+  "תוכן השיחה נשמר אצל דורית ואצל הצוות שמתפעל את האתר מטעמה, כדי לדעת מה נשאל ולשפר את המענה. השיחה מעובדת אצל ספק שירותי בינה מלאכותית מחוץ לישראל, שאינו משתמש בה לאימון מודלים. תמליל השיחה נשמר 12 חודשים ונמחק; מזהים שנמסרו בטעות מושמטים לפני השמירה. אפשר לבקש עיון, תיקון או מחיקה בכל עת.",
+] as const;
+
+/**
+ * The v6 notice of each agent the `chat` function may serve
+ * (`CHAT_FUNCTION_AGENTS`), by agent name. A served agent missing here would
+ * fall back to the interview's — a unit test fails first.
+ */
+export const CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT: Readonly<Record<string, readonly string[]>> = {
+  needs_interview: CHAT_FUNCTION_CONSENT_POINTS,
+  support_agent: CHAT_FUNCTION_SUPPORT_CONSENT_POINTS,
+};

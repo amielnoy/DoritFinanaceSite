@@ -1,11 +1,15 @@
 /**
- * The interview's two tools, run by the function itself — the fix for A-59,
- * where Base44 never ran them in an anonymous conversation.
+ * The chat tools, run by the function itself — the fix for A-59, where Base44
+ * never ran them in an anonymous conversation. The interview has submitLead and
+ * escalateToHuman; the support agent has escalateToHuman and two article tools
+ * that only read (listArticles, readArticle).
  *
- * Each calls the existing Edge handler in-process, so the lead and hand-off
- * logic exists once. What the model may decide is the content of the lead;
+ * submitLead and escalateToHuman each call the existing Edge handler in-process,
+ * so the lead and hand-off logic exists once. What the model may decide is the content of the lead;
  * consent and attribution come from the conversation row, never from the model.
  */
+
+import type { ArticleSource } from './articles.ts';
 
 export const ESCALATION_REASONS = [
   'regulated_advice',
@@ -28,47 +32,63 @@ export interface ToolDefinition {
 
 const text = { type: 'string' };
 
-export const INTERVIEW_TOOLS: ToolDefinition[] = [
-  {
-    name: 'submitLead',
-    description:
-      "שמירת הראיון. stage='partial' בשלב 5 — שמירה שקטה: אל תזכיר אותה למבקר, אבל המשך באותה הודעה לשאלה הבאה בראיון. stage='complete' בסיום, אחרי שהמבקר אישר את הסיכום — שולחת את הסיכום לדורית.",
-    input_schema: {
-      type: 'object',
-      properties: {
-        stage: { type: 'string', enum: ['partial', 'complete'] },
-        source: { type: 'string', enum: ['interview'] },
-        name: text,
-        phone: text,
-        email: text,
-        track: text,
-        meetingTopic: text,
-        timing: text,
-        notes: text,
-        scheduledAt: text,
-        summary: text,
-        profile: { type: 'object', additionalProperties: { type: 'string' } },
-      },
-      required: ['stage', 'name', 'phone'],
+const NO_ARTICLES: ArticleSource = { list: async () => [], read: async () => null };
+
+export const SUBMIT_LEAD_TOOL: ToolDefinition = {
+  name: 'submitLead',
+  description:
+    "שמירת הראיון. stage='partial' בשלב 5 — שמירה שקטה: אל תזכיר אותה למבקר, אבל המשך באותה הודעה לשאלה הבאה בראיון. stage='complete' בסיום, אחרי שהמבקר אישר את הסיכום — שולחת את הסיכום לדורית.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      stage: { type: 'string', enum: ['partial', 'complete'] },
+      source: { type: 'string', enum: ['interview'] },
+      name: text,
+      phone: text,
+      email: text,
+      track: text,
+      meetingTopic: text,
+      timing: text,
+      notes: text,
+      scheduledAt: text,
+      summary: text,
+      profile: { type: 'object', additionalProperties: { type: 'string' } },
     },
+    required: ['stage', 'name', 'phone'],
   },
-  {
-    name: 'escalateToHuman',
-    description:
-      'העברת הפנייה לטיפול אנושי של דורית: תיעוד הסיבה, התראה מיידית אליה, והחזרת ערוצי הקשר הישירים למבקר.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        reason: { type: 'string', enum: [...ESCALATION_REASONS] },
-        summary: text,
-        name: text,
-        phone: text,
-        email: text,
-      },
-      required: ['reason', 'summary'],
+};
+
+export const ESCALATE_TOOL: ToolDefinition = {
+  name: 'escalateToHuman',
+  description:
+    'העברת הפנייה לטיפול אנושי של דורית: תיעוד הסיבה, התראה מיידית אליה, והחזרת ערוצי הקשר הישירים למבקר.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      reason: { type: 'string', enum: [...ESCALATION_REASONS] },
+      summary: text,
+      name: text,
+      phone: text,
+      email: text,
     },
+    required: ['reason', 'summary'],
   },
-];
+};
+
+export const LIST_ARTICLES_TOOL: ToolDefinition = {
+  name: 'listArticles',
+  description: 'רשימת המאמרים שפורסמו באתר: slug, כותרת, תקציר ותגיות. קרא אותה לפני שאתה מפנה למאמר.',
+  input_schema: { type: 'object', properties: {} },
+};
+
+export const READ_ARTICLE_TOOL: ToolDefinition = {
+  name: 'readArticle',
+  description: 'הטקסט המלא של מאמר אחד, לפי ה-slug שחזר מ-listArticles. truncated=true כשהמאמר ארוך ונחתך.',
+  input_schema: { type: 'object', properties: { slug: { type: 'string' } }, required: ['slug'] },
+};
+
+export const INTERVIEW_TOOLS: ToolDefinition[] = [SUBMIT_LEAD_TOOL, ESCALATE_TOOL];
+export const SUPPORT_TOOLS: ToolDefinition[] = [LIST_ARTICLES_TOOL, READ_ARTICLE_TOOL, ESCALATE_TOOL];
 
 export type EdgeHandler = (req: Request) => Promise<Response>;
 export type ConversationStatus = 'open' | 'closed' | 'lead_saved' | 'escalated';
@@ -121,9 +141,18 @@ async function answerOf(res: Response): Promise<Record<string, unknown>> {
   return plainObject(await res.json().catch(() => null));
 }
 
-export function createToolRunner(handlers: { submitLead: EdgeHandler; escalateToHuman: EdgeHandler }): ToolRunner {
+export function createToolRunner(handlers: { submitLead: EdgeHandler; escalateToHuman: EdgeHandler }, articles: ArticleSource = NO_ARTICLES): ToolRunner {
   return async (name, input, ctx) => {
     try {
+      if (name === 'listArticles') {
+        return { name, status: 'ok', isError: false, forModel: JSON.stringify({ ok: true, articles: await articles.list() }) };
+      }
+      if (name === 'readArticle') {
+        const found = await articles.read(str(input.slug));
+        return found
+          ? { name, status: 'ok', isError: false, forModel: JSON.stringify({ ok: true, ...found }) }
+          : { name, status: 'error', isError: true, forModel: JSON.stringify({ ok: false, error: 'not_found' }) };
+      }
       if (name === 'submitLead') return await submitLead(handlers.submitLead, input, ctx);
       if (name === 'escalateToHuman') return await escalateToHuman(handlers.escalateToHuman, input, ctx);
     } catch {

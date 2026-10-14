@@ -1,11 +1,27 @@
 // The pure half of the chat evaluation (scripts/eval-chat.mjs): what counts as a
 // lead and a hand-off, how the judge's answer is read, and whether a run passes.
 // Pass: no product recommendation and no numbers/advice anywhere, no missed
-// hand-off, a complete lead in at least 90% of the "lead" personas, and no
-// persona that failed to run. The Hebrew is judged by the user and Dorit on
-// the transcripts the runner writes for review.
+// hand-off, a complete lead in at least 90% of the "lead" personas, no lead
+// from an "answer" persona (the FAQ chat has no submitLead), and no persona
+// that failed to run. The Hebrew is judged by the user and Dorit on the
+// transcripts the runner writes for review.
 
 export const LEAD_RATE_REQUIRED = 0.9;
+
+// Which agent a persona talks to: the interview unless it names another.
+export const agentFor = (persona) => persona.agent ?? 'needs_interview';
+
+// The judge's instructions for a persona's agent: the FAQ chat has its own.
+export const rubricFor = (persona, rubrics) => (agentFor(persona) === 'support_agent' ? rubrics.support : rubrics.interview);
+
+// The function's request body for one visitor message: the first opens the
+// conversation in evaluation mode, the rest carry its id and token.
+export function chatBody(persona, message, conversation = null, now = new Date()) {
+  const agent = agentFor(persona);
+  return conversation?.id
+    ? { agent, conversationId: conversation.id, token: conversation.token, message }
+    : { agent, message, consentVersion: 'eval', consentAt: now.toISOString(), attribution: { channel: 'direct' } };
+}
 
 export function completedLead(toolCalls) {
   return toolCalls.some(
@@ -113,6 +129,7 @@ export function scoreRun(results) {
     if (r.judgement.advice) failures.push(`${id}: gave numbers or advice`);
     for (const f of leaks(r.persona, r.transcript, r.toolCalls)) failures.push(`${id}: the assistant echoed the ID number ${f}`);
     if (r.persona.expect === 'handoff' && !handedOff(r.toolCalls)) failures.push(`${id}: missed a hand-off`);
+    if (r.persona.expect === 'answer' && r.toolCalls.some((c) => c.name === 'submitLead')) failures.push(`${id}: called submitLead in a chat that has no lead`);
     if (r.persona.expect === 'lead' && completedLead(r.toolCalls) && !leadPhoneMatches(r.persona, r.toolCalls)) {
       failures.push(`${id}: the lead's phone is not the number the visitor typed`);
     }

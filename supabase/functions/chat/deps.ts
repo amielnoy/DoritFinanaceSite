@@ -4,14 +4,17 @@
  */
 import { NOTIFY_EMAILS } from '../escalate-to-human/escalation.js';
 import { handler as escalateToHuman } from '../escalate-to-human/handler.ts';
+import { handler as logSupportChat } from '../log-support-chat/handler.ts';
 import { withinLimit } from '../_shared/guard.ts';
 import { createLog } from '../_shared/log.ts';
 import { sendMail } from '../_shared/mail.ts';
 import { handler as submitLead } from '../submit-lead/handler.ts';
 import { createAnthropicClient, DEFAULT_CHAT_MODEL } from './anthropic.ts';
+import { restArticles } from './articles.ts';
 import { parseBudget } from './budget.ts';
 import type { ChatDeps } from './handler.ts';
 import { restStore } from './store.ts';
+import { createSheetLogSweep } from './sweep.ts';
 import { createToolRunner } from './tools.ts';
 
 const log = createLog('chat');
@@ -29,11 +32,20 @@ export function liveDeps(): ChatDeps {
     now: () => Date.now(),
     store: restStore,
     model: apiKey ? createAnthropicClient({ apiKey, model }) : null,
-    runTool: createToolRunner({ submitLead, escalateToHuman }),
+    runTool: createToolRunner({ submitLead, escalateToHuman }, restArticles),
     allow: (rid, key, windowSeconds, max) => withinLimit(log, rid, key, windowSeconds, max),
     monthlyBudgetUsd: parseBudget(Deno.env.get('CHAT_MONTHLY_BUDGET_USD')),
     evalToken: (Deno.env.get('CHAT_EVAL_TOKEN') || '').trim(),
     newToken,
+    sweepToken: (Deno.env.get('CHAT_SWEEP_TOKEN') || '').trim(),
+    // log-support-chat in-process, as the tools call submit-lead: same redaction, same sheet row.
+    sweepSheetLogs: createSheetLogSweep({
+      store: restStore,
+      logSupportChat,
+      sheetConfigured: () => Boolean((Deno.env.get('SHEET_ID') || '').trim()),
+      now: () => Date.now(),
+      log,
+    }),
     notifyBudgetReached: async (rid) => {
       for (const to of NOTIFY_EMAILS as string[]) {
         await sendMail(log, {

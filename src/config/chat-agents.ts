@@ -5,9 +5,10 @@
  * default; removing a name and redeploying is the rollback. Only agents the
  * function can serve count, and nothing does without Supabase configured — so
  * the consent notice and the transport can never disagree about who answers.
+ * Each one here needs its own v6 notice in `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT`.
  * docs/superpowers/specs/2026-10-13-chat-off-base44-design.md, "The switch".
  */
-export const CHAT_FUNCTION_AGENTS: readonly string[] = ["needs_interview"];
+export const CHAT_FUNCTION_AGENTS: readonly string[] = ["needs_interview", "support_agent"];
 
 export function parseChatAgents(raw: string | undefined, supabaseConfigured: boolean): ReadonlySet<string> {
   if (!supabaseConfigured || !raw) return new Set();

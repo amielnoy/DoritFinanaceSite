@@ -8,7 +8,10 @@ import { PROMPTS } from "../../supabase/functions/chat/prompts.generated.ts";
 import { fillPlaceholders } from "../../supabase/functions/chat/prompt.ts";
 import {
   INTERVIEW_TOOL_SECTION,
+  SUPPORT_TOOL_SECTION,
+  collapseBlankRuns,
   complianceExcerpt,
+  readAgentInstructions,
   readInterviewInstructions,
   withToolSection,
   // @ts-expect-error — plain .mjs helper, imported for its pure steps.
@@ -62,5 +65,36 @@ describe("compliance.md", () => {
 describe("prompts.generated.ts", () => {
   it("is what the build script writes from the Markdown files today", () => {
     expect(read(OUTPUT)).toBe(renderPromptsModule(REPO_ROOT));
+  });
+});
+
+const supportInstructions: string = readAgentInstructions(join(REPO_ROOT, "base44/agents/support_agent.jsonc"));
+
+describe("support.md against the prompt Base44 runs today", () => {
+  it("each replaced or removed line exists exactly once today", () => {
+    const lines = supportInstructions.split("\n");
+    for (const c of SUPPORT_TOOL_SECTION) {
+      expect(lines.filter((l: string) => l.startsWith(c.startsWith)), c.startsWith).toHaveLength(1);
+    }
+  });
+
+  it("equals today's instructions with only the tool section changed", () => {
+    expect(fillPlaceholders(PROMPTS.support)).toBe(
+      collapseBlankRuns(withToolSection(supportInstructions, (s: string) => fillPlaceholders(s), SUPPORT_TOOL_SECTION)),
+    );
+  });
+
+  it("names its real tools and no Base44 one", () => {
+    expect(PROMPTS.support).toMatch(/listArticles/);
+    expect(PROMPTS.support).toMatch(/readArticle/);
+    expect(PROMPTS.support).toMatch(/escalateToHuman/);
+    expect(PROMPTS.support).not.toMatch(/BlogPost|logSupportChat/);
+    expect(PROMPTS.support).toMatch(/\(\/blog\/<slug>\)/);
+  });
+
+  it("carries the agency's details as placeholders, not literals", () => {
+    for (const literal of ["050-831-1776", "dorit@govari-fin.co.il", "L-00107009"]) {
+      expect(PROMPTS.support).not.toContain(literal);
+    }
   });
 });

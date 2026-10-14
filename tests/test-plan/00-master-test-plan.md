@@ -19,7 +19,7 @@ In scope:
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
 | Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` and `escalateToHuman` functions, RLS rules |
 | Integration | The Base44 functions executed in-process against a recording client — what is stored, who is mailed, what each recipient sees, and what survives a failure |
-| Eval | The deployed interview and procedures agents driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank the procedures cases come from |
+| Eval | The deployed interview, FAQ (chat function) and procedures agents driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank the procedures cases come from |
 | Agent compliance | The three agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
 | UI e2e | Landing page, routing, calculator, the quick contact form and the claim report, blog, the agent chat's regulatory shell |
@@ -59,6 +59,7 @@ backend when one is available.
 | Item | Version reference |
 |---|---|
 | Application source | `src/**` at the commit under test |
+| Chat function | `supabase/functions/chat/` (handler, tools, articles, sweep, prompts for the interview and the FAQ chat) and its migrations; the FAQ chat's sheet-log sweep and `log-support-chat` |
 | Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{submitLead,submitClaim,createConsultationEvent,escalateToHuman,logSupportChat,upsertContact,contentAdmin,adminLead}`, `base44/agents/*.jsonc`, `dorit-mailer/functions/api/send-email.js` |
 | Published copy | `content/blog/*.md`, `src/config/compliance.ts` |
 | Static assets | `index.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`, `public/manifest.json` |
