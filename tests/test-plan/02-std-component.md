@@ -373,8 +373,26 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-MSKG-004 | "shows no screenshot unless one is given" | 0 figures; then the given image |
 | CMP-MSKG-005 | "is marked noindex" | `/admin/masleka/guide` through `SeoRouteGuard` sets `robots` to `noindex` |
 
+### 4.22 `<AgentChat />` on a phone — the support chat's card and layer — `tests/component/agent-mobile-sheet.test.tsx`
+
+`matchMedia` is stubbed to a width; with none at all (jsdom's default) the chat
+renders as on a desktop, which is what every other component test relies on.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-SHEET-001 | "shows the card, with the fence in a closed <details>, and no chat until asked" | At 390: heading, "שאלו את העוזר" with `aria-expanded=false`, no dialog; the `<details>` is closed and holds the tagline, the note and every guardrail line verbatim |
+| CMP-SHEET-002 | "opens a modal dialog, locks the page's scroll, and shows the notice word for word" | `dialog` "העוזר של דורית", `aria-modal`, `body` overflow hidden, "אוטומטי · לא דורית עצמה", every `SUPPORT_CONSENT_POINTS` entry |
+| CMP-SHEET-003 | "closes on Escape and on the X, and gives focus back to the button" | Both close it; focus on the opener; overflow restored |
+| CMP-SHEET-004 | "fires chat_start and chat_handoff from inside the layer, and generate_lead only once it reaches Dorit" | `gtag` sees `chat_start` and `chat_handoff` (`ai_support`), and `generate_lead` only after `escalate` |
+| CMP-SHEET-005 | "keeps the conversation, and the consent, across closing and reopening" | No checkbox on reopening; the typed draft still there |
+| CMP-SHEET-006 | "gives every field in the layer at least 16px, so iOS does not zoom" | No text field in the layer is sized below 16px |
+| CMP-SHEET-007 | "goes back in place when the viewport grows past md" | Dialog and card gone, the 560px panel back, overflow restored |
+| CMP-SHEET-008 | "renders the embedded panel and no card, with no matchMedia at all" | Desktop as before |
+| CMP-SHEET-009 | "renders the same at 1440px with matchMedia present" | Desktop as before |
+| CMP-SHEET-010 | "leaves the home page's interview, which has no mobileSheet, as it was on a phone" | The interview keeps its 560px panel at 390 |
+
 ## 5. Pass criteria
 
-All 206 declared cases pass (vitest: 246 with expansions). A `submitLead` or `submitClaim` payload assertion failing
+All 216 declared cases pass (vitest: 246 with expansions). A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.

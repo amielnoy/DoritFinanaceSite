@@ -135,7 +135,7 @@ model does — the part that is a gate rather than an instruction.
 | E2E-AGT-003 | "the fence is published beside the interview agent" | The tagline and the כללי הגדר block (what it does / does not do / when it hands over) visible in `#interview` |
 | E2E-AGT-004 | "a standing disclaimer sits under every message box" | The "אינו ייעוץ, שיווק פנסיוני או המלצה אישית" line visible in all three sections |
 | E2E-AGT-005 | "the route to a person works without the model, and before consent" | Handoff button present on first frame; pressing it POSTs to `escalateToHuman`; phone and WhatsApp links render even though the visitor never consented and no conversation exists |
-| E2E-AGT-006 | "a visitor cannot type before accepting the notice" (support) | The support chat on `/faq` gates the same way: box disabled, **zero** requests to `/agents/`, accepting unlocks it |
+| E2E-AGT-006 | "a visitor cannot type before accepting the notice" (support) | The support chat on `/faq` gates the same way: box disabled, **zero** requests to `/agents/`, accepting unlocks it. On the phone projects E2E-AGT-006–008 first open the chat from the card ("שאלו את העוזר"), where it is a full-screen layer — see E2E-MOB-011–014 |
 | E2E-AGT-007 | "the notice describes this chat and not the interview" | The support notice states the conversation itself is kept and why; the interview's "נאספים שם וטלפון בלבד" is **absent**; the licence and affiliation still present |
 | E2E-AGT-008 | "the route to a person is here too" | The handoff button on `/faq` POSTs to `escalateToHuman` |
 
