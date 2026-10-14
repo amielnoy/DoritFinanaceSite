@@ -9,6 +9,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'r
 const PageNotFound = lazy(() => import('./lib/PageNotFound'));
 import { AuthProvider } from '@/lib/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import RouteCommitted from '@/components/RouteCommitted';
 import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import SeoRouteGuard from '@/components/SeoRouteGuard';
@@ -118,6 +119,8 @@ const AuthenticatedApp = () => {
         <Route path="*" element={<PageNotFound />} />
       </Routes>
       </ErrorBoundary>
+      {/* After the route (or its error screen) commits — read by e2e gotoApp. */}
+      <RouteCommitted />
       </Suspense>
       <FloatingActions />
     </>

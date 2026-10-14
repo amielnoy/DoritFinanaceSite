@@ -1,19 +1,10 @@
 import { getAccessToken } from '@base44/sdk';
-
-const isNode = typeof window === 'undefined';
-
-const isClearAccessTokenRequested = () =>
-	!isNode && new URLSearchParams(window.location.search).get("clear_access_token") === 'true';
-
-const clearStoredAccessToken = () => {
-	window.localStorage.removeItem('base44_access_token');
-	window.localStorage.removeItem('token');
-}
+import { clearAccessTokenIfRequested } from '@/lib/clear-access-token';
 
 const getAppParams = () => {
-	if (isClearAccessTokenRequested()) {
-		clearStoredAccessToken();
-	}
+	// main.jsx has already done this at boot and removed the flag, so this is a
+	// no-op there; it stays for any entry that reaches the SDK without main.jsx.
+	clearAccessTokenIfRequested();
 	return {
 		appId: import.meta.env.VITE_BASE44_APP_ID,
 		token: getAccessToken(),

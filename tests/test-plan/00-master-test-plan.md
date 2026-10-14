@@ -71,7 +71,7 @@ backend when one is available.
 |---|---|
 | Node | 22.x (CI) / 26.x (verified locally) |
 | Unit/component/contract/security | Vitest 3, jsdom |
-| e2e | Playwright 1.62, Chromium + WebKit |
+| e2e | Playwright 1.64, Chromium + WebKit |
 | Platforms | `web-chromium` (desktop Chrome), `web-webkit` (desktop Safari), `ios-safari` (iPhone 14 / WebKit), `android-chrome` (Pixel 7 / Chromium) |
 | SUT under e2e | Production build served by `vite preview` on `127.0.0.1:4173`, or any `PLAYWRIGHT_BASE_URL`. In CI the shards run `SKIP_BUILD=1` against the `dist` artifact the `build` job uploaded — they never build for themselves |
 | Locale | `he-IL`, timezone `Asia/Jerusalem` |
