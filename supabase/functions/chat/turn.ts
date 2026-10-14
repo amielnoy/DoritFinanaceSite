@@ -77,6 +77,8 @@ export async function runTurn(args: {
   const tools: ToolOutcome[] = [];
   const toolCalls: TurnResult['toolCalls'] = [];
   let retried = false;
+  // Asked again once after an empty reply that followed a tool (see below).
+  let askedAgain = false;
 
   const call = async () => {
     for (;;) {
@@ -111,7 +113,19 @@ export async function runTurn(args: {
     // lead) nor answer with the text before it (the visitor would think it was saved).
     if (response.stopReason === 'max_tokens' && uses.length > 0) throw new TurnFailure('truncated_tool_call', tools, usage);
     if (response.stopReason !== 'tool_use' || uses.length === 0) {
-      if (!reply) throw new TurnFailure('empty_reply', tools, usage);
+      if (!reply) {
+        // After a tool the model sometimes answers with nothing (one output
+        // token): twice in the evaluation of 2026-10-14, right after a quiet
+        // partial save, each a 503 in the middle of an interview. Ask once more
+        // with the same conversation — nothing is added on the visitor's behalf
+        // — and fail only if that is empty too.
+        if (tools.length > 0 && !askedAgain) {
+          askedAgain = true;
+          round--;
+          continue;
+        }
+        throw new TurnFailure('empty_reply', tools, usage);
+      }
       return { reply, usage, tools, toolCalls };
     }
     if (round >= MAX_TOOL_ROUNDS) throw new TurnFailure('too_many_tool_rounds', tools, usage);
