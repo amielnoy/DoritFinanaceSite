@@ -3,6 +3,8 @@ import {
   SHEET_LOG_BATCH,
   SHEET_LOG_IDLE_MS,
   SHEET_LOGGED_ROLES,
+  TRANSCRIPT_LIMIT,
+  fitTranscript,
   createSheetLogSweep,
   sheetRow,
 } from "../../supabase/functions/chat/sweep.ts";
@@ -35,6 +37,24 @@ describe("sheetRow", () => {
     expect(sheetRow([m("user", "א".repeat(300)), m("assistant", "a")], false)?.topic).toHaveLength(200);
   });
 
+  it("fits a long transcript under log-support-chat's 2,000-character cut, keeping the opening and the close", () => {
+    const messages = [m("user", "השאלה הראשונה"), ...Array.from({ length: 30 }, (_, i) => m(i % 2 ? "user" : "assistant", `תשובה ${i} ${"א".repeat(100)}`)), m("assistant", "[לשיחה קצרה עם דורית](/#start)")];
+    const row = sheetRow(messages, false)!;
+    expect([...row.transcript].length).toBe(TRANSCRIPT_LIMIT);
+    expect(row.transcript.startsWith("מבקר: השאלה הראשונה")).toBe(true);
+    expect(row.transcript.endsWith("עוזר: [לשיחה קצרה עם דורית](/#start)")).toBe(true);
+    expect(row.transcript).toContain("\n[…]\n");
+    expect(row.messageCount).toBe(32);
+  });
+
+  it("leaves a transcript that fits as it is, and never splits a character", () => {
+    expect(fitTranscript("קצר")).toBe("קצר");
+    const emoji = "😀".repeat(TRANSCRIPT_LIMIT + 10);
+    const fitted = fitTranscript(emoji);
+    expect([...fitted].length).toBe(TRANSCRIPT_LIMIT);
+    expect(fitted).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  });
+
   it("is nothing for a conversation with no visitor message", () => {
     expect(sheetRow([m("assistant", "שלום")], false)).toBeNull();
     expect(sheetRow([], false)).toBeNull();
@@ -51,8 +71,9 @@ describe("the sweep", () => {
     };
     const logSupportChat = vi.fn(async (_req: Request) => Response.json(SAVED));
     const log = vi.fn();
-    const sweep = createSheetLogSweep({ store: store as never, logSupportChat, now: () => Date.UTC(2026, 9, 14, 10, 0), log });
-    return { store, logSupportChat, log, sweep };
+    const sheet = { configured: true };
+    const sweep = createSheetLogSweep({ store: store as never, logSupportChat, sheetConfigured: () => sheet.configured, now: () => Date.UTC(2026, 9, 14, 10, 0), log });
+    return { store, logSupportChat, log, sheet, sweep };
   };
   const sent = async (fn: ReturnType<typeof vi.fn>, call = 0) => (fn.mock.calls[call][0] as Request).json();
 
@@ -114,6 +135,15 @@ describe("the sweep", () => {
     expect(await sweep("r")).toBe(0);
     expect(store.listMessages).not.toHaveBeenCalled();
     expect(logSupportChat).not.toHaveBeenCalled();
+  });
+
+  it("claims nothing while there is no sheet: the rows wait for one rather than being marked logged", async () => {
+    const { store, logSupportChat, log, sheet, sweep } = setup([conv("c1")], { c1: [m("user", "q"), m("assistant", "a")] });
+    sheet.configured = false;
+    expect(await sweep("r")).toBe(0);
+    expect(store.claimSheetLogs).not.toHaveBeenCalled();
+    expect(logSupportChat).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith("warn", "sweep.sheet_unconfigured", { rid: "r" });
   });
 
   it("lets a failed claim fail the sweep, so the route reports it", async () => {

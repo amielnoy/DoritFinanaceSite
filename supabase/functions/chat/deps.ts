@@ -39,7 +39,13 @@ export function liveDeps(): ChatDeps {
     newToken,
     sweepToken: (Deno.env.get('CHAT_SWEEP_TOKEN') || '').trim(),
     // log-support-chat in-process, as the tools call submit-lead: same redaction, same sheet row.
-    sweepSheetLogs: createSheetLogSweep({ store: restStore, logSupportChat, now: () => Date.now(), log }),
+    sweepSheetLogs: createSheetLogSweep({
+      store: restStore,
+      logSupportChat,
+      sheetConfigured: () => Boolean((Deno.env.get('SHEET_ID') || '').trim()),
+      now: () => Date.now(),
+      log,
+    }),
     notifyBudgetReached: async (rid) => {
       for (const to of NOTIFY_EMAILS as string[]) {
         await sendMail(log, {

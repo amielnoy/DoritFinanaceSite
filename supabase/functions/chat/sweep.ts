@@ -25,8 +25,19 @@ export const SHEET_LOG_IDLE_MS = 30 * 60 * 1000;
 /** A sheet append is one token fetch and one append, each up to 10 s but usually well under one. */
 export const SHEET_LOG_BATCH = 10;
 const TOPIC_LIMIT = 200;
+/**
+ * log-support-chat's redact() keeps the first 2,000 characters of the
+ * transcript and drops the rest — usually the end, where the outcome was
+ * decided. Its markers can lengthen the text, so the row is fitted well under
+ * that: the opening and the close, with a marker where the middle was.
+ */
+export const TRANSCRIPT_LIMIT = 1_800;
+const TRANSCRIPT_HEAD = 600;
+const CUT = '\n[…]\n';
 
-export type SheetOutcome = 'answered' | 'escalated' | 'referred_to_interview' | 'abandoned';
+/** The outcomes log-support-chat knows (its OUTCOMES); anything else is filed as unknown. */
+export const SHEET_OUTCOMES = ['answered', 'escalated', 'referred_to_interview', 'abandoned'] as const;
+export type SheetOutcome = (typeof SHEET_OUTCOMES)[number];
 
 export interface SheetRow {
   topic: string;
@@ -57,15 +68,25 @@ export function sheetRow(messages: StoredMessage[], escalated: boolean): SheetRo
         : 'answered';
   return {
     topic: firstQuestion.content.trim().slice(0, TOPIC_LIMIT),
-    transcript: said.map((x) => `${x.role === 'user' ? 'מבקר' : 'עוזר'}: ${x.content}`).join('\n'),
+    transcript: fitTranscript(said.map((x) => `${x.role === 'user' ? 'מבקר' : 'עוזר'}: ${x.content}`).join('\n')),
     outcome,
     messageCount: said.length,
   };
 }
 
+/** At most TRANSCRIPT_LIMIT characters (code points, so no emoji is split): the head and the tail when it is longer. */
+export function fitTranscript(text: string): string {
+  const chars = [...text];
+  if (chars.length <= TRANSCRIPT_LIMIT) return text;
+  const tail = TRANSCRIPT_LIMIT - TRANSCRIPT_HEAD - CUT.length;
+  return chars.slice(0, TRANSCRIPT_HEAD).join('') + CUT + chars.slice(-tail).join('');
+}
+
 export interface SheetLogSweepDeps {
   store: Pick<ChatStore, 'claimSheetLogs' | 'listMessages'>;
   logSupportChat: EdgeHandler;
+  /** Whether log-support-chat has a sheet to write to (SHEET_ID). Without one nothing is claimed. */
+  sheetConfigured(): boolean;
   now(): number;
   log: Log;
 }
@@ -75,6 +96,12 @@ export function createSheetLogSweep(deps: SheetLogSweepDeps): (rid: string) => P
   // A bare `log(`, so the logging contract's scan reads these lines too.
   const { log } = deps;
   return async function sweep(rid: string): Promise<number> {
+    // log-support-chat answers ok without a sheet, so a claim now would mark
+    // rows logged that no sheet holds. They wait for one instead.
+    if (!deps.sheetConfigured()) {
+      log('warn', 'sweep.sheet_unconfigured', { rid });
+      return 0;
+    }
     const now = deps.now();
     const claimed = await deps.store.claimSheetLogs(
       SHEET_LOGGED_ROLES,

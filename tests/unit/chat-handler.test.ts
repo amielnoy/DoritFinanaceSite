@@ -5,6 +5,7 @@ import type { UsageTotals } from "../../supabase/functions/chat/budget.ts";
 import { createChatHandler, MAX_CONSENT_VERSION_CHARS, type ChatDeps } from "../../supabase/functions/chat/handler.ts";
 import { toFacts, type ChatStore, type ConversationRow, type NewConversation, type UpdateOptions } from "../../supabase/functions/chat/store.ts";
 import { createToolRunner, type EdgeHandler, type ToolCallContext, type ToolOutcome } from "../../supabase/functions/chat/tools.ts";
+import { createSheetLogSweep } from "../../supabase/functions/chat/sweep.ts";
 
 const TOKEN = "a".repeat(64);
 const clock = { now: Date.UTC(2026, 9, 13, 9, 0) };
@@ -827,5 +828,58 @@ describe("the sweep route", () => {
     const { chat, deps } = setup();
     expect((await json(await chat(post(first())))).status).toBe(200);
     expect(deps.sweepSheetLogs).not.toHaveBeenCalled();
+  });
+});
+
+describe("the sheet-log sweep over the store (Review Focus 3 and 4)", () => {
+  const ago = (minutes: number) => new Date(clock.now - minutes * 60_000).toISOString();
+  const later = (minutes: number) => new Date(clock.now + minutes * 60_000).toISOString();
+
+  async function seeded() {
+    const store = new MemoryStore();
+    const ids: Record<string, string> = {};
+    const add = async (name: string, over: Partial<ConversationRow>) => {
+      const c = await store.createConversation({
+        agency_id: "a",
+        role: "support",
+        token_hash: "h",
+        consent_version: "2026-10-agents-v6",
+        consent_at: ago(120),
+        attribution: { channel: "", campaign: "", landingPath: "" },
+        is_eval: false,
+        turns: 1,
+        busy_until: ago(100),
+      });
+      Object.assign(store.conversations.get(c.id)!, { busy_until: null, last_message_at: ago(45), ...over });
+      store.messages.push({ conversation_id: c.id, agency_id: "a", role: "user", content: `שאלה ${name}` }, { conversation_id: c.id, agency_id: "a", role: "assistant", content: "תשובה" });
+      ids[name] = c.id;
+    };
+    await add("idle", {});
+    await add("lapsed_lease", { busy_until: ago(1) });
+    await add("recent", { last_message_at: ago(10) });
+    await add("in_a_turn", { busy_until: later(2) });
+    await add("eval", { is_eval: true });
+    await add("interview", { role: "interview" });
+    await add("already_logged", { sheet_logged_at: ago(20) });
+    const logSupportChat = vi.fn(async (_req: Request) => Response.json({ ok: true, rid: "l", sheet: "נרשם" }));
+    const sweep = () => createSheetLogSweep({ store, logSupportChat, sheetConfigured: () => true, now: () => clock.now, log: () => undefined })("r");
+    return { store, ids, logSupportChat, sweep };
+  }
+
+  it("logs only support conversations idle for 30 minutes that no turn holds, never an evaluation or a logged one", async () => {
+    const { store, ids, logSupportChat, sweep } = await seeded();
+    expect(await sweep()).toBe(2);
+    const topics = await Promise.all(logSupportChat.mock.calls.map(async ([req]) => ((await (req as Request).json()) as { topic: string }).topic));
+    expect(topics.sort()).toEqual(["שאלה idle", "שאלה lapsed_lease"]);
+    expect(store.conversations.get(ids.idle)!.sheet_logged_at).toBe(new Date(clock.now).toISOString());
+    for (const name of ["recent", "in_a_turn", "eval", "interview"]) expect(store.conversations.get(ids[name])!.sheet_logged_at ?? null, name).toBeNull();
+  });
+
+  it("logs each conversation once when two sweeps overlap", async () => {
+    const { logSupportChat, sweep } = await seeded();
+    const [a, b] = await Promise.all([sweep(), sweep()]);
+    expect(a + b).toBe(2);
+    expect(logSupportChat).toHaveBeenCalledTimes(2);
+    expect(await sweep()).toBe(0);
   });
 });
