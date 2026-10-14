@@ -23,7 +23,7 @@ export type TrackParams = Partial<Record<Param, string>>;
  * may carry only one of these: anything else is dropped, so a figure the
  * calculator showed cannot reach Google in it.
  */
-export const CALCULATOR_TOOLS = ["fee_calculator", "insurance_assessment"] as const;
+export const CALCULATOR_TOOLS = ["fee_calculator", "insurance_assessment", "retirement_projection"] as const;
 export type CalculatorTool = (typeof CALCULATOR_TOOLS)[number];
 
 /** Parameters whose value must come from a closed list. */

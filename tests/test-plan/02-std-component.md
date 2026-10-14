@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 286 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 316 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 294 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 324 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -536,6 +536,21 @@ Rendered on its own: on the home page it appears only with `VITE_SNAPSHOT_HOME=t
 | CMP-SNAP-006 | "reaches Dorit directly from the dark band, by the numbers in the contact config" | `tel:` + `CONTACT.phoneE164`; `wa.me/` + `CONTACT.whatsapp`, `noopener noreferrer` |
 | CMP-SNAP-007 | "lists four tools, the two new ones tagged חדש" | Four `/tools#…` links; "חדש" on the last two only |
 | CMP-SNAP-008 | "makes no claim of a free check and counts no users or savings" | No "חינם"/"ללא עלות", no counters |
+
+### 4.30 `<RetirementCalculator />` — /tools, מחשבון פרישה — `tests/component/retirement-calculator.test.tsx`
+
+On /tools only with `VITE_SNAPSHOT_HOME=true`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-RET-001 | "pairs every slider with a number field, in the brief's ranges" | Six sliders with their min/max; a "— ערך" field each |
+| CMP-RET-002 | "shows the monthly pension highlighted, the final balance and the fees" | The projection's figures; the pension card has the gold border; the chart's label names both ends |
+| CMP-RET-003 | "answers 'ומה אם?' with ₪500 more a month and a 0.15% fee" | Both variations' pensions |
+| CMP-RET-004 | "lets a two-digit age be typed, clamping only when the field is left" | "4" stays while typing; "45" moves the slider; "90" → 64 on blur |
+| CMP-RET-005 | "says so when retirement is not after today" | Status "גיל הפרישה צריך להיות אחרי הגיל היום." |
+| CMP-RET-006 | "keeps the disclaimer word for word, and sends the CTA to the questionnaire" | The brief's sentence; CTA → `/#start` |
+| CMP-RET-007 | "sends no calculator_result for the untouched defaults" | None |
+| CMP-RET-008 | "sends calculator_result once the inputs settle, with the tool's name and no figure" | `{tool: "retirement_projection"}` once |
 
 ## 5. Pass criteria
 

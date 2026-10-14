@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 830 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1419 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 841 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1432 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1218,6 +1218,8 @@ opens. The message goes from the visitor's phone to Dorit; GA4 hears only
 | UNIT-CLD-006 | "speaks of one kind in the singular, and leaves out the priority clause when none is" | "ויצא סוג ביטוח אחד לבחון: …" |
 | UNIT-CLD-007 | "still asks for a check when the result is empty" | The fixed sentence |
 | UNIT-CLD-008 | "waits long enough to outlast typing, short enough to catch a reader" | `RESULT_SETTLE_MS` is 1500 |
+| UNIT-CLD-009 | "names the estimated monthly pension and the retirement age" | `retirementMessage`: "כ-₪9,000 בגיל 67" |
+| UNIT-CLD-010 | "asks without numbers when there is no result to speak of" | The fixed sentence for 0 and NaN |
 
 ## 5. Pass criteria
 
@@ -1259,3 +1261,19 @@ these tests have no external dependencies.
 | UNIT-SNAP-002 | "shows no timing until Dorit has confirmed one" | `SNAPSHOT_REVIEW_BUSINESS_DAYS` null; `stepTiming` null for null, 0, 2.5 |
 | UNIT-SNAP-003 | "words a confirmed timing in Hebrew" | "תוך יום עסקים אחד"; "תוך 5 ימי עסקים" |
 | UNIT-SNAP-004 | "links every tool to its own section on /tools" | Four `/tools#…` addresses from `TOOL_SECTION` |
+
+### 4.51 The retirement projection — `tests/unit/retirement-projection.test.ts`
+
+`src/lib/retirement-projection.ts`: monthly compounding at return − fee, deposit at each month's end, conversion factor 200.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-RET-001 | "compounds monthly at the return less the fee, deposit at each month's end" | One year, 59 → 60, equals the hand-rolled loop |
+| UNIT-RET-002 | "turns the balance into a pension at a factor of 200" | `monthlyPension = finalBalance / 200` |
+| UNIT-RET-003 | "adds up every month's fee, and none when the fee is 0" | Fees > 0; 0 % fee → 0 and a larger balance |
+| UNIT-RET-004 | "charts one point per birthday, today first and retirement last" | 28 points, 40 → 67 |
+| UNIT-RET-005 | "projects nothing forward when retirement is not after today" | Balance unchanged, one point |
+| UNIT-RET-006 | "reads a value below its minimum, or not a number, as the minimum" | NaN, −5 and 0 % return read as the minimums |
+| UNIT-RET-007 | "keeps a value inside its range" | `clampTo` per the slider ranges |
+| UNIT-RET-008 | "adds ₪500 a month, even past the slider's top" | At ₪10,000 the variation still grows the balance |
+| UNIT-RET-009 | "lowers the fee to 0.15%, and never raises one already below it" | At 0.1 % the variation equals the base |

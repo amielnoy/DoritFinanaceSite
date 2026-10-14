@@ -614,6 +614,10 @@ retirement calculator on /tools, (3) a Har HaBituach double-coverage check on
 - **Phase 1 (home):** `SnapshotHome.tsx`, between the services and `#start`.
   Its main button goes to the questionnaire (`#start`), whose follow-up offers
   the clearinghouse link — a visitor cannot open `/masleka` without one.
+- **Phase 2 (/tools, `#retirement`):** `RetirementCalculator.tsx` over
+  `src/lib/retirement-projection.ts` — monthly compounding at return − fee,
+  pension = balance / 200; "ומה אם?" (₪500 more, fee 0.15%). GA4:
+  `calculator_result` with `tool: retirement_projection`, never a figure.
 - **Waiting on Dorit:** `SNAPSHOT_REVIEW_BUSINESS_DAYS` (null → step 3 states no
   timing).
 
@@ -1902,7 +1906,7 @@ enquiry. Everything goes through `src/lib/analytics.ts`:
 | `chat_start` | consent accepted and "התחלת השיחה" pressed | `method`: which chat |
 | `chat_handoff` | "מעבר לדורית" opened | `method`: which chat |
 | `click_chat` | any link to `/faq#support-chat` (header menu `header_menu`, sticky bar, desktop dock), and the phone's card on /faq opening the support chat | `location`; `method` when the chat itself opened |
-| `calculator_result` | once per result a visitor produced on /tools: the self-check's last answer; the fee calculator once its inputs have been changed and then left alone for 1.5 s, once per distinct set of inputs, never for the untouched defaults | `tool: fee_calculator \| insurance_assessment` — never a figure |
+| `calculator_result` | once per result a visitor produced on /tools: the self-check's last answer; the fee calculator once its inputs have been changed and then left alone for 1.5 s, once per distinct set of inputs, never for the untouched defaults | `tool: fee_calculator \| insurance_assessment \| retirement_projection` — never a figure |
 
 `location` comes from `data-track-location`, otherwise the nearest `section[id]`,
 `header`, `footer` or `nav`; `mobile_sticky_bar`, `floating_dock` and `faq` are
