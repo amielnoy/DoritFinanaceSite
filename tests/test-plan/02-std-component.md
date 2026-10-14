@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 335 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 365 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 341 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 371 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -620,6 +620,20 @@ On /tools only with `VITE_SNAPSHOT_HOME=true`.
 | CMP-ACCS-004 | "offers the clearinghouse check when nothing is published yet" | "עוד אין כאן תמונת מצב"; link to `/pension-check` |
 | CMP-ACCS-005 | "keeps the enquiries in their own tab" | "הפניות שלי" panel with the enquiries |
 | CMP-ACCS-006 | "is the page it was when the switch is off: no tabs, no snapshot" | No tablist; the enquiries as before |
+
+
+### 4.34 English and French pages — `tests/component/i18n-pages.test.tsx`
+
+The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en` and `/fr`; `ENABLED_LOCALES` mocked to he, en, fr; `submitInterview` mocked.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-I18N-001 | "renders /en/pension-check in English, left to right" | `<html lang="en" dir="ltr">`; "Pension portfolio check"; the English disclosure |
+| CMP-I18N-002 | "renders /fr/pension-check in French" | `lang="fr"`; "Bilan de votre épargne retraite" |
+| CMP-I18N-003 | "keeps the Hebrew page Hebrew and right to left" | `dir="rtl"`; "בדיקת תיק פנסיוני" |
+| CMP-I18N-004 | "keeps the visitor in their language: prefixed links, and no Hebrew-only pages in the menu" | `/en/tools`, `/en/#start`; no Blog or Perspective; "Privacy policy (in Hebrew)" → `/privacy` |
+| CMP-I18N-005 | "offers the same page in the other languages" | עברית → `/pension-check`; Français → `/fr/pension-check`; English `aria-current` |
+| CMP-I18N-006 | "asks in English, but sends Dorit the Hebrew summary, noting the language" | "Please enter your name."; the summary in Hebrew with "· מולא באנגלית" |
 
 ## 5. Pass criteria
 

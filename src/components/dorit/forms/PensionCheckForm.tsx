@@ -9,6 +9,8 @@ import { leadEvents } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { isIsraeliMobile } from "@/lib/phone";
 import { services } from "@/services";
+import { useLocale, useT } from "@/i18n/LocaleContext";
+import type { Locale } from "@/i18n/locales";
 
 /**
  * "בדיקת תיק פנסיוני" — name, mobile, and the address the personal
@@ -19,8 +21,10 @@ import { services } from "@/services";
  * the year-end page — told apart by `location`.
  */
 
-const PHONE_ERROR = "מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות";
-const EMAIL_ERROR = "כתובת המייל לא נראית תקינה";
+type Problem = "form.errorName" | "form.errorPhone" | "form.errorEmail";
+
+/** How the summary names the visitor's language for Dorit, who reads it in Hebrew. */
+const LANGUAGE_NOTE: Record<Locale, string> = { he: "", en: " · מולא באנגלית", fr: " · מולא בצרפתית" };
 const isEmail = (v: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
 
 export interface PensionCheckFormProps {
@@ -36,15 +40,17 @@ export default function PensionCheckForm({ location, context, heading }: Pension
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState<Problem | null>(null);
+  const t = useT("pension");
+  const locale = useLocale();
   const [sentWithEmail, setSentWithEmail] = useState(false);
   const { sending, sent, error, submit } = useSubmission("request");
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setInvalid("נא למלא שם.");
-    if (!isIsraeliMobile(phone)) return setInvalid(PHONE_ERROR);
-    if (email.trim() && !isEmail(email.trim())) return setInvalid(EMAIL_ERROR);
+    if (!name.trim()) return setInvalid("form.errorName");
+    if (!isIsraeliMobile(phone)) return setInvalid("form.errorPhone");
+    if (email.trim() && !isEmail(email.trim())) return setInvalid("form.errorEmail");
     setInvalid(null);
     // Read now, not after the await: the thank-you renders the moment the save lands.
     setSentWithEmail(Boolean(email.trim()));
@@ -56,7 +62,8 @@ export default function PensionCheckForm({ location, context, heading }: Pension
         email: email.trim() || undefined,
         track: "pension",
         meetingTopic: PENSION_CHECK.name,
-        summary: `${PENSION_CHECK.name} — בקשה מהאתר (${context}).`,
+        // Hebrew whatever the page's language — Dorit reads it — with a note when it was not.
+        summary: `${PENSION_CHECK.name} — בקשה מהאתר (${context}${LANGUAGE_NOTE[locale]}).`,
         profile: { clearinghouse: "מעוניין/ת" },
         stage: "complete",
         channel: attribution?.channel,
@@ -76,8 +83,8 @@ export default function PensionCheckForm({ location, context, heading }: Pension
         <Check size={20} className="mt-1 shrink-0 text-highlight" aria-hidden="true" />
         <p className="m-0 text-[17px] leading-relaxed">
           {sentWithEmail
-            ? "נשלח. במייל שלך מחכה קישור אישי למסירת קוד המסלקה, עם הסבר צעד אחר צעד. דורית תחזור אליך."
-            : "נשלח. דורית תחזור אליך ותשלח את הקישור האישי למסירת קוד המסלקה."}
+            ? t("form.sentWithEmail")
+            : t("form.sentNoEmail")}
         </p>
       </div>
     );
@@ -87,10 +94,10 @@ export default function PensionCheckForm({ location, context, heading }: Pension
     <form onSubmit={send} noValidate data-track-location={location} className="rounded-[4px] border border-border p-5 md:p-6">
       {heading ? <h3 className="font-heading text-xl md:text-2xl leading-snug">{heading}</h3> : null}
       <div className={`grid gap-4 sm:grid-cols-2 ${heading ? "mt-4" : ""}`}>
-        <Field label="שם *">
+        <Field label={t("form.name")}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={inputClass()} />
         </Field>
-        <Field label="טלפון נייד *">
+        <Field label={t("form.phone")}>
           <input
             type="tel"
             inputMode="tel"
@@ -98,36 +105,36 @@ export default function PensionCheckForm({ location, context, heading }: Pension
             onChange={(e) => setPhone(e.target.value)}
             placeholder={HUMAN_HANDOFF.phonePlaceholder}
             autoComplete="tel"
-            aria-invalid={invalid === PHONE_ERROR}
+            aria-invalid={invalid === "form.errorPhone"}
             className={inputClass()}
           />
         </Field>
-        <Field label="אימייל — לשם נשלח הקישור האישי (לא חובה)" className="sm:col-span-2">
+        <Field label={t("form.email")} className="sm:col-span-2">
           <input
             type="email"
             dir="ltr"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
-            aria-invalid={invalid === EMAIL_ERROR}
+            aria-invalid={invalid === "form.errorEmail"}
             className={inputClass("text-left")}
           />
         </Field>
       </div>
       {invalid || error ? (
         <p role="alert" className="mt-3 text-sm text-destructive">
-          {invalid || error}
+          {invalid ? t(invalid) : error}
         </p>
       ) : null}
       <CtaButton type="submit" disabled={sending} className="mt-5 max-sm:w-full">
         {sending ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : null}
-        ל{PENSION_CHECK.name}
+        {t("form.submit")}
       </CtaButton>
       <p className="mt-3 text-sm text-muted-foreground">
-        הפרטים משמשים לחזרה אליך ולבדיקה בלבד.{" "}
+        {t("form.privacy")}{" "}
         {/* A plain link: the form also sits where there is no router (a calculator rendered alone). */}
         <a href="/privacy" className="underline underline-offset-4">
-          מדיניות הפרטיות
+          {t("form.privacyLink")}
         </a>
       </p>
     </form>

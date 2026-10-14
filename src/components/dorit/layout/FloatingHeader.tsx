@@ -10,11 +10,16 @@ import { useQuery } from "@tanstack/react-query";
 import { MASLEKA_ENABLED } from "@/config/masleka";
 import { services } from "@/services";
 import SupportLink from "./SupportLink";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
+import type { KeyOf } from "@/i18n/resources";
 
 interface NavItem {
-  label: string;
+  label: KeyOf<"common">;
   href: string;
   route?: boolean;
+  /** A page that exists in Hebrew only — left out of the English and French menus. */
+  hebrewOnly?: boolean;
 }
 
 /**
@@ -33,13 +38,13 @@ interface NavItem {
  * footer, nobody found it — Dorit included, on a phone and on a desktop.
  */
 const NAV: NavItem[] = [
-  { label: "אודות", href: "#about" },
-  { label: "שירותים", href: "#services" },
-  { label: "נקודת מבט", href: "/perspective", route: true },
-  { label: "כלים", href: "/tools", route: true },
-  { label: "תביעות", href: "/claims", route: true },
-  { label: "בלוג", href: "/blog", route: true },
-  { label: "שאלות ותשובות", href: "/faq", route: true },
+  { label: "nav.about", href: "#about" },
+  { label: "nav.services", href: "#services" },
+  { label: "nav.perspective", href: "/perspective", route: true, hebrewOnly: true },
+  { label: "nav.tools", href: "/tools", route: true },
+  { label: "nav.claims", href: "/claims", route: true },
+  { label: "nav.blog", href: "/blog", route: true, hebrewOnly: true },
+  { label: "nav.faq", href: "/faq", route: true },
 ];
 
 const NAV_LINK =
@@ -96,6 +101,10 @@ export default function FloatingHeader() {
   // Not while the auth check is still answering: a signed-in visitor would see
   // the sign-in link flash and vanish on every page load.
   const showLogin = !isAuthenticated && !isLoadingAuth;
+  const t = useT("common");
+  const lp = useLocalePath();
+  const locale = useLocale();
+  const nav = NAV.filter((n) => locale === "he" || !n.hebrewOnly);
   // Home rather than this page: on /account or /admin/* the guard would bounce a
   // signed-out visitor straight to the login screen.
   const signOut = () => {
@@ -132,30 +141,31 @@ export default function FloatingHeader() {
     <header className="fixed top-0 inset-x-0 z-50 bg-background border-b border-border">
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-4 flex items-center justify-between gap-6">
         <a
-          href="/#top"
+          href={lp("/#top")}
           onClick={(e) => goToSection(e, "#top")}
           className="flex items-center gap-3 leading-none"
         >
           <span className="hidden sm:flex w-[38px] h-[38px] shrink-0 items-center justify-center border border-highlight font-heading text-[19px] text-accent">
-            ד
+            {t("brand.monogram")}
           </span>
           <span className="flex flex-col leading-none">
             <span className="font-heading text-xl md:text-[23px] font-medium">
-              דורית גוב ארי
+              {t("brand.name")}
             </span>
             <span className="text-[13px] text-muted-foreground mt-1">
-              התכנון שלי — השקט שלך
+              {t("brand.slogan")}
             </span>
           </span>
         </a>
 
         <div className="flex items-center gap-2.5">
+          <LanguageSwitcher className="hidden md:inline-flex" />
           <a
-            href="/#start"
+            href={lp("/#start")}
             onClick={(e) => goToSection(e, "#start")}
             className={ctaClass("hidden md:inline-flex min-h-11 px-5 text-[17px]")}
           >
-            לשיחה קצרה עם דורית
+            {t("cta.shortCall")}
           </a>
           {/* Desktop only. On a phone the sticky bar at the bottom of every
               screen already offers חיוג עכשיו, at thumb height and always in
@@ -164,7 +174,7 @@ export default function FloatingHeader() {
               has a call button for anyone who opens it. */}
           <a
             href={`tel:${CONTACT.phoneE164}`}
-            aria-label="התקשרות לדורית גוב ארי"
+            aria-label={t("header.callAria")}
             className="hidden md:inline-flex items-center gap-2 min-h-11 px-4 border border-border rounded-md text-[15px] text-foreground hover:bg-foreground/[0.06] transition-colors duration-200"
           >
             <Phone size={15} className="text-accent" />
@@ -174,7 +184,7 @@ export default function FloatingHeader() {
             /* p-3 keeps the tap target at 46px — WCAG 2.5.5 / iOS HIG want >= 44. */
             className="md:hidden p-3"
             onClick={() => setOpen((v) => !v)}
-            aria-label="תפריט"
+            aria-label={t("header.menu")}
           >
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -184,19 +194,19 @@ export default function FloatingHeader() {
       {/* Second masthead row: the navigation. Links underline in gold on hover. */}
       <nav className="hidden md:block border-t border-border/60">
         <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] flex flex-wrap items-center gap-x-7 whitespace-nowrap">
-          {NAV.map((n) =>
+          {nav.map((n) =>
             n.route ? (
-              <Link key={n.href} to={n.href} className={NAV_LINK}>
-                {n.label}
+              <Link key={n.href} to={lp(n.href)} className={NAV_LINK}>
+                {t(n.label)}
               </Link>
             ) : (
               <a
                 key={n.href}
-                href={`/${n.href}`}
+                href={lp(`/${n.href}`)}
                 onClick={(e) => goToSection(e, n.href)}
                 className={NAV_LINK}
               >
-                {n.label}
+                {t(n.label)}
               </a>
             )
           )}
@@ -207,11 +217,11 @@ export default function FloatingHeader() {
             {showLogin ? (
               <Link to={LOGIN_HREF} className={`${NAV_LINK} inline-flex items-center gap-1.5`}>
                 <User size={15} aria-hidden="true" className="text-accent" />
-                כניסה ללקוחות
+                {t("header.login")}
               </Link>
             ) : null}
             {isAuthenticated ? (
-              <Link to="/account" className={NAV_LINK}>האזור שלי</Link>
+              <Link to="/account" className={NAV_LINK}>{t("header.account")}</Link>
             ) : null}
             {isAuthenticated && user?.role === "admin" ? (
               <>
@@ -224,7 +234,7 @@ export default function FloatingHeader() {
             ) : null}
             {isAuthenticated ? (
               <button type="button" onClick={signOut} className={NAV_LINK}>
-                יציאה
+                {t("header.logout")}
               </button>
             ) : null}
           </div>
@@ -250,10 +260,10 @@ export default function FloatingHeader() {
               transition={{ type: "tween", duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="flex items-center justify-between px-6 py-5 border-b border-border/60">
-                <span className="font-heading text-lg font-medium">תפריט</span>
+                <span className="font-heading text-lg font-medium">{t("header.menu")}</span>
                 <button
                   onClick={() => setOpen(false)}
-                  aria-label="סגירת תפריט"
+                  aria-label={t("header.closeMenu")}
                   className="w-11 h-11 flex items-center justify-center border border-border rounded-md hover:border-highlight hover:text-accent transition-colors duration-200"
                 >
                   <X size={20} />
@@ -261,26 +271,26 @@ export default function FloatingHeader() {
               </div>
 
               <nav className="flex-1 overflow-y-auto px-2 py-3">
-                {NAV.map((n) =>
+                {nav.map((n) =>
                   n.route ? (
                     <Link
                       key={n.href}
-                      to={n.href}
+                      to={lp(n.href)}
                       onClick={() => setOpen(false)}
                       className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"
                     >
-                      <span>{n.label}</span>
-                      <ChevronLeft size={18} className="text-muted-foreground" />
+                      <span>{t(n.label)}</span>
+                      <ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" />
                     </Link>
                   ) : (
                     <a
                       key={n.href}
-                      href={`/${n.href}`}
+                      href={lp(`/${n.href}`)}
                       onClick={(e) => goToSection(e, n.href)}
                       className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"
                     >
-                      <span>{n.label}</span>
-                      <ChevronLeft size={18} className="text-muted-foreground" />
+                      <span>{t(n.label)}</span>
+                      <ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" />
                     </a>
                   )
                 )}
@@ -292,13 +302,13 @@ export default function FloatingHeader() {
             data-track-location="header_menu"
             className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"
           >
-            <span className="inline-flex items-center gap-2"><LifeBuoy size={18} aria-hidden="true" className="text-accent" />תמיכה — שאלה לעוזר</span>
-            <ChevronLeft size={18} className="text-muted-foreground" />
+            <span className="inline-flex items-center gap-2"><LifeBuoy size={18} aria-hidden="true" className="text-accent" />{t("header.support")}</span>
+            <ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" />
           </SupportLink>
           {isAuthenticated ? (
-            <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>האזור שלי</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+            <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>{t("header.account")}</span><ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" /></Link>
           ) : showLogin ? (
-            <Link to={LOGIN_HREF} className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span className="inline-flex items-center gap-2"><User size={18} aria-hidden="true" className="text-accent" />כניסה ללקוחות</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+            <Link to={LOGIN_HREF} className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span className="inline-flex items-center gap-2"><User size={18} aria-hidden="true" className="text-accent" />{t("header.login")}</span><ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" /></Link>
           ) : null}
           {isAuthenticated && user?.role === "admin" ? (
             <>
@@ -311,19 +321,20 @@ export default function FloatingHeader() {
           ) : null}
           {isAuthenticated ? (
             <button type="button" onClick={signOut} className="w-full flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200 text-start">
-              <span>יציאה</span>
+              <span>{t("header.logout")}</span>
             </button>
           ) : null}
               </nav>
 
               <div className="px-6 py-5 border-t border-border/60 space-y-3">
+                <LanguageSwitcher className="flex w-full justify-center" />
                 <a
-                  href="/#start"
+                  href={lp("/#start")}
                   onClick={(e) => goToSection(e, "#start")}
                   className={ctaClass("flex w-full")}
                 >
                   <Calendar size={18} />
-                  לשיחה קצרה עם דורית
+                  {t("cta.shortCall")}
                 </a>
                 <div className="grid grid-cols-2 gap-3">
                   <a
@@ -331,7 +342,7 @@ export default function FloatingHeader() {
                     className="flex items-center justify-center gap-2 min-h-12 border border-border rounded-md text-[15px] hover:border-highlight hover:bg-highlight/5 transition-colors duration-200"
                   >
                     <Phone size={16} />
-                    חייגו
+                    {t("header.call")}
                   </a>
                   <a
                     href={`https://wa.me/${CONTACT.whatsapp}`}

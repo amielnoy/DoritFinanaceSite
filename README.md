@@ -731,6 +731,37 @@ retirement calculator on /tools, (3) a Har HaBituach double-coverage check on
   `SNAPSHOT_REVIEW_BUSINESS_DAYS` (null → step 3 states no
   timing).
 
+### English and French — behind `VITE_LOCALES`
+
+Hebrew stays at the unprefixed addresses; English is served at `/en/…` and
+French at `/fr/…`, for the public pages only. The build serves them only when
+`VITE_LOCALES` names them (`VITE_LOCALES=en,fr`). It is **empty by default**:
+no `/en` route, no language switcher, no hreflang. Locally:
+`VITE_LOCALES=en,fr npm run dev`, then open `/en/pension-check`.
+
+- **Resource files:** `src/i18n/locales/<lang>/<namespace>.json`. Hebrew is
+  the source: its keys are the TypeScript type, so a misspelt key fails the
+  build. `tests/unit/i18n-resources.test.ts` holds English and French to the
+  same keys and `{placeholders}`. Read a key with `useT("<namespace>")`.
+  Internal links go through `useLocalePath()`.
+- **Done in slice 1:** the header, footer and mobile bar, the language
+  switcher, and `/pension-check` with its form. `useSeo` takes `locale` and
+  `translated` (a canonical per language, `og:locale`, hreflang with Hebrew as
+  `x-default`).
+- **Hebrew-only pages** (blog, perspective, privacy, accessibility, the
+  personal area, admin) are kept out of the English and French menus. The
+  privacy and accessibility links are marked "(in Hebrew)".
+- **Stays Hebrew whatever the page's language:** everything the site sends.
+  That covers a lead's topic and summary (Dorit reads them, with
+  "· מולא באנגלית" / "· מולא בצרפתית" appended), questionnaire answers and
+  GA4's closed values.
+- **Still Hebrew under `/en` and `/fr`:** the home sections, /tools, /claims,
+  /faq and /atzmaim-31-12. They follow in their own slices, with the sitemap
+  and prerender for the new addresses.
+- **Before the switch goes on:** a native speaker reviews the English and
+  French. The compliance adviser approves the translated licence and
+  pension-marketing lines (`compliance.pensionMarketing`; COMPLIANCE.md §11).
+
 ## The chat function (Phase 3)
 
 The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents

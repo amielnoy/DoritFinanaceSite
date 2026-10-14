@@ -9,6 +9,8 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'r
 const PageNotFound = lazy(() => import('./lib/PageNotFound'));
 import { AuthProvider } from '@/lib/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import LocaleLayout from '@/i18n/LocaleLayout';
+import { ENABLED_LOCALES, DEFAULT_LOCALE } from '@/i18n/locales';
 import RouteCommitted from '@/components/RouteCommitted';
 import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -91,6 +93,22 @@ const AuthenticatedApp = () => {
       <Suspense fallback={<RouteFallback />}>
       <ErrorBoundary scope="page" resetKey={pathname}>
       <Routes>
+        {/* English and French (/en, /fr): the public pages only, and only for
+            the languages VITE_LOCALES names — a build without it registers
+            none of these (src/i18n/locales.ts). */}
+        {ENABLED_LOCALES.filter((l) => l !== DEFAULT_LOCALE).map((l) => (
+          <Route key={l} path={`/${l}`} element={<LocaleLayout locale={l} />}>
+            <Route index element={<Home />} />
+            <Route path="tools" element={<Tools />} />
+            <Route path="pension-check" element={<PensionCheck />} />
+            <Route path="claims" element={<Claims />} />
+            <Route path="faq" element={<FAQPage />} />
+            <Route path="atzmaim-31-12" element={<YearEndSelfEmployed />} />
+            <Route path="*" element={<PageNotFound />} />
+          </Route>
+        ))}
+        {/* Hebrew, at the unprefixed addresses — every page, as before. */}
+        <Route element={<LocaleLayout locale={DEFAULT_LOCALE} />}>
         {/* Add your page Route elements here */}
         <Route path="/" element={<Home />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -123,6 +141,7 @@ const AuthenticatedApp = () => {
           </Route>
         ) : null}
         <Route path="*" element={<PageNotFound />} />
+        </Route>
       </Routes>
       </ErrorBoundary>
       {/* After the route (or its error screen) commits — read by e2e gotoApp. */}
