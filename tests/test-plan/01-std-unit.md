@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 722 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1342 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 730 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1372 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -603,7 +603,8 @@ gets the shell with its head; anything else is 404 + noindex.
 ### 4.27 Where the canonical origin comes from — `tests/unit/seo-site-url.test.ts` (`resolveSiteUrl`)
 
 `SITE_URL` in `src/lib/seo.ts` is Vite's `VITE_SITE_URL`, else the server's
-(`process.env`, the only one a Vercel function has), else the default host.
+(`process.env`, the only one a Vercel function has), else the production
+domain `https://govari-fin.co.il` (the old Base44 host until 2026-10-14).
 Tested on the pure resolver: under Vitest `import.meta.env` mirrors
 `process.env`, so the end-to-end case is UNIT-OG-018.
 
@@ -611,7 +612,7 @@ Tested on the pure resolver: under Vitest `import.meta.env` mirrors
 |---|---|---|
 | UNIT-SURL-001 | "takes Vite's VITE_SITE_URL first, over the server's" | Vite's value |
 | UNIT-SURL-002 | "falls back to the server's VITE_SITE_URL when Vite's env lacks it — a Vercel function" | Server's value, for an absent or empty Vite env |
-| UNIT-SURL-003 | "falls back to the default host when neither names one" | `https://safe-arch-plan.base44.app` |
+| UNIT-SURL-003 | "falls back to the production domain when neither names one — never the old Base44 host" | `https://govari-fin.co.il`, and not `https://safe-arch-plan.base44.app` |
 | UNIT-SURL-004 | "treats a blank value as unset, as the build plugin does" | Empty / whitespace skipped |
 | UNIT-SURL-005 | "strips trailing slashes from whichever source wins" | No trailing `/` |
 
@@ -733,6 +734,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-029 | "%s: an error the model can act on, nothing saved, in both modes" (3 cases) | `{}`, a name and phone with no `stage`, and `stage: "final"`: in live and evaluation mode the handler is not called, the outcome is `error` / `isError` / not `leadSaved`, the answer is `{ ok: false }` naming `stage`, and the conversation stays `open` (the evaluation of 2026-10-14: `submitLead({})` counted as complete) |
 | UNIT-CHTOOL-030 | "after a refused empty call, the real complete save still goes through" | Evaluation mode: `{}` then a full lead → `simulated`, `leadSaved` |
 | UNIT-CHTOOL-031 | "an evaluation run refuses %s as submit-lead does: its own Hebrew error, nothing saved" (2 cases) | No name / a blank phone in evaluation mode → `error`, "נדרשים שם וטלפון", conversation `open` — the simulation answers as `submit-lead` would |
+| UNIT-CHTOOL-032 | "in evaluation mode %s, a complete save asks for a short closing message" (2 cases) | `{ ok, stage: "complete", next }`; `next` asks for "הודעת סיום", not for the next question (the evaluation of 2026-10-14: two turns ended `empty_reply` after a bare complete answer) |
+| UNIT-CHTOOL-033 | "a save after the lead is saved says so and asks for a reply, not silence" | `{ ok, alreadySaved, next }`, `next` says to answer the visitor |
+| UNIT-CHTOOL-034 | "a second hand-off says so and asks for a reply, not silence" | `{ ok, alreadyEscalated, next }` |
 
 ### 4.32a The chat's article source — `tests/unit/chat-articles.test.ts`
 
@@ -771,7 +775,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTURN-008 | "fails on a second failure, keeping what the tools already did" | `TurnFailure` `model_timeout`, `tools` equals the earlier outcome |
 | UNIT-CHTURN-009 | "refuses an empty reply" | `TurnFailure` `empty_reply` |
 | UNIT-CHTURN-010 | "fails a reply cut off at max_tokens inside a tool call, without running the tool or returning its text" | `stop_reason: max_tokens` with a partial `submitLead`: `TurnFailure` `truncated_tool_call`, usage kept, `runTool` never called (I1) |
-| UNIT-CHTURN-011 | "asks for up to 2,048 reply tokens, room for a Hebrew profile summary" | `MAX_REPLY_TOKENS` is 2048 and the request carries it (I1) |
+| UNIT-CHTURN-011 | "asks for up to 4,096 reply tokens, room for a full Hebrew profile and summary" | `MAX_REPLY_TOKENS` is 4096 and the request carries it (I1; 2,048 cut a complete save off in the evaluation of 2026-10-14) |
 | UNIT-CHTURN-012 | "still fails when the model asks for a tool even with tools switched off" | `TurnFailure` `too_many_tool_rounds`, three tool outcomes kept |
 | UNIT-CHBUDGET-001 | "prices Haiku tokens per million" | 1M input + 1M cached + 1M output = $0.61 |
 | UNIT-CHBUDGET-002 | "prices an unknown model at the most expensive known rate, never at zero" | 1M input tokens = $2 |

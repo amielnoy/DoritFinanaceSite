@@ -30,6 +30,7 @@ one.
 | Build-time prerender | `scripts/prerender.mjs`, wired in as `npm run build:prerender` (the `buildCommand` in `vercel.json`) |
 | Crawl directives | `public/robots.txt`, `public/sitemap.xml` |
 | Host rewriting | `scripts/vite-site-url-plugin.mjs` — rewrites the origin in `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` when `VITE_SITE_URL` names a different one |
+| The old Base44 host | `src/lib/legacy-host.ts` (the decision), `src/lib/legacy-host-boot.ts` (the boot step in `main.jsx`) — on `safe-arch-plan.base44.app` a page goes noindex, names production canonical, and moves to the same address on `govari-fin.co.il` |
 | Page-level declarations | `src/pages/{Home,Blog,BlogPost,Claims,PrivacyPolicy,Accessibility}.tsx`, `src/lib/PageNotFound.jsx` |
 
 ## 3. Unit cases — `tests/unit/seo.dom.test.ts`
@@ -176,6 +177,38 @@ API-HTP-013 and API-HTP-014 in `05-std-api.md` for the served files.
 | Route | How it is kept out | Pinned by |
 |---|---|---|
 | `/masleka` | `noindex` from SeoRouteGuard; `Disallow: /masleka` in the `*` group of robots.txt; absent from the sitemap, prerender `ROUTES` and `llms.txt`; the link's token rides in the fragment | CMP-MSK-016; `ai-surface.contract.test.ts` "keeps the private routes out for everyone"; E2E-MSK-001 |
+
+## 5c. The old Base44 host — `tests/unit/legacy-host*.test.ts`, `e2e/seo/legacy-host.spec.ts`
+
+Base44 keeps serving a copy of the site at `safe-arch-plan.base44.app` and cannot
+`301` it (its site config has no redirects, and its CLI ignores `_redirects`). The
+same host is the backend `/api/*` and `/ws-user-apps/*` are rewritten to, so the
+cases pin both halves: what a page booted there does, and what is never touched.
+
+| ID | Title | Expected result |
+|---|---|---|
+| SEO-OLD-001 | "defaults to exactly the old production host" / "is configurable, and `none` turns it off" | `VITE_LEGACY_HOSTS` replaces the list; `none` empties it |
+| SEO-OLD-002 | "matches the exact host only — never the Builder's preview hosts or other base44.app apps" | `preview--…`, `preview-sandbox--…`, `*.modal.host`, production, localhost: not the old host |
+| SEO-OLD-003 | "redirects to the same path, query and fragment on the production domain" | `/faq?utm_source=wa#q3` → `https://govari-fin.co.il/faq?utm_source=wa#q3` |
+| SEO-OLD-004 | "moves sign-in and admin pages too, when no sign-in is in flight" | `/login`, `/admin/leads`, `/account` move |
+| SEO-OLD-005 | "cannot be turned into a redirect to another host by the path" | `//evil.example/x` stays on production |
+| SEO-OLD-006 | "never touches the backend paths that share the host" | `/api…`, `/ws-user-apps…` stay; `/apiary` is not a backend path |
+| SEO-OLD-007 | "leaves a sign-in in flight on the origin that holds its state" | `code`, `error`, `#access_token`, `access_token`, `from_url`, `clear_access_token`, `token_hash` stay |
+| SEO-OLD-008 | "leaves the platform's own auth pages where the platform sent them" | `/register`, `/forgot-password`, `/reset-password`, `/oauth/*` stay |
+| SEO-OLD-009 | "stays inside a frame, which production refuses to be shown in" | Framed: stay |
+| SEO-OLD-010 | "never redirects to itself, to another old host, or to a non-https origin" | Loop guard |
+| SEO-OLD-011 | "production, its www alias, a Vercel preview, the Builder preview and localhost" | No change at all, framed or not |
+| SEO-OLD-012 | DOM: "marks the page noindex, points canonical and og:url at production, and moves the visitor" | `robots`/`googlebot` `noindex`; canonical and `og:url` on production; one `location.replace` |
+| SEO-OLD-013 | DOM: notice, sign-in in flight, frame, misconfigured origin, and three other hosts | Notice links to the target; staying pages are still noindex; other hosts' heads are byte-identical |
+| SEO-OLD-014 | DOM: "applySeo keeps the old host out of the index after boot" | `noindex` (`noindex, nofollow` on private routes) there; unchanged on production |
+| SEO-OLD-015 | e2e: "sends a visitor to the same address on the production domain" | The browser, told the old host is this build, lands on the production stub with path, query and fragment; no backend call on the way but Base44's own page-view log |
+| SEO-OLD-016 | e2e: "keeps a page whose sign-in is in flight, marked noindex with the canonical on production" | After the route's own `useSeo`, still `noindex` with a production canonical |
+| SEO-OLD-017 | e2e: "stays inside a frame, as in the Base44 dashboard, and is still noindex" | The frame renders the page on the old host |
+| SEO-OLD-018 | e2e: "is left as it was: indexable, and not redirected" | The local host keeps `index, follow, …` |
+
+The e2e cases play both hosts with `page.route`, so nothing reaches either real
+one. With `VITE_LEGACY_HOSTS=none` in the build, SEO-OLD-015..017 fail and
+SEO-OLD-018 passes — checked once when they were written.
 
 ## 6. Pass criteria
 

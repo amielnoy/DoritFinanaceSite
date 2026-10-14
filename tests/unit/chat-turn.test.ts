@@ -133,11 +133,13 @@ describe("runTurn", () => {
     expect(runTool).not.toHaveBeenCalled();
   });
 
-  it("asks for up to 2,048 reply tokens, room for a Hebrew profile summary", async () => {
+  // 2,048 cut a complete save off mid-profile in the evaluation of 2026-10-14
+  // (run 5, truncated_tool_call): a long Hebrew profile and summary need more.
+  it("asks for up to 4,096 reply tokens, room for a full Hebrew profile and summary", async () => {
     const model = scripted([text("שלום")]);
     await runTurn({ ...base, model, runTool: vi.fn() });
-    expect(MAX_REPLY_TOKENS).toBe(2048);
-    expect(model.calls[0].maxTokens).toBe(2048);
+    expect(MAX_REPLY_TOKENS).toBe(4096);
+    expect(model.calls[0].maxTokens).toBe(4096);
   });
 
   it("refuses an empty reply", async () => {

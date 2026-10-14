@@ -298,10 +298,33 @@ describe("a partial save tells the model to keep talking", () => {
     expect(answer.next).toMatch(/המשך/);
   });
 
-  it("a complete save says nothing of the kind: the interview is over", async () => {
+  // The evaluation of 2026-10-14 (run 5): two turns ended empty_reply right after a
+  // complete save answered a bare { ok, stage } — the model wrote nothing, twice.
+  // Every answer that ends a conversation now says what to write next.
+  it.each([false, true])("in evaluation mode %s, a complete save asks for a short closing message", async (evalMode) => {
     const run = createToolRunner({ submitLead: answering(200, { ok: true, leadId: "l1" }), escalateToHuman: answering(200, {}) });
-    const answer = JSON.parse((await run("submitLead", LEAD, ctx())).forModel);
-    expect(answer).toEqual({ ok: true, stage: "complete" });
+    const answer = JSON.parse((await run("submitLead", LEAD, ctx({ evalMode }))).forModel);
+    expect(answer).toMatchObject({ ok: true, stage: "complete" });
+    expect(answer.next).toMatch(/הודעת סיום/);
+    expect(answer.next).not.toMatch(/המשך.*לשאלה הבאה/);
+  });
+
+  it("a save after the lead is saved says so and asks for a reply, not silence", async () => {
+    const run = createToolRunner({ submitLead: answering(200, { ok: true, leadId: "l1" }), escalateToHuman: answering(200, {}) });
+    const c = ctx();
+    await run("submitLead", LEAD, c);
+    const answer = JSON.parse((await run("submitLead", LEAD, c)).forModel);
+    expect(answer).toMatchObject({ ok: true, alreadySaved: true });
+    expect(answer.next).toMatch(/ענה למבקר/);
+  });
+
+  it("a second hand-off says so and asks for a reply, not silence", async () => {
+    const run = createToolRunner({ submitLead: answering(200, {}), escalateToHuman: answering(200, { ok: true, contact: null, acknowledgement: "הועבר" }) });
+    const c = ctx();
+    await run("escalateToHuman", { reason: "user_request", summary: "ביקש את דורית" }, c);
+    const answer = JSON.parse((await run("escalateToHuman", { reason: "user_request", summary: "שוב" }, c)).forModel);
+    expect(answer).toMatchObject({ ok: true, alreadyEscalated: true });
+    expect(answer.next).toMatch(/ענה למבקר/);
   });
 
   it("the tool's description says the partial save is not mentioned but the conversation goes on", () => {
