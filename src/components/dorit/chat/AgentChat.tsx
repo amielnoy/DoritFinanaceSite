@@ -1084,7 +1084,10 @@ export default function AgentChat({
               aria-haspopup="dialog"
               aria-expanded={layerOpen}
               aria-controls={panelId}
-              className={ctaClass("mt-5 w-full")}
+              // The brief asked for a filled button; the system's CTA is "an
+              // outline, never a fill" (primitives/Cta.tsx). The hero's answer
+              // to the same tension is reused: a heavier border and a tint.
+              className={ctaClass("mt-5 w-full border-2 bg-highlight/[0.08] hover:bg-highlight/[0.18]")}
             >
               <MessageCircle size={18} aria-hidden="true" />
               {sheet.openLabel}
