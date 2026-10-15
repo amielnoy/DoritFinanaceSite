@@ -783,14 +783,16 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 
 `tests/component/admin-users.test.tsx` adds CMP-AUSR "switches from cards to the table at 680px, as the design asks" (`min-[680px]:table` / `min-[680px]:hidden`).
 
-### 4.45 `/login` — Google — `tests/component/login-google.test.tsx`
+### 4.46 `<ClaimForm />` — the file picker and the limits — `tests/component/claim-form-limits.test.tsx`
 
-`vitest.config.ts` now resolves `.ts`/`.tsx` before `.jsx`, as `vite.config.js` does, so `@/pages/Login` is the site's page, not Base44's restored boilerplate.
+From the code review of 2026-10-15.
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-LOGIN-001 | "tells the visitor when Google's sign-in could not start" | A rejecting `signInWithGoogle` shows "לא הצלחנו להתחיל את ההתחברות. נסו שוב." |
-| CMP-LOGIN-002 | "says nothing while Google takes the visitor away" | No message; the call made |
+| CMP-CLAIMLIM-001 | "keeps the file picker in the tab order, visually hidden rather than display:none" | `sr-only`, not `hidden`; Tab from the description lands on it |
+| CMP-CLAIMLIM-002 | "states the limits before anything is picked, tied to the picker" | "עד 10 מסמכים, עד 10MB…"; the picker's `aria-describedby` names it |
+| CMP-CLAIMLIM-003 | "names a refused file beside the picker, not by the Send button" | An alert with the file's name, tied to the picker, which is `aria-invalid` |
+| CMP-CLAIMLIM-004 | "lets no field take more than the server accepts" | `maxLength` = `CLAIM_FIELD_LIMITS` for name, phone, email, description |
 
 ## 5. Pass criteria
 
