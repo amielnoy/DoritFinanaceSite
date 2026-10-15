@@ -101,7 +101,7 @@ were drawn from is [14-procedures-zones](14-procedures-zones.md) §3.
 function replaces Base44 for the interview (rollout step 3). It is a script, not
 a Vitest suite, and it is run by hand by the user.
 
-**What it runs.** A Sonnet model plays each of the 43 personas in
+**What it runs.** A Sonnet model plays each of the 49 personas in
 `tests/eval/chat/personas.json` against the deployed `chat` function,
 up to 14 visitor turns each. Thirty-one are the interview's (11 cooperative
 Hebrew and 1 English lead personas, 4 vague, 4 product pushes, 4 returns or
@@ -110,7 +110,12 @@ English: a product push and a browser). Twelve are the FAQ chat's and carry
 `"agent": "support_agent"`: 4 general questions (`sup-gen-01..04`, `expect:
 answer`), 3 personal cases, 2 product pushes, 1 refund-amount question and 1
 request for Dorit herself (all `expect: handoff`), and 1 English general
-question (`sup-en-01`, `expect: answer`). A persona with no `agent` talks to
+question (`sup-en-01`, `expect: answer`). Six are the procedures chat's and carry
+`"agent": "procedures_agent"`: 3 how-to questions (`proc-01`, `proc-02`, `proc-04`
+— the last asks for a form number and fax the agent must not invent; `expect:
+answer`) and 3 that must reach Dorit — a pasted balance with a request for a
+recommendation, an ID and policy number (`proc-05`, which lists the constructed
+ID as forbidden), and a request for Dorit herself (`expect: handoff`). A persona with no `agent` talks to
 `needs_interview`. Every request sends `x-chat-eval` with
 `CHAT_EVAL_TOKEN`: the function then simulates its tools, mails no one, returns
 `eval.toolCalls`, bypasses the rate limits and gives the conversation a
@@ -120,9 +125,12 @@ sends one canned greeting (`שלום`) and requires an answer carrying
 `eval.toolCalls`; otherwise it prints "the function is not in evaluation mode"
 and exits 3 with nothing else sent. A persona's first turn that is not an
 evaluation-mode success stops the whole run the same way. A second Sonnet call scores each transcript
-against `tests/eval/chat/rubric.md`, or against `tests/eval/chat/rubric-support.md`
-for an FAQ persona. The two rubrics end in the same JSON contract (one
-parser reads both): the support rubric adds that an article link or title no
+against `tests/eval/chat/rubric.md`, against `tests/eval/chat/rubric-support.md`
+for an FAQ persona, or against `tests/eval/chat/rubric-procedures.md` for a
+procedures one. The three rubrics end in the same JSON contract (one
+parser reads all three); the procedures rubric adds that a form number, address,
+fax or deadline no `readArticle` call returned is invented, noted like an invented
+article: the support rubric adds that an article link or title no
 `listArticles` / `readArticle` call returned is invented, which is noted in
 `notes` and does not set either flag.
 

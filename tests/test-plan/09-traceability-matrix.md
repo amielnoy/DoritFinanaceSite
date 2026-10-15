@@ -35,6 +35,7 @@ gap is visible and a failure points at a feature.
 | F-29 | Signed-in visitor sees their own enquiries (/account) | UNIT-ACC-001..017 | CMP-ACC-001..023, CMP-HDR-001..005 | CTR-ACC-001..006 | INT-ACC-001..010 | — | — | E2E-ACC-001 | — | — | — |
 | F-30 | Admin sees which lead events reach GA4, and marks a browser internal (/admin/leads) | UNIT-GA4-001..014 | CMP-GA4-001..005, CMP-QCF-006 | — | — | — | — | — | — | — | — |
 | F-31 | The FAQ chat runs on the chat function: its own tools, its own notice, no lead tool | UNIT-CHTOOL-020..028, UNIT-CHART-001..009, UNIT-CHHANDLER-048..051, UNIT-CHCONFIG-005..009 | CMP-CHSUP-001/002 | CTR-CHPROMPT-009..012 | — | EVAL-CHAT (UNIT-EVALCHAT-034..042; `npm run test:eval:chat`, manual) | — | — | — | — | — |
+| F-33 | The procedures chat runs on the chat function: the FAQ chat's tools, its own notice, logged to the Support tab | UNIT-CHHANDLER-061/062, UNIT-CHSWEEP-007, UNIT-CHCONFIG-010/011 | CMP-CHPROC-001/002 | CTR-CHPROMPT-014..017 | — | EVAL-CHAT (`proc-01..06`, UNIT-EVALCHAT-046/047; manual) | — | — | — | — | — |
 | F-32 | A finished FAQ conversation is logged to the sheet by the function itself, once | UNIT-CHSWEEP-001..014, UNIT-CHSTORE-016..019, UNIT-CHHANDLER-052..059 | — | CTR-CHSCH-011..014, CTR-CHFN-009/010 | — | — | — | — | — | — | — |
 
 ### Review Focus of the FAQ-chat branch (feat/chat-pr2-support)

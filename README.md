@@ -873,8 +873,10 @@ does exactly that, nightly at 03:45 (`leads-retention`):
 The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents
 named in `VITE_CHAT_AGENTS`, a comma-separated list that is **empty by default**,
 so nothing calls it until it is set. It serves `needs_interview` (the
-interview) and `support_agent` (the FAQ chat); procedures and the blog
-recommender follow in their own PRs. For the interview it fixes A-59: the model calls `submitLead` and `escalateToHuman` itself, on the
+interview), `support_agent` (the FAQ chat) and `procedures_agent` (the
+procedures chat on /tools, with the FAQ chat's tools and its own v6 notice, its
+conversations logged to the Support tab by the same sweep); the blog recommender
+follows in its own PR. For the interview it fixes A-59: the model calls `submitLead` and `escalateToHuman` itself, on the
 server, instead of the page parsing a fenced `lead` block. It also keeps a
 redacted transcript that Dorit reads on `/admin/leads` (the "שיחה" button on any
 lead with a linked conversation). Agents not named in `VITE_CHAT_AGENTS` stay on
