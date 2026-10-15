@@ -115,7 +115,9 @@ question (`sup-en-01`, `expect: answer`). Six are the procedures chat's and carr
 — the last asks for a form number and fax the agent must not invent; `expect:
 answer`) and 3 that must reach Dorit — a pasted balance with a request for a
 recommendation, an ID and policy number (`proc-05`, which lists the constructed
-ID as forbidden), and a request for Dorit herself (`expect: handoff`). A persona with no `agent` talks to
+ID as forbidden), and a request for Dorit herself (`expect: handoff`); each of the three
+names the `phone` it types, and its run fails unless an `escalateToHuman` call carries it
+(the hand-off asks for it after the first call, so the one follow-up carries it). A persona with no `agent` talks to
 `needs_interview`. Every request sends `x-chat-eval` with
 `CHAT_EVAL_TOKEN`: the function then simulates its tools, mails no one, returns
 `eval.toolCalls`, bypasses the rate limits and gives the conversation a
@@ -151,7 +153,7 @@ article: the support rubric adds that an article link or title no
 - a persona that names its `phone` (`coop-11`, typed `050-1234567`) gets a
   lead carrying exactly that number — the redaction once cut its 7-digit tail;
 - ten transcripts written to `eval-results/chat-<time>/review/` for the Hebrew
-  to be read by a person (the judge's naturalness score is advisory only).
+  to be read by a person — at least one per agent, then across the kinds (the judge's naturalness score is advisory only).
 
 **Environment.** `CHAT_EVAL_URL` (the function URL), `CHAT_EVAL_TOKEN` (the
 function secret of the same name), `ANTHROPIC_API_KEY`; optional `EVAL_MODEL`

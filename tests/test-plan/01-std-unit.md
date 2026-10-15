@@ -745,6 +745,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-032 | "in evaluation mode %s, a complete save asks for a short closing message" (2 cases) | `{ ok, stage: "complete", next }`; `next` asks for "הודעת סיום", not for the next question (the evaluation of 2026-10-14: two turns ended `empty_reply` after a bare complete answer) |
 | UNIT-CHTOOL-033 | "a save after the lead is saved says so and asks for a reply, not silence" | `{ ok, alreadySaved, next }`, `next` says to answer the visitor |
 | UNIT-CHTOOL-034 | "a second hand-off says so and asks for a reply, not silence" | `{ ok, alreadyEscalated, next }` |
+| UNIT-CHTOOL-035 | "takes the name and phone given after an anonymous hand-off: one follow-up, then no more" | A hand-off with no lead allows one more `escalateToHuman` carrying a name and a valid phone; its lead sets `hasLead`; a third call answers `already_escalated` (final review, Important 1; A-55) |
+| UNIT-CHTOOL-036 | "follows up only with a name and a valid phone" | No name, or a phone that is not `0` + 8–9 digits: `already_escalated`, the handler not called |
+| UNIT-CHTOOL-037 | "does not follow up once the conversation has a lead" | `hasLead: true`: `already_escalated` |
 
 ### 4.32a The chat's article source — `tests/unit/chat-articles.test.ts`
 
@@ -996,6 +999,8 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-045 | "still fails handoff_or_lead on a recommendation" | `recommended a product` listed |
 | UNIT-EVALCHAT-046 | "gives the procedures chat six personas, none of them expecting a lead" (persona file) | `proc-01..06` in order, `expect` `answer` or `handoff`; `answer` for `proc-01`, `proc-02`, `proc-04` |
 | UNIT-EVALCHAT-047 | "judges a procedures persona by the procedures rubric" (`rubricFor`) | `procedures_agent` gets `rubrics.procedures`; support and interview unchanged |
+| UNIT-EVALCHAT-048 | "puts every agent's transcripts in front of the reviewer" (`pickForReview`) | The ten picked include `needs_interview`, `support_agent` and `procedures_agent` — the first of each agent, then round-robin by kind (final review, Important 2) |
+| UNIT-EVALCHAT-049 | "fail a hand-off that never carried the phone the visitor typed" (scoreRun) | A `handoff` persona with `phone` fails unless some `escalateToHuman` call carries that number; one with no `phone` is judged on the hand-off alone (final review, Important 1) |
 | UNIT-EVALCHAT-008 | "fails below 90% complete leads" (scoreRun) | 8 of 10: `pass: false` |
 | UNIT-EVALCHAT-009 | "fails on a persona that errored" (scoreRun) | An errored persona fails the run |
 | UNIT-EVALCHAT-010 | "names the persona, the transcript and the tool calls" (formatForJudge) | Persona id, `מבקר:` / `עוזר:` lines and `submitLead` all present |
@@ -1017,7 +1022,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-026 | "runs every persona after a good preflight, and lets one persona's ordinary error through" (preflight) | 3 results; the thrown error recorded on persona b |
 | UNIT-EVALCHAT-027 | "stops the whole run when a persona's first turn is not in evaluation mode, or failed" (preflight) | `EvalStop` after persona a; b never ran; `assertEvalFirstTurn` throws on non-eval, not on eval |
 | UNIT-EVALCHAT-028 | "fails when a persona's lead carries a phone other than the one it typed" (scoreRun) | A persona with `phone: 050-1234567` passes with `0501234567`, `050-1234567` or `+972-50-1234567` in its lead; a redacted phone fails with `the lead's phone is not the number the visitor typed` (C1) |
-| UNIT-EVALCHAT-029 | "has one persona typing its phone as 050-1234567, whose lead must carry that number (C1: redaction kept phones whole)" (persona file) | Only `coop-11` names a `phone`; its brief types `050-1234567` |
+| UNIT-EVALCHAT-029 | "names the phone a persona types where the run must find it: coop-11's lead, and each procedures hand-off" (persona file) | `phone` on coop-11 (`050-1234567`, lead) and proc-03/05/06 (`050-000-0029..31`, handoff); each brief contains its phone |
 | UNIT-EVALCHAT-030 | "still reads the three verdict fields, and says the notes were unreadable" (parseJudgement; already on main, first documented here) | A judge's note with an unescaped quote: the verdict fields are read, `notes` is `(the judge's notes were not valid JSON)` |
 | UNIT-EVALCHAT-031 | "still refuses an answer whose verdict fields cannot be read" (parseJudgement; as above) | Throws |
 | UNIT-EVALCHAT-032 | "defaults to 24 visitor turns and takes EVAL_MAX_TURNS when it is a sane number" (`maxVisitorTurns`; as above) | 24 by default; `"30"` gives 30; `"0"`, `"-3"`, `"abc"`, `"500"` give 24 |

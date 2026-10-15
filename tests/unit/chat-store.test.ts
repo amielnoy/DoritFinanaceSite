@@ -72,9 +72,11 @@ describe("restStore", () => {
       is_eval: false, last_message_at: "2026-10-13T09:00:00.000Z",
     };
     expect(toFacts({ ...base, escalated_at: null })).toEqual({
-      id: ID, status: "open", escalated: false, consentVersion: "v6", consentAt: "2026-10-13T09:00:00.000Z", attribution: base.attribution,
+      id: ID, status: "open", escalated: false, hasLead: false, consentVersion: "v6", consentAt: "2026-10-13T09:00:00.000Z", attribution: base.attribution,
     });
     expect(toFacts({ ...base, escalated_at: "2026-10-13T10:00:00.000Z" }).escalated).toBe(true);
+    // A lead on the conversation ends the hand-off's one follow-up (tools.ts).
+    expect(toFacts({ ...base, escalated_at: null, lead_id: "lead-1" }).hasLead).toBe(true);
   });
 
   it("persists a hand-off as escalated_at, set to the current time", async () => {

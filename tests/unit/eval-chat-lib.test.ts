@@ -143,6 +143,13 @@ describe("report", () => {
     expect(picked).toHaveLength(10);
     expect(new Set(picked.map((r: { persona: { kind: string } }) => r.persona.kind)).size).toBeGreaterThanOrEqual(6);
   });
+
+  it("puts every agent's transcripts in front of the reviewer", () => {
+    const personas = JSON.parse(readFileSync("tests/eval/chat/personas.json", "utf8"));
+    const results = personas.map((p: { id: string }) => ({ persona: p, transcript: [], toolCalls: [], judgement }));
+    const agents = new Set(pickForReview(results).map((r: { persona: { agent?: string } }) => r.persona.agent ?? "needs_interview"));
+    expect([...agents].sort()).toEqual(["needs_interview", "procedures_agent", "support_agent"]);
+  });
 });
 
 describe("the persona file", () => {
@@ -180,10 +187,15 @@ describe("the persona file", () => {
     expect(procedures.filter((p) => p.expect === "answer").map((p) => p.id)).toEqual(["proc-01", "proc-02", "proc-04"]);
   });
 
-  it("has one persona typing its phone as 050-1234567, whose lead must carry that number (C1: redaction kept phones whole)", () => {
+  it("names the phone a persona types where the run must find it: coop-11's lead, and each procedures hand-off", () => {
     const typed = personas.filter((p) => (p as { phone?: string }).phone);
-    expect(typed.map((p) => [p.id, (p as { phone?: string }).phone, p.expect])).toEqual([["coop-11", "050-1234567", "lead"]]);
-    expect(typed[0].brief).toContain("050-1234567");
+    expect(typed.map((p) => [p.id, (p as { phone?: string }).phone, p.expect])).toEqual([
+      ["coop-11", "050-1234567", "lead"],
+      ["proc-03", "050-000-0029", "handoff"],
+      ["proc-05", "050-000-0030", "handoff"],
+      ["proc-06", "050-000-0031", "handoff"],
+    ]);
+    for (const p of typed) expect(p.brief, p.id).toContain((p as { phone?: string }).phone);
   });
 
   it("carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for", () => {
@@ -340,6 +352,18 @@ describe("support personas", () => {
     const bad = scoreRun([leaky]);
     expect(bad.pass).toBe(false);
     expect(bad.failures.join()).toMatch(/sup-01: called submitLead in a chat that has no lead/);
+  });
+
+  it("fail a hand-off that never carried the phone the visitor typed", () => {
+    const p = { id: "proc-03", kind: "product_push", expect: "handoff", agent: "procedures_agent", phone: "050-000-0029", brief: "" };
+    const anonymous = { persona: p, transcript: [], toolCalls: [{ name: "escalateToHuman", input: { reason: "product_recommendation" } }], judgement };
+    const followedUp = { ...anonymous, toolCalls: [...anonymous.toolCalls, { name: "escalateToHuman", input: { name: "מיכל אברהם", phone: "0500000029" } }] };
+    const bad = scoreRun([anonymous]);
+    expect(bad.pass).toBe(false);
+    expect(bad.failures.join()).toMatch(/proc-03: the hand-off did not carry the phone the visitor typed/);
+    expect(scoreRun([followedUp]).pass).toBe(true);
+    // A hand-off persona that gives no phone is judged on the hand-off alone.
+    expect(scoreRun([{ ...anonymous, persona: { ...p, phone: undefined } }]).pass).toBe(true);
   });
 
   it("fail an 'answer' persona on a judge's flag, as every persona does", () => {

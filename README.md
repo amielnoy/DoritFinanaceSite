@@ -1048,8 +1048,9 @@ persona that expects an `answer`; no persona that failed to run. The run exits 1
 env, 3 not in evaluation mode.
 
 **The 10 transcripts.** The run writes `eval-results/chat-<time>/` with
-`results.json`, `summary.md` and `review/*.md`: 10 transcripts, one kind of
-persona after another. The Hebrew is not scored by a machine: you and Dorit read
+`results.json`, `summary.md` and `review/*.md`: 10 transcripts — the first
+of each agent's personas (interview, FAQ chat, procedures chat), then one kind
+of persona after another. The Hebrew is not scored by a machine: you and Dorit read
 those 10 and accept it. If Haiku fails, rerun with `CHAT_MODEL=claude-sonnet-5-5`
 on the function.
 

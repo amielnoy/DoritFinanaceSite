@@ -94,6 +94,7 @@ export function toFacts(row: ConversationRow): ConversationFacts {
     id: row.id,
     status: row.status,
     escalated: row.escalated_at != null,
+    hasLead: row.lead_id != null,
     consentVersion: row.consent_version,
     consentAt: row.consent_at,
     attribution: row.attribution,
