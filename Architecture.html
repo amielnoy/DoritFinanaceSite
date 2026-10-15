@@ -286,21 +286,24 @@
 <div class="page">
 
   <header class="masthead">
-    <span class="stamp">Architecture Record · Rev 1.0</span>
+    <span class="stamp">Architecture Record · Rev 2.0 · 15 October 2026</span>
     <h1>Dorit Gov-Ari Finance Site</h1>
     <p class="standfirst">
-      How the site is built, how a request travels through it, and where the
-      structure works against the one job it exists to do — turning a visitor
-      into a phone call. Written alongside the automated test suite, so every
-      claim here has a test behind it.
+      How the site is built today, how a request travels through it, and where
+      the structure still works against the one job it exists to do — turning
+      a visitor into a conversation. Revision 1.0 (7 October) described a
+      Base44 app; since then production moved to Vercel, the data and most of
+      the backend to Supabase, and the site grew a clearinghouse workflow, a
+      chat function of its own and English and French. Every claim here was
+      checked against <code>main</code> at <code>8e31408</code>.
     </p>
     <dl class="facts">
-      <div class="fact"><dt>Type</dt><dd>Base44 app · React SPA</dd></div>
-      <div class="fact"><dt>Surface</dt><dd>14 routes · 2 admin</dd></div>
-      <div class="fact"><dt>Entities</dt><dd>4</dd></div>
-      <div class="fact"><dt>Bundle</dt><dd>790 KB · 242 KB gz</dd></div>
-      <div class="fact"><dt>Locale</dt><dd>he-IL · RTL</dd></div>
-      <div class="fact"><dt>Tests</dt><dd>140 unit · 399 e2e</dd></div>
+      <div class="fact"><dt>Type</dt><dd>React SPA · Vercel · Supabase</dd></div>
+      <div class="fact"><dt>Surface</dt><dd>13 public · 1 signed-in · 3 admin · 3 staff</dd></div>
+      <div class="fact"><dt>Data</dt><dd>19 tables · 12 Edge functions</dd></div>
+      <div class="fact"><dt>Bundle</dt><dd>main 489 KB · 146 KB gz · 43 chunks</dd></div>
+      <div class="fact"><dt>Locale</dt><dd>he-IL · RTL · en/fr built, off</dd></div>
+      <div class="fact"><dt>Tests</dt><dd>3,700 Vitest runs · 182 e2e</dd></div>
     </dl>
   </header>
 
@@ -316,7 +319,7 @@
       <li><a href="#delivery">Build &amp; delivery</a></li>
       <li><a href="#testing">Test architecture</a></li>
       <li><a href="#review">Review findings</a></li>
-      <li><a href="#sequence">What to do first</a></li>
+      <li><a href="#sequence">What to do next</a></li>
     </ol>
   </nav>
 
@@ -326,22 +329,27 @@
     <section id="overview">
       <h2><span class="num">01</span> What the system is</h2>
       <p class="lede">
-        A single-page marketing and lead-generation site for an independent
-        Israeli insurance and financial adviser, in Hebrew with right-to-left
-        layout, running on the Base44 platform.
+        A marketing, lead-generation and client-service site for an
+        independent Israeli financial planner and insurance agent, in Hebrew
+        with right-to-left layout. The browser app is hosted on Vercel; its
+        data, authentication, files and most server logic live in Supabase;
+        Base44, where the site began, still runs two of the chat agents and a
+        few legacy functions.
       </p>
       <p>
-        Everything the business needs from it comes down to three transactions:
-        a visitor reads the adviser's story and services, a visitor models what
-        their pension management fees actually cost them, and a visitor hands
-        over a name and a phone number. A small admin area behind
-        authentication lets the adviser read those leads and publish blog posts.
+        The business still comes down to a visitor handing over a name and a
+        phone number, but the paths to it have multiplied: the short contact
+        form, the needs questionnaire, the pension-portfolio check, the claims
+        report, two chat agents, the calculators on <code>/tools</code> and a
+        year-end campaign page. Behind sign-in there is a personal area (the
+        visitor's own enquiries, and — behind a switch — a published
+        <em>personal snapshot</em>), and an admin and staff area: leads, the
+        blog, the clearinghouse requests and their analysis, and the users.
       </p>
       <p>
-        There is no native mobile application. Mobile is the same SPA at a phone
-        viewport, which is why the test suite's <code>ios-safari</code> and
-        <code>android-chrome</code> platforms drive mobile <em>web</em> through
-        WebKit and Chromium device profiles rather than a device farm.
+        There is still no native app. Mobile is the same SPA at a phone
+        viewport; the e2e suite drives it through the <code>android-chrome</code>
+        device profile.
       </p>
 
       <div class="scroll">
@@ -351,14 +359,18 @@
             <tr><th>Layer</th><th>Choice</th><th>Notes</th></tr>
           </thead>
           <tbody>
-            <tr><td>UI</td><td>React 18.2</td><td>Function components, hooks, no SSR</td></tr>
-            <tr><td>Build</td><td>Vite 8 + <code>@base44/vite-plugin</code></td><td>Plugin supplies the <code>/api</code> dev proxy, HMR notifier, analytics beacon</td></tr>
-            <tr><td>Language</td><td>TypeScript (partial)</td><td><code>strict: true</code>, <code>checkJs: false</code>; <code>src/components/ui</code> and <code>src/api</code> excluded</td></tr>
-            <tr><td>Routing</td><td>react-router-dom 6</td><td><code>BrowserRouter</code>, all routes declared in one file</td></tr>
-            <tr><td>Styling</td><td>Tailwind 3 + shadcn/ui</td><td>HSL design tokens in <code>src/index.css</code>; 49 unmodified primitives</td></tr>
-            <tr><td>Data access</td><td><code>@base44/sdk</code></td><td>Same-origin <code>/api</code>; axios under the hood</td></tr>
-            <tr><td>Backend</td><td>Base44 entities, Core integrations, one Deno function</td><td>Declared as JSON in <code>base44/</code></td></tr>
-            <tr><td>Delivery</td><td>git → Base44 sync → dashboard publish</td><td>Not <code>base44 deploy</code>; see §6</td></tr>
+            <tr><td>UI</td><td>React 18 + TypeScript</td><td>72% of <code>src/</code> is <code>.ts</code>/<code>.tsx</code>; <code>tsc</code> passes clean and blocks in CI</td></tr>
+            <tr><td>Build</td><td>Vite (Rolldown)</td><td>Named vendor chunks (<code>vite.config.js</code>); <code>build:prerender</code> renders the public pages to HTML</td></tr>
+            <tr><td>Routing</td><td>react-router-dom 6</td><td>Every page but Home is <code>React.lazy</code>; guards per route</td></tr>
+            <tr><td>Data in the browser</td><td>TanStack Query</td><td>Ports and adapters in <code>src/services/</code>, loaded lazily</td></tr>
+            <tr><td>Styling</td><td>Tailwind 3 + shadcn/ui</td><td>HSL tokens in <code>src/index.css</code>; a lint rule bans raw hex; self-hosted fonts</td></tr>
+            <tr><td>Languages</td><td><code>src/i18n/</code></td><td>Hebrew at <code>/</code>; English and French at <code>/en</code>, <code>/fr</code> behind <code>VITE_LOCALES</code></td></tr>
+            <tr><td>Database &amp; auth</td><td>Supabase</td><td>Postgres with RLS on every table, Auth (Google, email + password), Storage, pg_cron + pg_net</td></tr>
+            <tr><td>Server logic</td><td>Supabase Edge Functions (Deno)</td><td>12 functions, service role, each with its own guards</td></tr>
+            <tr><td>Chat</td><td>The <code>chat</code> Edge Function → Anthropic</td><td>For the agents named in <code>VITE_CHAT_AGENTS</code>; the rest stay on Base44</td></tr>
+            <tr><td>Mail</td><td><code>dorit-mailer</code> (Cloudflare Pages) → Resend</td><td>One relay for every function; token per caller</td></tr>
+            <tr><td>Hosting</td><td>Vercel, prebuilt from CI</td><td>Production = <code>govari-fin.co.il</code>; Git auto-deploys are off</td></tr>
+            <tr><td>Legacy</td><td>Base44</td><td>Agents, 8 functions (3 are now forwarders), entities as a fallback</td></tr>
           </tbody>
         </table>
       </div>
@@ -368,84 +380,116 @@
     <section id="topology">
       <h2><span class="num">02</span> Runtime topology</h2>
       <p class="lede">
-        Everything is same-origin. The SPA never talks to a third party for
-        data — the Base44 edge fronts the entity store, the Core integrations
-        and the function runtime under one <code>/api</code> prefix, which is
-        also why the whole backend can be stubbed at a single route pattern in
-        the tests.
+        No longer same-origin. The browser loads the site from Vercel and then
+        talks to Supabase directly — PostgREST under row-level security, Auth,
+        Storage and the Edge Functions — while Base44 is reached through a
+        Vercel rewrite and the agent socket. The Edge Functions, not the
+        browser, hold every secret that reaches beyond the site.
       </p>
 
       <div class="plate">
         <div class="plate-head">
           <span class="label">Figure 1 — Request paths</span>
-          <span class="note">Solid: same-origin. Dashed: server-to-server, token from the connector.</span>
+          <span class="note">Accent: the browser's own calls. Dashed: server to server, secrets held server-side.</span>
         </div>
         <div class="plate-body">
-          <svg viewBox="0 0 940 372" role="img" aria-label="Diagram: the browser loads static assets and calls the same-origin /api prefix, which fans out to the entity store with row-level security, the Core integrations, the Deno function runtime and auth. The function runtime calls the Google Calendar API server-to-server.">
+          <svg viewBox="0 0 960 430" role="img" aria-label="Diagram: the browser loads prerendered pages and chunks from Vercel and calls Supabase directly — Postgres with RLS, Auth, Storage and Edge Functions. Base44 is reached through a Vercel rewrite and the agent socket. The Edge Functions call the dorit-mailer relay (Resend), Google Sheets and Calendar, and the Anthropic API; Base44's forwarders call the Edge Functions.">
             <!-- Browser -->
-            <rect class="d-box-a" x="8" y="24" width="232" height="200" rx="2"/>
-            <text class="d-t-b" x="24" y="48">Browser</text>
-            <text class="d-s" x="24" y="66">Chrome · Safari · iOS · Android</text>
-            <rect class="d-box" x="24" y="80" width="200" height="46" rx="2"/>
-            <text class="d-t" x="36" y="99">SPA bundle</text>
-            <text class="d-s" x="36" y="115">index-*.js · 790 KB</text>
-            <rect class="d-box" x="24" y="136" width="200" height="46" rx="2"/>
-            <text class="d-t" x="36" y="155">Static files</text>
-            <text class="d-s" x="36" y="171">robots · sitemap · manifest</text>
-            <text class="d-s" x="24" y="208">React 18 · Router 6 · Tailwind</text>
+            <rect class="d-box-a" x="8" y="24" width="228" height="196" rx="2"/>
+            <text class="d-t-b" x="22" y="48">Browser</text>
+            <text class="d-s" x="22" y="66">Chrome · Safari · iOS · Android</text>
+            <rect class="d-box" x="22" y="80" width="200" height="46" rx="2"/>
+            <text class="d-t" x="34" y="99">Prerendered page</text>
+            <text class="d-s" x="34" y="115">dist/&lt;route&gt;.html</text>
+            <rect class="d-box" x="22" y="136" width="200" height="46" rx="2"/>
+            <text class="d-t" x="34" y="155">SPA chunks</text>
+            <text class="d-s" x="34" y="171">43 · main 146 KB gz</text>
+            <text class="d-s" x="22" y="206">React 18 · Router 6 · Query</text>
 
-            <!-- Edge -->
-            <rect class="d-box-a" x="272" y="86" width="158" height="72" rx="2"/>
-            <text class="d-t-b" x="288" y="112">Base44 edge</text>
-            <text class="d-s" x="288" y="130">same-origin</text>
-            <text class="d-s" x="288" y="146">/api/apps/:appId/…</text>
+            <!-- Vercel -->
+            <rect class="d-box-a" x="252" y="24" width="188" height="196" rx="2"/>
+            <text class="d-t-b" x="266" y="48">Vercel</text>
+            <text class="d-s" x="266" y="66">govari-fin.co.il · fra1</text>
+            <text class="d-s" x="266" y="98">static + prerendered HTML</text>
+            <text class="d-s" x="266" y="118">CSP · HSTS · Trusted Types</text>
+            <text class="d-s" x="266" y="146">api/og/blog</text>
+            <text class="d-s" x="266" y="164">api/csp-report</text>
+            <text class="d-s" x="266" y="194">/api/* → Base44 (rewrite)</text>
 
-            <!-- Backend services -->
-            <rect class="d-box" x="470" y="16" width="214" height="72" rx="2"/>
-            <text class="d-t-b" x="486" y="40">Entity store</text>
-            <text class="d-s" x="486" y="58">BlogPost · Lead · Testimonial</text>
-            <text class="d-s" x="486" y="74">row-level security per op</text>
+            <!-- Supabase -->
+            <rect class="d-box-a" x="474" y="14" width="250" height="262" rx="2"/>
+            <text class="d-t-b" x="488" y="38">Supabase</text>
+            <rect class="d-box" x="488" y="50" width="222" height="48" rx="2"/>
+            <text class="d-t" x="500" y="70">Postgres + RLS</text>
+            <text class="d-s" x="500" y="87">19 tables · 6 cron jobs</text>
+            <rect class="d-box" x="488" y="106" width="104" height="48" rx="2"/>
+            <text class="d-t" x="500" y="126">Auth</text>
+            <text class="d-s" x="500" y="143">Google · email</text>
+            <rect class="d-box" x="600" y="106" width="110" height="48" rx="2"/>
+            <text class="d-t" x="612" y="126">Storage</text>
+            <text class="d-s" x="612" y="143">2 buckets</text>
+            <rect class="d-box" x="488" y="162" width="222" height="100" rx="2"/>
+            <text class="d-t" x="500" y="182">Edge Functions · Deno</text>
+            <text class="d-s" x="500" y="200">submit-lead · submit-claim</text>
+            <text class="d-s" x="500" y="216">escalate · chat · content-admin</text>
+            <text class="d-s" x="500" y="232">masleka-* (5) · purge · log</text>
+            <text class="d-s" x="500" y="250">service role · own guards</text>
 
-            <rect class="d-box" x="470" y="104" width="214" height="56" rx="2"/>
-            <text class="d-t-b" x="486" y="127">Core integrations</text>
-            <text class="d-s" x="486" y="145">SendEmail · UploadFile</text>
-
-            <rect class="d-box" x="470" y="176" width="214" height="72" rx="2"/>
-            <text class="d-t-b" x="486" y="200">Function runtime</text>
-            <text class="d-s" x="486" y="218">createConsultationEvent</text>
-            <text class="d-s" x="486" y="234">Deno · asServiceRole connector</text>
-
-            <rect class="d-box" x="470" y="264" width="214" height="56" rx="2"/>
-            <text class="d-t-b" x="486" y="287">Auth</text>
-            <text class="d-s" x="486" y="305">email+OTP · Google OAuth</text>
+            <!-- Base44 -->
+            <rect class="d-box" x="474" y="306" width="250" height="96" rx="2"/>
+            <text class="d-t-b" x="488" y="330">Base44</text>
+            <text class="d-s" x="488" y="348">procedures · blog agents</text>
+            <text class="d-s" x="488" y="364">8 functions · 3 forward to Edge</text>
+            <text class="d-s" x="488" y="380">entities (fallback)</text>
 
             <!-- External -->
-            <rect class="d-box" x="724" y="184" width="176" height="56" rx="2"/>
-            <text class="d-t-b" x="740" y="208">Google Calendar</text>
-            <text class="d-s" x="740" y="226">events.insert</text>
+            <rect class="d-box" x="764" y="40" width="188" height="56" rx="2"/>
+            <text class="d-t-b" x="778" y="63">dorit-mailer → Resend</text>
+            <text class="d-s" x="778" y="81">Cloudflare Pages</text>
+            <rect class="d-box" x="764" y="112" width="188" height="56" rx="2"/>
+            <text class="d-t-b" x="778" y="135">Google Sheets · Calendar</text>
+            <text class="d-s" x="778" y="153">service account</text>
+            <rect class="d-box" x="764" y="184" width="188" height="56" rx="2"/>
+            <text class="d-t-b" x="778" y="207">Anthropic API</text>
+            <text class="d-s" x="778" y="225">from the chat function</text>
+            <rect class="d-box" x="764" y="306" width="188" height="56" rx="2"/>
+            <text class="d-t-b" x="778" y="329">GA4 · Vercel Analytics</text>
+            <text class="d-s" x="778" y="347">from the browser</text>
 
-            <!-- Connectors -->
-            <path class="d-line-a" d="M240 122 H272"/>
-            <path class="d-line-a" d="M430 122 H452 V52 H470"/>
-            <path class="d-line-a" d="M430 122 H470"/>
-            <path class="d-line-a" d="M430 122 H452 V212 H470"/>
-            <path class="d-line-a" d="M430 122 H452 V292 H470"/>
-            <circle cx="452" cy="122" r="2.6" fill="var(--accent)"/>
-            <path class="d-line d-dash" d="M684 212 H724"/>
-
-            <!-- Static asset path -->
-            <path class="d-line" d="M124 224 V256 H272 V158"/>
-            <text class="d-s" x="136" y="272">static assets over the same origin</text>
+            <!-- Browser to Vercel and Supabase -->
+            <path class="d-line-a" d="M236 104 H252"/>
+            <path class="d-line-a" d="M236 160 H244 V250 H458 V74 H488"/>
+            <path class="d-line-a" d="M458 130 H488"/>
+            <path class="d-line-a" d="M458 210 H488"/>
+            <circle cx="458" cy="250" r="2.6" fill="var(--accent)"/>
+            <!-- Browser to Base44 (socket) and Vercel rewrite to Base44 -->
+            <path class="d-line-a d-dash" d="M120 220 V354 H474"/>
+            <path class="d-line d-dash" d="M346 220 V330 H474"/>
+            <!-- Edge to the outside -->
+            <path class="d-line d-dash" d="M710 196 H744 V68 H764"/>
+            <path class="d-line d-dash" d="M744 140 H764"/>
+            <path class="d-line d-dash" d="M744 196 V212 H764"/>
+            <!-- Base44 forwarders to Edge -->
+            <path class="d-line d-dash" d="M600 306 V262"/>
+            <!-- Browser to analytics -->
+            <path class="d-line d-dash" d="M120 354 V418 H744 V334 H764"/>
+            <text class="d-s" x="130" y="346">agent socket (wss)</text>
+            <text class="d-s" x="130" y="410">analytics beacons</text>
           </svg>
         </div>
       </div>
 
       <p>
-        The consequence worth naming: because <code>serverUrl</code> is empty in
-        <code>src/api/base44Client.js</code>, every call is relative. That is
-        good for cookies and CORS, and it is what lets the end-to-end suite
-        intercept <code>**/api/**</code> once and run the entire site offline
-        with no credentials and no risk to production data.
+        What the change bought: Postgres row-level security is now the single
+        gate on every read, and the public site cannot write a lead directly
+        at all — <code>leads</code> has no insert policy for
+        <code>anon</code> or <code>authenticated</code>
+        (<code>20261013010000_no_public_lead_inserts.sql</code>). Every write
+        goes through an Edge Function running as the service role, which is
+        why each of them carries its own validation, rate limit and logging.
+        What it cost: the end-to-end suite now intercepts three origins
+        (Base44, Supabase and analytics) instead of one, and the switches in
+        §4.6 decide which of two stacks a given call reaches.
       </p>
     </section>
 
@@ -455,76 +499,115 @@
 
       <h3>Routing</h3>
       <p>
-        All fourteen routes are declared in <code>src/App.jsx</code>. Eleven are
-        public; <code>/account</code>, the signed-in visitor's personal area,
-        sits inside a <code>&lt;ProtectedRoute&gt;</code> that sends a signed-out
-        visitor to <code>/login?returnTo=/account</code> (read-only, noindex);
-        <code>/admin/leads</code> and <code>/admin/blog</code> sit
-        inside an <code>&lt;AdminRoute&gt;</code>, which delegates to
-        <code>&lt;ProtectedRoute&gt;</code> when the visitor is signed out —
-        redirecting to <code>/login</code> — and additionally sends anyone whose
-        role is not <code>admin</code> back to the home page. The row data is
-        already locked down by RLS; the gate keeps the page itself out of reach.
-        Every page module is imported eagerly at the top of the file, so the
-        router does no code splitting — see finding
-        <span class="ref">R-05</span>.
+        All routes are in <code>src/App.jsx</code>. <b>Home is the only eager
+        page</b>; every other one — and <code>PageNotFound</code> — is
+        <code>React.lazy</code> under one <code>Suspense</code>. Thirteen are
+        public (<code>/</code>, <code>/tools</code>, <code>/pension-check</code>,
+        <code>/claims</code>, <code>/faq</code>, <code>/atzmaim-31-12</code>,
+        <code>/perspective</code>, <code>/blog</code>, <code>/blog/:key</code>,
+        <code>/masleka</code>, <code>/privacy</code>, <code>/accessibility</code>,
+        <code>/login</code>). <code>/account</code> sits in a
+        <code>&lt;ProtectedRoute&gt;</code>. <code>/admin/leads</code>,
+        <code>/admin/blog</code> and <code>/admin/users</code> sit in an
+        <code>&lt;AdminRoute&gt;</code> (role <code>admin</code> in
+        <code>profiles</code>). The three clearinghouse screens sit in a
+        <code>&lt;StaffRoute&gt;</code> — an admin or any agency member, by the
+        <code>my_staff_role()</code> RPC — and are registered only when
+        <code>VITE_MASLEKA_ENABLED</code> is on. Row data is locked down by
+        RLS regardless; the guards keep the pages out of reach.
       </p>
-
-      <h3>Measurement</h3>
       <p>
-        <code>src/lib/analytics.ts</code> is the one place that talks to GA4. It
-        sends phone, WhatsApp and email clicks, <code>#start</code> clicks, chat
-        starts and handoffs, and <code>generate_lead</code> — the last only after
-        a save succeeds. <code>track</code> passes on just
-        <code>location</code>, <code>cta</code>, <code>method</code> and
-        <code>channel</code>, so personal data cannot ride along in a parameter.
-        <code>LEAD_EVENTS</code>, the catalogue of what is sent, also feeds the
-        <code>LeadTrackingPanel</code> at the top of <code>/admin/leads</code>,
-        and a test fails if the code sends an event the catalogue lacks.
+        When <code>VITE_LOCALES</code> names <code>en</code> and
+        <code>fr</code>, six pages are also routed under each prefix
+        (<code>TRANSLATED_ROUTES</code> in <code>src/i18n/locales.ts</code>),
+        inside a <code>LocaleLayout</code> that sets the language and the
+        direction. It is off in production and on in Vercel Preview.
       </p>
 
       <h3>Composition</h3>
       <p>
-        The home page is a single scroll of sixteen sections, each an
-        independent component in <code>src/components/dorit/</code> with its own
-        anchor id. Section ids are the site's real navigation contract: the
-        header nav, the section rail, the mobile sticky bar and the calculator's
-        call-to-action all target them, and the test suite asserts all twelve
-        top-level ids exist.
+        The home page is now thirteen sections, each in its own
+        <code>&lt;ErrorBoundary&gt;</code>, down from sixteen: the tools moved
+        to <code>/tools</code>, the essay to <code>/perspective</code>, and
+        the five competing contact paths became one start section. Section ids
+        remain the navigation contract — the header, the footer, the sticky bar
+        and CTAs on other pages reach them through <code>useSectionNav</code>,
+        which routes home first, in the visitor's language.
       </p>
 
       <h3>State and data</h3>
       <p>
-        There are two idioms in the codebase and only one of them is used.
-        <code>@tanstack/react-query</code> is installed, configured in
-        <code>src/lib/query-client.js</code> and mounted in
-        <code>App.jsx</code> — but the only <code>useQuery</code> call in the
-        whole application is in <code>PageNotFound.jsx</code>. Every other fetch
-        is a hand-rolled <code>useEffect</code> with local
-        <code>loading</code> / <code>error</code> state. Authentication state is
-        a plain React context.
+        One idiom now. <b>Ten files use TanStack Query</b> for every
+        server read and mutation; the hand-rolled <code>useEffect</code> fetches
+        are gone. The browser never touches a table or a function by name: it
+        calls the ports in <code>src/services/ports.ts</code>, and
+        <code>src/services/composition.ts</code> picks an adapter per port.
+        <code>src/services/index.ts</code> is a lazy proxy, so the Supabase and
+        Base44 SDKs (vendor chunks of 55 KB and 45 KB gzipped) load only when a
+        call needs them — public article reads go over plain
+        <code>fetch</code> to PostgREST without either.
+      </p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Port</th><th>Production adapter</th><th>Picked by</th></tr></thead>
+          <tbody>
+            <tr><td><code>leads</code></td><td>Supabase Edge (<code>submit-lead</code>, <code>submit-claim</code>)</td><td><code>VITE_LEAD_FUNCTIONS=supabase</code></td></tr>
+            <tr><td><code>support</code></td><td><code>escalate-to-human</code> Edge</td><td>the same switch</td></tr>
+            <tr><td><code>content</code> (reads)</td><td>Supabase (<code>blog_posts</code>, <code>testimonials</code>)</td><td>Supabase configured</td></tr>
+            <tr><td><code>contentAdmin</code> (writes)</td><td><b>Base44 <code>contentAdmin</code> function</b></td><td><code>VITE_CONTENT_WRITES</code> — unset</td></tr>
+            <tr><td><code>uploads</code>, <code>claimDocuments</code></td><td>Supabase Storage</td><td><code>VITE_CONTENT_IMAGES</code>, <code>VITE_UPLOAD_PROVIDER</code></td></tr>
+            <tr><td><code>leadsAdmin</code>, <code>usersAdmin</code>, <code>account</code>, <code>auth</code></td><td>Supabase</td><td>Supabase configured</td></tr>
+            <tr><td><code>masleka</code></td><td>Supabase (5 Edge functions + RPCs)</td><td><code>VITE_MASLEKA_ENABLED=true</code></td></tr>
+            <tr><td><code>agents</code></td><td><code>chat</code> Edge for <code>needs_interview</code>, <code>support_agent</code>; Base44 for the rest</td><td><code>VITE_CHAT_AGENTS</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Languages</h3>
+      <p>
+        Visible text lives in <code>src/i18n/locales/&lt;lang&gt;/&lt;ns&gt;.json</code>
+        — seven namespaces (common, home, pension, faq, claims, yearend,
+        tools) in Hebrew, English and French. Hebrew is the source: its keys
+        are the TypeScript type, so a misspelt key fails the build, and a test
+        holds the other two languages to the same keys and placeholders.
+        Values the site <em>sends</em> stay Hebrew whatever the page's
+        language — a lead's topic and summary, questionnaire answers, claim
+        types, GA4's closed values — with a Hebrew note when the visitor wrote
+        from the English or French site.
       </p>
 
-      <div class="callout">
-        <span class="label">Why it matters</span>
-        <p>
-          Two idioms means two sets of caching, retry and error semantics for
-          the same backend, and the one that is actually used is the one with
-          none. Reviewers have to read each component to know how it fails.
-        </p>
-      </div>
+      <h3>Measurement</h3>
+      <p>
+        <code>src/lib/analytics.ts</code> is still the one place that talks to
+        GA4 — one delegated click listener plus explicit events, eighteen of
+        them catalogued in <code>LEAD_EVENTS</code>, with
+        <code>generate_lead</code> sent only after a save succeeds and only
+        closed parameters allowed. Vercel Analytics is added on Vercel builds,
+        with the URL fragment stripped.
+      </p>
+
+      <h3>Search and sharing</h3>
+      <p>
+        <code>useSeo</code> writes each route's title, description,
+        canonical, social cards, JSON-LD and — for translated pages — hreflang.
+        The build then prerenders the ten public pages (and every published
+        article, and the English and French pages when enabled) so a crawler
+        receives the page, not an empty root. It refuses to ship two routes
+        with one title, or an English or French page with a Hebrew title.
+        <code>api/og/blog.ts</code> answers crawlers for an article published
+        since the last build.
+      </p>
 
       <h3>Styling</h3>
       <p>
-        Tailwind utilities over HSL custom properties declared in
-        <code>src/index.css</code> — <code>--background</code>,
-        <code>--foreground</code>, <code>--accent</code> and friends. Two brand
-        colours are also hard-coded as hex literals throughout the
-        <code>dorit/</code> components (<code>#C4A484</code> and
-        <code>#7D6B5D</code>) rather than going through the token layer, which
-        is what makes the contrast finding in
-        <span class="ref">R-09</span> a multi-file change instead of a
-        one-token change.
+        Tailwind over HSL tokens in <code>src/index.css</code>, and nothing
+        else: <b>an ESLint rule fails the build on a raw hex colour</b> in
+        application code. The bronze that once forked into five near-identical
+        values is now <code>--accent</code> (text, 6.9:1) and
+        <code>--highlight</code> (strokes). The four typefaces are self-hosted
+        (<code>src/fonts.css</code>, <code>font-src 'self'</code>). The two
+        justified exceptions to the hex ban — Google's logo and the
+        organizations' identity colours — carry an explicit comment.
       </p>
     </section>
 
@@ -532,569 +615,402 @@
     <section id="backend">
       <h2><span class="num">04</span> Backend</h2>
       <p class="lede">
-        Declarative, and still legible. The backend is <b>five</b> JSON entity
-        definitions, <b>eight Deno functions</b> (~3,900 lines in total), three
-        OAuth connectors (<code>googlecalendar</code>, <code>outlook</code>,
-        <code>googlesheets</code>) and three agent definitions — all in
-        <code>base44/</code>, all in version control. There is no server to
-        operate: Base44 hosts the runtime, and a deploy is a publish.
+        <b>Supabase</b> holds the data and does the work: 19 tables under
+        row-level security, 30 database functions, 6 scheduled jobs, 2 storage
+        buckets and 12 Edge Functions (with 19 shared modules), all in
+        <code>supabase/</code> and in version control. Migrations are applied
+        by hand, once each, and recorded with
+        <code>supabase migration repair</code>.
       </p>
 
       <h3>4.1 · The data model</h3>
+      <p>
+        <b>Multi-tenant from the schema up</b>, with one tenant today:
+        every business row carries an <code>agency_id</code>, and
+        <code>can_see(agency)</code> — a membership or admin check — is the
+        predicate behind almost every policy. Agency 1 is Dorit's.
+      </p>
       <div class="scroll">
         <table>
-          <thead>
-            <tr><th>Entity</th><th>Fields</th><th>Create</th><th>Read</th><th>Update / Delete</th></tr>
-          </thead>
+          <thead><tr><th>Area</th><th>Tables</th><th>Who may read</th><th>Who may write</th></tr></thead>
           <tbody>
-            <tr><td><code>Lead</code></td><td class="sans">name, phone, email, source, topic, timing, message, status, escalation_reason, handled_by_agent, consent_version, consent_at</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
-            <tr><td><code>Contact</code></td><td class="sans">phone, name, email, channel, notes, last_seen</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
-            <tr><td><code>BlogPost</code></td><td class="sans">title, excerpt, body, image_url, tags, published</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td>public</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
-            <tr><td><code>Testimonial</code></td><td class="sans">name, role, quote, image_url, rating, source</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td><td>unset — platform default</td><td class="sans" style="color:var(--ok);font-weight:600">admin</td></tr>
-            <tr><td><code>User</code></td><td class="sans">role (<code>admin</code> / <code>user</code>)</td><td colspan="3">platform-managed; no rules of its own</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p>
-        <code>Lead</code> and <code>Contact</code> carry the same rule and it is
-        exactly right for the job: <b>anyone may create, only an admin may
-        read.</b> Those two lines are what stand between a public contact form
-        and a public list of clients' names and phone numbers, which is why the
-        contract suite asserts them explicitly rather than trusting them.
-      </p>
-      <p>
-        The asymmetry is the design. Every entity the public writes to is
-        write-only to the public, and every entity the public reads is
-        admin-only to write — <code>BlogPost</code> is the mirror image of
-        <code>Lead</code>, and there is no entity that is public in both
-        directions.
-      </p>
-
-      <h3>4.2 · The eight functions</h3>
-      <div class="scroll">
-        <table>
-          <thead>
-            <tr><th>Function</th><th>Lines</th><th>What it does</th><th>Side effects</th><th>Statuses</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>submitLead</code></td><td class="sans">~1,050</td><td>The enquiry path for all three forms and for the interview agent</td><td>writes <code>Lead</code>; mails the agency, the operations team and the visitor; Outlook event; sheet row</td><td class="sans">400 · 500</td></tr>
-            <tr><td><code>escalateToHuman</code></td><td class="sans">~500</td><td>Hands a conversation to a person, for any reason an agent may not handle</td><td>writes <code>Lead</code> when contactable; always notifies; sheet row</td><td class="sans">200 only</td></tr>
-            <tr><td><code>submitClaim</code></td><td class="sans">~380</td><td>The claims form</td><td>writes <code>Lead</code>; mails</td><td class="sans">400 · 500</td></tr>
-            <tr><td><code>upsertContact</code></td><td class="sans">~220</td><td>Records or completes the person behind the enquiries, keyed on a normalised phone number. Built and tested; wired to no agent (see B-8)</td><td>writes <code>Contact</code>; sheet row on creation only</td><td class="sans">400 · 500</td></tr>
-            <tr><td><code>logSupportChat</code></td><td class="sans">~165</td><td>Files a finished support conversation — topic, outcome, redacted transcript</td><td>sheet row; nothing else</td><td class="sans">400 · 500</td></tr>
-            <tr><td><code>createConsultationEvent</code></td><td class="sans">~115</td><td>Books the follow-up in Google Calendar</td><td><code>googlecalendar</code> connector</td><td class="sans">400 · 500 · 502</td></tr>
-            <tr><td><code>createOutlookEvent</code></td><td class="sans">~110</td><td>The same, in Outlook</td><td><code>outlook</code> connector</td><td class="sans">400 · 500 · 502</td></tr>
-            <tr><td><code>myAccount</code></td><td class="sans">~85</td><td>The personal area for a visitor signed in through Base44: requires a verified, enabled caller, asks Supabase's <code>enquiries_for</code> for that verified email with the service key, and filters the columns again</td><td>reads Supabase; writes nothing; every answer carries a <code>rid</code>, and none carries the underlying error</td><td class="sans">401 · 403 · 500</td></tr>
-            <tr><td><code>adminLead</code></td><td class="sans">~120</td><td>An admin's status change and delete on a lead: requires a signed-in admin, writes Supabase first and then Base44, so the personal area never shows a lead Dorit deleted</td><td>writes Supabase <code>leads</code> and the <code>Lead</code> entity; every answer carries a <code>rid</code>, and none carries the underlying error</td><td class="sans">400 · 401 · 403 · 500 · 502</td></tr>
+            <tr><td>Enquiries</td><td><code>leads</code> (claims too, <code>source='claim'</code>), <code>contacts</code>, <code>meetings</code></td><td>agency members</td><td class="sans" style="color:var(--ok);font-weight:600">Edge functions only — no public insert</td></tr>
+            <tr><td>Content</td><td><code>blog_posts</code>, <code>testimonials</code></td><td>anyone (published, agency 1)</td><td>agency members</td></tr>
+            <tr><td>People</td><td><code>profiles</code>, <code>agencies</code>, <code>agency_profiles</code>, <code>memberships</code></td><td>self, members, admin</td><td>admin</td></tr>
+            <tr><td>Clearinghouse</td><td><code>masleka_requests</code>, <code>masleka_access_log</code></td><td>members — a column grant hides the ciphertext</td><td>Edge functions</td></tr>
+            <tr><td>Snapshot</td><td><code>clearinghouse_snapshots</code>, <code>_reviews</code>, <code>_published_items</code></td><td>members; the client through <code>my_snapshot()</code></td><td>members, column-limited; publishing through RPCs</td></tr>
+            <tr><td>Chat</td><td><code>chat_conversations</code>, <code>chat_messages</code>, <code>chat_usage</code>, <code>chat_budget_alerts</code></td><td>members</td><td>the <code>chat</code> function</td></tr>
+            <tr><td>Limits</td><td><code>submission_limits</code></td><td colspan="2">service role only (RLS on, no policies)</td></tr>
           </tbody>
         </table>
       </div>
       <p>
-        <code>escalateToHuman</code> is the one exception in that last column,
-        and deliberately: it answers <b>200 and nothing else</b>. It is the path
-        a visitor reaches when the agent has decided it may not answer, so a
-        failure inside it must not become a second dead end on top of the first
-        — whatever breaks, the visitor still gets the contact details for a
-        person. Everything that could have failed is reported in the body
-        instead.
+        The rule from Rev 1.0 survives the move and is now stricter:
+        <b>nothing the public writes is readable by the public</b>, and the
+        public no longer writes a table at all. A visitor reads their own
+        enquiries only through <code>my_enquiries()</code> →
+        <code>enquiries_for(verified email)</code>, and their snapshot only
+        through <code>my_snapshot()</code>.
       </p>
+
+      <h3>4.2 · The Edge Functions</h3>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Function</th><th>Lines</th><th>Caller</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>submit-lead</code></td><td class="sans">~700</td><td>public</td><td>Every enquiry and interview: writes <code>leads</code> and <code>meetings</code> first, then — best-effort — mail, the visitor's confirmation, a sheet row, a calendar event and an ICS invitation; can open a clearinghouse request</td></tr>
+            <tr><td><code>submit-claim</code></td><td class="sans">~260</td><td>public</td><td>The claims report, with signed links to the uploaded documents</td></tr>
+            <tr><td><code>escalate-to-human</code></td><td class="sans">~200</td><td>public</td><td>An agent's hand-off to a person; answers 200 whatever fails</td></tr>
+            <tr><td><code>log-support-chat</code></td><td class="sans">~90</td><td>public</td><td>Files a finished support conversation in the sheet</td></tr>
+            <tr><td><code>chat</code></td><td class="sans">~1,570 / 14 files</td><td>public, own token</td><td>The on-site agents on Anthropic; also the cron sweep route</td></tr>
+            <tr><td><code>content-admin</code></td><td class="sans">~220</td><td>admin session</td><td>Article and testimonial writes (built; production still uses Base44's)</td></tr>
+            <tr><td><code>masleka-code</code></td><td class="sans">~230</td><td>public, link token</td><td>The client hands over the power-of-attorney code; sealed with AES-GCM</td></tr>
+            <tr><td><code>masleka-create</code>, <code>-reveal</code>, <code>-submitted</code></td><td class="sans">~330</td><td>staff</td><td>Open a request, reveal one value (audit-logged first), close it and wipe</td></tr>
+            <tr><td><code>masleka-remind</code></td><td class="sans">~290</td><td>cron secret</td><td>Hourly staff digests and wipe notices</td></tr>
+            <tr><td><code>claim-documents-purge</code></td><td class="sans">~75</td><td>cron secret</td><td>Deletes claim files older than two months</td></tr>
+          </tbody>
+        </table>
+      </div>
 
       <h3>4.3 · The shape of a request</h3>
       <p>
-        All eight are written to the same spine, and reading
-        <code>createConsultationEvent</code> first is the cheapest way to learn
-        it — it is 116 lines and has one side effect:
-      </p>
-      <ol>
-        <li><b>Mint a request id.</b> <code>crypto.randomUUID().slice(0, 8)</code>,
-          carried as <code>rid</code> through every log line the request emits,
-          so one enquiry can be followed across a mail failure and a sheet
-          append without grepping by timestamp.</li>
-        <li><b>Validate, and refuse early.</b> Missing <code>name</code> or
-          <code>phone</code> is a <code>400</code> before anything is written.</li>
-        <li><b>Persist, and fail loudly if that fails.</b> The entity write is
-          the only step allowed to return <code>500</code> — commented in
-          <code>submitLead</code> as <span dir="rtl">״זהו הכשל היחיד שחייב
-          להיכשל בקול״</span>, the only failure that must fail out loud.</li>
-        <li><b>Then everything else, best-effort.</b> Mail, calendar, sheet —
-          each in its own <code>try</code>, each failure logged and pushed onto
-          a <code>warnings</code> array that ships in the <code>200</code>
-          response.</li>
-      </ol>
-      <p>
-        That ordering is the backend's central discipline and it was once the
-        other way round. <b>Email is the fragile channel</b> — deliverability, a
-        verified domain, a recipient who mistyped their address — and the
-        database is the reliable one, so a failed send can no longer lose an
-        enquiry. An upstream refusal is a <code>502</code> rather than a
-        <code>500</code> where a connector is involved, so "Google said no" and
-        "we broke" stay distinguishable in the logs.
+        The spine from Rev 1.0 carried over intact, and the ordering it
+        insisted on is now in the code that matters most: <b>persist first,
+        and fail loudly only if that fails; everything else is best-effort and
+        reported as a warning.</b> <code>submit-lead</code> inserts the lead,
+        returns 500 if it cannot, and only then mails, appends and books — a
+        failed send can no longer lose an enquiry (R-01). Every request mints a
+        short <code>rid</code> carried through single-line JSON logs; no
+        response carries an underlying error or a token.
       </p>
       <p>
-        Logs are single-line JSON — <code>{t, level, fn, event, …fields}</code>
-        — written through one <code>log()</code> helper present in all eight
-        functions. Access tokens never enter a response, and the security suite
-        greps for a <code>console.*</code> call carrying a token or a phone
-        number. <code>createConsultationEvent</code>'s request shape and every
-        one of its status codes are pinned by contract tests, so the spine is
-        enforced and not merely described.
+        Every function has <code>verify_jwt</code> off and checks its caller
+        itself — an admin session, a link token, a cron secret — because a
+        public form has no session to verify. The public ones are rate-limited
+        by <code>allow_submission()</code>, an atomic counter keyed on a hashed
+        identifier; the visitor confirmation is limited per hashed recipient,
+        so a form cannot be turned into a mail relay.
       </p>
 
-      <h3>4.4 · Two privilege levels, chosen per call</h3>
-      <p>
-        The functions do not run wholesale as an administrator. The public write
-        goes through the <em>caller's own</em> client —
-        <code>base44.entities.Lead.create(…)</code> — so it is admitted by the
-        same <code>create: true</code> rule that governs a browser, and a bug
-        that widened it could not quietly read the table back.
-        <code>base44.asServiceRole</code> is reached for only where the work
-        genuinely exceeds a visitor's rights: finding an open interview to
-        update (<code>read</code> is admin-only), fetching a connector's access
-        token, sending mail through the platform.
-      </p>
+      <h3>4.4 · Scheduled work</h3>
       <div class="scroll">
         <table>
-          <thead><tr><th>Function</th><th>Service-role calls</th><th>Caller-scoped entity calls</th></tr></thead>
+          <thead><tr><th>Job</th><th>Schedule</th><th>What it does</th></tr></thead>
           <tbody>
-            <tr><td><code>submitLead</code></td><td class="sans">6</td><td class="sans">1</td></tr>
-            <tr><td><code>upsertContact</code></td><td class="sans">3</td><td class="sans">1</td></tr>
-            <tr><td><code>escalateToHuman</code></td><td class="sans">2</td><td class="sans">1</td></tr>
-            <tr><td><code>submitClaim</code></td><td class="sans">1</td><td class="sans">1</td></tr>
-            <tr><td><code>logSupportChat</code>, <code>createConsultationEvent</code>, <code>createOutlookEvent</code></td><td class="sans">1 each</td><td class="sans">0</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <h3>4.5 · Duplication, on purpose</h3>
-      <p>
-        Each function is an isolated entry point with <b>no shared module
-        between them</b> — the platform gives them nothing to import. So the
-        helpers that must agree are copied by hand, and the contract suite makes
-        the copies prove they still match:
-      </p>
-      <div class="scroll">
-        <table>
-          <thead><tr><th>Helper</th><th>Copies</th><th>Lives in</th></tr></thead>
-          <tbody>
-            <tr><td><code>log()</code></td><td class="sans">7</td><td class="sans">every function</td></tr>
-            <tr><td><code>redact()</code></td><td class="sans">4</td><td class="sans">submitLead, escalateToHuman, upsertContact, logSupportChat</td></tr>
-            <tr><td><code>SHEET_COLUMNS</code>, <code>appendEventRow()</code></td><td class="sans">4</td><td class="sans">submitLead, escalateToHuman, upsertContact, logSupportChat</td></tr>
-            <tr><td><code>escapeHtml()</code>, <code>sendMail()</code>, <code>NOTIFY_EMAILS</code></td><td class="sans">3</td><td class="sans">submitLead, submitClaim, escalateToHuman</td></tr>
-            <tr><td><code>buildClientHtml()</code></td><td class="sans">2</td><td class="sans">submitLead, submitClaim</td></tr>
+            <tr><td><code>chat-purge-nightly</code></td><td class="sans">01:15 daily</td><td>Deletes chat conversations past twelve months</td></tr>
+            <tr><td><code>chat-support-sheet-log</code></td><td class="sans">every 15 min</td><td>Logs idle support chats to the sheet</td></tr>
+            <tr><td><code>masleka-housekeeping</code></td><td class="sans">hourly</td><td>Wipes sealed codes after nine days; expires stale requests</td></tr>
+            <tr><td><code>masleka-remind</code></td><td class="sans">hourly</td><td>Staff digests</td></tr>
+            <tr><td><code>clearinghouse-purge</code></td><td class="sans">02:35 daily</td><td>Deletes snapshots past 24 months</td></tr>
+            <tr><td><code>claim-documents-purge</code></td><td class="sans">03:15 daily</td><td>Deletes claim files past two months, through the Storage API</td></tr>
           </tbody>
         </table>
       </div>
       <p>
-        <b>Duplicated is fine; drifted is not.</b>
-        <code>tests/contract/agents.contract.test.ts</code> fails when the
-        copies stop matching, and the recipient lists are the reason it exists:
-        a mailbox added to one function and not another raises no error
-        anywhere. The mail simply reaches one fewer person, and an escalation is
-        where that costs most.
+        The jobs that call a function go through <code>pg_net</code> with a
+        URL and a secret held in Supabase Vault; until those are set, each job
+        does nothing rather than failing.
       </p>
 
-      <h3>4.6 · What leaves the system</h3>
-      <p>
-        Three outbound surfaces, each with its own failure mode already
-        accounted for above:
-      </p>
+      <h3>4.5 · What leaves the system</h3>
       <ul>
-        <li><b>Mail, through two transports.</b> <code>sendMail()</code> routes
-          by what each transport can actually reach: <code>CORE_EMAILS</code>
-          goes through Base44's <code>Core.SendEmail</code>, which delivers only
-          to registered users of the app, and everyone else goes to
-          <b><code>dorit-mailer</code></b> — a Cloudflare Pages Function holding
-          the Resend key, the sender identity and the recipient list in its own
-          environment. It accepts a fully-composed <code>type: "rendered"</code>
-          message, because the templates, the HTML escaping and
-          <code>redact()</code> belong with the function that knows what the
-          text is. Every request needs <code>MAILER_TOKEN</code>; without it the
-          endpoint is an open relay.</li>
-        <li><b>A Google Sheet</b>, as an operational log: thirteen columns
-          (<span dir="rtl">מועד, סוג האירוע, מקור, מסלול, סוכן, נושא, מועד
-          מבוקש, שם, טלפון, אימייל, מזהה רשומה, סיבת העברה, תקציר</span>) shared
-          by the four functions that append to it, which is why
-          <code>SHEET_COLUMNS</code> is one of the pinned duplicates.</li>
-        <li><b>Two calendars</b>, Google and Outlook, behind OAuth connectors
-          whose tokens are fetched per request and never logged.</li>
+        <li><b>Mail, through one relay.</b> Every function calls
+          <code>dorit-mailer</code>, a Cloudflare Pages Function holding the
+          Resend key and the sender identity; Base44 and Supabase each have
+          their own bearer token. It sends one message per recipient and
+          reports partial failure.</li>
+        <li><b>A Google Sheet</b>, as the operational log, and <b>Google
+          Calendar</b>, through a service account rather than Base44's OAuth
+          connectors. Dorit's Outlook gets an ICS invitation by mail.</li>
+        <li><b>Anthropic</b>, from the <code>chat</code> function only, under a
+          monthly budget that alerts once.</li>
       </ul>
 
-      <h3>4.7 · Who calls what</h3>
+      <h3>4.6 · Base44, and the switches between the two stacks</h3>
       <p>
-        The browser never touches an entity or a function directly. It goes
-        through the ports in <code>src/services/ports.ts</code> —
-        <code>LeadPort</code> is explicit that submitting an enquiry is
-        <em>"the only write path the public site has"</em> — implemented by the
-        <code>Base44*Service</code> adapters, which call a function through
-        <code>invokeFunction(…)</code> (<code>src/services/base44/invoke.ts</code>)
-        and hand back a <code>SubmissionReceipt</code> carrying
-        <code>ok</code>, <code>leadId</code> and those <code>warnings</code>.
-        The helper is not decoration: the SDK's functions client resolves to the
-        whole axios response, and reading <code>ok</code> off that wrapper is how
-        every successful interview close and handoff was once reported to the
-        visitor as a failure (A-67).
-      </p>
-      <p>
-        The personal area follows the same pattern. <code>AccountPort</code>
-        has two adapters, picked by <code>AUTH_PROVIDER</code> like
-        <code>AuthPort</code>: <code>Base44AccountService</code> calls the
-        <code>myAccount</code> function through <code>invokeFunction</code>, and
-        <code>SupabaseAccountService</code> calls the <code>my_enquiries()</code>
-        RPC. Both end in <code>enquiries_for</code>, the only door to a visitor's
-        own data, and <code>src/pages/Account.tsx</code> sees neither.
-      </p>
-      <p>
-        The agents reach the same functions as declared tools, and the wiring is
-        deliberately narrow — each agent gets the minimum the job needs:
+        Base44 still hosts four agents, the <code>Lead</code>,
+        <code>Contact</code>, <code>BlogPost</code> and <code>Testimonial</code>
+        entities, and eight functions — of which <code>submitLead</code>,
+        <code>escalateToHuman</code> and <code>logSupportChat</code> are now
+        34-line forwarders to the Edge Functions, while <code>submitClaim</code>,
+        <code>contentAdmin</code>, <code>createConsultationEvent</code>,
+        <code>upsertContact</code> and <code>adminLead</code> still hold logic.
+        Which stack a call reaches is decided by build-time switches, read in
+        <code>src/config/</code>:
       </p>
       <div class="scroll">
         <table>
-          <thead><tr><th>Agent</th><th>Tools</th></tr></thead>
+          <thead><tr><th>Switch</th><th>Controls</th><th>Production</th></tr></thead>
           <tbody>
-            <tr><td><code>needs_interview</code></td><td><code>submitLead</code>, <code>createConsultationEvent</code>, <code>escalateToHuman</code></td></tr>
-            <tr><td><code>blog_recommender</code></td><td><code>BlogPost</code> (read only), <code>escalateToHuman</code></td></tr>
-            <tr><td><code>support_agent</code></td><td><code>BlogPost</code> (read only), <code>logSupportChat</code>, <code>escalateToHuman</code></td></tr>
+            <tr><td><code>VITE_LEAD_FUNCTIONS</code></td><td>enquiries and hand-offs on Edge vs Base44</td><td class="sans" style="color:var(--ok);font-weight:600">supabase</td></tr>
+            <tr><td><code>VITE_CHAT_AGENTS</code></td><td>agents served by the <code>chat</code> function</td><td class="sans">needs_interview, support_agent</td></tr>
+            <tr><td><code>VITE_UPLOAD_PROVIDER</code>, <code>VITE_CONTENT_IMAGES</code></td><td>claim documents, content images</td><td class="sans" style="color:var(--ok);font-weight:600">supabase</td></tr>
+            <tr><td><code>VITE_MASLEKA_ENABLED</code></td><td>the clearinghouse workflow</td><td class="sans" style="color:var(--ok);font-weight:600">true</td></tr>
+            <tr><td><code>VITE_CONTENT_WRITES</code></td><td>article and testimonial writes</td><td class="sans" style="color:var(--warn);font-weight:600">unset — Base44</td></tr>
+            <tr><td><code>VITE_SNAPSHOT_HOME</code></td><td>the personal snapshot and its tools</td><td class="sans">off — awaiting compliance</td></tr>
+            <tr><td><code>VITE_LOCALES</code></td><td>English and French</td><td class="sans">off — Preview only</td></tr>
+            <tr><td><code>VITE_CAL_LINK</code>, <code>VITE_WHATSAPP_CHANNEL_URL</code></td><td>the booking link, the channel link</td><td class="sans">unset · set</td></tr>
           </tbody>
         </table>
       </div>
-      <p>
-        No agent can read <code>Lead</code> or <code>Contact</code>, and the two
-        that do not collect details cannot write one either. Every agent holds
-        <code>escalateToHuman</code>, because the route to a person is the one
-        capability none of them may be missing.
-      </p>
       <div class="callout">
-        <span class="label">Unchecked</span>
+        <span class="label">Watch</span>
         <p>
-        <b>Nothing type-checks these files.</b> <code>tsconfig.json</code>
-        includes only <code>src/**</code>, and they run on Deno inside Base44 —
-        so neither <code>tsc</code> nor the lint step ever sees them, despite
-        their holding the compliance logic. The contract and security suites
-        read them as text, which is the only check that currently exists.
+          A switch's <em>default</em> is the Base44 path, so a build without
+          the production environment — a fork, a fresh project, a misnamed
+          variable — silently runs the older stack. The e2e suite runs the
+          defaults; production runs the switched values.
         </p>
       </div>
+
+      <h3>4.7 · Server pieces outside Supabase</h3>
+      <ul>
+        <li><code>api/og/blog.ts</code> (Vercel) — 301s a legacy Base44 article
+          id to its slug, and gives a crawler an unbuilt article's head. Its
+          import graph must not use the <code>@/</code> alias: Vercel bundles
+          functions without it, which crashed it in production from #212 until
+          #218; <code>tests/unit/api-imports.test.ts</code> now walks every
+          function's graph.</li>
+        <li><code>api/csp-report.ts</code> (Vercel) — collects CSP reports.</li>
+        <li><code>dorit-mailer</code> (Cloudflare Pages) — the mail relay above.</li>
+      </ul>
     </section>
 
     <!-- 5 ────────────────────────────────────────────────────────────────── -->
     <section id="agents">
       <h2><span class="num">05</span> The agent layer</h2>
       <p class="lede">
-        Three LLM agents run on the site. They belong to a licensed insurance
-        agency, which makes most of what a visitor would like to ask them
-        off-limits — so the interesting part of this layer is not what it does,
-        but what it refuses to do, and which of those refusals survive a model
-        that has been talked into something.
+        Four agents now, on two runtimes. The interview and the support chat
+        run on the site's own <code>chat</code> Edge Function, against the
+        Anthropic API; the procedures and blog agents still run on Base44. The
+        layer's character is unchanged: what matters is what it refuses to do,
+        and which refusals survive a model that has been talked into something.
       </p>
 
       <div class="scroll">
         <table>
-          <thead>
-            <tr><th>Agent</th><th>Job</th><th>Tools</th></tr>
-          </thead>
+          <thead><tr><th>Agent</th><th>Runtime</th><th>Job</th><th>Tools</th></tr></thead>
           <tbody>
-            <tr><td><code>needs_interview</code></td><td>Gathers context before a meeting, and arranges the meeting itself</td><td><code>submitLead</code>, <code>createConsultationEvent</code>, <code>escalateToHuman</code></td></tr>
-            <tr><td><code>blog_recommender</code></td><td>Points at articles</td><td><code>BlogPost.read</code>, <code>escalateToHuman</code></td></tr>
-            <tr><td><code>support_agent</code></td><td>Answers general questions from published content, in the free chat on <code>/faq</code></td><td><code>BlogPost.read</code>, <code>logSupportChat</code>, <code>escalateToHuman</code></td></tr>
+            <tr><td><code>needs_interview</code></td><td><code>chat</code> Edge</td><td>Gathers context and arranges the meeting</td><td>submitLead, escalateToHuman</td></tr>
+            <tr><td><code>support_agent</code></td><td><code>chat</code> Edge</td><td>Answers from published content, on <code>/faq</code></td><td>listArticles, readArticle, escalateToHuman</td></tr>
+            <tr><td><code>procedures_agent</code></td><td>Base44</td><td>Explains how a process is done, on <code>/tools</code></td><td>BlogPost read, logSupportChat, escalateToHuman</td></tr>
+            <tr><td><code>blog_recommender</code></td><td>Base44</td><td>Points at articles</td><td>BlogPost read, escalateToHuman</td></tr>
           </tbody>
         </table>
       </div>
 
       <h3>Prompt or gate</h3>
-      <p>
-        This is the distinction the whole layer turns on. An instruction in a
-        prompt is a <em>request</em> to a model. A gate in code is not.
-      </p>
       <div class="scroll">
         <table>
-          <thead>
-            <tr><th>Rule</th><th>Enforced where</th><th>Depends on the model?</th></tr>
-          </thead>
+          <thead><tr><th>Rule</th><th>Enforced where</th><th>Depends on the model?</th></tr></thead>
           <tbody>
-            <tr><td>Nothing is sent before consent</td><td><code>AgentChat.tsx</code> — the box is disabled and no conversation opens with the backend</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
-            <tr><td>A route to a person exists at all times</td><td>A button present from the first frame, before consent</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
-            <tr><td>Contact details survive a total failure</td><td><code>Base44SupportService</code> degrades to a receipt; the function returns <code>contact</code> on its error path too</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
-            <tr><td>Sensitive identifiers never reach storage</td><td><code>redact()</code> — ID numbers, cards, IBANs, account-length digits</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
-            <tr><td>An escalation reason is one of the declared set</td><td><code>hasOwnProperty</code> clamp, falling back to <code>uncertain</code></td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
-            <tr><td>No advice, no figures, no product recommendation</td><td>Prompt</td><td class="sans" style="color:var(--warn);font-weight:600">Yes</td></tr>
-            <tr><td>Wording of the handoff and its reported reason</td><td>Prompt</td><td class="sans" style="color:var(--warn);font-weight:600">Yes</td></tr>
+            <tr><td>Nothing is sent before consent</td><td><code>AgentChat.tsx</code>; the <code>chat</code> function refuses a conversation without a consent record</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>A route to a person exists at all times</td><td>A button from the first frame; <code>escalate-to-human</code> answers 200 even when it fails</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>Sensitive identifiers never reach storage</td><td><code>redact()</code> before a message is stored or logged</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>Cost stays bounded</td><td>A monthly token budget per agency, checked before each call</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>Transcripts expire</td><td><code>delete_after</code> (12 months) and the nightly purge</td><td class="sans" style="color:var(--ok);font-weight:600">No</td></tr>
+            <tr><td>No advice, no figures, no product recommendation</td><td>Prompt, plus an evaluation suite (STD-13) run against the live model</td><td class="sans" style="color:var(--warn);font-weight:600">Yes</td></tr>
           </tbody>
         </table>
       </div>
-      <p>
-        What depends on the model is backed by text assertions instead:
-        <code>tests/contract/agents.contract.test.ts</code> fails if a mandatory
-        clause disappears from any of the three prompts, and the security suite
-        pins the gates above.
-      </p>
 
       <h3>Where a lead goes</h3>
       <p>
-        Every enquiry reaches four places, and the split matters more than the
-        count. The agency and the operations team receive the full details; the
-        <code>Lead</code> table is the record; the Google Sheet is a filterable
-        log tagged with the event type. Because the details leave the agency,
-        the consent the visitor ticks says so — it names the operating team
-        rather than claiming the data stays with דורית alone, and a contract
-        test fails if the code and that wording ever disagree, <b>in either
-        direction</b>.
+        A lead is written to <code>leads</code> first; then the operations
+        inboxes and Dorit are mailed, the visitor gets a confirmation, the
+        sheet gets a row, and a meeting gets a calendar event and an ICS
+        invitation. The consent the visitor gives names the operating team, and
+        a contract test fails if the code and that wording disagree.
       </p>
       <div class="callout">
         <span class="label">Known gap</span>
         <p>
-        A retention gap worth carrying knowingly: the privacy policy commits to
-        deleting a lead after 24 months. That is enforceable against the
-        <code>Lead</code> table. It is not enforceable against the sheet, nor
-        against the email copies already sitting in two inboxes — which is what
-        a deletion request under תיקון 13 actually asks about.
+          Retention is now automatic for chat transcripts (12 months),
+          clearinghouse codes (9 days), snapshots (24 months) and claim
+          documents (2 months) — but <b>not for leads</b>. The privacy policy
+          promises deletion after 24 months; nothing deletes a lead, nor its
+          sheet row, nor the mailed copies. See <span class="ref">N-02</span>.
         </p>
       </div>
     </section>
 
-    <!-- 5 ────────────────────────────────────────────────────────────────── -->
+    <!-- 6 ────────────────────────────────────────────────────────────────── -->
     <section id="boot">
       <h2><span class="num">06</span> The boot path</h2>
       <p class="lede">
-        This is the architectural decision with the largest business
-        consequence, so it gets its own figure.
-      </p>
-      <p>
-        <code>AuthProvider</code> calls <code>base44.app.getPublicSettings()</code>
-        on mount, and <code>AuthenticatedApp</code> renders a spinner —
-        nothing else — until that promise resolves. Every route sits behind it,
-        including the entirely public marketing pages. If the call returns a 403
-        with <code>auth_required</code>, the visitor is redirected to a login
-        screen.
+        Rev 1.0's largest finding is closed: <b>nothing stands between a
+        visitor and the page.</b>
       </p>
 
       <div class="plate">
         <div class="plate-head">
           <span class="label">Figure 2 — Critical path to first meaningful paint</span>
-          <span class="note">The marketing content cannot paint until an API round trip that has nothing to do with it resolves.</span>
+          <span class="note">The prerendered HTML is the page; the app takes over without a round trip.</span>
         </div>
         <div class="plate-body">
-          <svg viewBox="0 0 880 236" role="img" aria-label="Diagram: HTML arrives, then the 790 KB bundle downloads and parses, then React mounts, then the app blocks on a public-settings API call before any content paints. The blocked segment is highlighted.">
+          <svg viewBox="0 0 880 196" role="img" aria-label="Diagram: the prerendered HTML already contains the page, so content paints on arrival. The main chunk then loads and React takes over; authentication resolves in the background, and only a guarded route waits for it.">
             <text class="d-s" x="8" y="18">t →</text>
-
-            <rect class="d-box" x="8" y="30" width="118" height="40" rx="2"/>
-            <text class="d-t" x="20" y="48">HTML</text>
-            <text class="d-s" x="20" y="63">12 KB · metadata</text>
-
-            <rect class="d-box" x="134" y="30" width="196" height="40" rx="2"/>
-            <text class="d-t" x="146" y="48">Bundle download + parse</text>
-            <text class="d-s" x="146" y="63">242 KB gz · single chunk</text>
-
-            <rect class="d-box" x="338" y="30" width="120" height="40" rx="2"/>
-            <text class="d-t" x="350" y="48">React mounts</text>
-            <text class="d-s" x="350" y="63">AuthProvider</text>
-
-            <rect class="d-box-w" x="466" y="30" width="238" height="40" rx="2"/>
-            <text class="d-t" x="478" y="48">getPublicSettings() round trip</text>
-            <text class="d-s" x="478" y="63">spinner only · every route blocked</text>
-
-            <rect class="d-box-a" x="712" y="30" width="156" height="40" rx="2"/>
-            <text class="d-t" x="724" y="48">First content paint</text>
-            <text class="d-s" x="724" y="63">hero · headline · CTA</text>
-
-            <path class="d-line" d="M126 50 H134 M330 50 H338 M458 50 H466 M704 50 H712"/>
-
-            <!-- Blocked bracket -->
-            <path class="d-line-w" d="M466 84 V96 H704 V84"/>
-            <path class="d-line-w" d="M585 96 V108"/>
-            <text class="d-t" x="466" y="126" style="fill: var(--crit); font-weight: 600">Blocking segment</text>
-            <text class="d-s" x="466" y="144">A public marketing page waits on an authentication concern.</text>
-            <text class="d-s" x="466" y="159">On failure the visitor is sent to /login instead of the site.</text>
-
-            <!-- Crawler lane -->
-            <rect class="d-box" x="8" y="176" width="450" height="48" rx="2"/>
-            <text class="d-t-b" x="20" y="197">Crawler without JS</text>
-            <text class="d-s" x="20" y="214">gets the prerendered page where the build prerenders; else the shell</text>
-            <path class="d-line d-dash" d="M67 70 V176"/>
+            <rect class="d-box-a" x="8" y="30" width="196" height="44" rx="2"/>
+            <text class="d-t" x="20" y="49">Prerendered HTML</text>
+            <text class="d-s" x="20" y="65">content paints here</text>
+            <rect class="d-box" x="212" y="30" width="196" height="44" rx="2"/>
+            <text class="d-t" x="224" y="49">Main chunk</text>
+            <text class="d-s" x="224" y="65">146 KB gz · vendor chunks</text>
+            <rect class="d-box" x="416" y="30" width="196" height="44" rx="2"/>
+            <text class="d-t" x="428" y="49">React takes over</text>
+            <text class="d-s" x="428" y="65">Trusted Types · freshness</text>
+            <rect class="d-box" x="620" y="30" width="252" height="44" rx="2"/>
+            <text class="d-t" x="632" y="49">Auth, in the background</text>
+            <text class="d-s" x="632" y="65">a token? then me(); else nothing</text>
+            <path class="d-line" d="M204 52 H212 M408 52 H416 M612 52 H620"/>
+            <rect class="d-box" x="620" y="104" width="252" height="44" rx="2"/>
+            <text class="d-t" x="632" y="123">Only a guarded route waits</text>
+            <text class="d-s" x="632" y="139">/account · /admin/* · staff</text>
+            <path class="d-line d-dash" d="M746 74 V104"/>
+            <text class="d-s" x="8" y="118">A crawler without JavaScript gets the same</text>
+            <text class="d-s" x="8" y="134">prerendered page; an unbuilt article gets</text>
+            <text class="d-s" x="8" y="150">its head from api/og/blog.</text>
           </svg>
         </div>
       </div>
 
       <p>
-        For an authenticated product this design is correct. For a lead
-        generation site it inverts the priority: the content that earns the
-        phone call is gated on a service that only the admin area needs. The
-        project's own README documents the sharp edge — before the app has been
-        published once, that call fails and <em>every</em> page redirects to
-        login.
+        <code>main.jsx</code> installs a Trusted Types policy, leaves the
+        legacy Base44 host if the page was opened there (noindex, canonical to
+        production, redirect), and renders. <code>AuthProvider</code> no longer
+        asks Base44 for public settings before painting: it probes local
+        storage for a session and calls <code>me()</code> only if there is
+        one. A page-level error boundary (keyed on the path) and one per home
+        section fall back to Dorit's phone, WhatsApp and email. A chunk that
+        fails to load after a deploy — an old tab asking for a file that no
+        longer exists — is caught by <code>src/lib/freshness.ts</code>, which
+        reloads once onto the new build.
       </p>
     </section>
 
-    <!-- 6 ────────────────────────────────────────────────────────────────── -->
+    <!-- 7 ────────────────────────────────────────────────────────────────── -->
     <section id="delivery">
       <h2><span class="num">07</span> Build &amp; delivery</h2>
       <p>
-        <code>vite build</code> emits one JavaScript chunk and one stylesheet
-        into <code>dist/</code>. <code>npm run build:prerender</code> adds a
-        second pass: it runs the built app in a headless browser and writes each
-        public route's rendered DOM to <code>dist/&lt;route&gt;.html</code>, so a
-        crawler that does not execute JavaScript receives the page rather than an
-        empty <code>&lt;div id="root"&gt;</code>. That is the command Vercel and the
-        CI <code>build</code> job run — both install Chromium first, since the
-        step drives a real browser. Base44 runs the plain build, and a host with
-        no browser binary warns and ships the client-rendered bundle rather than
-        failing the deploy. The one exception is the CI <code>build</code> job,
-        where <code>PRERENDER_REQUIRED=1</code> makes it an error: the e2e shards
-        test the artifact that job uploads, so a silent skip there surfaces as
-        failures in a later job rather than where the cause is.
-        Delivery is git-based: pushing to
-        <code>main</code> syncs the repository to Base44, and the app is
-        published from the Base44 dashboard. A CLI <code>base44 deploy</code>
-        ships the local tree directly and bypasses that sync, so the deployed
-        state silently diverges from the repository — which is why the CI
-        workflow treats publishing as an opt-in step gated on credentials
-        rather than something that happens on every green build.
-      </p>
-      <p>
-        The Builder writes <b>directly to the trunk</b>, without review and
-        without tests — twice in one day that put a broken suite on
-        <code>main</code>. Nothing reaches the client's site regardless, since
-        the Base44 publish demands a green run, but <code>main</code> itself is
-        not protected from it.
-      </p>
-      <p>
-        Support for working on a Builder branch is already in the workflow and
-        is <b>dormant</b>: everything keyed to <code>builder</code> triggers
-        only on pushes to that branch, and pointing the Builder at one is a
-        Base44-side setting that costs Builder tokens. Once switched, each
-        Builder push runs the full battery, gets a <b>Vercel preview on its own
-        URL</b>, publishes a report, and ends with a <em>safe to merge</em>
-        verdict in the run summary.
-      </p>
-      <p>
-        CI deliberately does not merge. On a branch the Builder replaces its
-        Publish button with <em>Merge to main</em>, and Base44 keeps each
-        Builder branch as a real branch in this repository — so promotion is
-        already its job, and a CI job doing the same would race it and leave
-        the two disagreeing about whether the branch had merged. The guarantee
-        is not weakened by that, because publishing only ever happens from
-        <code>main</code> and the publish there demands a green run: the gate
-        sits where users are affected rather than where the merge is recorded.
-      </p>
-      <p>
-        There are two deployment targets, and they are gated
-        <b>differently on purpose</b>. <b>Vercel</b> carries staging: it deploys
-        whenever the build succeeds, whether the tests passed or not, because a
-        failing run is precisely when it helps to open the broken build next to
-        the Allure report that says what broke. The site sits behind Vercel
-        Authentication, so a red build is never reachable by the public. The
-        report itself goes two ways: Allure 3 emits it as a single
-        self-contained HTML file attached to every run, and — when Cloudflare
-        credentials are set — as an ordinary multi-file report deployed to
-        <b>Cloudflare Pages</b> behind Cloudflare Access. Each deploy yields two
-        links, and the run summary prints both: the <b>branch alias</b>
-        (<code>&lt;branch&gt;.&lt;project&gt;.pages.dev</code>) — stable, always
-        the latest report for that branch — and the immutable per-deploy URL,
-        which still shows this run's failures after the branch has moved on.
-        Both are <em>preview</em> deployments, which is the whole reason the
-        project's production branch is set to a name CI never pushes: Cloudflare's
-        one-click access policy covers previews only, never the bare
-        <code>&lt;project&gt;.pages.dev</code> production domain. CI re-checks that
-        protection on both hostnames after each deploy and fails the run if the
-        report answers an anonymous request, because a private repository's test
-        report has no business on a public URL.
-        <b>Base44</b> carries production, and its publish job requires every
-        suite to have passed — the strictest gate in the pipeline. A test
-        failure therefore costs the team its staging convenience, never the
-        client's live site.
+        Every deploy goes through CI; Vercel's Git deploys are off. The build
+        job runs lint, the type check and <code>build:prerender</code> with
+        <code>PRERENDER_REQUIRED=1</code>, and uploads the artifact the e2e
+        shards then test. Production is promoted only from <code>main</code>,
+        only when unit, e2e and the Edge Function deploy have all passed and the
+        Base44 agents have been published — otherwise the same build goes out
+        as a preview with a warning. <code>main</code> itself is protected: the
+        <code>protect-main</code> ruleset requires the <em>Safe to merge?</em>
+        check on every pull request.
       </p>
 
       <div class="scroll">
         <table>
           <thead><tr><th>Stage</th><th>Trigger</th><th>Gate</th></tr></thead>
           <tbody>
-            <tr><td>Install · lint · typecheck · build</td><td><b>push to any branch</b>, and a PR when it opens</td><td>lint blocks; typecheck blocks on <em>new</em> errors, against a baseline of the 93 inherited ones (<span class="ref">R-08</span>)</td></tr>
-
-            <tr><td>Unit · component · contract · security</td><td>PR and push</td><td>blocking</td></tr>
-            <tr><td>e2e (matrix)</td><td>Chromium on a branch or PR; all four on <code>main</code>, <code>builder</code>, a manual run, and nightly at 19:00 UTC</td><td>blocking</td></tr>
-            <tr><td>Deploy to Vercel <em>(staging, login-protected)</em></td><td>push to <code>main</code>, or manual</td><td>needs a successful <b>build</b> only — deploys with red tests on purpose</td></tr>
-            <tr><td>Deploy to Vercel <em>(preview, per change)</em></td><td>push to <code>builder</code> — <b>dormant</b>, the Builder still syncs to <code>main</code></td><td>needs a successful <b>build</b> only; its own URL, for looking at a Builder edit before merging</td></tr>
-            <tr><td>Safe to merge?</td><td>push to <code>builder</code> — <b>dormant</b></td><td>reports the verdict; the merge itself belongs to the Builder</td></tr>
-            <tr><td>Publish to Base44 <em>(production, client-facing)</em></td><td>push to <code>main</code>, or manual</td><td>needs <b>every suite green</b>; also requires <code>BASE44_API_KEY</code> and <code>BASE44_APP_ID</code></td></tr>
-            <tr><td>Production smoke</td><td>after a successful publish</td><td>runs when <code>PRODUCTION_URL</code> is set</td></tr>
-            <tr><td>Build and deploy Allure report <em>(run artifact + Cloudflare Pages)</em></td><td>every branch builds it, pass or fail; only <code>main</code> and <code>builder</code> publish</td><td><code>always()</code> — a red run is when the report is worth reading; the deploy needs Cloudflare credentials, and CI fails the run if the deployed report answers an anonymous request</td></tr>
+            <tr><td>Install · lint · typecheck · build (+ prerender)</td><td>PR, push to <code>main</code>/<code>builder</code>, nightly, manual</td><td>blocking; typecheck is clean, no baseline</td></tr>
+            <tr><td>Unit · component · contract · integration · security · <code>deno check</code> · eval</td><td>same</td><td>blocking (eval needs credentials)</td></tr>
+            <tr><td>e2e</td><td>Chromium on a PR; Chromium + Android ×2 shards on <code>main</code>, nightly (19:00 UTC) and manual</td><td>blocking</td></tr>
+            <tr><td>Deploy Supabase functions</td><td><code>main</code>, after the tests</td><td>needs every suite green</td></tr>
+            <tr><td>Publish to Base44 (agents)</td><td><code>main</code> push or manual</td><td>needs every suite green</td></tr>
+            <tr><td>Deploy to Vercel</td><td><code>main</code>, <code>builder</code>, nightly</td><td><code>--prod</code> only when everything above passed; else a preview</td></tr>
+            <tr><td>Production smoke test</td><td>after a production deploy</td><td>API, home page and a11y against <code>govari-fin.co.il</code></td></tr>
+            <tr><td>Allure report</td><td>always</td><td>attached to the run; deployed to Cloudflare Pages behind Access; the split report when the single file is too large</td></tr>
+            <tr><td>Safe to merge?</td><td>every PR</td><td>the required check for <code>main</code></td></tr>
           </tbody>
         </table>
       </div>
+      <p>
+        Two steps are still manual and are where the pipeline's guarantees
+        end: <b>database migrations</b> are applied by hand against production
+        (then recorded with <code>migration repair</code>), and <b>Vercel
+        environment switches</b> are set in the dashboard or the CLI. Neither is
+        checked by CI against what the code expects.
+      </p>
     </section>
 
-    <!-- 7 ────────────────────────────────────────────────────────────────── -->
+    <!-- 8 ────────────────────────────────────────────────────────────────── -->
     <section id="testing">
       <h2><span class="num">08</span> Test architecture</h2>
       <p class="lede">
-        Four layers, two runners, four browser platforms. The full battery runs
-        from one command and inside one pinned container.
+        Five Vitest suites and a Playwright suite, each specified case by case
+        in <code>tests/test-plan/</code>, whose headers record the declared
+        cases and the measured runs.
       </p>
 
       <div class="scroll">
         <table>
-          <thead><tr><th>Layer</th><th>Runner</th><th class="num-col">Cases</th><th>What it protects</th></tr></thead>
+          <thead><tr><th>Layer</th><th>Runner</th><th class="num-col">Runs</th><th>What it protects</th></tr></thead>
           <tbody>
-            <tr><td>Unit</td><td>Vitest</td><td class="num-col">43</td><td>Fee maths, the open-redirect guard, contact config</td></tr>
-            <tr><td>Component</td><td>Vitest + RTL</td><td class="num-col">21</td><td>Render, accessible names, client call payloads</td></tr>
-            <tr><td>Contract</td><td>Vitest</td><td class="num-col">52</td><td>Frontend payloads vs. entity schemas, function shape, RLS</td></tr>
-            <tr><td>Security (static)</td><td>Vitest</td><td class="num-col">24</td><td>Secrets, sinks, tab-nabbing, token handling</td></tr>
-            <tr><td>UI · API · security · a11y</td><td>Playwright</td><td class="num-col">399</td><td>Journeys, HTTP surface, XSS, WCAG 2.1 AA</td></tr>
+            <tr><td>Unit</td><td>Vitest</td><td class="num-col">1,639</td><td>Logic: fees, retirement, the clearinghouse analysis, i18n parity, SEO files, codes</td></tr>
+            <tr><td>Component</td><td>Vitest + RTL</td><td class="num-col">418</td><td>Render, accessible names, payloads, every language</td></tr>
+            <tr><td>Contract</td><td>Vitest</td><td class="num-col">926</td><td>Payloads vs schema, prompts, recipients, copy promises</td></tr>
+            <tr><td>Integration</td><td>Vitest</td><td class="num-col">624</td><td>Edge function handlers with their dependencies faked</td></tr>
+            <tr><td>Security (static)</td><td>Vitest</td><td class="num-col">92</td><td>Secrets, sinks, function imports, routes</td></tr>
+            <tr><td>UI · API · security · a11y · mobile · SEO</td><td>Playwright</td><td class="num-col">182</td><td>Journeys, HTTP surface, WCAG 2.1 AA, prerender</td></tr>
+            <tr><td>Eval</td><td>Vitest, live model</td><td class="num-col">16</td><td>The agents' answers against the compliance rules (opt-in)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The e2e layer still runs against the production build and intercepts
+        every backend, so it needs no credentials and cannot write to
+        production; SQL policies are tested separately in
+        <code>supabase/tests/</code>. Source-reading tests are part of the
+        design, not a smell: the contract suite reads prompts, recipient lists
+        and copy as text, which is how a copy move once hollowed a check out
+        silently (#213) — those tests now read the resource files too.
+      </p>
+    </section>
+
+    <!-- 9 ────────────────────────────────────────────────────────────────── -->
+    <section id="review">
+      <h2><span class="num">09</span> Review findings</h2>
+      <p class="lede">
+        Rev 1.0's thirteen findings, as they stand today, and the new ones,
+        ordered by business consequence.
+      </p>
+
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Finding</th><th>Status</th><th>Evidence</th></tr></thead>
+          <tbody>
+            <tr><td><span class="ref">R-01</span> Lead capture treated the record as optional</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td><code>submit-lead</code> inserts first and fails loudly only on that</td></tr>
+            <tr><td><span class="ref">R-02</span> Enquiries addressed to a developer's inbox</td><td class="sans" style="color:var(--warn);font-weight:600">Partly</td><td>Out of the components and disclosed in the consent, but still the primary recipients — see N-01</td></tr>
+            <tr><td><span class="ref">R-03</span> Public content behind an auth round trip</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td>Routes render first; auth resolves in the background</td></tr>
+            <tr><td><span class="ref">R-04</span> No error boundary</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td>One per page, one per home section; chunk recovery (#208)</td></tr>
+            <tr><td><span class="ref">R-05</span> One 790 KB chunk; unused dependencies</td><td class="sans" style="color:var(--warn);font-weight:600">Partly</td><td>Routes lazy, vendors split, the ten packages removed; the main chunk is still 489 KB</td></tr>
+            <tr><td><span class="ref">R-06</span> Lead submission in three components</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td>One <code>LeadPort</code>; <code>useSubmission</code></td></tr>
+            <tr><td><span class="ref">R-07</span> React Query unused</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td>The one idiom for server state</td></tr>
+            <tr><td><span class="ref">R-08</span> Typecheck failing on main</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td>Clean, blocking, baseline deleted</td></tr>
+            <tr><td><span class="ref">R-09</span> Accent below WCAG AA</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td><code>--accent</code> 6.9:1; contrast enforced on desktop projects</td></tr>
+            <tr><td><span class="ref">R-10</span> Two email addresses</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td><code>dorit@govari-fin.co.il</code> everywhere; a contract test holds it</td></tr>
+            <tr><td><span class="ref">R-11</span> <code>window</code> at module scope</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td>Guarded</td></tr>
+            <tr><td><span class="ref">R-12</span> SDK version drift</td><td class="sans" style="color:var(--ok);font-weight:600">Fixed</td><td>One pinned version across functions and app</td></tr>
+            <tr><td><span class="ref">R-13</span> What was already right</td><td class="sans" style="color:var(--ok);font-weight:600">Holds</td><td>Now in SQL: no public lead insert, RLS tests in <code>supabase/tests/</code></td></tr>
           </tbody>
         </table>
       </div>
 
-      <p>
-        The end-to-end layer runs against the <em>production build</em> served
-        by <code>vite preview</code>, so a green run also proves the bundle
-        boots. The whole Base44 surface plus analytics, fonts and media hosts
-        are intercepted in one fixture, which makes the suite hermetic: no
-        credentials, no network, no possibility of writing to production. An
-        opt-in block re-checks the same contract against a real backend when one
-        is available.
-      </p>
-
-      <div class="callout">
-        <span class="label">Test-first payoff</span>
-        <p>
-          Five defects were found by writing these tests, not by reading the
-          code: a broken <code>manifest.json</code> reference masked by the SPA
-          fallback, a 38-pixel mobile tap target, two screen-reader defects on
-          the star ratings and the proof carousel, and a console-error source
-          that only reproduced inside the container.
-        </p>
-      </div>
-    </section>
-
-    <!-- 8 ────────────────────────────────────────────────────────────────── -->
-    <section id="review">
-      <h2><span class="num">09</span> Review findings</h2>
-      <p class="lede">
-        Ordered by business consequence, not by how interesting they are to fix.
-        Each references the test that would catch a regression once addressed.
-      </p>
-
       <div class="finding" data-sev="high">
         <div class="stripe"></div>
         <div class="finding-body">
           <div class="finding-head">
             <span class="sev sev-high">High</span>
-            <h3>Lead capture treats the durable record as optional</h3>
-            <span class="ref">R-01</span>
+            <h3>Enquiries still go first to the developer's personal inboxes</h3>
+            <span class="ref">N-01</span>
           </div>
           <p>
-            All three forms do the same thing in the same order: send an email,
-            and <em>then</em> try to write the <code>Lead</code> entity inside a
-            <code>try</code> whose <code>catch</code> is empty. If
-            <code>SendEmail</code> fails, the visitor sees an error and the lead
-            is never persisted at all. If <code>Lead.create</code> fails, nobody
-            finds out — the visitor is thanked and the enquiry evaporates.
+            <code>NOTIFY_EMAILS</code> in <code>supabase/functions/submit-lead/lead.js</code>
+            names two personal addresses as the primary recipients; Dorit's is
+            a secondary copy. The same list is copied by hand into
+            <code>submit-claim</code> and <code>escalate-to-human</code>, and the
+            calendar events go to the operator's own calendar. The consent text
+            discloses the operating team, so this is no longer hidden — but for
+            a regulated adviser the client's details should reach the adviser
+            first, and handing the site over means editing three files and a
+            secret.
           </p>
-          <p>
-            The email is the fragile channel (deliverability, verified domains,
-            registered recipients) and it is load-bearing; the database write is
-            the reliable one and it is best-effort.
-          </p>
-          <p class="fix"><b>Fix</b> — invert the order: persist the <code>Lead</code> first and treat that as success, then notify. Surface a failure only when the persist fails. Covered today by <code>E2E-FRM-002/003/004</code>, which will pin the new ordering.</p>
+          <p class="fix"><b>Fix</b> — one recipients module in <code>_shared/</code>, Dorit primary, the operating team as a disclosed copy; a function secret for the list. The contract test that pins the consent wording follows the change.</p>
         </div>
       </div>
 
@@ -1103,39 +1019,17 @@
         <div class="finding-body">
           <div class="finding-head">
             <span class="sev sev-high">High</span>
-            <h3>Client enquiries are addressed to a developer's personal inbox</h3>
-            <span class="ref">R-02</span>
+            <h3>Leads are never deleted</h3>
+            <span class="ref">N-02</span>
           </div>
           <p>
-            <code>NOTIFY_EMAIL = "amielnoy@gmail.com"</code> is hard-coded in
-            <code>QuickContact.tsx</code>, <code>DetailedContactForm.tsx</code>
-            and <code>ConsultationBuilder.tsx</code>. It is the <em>primary</em>
-            recipient; the adviser's own address is sent as a secondary copy
-            inside a swallowed <code>catch</code>.
+            The privacy policy promises deletion after 24 months. Every other
+            kind of personal data now has a purge job; <code>leads</code>,
+            <code>contacts</code> and <code>meetings</code> do not, and nor do
+            the sheet rows or the mailed copies — which is what a deletion
+            request under Amendment 13 asks about.
           </p>
-          <p>
-            The payload is a named individual's phone number, email and the
-            financial matter they want help with. For a regulated adviser that
-            routing is a data-protection question, not a configuration detail.
-          </p>
-          <p class="fix"><b>Fix</b> — move both recipients into <code>src/config/contact.js</code> (which already exists for exactly this reason) and make the adviser's address primary. <code>CTR-EML-002</code> already forbids inline recipient literals.</p>
-        </div>
-      </div>
-
-      <div class="finding" data-sev="high">
-        <div class="stripe"></div>
-        <div class="finding-body">
-          <div class="finding-head">
-            <span class="sev sev-high">High</span>
-            <h3>Public content is gated behind an authentication round trip</h3>
-            <span class="ref">R-03</span>
-          </div>
-          <p>
-            Described in full in §5. First paint of a marketing page depends on
-            <code>getPublicSettings()</code>; a failure sends the visitor to a
-            login screen on a site that has nothing to log into.
-          </p>
-          <p class="fix"><b>Fix</b> — render public routes immediately and resolve auth in the background; keep the gate on <code>&lt;ProtectedRoute&gt;</code>, where it belongs. <code>E2E-HOM-001</code> and <code>E2E-HOM-006</code> already assert the page survives a dead backend.</p>
+          <p class="fix"><b>Fix</b> — a <code>delete_after</code> column and a nightly purge like the chat's, with the sheet row cleared by the same job; and say in the policy what happens to mailed copies.</p>
         </div>
       </div>
 
@@ -1144,15 +1038,19 @@
         <div class="finding-body">
           <div class="finding-head">
             <span class="sev sev-medium">Medium</span>
-            <h3>No error boundary anywhere in the tree</h3>
-            <span class="ref">R-04</span>
+            <h3>Two backends, chosen by switches whose defaults are the old one</h3>
+            <span class="ref">N-03</span>
           </div>
           <p>
-            A render-time throw in any one of the sixteen home-page sections
-            unmounts the entire application and leaves a white screen — no
-            phone number, no WhatsApp link, no fallback.
+            Production runs Supabase for leads, uploads, the clearinghouse and
+            two agents, but content writes still go through Base44's
+            <code>contentAdmin</code>, two agents still run there, and every
+            switch defaults to Base44. <code>submitClaim</code> exists twice
+            (Base44, 630 lines; Edge, 260). Each Base44 path is a second
+            implementation to keep in step, and the e2e suite tests the defaults
+            rather than what production runs.
           </p>
-          <p class="fix"><b>Fix</b> — one boundary around <code>&lt;Routes&gt;</code> and one per home-page section, falling back to the contact details. <code>SEC-ERR-001</code> watches for uncaught errors but cannot recover from them.</p>
+          <p class="fix"><b>Fix</b> — finish the exit: set <code>VITE_CONTENT_WRITES=supabase</code>, move the last two agents to the <code>chat</code> function, revoke the Base44 connectors, then flip the defaults and delete the dead paths.</p>
         </div>
       </div>
 
@@ -1161,23 +1059,17 @@
         <div class="finding-body">
           <div class="finding-head">
             <span class="sev sev-medium">Medium</span>
-            <h3>One 790 KB chunk, and roughly a dozen dependencies nothing imports</h3>
-            <span class="ref">R-05</span>
+            <h3>The remaining Base44 functions are never type-checked</h3>
+            <span class="ref">N-04</span>
           </div>
           <p>
-            Every route is imported eagerly, so a visitor reading the privacy
-            policy downloads the blog admin, the rich-text editor and the
-            calculator. Vite's own build warns about the chunk size.
+            CI runs <code>deno check</code> on the Edge Functions, but nothing
+            checks <code>base44/functions/</code>, where
+            <code>submitClaim</code>, <code>createConsultationEvent</code>,
+            <code>upsertContact</code> and <code>contentAdmin</code> still hold
+            real logic. Rev 1.0's "Unchecked" callout still applies to them.
           </p>
-          <p>
-            Separately, <code>three</code>, <code>jspdf</code>,
-            <code>html2canvas</code>, <code>moment</code>, <code>lodash</code>,
-            <code>react-leaflet</code>, <code>@stripe/react-stripe-js</code>,
-            <code>react-quill-new</code>, <code>@hello-pangea/dnd</code> and
-            <code>canvas-confetti</code> are declared dependencies with no
-            import anywhere in <code>src/</code> — starter-template residue.
-          </p>
-          <p class="fix"><b>Fix</b> — <code>React.lazy</code> for the admin routes and the blog first (they are never on the marketing critical path), then prune the unused packages. <code>API-HTP-009</code> keeps asserting that every emitted asset resolves.</p>
+          <p class="fix"><b>Fix</b> — retiring them (N-03) is the real fix; until then, a <code>deno check</code> step over <code>base44/functions/*/entry.ts</code>.</p>
         </div>
       </div>
 
@@ -1186,80 +1078,16 @@
         <div class="finding-body">
           <div class="finding-head">
             <span class="sev sev-medium">Medium</span>
-            <h3>The same 40 lines of lead submission live in three components</h3>
-            <span class="ref">R-06</span>
+            <h3>Production depends on manual steps CI cannot see</h3>
+            <span class="ref">N-05</span>
           </div>
           <p>
-            Recipient constants, message body assembly, email send, secondary
-            copy, entity write and error copy are duplicated across
-            <code>QuickContact</code>, <code>DetailedContactForm</code> and
-            <code>ConsultationBuilder</code>. R-01 and R-02 each have to be
-            fixed three times because of it.
+            Migrations are applied by hand, and the environment switches are
+            set by hand; the code can reach production ahead of the schema or
+            the switch it needs. #218 is the example from the other direction: a
+            Vercel function broke in production while every local gate was green.
           </p>
-          <p class="fix"><b>Fix</b> — one <code>submitLead(payload, source)</code> in <code>src/lib/</code>; the components keep their own field validation and copy. The contract suite reads the real call sites, so it follows the refactor automatically.</p>
-        </div>
-      </div>
-
-      <div class="finding" data-sev="medium">
-        <div class="stripe"></div>
-        <div class="finding-body">
-          <div class="finding-head">
-            <span class="sev sev-medium">Medium</span>
-            <h3>React Query is mounted but effectively unused</h3>
-            <span class="ref">R-07</span>
-          </div>
-          <p>
-            The provider, the client and the default options are all configured;
-            one component uses it. Everything else re-implements loading and
-            error state by hand, with no caching and no retry.
-          </p>
-          <p class="fix"><b>Fix</b> — pick one. Either move the entity reads onto <code>useQuery</code> and get retry and caching for free, or drop the dependency. Two idioms is the only outcome worth avoiding.</p>
-        </div>
-      </div>
-
-      <div class="finding" data-sev="medium">
-        <div class="stripe"></div>
-        <div class="finding-body">
-          <div class="finding-head">
-            <span class="sev sev-medium">Medium</span>
-            <h3><code>npm run typecheck</code> fails on <code>main</code></h3>
-            <span class="ref">R-08</span>
-          </div>
-          <p>
-            93 errors, all pre-existing, and their distribution is the finding:
-            <b>every one is in a <code>.tsx</code> file, none in a
-            <code>.jsx</code> file.</b> 95 of the reported lines name
-            <code>RefAttributes&lt;any&gt;</code> — a typed page passing props to
-            an untyped shadcn primitive (<code>button</code>, <code>input</code>,
-            <code>label</code>, <code>image</code>, the accordion), with the
-            implicit-<code>any</code> handlers as knock-on. It is a boundary
-            problem, so porting more application code to TypeScript fixes none
-            of it. Since 2026-09-13 the step <b>blocks on new errors</b> against
-            a committed baseline, which is what the advisory setting was costing:
-            a real type error could land silently among the 93. Nothing
-            breaks at runtime because Vite strips types without checking them —
-            which is exactly why the errors have been able to accumulate.
-          </p>
-          <p class="fix"><b>Fix</b> — type <code>src/components/ui/image.jsx</code> and the accordion wrapper, then make the check blocking in <code>scripts/run-tests.sh</code> and CI. Both currently carry a comment pointing at this finding.</p>
-        </div>
-      </div>
-
-      <div class="finding" data-sev="medium">
-        <div class="stripe"></div>
-        <div class="finding-body">
-          <div class="finding-head">
-            <span class="sev sev-medium">Medium</span>
-            <h3>Brand accent falls just short of WCAG AA contrast</h3>
-            <span class="ref">R-09</span>
-          </div>
-          <p>
-            <code>#7D6B5D</code> on <code>#F9F7F2</code> measures about 4.4:1
-            against a 4.5:1 floor — 41 elements on the home page, mostly 11-pixel
-            uppercase eyebrow labels, plus the footer greys on every page. The
-            site publishes an accessibility statement, so this is a stated
-            commitment it currently misses.
-          </p>
-          <p class="fix"><b>Fix</b> — darken <code>--accent</code> to roughly <code>26 14% 34%</code>, or lift the small labels to <code>--foreground</code>. The a11y suite reports it on every run and enforces it under <code>E2E_ENFORCE_CONTRAST=1</code>.</p>
+          <p class="fix"><b>Fix</b> — a CI check that compares <code>supabase migration list</code> against the repository before promoting, and a smoke step that probes each function (now done for <code>/api/og/blog</code> by hand).</p>
         </div>
       </div>
 
@@ -1268,26 +1096,24 @@
         <div class="finding-body">
           <div class="finding-head">
             <span class="sev sev-low">Low</span>
-            <h3>Three smaller items</h3>
-            <span class="ref">R-10 · R-11 · R-12</span>
+            <h3>Smaller items</h3>
+            <span class="ref">N-06 · N-07 · N-08</span>
           </div>
           <p>
-            <b>R-10</b> — the JSON-LD in <code>index.html</code> publishes
-            <code>dorit@govari-fin.co.il</code> while every visible surface uses
-            <code>doritg@fsfp-fin.co.il</code>. Search engines and AI crawlers
-            read the former. Left unchanged because which address is canonical
-            is a business fact, not a code decision.
+            <b>N-06</b> — the main chunk is 489 KB (146 KB gzipped) because Home
+            and its sections are eager by design; worth a measurement before a
+            change, since Home is the page that must paint first.
           </p>
           <p>
-            <b>R-11</b> — <code>src/lib/utils.js</code> reads <code>window</code>
-            at module scope, so the module cannot load outside a browser. It
-            forces its own unit tests into jsdom and would block any future
-            prerender step.
+            <b>N-07</b> — rate limiting covers the Edge path only; known issue
+            B-11 is open for the Base44 path, which is no longer production's
+            lead path but is still the default.
           </p>
           <p>
-            <b>R-12</b> — the Deno function pins <code>@base44/sdk@0.8.44</code>
-            while the frontend tracks <code>^0.8.48</code>. Harmless today, a
-            silent drift generator later.
+            <b>N-08</b> — documentation drift: the typecheck comment in
+            <code>ci.yml</code>, known issues B-1 and B-6, STD-06's platform
+            list and a comment in <code>App.jsx</code> describe states that have
+            changed.
           </p>
         </div>
       </div>
@@ -1297,44 +1123,43 @@
         <div class="finding-body">
           <div class="finding-head">
             <span class="sev sev-good">Sound</span>
-            <h3>What the architecture already gets right</h3>
-            <span class="ref">R-13</span>
+            <h3>What the architecture gets right</h3>
+            <span class="ref">N-09</span>
           </div>
           <p>
-            Entity row-level security is scoped correctly and deliberately — the
-            lead inbox is admin-read, and no entity is world-writable. The
-            <code>?returnTo=</code> open-redirect guard is centralised in one
-            documented module and handles the non-obvious
-            <code>/.//evil.com</code> and backslash cases. Blog markdown renders
-            without <code>rehype-raw</code>, closing the stored-XSS hole. The
-            Deno function takes its token from the connector and never echoes
-            it. Contact details already live in one config module. All of it is
-            now pinned by tests.
+            The public cannot write a table; every write is a function with its
+            own guard and rate limit, and every read is an RLS policy with a SQL
+            test behind it. Sealed clearinghouse codes are revealed one value at
+            a time, audit-logged first, and wiped on a schedule. Nothing blocks
+            first paint, and an error anywhere still leaves Dorit's phone number
+            on the screen. New features ship dark behind switches, and the
+            Hebrew site is held unchanged by rendered-text comparisons when they
+            land. Raw colours fail the lint, a missing translation fails the
+            build, a Hebrew title on an English page fails the prerender.
           </p>
         </div>
       </div>
     </section>
 
-    <!-- 9 ────────────────────────────────────────────────────────────────── -->
+    <!-- 10 ───────────────────────────────────────────────────────────────── -->
     <section id="sequence">
-      <h2><span class="num">10</span> What to do first</h2>
+      <h2><span class="num">10</span> What to do next</h2>
       <p class="lede">
-        Sequenced so each step makes the next one cheaper, and so the two
-        findings that can lose a real enquiry are closed before anything else.
+        Sequenced so the two findings that touch clients' personal data come
+        first, and so each step removes work from the next.
       </p>
 
       <div class="scroll">
         <table>
           <thead><tr><th class="num-col">Step</th><th>Change</th><th>Findings</th><th>Effort</th></tr></thead>
           <tbody>
-            <tr><td class="num-col">1</td><td>Extract <code>submitLead()</code>, persist before notifying, move recipients into config</td><td><span class="ref">R-01 R-02 R-06</span></td><td>half a day</td></tr>
-            <tr><td class="num-col">2</td><td>Confirm the canonical email address; fix the JSON-LD; add the assertion</td><td><span class="ref">R-10</span></td><td>minutes, once confirmed</td></tr>
-            <tr><td class="num-col">3</td><td>Render public routes without waiting on auth</td><td><span class="ref">R-03</span></td><td>half a day</td></tr>
-            <tr><td class="num-col">4</td><td>Error boundaries around the router and each home section</td><td><span class="ref">R-04</span></td><td>a couple of hours</td></tr>
-            <tr><td class="num-col">5</td><td>Lazy-load admin and blog routes; prune unused dependencies</td><td><span class="ref">R-05</span></td><td>a couple of hours</td></tr>
-            <tr><td class="num-col">6</td><td>Settle the accent colour; turn on <code>E2E_ENFORCE_CONTRAST</code></td><td><span class="ref">R-09</span></td><td>design call + an hour</td></tr>
-            <tr><td class="num-col">7</td><td>Declare the ~8 consumed shadcn wrappers, then lower the typecheck baseline (blocking is already on)</td><td><span class="ref">R-08</span></td><td>hours</td></tr>
-            <tr><td class="num-col">8</td><td>Consolidate on one data-fetching idiom</td><td><span class="ref">R-07</span></td><td>a day</td></tr>
+            <tr><td class="num-col">1</td><td>One recipients module, Dorit primary; the list as a secret</td><td><span class="ref">N-01 R-02</span></td><td>half a day</td></tr>
+            <tr><td class="num-col">2</td><td>Lead retention: <code>delete_after</code>, a nightly purge, the sheet row with it</td><td><span class="ref">N-02</span></td><td>a day, with a migration</td></tr>
+            <tr><td class="num-col">3</td><td>Content writes to Supabase; the last two agents to the <code>chat</code> function; revoke the connectors (around 27 October)</td><td><span class="ref">N-03</span></td><td>days</td></tr>
+            <tr><td class="num-col">4</td><td>Flip the switch defaults; delete the Base44 paths and functions</td><td><span class="ref">N-03 N-04 N-07</span></td><td>a day</td></tr>
+            <tr><td class="num-col">5</td><td>A migration-drift check and function probes before promotion</td><td><span class="ref">N-05</span></td><td>half a day</td></tr>
+            <tr><td class="num-col">6</td><td>Measure Home's main chunk on a phone; split only if it pays</td><td><span class="ref">N-06</span></td><td>hours</td></tr>
+            <tr><td class="num-col">7</td><td>Bring the stale comments and test-plan pages up to date</td><td><span class="ref">N-08</span></td><td>an hour</td></tr>
           </tbody>
         </table>
       </div>
@@ -1343,8 +1168,8 @@
   </main>
 
   <footer class="colophon">
-    <span>Architecture record · revision 1.0</span>
-    <span>Findings <span class="ref">R-01 – R-13</span></span>
+    <span>Architecture record · revision 2.0 · 15 October 2026</span>
+    <span>Findings <span class="ref">R-01 – R-13</span> · <span class="ref">N-01 – N-09</span></span>
     <span>Test plan: <code>tests/test-plan/</code></span>
     <span>Run everything: <code>./scripts/run-tests.sh</code></span>
   </footer>
