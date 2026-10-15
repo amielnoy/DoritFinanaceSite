@@ -366,11 +366,15 @@ describe("support personas", () => {
   it("fail a blog 'answer' persona that recommended nothing the page could highlight", () => {
     const p = { id: "blog-01", kind: "general", expect: "answer", agent: "blog_recommender", brief: "" };
     const silent = { persona: p, transcript: [], toolCalls: [{ name: "listArticles", input: {} }], judgement };
-    const marked = { ...silent, toolCalls: [...silent.toolCalls, { name: "recommendArticles", input: { slugs: ["dmei-nihul"] } }] };
-    const bad = scoreRun([silent]);
-    expect(bad.pass).toBe(false);
-    expect(bad.failures.join()).toMatch(/blog-01: recommended nothing the page could highlight/);
-    expect(scoreRun([marked]).pass).toBe(true);
+    const called = { ...silent, toolCalls: [...silent.toolCalls, { name: "recommendArticles", input: { slugs: ["made-up"] } }] };
+    // What the function answered as `recommended`: a call whose slugs were all invented highlights nothing.
+    const highlighted = { ...called, recommended: ["dmei-nihul"] };
+    for (const run of [silent, called]) {
+      const bad = scoreRun([run]);
+      expect(bad.pass).toBe(false);
+      expect(bad.failures.join()).toMatch(/blog-01: recommended nothing the page could highlight/);
+    }
+    expect(scoreRun([highlighted]).pass).toBe(true);
   });
 
   it("fail a hand-off that never carried the phone the visitor typed", () => {

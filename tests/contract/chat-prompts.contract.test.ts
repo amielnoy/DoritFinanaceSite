@@ -161,6 +161,8 @@ describe("blog.md against the prompt Base44 runs today", () => {
     expect(PROMPTS.blog).toMatch(/listArticles/);
     expect(PROMPTS.blog).toMatch(/escalateToHuman/);
     expect(PROMPTS.blog).not.toMatch(/```recommended|BlogPost/);
+    // Base44 left two lines the site cannot honour: an anchor no page has, and a link by id.
+    expect(PROMPTS.blog).not.toMatch(/#consultation|\/blog\/<id>/);
     expect(PROMPTS.blog).toMatch(/\(\/blog\/<slug>\)/);
   });
 

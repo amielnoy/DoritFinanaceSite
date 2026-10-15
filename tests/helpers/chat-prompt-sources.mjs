@@ -125,6 +125,16 @@ export const BLOG_TOOL_SECTION = [
   { startsWith: '["", "", ""]', replacement: null },
   { equals: '```', replacement: null },
   { startsWith: 'מערך JSON תקין בלבד של עד 3 ה-id', replacement: null },
+  // Two lines Base44 left that the site cannot honour: no page has a #consultation
+  // anchor (the booking is the home page's #start), and articles are linked by slug.
+  {
+    startsWith: '6. שאל אם המבקר רוצה המלצות בנושא אחר',
+    replacement: '6. שאל אם המבקר רוצה המלצות בנושא אחר, או לקבוע פגישה אישית עם דורית. אם כן — הפנה לקישור [לשיחה קצרה עם דורית](/#start).',
+  },
+  {
+    startsWith: '- החזר תמיד את הקישור המדויק למאמר בפורמט /blog/<id>.',
+    replacement: '- החזר תמיד את הקישור המדויק למאמר בפורמט /blog/<slug>, עם ה-slug שחזר מ-listArticles.',
+  },
 ];
 
 /** An agent's instructions as Base44 runs them today. */

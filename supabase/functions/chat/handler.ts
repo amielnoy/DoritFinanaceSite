@@ -29,6 +29,13 @@ const log = createLog(FN);
 export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview', support_agent: 'support', procedures_agent: 'procedures', blog_recommender: 'blog' };
 // The procedures chat answers from published articles and hands off, exactly as the FAQ chat does.
 const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS, support: SUPPORT_TOOLS, procedures: SUPPORT_TOOLS, blog: BLOG_TOOLS };
+/**
+ * Tool rows never reach the next turn's history, so the recommender lists,
+ * reads (often twice) and recommends before it answers, every turn it
+ * recommends: more rounds than the other roles' three (turn.ts). Still within
+ * TURN_BUDGET_MS, which ends any turn that runs long.
+ */
+const ROLE_TOOL_ROUNDS: Readonly<Partial<Record<ChatRole, number>>> = { blog: 5 };
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_TURNS = 40;
 export const IDLE_MS = 2 * 60 * 60 * 1000;
@@ -229,6 +236,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
             model: deps.model,
             system: systemBlocks(role, deps.now()),
             tools: ROLE_TOOLS[role],
+            maxToolRounds: ROLE_TOOL_ROUNDS[role],
             history,
             runTool: async (name, args) => {
               // A tool outside this conversation's role is never run, whatever the model names.

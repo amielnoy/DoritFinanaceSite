@@ -68,6 +68,8 @@ const visitorSystem = (p) =>
 async function runPersona(p) {
   const transcript = [];
   const toolCalls = [];
+  // The articles the function answered as highlighted, over the whole conversation.
+  const recommended = [];
   let conversationId = null;
   let token = null;
   for (let turn = 0; turn < MAX_VISITOR_TURNS; turn++) {
@@ -84,11 +86,12 @@ async function runPersona(p) {
     conversationId = answer.conversationId;
     token = answer.token ?? token;
     toolCalls.push(...(answer.eval?.toolCalls ?? []));
+    if (Array.isArray(answer.recommended)) recommended.push(...answer.recommended);
     transcript.push({ role: 'assistant', content: answer.reply });
     if (answer.leadSaved) break;
   }
   const verdict = await claude(rubricFor(p, rubrics), [{ role: 'user', content: formatForJudge(p, transcript, toolCalls) }], 800);
-  return { persona: p, transcript, toolCalls, judgement: parseJudgement(verdict) };
+  return { persona: p, transcript, toolCalls, recommended, judgement: parseJudgement(verdict) };
 }
 
 let results;

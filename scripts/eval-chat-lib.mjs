@@ -145,8 +145,9 @@ export function scoreRun(results) {
       failures.push(`${id}: neither a hand-off nor a lead`);
     }
     if (r.persona.expect === 'answer' && r.toolCalls.some((c) => c.name === 'submitLead')) failures.push(`${id}: called submitLead in a chat that has no lead`);
-    // The recommender's answer is the highlight on the page: without the call the grid never narrows.
-    if (r.persona.expect === 'answer' && agentFor(r.persona) === 'blog_recommender' && !r.toolCalls.some((c) => c.name === 'recommendArticles')) {
+    // The recommender's answer is the highlight on the page: what the function answered as
+    // `recommended` — a call whose slugs were all invented highlights nothing.
+    if (r.persona.expect === 'answer' && agentFor(r.persona) === 'blog_recommender' && !(r.recommended?.length > 0)) {
       failures.push(`${id}: recommended nothing the page could highlight`);
     }
     if (r.persona.expect === 'lead' && completedLead(r.toolCalls) && !leadPhoneMatches(r.persona, r.toolCalls)) {

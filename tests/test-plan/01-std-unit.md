@@ -889,6 +889,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-063 | "serves blog_recommender with the article tools, recommendArticles and the hand-off" (the blog role) | `role` `blog`; tools `listArticles`, `readArticle`, `recommendArticles`, `escalateToHuman` |
 | UNIT-CHHANDLER-064 | "answers with the recommended slugs of the turn, and none on a turn that failed" (the blog role) | 200 carries `recommended: ["dmei-nihul"]`; a 503 after the same call carries none |
 | UNIT-CHHANDLER-065 | "answers no recommended field when the turn recommended nothing" (the blog role) | No `recommended` key |
+| UNIT-CHHANDLER-066 | "gives a recommendation turn room to list, read twice and recommend before it answers" (the blog role) | Four tool rounds then a reply: 200 for `blog_recommender` (`ROLE_TOOL_ROUNDS.blog = 5`); 503 for the FAQ chat (three) |
 | UNIT-CHHANDLER-052 | "runs the sweep for the right token, and nothing of the chat" | `x-chat-sweep` with the right token: 200, `ok`, `logged: 2`, an `rid` passed to `sweepSheetLogs`; no model call, no conversation, no rate-limit check (Review Focus 5) |
 | UNIT-CHHANDLER-053 | "refuses %s with 401 and runs nothing" | A wrong token, an empty token and the evaluation token: 401 `unauthorized`; the sweep, the model and the store untouched (Review Focus 5) |
 | UNIT-CHHANDLER-054 | "refuses every sweep when the function has no token configured" | With `sweepToken` empty, an empty and an arbitrary header both give 401; the sweep never runs (Review Focus 5) |
@@ -1011,7 +1012,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-048 | "puts every agent's transcripts in front of the reviewer" (`pickForReview`) | The ten picked include `needs_interview`, `support_agent`, `procedures_agent` and `blog_recommender` — the first of each agent, then round-robin by kind (final review, Important 2) |
 | UNIT-EVALCHAT-049 | "fail a hand-off that never carried the phone the visitor typed" (scoreRun) | A `handoff` persona with `phone` fails unless some `escalateToHuman` call carries that number; one with no `phone` is judged on the hand-off alone (final review, Important 1) |
 | UNIT-EVALCHAT-050 | "gives the blog recommender four personas, none of them expecting a lead" (persona file) | `blog-01..04`; `answer` for 01, 02, 04; `handoff` for 03 |
-| UNIT-EVALCHAT-051 | "fail a blog 'answer' persona that recommended nothing the page could highlight" (scoreRun) | No `recommendArticles` call: `blog-01: recommended nothing the page could highlight`; with one, pass |
+| UNIT-EVALCHAT-051 | "fail a blog 'answer' persona that recommended nothing the page could highlight" (scoreRun) | No call, or a call the function answered with no `recommended` (every slug invented): `blog-01: recommended nothing the page could highlight`; a non-empty `recommended`: pass |
 | UNIT-EVALCHAT-008 | "fails below 90% complete leads" (scoreRun) | 8 of 10: `pass: false` |
 | UNIT-EVALCHAT-009 | "fails on a persona that errored" (scoreRun) | An errored persona fails the run |
 | UNIT-EVALCHAT-010 | "names the persona, the transcript and the tool calls" (formatForJudge) | Persona id, `מבקר:` / `עוזר:` lines and `submitLead` all present |
