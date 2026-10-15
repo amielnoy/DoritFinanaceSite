@@ -189,6 +189,30 @@ export async function authUser(token: string): Promise<{ id: string } | null> {
 }
 
 /**
+ * A Supabase Auth account for `email`, made by the service role with no
+ * password and the address marked confirmed — for invite-user, inviting
+ * someone who has never signed in. They sign in with Google under the same
+ * address, and Auth links that identity to this account, so a membership
+ * given before their first sign-in is already theirs at it. Null when Auth
+ * says the address is registered already.
+ */
+export async function createAuthUser(email: string): Promise<{ id: string } | null> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, email_confirm: true }),
+    signal: AbortSignal.timeout(10000),
+  });
+  const body = (await res.json().catch(() => null)) as { id?: unknown; error_code?: unknown } | null;
+  if (res.status === 422 && body?.error_code === 'email_exists') return null;
+  if (!res.ok) throw new Error(`auth_admin_http_${res.status}`);
+  const id = body?.id;
+  if (typeof id !== 'string' || !id) throw new Error('auth_admin_returned_no_user');
+  return { id };
+}
+
+/**
  * A Postgres function through PostgREST's `/rpc`, with the service key. Used
  * for `allow_submission`, which only the service role may execute. Throws on
  * a refusal with the status alone, like insertRow.

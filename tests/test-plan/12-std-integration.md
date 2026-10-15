@@ -805,6 +805,19 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-SRET-006 | "fails without clearing anything when the database cannot say who is live" | 500; no clear |
 | INT-SRET-007 | "logs counts, never a cell" | No name, phone, email or transcript in the answer |
 
+### 4.33 `invite-user` — "הוספת משתמש" — `INT-INV-001..009`
+
+`invite-user.integration.test.ts` fakes Supabase Auth (the session, the admin create), PostgREST (profiles, agencies, the membership upsert) and lets the mailer stub record the invitation.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-INV-001 | "refuses a caller with no session, and one who is not an admin" | 401 / 403; no account, no membership |
+| INT-INV-002..005 | "refuses %s, and changes nothing" | A bad address, an unknown role (`admin` included), a malformed or missing organization: 400 |
+| INT-INV-006 | "makes an account for an address never seen, adds the membership, and mails the invitation" | Lower-cased address; `email_confirm: true`; the membership; the mail with the organization, the role and the sign-in link; no `/auth/v1/invite` |
+| INT-INV-007 | "adds an existing account without making another, and changes the role of a member already there" | No create; `on_conflict=user_id,agency_id`; the role replaced |
+| INT-INV-008 | "keeps the membership and says so when the invitation mail does not go" | 200, `mailed: false`, `invite_email_failed` |
+| INT-INV-009 | "refuses an address Auth holds but no profile does, rather than guess at an account" | 409; no membership |
+
 ## 5. Pass criteria
 
 All 171 declared cases pass (vitest: 751 with expansions). These assert behaviour, not shape — a failure means the

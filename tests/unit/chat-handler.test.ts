@@ -736,6 +736,53 @@ describe("HTTP", () => {
   });
 });
 
+describe("the blog role", () => {
+  const firstBlog = (message = "על דמי ניהול") => ({ ...first(message), agent: "blog_recommender" });
+
+  it("serves blog_recommender with the article tools, recommendArticles and the hand-off", async () => {
+    const { chat, model, store } = setup({}, [text("הנה מאמר…")]);
+    expect((await json(await chat(post(firstBlog())))).status).toBe(200);
+    expect([...store.conversations.values()][0].role).toBe("blog");
+    expect(model.calls[0].tools.map((t) => t.name)).toEqual(["listArticles", "readArticle", "recommendArticles", "escalateToHuman"]);
+  });
+
+  it("answers with the recommended slugs of the turn, and none on a turn that failed", async () => {
+    const runTool = vi.fn(async () => ({ name: "recommendArticles", status: "ok" as const, isError: false, forModel: "{}", recommended: ["dmei-nihul"] }));
+    const ok = setup({ runTool }, [toolUse("recommendArticles", { slugs: ["dmei-nihul"] }), text("הנה…")]);
+    expect((await json(await ok.chat(post(firstBlog())))).body.recommended).toEqual(["dmei-nihul"]);
+    const failed = setup({ runTool }, [toolUse("recommendArticles", { slugs: ["dmei-nihul"] }), new Error("model down")]);
+    const res = await json(await failed.chat(post(firstBlog())));
+    expect(res.status).toBe(503);
+    expect(res.body.recommended).toBeUndefined();
+  });
+
+  /**
+   * Tool rows never reach the next turn's history, so a recommendation turn
+   * lists, reads (often more than once) and recommends before it answers —
+   * more than the three rounds the other roles get (final review, Important 1).
+   */
+  it("gives a recommendation turn room to list, read twice and recommend before it answers", async () => {
+    const runTool = vi.fn(async (name: string) => ({ name, status: "ok" as const, isError: false, forModel: "{}" }));
+    const script = () => [
+      toolUse("listArticles", {}),
+      toolUse("readArticle", { slug: "dmei-nihul" }),
+      toolUse("readArticle", { slug: "tikun-190" }),
+      toolUse("recommendArticles", { slugs: ["dmei-nihul"] }),
+      text("הנה…"),
+    ];
+    const blog = setup({ runTool }, script());
+    expect((await json(await blog.chat(post(firstBlog())))).status).toBe(200);
+    // The same turn for the FAQ chat still stops at three rounds.
+    const support = setup({ runTool }, script());
+    expect((await json(await support.chat(post({ ...first("x"), agent: "support_agent" })))).status).toBe(503);
+  });
+
+  it("answers no recommended field when the turn recommended nothing", async () => {
+    const { chat } = setup({}, [text("על איזה נושא?")]);
+    expect((await json(await chat(post(firstBlog())))).body).not.toHaveProperty("recommended");
+  });
+});
+
 describe("the procedures role", () => {
   const firstProcedures = (message = "איך מושכים כספים מקופת גמל?") => ({ ...first(message), agent: "procedures_agent" });
 

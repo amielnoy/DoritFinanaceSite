@@ -1,4 +1,5 @@
-import type { AdminUser, UsersAdminPort } from "../ports";
+import type { AdminOrganization, AdminUser, InviteInput, InviteResult, UsersAdminPort } from "../ports";
+import type { ContentFunctionsClient } from "./EdgeContentAdminService";
 import { fetchRows, type SupabaseTableClient } from "./SupabaseTableClient";
 
 /**
@@ -8,7 +9,44 @@ import { fetchRows, type SupabaseTableClient } from "./SupabaseTableClient";
  * (supabase/migrations) — joined here. Nothing is written.
  */
 export class SupabaseUsersAdminService implements UsersAdminPort {
-  constructor(private readonly client: SupabaseTableClient) {}
+  /**
+   * `functions` and `accessToken` serve the invitation alone (invite-user):
+   * reading needs only the table client, and a build without them still lists.
+   */
+  constructor(
+    private readonly client: SupabaseTableClient,
+    private readonly functions: ContentFunctionsClient | null = null,
+    private readonly accessToken: () => Promise<string | null> = async () => null,
+  ) {}
+
+  /** Every organization, by name — agencies_read_member_or_admin lets the admin read them all. */
+  async organizations(): Promise<AdminOrganization[]> {
+    const rows = await fetchRows(this.client.from("agencies").select("id,name"), "agencies");
+    return rows
+      .map((r) => ({ id: String(r.id), name: String(r.name ?? "") }))
+      .sort((a, b) => a.name.localeCompare(b.name, "he"));
+  }
+
+  /**
+   * The invite-user Edge Function, under the admin's own session: it finds or
+   * makes the account, adds the membership and mails the invitation. Its
+   * refusal is reported in its own words, as content-admin's are.
+   */
+  async invite(input: InviteInput): Promise<InviteResult> {
+    const token = await this.accessToken();
+    if (!token || !this.functions) throw new Error("נדרשת התחברות.");
+    const { data, error } = await this.functions.functions.invoke("invite-user", {
+      body: { ...input },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (error) {
+      const res = error.context instanceof Response ? error.context : null;
+      const answer = res ? ((await res.json().catch(() => null)) as { error?: string } | null) : null;
+      throw new Error(answer?.error ?? `ההזמנה נכשלה (${res?.status ?? "ללא תשובה"}).`);
+    }
+    const body = (data ?? {}) as { created?: unknown; mailed?: unknown };
+    return { created: body.created === true, mailed: body.mailed === true };
+  }
 
   async list(): Promise<AdminUser[]> {
     const [profiles, memberships, agencies] = await Promise.all([

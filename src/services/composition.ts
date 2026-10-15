@@ -121,7 +121,15 @@ const authPort: AuthPort = supabase
  * The accounts screen reads Supabase only: a build without it has no accounts
  * to list (Base44 never kept them), so the screen shows its empty state.
  */
-const usersAdminPort: UsersAdminPort = tables ? new SupabaseUsersAdminService(tables) : { list: async () => [] };
+const usersAdminPort: UsersAdminPort = tables
+  ? new SupabaseUsersAdminService(tables, supabase as unknown as ContentFunctionsClient | null, sessionToken)
+  : {
+      list: async () => [],
+      organizations: async () => [],
+      invite: async () => {
+        throw new Error("אין חיבור למאגר המשתמשים.");
+      },
+    };
 
 const accountPort: AccountPort = supabase
   ? new SupabaseAccountService(supabase as unknown as SupabaseRpcClient)

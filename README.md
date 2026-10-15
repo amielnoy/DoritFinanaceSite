@@ -472,6 +472,16 @@ within what the consent text discloses ("the team that operates the site for
 her"). Base44's `submitClaim` still keeps its own copy, which a contract test
 holds equal to the module's default.
 
+**Adding a user** ("הוספת משתמש" on `/admin/users`) goes through the
+`invite-user` Edge Function: the admin gate (`_shared/admin.ts`, shared with
+`content-admin`), then the account — the profile holding that address, or a new
+Supabase Auth account made with no password and the address confirmed — the
+membership (organization and role: owner, agent or staff; upserted), and the
+invitation through `dorit-mailer`. Sign-in is Google's: signing in with that
+address links the Google identity to the account already made. Supabase
+Auth's own invite mail is not used — its default sender delivers only to the
+project's team. Nothing to set up beyond the mailer secrets already there.
+
 ### Lead functions on Supabase
 
 `submitLead`, `escalateToHuman` and `logSupportChat` also exist as Supabase Edge
@@ -882,7 +892,9 @@ does exactly that, nightly at 03:45 (`leads-retention`):
   `masleka_functions_url` and `masleka_cron_secret`) and the sheet's service
   account; checked in a scratch Postgres by
   `supabase/tests/lead_sheet_retention_check.sql`.
-- **Not reached yet:** the copies already mailed (N-02, the next PR).
+- **The mailed copies** (#231): only Dorit receives the enquiry; the operating
+  team gets a notice without the visitor's details. The privacy policy (§7) says
+  mailed and diary copies are deleted at the end of the same period — by hand.
 - Apply the migration by hand like the others. The job is checked end to end
   in a scratch Postgres by `supabase/tests/lead_retention_check.sql` (its
   header has the commands); it refuses to run where a `leads` table exists.
@@ -894,8 +906,11 @@ named in `VITE_CHAT_AGENTS`, a comma-separated list that is **empty by default**
 so nothing calls it until it is set. It serves `needs_interview` (the
 interview), `support_agent` (the FAQ chat) and `procedures_agent` (the
 procedures chat on /tools, with the FAQ chat's tools and its own v6 notice, its
-conversations logged to the Support tab by the same sweep); the blog recommender
-follows in its own PR. For the interview it fixes A-59: the model calls `submitLead` and `escalateToHuman` itself, on the
+conversations logged to the Support tab by the same sweep) and `blog_recommender`
+(the reading recommender on /blog: it marks the articles it recommends with a
+`recommendArticles` tool, the function answers them as `recommended`, and the
+site's adapter hands the page the same ```` ```recommended ```` block Base44's agent
+writes, so /blog reads one protocol and matches a card by slug or id). For the interview it fixes A-59: the model calls `submitLead` and `escalateToHuman` itself, on the
 server, instead of the page parsing a fenced `lead` block. It also keeps a
 redacted transcript that Dorit reads on `/admin/leads` (the "שיחה" button on any
 lead with a linked conversation). Agents not named in `VITE_CHAT_AGENTS` stay on

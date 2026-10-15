@@ -47,6 +47,42 @@ describe("SupabaseAgentService", () => {
     expect(cb.mock.calls.at(-1)![0].at(-1)).toEqual({ role: "assistant", content: "נשמר", signal: "lead_saved" });
   });
 
+  /**
+   * The chat function answers the articles it highlighted as `recommended`; the
+   * page has one protocol for both backends, the ```recommended block
+   * (src/lib/blog-recommendation.ts), so the adapter writes the block.
+   */
+  it("hands the page the recommended articles as the block it reads, and the visitor none of it", async () => {
+    const { readRecommendation } = await import("@/lib/blog-recommendation");
+    const svc = new SupabaseAgentService(client(ok({ ok: true, conversationId: "s", token: "t".repeat(64), reply: "הנה…", recommended: ["dmei-nihul", "tikun-190"] })), () => "l");
+    const conv = await svc.start("blog_recommender", META);
+    const cb = vi.fn();
+    svc.subscribe(conv.id, cb);
+    await svc.send(conv, "על דמי ניהול");
+    const last = cb.mock.calls.at(-1)![0].at(-1) as AgentMessage;
+    expect(readRecommendation(last.content)).toEqual({ visible: "הנה…", ids: ["dmei-nihul", "tikun-190"], malformed: false });
+  });
+
+  it("leaves a reply without recommendations as it came, and never writes a second block", async () => {
+    const { readRecommendation } = await import("@/lib/blog-recommendation");
+    const plain = new SupabaseAgentService(client(ok({ ok: true, conversationId: "s", token: "t".repeat(64), reply: "על איזה נושא?" })), () => "l");
+    const a = await plain.start("blog_recommender", META);
+    const cbA = vi.fn();
+    plain.subscribe(a.id, cbA);
+    await plain.send(a, "שלום");
+    expect(cbA.mock.calls.at(-1)![0].at(-1).content).toBe("על איזה נושא?");
+
+    const already = "הנה…\n\n```recommended\n[\"pensia\"]\n```";
+    const both = new SupabaseAgentService(client(ok({ ok: true, conversationId: "s", token: "t".repeat(64), reply: already, recommended: ["dmei-nihul"] })), () => "l");
+    const b = await both.start("blog_recommender", META);
+    const cbB = vi.fn();
+    both.subscribe(b.id, cbB);
+    await both.send(b, "שלום");
+    const content = cbB.mock.calls.at(-1)![0].at(-1).content as string;
+    expect(content.match(/```recommended/g)).toHaveLength(1);
+    expect(readRecommendation(content).ids).toEqual(["pensia"]);
+  });
+
   it("refuses a long message before any request", async () => {
     const c = client(ok({}));
     const svc = new SupabaseAgentService(c, () => "l");

@@ -274,6 +274,7 @@ visitor would.
 | CMP-REC-008 | "scrolls the recommendation into view" | `scrollIntoView` called |
 | CMP-REC-009 | "clears a chosen keyword when a recommendation arrives" | Recommended card only; keyword no longer pressed |
 | CMP-REC-010 | "drops the recommendation filter once the visitor picks a keyword" | The keyword's cards, not the recommendation |
+| CMP-REC-011 | "finds a post the chat function named by its slug, as one Base44 named by its id" | A block naming `livui-tviot` shows `post-c` alone |
 
 ### 4.14 Reading-recommender chat — `tests/component/blog-recommendation-chat.test.tsx`
 
@@ -470,6 +471,13 @@ As §4.23, with `procedures_agent` served by the function.
 |---|---|---|
 | CMP-CHPROC-001 | "shows the procedures chat's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS` entry is on screen; not the interview's third point, not the Base44 notice's fourth |
 | CMP-CHPROC-002 | "sends the first message as procedures_agent with the v6 stamp, and shows the reply" | `invoke("chat", …)` with `agent: procedures_agent` and `CHAT_FUNCTION_CONSENT_VERSION`; the reply on screen |
+
+### 4.23b `<AgentChat />` — the blog recommender on the chat function — `tests/component/chat-function-blog.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CHBLOG-001 | "shows the blog recommender's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_BLOG_CONSENT_POINTS` entry; not the interview's third point |
+| CMP-CHBLOG-002 | "sends the first message as blog_recommender with the v6 stamp, and hides the block it is handed" | `agent: blog_recommender`, v6; the reply shown without the block; `onAssistantMessage` gets the block |
 
 ### 4.24 `<NeedsWizard />` — three taps, the contact step, then three optional questions — `tests/component/needs-wizard.test.tsx`
 
@@ -763,6 +771,17 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-ALAY-006 | "shows a client's personal area without the frame" | `/account` for a client: the page, no sidebar |
 | CMP-ALAY-007 | "shows the admin's personal area as her main page, in the frame" | `/account` for the admin: the sidebar, ראשי current |
 | CMP-ALAY-008 | "signs out and sends her home" | "יציאה" calls `logout(true, <origin>/)` |
+
+### 4.44 "הוספת משתמש" — `tests/component/invite-user.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-INV-001 | "invites with the address, organization and role, says so, and reloads the list" | `invite({ email, orgId, role })`; status "ההזמנה נשלחה ל-…"; the users list read again |
+| CMP-INV-002 | "says plainly when the membership was added but the mail did not go" | Status "נוסף לארגון, אבל המייל לא נשלח" |
+| CMP-INV-003 | "shows the function's refusal in its own words" | Alert with the function's message |
+| CMP-INV-004 | "asks for an address before sending anything" | Alert "יש להזין כתובת דוא״ל תקינה"; no call |
+
+`tests/component/admin-users.test.tsx` adds CMP-AUSR "switches from cards to the table at 680px, as the design asks" (`min-[680px]:table` / `min-[680px]:hidden`).
 
 ## 5. Pass criteria
 

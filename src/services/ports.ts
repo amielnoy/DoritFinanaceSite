@@ -311,6 +311,28 @@ export interface AdminUser {
 /** The admin's view of the accounts. Read-only; every row is personal data. */
 export interface UsersAdminPort {
   list(): Promise<AdminUser[]>;
+  /** Every organization, members or not — the invitation offers each. */
+  organizations(): Promise<AdminOrganization[]>;
+  /** Adds `email` to an organization in a role, making the account if needed, and mails the invitation (invite-user). */
+  invite(input: InviteInput): Promise<InviteResult>;
+}
+
+export interface AdminOrganization {
+  id: string;
+  name: string;
+}
+
+export interface InviteInput {
+  email: string;
+  orgId: string;
+  role: "owner" | "agent" | "staff";
+}
+
+export interface InviteResult {
+  /** A new account was made for the address; false when it had signed in, or been invited, before. */
+  created: boolean;
+  /** The invitation mail went. The membership stands either way. */
+  mailed: boolean;
 }
 
 export interface ArticleDraft {

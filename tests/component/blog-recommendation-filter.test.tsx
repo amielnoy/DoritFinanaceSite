@@ -55,7 +55,7 @@ vi.mock("@/components/dorit/chat/AgentChat", () => ({
 const POSTS = [
   { id: "post-a", title: "דמי ניהול בפנסיה", excerpt: "", tags: "פנסיה", created_date: "2026-01-01" },
   { id: "post-b", title: "ביטוח חיים ומשכנתא", excerpt: "", tags: "ביטוח", created_date: "2026-01-02" },
-  { id: "post-c", title: "ליווי תביעות", excerpt: "", tags: "תביעות", created_date: "2026-01-03" },
+  { id: "post-c", slug: "livui-tviot", title: "ליווי תביעות", excerpt: "", tags: "תביעות", created_date: "2026-01-03" },
 ];
 
 const keyword = (name: string) =>
@@ -121,6 +121,16 @@ describe("the blog page shows only the recommended posts", () => {
     expect(card("post-a")).not.toBeNull();
     expect(card("post-c")).toBeNull();
     expect(screen.getByRole("heading", { name: /מאמרים שהומלצו בצ'אט\s*מאמר אחד/ })).toBeTruthy();
+  });
+
+  it("finds a post the chat function named by its slug, as one Base44 named by its id", async () => {
+    renderBlog();
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
+
+    await recommend(["livui-tviot"]);
+
+    await waitFor(() => expect(card("post-a")).toBeNull());
+    expect(card("post-c")).not.toBeNull();
   });
 
   it("orders the posts the way the chat ranked them", async () => {

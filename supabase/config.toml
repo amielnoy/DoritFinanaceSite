@@ -440,3 +440,8 @@ verify_jwt = false
 # than "any valid JWT": a session Supabase Auth accepts, whose profile is admin.
 [functions.content-admin]
 verify_jwt = false
+
+# "הוספת משתמש" on /admin/users: the same gate as content-admin — a session
+# whose profile is admin, checked by the function (_shared/admin.ts).
+[functions.invite-user]
+verify_jwt = false

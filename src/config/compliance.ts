@@ -248,6 +248,21 @@ export const CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS = [
 ] as const;
 
 /**
+ * v6 for the reading recommender: the two lines Dorit's compliance adviser
+ * approved on 2026-10-10 (base44/agents/COMPLIANCE.md §9), and the v6 line —
+ * who processes the conversation (an AI provider outside Israel) and that the
+ * transcript is kept 12 months, which the function newly does.
+ *
+ * TODO(compliance): the same release gate as the other v6 lines, before
+ * VITE_CHAT_AGENTS names blog_recommender.
+ */
+export const CHAT_FUNCTION_BLOG_CONSENT_POINTS = [
+  BLOG_RECOMMENDER_CONSENT_POINTS[0],
+  BLOG_RECOMMENDER_CONSENT_POINTS[1],
+  CHAT_FUNCTION_SUPPORT_CONSENT_POINTS[3],
+] as const;
+
+/**
  * The v6 notice of each agent the `chat` function may serve
  * (`CHAT_FUNCTION_AGENTS`), by agent name. A served agent missing here would
  * fall back to the interview's — a unit test fails first.
@@ -256,4 +271,5 @@ export const CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT: Readonly<Record<string, read
   needs_interview: CHAT_FUNCTION_CONSENT_POINTS,
   support_agent: CHAT_FUNCTION_SUPPORT_CONSENT_POINTS,
   procedures_agent: CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS,
+  blog_recommender: CHAT_FUNCTION_BLOG_CONSENT_POINTS,
 };

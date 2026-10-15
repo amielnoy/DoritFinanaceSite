@@ -180,6 +180,8 @@ export const services: Services = {
   },
   usersAdmin: {
     list: () => real().then((s) => s.usersAdmin.list()),
+    organizations: () => real().then((s) => s.usersAdmin.organizations()),
+    invite: (input) => real().then((s) => s.usersAdmin.invite(input)),
   },
   account: {
     myEnquiries: () => real().then((s) => s.account.myEnquiries()),

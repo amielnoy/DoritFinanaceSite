@@ -73,8 +73,11 @@ export async function runTurn(args: {
   history: ModelMessage[];
   runTool: (name: string, input: Record<string, unknown>) => Promise<ToolOutcome>;
   now?: () => number;
+  /** Tool rounds before the model must answer in words; MAX_TOOL_ROUNDS unless the role needs more. */
+  maxToolRounds?: number;
 }): Promise<TurnResult> {
   const now = args.now ?? Date.now;
+  const maxToolRounds = args.maxToolRounds ?? MAX_TOOL_ROUNDS;
   const started = now();
   const deadline = started + TURN_BUDGET_MS;
   const messages: ModelMessage[] = [...args.history];
@@ -108,7 +111,7 @@ export async function runTurn(args: {
     // After MAX_TOOL_ROUNDS the model must answer in words: in the evaluation of
     // 2026-10-14 it chained a hand-off and two saves, asked for a fourth tool, and
     // the turn failed with 503 although the lead was saved.
-    const response = await call(round >= MAX_TOOL_ROUNDS ? 'none' : undefined);
+    const response = await call(round >= maxToolRounds ? 'none' : undefined);
     usage.push({ model: response.model, ...response.usage });
     const reply = response.content
       .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
@@ -136,7 +139,7 @@ export async function runTurn(args: {
       }
       return { reply, usage, tools, toolCalls };
     }
-    if (round >= MAX_TOOL_ROUNDS) throw new TurnFailure('too_many_tool_rounds', tools, usage);
+    if (round >= maxToolRounds) throw new TurnFailure('too_many_tool_rounds', tools, usage);
 
     messages.push({ role: 'assistant', content: response.content });
     const results: ContentBlock[] = [];

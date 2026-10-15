@@ -593,6 +593,15 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 | CTR-CHPROMPT-016 | "names its real tools and no Base44 one" (procedures.md) | Names `listArticles`, `readArticle`, `escalateToHuman` and `(/blog/<slug>)`; not `BlogPost` or `logSupportChat` |
 | CTR-CHPROMPT-017 | "carries the agency's details as placeholders, not literals" (procedures.md) | No `050-831-1776`, `dorit@govari-fin.co.il` or `L-00107009` in `PROMPTS.procedures` |
 
+`blog.md` is the reading recommender's prompt (`base44/agents/blog_recommender.jsonc`) with `BLOG_TOOL_SECTION`: its two BlogPost reads become `listArticles` / `readArticle`, step 5 links by slug and calls `recommendArticles`, and the hidden block's five lines (the fence matched with `equals`) are dropped; step 6 points to `/#start` instead of a `#consultation` anchor no page has, and the link rule names `/blog/<slug>`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHPROMPT-018 | "each replaced or removed line exists exactly once today" (blog.md) | Each `BLOG_TOOL_SECTION` entry matches one line |
+| CTR-CHPROMPT-019 | "equals today's instructions with only the tool section changed" (blog.md) | `PROMPTS.blog` filled equals today's with the section applied |
+| CTR-CHPROMPT-020 | "recommends through the tool, never a fenced block, and names no Base44 tool" (blog.md) | `recommendArticles`, `listArticles`, `escalateToHuman`, `(/blog/<slug>)`; no ```` ```recommended ````, `BlogPost`, `#consultation` or `/blog/<id>` |
+| CTR-CHPROMPT-021 | "carries the agency's details as placeholders, not literals" (blog.md) | No phone, email or licence literal |
+
 ### 4.12 The chat function's tools — `tests/contract/chat-function.contract.test.ts`
 
 The interview's tools ask the model for nothing their Edge handlers do not read, and offer exactly the hand-off reasons `escalate-to-human` knows. Tasks 6 and 7 add their cases here.
@@ -701,6 +710,16 @@ Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behavi
 | CTR-PUB-003 | "answers only for the signed-in user's verified address, and only published snapshots" | `snapshot_for(my_email())`; `published_at is not null`; answers only on the caller's own |
 | CTR-PUB-004 | "lets only the service role call snapshot_for, and nobody anonymous call anything" | As titled |
 | CTR-PUB-005 | "lets staff publish only their own agency's snapshots, and never write the items directly" | `can_see(v_agency) or is_admin()` in all three; items: select only |
+
+### 4.18 `invite-user` — an admin's act, and nothing wider — `invite-user.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-INV-001 | "passes the same admin gate as content-admin, before reading its input" | `requireAdminSession` before `req.json()`; the gate reads `profiles.role` |
+| CTR-INV-002 | "checks the session itself, as content-admin does" | `verify_jwt = false` |
+| CTR-INV-003 | "gives only the three membership roles, never the site admin" | owner, agent, staff; no `role: 'admin'` |
+| CTR-INV-004 | "mails through dorit-mailer, never Supabase Auth's invite" | No `/auth/v1/invite`; `sendMail` to the address |
+| CTR-INV-005 | "logs ids, never the invitee's address" | No `email` in any log call |
 
 ## 5. Runtime counterpart
 
