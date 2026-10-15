@@ -21,6 +21,7 @@ import { SupabaseContentService } from "./supabase/SupabaseContentService";
 import { SupabaseImageUploadService, type SupabaseImageStorageClient } from "./supabase/SupabaseImageUploadService";
 import { EdgeContentAdminService, type ContentFunctionsClient } from "./supabase/EdgeContentAdminService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
+import { SupabaseUsersAdminService } from "./supabase/SupabaseUsersAdminService";
 import { SupabaseLeadService, type SupabaseFunctionsClient } from "./supabase/SupabaseLeadService";
 import type { SupabaseLeadTableClient } from "./supabase/SupabaseTableClient";
 import { SupabaseMaslekaService, type SupabaseMaslekaClient } from "./supabase/SupabaseMaslekaService";
@@ -38,6 +39,7 @@ import type {
   ContentAdminPort,
   ContentPort,
   LeadAdminPort,
+  UsersAdminPort,
   LeadPort,
   MaslekaPort,
   SupportPort,
@@ -115,6 +117,12 @@ const authPort: AuthPort = supabase
  * The personal area, on Supabase — the same rule as `authPort`, so the page
  * asks the system that knows who the visitor is.
  */
+/**
+ * The accounts screen reads Supabase only: a build without it has no accounts
+ * to list (Base44 never kept them), so the screen shows its empty state.
+ */
+const usersAdminPort: UsersAdminPort = tables ? new SupabaseUsersAdminService(tables) : { list: async () => [] };
+
 const accountPort: AccountPort = supabase
   ? new SupabaseAccountService(supabase as unknown as SupabaseRpcClient)
   : new UnconfiguredAccountService();
@@ -188,6 +196,7 @@ export const services: Services = {
   leadsAdmin: leadsAdminPort,
   contentAdmin,
   account: accountPort,
+  usersAdmin: usersAdminPort,
   masleka: maslekaPort,
 };
 

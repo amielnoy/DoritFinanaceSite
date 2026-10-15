@@ -9,6 +9,7 @@ import type {
   ContentAdminPort,
   ContentPort,
   LeadAdminPort,
+  UsersAdminPort,
   LeadPort,
   MaslekaPort,
   SupportPort,
@@ -55,6 +56,8 @@ export interface Services {
   contentAdmin: ContentAdminPort;
   /** The signed-in visitor's own enquiries — the personal area. */
   account: AccountPort;
+  /** The accounts and their organizations — the admin's users screen. */
+  usersAdmin: UsersAdminPort;
   /** The clearinghouse requests: the client's page and the staff board. */
   masleka: MaslekaPort;
 }
@@ -173,6 +176,9 @@ export const services: Services = {
     listTestimonials: (limit) => real().then((s) => s.contentAdmin.listTestimonials(limit)),
     createTestimonial: (draft) => real().then((s) => s.contentAdmin.createTestimonial(draft)),
     removeTestimonial: (id) => real().then((s) => s.contentAdmin.removeTestimonial(id)),
+  },
+  usersAdmin: {
+    list: () => real().then((s) => s.usersAdmin.list()),
   },
   account: {
     myEnquiries: () => real().then((s) => s.account.myEnquiries()),

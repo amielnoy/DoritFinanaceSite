@@ -804,26 +804,39 @@ no `/en` route, no language switcher, no hreflang. Locally:
   French. The compliance adviser approves the translated licence and
   pension-marketing lines (`compliance.pensionMarketing`; COMPLIANCE.md §11).
 
-### Organization badges — ready, not shown yet
+### Organizations: badges, chips and the users screen
 
-Which organization a user belongs to, as a colour **and** a letter (never the
-colour alone). Built ahead of need: the site has one agency today, so nothing
-renders these until a second one joins.
+Which organization (agency) a user belongs to, as a colour **and** a code or
+logo — never the colour alone. The site has one agency today; everything below
+scales to many.
 
-- **One place:** `src/config/organizations.ts` — each organization's `id`,
-  `name`, `letter`, `color` (badge), `tint` (chip background), `ink` (chip
-  text). The four there are samples; replace them with the real agencies. An
-  organization with no entry gets a palette colour picked by its id (always the
-  same) and its name's first letter: `orgFor(id, name)`.
-- **On an avatar:** `<Avatar org={orgFor(id, name)} size={64}>` — the badge at
-  the bottom corner on the inline end (left in RTL), 26px on a 64px avatar,
-  20px on 40–44px, colour only at 32px and below; the full name as the tooltip
-  and `aria-label`. Without `org`, `Avatar` is unchanged.
-- **As a label:** `<OrgChip org={…} />` — tint, ink, and an 8px square of the
-  colour before the name.
-- **Contrast:** `tests/unit/organizations.test.ts` fails any colour under
-  4.5:1 (white on the colour, ink on the tint) — a new organization's colours
-  are checked the moment they are added.
+- **One place:** `src/config/organizations.ts`. An agency listed there by its
+  id gets that look (`color`, `tint`, `ink`, an optional `code` of up to two
+  characters and an optional `logoUrl`); any other gets a palette colour picked
+  by its id. The four entries are samples. `organizationDirectory(orgs)` codes
+  every organization shown together: configured codes are kept, the rest are
+  derived (first letters of the first two words, or a one-word name's first
+  two) and a collision moves to the first letter with the next distinct
+  letter — in id order, so the same set always gets the same codes.
+- **On an avatar:** `<Avatar org={…} size={64}>` — the badge at the inline-end
+  bottom corner (left in RTL): 26px on a 64px avatar, 20px (code at 9.5px) on
+  40–44px, colour only at 32px and below. "ארגון: <name>" is its `aria-label`
+  and its tooltip, which opens on hover, keyboard focus and a tap.
+- **As labels:** `<OrgChip>`, or `<OrgChips>` for several — two, then "+N"
+  opening the rest.
+- **`/admin/users`** (admins only, linked from the admin menu): every account
+  from `profiles`, with its organizations from `memberships` and `agencies` —
+  read under the admin's own RLS policies, no migration. Search (name, role,
+  organization; 200ms debounce) AND the organization filter (buttons up to six
+  organizations, a searchable multi-select above; a user matches ANY selected),
+  both in the URL (`?q=&org=a,b&sort=&dir=`). From 640px a table sortable by
+  name, role and organization (`aria-sort`), whose organization column is the
+  indicator, so its avatars carry no badge; below 640px cards with the badge.
+  "מציג X מתוך Y משתמשים", an empty state with "ניקוי סינון", skeletons while
+  loading. A user's primary organization is the one they joined first (no flag
+  is stored). Accounts keep no name, so the name shown and searched is the
+  email.
+- **Contrast:** `tests/unit/organizations.test.ts` fails any colour under 4.5:1.
 
 ## The chat function (Phase 3)
 
