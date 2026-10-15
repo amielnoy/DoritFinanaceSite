@@ -5,6 +5,7 @@ import { leadEvents } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { CONTACT } from "@/config/contact";
 import { HUMAN_HANDOFF } from "@/config/compliance";
+import { isContactPhone } from "@/lib/phone";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
 import { Send, Loader2, Check, Mail, MessageCircle } from "lucide-react";
@@ -19,13 +20,21 @@ interface QuickContactForm {
   message: string;
 }
 
-/** What's missing, named rather than left to a greyed-out button to imply. */
-function missingFieldsMessage(form: QuickContactForm): "quick.errorBoth" | "quick.errorName" | "quick.errorPhone" | null {
+/**
+ * What's missing or wrong, named rather than left to a greyed-out button to
+ * imply. A phone Dorit could not call back is refused here, as `submit-lead`
+ * refuses it — "abc" or "123" used to go through (D-01, manual test
+ * 2026-10-14).
+ */
+function missingFieldsMessage(
+  form: QuickContactForm
+): "quick.errorBoth" | "quick.errorName" | "quick.errorPhone" | "quick.errorPhoneInvalid" | null {
   const missingName = !form.name.trim();
   const missingPhone = !form.phone.trim();
   if (missingName && missingPhone) return "quick.errorBoth";
   if (missingName) return "quick.errorName";
   if (missingPhone) return "quick.errorPhone";
+  if (!isContactPhone(form.phone)) return "quick.errorPhoneInvalid";
   return null;
 }
 
@@ -111,6 +120,7 @@ export default function QuickContact({ embedded = false, className }: { embedded
                     }}
                     placeholder={HUMAN_HANDOFF.phonePlaceholder}
                     autoComplete="tel"
+                    aria-invalid={validationError === "quick.errorPhoneInvalid" || undefined}
                     className={inputClass()}
                   />
                 </Field>

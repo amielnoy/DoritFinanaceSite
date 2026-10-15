@@ -6,6 +6,12 @@ import { leadEvents } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
+import { isContactPhone } from "@/lib/phone";
+import {
+  CLAIM_DOCUMENT_ACCEPT,
+  CLAIM_DOCUMENT_MAX_FILES,
+  claimDocumentProblem,
+} from "@/config/claimDocuments";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 import { withFilledInNote } from "@/i18n/locales";
 import type { KeyOf } from "@/i18n/resources";
@@ -18,9 +24,16 @@ const CLAIM_TYPES = [
   "אחר",
 ];
 
-interface UploadedDoc {
-  name: string;
-  url: string;
+/**
+ * A document the visitor picked. It stays in the browser until they send the
+ * report: picking used to upload at once, so insurance documents sat in the
+ * bucket for anyone who picked a file and walked away (D-02, manual test
+ * 2026-10-14). `ref` is set once it is uploaded, so a send that fails after
+ * the uploads does not upload them again on the retry.
+ */
+interface PickedDoc {
+  file: File;
+  ref?: string;
 }
 
 interface ClaimFields {
@@ -45,42 +58,50 @@ const EMPTY: ClaimFields = {
 
 export default function ClaimForm() {
   const [form, setForm] = useState<ClaimFields>(EMPTY);
-  const [docs, setDocs] = useState<UploadedDoc[]>([]);
+  const [docs, setDocs] = useState<PickedDoc[]>([]);
   const { sending, sent: done, error: submitError, submit: submitReport, reset } = useSubmission("report");
-  const [uploading, setUploading] = useState(false);
+  /** While the send uploads the documents: how many of how many. */
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   /**
-   * Upload failures are the form's own state, separate from the submission
-   * state machine: a document that failed to upload must not put the whole
-   * form into "error", because the visitor can simply try the file again.
+   * File problems — one refused when picked, or an upload that failed on send —
+   * named in their own words rather than as the generic "could not send".
    *
    * This used to call a `setError` that did not exist — `error` comes from
    * `useSubmission`, which exposes no setter — so a failed upload threw a
    * ReferenceError instead of showing a message. (Baselined as TS2304.)
    */
   const [uploadError, setUploadError] = useState("");
+  /**
+   * A phone Dorit could not call back. Checked on send, as `submit-claim`
+   * checks it: "abc" or "123" used to file a claim nobody could answer (D-01,
+   * manual test 2026-10-14).
+   */
+  const [phoneError, setPhoneError] = useState("");
   const error = uploadError || submitError;
 
-  const set = (key: keyof ClaimFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+  const set = (key: keyof ClaimFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    if (key === "phone") setPhoneError("");
     setForm((f) => ({ ...f, [key]: e.target.value }));
+  };
 
   const { name, phone, email, claimType, eventDate, policyNumber, description } = form;
   const t = useT("claims");
   const locale = useLocale();
 
-  const handleFiles = async (files: FileList | null) => {
+  /** Checks each file against the bucket's limits and keeps it; nothing leaves the browser here. */
+  const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setUploading(true);
-    setUploadError("");
-    try {
-      for (const file of Array.from(files)) {
-        const { url: file_url } = await services.claimDocuments.upload(file);
-        setDocs((d) => [...d, { name: file.name, url: file_url }]);
-      }
-    } catch {
-      setUploadError(t("form.uploadError"));
-    } finally {
-      setUploading(false);
+    const problems: string[] = [];
+    const accepted: PickedDoc[] = [];
+    for (const file of Array.from(files)) {
+      const problem = claimDocumentProblem(file);
+      if (problem) problems.push(t(problem, { name: file.name }));
+      else accepted.push({ file });
     }
+    const room = CLAIM_DOCUMENT_MAX_FILES - docs.length;
+    if (accepted.length > room) problems.push(t("form.fileCount", { max: CLAIM_DOCUMENT_MAX_FILES }));
+    setDocs((d) => [...d, ...accepted.slice(0, Math.max(room, 0))]);
+    setUploadError(problems.join(" "));
   };
 
   const startAnother = () => {
@@ -88,6 +109,7 @@ export default function ClaimForm() {
     setForm(EMPTY);
     setDocs([]);
     setUploadError("");
+    setPhoneError("");
   };
 
   const removeDoc = (idx: number) => {
@@ -98,7 +120,28 @@ export default function ClaimForm() {
 
   const submit = async () => {
     if (!valid) return;
-    const ok = await submitReport(() => {
+    if (!isContactPhone(phone)) {
+      setPhoneError(t("form.phoneInvalid"));
+      return;
+    }
+    setUploadError("");
+    // The uploads run inside the submission, so its double-click guard and
+    // its "sending" state cover them too.
+    const ok = await submitReport(async () => {
+      const refs: string[] = [];
+      try {
+        for (const [i, doc] of docs.entries()) {
+          setProgress({ done: i, total: docs.length });
+          const ref = doc.ref ?? (await services.claimDocuments.upload(doc.file)).url;
+          refs.push(ref);
+          if (!doc.ref) setDocs((d) => d.map((x) => (x.file === doc.file ? { ...x, ref } : x)));
+        }
+      } catch (e) {
+        setUploadError(t("form.uploadError"));
+        throw e;
+      } finally {
+        setProgress(null);
+      }
       const attribution = getAttribution();
       return services.leads.submitClaim({
         name,
@@ -110,7 +153,7 @@ export default function ClaimForm() {
         // The visitor's words as written, and — from the English or French
         // site — a Hebrew note for Dorit saying so.
         description: withFilledInNote(description, locale),
-        documents: docs.map((d) => d.url),
+        documents: refs,
         channel: attribution?.channel,
         campaign: attribution?.campaign ?? undefined,
         landingPath: window.location.pathname,
@@ -151,7 +194,7 @@ export default function ClaimForm() {
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label={t("form.name")}>
-            <input value={name} onChange={set("name")} className={inputClass()} autoComplete="name" />
+            <input value={name} onChange={set("name")} className={inputClass()} autoComplete="name" aria-required="true" />
           </Field>
           <Field label={t("form.phone")}>
             <input
@@ -162,9 +205,17 @@ export default function ClaimForm() {
               type="tel"
               inputMode="tel"
               autoComplete="tel"
+              aria-required="true"
+              aria-invalid={phoneError ? true : undefined}
+              aria-describedby={phoneError ? "claim-phone-error" : undefined}
             />
           </Field>
         </div>
+        {phoneError && (
+          <p id="claim-phone-error" role="alert" className="text-sm text-destructive text-right -mt-2">
+            {phoneError}
+          </p>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label={t("form.email")}>
@@ -214,14 +265,19 @@ export default function ClaimForm() {
           <label className="flex flex-col items-center justify-center gap-2 p-8 border border-dashed border-border hover:border-accent transition-colors cursor-pointer text-center">
             <Upload size={22} className="text-accent" />
             <span className="text-sm text-foreground/70">
-              {uploading ? t("form.uploading") : t("form.pick")}
+              {t("form.pick")}
             </span>
             <input
               type="file"
               multiple
+              accept={CLAIM_DOCUMENT_ACCEPT}
               className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-              disabled={uploading || sending}
+              onChange={(e) => {
+                handleFiles(e.target.files);
+                // The same file can be picked again after it is removed.
+                e.target.value = "";
+              }}
+              disabled={sending}
             />
           </label>
 
@@ -231,7 +287,7 @@ export default function ClaimForm() {
                 <li key={i} className="flex items-center justify-between gap-3 p-3 bg-secondary/40 border border-border/60">
                   <span className="flex items-center gap-2 text-sm min-w-0">
                     <FileText size={16} className="text-accent shrink-0" />
-                    <span className="truncate">{d.name}</span>
+                    <span className="truncate">{d.file.name}</span>
                   </span>
                   <button
                     onClick={() => removeDoc(i)}
@@ -249,12 +305,16 @@ export default function ClaimForm() {
 
         <div className="flex items-center justify-between pt-4 border-t border-border/60">
           <p className="text-xs text-muted-foreground">{t("form.secure")}</p>
-          <CtaButton onClick={submit} disabled={sending || uploading || !valid}>
+          <CtaButton onClick={submit} disabled={sending || !valid}>
             {sending && <Loader2 size={16} className="animate-spin" />}
-            {sending ? t("form.sending") : t("form.send")}
+            {progress
+              ? t("form.uploadingCount", { done: progress.done + 1, total: progress.total })
+              : sending
+                ? t("form.sending")
+                : t("form.send")}
           </CtaButton>
         </div>
-        {error && <p className="text-sm text-destructive text-start">{error}</p>}
+        <p aria-live="polite" className="text-sm text-destructive text-start empty:hidden">{error}</p>
       </div>
     </div>
   );

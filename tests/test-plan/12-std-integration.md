@@ -80,8 +80,10 @@ that is a phishing message carrying the agency's branding and the attacker's
 link — not an XSS in the sender's own browser.
 
 So: no live markup reaches the visitor's HTML mail, or the staff HTML either; the
-payload survives as escaped text a client displays; a hostile phone number is
-stripped to digits before it reaches an `href`; the plain-text copy is left
+payload survives as escaped text a client displays; a form whose phone is a
+payload is refused before anything is written (D-01), and an interview's —
+the one source not refused for its phone's shape — is stripped to digits
+before it reaches an `href`; the plain-text copy is left
 unescaped on purpose, because escaping it would only make the mail unreadable;
 and the record stores the raw value, so it matches what was submitted.
 
@@ -93,7 +95,11 @@ deleting it silently.
 
 ### 4.4 `submitLead` — what survives a failure — `INT-LEAD-018..024`
 
-No name or no phone refuses and writes nothing. A failed entity write fails
+No name or no phone refuses and writes nothing. Neither does a phone Dorit
+cannot call back (`abc`, `123`, a foreign number) from any source but the
+interview, while an Israeli mobile or landline, with or without `+972`, is
+stored (D-01, manual test 2026-10-14); the claim's Edge function refuses the
+same numbers (`submit-claim-edge`, "what it refuses"). A failed entity write fails
 loudly and mails nobody — an enquiry nobody can find is worse than an enquiry
 that bounced. Past that point everything is best-effort: a bouncing mailbox, a
 refusing calendar and a missing connector token each leave the lead stored, the

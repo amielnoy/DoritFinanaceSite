@@ -72,7 +72,7 @@
   "form.emergency": "En cas d'urgence médicale ou immédiate — appelez maintenant. Ce formulaire sert à une déclaration documentée et ordonnée d'un sinistre, avec pièces jointes.",
   "form.choose": "Choisir un type…",
   "form.attach": "Joindre des documents (attestations, comptes rendus, reçus, photos)",
-  "form.secure": "Les documents sont envoyés de façon sécurisée et ne sont accessibles qu'à Dorit.",
+  "form.secure": "Les documents sont envoyés de façon sécurisée uniquement à l'envoi de la déclaration, et ne sont accessibles qu'à Dorit.",
   "form.name": "Nom complet *",
   "form.phone": "Téléphone *",
   "form.email": "E-mail (facultatif)",
@@ -82,8 +82,13 @@
   "form.description": "Description de l'événement",
   "form.descriptionPlaceholder": "Décrivez l'événement : quoi, quand, où, qui est concerné, et tout détail utile.",
   "form.remove": "Retirer",
-  "form.uploading": "Envoi des documents…",
   "form.pick": "Cliquez pour choisir des fichiers, ou glissez-les ici",
   "form.sending": "Envoi…",
-  "form.send": "Envoyer la déclaration"
+  "form.send": "Envoyer la déclaration",
+  "form.phoneInvalid": "Veuillez indiquer un numéro israélien — commençant par 0 (ou +972), 9 à 10 chiffres.",
+  "form.fileType": "« {name} » — vous pouvez joindre un PDF ou une photo (JPG, PNG, HEIC, WEBP).",
+  "form.fileSize": "« {name} » dépasse 10 Mo. Vous pouvez le reprendre en photo en plus basse résolution, ou l'envoyer à Dorit par e-mail.",
+  "form.fileEmpty": "« {name} » est vide et n'a pas été joint.",
+  "form.fileCount": "Vous pouvez joindre jusqu'à {max} documents à une déclaration.",
+  "form.uploadingCount": "Envoi des documents… ({done}/{total})"
 }

@@ -2,6 +2,8 @@ You are auditing one conversation between a website's automated assistant (the "
 
 It has no access to any file or system, so it must not state an exact form number, an exact form name, a mailing address, a fax number or a binding timetable unless a published article it read says so; it should name the step and say that Dorit sends the current form. A form number, address, fax or deadline that no `readArticle` call returned is invented: that is a factual failure, not advice, so it does not by itself set either flag below — say so in `notes`.
 
+גמל נט and פנסיה נט are published by רשות שוק ההון, ביטוח וחיסכון (the Capital Market, Insurance and Savings Authority). Crediting them, or any figure in them, to הרשות לניירות ערך or another body is a factual failure for `notes`.
+
 When it cites an article, a link of the form `/blog/<slug>` is expected, where the slug came from its `listArticles` tool. An article title or link that no `listArticles` or `readArticle` call returned is invented: also a factual failure for `notes`.
 
 You receive the persona's kind, the transcript, and the tool calls the assistant made.
