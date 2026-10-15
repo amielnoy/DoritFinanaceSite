@@ -304,3 +304,14 @@ provider-switching layer beyond the one adapter interface.
 - `pg_cron` is not used by any migration yet. The plan confirms it is enabled on the
   project before relying on it for the nightly purge (the clearinghouse design
   assumes it too).
+
+## Amendments during PR 3 (2026-10-15)
+
+PR 3 serves `procedures_agent` (the procedures chat on /tools). It needed no new mechanism:
+
+- **No migration.** `chat_conversations.role` already allowed `'procedures'`.
+- **The FAQ chat's tools.** `ROLE_TOOLS.procedures = SUPPORT_TOOLS` (`listArticles`, `readArticle`, `escalateToHuman`): the procedures agent read BlogPost, logged the chat and handed off on Base44, and the function covers those three with the same tools and the sweep.
+- **Logged like the FAQ chat.** `SHEET_LOGGED_ROLES` is `['support', 'procedures']`; Base44's `logSupportChat` wrote both to the Support tab.
+- **The prompt.** `procedures.md` is held to `procedures_agent.jsonc` apart from `PROCEDURES_TOOL_SECTION`: the BlogPost and logSupportChat lines of the tool section, and one line outside it ("מגבלת הירוק") that read an article "ב-BlogPost", now with `readArticle`.
+- **The notice.** `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS`: the procedures notice's own three points and the FAQ chat's v6 fourth.
+

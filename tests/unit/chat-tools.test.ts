@@ -15,6 +15,7 @@ const ctx = (over: Partial<ToolCallContext> = {}): ToolCallContext => ({
     id: "00000000-0000-4000-8000-000000000001",
     status: "open",
     escalated: false,
+    hasLead: false,
     consentVersion: "2026-10-agents-v6",
     consentAt: "2026-10-13T09:00:00.000Z",
     attribution: { channel: "google", campaign: "", landingPath: "/" },
@@ -196,6 +197,48 @@ describe("escalateToHuman", () => {
     expect(second).toMatchObject({ status: "already_escalated", isError: false });
     expect(c.conversation.status).toBe("escalated");
     expect(c.conversation.escalated).toBe(true);
+  });
+
+  /**
+   * The hand-off's §5 calls escalateToHuman first and only then asks for a name
+   * and a phone. A second call used to answer already_escalated, so a phone the
+   * visitor gave afterwards never reached Dorit (A-55). One follow-up carries it.
+   */
+  it("takes the name and phone given after an anonymous hand-off: one follow-up, then no more", async () => {
+    const escalateToHuman = vi
+      .fn<(req: Request) => Promise<Response>>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, leadId: null }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, leadId: "lead-7" }), { status: 200 }));
+    const run = createToolRunner({ submitLead: answering(200, {}), escalateToHuman });
+    const c = ctx();
+    await run("escalateToHuman", { reason: "product_recommendation", summary: "x" }, c);
+    const followUp = await run("escalateToHuman", { reason: "product_recommendation", summary: "x", name: "מיכל אברהם", phone: "050-000-0029" }, c);
+    expect(escalateToHuman).toHaveBeenCalledTimes(2);
+    expect(await (escalateToHuman.mock.calls[1][0] as Request).json()).toMatchObject({ name: "מיכל אברהם", phone: "050-000-0029" });
+    expect(followUp).toMatchObject({ status: "ok", leadId: "lead-7" });
+    expect(c.conversation.hasLead).toBe(true);
+    const third = await run("escalateToHuman", { reason: "complaint", summary: "y", name: "מיכל אברהם", phone: "050-000-0029" }, c);
+    expect(third).toMatchObject({ status: "already_escalated" });
+    expect(escalateToHuman).toHaveBeenCalledTimes(2);
+  });
+
+  it("follows up only with a name and a valid phone", async () => {
+    const escalateToHuman = answering(200, { ok: true, leadId: null });
+    const run = createToolRunner({ submitLead: answering(200, {}), escalateToHuman });
+    const c = ctx();
+    await run("escalateToHuman", { reason: "uncertain", summary: "x" }, c);
+    for (const input of [{ name: "מיכל", phone: "123" }, { name: "", phone: "0500000029" }, { name: "מיכל" }]) {
+      expect(await run("escalateToHuman", { reason: "uncertain", summary: "x", ...input }, c)).toMatchObject({ status: "already_escalated" });
+    }
+    expect(escalateToHuman).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not follow up once the conversation has a lead", async () => {
+    const escalateToHuman = answering(200, { ok: true });
+    const run = createToolRunner({ submitLead: answering(200, {}), escalateToHuman });
+    const c = ctx({ conversation: { ...ctx().conversation, escalated: true, status: "escalated", hasLead: true } });
+    expect(await run("escalateToHuman", { reason: "uncertain", summary: "x", name: "מיכל", phone: "0500000029" }, c)).toMatchObject({ status: "already_escalated" });
+    expect(escalateToHuman).not.toHaveBeenCalled();
   });
 
   it("does not let a failed hand-off block the retry", async () => {

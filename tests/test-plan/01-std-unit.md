@@ -745,6 +745,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-032 | "in evaluation mode %s, a complete save asks for a short closing message" (2 cases) | `{ ok, stage: "complete", next }`; `next` asks for "הודעת סיום", not for the next question (the evaluation of 2026-10-14: two turns ended `empty_reply` after a bare complete answer) |
 | UNIT-CHTOOL-033 | "a save after the lead is saved says so and asks for a reply, not silence" | `{ ok, alreadySaved, next }`, `next` says to answer the visitor |
 | UNIT-CHTOOL-034 | "a second hand-off says so and asks for a reply, not silence" | `{ ok, alreadyEscalated, next }` |
+| UNIT-CHTOOL-035 | "takes the name and phone given after an anonymous hand-off: one follow-up, then no more" | A hand-off with no lead allows one more `escalateToHuman` carrying a name and a valid phone; its lead sets `hasLead`; a third call answers `already_escalated` (final review, Important 1; A-55) |
+| UNIT-CHTOOL-036 | "follows up only with a name and a valid phone" | No name, or a phone that is not `0` + 8–9 digits: `already_escalated`, the handler not called |
+| UNIT-CHTOOL-037 | "does not follow up once the conversation has a lead" | `hasLead: true`: `already_escalated` |
 
 ### 4.32a The chat's article source — `tests/unit/chat-articles.test.ts`
 
@@ -879,6 +882,8 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-049 | "never runs a tool its role was not given, even when the model names one" | The model names `submitLead` in a support chat: the runner is not called, the tool row is `submitLead: error`, the conversation stays `open` (Review Focus 1) |
 | UNIT-CHHANDLER-050 | "stores a made-up tool name no longer than the log line keeps it" | A 500-character tool name is stored as 40 characters plus `: error` |
 | UNIT-CHHANDLER-051 | "the interview is gated the same way: it never reads articles, whatever the model names" | `listArticles` and `readArticle` named in an interview: the runner is not called; tool rows `listArticles: error`, `readArticle: error` |
+| UNIT-CHHANDLER-061 | "serves procedures_agent with the procedures prompt and the FAQ chat's tools" (the procedures role) | 200; `role` is `procedures`; tools `listArticles`, `readArticle`, `escalateToHuman`; the role block is the procedures prompt |
+| UNIT-CHHANDLER-062 | "never runs a lead save or a sheet log, even when the model names one" (the procedures role) | `submitLead` and `logSupportChat` answer `unknown_tool` (`… : error`), nothing runs, the conversation stays `open` |
 | UNIT-CHHANDLER-052 | "runs the sweep for the right token, and nothing of the chat" | `x-chat-sweep` with the right token: 200, `ok`, `logged: 2`, an `rid` passed to `sweepSheetLogs`; no model call, no conversation, no rate-limit check (Review Focus 5) |
 | UNIT-CHHANDLER-053 | "refuses %s with 401 and runs nothing" | A wrong token, an empty token and the evaluation token: 401 `unauthorized`; the sweep, the model and the store untouched (Review Focus 5) |
 | UNIT-CHHANDLER-054 | "refuses every sweep when the function has no token configured" | With `sweepToken` empty, an empty and an arbitrary header both give 401; the sweep never runs (Review Focus 5) |
@@ -918,7 +923,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHSWEEP-004 | "fits a long transcript under log-support-chat's 2,000-character cut, keeping the opening and the close" | Exactly `TRANSCRIPT_LIMIT` characters; starts with the first question, ends with the last reply, `[…]` between; `messageCount` 32 |
 | UNIT-CHSWEEP-005 | "leaves a transcript that fits as it is, and never splits a character" (`fitTranscript`) | A short text unchanged; emoji cut on code points, no lone surrogate |
 | UNIT-CHSWEEP-006 | "is nothing for a conversation with no visitor message" | `null` for an assistant-only or empty conversation |
-| UNIT-CHSWEEP-007 | "claims a batch of support conversations idle past the handler's close (2 h + a margin), then logs each through log-support-chat" | `claimSheetLogs(["support"], cutoff, now, SHEET_LOG_BATCH)` with now minus cutoff equal to `SHEET_LOG_IDLE_MS` = the handler's `IDLE_MS` + `SHEET_LOG_MARGIN_MS` (125 minutes, more than `IDLE_MS`, margin at least a minute); a `sweep.logged` info line; one POST with `channel: site`, topic, transcript, outcome, count (Review Focus 4) |
+| UNIT-CHSWEEP-007 | "claims a batch of support and procedures conversations idle past the handler's close (2 h + a margin), then logs each through log-support-chat" | `claimSheetLogs(["support", "procedures"], cutoff, now, SHEET_LOG_BATCH)` with now minus cutoff equal to `SHEET_LOG_IDLE_MS` = the handler's `IDLE_MS` + `SHEET_LOG_MARGIN_MS` (125 minutes, more than `IDLE_MS`, margin at least a minute); a `sweep.logged` info line; one POST with `channel: site`, topic, transcript, outcome, count (Review Focus 4) |
 | UNIT-CHSWEEP-008 | "counts an escalated conversation as escalated" | `escalated_at` set gives outcome `escalated` |
 | UNIT-CHSWEEP-009 | "sends no phone: the chat has none, and the model is never asked for one" | The body has no `phone` |
 | UNIT-CHSWEEP-010 | "skips a claimed conversation with nothing to log, and keeps going after one that throws" | Of three claimed, one logged; `sweep.nothing_to_log` info, `sweep.log_failed` error naming the conversation, `sweep.done` with `claimed: 3, logged: 1` |
@@ -951,13 +956,15 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
 | UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
-| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | `procedures_agent` and `blog_recommender` are dropped from `procedures_agent,needs_interview,blog_recommender`; `needs_interview` stays |
+| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | `blog_recommender` is dropped from `blog_recommender,needs_interview`; `needs_interview` stays |
 | UNIT-CHCONFIG-004 | "is empty without Supabase, whatever it says" | Not configured gives no agents |
-| UNIT-CHCONFIG-005 | "may serve the FAQ chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `support_agent`; empty switch gives none; `support_agent` and `needs_interview,support_agent` are read in order; without Supabase none; `procedures_agent,blog_recommender` none |
+| UNIT-CHCONFIG-005 | "may serve the FAQ chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `support_agent`; empty switch gives none; `support_agent` and `needs_interview,support_agent` are read in order; without Supabase none; `blog_recommender` none |
 | UNIT-CHCONFIG-006 | "exists for every one of them" (the v6 notice of each agent the function may serve) | `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` has an entry for every `CHAT_FUNCTION_AGENTS` name |
 | UNIT-CHCONFIG-007 | "is the interview's for the interview" | `needs_interview` maps to `CHAT_FUNCTION_CONSENT_POINTS` |
 | UNIT-CHCONFIG-008 | "is the FAQ chat's own for the FAQ chat: its first three points, never the interview's promise of a name, a phone and a meeting" | `support_agent` maps to `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`; its first three equal the first three of `SUPPORT_CONSENT_POINTS`; neither of the interview's points 1 and 3 appears; no "name and phone collected" or "arranges a meeting" wording |
 | UNIT-CHCONFIG-009 | "says, for the FAQ chat as for the interview, who processes the conversation and how long it is kept" | The FAQ chat's fourth point names the AI provider outside Israel and 12 months; the interview's names the provider; the FAQ point is not the old one |
+| UNIT-CHCONFIG-010 | "may serve the procedures chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `procedures_agent`; read when named; none without Supabase |
+| UNIT-CHCONFIG-011 | "is the procedures chat's own for the procedures chat: its three points and the v6 fourth" | `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS`: `PROCEDURES_CONSENT_POINTS[0..2]` and the FAQ chat's v6 fourth; never the interview's first point or "מתאם פגישה" |
 | UNIT-CHWIRE-001 | "sends the named agent to the chat function and every other agent to Base44" | With `VITE_CHAT_AGENTS=needs_interview`, the composed `services.agents` start/send/subscribe for it reach the Supabase `chat` invoke and never Base44; `support_agent` reaches Base44 and never `chat` (Ruling 8) |
 | UNIT-CHWIRE-002 | "sends every agent to Base44 when the switch is empty" | With `VITE_CHAT_AGENTS` empty, `needs_interview` goes to Base44 and `chat` is never invoked (Ruling 8) |
 
@@ -990,6 +997,10 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-043 | "passes handoff_or_lead with %s" (2 cases, scoreRun) | A hand-off or a complete lead: no failure for that persona (the user's decision of 2026-10-14: push-04 refused, then booked) |
 | UNIT-EVALCHAT-044 | "fails handoff_or_lead with neither" | `neither a hand-off nor a lead` listed |
 | UNIT-EVALCHAT-045 | "still fails handoff_or_lead on a recommendation" | `recommended a product` listed |
+| UNIT-EVALCHAT-046 | "gives the procedures chat six personas, none of them expecting a lead" (persona file) | `proc-01..06` in order, `expect` `answer` or `handoff`; `answer` for `proc-01`, `proc-02`, `proc-04` |
+| UNIT-EVALCHAT-047 | "judges a procedures persona by the procedures rubric" (`rubricFor`) | `procedures_agent` gets `rubrics.procedures`; support and interview unchanged |
+| UNIT-EVALCHAT-048 | "puts every agent's transcripts in front of the reviewer" (`pickForReview`) | The ten picked include `needs_interview`, `support_agent` and `procedures_agent` — the first of each agent, then round-robin by kind (final review, Important 2) |
+| UNIT-EVALCHAT-049 | "fail a hand-off that never carried the phone the visitor typed" (scoreRun) | A `handoff` persona with `phone` fails unless some `escalateToHuman` call carries that number; one with no `phone` is judged on the hand-off alone (final review, Important 1) |
 | UNIT-EVALCHAT-008 | "fails below 90% complete leads" (scoreRun) | 8 of 10: `pass: false` |
 | UNIT-EVALCHAT-009 | "fails on a persona that errored" (scoreRun) | An errored persona fails the run |
 | UNIT-EVALCHAT-010 | "names the persona, the transcript and the tool calls" (formatForJudge) | Persona id, `מבקר:` / `עוזר:` lines and `submitLead` all present |
@@ -998,8 +1009,8 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-013 | "accepts only an ok answer that carries the evaluation tool calls" (isEvalAnswer) | An answer without `eval.toolCalls` is not evaluation mode, so the runner stops before a real lead is made |
 | UNIT-EVALCHAT-014 | "states pass or fail, the lead count and every failure" (report) | `FAIL`, `8 of 10`, each failure as a bullet; `PASS` with `No failures` |
 | UNIT-EVALCHAT-015 | "picks ten transcripts for review, spread across the kinds" (report) | 10 picked, at least 6 persona kinds |
-| UNIT-EVALCHAT-016 | "holds 43 unique personas with a valid expectation" (persona file) | 43 unique ids (31 interview + 12 FAQ), `expect` in lead/handoff/none/answer, 12 lead personas |
-| UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone than `050-000-00NN` and coop-11's `050-1234567`, no other 9-digit number; `id-01` lists `123456782` as forbidden |
+| UNIT-EVALCHAT-016 | "holds 49 unique personas with a valid expectation" (persona file) | 49 unique ids (31 interview + 12 FAQ + 6 procedures), `expect` in lead/handoff/none/answer, 12 lead personas |
+| UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone than `050-000-00NN` and coop-11's `050-1234567`, no other 9-digit number; `id-01` and `proc-05` list `123456782` as forbidden |
 | UNIT-EVALCHAT-018 | "refuses with a clear message, exit 2, and calls nothing" (runner) | `node scripts/eval-chat.mjs` with no env: stderr `Missing CHAT_EVAL_URL, CHAT_EVAL_TOKEN, ANTHROPIC_API_KEY`, exit 2, empty stdout |
 | UNIT-EVALCHAT-019 | "names only the variable that is missing" (runner) | `Missing ANTHROPIC_API_KEY.`, exit 2 |
 | UNIT-EVALCHAT-020 | "accepts an evaluation-mode answer" (preflight) | `ok` |
@@ -1011,12 +1022,12 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-026 | "runs every persona after a good preflight, and lets one persona's ordinary error through" (preflight) | 3 results; the thrown error recorded on persona b |
 | UNIT-EVALCHAT-027 | "stops the whole run when a persona's first turn is not in evaluation mode, or failed" (preflight) | `EvalStop` after persona a; b never ran; `assertEvalFirstTurn` throws on non-eval, not on eval |
 | UNIT-EVALCHAT-028 | "fails when a persona's lead carries a phone other than the one it typed" (scoreRun) | A persona with `phone: 050-1234567` passes with `0501234567`, `050-1234567` or `+972-50-1234567` in its lead; a redacted phone fails with `the lead's phone is not the number the visitor typed` (C1) |
-| UNIT-EVALCHAT-029 | "has one persona typing its phone as 050-1234567, whose lead must carry that number (C1: redaction kept phones whole)" (persona file) | Only `coop-11` names a `phone`; its brief types `050-1234567` |
+| UNIT-EVALCHAT-029 | "names the phone a persona types where the run must find it: coop-11's lead, and each procedures hand-off" (persona file) | `phone` on coop-11 (`050-1234567`, lead) and proc-03/05/06 (`050-000-0029..31`, handoff); each brief contains its phone |
 | UNIT-EVALCHAT-030 | "still reads the three verdict fields, and says the notes were unreadable" (parseJudgement; already on main, first documented here) | A judge's note with an unescaped quote: the verdict fields are read, `notes` is `(the judge's notes were not valid JSON)` |
 | UNIT-EVALCHAT-031 | "still refuses an answer whose verdict fields cannot be read" (parseJudgement; as above) | Throws |
 | UNIT-EVALCHAT-032 | "defaults to 24 visitor turns and takes EVAL_MAX_TURNS when it is a sane number" (`maxVisitorTurns`; as above) | 24 by default; `"30"` gives 30; `"0"`, `"-3"`, `"abc"`, `"500"` give 24 |
 | UNIT-EVALCHAT-033 | "reports how many visitor turns each completed lead took, with the median and the longest" (`turnStats`; as above) | Three completed leads of 12, 16, 20 turns: median 16, max 20; none completed gives nulls |
-| UNIT-EVALCHAT-034 | "gives the FAQ chat twelve personas, none of them expecting a lead, and the interview the rest" (persona file) | The twelve `sup-*` ids in order, each `agent: support_agent` and `expect` `answer` or `handoff`; `answer` for `sup-gen-01..04` and `sup-en-01`; any other persona has no `agent`; every `answer` persona is an FAQ one |
+| UNIT-EVALCHAT-034 | "gives the FAQ chat twelve personas, none of them expecting a lead, and the interview the rest" (persona file) | The twelve `sup-*` ids in order, each `agent: support_agent` and `expect` `answer` or `handoff`; `answer` for `sup-gen-01..04` and `sup-en-01`; any other persona has no `agent` or `procedures_agent`; every `answer` persona is an FAQ or procedures one |
 | UNIT-EVALCHAT-035 | "default to the interview, and name their own agent otherwise" (`agentFor`) | No `agent` gives `needs_interview`; `support_agent` as named |
 | UNIT-EVALCHAT-036 | "are judged by the support rubric" (`rubricFor`) | A support persona gets the support rubric; others the interview's |
 | UNIT-EVALCHAT-037 | "open and continue their conversation with their own agent" (`chatBody`) | First body carries `agent: support_agent`, the message, consent `eval` with the given time, attribution `direct`; a continuation carries `conversationId` and `token` and defaults to `needs_interview` |

@@ -584,6 +584,15 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 | CTR-CHPROMPT-011 | "names its real tools and no Base44 one" | Names `listArticles`, `readArticle`, `escalateToHuman` and the `(/blog/<slug>)` link form; not `BlogPost` or `logSupportChat` |
 | CTR-CHPROMPT-012 | "carries the agency's details as placeholders, not literals" | No `050-831-1776`, `dorit@govari-fin.co.il` or `L-00107009` in `PROMPTS.support` |
 
+`procedures.md` is the procedures agent's prompt (`base44/agents/procedures_agent.jsonc`) with `PROCEDURES_TOOL_SECTION` applied: the BlogPost line names `listArticles` / `readArticle` and links by slug, the `logSupportChat` line is dropped (the sweep logs the chat), and the one "מגבלת הירוק" line that read an article "ב-BlogPost" reads it with `readArticle`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CHPROMPT-014 | "each replaced or removed line exists exactly once today" (procedures.md against the prompt Base44 runs today) | Each of the three `PROCEDURES_TOOL_SECTION` prefixes matches one line of `procedures_agent.jsonc` |
+| CTR-CHPROMPT-015 | "equals today's instructions with only the tool section changed" (procedures.md) | `PROMPTS.procedures` filled equals today's instructions with the three lines replaced or dropped and blank runs collapsed |
+| CTR-CHPROMPT-016 | "names its real tools and no Base44 one" (procedures.md) | Names `listArticles`, `readArticle`, `escalateToHuman` and `(/blog/<slug>)`; not `BlogPost` or `logSupportChat` |
+| CTR-CHPROMPT-017 | "carries the agency's details as placeholders, not literals" (procedures.md) | No `050-831-1776`, `dorit@govari-fin.co.il` or `L-00107009` in `PROMPTS.procedures` |
+
 ### 4.12 The chat function's tools — `tests/contract/chat-function.contract.test.ts`
 
 The interview's tools ask the model for nothing their Edge handlers do not read, and offer exactly the hand-off reasons `escalate-to-human` knows. Tasks 6 and 7 add their cases here.

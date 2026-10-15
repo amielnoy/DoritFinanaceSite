@@ -455,6 +455,15 @@ renders as on a desktop, which is what every other component test relies on.
 | CMP-CHSUP-001 | "shows the FAQ chat's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS` entry is on screen; the interview's fourth point, `CONSENT.points[2]` and the old support fourth point are not |
 | CMP-CHSUP-002 | "sends the first message as support_agent with the v6 stamp, and shows the reply" | After consent, start and send: `invoke("chat", …)` with `agent: support_agent` and `consentVersion: CHAT_FUNCTION_CONSENT_VERSION`; the reply is shown |
 
+### 4.23a `<AgentChat />` — the procedures chat on the chat function — `tests/component/chat-function-procedures.test.tsx`
+
+As §4.23, with `procedures_agent` served by the function.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CHPROC-001 | "shows the procedures chat's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS` entry is on screen; not the interview's third point, not the Base44 notice's fourth |
+| CMP-CHPROC-002 | "sends the first message as procedures_agent with the v6 stamp, and shows the reply" | `invoke("chat", …)` with `agent: procedures_agent` and `CHAT_FUNCTION_CONSENT_VERSION`; the reply on screen |
+
 ### 4.24 `<NeedsWizard />` — three taps, the contact step, then three optional questions — `tests/component/needs-wizard.test.tsx`
 
 The brief of 2026-10-14: the concern, life stage and urgency (each moves on 250 ms

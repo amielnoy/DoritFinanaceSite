@@ -98,6 +98,8 @@ export interface ConversationFacts {
   status: ConversationStatus;
   /** A hand-off has been made. Kept apart from status, which holds one value: a lead and a hand-off can both be told. Persisted as `escalated_at is not null`. */
   escalated: boolean;
+  /** The conversation has a lead — a saved interview, or a hand-off that carried a name and phone. Persisted as `lead_id is not null`. */
+  hasLead: boolean;
   consentVersion: string;
   consentAt: string;
   attribution: { channel: string; campaign: string; landingPath: string };
@@ -249,14 +251,23 @@ function markEscalated(c: ConversationFacts): void {
   if (c.status === 'open') c.status = 'escalated';
 }
 
+/** An Israeli phone as escalate-to-human accepts it for a lead (escalation.js validPhone). */
+const contactPhone = (raw: string): boolean => /^0\d{8,9}$/.test(raw.replace(/[-\s]/g, ''));
+
 async function escalateToHuman(handler: EdgeHandler, input: Record<string, unknown>, ctx: ToolCallContext): Promise<ToolOutcome> {
-  // One successful hand-off per conversation: a second call mails no one.
-  if (ctx.conversation.escalated) {
+  // One successful hand-off per conversation: a second call mails no one —
+  // except one follow-up. The hand-off (§5) asks for a name and phone only
+  // after the call, so the details a visitor gives then would otherwise never
+  // reach Dorit (A-55). The follow-up carries them while the conversation has
+  // no lead yet; the lead it makes ends it.
+  const followUp = ctx.conversation.escalated && !ctx.conversation.hasLead && str(input.name) !== '' && contactPhone(str(input.phone));
+  if (ctx.conversation.escalated && !followUp) {
     return { name: 'escalateToHuman', status: 'already_escalated', isError: false, forModel: JSON.stringify({ ok: true, alreadyEscalated: true, next: ALREADY_DONE_NEXT }) };
   }
   const reason = (ESCALATION_REASONS as readonly string[]).includes(str(input.reason)) ? str(input.reason) : 'uncertain';
   if (ctx.evalMode) {
     markEscalated(ctx.conversation);
+    if (followUp) ctx.conversation.hasLead = true;
     return { name: 'escalateToHuman', status: 'simulated', isError: false, escalated: true, forModel: JSON.stringify({ ok: true }) };
   }
   const { attribution } = ctx.conversation;
@@ -283,6 +294,8 @@ async function escalateToHuman(handler: EdgeHandler, input: Record<string, unkno
   const ok = res.ok && answer.ok === true;
   if (ok) markEscalated(ctx.conversation);
   const leadId = ok && typeof answer.leadId === 'string' ? answer.leadId : undefined;
+  // A follow-up is spent once it went through, lead or not: the next call mails no one.
+  if (leadId || (ok && followUp)) ctx.conversation.hasLead = true;
   return {
     name: 'escalateToHuman',
     status: ok ? 'ok' : 'error',

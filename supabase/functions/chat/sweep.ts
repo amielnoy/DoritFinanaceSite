@@ -23,8 +23,8 @@ import type { ChatStore } from './store.ts';
 import type { EdgeHandler } from './tools.ts';
 import type { StoredMessage } from './turn.ts';
 
-/** The roles whose conversations go to the Support tab. PR 3 adds 'procedures'. */
-export const SHEET_LOGGED_ROLES: readonly string[] = ['support'];
+/** The roles whose conversations go to the Support tab: the FAQ chat and the procedures chat, as Base44's logSupportChat did for both. */
+export const SHEET_LOGGED_ROLES: readonly string[] = ['support', 'procedures'];
 /**
  * Past the handler's idle close. The handler reads last_message_at, checks it
  * against IDLE_MS and only then claims the turn; a sweep cutting at exactly
