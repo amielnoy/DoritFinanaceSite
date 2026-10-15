@@ -765,6 +765,17 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-ALAY-007 | "shows the admin's personal area as her main page, in the frame" | `/account` for the admin: the sidebar, ראשי current |
 | CMP-ALAY-008 | "signs out and sends her home" | "יציאה" calls `logout(true, <origin>/)` |
 
+### 4.44 "הוספת משתמש" — `tests/component/invite-user.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-INV-001 | "invites with the address, organization and role, says so, and reloads the list" | `invite({ email, orgId, role })`; status "ההזמנה נשלחה ל-…"; the users list read again |
+| CMP-INV-002 | "says plainly when the membership was added but the mail did not go" | Status "נוסף לארגון, אבל המייל לא נשלח" |
+| CMP-INV-003 | "shows the function's refusal in its own words" | Alert with the function's message |
+| CMP-INV-004 | "asks for an address before sending anything" | Alert "יש להזין כתובת דוא״ל תקינה"; no call |
+
+`tests/component/admin-users.test.tsx` adds CMP-AUSR "switches from cards to the table at 680px, as the design asks" (`min-[680px]:table` / `min-[680px]:hidden`).
+
 ## 5. Pass criteria
 
 All 278 declared cases pass (vitest: 308 with expansions). A `submitLead` or `submitClaim` payload assertion failing
