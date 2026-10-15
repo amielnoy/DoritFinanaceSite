@@ -1482,7 +1482,8 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-MIG-001 | "finds what the repository has and production does not, and the reverse" | Two missing in production; one unknown to the repository |
 | UNIT-MIG-002 | "fails the run on a migration missing from production, naming it and the fix" | Exit 1; `::error::` with the versions and `migration repair` |
 | UNIT-MIG-003 | "passes when every migration is applied" | Exit 0 |
-| UNIT-MIG-004 | "warns, not fails, on a listing with no rows" | Exit 0 with `::warning::` |
+| UNIT-MIG-004 | "warns, not fails, on an empty history" | Exit 0 with `::warning::` |
+| UNIT-MIG-005 | "warns, not fails, on an answer that is not a list" | An API error body: exit 0 with `::warning::` |
 
 ## 5. Pass criteria
 

@@ -2,36 +2,56 @@
 // stops before the functions that may depend on it are deployed (Architecture
 // N-05). Migrations are applied by hand; this is the check that the hand did it.
 //
-// Reads the output of `supabase migration list --linked` (Local | Remote | Time):
-//   - a version only on the left (in the repository, not in production) fails;
-//   - a version only on the right (in production, not in the repository) warns —
+// Production's history comes from the Management API
+// (GET /v1/projects/{ref}/database/migrations, an array of { version, name }),
+// which a scoped token reads with database_migrations_read alone. `supabase link`
+// would also need the project's API keys, service_role included.
+//   - a version only in the repository (not in production) fails;
+//   - a version only in production (not in the repository) warns —
 //     history that came from somewhere else, worth knowing, not worth blocking on.
 //
-// Usage: supabase migration list --linked > list.txt && node scripts/check-migrations.mjs list.txt
-import { readFileSync } from "node:fs";
+// Usage: node scripts/check-migrations.mjs remote.json supabase/migrations
+import { readFileSync, readdirSync } from "node:fs";
 
-/** The versions on each side of the listing, by row. */
-export function migrationDrift(listing) {
-  const missingInProduction = [];
-  const unknownToRepository = [];
-  let rows = 0;
-  for (const line of listing.split("\n")) {
-    const m = /^\s*(\d{14})?\s*\|\s*(\d{14})?\s*\|/.exec(line);
-    if (!m || (!m[1] && !m[2])) continue;
-    rows += 1;
-    if (m[1] && !m[2]) missingInProduction.push(m[1]);
-    if (!m[1] && m[2]) unknownToRepository.push(m[2]);
-  }
-  return { rows, missingInProduction, unknownToRepository };
+/** The versions of the repository's migration files, `<version>_<name>.sql`. */
+export function localVersions(files) {
+  return files.map((f) => /^(\d{14})_.+\.sql$/.exec(f)?.[1]).filter(Boolean);
+}
+
+/** The versions in the API's answer, or null when the answer is not a list. */
+export function remoteVersions(body) {
+  if (!Array.isArray(body)) return null;
+  return body.map((row) => row?.version).filter((v) => typeof v === "string" && /^\d{14}$/.test(v));
+}
+
+/** What each side has that the other does not. */
+export function migrationDrift(local, remote) {
+  const inRemote = new Set(remote);
+  const inLocal = new Set(local);
+  return {
+    rows: new Set([...local, ...remote]).size,
+    missingInProduction: [...inLocal].filter((v) => !inRemote.has(v)).sort(),
+    unknownToRepository: [...inRemote].filter((v) => !inLocal.has(v)).sort(),
+  };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const file = process.argv[2];
-  const { rows, missingInProduction, unknownToRepository } = migrationDrift(readFileSync(file, "utf8"));
-  if (rows === 0) {
-    console.log("::warning::The migration listing had no rows — production's history was not checked.");
+  const [file, dir] = process.argv.slice(2);
+  let remote;
+  try {
+    remote = remoteVersions(JSON.parse(readFileSync(file, "utf8")));
+  } catch {
+    remote = null;
+  }
+  if (!remote) {
+    console.log("::warning::Production's migration history was not a list — not checked.");
     process.exit(0);
   }
+  if (remote.length === 0) {
+    console.log("::warning::Production's migration history had no rows — not checked.");
+    process.exit(0);
+  }
+  const { rows, missingInProduction, unknownToRepository } = migrationDrift(localVersions(readdirSync(dir)), remote);
   for (const v of unknownToRepository) console.log(`::warning::Production has migration ${v}, which the repository does not.`);
   if (missingInProduction.length) {
     console.log(
