@@ -702,6 +702,16 @@ Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behavi
 | CTR-PUB-004 | "lets only the service role call snapshot_for, and nobody anonymous call anything" | As titled |
 | CTR-PUB-005 | "lets staff publish only their own agency's snapshots, and never write the items directly" | `can_see(v_agency) or is_admin()` in all three; items: select only |
 
+### 4.18 `invite-user` — an admin's act, and nothing wider — `invite-user.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-INV-001 | "passes the same admin gate as content-admin, before reading its input" | `requireAdminSession` before `req.json()`; the gate reads `profiles.role` |
+| CTR-INV-002 | "checks the session itself, as content-admin does" | `verify_jwt = false` |
+| CTR-INV-003 | "gives only the three membership roles, never the site admin" | owner, agent, staff; no `role: 'admin'` |
+| CTR-INV-004 | "mails through dorit-mailer, never Supabase Auth's invite" | No `/auth/v1/invite`; `sendMail` to the address |
+| CTR-INV-005 | "logs ids, never the invitee's address" | No `email` in any log call |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed

@@ -472,6 +472,16 @@ within what the consent text discloses ("the team that operates the site for
 her"). Base44's `submitClaim` still keeps its own copy, which a contract test
 holds equal to the module's default.
 
+**Adding a user** ("הוספת משתמש" on `/admin/users`) goes through the
+`invite-user` Edge Function: the admin gate (`_shared/admin.ts`, shared with
+`content-admin`), then the account — the profile holding that address, or a new
+Supabase Auth account made with no password and the address confirmed — the
+membership (organization and role: owner, agent or staff; upserted), and the
+invitation through `dorit-mailer`. Sign-in is Google's: signing in with that
+address links the Google identity to the account already made. Supabase
+Auth's own invite mail is not used — its default sender delivers only to the
+project's team. Nothing to set up beyond the mailer secrets already there.
+
 ### Lead functions on Supabase
 
 `submitLead`, `escalateToHuman` and `logSupportChat` also exist as Supabase Edge

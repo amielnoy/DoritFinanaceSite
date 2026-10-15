@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import InviteUserDialog from "@/components/dorit/admin/InviteUserDialog";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { services } from "@/services";
@@ -85,11 +86,12 @@ export default function AdminUsers() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/60 bg-card">
-        <div className="max-w-[1200px] mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="max-w-[1200px] mx-auto px-6 py-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <Eyebrow>תוכן והגדרות</Eyebrow>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">ניהול משתמשים</h1>
           </div>
+          <InviteUserDialog />
         </div>
       </header>
 
@@ -146,7 +148,7 @@ export default function AdminUsers() {
         ) : !error ? (
           <>
             {/* From 640px: the table. Its organization column is the indicator, so no avatar badge here. */}
-            <table className="hidden w-full border-collapse text-start sm:table">
+            <table className="hidden w-full border-collapse text-start min-[680px]:table">
               <thead>
                 <tr className="border-b border-border">
                   {SORTABLE.map(({ key, label }) => (
@@ -185,7 +187,7 @@ export default function AdminUsers() {
             </table>
 
             {/* Below 640px: the same users as cards, the avatar carrying the primary organization's badge. */}
-            <ul aria-label="משתמשים" className="m-0 flex list-none flex-col gap-3 p-0 sm:hidden">
+            <ul aria-label="משתמשים" className="m-0 flex list-none flex-col gap-3 p-0 min-[680px]:hidden">
               {shown.map((u) => {
                 const primary = primaryOrg(u, dirOrgs);
                 return (

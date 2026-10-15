@@ -104,6 +104,16 @@ describe("/admin/users", () => {
     expect(within(table()).getByRole("columnheader", { name: "משתמש/ת" })).toHaveAttribute("aria-sort", "none");
   });
 
+  it("switches from cards to the table at 680px, as the design asks", async () => {
+    list.mockResolvedValue(USERS);
+    renderAt();
+    await screen.findAllByText("dana@example.com");
+    // jsdom has no layout: the breakpoint is read off the two classes that carry it.
+    expect(table().className).toMatch(/(^|\s)hidden(\s|$)/);
+    expect(table().className).toContain("min-[680px]:table");
+    expect(screen.getByRole("list", { name: "משתמשים" }).className).toContain("min-[680px]:hidden");
+  });
+
   it("shows the organization column in the table without avatar badges, and the badge on the cards", async () => {
     renderAt();
     await screen.findByText("מציג 3 מתוך 3 משתמשים");
