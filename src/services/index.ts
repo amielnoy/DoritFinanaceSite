@@ -167,6 +167,7 @@ export const services: Services = {
     documentLink: (ref) => real().then((s) => s.leadsAdmin.documentLink(ref)),
     transcript: (leadId) => real().then((s) => s.leadsAdmin.transcript(leadId)),
     transcriptLeadIds: () => real().then((s) => s.leadsAdmin.transcriptLeadIds()),
+    countNew: () => real().then((s) => s.leadsAdmin.countNew()),
   },
   contentAdmin: {
     listArticles: (limit) => real().then((s) => s.contentAdmin.listArticles(limit)),

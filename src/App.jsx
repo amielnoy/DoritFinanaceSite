@@ -35,6 +35,8 @@ const Accessibility = lazy(() => import('@/pages/Accessibility'));
 const Account = lazy(() => import('@/pages/Account'));
 const Login = lazy(() => import('@/pages/Login'));
 const Leads = lazy(() => import('@/pages/Leads'));
+// The admin interface's sidebar frame — inside the guards below, never instead of them.
+const AdminLayout = lazy(() => import('@/components/dorit/admin/AdminLayout'));
 const AdminUsers = lazy(() => import('@/pages/AdminUsers'));
 const Blog = lazy(() => import('@/pages/Blog'));
 const BlogPost = lazy(() => import('@/pages/BlogPost'));
@@ -125,21 +127,28 @@ const AuthenticatedApp = () => {
         <Route path="/masleka" element={<Masleka />} />
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login?returnTo=/account" replace />} />}>
-          <Route path="/account" element={<Account />} />
+          {/* The admin's main page sits in the admin frame; a client's is the plain page. */}
+          <Route element={<AdminLayout adminOnly />}>
+            <Route path="/account" element={<Account />} />
+          </Route>
         </Route>
         <Route element={<AdminRoute unauthenticatedElement={<LoginRedirect />} />}>
-          <Route path="/admin/leads" element={<Leads />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/admin/blog" element={<BlogAdmin />} />
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/leads" element={<Leads />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/blog" element={<BlogAdmin />} />
+          </Route>
         </Route>
         {/* The clearinghouse board: the admin or an agency member (StaffRoute).
             Not registered at all until VITE_MASLEKA_ENABLED — a dark build
             answers 404 here. */}
         {MASLEKA_ENABLED ? (
           <Route element={<StaffRoute unauthenticatedElement={<LoginRedirect />} />}>
-            <Route path="/admin/masleka" element={<MaslekaBoard />} />
-            <Route path="/admin/masleka/guide" element={<MaslekaGuide />} />
-            <Route path="/admin/masleka/analysis/:snapshotId" element={<MaslekaAnalysis />} />
+            <Route element={<AdminLayout />}>
+              <Route path="/admin/masleka" element={<MaslekaBoard />} />
+              <Route path="/admin/masleka/guide" element={<MaslekaGuide />} />
+              <Route path="/admin/masleka/analysis/:snapshotId" element={<MaslekaAnalysis />} />
+            </Route>
           </Route>
         ) : null}
         <Route path="*" element={<PageNotFound />} />

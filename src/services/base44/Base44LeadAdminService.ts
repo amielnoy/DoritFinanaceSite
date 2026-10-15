@@ -52,6 +52,10 @@ export class Base44LeadAdminService implements LeadAdminPort {
     return [];
   }
 
+  async countNew(): Promise<number> {
+    return (await this.list()).filter((lead) => lead.status === "new").length;
+  }
+
   private async write(payload: Record<string, unknown>): Promise<void> {
     const receipt = await invokeFunction<{ ok?: boolean; error?: string; rid?: string }>(
       this.client,
