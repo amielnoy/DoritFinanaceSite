@@ -779,6 +779,20 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-CDP-006 | "tells Dorit to keep a stored file, since the site deletes it after two months" | The staff mail carries the line for a `storage:claim-documents/…` file |
 | INT-CDP-007 | "says nothing of it when no file is stored on the site" | No such line — the Base44 and Edge mails still match |
 
+### 4.32 `sheet-retention` — the leads sheet keeps what the database keeps — `INT-SRET-001..007`
+
+`sheet-retention.integration.test.ts` fakes the Sheets API (read, `values:batchClear`) and the rpc `lead_sheet_live` (Architecture N-02).
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-SRET-001 | "refuses a call without the cron secret, and one when no secret is configured" | 401 / 503; nothing cleared |
+| INT-SRET-002 | "does nothing, and says so, when no sheet is configured" | `skipped: sheet_not_configured`; no Sheets call |
+| INT-SRET-003 | "empties an Events row whose lead is anonymized or deleted, and keeps a live lead's" | The ids asked once; rows 3 and 4 → `G:J`, `M`, `O:R`; the live and the already-empty rows untouched |
+| INT-SRET-004 | "goes by the row's own date when it names no lead: 24 months" | ISO text, a serial date and `dd.mm.yyyy` past 24 months cleared; within kept; an unreadable date left and counted |
+| INT-SRET-005 | "empties a Support row's phone and transcript after 12 months, and nothing else" | `C` and `G` of the rows past 12 months |
+| INT-SRET-006 | "fails without clearing anything when the database cannot say who is live" | 500; no clear |
+| INT-SRET-007 | "logs counts, never a cell" | No name, phone, email or transcript in the answer |
+
 ## 5. Pass criteria
 
 All 171 declared cases pass (vitest: 751 with expansions). These assert behaviour, not shape — a failure means the

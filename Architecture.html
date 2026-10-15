@@ -828,8 +828,9 @@
           Retention is now automatic for chat transcripts (12 months),
           clearinghouse codes (9 days), snapshots (24 months) and claim
           documents (2 months) — but <b>not for leads</b>. The privacy policy
-          promises deletion after 24 months; nothing deletes a lead, nor its
-          sheet row, nor the mailed copies. See <span class="ref">N-02</span>.
+          promises deletion after 24 months. Leads are now anonymized after
+          24 months and their sheet rows emptied with them; the mailed copies
+          are still not reached. See <span class="ref">N-02</span>.
         </p>
       </div>
     </section>
@@ -1031,7 +1032,7 @@
             request under Amendment 13 asks about.
           </p>
           <p class="fix"><b>Fix</b> — a <code>delete_after</code> column and a nightly purge like the chat's, with the sheet row cleared by the same job; and say in the policy what happens to mailed copies.</p>
-          <p class="fix"><b>Status · fixed in #223</b> (migration applied 15 October) — a <code>client</code> status, set in <code>/admin/leads</code>, exempts an engagement; every other lead is anonymized nightly at 03:45, 24 months after its last contact, keeping date, source, topic and status; old contact records go with it. Still not reached: the sheet row and the mailed copies.</p>
+          <p class="fix"><b>Status · fixed in #223</b> (migration applied 15 October) — a <code>client</code> status, set in <code>/admin/leads</code>, exempts an engagement; every other lead is anonymized nightly at 03:45, 24 months after its last contact, keeping date, source, topic and status; old contact records go with it. The sheet follows nightly at 04:30 (<code>sheet-retention</code>): an anonymized or deleted lead's row loses its personal cells, an unlinked row after 24 months, a Support row's phone and transcript after 12. Still not reached: the mailed copies.</p>
         </div>
       </div>
 
@@ -1158,7 +1159,7 @@
           <thead><tr><th class="num-col">Step</th><th>Change</th><th>Findings</th><th>Effort</th></tr></thead>
           <tbody>
             <tr><td class="num-col">1</td><td><s>One recipients module; the list as a secret</s> — done, #224 (who receives: unchanged, by decision)</td><td><span class="ref">N-01 R-02</span></td><td>done</td></tr>
-            <tr><td class="num-col">2</td><td><s>Lead retention: a client status, a nightly anonymization</s> — done, #223; the sheet row still open</td><td><span class="ref">N-02</span></td><td>done</td></tr>
+            <tr><td class="num-col">2</td><td><s>Lead retention: a client status, a nightly anonymization</s> — done, #223; the sheet row by <code>sheet-retention</code>; the mailed copies still open</td><td><span class="ref">N-02</span></td><td>done</td></tr>
             <tr><td class="num-col">3</td><td>Content writes to Supabase; the last two agents to the <code>chat</code> function; revoke the connectors (around 27 October)</td><td><span class="ref">N-03</span></td><td>days</td></tr>
             <tr><td class="num-col">4</td><td>Flip the switch defaults; delete the Base44 paths and functions</td><td><span class="ref">N-03 N-04 N-07</span></td><td>a day</td></tr>
             <tr><td class="num-col">5</td><td>A migration-drift check before promotion (<s>function probes</s> — done)</td><td><span class="ref">N-05</span></td><td>a few hours</td></tr>

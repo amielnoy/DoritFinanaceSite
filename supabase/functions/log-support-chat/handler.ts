@@ -12,7 +12,7 @@ import { redact } from './redact.js';
 const FN = 'log-support-chat';
 const log = createLog(FN);
 const SHEET_TAB = (Deno.env.get('SHEET_TAB_SUPPORT') || 'Support').trim();
-const SHEET_COLUMNS = ['מועד', 'ערוץ', 'טלפון', 'נושא', 'תוצאה', 'הודעות', 'תמלול'];
+export const SHEET_COLUMNS = ['מועד', 'ערוץ', 'טלפון', 'נושא', 'תוצאה', 'הודעות', 'תמלול'];
 
 /** תוצאות מוכרות. מה שאינו ברשימה נרשם כ'לא ידוע' ולא כטקסט חופשי. */
 const OUTCOMES: Record<string, string> = {
