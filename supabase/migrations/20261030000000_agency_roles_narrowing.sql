@@ -34,6 +34,34 @@ $$;
 
 -- ── the lead-level helpers every related table asks ────────────────────────
 
+-- Whether a lead belongs to an agency. Every check below that accepts a lead
+-- for a row binds the two, or a User could file a row under another agency
+-- by naming their own lead (a cross-tenant write).
+create function public.lead_in_agency(p_lead_id uuid, p_agency_id uuid) returns boolean
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$
+  select exists (select 1 from public.leads l where l.id = p_lead_id and l.agency_id = p_agency_id)
+$$;
+
+-- The same for a clearinghouse request, and — when the row names a lead too —
+-- that it is the request's own lead.
+create function public.request_in_agency(p_request_id uuid, p_agency_id uuid, p_lead_id uuid) returns boolean
+  language sql
+  stable
+  security definer
+  set search_path = ''
+as $$
+  select exists (
+    select 1 from public.masleka_requests r
+     where r.id = p_request_id
+       and r.agency_id = p_agency_id
+       and (p_lead_id is null or r.lead_id is null or r.lead_id = p_lead_id)
+  )
+$$;
+
 -- A row of an agency that may hang off a lead, or be someone's own lead-less
 -- work: Admin+ and the operator always; a User for their assigned lead, or for
 -- a lead-less row they created.
@@ -45,7 +73,7 @@ create function public.can_work(p_agency_id uuid, p_lead_id uuid, p_created_by u
 as $$
   select public.has_role(p_agency_id, 'admin')
       or public.is_admin()
-      or (p_lead_id is not null and public.can_see_lead(p_lead_id))
+      or (p_lead_id is not null and public.lead_in_agency(p_lead_id, p_agency_id) and public.can_see_lead(p_lead_id))
       or (p_lead_id is null and p_created_by = auth.uid() and public.has_role(p_agency_id, 'user'))
 $$;
 
@@ -121,7 +149,7 @@ drop policy meetings_write_admin on public.meetings;
 create policy meetings_update_lead on public.meetings
   for update to authenticated
   using (public.can_see_lead(lead_id) or public.is_admin())
-  with check (public.can_see_lead(lead_id) or public.is_admin());
+  with check ((public.can_see_lead(lead_id) and public.lead_in_agency(lead_id, agency_id)) or public.is_admin());
 create policy meetings_delete_admin on public.meetings
   for delete to authenticated using (public.has_role(agency_id, 'admin') or public.is_admin());
 -- Meetings are written by the server.
@@ -171,8 +199,9 @@ create policy clearinghouse_snapshots_read_lead on public.clearinghouse_snapshot
          or (request_id is not null and public.can_work_request(request_id)));
 create policy clearinghouse_snapshots_insert_lead on public.clearinghouse_snapshots
   for insert to authenticated
-  with check (public.can_work(agency_id, lead_id, created_by)
-              or (request_id is not null and public.can_work_request(request_id)));
+  with check ((request_id is null or public.request_in_agency(request_id, agency_id, lead_id))
+              and (public.can_work(agency_id, lead_id, created_by)
+                   or (request_id is not null and public.can_work_request(request_id))));
 create policy clearinghouse_snapshots_delete_admin on public.clearinghouse_snapshots
   for delete to authenticated using (public.has_role(agency_id, 'admin') or public.is_admin());
 
@@ -369,6 +398,8 @@ as $$
 $$;
 
 -- ── grants ─────────────────────────────────────────────────────────────────
+revoke execute on function public.lead_in_agency(uuid, uuid)           from public, anon, authenticated;
+revoke execute on function public.request_in_agency(uuid, uuid, uuid)  from public, anon, authenticated;
 revoke execute on function public.can_work(uuid, uuid, uuid)          from public, anon, authenticated;
 revoke execute on function public.can_work_request(uuid)              from public, anon, authenticated;
 revoke execute on function public.can_work_snapshot(uuid)             from public, anon, authenticated;
@@ -376,6 +407,8 @@ revoke execute on function public.can_see_conversation(uuid)          from publi
 revoke execute on function public.staff_role(uuid, uuid)              from public, anon, authenticated;
 revoke execute on function public.my_agency_role(uuid)                from public, anon, authenticated;
 revoke execute on function public.masleka_staff_emails(uuid)          from public, anon, authenticated;
+grant execute on function public.lead_in_agency(uuid, uuid)        to authenticated;
+grant execute on function public.request_in_agency(uuid, uuid, uuid) to authenticated;
 grant execute on function public.can_work(uuid, uuid, uuid)       to authenticated;
 grant execute on function public.can_work_request(uuid)           to authenticated;
 grant execute on function public.can_work_snapshot(uuid)          to authenticated;

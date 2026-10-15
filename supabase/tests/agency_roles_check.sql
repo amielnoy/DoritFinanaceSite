@@ -311,6 +311,24 @@ begin
   perform pg_temp.expect_error(
     $q$select public.clearinghouse_publish('ffffffff-0000-0000-0000-0000000000b2', 'client@roles.test', '[{"title":"t","body":"b","priority":"check"}]')$q$,
     'not_found');
+  -- Never a row in another agency by naming their own lead or request
+  -- (agency B is cccc…b; user1's lead 1 and lead-less request a3 are in A).
+  perform pg_temp.expect_error(
+    $q$insert into public.clearinghouse_snapshots (agency_id, lead_id, client_name, taken_at, interface_version, data) values ('cccccccc-0000-0000-0000-00000000000b', 'eeeeeeee-0000-0000-0000-000000000001', 'x', now(), '1', '{}')$q$,
+    'new row violates row-level security policy for table "clearinghouse_snapshots"');
+  perform pg_temp.expect_error(
+    $q$insert into public.clearinghouse_snapshots (agency_id, request_id, client_name, taken_at, interface_version, data) values ('cccccccc-0000-0000-0000-00000000000b', 'ffffffff-0000-0000-0000-0000000000a3', 'x', now(), '1', '{}')$q$,
+    'new row violates row-level security policy for table "clearinghouse_snapshots"');
+  -- Nor a request of their own paired with another User's lead.
+  perform pg_temp.expect_error(
+    $q$insert into public.clearinghouse_snapshots (agency_id, request_id, lead_id, client_name, taken_at, interface_version, data) values ('cccccccc-0000-0000-0000-00000000000a', 'ffffffff-0000-0000-0000-0000000000a1', 'eeeeeeee-0000-0000-0000-000000000002', 'x', now(), '1', '{}')$q$,
+    'new row violates row-level security policy for table "clearinghouse_snapshots"');
+  perform pg_temp.expect_error(
+    $q$update public.meetings set agency_id = 'cccccccc-0000-0000-0000-00000000000b' where lead_id = 'eeeeeeee-0000-0000-0000-000000000001'$q$,
+    'new row violates row-level security policy for table "meetings"');
+  -- Their own lead's snapshot, in its own agency: allowed.
+  insert into public.clearinghouse_snapshots (agency_id, lead_id, client_name, taken_at, interface_version, data)
+  values ('cccccccc-0000-0000-0000-00000000000a', 'eeeeeeee-0000-0000-0000-000000000001', 'שלי', now(), '1', '{}');
   -- The agency profile: read, never written.
   if not exists (select 1 from public.agency_profiles where agency_id = 'cccccccc-0000-0000-0000-00000000000a') then
     raise exception 'a user cannot read the agency profile';
@@ -353,7 +371,7 @@ declare v_count int;
 begin
   if (select count(*) from public.leads) <> 4 or (select count(*) from public.meetings) <> 2
      or (select count(*) from public.chat_conversations) <> 3 or (select count(*) from public.masleka_requests) <> 4
-     or (select count(*) from public.clearinghouse_snapshots) <> 3 or (select count(*) from public.masleka_access_log) <> 2
+     or (select count(*) from public.clearinghouse_snapshots) <> 4 or (select count(*) from public.masleka_access_log) <> 2
      or (select count(*) from public.contacts) <> 1 then
     raise exception 'an admin does not read the whole agency';
   end if;

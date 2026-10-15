@@ -238,6 +238,13 @@ describe("agency roles, step 2 (narrowing)", () => {
     expect(narrowing).toMatch(/grant execute on function public\.masleka_staff_emails\(uuid\)\s+to service_role;/);
   });
 
+  it("binds a row's lead and request to the row's own agency, so nobody files work under another agency", () => {
+    expect(fns.get("can_work")).toMatch(/p_lead_id is not null and public\.lead_in_agency\(p_lead_id, p_agency_id\) and public\.can_see_lead\(p_lead_id\)/);
+    expect(fns.get("request_in_agency")).toMatch(/r\.agency_id = p_agency_id/);
+    expect(narrowing).toMatch(/create policy clearinghouse_snapshots_insert_lead[\s\S]*?request_id is null or public\.request_in_agency\(request_id, agency_id, lead_id\)/);
+    expect(narrowing).toMatch(/create policy meetings_update_lead[\s\S]*?with check \(\(public\.can_see_lead\(lead_id\) and public\.lead_in_agency\(lead_id, agency_id\)\)/);
+  });
+
   it("pins search_path on every new function and revokes each by name", () => {
     for (const [name, body] of fns) {
       expect(body, name).toContain("set search_path = ''");
