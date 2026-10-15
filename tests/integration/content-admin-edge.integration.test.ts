@@ -233,6 +233,16 @@ describe("content-admin — per action, by agency role", () => {
     expect(writes(r)).toEqual([]);
   });
 
+  it("refuses a publish value that is not a boolean, before the gate could misread it as a draft edit", async () => {
+    for (const published of ["true", 1, "yes", null]) {
+      const db = fakeSupabase({ posts: [post()] });
+      const r = await call({ op: "updateArticle", id: UUID, draft: { published } }, USER, db);
+      expect(r.status).toBe(400);
+      expect(writes(r)).toEqual([]);
+      expect(db.tables.blog_posts[0].published).toBe(false);
+    }
+  });
+
   it("lets an agency Admin publish, unpublish, delete and manage testimonials", async () => {
     const db = fakeSupabase({ posts: [post()], testimonials: [{ id: UUID, agency_id: AGENCY_1 }] });
     expect((await call({ op: "updateArticle", id: UUID, draft: { published: true } }, AGENCY_ADMIN, db)).status).toBe(200);

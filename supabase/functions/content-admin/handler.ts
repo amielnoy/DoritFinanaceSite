@@ -139,6 +139,12 @@ export async function handler(req: Request): Promise<Response> {
         const filter = keyFilter(id);
         if (!filter) return json({ error: 'מזהה לא תקין.' }, 400);
         const fields = pick(draft, ARTICLE_FIELDS);
+        // Only a real boolean: PostgREST would cast "true" or 1 to true, past a
+        // gate that compares with `=== true` (security review of 2a50596).
+        if ('published' in fields && typeof fields.published !== 'boolean') {
+          log('warn', 'article.published_invalid', { rid, op });
+          return json({ error: 'ערך הפרסום אינו תקין.' }, 400);
+        }
         const row = await existing('blog_posts', filter);
         if (!row) {
           log('warn', 'article.not_found', { rid, op });

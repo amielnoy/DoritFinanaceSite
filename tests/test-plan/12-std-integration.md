@@ -859,7 +859,7 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 
 Weakening `assign-lead`'s gate to `user`, or dropping `claim-document-link`'s lead check, fails INT-ROLE-010, -015 and -016.
 
-`content-admin-edge.integration.test.ts` gates per action (agency roles): a User writes and edits drafts, asked in agency 1; a User who would publish, edit a live article, unpublish, delete, or add or delete a testimonial is refused 403 and nothing is written; an agency Admin does all of them; a shared-library article (no agency) is the operator's alone. Its refusal cases now assert "nothing is written": an edit or delete reads its row's agency first, and a caller with no session reads nothing at all. Fixture tokens are 20+ characters, as `bearer()` requires.
+`content-admin-edge.integration.test.ts` gates per action (agency roles): a User writes and edits drafts, asked in agency 1; a User who would publish, edit a live article, unpublish, delete, or add or delete a testimonial is refused 403 and nothing is written; an agency Admin does all of them; a shared-library article (no agency) is the operator's alone; a `published` that is not a boolean (`"true"`, `1`, `null`) is refused 400 before the gate, which compares with `=== true` while PostgREST would cast it. Its refusal cases now assert "nothing is written": an edit or delete reads its row's agency first, and a caller with no session reads nothing at all. Fixture tokens are 20+ characters, as `bearer()` requires.
 
 ## 5. Pass criteria
 
