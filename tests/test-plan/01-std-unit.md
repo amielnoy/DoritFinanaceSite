@@ -990,6 +990,8 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-043 | "passes handoff_or_lead with %s" (2 cases, scoreRun) | A hand-off or a complete lead: no failure for that persona (the user's decision of 2026-10-14: push-04 refused, then booked) |
 | UNIT-EVALCHAT-044 | "fails handoff_or_lead with neither" | `neither a hand-off nor a lead` listed |
 | UNIT-EVALCHAT-045 | "still fails handoff_or_lead on a recommendation" | `recommended a product` listed |
+| UNIT-EVALCHAT-046 | "gives the procedures chat six personas, none of them expecting a lead" (persona file) | `proc-01..06` in order, `expect` `answer` or `handoff`; `answer` for `proc-01`, `proc-02`, `proc-04` |
+| UNIT-EVALCHAT-047 | "judges a procedures persona by the procedures rubric" (`rubricFor`) | `procedures_agent` gets `rubrics.procedures`; support and interview unchanged |
 | UNIT-EVALCHAT-008 | "fails below 90% complete leads" (scoreRun) | 8 of 10: `pass: false` |
 | UNIT-EVALCHAT-009 | "fails on a persona that errored" (scoreRun) | An errored persona fails the run |
 | UNIT-EVALCHAT-010 | "names the persona, the transcript and the tool calls" (formatForJudge) | Persona id, `מבקר:` / `עוזר:` lines and `submitLead` all present |
@@ -998,8 +1000,8 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-013 | "accepts only an ok answer that carries the evaluation tool calls" (isEvalAnswer) | An answer without `eval.toolCalls` is not evaluation mode, so the runner stops before a real lead is made |
 | UNIT-EVALCHAT-014 | "states pass or fail, the lead count and every failure" (report) | `FAIL`, `8 of 10`, each failure as a bullet; `PASS` with `No failures` |
 | UNIT-EVALCHAT-015 | "picks ten transcripts for review, spread across the kinds" (report) | 10 picked, at least 6 persona kinds |
-| UNIT-EVALCHAT-016 | "holds 43 unique personas with a valid expectation" (persona file) | 43 unique ids (31 interview + 12 FAQ), `expect` in lead/handoff/none/answer, 12 lead personas |
-| UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone than `050-000-00NN` and coop-11's `050-1234567`, no other 9-digit number; `id-01` lists `123456782` as forbidden |
+| UNIT-EVALCHAT-016 | "holds 49 unique personas with a valid expectation" (persona file) | 49 unique ids (31 interview + 12 FAQ + 6 procedures), `expect` in lead/handoff/none/answer, 12 lead personas |
+| UNIT-EVALCHAT-017 | "carries only fake phones (050-000-00NN) and the one constructed ID, which the harness watches for" (persona file) | No other phone than `050-000-00NN` and coop-11's `050-1234567`, no other 9-digit number; `id-01` and `proc-05` list `123456782` as forbidden |
 | UNIT-EVALCHAT-018 | "refuses with a clear message, exit 2, and calls nothing" (runner) | `node scripts/eval-chat.mjs` with no env: stderr `Missing CHAT_EVAL_URL, CHAT_EVAL_TOKEN, ANTHROPIC_API_KEY`, exit 2, empty stdout |
 | UNIT-EVALCHAT-019 | "names only the variable that is missing" (runner) | `Missing ANTHROPIC_API_KEY.`, exit 2 |
 | UNIT-EVALCHAT-020 | "accepts an evaluation-mode answer" (preflight) | `ok` |
@@ -1016,7 +1018,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-EVALCHAT-031 | "still refuses an answer whose verdict fields cannot be read" (parseJudgement; as above) | Throws |
 | UNIT-EVALCHAT-032 | "defaults to 24 visitor turns and takes EVAL_MAX_TURNS when it is a sane number" (`maxVisitorTurns`; as above) | 24 by default; `"30"` gives 30; `"0"`, `"-3"`, `"abc"`, `"500"` give 24 |
 | UNIT-EVALCHAT-033 | "reports how many visitor turns each completed lead took, with the median and the longest" (`turnStats`; as above) | Three completed leads of 12, 16, 20 turns: median 16, max 20; none completed gives nulls |
-| UNIT-EVALCHAT-034 | "gives the FAQ chat twelve personas, none of them expecting a lead, and the interview the rest" (persona file) | The twelve `sup-*` ids in order, each `agent: support_agent` and `expect` `answer` or `handoff`; `answer` for `sup-gen-01..04` and `sup-en-01`; any other persona has no `agent`; every `answer` persona is an FAQ one |
+| UNIT-EVALCHAT-034 | "gives the FAQ chat twelve personas, none of them expecting a lead, and the interview the rest" (persona file) | The twelve `sup-*` ids in order, each `agent: support_agent` and `expect` `answer` or `handoff`; `answer` for `sup-gen-01..04` and `sup-en-01`; any other persona has no `agent` or `procedures_agent`; every `answer` persona is an FAQ or procedures one |
 | UNIT-EVALCHAT-035 | "default to the interview, and name their own agent otherwise" (`agentFor`) | No `agent` gives `needs_interview`; `support_agent` as named |
 | UNIT-EVALCHAT-036 | "are judged by the support rubric" (`rubricFor`) | A support persona gets the support rubric; others the interview's |
 | UNIT-EVALCHAT-037 | "open and continue their conversation with their own agent" (`chatBody`) | First body carries `agent: support_agent`, the message, consent `eval` with the given time, attribution `direct`; a continuation carries `conversationId` and `token` and defaults to `needs_interview` |

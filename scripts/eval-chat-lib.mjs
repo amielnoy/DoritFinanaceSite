@@ -11,8 +11,9 @@ export const LEAD_RATE_REQUIRED = 0.9;
 // Which agent a persona talks to: the interview unless it names another.
 export const agentFor = (persona) => persona.agent ?? 'needs_interview';
 
-// The judge's instructions for a persona's agent: the FAQ chat has its own.
-export const rubricFor = (persona, rubrics) => (agentFor(persona) === 'support_agent' ? rubrics.support : rubrics.interview);
+// The judge's instructions for a persona's agent: the FAQ and procedures chats have their own.
+const RUBRIC_BY_AGENT = { support_agent: 'support', procedures_agent: 'procedures' };
+export const rubricFor = (persona, rubrics) => rubrics[RUBRIC_BY_AGENT[agentFor(persona)] ?? 'interview'];
 
 // The function's request body for one visitor message: the first opens the
 // conversation in evaluation mode, the rest carry its id and token.
