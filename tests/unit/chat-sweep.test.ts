@@ -79,12 +79,12 @@ describe("the sweep", () => {
   };
   const sent = async (fn: ReturnType<typeof vi.fn>, call = 0) => (fn.mock.calls[call][0] as Request).json();
 
-  it("claims a batch of support conversations idle past the handler's close (2 h + a margin), then logs each through log-support-chat", async () => {
+  it("claims a batch of support and procedures conversations idle past the handler's close (2 h + a margin), then logs each through log-support-chat", async () => {
     const { store, logSupportChat, log, sweep } = setup([conv("c1")], { c1: [m("user", "q"), m("assistant", "a")] });
     expect(await sweep("rid1")).toBe(1);
     const [roles, cutoff, now, limit] = store.claimSheetLogs.mock.calls[0];
-    expect(roles).toEqual(["support"]);
-    expect(SHEET_LOGGED_ROLES).toEqual(["support"]);
+    expect(roles).toEqual(["support", "procedures"]);
+    expect(SHEET_LOGGED_ROLES).toEqual(["support", "procedures"]);
     expect(now).toBe("2026-10-14T10:00:00.000Z");
     expect(Date.parse(now) - Date.parse(cutoff)).toBe(SHEET_LOG_IDLE_MS);
     expect(SHEET_LOG_IDLE_MS).toBe(IDLE_MS + SHEET_LOG_MARGIN_MS);

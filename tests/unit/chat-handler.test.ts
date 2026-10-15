@@ -736,6 +736,33 @@ describe("HTTP", () => {
   });
 });
 
+describe("the procedures role", () => {
+  const firstProcedures = (message = "איך מושכים כספים מקופת גמל?") => ({ ...first(message), agent: "procedures_agent" });
+
+  it("serves procedures_agent with the procedures prompt and the FAQ chat's tools", async () => {
+    const { chat, model, store } = setup({}, [text("כך מושכים…")]);
+    const { status } = await json(await chat(post(firstProcedures())));
+    expect(status).toBe(200);
+    const [conv] = [...store.conversations.values()];
+    expect(conv.role).toBe("procedures");
+    expect(model.calls[0].tools.map((t) => t.name)).toEqual(["listArticles", "readArticle", "escalateToHuman"]);
+    expect(model.calls[0].system[1].text).toContain("סוכן ההליכים");
+  });
+
+  it("never runs a lead save or a sheet log, even when the model names one", async () => {
+    const runTool = vi.fn();
+    const { chat, store } = setup({ runTool }, [
+      toolUse("submitLead", { stage: "complete", name: "x", phone: "0500000000" }),
+      toolUse("logSupportChat", { topic: "x" }),
+      text("…"),
+    ]);
+    await chat(post(firstProcedures()));
+    expect(runTool).not.toHaveBeenCalled();
+    expect(store.messages.map((m) => m.content)).toEqual(expect.arrayContaining(["submitLead: error", "logSupportChat: error"]));
+    expect([...store.conversations.values()][0].status).toBe("open");
+  });
+});
+
 describe("the support role", () => {
   const firstSupport = (message = "מה זה דמי ניהול?") => ({ ...first(message), agent: "support_agent" });
 

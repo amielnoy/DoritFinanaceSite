@@ -26,8 +26,9 @@ import { runTurn, toModelHistory, TurnFailure, type TurnResult } from './turn.ts
 const FN = 'chat';
 const log = createLog(FN);
 
-export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview', support_agent: 'support' };
-const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS, support: SUPPORT_TOOLS };
+export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview', support_agent: 'support', procedures_agent: 'procedures' };
+// The procedures chat answers from published articles and hands off, exactly as the FAQ chat does.
+const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS, support: SUPPORT_TOOLS, procedures: SUPPORT_TOOLS };
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_TURNS = 40;
 export const IDLE_MS = 2 * 60 * 60 * 1000;
