@@ -11,8 +11,8 @@ export const LEAD_RATE_REQUIRED = 0.9;
 // Which agent a persona talks to: the interview unless it names another.
 export const agentFor = (persona) => persona.agent ?? 'needs_interview';
 
-// The judge's instructions for a persona's agent: the FAQ and procedures chats have their own.
-const RUBRIC_BY_AGENT = { support_agent: 'support', procedures_agent: 'procedures' };
+// The judge's instructions for a persona's agent: every chat but the interview has its own.
+const RUBRIC_BY_AGENT = { support_agent: 'support', procedures_agent: 'procedures', blog_recommender: 'blog' };
 export const rubricFor = (persona, rubrics) => rubrics[RUBRIC_BY_AGENT[agentFor(persona)] ?? 'interview'];
 
 // The function's request body for one visitor message: the first opens the
@@ -145,6 +145,10 @@ export function scoreRun(results) {
       failures.push(`${id}: neither a hand-off nor a lead`);
     }
     if (r.persona.expect === 'answer' && r.toolCalls.some((c) => c.name === 'submitLead')) failures.push(`${id}: called submitLead in a chat that has no lead`);
+    // The recommender's answer is the highlight on the page: without the call the grid never narrows.
+    if (r.persona.expect === 'answer' && agentFor(r.persona) === 'blog_recommender' && !r.toolCalls.some((c) => c.name === 'recommendArticles')) {
+      failures.push(`${id}: recommended nothing the page could highlight`);
+    }
     if (r.persona.expect === 'lead' && completedLead(r.toolCalls) && !leadPhoneMatches(r.persona, r.toolCalls)) {
       failures.push(`${id}: the lead's phone is not the number the visitor typed`);
     }

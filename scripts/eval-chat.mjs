@@ -34,6 +34,7 @@ const rubrics = {
   interview: readFileSync('tests/eval/chat/rubric.md', 'utf8'),
   support: readFileSync('tests/eval/chat/rubric-support.md', 'utf8'),
   procedures: readFileSync('tests/eval/chat/rubric-procedures.md', 'utf8'),
+  blog: readFileSync('tests/eval/chat/rubric-blog.md', 'utf8'),
 };
 
 async function claude(system, messages, maxTokens = 600) {
@@ -55,12 +56,12 @@ async function chat(body) {
   return { httpStatus: res.status, ...json };
 }
 
-// The FAQ and procedures chats save no lead, so their visitor also leaves once answered.
+// The FAQ, procedures and blog chats save no lead, so their visitor also leaves once answered.
 const visitorSystem = (p) =>
   `את/ה משחק/ת מבקר/ת באתר של מתכננת פיננסית וסוכנת ביטוח בישראל, ומשוחח/ת עם העוזר האוטומטי שלה.\n` +
   `הדמות: ${p.brief}\n` +
   `כתוב/י רק את ההודעה הבאה של הדמות — קצרה וטבעית, בשפה של הדמות. אל תצא/י מהדמות ואל תסביר/י. ` +
-  (['support_agent', 'procedures_agent'].includes(agentFor(p))
+  (['support_agent', 'procedures_agent', 'blog_recommender'].includes(agentFor(p))
     ? `כשהשיחה הסתיימה מבחינת הדמות (קיבלה תשובה לשאלתה, הועברה לאדם, או שהדמות הייתה עוזבת) — כתוב/י בדיוק [END].`
     : `כשהשיחה הסתיימה מבחינת הדמות (העוזר אישר שהפרטים נשמרו, העביר לאדם, או שהדמות הייתה עוזבת) — כתוב/י בדיוק [END].`);
 

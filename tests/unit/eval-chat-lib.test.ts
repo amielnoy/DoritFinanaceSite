@@ -148,16 +148,16 @@ describe("report", () => {
     const personas = JSON.parse(readFileSync("tests/eval/chat/personas.json", "utf8"));
     const results = personas.map((p: { id: string }) => ({ persona: p, transcript: [], toolCalls: [], judgement }));
     const agents = new Set(pickForReview(results).map((r: { persona: { agent?: string } }) => r.persona.agent ?? "needs_interview"));
-    expect([...agents].sort()).toEqual(["needs_interview", "procedures_agent", "support_agent"]);
+    expect([...agents].sort()).toEqual(["blog_recommender", "needs_interview", "procedures_agent", "support_agent"]);
   });
 });
 
 describe("the persona file", () => {
   const personas = JSON.parse(readFileSync("tests/eval/chat/personas.json", "utf8")) as { id: string; kind: string; expect: string; brief: string; forbidden?: string[] }[];
 
-  it("holds 49 unique personas with a valid expectation", () => {
-    expect(personas).toHaveLength(49);
-    expect(new Set(personas.map((p) => p.id)).size).toBe(49);
+  it("holds 53 unique personas with a valid expectation", () => {
+    expect(personas).toHaveLength(53);
+    expect(new Set(personas.map((p) => p.id)).size).toBe(53);
     for (const p of personas) {
       expect(["lead", "handoff", "handoff_or_lead", "none", "answer"]).toContain(p.expect);
       expect(p.brief.length).toBeGreaterThan(20);
@@ -175,9 +175,16 @@ describe("the persona file", () => {
     for (const p of support) expect(["answer", "handoff"], p.id).toContain(p.expect);
     expect(support.filter((p) => p.expect === "answer").map((p) => p.id)).toEqual(["sup-gen-01", "sup-gen-02", "sup-gen-03", "sup-gen-04", "sup-en-01"]);
     for (const p of personas) {
-      expect([undefined, "support_agent", "procedures_agent"], p.id).toContain((p as { agent?: string }).agent);
-      if (p.expect === "answer") expect(["support_agent", "procedures_agent"], p.id).toContain(agentFor(p));
+      expect([undefined, "support_agent", "procedures_agent", "blog_recommender"], p.id).toContain((p as { agent?: string }).agent);
+      if (p.expect === "answer") expect(["support_agent", "procedures_agent", "blog_recommender"], p.id).toContain(agentFor(p));
     }
+  });
+
+  it("gives the blog recommender four personas, none of them expecting a lead", () => {
+    const blog = personas.filter((p) => agentFor(p) === "blog_recommender");
+    expect(blog.map((p) => p.id)).toEqual(["blog-01", "blog-02", "blog-03", "blog-04"]);
+    expect(blog.filter((p) => p.expect === "answer").map((p) => p.id)).toEqual(["blog-01", "blog-02", "blog-04"]);
+    expect(blog.find((p) => p.id === "blog-03")?.expect).toBe("handoff");
   });
 
   it("gives the procedures chat six personas, none of them expecting a lead", () => {
@@ -187,13 +194,14 @@ describe("the persona file", () => {
     expect(procedures.filter((p) => p.expect === "answer").map((p) => p.id)).toEqual(["proc-01", "proc-02", "proc-04"]);
   });
 
-  it("names the phone a persona types where the run must find it: coop-11's lead, and each procedures hand-off", () => {
+  it("names the phone a persona types where the run must find it: coop-11's lead, and each procedures and blog hand-off", () => {
     const typed = personas.filter((p) => (p as { phone?: string }).phone);
     expect(typed.map((p) => [p.id, (p as { phone?: string }).phone, p.expect])).toEqual([
       ["coop-11", "050-1234567", "lead"],
       ["proc-03", "050-000-0029", "handoff"],
       ["proc-05", "050-000-0030", "handoff"],
       ["proc-06", "050-000-0031", "handoff"],
+      ["blog-03", "050-000-0032", "handoff"],
     ]);
     for (const p of typed) expect(p.brief, p.id).toContain((p as { phone?: string }).phone);
   });
@@ -326,8 +334,9 @@ describe("support personas", () => {
   });
 
   it("judges a procedures persona by the procedures rubric", () => {
-    const rubrics = { interview: "I", support: "S", procedures: "P" };
+    const rubrics = { interview: "I", support: "S", procedures: "P", blog: "B" };
     expect(rubricFor({ agent: "procedures_agent" }, rubrics)).toBe("P");
+    expect(rubricFor({ agent: "blog_recommender" }, rubrics)).toBe("B");
     expect(rubricFor({ agent: "support_agent" }, rubrics)).toBe("S");
     expect(rubricFor({}, rubrics)).toBe("I");
   });
@@ -352,6 +361,16 @@ describe("support personas", () => {
     const bad = scoreRun([leaky]);
     expect(bad.pass).toBe(false);
     expect(bad.failures.join()).toMatch(/sup-01: called submitLead in a chat that has no lead/);
+  });
+
+  it("fail a blog 'answer' persona that recommended nothing the page could highlight", () => {
+    const p = { id: "blog-01", kind: "general", expect: "answer", agent: "blog_recommender", brief: "" };
+    const silent = { persona: p, transcript: [], toolCalls: [{ name: "listArticles", input: {} }], judgement };
+    const marked = { ...silent, toolCalls: [...silent.toolCalls, { name: "recommendArticles", input: { slugs: ["dmei-nihul"] } }] };
+    const bad = scoreRun([silent]);
+    expect(bad.pass).toBe(false);
+    expect(bad.failures.join()).toMatch(/blog-01: recommended nothing the page could highlight/);
+    expect(scoreRun([marked]).pass).toBe(true);
   });
 
   it("fail a hand-off that never carried the phone the visitor typed", () => {
