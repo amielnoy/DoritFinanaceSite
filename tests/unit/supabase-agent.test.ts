@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
+import { CHAT_REQUEST_TIMEOUT_MS, STATUS_POLL_MS, STATUS_RECOVERY_MS, SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
 import { AgentLimitError, AgentUnavailableError, LEAD_SAVED_WITHOUT_REPLY } from "@/services/agent-errors";
 import type { AgentMessage } from "@/services/ports";
 
@@ -211,5 +211,85 @@ describe("SupabaseAgentService", () => {
       await svc.send(conv, "2");
       expect(c.functions.invoke.mock.calls[1][1].body).toEqual({ agent: "needs_interview", conversationId: "late-1", token: "t".repeat(64), message: "2" });
     });
+  });
+});
+
+/**
+ * The page stops waiting at CHAT_REQUEST_TIMEOUT_MS, and a turn whose tools run
+ * long may still finish — saving the lead — after that (review 2026-10-15).
+ * On a conversation that already exists, the adapter then asks the function how
+ * the turn ended before it tells the visitor anything.
+ */
+describe("SupabaseAgentService — a reply that outlived the wait", () => {
+  afterEach(() => vi.useRealTimers());
+
+  type Status = { busy: boolean; leadSaved?: boolean; last?: { role: string; content: string } | null };
+  /** The first message answers at once; the second never does; status requests answer from `statuses`, the last one repeating. */
+  function hanging(statuses: Status[]) {
+    const asked: Record<string, unknown>[] = [];
+    let turns = 0;
+    const invoke: Invoke = async (_name, { body }) => {
+      if (body.status === true) {
+        asked.push(body);
+        const next = statuses.length > 1 ? statuses.shift()! : statuses[0];
+        return { data: { ok: true, status: "open", leadSaved: false, last: null, ...next }, error: null };
+      }
+      turns += 1;
+      if (turns === 1) return { data: { ok: true, conversationId: "srv-1", token: "t".repeat(64), reply: "שלום" }, error: null };
+      return new Promise(() => undefined);
+    };
+    return { invoke, asked };
+  }
+
+  async function secondMessage(statuses: Status[]) {
+    vi.useFakeTimers();
+    const { invoke, asked } = hanging(statuses);
+    const svc = new SupabaseAgentService(client(invoke), () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const cb = vi.fn();
+    svc.subscribe(conv.id, cb);
+    await svc.send(conv, "היי");
+    const sending = svc.send(conv, "0521234567").then(() => "ok", (e) => e);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS + STATUS_POLL_MS);
+    return { outcome: await sending, cb, asked };
+  }
+
+  it("shows the reply the turn produced once it finished, instead of a failure", async () => {
+    const { outcome, cb, asked } = await secondMessage([
+      { busy: true },
+      { busy: false, leadSaved: true, last: { role: "assistant", content: "תודה, הפרטים אצל דורית" } },
+    ]);
+    expect(outcome).toBe("ok");
+    expect(cb.mock.calls.at(-1)![0].at(-1)).toEqual({ role: "assistant", content: "תודה, הפרטים אצל דורית", signal: "lead_saved" });
+    expect(asked[0]).toEqual({ agent: "needs_interview", conversationId: "srv-1", token: "t".repeat(64), status: true });
+  });
+
+  it("says the details were saved when the turn saved the lead but left no reply", async () => {
+    const { outcome, cb } = await secondMessage([{ busy: false, leadSaved: true, last: { role: "user", content: "0521234567" } }]);
+    expect(outcome).toBe("ok");
+    expect(cb.mock.calls.at(-1)![0].at(-1)).toEqual({ role: "assistant", content: LEAD_SAVED_WITHOUT_REPLY, signal: "lead_saved", replyMissing: true });
+  });
+
+  it("fails as before when the turn ended with neither a reply nor a saved lead", async () => {
+    const { outcome, cb } = await secondMessage([{ busy: false, last: { role: "user", content: "0521234567" } }]);
+    expect(outcome).toBeInstanceOf(AgentUnavailableError);
+    expect(cb.mock.calls.at(-1)![0].map((m: AgentMessage) => m.content)).not.toContain("0521234567");
+  });
+
+  it("stops asking after the recovery window and fails", async () => {
+    const { outcome, asked } = await secondMessage([{ busy: true }]);
+    expect(outcome).toBeInstanceOf(AgentUnavailableError);
+    expect(asked.length).toBeLessThanOrEqual(Math.ceil(STATUS_RECOVERY_MS / STATUS_POLL_MS));
+  });
+
+  it("asks nothing after a first message timed out: there is no conversation to ask about", async () => {
+    vi.useFakeTimers();
+    const invoke = vi.fn<Invoke>(() => new Promise(() => undefined));
+    const svc = new SupabaseAgentService(client(invoke), () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const sending = svc.send(conv, "שלום").then(() => "ok", (e) => e);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS);
+    expect(await sending).toBeInstanceOf(AgentUnavailableError);
+    expect(invoke).toHaveBeenCalledTimes(1);
   });
 });

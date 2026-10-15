@@ -736,6 +736,47 @@ describe("HTTP", () => {
   });
 });
 
+/**
+ * The page stops waiting at 40 s while a turn may run on — its tools outside the
+ * 25 s model budget — and save the lead. It then asks how the turn ended instead
+ * of telling the visitor it failed (review 2026-10-15). A status request runs no turn.
+ */
+describe("a status request", () => {
+  const status = (id: unknown, token = TOKEN) => ({ agent: "needs_interview", conversationId: id, token, status: true });
+
+  it("says the turn is still running while it holds the conversation", async () => {
+    const { chat, store, model } = setup({}, [text("שלום! מה שלומך?")]);
+    const { body } = await json(await chat(post(first())));
+    const id = body.conversationId as string;
+    store.conversations.get(id)!.busy_until = new Date(Date.now() + 60_000).toISOString();
+    const calls = model.calls.length;
+    const res = await json(await chat(post(status(id))));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, busy: true });
+    expect(model.calls.length).toBe(calls);
+  });
+
+  it("answers how the last turn ended: its reply, and whether the lead was saved", async () => {
+    const { chat, store } = setup({}, [text("שלום! מה שלומך?")]);
+    const { body } = await json(await chat(post(first())));
+    const id = body.conversationId as string;
+    const res = await json(await chat(post(status(id))));
+    expect(res.body).toMatchObject({ ok: true, busy: false, leadSaved: false, last: { role: "assistant", content: "שלום! מה שלומך?" } });
+    store.conversations.get(id)!.status = "lead_saved";
+    expect((await json(await chat(post(status(id))))).body).toMatchObject({ leadSaved: true });
+  });
+
+  it("refuses a status request without the conversation's token, and runs nothing", async () => {
+    const { chat, model } = setup({}, [text("שלום! מה שלומך?")]);
+    const { body } = await json(await chat(post(first())));
+    const calls = model.calls.length;
+    const res = await json(await chat(post(status(body.conversationId, "b".repeat(64)))));
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ ok: false, code: "gone" });
+    expect(model.calls.length).toBe(calls);
+  });
+});
+
 describe("the blog role", () => {
   const firstBlog = (message = "על דמי ניהול") => ({ ...first(message), agent: "blog_recommender" });
 

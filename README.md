@@ -913,7 +913,12 @@ site's adapter hands the page the same ```` ```recommended ```` block Base44's a
 writes, so /blog reads one protocol and matches a card by slug or id). For the interview it fixes A-59: the model calls `submitLead` and `escalateToHuman` itself, on the
 server, instead of the page parsing a fenced `lead` block. It also keeps a
 redacted transcript that Dorit reads on `/admin/leads` (the "שיחה" button on any
-lead with a linked conversation). Agents not named in `VITE_CHAT_AGENTS` stay on
+lead with a linked conversation). The page stops waiting for a reply at 40 s;
+on a conversation that already exists it then asks the function how the turn
+ended (`status: true` with the conversation's token, every 3 s for up to 60 s)
+and shows the reply or the saved-lead confirmation rather than a failure — a
+turn's tools run outside the model's budget and may finish after the wait.
+Agents not named in `VITE_CHAT_AGENTS` stay on
 Base44, with the fenced block.
 
 Files: `handler.ts` (flow and logs), `prompt.ts`, `tools.ts`, `turn.ts`,
