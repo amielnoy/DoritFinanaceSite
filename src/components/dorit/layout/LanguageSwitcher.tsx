@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Globe } from "lucide-react";
 import { useLocale, useT } from "@/i18n/LocaleContext";
-import { ENABLED_LOCALES, localePath, splitLocale, type Locale } from "@/i18n/locales";
+import { ENABLED_LOCALES, TRANSLATED_ROUTES, localePath, splitLocale, type Locale } from "@/i18n/locales";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * page and its query, and a page that exists in Hebrew only leads to the
  * other language's home.
  */
-const TRANSLATED = new Set(["/", "/tools", "/pension-check", "/claims", "/faq", "/atzmaim-31-12"]);
+const TRANSLATED: ReadonlySet<string> = new Set(TRANSLATED_ROUTES);
 
 export function switchTarget(pathname: string, search: string, hash: string, to: Locale): string {
   const { rest } = splitLocale(pathname);

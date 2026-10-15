@@ -30,7 +30,8 @@
 
 import { access, cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { buildEnv, duplicateTitles, fixtureArticleFor, planArticles } from './published-articles.mjs'
+import { buildEnv, duplicateTitles, fixtureArticleFor, hebrewTitledLocalePages, planArticles } from './published-articles.mjs'
+import { enabledLocales, translatedRoutes } from '../src/i18n/locales.ts'
 
 const DIST = join(process.cwd(), 'dist')
 const PORT = Number(process.env.PRERENDER_PORT ?? 4183)
@@ -174,7 +175,10 @@ async function main() {
     process.exit(1)
   }
   if (articles.warning) console.warn(`\n::warning::${articles.warning}`)
-  const routes = [...ROUTES, ...articles.routes]
+  // English and French, when the build serves them (VITE_LOCALES): the same
+  // pages under /en and /fr, each written to dist/en/<route>.html. Unset, this
+  // adds nothing and the build is what it was.
+  const routes = [...ROUTES, ...translatedRoutes(enabledLocales(env.VITE_LOCALES)), ...articles.routes]
 
   const server = await preview({
     preview: { port: PORT, host: '127.0.0.1', strictPort: true },
@@ -318,6 +322,19 @@ async function main() {
       `\nPrerender gave more than one route the same title — the per-route head did not apply, ` +
         `or two published articles share a title. Refusing to ship pages that compete with each other:\n` +
         dupes.map((d) => `  "${d.title}": ${d.routes.join(', ')}`).join('\n'),
+    )
+    process.exit(1)
+  }
+
+  // An English or French page whose title is Hebrew — whole, or a Hebrew site
+  // name after an English title — is the head of the wrong language (it was
+  // "Self-check tools | דורית גוב ארי — …" before siteNameIn).
+  const wrongLanguage = hebrewTitledLocalePages(results)
+  if (wrongLanguage.length) {
+    console.error(
+      `
+Prerender gave an English or French page a Hebrew title:\n` +
+        wrongLanguage.map((r) => `  ${r.route}: "${r.title}"`).join('\n'),
     )
     process.exit(1)
   }

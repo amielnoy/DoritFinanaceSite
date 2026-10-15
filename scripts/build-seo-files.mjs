@@ -14,6 +14,7 @@ import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { FAQ_ENTRIES } from '../src/content/faq.ts'
+import { enabledLocales, translatedRoutes } from '../src/i18n/locales.ts'
 import { buildEnv, loadPublishedArticles } from './published-articles.mjs'
 import { buildLlms, buildLlmsFull, buildSitemap, originFromSitemap, withBuiltPages } from './seo-files.mjs'
 
@@ -22,8 +23,10 @@ const COLUMNS = 'slug,title,excerpt,body,updated_at,created_at'
 
 async function main() {
   let loaded
+  let env
   try {
-    loaded = await loadPublishedArticles(await buildEnv(), { columns: COLUMNS })
+    env = await buildEnv()
+    loaded = await loadPublishedArticles(env, { columns: COLUMNS })
   } catch (err) {
     console.error(`\n::error::SEO files: ${err.message}`)
     process.exit(1)
@@ -45,11 +48,15 @@ async function main() {
   const origin = originFromSitemap(sitemapTemplate)
   const faq = FAQ_ENTRIES.map(({ q, a }) => ({ q, a }))
 
-  await writeFile(join(DIST, 'sitemap.xml'), buildSitemap(sitemapTemplate, articles), 'utf8')
+  // The English and French pages, only when the build serves them (VITE_LOCALES).
+  const localeRoutes = translatedRoutes(enabledLocales(env.VITE_LOCALES))
+  await writeFile(join(DIST, 'sitemap.xml'), buildSitemap(sitemapTemplate, articles, localeRoutes), 'utf8')
   await writeFile(join(DIST, 'llms.txt'), buildLlms(llmsTemplate, origin, articles), 'utf8')
   await writeFile(join(DIST, 'llms-full.txt'), buildLlmsFull(llmsTemplate, origin, faq, articles), 'utf8')
 
-  console.log(`SEO files: ${articles.length} articles and ${faq.length} questions on ${origin}.`)
+  console.log(
+    `SEO files: ${articles.length} articles, ${faq.length} questions and ${localeRoutes.length} English/French pages on ${origin}.`,
+  )
 }
 
 main().catch((err) => {

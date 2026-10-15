@@ -4,7 +4,7 @@ import Footer from "@/components/dorit/layout/Footer";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import PensionCheckForm from "@/components/dorit/forms/PensionCheckForm";
 import { PENSION_CHECK } from "@/config/offers";
-import { SITE_NAME, breadcrumbLd, useSeo } from "@/lib/seo";
+import { breadcrumbLd, siteNameIn, useSeo } from "@/lib/seo";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 import { localePath } from "@/i18n/locales";
 
@@ -25,7 +25,7 @@ export default function PensionCheck() {
   const tc = useT("common");
   const locale = useLocale();
   useSeo({
-    title: `${t("seo.title")} | ${SITE_NAME}`,
+    title: `${t("seo.title")} | ${siteNameIn(locale)}`,
     description: t("seo.description"),
     path: PENSION_CHECK.path,
     locale,

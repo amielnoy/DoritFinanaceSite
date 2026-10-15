@@ -8,7 +8,7 @@ import RetirementCalculator from "@/components/dorit/sections/RetirementCalculat
 import HarHabituachCheck from "@/components/dorit/sections/HarHabituachCheck";
 import { SNAPSHOT_HOME } from "@/config/snapshot";
 import Reveal from "@/components/dorit/primitives/Reveal";
-import { SITE_NAME, breadcrumbLd, useSeo } from "@/lib/seo";
+import { breadcrumbLd, siteNameIn, useSeo } from "@/lib/seo";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { AGENTS } from "@/config/agents";
 import { useLocale, useT } from "@/i18n/LocaleContext";
@@ -36,7 +36,7 @@ export default function Tools() {
   const locale = useLocale();
   const he = locale === "he";
   useSeo({
-    title: `${t("page.seoTitle")} | ${SITE_NAME}`,
+    title: `${t("page.seoTitle")} | ${siteNameIn(locale)}`,
     description:
       t("page.seoDescription"),
     path: "/tools",

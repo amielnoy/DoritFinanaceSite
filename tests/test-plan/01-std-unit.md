@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 946 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1619 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 952 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1625 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1414,6 +1414,12 @@ On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's l
 | UNIT-I18N-023 | "sends Hebrew through the existing functions, untouched" | `…In("he", …)` = `calculator-lead.ts` |
 | UNIT-I18N-024 | "offers an English message with English names and English-formatted shekels" | No Hebrew; "₪3,951 a year … ₪98,765 … ₪2,000" |
 | UNIT-I18N-025 | "formats shekels for the page: Hebrew as before, English and French without direction marks" | he = `formatIls`; "₪123,456"; "123 456 ₪"; no U+200E/U+200F |
+| UNIT-I18N-026 | "lists the translated pages only for the languages the build serves" (`tests/unit/i18n-build.test.ts`) | `[]` for Hebrew only; six per added language |
+| UNIT-I18N-027 | "names exactly the pages App.jsx routes under /en and /fr" | `TRANSLATED_ROUTES` = the routes in App.jsx's locale block |
+| UNIT-I18N-028 | "leaves the sitemap byte for byte as it was when no language is added" | `buildSitemap(template, [], [])` = the template |
+| UNIT-I18N-029 | "adds one entry per English and French page, inside the urlset" | 12 more `<url>`s, each `<loc>` on the site's origin |
+| UNIT-I18N-030 | "flags an English or French page with any Hebrew in its title, and nothing else" | Only `/en/tools` of four |
+| UNIT-I18N-031 | "names the site in each language, Hebrew as it always was" | he = `SITE_NAME`; en and fr without Hebrew |
 
 
 ### 4.55 Organizations — `tests/unit/organizations.test.ts`

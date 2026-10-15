@@ -14,6 +14,7 @@ describe("SEO in a language", () => {
     applySeo({ title: "t", description: "d", path: "/pension-check", locale: "en", translated: true });
     expect(head('link[rel="canonical"]')[0].getAttribute("href")).toMatch(/\/en\/pension-check$/);
     expect(head('meta[property="og:locale"]')[0].getAttribute("content")).toBe("en_US");
+    expect(head('meta[property="og:site_name"]')[0].getAttribute("content")).toBe("Dorit Gov Ari — Financial planner & insurance agent");
     const alternates = Object.fromEntries(head('link[rel="alternate"][hreflang]').map((l) => [l.getAttribute("hreflang"), l.getAttribute("href")]));
     expect(Object.keys(alternates).sort()).toEqual(["en", "fr", "he", "x-default"]);
     expect(alternates.he).toMatch(/\/pension-check$/);
@@ -25,5 +26,6 @@ describe("SEO in a language", () => {
     applySeo({ title: "t", description: "d", path: "/blog" });
     expect(head('link[rel="alternate"][hreflang]')).toHaveLength(0);
     expect(head('meta[property="og:locale"]')[0].getAttribute("content")).toBe("he_IL");
+    expect(head('meta[property="og:site_name"]')[0].getAttribute("content")).toBe("דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח");
   });
 });
