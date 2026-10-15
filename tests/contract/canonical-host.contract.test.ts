@@ -116,9 +116,8 @@ describe("the canonical host has a single source", () => {
     expect(ws, "nothing proxies the agent socket").toBeDefined();
     expect(ws!.destination).toContain("base44.app");
 
-    // Before the catch-all, or it never matches.
-    // The catch-all is the rule that serves the app shell, whatever paths it
-    // leaves out (it skips /assets, so a removed chunk is a 404).
+    // Before the rules that serve the app shell, or a later broadening of
+    // them could swallow it.
     const at = (pred: (r: { source: string; destination: string }) => boolean) => rewrites.findIndex(pred);
     const shell = at((r) => r.destination === "/app");
     expect(shell, "no rule serves the app shell").toBeGreaterThan(-1);

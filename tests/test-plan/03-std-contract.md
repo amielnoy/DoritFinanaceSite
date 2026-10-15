@@ -400,13 +400,32 @@ old origin in its canonical tag, `og:url` and two static JSON-LD blocks.
 **`vercel-functions.contract.test.ts`, old article addresses.** Every
 `/blog/<24 hex>` — a Base44 id, what article links were before slugs — must be
 rewritten to `api/og/blog.ts` with no `has` condition (people get the 301 as
-well as crawlers), before the crawler rule and the SPA catch-all.
+well as crawlers), before the crawler rule and the rules that serve the app shell.
 
 **`vercel-functions.contract.test.ts`, clean URLs.** `cleanUrls` is `true` (so
-`dist/<route>.html` answers `/<route>`), the catch-all rewrites to `/app`, and
+`dist/<route>.html` answers `/<route>`), no rewrite names a `.html` destination
+(that is a 308), the shell is served at `/app`, and
 `api/og/blog.ts` fetches the shell from `${SITE_URL}/app` — no `VERCEL_URL`
 (deployment protection) and no `functions.includeFiles` (it aborts
 `deploy --prebuilt`).
+
+**`spa-routes.contract.test.ts`, which addresses get the app and which a
+404.** The app shell used to answer every path (`/((?!assets/).*)`), so an
+unknown address was a 200 with the home page's canonical and `index, follow`
+(D-05, manual test 2026-10-14). Now only named routes are rewritten to `/app`,
+and anything else gets `dist/404.html` with a 404 status. Every absolute
+`path="…"` in `src/App.jsx` (a `:param` filled with a sample), every English and
+French page in `TRANSLATED_ROUTES`, and an article not yet prebuilt must be
+served the shell — a route added to App.jsx and not to vercel.json works when
+clicked to and 404s on a reload, which is what this fails on. `/nope-xyz`,
+`/blog/a/b`, `/admin`, `/admin/nope`, `/en/nope`, `/de` and a removed
+`/assets/` chunk must not be. `/login`, `/account`, `/masleka`, `/admin/*` and
+`/404` carry `X-Robots-Tag: noindex` (the shell's static head says `index,
+follow`, and only the app corrects it); `/`, `/faq`, `/blog`, an article and
+`/claims` must not. `scripts/prerender.mjs` copies the shell to `404.html`
+first and then renders the not-found page over it. The vercel.json `source`
+syntax is matched by `tests/helpers/vercel-routes.ts`, which covers the subset
+the file uses.
 
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
