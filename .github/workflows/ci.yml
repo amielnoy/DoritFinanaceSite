@@ -534,14 +534,16 @@ jobs:
       - name: Every migration is applied in production
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_MIGRATIONS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
+        # The Management API, not `supabase link`: link also reads the project's
+        # API keys (service_role included); this needs database_migrations_read.
         run: |
-          if ! supabase link --project-ref "$SUPABASE_PROJECT_REF" > link.log 2>&1 < /dev/null; then
-            echo "::warning::Could not link the Supabase project — the migration history was not checked. If the log says project_admin_read, set the SUPABASE_MIGRATIONS_TOKEN secret to an access token that can read the project."; cat link.log; exit 0
+          status=$(curl -sS --max-time 30 -o remote.json -w '%{http_code}' \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/migrations") || status=000
+          if [ "$status" != 200 ]; then
+            echo "::warning::Could not read production's migration history (HTTP $status) — not checked. A scoped token needs database_migrations_read; set SUPABASE_MIGRATIONS_TOKEN to one that has it."; cat remote.json 2>/dev/null; exit 0
           fi
-          if ! supabase migration list --linked > migrations.txt 2> list.log < /dev/null; then
-            echo "::warning::Could not read production's migration history — not checked."; cat list.log; exit 0
-          fi
-          node scripts/check-migrations.mjs migrations.txt
+          node scripts/check-migrations.mjs remote.json supabase/migrations
 
       # No function named: every directory under supabase/functions except
       # `_shared`, with each one's verify_jwt from supabase/config.toml.
