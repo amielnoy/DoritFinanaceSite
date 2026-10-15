@@ -1370,6 +1370,15 @@ describe("the event log in Google Sheets", () => {
     }
   });
 
+  it("stores formula-like values and leading-zero numbers as text, with one rule in both appenders", () => {
+    // USER_ENTERED runs a cell starting = + - @ (or a tab or CR) as a formula.
+    // The Base44 copy is a hand duplicate of _shared/sheets.ts's sheetCell.
+    const rule = "return /^[=+\\-@\\t\\r]/.test(s) || /^0\\d+$/.test(s) ? `'${s}` : s;";
+    expect(read(join(REPO_ROOT, "supabase/functions/_shared/sheets.ts"))).toContain(rule);
+    expect(contacts).toContain(rule);
+    expect(read(join(REPO_ROOT, "supabase/functions/_shared/sheets.ts"))).toContain("row.map(sheetCell)");
+  });
+
   it("keeps the column order identical in both writers", () => {
     const columns = Object.entries(writers).map(
       ([, src]) => block(src, "const SHEET_COLUMNS = [", "];"),

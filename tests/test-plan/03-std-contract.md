@@ -177,6 +177,13 @@ one fewer person. One case pins the three copies byte-identical; another pins
 that each mailbox gets its own `try`, since one wrapped around the whole loop
 would let the first bounce swallow the rest.
 
+The **sheet cell rule** is duplicated the same way: `upsertContact`'s
+`appendEventRow` carries the line `_shared/sheets.ts`'s `sheetCell` returns, and
+one case pins both to the same text. Under `USER_ENTERED` a cell starting with
+`=`, `+`, `-`, `@`, a tab or a carriage return runs as a formula, so a visitor's
+name could fetch a URL or rewrite the sheet; the leading apostrophe stores it as
+text, as it already did for a phone's leading zero.
+
 A last block covers how the interview agent *ends*. A finished interview has to
 reach a person, and a bare `Lead.create` reaches nobody — it stores the summary
 and sends no mail, so it waits for whoever next opens the leads screen. The

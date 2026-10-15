@@ -525,7 +525,9 @@ message types. The shared Edge modules have unit tests: `edge-google.test.ts`
 (service-account token: two scopes, cached for the hour, failure named without
 the endpoint's words), `edge-ics.test.ts` (the invitation: UTC, escaping,
 75-octet folding, size limit) and `edge-google-apis.test.ts` (calendar event,
-sheet append, PostgREST helpers). The live smoke asks `submit-lead` and
+sheet append — `sheetCell` stores a leading-zero number, and any value that
+starts with `=`, `+`, `-`, `@`, a tab or a carriage return, as text behind a
+leading apostrophe, so a visitor's words never run as a formula — PostgREST helpers). The live smoke asks `submit-lead` and
 `log-support-chat` an empty question in production.
 
 Invitations independent of the Google event — `INT-INV-001..007`, in the Edge
