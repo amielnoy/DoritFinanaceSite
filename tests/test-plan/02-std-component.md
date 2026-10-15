@@ -365,21 +365,19 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-MSK-016 | "is marked noindex" | SeoRouteGuard writes `noindex` on `/masleka` |
 | CMP-MSK-017 | "after a send that stored nothing says so plainly, and keeps both values for the retry" | `not_saved`: "השליחה לא עברה והקוד לא נשמר", "נסו לשלוח שוב", no "ייתכן"; a second click resends the same three values and thanks (decision 2026-10-14) |
 
-### 4.18 `<StaffRoute />` — the clearinghouse board's gate — `tests/component/staff-route.test.tsx`
+### 4.18 `<AgencyRoute />` — an agency screen's gate — `tests/component/agency-route.test.tsx`
+
+Replaces `<StaffRoute />` (agency roles). The role is asked of the database through `services.agency.myRole(agency)` for the current agency (`?agency=` when it is one of the person's, else their own, else agency 1).
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-STF-001 | "sends a signed-out visitor to sign in" | `unauthenticatedElement`; no role lookup |
-| CMP-STF-002 | "admits the platform admin without asking for a membership" | Outlet; no lookup |
-| CMP-STF-003 | "admits a member of the agency" | Outlet |
-| CMP-STF-004 | "turns away a signed-in user with no membership" | Redirect to `/` |
-| CMP-STF-005 | "says so when the role cannot be read, rather than guessing either way" | Alert; no outlet |
-| CMP-STF-006 | "waits while sign-in is still being checked" | Neither outlet nor redirect |
-| CMP-STF-007 | "turns away a membership answer of %s, never rendering the outlet" (3 cases: empty string, `superuser`, `Staff`) | Redirect to `/`; no outlet |
-| CMP-STF-008 | "alerts, never renders the outlet, when the membership answer is undefined" | Alert; no outlet |
-| CMP-STF-009 | "turns away a signed-in user who has no id, without asking" | Redirect to `/`; no lookup |
-| CMP-STF-010 | "does not take %s on the user for the platform admin" (3: `ADMIN`, no role, `owner`) | One lookup, then redirect to `/`; no outlet |
-| CMP-STF-011 | "does not let one user's role reach the next user who signs in" | Second user never sees the outlet; two lookups |
+| CMP-AGR-001 | "sends a signed-out visitor to sign in, asking nothing" | `unauthenticatedElement`; no role lookup |
+| CMP-AGR-002 | "admits the platform operator to every level, a member of no agency" | Outlet at `min="owner"` |
+| CMP-AGR-003..007 | "a %s at a %s screen: %s" | user@user, admin@user, owner@admin admitted; user@admin, admin@owner sent to `/` |
+| CMP-AGR-008 | "sends someone with no role in the agency home" | Redirect to `/` |
+| CMP-AGR-009 | "says it could not check, rather than guessing, when the role cannot be read" | Alert; no outlet |
+| CMP-AGR-010 | "asks about the agency in ?agency= when it is one of the person's" | `myRole(TRUST)`; Owner admitted |
+| CMP-AGR-011 | "ignores an ?agency= that is not the person's, and asks about their own" | Last lookup for agency 1 |
 
 ### 4.19 `<MaslekaBoard />` — the staff board — `tests/component/masleka-board.test.tsx`
 
@@ -800,3 +798,39 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 All 278 declared cases pass (vitest: 308 with expansions). A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
+
+### 4.46 The screens by agency role — `tests/component/agency-roles-ui.test.tsx`
+
+What a User, an Admin and an Owner are offered, with `src/hooks/useAgency` replaced by `tests/helpers/agency-role-mock.ts` (whose `can()` reads the real permissions table). The same mock gives full access in `lead-transcript`, `lead-client-status`, `blog-admin-slug`, `admin-users` and `invite-user`, so their existing cases test what they did.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ROLEUI-001 | "shows a User 'הפניות שלי', with no assignment, no delete and no tracking panel" | Heading הפניות שלי; no מחיקה, no assignee select, no לא שויכו chip, no tracking panel |
+| CMP-ROLEUI-002 | "shows a backend-written status as it is, and not as a choice" | The select's value is `escalated`, its option disabled |
+| CMP-ROLEUI-003 | "gives an Admin the queue: an assignee per lead, the unassigned chip, and delete" | ניהול פניות; delete on each; לא שויכו shows the open unassigned lead only (not a closed one); the assignee options are the agency's members; a choice calls assign with `{ id, userId }` |
+| CMP-ROLEUI-004 | "offers everyone the escalated and partial chips" | Both chips, with counts |
+| CMP-ROLEUI-005 | "shows only the current agency's leads" | Another agency's lead absent |
+| CMP-ROLEUI-006 | "lets a User write drafts only: no publish toggle, no delete, no edit of a live article" | One עריכה (the draft's) |
+| CMP-ROLEUI-007 | "gives an Admin publishing and deleting" | Toggle and delete on both articles |
+| CMP-ROLEUI-008 | "shows a User the members, lets them leave, and offers no change to anyone else" | Three members; no הסרה or role select; עזיבת הסוכנות calls `leave(agency)` |
+| CMP-ROLEUI-009 | "lets an Admin remove a User, saying how many leads go back to the queue, and never touch the Owner" | No הסרה on the Owner; no role select (User only); the confirm names 2 open leads; `remove(agency, user)` |
+| CMP-ROLEUI-010 | "lets the Owner change roles and hand over ownership" | `setRole(agency, u2, 'admin')` — the value read at the change, not after React resets the controlled select; `transferOwnership(agency, u2)` |
+| CMP-ROLEUI-011 | "lets the Owner edit and save every field" | `updateProfile(agency, { displayName, … })` |
+| CMP-ROLEUI-012 | "shows anyone else the details read-only, with no save" | Inputs `readonly`; no שמירה |
+
+Changed for agency roles:
+- **`admin-layout.test.tsx`:**
+  - The operator's sidebar adds פרטי הסוכנות, and counts the unassigned queue.
+  - A User gets the agency's pages without פרטי הסוכנות, with their own new leads counted.
+  - Someone in two agencies gets a switcher, and every link keeps `?agency=`; one agency shows no switcher.
+- **`admin-menu.test.tsx`:**
+  - The operator reads "מפעיל הפלטפורמה" and the unassigned queue.
+  - A User gets הפניות שלי, with the leads as the way in.
+  - An Admin gets the queue.
+- **`floating-header(-masleka).test.tsx`:**
+  - A member's ניהול leads to `/admin/leads`.
+  - The operator's counter is the unassigned queue.
+- **`invite-user.test.tsx`:**
+  - An agency Admin is offered only their agencies and the User role.
+  - A User gets no invite button.
+  - The role offered by default is an Admin's (the operator may give it).

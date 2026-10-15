@@ -9,20 +9,41 @@ import type { MaslekaRequest } from "@/services/ports";
 const labels = (groups: ReturnType<typeof adminNavFor>) => groups.map((g) => [g.title, g.items.map((i) => i.label)]);
 
 describe("adminNavFor", () => {
-  it("gives the admin every page, grouped by task", () => {
-    expect(labels(adminNavFor("admin", true))).toEqual([
+  it("gives the platform operator every page, grouped by task", () => {
+    expect(labels(adminNavFor("operator", true))).toEqual([
       [null, ["ראשי"]],
       ["טיפול שוטף", ["פניות", "בקשות מסלקה"]],
-      ["תוכן והגדרות", ["בלוג", "משתמשים"]],
+      ["תוכן והגדרות", ["בלוג", "משתמשים", "פרטי הסוכנות"]],
     ]);
   });
 
   it("leaves the clearinghouse out while its switch is off", () => {
-    expect(labels(adminNavFor("admin", false))[1]).toEqual(["טיפול שוטף", ["פניות"]]);
+    expect(labels(adminNavFor("operator", false))[1]).toEqual(["טיפול שוטף", ["פניות"]]);
   });
 
-  it("gives agency staff the clearinghouse alone, and drops the groups left empty", () => {
-    expect(labels(adminNavFor("staff", true))).toEqual([["טיפול שוטף", ["בקשות מסלקה"]]]);
+  it("gives an Owner the agency's pages and its details, not the operator's main page", () => {
+    expect(labels(adminNavFor("owner", true))).toEqual([
+      ["טיפול שוטף", ["פניות", "בקשות מסלקה"]],
+      ["תוכן והגדרות", ["בלוג", "משתמשים", "פרטי הסוכנות"]],
+    ]);
+  });
+
+  it("gives an Admin and a User the same rows, but not the agency's details", () => {
+    for (const role of ["admin", "user"] as const) {
+      expect(labels(adminNavFor(role, true))).toEqual([
+        ["טיפול שוטף", ["פניות", "בקשות מסלקה"]],
+        ["תוכן והגדרות", ["בלוג", "משתמשים"]],
+      ]);
+    }
+  });
+
+  it("counts the unassigned queue for Admin+, and a User's own new leads", () => {
+    const leadsRow = (access: Parameters<typeof adminNavFor>[0]) =>
+      adminNavFor(access, true).flatMap((g) => g.items).find((i) => i.to === "/admin/leads")?.counter?.key;
+    expect(leadsRow("operator")).toBe("unassigned");
+    expect(leadsRow("owner")).toBe("unassigned");
+    expect(leadsRow("admin")).toBe("unassigned");
+    expect(leadsRow("user")).toBe("newLeads");
   });
 
   it("gives anyone else nothing", () => {
@@ -32,12 +53,12 @@ describe("adminNavFor", () => {
   it("names a route for every page, each once", () => {
     const routes = ADMIN_NAV.flatMap((g) => g.items.map((i) => i.to));
     expect(new Set(routes).size).toBe(routes.length);
-    expect(routes).toEqual(["/account", "/admin/leads", "/admin/masleka", "/admin/blog", "/admin/users"]);
+    expect(routes).toEqual(["/account", "/admin/leads", "/admin/masleka", "/admin/blog", "/admin/users", "/admin/agency"]);
   });
 
-  it("sends the admin to her main page and staff to the board", () => {
-    expect(adminHome("admin")).toBe("/account");
-    expect(adminHome("staff")).toBe("/admin/masleka");
+  it("sends the operator to their main page and an agency's members to the leads", () => {
+    expect(adminHome("operator")).toBe("/account");
+    for (const role of ["owner", "admin", "user"] as const) expect(adminHome(role)).toBe("/admin/leads");
   });
 });
 

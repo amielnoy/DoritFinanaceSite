@@ -4,20 +4,16 @@ import {
   type MaslekaPort,
   type MaslekaRequest,
   type SnapshotSummary,
-  type StaffRole,
 } from "../ports";
 
 /**
  * The clearinghouse pipeline for a build with no Supabase credentials: never
- * available, and nobody is staff — the same "signed out" stance as
+ * available — the same "signed out" stance as
  * UnconfiguredAccountService, rather than a TypeError from a null client.
  */
 export class UnconfiguredMaslekaService implements MaslekaPort {
   async submitCode(): Promise<void> {
     throw new MaslekaError("unavailable");
-  }
-  async myRole(): Promise<StaffRole | null> {
-    return null;
   }
   async list(): Promise<MaslekaRequest[]> {
     throw new MaslekaError("unavailable");

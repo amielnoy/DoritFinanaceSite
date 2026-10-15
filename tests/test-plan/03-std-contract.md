@@ -660,7 +660,7 @@ itself is proved by `supabase/tests/masleka_check.sql` against a local
 | CTR-MSKD-008 | "lets submit-lead create or reuse a request only behind the same switch" | `await createRequest(` and `await findInvitedRequest(` each called once, inside the guarded block; `rotateMaslekaLink` called once, only under `if (masleka?.reuse)` |
 | CTR-MSKD-009 | "is off in a build that does not set VITE_MASLEKA_ENABLED" | `false` |
 | CTR-MSKD-010 | "is turned on by nothing in the repository" | No `MASLEKA_ENABLED=true` (comment lines aside) in Vercel, Playwright, Vitest, Supabase config, package.json or workflows |
-| CTR-MSKD-011 | "registers the staff pages only when switched on, and the client page always (it then says unavailable)" | Guarded `StaffRoute` block; `/masleka` route; page default `enabled = MASLEKA_ENABLED` |
+| CTR-MSKD-011 | "registers the staff pages only when switched on, and the client page always (it then says unavailable)" | Guarded `<AgencyRoute min="user">` block; `/masleka` route; page default `enabled = MASLEKA_ENABLED` |
 | CTR-MSKD-012 | "recognises "VITE_MASLEKA_ENABLED": "true" as switch-on: true" | Detected (JSON-quoted key with a string true) |
 | CTR-MSKD-013 | "recognises "MASLEKA_ENABLED":true as switch-on: true" | Detected (JSON-quoted key with a bare true) |
 | CTR-MSKD-014 | "recognises MASLEKA_ENABLED: true as switch-on: true" | Detected (unquoted YAML) |
@@ -771,6 +771,22 @@ Step 2 is `20261030000000_agency_roles_narrowing.sql`. It maps `agent`/`staff` t
 It also checks that a User cannot file a snapshot under another agency by naming their own lead or request, cannot pin their own lead-less request, or a request on their own lead, to another User's lead, and cannot move a meeting to another agency; these cases failed against the unbound rules. Reopening the leads, chat or agency-profile policy, or `can_work`, makes it fail. In `masleka_check.sql`, `clearinghouse_analysis_check.sql` and `clearinghouse_publish_check.sql`, the agency-1 "staff" member is now an Admin, the role that still sees the whole agency. `masleka_check.sql` asks `my_agency_role(agency)` and `staff_role(user, agency)`, and checks that the request's mailing list holds the agency's Admins and Owners but not the platform operator. `agency_isolation_check.sql` expects the narrowed USING / WITH CHECK expressions.
 
 `supabase/tests/agency_roles_check.sql` proves the behaviour in PostgreSQL with synthetic agencies (an active A and B, and a suspended one) and people: an Owner, an Admin, two Users, a non-member, the operator, and a suspended agency's Owner. Covered: role ranks and suspension; `can_see_lead` for each person; the leads trigger refuses a User's assignment change and any change of agency, records `assigned_at` / `assigned_by` for an Admin, keeps those two columns from a direct write, clears them on unassign, and lets the server assign only to a member; `set_member_role` and `remove_member` follow the rules above, including last owner, an Admin who cannot touch another Admin, leaving (which unassigns), and transfer of ownership; anon cannot execute the functions; deleting an agency or an account is not refused as a demotion. Breaking any guard, the suspension check or `can_see_lead` makes it fail.
+
+### 4.20 The screens' permissions table — `permissions.contract.test.ts`
+
+`src/config/permissions.ts` chooses what the screens show; the functions and the database decide. This holds the two to one table.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-PERM-001 | "assigning a lead is Admin+ in assign-lead" | `leads.assign: admin`; `allowRole(…, 'admin', …)`; the leads trigger's Admin+ check |
+| CTR-PERM-002 | "deleting a lead and reading contacts are Admin+ in the policies" | `leads_delete_admin`, `contacts_read_admin` |
+| CTR-PERM-003 | "a User works their own leads: status, transcripts, documents and the clearinghouse" | Those actions `user`; `allowLead` / `allowRequest` / `allowRole(AGENCY_1, 'user')`; publish through `can_work_snapshot` |
+| CTR-PERM-004 | "drafts are any member's; publishing, deleting and testimonials are Admin+ in content-admin" | `draft?.published ? 'admin' : 'user'`; removes and `createTestimonial` at `admin` |
+| CTR-PERM-005 | "a shared-library article is the operator's alone" | `blog.sharedLibrary: operator`; a null agency in content-admin |
+| CTR-PERM-006 | "inviting is Admin+, an Admin grants User only, and only an Owner grants Admin or Owner" | invite-user's gate and pre-check; `set_member_role`'s admin branch; `grantableRoles` |
+| CTR-PERM-007 | "the agency profile is the Owner's" | `agency_profiles_update_owner` |
+| CTR-PERM-008 | "the membership history is Admin+" | `membership_events_read_admin` |
+| CTR-PERM-009..011 | `can`, `grantableRoles`, `canManage` | Ranks; no role → nothing; the operator everything but leaving an agency they are not in; nobody changes someone above what they may grant |
 
 ## 5. Runtime counterpart
 

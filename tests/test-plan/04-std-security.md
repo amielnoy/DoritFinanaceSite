@@ -53,7 +53,7 @@ lead inbox.
 | SEC-STA-019 | "pages that consume `?returnTo=` go through the shared guard" | `Login` imports `safeReturnTo` (`Register` went with email/password sign-in) |
 | SEC-STA-020 | "no page reads `returnTo` out of the query string without the guard" | Zero offenders outside `authReturnTo.js` |
 | SEC-STA-021 | "redirects derived from `returnTo` are assigned from the guarded value" | `Login` assigns `window.location.href` from `safeReturnTo()` |
-| SEC-STA-022 | "admin routes stay behind a gate that requires both sign-in and the admin role" | `/admin/leads` and `/admin/blog` inside the `AdminRoute` block; `AdminRoute` falls back to `ProtectedRoute` when signed out and rejects `role !== "admin"` |
+| SEC-STA-022 | "admin routes stay behind a gate that requires sign-in and an agency role (agency roles)" | `/admin/leads`, `/admin/blog`, `/admin/users` inside `<AgencyRoute min="user">`, `/admin/agency` inside `min="owner"`, each registered once; AgencyRoute falls back to ProtectedRoute and turns away `!meets(role, min)`; the role is asked of `services.agency.myRole`; AdminRoute still gates `role !== "admin"` for the operator's own screens |
 | SEC-STA-023 | "no entity that stores personal data is world-readable" | `Lead.rls.read !== true` |
 | SEC-STA-024 | "every entity used by the app has an explicit definition" | Every `base44.entities.X` has a `.jsonc` |
 
@@ -142,7 +142,7 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 
 | ID | Title | Expected result |
 |---|---|---|
-| SEC-STAFF-001 | "keeps the clearinghouse board behind a gate that requires sign-in and a staff role, and only when switched on" | `/admin/masleka` and `/admin/masleka/guide` inside `<StaffRoute>` under `MASLEKA_ENABLED ?`, and nowhere else in `App.jsx`; StaffRoute falls back to ProtectedRoute, redirects a non-member to `/`, asks `myRole()` |
+| SEC-STAFF-001 | "keeps the clearinghouse board behind a gate that requires sign-in and an agency role, and only when switched on" | `/admin/masleka` and `/admin/masleka/guide` inside `<AgencyRoute min="user">` within the `MASLEKA_ENABLED ?` block, and nowhere else in `App.jsx` |
 | SEC-STAFF-002 | "the clearinghouse board keeps a revealed value out of storage, logs and the access log" | `MaslekaBoard.tsx` names no `masleka_access_log` (the server writes it, Ruling 17), no Web Storage or IndexedDB, no `console.`, no analytics call, no history/navigation write |
 
 ## 5. Deviations

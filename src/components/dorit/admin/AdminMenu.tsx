@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MASLEKA_ENABLED } from "@/config/masleka";
-import type { AdminCounts } from "@/hooks/useAdminMenu";
+import { reaches, type AdminAccess, type AdminCounts } from "@/hooks/useAdminMenu";
 import { adminHome } from "./adminNav";
 import CountBadge from "./CountBadge";
 
@@ -25,7 +25,7 @@ import CountBadge from "./CountBadge";
  * on the button, and a click outside closing it.
  */
 export interface AdminMenuProps {
-  access: "admin" | "staff";
+  access: Exclude<AdminAccess, null>;
   counts: AdminCounts;
   name: string;
   roleLabel: string;
@@ -72,14 +72,22 @@ export default function AdminMenu({ access, counts, name, roleLabel, onSignOut }
         <DropdownMenuItem asChild className={ITEM}>
           <Link to={adminHome(access)}>ממשק ניהול</Link>
         </DropdownMenuItem>
-        {access === "admin" ? (
+        {/* Admin+ see the queue they assign; a User, their own new leads. */}
+        {reaches(access, "admin") ? (
           <DropdownMenuItem asChild className={ITEM}>
             <Link to="/admin/leads">
-              <span>פניות חדשות</span>
+              <span>פניות שלא שויכו</span>
+              <CountBadge count={counts.unassigned} label="לא שויכו" className="ms-auto" />
+            </Link>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem asChild className={ITEM}>
+            <Link to="/admin/leads">
+              <span>הפניות שלי</span>
               <CountBadge count={counts.newLeads} label="חדשות" className="ms-auto" />
             </Link>
           </DropdownMenuItem>
-        ) : null}
+        )}
         {MASLEKA_ENABLED ? (
           <DropdownMenuItem asChild className={ITEM}>
             <Link to="/admin/masleka">

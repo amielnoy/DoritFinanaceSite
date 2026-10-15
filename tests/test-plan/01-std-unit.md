@@ -1538,12 +1538,14 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 
 | ID | Test | Expect |
 |---|---|---|
-| UNIT-ANAV-001 | "gives the admin every page, grouped by task" | ראשי; טיפול שוטף: פניות, בקשות מסלקה; תוכן והגדרות: בלוג, משתמשים |
+| UNIT-ANAV-001 | "gives the platform operator every page, grouped by task" | ראשי; טיפול שוטף: פניות, בקשות מסלקה; תוכן והגדרות: בלוג, משתמשים, פרטי הסוכנות |
 | UNIT-ANAV-002 | "leaves the clearinghouse out while its switch is off" | טיפול שוטף holds פניות alone |
-| UNIT-ANAV-003 | "gives agency staff the clearinghouse alone, and drops the groups left empty" | One group, one item |
+| UNIT-ANAV-003 | "gives an Owner the agency's pages and its details, not the operator's main page" | No ראשי; פרטי הסוכנות |
+| UNIT-ANAV-003a | "gives an Admin and a User the same rows, but not the agency's details" | No פרטי הסוכנות |
+| UNIT-ANAV-003b | "counts the unassigned queue for Admin+, and a User's own new leads" | `unassigned` for operator/owner/admin; `newLeads` for a User |
 | UNIT-ANAV-004 | "gives anyone else nothing" | `[]` for `null` |
-| UNIT-ANAV-005 | "names a route for every page, each once" | The five routes, no repeat |
-| UNIT-ANAV-006 | "sends the admin to her main page and staff to the board" | `/account`; `/admin/masleka` |
+| UNIT-ANAV-005 | "names a route for every page, each once" | The six routes, no repeat |
+| UNIT-ANAV-006 | "sends the operator to their main page and an agency's members to the leads" | `/account`; `/admin/leads` |
 | UNIT-ANAV-007 | "%s → %s" (`initials`) | דורית גוב ארי → דג; Dorit → D; an email → its name's letters; empty → ? |
 | UNIT-ANAV-008 | "counts the requests whose code has arrived and is not yet submitted" (`waitingCount`) | Two `code_received` of five → 2; none → 0 |
 
@@ -1600,3 +1602,25 @@ The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). 
 | UNIT-AOL-004 | "plans nothing without a plan" | Both lists empty |
 | UNIT-AOL-005 | "lists ids, Israel-time dates, statuses, sources and topics — never a name, phone or email" | `2026-10-01T09:00:00Z` shows as `2026-10-01 12:00`; no client name, phone or address |
 | UNIT-AOL-006 | "says when there is nothing to assign" | `no open unassigned leads` |
+
+### 4.65 Agency roles in the services — `tests/unit/supabase-agency.test.ts`, `tests/unit/supabase-lead-admin.test.ts` (changed), `tests/unit/masleka-services.test.ts` / `services-wiring` / `lazy-services` (changed)
+
+`SupabaseAgencyService` (the person's agencies and role, the agency profile), the members screen's changes in `SupabaseUsersAdminService`, and the lead service's assignment, unassigned count and claim-document links.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AGY-001 | "lists the person's agencies with their roles, leaving out what they cannot read or do not know" | Two agencies; a suspended (unreadable) one and a `staff` role dropped |
+| UNIT-AGY-002 | "asks my_agency_role for one agency, and reads anything but the three roles as none" | `rpc('my_agency_role', { p_agency_id })`; `staff`, `agent`, null, 1 → null |
+| UNIT-AGY-003 | "fails rather than guessing when the role cannot be read" | Throws |
+| UNIT-AGY-004 | "maps the profile's columns, and writes back only the fields given, by their column names" | `update({ display_name, licence_number })` |
+| UNIT-AGY-005 | "calls a save the policy filtered out an error — only the Owner may" | An empty answer throws |
+| UNIT-AGY-006..009 | "%s goes to member-admin as the person" | `setRole`, `remove`, `leave`, `transferOwnership` → `member-admin` with the op's body and the bearer |
+| UNIT-AGY-010 | "says the function's refusal in its own words, and asks nothing without a session" | `last_owner`'s Hebrew; no call without a token |
+| UNIT-SLA-DOC-001 | "asks claim-document-link, as the person, for this lead's document" | `{ leadId, path }` with the bearer; the returned URL |
+| UNIT-SLA-DOC-002 | "returns a Base44 file URL unchanged, asking nobody" | No call |
+| UNIT-SLA-DOC-003 | "says the function's own refusal — another User's lead, or a document not on it" | The Hebrew refusal |
+| UNIT-SLA-DOC-004 | "asks nothing without a session" | `נדרשת התחברות` |
+| UNIT-SLA-ASG-001 | "assigns through assign-lead, and back to the queue with null" | `{ leadId, userId }`, then `userId: null` |
+| UNIT-SLA-ASG-002 | "counts open leads nobody works, by ids only" | `select('id')`, `is('assigned_user_id', null)`, `not('status','eq','closed')` |
+
+`MaslekaPort.myRole` is gone (the role is the agency's, `services.agency.myRole`): its three cases are removed. `UnconfiguredMaslekaService` "is never available"; the lazy front delegates `masleka.list` and `agency.myRole`. In `admin-users.test.ts` the operator reads "מפעיל הפלטפורמה" and an agency Admin "מנהל/ת", and the search finds each by their own label.

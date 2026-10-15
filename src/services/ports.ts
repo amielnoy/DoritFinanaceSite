@@ -259,6 +259,9 @@ export interface LeadRecord {
   message?: string;
   status: LeadStatus;
   created_date: string;
+  /** The lead's agency, and who works it — null while it waits in the "לא שויכו" queue. */
+  agency_id?: string | null;
+  assigned_user_id?: string | null;
 }
 
 /** Managing received enquiries. Every method here touches personal data. */
@@ -276,10 +279,15 @@ export interface LeadAdminPort {
   /**
    * A link that opens one of a claim's documents. A Base44 file URL is already
    * one; a Supabase Storage reference (`storage:claim-documents/…`) is signed
-   * for a few minutes under the admin's own session, so a link copied out of
-   * the screen stops working rather than lasting for years.
+   * for a few minutes by the claim-document-link function, for whoever may see
+   * that lead — so a link copied out of the screen stops working rather than
+   * lasting for years.
    */
-  documentLink(ref: string): Promise<string>;
+  documentLink(ref: string, leadId: string): Promise<string>;
+  /** Give the lead to a member of its agency, or back to the queue (null). Admin+ (assign-lead). */
+  assign(leadId: string, userId: string | null): Promise<{ mailed: boolean }>;
+  /** Open leads nobody works yet — the Admin's menu counter. Ids only. */
+  countUnassigned(): Promise<number>;
   /** The interview behind a lead, if it came from the chat function; [] otherwise. Read-only. */
   transcript(leadId: string): Promise<TranscriptLine[]>;
   /** The ids of the leads that have a conversation behind them — the screen shows the tab for these and no others. */
@@ -292,7 +300,7 @@ export interface LeadAdminPort {
 export interface AdminUserMembership {
   orgId: string;
   orgName: string;
-  /** The user's role in that organization: owner, agent or staff. */
+  /** The user's role in that organization: owner, admin or user. */
   role: string;
   joinedAt: string;
 }
@@ -315,6 +323,51 @@ export interface UsersAdminPort {
   organizations(): Promise<AdminOrganization[]>;
   /** Adds `email` to an organization in a role, making the account if needed, and mails the invitation (invite-user). */
   invite(input: InviteInput): Promise<InviteResult>;
+  /**
+   * The members screen's changes, through member-admin under the caller's own
+   * session; the database decides who may do which (set_member_role / remove_member).
+   */
+  setRole(agencyId: string, userId: string, role: AgencyRole): Promise<void>;
+  /** Their leads in the agency go back to the unassigned queue. */
+  remove(agencyId: string, userId: string): Promise<void>;
+  leave(agencyId: string): Promise<void>;
+  /** Make `userId` the Owner, then step the caller down to Admin. */
+  transferOwnership(agencyId: string, userId: string): Promise<void>;
+}
+
+/** owner > admin > user — src/config/permissions.ts holds what each may do. */
+export type AgencyRole = "owner" | "admin" | "user";
+
+/** One agency the signed-in person belongs to. */
+export interface MyAgency {
+  id: string;
+  name: string;
+  role: AgencyRole;
+}
+
+/** The agency's public details (agency_profiles) — the Owner's to edit. */
+export interface AgencyProfile {
+  agencyId: string;
+  displayName: string;
+  phoneE164: string;
+  phoneDisplay: string;
+  whatsapp: string;
+  email: string;
+  defaultWhatsappMessage: string;
+  licenceEntity: string;
+  licenceNumber: string;
+  licenceRegulator: string;
+}
+
+/** Who the signed-in person is in their agencies, and the agency's own details. */
+export interface AgencyPort {
+  /** Every agency the person is a member of, with their role — the switcher's list. */
+  myAgencies(userId: string): Promise<MyAgency[]>;
+  /** The person's role in one active agency, or null. Chooses screens; decides nothing. */
+  myRole(agencyId: string): Promise<AgencyRole | null>;
+  profile(agencyId: string): Promise<AgencyProfile | null>;
+  /** Owner (or operator) only — the policy refuses anyone else, and an empty answer is an error. */
+  updateProfile(agencyId: string, fields: Partial<Omit<AgencyProfile, "agencyId">>): Promise<void>;
 }
 
 export interface AdminOrganization {
@@ -325,7 +378,7 @@ export interface AdminOrganization {
 export interface InviteInput {
   email: string;
   orgId: string;
-  role: "owner" | "agent" | "staff";
+  role: AgencyRole;
 }
 
 export interface InviteResult {
@@ -519,7 +572,8 @@ export class AccountLoadError extends Error {
  * the migration grants — never a ciphertext or a token hash.
  * ───────────────────────────────────────────────────────────────────────── */
 
-export type StaffRole = "admin" | "owner" | "agent" | "staff";
+/** A clearinghouse staff member's role is their agency role. */
+export type StaffRole = AgencyRole;
 export type MaslekaStatus = "invited" | "code_received" | "submitted" | "completed" | "expired" | "cancelled";
 export type MaslekaField = "id" | "code";
 
@@ -584,8 +638,6 @@ export class MaslekaError extends Error {
 export interface MaslekaPort {
   /** The client's page: the link's token, their code and their ID. */
   submitCode(token: string, code: string, idNumber: string): Promise<void>;
-  /** The signed-in user's staff role, or null — decides which screens to offer, nothing more. */
-  myRole(): Promise<StaffRole | null>;
   /** Requests still on the board (invited, waiting, submitted, completed), newest first. */
   list(): Promise<MaslekaRequest[]>;
   create(input: NewMaslekaRequest): Promise<MaslekaLink>;

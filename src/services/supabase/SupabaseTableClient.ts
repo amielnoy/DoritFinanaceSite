@@ -11,6 +11,8 @@ export interface SupabaseQuery extends PromiseLike<SupabaseReadResult> {
   or(filters: string): SupabaseQuery;
   /** PostgREST `col=not.<op>.<value>`, as supabase-js's `.not("lead_id", "is", null)`. */
   not(column: string, operator: string, value: unknown): SupabaseQuery;
+  /** PostgREST `col=is.null` — supabase-js's `.is("assigned_user_id", null)`. */
+  is(column: string, value: null): SupabaseQuery;
   order(column: string, options: { ascending: boolean }): SupabaseQuery;
   limit(count: number): SupabaseQuery;
   /** PostgREST `Range` paging, inclusive; supabase-js has it, the narrower fakes may not. */
