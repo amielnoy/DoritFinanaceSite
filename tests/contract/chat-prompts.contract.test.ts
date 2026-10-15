@@ -10,6 +10,7 @@ import {
   INTERVIEW_TOOL_SECTION,
   SUPPORT_TOOL_SECTION,
   PROCEDURES_TOOL_SECTION,
+  BLOG_TOOL_SECTION,
   collapseBlankRuns,
   complianceExcerpt,
   readAgentInstructions,
@@ -137,5 +138,33 @@ describe("procedures.md against the prompt Base44 runs today", () => {
     for (const literal of ["050-831-1776", "dorit@govari-fin.co.il", "L-00107009"]) {
       expect(PROMPTS.procedures).not.toContain(literal);
     }
+  });
+});
+
+const blogInstructions: string = readAgentInstructions(join(REPO_ROOT, "base44/agents/blog_recommender.jsonc"));
+const matches = (l: string, c: { startsWith?: string; equals?: string }) => (c.equals !== undefined ? l === c.equals : l.startsWith(c.startsWith!));
+
+describe("blog.md against the prompt Base44 runs today", () => {
+  it("each replaced or removed line exists exactly once today", () => {
+    const lines = blogInstructions.split("\n");
+    for (const c of BLOG_TOOL_SECTION) expect(lines.filter((l: string) => matches(l, c)), JSON.stringify(c).slice(0, 60)).toHaveLength(1);
+  });
+
+  it("equals today's instructions with only the tool section changed", () => {
+    expect(fillPlaceholders(PROMPTS.blog)).toBe(
+      collapseBlankRuns(withToolSection(blogInstructions, (s: string) => fillPlaceholders(s), BLOG_TOOL_SECTION)),
+    );
+  });
+
+  it("recommends through the tool, never a fenced block, and names no Base44 tool", () => {
+    expect(PROMPTS.blog).toMatch(/recommendArticles/);
+    expect(PROMPTS.blog).toMatch(/listArticles/);
+    expect(PROMPTS.blog).toMatch(/escalateToHuman/);
+    expect(PROMPTS.blog).not.toMatch(/```recommended|BlogPost/);
+    expect(PROMPTS.blog).toMatch(/\(\/blog\/<slug>\)/);
+  });
+
+  it("carries the agency's details as placeholders, not literals", () => {
+    for (const literal of ["050-831-1776", "dorit@govari-fin.co.il", "L-00107009"]) expect(PROMPTS.blog).not.toContain(literal);
   });
 });
