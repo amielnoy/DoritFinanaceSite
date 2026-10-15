@@ -162,4 +162,34 @@ test.describe("Claim submission", () => {
       expect(mockApi.requestsTo("/functions/submitClaim")).toHaveLength(1);
     });
   });
+
+  // D-02, manual test 2026-10-14: picking a file uploaded it at once, with no
+  // type or size check, before the visitor had decided to report anything.
+  test("keeps documents in the browser until the report is sent, and turns away the wrong ones", async ({ page, mockApi }) => {
+    const form = new ClaimFormPage(page);
+    await form.open();
+    const picker = page.getByLabel("לחצו לבחירת קבצים, או גררו לכאן");
+
+    await test_step("pick a program and a PDF", async () => {
+      await picker.setInputFiles([
+        { name: "setup.exe", mimeType: "application/x-msdownload", buffer: Buffer.from("MZ") },
+        { name: "receipt.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4") },
+      ]);
+    });
+
+    await test_step("the program is named and left out; the PDF is listed; nothing is uploaded", async () => {
+      await expect(page.getByText(/"setup\.exe" — ניתן לצרף PDF או תמונה/)).toBeVisible();
+      await expect(page.getByText("receipt.pdf")).toBeVisible();
+      await expect(page.getByText("setup.exe", { exact: true })).toHaveCount(0);
+      expect(mockApi.requestsTo("/UploadFile")).toHaveLength(0);
+    });
+
+    await test_step("send: the PDF is uploaded, then the report carries it", async () => {
+      await form.fillMinimum(REPORTER.name, REPORTER.phone);
+      await form.submit.click();
+      const report = await mockApi.waitForRequest("/functions/submitClaim");
+      expect(mockApi.requestsTo("/UploadFile")).toHaveLength(1);
+      expect((report.body as { documents: string[] }).documents).toHaveLength(1);
+    });
+  });
 });

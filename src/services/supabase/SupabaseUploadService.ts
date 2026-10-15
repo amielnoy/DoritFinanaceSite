@@ -1,4 +1,5 @@
 import type { UploadPort } from "../ports";
+import { claimDocumentType } from "@/config/claimDocuments";
 
 /** Just the calls this adapter makes — see SupabaseAuthClient for why it is narrowed. */
 export interface SupabaseStorageClient {
@@ -7,6 +8,7 @@ export interface SupabaseStorageClient {
       upload(
         path: string,
         file: File,
+        options?: { contentType?: string },
       ): PromiseLike<{ data: { path: string } | null; error: { message: string } | null }>;
       createSignedUrl(
         path: string,
@@ -59,7 +61,15 @@ export class SupabaseUploadService implements UploadPort {
   async upload(file: File): Promise<{ url: string }> {
     const path = agencyObjectPath(file);
 
-    const { error } = await this.client.storage.from(CLAIM_DOCUMENTS_BUCKET).upload(path, file);
+    // The type the bucket checks. A HEIC photo from iOS can arrive with an
+    // empty `type`, and untyped it would be refused as a generic upload.
+    // storage-js sends a File or Blob as its own type and ignores `contentType`
+    // for one, so a file whose type is missing or different is re-typed itself.
+    const contentType = claimDocumentType(file) ?? undefined;
+    const body = contentType && file.type !== contentType ? new File([file], file.name, { type: contentType }) : file;
+    const { error } = await this.client.storage
+      .from(CLAIM_DOCUMENTS_BUCKET)
+      .upload(path, body, contentType ? { contentType } : undefined);
     if (error) throw new Error(`claim document upload failed: ${error.message}`);
 
     return { url: `${CLAIM_DOCUMENT_REF_PREFIX}${path}` };

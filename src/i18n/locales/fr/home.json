@@ -57,6 +57,7 @@
   "quick.errorBoth": "Veuillez indiquer votre nom et votre téléphone.",
   "quick.errorName": "Veuillez indiquer votre nom complet.",
   "quick.errorPhone": "Veuillez indiquer un numéro de téléphone.",
+  "quick.errorPhoneInvalid": "Ce numéro ne semble pas valide — un numéro israélien, commençant par 0 ou +972.",
   "quick.sentTitle": "Message envoyé. Merci.",
   "quick.sentText": "J'ai bien reçu vos coordonnées et je vous recontacterai dès que possible.",
   "quick.again": "Envoyer un autre message",

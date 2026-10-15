@@ -57,6 +57,7 @@
   "quick.errorBoth": "נא למלא שם וטלפון.",
   "quick.errorName": "נא למלא שם מלא.",
   "quick.errorPhone": "נא למלא מספר טלפון.",
+  "quick.errorPhoneInvalid": "מספר הטלפון לא נראה תקין — מספר ישראלי, מתחיל ב-0 או ב-+972.",
   "quick.sentTitle": "ההודעה נשלחה. תודה.",
   "quick.sentText": "קיבלתי את פרטיכם ואחזור אליכם בהקדם האפשרי.",
   "quick.again": "שליחת הודעה נוספת",

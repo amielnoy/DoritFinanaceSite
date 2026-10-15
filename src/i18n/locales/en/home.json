@@ -57,6 +57,7 @@
   "quick.errorBoth": "Please enter your name and phone.",
   "quick.errorName": "Please enter your full name.",
   "quick.errorPhone": "Please enter a phone number.",
+  "quick.errorPhoneInvalid": "That phone number doesn't look right — an Israeli number, starting with 0 or +972.",
   "quick.sentTitle": "Message sent. Thank you.",
   "quick.sentText": "I've received your details and will get back to you as soon as I can.",
   "quick.again": "Send another message",

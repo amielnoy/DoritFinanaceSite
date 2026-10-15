@@ -24,6 +24,7 @@ import {
   withinLimit,
 } from '../_shared/guard.ts';
 import { opsNotice } from '../_shared/ops-notice.ts';
+import { contactPhone } from '../_shared/phone.ts';
 import { NOTIFY_EMAILS, SECONDARY_EMAIL } from '../_shared/recipients.ts';
 
 const FN = 'submit-claim';
@@ -100,6 +101,13 @@ export async function handler(req: Request): Promise<Response> {
       // them, so this is the only check that sees one go missing.
       const ready = { db: supabaseConfigured(), mailer: mailerConfigured() };
       return Response.json({ error: 'נדרשים שם וטלפון', rid, ready }, { status: 400, headers: cors });
+    }
+
+    // A claim nobody can call back about: "abc" and "123" used to be filed
+    // (D-01, manual test 2026-10-14). ClaimForm checks the same rule first.
+    if (!contactPhone(phone)) {
+      log('warn', 'request.rejected', { rid, reason: 'invalid_phone' });
+      return Response.json({ error: 'מספר הטלפון לא נראה תקין', rid }, { status: 400, headers: cors });
     }
 
     const oversized = oversizedField(body);

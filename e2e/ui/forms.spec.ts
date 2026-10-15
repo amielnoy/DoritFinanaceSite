@@ -61,6 +61,12 @@ test.describe("Quick contact form", () => {
       await expect(form.root.getByRole("alert")).toHaveText("נא למלא מספר טלפון.");
     });
 
+    await form.fill({ phone: "abc" });
+    await test_step("a phone Dorit could not call back is named too (D-01)", async () => {
+      await form.send();
+      await expect(form.root.getByRole("alert")).toHaveText(/מספר הטלפון לא נראה תקין/);
+    });
+
     await form.fill({ phone: LEAD.phone });
     await test_step("with both filled the message clears on the next keystroke", async () => {
       await expect(form.root.getByRole("alert")).toBeHidden();

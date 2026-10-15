@@ -72,7 +72,7 @@
   "form.emergency": "In a medical or immediate emergency — call now. This form is for a documented, orderly report of an insured event, with documents attached.",
   "form.choose": "Choose a type…",
   "form.attach": "Attach documents (certificates, reports, receipts, photos)",
-  "form.secure": "Documents are uploaded securely and are available to Dorit only.",
+  "form.secure": "Documents are uploaded securely only when you send the report, and are available to Dorit only.",
   "form.name": "Full name *",
   "form.phone": "Phone *",
   "form.email": "Email (optional)",
@@ -82,8 +82,13 @@
   "form.description": "Description of the event",
   "form.descriptionPlaceholder": "Describe the event: what, when, where, who was involved, and any relevant detail.",
   "form.remove": "Remove",
-  "form.uploading": "Uploading documents…",
   "form.pick": "Click to choose files, or drag them here",
   "form.sending": "Sending…",
-  "form.send": "Send report"
+  "form.send": "Send report",
+  "form.phoneInvalid": "Please enter an Israeli phone number — starting with 0 (or +972), 9–10 digits.",
+  "form.fileType": "\"{name}\" — you can attach a PDF or a photo (JPG, PNG, HEIC, WEBP).",
+  "form.fileSize": "\"{name}\" is larger than 10MB. You can photograph it again at a lower resolution, or email it to Dorit.",
+  "form.fileEmpty": "\"{name}\" is empty and was not attached.",
+  "form.fileCount": "You can attach up to {max} documents to one report.",
+  "form.uploadingCount": "Uploading documents… ({done}/{total})"
 }

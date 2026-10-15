@@ -291,12 +291,25 @@ describe.each(IMPLEMENTATIONS)("$label — a name that is really a payload", ({ 
     expect(r.mailTo(OPS).html).not.toContain("evil.example");
   });
 
+  it("refuses a form whose phone is a payload, and writes nothing", async () => {
+    // A phone has to be one Dorit can call back (D-01), so from a form this
+    // never reaches a mail at all.
+    const r = await run({ ...hostile, phone: '052"><script>alert(1)</script>' });
+    expect(r.status).toBe(400);
+    expect(r.leads).toHaveLength(0);
+    expect(r.emails).toHaveLength(0);
+  });
+
   it("does not turn a hostile phone number into a live link", async () => {
     // The phone is the one field rendered into an href. Anything that is not a
     // digit or a leading + is stripped before it gets there, so the attribute
-    // cannot be escaped out of.
+    // cannot be escaped out of. An interview is the one source whose phone is
+    // not refused for its shape (the model transcribed it), so it is the one
+    // that still reaches the link.
     const r = await run({
       ...hostile,
+      source: "interview",
+      stage: "complete",
       phone: '052"><script>alert(1)</script>',
     });
     const html = r.mailTo(AGENCY).html!;
@@ -348,6 +361,28 @@ describe.each(IMPLEMENTATIONS)("$label — the public entry point's limits", ({ 
     });
     expect(r.status).toBe(400);
     expect(r.leads).toHaveLength(0);
+  });
+
+  // D-01, manual test 2026-10-14: "abc" and "123" were stored as enquiries.
+  it.each(["abc", "123", "050123", "+1 202 555 0143"])("refuses a phone Dorit cannot call back (%s), and writes nothing", async (phone) => {
+    const r = await run({ ...consultation, source: "quick", phone });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toBe("מספר הטלפון לא נראה תקין");
+    expect(r.json.rid).toBeTruthy();
+    expect(r.leads).toHaveLength(0);
+    expect(r.emails).toHaveLength(0);
+  });
+
+  it.each(["050-123-4567", "03 123 4567", "+972 50 123 4567", "97231234567"])("accepts an Israeli mobile or landline (%s)", async (phone) => {
+    const r = await run({ ...consultation, source: "quick", phone });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+  });
+
+  it("does not refuse an interview for its phone's shape — the model wrote it, and the interview would be lost", async () => {
+    const r = await run({ ...consultation, source: "interview", stage: "complete", phone: "חמישים ושתיים 1234567" });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
   });
 
   it("keeps the enquiry but mails no confirmation to something that is not an address", async () => {
