@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 965 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1647 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 969 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1651 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1471,6 +1471,18 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-RCP-002 | "takes the operations list from the NOTIFY_EMAILS secret, and the diary follows" | The secret's list; no fallback once the owner is not notified |
 | UNIT-RCP-003 | "ignores a malformed secret (%j) and keeps the default" (5 cases) | The default list |
 | UNIT-RCP-004 | "never invites anyone who does not receive the enquiry" | Every attendee, invitee and fallback is mailed, for three secrets |
+
+
+### 4.59 Production's migration history — `tests/unit/check-migrations.test.ts`
+
+`scripts/check-migrations.mjs`, run in CI's Supabase deploy job on the output of `supabase migration list --linked`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MIG-001 | "finds what the repository has and production does not, and the reverse" | Two missing in production; one unknown to the repository |
+| UNIT-MIG-002 | "fails the run on a migration missing from production, naming it and the fix" | Exit 1; `::error::` with the versions and `migration repair` |
+| UNIT-MIG-003 | "passes when every migration is applied" | Exit 0 |
+| UNIT-MIG-004 | "warns, not fails, on a listing with no rows" | Exit 0 with `::warning::` |
 
 ## 5. Pass criteria
 

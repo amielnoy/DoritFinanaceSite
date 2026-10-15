@@ -519,6 +519,24 @@ jobs:
         with:
           version: latest
 
+      # Migrations are applied to production by hand (README). Before the
+      # functions that may depend on one go out — and so before Vercel is
+      # promoted, which waits for this job — every migration in the repository
+      # must be in production's history (Architecture N-05; two were applied
+      # but never recorded until 15 October). A listing that cannot be read
+      # warns rather than blocking a deploy on a read failure; drift fails.
+      - name: Every migration is applied in production
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if ! supabase link --project-ref "$SUPABASE_PROJECT_REF" > link.log 2>&1 < /dev/null; then
+            echo "::warning::Could not link the Supabase project — the migration history was not checked."; cat link.log; exit 0
+          fi
+          if ! supabase migration list --linked > migrations.txt 2> list.log < /dev/null; then
+            echo "::warning::Could not read production's migration history — not checked."; cat list.log; exit 0
+          fi
+          node scripts/check-migrations.mjs migrations.txt
+
       # No function named: every directory under supabase/functions except
       # `_shared`, with each one's verify_jwt from supabase/config.toml.
       # --use-api bundles on Supabase's side, so the runner needs no Docker.
