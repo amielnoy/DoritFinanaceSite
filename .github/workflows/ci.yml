@@ -525,12 +525,18 @@ jobs:
       # must be in production's history (Architecture N-05; two were applied
       # but never recorded until 15 October). A listing that cannot be read
       # warns rather than blocking a deploy on a read failure; drift fails.
+      #
+      # Its own token: reading the project (`supabase link`) needs
+      # `project_admin_read`, which the functions-deploy token does not carry —
+      # the first run on main found exactly that. SUPABASE_MIGRATIONS_TOKEN is a
+      # Supabase access token that can read the project; until it is set, the
+      # step falls back to the deploy token and says what is missing.
       - name: Every migration is applied in production
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_MIGRATIONS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if ! supabase link --project-ref "$SUPABASE_PROJECT_REF" > link.log 2>&1 < /dev/null; then
-            echo "::warning::Could not link the Supabase project — the migration history was not checked."; cat link.log; exit 0
+            echo "::warning::Could not link the Supabase project — the migration history was not checked. If the log says project_admin_read, set the SUPABASE_MIGRATIONS_TOKEN secret to an access token that can read the project."; cat link.log; exit 0
           fi
           if ! supabase migration list --linked > migrations.txt 2> list.log < /dev/null; then
             echo "::warning::Could not read production's migration history — not checked."; cat list.log; exit 0
