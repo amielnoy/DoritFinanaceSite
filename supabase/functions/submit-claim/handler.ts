@@ -23,6 +23,7 @@ import {
   sha256Hex,
   withinLimit,
 } from '../_shared/guard.ts';
+import { opsNotice } from '../_shared/ops-notice.ts';
 import { NOTIFY_EMAILS, SECONDARY_EMAIL } from '../_shared/recipients.ts';
 
 const FN = 'submit-claim';
@@ -201,10 +202,19 @@ export async function handler(req: Request): Promise<Response> {
 
     const warnings: string[] = [];
 
-    // The operations mailboxes — one that fails does not stop the others.
+    // The operations mailboxes are told a claim arrived, not whose or what it
+    // says (N-02) — Dorit's copy below is the whole of it. One that fails does
+    // not stop the others.
+    const notice = opsNotice('דיווח אירוע ביטוחי חדש', [
+      ['סוג אירוע', claimType || ''],
+      ['מזהה רשומה', leadId || ''],
+      ['מסמכים מצורפים', String(docList.length)],
+      // No line at all for an unknown channel, as Dorit's copy does.
+      ...(claimChannelText ? [['הגיע/ה דרך', claimChannelText] as [string, string]] : []),
+    ]);
     for (const to of NOTIFY_EMAILS) {
       try {
-        await sendMail(log, { to, subject, body: agentBody, rid, role: 'ops' });
+        await sendMail(log, { to, subject: notice.subject, html: notice.html, text: notice.text, body: notice.text, rid, role: 'ops' });
       } catch (e) {
         log('warn', 'mail.failed', { rid, role: 'ops', err: String((e as Error)?.message ?? e).slice(0, 200) });
         warnings.push(deliveryWarning('notify_email_failed', e));

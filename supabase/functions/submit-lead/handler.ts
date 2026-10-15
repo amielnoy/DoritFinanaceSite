@@ -11,7 +11,7 @@
  * calendar provider. tests/integration/submit-lead.integration.test.ts runs
  * both against one set of cases while both exist.
  */
-import { validCampaign, validChannel, validLandingPath } from '../_shared/attribution.ts';
+import { channelLine, validCampaign, validChannel, validLandingPath } from '../_shared/attribution.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { deviceLabel } from '../_shared/device.ts';
 import { buildClientHtml, type ClientMail } from '../_shared/html.ts';
@@ -26,10 +26,11 @@ import { googleConfigured } from '../_shared/google.ts';
 import { calendarConfigured, createCalendarEvent } from '../_shared/calendar.ts';
 import { appendSheetRow } from '../_shared/sheets.ts';
 import { buildInvitation } from '../_shared/ics.ts';
+import { ADMIN_LEADS_URL, opsNotice, type OpsRow } from '../_shared/ops-notice.ts';
 import {
   INTERVIEW_TRACKS, INVITE_ATTENDEES, INVITE_FALLBACK_GOOGLE, INVITE_ORGANIZER, INTERVIEW_WINDOW_MS, LEAD_FIELD_LIMITS, NOTIFY_EMAILS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB,
-  buildAgentBody, buildAgentHtml, buildClientText, buildInterviewProfile, buildLinksFooter, buildOpsFooter,
-  clientMailFor, completenessLine, eventTypeFor, interviewCompleteness, israelInstant, profileValue,
+  buildAgentBody, buildAgentHtml, buildClientText, buildInterviewProfile, buildLinksFooter,
+  clientMailFor, completenessLine, eventTypeFor, interviewCompleteness, isUrgent, israelInstant, profileValue,
   redact, sameInterviewee, subjectFor, tomorrowInIsrael, wallClock, wantsClearinghouse,
 } from './lead.js';
 // lead.js is plain JavaScript, as Base44's file was. The few `as` casts below
@@ -542,6 +543,16 @@ export async function handler(req: Request): Promise<Response> {
       const calEndIso = wallClock(calStartIso, 30) as string;
       calendarStartedAt = calStartIso;
       const description = `${agentBody}\n\nלייצר קשר ולתאם מעקב.`;
+      // The operating team's diary — the Google event in its owner's calendar and
+      // every invitation but Dorit's — holds what a meeting needs: who, how to
+      // reach them, about what (the user's decision of 2026-10-15, N-02). The
+      // summary and the profile are Dorit's, in her own invitation.
+      const brief = [
+        `${name || '—'}${phone ? ` · ${phone}` : ''}`,
+        `נושא: ${effectiveTopic || '—'}`,
+        `מזהה רשומה: ${leadId || '—'}`,
+        `הפרטים המלאים אצל דורית ובמסך הפניות: ${ADMIN_LEADS_URL}`,
+      ].join('\n');
       // The .ics is capped (20,000 bytes) and a long interview in Hebrew can
       // pass it, which would fail every invitation. The invitation carries the
       // opening of the body; the mail text and the calendar event carry it all.
@@ -555,7 +566,7 @@ export async function handler(req: Request): Promise<Response> {
       calendar = 'אירוע ביומן Google לא נוצר';
       if (calendarConfigured()) {
         try {
-          ev = await createCalendarEvent({ summary: subject, description, startIso: calStartIso, endIso: calEndIso });
+          ev = await createCalendarEvent({ summary: subject, description: brief, startIso: calStartIso, endIso: calEndIso });
           log('info', 'calendar.created', { rid, provider: 'google' });
           calendar = `אירוע נוצר ✓ (google) — ${calStartIso.slice(0, 16).replace('T', ' ')}`;
         } catch (e) {
@@ -574,13 +585,14 @@ export async function handler(req: Request): Promise<Response> {
       // With no event, Gmail's calendar would hold nothing: it gets the invitation.
       const invitees = ev || !INVITE_FALLBACK_GOOGLE ? INVITE_ATTENDEES : [...INVITE_ATTENDEES, INVITE_FALLBACK_GOOGLE];
       const sent = await Promise.all(invitees.map(async (attendee: string) => {
+        const forDorit = attendee === SECONDARY_EMAIL;
         try {
           await sendMail(log, {
             to: attendee,
             subject: `הזמנה: ${subject}`,
-            text: `${description}${ev ? `\n\nהאירוע ביומן: ${ev.htmlLink}` : ''}`,
+            text: `${forDorit ? description : brief}${ev ? `\n\nהאירוע ביומן: ${ev.htmlLink}` : ''}`,
             ics: buildInvitation({
-              uid, start: startAt, end: endAt, summary: subject, description: inviteDescription,
+              uid, start: startAt, end: endAt, summary: subject, description: forDorit ? inviteDescription : brief,
               organizer: INVITE_ORGANIZER, organizerName: 'דורית גוב ארי', attendee,
             }),
             rid,
@@ -661,20 +673,39 @@ export async function handler(req: Request): Promise<Response> {
       warnings.push(deliveryWarning('secondary_email_failed', e));
     }
 
-    // עותק לצוות התפעול — אותה פנייה מלאה, בתוספת נספח המצב. נשלח אחרון
-    // כדי שיוכל לדווח גם על תוצאת היומן, הגיליון וההזמנות. ראו ההערה ליד
-    // NOTIFY_EMAILS. Each mailbox is its own attempt: one that bounces must
-    // not take the others with it.
-    const opsOps = { source, leadId, topic, calendar, sheet, invites, warnings, channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath };
-    const opsHtml = buildAgentHtml(source, data, opsOps);
-    const opsText = `${agentBody}\n\n${buildOpsFooter(source, opsOps)}`;
+    // הודעה לצוות התפעול: שהגיעה פנייה, מאיזה סוג, ומה עלה בגורל היומן,
+    // הגיליון וההזמנות — בלי פרטי הפונה (N-02). הפנייה המלאה אצל דורית
+    // ובמסך הפניות; עותק שלה בתיבה נוספת הוא עותק שאף מחיקה אינה מגיעה אליו.
+    // נשלחת אחרונה כדי לדווח גם על תוצאת היומן, הגיליון וההזמנות. Each
+    // mailbox is its own attempt: one that bounces must not take the others with it.
+    const OPS_TITLES: Record<string, string> = {
+      interview: 'סיכום ראיון היכרות חדש',
+      consultation: 'בקשת ייעוץ חדשה',
+      detailed: 'פנייה מפורטת חדשה',
+    };
+    const opsChannel = channelLine({ channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath });
+    const notice = opsNotice(
+      `${source === 'interview' && isUrgent(data.profile) ? '🔴 דחוף — ' : ''}${details && openInterview ? 'פרטים נוספים — ' : ''}${OPS_TITLES[source] ?? 'פנייה חדשה מהאתר'}`,
+      [
+        ['מקור', source || 'quick'],
+        ['נושא', effectiveTopic || ''],
+        ['מזהה רשומה', leadId || ''],
+        // No line at all for an unknown channel — never an echo of what was sent.
+        ...(opsChannel ? [['הגיע/ה דרך', opsChannel] as OpsRow] : []),
+        ['יומן', calendar],
+        // The row's status, linked to the sheet when the row was written — as Dorit's copy links it.
+        ['גיליון', String(sheet).replace(/ — https:\/\/\S+$/, ''), SHEET_ID && /^נרשם ✓/.test(String(sheet)) ? `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit` : undefined],
+        ['הזמנות', invites],
+        ['תקלות', warnings.length ? warnings.join(', ') : 'אין'],
+      ],
+    );
     await Promise.all(NOTIFY_EMAILS.map(async (to: string) => {
       try {
         await sendMail(log, {
           to,
-          subject,
-          html: opsHtml,
-          text: opsText,
+          subject: notice.subject,
+          html: notice.html,
+          text: notice.text,
           rid,
           role: 'ops',
         });

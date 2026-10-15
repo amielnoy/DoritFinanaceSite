@@ -690,69 +690,44 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   };
 
   /**
-   * Does the outside recipient get the visitor's actual details?
+   * What the operating team's mailboxes receive (N-02; the user's decision of
+   * 2026-10-15): a notice that an enquiry arrived, never the enquiry. Dorit
+   * alone gets the visitor's details by mail.
    *
-   * Read off the send itself, so the consent wording is checked against what
-   * the code does rather than against what someone remembered. Both payload
-   * shapes count, and both carry the whole lead: `agentBody` is the plain-text
-   * notification, `buildAgentHtml(source, data, …)` the same fields laid out in
-   * the site's palette. A send that stopped carrying either — a summary, a bare
-   * "you have a new lead", nothing at all — is the only thing that makes this
-   * false, and that is exactly when the narrower consent promise becomes the
-   * honest one.
+   * Read off the send itself. Both payload shapes of the full lead are named —
+   * `agentBody` is the plain-text notification, `buildAgentHtml(source, data, …)`
+   * the same fields in the site's palette — and neither may reach the ops send.
    *
-   * This pattern has to keep up with the send. If it silently stops matching, the
-   * suite does not go red on a leak — it goes red on the consent text, which is
-   * the wrong end of the problem. The two assertions below are what catch it.
+   * The consent wording does not narrow with it: the team still runs the
+   * database the enquiry is kept in, so "אצל דורית ואצל הצוות שמתפעל את האתר
+   * מטעמה" stays the true sentence, and "אצל דורית בלבד" would not be.
    */
   const outsideGetsFullLead =
-    OPS_FANOUT.test(submitLead) &&
-    (/const opsHtml = buildAgentHtml\(\s*source,\s*data\b/.test(submitLead) ||
-      /const opsText = `\$\{agentBody\}/.test(submitLead));
+    /const opsHtml = buildAgentHtml\(\s*source,\s*data\b/.test(submitLead) ||
+    /const opsText = `\$\{agentBody\}/.test(submitLead);
 
-  it("reads the outside recipient's payload off a send that exists", () => {
-    // Guards the detector above rather than the code: a renamed builder or a
-    // reshaped SendEmail call would quietly turn every check in this block into
-    // an assertion about a branch that no longer runs.
+  it("sends the ops mailboxes a notice, never the enquiry", () => {
     // The list lives in _shared/recipients.ts, which the bundle includes.
     expect(submitLead, "no ops mailbox list found at all").toMatch(/const DEFAULT_NOTIFY_EMAILS = \[/);
-    // Either shape of the same iteration. `submitLead` sends the three copies
-    // concurrently now — in a queue they cost a second of the only latency the
-    // visitor can feel (A-56) — while `submitClaim` still loops. What matters
-    // here is that something walks the list, not how it walks it.
+    // Either shape of the same iteration; what matters is that something walks the list.
     expect(submitLead, "nothing sends to the ops mailboxes").toMatch(OPS_FANOUT);
-    expect(
-      outsideGetsFullLead,
-      "a send to NOTIFY_EMAILS exists but carries neither agentBody nor buildAgentHtml — " +
-        "if that is deliberate, narrow the consent text with it; if the call was just " +
-        "reshaped, teach outsideGetsFullLead the new shape",
-    ).toBe(true);
+    expect(submitLead).toMatch(/subject: notice\.subject,\s*html: notice\.html,\s*text: notice\.text,/);
+    expect(outsideGetsFullLead, "the ops copy carries the full lead again — N-02").toBe(false);
+    // The hand-off picks its payload per recipient: the notice for the team.
+    expect(escalate).toMatch(/html: forDorit \? escalationHtml : notice\.html/);
   });
 
-
-  it("keeps the consent notice honest about the second recipient", () => {
-    if (outsideGetsFullLead) {
-      // The visitor's details leave the agency, so the notice may not claim
-      // otherwise — and must say who else holds them.
-      expect(
-        consent,
-        'submitLead sends the full lead to NOTIFY_EMAIL, so the consent text may no longer say "אצל דורית בלבד"',
-      ).not.toMatch(/אצל דורית בלבד/);
-      expect(consent).toMatch(/הצוות שמתפעל את האתר מטעמה/);
-    } else {
-      // Nothing identifying leaves, so the narrower promise is the honest one.
-      expect(consent).toMatch(/אצל דורית בלבד/);
-    }
+  it("keeps the consent notice naming the team, which runs the records", () => {
+    expect(consent).not.toMatch(/אצל דורית בלבד/);
+    expect(consent).toMatch(/הצוות שמתפעל את האתר מטעמה/);
   });
 
-  it("keeps the privacy policy saying the same thing as the consent notice", () => {
+  it("keeps the privacy policy saying the same thing as the consent notice, and what the team's mail holds", () => {
     // Two screens, one fact. They drift when only one of them is remembered.
-    if (outsideGetsFullLead) {
-      expect(privacy).toMatch(/לצוות המתפעל את האתר/);
-      expect(privacy).not.toMatch(/מוגבלת בהרשאות לדורית בלבד/);
-    } else {
-      expect(privacy).toMatch(/מוגבלת בהרשאות לדורית בלבד/);
-    }
+    expect(privacy).toMatch(/לצוות המתפעל את האתר/);
+    expect(privacy).not.toMatch(/מוגבלת בהרשאות לדורית בלבד/);
+    expect(privacy).toMatch(/הצוות המתפעל את האתר מקבל הודעה על פנייה\s+חדשה בלי פרטי הפונה/);
+    expect(privacy).toMatch(/העותקים בדוא״ל וביומן\s+נמחקים בתום אותה תקופה/);
   });
 
   it("bumps CONSENT_VERSION past the wording the first notice shipped with", () => {
@@ -1035,9 +1010,9 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   it("renders the handover rather than sending a paragraph", () => {
     // The mail Dorit opens on a phone to decide whether to call someone back.
     expect(escalate).toMatch(/function buildEscalationHtml\(/);
-    expect(escalate).toMatch(/html: escalationHtml/);
+    expect(escalate).toMatch(/html: forDorit \? escalationHtml :/);
     // And the text still travels with it, not instead of it.
-    expect(escalate).toMatch(/text: notification/);
+    expect(escalate).toMatch(/text: forDorit \? notification :/);
   });
 
   it("keeps every copy of redact() identical", () => {

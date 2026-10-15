@@ -211,6 +211,19 @@ describe.each(IMPLEMENTATIONS)("$label — the operations mailboxes", ({ run }) 
     }
   });
 
+  it("tells the operations team a hand-off happened and why, never who asked or what they said", async () => {
+    const r = await run(escalation);
+    const details = [escalation.name, escalation.phone, escalation.email, escalation.summary];
+    for (const d of details) expect(r.mailTo(AGENCY).text ?? "", `agency: ${d}`).toContain(d);
+    for (const to of [OPS, OPS2]) {
+      const mail = r.mailTo(to);
+      const all = `${mail.subject}\n${mail.text ?? ""}\n${mail.html ?? ""}`;
+      for (const d of details) expect(all, `${to}: ${d}`).not.toContain(d);
+      expect(mail.subject, to).toContain("העברה לטיפול אנושי");
+      expect(mail.text, to).toContain("https://govari-fin.co.il/admin/leads");
+    }
+  });
+
   it("still reports notified when only one mailbox bounces", async () => {
     // An escalation that reached nobody is a regulatory failure; one that
     // reached two of three is not, and must not be reported as one.

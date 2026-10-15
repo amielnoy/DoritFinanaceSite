@@ -458,7 +458,14 @@ value and write it to both ends.
 `supabase/functions/_shared/recipients.ts` — the operating team's mailboxes
 (`NOTIFY_EMAILS`) and the agent (`SECONDARY_EMAIL`); the diary's attendees and
 the meeting invitations are derived from them, so nobody is invited who did not
-receive the enquiry. The optional Edge Function secret **`NOTIFY_EMAILS`**
+receive the enquiry. Since N-02 only Dorit receives the enquiry itself: the
+team's mailboxes get a notice without the visitor's details
+(`_shared/ops-notice.ts`: kind, topic, record id, how the save, diary and mails
+went, and a link to `/admin/leads`), and the team's diary — the Google event and
+the `amielnoy@outlook.com` invitation — holds the name, phone and topic of a
+meeting, not the summary or profile. Dorit's invitation carries the whole
+enquiry. Base44's `submitClaim` twin (off production's path, retired by N-03)
+still sends the team the full report. The optional Edge Function secret **`NOTIFY_EMAILS`**
 (comma-separated) replaces the team's list without a code change; an empty or
 malformed value is ignored and the default stands. Whoever is on it must stay
 within what the consent text discloses ("the team that operates the site for

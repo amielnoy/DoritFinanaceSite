@@ -59,12 +59,13 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 ### 4.1 `submitLead` — the enquiry lands — `INT-LEAD-001..009`
 
 Stores the lead, mails all three recipients and books the calendar in one call;
-pins `status` to `new` rather than trusting the caller; gives the agency and the
-operations team the same details in **both** the HTML and the text copy; adds the
-operational appendix to the operations copy only; reports the calendar and sheet
-outcome inside it; sends every copy as HTML with a plain-text twin; breaks the
-staff copy into titled blocks; and skips the visitor's confirmation when no
-address was given.
+pins `status` to `new` rather than trusting the caller; gives the agency the
+details in **both** the HTML and the text copy, and the operations team a notice
+with **none** of them (N-02: the kind, topic, record id, the delivery and a link
+to `/admin/leads` — `_shared/ops-notice.ts`); reports the calendar and sheet
+outcome in that notice only; sends every copy as HTML with a plain-text twin;
+breaks Dorit's copy into titled blocks; and skips the visitor's confirmation when
+no address was given.
 
 The last two exist because the staff copy used to go out as text alone, and Gmail
 collapsed its newlines into a single running paragraph — eight fields, no line
@@ -169,7 +170,7 @@ does not render; an unanswered field is omitted rather than printed as a dash;
 an identifier echoed into a field is redacted everywhere; the record stores the
 same fields that were mailed, so the two cannot disagree. Two cases cover the
 rest of the contract: the collect-not-advise declaration rides on every
-interview to both staff copies, and the pre-schema free-text path still works —
+interview to Dorit's copy (the operations notice carries no interview), and the pre-schema free-text path still works —
 that is what a mid-deploy agent is still sending.
 
 ### 4.8 `submitLead` — every declared track — `INT-LEAD-049..060`
@@ -189,10 +190,13 @@ markup placed inside a profile value — the same defect class as the hostile-na
 case in §4.2, one layer further in, because the profile is model-written text
 interpolated into HTML that staff open.
 
-### 4.9 `submitLead` / `escalateToHuman` — the operations mailboxes — `INT-LEAD-061..064`, `INT-ESC-018/019`
+### 4.9 `submitLead` / `escalateToHuman` — the operations mailboxes — `INT-LEAD-061..064`, `INT-ESC-018..020`
 
-The operations copy goes to more than one mailbox. Every mailbox receives the
-identical copy, appendix included, while the agency's stays free of it; and each
+The operations copy goes to more than one mailbox. Since N-02 it is a notice, not
+the enquiry: every mailbox receives the identical notice — a link to
+`/admin/leads`, no visitor — while the agency's copy is the whole enquiry and
+free of the delivery report. A hand-off tells the team it happened and why,
+never who asked or what they said (`INT-ESC-020`). Each
 mailbox is its own delivery attempt, verified from both directions — the first
 bouncing must not cost the second, nor the second the first. The risk being
 pinned is not the happy path but a future simplification: one `try` around the
@@ -228,8 +232,10 @@ an entry point. Nothing else in the repository runs this file.
 ### 4.11 `submitClaim` — the claim lands — `INT-CLAIM-001..013`
 
 Previously a known gap, now executed. Stores the claim and tells the agency,
-both operations mailboxes and the reporter; gives every staff mailbox the same
-report; pins `status` and `source` rather than taking them from the caller;
+both operations mailboxes and the reporter; gives Dorit the whole report and the
+operations mailboxes a notice without the reporter's details (N-02; Base44's twin,
+off production's path and retired by N-03, still sends them the report, and is
+compared with the Edge function on Dorit's copy alone); pins `status` and `source` rather than taking them from the caller;
 says so when no documents were attached; skips the confirmation when no address
 was given. The mailbox cases mirror §4.9. The failure cases pin that a claim
 nobody stored fails loudly and mails nobody — worse than an unmailed claim,

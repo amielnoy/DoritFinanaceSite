@@ -95,7 +95,10 @@ async function fingerprint(body: unknown, envPatch: Record<string, string | null
 /**
  * What submit-lead produced for these three interviews before Task 12 touched
  * it (captured from commit 733c9bd, then re-captured after #170 narrowed the
- * invitations to Dorit and the Outlook address, with the clock and fixtures above). A
+ * invitations to Dorit and the Outlook address, and again after N-02 gave the
+ * operations mailboxes a notice instead of the enquiry and the team's diary
+ * the name, phone and topic — Dorit's and the visitor's mails byte for byte
+ * the same — with the clock and fixtures above). A
  * switched-off pipeline must reproduce it exactly: the same mails, byte for
  * byte, the same answer and the same log lines.
  */
@@ -118,9 +121,9 @@ const TODAY = {
     status: 200,
     json: answer,
     mails: [
-      "amielnoy@gmail.com | סיכום ראיון היכרות — אורי לוי | html:58b611cad3c7624e text:9e7c57f030c7be7d ics:-",
-      "amielnoy@outlook.com | הזמנה: סיכום ראיון היכרות — אורי לוי | html:e3b0c44298fc1c14 text:a2d72e70a532e5c2 ics:yes",
-      "amielnoy@outlook.com | סיכום ראיון היכרות — אורי לוי | html:58b611cad3c7624e text:9e7c57f030c7be7d ics:-",
+      "amielnoy@gmail.com | סיכום ראיון היכרות חדש | html:1298c5c035deb856 text:9eb8ee10c2cc0870 ics:-",
+      "amielnoy@outlook.com | הזמנה: סיכום ראיון היכרות — אורי לוי | html:e3b0c44298fc1c14 text:b344439cde9e5518 ics:yes",
+      "amielnoy@outlook.com | סיכום ראיון היכרות חדש | html:1298c5c035deb856 text:9eb8ee10c2cc0870 ics:-",
       "dorit@govari-fin.co.il | הזמנה: סיכום ראיון היכרות — אורי לוי | html:e3b0c44298fc1c14 text:a2d72e70a532e5c2 ics:yes",
       "dorit@govari-fin.co.il | סיכום ראיון היכרות — אורי לוי | html:75ee6c82b0f36d50 text:495f18d212660c37 ics:-",
       "uri@example.com | אישור — קיבלנו את סיכום השיחה · דורית גוב ארי | html:77a84198865c003e text:08969448b0f14f10 ics:-",
@@ -137,8 +140,8 @@ const TODAY = {
     status: 200,
     json: answer,
     mails: [
-      "amielnoy@gmail.com | סיכום ראיון היכרות — אורי לוי | html:e832bb791ca3b830 text:24510590f61d1ec2 ics:-",
-      "amielnoy@outlook.com | סיכום ראיון היכרות — אורי לוי | html:e832bb791ca3b830 text:24510590f61d1ec2 ics:-",
+      "amielnoy@gmail.com | סיכום ראיון היכרות חדש | html:a7dd872f46182f07 text:a4b882a9471e47ed ics:-",
+      "amielnoy@outlook.com | סיכום ראיון היכרות חדש | html:a7dd872f46182f07 text:a4b882a9471e47ed ics:-",
       "dorit@govari-fin.co.il | סיכום ראיון היכרות — אורי לוי | html:5e8de04bbc52701e text:d96cf311e2411337 ics:-",
       "uri@example.com | אישור — קיבלנו את סיכום השיחה · דורית גוב ארי | html:e1959abe07019c46 text:7b76f503c5bdfee7 ics:-",
     ],
@@ -149,8 +152,8 @@ const TODAY = {
     status: 200,
     json: answer,
     mails: [
-      "amielnoy@gmail.com | סיכום ראיון היכרות — אורי לוי | html:8976c20db3d9fca6 text:72549e6708003322 ics:-",
-      "amielnoy@outlook.com | סיכום ראיון היכרות — אורי לוי | html:8976c20db3d9fca6 text:72549e6708003322 ics:-",
+      "amielnoy@gmail.com | סיכום ראיון היכרות חדש | html:a7dd872f46182f07 text:a4b882a9471e47ed ics:-",
+      "amielnoy@outlook.com | סיכום ראיון היכרות חדש | html:a7dd872f46182f07 text:a4b882a9471e47ed ics:-",
       "dorit@govari-fin.co.il | סיכום ראיון היכרות — אורי לוי | html:89d377e400b0d30d text:88ddf0fbdc72c757 ics:-",
       "uri@example.com | אישור — קיבלנו את סיכום השיחה · דורית גוב ארי | html:e1959abe07019c46 text:7b76f503c5bdfee7 ics:-",
     ],
