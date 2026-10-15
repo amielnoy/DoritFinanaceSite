@@ -171,6 +171,11 @@ begin
   if not (list @> array['masleka-staff@example.com']) then
     raise exception 'staff addresses miss the agency admin: %', list;
   end if;
+  -- With no request, agency 1's Admins and Owners alone.
+  if not (public.masleka_staff_emails(null) @> array['masleka-staff@example.com'])
+     or 'masleka-other-agency@example.com' = any(public.masleka_staff_emails(null)) then
+    raise exception 'the no-request list is not agency 1''s Admins and Owners: %', public.masleka_staff_emails(null);
+  end if;
   if 'masleka-outsider@example.com' = any(list) or 'masleka-other-agency@example.com' = any(list)
      or 'masleka-admin@example.com' = any(list) then
     raise exception 'staff addresses include someone who is not staff: %', list;

@@ -715,9 +715,10 @@ Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behavi
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-INV-001 | "passes the same admin gate as content-admin, before reading its input" | `requireAdminSession` before `req.json()`; the gate reads `profiles.role` |
+| CTR-INV-001 | "checks the session before reading its input, then Admin+ in that agency" | `sessionCaller` before `req.json()`, then `allowRole(session, orgId, 'admin', …)`; content-admin uses the same session gate; the operator is read from `profiles.role` |
+| CTR-INV-001a | "lets an Admin grant User only, before making any account, and leaves the grant to set_member_role under the caller's session" | The Admin check precedes `createAuthUser`; `callRpc('set_member_role', …, sessionToken)`; no direct `memberships` write |
 | CTR-INV-002 | "checks the session itself, as content-admin does" | `verify_jwt = false` |
-| CTR-INV-003 | "gives only the three membership roles, never the site admin" | owner, agent, staff; no `role: 'admin'` |
+| CTR-INV-003 | "gives only the three agency roles, in Hebrew, and never the platform operator" | `owner: בעלים`, `admin: מנהל/ת`, `user: משתמש/ת`; `profiles` never written |
 | CTR-INV-004 | "mails through dorit-mailer, never Supabase Auth's invite" | No `/auth/v1/invite`; `sendMail` to the address |
 | CTR-INV-005 | "logs ids, never the invitee's address" | No `email` in any log call |
 | CTR-INV-006 | "resolves invitees from Auth through a service-role-only RPC" | `invitee_for` joins Auth to a profile by id, matches the current Auth address, uses an empty search path and revokes execution from public/anon/authenticated |

@@ -379,7 +379,9 @@ $$;
 
 -- Who hears about a request: its lead's assignee, or whoever created a
 -- lead-less one, plus the agency's Admins and Owners. Not every member: Users
--- do not see each other's clients.
+-- do not see each other's clients. With no request (a client's code that
+-- failed before its link was matched), agency 1's Admins and Owners — the
+-- pipeline is agency 1's.
 drop function public.masleka_staff_emails();
 create function public.masleka_staff_emails(p_request_id uuid) returns text[]
   language sql
@@ -392,6 +394,9 @@ as $$
       from public.masleka_requests q
       left join public.leads l on l.id = q.lead_id
      where q.id = p_request_id
+    union all
+    select '00000000-0000-0000-0000-000000000001'::uuid, null::uuid
+     where p_request_id is null
   )
   select coalesce(array_agg(distinct lower(p.email)), '{}')
     from r

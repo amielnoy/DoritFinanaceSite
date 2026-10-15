@@ -15,8 +15,14 @@ const serviceKeyOf = (f: FetchCall) => String(f.headers.apikey ?? "");
  * since this function) or a Base44 id (rows the dual-write era created), and
  * both must find their row.
  */
-const ADMIN = "admin-token";
-const MEMBER = "member-token";
+// Session tokens as long as real ones: _shared/staff.ts's bearer() wants 20+ characters.
+// ADMIN is the platform operator; USER and AGENCY_ADMIN hold those roles in agency 1;
+// MEMBER is signed in with no role.
+const ADMIN = "admin-session-token-0123456789";
+const MEMBER = "member-session-token-0123456789";
+const USER = "user-session-token-0123456789";
+const AGENCY_ADMIN = "agency-admin-session-token-0123456789";
+const AGENCY_1 = "00000000-0000-0000-0000-000000000001";
 const B44_ID = "0123456789abcdef01234567";
 const UUID = "11111111-2222-4333-8444-555555555555";
 
@@ -55,6 +61,8 @@ function fakeSupabase(
       const token = String(call.headers.Authorization ?? "").replace(/^Bearer /, "");
       if (token === ADMIN) return json({ id: "user-admin" });
       if (token === MEMBER) return json({ id: "user-member" });
+      if (token === USER) return json({ id: "user-user" });
+      if (token === AGENCY_ADMIN) return json({ id: "user-agency-admin" });
       // Auth's own refusal carries an error_code; the gateway's "Invalid API key" does not.
       return json({ code: 403, error_code: "bad_jwt", msg: "invalid JWT" }, 403);
     }
@@ -62,6 +70,11 @@ function fakeSupabase(
       if (seed.profileStatus) return json({}, seed.profileStatus);
       const id = url.searchParams.get("id")?.slice(3);
       return json([{ role: id === "user-admin" ? "admin" : "user" }]);
+    }
+    if (url.pathname === "/rest/v1/rpc/staff_role") {
+      const { p_user_id, p_agency_id } = call.body as { p_user_id: string; p_agency_id: string };
+      const roles: Record<string, string> = { "user-user": "user", "user-agency-admin": "admin" };
+      return json(p_agency_id === AGENCY_1 ? (roles[p_user_id] ?? null) : null);
     }
 
     const table = url.pathname.replace("/rest/v1/", "");
@@ -148,13 +161,16 @@ describe("content-admin — the gate", () => {
   ];
 
   it.each(OPS.flatMap((body) => CALLERS.map(([who, token, status]) => [body.op, who, token, status, body] as const)))(
-    "%s from %s is refused with %s, and no table is touched",
+    "%s from %s is refused with %s, and nothing is written",
     async (_op, _who, token, status, body) => {
-      const db = fakeSupabase({ posts: [{ id: UUID, base44_id: null, slug: "s" }], testimonials: [{ id: UUID }] });
+      const db = fakeSupabase({ posts: [{ id: UUID, base44_id: null, slug: "s", agency_id: AGENCY_1 }], testimonials: [{ id: UUID, agency_id: AGENCY_1 }] });
       const r = await call(body as Record<string, unknown>, token as string | null, db);
       expect(r.status).toBe(status);
-      expect(r.callsTo("/rest/v1/blog_posts")).toEqual([]);
-      expect(r.callsTo("/rest/v1/testimonials")).toEqual([]);
+      // An edit or delete reads its row's agency to know whose Admin may act;
+      // nothing past that read.
+      const writes = r.fetches.filter((f) => /\/rest\/v1\/(blog_posts|testimonials)/.test(f.url) && f.method !== "GET");
+      expect(writes).toEqual([]);
+      if (token === null || status === 401) expect(r.callsTo("/rest/v1/")).toEqual([]);
       expect(db.tables.blog_posts).toHaveLength(1);
       expect(db.tables.testimonials).toHaveLength(1);
     },
@@ -186,6 +202,50 @@ describe("content-admin — the gate", () => {
   it("refuses an unknown op with 400", async () => {
     const r = await call({ op: "dropTable" }, ADMIN);
     expect(r.status).toBe(400);
+  });
+});
+
+describe("content-admin — per action, by agency role", () => {
+  const post = (over: Row = {}) => ({ id: UUID, base44_id: null, slug: "s", agency_id: AGENCY_1, published: false, ...over });
+  const writes = (r: Awaited<ReturnType<typeof call>>) =>
+    r.fetches.filter((f) => /\/rest\/v1\/(blog_posts|testimonials)/.test(f.url) && f.method !== "GET");
+
+  it("lets a User write a draft and edit it, asking the role in agency 1", async () => {
+    const db = fakeSupabase({ posts: [post()] });
+    expect((await call({ op: "createArticle", draft }, USER, db)).status).toBe(200);
+    const r = await call({ op: "updateArticle", id: UUID, draft: { title: "חדש" } }, USER, db);
+    expect(r.status).toBe(200);
+    expect(r.callsTo("/rpc/staff_role")[0].body).toEqual({ p_user_id: "user-user", p_agency_id: AGENCY_1 });
+  });
+
+  it.each([
+    ["publish a new article", { op: "createArticle", draft: { ...draft, published: true } }, [post()]],
+    ["publish a draft", { op: "updateArticle", id: UUID, draft: { published: true } }, [post()]],
+    ["edit a live article", { op: "updateArticle", id: UUID, draft: { title: "x" } }, [post({ published: true })]],
+    ["unpublish one", { op: "updateArticle", id: UUID, draft: { published: false } }, [post({ published: true })]],
+    ["delete an article", { op: "removeArticle", id: UUID }, [post()]],
+    ["add a testimonial", { op: "createTestimonial", draft: { name: "n", quote: "q" } }, []],
+    ["delete a testimonial", { op: "removeTestimonial", id: UUID }, []],
+  ])("refuses a User who would %s, writing nothing", async (_what, body, posts) => {
+    const db = fakeSupabase({ posts: posts as Row[], testimonials: [{ id: UUID, agency_id: AGENCY_1 }] });
+    const r = await call(body as Record<string, unknown>, USER, db);
+    expect(r.status).toBe(403);
+    expect(writes(r)).toEqual([]);
+  });
+
+  it("lets an agency Admin publish, unpublish, delete and manage testimonials", async () => {
+    const db = fakeSupabase({ posts: [post()], testimonials: [{ id: UUID, agency_id: AGENCY_1 }] });
+    expect((await call({ op: "updateArticle", id: UUID, draft: { published: true } }, AGENCY_ADMIN, db)).status).toBe(200);
+    expect((await call({ op: "updateArticle", id: UUID, draft: { published: false } }, AGENCY_ADMIN, db)).status).toBe(200);
+    expect((await call({ op: "createTestimonial", draft: { name: "n", quote: "q" } }, AGENCY_ADMIN, db)).status).toBe(200);
+    expect((await call({ op: "removeTestimonial", id: UUID }, AGENCY_ADMIN, db)).status).toBe(200);
+    expect((await call({ op: "removeArticle", id: UUID }, AGENCY_ADMIN, db)).status).toBe(200);
+  });
+
+  it("keeps a shared-library article (no agency) the platform operator's alone", async () => {
+    const shared = () => fakeSupabase({ posts: [post({ agency_id: null })] });
+    expect((await call({ op: "updateArticle", id: UUID, draft: { title: "x" } }, AGENCY_ADMIN, shared())).status).toBe(403);
+    expect((await call({ op: "updateArticle", id: UUID, draft: { title: "x" } }, ADMIN, shared())).status).toBe(200);
   });
 });
 

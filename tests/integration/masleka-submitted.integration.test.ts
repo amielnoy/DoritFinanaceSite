@@ -36,7 +36,7 @@ function run(b: unknown, o: EdgeOptions & { fake?: MaslekaFake; token?: string |
     masleka: {
       requests: [waiting()],
       sessions: { [STAFF_TOKEN]: STAFF, [OUTSIDER_TOKEN]: OUTSIDER },
-      roles: { [STAFF]: "staff", [OUTSIDER]: null },
+      roles: { [STAFF]: "admin", [OUTSIDER]: null },
       ...fake,
     },
   });
@@ -57,7 +57,7 @@ describe("masleka-submitted", () => {
   it("answers disabled while MASLEKA_ENABLED is unset, before reading the body", async () => {
     const r = await invokeEdge("masleka-submitted", { requestId: REQUEST_ID }, {
       headers: { authorization: `Bearer ${STAFF_TOKEN}` },
-      masleka: { requests: [waiting()], sessions: { [STAFF_TOKEN]: STAFF }, roles: { [STAFF]: "staff" } },
+      masleka: { requests: [waiting()], sessions: { [STAFF_TOKEN]: STAFF }, roles: { [STAFF]: "admin" } },
     });
     expect(r.status).toBe(404);
     expect(r.json).toEqual({ error: "disabled", rid: expect.any(String) });
@@ -174,9 +174,12 @@ describe("masleka-submitted", () => {
   });
 
   it("does not find a request that is not there, or not the agency's, and leaves the other agency's values alone", async () => {
+    // Not there: the database's access check refuses it first (can_work_request
+    // is false), without saying whether it exists.
     const missing = await run({ requestId: "99999999-9999-4999-8999-999999999999" });
-    expect(missing.status).toBe(404);
-    expect(missing.json).toEqual({ error: "not_found", rid: expect.any(String) });
+    expect(missing.status).toBe(403);
+    expect(missing.json).toEqual({ error: "forbidden", rid: expect.any(String) });
+    expect(missing.requestPatches).toHaveLength(0);
     const other = await run({ requestId: REQUEST_ID, agencyId: OTHER_AGENCY, agency_id: OTHER_AGENCY }, {
       fake: { requests: [waiting({ agency_id: OTHER_AGENCY })] },
     });

@@ -69,6 +69,8 @@ export async function handler(req: Request): Promise<Response> {
   // and whether the accepting write was under way when it happened.
   let hash: string | null = null;
   let clientName: string | null = null;
+  // The request, once known: its people hear about a failure; before, Dorit's mailbox.
+  let knownRequest: string | null = null;
   let storing = false;
   try {
     log('info', 'request.start', { rid });
@@ -111,7 +113,7 @@ export async function handler(req: Request): Promise<Response> {
     const key = await sealKeyFromEnv();
     if (!key) {
       log('error', 'seal.not_configured', { rid });
-      await alertStaff(rid, hash, null, 'unavailable');
+      await alertStaff(rid, hash, null, 'unavailable', null);
       return Response.json({ error: 'unavailable', rid }, { status: 503, headers: cors });
     }
 
@@ -121,6 +123,7 @@ export async function handler(req: Request): Promise<Response> {
     const waiting = `token_hash=eq.${hash}&status=eq.invited&token_expires_at=gt.${encodeURIComponent(now)}`;
     const found = await selectRows('masleka_requests', `select=id,client_name&${waiting}&limit=1`);
     const requestId = String(found[0]?.id ?? '');
+    if (UUID.test(requestId)) knownRequest = requestId;
     if (!UUID.test(requestId)) {
       // Unknown, used, rotated and expired links all look the same from here,
       // on purpose: the answer says nothing about which.
@@ -158,7 +161,7 @@ export async function handler(req: Request): Promise<Response> {
     let notified = 0;
     try {
       const notice = buildStaffNotice('code_received', [String(rows[0].client_name ?? '')]);
-      for (const to of await staffRecipients(log, rid)) {
+      for (const to of await staffRecipients(log, rid, requestId)) {
         try {
           await sendMail(log, { to, ...notice, rid, role: 'staff' });
           notified += 1;
@@ -179,7 +182,7 @@ export async function handler(req: Request): Promise<Response> {
     log('error', 'request.failed', {
       rid, ms: Date.now() - startedAt, outcome, err: String((error as Error)?.message ?? error).slice(0, 200),
     });
-    await alertStaff(rid, hash, clientName, outcome);
+    await alertStaff(rid, hash, clientName, outcome, knownRequest);
     return Response.json({ error: outcome === 'not_saved' ? 'not_saved' : 'failed', rid }, { status: 500, headers: cors });
   }
 }
@@ -190,7 +193,7 @@ export async function handler(req: Request): Promise<Response> {
  * the handler on purpose: masleka-dark-launch.contract.test.ts reads the
  * source in order and wants the switch ahead of every mail.
  */
-async function alertStaff(rid: string, hash: string | null, clientName: string | null, failure: CodeFailure): Promise<number> {
+async function alertStaff(rid: string, hash: string | null, clientName: string | null, failure: CodeFailure, requestId: string | null): Promise<number> {
   try {
     const key = `masleka-alert:${hash ?? 'unknown'}`;
     if (!firstInWindow(alerted, key, Date.now(), HOUR_MS)) {
@@ -206,7 +209,7 @@ async function alertStaff(rid: string, hash: string | null, clientName: string |
     }
     const alert = buildCodeFailureAlert({ clientName, failure, rid });
     const sent = await Promise.all(
-      (await staffRecipients(log, rid)).map(async (to) => {
+      (await staffRecipients(log, rid, requestId)).map(async (to) => {
         try {
           await sendMail(log, { to, ...alert, rid, role: 'staff' });
           return 1;

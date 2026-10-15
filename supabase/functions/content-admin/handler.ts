@@ -8,20 +8,35 @@
  * reading Base44's BlogPost, an article written only here is invisible to them.
  *
  * Writes go with the service key, which bypasses row-level security, so the
- * gate below is the whole of the access control. It runs before every op.
+ * gate below is the whole of the access control. It runs before every op, per
+ * op (docs/superpowers/specs/2026-10-15-agency-roles-design.md): any member
+ * writes an unpublished draft; publishing, unpublishing, deleting and every
+ * testimonial write are Admin+; a shared-library article (no agency) is the
+ * platform operator's. The agency is the row's own, or agency 1 for a new row
+ * (the column default every insert here takes).
  *
  * Once switched on, rows written here exist in Supabase only, so
  * scripts/reconcile-stores.mjs reports them as drift — expected, not a fault.
  */
 import { corsHeaders } from '../_shared/cors.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
-import { requireAdminSession } from '../_shared/admin.ts';
+import { AGENCY_1 } from '../_shared/masleka.ts';
 import { deleteRows, insertRow, selectRows, updateRows } from '../_shared/rest.ts';
+import { allowRole, sessionCaller, type AgencyRole, type Session } from '../_shared/staff.ts';
 
 const FN = 'content-admin';
 const log = createLog(FN);
 
-const requireAdmin = (req: Request, rid: string) => requireAdminSession(req, rid, log);
+/** The row an op acts on, for its agency and whether it is live; null when it is not there. */
+async function existing(table: 'blog_posts' | 'testimonials', filter: string): Promise<Record<string, unknown> | null> {
+  const select = table === 'blog_posts' ? 'agency_id,published' : 'agency_id';
+  const rows = await selectRows(table, `${filter}&select=${select}`);
+  return rows[0] ?? null;
+}
+
+/** The agency a row belongs to: its own (null for a shared-library article), or agency 1 for a new row. */
+const agencyOf = (row: Record<string, unknown> | null): string | null =>
+  row ? (typeof row.agency_id === 'string' ? row.agency_id : null) : AGENCY_1;
 
 /** Only the fields the forms send, by name. Anything else — agency_id, id, base44_id — falls away. */
 const pick = (obj: unknown, keys: readonly string[]) => {
@@ -82,15 +97,22 @@ export async function handler(req: Request): Promise<Response> {
   try {
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-    const gate = await requireAdmin(req, rid);
-    if (!gate.ok) return json({ error: gate.error }, gate.status);
+    const session = await sessionCaller(req, rid, log);
+    if (!session.ok) return json({ error: session.error }, session.status);
 
     const body = (await req.json().catch(() => null)) as { op?: unknown; id?: unknown; draft?: Record<string, unknown> } | null;
     const { op, id, draft } = body ?? {};
     let result: Record<string, unknown> = { ok: true };
+    // The gate for this op, on the row's agency; null when it passes.
+    const refused = async (s: Session, row: Record<string, unknown> | null, min: AgencyRole) => {
+      const gate = await allowRole(s, agencyOf(row), min, rid, log);
+      return gate.ok ? null : json({ error: gate.error }, gate.status);
+    };
 
     switch (op) {
       case 'createArticle': {
+        const stop = await refused(session, null, draft?.published ? 'admin' : 'user');
+        if (stop) return stop;
         const slug = draft?.slug;
         if (!isValidSlug(slug)) {
           log('warn', 'article.slug_invalid', { rid, op });
@@ -117,6 +139,14 @@ export async function handler(req: Request): Promise<Response> {
         const filter = keyFilter(id);
         if (!filter) return json({ error: 'מזהה לא תקין.' }, 400);
         const fields = pick(draft, ARTICLE_FIELDS);
+        const row = await existing('blog_posts', filter);
+        if (!row) {
+          log('warn', 'article.not_found', { rid, op });
+          return json({ error: 'המאמר לא נמצא.' }, 404);
+        }
+        // A live article, or one this edit would publish, is Admin+.
+        const stop = await refused(session, row, row.published === true || fields.published === true ? 'admin' : 'user');
+        if (stop) return stop;
         // No slug key unless the draft carries a valid one: a null or empty
         // slug would defeat the NOT NULL column. A publish toggle has none.
         const slug = draft?.slug;
@@ -144,12 +174,16 @@ export async function handler(req: Request): Promise<Response> {
       case 'removeTestimonial': {
         const filter = keyFilter(id);
         if (!filter) return json({ error: 'מזהה לא תקין.' }, 400);
+        const stop = await refused(session, await existing(op === 'removeArticle' ? 'blog_posts' : 'testimonials', filter), 'admin');
+        if (stop) return stop;
         // Removing what is already gone answers 200: a retry after a lost
         // answer must not fail on the row its first attempt deleted.
         await deleteRows(op === 'removeArticle' ? 'blog_posts' : 'testimonials', filter);
         break;
       }
       case 'createTestimonial': {
+        const stop = await refused(session, null, 'admin');
+        if (stop) return stop;
         const row = await insertRow('testimonials', {
           ...pick(draft, TESTIMONIAL_FIELDS),
           rating: Number(draft?.rating) || 5,

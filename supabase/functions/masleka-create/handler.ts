@@ -2,6 +2,10 @@
  * A staff member's two ways to start a client off: a request made by hand
  * (a lead that came by phone), or a fresh link for one still waiting.
  *
+ * Who may: any member of the agency starts a request by hand (it has no lead,
+ * so it is theirs, `created_by`); a fresh link is for whoever may work that
+ * request (`allowRequest`). Both are asked of the database on every call.
+ *
  * The link is returned once, to the staff member, so they can send it by
  * WhatsApp if they like; only its hash is stored, so it cannot be shown again
  * — a lost link is replaced, never recovered. A fresh link also marks the
@@ -24,7 +28,7 @@ import {
   AGENCY_1, UUID, createRequest, maslekaEnabled, maslekaLink, newToken, tokenExpiry, tokenHash,
 } from '../_shared/masleka.ts';
 import { updateRow, updateWhere } from '../_shared/rest.ts';
-import { staffCaller } from '../_shared/staff.ts';
+import { allowRequest, allowRole, sessionCaller, type Refusal } from '../_shared/staff.ts';
 
 const FN = 'masleka-create';
 const log = createLog(FN);
@@ -46,15 +50,13 @@ export async function handler(req: Request): Promise<Response> {
       return Response.json({ error: 'disabled', rid }, { status: 404, headers: cors });
     }
 
-    const caller = await staffCaller(req);
-    if (caller.kind === 'anonymous') {
-      log('warn', 'request.rejected', { rid, reason: 'unauthorized' });
-      return Response.json({ error: 'unauthorized', rid }, { status: 401, headers: cors });
-    }
-    if (caller.kind === 'outsider') {
-      log('warn', 'request.rejected', { rid, reason: 'forbidden', userId: caller.userId });
-      return Response.json({ error: 'forbidden', rid }, { status: 403, headers: cors });
-    }
+    const refused = (r: Refusal) => {
+      const reason = r.status === 401 ? 'unauthorized' : r.status === 403 ? 'forbidden' : 'failed';
+      log('warn', 'request.rejected', { rid, reason });
+      return Response.json({ error: reason, rid }, { status: r.status, headers: cors });
+    };
+    const session = await sessionCaller(req, rid, log);
+    if (!session.ok) return refused(session);
 
     const input = (await req.json().catch(() => null)) as Record<string, unknown> | null;
 
@@ -65,6 +67,8 @@ export async function handler(req: Request): Promise<Response> {
         return Response.json({ error: 'invalid', rid }, { status: 400, headers: cors });
       }
       const requestId = input.requestId.toLowerCase();
+      const allowed = await allowRequest(session, requestId, rid, log);
+      if (!allowed.ok) return refused(allowed);
       const token = newToken();
       // The id is UUID-checked and lowercased, the agency is a fixed literal, and
       // `select=id` names the only column handed back (never a ciphertext or the hash).
@@ -81,7 +85,9 @@ export async function handler(req: Request): Promise<Response> {
       return Response.json({ ok: true, requestId, link: maslekaLink(token), invited: false, rid }, { headers: noStore });
     }
 
-    // A new request.
+    // A new request: no lead, so it belongs to whoever starts it.
+    const caller = await allowRole(session, AGENCY_1, 'user', rid, log);
+    if (!caller.ok) return refused(caller);
     const clientName = typeof input?.clientName === 'string' ? input.clientName.trim() : '';
     if (!clientName || clientName.length > 80) {
       log('warn', 'request.rejected', { rid, reason: 'invalid_name' });

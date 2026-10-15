@@ -18,7 +18,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { AGENCY_1, CLEARINGHOUSE_RETENTION_BUSINESS_DAYS, UUID, maslekaEnabled } from '../_shared/masleka.ts';
 import { selectRows, updateWhere } from '../_shared/rest.ts';
-import { staffCaller } from '../_shared/staff.ts';
+import { allowRequest, sessionCaller } from '../_shared/staff.ts';
 
 const FN = 'masleka-submitted';
 const log = createLog(FN);
@@ -39,14 +39,10 @@ export async function handler(req: Request): Promise<Response> {
       return Response.json({ error: 'disabled', rid }, { status: 404, headers: cors });
     }
 
-    const caller = await staffCaller(req);
-    if (caller.kind === 'anonymous') {
-      log('warn', 'request.rejected', { rid, reason: 'unauthorized' });
-      return Response.json({ error: 'unauthorized', rid }, { status: 401, headers: cors });
-    }
-    if (caller.kind === 'outsider') {
-      log('warn', 'request.rejected', { rid, reason: 'forbidden', userId: caller.userId });
-      return Response.json({ error: 'forbidden', rid }, { status: 403, headers: cors });
+    const session = await sessionCaller(req, rid, log);
+    if (!session.ok) {
+      log('warn', 'request.rejected', { rid, reason: session.status === 401 ? 'unauthorized' : 'failed' });
+      return Response.json({ error: session.status === 401 ? 'unauthorized' : 'failed', rid }, { status: session.status, headers: cors });
     }
 
     const input = (await req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -56,6 +52,13 @@ export async function handler(req: Request): Promise<Response> {
       return Response.json({ error: 'invalid', rid }, { status: 400, headers: cors });
     }
     const requestId = raw.toLowerCase();
+    // Whoever may work the request: its lead's assignee, or the creator of a
+    // lead-less one; Admin+ and the operator always.
+    const caller = await allowRequest(session, requestId, rid, log);
+    if (!caller.ok) {
+      log('warn', 'request.rejected', { rid, reason: caller.status === 403 ? 'forbidden' : 'failed', userId: session.userId });
+      return Response.json({ error: caller.status === 403 ? 'forbidden' : 'failed', rid }, { status: caller.status, headers: cors });
+    }
 
     // The id is UUID-checked and lowercased, the agency is a fixed literal, and
     // `select=id` names the only column handed back.

@@ -13,8 +13,10 @@ import {
   sameAddress,
   tokenExpiry,
 } from "../../supabase/functions/_shared/masleka.ts";
-import { authUser, updateWhere } from "../../supabase/functions/_shared/rest.ts";
-import { staffCaller, staffRecipients } from "../../supabase/functions/_shared/staff.ts";
+import { authUser, callRpc, refusalReason, updateRows, updateWhere } from "../../supabase/functions/_shared/rest.ts";
+import {
+  meets, requireAgencyRole, requireLeadAccess, requireRequestAccess, sessionCaller, staffRecipients,
+} from "../../supabase/functions/_shared/staff.ts";
 
 const SUPABASE_URL = "https://project-ref.supabase.test";
 const BASE_ENV = { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: "service-role-test" };
@@ -213,61 +215,149 @@ describe("authUser", () => {
   });
 });
 
-describe("staffCaller", () => {
+describe("the agency-role gates", () => {
+  const TOKEN = "user-token-0123456789";
   const request = (auth?: string) =>
     new Request("https://edge.test/x", { method: "POST", headers: auth ? { authorization: auth } : {} });
+  const A1 = "00000000-0000-0000-0000-000000000001";
 
-  function server(role: unknown) {
+  /** Auth names u1; profiles says whether u1 runs the platform; the RPCs answer as given. */
+  function server({ role = null as unknown, operator = false, allowed = false as unknown } = {}) {
     withEnv(BASE_ENV);
     return withFetch((url) => {
       if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "u1" }), { status: 200 });
+      if (url.includes("/rest/v1/profiles?")) return new Response(JSON.stringify([{ role: operator ? "admin" : "user" }]), { status: 200 });
       if (url.endsWith("/rpc/staff_role")) return new Response(JSON.stringify(role), { status: 200 });
+      if (url.endsWith("/rpc/can_see_lead") || url.endsWith("/rpc/can_work_request")) {
+        return new Response(JSON.stringify(allowed), { status: 200 });
+      }
       throw new Error(`unexpected ${url}`);
     });
   }
 
-  it("is anonymous without a bearer token, and asks nobody", async () => {
-    const calls = server("staff");
-    expect(await staffCaller(request())).toEqual({ kind: "anonymous" });
+  it("ranks owner over admin over user", () => {
+    expect(meets("owner", "admin")).toBe(true);
+    expect(meets("admin", "admin")).toBe(true);
+    expect(meets("user", "admin")).toBe(false);
+    expect(meets(null, "user")).toBe(false);
+  });
+
+  it("asks nobody without a bearer token, and answers 401", async () => {
+    const calls = server();
+    expect(await sessionCaller(request(), "r", vi.fn())).toMatchObject({ ok: false, status: 401 });
     expect(calls).toHaveLength(0);
   });
 
-  it("is an outsider when the database knows no role for the user", async () => {
-    server(null);
-    expect(await staffCaller(request("Bearer user-token-0123456789"))).toEqual({ kind: "outsider", userId: "u1" });
+  it("names the operator from profiles.role, never from the token", async () => {
+    server({ operator: true });
+    expect(await sessionCaller(request(`Bearer ${TOKEN}`), "r", vi.fn())).toEqual({ ok: true, userId: "u1", token: TOKEN, isOperator: true });
   });
 
-  it("is an outsider for a role it does not recognise", async () => {
-    server("superuser");
-    expect(await staffCaller(request("Bearer user-token-0123456789"))).toEqual({ kind: "outsider", userId: "u1" });
+  it("passes a role at or above the minimum, in that agency, and refuses one below with 403", async () => {
+    const calls = server({ role: "admin" });
+    expect(await requireAgencyRole(request(`Bearer ${TOKEN}`), A1, "admin", "r", vi.fn())).toMatchObject({ ok: true, role: "admin" });
+    expect(JSON.parse(String(calls.find((c) => c.url.endsWith("/rpc/staff_role"))!.init.body))).toEqual({ p_user_id: "u1", p_agency_id: A1 });
+    server({ role: "user" });
+    expect(await requireAgencyRole(request(`Bearer ${TOKEN}`), A1, "admin", "r", vi.fn())).toMatchObject({ ok: false, status: 403 });
   });
 
-  it("is staff with the role the database gives", async () => {
-    server("staff");
-    expect(await staffCaller(request("Bearer user-token-0123456789"))).toEqual({ kind: "staff", userId: "u1", role: "staff" });
+  it("refuses a role the database does not name, and the old agent/staff, as no role", async () => {
+    for (const role of ["staff", "agent", "superuser", null]) {
+      server({ role });
+      expect(await requireAgencyRole(request(`Bearer ${TOKEN}`), A1, "user", "r", vi.fn())).toMatchObject({ ok: false, status: 403 });
+    }
+  });
+
+  it("lets the operator through with no membership, and only the operator onto a shared-library row", async () => {
+    server({ operator: true });
+    expect(await requireAgencyRole(request(`Bearer ${TOKEN}`), A1, "owner", "r", vi.fn())).toMatchObject({ ok: true, role: null, isOperator: true });
+    expect(await requireAgencyRole(request(`Bearer ${TOKEN}`), null, "admin", "r", vi.fn())).toMatchObject({ ok: true });
+    server({ role: "owner" });
+    expect(await requireAgencyRole(request(`Bearer ${TOKEN}`), null, "user", "r", vi.fn())).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it("answers 500, not 403, when the role cannot be read", async () => {
+    withEnv(BASE_ENV);
+    withFetch((url) => {
+      if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "u1" }), { status: 200 });
+      if (url.includes("/rest/v1/profiles?")) return new Response("[]", { status: 200 });
+      return new Response("{}", { status: 503 });
+    });
+    expect(await requireAgencyRole(request(`Bearer ${TOKEN}`), A1, "user", "r", vi.fn())).toMatchObject({ ok: false, status: 500 });
+  });
+
+  it("asks can_see_lead and can_work_request as the caller, with their own token", async () => {
+    const calls = server({ allowed: true });
+    expect(await requireLeadAccess(request(`Bearer ${TOKEN}`), "lead-1", "r", vi.fn())).toMatchObject({ ok: true, userId: "u1" });
+    expect(await requireRequestAccess(request(`Bearer ${TOKEN}`), "req-1", "r", vi.fn())).toMatchObject({ ok: true });
+    for (const c of calls.filter((x) => x.url.includes("/rpc/can_"))) {
+      expect((c.init.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`);
+    }
+    expect(JSON.parse(String(calls.find((c) => c.url.endsWith("/rpc/can_see_lead"))!.init.body))).toEqual({ p_lead_id: "lead-1" });
+    expect(JSON.parse(String(calls.find((c) => c.url.endsWith("/rpc/can_work_request"))!.init.body))).toEqual({ p_request_id: "req-1" });
+  });
+
+  it("refuses with 403 when the database says no — and anything but a plain true is no", async () => {
+    for (const allowed of [false, null, "true", 1]) {
+      server({ allowed });
+      expect(await requireLeadAccess(request(`Bearer ${TOKEN}`), "lead-1", "r", vi.fn())).toMatchObject({ ok: false, status: 403 });
+    }
+  });
+});
+
+describe("rest.ts as the caller", () => {
+  it("sends the caller's token on Authorization, and keeps the service key on apikey", async () => {
+    withEnv(BASE_ENV);
+    const calls = withFetch(() => new Response("true", { status: 200 }));
+    await callRpc("can_see_lead", { p_lead_id: "x" }, "caller-token");
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer caller-token");
+    expect(headers.apikey).toBe("service-role-test");
+  });
+
+  it("names a function's own reason, and never Postgres's prose", async () => {
+    withEnv(BASE_ENV);
+    withFetch(() => new Response(JSON.stringify({ code: "23514", message: "last_owner" }), { status: 400 }));
+    const own = await callRpc("set_member_role", {}, "t").catch((e) => e);
+    expect(String(own.message)).toBe("rpc_http_400:23514:last_owner");
+    expect(refusalReason(own)).toBe("last_owner");
+    withFetch(() => new Response(JSON.stringify({ code: "23505", message: 'duplicate key value violates "x" (Failing row contains (Dana))' }), { status: 409 }));
+    const prose = await updateRows("leads", "id=eq.x", {}, "t").catch((e) => e);
+    expect(String(prose.message)).toBe("update_http_409:23505");
+    expect(refusalReason(prose)).toBe("");
   });
 });
 
 describe("staffRecipients", () => {
-  it("mails each staff address once, in lower case, and skips what is not an address", async () => {
+  const REQUEST = "cccccccc-0000-0000-0000-000000000001";
+
+  it("asks for the request's own people, and mails each address once, in lower case, skipping what is not one", async () => {
     withEnv(BASE_ENV);
-    withFetch(() => new Response(JSON.stringify(["Staff@Example.com", "staff@example.com", "not-an-address"]), { status: 200 }));
-    expect(await staffRecipients(vi.fn(), "rid1")).toEqual(["staff@example.com"]);
+    const calls = withFetch(() => new Response(JSON.stringify(["Staff@Example.com", "staff@example.com", "not-an-address"]), { status: 200 }));
+    expect(await staffRecipients(vi.fn(), "rid1", REQUEST)).toEqual(["staff@example.com"]);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ p_request_id: REQUEST });
   });
 
   it("falls back to Dorit's mailbox when nobody can be read", async () => {
     withEnv(BASE_ENV);
     withFetch(() => new Response("{}", { status: 500 }));
     const log = vi.fn();
-    expect(await staffRecipients(log, "rid1")).toEqual(["dorit@govari-fin.co.il"]);
+    expect(await staffRecipients(log, "rid1", REQUEST)).toEqual(["dorit@govari-fin.co.il"]);
     expect(log).toHaveBeenCalledWith("warn", "staff.lookup_failed", expect.objectContaining({ rid: "rid1" }));
   });
 
-  it("falls back to Dorit's mailbox when the staff list is empty", async () => {
+  it("falls back to Dorit's mailbox when the request has nobody", async () => {
     withEnv(BASE_ENV);
     withFetch(() => new Response("[]", { status: 200 }));
     const log = vi.fn();
-    expect(await staffRecipients(log, "rid1")).toEqual(["dorit@govari-fin.co.il"]);
-    expect(log).toHaveBeenCalledWith("warn", "staff.none", { rid: "rid1" });
+    expect(await staffRecipients(log, "rid1", REQUEST)).toEqual(["dorit@govari-fin.co.il"]);
+    expect(log).toHaveBeenCalledWith("warn", "staff.none", { rid: "rid1", requestId: REQUEST });
+  });
+
+  it("asks for the agency's Admins and Owners while the request is not yet known", async () => {
+    withEnv(BASE_ENV);
+    const calls = withFetch(() => new Response(JSON.stringify(["owner@example.com"]), { status: 200 }));
+    expect(await staffRecipients(vi.fn(), "rid1", null)).toEqual(["owner@example.com"]);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ p_request_id: null });
   });
 });

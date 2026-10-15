@@ -1,8 +1,11 @@
 /**
  * A staff member's copy button: one value of one waiting request, decrypted.
  *
- * Members only, proved on every call (`staffCaller`): a removed membership is
- * refused at once, whatever the browser still shows. The access is written to
+ * For whoever may work the request, proved on every call (`allowRequest`, the
+ * database's `can_work_request`): its lead's assignee, or the creator of a
+ * request with no lead, and the agency's Admins and Owners. A removed
+ * membership or a reassigned lead is refused at once, whatever the browser
+ * still shows. The access is written to
  * `masleka_access_log` before the value is decrypted, and a failed write
  * reveals nothing — the audit cannot be skipped by breaking it. The log row's
  * agency is the request's own, never the column default or anything the
@@ -16,7 +19,7 @@ import { createLog, newRequestId } from '../_shared/log.ts';
 import { AGENCY_1, UUID, maslekaEnabled } from '../_shared/masleka.ts';
 import { insertRow, selectRows } from '../_shared/rest.ts';
 import { sealKeyFromEnv, unseal } from '../_shared/seal.ts';
-import { staffCaller } from '../_shared/staff.ts';
+import { allowRequest, sessionCaller } from '../_shared/staff.ts';
 
 const FN = 'masleka-reveal';
 const log = createLog(FN);
@@ -37,14 +40,10 @@ export async function handler(req: Request): Promise<Response> {
       return Response.json({ error: 'disabled', rid }, { status: 404, headers: cors });
     }
 
-    const caller = await staffCaller(req);
-    if (caller.kind === 'anonymous') {
-      log('warn', 'request.rejected', { rid, reason: 'unauthorized' });
-      return Response.json({ error: 'unauthorized', rid }, { status: 401, headers: cors });
-    }
-    if (caller.kind === 'outsider') {
-      log('warn', 'request.rejected', { rid, reason: 'forbidden', userId: caller.userId });
-      return Response.json({ error: 'forbidden', rid }, { status: 403, headers: cors });
+    const session = await sessionCaller(req, rid, log);
+    if (!session.ok) {
+      log('warn', 'request.rejected', { rid, reason: session.status === 401 ? 'unauthorized' : 'failed' });
+      return Response.json({ error: session.status === 401 ? 'unauthorized' : 'failed', rid }, { status: session.status, headers: cors });
     }
 
     const input = (await req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -53,6 +52,12 @@ export async function handler(req: Request): Promise<Response> {
     if (typeof requestId !== 'string' || !UUID.test(requestId) || (field !== 'id' && field !== 'code')) {
       log('warn', 'request.rejected', { rid, reason: 'invalid' });
       return Response.json({ error: 'invalid', rid }, { status: 400, headers: cors });
+    }
+
+    const caller = await allowRequest(session, requestId, rid, log);
+    if (!caller.ok) {
+      log('warn', 'request.rejected', { rid, reason: caller.status === 403 ? 'forbidden' : 'failed', userId: session.userId });
+      return Response.json({ error: caller.status === 403 ? 'forbidden' : 'failed', rid }, { status: caller.status, headers: cors });
     }
 
     // No key is a refusal before anything is read.

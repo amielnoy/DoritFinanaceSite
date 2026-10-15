@@ -1130,13 +1130,21 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSH-010 | "answers who the token belongs to, asking the auth server with the service key" | `/auth/v1/user`, apikey + bearer |
 | UNIT-MSKSH-011 | "answers nobody for a token the auth server refuses" | `null` on 401 |
 | UNIT-MSKSH-012 | "throws when the auth server is down, rather than calling it a refusal" | `auth_http_503` |
-| UNIT-MSKSH-013 | "is anonymous without a bearer token, and asks nobody" | No fetch |
-| UNIT-MSKSH-014 | "is an outsider when the database knows no role for the user" | `outsider` |
-| UNIT-MSKSH-015 | "is an outsider for a role it does not recognise" | `outsider` |
-| UNIT-MSKSH-016 | "is staff with the role the database gives" | `staff`, role `staff` |
-| UNIT-MSKSH-017 | "mails each staff address once, in lower case, and skips what is not an address" | Deduplicated list |
+| UNIT-MSKSH-013 | "ranks owner over admin over user" | `meets`: owner ≥ admin; admin ≥ admin; user < admin; no role meets nothing |
+| UNIT-MSKSH-014 | "asks nobody without a bearer token, and answers 401" | `sessionCaller`: 401; no fetch |
+| UNIT-MSKSH-015 | "names the operator from profiles.role, never from the token" | `{ ok, userId, token, isOperator: true }` from `profiles.role = 'admin'` |
+| UNIT-MSKSH-016 | "passes a role at or above the minimum, in that agency, and refuses one below with 403" | `staff_role` asked with `{ p_user_id, p_agency_id }`; admin passes `admin`, user refused 403 |
+| UNIT-MSKSH-016a | "refuses a role the database does not name, and the old agent/staff, as no role" | `staff`, `agent`, unknown, null: 403 |
+| UNIT-MSKSH-016b | "lets the operator through with no membership, and only the operator onto a shared-library row" | Operator passes `owner` with `role: null`; agency `null` passes the operator, refuses an Owner |
+| UNIT-MSKSH-016c | "answers 500, not 403, when the role cannot be read" | `staff_role` 503 → 500 |
+| UNIT-MSKSH-016d | "asks can_see_lead and can_work_request as the caller, with their own token" | Both RPCs carry `Authorization: Bearer <caller>`; bodies `{ p_lead_id }`, `{ p_request_id }` |
+| UNIT-MSKSH-016e | "refuses with 403 when the database says no — and anything but a plain true is no" | `false`, `null`, `"true"`, `1`: 403 |
+| UNIT-MSKSH-016f | "sends the caller's token on Authorization, and keeps the service key on apikey" | `callRpc(…, token)` |
+| UNIT-MSKSH-016g | "names a function's own reason, and never Postgres's prose" | `rpc_http_400:23514:last_owner` → `refusalReason` `last_owner`; a 23505 whose message quotes the row → `update_http_409:23505`, reason `''` |
+| UNIT-MSKSH-017 | "asks for the request's own people, and mails each address once, in lower case, skipping what is not one" | `masleka_staff_emails({ p_request_id })`; deduplicated list |
 | UNIT-MSKSH-018 | "falls back to Dorit's mailbox when nobody can be read" | `dorit@govari-fin.co.il`, `staff.lookup_failed` |
-| UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the staff list is empty" | `dorit@govari-fin.co.il`, `staff.none` |
+| UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the request has nobody" | `dorit@govari-fin.co.il`, `staff.none` with the request id |
+| UNIT-MSKSH-019a | "asks for the agency's Admins and Owners while the request is not yet known" | `{ p_request_id: null }`; the answer's addresses |
 | UNIT-MSKSH-022 | "reads a phone as its local digits, however it was typed" | `054-111-2233`, `+972-54-111-2233`, `972541112233`, spaces and brackets all → `0541112233`; a landline keeps its 9 digits (decision 2026-10-14, the same contact) |
 | UNIT-MSKSH-023 | "reads nothing too short, or not a string, as a phone" | `''` for fewer than 9 digits, letters, `null`, `undefined`, a number — and `''` matches nothing |
 | UNIT-MSKSH-024 | "matches two addresses only when both are addresses, ignoring case and spaces at the ends" | Equal mailboxes match; two blanks, two nulls, two non-addresses, or one missing never match |
