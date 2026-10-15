@@ -142,22 +142,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Blocking, on a ratchet.
-      #
-      # `tsc` reports 93 errors inherited from the JS→TS conversion. Every one
-      # of them sits in a `.tsx` file that passes props to an untyped `.jsx`
-      # shadcn primitive — TypeScript sees `RefAttributes<any>` and rejects the
-      # lot. None are in the JavaScript files, and none are bugs. Flipping this
-      # step to blocking as it stood would have painted CI red without finding
-      # anything.
-      #
-      # What it cost while advisory: a genuinely new type error landed silently
-      # among the 93 and nobody had to fix it. So the gate allows for exactly
-      # the inherited set (tests/typecheck-baseline.json, keyed by file and
-      # error code, never by line) and fails on anything on top of it.
-      #
-      # Fixed some? `npm run typecheck:baseline` lowers the bar; commit it.
-      - name: Typecheck (blocks on new errors)
+      # Blocking, and clean: any type error fails the build. It once ran on a
+      # ratchet over 93 errors inherited from the JS→TS conversion (untyped
+      # `.jsx` shadcn primitives behind typed pages); the primitives now carry
+      # `.d.ts` files, the baseline and its script are gone (R-08), and
+      # `typecheck:gate` is plain `npm run typecheck` — the app and `api/`.
+      - name: Typecheck
         run: npm run typecheck:gate
 
       # The e2e shards test the `dist` artifact this job uploads — they run with
@@ -1024,6 +1014,24 @@ jobs:
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
           PREVIOUS_ASSET: ${{ needs.deploy.outputs.previous_asset }}
           EXPECTED_ASSET: ${{ needs['deploy-vercel'].outputs.asset }}
+
+      # The Vercel functions are bundled apart from the app, without the "@/"
+      # alias, and #218 found one crashing on load in production behind a green
+      # build (Architecture N-05). Ask each for an answer only a loaded function
+      # gives: a 404 for a missing article, a 405 for a GET. A function that
+      # cannot load answers 500.
+      - name: Probe the Vercel functions
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          base="${PRODUCTION_URL%/}"
+          probe() {
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$base$1")
+            echo "$1 → $code (expected $2)"
+            [ "$code" = "$2" ] || { echo "::error::$1 answered $code, expected $2 — 500 means the function did not load"; return 1; }
+          }
+          probe "/api/og/blog?id=smoke-probe-missing" 404
+          probe "/api/csp-report" 405
 
       - run: npm ci
       - run: npx playwright install --with-deps chromium
