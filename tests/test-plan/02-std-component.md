@@ -779,6 +779,15 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 
 `tests/component/admin-users.test.tsx` adds CMP-AUSR "switches from cards to the table at 680px, as the design asks" (`min-[680px]:table` / `min-[680px]:hidden`).
 
+### 4.45 `/login` — Google — `tests/component/login-google.test.tsx`
+
+`vitest.config.ts` now resolves `.ts`/`.tsx` before `.jsx`, as `vite.config.js` does, so `@/pages/Login` is the site's page, not Base44's restored boilerplate.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-LOGIN-001 | "tells the visitor when Google's sign-in could not start" | A rejecting `signInWithGoogle` shows "לא הצלחנו להתחיל את ההתחברות. נסו שוב." |
+| CMP-LOGIN-002 | "says nothing while Google takes the visitor away" | No message; the call made |
+
 ## 5. Pass criteria
 
 All 278 declared cases pass (vitest: 308 with expansions). A `submitLead` or `submitClaim` payload assertion failing

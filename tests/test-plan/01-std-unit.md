@@ -890,6 +890,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-064 | "answers with the recommended slugs of the turn, and none on a turn that failed" (the blog role) | 200 carries `recommended: ["dmei-nihul"]`; a 503 after the same call carries none |
 | UNIT-CHHANDLER-065 | "answers no recommended field when the turn recommended nothing" (the blog role) | No `recommended` key |
 | UNIT-CHHANDLER-066 | "gives a recommendation turn room to list, read twice and recommend before it answers" (the blog role) | Four tool rounds then a reply: 200 for `blog_recommender` (`ROLE_TOOL_ROUNDS.blog = 5`); 503 for the FAQ chat (three) |
+| UNIT-CHHANDLER-067 | "says the turn is still running while it holds the conversation" (a status request) | `status: true` with the token: 200 `busy: true`; no model call |
+| UNIT-CHHANDLER-068 | "answers how the last turn ended: its reply, and whether the lead was saved" (a status request) | `busy: false`, the last non-tool message, `leadSaved` from the status |
+| UNIT-CHHANDLER-069 | "refuses a status request without the conversation's token, and runs nothing" (a status request) | 403 `gone` |
 | UNIT-CHHANDLER-052 | "runs the sweep for the right token, and nothing of the chat" | `x-chat-sweep` with the right token: 200, `ok`, `logged: 2`, an `rid` passed to `sweepSheetLogs`; no model call, no conversation, no rate-limit check (Review Focus 5) |
 | UNIT-CHHANDLER-053 | "refuses %s with 401 and runs nothing" | A wrong token, an empty token and the evaluation token: 401 `unauthorized`; the sweep, the model and the store untouched (Review Focus 5) |
 | UNIT-CHHANDLER-054 | "refuses every sweep when the function has no token configured" | With `sweepToken` empty, an empty and an arbitrary header both give 401; the sweep never runs (Review Focus 5) |
@@ -960,6 +963,11 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHADAPTER-014 | "treats a 503 that says the lead was saved as a saved lead, not a failure" | `send` resolves; the transcript ends with `LEAD_SAVED_WITHOUT_REPLY`, `signal: lead_saved`, `replyMissing: true`; the 503's ids are sent with the next message (I5) |
 | UNIT-CHADAPTER-015 | "hands the page the recommended articles as the block it reads, and the visitor none of it" | `recommended` → a ```` ```recommended ```` block `readRecommendation` reads; visible text unchanged |
 | UNIT-CHADAPTER-016 | "leaves a reply without recommendations as it came, and never writes a second block" | No `recommended`: content as sent; a reply with its own block keeps it alone |
+| UNIT-CHADAPTER-017 | "shows the reply the turn produced once it finished, instead of a failure" | After the 40 s wait, `status` polled every 3 s: busy, then the reply with `lead_saved` — shown, not a failure |
+| UNIT-CHADAPTER-018 | "says the details were saved when the turn saved the lead but left no reply" | `LEAD_SAVED_WITHOUT_REPLY`, `replyMissing` |
+| UNIT-CHADAPTER-019 | "fails as before when the turn ended with neither a reply nor a saved lead" | `AgentUnavailableError`; the message taken off the screen |
+| UNIT-CHADAPTER-020 | "stops asking after the recovery window and fails" | At most 60 s / 3 s requests |
+| UNIT-CHADAPTER-021 | "asks nothing after a first message timed out: there is no conversation to ask about" | One request only |
 | UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |
 | UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
@@ -1534,6 +1542,16 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-USRADM-002 | "asks invite-user with the admin's session, and says whether an account was made and the mail went" | `invoke("invite-user", { body, headers: Authorization })`; `{ created, mailed }` |
 | UNIT-USRADM-003 | "refuses without a session, before any request" | "נדרשת התחברות."; no call |
 | UNIT-USRADM-004 | "reports the function's own refusal, in its words" | The 400 body's `error` |
+
+### 4.62 Review fixes of 2026-10-15 — `csv-cell.test.ts`, `supabase-auth.test.ts`, `supabase-lead-admin.test.ts`
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-CSV-001 | "neutralises a value Excel would run: %j → %j" | `=`, `+`, `-`, `@`, tab, CR first: a leading `'` (quoted when the value has a CR) |
+| UNIT-CSV-002 | "quotes commas, quotes and newlines, after neutralising" | `=HYPERLINK("x","y")` → `"'=HYPERLINK(""x"",""y"")"` |
+| UNIT-CSV-003 | "leaves ordinary text, numbers and empties as they were" | Hebrew, a phone, null and undefined |
+| UNIT-AUTH-GOOGLE-ERR | "reports a Google sign-in Supabase refused, so the page can say so" | A payload `error` and a rejection both reject `signInWithGoogle` |
+| UNIT-LEADADM-PAGE | "reads every lead, page after page, until a short page" | 2,500 rows → 2,500, in three `range` reads of 1,000; the first test now expects `range(0, 999)` |
 
 ## 5. Pass criteria
 

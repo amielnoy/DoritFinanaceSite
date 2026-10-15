@@ -4,6 +4,12 @@ import type { SupabaseFunctionsClient } from "./SupabaseLeadService";
 
 /** Longer than the function's own 25-second turn budget plus a tool call. */
 export const CHAT_REQUEST_TIMEOUT_MS = 40_000;
+/** After a timeout, how often the adapter asks how the turn ended, and for how long. */
+export const STATUS_POLL_MS = 3_000;
+export const STATUS_RECOVERY_MS = 60_000;
+
+/** The wait ran out; the turn may still be running on the server. */
+class TimedOut extends AgentUnavailableError {}
 
 interface LocalConversation {
   agent: string;
@@ -81,6 +87,8 @@ export class SupabaseAgentService implements AgentPort {
           attribution: { channel: str(m.channel), campaign: str(m.campaign), landingPath: str(m.landing_path) },
         };
 
+    // A conversation the server already holds can be asked how a turn ended (`status`).
+    const continuing = Boolean(local.serverId && local.token);
     // On screen at once, not after the reply (up to 25 s): the visitor sees what was sent.
     const sent: AgentMessage = { role: "user", content: text };
     this.publish(local, [...local.messages, sent]);
@@ -102,10 +110,46 @@ export class SupabaseAgentService implements AgentPort {
         { role: "assistant", content: withRecommendation(answer.reply, answer.recommended), ...(answer.leadSaved ? { signal: "lead_saved" as const } : {}) },
       ]);
     } catch (e) {
+      // The wait ran out, but the turn may have run on — its tools are not in the
+      // model's 25 s budget — and saved the lead (review 2026-10-15). Ask before
+      // telling the visitor it failed, or they send again what was already done.
+      if (e instanceof TimedOut && continuing) {
+        const ended = await this.recover(local);
+        if (ended === "saved") {
+          this.publish(local, [...local.messages, { role: "assistant", content: LEAD_SAVED_WITHOUT_REPLY, signal: "lead_saved", replyMissing: true }]);
+          return;
+        }
+        if (ended) {
+          this.publish(local, [...local.messages, { role: "assistant", content: ended.reply, ...(ended.leadSaved ? { signal: "lead_saved" as const } : {}) }]);
+          return;
+        }
+      }
       // Not sent after all: off the screen, and AgentChat puts the text back in the box.
       this.publish(local, local.messages.filter((m) => m !== sent));
       throw e;
     }
+  }
+
+  /**
+   * How the turn that outlived the wait ended, asked every STATUS_POLL_MS for
+   * STATUS_RECOVERY_MS: its reply, "saved" for a lead saved with no reply, or
+   * null when it ended with neither — or never stopped running in the window.
+   * A status request that fails is asked again; it runs no turn.
+   */
+  private async recover(local: LocalConversation): Promise<{ reply: string; leadSaved: boolean } | "saved" | null> {
+    const body = { agent: local.agent, conversationId: local.serverId, token: local.token, status: true };
+    for (let waited = 0; waited < STATUS_RECOVERY_MS; waited += STATUS_POLL_MS) {
+      await new Promise((resolve) => setTimeout(resolve, STATUS_POLL_MS));
+      const { data, error } = await this.client.functions.invoke("chat", { body }).catch(() => ({ data: null, error: { message: "network" } }));
+      if (error || !data) continue;
+      const answer = data as { busy?: boolean; leadSaved?: boolean; last?: { role?: string; content?: unknown } | null };
+      if (answer.busy) continue;
+      if (answer.last?.role === "assistant" && typeof answer.last.content === "string") {
+        return { reply: answer.last.content, leadSaved: answer.leadSaved === true };
+      }
+      return answer.leadSaved === true ? "saved" : null;
+    }
+    return null;
   }
 
   private publish(local: LocalConversation, messages: AgentMessage[]): void {
@@ -166,7 +210,7 @@ export class SupabaseAgentService implements AgentPort {
           },
           () => undefined,
         );
-        reject(new AgentUnavailableError());
+        reject(new TimedOut());
       }, CHAT_REQUEST_TIMEOUT_MS);
     });
     return Promise.race([request, timeout]).finally(() => clearTimeout(timer));

@@ -40,6 +40,8 @@ export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_TURNS = 40;
 export const IDLE_MS = 2 * 60 * 60 * 1000;
 export const PER_IP_PER_MINUTE = 20;
+/** Status requests, apart from messages: the page polls one turn every few seconds. */
+export const STATUS_PER_IP_PER_MINUTE = 60;
 export const NEW_CONVERSATIONS_PER_HOUR = 300;
 /**
  * How long a turn holds its conversation. The 25 s budget covers only the
@@ -115,6 +117,32 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       const role = AGENT_ROLES[agent];
       const text = str(input.message).trim();
       if (!role) return refuse(400, 'unknown_agent');
+
+      // How the conversation's last turn ended. The page stops waiting at 40 s, and a
+      // turn whose tools run long may still finish — saving the lead — after that
+      // (review 2026-10-15). Asked with the conversation's own token; runs no turn,
+      // claims nothing, and is limited apart from messages.
+      if (input.status === true) {
+        const statusIp = clientIp(req);
+        if (statusIp && !(await deps.allow(rid, `chat-status-ip:${await sha256Hex(statusIp)}`, 60, STATUS_PER_IP_PER_MINUTE))) {
+          return refuse(429, 'rate_limited');
+        }
+        const id = str(input.conversationId);
+        const token = str(input.token);
+        const found = UUID.test(id) && TOKEN.test(token) ? await deps.store.getConversation(id) : null;
+        if (!found || found.role !== role || found.token_hash !== (await sha256Hex(token))) return refuse(403, 'gone');
+        const busy = found.busy_until !== null && Date.parse(found.busy_until) > deps.now();
+        const last = [...(await deps.store.listMessages(found.id))].reverse().find((m) => m.role !== 'tool');
+        log('info', 'request.end', { rid, ms: Date.now() - startedAt, conversation: found.id, statusRequest: true, busy });
+        return respond(200, {
+          ok: true,
+          busy,
+          status: found.status,
+          leadSaved: found.status === 'lead_saved',
+          last: last ? { role: last.role, content: last.content } : null,
+        });
+      }
+
       if (!text) return refuse(400, 'empty');
       if (text.length > MAX_MESSAGE_CHARS) return refuse(400, 'too_long');
 

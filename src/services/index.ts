@@ -122,7 +122,7 @@ const auth: AuthPort = {
   signInWithPassword: (email, password) => real().then((s) => s.auth.signInWithPassword(email, password)),
   logout: (redirectUrl) => later((s) => s.auth.logout(redirectUrl)),
   redirectToLogin: (returnUrl) => later((s) => s.auth.redirectToLogin(returnUrl)),
-  signInWithGoogle: (returnUrl) => later((s) => s.auth.signInWithGoogle(returnUrl)),
+  signInWithGoogle: (returnUrl) => real().then((s) => s.auth.signInWithGoogle(returnUrl)),
 };
 
 const agents: AgentPort = {

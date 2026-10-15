@@ -147,11 +147,18 @@ export class SupabaseAuthService implements AuthPort {
   }
 
   redirectToLogin(returnUrl: string): void {
-    this.signInWithGoogle(returnUrl);
+    // The guard's own redirect has no page to report on; the login page's button does.
+    this.signInWithGoogle(returnUrl).catch((e) => console.error("google sign-in did not start:", e));
   }
 
-  signInWithGoogle(returnUrl: string): void {
-    void this.client.auth.signInWithOAuth({
+  /**
+   * supabase-js reports a refused start in the payload rather than by
+   * rejecting, as signInWithPassword's comment says — so both are turned into
+   * a rejection the login page shows. It was fired and forgotten, and a
+   * failed click ended in silence (review 2026-10-15).
+   */
+  async signInWithGoogle(returnUrl: string): Promise<void> {
+    const { error } = await this.client.auth.signInWithOAuth({
       provider: "google",
       // Always ask which Google account. Without it Google signs the browser
       // straight back into the account it remembers, so signing out to switch
@@ -159,6 +166,7 @@ export class SupabaseAuthService implements AuthPort {
       // sign-in already sends this.
       options: { redirectTo: absoluteOnThisOrigin(returnUrl), queryParams: { prompt: "select_account" } },
     });
+    if (error) throw new Error(error.message ?? "Google sign-in did not start");
   }
 
   async signInWithPassword(email: string, password: string): Promise<void> {

@@ -430,7 +430,8 @@ export interface AuthPort {
    * while it called the SDK directly, flipping VITE_AUTH_PROVIDER changed who
    * answered `me()` and left the visitor signing in to the old system.
    */
-  signInWithGoogle(returnUrl: string): void;
+  /** Starts Google's sign-in; rejects when it could not start, so the page can say so. */
+  signInWithGoogle(returnUrl: string): Promise<void>;
   /**
    * Sign in with an address and a password.
    *
