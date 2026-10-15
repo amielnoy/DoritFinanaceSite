@@ -89,6 +89,7 @@
   "form.fileType": "« {name} » — vous pouvez joindre un PDF ou une photo (JPG, PNG, HEIC, WEBP).",
   "form.fileSize": "« {name} » dépasse 10 Mo. Vous pouvez le reprendre en photo en plus basse résolution, ou l'envoyer à Dorit par e-mail.",
   "form.fileEmpty": "« {name} » est vide et n'a pas été joint.",
+  "form.fileLimits": "Jusqu’à {max} documents, 10 Mo chacun — PDF, JPG, PNG, HEIC ou WEBP.",
   "form.fileCount": "Vous pouvez joindre jusqu'à {max} documents à une déclaration.",
   "form.uploadingCount": "Envoi des documents… ({done}/{total})"
 }

@@ -721,6 +721,12 @@ Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behavi
 | CTR-INV-004 | "mails through dorit-mailer, never Supabase Auth's invite" | No `/auth/v1/invite`; `sendMail` to the address |
 | CTR-INV-005 | "logs ids, never the invitee's address" | No `email` in any log call |
 
+### 4.19 The claim form's field limits — `claim-field-limits.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CLAIMLIM-001 | "are the server's own" | Each `CLAIM_FIELD_LIMITS` entry equals `_shared/guard.ts` `FIELD_LIMITS` |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed

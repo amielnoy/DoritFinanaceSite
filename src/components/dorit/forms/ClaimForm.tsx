@@ -10,6 +10,7 @@ import { isContactPhone } from "@/lib/phone";
 import {
   CLAIM_DOCUMENT_ACCEPT,
   CLAIM_DOCUMENT_MAX_FILES,
+  CLAIM_FIELD_LIMITS,
   claimDocumentProblem,
 } from "@/config/claimDocuments";
 import { useLocale, useT } from "@/i18n/LocaleContext";
@@ -71,6 +72,8 @@ export default function ClaimForm() {
    * ReferenceError instead of showing a message. (Baselined as TS2304.)
    */
   const [uploadError, setUploadError] = useState("");
+  /** What was wrong with the files just picked — shown beside the picker, not by Send. */
+  const [fileProblems, setFileProblems] = useState("");
   /**
    * A phone Dorit could not call back. Checked on send, as `submit-claim`
    * checks it: "abc" or "123" used to file a claim nobody could answer (D-01,
@@ -101,7 +104,7 @@ export default function ClaimForm() {
     const room = CLAIM_DOCUMENT_MAX_FILES - docs.length;
     if (accepted.length > room) problems.push(t("form.fileCount", { max: CLAIM_DOCUMENT_MAX_FILES }));
     setDocs((d) => [...d, ...accepted.slice(0, Math.max(room, 0))]);
-    setUploadError(problems.join(" "));
+    setFileProblems(problems.join(" "));
   };
 
   const startAnother = () => {
@@ -109,6 +112,7 @@ export default function ClaimForm() {
     setForm(EMPTY);
     setDocs([]);
     setUploadError("");
+    setFileProblems("");
     setPhoneError("");
   };
 
@@ -194,7 +198,7 @@ export default function ClaimForm() {
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label={t("form.name")}>
-            <input value={name} onChange={set("name")} className={inputClass()} autoComplete="name" aria-required="true" />
+            <input value={name} onChange={set("name")} className={inputClass()} autoComplete="name" aria-required="true" maxLength={CLAIM_FIELD_LIMITS.name} />
           </Field>
           <Field label={t("form.phone")}>
             <input
@@ -205,6 +209,7 @@ export default function ClaimForm() {
               type="tel"
               inputMode="tel"
               autoComplete="tel"
+              maxLength={CLAIM_FIELD_LIMITS.phone}
               aria-required="true"
               aria-invalid={phoneError ? true : undefined}
               aria-describedby={phoneError ? "claim-phone-error" : undefined}
@@ -226,10 +231,11 @@ export default function ClaimForm() {
               dir="ltr"
               type="email"
               autoComplete="email"
+              maxLength={CLAIM_FIELD_LIMITS.email}
             />
           </Field>
           <Field label={t("form.policy")}>
-            <input value={policyNumber} onChange={set("policyNumber")} className={inputClass()} />
+            <input value={policyNumber} onChange={set("policyNumber")} className={inputClass()} maxLength={CLAIM_FIELD_LIMITS.policyNumber} />
           </Field>
         </div>
 
@@ -255,6 +261,7 @@ export default function ClaimForm() {
             rows={4}
             placeholder={t("form.descriptionPlaceholder")}
             className={inputClass("resize-none")}
+            maxLength={CLAIM_FIELD_LIMITS.description}
           />
         </Field>
 
@@ -262,7 +269,9 @@ export default function ClaimForm() {
           <span className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
             {t("form.attach")}
           </span>
-          <label className="flex flex-col items-center justify-center gap-2 p-8 border border-dashed border-border hover:border-accent transition-colors cursor-pointer text-center">
+          {/* The input stays in the tab order, visually hidden (sr-only, not display:none):
+              the label is the drop zone a mouse sees, and it rings when the input has focus. */}
+          <label className="flex flex-col items-center justify-center gap-2 p-8 border border-dashed border-border hover:border-accent transition-colors cursor-pointer text-center focus-within:outline focus-within:outline-2 focus-within:outline-ring">
             <Upload size={22} className="text-accent" />
             <span className="text-sm text-foreground/70">
               {t("form.pick")}
@@ -271,7 +280,9 @@ export default function ClaimForm() {
               type="file"
               multiple
               accept={CLAIM_DOCUMENT_ACCEPT}
-              className="hidden"
+              className="sr-only"
+              aria-describedby={fileProblems ? "claim-docs-limits claim-docs-error" : "claim-docs-limits"}
+              aria-invalid={fileProblems ? true : undefined}
               onChange={(e) => {
                 handleFiles(e.target.files);
                 // The same file can be picked again after it is removed.
@@ -280,6 +291,14 @@ export default function ClaimForm() {
               disabled={sending}
             />
           </label>
+          <p id="claim-docs-limits" className="mt-2 text-xs text-muted-foreground text-start">
+            {t("form.fileLimits", { max: CLAIM_DOCUMENT_MAX_FILES })}
+          </p>
+          {fileProblems && (
+            <p id="claim-docs-error" role="alert" className="mt-2 text-sm text-destructive text-start">
+              {fileProblems}
+            </p>
+          )}
 
           {docs.length > 0 && (
             <ul className="mt-4 space-y-2">

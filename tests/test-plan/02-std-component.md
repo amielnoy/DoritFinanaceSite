@@ -783,6 +783,17 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 
 `tests/component/admin-users.test.tsx` adds CMP-AUSR "switches from cards to the table at 680px, as the design asks" (`min-[680px]:table` / `min-[680px]:hidden`).
 
+### 4.46 `<ClaimForm />` — the file picker and the limits — `tests/component/claim-form-limits.test.tsx`
+
+From the code review of 2026-10-15.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CLAIMLIM-001 | "keeps the file picker in the tab order, visually hidden rather than display:none" | `sr-only`, not `hidden`; Tab from the description lands on it |
+| CMP-CLAIMLIM-002 | "states the limits before anything is picked, tied to the picker" | "עד 10 מסמכים, עד 10MB…"; the picker's `aria-describedby` names it |
+| CMP-CLAIMLIM-003 | "names a refused file beside the picker, not by the Send button" | An alert with the file's name, tied to the picker, which is `aria-invalid` |
+| CMP-CLAIMLIM-004 | "lets no field take more than the server accepts" | `maxLength` = `CLAIM_FIELD_LIMITS` for name, phone, email, description |
+
 ## 5. Pass criteria
 
 All 278 declared cases pass (vitest: 308 with expansions). A `submitLead` or `submitClaim` payload assertion failing

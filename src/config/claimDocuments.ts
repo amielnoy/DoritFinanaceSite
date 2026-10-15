@@ -19,6 +19,19 @@ export const CLAIM_DOCUMENT_TYPES = ["image/jpeg", "image/png", "image/heic", "i
 export const CLAIM_DOCUMENT_MAX_FILES = 10;
 
 /**
+ * The longest value submit-claim takes for each field (supabase/functions/_shared/guard.ts,
+ * FIELD_LIMITS). The form stops typing there instead of a refusal at Send
+ * (review 2026-10-15); tests/contract/claim-field-limits.contract.test.ts keeps them equal.
+ */
+export const CLAIM_FIELD_LIMITS = {
+  name: 80,
+  phone: 30,
+  email: 254,
+  policyNumber: 60,
+  description: 4000,
+} as const;
+
+/**
  * The type a file is known by from its name. iOS hands over a HEIC photo, and
  * some browsers any file, with an empty `type`; without a type the upload would
  * go as a generic one the bucket refuses.

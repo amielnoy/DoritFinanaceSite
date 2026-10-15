@@ -89,6 +89,7 @@
   "form.fileType": "\"{name}\" — you can attach a PDF or a photo (JPG, PNG, HEIC, WEBP).",
   "form.fileSize": "\"{name}\" is larger than 10MB. You can photograph it again at a lower resolution, or email it to Dorit.",
   "form.fileEmpty": "\"{name}\" is empty and was not attached.",
+  "form.fileLimits": "Up to {max} documents, 10MB each — PDF, JPG, PNG, HEIC or WEBP.",
   "form.fileCount": "You can attach up to {max} documents to one report.",
   "form.uploadingCount": "Uploading documents… ({done}/{total})"
 }

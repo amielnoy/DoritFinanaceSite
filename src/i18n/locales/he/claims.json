@@ -89,6 +89,7 @@
   "form.fileType": "\"{name}\" — ניתן לצרף PDF או תמונה (JPG, PNG, HEIC, WEBP).",
   "form.fileSize": "\"{name}\" גדול מ-10MB. אפשר לצלם שוב ברזולוציה נמוכה יותר, או לשלוח אותו לדורית במייל.",
   "form.fileEmpty": "\"{name}\" ריק, ולא צורף.",
+  "form.fileLimits": "עד {max} מסמכים, עד 10MB כל אחד — PDF, JPG, PNG, HEIC או WEBP.",
   "form.fileCount": "אפשר לצרף עד {max} מסמכים לדיווח אחד.",
   "form.uploadingCount": "מעלה מסמכים… ({done}/{total})"
 }
