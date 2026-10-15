@@ -7,7 +7,9 @@ import { defineConfig } from "allure";
  * places it goes have opposite constraints:
  *
  *   singleFile (default) — one self-contained index.html, attached to each CI
- *     run as an artifact and generated locally. Allure 2 could not do this: it
+ *     run as an artifact and generated locally. Over Allure's single-file size
+ *     limit (a full run passed it in October 2026), CI attaches the split
+ *     report instead — see "Generate the report" in .github/workflows/ci.yml. Allure 2 could not do this: it
  *     emitted thousands of small JSON files fetched over XHR, so the report had
  *     to be *served* and opening it from disk showed an empty shell.
  *
