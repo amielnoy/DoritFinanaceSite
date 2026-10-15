@@ -46,7 +46,8 @@
         "contacted",
         "closed",
         "escalated",
-        "partial"
+        "partial",
+        "client"
       ],
       "default": "new"
     },

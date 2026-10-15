@@ -75,7 +75,7 @@ describe("adminLead — what it accepts", () => {
     nothingWritten(r);
   });
 
-  it.each(["new", "contacted", "closed", "escalated", "partial"])("accepts the status %s", async (s) => {
+  it.each(["new", "contacted", "closed", "escalated", "partial", "client"])("accepts the status %s", async (s) => {
     const r = await invokeFunction("adminLead", { action: "status", id: "lead-1", status: s }, { env, user: admin });
     expect(r.status).toBe(200);
   });

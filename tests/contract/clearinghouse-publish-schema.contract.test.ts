@@ -24,8 +24,9 @@ const fn = (name: string) => {
 
 describe("the clearinghouse publish migration", () => {
   it("sorts after every migration already applied", () => {
+    // After the one before it, not last: a later migration must not break this.
     const all = readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort();
-    expect(all.at(-1)).toBe(FILE);
+    expect(all.indexOf(FILE)).toBeGreaterThan(all.indexOf("20261023000000_claim_documents_retention.sql"));
   });
 
   it("shows the client exactly four fields, and each recommendation exactly six", () => {

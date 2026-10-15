@@ -1,7 +1,7 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 161 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 624 including `it.each` / `describe.each` expansions
+**Location:** `tests/integration/` · **Cases:** 161 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 625 including `it.each` / `describe.each` expansions
 
 ---
 

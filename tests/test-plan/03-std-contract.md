@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 175 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 926 including `it.each` / `describe.each` expansions (925 pass, 1 skipped)
+**Location:** `tests/contract/` · **Cases:** 181 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 932 including `it.each` / `describe.each` expansions (931 pass, 1 skipped)
 
 ---
 
@@ -704,6 +704,20 @@ time.
 
 All 161 declared cases pass (vitest: 890 pass, 1 skipped, of 891 with expansions). A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
+
+
+### Lead retention — `lead-retention.contract.test.ts`
+
+`supabase/migrations/20261025000000_lead_retention.sql` against what it must agree with. The job itself is exercised end to end in a scratch Postgres by `supabase/tests/lead_retention_check.sql`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-RET-001 | "sorts after every migration already applied" | After `20261024000000_clearinghouse_publish.sql` |
+| CTR-RET-002 | "allows the same statuses in the database, the Base44 entity and adminLead" | new, contacted, closed, escalated, partial, client — in all three |
+| CTR-RET-003 | "lets an admin set every status the type names, client included, and each one exists in the database" | `LeadStatus` ⊆ the check constraint |
+| CTR-RET-004 | "keeps the privacy policy's promise: 24 months from the last contact, then deleted or anonymized" | The policy's sentence; `interval '24 months'`; the last contact = latest of created, updated, meeting |
+| CTR-RET-005 | "never touches a client, and anonymizes what identifies the person" | `status <> 'client'`; name, phone, email, message, summary, profile, notes cleared |
+| CTR-RET-006 | "runs nightly and only as the database itself" | Execute revoked from public, anon, authenticated; `leads-retention` at 03:45 |
 
 ### Production smoke publish preflight
 

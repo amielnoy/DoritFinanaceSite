@@ -10,11 +10,15 @@ type LeadItem = LeadRecord;
 /* The statuses an admin may set. `escalated` and `partial` are written by the
    backend and are not offered here — an admin moves such a lead on to
    "contacted" or "closed" rather than back into them. */
-const STATUS: LeadStatus[] = ["new", "contacted", "closed"];
+/* "לקוח/ה" is what keeps an enquiry from being anonymized 24 months after its
+   last contact (the privacy policy's period for an enquiry that did not become
+   an engagement) — see 20261025000000_lead_retention.sql. */
+const STATUS: LeadStatus[] = ["new", "contacted", "closed", "client"];
 const STATUS_LABEL: Record<LeadStatus, string> = {
   new: "חדשה",
   contacted: "טופלה",
   closed: "נסגרה",
+  client: "לקוח/ה",
 };
 /* Display labels for every status the entity can hold, settable or not. Without
    the backend-written ones a lead rendered with its raw English key. */
@@ -27,6 +31,7 @@ const STATUS_COLOR: Record<LeadStatus, string> = {
   new: "bg-highlight/15 text-highlight-ink",
   contacted: "bg-accent/15 text-accent",
   closed: "bg-muted text-muted-foreground",
+  client: "bg-primary/10 text-foreground",
 };
 /* Every value the Lead entity's `source` enum can hold. `escalation` was missing
    while this screen kept its own narrower copy of the type, so a lead handed over

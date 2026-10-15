@@ -838,6 +838,25 @@ scales to many.
   email.
 - **Contrast:** `tests/unit/organizations.test.ts` fails any colour under 4.5:1.
 
+### Lead retention
+
+The privacy policy (§7) keeps an enquiry that did not become an engagement
+for 24 months from the last contact, and an engagement for as long as the law
+and the Capital Market Authority require. `20261025000000_lead_retention.sql`
+does exactly that, nightly at 03:45 (`leads-retention`):
+
+- **A client is never touched.** Mark the lead "לקוח/ה" in `/admin/leads`.
+- **Every other lead is anonymized** 24 months after its last contact (the
+  latest of the enquiry, its last change and its meeting): name, phone, email,
+  message, summary, profile, notes and the meeting's own text go; the date,
+  source, topic and status stay, so the counts still add up.
+- **A contact record** (one per phone) goes when it is that old, unless a client
+  or a recent enquiry shares the phone.
+- **Not reached:** the Google Sheet row and the copies already mailed.
+- Apply the migration by hand like the others. The job is checked end to end
+  in a scratch Postgres by `supabase/tests/lead_retention_check.sql` (its
+  header has the commands); it refuses to run where a `leads` table exists.
+
 ## The chat function (Phase 3)
 
 The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents

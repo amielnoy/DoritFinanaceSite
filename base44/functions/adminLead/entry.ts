@@ -17,7 +17,7 @@ function log(level, event, fields) {
 const newRequestId = () => crypto.randomUUID().slice(0, 8);
 
 /** ערכי `status` של הישות Lead — base44/entities/Lead.jsonc. */
-const STATUSES = ['new', 'contacted', 'closed', 'escalated', 'partial'];
+const STATUSES = ['new', 'contacted', 'closed', 'escalated', 'partial', 'client'];
 
 /**
  * מזהה פנייה סביר: אותיות, ספרות, מקף וקו תחתון. המזהה נכנס ישר למסנן של
