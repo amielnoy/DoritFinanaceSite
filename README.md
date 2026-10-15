@@ -777,7 +777,17 @@ no `/en` route, no language switcher, no hreflang. Locally:
   only their labels are translated. The Hebrew in `claims.json` was taken from
   the source by script, not retyped. `withFilledInNote()` sends a Hebrew
   visitor's text exactly as typed, and adds the language note otherwise.
-- **Still Hebrew under `/en` and `/fr`:** /tools. They follow in their own slices, with the sitemap and
+- **Done in slice 5:** /tools (`tools.json`) — the insurance self-check and
+  the fee calculator, with the lead box under them. The quiz keeps its Hebrew
+  in `src/lib/insurance-assessment.ts` (each recommendation now has an `id`
+  and a `reason`); `tools.json`'s Hebrew is generated from it and a test holds
+  the two equal. The WhatsApp messages are the visitor's own, so English and
+  French pages offer them in English and French (`src/i18n/tools.ts`); Hebrew
+  goes through `calculator-lead.ts` unchanged, and a test checks the Hebrew
+  templates read exactly as it writes. Shekels are formatted per language
+  (`formatIlsIn`). The retirement calculator and the Har HaBituach check (both
+  behind `VITE_SNAPSHOT_HOME`) and the procedures chat stay on the Hebrew page.
+- **Still to do:** the sitemap and prerender for `/en` and `/fr`. They follow in their own slices, with the sitemap and
   prerender for the new addresses.
 - **Before the switch goes on:** a native speaker reviews the English and
   French. The compliance adviser approves the translated licence and

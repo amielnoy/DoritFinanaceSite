@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 362 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 401 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 366 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 406 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -682,6 +682,17 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-ORG-003 | "writes the name on the chip, in the ink on the tint, with the colour's square first" | Ink on tint; an `aria-hidden` square in the colour |
 | CMP-ORG-004 | "puts the badge on an avatar given an organization, sized to the avatar" | 26px with the fallback's letter on a 64px avatar |
 | CMP-ORG-005 | "leaves an avatar without an organization exactly as it was" | No badge; the original classes; no `style` |
+
+### 4.39 /tools in English and French — `tests/component/i18n-tools.test.tsx`
+
+`<Tools />` through `LocaleLayout`; the procedures chat mocked as a marker.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-I18N-023 | "renders %s with no Hebrew but the switcher's עברית, and without the Hebrew-only chat" (/en, /fr) | The h1 in the language; no Hebrew outside `lang="he"`; no chat |
+| CMP-I18N-024 | "runs the insurance self-check in English, and offers an English WhatsApp message" | "6 kinds of insurance relevant to you"; the WhatsApp text starts "Hello Dorit, I did the self-check" |
+| CMP-I18N-025 | "shows the fee calculator's amounts in shekels the English way" | "₪600,000" |
+| CMP-I18N-026 | "keeps the Hebrew page's chat, quiz and amounts" | The chat; the Hebrew heading; "‏600,000 ‏₪" |
 
 ## 5. Pass criteria
 

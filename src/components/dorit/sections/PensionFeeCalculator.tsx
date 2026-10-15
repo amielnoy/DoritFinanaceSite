@@ -2,18 +2,14 @@ import React, { useMemo, useState } from "react";
 import { Calculator, TrendingDown, Wallet, PiggyBank } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { CtaLink } from "@/components/dorit/primitives/Cta";
-import {
-  computePensionFees,
-  formatIls as fmtCurrency,
-  type PensionFeeResult,
-} from "@/lib/pension-fee";
+import { computePensionFees, type PensionFeeResult } from "@/lib/pension-fee";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import CalculatorLeadBox from "@/components/dorit/sections/CalculatorLeadBox";
-import { feeCalculatorMessage } from "@/lib/calculator-lead";
+import { feeCalculatorMessageIn, formatIlsIn } from "@/i18n/tools";
 import { useCalculatorResultEvent } from "@/hooks/useCalculatorResultEvent";
 import { TOOL_SECTION } from "@/config/tools";
 import PensionCheckForm from "@/components/dorit/forms/PensionCheckForm";
-import { PENSION_CHECK } from "@/config/offers";
+import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
 
 interface NumFieldProps {
   label: string;
@@ -39,6 +35,11 @@ export default function PensionFeeCalculator() {
   // The defaults are the calculator's, not the visitor's: no result counts
   // for GA4 until they change something.
   const [touched, setTouched] = useState(false);
+  const t = useT("tools");
+  const tp = useT("pension");
+  const ils = (n: number) => formatIlsIn(locale, n);
+  const locale = useLocale();
+  const lp = useLocalePath();
   const edit = (set: (v: string) => void) => (v: string) => {
     setTouched(true);
     set(v);
@@ -69,49 +70,47 @@ export default function PensionFeeCalculator() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
         <div className="lg:col-span-5 flex flex-col justify-center">
           <Eyebrow>
-            כלי שקיפות
+            {t("fee.eyebrow")}
           </Eyebrow>
           <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
-            כמה באמת
+            {t("fee.titleLine1")}
             <br />
-            עולה לכם החיסכון?
+            {t("fee.titleLine2")}
           </h2>
           <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">
-            דמי הניהול נראים קטנים בכל חודש, אך לאורך שנים הם מתגלגלים למאות אלפי
-            שקלים מהצבירה שלכם. המחשבון הזה מעניק תמונה כנה — כי ידע הוא הצעד
-            הראשון לקראת החלטה מושכלת.
+            {t("fee.intro")}
           </p>
           <div className="mt-10 flex items-center gap-3 text-sm text-muted-foreground">
             <Calculator size={16} className="text-accent" />
-            <span>הערכה כללית בלבד — אינה מחליפה ייעוץ אישי.</span>
+            <span>{t("fee.estimate")}</span>
           </div>
         </div>
 
         <div className="lg:col-span-7 bg-card border border-border/60 p-8 md:p-12">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <NumField
-              label="הפקדה חודשית (₪)"
+              label={t("fee.deposit")}
               value={monthlyDeposit}
               onChange={edit(setMonthlyDeposit)}
               step={100}
               min={0}
             />
             <NumField
-              label="שנות חיסכון"
+              label={t("fee.years")}
               value={years}
               onChange={edit(setYears)}
               step={1}
               min={1}
             />
             <NumField
-              label="דמי ניהול בהפקדה (%)"
+              label={t("fee.depositFee")}
               value={depositFee}
               onChange={edit(setDepositFee)}
               step={0.1}
               min={0}
             />
             <NumField
-              label="דמי ניהול שוטפים (% שנתי)"
+              label={t("fee.annualFee")}
               value={annualFee}
               onChange={edit(setAnnualFee)}
               step={0.05}
@@ -119,7 +118,7 @@ export default function PensionFeeCalculator() {
             />
             <div className="sm:col-span-2">
               <NumField
-                label="תשואה שנתית צפויה (%)"
+                label={t("fee.return")}
                 value={annualReturn}
                 onChange={edit(setAnnualReturn)}
                 step={0.5}
@@ -131,54 +130,54 @@ export default function PensionFeeCalculator() {
           <div className="mt-10 grid grid-cols-2 gap-4">
             <ResultCard
               icon={PiggyBank}
-              label="סך הפקדות"
-              value={fmtCurrency(result.totalDeposited)}
+              label={t("fee.totalDeposited")}
+              value={ils(result.totalDeposited)}
             />
             <ResultCard
               icon={Wallet}
-              label="יתרה מצופה בסוף התקופה"
-              value={fmtCurrency(result.balance)}
+              label={t("fee.balance")}
+              value={ils(result.balance)}
               highlight
             />
             <ResultCard
               icon={TrendingDown}
-              label="דמי ניהול בהפקדה (צבירה)"
-              value={fmtCurrency(result.totalDepositFees)}
+              label={t("fee.depositFees")}
+              value={ils(result.totalDepositFees)}
             />
             <ResultCard
               icon={TrendingDown}
-              label="דמי ניהול שוטפים (צבירה)"
-              value={fmtCurrency(result.totalAnnualFees)}
+              label={t("fee.annualFees")}
+              value={ils(result.totalAnnualFees)}
             />
           </div>
 
           <div className="mt-6 p-5 bg-background border border-border/60">
             <p className="text-sm text-foreground/70 leading-relaxed">
-              סך דמי הניהול שישולמו:{" "}
+              {t("fee.sumTotal")}{" "}
               <span className="font-semibold text-foreground">
-                {fmtCurrency(result.totalFees)}
+                {ils(result.totalFees)}
               </span>
-              . ללא דמי ניהול כלל, היתרה הייתה עומדת על{" "}
+              {t("fee.sumWithout")}{" "}
               <span className="font-semibold text-foreground">
-                {fmtCurrency(result.balance + result.lostToFees)}
+                {ils(result.balance + result.lostToFees)}
               </span>{" "}
-              — הפרש של{" "}
+              {t("fee.sumDiff")}{" "}
               <span className="font-semibold text-highlight-ink">
-                {fmtCurrency(result.lostToFees)}
+                {ils(result.lostToFees)}
               </span>{" "}
-              שנשאר ברשות הגוף המנהל במקום אצלכם.
+              {t("fee.sumKept")}
             </p>
           </div>
 
           {/* The strongest moment on the site, turned into a lead: right after
               the result, the clearinghouse check that shows the real fees. */}
           <div className="mt-8">
-            <PensionCheckForm location="calculator_check" context="אחרי מחשבון דמי הניהול" heading={PENSION_CHECK.calculatorHeadline} />
+            <PensionCheckForm location="calculator_check" context="אחרי מחשבון דמי הניהול" heading={tp("form.calculatorHeadline")} />
           </div>
 
-          <CalculatorLeadBox className="mt-8" message={feeCalculatorMessage({ monthlyDeposit, years }, result)}>
-            <CtaLink muted href="/#start" className="max-sm:w-full">
-              רוצים לדעת אם אפשר לחסוך? שאלו אותי
+          <CalculatorLeadBox className="mt-8" message={feeCalculatorMessageIn(locale, { monthlyDeposit, years }, result)}>
+            <CtaLink muted href={lp("/#start")} className="max-sm:w-full">
+              {t("fee.ask")}
             </CtaLink>
           </CalculatorLeadBox>
         </div>

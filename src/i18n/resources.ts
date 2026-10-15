@@ -17,6 +17,9 @@ import frYearend from "@/i18n/locales/fr/yearend.json";
 import heClaims from "@/i18n/locales/he/claims.json";
 import enClaims from "@/i18n/locales/en/claims.json";
 import frClaims from "@/i18n/locales/fr/claims.json";
+import heTools from "@/i18n/locales/he/tools.json";
+import enTools from "@/i18n/locales/en/tools.json";
+import frTools from "@/i18n/locales/fr/tools.json";
 
 /**
  * The resource files, one per namespace and language
@@ -29,7 +32,7 @@ import frClaims from "@/i18n/locales/fr/claims.json";
  * questionnaire's answers, a lead's topic, GA4's closed values, the summary
  * Dorit reads — stay Hebrew in code, whatever the page's language.
  */
-const HE = { common: heCommon, pension: hePension, home: heHome, faq: heFaq, yearend: heYearend, claims: heClaims };
+const HE = { common: heCommon, pension: hePension, home: heHome, faq: heFaq, yearend: heYearend, claims: heClaims, tools: heTools };
 
 export type Namespace = keyof typeof HE;
 export type KeyOf<N extends Namespace> = keyof (typeof HE)[N] & string;
@@ -37,6 +40,6 @@ type Table = { [N in Namespace]: Record<KeyOf<N>, string> };
 
 export const RESOURCES: Record<Locale, Table> = {
   he: HE,
-  en: { common: enCommon, pension: enPension, home: enHome, faq: enFaq, yearend: enYearend, claims: enClaims },
-  fr: { common: frCommon, pension: frPension, home: frHome, faq: frFaq, yearend: frYearend, claims: frClaims },
+  en: { common: enCommon, pension: enPension, home: enHome, faq: enFaq, yearend: enYearend, claims: enClaims, tools: enTools },
+  fr: { common: frCommon, pension: frPension, home: frHome, faq: frFaq, yearend: frYearend, claims: frClaims, tools: frTools },
 };
