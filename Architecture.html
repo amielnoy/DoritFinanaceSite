@@ -286,7 +286,7 @@
 <div class="page">
 
   <header class="masthead">
-    <span class="stamp">Architecture Record · Rev 2.0 · 15 October 2026</span>
+    <span class="stamp">Architecture Record · Rev 2.1 · 15 October 2026</span>
     <h1>Dorit Gov-Ari Finance Site</h1>
     <p class="standfirst">
       How the site is built today, how a request travels through it, and where
@@ -1011,6 +1011,7 @@
             secret.
           </p>
           <p class="fix"><b>Fix</b> — one recipients module in <code>_shared/</code>, Dorit primary, the operating team as a disclosed copy; a function secret for the list. The contract test that pins the consent wording follows the change.</p>
+          <p class="fix"><b>Status · #224</b> — the three copies are one module, <code>supabase/functions/_shared/recipients.ts</code>, with the diary derived from it and an optional <code>NOTIFY_EMAILS</code> secret. <b>Who receives is unchanged by decision</b> (the user, 15 October): the operating team and Dorit, as the consent discloses. Changing it is now one line, or the secret.</p>
         </div>
       </div>
 
@@ -1030,6 +1031,7 @@
             request under Amendment 13 asks about.
           </p>
           <p class="fix"><b>Fix</b> — a <code>delete_after</code> column and a nightly purge like the chat's, with the sheet row cleared by the same job; and say in the policy what happens to mailed copies.</p>
+          <p class="fix"><b>Status · fixed in #223</b> (migration applied 15 October) — a <code>client</code> status, set in <code>/admin/leads</code>, exempts an engagement; every other lead is anonymized nightly at 03:45, 24 months after its last contact, keeping date, source, topic and status; old contact records go with it. Still not reached: the sheet row and the mailed copies.</p>
         </div>
       </div>
 
@@ -1070,6 +1072,7 @@
             real logic. Rev 1.0's "Unchecked" callout still applies to them.
           </p>
           <p class="fix"><b>Fix</b> — retiring them (N-03) is the real fix; until then, a <code>deno check</code> step over <code>base44/functions/*/entry.ts</code>.</p>
+          <p class="fix"><b>Status</b> — tried on 15 October: the step cannot resolve <code>npm:@base44/sdk</code> outside Base44, and past that reports dozens of implicit-<code>any</code> errors in code due for retirement. Left to N-03.</p>
         </div>
       </div>
 
@@ -1088,6 +1091,7 @@
             Vercel function broke in production while every local gate was green.
           </p>
           <p class="fix"><b>Fix</b> — a CI check that compares <code>supabase migration list</code> against the repository before promoting, and a smoke step that probes each function (now done for <code>/api/og/blog</code> by hand).</p>
+          <p class="fix"><b>Status · partly</b> — the smoke job now probes both Vercel functions after every production deploy (a 404 and a 405 that only a loaded function returns). The migration-drift check is still open.</p>
         </div>
       </div>
 
@@ -1113,7 +1117,7 @@
             <b>N-08</b> — documentation drift: the typecheck comment in
             <code>ci.yml</code>, known issues B-1 and B-6, STD-06's platform
             list and a comment in <code>App.jsx</code> describe states that have
-            changed.
+            changed. <b>Fixed</b> — all five brought up to date.
           </p>
         </div>
       </div>
@@ -1153,13 +1157,13 @@
         <table>
           <thead><tr><th class="num-col">Step</th><th>Change</th><th>Findings</th><th>Effort</th></tr></thead>
           <tbody>
-            <tr><td class="num-col">1</td><td>One recipients module, Dorit primary; the list as a secret</td><td><span class="ref">N-01 R-02</span></td><td>half a day</td></tr>
-            <tr><td class="num-col">2</td><td>Lead retention: <code>delete_after</code>, a nightly purge, the sheet row with it</td><td><span class="ref">N-02</span></td><td>a day, with a migration</td></tr>
+            <tr><td class="num-col">1</td><td><s>One recipients module; the list as a secret</s> — done, #224 (who receives: unchanged, by decision)</td><td><span class="ref">N-01 R-02</span></td><td>done</td></tr>
+            <tr><td class="num-col">2</td><td><s>Lead retention: a client status, a nightly anonymization</s> — done, #223; the sheet row still open</td><td><span class="ref">N-02</span></td><td>done</td></tr>
             <tr><td class="num-col">3</td><td>Content writes to Supabase; the last two agents to the <code>chat</code> function; revoke the connectors (around 27 October)</td><td><span class="ref">N-03</span></td><td>days</td></tr>
             <tr><td class="num-col">4</td><td>Flip the switch defaults; delete the Base44 paths and functions</td><td><span class="ref">N-03 N-04 N-07</span></td><td>a day</td></tr>
-            <tr><td class="num-col">5</td><td>A migration-drift check and function probes before promotion</td><td><span class="ref">N-05</span></td><td>half a day</td></tr>
+            <tr><td class="num-col">5</td><td>A migration-drift check before promotion (<s>function probes</s> — done)</td><td><span class="ref">N-05</span></td><td>a few hours</td></tr>
             <tr><td class="num-col">6</td><td>Measure Home's main chunk on a phone; split only if it pays</td><td><span class="ref">N-06</span></td><td>hours</td></tr>
-            <tr><td class="num-col">7</td><td>Bring the stale comments and test-plan pages up to date</td><td><span class="ref">N-08</span></td><td>an hour</td></tr>
+            <tr><td class="num-col">7</td><td><s>Bring the stale comments and test-plan pages up to date</s> — done</td><td><span class="ref">N-08</span></td><td>done</td></tr>
           </tbody>
         </table>
       </div>
@@ -1168,7 +1172,7 @@
   </main>
 
   <footer class="colophon">
-    <span>Architecture record · revision 2.0 · 15 October 2026</span>
+    <span>Architecture record · revision 2.1 · 15 October 2026</span>
     <span>Findings <span class="ref">R-01 – R-13</span> · <span class="ref">N-01 – N-09</span></span>
     <span>Test plan: <code>tests/test-plan/</code></span>
     <span>Run everything: <code>./scripts/run-tests.sh</code></span>

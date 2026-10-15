@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 71 in `e2e/ui`, of 182 across the whole e2e suite, run on all four platforms
+**Location:** `e2e/ui/` · **Cases:** 71 in `e2e/ui`, of 182 across the whole e2e suite. CI runs `web-chromium` on a pull request, and `web-chromium` + `android-chrome` (two shards each) on `main`, nightly and on a manual run; `web-webkit` and `ios-safari` remain in `playwright.config` for a local run
 
 ---
 
@@ -197,5 +197,5 @@ known to bite.
 
 ## 4. Pass criteria
 
-Every case passes on all four platforms. `E2E-DSK-*` runs only on the two
-desktop projects; the mobile block is in [STD-07](07-std-mobile.md).
+Every case passes on every project CI runs (`web-chromium`, `android-chrome`)
+and locally on all four. `E2E-DSK-*` runs only on the desktop projects; the mobile block is in [STD-07](07-std-mobile.md).
