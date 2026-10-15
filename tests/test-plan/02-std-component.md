@@ -267,6 +267,7 @@ visitor would.
 | CMP-REC-008 | "scrolls the recommendation into view" | `scrollIntoView` called |
 | CMP-REC-009 | "clears a chosen keyword when a recommendation arrives" | Recommended card only; keyword no longer pressed |
 | CMP-REC-010 | "drops the recommendation filter once the visitor picks a keyword" | The keyword's cards, not the recommendation |
+| CMP-REC-011 | "finds a post the chat function named by its slug, as one Base44 named by its id" | A block naming `livui-tviot` shows `post-c` alone |
 
 ### 4.14 Reading-recommender chat — `tests/component/blog-recommendation-chat.test.tsx`
 
@@ -463,6 +464,13 @@ As §4.23, with `procedures_agent` served by the function.
 |---|---|---|
 | CMP-CHPROC-001 | "shows the procedures chat's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS` entry is on screen; not the interview's third point, not the Base44 notice's fourth |
 | CMP-CHPROC-002 | "sends the first message as procedures_agent with the v6 stamp, and shows the reply" | `invoke("chat", …)` with `agent: procedures_agent` and `CHAT_FUNCTION_CONSENT_VERSION`; the reply on screen |
+
+### 4.23b `<AgentChat />` — the blog recommender on the chat function — `tests/component/chat-function-blog.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CHBLOG-001 | "shows the blog recommender's own v6 notice, not the interview's" | Every `CHAT_FUNCTION_BLOG_CONSENT_POINTS` entry; not the interview's third point |
+| CMP-CHBLOG-002 | "sends the first message as blog_recommender with the v6 stamp, and hides the block it is handed" | `agent: blog_recommender`, v6; the reply shown without the block; `onAssistantMessage` gets the block |
 
 ### 4.24 `<NeedsWizard />` — three taps, the contact step, then three optional questions — `tests/component/needs-wizard.test.tsx`
 
