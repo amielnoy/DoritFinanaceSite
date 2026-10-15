@@ -37,6 +37,7 @@ something outside the repository.
 | `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
 | `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
 | `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
+| `groupOpenLeads`, `planAssignments`, `describeOpenLeads` | `scripts/assign-open-leads.mjs` |
 | `fetchPublishedArticles`, `planArticles`, `fixtureArticleFor`, `duplicateTitles` | `scripts/published-articles.mjs` |
 | `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
@@ -1578,3 +1579,16 @@ uploaded, against the limits the bucket and `submit-claim` enforce anyway.
 
 All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
+
+### 4.64 Assigning the open leads before narrowing — `tests/unit/assign-open-leads.test.ts`
+
+The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). It lists every agency's open (any status but `closed`), unassigned leads and, given a plan, says which lead goes to which address. It is a dry run unless given `--apply`. Writes go to unassigned rows only, and the leads trigger refuses an assignee outside the lead's agency.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AOL-001 | "keeps open, unassigned leads per agency, oldest first" | `closed` and already-assigned leads dropped; grouped by `agency_id`; sorted by `created_at` |
+| UNIT-AOL-002 | "gives a lead's own key priority over its agency's" | The lead key's address for that lead, the `agency:<id>` address (trimmed, lower-cased) for the rest |
+| UNIT-AOL-003 | "reports what it cannot do instead of dropping it" | `not_open_or_unassigned`, `not_an_address`, `no_open_leads` |
+| UNIT-AOL-004 | "plans nothing without a plan" | Both lists empty |
+| UNIT-AOL-005 | "lists ids, Israel-time dates, statuses, sources and topics — never a name, phone or email" | `2026-10-01T09:00:00Z` shows as `2026-10-01 12:00`; no client name, phone or address |
+| UNIT-AOL-006 | "says when there is nothing to assign" | `no open unassigned leads` |
