@@ -319,7 +319,11 @@ begin
   perform pg_temp.expect_error(
     $q$insert into public.clearinghouse_snapshots (agency_id, request_id, client_name, taken_at, interface_version, data) values ('cccccccc-0000-0000-0000-00000000000b', 'ffffffff-0000-0000-0000-0000000000a3', 'x', now(), '1', '{}')$q$,
     'new row violates row-level security policy for table "clearinghouse_snapshots"');
-  -- Nor a request of their own paired with another User's lead.
+  -- Nor their own lead-less request pinned to another User's lead.
+  perform pg_temp.expect_error(
+    $q$insert into public.clearinghouse_snapshots (agency_id, request_id, lead_id, client_name, taken_at, interface_version, data) values ('cccccccc-0000-0000-0000-00000000000a', 'ffffffff-0000-0000-0000-0000000000a3', 'eeeeeeee-0000-0000-0000-000000000002', 'x', now(), '1', '{}')$q$,
+    'new row violates row-level security policy for table "clearinghouse_snapshots"');
+  -- Nor a request on their own lead paired with another User's lead.
   perform pg_temp.expect_error(
     $q$insert into public.clearinghouse_snapshots (agency_id, request_id, lead_id, client_name, taken_at, interface_version, data) values ('cccccccc-0000-0000-0000-00000000000a', 'ffffffff-0000-0000-0000-0000000000a1', 'eeeeeeee-0000-0000-0000-000000000002', 'x', now(), '1', '{}')$q$,
     'new row violates row-level security policy for table "clearinghouse_snapshots"');

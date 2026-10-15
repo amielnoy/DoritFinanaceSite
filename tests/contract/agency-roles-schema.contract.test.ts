@@ -242,6 +242,8 @@ describe("agency roles, step 2 (narrowing)", () => {
     expect(fns.get("can_work")).toMatch(/p_lead_id is not null and public\.lead_in_agency\(p_lead_id, p_agency_id\) and public\.can_see_lead\(p_lead_id\)/);
     expect(fns.get("request_in_agency")).toMatch(/r\.agency_id = p_agency_id/);
     expect(narrowing).toMatch(/create policy clearinghouse_snapshots_insert_lead[\s\S]*?request_id is null or public\.request_in_agency\(request_id, agency_id, lead_id\)/);
+    // The named lead on its own, whatever request comes with it.
+    expect(narrowing).toMatch(/create policy clearinghouse_snapshots_insert_lead[\s\S]*?lead_id is null or \(public\.lead_in_agency\(lead_id, agency_id\) and public\.can_see_lead\(lead_id\)\)/);
     expect(narrowing).toMatch(/create policy meetings_update_lead[\s\S]*?with check \(\(public\.can_see_lead\(lead_id\) and public\.lead_in_agency\(lead_id, agency_id\)\)/);
   });
 

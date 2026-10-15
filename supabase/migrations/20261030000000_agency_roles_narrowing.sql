@@ -197,9 +197,13 @@ create policy clearinghouse_snapshots_read_lead on public.clearinghouse_snapshot
   for select to authenticated
   using (public.can_work(agency_id, lead_id, created_by)
          or (request_id is not null and public.can_work_request(request_id)));
+-- A named lead is checked on its own, whatever request comes with it: in the
+-- row's agency and one the caller may see — or a User could pin their own
+-- lead-less request to another User's lead.
 create policy clearinghouse_snapshots_insert_lead on public.clearinghouse_snapshots
   for insert to authenticated
-  with check ((request_id is null or public.request_in_agency(request_id, agency_id, lead_id))
+  with check ((lead_id is null or (public.lead_in_agency(lead_id, agency_id) and public.can_see_lead(lead_id)))
+              and (request_id is null or public.request_in_agency(request_id, agency_id, lead_id))
               and (public.can_work(agency_id, lead_id, created_by)
                    or (request_id is not null and public.can_work_request(request_id))));
 create policy clearinghouse_snapshots_delete_admin on public.clearinghouse_snapshots
