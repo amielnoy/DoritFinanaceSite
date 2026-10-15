@@ -88,6 +88,20 @@ describe("submit-claim — the key it writes with", () => {
 });
 
 describe("submit-claim — what it refuses", () => {
+  // D-01, manual test 2026-10-14: a claim with the phone "abc" was filed. Edge
+  // only: Base44's submitClaim is the rollback N-03 retires, and was not changed.
+  it.each(["abc", "123", "050123", "+1 202 555 0143"])("refuses a phone Dorit cannot call back (%s), touching nothing", async (phone) => {
+    const r = await invokeEdge("submit-claim", { ...claim, phone });
+    expect(r.status).toBe(400);
+    expect(r.json).toEqual({ error: "מספר הטלפון לא נראה תקין", rid: expect.any(String) });
+    expect(r.fetches).toEqual([]);
+  });
+
+  it.each(["053-666-7788", "03 123 4567", "+972 53 666 7788"])("accepts an Israeli mobile or landline (%s)", async (phone) => {
+    const r = await invokeEdge("submit-claim", { ...claim, phone });
+    expect(r.status).toBe(200);
+  });
+
   it("answers a body that is not JSON as a missing name and phone, touching nothing", async () => {
     const r = await invokeEdge("submit-claim", null, { rawBody: "not json" });
     expect(r.status).toBe(400);

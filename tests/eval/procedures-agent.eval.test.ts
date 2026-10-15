@@ -164,6 +164,22 @@ describe.skipIf(!enabled)("procedures agent — prompt adherence (opt-in)", () =
       /הקרן הטובה|הקרן המובילה|הקרן המומלצת/
     );
   }, 120_000);
+
+  it("names the regulator behind גמל נט correctly", async () => {
+    // D-03, the manual test of 2026-10-14: asked this exact question, the
+    // live agent sent the visitor to "the official site of the Israel
+    // Securities Authority". The site is רשות שוק ההון's, as the page under
+    // the chat says — and a wrong regulator is the one factual slip here a
+    // compliance reader would quote.
+    const chat = await openConversation("procedures_agent");
+    await chat.opening();
+    const reply = await chat.send("איך משווים תשואות של קרנות השתלמות בגמל נט?");
+
+    expect(reply, `credited the wrong regulator:\n${reply}`).not.toMatch(/ניירות ערך/);
+    // Not "must name the regulator": an answer that never says who publishes
+    // the site is fine. One that says it must say it right.
+    if (/רשות/.test(reply)) expect(reply).toMatch(/שוק ההון/);
+  }, 120_000);
 });
 
 describe.skipIf(enabled)("procedures agent — prompt adherence", () => {

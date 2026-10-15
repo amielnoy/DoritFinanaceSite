@@ -1298,13 +1298,17 @@ opens. The message goes from the visitor's phone to Dorit; GA4 hears only
 
 ### 4.48 Israeli phone numbers — `tests/unit/phone.test.ts`
 
-`isIsraeliMobile` (the questionnaire's contact step) and `isIsraeliPhone` (escalateToHuman's rule, unchanged).
+`isIsraeliMobile` (the questionnaire's contact step), `isIsraeliPhone` (escalateToHuman's rule, unchanged), and `isContactPhone` (quick contact and the claim report), with its backend copy `contactPhone` in `supabase/functions/_shared/phone.ts` held to the same table.
 
 | ID | Title | Expected result |
 |---|---|---|
 | UNIT-PHONE-001 | "accepts %s" (6 cases) | `050-1234567`, `0521234567`, `054 123 4567`, `+972-50-1234567`, `972501234567`, `+972 58 123 4567` |
 | UNIT-PHONE-002 | "refuses %s (%s)" (6 cases) | A landline, 9 or 11 digits, letters, empty, a foreign number |
 | UNIT-PHONE-003 | "still accepts a landline — escalateToHuman's rule, unchanged" | `isIsraeliPhone("03-1234567")` |
+| UNIT-PHONE-004 | "accepts %s" (10 cases) — `isContactPhone` and the backend's `contactPhone` | Mobiles and landlines, with 0 or `+972`/`972`; both functions agree |
+| UNIT-PHONE-005 | "refuses %s (%s)" (8 cases) | Letters, too short, 7 digits, no leading 0, too long, a 0 after +972, foreign, empty — both refuse |
+| UNIT-PHONE-006 | "accepts everything the questionnaire's rules accept" | Whatever `isIsraeliPhone` or `isIsraeliMobile` accepts, `contactPhone` accepts |
+| UNIT-PHONE-007 | "treats a missing phone as refused on the backend" | `contactPhone(undefined/null)` is false |
 
 ### 4.49 The clearinghouse analysis — `tests/unit/clearinghouse-analysis.test.ts`
 
@@ -1549,6 +1553,23 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-CSV-003 | "leaves ordinary text, numbers and empties as they were" | Hebrew, a phone, null and undefined |
 | UNIT-AUTH-GOOGLE-ERR | "reports a Google sign-in Supabase refused, so the page can say so" | A payload `error` and a rejection both reject `signInWithGoogle` |
 | UNIT-LEADADM-PAGE | "reads every lead, page after page, until a short page" | 2,500 rows → 2,500, in three `range` reads of 1,000; the first test now expects `range(0, 999)` |
+
+### 4.63 The claim form's file checks — `tests/unit/claim-documents.test.ts`, `tests/unit/supabase-upload.test.ts` (new case)
+
+D-02 (manual test 2026-10-14): the form checks a document before anything is
+uploaded, against the limits the bucket and `submit-claim` enforce anyway.
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-CLDOC-001 | "has the bucket's size limit" | `CLAIM_DOCUMENT_MAX_BYTES` = the migration's `file_size_limit` |
+| UNIT-CLDOC-002 | "has the bucket's types, no more and no fewer" | `CLAIM_DOCUMENT_TYPES` = the migration's `allowed_mime_types` |
+| UNIT-CLDOC-003 | "has submit-claim's document count" | `CLAIM_DOCUMENT_MAX_FILES` = `MAX_DOCUMENTS` |
+| UNIT-CLDOC-004 | "offers every type, and the extensions, in the picker" | `accept` lists each type and `.heic` |
+| UNIT-CLDOC-005 | "knows %s" (3 cases) | A typed PDF; an untyped HEIC; an octet-stream JPEG — by extension |
+| UNIT-CLDOC-006 | "refuses %s" (4 cases) | A program, an archive, an HTML file named `.pdf`, an untyped file with no known extension |
+| UNIT-CLDOC-007 | "names the type, the size and the empty file, in that order" | `form.fileType`, `form.fileSize`, `form.fileEmpty` |
+| UNIT-CLDOC-008 | "takes a file at exactly the limit" | 10 MB passes |
+| UNIT-CLDOC-009 | "names the file's type for the bucket, also when the browser left it empty" (`SupabaseUploadService`) | An untyped `.HEIC` uploads with `contentType: image/heic` |
 
 ## 5. Pass criteria
 
