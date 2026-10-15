@@ -93,7 +93,14 @@ closing it would take.
 
 ## B. Open findings — decisions for the owner
 
-### B-6 · Two mail recipients are still unregistered, and one of them is the agency
+### B-6 · ~~Two mail recipients are still unregistered, and one of them is the agency~~ — closed
+
+**Fixed by the second route below.** Every function now mails through
+`dorit-mailer` (Cloudflare Pages) and Resend from a verified domain
+(`notifications@mail.govari-fin.co.il`), one message per recipient, so no
+address needs to be a Base44 user — and the visitor gets a confirmation. Who
+receives an enquiry is one module, `supabase/functions/_shared/recipients.ts`
+(#224). Kept for the reasoning.
 
 `Core.SendEmail` delivers only to registered users. `dorit@govari-fin.co.il` and
 `amielnoy@outlook.com` are not registered, so every send to them fails.
@@ -158,7 +165,13 @@ prerender, and it does not read `vercel.json`. The step is opt-in per host by
 build command, and a host without a Chromium binary ships the plain SPA with a
 warning rather than failing the deploy.
 
-### B-1 · Colour contrast below WCAG AA
+### B-1 · ~~Colour contrast below WCAG AA~~ — closed
+
+**Fixed.** `e2e/a11y/axe.spec.ts` now enforces contrast on every desktop
+(`web-*`) project, unconditionally, and CI is green; the mobile projects still
+only report, because axe there catches entrances mid-animation. The accent is
+`--accent: 37 76% 28%` (`#7d5411`, 6.9:1) on the current ground. The history
+below is kept for the reasoning.
 
 Half of this is fixed; the description of the other half was wrong.
 
