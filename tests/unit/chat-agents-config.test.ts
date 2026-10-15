@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { CHAT_FUNCTION_AGENTS, parseChatAgents } from "@/config/chat-agents";
 import {
   CHAT_FUNCTION_CONSENT_POINTS,
+  BLOG_RECOMMENDER_CONSENT_POINTS,
+  CHAT_FUNCTION_BLOG_CONSENT_POINTS,
   CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT,
   CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS,
   CHAT_FUNCTION_SUPPORT_CONSENT_POINTS,
@@ -14,7 +16,12 @@ describe("parseChatAgents", () => {
   it("is empty by default", () => expect([...parseChatAgents(undefined, true)]).toEqual([]));
   it("reads a comma-separated list", () => expect([...parseChatAgents(" needs_interview , ", true)]).toEqual(["needs_interview"]));
   it("ignores agents the function cannot serve yet", () =>
-    expect([...parseChatAgents("blog_recommender,needs_interview", true)]).toEqual(["needs_interview"]));
+    expect([...parseChatAgents("some_other_agent,needs_interview", true)]).toEqual(["needs_interview"]));
+  it("may serve the blog recommender from the function, but only when VITE_CHAT_AGENTS names it", () => {
+    expect(CHAT_FUNCTION_AGENTS).toContain("blog_recommender");
+    expect([...parseChatAgents("blog_recommender", true)]).toEqual(["blog_recommender"]);
+    expect([...parseChatAgents("blog_recommender", false)]).toEqual([]);
+  });
   it("may serve the procedures chat from the function, but only when VITE_CHAT_AGENTS names it", () => {
     expect(CHAT_FUNCTION_AGENTS).toContain("procedures_agent");
     expect([...parseChatAgents("procedures_agent", true)]).toEqual(["procedures_agent"]);
@@ -28,7 +35,7 @@ describe("parseChatAgents", () => {
     expect([...parseChatAgents("support_agent", true)]).toEqual(["support_agent"]);
     expect([...parseChatAgents("needs_interview,support_agent", true)]).toEqual(["needs_interview", "support_agent"]);
     expect([...parseChatAgents("support_agent", false)]).toEqual([]);
-    expect([...parseChatAgents("blog_recommender", true)]).toEqual([]);
+    expect([...parseChatAgents("some_other_agent", true)]).toEqual([]);
   });
 });
 
@@ -67,5 +74,14 @@ describe("the procedures chat's v6 notice", () => {
     expect(points[3]).toBe(CHAT_FUNCTION_SUPPORT_CONSENT_POINTS[3]);
     expect(points).not.toContain(CONSENT.points[0]);
     expect(points.join(" ")).not.toMatch(/מתאם פגישה/);
+  });
+});
+
+describe("the blog recommender's v6 notice", () => {
+  it("is the adviser's two lines and the v6 line, never the interview's", () => {
+    const points = CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT.blog_recommender;
+    expect(points).toBe(CHAT_FUNCTION_BLOG_CONSENT_POINTS);
+    expect(points).toEqual([BLOG_RECOMMENDER_CONSENT_POINTS[0], BLOG_RECOMMENDER_CONSENT_POINTS[1], CHAT_FUNCTION_SUPPORT_CONSENT_POINTS[3]]);
+    expect(points.join(" ")).not.toMatch(/נאספים שם וטלפון/);
   });
 });
