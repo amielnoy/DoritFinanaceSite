@@ -787,7 +787,18 @@ no `/en` route, no language switcher, no hreflang. Locally:
   templates read exactly as it writes. Shekels are formatted per language
   (`formatIlsIn`). The retirement calculator and the Har HaBituach check (both
   behind `VITE_SNAPSHOT_HOME`) and the procedures chat stay on the Hebrew page.
-- **Still to do:** the sitemap and prerender for `/en` and `/fr`. They follow in their own slices, with the sitemap and
+- **Done in slice 6 (the build):** with `VITE_LOCALES` set, `build:prerender`
+  also prerenders the six translated pages under each added language
+  (`dist/en.html`, `dist/en/tools.html`, …) and lists them in the sitemap;
+  unset, the build output is byte-for-byte what it was. The list of
+  translated pages is one constant, `TRANSLATED_ROUTES` in
+  `src/i18n/locales.ts` (the language switcher and both scripts read it; a test
+  holds it to App.jsx's routes). Titles and `og:site_name` end with the site's
+  name in the page's language (`siteNameIn`), and the prerender fails the build
+  if an English or French page's title has Hebrew in it.
+- **Before the switch goes on:** see below — native-speaker and compliance
+  review. Turning it on is setting `VITE_LOCALES=en,fr` in Vercel and
+  redeploying. They follow in their own slices, with the sitemap and
   prerender for the new addresses.
 - **Before the switch goes on:** a native speaker reviews the English and
   French. The compliance adviser approves the translated licence and

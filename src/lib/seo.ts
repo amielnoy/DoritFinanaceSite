@@ -8,7 +8,9 @@
 import { useEffect } from "react";
 import { isLegacyHost } from "./legacy-host.js";
 import { jsonLdText } from "./trusted-types.js";
-import { DEFAULT_LOCALE, ENABLED_LOCALES, localePath, type Locale } from "@/i18n/locales";
+// Relative, like the imports above: api/og/blog.ts runs this file in a Vercel
+// function, whose bundler does not resolve the "@/" alias (#212 broke it so).
+import { DEFAULT_LOCALE, ENABLED_LOCALES, localePath, type Locale } from "../i18n/locales.js";
 
 type Env = Record<string, string | undefined> | undefined;
 
@@ -50,6 +52,14 @@ export function resolveSiteUrl(fromVite: Env, fromServer: Env): string {
 export const SITE_URL: string = resolveSiteUrl(viteEnv, serverEnv);
 
 export const SITE_NAME = "דורית גוב ארי — מתכננת פיננסית וסוכנת ביטוח";
+
+/** The site's name in a page's language: titles end with it, and og:site_name is it. Hebrew is SITE_NAME. */
+const SITE_NAMES: Record<Locale, string> = {
+  he: SITE_NAME,
+  en: "Dorit Gov Ari — Financial planner & insurance agent",
+  fr: "Dorit Gov Ari — Planificatrice financière et agente d'assurance",
+};
+export const siteNameIn = (locale: Locale): string => SITE_NAMES[locale];
 
 // A photograph of Dorit, not the generated stock image it used to be: the
 // card a shared link unfurls into is the first face of the business.
@@ -215,7 +225,7 @@ export function applySeo(config: SeoConfig): void {
   og("og:type", type);
   og("og:image", image);
   og("og:image:alt", imageAlt);
-  og("og:site_name", SITE_NAME);
+  og("og:site_name", siteNameIn(locale));
   og("og:locale", OG_LOCALE[locale]);
 
   // Each language's address for the same page, and Hebrew as the default —

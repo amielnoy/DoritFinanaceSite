@@ -27,6 +27,20 @@ export const ENABLED_LOCALES: Locale[] = enabledLocales(env?.VITE_LOCALES);
 export const dirOf = (locale: Locale): "rtl" | "ltr" => (locale === "he" ? "rtl" : "ltr");
 
 /**
+ * The pages that exist in English and French (App.jsx routes them under /en
+ * and /fr). The language switcher keeps a visitor on one of these, and the
+ * build prerenders and lists them in the sitemap. This file imports nothing,
+ * so scripts/prerender.mjs and scripts/build-seo-files.mjs load it under plain
+ * Node.
+ */
+export const TRANSLATED_ROUTES = ["/", "/tools", "/pension-check", "/claims", "/faq", "/atzmaim-31-12"] as const;
+
+/** The translated pages' addresses in the languages a build serves, Hebrew's left out (it has its own). */
+export function translatedRoutes(locales: readonly Locale[]): string[] {
+  return locales.filter((l) => l !== DEFAULT_LOCALE).flatMap((l) => TRANSLATED_ROUTES.map((r) => localePath(l, r)));
+}
+
+/**
  * What Dorit reads stays Hebrew whatever the page's language — a lead's
  * summary, a message's text. This is the note that says the visitor wrote
  * from the English or French site ("" for Hebrew), so she answers in kind.

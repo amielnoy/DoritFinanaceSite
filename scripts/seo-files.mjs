@@ -84,8 +84,8 @@ export function lastmodOf(row) {
  * The template sitemap plus one entry per article. Static routes keep no
  * lastmod — there is no honest value for them; /blog takes its newest article's.
  */
-export function buildSitemap(templateXml, articles) {
-  if (articles.length === 0) return templateXml
+export function buildSitemap(templateXml, articles, localeRoutes = []) {
+  if (articles.length === 0 && localeRoutes.length === 0) return templateXml
   const origin = originFromSitemap(templateXml)
   const blogLoc = `<loc>${origin}/blog</loc>`
   if (!templateXml.includes(blogLoc)) throw new Error(`sitemap.xml template has no ${blogLoc}`)
@@ -107,7 +107,12 @@ export function buildSitemap(templateXml, articles) {
       )
     })
     .join('')
-  return xml.replace('</urlset>', `${entries}</urlset>`)
+  // The English and French pages, when the build serves them. Each page's
+  // hreflang links (useSeo) tie it to its other languages.
+  const localeEntries = localeRoutes
+    .map((route) => '  <url>\n' + `    <loc>${xmlEscape(origin + route)}</loc>\n` + '    <changefreq>monthly</changefreq>\n' + '    <priority>0.5</priority>\n' + '  </url>\n')
+    .join('')
+  return xml.replace('</urlset>', `${entries}${localeEntries}</urlset>`)
 }
 
 /**

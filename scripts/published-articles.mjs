@@ -179,3 +179,8 @@ export async function buildEnv(cwd = process.cwd()) {
   const { loadEnv } = await import('vite')
   return { ...process.env, ...loadEnv('production', cwd, 'VITE_') }
 }
+
+/** The /en and /fr pages among `results` ({ route, title }) whose title has any Hebrew in it. */
+export function hebrewTitledLocalePages(results) {
+  return results.filter((r) => /^\/(en|fr)(\/|$)/.test(r.route) && /[\u0590-\u05FF]/.test(r.title))
+}
