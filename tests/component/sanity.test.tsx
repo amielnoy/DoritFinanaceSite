@@ -217,6 +217,25 @@ describe("<QuickContact />", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("refuses a phone Dorit could not call back, and says so", async () => {
+    // D-01, manual test 2026-10-14: "abc" used to be sent as a lead.
+    const user = userEvent.setup();
+    render(<QuickContact />);
+
+    await user.type(screen.getByLabelText(/שם מלא/), "ישראלה");
+    await user.type(screen.getByLabelText(/טלפון/), "abc");
+    await user.click(screen.getByRole("button", { name: /שליחת הודעה/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("מספר הטלפון לא נראה תקין");
+    expect(screen.getByLabelText(/טלפון/)).toHaveAttribute("aria-invalid", "true");
+    expect(base44Mock.functions.invoke).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByLabelText(/טלפון/));
+    await user.type(screen.getByLabelText(/טלפון/), "+972 50 123 4567");
+    await user.click(screen.getByRole("button", { name: /שליחת הודעה/ }));
+    await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalledTimes(1));
+  });
+
   it("hands the lead to the submitLead backend function", async () => {
     const user = userEvent.setup();
     render(<QuickContact />);
@@ -328,6 +347,34 @@ describe("<ClaimForm />", () => {
       phone: "050-1234567",
       documents: ["https://example.test/f.png"],
     });
+  });
+
+  it("refuses a phone Dorit could not call back, and says so beside the field", async () => {
+    // D-01, manual test 2026-10-14: a claim with the phone "123" used to be filed.
+    const user = userEvent.setup();
+    render(<ClaimForm />);
+
+    await user.type(screen.getByLabelText(/שם מלא/), "ישראלה");
+    await user.type(screen.getByLabelText(/טלפון/), "123");
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
+
+    const phone = screen.getByLabelText(/טלפון/);
+    expect(await screen.findByRole("alert")).toHaveTextContent("נא להזין מספר טלפון ישראלי");
+    expect(phone).toHaveAttribute("aria-invalid", "true");
+    expect(phone).toHaveAccessibleDescription(/נא להזין מספר טלפון ישראלי/);
+    expect(base44Mock.functions.invoke).not.toHaveBeenCalled();
+
+    // Editing the field clears the message until the next send.
+    await user.clear(phone);
+    await user.type(phone, "050-1234567");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("marks the name and phone as required for assistive technology", () => {
+    // D-16: the "*" in the label was the only sign.
+    render(<ClaimForm />);
+    expect(screen.getByLabelText(/שם מלא/)).toHaveAttribute("aria-required", "true");
+    expect(screen.getByLabelText(/טלפון/)).toHaveAttribute("aria-required", "true");
   });
 
   it("reports a failed upload instead of crashing, and keeps the form usable", async () => {

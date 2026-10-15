@@ -6,6 +6,7 @@ import { leadEvents } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { CtaButton } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
+import { isContactPhone } from "@/lib/phone";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 import { withFilledInNote } from "@/i18n/locales";
 import type { KeyOf } from "@/i18n/resources";
@@ -33,6 +34,9 @@ interface ClaimFields {
   description: string;
 }
 
+/** The same words as the questionnaire's claim branch, which checks the same thing. */
+const PHONE_ERROR = "נא להזין מספר טלפון ישראלי — מתחיל ב-0, 9–10 ספרות.";
+
 const EMPTY: ClaimFields = {
   name: "",
   phone: "",
@@ -58,10 +62,18 @@ export default function ClaimForm() {
    * ReferenceError instead of showing a message. (Baselined as TS2304.)
    */
   const [uploadError, setUploadError] = useState("");
+  /**
+   * A phone Dorit could not call back. Checked on send, as `submit-claim`
+   * checks it: "abc" or "123" used to file a claim nobody could answer (D-01,
+   * manual test 2026-10-14).
+   */
+  const [phoneError, setPhoneError] = useState("");
   const error = uploadError || submitError;
 
-  const set = (key: keyof ClaimFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+  const set = (key: keyof ClaimFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    if (key === "phone") setPhoneError("");
     setForm((f) => ({ ...f, [key]: e.target.value }));
+  };
 
   const { name, phone, email, claimType, eventDate, policyNumber, description } = form;
   const t = useT("claims");
@@ -88,6 +100,7 @@ export default function ClaimForm() {
     setForm(EMPTY);
     setDocs([]);
     setUploadError("");
+    setPhoneError("");
   };
 
   const removeDoc = (idx: number) => {
@@ -98,6 +111,10 @@ export default function ClaimForm() {
 
   const submit = async () => {
     if (!valid) return;
+    if (!isContactPhone(phone)) {
+      setPhoneError(PHONE_ERROR);
+      return;
+    }
     const ok = await submitReport(() => {
       const attribution = getAttribution();
       return services.leads.submitClaim({
@@ -151,7 +168,7 @@ export default function ClaimForm() {
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label={t("form.name")}>
-            <input value={name} onChange={set("name")} className={inputClass()} autoComplete="name" />
+            <input value={name} onChange={set("name")} className={inputClass()} autoComplete="name" aria-required="true" />
           </Field>
           <Field label={t("form.phone")}>
             <input
@@ -162,9 +179,17 @@ export default function ClaimForm() {
               type="tel"
               inputMode="tel"
               autoComplete="tel"
+              aria-required="true"
+              aria-invalid={phoneError ? true : undefined}
+              aria-describedby={phoneError ? "claim-phone-error" : undefined}
             />
           </Field>
         </div>
+        {phoneError && (
+          <p id="claim-phone-error" role="alert" className="text-sm text-destructive text-right -mt-2">
+            {phoneError}
+          </p>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label={t("form.email")}>

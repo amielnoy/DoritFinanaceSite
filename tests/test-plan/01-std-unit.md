@@ -1278,13 +1278,17 @@ opens. The message goes from the visitor's phone to Dorit; GA4 hears only
 
 ### 4.48 Israeli phone numbers — `tests/unit/phone.test.ts`
 
-`isIsraeliMobile` (the questionnaire's contact step) and `isIsraeliPhone` (escalateToHuman's rule, unchanged).
+`isIsraeliMobile` (the questionnaire's contact step), `isIsraeliPhone` (escalateToHuman's rule, unchanged), and `isContactPhone` (quick contact and the claim report), with its backend copy `contactPhone` in `supabase/functions/_shared/phone.ts` held to the same table.
 
 | ID | Title | Expected result |
 |---|---|---|
 | UNIT-PHONE-001 | "accepts %s" (6 cases) | `050-1234567`, `0521234567`, `054 123 4567`, `+972-50-1234567`, `972501234567`, `+972 58 123 4567` |
 | UNIT-PHONE-002 | "refuses %s (%s)" (6 cases) | A landline, 9 or 11 digits, letters, empty, a foreign number |
 | UNIT-PHONE-003 | "still accepts a landline — escalateToHuman's rule, unchanged" | `isIsraeliPhone("03-1234567")` |
+| UNIT-PHONE-004 | "accepts %s" (10 cases) — `isContactPhone` and the backend's `contactPhone` | Mobiles and landlines, with 0 or `+972`/`972`; both functions agree |
+| UNIT-PHONE-005 | "refuses %s (%s)" (8 cases) | Letters, too short, 7 digits, no leading 0, too long, a 0 after +972, foreign, empty — both refuse |
+| UNIT-PHONE-006 | "accepts everything the questionnaire's rules accept" | Whatever `isIsraeliPhone` or `isIsraeliMobile` accepts, `contactPhone` accepts |
+| UNIT-PHONE-007 | "treats a missing phone as refused on the backend" | `contactPhone(undefined/null)` is false |
 
 ### 4.49 The clearinghouse analysis — `tests/unit/clearinghouse-analysis.test.ts`
 

@@ -73,6 +73,7 @@ The lead box under both /tools calculators is §4.25.
 | CMP-QCF-003 | "confirms to the visitor and clears the form after a successful send" | submit, then "send another" | Confirmation shown; fields reset |
 | CMP-QCF-004 | "keeps the visitor's input and offers a fallback when sending fails" | `SendEmail` rejects | Error message shown; typed name still present |
 | CMP-QCF-005 | "does not submit twice on a double click" | double-click submit | The function is invoked exactly once |
+| CMP-QCF-006 | "refuses a phone Dorit could not call back, and says so" | name + phone `abc`, submit; then `+972 50 123 4567` | Alert "מספר הטלפון לא נראה תקין", phone `aria-invalid`, nothing sent; the +972 number is sent (D-01) |
 
 ### 4.5 `<ClaimForm />` — the claim report
 
@@ -85,6 +86,8 @@ React does not surface anywhere a visitor can see. The form simply stops.
 | CMP-CLM-001 | "hands the report to the submitClaim backend function with uploaded document urls" | fill, attach a file, submit | `functions.invoke("submitClaim", {name, phone, documents:[url]})` |
 | CMP-CLM-002 | "reports a failed upload instead of crashing, and keeps the form usable" | `UploadFile` rejects | Upload error shown; submit still enabled |
 | CMP-CLM-003 | "offers a blank form again after a successful report" | submit, then "send another" | Fields cleared; submit disabled again |
+| CMP-CLM-004 | "refuses a phone Dorit could not call back, and says so beside the field" | name + phone `123`, submit | Alert under the phone, which is `aria-invalid` and described by it; nothing sent; editing clears it (D-01) |
+| CMP-CLM-005 | "marks the name and phone as required for assistive technology" | render | Both carry `aria-required="true"` (D-16) |
 
 ### 4.6 `<FAQ />`, `<ShareButtons />`, `<ReviewsWidget />`
 

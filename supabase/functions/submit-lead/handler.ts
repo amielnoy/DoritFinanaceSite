@@ -22,6 +22,7 @@ import {
 import { deliveryWarning, mailerConfigured, sendMail } from '../_shared/mail.ts';
 import { insertRow, selectRows, supabaseConfigured, updateRow, updateWhere, upsertRow } from '../_shared/rest.ts';
 import { isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
+import { contactPhone } from '../_shared/phone.ts';
 import { googleConfigured } from '../_shared/google.ts';
 import { calendarConfigured, createCalendarEvent } from '../_shared/calendar.ts';
 import { appendSheetRow } from '../_shared/sheets.ts';
@@ -208,6 +209,17 @@ export async function handler(req: Request): Promise<Response> {
       // setting's value.
       const ready = { db: supabaseConfigured(), mailer: mailerConfigured(), google: googleConfigured() };
       return Response.json({ error: 'נדרשים שם וטלפון', rid, ready }, { status: 400, headers: cors });
+    }
+
+    // A phone Dorit cannot call back is not an enquiry: "abc" and "123" were
+    // stored, mailed and put in the sheet (D-01, manual test 2026-10-14).
+    // Every form checks the same rule first, so a visitor sees this only past
+    // the browser. Not the interview: its phone is the model's transcription of
+    // a conversation, and refusing it would discard the whole interview — the
+    // agent is told to ask for a valid number, and Dorit can still read it.
+    if (source !== 'interview' && !contactPhone(phone)) {
+      log('warn', 'request.rejected', { rid, reason: 'invalid_phone', source: source || 'quick' });
+      return Response.json({ error: 'מספר הטלפון לא נראה תקין', rid }, { status: 400, headers: cors });
     }
 
     // תקרות נדיבות: הסוכן מוסר כאן סיכום ופרופיל שכתב מודל, וראיון אמיתי לא

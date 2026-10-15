@@ -83,7 +83,7 @@ E2E-CAL-009 (`@mobile-only`, phone projects) is in [STD-07](07-std-mobile.md).
 
 | ID | Title | Expected result |
 |---|---|---|
-| E2E-FRM-001 | "keeps submit disabled until name and phone are filled" | Enabled only after both |
+| E2E-FRM-001 | "names what's missing instead of silently disabling submit" | Submit stays enabled; each send names what is missing — both fields, the phone, then a phone Dorit could not call back (`abc`, D-01); the alert clears once both are valid |
 | E2E-FRM-002 | "submits, confirms, and sends the payload the backend expects" | Confirmation shown; the `submitLead` payload carries the name and phone and `source: quick` |
 | E2E-FRM-003 | "shows a recoverable error and a direct mail fallback when sending fails" | Error message; input preserved; button re-enabled |
 | E2E-FRM-004 | "still records the lead when only the optional secondary copy fails" | Exactly one lead written |
