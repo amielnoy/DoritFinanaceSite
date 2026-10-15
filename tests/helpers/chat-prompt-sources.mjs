@@ -11,6 +11,9 @@
 //                   likewise; the BlogPost line names listArticles/readArticle, the
 //                   logSupportChat line is removed (the function logs itself), and
 //                   "מגבלת הירוק" reads an article with readArticle, not BlogPost;
+//   blog.md       = base44/agents/blog_recommender.jsonc's instructions, placeholders
+//                   likewise; its BlogPost reads name listArticles/readArticle and
+//                   the hidden ```recommended block becomes recommendArticles;
 //   compliance.md = base44/agents/COMPLIANCE.md §3 and §5, verbatim.
 // tests/contract/chat-prompts.contract.test.ts holds the files to these rules.
 import { readFileSync } from 'node:fs';
@@ -98,6 +101,42 @@ export const PROCEDURES_TOOL_SECTION = [
   },
 ];
 
+/**
+ * The reading recommender's tool section. BlogPost reads become listArticles /
+ * readArticle; the hidden ```recommended block becomes the recommendArticles
+ * tool — the function returns the slugs, and the site's adapter hands the page
+ * the same block it always read (SupabaseAgentService).
+ */
+export const BLOG_TOOL_SECTION = [
+  {
+    startsWith: '   a. קרא תחילה רק את המאמרים',
+    replacement: "   a. קרא תחילה את רשימת המאמרים שפורסמו ב-listArticles, ובחר תחילה מאמרים שהתגיות שלהם נוגעות לנושא שעלה מהשיחה (פנסיה, מיסוי, ביטוח, וכו').",
+  },
+  {
+    startsWith: '   b. אם לא מצאת מספיק מאמרים',
+    replacement: '   b. קרא ב-readArticle את המאמרים המתאימים ביותר מהרשימה כדי לאתר התאמות עמוקות יותר לפי התוכן.',
+  },
+  {
+    startsWith: '5. בחר עד 3 מאמרים רלוונטיים ביותר.',
+    replacement:
+      '5. בחר עד 3 מאמרים רלוונטיים ביותר. לכל מאמר, כתוב: הכותרת, משפט קצר משלך שמסביר למה הוא רלוונטי למה שנאמר בשיחה, וקישור לקריאה בתחביר מרקדאון: [קריאת המאמר](/blog/<slug>), כאשר <slug> הוא שדה ה-slug שחזר מ-listArticles (זהו קישור אמיתי שהמבקר יכול ללחוץ עליו). בכל הודעה שבה המלצת על מאמרים קרא גם ל-recommendArticles עם slugs — מערך של עד 3 ה-slug שהמלצת עליהם, בסדר הרלוונטיות; הדף מבליט אותם וגולל אליהם. אם לא המלצת על אף מאמר — אל תקרא לה. אל תזכיר את הקריאה במילים.',
+  },
+  { startsWith: '```recommended', replacement: null },
+  { startsWith: '["", "", ""]', replacement: null },
+  { equals: '```', replacement: null },
+  { startsWith: 'מערך JSON תקין בלבד של עד 3 ה-id', replacement: null },
+  // Two lines Base44 left that the site cannot honour: no page has a #consultation
+  // anchor (the booking is the home page's #start), and articles are linked by slug.
+  {
+    startsWith: '6. שאל אם המבקר רוצה המלצות בנושא אחר',
+    replacement: '6. שאל אם המבקר רוצה המלצות בנושא אחר, או לקבוע פגישה אישית עם דורית. אם כן — הפנה לקישור [לשיחה קצרה עם דורית](/#start).',
+  },
+  {
+    startsWith: '- החזר תמיד את הקישור המדויק למאמר בפורמט /blog/<id>.',
+    replacement: '- החזר תמיד את הקישור המדויק למאמר בפורמט /blog/<slug>, עם ה-slug שחזר מ-listArticles.',
+  },
+];
+
 /** An agent's instructions as Base44 runs them today. */
 export function readAgentInstructions(path) {
   const raw = readFileSync(path, 'utf8').replace(/^\s*\/\/.*$/gm, '');
@@ -109,7 +148,8 @@ export const readInterviewInstructions = readAgentInstructions;
 export function withToolSection(instructions, render = (s) => s, section = INTERVIEW_TOOL_SECTION) {
   const out = [];
   for (const line of instructions.split('\n')) {
-    const change = section.find((c) => line.startsWith(c.startsWith));
+    // `equals` for a line no prefix can single out (the blog block's bare closing fence).
+    const change = section.find((c) => (c.equals !== undefined ? line === c.equals : line.startsWith(c.startsWith)));
     if (!change) out.push(line);
     else if (change.replacement !== null) out.push(render(change.replacement));
   }

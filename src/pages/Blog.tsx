@@ -127,9 +127,10 @@ export default function Blog() {
   // filtered — an empty page answers the visitor's question worse than all.
   const recommended = React.useMemo(() => {
     if (!posts || !recommendedIds.length) return [];
-    const byId = new Map(posts.map((p) => [p.id, p]));
+    // Base44's recommender names a post by its id, the chat function's by its slug.
+    const byKey = new Map<string, Article>(posts.flatMap((p) => [[p.id, p] as const, ...(p.slug ? [[p.slug, p] as const] : [])]));
     return [...new Set(recommendedIds)]
-      .map((id) => byId.get(id))
+      .map((id) => byKey.get(id))
       .filter((p): p is Article => Boolean(p));
   }, [posts, recommendedIds]);
 

@@ -9,6 +9,10 @@
  * anyway). So, mirroring the interview agent's `lead` block, it also states
  * the chosen ids in a fenced block: the page reads it to narrow its grid to
  * the matching cards and scroll to them, and the visitor never sees it.
+ *
+ * Two producers write it: Base44's agent itself (post ids), and, for the
+ * `chat` function, SupabaseAgentService from the turn's `recommended` list
+ * (the `recommendArticles` tool; slugs). The page matches a card by either.
  */
 
 export interface RecommendationResult {

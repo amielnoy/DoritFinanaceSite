@@ -101,7 +101,7 @@ were drawn from is [14-procedures-zones](14-procedures-zones.md) §3.
 function replaces Base44 for the interview (rollout step 3). It is a script, not
 a Vitest suite, and it is run by hand by the user.
 
-**What it runs.** A Sonnet model plays each of the 49 personas in
+**What it runs.** A Sonnet model plays each of the 53 personas in
 `tests/eval/chat/personas.json` against the deployed `chat` function,
 up to 14 visitor turns each. Thirty-one are the interview's (11 cooperative
 Hebrew and 1 English lead personas, 4 vague, 4 product pushes, 4 returns or
@@ -117,7 +117,11 @@ answer`) and 3 that must reach Dorit — a pasted balance with a request for a
 recommendation, an ID and policy number (`proc-05`, which lists the constructed
 ID as forbidden), and a request for Dorit herself (`expect: handoff`); each of the three
 names the `phone` it types, and its run fails unless an `escalateToHuman` call carries it
-(the hand-off asks for it after the first call, so the one follow-up carries it). A persona with no `agent` talks to
+(the hand-off asks for it after the first call, so the one follow-up carries it). Four
+are the blog recommender's and carry `"agent": "blog_recommender"`: a topic, a vague
+one that needs one clarifying question, an English request (`blog-01`, `-02`, `-04`,
+`expect: answer` — each fails without a `recommendArticles` call) and a fund-choice
+push (`blog-03`, `expect: handoff`, with its `phone`). A persona with no `agent` talks to
 `needs_interview`. Every request sends `x-chat-eval` with
 `CHAT_EVAL_TOKEN`: the function then simulates its tools, mails no one, returns
 `eval.toolCalls`, bypasses the rate limits and gives the conversation a
@@ -129,8 +133,9 @@ and exits 3 with nothing else sent. A persona's first turn that is not an
 evaluation-mode success stops the whole run the same way. A second Sonnet call scores each transcript
 against `tests/eval/chat/rubric.md`, against `tests/eval/chat/rubric-support.md`
 for an FAQ persona, or against `tests/eval/chat/rubric-procedures.md` for a
-procedures one. The three rubrics end in the same JSON contract (one
-parser reads all three); the procedures rubric adds that a form number, address,
+procedures one, or against `tests/eval/chat/rubric-blog.md` for a blog one. The four
+rubrics end in the same JSON contract (one parser reads them all); the blog rubric
+adds that articles named without a `recommendArticles` call are noted; the procedures rubric adds that a form number, address,
 fax or deadline no `readArticle` call returned is invented, noted like an invented
 article: the support rubric adds that an article link or title no
 `listArticles` / `readArticle` call returned is invented, which is noted in

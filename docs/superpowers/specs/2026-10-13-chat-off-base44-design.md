@@ -315,3 +315,13 @@ PR 3 serves `procedures_agent` (the procedures chat on /tools). It needed no new
 - **The prompt.** `procedures.md` is held to `procedures_agent.jsonc` apart from `PROCEDURES_TOOL_SECTION`: the BlogPost and logSupportChat lines of the tool section, and one line outside it ("מגבלת הירוק") that read an article "ב-BlogPost", now with `readArticle`.
 - **The notice.** `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS`: the procedures notice's own three points and the FAQ chat's v6 fourth.
 
+## Amendments during PR 4 (2026-10-15)
+
+PR 4 serves `blog_recommender` (the reading recommender on /blog):
+
+- **The tool is `recommendArticles`** (camelCase like the others; the PR 2 note's `recommend_articles`). It keeps at most three slugs that `readArticle` would find and names the rest back as `dropped`; with none it is an error.
+- **The page keeps one protocol.** The 200 answer carries the turn's `recommended` (the last call's, only when non-empty, never on a 503). `SupabaseAgentService` writes it into the reply as the same ```` ```recommended ```` block Base44's agent writes, unless the reply already has one; `/blog` matches a card by `slug` as well as `id`.
+- **The role.** `blog`, with `listArticles`, `readArticle`, `recommendArticles` and `escalateToHuman`; not sheet-logged (Base44's recommender never logged). No migration.
+- **The prompt.** `blog.md` is held to `blog_recommender.jsonc` apart from `BLOG_TOOL_SECTION`; `withToolSection` gained `{ equals }` for the block's bare closing fence.
+- **The notice.** The two lines the adviser approved on 2026-10-10 and the v6 line.
+

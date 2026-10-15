@@ -22,6 +22,22 @@ interface ChatAnswer {
   token?: string;
   reply?: string;
   leadSaved?: boolean;
+  /** The articles the blog recommender's turn highlighted (recommendArticles). */
+  recommended?: unknown;
+}
+
+/**
+ * The reply as the page reads it. The blog page has one protocol for both
+ * backends — the ```recommended block (src/lib/blog-recommendation.ts), which
+ * Base44's agent writes itself — so the function's `recommended` list is
+ * written into the same block here. A reply that already carries one keeps it,
+ * and gets no second.
+ */
+function withRecommendation(reply: string, recommended: unknown): string {
+  if (!Array.isArray(recommended)) return reply;
+  const slugs = recommended.filter((s): s is string => typeof s === "string" && s.length > 0);
+  if (slugs.length === 0 || reply.includes("```recommended")) return reply;
+  return `${reply}\n\n\`\`\`recommended\n${JSON.stringify(slugs)}\n\`\`\``;
 }
 
 /** A refusal that still saved the lead: the send succeeded as far as the visitor is concerned. */
@@ -83,7 +99,7 @@ export class SupabaseAgentService implements AgentPort {
       if (answer.token) local.token = answer.token;
       this.publish(local, [
         ...local.messages,
-        { role: "assistant", content: answer.reply, ...(answer.leadSaved ? { signal: "lead_saved" as const } : {}) },
+        { role: "assistant", content: withRecommendation(answer.reply, answer.recommended), ...(answer.leadSaved ? { signal: "lead_saved" as const } : {}) },
       ]);
     } catch (e) {
       // Not sent after all: off the screen, and AgentChat puts the text back in the box.
