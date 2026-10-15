@@ -14,7 +14,7 @@ insert into auth.users (instance_id, id, aud, role, email) values
   ('00000000-0000-0000-0000-000000000000','eeeeeeee-0000-0000-0000-000000000004','authenticated','authenticated','ch-other-agency@example.com');
 
 insert into public.memberships (user_id, agency_id, role) values
-  ('eeeeeeee-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'staff'),
+  ('eeeeeeee-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'admin'),
   ('eeeeeeee-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000002', 'owner');
 
 -- One snapshot per agency, and one already past its retention, as the owner.

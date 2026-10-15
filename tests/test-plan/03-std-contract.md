@@ -742,6 +742,32 @@ The schema for `docs/superpowers/specs/2026-10-15-agency-roles-design.md`, read 
 | CTR-ROLE-010 | "keeps a lead in its agency, and assignment to Admin+ and to the agency's members" | `agency_fixed`; assignment needs `has_role(…, 'admin')` or `is_admin()`; the assignee must pass `lead_assignee_ok` |
 | CTR-ROLE-011 | "makes the membership history read-only to people" | `membership_events`: select to `authenticated` only; no insert, update or delete grant |
 
+Step 2 is `20261030000000_agency_roles_narrowing.sql`. It maps `agent`/`staff` to `user`, narrows the CHECK, redefines `can_see` through `has_role` (so a suspended agency is no longer visible), and replaces every policy on lead data with the lead-level rule. It adds `can_work`, `can_work_request`, `can_work_snapshot` and `can_see_conversation`. The clearinghouse publish functions now check the snapshot's lead. Members can be changed only through the functions. A profile can be read by people who share an agency with it, so the members screen can name members. `staff_role` / `my_staff_role` become `staff_role(user, agency)` / `my_agency_role(agency)`. `masleka_staff_emails(request)` mails the request's handler plus Admins and Owners.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ROLE-012 | "sorts after step 1" | After `20261029000000_agency_roles_additive.sql` |
+| CTR-ROLE-013 | "leaves no read policy on lead data resting on can_see alone" | Replays every migration's `create policy` / `drop policy`. No top-level `or` branch of a select or all policy's USING clause on `leads`, `meetings`, `contacts`, `chat_*`, `masleka_requests`, `masleka_access_log` or `clearinghouse_*` is bare `public.can_see(…)`, and none of those USING clauses is empty |
+| CTR-ROLE-014 | "is a guard that would catch a bare can_see" | The branch splitter finds a bare `can_see` and does not flag one inside a conjunction |
+| CTR-ROLE-015 | "gives every lead-data table a read policy" | One per table |
+| CTR-ROLE-016 | "maps agent and staff to user, then allows only the three roles" | The update runs before the narrowed CHECK |
+| CTR-ROLE-017 | "makes can_see a membership of an active agency" | `select public.has_role(p_agency_id, 'user')` |
+| CTR-ROLE-018 | "lets only Admin+ delete leads and read contacts, and only the Owner edit the agency profile" | `leads_delete_admin` and `contacts_read_admin` use Admin+; `agency_profiles_update_owner` uses Owner |
+| CTR-ROLE-019 | "changes members only through the functions" | `memberships_write_admin` dropped; insert, update and delete revoked from `authenticated` |
+| CTR-ROLE-020 | "checks the lead, not the agency, when publishing an analysis" | The three publish functions call `can_work_snapshot(p_snapshot)`, never `can_see` |
+| CTR-ROLE-021 | "lets a User write drafts, and only Admin+ publish or delete" | Drafts for `user`; delete and testimonials for Admin+ |
+| CTR-ROLE-022 | "asks the role per agency, and mails a request's handler plus Admins and Owners" | The old functions dropped; `staff_role(uuid, uuid)` and `masleka_staff_emails(uuid)` granted to the service role only |
+| CTR-ROLE-023 | "pins search_path on every new function and revokes each by name" | `set search_path = ''`; each new function revoked from public/anon/authenticated; no grant to `anon` |
+
+`agency_roles_check.sql` adds the full matrix after step 2:
+- **A User** reads only their assigned lead, its meeting, its chat (not a lead-less conversation), their requests (on their lead, or lead-less ones they created), the matching snapshots and published items, and only their own reveals. They read no contacts. They cannot change another User's lead or delete their own. They can publish the analysis of their own lead but not another's. They read the agency profile but cannot change it. They write drafts but cannot publish, edit a published article, or add a testimonial. They see the agency's members and their profiles, but nobody outside, and cannot write `memberships`.
+- **An Admin** reads the whole agency, publishes, adds testimonials and deletes leads, but cannot change the agency profile or write `memberships`.
+- **The Owner** can change the agency profile.
+- **A non-member, or a suspended agency's Owner,** reads nothing.
+- **The operator** reads every agency.
+
+Reopening the leads, chat or agency-profile policy, or `can_work`, makes it fail. In `masleka_check.sql`, `clearinghouse_analysis_check.sql` and `clearinghouse_publish_check.sql`, the agency-1 "staff" member is now an Admin, the role that still sees the whole agency. `masleka_check.sql` asks `my_agency_role(agency)` and `staff_role(user, agency)`, and checks that the request's mailing list holds the agency's Admins and Owners but not the platform operator. `agency_isolation_check.sql` expects the narrowed USING / WITH CHECK expressions.
+
 `supabase/tests/agency_roles_check.sql` proves the behaviour in PostgreSQL with synthetic agencies (an active A and B, and a suspended one) and people: an Owner, an Admin, two Users, a non-member, the operator, and a suspended agency's Owner. Covered: role ranks and suspension; `can_see_lead` for each person; the leads trigger refuses a User's assignment change and any change of agency, records `assigned_at` / `assigned_by` for an Admin, keeps those two columns from a direct write, clears them on unassign, and lets the server assign only to a member; `set_member_role` and `remove_member` follow the rules above, including last owner, an Admin who cannot touch another Admin, leaving (which unassigns), and transfer of ownership; anon cannot execute the functions; deleting an agency or an account is not refused as a demotion. Breaking any guard, the suspension check or `can_see_lead` makes it fail.
 
 ## 5. Runtime counterpart

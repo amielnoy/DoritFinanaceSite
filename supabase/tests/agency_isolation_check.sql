@@ -139,6 +139,11 @@ do $$ begin
   end;
 end $$;
 
+-- Since the agency-roles narrowing (20261030000000) these expressions are
+-- role-aware — Admin+ or the assigned User for leads, Admin+ for contacts and
+-- deletes — and the expected strings below are the narrowed ones; every
+-- argument about why a definition check is needed still holds.
+--
 -- leads_update_admin's WITH CHECK, checked against its actual definition
 -- rather than through a crafted UPDATE: Postgres independently re-validates
 -- that an UPDATE's new row still satisfies the table's SELECT policy (there
@@ -154,7 +159,7 @@ do $$ begin
   if (
     select pg_get_expr(polwithcheck, polrelid) from pg_policy
      where polrelid = 'public.leads'::regclass and polname = 'leads_update_admin'
-  ) is distinct from '(can_see(agency_id) OR is_admin())' then
+  ) is distinct from '(has_role(agency_id, ''admin''::text) OR ((assigned_user_id = auth.uid()) AND can_see(agency_id)) OR is_admin())' then
     raise exception 'leads_update_admin''s WITH CHECK no longer enforces agency scoping';
   end if;
 end $$;
@@ -166,7 +171,7 @@ do $$ begin
   if (
     select pg_get_expr(polwithcheck, polrelid) from pg_policy
      where polrelid = 'public.contacts'::regclass and polname = 'contacts_update_admin'
-  ) is distinct from '(can_see(agency_id) OR is_admin())' then
+  ) is distinct from '(has_role(agency_id, ''admin''::text) OR is_admin())' then
     raise exception 'contacts_update_admin''s WITH CHECK no longer enforces agency scoping';
   end if;
 end $$;
@@ -308,7 +313,7 @@ do $$ begin
   if (
     select pg_get_expr(polqual, polrelid) from pg_policy
      where polrelid = 'public.leads'::regclass and polname = 'leads_delete_admin'
-  ) is distinct from '(can_see(agency_id) OR is_admin())' then
+  ) is distinct from '(has_role(agency_id, ''admin''::text) OR is_admin())' then
     raise exception 'leads_delete_admin''s USING no longer enforces agency scoping';
   end if;
 end $$;
