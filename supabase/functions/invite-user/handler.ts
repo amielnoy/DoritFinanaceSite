@@ -5,7 +5,7 @@
  * POST { email, orgId, role } with the admin's session on Authorization.
  *   1. The admin gate (_shared/admin.ts) — a session whose profile is admin.
  *   2. The organization must exist; the role is owner, agent or staff.
- *   3. The account: the profile already holding that address, or a new
+ *   3. The account: the current Auth owner with an application profile, or a new
  *      Supabase Auth account made for it (no password, address confirmed).
  *      Sign-in is Google's: when they sign in with that address, Auth links
  *      the Google identity to this account, so the membership is theirs.
@@ -24,7 +24,7 @@ import { isEmail } from '../_shared/guard.ts';
 import { buildClientHtml } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, sendMail } from '../_shared/mail.ts';
-import { createAuthUser, selectRows, upsertRow } from '../_shared/rest.ts';
+import { callRpc, createAuthUser, selectRows, upsertRow } from '../_shared/rest.ts';
 
 const FN = 'invite-user';
 const log = createLog(FN);
@@ -48,6 +48,7 @@ export async function handler(req: Request): Promise<Response> {
 
     const gate = await requireAdminSession(req, rid, log);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
+    const sessionToken = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
 
     const body = (await req.json().catch(() => null)) as { email?: unknown; orgId?: unknown; role?: unknown } | null;
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
@@ -57,14 +58,17 @@ export async function handler(req: Request): Promise<Response> {
     if (!(role in ROLES)) return json({ error: 'התפקיד אינו מוכר.' }, 400);
     if (!UUID_PATTERN.test(orgId)) return json({ error: 'הארגון אינו מוכר.' }, 400);
 
-    const orgs = await selectRows('agencies', `id=eq.${orgId}&select=id,name`);
+    // Tenant tables deliberately revoke service_role. Use the verified admin's
+    // RLS policies, for the organization read AND the membership write.
+    const orgs = await selectRows('agencies', `id=eq.${orgId}&select=id,name`, sessionToken);
     if (orgs.length === 0) return json({ error: 'הארגון אינו מוכר.' }, 400);
     const orgName = String(orgs[0].name ?? '');
 
-    // An account that has signed in has a profile with its address; one made
-    // here before has a profile too, from the same trigger.
-    const profiles = await selectRows('profiles', `email=eq.${encodeURIComponent(email)}&select=id`);
-    let userId = typeof profiles[0]?.id === 'string' ? (profiles[0].id as string) : '';
+    // Auth owns the current address. profiles.email is only a historical copy
+    // and can still name the old address after an account changes it.
+    const existing = await callRpc('invitee_for', { p_email: email });
+    if (existing !== null && (typeof existing !== 'string' || !existing)) throw new Error('invitee_unexpected_answer');
+    let userId = typeof existing === 'string' ? existing : '';
     let created = false;
     if (!userId) {
       const made = await createAuthUser(email);
@@ -77,7 +81,7 @@ export async function handler(req: Request): Promise<Response> {
       created = true;
     }
 
-    await upsertRow('memberships', { user_id: userId, agency_id: orgId, role }, 'user_id,agency_id');
+    await upsertRow('memberships', { user_id: userId, agency_id: orgId, role }, 'user_id,agency_id', sessionToken);
     log('info', 'invite.member', { rid, userId, orgId, role, created });
 
     let mailed = true;

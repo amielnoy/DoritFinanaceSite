@@ -305,11 +305,11 @@ export default function MaslekaAnalysis({
             ))}
           </ol>
           <div className="mt-4">
-            <CustomRecommendationForm busy={decide.isPending} onAdd={(key, decision) => decide.mutate({ key, decision })} />
+            <CustomRecommendationForm key={snapshotId} busy={decide.isPending} onAdd={(key, decision) => decide.mutateAsync({ key, decision })} />
           </div>
         </section>
 
-        <PublishPanel service={service} stored={stored.data} items={toPublish} confirm={confirm} />
+        <PublishPanel key={snapshotId} service={service} stored={stored.data} items={toPublish} confirm={confirm} />
 
         <section aria-labelledby="products-title">
           <h2 id="products-title" className="font-heading text-xl">

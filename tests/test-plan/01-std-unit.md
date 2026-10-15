@@ -1250,6 +1250,9 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-VANA-001 | "drops the #t= token from a /masleka url" | `https://govari-fin.co.il/masleka`; the token appears nowhere in the event |
 | UNIT-VANA-002 | "leaves a url without a hash unchanged" | Same url |
 | UNIT-VANA-003 | "keeps the query and drops only the hash" | `…/masleka?utm=x&a=1` |
+| UNIT-VANA-004..007 | "ignores private admin events at %s" | `/admin`, `/admin/`, user searches and analysis routes return null for pageviews and custom events |
+| UNIT-VANA-008 | "removes free-text search while preserving public campaign parameters" | `q` and fragment removed; public UTM parameter retained |
+| UNIT-VANA-009 | "drops malformed URLs instead of passing them through" | Invalid URL returns null |
 
 ### 4.46 The calculator → lead message — `tests/unit/calculator-lead.test.ts`
 
