@@ -239,7 +239,12 @@ export interface UploadPort {
  * three files still importing the SDK directly.
  * ───────────────────────────────────────────────────────────────────────── */
 
-export type LeadStatus = "new" | "contacted" | "closed";
+/**
+ * `client`: the enquiry became an engagement. The nightly retention job
+ * (20261025000000_lead_retention.sql) anonymizes every other lead 24 months
+ * after its last contact, as the privacy policy promises, and never a client.
+ */
+export type LeadStatus = "new" | "contacted" | "closed" | "client";
 
 /** A lead as stored, which is not the shape that was submitted: the store adds
  *  an id, a received timestamp and a status the owner moves through. */

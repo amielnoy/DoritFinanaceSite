@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 378 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 418 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 380 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 420 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -712,6 +712,14 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-024 | "runs the insurance self-check in English, and offers an English WhatsApp message" | "6 kinds of insurance relevant to you"; the WhatsApp text starts "Hello Dorit, I did the self-check" |
 | CMP-I18N-025 | "shows the fee calculator's amounts in shekels the English way" | "₪600,000" |
 | CMP-I18N-026 | "keeps the Hebrew page's chat, quiz and amounts" | The chat; the Hebrew heading; "‏600,000 ‏₪" |
+
+
+### 4.41 The client status on `/admin/leads` — `tests/component/lead-client-status.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-LCS-001 | "offers לקוח/ה, labels a client lead with it, and filters by it" | The label; the filter shows only the client |
+| CMP-LCS-002 | "marks a lead as a client" | `setStatus({ id, status: "client" })` |
 
 ## 5. Pass criteria
 
