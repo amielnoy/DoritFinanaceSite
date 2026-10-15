@@ -47,12 +47,18 @@ type Run = (
   mailTo(address: string): { subject: string; html?: string; text?: string; body?: string };
 }>;
 
-const IMPLEMENTATIONS: { label: string; run: Run }[] = [
-  { label: "Base44 submitClaim", run: (body, options) => invokeFunction("submitClaim", body, options) },
-  { label: "Edge submit-claim", run: (body, options) => invokeEdge("submit-claim", body, options) },
+/**
+ * `minimalOps`: the operations mailboxes get a notice without the reporter's
+ * details (N-02). The Edge function — production's path — does; Base44's twin,
+ * reached only where Supabase is not configured and retired by N-03, still
+ * sends them the whole report.
+ */
+const IMPLEMENTATIONS: { label: string; run: Run; minimalOps: boolean }[] = [
+  { label: "Base44 submitClaim", run: (body, options) => invokeFunction("submitClaim", body, options), minimalOps: false },
+  { label: "Edge submit-claim", run: (body, options) => invokeEdge("submit-claim", body, options), minimalOps: true },
 ];
 
-describe.each(IMPLEMENTATIONS)("$label", ({ run }) => {
+describe.each(IMPLEMENTATIONS)("$label", ({ run, minimalOps }) => {
   describe("submitClaim — the report lands", () => {
     it("stores the claim and tells the agency and both operations mailboxes", async () => {
       const r = await run(claim);
@@ -67,14 +73,21 @@ describe.each(IMPLEMENTATIONS)("$label", ({ run }) => {
       }
     });
 
-    it("gives every staff mailbox the same report", async () => {
+    it("gives Dorit the whole report, and the operations mailboxes a notice without the reporter's details", async () => {
       const r = await run(claim);
-      for (const to of [AGENCY, OPS, OPS2]) {
-        const body = r.mailTo(to).body ?? r.mailTo(to).text ?? "";
-        expect(body, to).toContain("רונית מזרחי");
-        expect(body, to).toContain("0536667788");
-        expect(body, to).toContain("נזק לרכב בחניון");
-        expect(body, to).toContain("אישור משטרה.pdf");
+      const details = ["רונית מזרחי", "0536667788", "נזק לרכב בחניון", "אישור משטרה.pdf"];
+      const agency = r.mailTo(AGENCY).body ?? r.mailTo(AGENCY).text ?? "";
+      for (const d of details) expect(agency, d).toContain(d);
+      for (const to of [OPS, OPS2]) {
+        const mail = r.mailTo(to);
+        const body = `${mail.subject}\n${mail.body ?? mail.text ?? ""}\n${mail.html ?? ""}`;
+        if (minimalOps) {
+          for (const d of details) expect(body, `${to}: ${d}`).not.toContain(d);
+          expect(body, to).toContain("דיווח אירוע ביטוחי חדש");
+          expect(body, to).toContain("https://govari-fin.co.il/admin/leads");
+        } else {
+          for (const d of details) expect(body, `${to}: ${d}`).toContain(d);
+        }
       }
     });
 
@@ -251,10 +264,11 @@ describe("the two implementations say the same thing", () => {
     expect(edge.mailTo("ronit@example.com").subject).toBe(base44.mailTo("ronit@example.com").subject);
   });
 
-  it("send the staff the same report, apart from the timestamp line", async () => {
+  // Dorit's copy only: the operations mailboxes get a notice from the Edge function (N-02).
+  it("send Dorit the same report, apart from the timestamp line", async () => {
     const [base44, edge] = await Promise.all([invokeFunction("submitClaim", claim), invokeEdge("submit-claim", claim)]);
     const rest = (text = "") => text.split("\n").slice(1).join("\n");
-    for (const to of [AGENCY, OPS, OPS2]) {
+    for (const to of [AGENCY]) {
       expect(rest(edge.mailTo(to).text), to).toBe(rest(base44.mailTo(to).body ?? base44.mailTo(to).text));
       expect(edge.mailTo(to).subject, to).toBe(base44.mailTo(to).subject);
     }

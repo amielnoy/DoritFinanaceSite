@@ -2,13 +2,15 @@
  * Who receives an enquiry — one place for every Edge function (Architecture
  * N-01), where submit-lead, submit-claim and escalate-to-human each kept a copy.
  *
- * Two recipients, both of whom receive the full enquiry: the agent
- * (SECONDARY_EMAIL) and the team that operates the site for her
- * (NOTIFY_EMAILS), which also gets a status note on the save, the diary and
- * the mails. The consent wording (src/config/compliance.ts) and the privacy
- * policy disclose exactly that — "אצל דורית ואצל הצוות שמתפעל את האתר מטעמה" —
- * and tests/contract/agents.contract.test.ts holds the code and the wording to
- * each other in both directions.
+ * Two recipients. The agent (SECONDARY_EMAIL) receives the full enquiry. The
+ * team that operates the site for her (NOTIFY_EMAILS) receives a notice
+ * without the visitor's details (_shared/ops-notice.ts: kind, topic, record id,
+ * how the save, the diary and the mails went) and, for a meeting, the name,
+ * phone and topic in its diary — N-02, the user's decision of 2026-10-15. The
+ * consent wording (src/config/compliance.ts) and the privacy policy still name
+ * the team — "אצל דורית ואצל הצוות שמתפעל את האתר מטעמה" — because it runs the
+ * database the enquiry is kept in; tests/contract/agents.contract.test.ts holds
+ * the code and the wording to each other.
  *
  * NOTIFY_EMAILS can be replaced without a deploy of the code: the function
  * secret NOTIFY_EMAILS, a comma-separated list. An empty or malformed secret is

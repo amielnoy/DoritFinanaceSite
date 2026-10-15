@@ -115,27 +115,33 @@ describe.each(IMPLEMENTATIONS)("$label — the enquiry actually lands", ({ run, 
     expect(r.leads[0].status).toBe("new");
   });
 
-  it("gives the agency and the operations team the same details", async () => {
+  it("gives the agency the details, and the operations team a notice without them", async () => {
     const r = await run(consultation);
-    for (const to of [AGENCY, OPS]) {
+    const details = ["יעל כהן", "0521234567", "עברה מעביד לעצמאית השנה"];
+    // Both halves, because a reader gets whichever one their client renders.
+    // A field that reached only the text copy would be invisible to everyone
+    // in practice — which is what makes checking both worth the repetition.
+    const agency = r.mailTo(AGENCY);
+    for (const [part, content] of [["html", agency.html], ["text", agency.text]] as const) {
+      for (const d of details) expect(content, `agency (${part})`).toContain(d);
+    }
+    // N-02: the team is told an enquiry arrived and where to read it, never who sent it.
+    for (const to of [OPS, OPS2]) {
       const mail = r.mailTo(to);
-      // Both halves, because a reader gets whichever one their client renders.
-      // A field that reached only the text copy would be invisible to everyone
-      // in practice — which is what makes checking both worth the repetition.
-      for (const [part, content] of [["html", mail.html], ["text", mail.text]] as const) {
-        expect(content, `${to} (${part})`).toContain("יעל כהן");
-        expect(content, `${to} (${part})`).toContain("0521234567");
-        expect(content, `${to} (${part})`).toContain("עברה מעביד לעצמאית השנה");
+      for (const [part, content] of [["subject", mail.subject], ["html", mail.html], ["text", mail.text]] as const) {
+        for (const d of details) expect(content, `${to} (${part}): ${d}`).not.toContain(d);
       }
+      expect(mail.text, to).toContain("https://govari-fin.co.il/admin/leads");
+      expect(mail.html, to).toContain('href="https://govari-fin.co.il/admin/leads"');
     }
   });
 
-  it("adds the operational appendix only to the operations copy", async () => {
+  it("reports the delivery only to the operations team", async () => {
     const r = await run(consultation);
-    expect(r.mailTo(OPS).html).toContain("מצב תפעולי");
-    expect(r.mailTo(OPS).text).toContain("מצב תפעולי");
+    expect(r.mailTo(OPS).html).toContain("תקלות");
+    expect(r.mailTo(OPS).text).toContain("תקלות:");
     expect(r.mailTo(AGENCY).html).not.toContain("מצב תפעולי");
-    expect(r.mailTo(AGENCY).text).not.toContain("מצב תפעולי");
+    expect(r.mailTo(AGENCY).text).not.toContain("תקלות:");
   });
 
   it("reports the calendar and sheet outcome in that appendix", async () => {
@@ -210,8 +216,8 @@ describe.each(IMPLEMENTATIONS)("$label — the enquiry actually lands", ({ run, 
     // gets separated, titled sections. Asserting on the headings rather than on
     // markup keeps this about legibility and not about a particular table.
     const r = await run(consultation);
-    const html = r.mailTo(OPS).html!;
-    for (const heading of ["מי פנה", "הבקשה", "תקציר השיחה", "מצב תפעולי"]) {
+    const html = r.mailTo(AGENCY).html!;
+    for (const heading of ["מי פנה", "הבקשה", "תקציר השיחה"]) {
       expect(html, heading).toContain(heading);
     }
   });
@@ -277,10 +283,12 @@ describe.each(IMPLEMENTATIONS)("$label — a name that is really a payload", ({ 
       expect(html, to).not.toContain("<img src=x");
       expect(html, to).not.toContain('onerror="');
       expect(html, to).not.toContain('<a href="https://evil.example"');
-      // Present, but as text the client displays rather than markup it runs.
+      // Present, but as text the client displays rather than markup it runs —
+      // the topic in both; the name in Dorit's copy alone (N-02).
       expect(html, to).toContain("&lt;img src=x");
-      expect(html, to).toContain("&lt;a href=&quot;https://evil.example&quot;");
     }
+    expect(r.mailTo(AGENCY).html).toContain("&lt;a href=&quot;https://evil.example&quot;");
+    expect(r.mailTo(OPS).html).not.toContain("evil.example");
   });
 
   it("does not turn a hostile phone number into a live link", async () => {
@@ -673,15 +681,16 @@ describe.each(IMPLEMENTATIONS)("$label — a finished introduction interview", (
     }
   });
 
-  it("carries the whole approved profile in both halves of the staff copy", async () => {
+  it("carries the whole approved profile in both halves of Dorit's copy, and none of it to the operations team", async () => {
     const r = await run(interview);
-    for (const to of [AGENCY, OPS]) {
+    const profile = ["אורי לוי", "0541112233", "דמי הניהול בקרן ההשתלמות", "פרישה מסודרת בעוד כעשור"];
+    for (const [to, carried] of [[AGENCY, true], [OPS, false]] as const) {
       const mail = r.mailTo(to);
       for (const [part, content] of [["html", mail.html], ["text", mail.text]] as const) {
-        expect(content, `${to} (${part})`).toContain("אורי לוי");
-        expect(content, `${to} (${part})`).toContain("0541112233");
-        expect(content, `${to} (${part})`).toContain("דמי הניהול בקרן ההשתלמות");
-        expect(content, `${to} (${part})`).toContain("פרישה מסודרת בעוד כעשור");
+        for (const p of profile) {
+          if (carried) expect(content, `${to} (${part})`).toContain(p);
+          else expect(content, `${to} (${part})`).not.toContain(p);
+        }
       }
     }
   });
@@ -876,10 +885,9 @@ describe.each(IMPLEMENTATIONS)("$label — the interview schema", ({ run, source
 
   it("carries the collect-not-advise declaration on every interview", async () => {
     const r = await run(pension);
-    for (const to of [AGENCY, OPS]) {
-      for (const part of [r.mailTo(to).html, r.mailTo(to).text]) {
-        expect(part, to).toContain("אינו בירור צרכים");
-      }
+    // Dorit's copy: the operations notice carries no interview to qualify (N-02).
+    for (const part of [r.mailTo(AGENCY).html, r.mailTo(AGENCY).text]) {
+      expect(part, AGENCY).toContain("אינו בירור צרכים");
     }
   });
 
@@ -1054,8 +1062,9 @@ describe.each(IMPLEMENTATIONS)("$label — the operations mailboxes", ({ run }) 
     expect(second.subject).toBe(first.subject);
     expect(second.html).toBe(first.html);
     expect(second.text).toBe(first.text);
-    // And it is the operations copy, not the agency's: appendix included.
-    expect(second.html).toContain("מצב תפעולי");
+    // And it is the operations notice, not the agency's copy: a link, no visitor.
+    expect(second.html).toContain("https://govari-fin.co.il/admin/leads");
+    expect(second.html).not.toContain("יעל כהן");
   });
 
   it("keeps the agency copy free of the appendix, with the list in place", async () => {
@@ -1945,7 +1954,7 @@ describe("Edge submit-lead — what only it does", () => {
     expect(String(r.meetings[0].calendar_status)).toMatch(/^אירוע נוצר ✓/);
   });
 
-  it("clips the invitation's description for a long interview, and leaves the event whole", async () => {
+  it("clips Dorit's invitation for a long interview, and gives the team's diary the name, phone and topic alone", async () => {
     // `notes` is capped at 4,000 characters and the summary, redacted, at 2,000;
     // the body is the two together with its headings, well past the 4,000 the
     // invitation carries. Hence 3,990 of notes (9,000 would be refused) and a 9,000-character summary.
@@ -1954,16 +1963,21 @@ describe("Edge submit-lead — what only it does", () => {
     const r = await invokeEdge("submit-lead", { ...consultation, summary: notes, notes: notes.slice(0, 3_990) });
     expect(r.status).toBe(200);
     const invitations = r.emails.filter((e) => e.ics);
-    expect(invitations).toHaveLength(2); // the Google event exists here
+    expect(invitations.map((m) => m.to).sort()).toEqual([AGENCY, OPS2].sort()); // the Google event exists here
     const encoder = new TextEncoder();
-    for (const mail of invitations) {
-      expect(encoder.encode(mail.ics!).length, mail.to).toBeLessThan(20_000);
-      expect(mail.ics!.replace(/\r\n /g, "")).toContain("…הפרטים המלאים במייל");
+    for (const mail of invitations) expect(encoder.encode(mail.ics!).length, mail.to).toBeLessThan(20_000);
+    const unfold = (ics: string) => ics.replace(/\r\n /g, "");
+    // Dorit's: the enquiry, clipped to fit.
+    expect(unfold(invitations.find((m) => m.to === AGENCY)!.ics!)).toContain("…הפרטים המלאים במייל");
+    // The team's diary — the Outlook invitation and the Google event — holds what a
+    // meeting needs and nothing more (N-02): the name, the phone, the topic, the record.
+    const team = [unfold(invitations.find((m) => m.to === OPS2)!.ics!), invitations.find((m) => m.to === OPS2)!.text!, String(r.calendarEvents[0].description)];
+    for (const copy of team) {
+      expect(copy).toContain(consultation.name);
+      expect(copy).toContain(consultation.phone);
+      expect(copy).toContain("https://govari-fin.co.il/admin/leads");
+      expect(copy).not.toContain("פרטים על המצב הפיננסי");
     }
-    const description = String(r.calendarEvents[0].description);
-    // The event keeps everything: far more than the 4,000 the invitation carries.
-    expect(description.length).toBeGreaterThan(6_000);
-    expect(description).not.toContain("הפרטים המלאים במייל");
     expect(r.json.warnings ?? []).not.toContain("invite_failed");
   });
 

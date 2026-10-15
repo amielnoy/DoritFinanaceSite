@@ -155,19 +155,6 @@ export function buildLinksFooter({ sheet }) {
   return [`── קישורים ──`, ...rows.map(([label, v]) => `${label}: ${linkIn(v)}`)].join('\n');
 }
 
-export function buildOpsFooter(source, { leadId, topic, calendar, sheet, invites, warnings }) {
-  return [
-    `── מצב תפעולי ──`,
-    `מקור: ${source || 'quick'}`,
-    `נושא: ${topic || '—'}`,
-    `מזהה רשומה: ${leadId || '—'}`,
-    `יומן: ${calendar}`,
-    `גיליון: ${sheet}`,
-    `הזמנות: ${invites}`,
-    `תקלות: ${warnings.length ? warnings.join(', ') : 'אין'}`,
-  ].join('\n');
-}
-
 /**
  * כותרת ההודעה הפנימית, לפי מקור הפנייה.
  *

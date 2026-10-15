@@ -7,13 +7,14 @@
  * goes in through the service account. tests/integration/
  * escalate-to-human.integration.test.ts runs it.
  */
-import { validCampaign, validChannel, validLandingPath } from '../_shared/attribution.ts';
+import { channelLine, validCampaign, validChannel, validLandingPath } from '../_shared/attribution.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { deviceLabel } from '../_shared/device.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, sendMail } from '../_shared/mail.ts';
 import { withinLimit } from '../_shared/guard.ts';
 import { insertRow } from '../_shared/rest.ts';
+import { opsNotice } from '../_shared/ops-notice.ts';
 import { appendSheetRow } from '../_shared/sheets.ts';
 import {
   HUMAN_CONTACT, NOTIFY_EMAILS, REASONS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB, URGENT,
@@ -110,6 +111,14 @@ export async function handler(req: Request): Promise<Response> {
       ...escalationAttribution,
     });
 
+    // The operating team is told that a hand-off happened and why, never who
+    // asked or what they said (N-02): Dorit gets the whole of it.
+    const notice = opsNotice(`${URGENT.has(safeReason) ? '🔴 ' : ''}העברה לטיפול אנושי — ${reasonText}`, [
+      ['סוכן', agent || ''],
+      ['מזהה רשומה', leadId || (contactable ? 'לא נשמרה' : 'אין — לא נמסרו פרטי קשר')],
+      ...(channelLine(escalationAttribution) ? [['הגיע/ה דרך', channelLine(escalationAttribution)] as [string, string]] : []),
+    ]);
+
     let notified = false;
     // Checked once per hand-off, not once per recipient. Over the cap the lead
     // and the sheet row are still written; only the staff mail is held back.
@@ -121,14 +130,15 @@ export async function handler(req: Request): Promise<Response> {
     // One sender for all three, through the mailer.
     for (const to of mayNotify ? [...NOTIFY_EMAILS, SECONDARY_EMAIL] : []) {
       try {
+        const forDorit = to === SECONDARY_EMAIL;
         await sendMail(log, {
           to,
-          subject,
-          html: escalationHtml,
-          text: notification,
-          body: notification,
+          subject: forDorit ? subject : notice.subject,
+          html: forDorit ? escalationHtml : notice.html,
+          text: forDorit ? notification : notice.text,
+          body: forDorit ? notification : notice.text,
           rid,
-          role: to === SECONDARY_EMAIL ? 'agency' : 'ops',
+          role: forDorit ? 'agency' : 'ops',
         });
         notified = true;
       } catch (e) {
