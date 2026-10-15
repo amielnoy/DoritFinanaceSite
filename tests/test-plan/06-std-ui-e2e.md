@@ -106,6 +106,7 @@ because the backend still accepts leads recorded under them.
 | E2E-CLM-003 | "reports an event and confirms to the visitor" | `submitClaim` invoked; confirmation shown |
 | E2E-CLM-004 | "keeps the report on screen and offers a fallback when the backend fails" | Typed report preserved; direct contact offered |
 | E2E-CLM-005 | "does not file two reports on a double click" | Exactly one invocation |
+| E2E-CLM-006 | "keeps documents in the browser until the report is sent, and turns away the wrong ones" | An `.exe` is named and left out, a PDF is listed, no upload until send; then one upload and `documents` of one (D-02) |
 
 ### 3.6 Blog — `blog.spec.ts`
 

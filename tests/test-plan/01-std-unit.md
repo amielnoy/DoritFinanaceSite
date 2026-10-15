@@ -1515,6 +1515,23 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-ANAV-007 | "%s → %s" (`initials`) | דורית גוב ארי → דג; Dorit → D; an email → its name's letters; empty → ? |
 | UNIT-ANAV-008 | "counts the requests whose code has arrived and is not yet submitted" (`waitingCount`) | Two `code_received` of five → 2; none → 0 |
 
+### 4.61 The claim form's file checks — `tests/unit/claim-documents.test.ts`, `tests/unit/supabase-upload.test.ts` (new case)
+
+D-02 (manual test 2026-10-14): the form checks a document before anything is
+uploaded, against the limits the bucket and `submit-claim` enforce anyway.
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-CLDOC-001 | "has the bucket's size limit" | `CLAIM_DOCUMENT_MAX_BYTES` = the migration's `file_size_limit` |
+| UNIT-CLDOC-002 | "has the bucket's types, no more and no fewer" | `CLAIM_DOCUMENT_TYPES` = the migration's `allowed_mime_types` |
+| UNIT-CLDOC-003 | "has submit-claim's document count" | `CLAIM_DOCUMENT_MAX_FILES` = `MAX_DOCUMENTS` |
+| UNIT-CLDOC-004 | "offers every type, and the extensions, in the picker" | `accept` lists each type and `.heic` |
+| UNIT-CLDOC-005 | "knows %s" (3 cases) | A typed PDF; an untyped HEIC; an octet-stream JPEG — by extension |
+| UNIT-CLDOC-006 | "refuses %s" (4 cases) | A program, an archive, an HTML file named `.pdf`, an untyped file with no known extension |
+| UNIT-CLDOC-007 | "names the type, the size and the empty file, in that order" | `form.fileType`, `form.fileSize`, `form.fileEmpty` |
+| UNIT-CLDOC-008 | "takes a file at exactly the limit" | 10 MB passes |
+| UNIT-CLDOC-009 | "names the file's type for the bucket, also when the browser left it empty" (`SupabaseUploadService`) | An untyped `.HEIC` uploads with `contentType: image/heic` |
+
 ## 5. Pass criteria
 
 All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —

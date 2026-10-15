@@ -83,8 +83,12 @@ React does not surface anywhere a visitor can see. The form simply stops.
 
 | ID | Title | Steps | Expected result |
 |---|---|---|---|
-| CMP-CLM-001 | "hands the report to the submitClaim backend function with uploaded document urls" | fill, attach a file, submit | `functions.invoke("submitClaim", {name, phone, documents:[url]})` |
-| CMP-CLM-002 | "reports a failed upload instead of crashing, and keeps the form usable" | `UploadFile` rejects | Upload error shown; submit still enabled |
+| CMP-CLM-001 | "hands the report to the submitClaim backend function with uploaded document urls" | fill, attach a file, submit | The file is uploaded on send, then `functions.invoke("submitClaim", {name, phone, documents:[url]})` |
+| CMP-CLM-002 | "reports a failed upload on send instead of crashing, sends nothing, and uploads once on the retry" | `UploadFile` rejects once, then send again | Upload error shown; `submitClaim` not called; submit still enabled; the retry uploads and sends |
+| CMP-CLM-006 | "uploads nothing when a file is picked — only on send" | pick a file, remove it, send | No upload at any point; `documents: []` (D-02) |
+| CMP-CLM-007 | "names a file it will not take, by its name and why, and keeps the rest" | pick an `.exe`, a 30 MB PDF and a PDF | Each refusal names its file and reason; only the good PDF is listed (D-02) |
+| CMP-CLM-008 | "offers only the bucket's types in the file picker" | render | `accept` has `application/pdf` and `.heic`, no wildcard |
+| CMP-CLM-009 | "does not upload a document twice when the send fails after the uploads" | `submitClaim` rejects once, send again | One upload in all; the retry sends the stored reference |
 | CMP-CLM-003 | "offers a blank form again after a successful report" | submit, then "send another" | Fields cleared; submit disabled again |
 | CMP-CLM-004 | "refuses a phone Dorit could not call back, and says so beside the field" | name + phone `123`, submit | Alert under the phone, which is `aria-invalid` and described by it; nothing sent; editing clears it (D-01) |
 | CMP-CLM-005 | "marks the name and phone as required for assistive technology" | render | Both carry `aria-required="true"` (D-16) |

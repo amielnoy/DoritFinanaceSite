@@ -377,7 +377,53 @@ describe("<ClaimForm />", () => {
     expect(screen.getByLabelText(/טלפון/)).toHaveAttribute("aria-required", "true");
   });
 
-  it("reports a failed upload instead of crashing, and keeps the form usable", async () => {
+  it("uploads nothing when a file is picked — only on send", async () => {
+    // D-02, manual test 2026-10-14: picking a file uploaded it at once, so a
+    // visitor who picked a document and left had stored it anyway.
+    const user = userEvent.setup();
+    render(<ClaimForm />);
+
+    await fill(user);
+    await user.upload(screen.getByLabelText(/לחצו לבחירת קבצים/), new File(["x"], "receipt.png", { type: "image/png" }));
+    expect(await screen.findByText("receipt.png")).toBeInTheDocument();
+    expect(base44Mock.integrations.Core.UploadFile).not.toHaveBeenCalled();
+
+    // Removed before sending, it never leaves the browser.
+    await user.click(screen.getByRole("button", { name: "הסרה" }));
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
+    await screen.findByText("הדיווח התקבל");
+    expect(base44Mock.integrations.Core.UploadFile).not.toHaveBeenCalled();
+    const [, payload] = base44Mock.functions.invoke.mock.calls[0] as [string, any];
+    expect(payload.documents).toEqual([]);
+  });
+
+  it("names a file it will not take, by its name and why, and keeps the rest", async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    render(<ClaimForm />);
+
+    const big = new File(["x"], "scan.pdf", { type: "application/pdf" });
+    Object.defineProperty(big, "size", { value: 30 * 1024 * 1024 });
+    await user.upload(screen.getByLabelText(/לחצו לבחירת קבצים/), [
+      new File(["MZ"], "setup.exe", { type: "application/x-msdownload" }),
+      big,
+      new File(["x"], "receipt.pdf", { type: "application/pdf" }),
+    ]);
+
+    expect(await screen.findByText(/"setup\.exe" — ניתן לצרף PDF או תמונה/)).toBeInTheDocument();
+    expect(screen.getByText(/"scan\.pdf" גדול מ-10MB/)).toBeInTheDocument();
+    expect(screen.getByText("receipt.pdf")).toBeInTheDocument();
+    expect(screen.queryByText("setup.exe")).not.toBeInTheDocument();
+  });
+
+  it("offers only the bucket's types in the file picker", () => {
+    render(<ClaimForm />);
+    const accept = screen.getByLabelText(/לחצו לבחירת קבצים/).getAttribute("accept") ?? "";
+    expect(accept).toContain("application/pdf");
+    expect(accept).toContain(".heic");
+    expect(accept).not.toContain("*");
+  });
+
+  it("reports a failed upload on send instead of crashing, sends nothing, and uploads once on the retry", async () => {
     // Regression: this path used to call a setter that did not exist and threw
     // a ReferenceError out of the change handler.
     const user = userEvent.setup();
@@ -385,13 +431,36 @@ describe("<ClaimForm />", () => {
     render(<ClaimForm />);
 
     await fill(user);
-    await user.upload(
-      screen.getByLabelText(/לחצו לבחירת קבצים/),
-      new File(["x"], "receipt.png", { type: "image/png" })
-    );
+    await user.upload(screen.getByLabelText(/לחצו לבחירת קבצים/), [
+      new File(["x"], "a.png", { type: "image/png" }),
+    ]);
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
 
     expect(await screen.findByText(/העלאת מסמך נכשלה/)).toBeInTheDocument();
+    expect(base44Mock.functions.invoke).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /שליחת דיווח/ })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
+    await screen.findByText("הדיווח התקבל");
+    expect(base44Mock.integrations.Core.UploadFile).toHaveBeenCalledTimes(2);
+    expect(base44Mock.functions.invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not upload a document twice when the send fails after the uploads", async () => {
+    const user = userEvent.setup();
+    base44Mock.functions.invoke.mockRejectedValueOnce(new Error("backend down"));
+    render(<ClaimForm />);
+
+    await fill(user);
+    await user.upload(screen.getByLabelText(/לחצו לבחירת קבצים/), new File(["x"], "a.png", { type: "image/png" }));
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
+    await screen.findByText(/לא הצלחנו לשלוח/);
+
+    await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
+    await screen.findByText("הדיווח התקבל");
+    expect(base44Mock.integrations.Core.UploadFile).toHaveBeenCalledTimes(1);
+    const [, payload] = base44Mock.functions.invoke.mock.calls[1] as [string, any];
+    expect(payload.documents).toEqual(["https://example.test/f.png"]);
   });
 
   it("offers a blank form again after a successful report", async () => {

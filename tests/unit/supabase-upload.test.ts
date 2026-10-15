@@ -57,6 +57,15 @@ describe("SupabaseUploadService", () => {
     expect(filenamePart.endsWith(".pdf")).toBe(true);
   });
 
+  it("names the file's type for the bucket, also when the browser left it empty", async () => {
+    // The bucket checks the type (D-02). iOS can hand over a HEIC photo with an
+    // empty `type`; untyped, it would be refused as a generic upload.
+    const upload = vi.fn().mockResolvedValue({ data: { path: "x" }, error: null });
+    const client = clientOf({ upload });
+    await new SupabaseUploadService(client).upload(new File(["x"], "IMG_0001.HEIC", { type: "" }));
+    expect(upload.mock.calls[0][2]).toEqual({ contentType: "image/heic" });
+  });
+
   it("throws when the upload itself fails, without trying to sign anything", async () => {
     const createSignedUrl = vi.fn();
     const upload = vi.fn().mockResolvedValue({ data: null, error: { message: "bucket is full" } });
