@@ -45,6 +45,7 @@
     "allure:open": "npm run allure:generate && allure open allure-report",
     "allure:generate:site": "ALLURE_SINGLE_FILE=0 allure generate allure-results -c allurerc.mjs -o allure-report-site && node scripts/strip-allure-analytics.mjs allure-report-site/index.html",
     "test:all": "./scripts/run-tests.sh",
+    "test:runner": "node scripts/local-runner/server.mjs",
     "test:docker": "docker compose -f docker-compose.test.yml run --rm tests"
   },
   "dependencies": {
