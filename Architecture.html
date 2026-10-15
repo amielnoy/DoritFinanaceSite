@@ -1092,7 +1092,7 @@
             Vercel function broke in production while every local gate was green.
           </p>
           <p class="fix"><b>Fix</b> — a CI check that compares <code>supabase migration list</code> against the repository before promoting, and a smoke step that probes each function (now done for <code>/api/og/blog</code> by hand).</p>
-          <p class="fix"><b>Status · partly</b> — the smoke job now probes both Vercel functions after every production deploy (a 404 and a 405 that only a loaded function returns). The migration-drift check is built (#226, #228): before the functions deploy, CI reads production's history from the Management API and stops on a migration the repository has and production does not. It needs a token with <code>database_migrations_read</code> (the <code>SUPABASE_MIGRATIONS_TOKEN</code> secret); until one is set it answers 403 and warns rather than checks — still open on that one secret.</p>
+          <p class="fix"><b>Status · fixed</b> — the smoke job now probes both Vercel functions after every production deploy (a 404 and a 405 that only a loaded function returns). The migration-drift check is built (#226, #228): before the functions deploy, CI reads production's history from the Management API and stops on a migration the repository has and production does not. It reads with its own token, <code>SUPABASE_MIGRATIONS_TOKEN</code> (only <code>database_migrations_read</code>, set 15 October), and on main answered "All 25 migrations in the repository are applied in production." A history it cannot read still warns rather than blocks.</p>
         </div>
       </div>
 
@@ -1162,7 +1162,7 @@
             <tr><td class="num-col">2</td><td><s>Lead retention: a client status, a nightly anonymization</s> — done, #223; the sheet row by <code>sheet-retention</code> (#230); the mailed copies narrowed to Dorit's and named in the policy (#231)</td><td><span class="ref">N-02</span></td><td>done</td></tr>
             <tr><td class="num-col">3</td><td>Content writes to Supabase; the last two agents to the <code>chat</code> function; revoke the connectors (around 27 October)</td><td><span class="ref">N-03</span></td><td>days</td></tr>
             <tr><td class="num-col">4</td><td>Flip the switch defaults; delete the Base44 paths and functions</td><td><span class="ref">N-03 N-04 N-07</span></td><td>a day</td></tr>
-            <tr><td class="num-col">5</td><td>A migration-drift check before promotion (<s>function probes</s> — done; the check built, #226 #228 — waits on a read-only token)</td><td><span class="ref">N-05</span></td><td>a few hours</td></tr>
+            <tr><td class="num-col">5</td><td>A migration-drift check before promotion (<s>function probes</s>, <s>the check</s> — done, #226 #228)</td><td><span class="ref">N-05</span></td><td>a few hours</td></tr>
             <tr><td class="num-col">6</td><td>Measure Home's main chunk on a phone; split only if it pays</td><td><span class="ref">N-06</span></td><td>hours</td></tr>
             <tr><td class="num-col">7</td><td><s>Bring the stale comments and test-plan pages up to date</s> — done</td><td><span class="ref">N-08</span></td><td>done</td></tr>
           </tbody>
