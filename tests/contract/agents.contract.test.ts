@@ -714,7 +714,8 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     // Guards the detector above rather than the code: a renamed builder or a
     // reshaped SendEmail call would quietly turn every check in this block into
     // an assertion about a branch that no longer runs.
-    expect(submitLead, "no ops mailbox list found at all").toMatch(/const NOTIFY_EMAILS = \[/);
+    // The list lives in _shared/recipients.ts, which the bundle includes.
+    expect(submitLead, "no ops mailbox list found at all").toMatch(/const DEFAULT_NOTIFY_EMAILS = \[/);
     // Either shape of the same iteration. `submitLead` sends the three copies
     // concurrently now — in a queue they cost a second of the only latency the
     // visitor can feel (A-56) — while `submitClaim` still loops. What matters
@@ -795,10 +796,12 @@ describe("who receives a lead, and whether the consent text admits it", () => {
 
   it("keeps the operations mailbox list identical in every function that mails", () => {
     const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
+    // The Edge functions share _shared/recipients.ts (DEFAULT_NOTIFY_EMAILS);
+    // Base44's submitClaim still keeps its own copy (NOTIFY_EMAILS).
     const listOf = (src: string, name: string) => {
-      const i = src.indexOf("const NOTIFY_EMAILS = [");
-      expect(i, `${name} declares no NOTIFY_EMAILS`).toBeGreaterThan(-1);
-      return src.slice(i, src.indexOf("];", i)).replace(/\s+/g, " ").trim();
+      const m = /const (?:DEFAULT_)?NOTIFY_EMAILS = \[([^\]]*)\]/.exec(src);
+      expect(m, `${name} declares no NOTIFY_EMAILS`).not.toBeNull();
+      return JSON.stringify([...m![1].matchAll(/["']([^"']+@[^"']+)["']/g)].map((x) => x[1]));
     };
     const lists = [
       listOf(submitLead, "submitLead"),
@@ -808,7 +811,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(lists[1], "escalateToHuman drifted from submitLead").toBe(lists[0]);
     expect(lists[2], "submitClaim drifted from submitLead").toBe(lists[0]);
     // And it is a list rather than a single address that happens to parse.
-    expect(lists[0].match(/"[^"]+@[^"]+"/g) ?? []).not.toHaveLength(0);
+    expect(JSON.parse(lists[0])).not.toHaveLength(0);
   });
 
   it("keeps the channel taxonomy identical in every function that mails", () => {
@@ -865,18 +868,23 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     const addresses = (src: string, decl: string, name: string) => {
       const i = src.indexOf(decl);
       expect(i, `${name} declares no ${decl}`).toBeGreaterThan(-1);
-      return (src.slice(i, src.indexOf("];", i)).match(/"[^"]+@[^"]+"/g) ?? []).sort();
+      return (src.slice(i, src.indexOf("];", i)).match(/["'][^"']+@[^"']+["']/g) ?? []).map((a) => `"${a.slice(1, -1)}"`).sort();
     };
-    const notified = addresses(submitLead, "const NOTIFY_EMAILS = [", "submitLead");
-    const agency = submitLead.match(/const SECONDARY_EMAIL = ("[^"]+@[^"]+")/)?.[1];
-    expect(agency, "submitLead declares no SECONDARY_EMAIL").toBeTruthy();
-    const mailed = [...notified, agency!].sort();
+    const recipients = read(join(REPO_ROOT, "supabase/functions/_shared/recipients.ts"));
+    const notified = addresses(recipients, "const DEFAULT_NOTIFY_EMAILS = [", "recipients.ts").map((a) => a.replace(/'/g, '"'));
+    const agency = recipients.match(/const SECONDARY_EMAIL = ['"]([^'"]+@[^'"]+)['"]/)?.[1];
+    expect(agency, "recipients.ts declares no SECONDARY_EMAIL").toBeTruthy();
+    const mailed = [...notified, `"${agency}"`].sort();
 
-    for (const [src, name] of [
-      [submitLead, "submitLead"],
-      [consultation, "createConsultationEvent"],
-      [read(join(REPO_ROOT, "supabase/functions/submit-lead/lead.js")), "submit-lead (Edge)"],
-    ] as const) {
+    // On the Edge the diary is derived from the mail, so it cannot drift: every
+    // attendee is a recipient by construction, and the owner's fallback
+    // invitation only while the owner is notified.
+    expect(recipients).toMatch(/CALENDAR_ATTENDEES: readonly string\[\] = \[SECONDARY_EMAIL, \.\.\.NOTIFY_EMAILS\]/);
+    expect(recipients).toMatch(/INVITE_ATTENDEES: readonly string\[\] = CALENDAR_ATTENDEES\.filter\(/);
+    expect(recipients).toMatch(/INVITE_FALLBACK_GOOGLE: string \| null = NOTIFY_EMAILS\.includes\(GOOGLE_CALENDAR_OWNER\)/);
+
+    // Base44's createConsultationEvent still lists its own.
+    for (const [src, name] of [[consultation, "createConsultationEvent"]] as const) {
       const invited = addresses(src, "const CALENDAR_ATTENDEES = [", name);
       // Nobody in the diary who is not on the enquiry.
       expect(

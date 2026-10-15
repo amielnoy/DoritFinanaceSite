@@ -7,10 +7,8 @@
 import { channelLine } from '../_shared/attribution.ts';
 import { escapeHtml } from '../_shared/html.ts';
 
-// כמה תיבות, אותו צוות. ראו את ההערה המקבילה ב-submitLead/entry.ts.
-export const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
-
-export const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
+// Who is told — one list for every Edge function: ../_shared/recipients.ts.
+export { NOTIFY_EMAILS, SECONDARY_EMAIL } from '../_shared/recipients.ts';
 
 
 // ערוצי הקשר האנושיים שהסוכן מוסר למבקר. מקור האמת בצד הדפדפן הוא

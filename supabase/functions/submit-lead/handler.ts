@@ -572,7 +572,7 @@ export async function handler(req: Request): Promise<Response> {
       const endAt = ev?.end ?? new Date(startAt.getTime() + 30 * 60000);
       const uid = ev?.iCalUID ?? `lead-${leadId ?? rid}@govari-fin.co.il`;
       // With no event, Gmail's calendar would hold nothing: it gets the invitation.
-      const invitees = ev ? INVITE_ATTENDEES : [...INVITE_ATTENDEES, INVITE_FALLBACK_GOOGLE];
+      const invitees = ev || !INVITE_FALLBACK_GOOGLE ? INVITE_ATTENDEES : [...INVITE_ATTENDEES, INVITE_FALLBACK_GOOGLE];
       const sent = await Promise.all(invitees.map(async (attendee: string) => {
         try {
           await sendMail(log, {
