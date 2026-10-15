@@ -13,6 +13,8 @@ export interface SupabaseQuery extends PromiseLike<SupabaseReadResult> {
   not(column: string, operator: string, value: unknown): SupabaseQuery;
   order(column: string, options: { ascending: boolean }): SupabaseQuery;
   limit(count: number): SupabaseQuery;
+  /** PostgREST `Range` paging, inclusive; supabase-js has it, the narrower fakes may not. */
+  range?(from: number, to: number): SupabaseQuery;
 }
 
 /** Just the table reads these adapters make — see SupabaseAuthClient for why it is narrowed. */

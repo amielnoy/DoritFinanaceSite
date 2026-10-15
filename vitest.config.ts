@@ -6,6 +6,10 @@ import { defineConfig } from "vitest/config";
 // unit/contract test run. Playwright e2e keeps using the real Vite build.
 export default defineConfig({
   resolve: {
+    // vite.config.js's order: the real pages (.ts/.tsx) before the Base44
+    // boilerplate .jsx it restores beside them (AGENTS.md). Without it a test
+    // of "@/pages/Login" rendered Base44's English page, not the site's.
+    extensions: [".mjs", ".mts", ".ts", ".tsx", ".js", ".jsx", ".json"],
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       "~": fileURLToPath(new URL(".", import.meta.url)),

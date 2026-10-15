@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { SupabaseLeadAdminService } from "@/services/supabase/SupabaseLeadAdminService";
+import { LEAD_PAGE, SupabaseLeadAdminService } from "@/services/supabase/SupabaseLeadAdminService";
 import { tableFake } from "../helpers/supabase-table-fake";
 import type { SupabaseLeadTableClient, SupabaseQuery, SupabaseReadResult } from "@/services/supabase/SupabaseTableClient";
 
@@ -19,12 +19,28 @@ const leadRow = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("SupabaseLeadAdminService.list", () => {
-  it("reads leads newest first, up to 500 by default", async () => {
+  it("reads leads newest first, a page at a time", async () => {
     const { client, calls } = tableFake({ data: [], error: null });
     await new SupabaseLeadAdminService(client).list();
     expect(calls[0]).toEqual(["from", "leads"]);
     expect(calls).toContainEqual(["order", "created_at", { ascending: false }]);
-    expect(calls).toContainEqual(["limit", 500]);
+    expect(calls).toContainEqual(["range", 0, LEAD_PAGE - 1]);
+  });
+
+  /**
+   * "כל הפניות" and "ייצוא הכל" were the newest 500: past that, older leads left
+   * the list, the counts and the export with no word (review 2026-10-15).
+   */
+  it("reads every lead, page after page, until a short page", async () => {
+    const rows = Array.from({ length: LEAD_PAGE * 2 + 500 }, (_, i) => leadRow({ id: `lead-${i}` }));
+    const { client, calls } = tableFake({ data: rows, error: null });
+    const leads = await new SupabaseLeadAdminService(client).list();
+    expect(leads).toHaveLength(LEAD_PAGE * 2 + 500);
+    expect(calls.filter((c) => c[0] === "range")).toEqual([
+      ["range", 0, LEAD_PAGE - 1],
+      ["range", LEAD_PAGE, LEAD_PAGE * 2 - 1],
+      ["range", LEAD_PAGE * 2, LEAD_PAGE * 3 - 1],
+    ]);
   });
 
   it("asks for the port's columns only, not the whole row", async () => {

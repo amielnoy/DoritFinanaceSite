@@ -30,11 +30,11 @@ export class UnconfiguredAuthService implements AuthPort {
     // No session was ever held, so there is nothing to clear.
   }
 
-  redirectToLogin(returnUrl: string): void {
-    this.signInWithGoogle(returnUrl);
+  redirectToLogin(_returnUrl: string): void {
+    throw new Error(SIGN_IN_UNAVAILABLE);
   }
 
-  signInWithGoogle(_returnUrl: string): void {
+  async signInWithGoogle(_returnUrl: string): Promise<void> {
     throw new Error(SIGN_IN_UNAVAILABLE);
   }
 
