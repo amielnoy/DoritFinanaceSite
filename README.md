@@ -474,13 +474,21 @@ holds equal to the module's default.
 
 **Adding a user** ("הוספת משתמש" on `/admin/users`) goes through the
 `invite-user` Edge Function: the admin gate (`_shared/admin.ts`, shared with
-`content-admin`), then the account — the profile holding that address, or a new
+`content-admin`), then the account — the current Auth owner with an application
+profile (resolved by the service-role-only `invitee_for` RPC), or a new
 Supabase Auth account made with no password and the address confirmed — the
 membership (organization and role: owner, agent or staff; upserted), and the
 invitation through `dorit-mailer`. Sign-in is Google's: signing in with that
 address links the Google identity to the account already made. Supabase
 Auth's own invite mail is not used — its default sender delivers only to the
-project's team. Nothing to set up beyond the mailer secrets already there.
+project's team. Apply `20261027000000_invitee_identity.sql` before deploying the
+updated function; a missing resolver refuses the invitation before granting any
+membership. `profiles.email` is a historical copy and is never used to resolve
+an invitee. Organization reads and membership writes use the verified admin's
+bearer token and RLS: tenant-schema deliberately revokes `service_role` from
+these tables, so using service credentials there answers 403/42501 even after
+the admin gate succeeds. Auth account creation and `invitee_for` stay under
+service credentials. The mailer uses the secrets already configured.
 
 ### Lead functions on Supabase
 

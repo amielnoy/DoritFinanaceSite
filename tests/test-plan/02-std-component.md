@@ -574,6 +574,9 @@ Over an in-memory port (decisions stored and read back) and the made-up client i
 | CMP-MSKA-012 | "publishes the approved recommendations to the client's address" | Disabled without an address; then `publish('s1', email, items)` |
 | CMP-MSKA-013 | "asks before a republish replaces what the client sees" | Declined → no publish |
 | CMP-MSKA-014 | "shows the client's answers, the new ones counted, and marks them read" | "1 חדשות", the note; `markAnswersSeen`; `unpublish` |
+| CMP-MSKA-015 | "keeps a failed custom recommendation and retries the same item, clearing only after success" | Failure preserves title, body and priority; retry uses the same key; success clears the draft |
+| CMP-MSKA-016 | "keeps a pending recommendation intact and prevents another submission" | Fields retain text and are disabled while saving; one write; clears after confirmation |
+| CMP-MSKA-017 | "resets the recipient and preview when moving between cached client reports" | Cached route change resets to the new client's address and closes preview; publish uses the new id and address |
 
 ### 4.32 The growth brief: "בדיקת תיק פנסיוני", Cal.com and the WhatsApp channel — `tests/component/lead-growth.test.tsx`
 

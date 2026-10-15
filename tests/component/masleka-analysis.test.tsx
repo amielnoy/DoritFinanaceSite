@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -169,6 +169,65 @@ describe("<MaslekaAnalysis /> — publishing to the client's area (phase 4)", ()
       status: "approved", finalText: "נעדכן את המוטבים בקרן.", title: "עדכון מוטבים", priority: "important",
     });
     expect(await screen.findByRole("listitem", { name: "עדכון מוטבים" })).toBeInTheDocument();
+  });
+
+  it("keeps a failed custom recommendation and retries the same item, clearing only after success", async () => {
+    const decide = vi.fn().mockRejectedValueOnce(new Error("write failed")).mockResolvedValueOnce(undefined);
+    renderWith(publishing({ decide }));
+    const form = within(await screen.findByRole("form", { name: "הוספת המלצה" }));
+    const title = form.getByLabelText("כותרת");
+    const body = form.getByLabelText("הסבר ללקוח");
+    await userEvent.type(title, "עדכון מוטבים");
+    await userEvent.type(body, "הנוסח החשוב של דורית");
+    await userEvent.selectOptions(form.getByLabelText("עדיפות"), "important");
+    await userEvent.click(form.getByRole("button", { name: "הוספה ואישור" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(title).toHaveValue("עדכון מוטבים");
+    expect(body).toHaveValue("הנוסח החשוב של דורית");
+    expect(form.getByLabelText("עדיפות")).toHaveValue("important");
+    await userEvent.click(form.getByRole("button", { name: "הוספה ואישור" }));
+    await waitFor(() => expect(title).toHaveValue(""));
+    expect(body).toHaveValue("");
+    expect(decide.mock.calls[1]).toEqual(decide.mock.calls[0]);
+  });
+
+  it("keeps a pending recommendation intact and prevents another submission", async () => {
+    let finish!: () => void;
+    const decide = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    renderWith(publishing({ decide }));
+    const form = within(await screen.findByRole("form", { name: "הוספת המלצה" }));
+    await userEvent.type(form.getByLabelText("כותרת"), "טיוטה");
+    await userEvent.type(form.getByLabelText("הסבר ללקוח"), "לשמור אחרי האישור");
+    const save = form.getByRole("button", { name: "הוספה ואישור" });
+    await userEvent.click(save);
+    expect(save).toBeDisabled();
+    expect(form.getByLabelText("כותרת")).toHaveValue("טיוטה");
+    expect(form.getByLabelText("הסבר ללקוח")).toBeDisabled();
+    await userEvent.click(save);
+    expect(decide).toHaveBeenCalledTimes(1);
+    finish();
+    await waitFor(() => expect(form.getByLabelText("כותרת")).toHaveValue(""));
+  });
+
+  it("resets the recipient and preview when moving between cached client reports", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const a = { ...STORED, id: "a", clientEmail: "alice@example.com", publishedAt: null };
+    const b = { ...STORED, id: "b", clientEmail: "bob@example.com", publishedAt: null };
+    for (const stored of [a, b]) {
+      client.setQueryData(["admin", "masleka", "snapshot", stored.id], stored);
+      client.setQueryData(["admin", "masleka", "reviews", stored.id], approvedFirst);
+    }
+    const port = publishing({ getSnapshot: vi.fn(async (id) => id === "a" ? a : b) });
+    const ui = (id: string) => (
+      <QueryClientProvider client={client}><MemoryRouter><MaslekaAnalysis service={port} snapshotId={id} /></MemoryRouter></QueryClientProvider>
+    );
+    const view = render(ui("a"));
+    await userEvent.click(screen.getByRole("button", { name: "תצוגה כפי שהלקוח רואה" }));
+    view.rerender(ui("b"));
+    expect(screen.getByLabelText("המייל שהלקוח מתחבר איתו לאתר")).toHaveValue("bob@example.com");
+    expect(screen.queryByRole("region", { name: "תצוגה כפי שהלקוח רואה" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "פרסום לאזור האישי" }));
+    expect(port.publish).toHaveBeenCalledWith("b", "bob@example.com", expect.any(Array));
   });
 
   it("previews exactly what the client will see, with nothing sent", async () => {

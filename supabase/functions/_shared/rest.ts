@@ -48,12 +48,13 @@ function target(): { url: string; auth: Record<string, string> } {
   return { url, auth };
 }
 
-/** Rows matching a PostgREST query string (`select=…&col=eq.…&order=…`). */
-export async function selectRows(table: string, query: string): Promise<Record<string, unknown>[]> {
+/** Rows matching a PostgREST query. A verified caller's token opts into that
+ * caller's RLS policies instead of the service role (invite-user). */
+export async function selectRows(table: string, query: string, sessionToken?: string): Promise<Record<string, unknown>[]> {
   const { url, auth } = target();
   const res = await fetch(`${url}/rest/v1/${table}?${query}`, {
     method: 'GET',
-    headers: { ...auth },
+    headers: { ...auth, ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}) },
     signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error(`select_http_${res.status}${await refusal(res)}`);
@@ -91,11 +92,11 @@ export async function updateRows(table: string, filter: string, fields: Record<s
 }
 
 /** Insert or merge on a unique key — the booking row is written twice per request. */
-export async function upsertRow(table: string, row: Record<string, unknown>, onConflict: string): Promise<void> {
+export async function upsertRow(table: string, row: Record<string, unknown>, onConflict: string, sessionToken?: string): Promise<void> {
   const { url, auth } = target();
   const res = await fetch(`${url}/rest/v1/${table}?on_conflict=${onConflict}`, {
     method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+    headers: { ...auth, ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify(row),
     signal: AbortSignal.timeout(10000),
   });

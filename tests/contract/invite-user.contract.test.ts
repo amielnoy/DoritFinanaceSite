@@ -41,4 +41,14 @@ describe("invite-user — an admin's act, and nothing wider", () => {
   it("logs ids, never the invitee's address", () => {
     for (const call of fn.match(/log\('[a-z]+', '[^']+', \{[^}]*\}/g) ?? []) expect(call, call).not.toMatch(/\bemail\b/);
   });
+
+  it("resolves invitees from Auth through a service-role-only RPC", () => {
+    const sql = read("supabase/migrations/20261027000000_invitee_identity.sql");
+    expect(fn).toContain("callRpc('invitee_for', { p_email: email })");
+    expect(sql).toMatch(/from auth\.users u\s+join public\.profiles p on p\.id = u\.id/);
+    expect(sql).toMatch(/where lower\(u\.email\) = nullif\(lower\(btrim\(p_email\)\), ''\)/);
+    expect(sql).toContain("set search_path = ''");
+    expect(sql).toContain("revoke execute on function public.invitee_for(text) from public, anon, authenticated");
+    expect(sql).toContain("grant execute on function public.invitee_for(text) to service_role");
+  });
 });

@@ -13,8 +13,9 @@ const ORG = "11111111-2222-4333-8444-555555555555";
 
 type Row = Record<string, unknown>;
 
-function fakeSupabase(seed: { profiles?: Row[]; agencies?: Row[]; authCreate?: { status: number; body: unknown } } = {}) {
+function fakeSupabase(seed: { profiles?: Row[]; authUsers?: Row[]; agencies?: Row[]; authCreate?: { status: number; body: unknown }; failLookup?: boolean } = {}) {
   const profiles: Row[] = [{ id: "user-admin", email: "dorit@example.com", role: "admin" }, { id: "user-member", email: "m@example.com", role: "user" }, ...(seed.profiles ?? [])];
+  const authUsers = seed.authUsers ?? profiles.map((p) => ({ id: p.id, email: p.email }));
   const agencies: Row[] = seed.agencies ?? [{ id: ORG, name: "סוכנות הדוגמה" }];
   const memberships: Row[] = [];
   const created: string[] = [];
@@ -36,15 +37,26 @@ function fakeSupabase(seed: { profiles?: Row[]; agencies?: Row[]; authCreate?: {
       created.push(email);
       const id = `user-new-${created.length}`;
       profiles.push({ id, email, role: "user" }); // the profile trigger
+      authUsers.push({ id, email });
       return json({ id, email });
+    }
+    if (url.pathname === "/rest/v1/rpc/invitee_for") {
+      if (seed.failLookup) return json({}, 503);
+      const email = (call.body as { p_email: string }).p_email;
+      const user = authUsers.find((u) => String(u.email).toLowerCase() === email && profiles.some((p) => p.id === u.id));
+      return json(user?.id ?? null);
     }
     if (url.pathname === "/rest/v1/profiles") {
       const id = eq(url.searchParams, "id");
       const email = eq(url.searchParams, "email");
       return json(profiles.filter((p) => (id ? p.id === id : true) && (email ? p.email === email : true)));
     }
-    if (url.pathname === "/rest/v1/agencies") return json(agencies.filter((a) => a.id === eq(url.searchParams, "id")));
+    if (url.pathname === "/rest/v1/agencies") {
+      if (call.headers.Authorization !== `Bearer ${ADMIN}`) return json({ code: '42501' }, 403);
+      return json(agencies.filter((a) => a.id === eq(url.searchParams, "id")));
+    }
     if (url.pathname === "/rest/v1/memberships" && call.method === "POST") {
+      if (call.headers.Authorization !== `Bearer ${ADMIN}`) return json({ code: '42501' }, 403);
       const row = call.body as Row;
       const at = memberships.findIndex((m) => m.user_id === row.user_id && m.agency_id === row.agency_id);
       if (at >= 0) memberships[at] = { ...memberships[at], ...row };
@@ -118,6 +130,16 @@ describe("invite-user — the newcomer", () => {
     expect(r.callsTo("/rest/v1/memberships")[0].url).toContain("on_conflict=user_id,agency_id");
   });
 
+  it("uses the verified admin session for tenant tables while keeping Auth and identity lookup server-side", async () => {
+    const s = fakeSupabase();
+    const r = await invite(newcomer, ADMIN, s);
+    expect(r.status).toBe(200);
+    expect(r.callsTo('/rest/v1/agencies')[0].headers.Authorization).toBe(`Bearer ${ADMIN}`);
+    expect(r.callsTo('/rest/v1/memberships')[0].headers.Authorization).toBe(`Bearer ${ADMIN}`);
+    expect(r.callsTo('/rest/v1/rpc/invitee_for')[0].headers.Authorization).not.toBe(`Bearer ${ADMIN}`);
+    expect(r.callsTo('/auth/v1/admin/users')[0].headers.Authorization).not.toBe(`Bearer ${ADMIN}`);
+  });
+
   it("keeps the membership and says so when the invitation mail does not go", async () => {
     const s = fakeSupabase();
     const r = await invite(newcomer, ADMIN, s, { failEmailTo: ["new.person@example.com"] });
@@ -132,5 +154,37 @@ describe("invite-user — the newcomer", () => {
     const r = await invite(newcomer, ADMIN, s);
     expect(r.status).toBe(409);
     expect(s.memberships).toEqual([]);
+  });
+
+  it("invites the current Auth owner when another profile still carries their address", async () => {
+    const s = fakeSupabase({
+      profiles: [{ id: "former-owner", email: "new.person@example.com" }, { id: "current-owner", email: "older-copy@example.com" }],
+      authUsers: [{ id: "former-owner", email: "moved@example.com" }, { id: "current-owner", email: "new.person@example.com" }],
+    });
+    const r = await invite(newcomer, ADMIN, s);
+    expect(r.status).toBe(200);
+    expect(s.created).toEqual([]);
+    expect(s.memberships).toEqual([{ user_id: "current-owner", agency_id: ORG, role: "agent" }]);
+    expect(r.mailTo("new.person@example.com")).toBeDefined();
+  });
+
+  it("never grants a former Auth owner access when the old address is now unused", async () => {
+    const s = fakeSupabase({
+      profiles: [{ id: "former-owner", email: "new.person@example.com" }],
+      authUsers: [{ id: "former-owner", email: "moved@example.com" }],
+    });
+    const r = await invite(newcomer, ADMIN, s);
+    expect(r.status).toBe(200);
+    expect(s.memberships[0].user_id).toBe("user-new-1");
+    expect(s.created).toEqual(["new.person@example.com"]);
+  });
+
+  it("fails closed when the authoritative address lookup is unavailable", async () => {
+    const s = fakeSupabase({ failLookup: true });
+    const r = await invite(newcomer, ADMIN, s);
+    expect(r.status).toBe(500);
+    expect(s.memberships).toEqual([]);
+    expect(s.created).toEqual([]);
+    expect(r.emails).toEqual([]);
   });
 });

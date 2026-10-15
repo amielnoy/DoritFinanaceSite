@@ -805,9 +805,9 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-SRET-006 | "fails without clearing anything when the database cannot say who is live" | 500; no clear |
 | INT-SRET-007 | "logs counts, never a cell" | No name, phone, email or transcript in the answer |
 
-### 4.33 `invite-user` — "הוספת משתמש" — `INT-INV-001..009`
+### 4.33 `invite-user` — "הוספת משתמש" — `INT-INV-001..013`
 
-`invite-user.integration.test.ts` fakes Supabase Auth (the session, the admin create), PostgREST (profiles, agencies, the membership upsert) and lets the mailer stub record the invitation.
+`invite-user.integration.test.ts` fakes Supabase Auth (the session, the admin create), PostgREST (profiles, agencies, the membership upsert), the `invitee_for` RPC over independent Auth/profile addresses, and lets the mailer stub record the invitation.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -817,6 +817,10 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-INV-007 | "adds an existing account without making another, and changes the role of a member already there" | No create; `on_conflict=user_id,agency_id`; the role replaced |
 | INT-INV-008 | "keeps the membership and says so when the invitation mail does not go" | 200, `mailed: false`, `invite_email_failed` |
 | INT-INV-009 | "refuses an address Auth holds but no profile does, rather than guess at an account" | 409; no membership |
+| INT-INV-010 | "invites the current Auth owner when another profile still carries their address" | Membership goes to the current owner, never the historical profile match |
+| INT-INV-011 | "never grants a former Auth owner access when the old address is now unused" | New account invited; former owner receives no membership |
+| INT-INV-012 | "fails closed when the authoritative address lookup is unavailable" | 500; no account creation, membership or mail |
+| INT-INV-013 | "uses the verified admin session for tenant tables while keeping Auth and identity lookup server-side" | Agencies and memberships require the admin bearer (fake refuses service-role access with 42501, as production does); account creation and `invitee_for` retain service credentials |
 
 ## 5. Pass criteria
 
