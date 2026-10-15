@@ -1,7 +1,7 @@
 # STD-08 — Accessibility Tests
 
 **Suite:** `a11y` · **Runner:** `npm run test:e2e:a11y` (Playwright + `@axe-core/playwright`)
-**Location:** `e2e/a11y/axe.spec.ts` · **Cases:** 23 per platform · **Standard:** WCAG 2.1 Level AA
+**Location:** `e2e/a11y/axe.spec.ts` · **Cases:** 24 per platform · **Standard:** WCAG 2.1 Level AA
 
 ---
 
@@ -34,6 +34,21 @@ fallback face — it read 66 against the dev server and 75 here, for identical
 CSS. The count lives in `src/index.css`, against a browser measurement recorded
 in the comment beside it. Hebrew has no true italic, so a browser synthesises
 one by shearing the glyphs, and sheared Hebrew is measurably harder to decode.
+
+## The contact box inside an article
+
+The box after an article's third paragraph sits inside `.blog-body`, whose
+gold link rule outranked the box's own colours: on production the WhatsApp
+label was gold on green, 3.37:1 (D-07, manual test 2026-10-14). The fixture
+article is too short to get the inline box, which is why the page sweep never
+saw it; this case serves a four-paragraph one.
+
+| ID | Title | Expected result |
+|---|---|---|
+| A11Y-ART-002 | "keeps its own colours and clears 4.5:1" | The WhatsApp label's computed colour is the body's ink; axe `color-contrast`, scoped to `[data-testid="article_inline"]`, finds nothing — enforced on every project |
+
+The skip link (D-08) and the not-found page's landmarks are covered by
+`tests/component/not-found.test.tsx` (STD-02 §4.46).
 
 ## 2. Configuration
 
