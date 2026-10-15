@@ -11,6 +11,8 @@ import Reveal from "@/components/dorit/primitives/Reveal";
 import { SITE_NAME, breadcrumbLd, useSeo } from "@/lib/seo";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { AGENTS } from "@/config/agents";
+import { useLocale, useT } from "@/i18n/LocaleContext";
+import { localePath } from "@/i18n/locales";
 
 /**
  * The two self-assessment tools, off the home page.
@@ -30,15 +32,20 @@ import { AGENTS } from "@/config/agents";
  * telling them.
  */
 export default function Tools() {
+  const t = useT("tools");
+  const locale = useLocale();
+  const he = locale === "he";
   useSeo({
-    title: `כלים לבדיקה עצמית | ${SITE_NAME}`,
+    title: `${t("page.seoTitle")} | ${SITE_NAME}`,
     description:
-      "שני כלים חינמיים לבדיקה עצמית: הערכת כיסוי ביטוחי במספר שאלות קצרות, ומחשבון שמראה כמה דמי הניהול שלכם עולים לאורך שנות החיסכון. ובנוסף עוזר שמסביר איך מבצעים תהליכים — אילו שלבים, אילו מסמכים, ואיך קוראים את גמל נט ואת פנסיה נט. ללא הרשמה וללא התחייבות.",
+      t("page.seoDescription"),
     path: "/tools",
+    locale,
+    translated: true,
     jsonLd: [
       breadcrumbLd([
-        { name: "דף הבית", path: "/" },
-        { name: "כלים לבדיקה עצמית", path: "/tools" },
+        { name: t("page.crumbHome"), path: localePath(locale, "/") },
+        { name: t("page.crumb"), path: localePath(locale, "/tools") },
       ]),
     ],
   });
@@ -50,14 +57,12 @@ export default function Tools() {
         <section className="pt-40 pb-16 md:pt-48 md:pb-20 border-b border-border/50">
           <div className="max-w-[1400px] mx-auto px-6 md:px-10">
             <Reveal>
-              <Eyebrow>כלים</Eyebrow>
+              <Eyebrow>{t("page.eyebrow")}</Eyebrow>
               <h1 className="font-heading text-5xl md:text-7xl mt-5 leading-tight max-w-4xl">
-                כלים לבדיקה עצמית
+                {t("page.title")}
               </h1>
               <p className="mt-8 text-muted-foreground max-w-2xl leading-relaxed">
-                שני כלים שאפשר להריץ לבד, בלי להשאיר פרטים ובלי התחייבות, ולמטה
-                עוזר שמסביר איך מבצעים את התהליך עצמו. הכלים מראים תמונה כללית
-                ואינם תחליף לבדיקה אישית — את זו עושים בפגישה.
+                {t("page.intro")}
               </p>
             </Reveal>
           </div>
@@ -65,9 +70,11 @@ export default function Tools() {
         <InsuranceAssessment />
         <PensionFeeCalculator />
         {/* The snapshot programme's new tools ship with its switch (VITE_SNAPSHOT_HOME). */}
-        {SNAPSHOT_HOME ? <RetirementCalculator /> : null}
-        {SNAPSHOT_HOME ? <HarHabituachCheck /> : null}
-        <AgentChat descriptor={AGENTS.procedures} />
+        {/* Hebrew only for now, like the snapshot section on the home page. */}
+        {SNAPSHOT_HOME && he ? <RetirementCalculator /> : null}
+        {SNAPSHOT_HOME && he ? <HarHabituachCheck /> : null}
+        {/* The procedures chat answers in Hebrew: on the Hebrew page only. */}
+        {he ? <AgentChat descriptor={AGENTS.procedures} /> : null}
       </main>
       <Footer />
     </div>

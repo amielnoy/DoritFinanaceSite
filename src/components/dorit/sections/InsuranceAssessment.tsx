@@ -6,14 +6,20 @@ import type { Answers } from "@/lib/insurance-assessment";
 import { CtaLink } from "@/components/dorit/primitives/Cta";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import CalculatorLeadBox from "@/components/dorit/sections/CalculatorLeadBox";
-import { assessmentMessage } from "@/lib/calculator-lead";
+import { assessmentMessageIn } from "@/i18n/tools";
 import { leadEvents } from "@/lib/analytics";
 import { TOOL_SECTION } from "@/config/tools";
+import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
+import type { KeyOf } from "@/i18n/resources";
 
 export default function InsuranceAssessment() {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [done, setDone] = useState(false);
+  const t = useT("tools");
+  const tc = useT("common");
+  const locale = useLocale();
+  const lp = useLocalePath();
 
   const current = QUESTIONS[step];
   const progress = done ? 100 : (step / QUESTIONS.length) * 100;
@@ -49,14 +55,13 @@ export default function InsuranceAssessment() {
       <div className="max-w-[1100px] mx-auto px-6 md:px-10">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <Eyebrow>
-            בדיקה עצמית
+            {t("assess.eyebrow")}
           </Eyebrow>
           <h2 className="font-heading text-4xl md:text-5xl mt-5 leading-tight">
-            איזה ביטוח באמת מתאים לך?
+            {t("assess.title")}
           </h2>
           <p className="mt-6 text-muted-foreground leading-relaxed">
-            ארבע שאלות קצרות — ותקבל/י תמונה ברורה של סוגי הביטוח הרלוונטיים לשלב
-            החיים שלך. אין כאן ייעוץ פיננסי, אלא מפת דרכים ראשונית להבנת הצרכים.
+            {t("assess.intro")}
           </p>
         </div>
 
@@ -83,23 +88,23 @@ export default function InsuranceAssessment() {
                 >
                   <div className="flex items-center justify-between mb-8">
                     <span className="text-sm text-muted-foreground">
-                      שאלה {step + 1} מתוך {QUESTIONS.length}
+                      {t("assess.questionOf", { n: step + 1, total: QUESTIONS.length })}
                     </span>
                     {step > 0 && (
                       <button
                         onClick={back}
                         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-accent transition-colors"
                       >
-                        <ArrowLeft size={15} />
-                        חזרה
+                        <ArrowLeft size={15} className="ltr:rotate-180" />
+                        {t("assess.back")}
                       </button>
                     )}
                   </div>
 
                   <h3 className="font-heading text-2xl md:text-3xl mb-2 leading-snug">
-                    {current.label}
+                    {t(`assess.q.${current.id}.label`)}
                   </h3>
-                  <p className="text-sm text-muted-foreground mb-8">{current.hint}</p>
+                  <p className="text-sm text-muted-foreground mb-8">{t(`assess.q.${current.id}.hint`)}</p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {current.options.map((opt) => {
@@ -108,14 +113,14 @@ export default function InsuranceAssessment() {
                         <button
                           key={opt.value}
                           onClick={() => choose(opt.value)}
-                          className={`group text-right p-5 border rounded-sm transition-all duration-200 ${
+                          className={`group text-start p-5 border rounded-sm transition-all duration-200 ${
                             selected
                               ? "border-highlight bg-highlight-muted/40"
                               : "border-border hover:border-accent hover:bg-secondary/50"
                           }`}
                         >
                           <span className="flex items-center justify-between">
-                            <span className="font-body text-lg">{opt.label}</span>
+                            <span className="font-body text-lg">{t(`assess.q.${current.id}.${opt.value}` as KeyOf<"tools">)}</span>
                             <span
                               className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
                                 selected
@@ -140,24 +145,24 @@ export default function InsuranceAssessment() {
                 >
                   <div className="flex items-center justify-between mb-8">
                     <span className="text-sm text-muted-foreground">
-                      התוצאה שלך
+                      {t("assess.yourResult")}
                     </span>
                     <button
                       onClick={restart}
                       className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-accent transition-colors"
                     >
                       <RotateCcw size={15} />
-                      התחלה מחדש
+                      {t("assess.restart")}
                     </button>
                   </div>
 
                   <h3 className="font-heading text-3xl md:text-4xl mb-3 leading-tight">
-                    {recs.length} סוגי ביטוח רלוונטיים עבורך
+                    {t("assess.count", { n: recs.length })}
                   </h3>
                   <p className="text-muted-foreground mb-12">
                     {priorityCount > 0
-                      ? `${priorityCount} מהם מומלצים כעדיפות גבוהה לפי התשובות שלך.`
-                      : "לפי התשובות שלך, אלו סוגי הביטוח שכדאי לבחון."}
+                      ? t("assess.priorities", { n: priorityCount })
+                      : t("assess.noPriority")}
                   </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -165,7 +170,7 @@ export default function InsuranceAssessment() {
                       const Icon = rec.icon;
                       return (
                         <motion.div
-                          key={rec.title}
+                          key={rec.id}
                           initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: idx * 0.08 }}
@@ -184,30 +189,30 @@ export default function InsuranceAssessment() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2.5 mb-2">
-                              <h4 className="font-heading text-xl">{rec.title}</h4>
+                              <h4 className="font-heading text-xl">{t(`assess.rec.${rec.id}` as KeyOf<"tools">)}</h4>
                               {rec.priority && (
                                 <span className="text-sm text-highlight-ink border border-highlight/40 px-2 py-0.5 rounded-sm">
-                                  עדיפות גבוהה
+                                  {t("assess.highPriority")}
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{rec.why}</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{t(`assess.why.${rec.reason}` as KeyOf<"tools">)}</p>
                           </div>
                         </motion.div>
                       );
                     })}
                   </div>
 
-                  <CalculatorLeadBox className="mt-12" message={assessmentMessage(recs)} />
+                  <CalculatorLeadBox className="mt-12" message={assessmentMessageIn(locale, recs)} />
 
                   <div className="mt-8 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-5">
-                    <p className="text-sm text-muted-foreground text-center sm:text-right">
-                      ההערכה כאן היא כללית בלבד. להמלצות מדויקות — כדאי לשוחח עם דורית.
+                    <p className="text-sm text-muted-foreground text-center sm:text-start">
+                      {t("assess.general")}
                     </p>
                     {/* `/#start`, not `#start`: there is no #start on /tools. */}
-                    <CtaLink href="/#start" className="whitespace-nowrap">
+                    <CtaLink href={lp("/#start")} className="whitespace-nowrap">
                       <Calendar size={18} />
-                      לשיחה קצרה עם דורית
+                      {tc("cta.shortCall")}
                     </CtaLink>
                   </div>
                 </motion.div>
@@ -217,8 +222,7 @@ export default function InsuranceAssessment() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6 max-w-xl mx-auto leading-relaxed">
-          הכלי נועד להערכה ראשונית בלבד ואינו מהווה ייעוץ פיננסי או המלצה לרכישת
-          מוצר. ההמלצות המדויקות ניתנות אך ורק בפגישה אישית.
+          {t("assess.disclaimer")}
         </p>
       </div>
     </section>

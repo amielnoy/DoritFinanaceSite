@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 941 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1609 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 946 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1619 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1409,6 +1409,11 @@ On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's l
 | UNIT-I18N-018 | "names the categories in each language" | Income tax, Pension & savings, Insurance, General; Hebrew = `FAQ_CATEGORIES` |
 | UNIT-I18N-019 | "keeps the disclosure in the 'are you independent?' answer, in every language" | "שיווק פנסיוני ולא ייעוץ…"; "pension marketing, not objective pension advice"; "et non du conseil en retraite objectif" |
 | UNIT-I18N-020 | "is exactly as typed from the Hebrew site, and carries the note on its own line from English or French" | Hebrew untouched (spaces kept); en/fr trimmed, then "(מולא באנגלית)" / "(מולא בצרפתית)" |
+| UNIT-I18N-021 | "holds tools.json's Hebrew to the quiz's own wording, key for key" (`tests/unit/i18n-tools.test.ts`) | Every question, option, recommendation and reason equal to `insurance-assessment.ts` |
+| UNIT-I18N-022 | "writes the Hebrew messages from the templates exactly as calculator-lead.ts does" | Fee cases and all 180 answer combinations: identical strings |
+| UNIT-I18N-023 | "sends Hebrew through the existing functions, untouched" | `…In("he", …)` = `calculator-lead.ts` |
+| UNIT-I18N-024 | "offers an English message with English names and English-formatted shekels" | No Hebrew; "₪3,951 a year … ₪98,765 … ₪2,000" |
+| UNIT-I18N-025 | "formats shekels for the page: Hebrew as before, English and French without direction marks" | he = `formatIls`; "₪123,456"; "123 456 ₪"; no U+200E/U+200F |
 
 
 ### 4.55 Organizations — `tests/unit/organizations.test.ts`
