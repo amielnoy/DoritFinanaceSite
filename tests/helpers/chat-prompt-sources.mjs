@@ -7,6 +7,10 @@
 //   support.md    = base44/agents/support_agent.jsonc's instructions, placeholders
 //                   likewise; the BlogPost line names listArticles/readArticle and
 //                   the logSupportChat lines are removed (the function logs itself);
+//   procedures.md = base44/agents/procedures_agent.jsonc's instructions, placeholders
+//                   likewise; the BlogPost line names listArticles/readArticle, the
+//                   logSupportChat line is removed (the function logs itself), and
+//                   "מגבלת הירוק" reads an article with readArticle, not BlogPost;
 //   compliance.md = base44/agents/COMPLIANCE.md §3 and §5, verbatim.
 // tests/contract/chat-prompts.contract.test.ts holds the files to these rules.
 import { readFileSync } from 'node:fs';
@@ -71,6 +75,27 @@ export const SUPPORT_TOOL_SECTION = [
   { startsWith: "- מסור: channel='site'", replacement: null },
   { startsWith: '- ב-transcript אל תעתיק', replacement: null },
   { startsWith: '- הרישום הוא פנימי', replacement: null },
+];
+
+/**
+ * The procedures agent's tool section (procedures_agent.jsonc, its last three
+ * lines). BlogPost becomes the function's article tools; logSupportChat goes —
+ * the function logs the chat itself (chat/sweep.ts); escalateToHuman stays.
+ */
+export const PROCEDURES_TOOL_SECTION = [
+  {
+    startsWith: '- BlogPost: קרא ממנו',
+    replacement:
+      '- listArticles ו-readArticle: מצא מאמר שפורסם באתר ב-listArticles וקרא אותו ב-readArticle כשהוא רלוונטי, והפנה אליו בקישור מדויק בפורמט מרקדאון: [כותרת המאמר](/blog/<slug>), כאשר <slug> הוא שדה ה-slug שחזר מ-listArticles — לא הכותרת ולא שם קובץ. אל תמציא תוכן שאינו שם. אם readArticle החזירה not_found — אל תפנה לאותו מאמר.',
+  },
+  { startsWith: '- logSupportChat: קרא לה', replacement: null },
+  // The one line outside the tool section that names a Base44 tool: an article
+  // "read in BlogPost" is now one read with readArticle. Nothing else changes.
+  {
+    startsWith: '**מגבלת הירוק — אל תמציא פרטי טופס.** ',
+    replacement:
+      "**מגבלת הירוק — אל תמציא פרטי טופס.** אין בידך מערכת, אין לך גישה למסמכים של דורית ואין לך תיק של אף אדם. לכן אל תנקוב במספר טופס, בשם טופס מדויק, בכתובת למשלוח, במספר פקס או בלוח זמנים מחייב, אלא אם הם מופיעים כאן בהנחיות או במאמר שקראת ב-readArticle. אמור במקום זאת מה השלב, ושהטופס המדויק נשלח מדורית — \"כדי שיהיה הנוסח העדכני של הגוף הרלוונטי\". מספר טופס שהומצא מזיק יותר מהעברה לאדם: מישהו ימלא אותו.",
+  },
 ];
 
 /** An agent's instructions as Base44 runs them today. */

@@ -9,6 +9,7 @@ import { fillPlaceholders } from "../../supabase/functions/chat/prompt.ts";
 import {
   INTERVIEW_TOOL_SECTION,
   SUPPORT_TOOL_SECTION,
+  PROCEDURES_TOOL_SECTION,
   collapseBlankRuns,
   complianceExcerpt,
   readAgentInstructions,
@@ -104,6 +105,37 @@ describe("support.md against the prompt Base44 runs today", () => {
   it("carries the agency's details as placeholders, not literals", () => {
     for (const literal of ["050-831-1776", "dorit@govari-fin.co.il", "L-00107009"]) {
       expect(PROMPTS.support).not.toContain(literal);
+    }
+  });
+});
+
+const proceduresInstructions: string = readAgentInstructions(join(REPO_ROOT, "base44/agents/procedures_agent.jsonc"));
+
+describe("procedures.md against the prompt Base44 runs today", () => {
+  it("each replaced or removed line exists exactly once today", () => {
+    const lines = proceduresInstructions.split("\n");
+    for (const c of PROCEDURES_TOOL_SECTION) {
+      expect(lines.filter((l: string) => l.startsWith(c.startsWith)), c.startsWith).toHaveLength(1);
+    }
+  });
+
+  it("equals today's instructions with only the tool section changed", () => {
+    expect(fillPlaceholders(PROMPTS.procedures)).toBe(
+      collapseBlankRuns(withToolSection(proceduresInstructions, (s: string) => fillPlaceholders(s), PROCEDURES_TOOL_SECTION)),
+    );
+  });
+
+  it("names its real tools and no Base44 one", () => {
+    expect(PROMPTS.procedures).toMatch(/listArticles/);
+    expect(PROMPTS.procedures).toMatch(/readArticle/);
+    expect(PROMPTS.procedures).toMatch(/escalateToHuman/);
+    expect(PROMPTS.procedures).not.toMatch(/BlogPost|logSupportChat/);
+    expect(PROMPTS.procedures).toMatch(/\(\/blog\/<slug>\)/);
+  });
+
+  it("carries the agency's details as placeholders, not literals", () => {
+    for (const literal of ["050-831-1776", "dorit@govari-fin.co.il", "L-00107009"]) {
+      expect(PROMPTS.procedures).not.toContain(literal);
     }
   });
 });
