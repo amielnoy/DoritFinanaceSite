@@ -724,6 +724,26 @@ Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behavi
 
 `supabase/tests/invitee_identity_check.sql` verifies the resolver and execution grants in PostgreSQL with changed Auth addresses, stale profiles, a missing profile, empty inputs and anon/authenticated/service_role callers. Apply `20261027000000_invitee_identity.sql` before deploying the updated `invite-user` function; without it invitations fail closed.
 
+### 4.19 Agency roles: Owner, Admin, User — `agency-roles-schema.contract.test.ts`
+
+The schema for `docs/superpowers/specs/2026-10-15-agency-roles-design.md`, read as source. Step 1 is `20261029000000_agency_roles_additive.sql`: it adds lead assignment, the role helpers, the membership audit, `set_member_role` / `remove_member`, and two guard triggers, and no policy reads any of it yet.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ROLE-001 | "sorts after every migration already applied" | After `20261027000000_invitee_identity.sql` |
+| CTR-ROLE-002 | "defines the role helpers, the member functions and the two guards" | `agency_role`, `has_role`, `can_see_lead`, `lead_assignee_ok`, `set_member_role`, `remove_member`, `memberships_keep_an_owner`, `leads_guard_assignment` |
+| CTR-ROLE-003 | "pins search_path on every function, and revokes each from public, anon and authenticated by name" | `set search_path = ''` in each; a `revoke execute … from public, anon, authenticated;` per function; no grant names `anon` |
+| CTR-ROLE-004 | "runs every function as its definer except the leads trigger, which must see its caller" | `security definer` on all but `leads_guard_assignment`, which reads `current_user` to tell a person from the server |
+| CTR-ROLE-005 | "ranks owner over admin over user, and gives a suspended agency's members nothing" | `array['user', 'admin', 'owner']`; `agency_role` requires `a.status = 'active'` and `auth.uid()` |
+| CTR-ROLE-006 | "lets a User see a lead only when it is assigned to them" | `can_see_lead`: Admin+ in the lead's agency, the assignee holding `user`, or `is_admin()` |
+| CTR-ROLE-007 | "lets an Admin grant only User, to someone who is a User or not yet a member" | The admin branch refuses any other role or target; only the three new roles are valid; every change writes `membership_events` |
+| CTR-ROLE-008 | "removes a member's assignments with them, and lets anyone leave" | `remove_member` unassigns the person's leads in the agency and records `left` for oneself, `removed` otherwise |
+| CTR-ROLE-009 | "refuses to demote or remove an agency's last Owner" | `last_owner` from a `before update or delete` trigger on `memberships` |
+| CTR-ROLE-010 | "keeps a lead in its agency, and assignment to Admin+ and to the agency's members" | `agency_fixed`; assignment needs `has_role(…, 'admin')` or `is_admin()`; the assignee must pass `lead_assignee_ok` |
+| CTR-ROLE-011 | "makes the membership history read-only to people" | `membership_events`: select to `authenticated` only; no insert, update or delete grant |
+
+`supabase/tests/agency_roles_check.sql` proves the behaviour in PostgreSQL with synthetic agencies (an active A and B, and a suspended one) and people: an Owner, an Admin, two Users, a non-member, the operator, and a suspended agency's Owner. Covered: role ranks and suspension; `can_see_lead` for each person; the leads trigger refuses a User's assignment change and any change of agency, records `assigned_at` / `assigned_by` for an Admin, keeps those two columns from a direct write, clears them on unassign, and lets the server assign only to a member; `set_member_role` and `remove_member` follow the rules above, including last owner, an Admin who cannot touch another Admin, leaving (which unassigns), and transfer of ownership; anon cannot execute the functions; deleting an agency or an account is not refused as a demotion. Breaking any guard, the suspension check or `can_see_lead` makes it fail.
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
