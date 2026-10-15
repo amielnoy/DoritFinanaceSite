@@ -722,8 +722,9 @@ Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behavi
 | CTR-INV-004 | "mails through dorit-mailer, never Supabase Auth's invite" | No `/auth/v1/invite`; `sendMail` to the address |
 | CTR-INV-005 | "logs ids, never the invitee's address" | No `email` in any log call |
 | CTR-INV-006 | "resolves invitees from Auth through a service-role-only RPC" | `invitee_for` joins Auth to a profile by id, matches the current Auth address, uses an empty search path and revokes execution from public/anon/authenticated |
+| CTR-INV-007 | "never resolves an unconfirmed account, in the latest definition of each identity function" | The last migration to define `invitee_for` requires `u.email_confirmed_at is not null` (`20261028000000_invitee_confirmed.sql`: security definer, empty search path, revokes by name); the last `my_email` requires a confirmed address, and `my_enquiries` and `my_snapshot` go through it |
 
-`supabase/tests/invitee_identity_check.sql` verifies the resolver and execution grants in PostgreSQL with changed Auth addresses, stale profiles, a missing profile, empty inputs and anon/authenticated/service_role callers. Apply `20261027000000_invitee_identity.sql` before deploying the updated `invite-user` function; without it invitations fail closed.
+`supabase/tests/invitee_identity_check.sql` verifies the resolver and execution grants in PostgreSQL with changed Auth addresses, stale profiles, a missing profile, an unconfirmed account, empty inputs and anon/authenticated/service_role callers. An unconfirmed account is not resolved, so `invite-user` cannot make an account for the address either and answers its existing 409. Apply `20261027000000_invitee_identity.sql` before deploying the updated `invite-user` function; without it invitations fail closed.
 
 ### 4.19 Agency roles: Owner, Admin, User — `agency-roles-schema.contract.test.ts`
 
