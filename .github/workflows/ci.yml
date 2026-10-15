@@ -1200,7 +1200,8 @@ jobs:
             echo "> The Vercel staging link answers anonymous requests with a 302; sign in to Vercel to view it."
             echo ">"
             echo "> The test report also rides on this run as the \`allure-report\` artifact — one self-contained"
-            echo "> \`index.html\`, no server needed. The Cloudflare copy sits behind Cloudflare Access, which CI"
+            echo "> \`index.html\`, no server needed (over Allure's single-file size limit, the split report:"
+            echo "> \`npx allure open allure-report\`). The Cloudflare copy sits behind Cloudflare Access, which CI"
             echo "> re-checks on every deploy: the repository is private and the report carries the client's copy."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -1209,7 +1210,9 @@ jobs:
   # The report goes to two places, in two shapes, from one set of results:
   #
   #   - **This run**, as the `allure-report` artifact: one self-contained
-  #     index.html that opens from the filesystem. Always produced, needs no
+  #     index.html that opens from the filesystem — or, over Allure's
+  #     single-file size limit, the split report, served with
+  #     `npx allure open allure-report`. Always produced, needs no
   #     credentials, and visible to exactly the people who can already see this
   #     private repository.
   #
@@ -1284,8 +1287,23 @@ jobs:
       # Also strips the Google Analytics beacon Allure injects into every
       # report — see scripts/strip-allure-analytics.mjs for why that is not
       # just a config flag.
+      #
+      # The single-file report has a size ceiling, and a full run passed it in
+      # October 2026 (~3,600 tests): "The report is too large to be generated in
+      # the single file mode!" failed the job on main while everything it
+      # reports on was green. On exactly that message the run's copy becomes the
+      # split report — the one Cloudflare already hosts — which has to be served
+      # rather than opened from disk (`npx allure open allure-report`). Any
+      # other failure still fails the job.
       - name: Generate the report
-        run: npm run allure:generate
+        run: |
+          set -o pipefail
+          if npm run allure:generate 2>&1 | tee allure-generate.log; then exit 0; fi
+          grep -q "too large to be generated in the single file mode" allure-generate.log || exit 1
+          echo "::warning::The single-file report is over Allure's size limit; this run's allure-report artifact is the split report — open it with: npx allure open allure-report"
+          rm -rf allure-report
+          ALLURE_SINGLE_FILE=0 npx allure generate allure-results -c allurerc.mjs -o allure-report
+          node scripts/strip-allure-analytics.mjs allure-report/index.html
 
       - name: Attach the report to this run
         if: always()
@@ -1592,7 +1610,7 @@ jobs:
               # reads as this run's and quietly disagrees with the verdict above.
               echo "| **Allure — test report** (behind Cloudflare Access) | ${ALLURE_HOME} | latest \`main\`; this branch's is the [\`allure-report\` artifact](${RUN_URL}) |"
             elif [ "$ALLURE_RESULT" = "success" ]; then
-              echo "| **Allure — test report** | [\`allure-report\` on this run](${RUN_URL}) | one self-contained \`index.html\` |"
+              echo "| **Allure — test report** | [\`allure-report\` on this run](${RUN_URL}) | self-contained \`index.html\`, or the split report over the size limit |"
             else
               echo "| **Allure — test report** | — | not built (${ALLURE_RESULT}) |"
             fi
