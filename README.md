@@ -454,6 +454,17 @@ mailer's `MAILER_TOKEN_SUPABASE` — a token of its own, so either caller can be
 without the other. Neither value can be read back once stored; to replace one, generate a new
 value and write it to both ends.
 
+**Who receives an enquiry** is one module for every Edge function:
+`supabase/functions/_shared/recipients.ts` — the operating team's mailboxes
+(`NOTIFY_EMAILS`) and the agent (`SECONDARY_EMAIL`); the diary's attendees and
+the meeting invitations are derived from them, so nobody is invited who did not
+receive the enquiry. The optional Edge Function secret **`NOTIFY_EMAILS`**
+(comma-separated) replaces the team's list without a code change; an empty or
+malformed value is ignored and the default stands. Whoever is on it must stay
+within what the consent text discloses ("the team that operates the site for
+her"). Base44's `submitClaim` still keeps its own copy, which a contract test
+holds equal to the module's default.
+
 ### Lead functions on Supabase
 
 `submitLead`, `escalateToHuman` and `logSupportChat` also exist as Supabase Edge

@@ -44,9 +44,12 @@ describe("Edge Functions", () => {
       expect(m, `${decl} not found`).not.toBeNull();
       return [...m![1].matchAll(/["']([^"']+@[^"']+)["']/g)].map((x) => x[1]);
     };
-    const edge = read(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"));
+    // submit-claim takes its recipients from the shared module.
+    const handler = read(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"));
+    expect(handler).toMatch(/import \{ NOTIFY_EMAILS, SECONDARY_EMAIL \} from '\.\.\/_shared\/recipients\.ts';/);
+    const edge = read(join(REPO_ROOT, "supabase/functions/_shared/recipients.ts"));
     const base44 = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    const notify = /const NOTIFY_EMAILS = \[([^\]]*)\]/;
+    const notify = /const (?:DEFAULT_)?NOTIFY_EMAILS = \[([^\]]*)\]/;
     const secondary = /const SECONDARY_EMAIL = ([^;]+);/;
     expect(addresses(edge, notify)).toEqual(addresses(base44, notify));
     expect(addresses(edge, notify).length).toBeGreaterThan(0);

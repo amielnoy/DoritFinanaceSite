@@ -23,6 +23,7 @@ import {
   sha256Hex,
   withinLimit,
 } from '../_shared/guard.ts';
+import { NOTIFY_EMAILS, SECONDARY_EMAIL } from '../_shared/recipients.ts';
 
 const FN = 'submit-claim';
 const log = createLog(FN);
@@ -47,9 +48,7 @@ export const STORAGE_REF_PREFIX = 'storage:claim-documents/';
 /** How long the link in the notification mail opens the document. Past that, the admin screen signs a fresh one. */
 const MAIL_LINK_SECONDS = 7 * 24 * 60 * 60;
 
-// Several mailboxes, one team — see the note in base44/functions/submitLead/entry.ts.
-const NOTIFY_EMAILS = ['amielnoy@gmail.com', 'amielnoy@outlook.com'];
-const SECONDARY_EMAIL = 'dorit@govari-fin.co.il';
+// Who is told — one list for every Edge function: ../_shared/recipients.ts.
 
 /** What changes in this function's confirmation — the content only; the template is shared. */
 function clientMailFor(data: { name?: string; claimType?: string; eventDate?: string }): ClientMail {

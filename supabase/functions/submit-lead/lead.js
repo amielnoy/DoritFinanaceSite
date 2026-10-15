@@ -62,65 +62,19 @@ export function israelInstant(wall) {
   return null;
 }
 
-/**
- * מי מוזמן לפגישה, בנוסף לבעל היומן.
- *
- * דורית ראשונה ברשימה, וזו תקלה שתוקנה ולא החלטה חדשה. ב-Base44 היה כתוב
- * שהאירוע נוצר ביומן של מי שאישר את המחבר, שזו דורית, ולכן היא המארגנת ואינה
- * צריכה הזמנה. ההנחה הזו לא נבדקה מעולם ולא הייתה נכונה: את מחבר היומן של
- * Microsoft אישרה תיבה של הצוות, האירוע נוצר ביומן *שלה*, ודורית לא הייתה לא
- * מארגנת ולא מוזמנת — כלומר לא הייתה לה פגישה ביומן בכלל. ראו A-54.
- *
- * כאן אין מחבר: האירוע נכתב ליומן Google של דורית בלי משתתפים, וכל כתובת
- * ברשימה מקבלת בדואר הזמנת פגישה (ראו _shared/ics.ts), עם אותו UID.
- *
- * כל כתובת כאן חייבת לקבל את הפנייה עצמה בדואר — NOTIFY_EMAILS או
- * SECONDARY_EMAIL. זה גילוי, לא נוחות: אסור להזמין לפגישה מי שלא ראה את
- * הפנייה שהולידה אותה. tests/contract/agents.contract.test.ts אוכף בדיוק את
- * זה, ונכשל כשהרשימות מתפצלות — תיבה שנוספה לאחת ולא לשנייה אינה מרימה שגיאה
- * בשום מקום, היא פשוט מקבלת פחות.
- */
-export const CALENDAR_ATTENDEES = [
-  "dorit@govari-fin.co.il",
-  "amielnoy@gmail.com",
-  "amielnoy@outlook.com",
-];
-
-/**
- * מי מקבל הזמנת פגישה בדואר (Edge בלבד). האירוע ביומן Google נכתב ישירות
- * ליומן של amielnoy@gmail.com, ולכן אין לשלוח לו הזמנה נוספת; דורית
- * וה-Outlook של הצוות מקבלים הזמנה. תת-קבוצה של CALENDAR_ATTENDEES.
- */
-export const INVITE_ATTENDEES = [
-  "dorit@govari-fin.co.il",
-  "amielnoy@outlook.com",
-];
+// Who receives an enquiry — the mailboxes, the agent and the diary — lives in
+// one place for every Edge function: ../_shared/recipients.ts (Architecture N-01).
+export {
+  CALENDAR_ATTENDEES,
+  INVITE_ATTENDEES,
+  INVITE_FALLBACK_GOOGLE,
+  NOTIFY_EMAILS,
+  SECONDARY_EMAIL,
+} from '../_shared/recipients.ts';
 
 /** כתובת השולח של המערכת (MAIL_FROM של dorit-mailer): מארגן ההזמנה, ולעולם לא אחד מהמוזמנים. */
 export const INVITE_ORGANIZER = "notifications@mail.govari-fin.co.il";
 
-/**
- * כשאירוע Google לא נוצר (אין GOOGLE_CALENDAR_ID, או שהקריאה נכשלה), ליומן
- * Google של המפעיל מגיעה הפגישה בהזמנה בדואר. עם האירוע — אין הזמנה לכתובת הזו.
- */
-export const INVITE_FALLBACK_GOOGLE = "amielnoy@gmail.com";
-
-// שני נמענים, שניהם מקבלים את הפנייה המלאה.
-//
-// SECONDARY_EMAIL הוא הסוכנת. NOTIFY_EMAILS הן תיבות הצוות שמתפעל את האתר מטעמה,
-// ומקבל בנוסף נספח מצב על השמירה, היומן והמיילים.
-//
-// זה מחייב גילוי, וקיים כזה: נוסח ההסכמה ב-src/config/compliance.ts ומדיניות
-// הפרטיות אומרים "אצל דורית ואצל הצוות שמתפעל את האתר מטעמה" — ולא "אצל
-// דורית בלבד", שהיה הנוסח הקודם והיה הופך להצהרה לא נכונה ברגע שנשלח עותק
-// החוצה. tests/contract/agents.contract.test.ts אוכף שהקוד והנוסח מסכימים,
-// לשני הכיוונים: מי שיצמצם כאן את השליחה חייב להחזיר גם את הנוסח.
-// כמה תיבות, אותו צוות. הרשימה קיימת כדי שתוספת תיבה תהיה שורה אחת ולא
-// שכפול של הקריאה — וכדי שכשל במסירה לתיבה אחת לא ימנע את השאר.
-
-export const NOTIFY_EMAILS = ["amielnoy@gmail.com", "amielnoy@outlook.com"];
-
-export const SECONDARY_EMAIL = "dorit@govari-fin.co.il";
 
 /**
  * הסרת מזהים רגישים מתקציר שנכתב על ידי מודל.

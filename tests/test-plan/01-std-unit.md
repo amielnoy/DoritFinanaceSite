@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 961 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1639 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 965 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1647 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1459,6 +1459,18 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 |---|---|---|
 | UNIT-API-001 | "finds the functions" | `api/og/blog.ts` among them |
 | UNIT-API-002 | "%s imports nothing through the \"@/\" alias at run time" (one case per function) | No runtime `@/` import in the graph |
+
+
+### 4.58 Who receives an enquiry — `tests/unit/edge-recipients.test.ts`
+
+`supabase/functions/_shared/recipients.ts`, with the Edge Function secret `NOTIFY_EMAILS` stubbed.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-RCP-001 | "is the operating team and the agent by default, everyone in the diary, the calendar's owner by its event" | The two mailboxes and Dorit; attendees = all three; invitations without the calendar's owner; the owner as fallback |
+| UNIT-RCP-002 | "takes the operations list from the NOTIFY_EMAILS secret, and the diary follows" | The secret's list; no fallback once the owner is not notified |
+| UNIT-RCP-003 | "ignores a malformed secret (%j) and keeps the default" (5 cases) | The default list |
+| UNIT-RCP-004 | "never invites anyone who does not receive the enquiry" | Every attendee, invitee and fallback is mailed, for three secrets |
 
 ## 5. Pass criteria
 
