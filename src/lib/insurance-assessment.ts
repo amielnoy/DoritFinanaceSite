@@ -38,6 +38,11 @@ export type Answers = Partial<Record<Question["id"], string>>;
 
 export interface Recommendation {
   icon: LucideIcon;
+  /** Which recommendation — stable across languages. */
+  id: string;
+  /** Which of its reasons applied. */
+  reason: string;
+  /** The Hebrew name and reason (REC_TITLES, REC_REASONS). */
   title: string;
   why: string;
   priority: boolean;
@@ -85,6 +90,40 @@ export const QUESTIONS: Question[] = [
   },
 ];
 
+/** Each recommendation's name, by id — the Hebrew; other languages in tools.json (`assess.rec.<id>`). */
+export const REC_TITLES = {
+  life: "ביטוח חיים",
+  health: "ביטוח בריאות משלים",
+  disability: "ביטוח אובדן כושר עבודה",
+  accidents: "ביטוח תאונות אישיות",
+  pension: "תכנון פנסיוני / מנהלים",
+  critical: "ביטוח מחלות קשות",
+  review: "בחינת קרן השתלמות / פנסיה",
+} as const;
+
+/** Why it is recommended, by reason — the Hebrew; other languages in tools.json (`assess.why.<reason>`). */
+export const REC_REASONS = {
+  "life.parent": "ילדים תלויים בהכנסתך — ביטוח חיים מבטיח שהם יהיו מוגנים גם אם משהו יקרה.",
+  "life.mortgage": "משכנתא משמעותית נשארת גם בלעדיך — ביטוח חיים מגן על המשפחה מפני נטל כלכלי.",
+  "life.couple": "בן/בת זוג תלויים בהכנסתך המשותפת — כדאי להבטיח הגנה בסיסית.",
+  "health.history": "רקע רפואי משפחתי מעלה את החשיבות של כיסוי לרפואה פרטית, תרופות וטיפולים שאינם בסל.",
+  "health.general": "גם בריאות תקינה נזקקת לרפואה פרטית, טיפולים ותרופות שמחוץ לסל הבסיסי.",
+  "disability.selfEmployed": "עצמאי/ת שאינו/ה עובד/ת עקב מחלה או תאונה — ההכנסה נעצרת לחלוטין. זה הביטוח הקריטי ביותר עבורך.",
+  "disability.family": "כשהמשפחה תלויה בהכנסתך ויש משכנתא — אובדן כושר עבודה מגן על היכולת להמשיך ולעמוד בהתחייבויות.",
+  "accidents": "כיסוי לנזקי גוף מתאונות — רלוונטי במיוחד לעצמאיים שאינם מוגנים דרך מעסיק.",
+  "pension.retiree": "לקראת פרישה חשוב לבחון את מוצרי החיסכון, דמי הניהול ומסלולי הפרישה — כדי למקסם את ההכנסה הפנסיונית.",
+  "pension.parent": "ככל שמתקרבים לפרישה, דמי הניהול ובחירת המסלול משפיעים על עשרות אלפי שקלים בעתיד.",
+  "critical": "רקע משפחתי מצדיק כיסוי למחלות קשות — פיצוי חד-פעמי שמאפשר התמודדות כלכלית בעת משבר בריאותי.",
+  "review": "שכירים רבים משלמים דמי ניהול גבוהים מבלי לדעת — כדאי לבחון את המוצרים הקיימים ולהוריד עלויות.",
+} as const;
+
+const rec = (
+  icon: LucideIcon,
+  id: keyof typeof REC_TITLES,
+  reason: keyof typeof REC_REASONS,
+  priority: boolean,
+): Recommendation => ({ icon, id, reason, title: REC_TITLES[id], why: REC_REASONS[reason], priority });
+
 export function buildRecommendations(answers: Answers): Recommendation[] {
   const recs: Recommendation[] = [];
   const stage = answers.stage;
@@ -92,86 +131,30 @@ export function buildRecommendations(answers: Answers): Recommendation[] {
   const mortgage = answers.mortgage;
   const health = answers.health;
 
-  // ביטוח חיים — תלויים או התחייבויות
   if (stage === "parent" || mortgage === "yes" || stage === "couple") {
-    recs.push({
-      icon: Heart,
-      title: "ביטוח חיים",
-      why:
-        stage === "parent"
-          ? "ילדים תלויים בהכנסתך — ביטוח חיים מבטיח שהם יהיו מוגנים גם אם משהו יקרה."
-          : mortgage === "yes"
-          ? "משכנתא משמעותית נשארת גם בלעדיך — ביטוח חיים מגן על המשפחה מפני נטל כלכלי."
-          : "בן/בת זוג תלויים בהכנסתך המשותפת — כדאי להבטיח הגנה בסיסית.",
-      priority: true,
-    });
+    recs.push(rec(Heart, "life", stage === "parent" ? "life.parent" : mortgage === "yes" ? "life.mortgage" : "life.couple", true));
   }
 
-  // ביטוח בריאות משלים — כולם, חזק יותר עם סיכון
-  recs.push({
-    icon: Activity,
-    title: "ביטוח בריאות משלים",
-    why:
-      health === "yes"
-        ? "רקע רפואי משפחתי מעלה את החשיבות של כיסוי לרפואה פרטית, תרופות וטיפולים שאינם בסל."
-        : "גם בריאות תקינה נזקקת לרפואה פרטית, טיפולים ותרופות שמחוץ לסל הבסיסי.",
-    priority: health === "yes",
-  });
+  recs.push(rec(Activity, "health", health === "yes" ? "health.history" : "health.general", health === "yes"));
 
-  // אובדן כושר עבודה — עצמאי או מפרנס עיקרי עם משכנתא
   if (work === "selfemployed" || (mortgage === "yes" && stage === "parent")) {
-    recs.push({
-      icon: Shield,
-      title: "ביטוח אובדן כושר עבודה",
-      why:
-        work === "selfemployed"
-          ? "עצמאי/ת שאינו/ה עובד/ת עקב מחלה או תאונה — ההכנסה נעצרת לחלוטין. זה הביטוח הקריטי ביותר עבורך."
-          : "כשהמשפחה תלויה בהכנסתך ויש משכנתא — אובדן כושר עבודה מגן על היכולת להמשיך ולעמוד בהתחייבויות.",
-      priority: true,
-    });
+    recs.push(rec(Shield, "disability", work === "selfemployed" ? "disability.selfEmployed" : "disability.family", true));
   }
 
-  // תאונות אישיות — עצמאי
   if (work === "selfemployed") {
-    recs.push({
-      icon: Umbrella,
-      title: "ביטוח תאונות אישיות",
-      why: "כיסוי לנזקי גוף מתאונות — רלוונטי במיוחד לעצמאיים שאינם מוגנים דרך מעסיק.",
-      priority: false,
-    });
+    recs.push(rec(Umbrella, "accidents", "accidents", false));
   }
 
-  // תכנון פנסיוני — הורה או לקראת פרישה
   if (stage === "retiree" || stage === "parent") {
-    recs.push({
-      icon: TrendingUp,
-      title: "תכנון פנסיוני / מנהלים",
-      why:
-        stage === "retiree"
-          ? "לקראת פרישה חשוב לבחון את מוצרי החיסכון, דמי הניהול ומסלולי הפרישה — כדי למקסם את ההכנסה הפנסיונית."
-          : "ככל שמתקרבים לפרישה, דמי הניהול ובחירת המסלול משפיעים על עשרות אלפי שקלים בעתיד.",
-      priority: stage === "retiree",
-    });
+    recs.push(rec(TrendingUp, "pension", stage === "retiree" ? "pension.retiree" : "pension.parent", stage === "retiree"));
   }
 
-  // מחלות קשות — סיכון בריאותי
   if (health === "yes") {
-    recs.push({
-      icon: HeartPulse,
-      title: "ביטוח מחלות קשות",
-      why: "רקע משפחתי מצדיק כיסוי למחלות קשות — פיצוי חד-פעמי שמאפשר התמודדות כלכלית בעת משבר בריאותי.",
-      priority: false,
-    });
+    recs.push(rec(HeartPulse, "critical", "critical", false));
   }
 
-  // מנהלים לשכיר — נדיר שיש, אבל רלוונטי
   if (work === "employee" && stage !== "retiree") {
-    recs.push({
-      icon: Briefcase,
-      title: "בחינת קרן השתלמות / פנסיה",
-      why: "שכירים רבים משלמים דמי ניהול גבוהים מבלי לדעת — כדאי לבחון את המוצרים הקיימים ולהוריד עלויות.",
-      priority: false,
-    });
+    recs.push(rec(Briefcase, "review", "review", false));
   }
 
   return recs;

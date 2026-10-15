@@ -2,6 +2,7 @@ import React, { useId } from "react";
 import { MessageCircle } from "lucide-react";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { whatsappHref } from "@/lib/calculator-lead";
+import { useT } from "@/i18n/LocaleContext";
 
 /**
  * The step after a calculator's result: ask Dorit to check the real numbers,
@@ -26,6 +27,7 @@ export default function CalculatorLeadBox({
   children?: React.ReactNode;
 }) {
   const headingId = useId();
+  const t = useT("tools");
   return (
     <aside
       aria-labelledby={headingId}
@@ -33,11 +35,10 @@ export default function CalculatorLeadBox({
       className={`border border-highlight/40 bg-highlight-muted/10 p-5 md:p-7 ${className}`}
     >
       <h3 id={headingId} className="font-heading text-2xl md:text-[28px] leading-snug">
-        רוצים שדורית תבדוק את הנתונים האמיתיים שלכם?
+        {t("lead.title")}
       </h3>
       <p className="mt-3 text-sm text-foreground/70 leading-relaxed max-w-xl">
-        התוצאה כאן היא הערכה כללית בלבד ואינה ייעוץ או המלצה. ההודעה נפתחת בוואטסאפ עם התוצאה,
-        ואפשר לערוך אותה לפני השליחה.
+        {t("lead.text")}
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
         <a
@@ -47,7 +48,7 @@ export default function CalculatorLeadBox({
           className={ctaClass("max-sm:w-full")}
         >
           <MessageCircle size={18} aria-hidden="true" />
-          שלחו לדורית את התוצאה בוואטסאפ
+          {t("lead.send")}
         </a>
         {children}
       </div>
