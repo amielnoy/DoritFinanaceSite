@@ -882,7 +882,9 @@ does exactly that, nightly at 03:45 (`leads-retention`):
   `masleka_functions_url` and `masleka_cron_secret`) and the sheet's service
   account; checked in a scratch Postgres by
   `supabase/tests/lead_sheet_retention_check.sql`.
-- **Not reached yet:** the copies already mailed (N-02, the next PR).
+- **The mailed copies** (#231): only Dorit receives the enquiry; the operating
+  team gets a notice without the visitor's details. The privacy policy (§7) says
+  mailed and diary copies are deleted at the end of the same period — by hand.
 - Apply the migration by hand like the others. The job is checked end to end
   in a scratch Postgres by `supabase/tests/lead_retention_check.sql` (its
   header has the commands); it refuses to run where a `leads` table exists.
