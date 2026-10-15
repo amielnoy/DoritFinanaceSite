@@ -255,6 +255,12 @@ featured row's deadline does not decide the outcome of an unrelated run.
 | CMP-BLOG-022 | "keeps a keyword the new topic still carries" | Still pressed after the switch |
 | CMP-BLOG-023 | "hides the featured row while a keyword is chosen" | No featured row; only matching cards |
 | CMP-BLOG-024 | "links each card and the blog's JSON-LD to the slug, or to the id where the store has none" | `/blog/maslul-hashkaa` and `/blog/pen-2` in the cards and in `Blog.blogPost[].url` |
+| CMP-BLOG-025 | "keeps the filters and holds a screen's height for the grid, so the prerendered page does not jump" | With the read pending: the topic group and the search box are there, and the spinner's box is `min-h-screen` (D-06) |
+| CMP-BLOG-026 | "says so and offers a retry, rather than saying there are no articles" | A failed read shows `role="alert"` "לא הצלחנו לטעון את המאמרים…", not "עדיין אין מאמרים"; "לנסות שוב" reads again and the cards appear (D-09) |
+| CMP-BLOG-027 | "still says there are none when the read succeeds empty" | "עדיין אין מאמרים"; no topic group |
+
+The suite's `loaded()` waits for the spinner to go, not for the topic group:
+the group now renders while the read is pending (CMP-BLOG-025).
 
 ### 4.13 Reading-recommender filter — `tests/component/blog-recommendation-filter.test.tsx`
 

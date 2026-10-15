@@ -117,8 +117,9 @@ because the backend still accepts leads recorded under them.
 | E2E-BLG-003 | "opens a post and renders its markdown body" | Heading, `##` subheading and list items rendered |
 | E2E-BLG-004 | "shows a friendly not-found for a missing post" | "המאמר לא נמצא" plus a back link; no `pageerror` |
 | E2E-BLG-005 | "share buttons point at real share endpoints" | ≥1 wa.me/facebook/linkedin/x link |
-| E2E-BLG-006 | "degrades gracefully when the blog backend errors" | Root non-empty; no `pageerror` |
+| E2E-BLG-006 | "degrades gracefully when the blog backend errors" | Root non-empty; no `pageerror`; a `role="alert"` "לא הצלחנו לטעון את המאמרים" with "לנסות שוב", and no "עדיין אין מאמרים" (D-09) |
 | E2E-BLG-007 | "the first article is on the first screen and a half" (375×812) | First `article-card` (the featured one, seeded) starts < 1,250px from the top; it was ~2,300px before the redesign |
+| E2E-BLG-008 | "the prerendered list does not jump when the app takes over" (Chromium projects; layout-shift entries are Chromium's alone) | Cumulative layout shift, observed from the first paint to a second after the cards appear, is < 0.1. It was 0.444 on production and 0.18 here before the fix (D-06) |
 
 ### 3.7 Desktop chrome — `mobile.spec.ts` (desktop projects only)
 

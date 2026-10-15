@@ -37,7 +37,7 @@ const articlesLabel = (n: number) => (n === 1 ? "מאמר אחד" : `${n} מאמ
 const moreLabel = (n: number) => (n === 1 ? "מאמר נוסף" : `${n} נוספים`);
 
 export default function Blog() {
-  const { data, isPending: loading } = useArticles();
+  const { data, isPending: loading, isError: failed, isFetching: retrying, refetch } = useArticles();
   const posts = (data ?? null) as Article[] | null;
   const [query, setQuery] = useState<string>("");
   const [topic, setTopic] = useState<TopicId>("all");
@@ -196,7 +196,11 @@ export default function Blog() {
               לעצור ולהתייעץ.
             </p>
 
-            {!loading && posts && posts.length > 0 ? (
+            {/* Rendered while the articles load, too. The page is prerendered
+                with its filters; hiding them until the read answered collapsed
+                the hero, then pushed every card back down — a layout shift of
+                0.444 on /blog (D-06, manual test 2026-10-14). */}
+            {loading || (posts && posts.length > 0) ? (
               <div className="mt-6 space-y-4">
                 <div className="relative max-w-xl">
                   <label htmlFor="blog-search" className="sr-only">
@@ -257,8 +261,11 @@ export default function Blog() {
                 </div>
 
                 {/* One sideways-scrolling line on a phone, so it costs a row
-                    rather than pushing the articles down; wraps from md. */}
-                {topicTags.length > 0 ? (
+                    rather than pushing the articles down; wraps from md. While
+                    loading, a row's height is held for it. */}
+                {loading ? (
+                  <div aria-hidden="true" className="min-h-11" />
+                ) : topicTags.length > 0 ? (
                   <div
                     role="group"
                     aria-label="סינון לפי מילת מפתח"
@@ -301,8 +308,26 @@ export default function Blog() {
 
           <section aria-labelledby="blog-grid-title" data-track-location="blog_grid">
             {loading ? (
-              <div className="flex justify-center py-20">
+              // A screen's height, so what follows the grid stays below the
+              // fold until the cards arrive rather than rising and falling.
+              <div className="flex justify-center pt-20 min-h-screen">
                 <Loader2 className="animate-spin text-accent" aria-label="טוען מאמרים" />
+              </div>
+            ) : failed && !posts ? (
+              // A failed read is not an empty blog. It used to say "no articles
+              // yet" (D-09, manual test 2026-10-14).
+              <div role="alert" className="text-center py-20 border border-dashed border-border rounded-md">
+                <Newspaper size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} aria-hidden="true" />
+                <p className="text-foreground">לא הצלחנו לטעון את המאמרים כרגע.</p>
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  disabled={retrying}
+                  className={`mt-4 min-h-11 inline-flex items-center gap-2 text-sm text-accent underline underline-offset-4 hover:text-highlight transition-colors disabled:opacity-60 ${FOCUS_RING}`}
+                >
+                  {retrying ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+                  לנסות שוב
+                </button>
               </div>
             ) : !posts || posts.length === 0 ? (
               <div className="text-center py-20 border border-dashed border-border rounded-md">

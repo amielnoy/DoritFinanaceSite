@@ -86,12 +86,33 @@ const renderBlog = () => {
   );
 };
 
-/** The topic buttons render once the posts have loaded. */
+/**
+ * The posts have loaded: the spinner is gone. Not "the topic buttons are
+ * there" — they render while loading too, so the prerendered page does not
+ * shift (D-06).
+ */
 // The first render in this file pays for loading the page's whole module graph
 // (header, footer, sticky bar, recommender); under the full suite's parallel
 // load that alone has run past findBy's 1 s default. The test is about the
 // filter, not about how fast jsdom imports, so wait up to 5 s.
-const loaded = () => screen.findByRole("group", { name: "סינון לפי נושא" }, { timeout: 5000 });
+const loaded = async () => {
+  const group = await screen.findByRole("group", { name: "סינון לפי נושא" }, { timeout: 5000 });
+  await until(() => !screen.queryByLabelText("טוען מאמרים"));
+  return group;
+};
+
+/**
+ * Polls on the real clock. Not `waitFor`: this suite fakes `Date`, which
+ * stalls `waitFor`'s own deadline, and its failure message prints the whole
+ * page — long enough to throw "Invalid string length".
+ */
+async function until(condition: () => boolean, what = "the condition") {
+  for (let i = 0; i < 100; i++) {
+    if (condition()) return;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
 
 const gridIds = () =>
   Array.from(document.querySelectorAll<HTMLElement>('[id^="post-"]')).map((el) => el.id.slice(5));
@@ -371,5 +392,41 @@ describe("article links", () => {
       .find((b) => b["@type"] === "Blog");
     const urls = blog.blogPost.map((p: { url: string }) => new URL(p.url).pathname);
     expect(urls).toEqual(expect.arrayContaining(["/blog/maslul-hashkaa", "/blog/pen-2"]));
+  });
+});
+
+describe("while the articles load", () => {
+  it("keeps the filters and holds a screen's height for the grid, so the prerendered page does not jump", async () => {
+    // D-06, manual test 2026-10-14: hiding the filters until the read answered
+    // gave /blog a layout shift of 0.444.
+    base44Mock.entities.BlogPost.filter.mockReturnValue(new Promise(() => {}));
+    renderBlog();
+    expect(await screen.findByRole("group", { name: "סינון לפי נושא" }, { timeout: 5000 })).toBeTruthy();
+    expect(screen.getByLabelText("חיפוש מאמרים")).toBeTruthy();
+    const spinner = screen.getByLabelText("טוען מאמרים");
+    expect(spinner.parentElement?.className).toContain("min-h-screen");
+  });
+});
+
+describe("when the articles cannot be read", () => {
+  it("says so and offers a retry, rather than saying there are no articles", async () => {
+    // D-09, manual test 2026-10-14.
+    base44Mock.entities.BlogPost.filter.mockRejectedValue(new Error("network"));
+    renderBlog();
+    const alert = await screen.findByRole("alert", {}, { timeout: 5000 });
+    expect(alert.textContent).toContain("לא הצלחנו לטעון את המאמרים");
+    expect(screen.queryByText(/עדיין אין מאמרים/)).toBeNull();
+
+    base44Mock.entities.BlogPost.filter.mockResolvedValue(POSTS);
+    fireEvent.click(within(alert).getByRole("button", { name: "לנסות שוב" }));
+    await until(() => gridIds().length > 0, "the cards after a retry");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("still says there are none when the read succeeds empty", async () => {
+    base44Mock.entities.BlogPost.filter.mockResolvedValue([]);
+    renderBlog();
+    expect(await screen.findByText(/עדיין אין מאמרים/, {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "סינון לפי נושא" })).toBeNull();
   });
 });
