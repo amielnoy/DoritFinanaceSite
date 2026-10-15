@@ -719,6 +719,19 @@ moved — fix the side that is wrong; do not relax the assertion.
 | CTR-RET-005 | "never touches a client, and anonymizes what identifies the person" | `status <> 'client'`; name, phone, email, message, summary, profile, notes cleared |
 | CTR-RET-006 | "runs nightly and only as the database itself" | Execute revoked from public, anon, authenticated; `leads-retention` at 03:45 |
 
+### Lead sheet retention — `lead-sheet-retention.contract.test.ts`
+
+`supabase/migrations/20261026000000_lead_sheet_retention.sql` and `supabase/functions/sheet-retention` (Architecture N-02). The rule is exercised in a scratch Postgres by `supabase/tests/lead_sheet_retention_check.sql`; the job by `sheet-retention.integration.test.ts`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-SRET-001 | "sorts after the lead retention it follows" | After `20261025000000_lead_retention.sql` |
+| CTR-SRET-002 | "counts a lead live only while it exists and is not anonymized, by either id" | `anonymized_at is null`; `base44_id = x` or a guarded `x::uuid`; the anonymization spares a client |
+| CTR-SRET-003 | "empties the visitor's details and keeps what the database keeps" | Events: requested time, name, phone, email, summary, the four profile fields — never the date, source, topic, id or completeness; Support: phone and transcript |
+| CTR-SRET-004 | "keeps an unlinked Events row 24 months and a Support row 12, as promised" | `EVENTS_MONTHS = 24`, `SUPPORT_MONTHS = 12`; the policy's 24 months |
+| CTR-SRET-005 | "lets only the service role ask or start it" | Revoked from public, anon, authenticated; every grant to `service_role` |
+| CTR-SRET-006 | "runs nightly after the anonymization, and the function checks the cron secret rather than a JWT" | `lead-sheet-retention` at 04:30, after `leads-retention` at 03:45; `verify_jwt = false`; `x-site-cron` on both sides |
+
 ### Production smoke publish preflight
 
 `production-smoke.contract.test.ts` executes the CI preflight and checks that

@@ -425,6 +425,11 @@ verify_jwt = false
 [functions.claim-documents-purge]
 verify_jwt = false
 
+# The nightly sheet retention (N-02): called by pg_cron with the site's cron
+# secret in x-site-cron, which the function checks itself.
+[functions.sheet-retention]
+verify_jwt = false
+
 # The site's chat posts without signing in, like the forms; the function checks
 # its own input and holds a conversation by its own token.
 [functions.chat]

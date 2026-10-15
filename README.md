@@ -863,7 +863,19 @@ does exactly that, nightly at 03:45 (`leads-retention`):
   source, topic and status stay, so the counts still add up.
 - **A contact record** (one per phone) goes when it is that old, unless a client
   or a recent enquiry shares the phone.
-- **Not reached:** the Google Sheet row and the copies already mailed.
+- **The Google Sheet follows** (`sheet-retention`, nightly at 04:30,
+  migration `20261026000000_lead_sheet_retention.sql`). An Events row whose
+  lead is anonymized, or deleted from `/admin/leads`, loses the requested time,
+  name, phone, email, summary and the four profile fields. The database
+  decides which leads are still live (`lead_sheet_live`), so a client's row is
+  never touched. A row with no lead goes by its own date after 24 months. A
+  Support row loses its phone and transcript after 12 months, the chat's own
+  retention. Cells are emptied, never rows deleted. It reuses the
+  clearinghouse's cron secret (`MASLEKA_CRON_SECRET`; Vault
+  `masleka_functions_url` and `masleka_cron_secret`) and the sheet's service
+  account; checked in a scratch Postgres by
+  `supabase/tests/lead_sheet_retention_check.sql`.
+- **Not reached yet:** the copies already mailed (N-02, the next PR).
 - Apply the migration by hand like the others. The job is checked end to end
   in a scratch Postgres by `supabase/tests/lead_retention_check.sql` (its
   header has the commands); it refuses to run where a `leads` table exists.
