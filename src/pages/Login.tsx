@@ -34,10 +34,10 @@ export default function Login() {
   // shared open-redirect guard, and an attacker controls this query parameter.
   const returnTo = safeReturnTo();
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
     setError("");
     try {
-      services.auth.signInWithGoogle(returnTo);
+      await services.auth.signInWithGoogle(returnTo);
     } catch (err) {
       setError("לא הצלחנו להתחיל את ההתחברות. נסו שוב.");
     }

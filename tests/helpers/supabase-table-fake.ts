@@ -20,6 +20,8 @@ export function tableFake(
   writeResult: SupabaseReadResult = result,
 ): { client: SupabaseLeadTableClient; calls: Call[] } {
   const calls: Call[] = [];
+  // A `range` answers that slice of `result.data`, as PostgREST pages it; reset by each select.
+  let window: [number, number] | null = null;
   const query: SupabaseQuery = {
     eq(column, value) {
       calls.push(["eq", column, value]);
@@ -41,8 +43,14 @@ export function tableFake(
       calls.push(["limit", count]);
       return query;
     },
+    range(from, to) {
+      calls.push(["range", from, to]);
+      window = [from, to];
+      return query;
+    },
     then(onFulfilled, onRejected) {
-      return Promise.resolve(result).then(onFulfilled, onRejected);
+      const answer = window && result.data ? { ...result, data: result.data.slice(window[0], window[1] + 1) } : result;
+      return Promise.resolve(answer).then(onFulfilled, onRejected);
     },
   };
   const write: SupabaseWriteQuery = {
@@ -62,6 +70,7 @@ export function tableFake(
       return {
         select(columns) {
           calls.push(["select", columns]);
+          window = null;
           return query;
         },
         update(values) {
