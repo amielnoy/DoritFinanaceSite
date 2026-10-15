@@ -26,8 +26,8 @@ describe("UnconfiguredAuthService", () => {
     expect(() => auth.logout("/")).not.toThrow();
   });
 
-  it("refuses a Google sign-in with a message the login page can show", () => {
-    expect(() => auth.signInWithGoogle("/")).toThrow(/\S/);
+  it("refuses a Google sign-in with a message the login page can show", async () => {
+    await expect(auth.signInWithGoogle("/")).rejects.toThrow(/\S/);
   });
 
   it("refuses a password sign-in with a message the login page can show", async () => {

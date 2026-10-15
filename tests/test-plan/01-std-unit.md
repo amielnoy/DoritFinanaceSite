@@ -1536,7 +1536,17 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-USRADM-003 | "refuses without a session, before any request" | "נדרשת התחברות."; no call |
 | UNIT-USRADM-004 | "reports the function's own refusal, in its words" | The 400 body's `error` |
 
-### 4.62 The claim form's file checks — `tests/unit/claim-documents.test.ts`, `tests/unit/supabase-upload.test.ts` (new case)
+### 4.62 Review fixes of 2026-10-15 — `csv-cell.test.ts`, `supabase-auth.test.ts`, `supabase-lead-admin.test.ts`
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-CSV-001 | "neutralises a value Excel would run: %j → %j" | `=`, `+`, `-`, `@`, tab, CR first: a leading `'` (quoted when the value has a CR) |
+| UNIT-CSV-002 | "quotes commas, quotes and newlines, after neutralising" | `=HYPERLINK("x","y")` → `"'=HYPERLINK(""x"",""y"")"` |
+| UNIT-CSV-003 | "leaves ordinary text, numbers and empties as they were" | Hebrew, a phone, null and undefined |
+| UNIT-AUTH-GOOGLE-ERR | "reports a Google sign-in Supabase refused, so the page can say so" | A payload `error` and a rejection both reject `signInWithGoogle` |
+| UNIT-LEADADM-PAGE | "reads every lead, page after page, until a short page" | 2,500 rows → 2,500, in three `range` reads of 1,000; the first test now expects `range(0, 999)` |
+
+### 4.63 The claim form's file checks — `tests/unit/claim-documents.test.ts`, `tests/unit/supabase-upload.test.ts` (new case)
 
 D-02 (manual test 2026-10-14): the form checks a document before anything is
 uploaded, against the limits the bucket and `submit-claim` enforce anyway.

@@ -132,6 +132,18 @@ describe("SupabaseAuthService", () => {
     });
   });
 
+  /**
+   * supabase-js reports a refused OAuth start in the payload, not by rejecting.
+   * The call was fired and forgotten, so the login page's catch never ran and a
+   * failed click ended in silence (review 2026-10-15).
+   */
+  it("reports a Google sign-in Supabase refused, so the page can say so", async () => {
+    const refused = new SupabaseAuthService(clientWith({ spy: { signInWithOAuth: vi.fn(async () => ({ error: { message: "provider is not enabled" } })) } }));
+    await expect(refused.signInWithGoogle("/")).rejects.toThrow(/provider is not enabled/);
+    const down = new SupabaseAuthService(clientWith({ spy: { signInWithOAuth: vi.fn(async () => { throw new Error("network"); }) } }));
+    await expect(down.signInWithGoogle("/")).rejects.toThrow(/network/);
+  });
+
   it("makes the guarded path absolute, because Supabase silently ignores a path", async () => {
     const signInWithOAuth = vi.fn(async () => ({ error: null }));
     const svc = new SupabaseAuthService(clientWith({ spy: { signInWithOAuth } }));

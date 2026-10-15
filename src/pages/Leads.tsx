@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { services, type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
 import { useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds } from "@/hooks/useAdmin";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { csvCell } from "@/lib/csv";
 import { Loader2, Download, Trash2 } from "lucide-react";
 import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
 
@@ -44,11 +45,6 @@ const SOURCE_LABEL: Record<LeadSource, string> = {
   escalation: "העברה לטיפול אנושי",
   interview: "ראיון היכרות",
 };
-
-function csvEscape(v: unknown): string {
-  const s = String(v ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 /** A claim document stored in Supabase, as `submit-claim` writes it into the message. */
 const DOCUMENT_REF = /(storage:claim-documents\/[^\s|]+)/;
@@ -159,7 +155,7 @@ export default function Leads() {
       ANY_STATUS_LABEL[l.status] || l.status || "",
       l.message || "",
     ]);
-    const csv = [headers, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const csv = [headers, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

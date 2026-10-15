@@ -16,6 +16,11 @@ import {
  *  the screen does not need stays out of the browser. */
 const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at";
 
+/** Leads per read; PostgREST's own default cap is 1,000. */
+export const LEAD_PAGE = 1000;
+/** A bound on one list, far past what the agency holds. */
+export const LEAD_LIST_MAX = 20_000;
+
 const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת";
 
 /** How long a document link from the leads screen opens the file: long enough to open it, not to keep it. */
@@ -37,11 +42,21 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     private readonly storage: SupabaseStorageClient | null = null,
   ) {}
 
-  async list(limit = 500): Promise<LeadRecord[]> {
-    const rows = await fetchRows(
-      this.client.from("leads").select(LEAD_COLUMNS).order("created_at", { ascending: false }).limit(limit),
-      "leads",
-    );
+  /**
+   * Every lead, newest first, a page at a time: "כל הפניות", the counts and
+   * "ייצוא הכל" read this list, and at a fixed 500 the older leads left all
+   * three without a word (review 2026-10-15). `id` breaks ties so no row falls
+   * between pages; LEAD_LIST_MAX only bounds a runaway read.
+   */
+  async list(limit = LEAD_LIST_MAX): Promise<LeadRecord[]> {
+    const rows: Record<string, unknown>[] = [];
+    for (let from = 0; from < limit; from += LEAD_PAGE) {
+      const to = Math.min(from + LEAD_PAGE, limit) - 1;
+      const query = this.client.from("leads").select(LEAD_COLUMNS).order("created_at", { ascending: false }).order("id", { ascending: false });
+      const page = await fetchRows(query.range ? query.range(from, to) : query.limit(to + 1), "leads");
+      rows.push(...page);
+      if (!query.range || page.length < to - from + 1) break;
+    }
     return rows.map((row) => ({ ...toPortRow(row), id: row.id }) as unknown as LeadRecord);
   }
 
