@@ -64,6 +64,11 @@ describe("SupabaseUploadService", () => {
     const client = clientOf({ upload });
     await new SupabaseUploadService(client).upload(new File(["x"], "IMG_0001.HEIC", { type: "" }));
     expect(upload.mock.calls[0][2]).toEqual({ contentType: "image/heic" });
+    // storage-js ignores `contentType` for a Blob or File — it sends the body's own
+    // type — so the body itself must carry it, or the bucket refuses the photo.
+    const body = upload.mock.calls[0][1] as File;
+    expect(body.type).toBe("image/heic");
+    expect(body.name).toBe("IMG_0001.HEIC");
   });
 
   it("throws when the upload itself fails, without trying to sign anything", async () => {

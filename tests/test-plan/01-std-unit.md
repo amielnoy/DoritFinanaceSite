@@ -1527,7 +1527,16 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-ANAV-007 | "%s → %s" (`initials`) | דורית גוב ארי → דג; Dorit → D; an email → its name's letters; empty → ? |
 | UNIT-ANAV-008 | "counts the requests whose code has arrived and is not yet submitted" (`waitingCount`) | Two `code_received` of five → 2; none → 0 |
 
-### 4.61 The claim form's file checks — `tests/unit/claim-documents.test.ts`, `tests/unit/supabase-upload.test.ts` (new case)
+### 4.61 The users port — `tests/unit/supabase-users-admin.test.ts`
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-USRADM-001 | "lists every organization by name, members or not" | `agencies` read; sorted by Hebrew name |
+| UNIT-USRADM-002 | "asks invite-user with the admin's session, and says whether an account was made and the mail went" | `invoke("invite-user", { body, headers: Authorization })`; `{ created, mailed }` |
+| UNIT-USRADM-003 | "refuses without a session, before any request" | "נדרשת התחברות."; no call |
+| UNIT-USRADM-004 | "reports the function's own refusal, in its words" | The 400 body's `error` |
+
+### 4.62 The claim form's file checks — `tests/unit/claim-documents.test.ts`, `tests/unit/supabase-upload.test.ts` (new case)
 
 D-02 (manual test 2026-10-14): the form checks a document before anything is
 uploaded, against the limits the bucket and `submit-claim` enforce anyway.
