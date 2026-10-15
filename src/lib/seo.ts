@@ -8,7 +8,9 @@
 import { useEffect } from "react";
 import { isLegacyHost } from "./legacy-host.js";
 import { jsonLdText } from "./trusted-types.js";
-import { DEFAULT_LOCALE, ENABLED_LOCALES, localePath, type Locale } from "@/i18n/locales";
+// Relative, like the imports above: api/og/blog.ts runs this file in a Vercel
+// function, whose bundler does not resolve the "@/" alias (#212 broke it so).
+import { DEFAULT_LOCALE, ENABLED_LOCALES, localePath, type Locale } from "../i18n/locales.js";
 
 type Env = Record<string, string | undefined> | undefined;
 
