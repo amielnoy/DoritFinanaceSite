@@ -438,3 +438,23 @@ describe("listArticles / readArticle", () => {
     expect(JSON.parse(out.forModel)).toEqual({ ok: false, error: "tool_failed" });
   });
 });
+
+describe("recommendArticles", () => {
+  const known = ["dmei-nihul", "tikun-190", "pensia", "kupat-gemel"];
+  const fakeArticles = articleSource({
+    read: vi.fn(async (slug: string) => (known.includes(slug) ? { slug, title: slug, body: "גוף", truncated: false } : null)),
+  });
+  const run = createToolRunner({ submitLead: answering(200, {}), escalateToHuman: answering(200, {}) }, fakeArticles);
+
+  it("keeps the slugs the store has, in order, at most three", async () => {
+    const out = await run("recommendArticles", { slugs: ["dmei-nihul", "made-up", "tikun-190", "pensia", "kupat-gemel"] }, ctx());
+    expect(out).toMatchObject({ status: "ok", isError: false, recommended: ["dmei-nihul", "tikun-190", "pensia"] });
+    expect(JSON.parse(out.forModel)).toMatchObject({ ok: true, recommended: ["dmei-nihul", "tikun-190", "pensia"], dropped: ["made-up"] });
+  });
+
+  it("refuses a call with no slug it can show", async () => {
+    for (const input of [{}, { slugs: "dmei-nihul" }, { slugs: ["nope", 7] }]) {
+      expect(await run("recommendArticles", input, ctx()), JSON.stringify(input)).toMatchObject({ status: "error", isError: true });
+    }
+  });
+});

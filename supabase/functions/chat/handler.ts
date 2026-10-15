@@ -20,15 +20,15 @@ import type { ModelClient } from './anthropic.ts';
 import { monthKey, monthStartIso, spendUsd } from './budget.ts';
 import { systemBlocks, type ChatRole } from './prompt.ts';
 import { toFacts, type ChatStore, type ConversationRow } from './store.ts';
-import { INTERVIEW_TOOLS, SUPPORT_TOOLS, type ConversationStatus, type ToolCallContext, type ToolDefinition, type ToolOutcome, type ToolRunner } from './tools.ts';
+import { BLOG_TOOLS, INTERVIEW_TOOLS, SUPPORT_TOOLS, type ConversationStatus, type ToolCallContext, type ToolDefinition, type ToolOutcome, type ToolRunner } from './tools.ts';
 import { runTurn, toModelHistory, TurnFailure, type TurnResult } from './turn.ts';
 
 const FN = 'chat';
 const log = createLog(FN);
 
-export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview', support_agent: 'support', procedures_agent: 'procedures' };
+export const AGENT_ROLES: Readonly<Record<string, ChatRole>> = { needs_interview: 'interview', support_agent: 'support', procedures_agent: 'procedures', blog_recommender: 'blog' };
 // The procedures chat answers from published articles and hands off, exactly as the FAQ chat does.
-const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS, support: SUPPORT_TOOLS, procedures: SUPPORT_TOOLS };
+const ROLE_TOOLS: Readonly<Record<ChatRole, ToolDefinition[]>> = { interview: INTERVIEW_TOOLS, support: SUPPORT_TOOLS, procedures: SUPPORT_TOOLS, blog: BLOG_TOOLS };
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_TURNS = 40;
 export const IDLE_MS = 2 * 60 * 60 * 1000;
@@ -268,6 +268,8 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           );
         }
         const leadSaved = outcomes.some((o) => o.leadSaved);
+        // The articles this turn highlighted, the last call's — the adapter hands them to the page.
+        const recommended = [...outcomes].reverse().find((o) => o.recommended?.length)?.recommended ?? [];
         const status = ctx.conversation.status;
         if (result) {
           // The store clips to the column's 8,000 characters, past anything MAX_REPLY_TOKENS allows in practice.
@@ -285,6 +287,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           reply: result.reply,
           leadSaved,
           status,
+          ...(recommended.length ? { recommended } : {}),
           // Model arguments, for the evaluation's holder only; never stored or logged.
           ...(evalMode ? { eval: { toolCalls: result.toolCalls } } : {}),
         });

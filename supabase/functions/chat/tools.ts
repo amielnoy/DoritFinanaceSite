@@ -87,8 +87,19 @@ export const READ_ARTICLE_TOOL: ToolDefinition = {
   input_schema: { type: 'object', properties: { slug: { type: 'string' } }, required: ['slug'] },
 };
 
+/** At most this many articles highlighted per turn — the prompt's "עד 3". */
+export const RECOMMEND_LIMIT = 3;
+
+/** The blog recommender's hidden ```recommended block, as a tool: the page highlights what it names (SupabaseAgentService re-encodes it). */
+export const RECOMMEND_ARTICLES_TOOL: ToolDefinition = {
+  name: 'recommendArticles',
+  description: 'מסמן לדף את המאמרים שהמלצת עליהם בהודעה הזו, כדי שיבליט אותם: עד 3 slug שחזרו מ-listArticles, בסדר הרלוונטיות.',
+  input_schema: { type: 'object', properties: { slugs: { type: 'array', items: { type: 'string' }, maxItems: RECOMMEND_LIMIT } }, required: ['slugs'] },
+};
+
 export const INTERVIEW_TOOLS: ToolDefinition[] = [SUBMIT_LEAD_TOOL, ESCALATE_TOOL];
 export const SUPPORT_TOOLS: ToolDefinition[] = [LIST_ARTICLES_TOOL, READ_ARTICLE_TOOL, ESCALATE_TOOL];
+export const BLOG_TOOLS: ToolDefinition[] = [LIST_ARTICLES_TOOL, READ_ARTICLE_TOOL, RECOMMEND_ARTICLES_TOOL, ESCALATE_TOOL];
 
 export type EdgeHandler = (req: Request) => Promise<Response>;
 export type ConversationStatus = 'open' | 'closed' | 'lead_saved' | 'escalated';
@@ -123,6 +134,8 @@ export interface ToolOutcome {
   leadId?: string;
   leadSaved?: boolean;
   escalated?: boolean;
+  /** recommendArticles: the slugs the page should highlight — each one readArticle would find. */
+  recommended?: string[];
 }
 
 export type ToolRunner = (name: string, input: Record<string, unknown>, ctx: ToolCallContext) => Promise<ToolOutcome>;
@@ -154,6 +167,21 @@ export function createToolRunner(handlers: { submitLead: EdgeHandler; escalateTo
         return found
           ? { name, status: 'ok', isError: false, forModel: JSON.stringify({ ok: true, ...found }) }
           : { name, status: 'error', isError: true, forModel: JSON.stringify({ ok: false, error: 'not_found' }) };
+      }
+      if (name === 'recommendArticles') {
+        // Only what the visitor can open: a slug the store does not hold (a model slip,
+        // or an article unpublished since) is dropped and named back to the model.
+        const asked = Array.isArray(input.slugs) ? input.slugs.filter((v): v is string => typeof v === 'string') : [];
+        const kept: string[] = [];
+        const dropped: string[] = [];
+        for (const slug of [...new Set(asked)]) {
+          if (kept.length >= RECOMMEND_LIMIT) break;
+          if (await articles.read(slug)) kept.push(slug);
+          else dropped.push(slug);
+        }
+        return kept.length
+          ? { name, status: 'ok', isError: false, recommended: kept, forModel: JSON.stringify({ ok: true, recommended: kept, dropped }) }
+          : { name, status: 'error', isError: true, forModel: JSON.stringify({ ok: false, error: 'no_known_article', dropped }) };
       }
       if (name === 'submitLead') return await submitLead(handlers.submitLead, input, ctx);
       if (name === 'escalateToHuman') return await escalateToHuman(handlers.escalateToHuman, input, ctx);
