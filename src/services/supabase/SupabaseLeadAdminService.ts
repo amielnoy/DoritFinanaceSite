@@ -103,6 +103,12 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     );
     return [...new Set(rows.map((r) => r.lead_id).filter((v): v is string => typeof v === "string" && v !== ""))];
   }
+
+  /** `leads_read_admin` is the gate here too. Capped at a thousand, which the menu shows as it is. */
+  async countNew(): Promise<number> {
+    const rows = await fetchRows(this.client.from("leads").select("id").eq("status", "new").limit(1000), "leads");
+    return rows.length;
+  }
 }
 
 /**

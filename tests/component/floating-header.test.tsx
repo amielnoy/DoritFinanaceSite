@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -10,6 +11,10 @@ vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
 const auth = vi.hoisted(() => ({ value: { user: null, isAuthenticated: false } as { user: Record<string, unknown> | null; isAuthenticated: boolean; isLoadingAuth?: boolean; logout?: (...a: unknown[]) => void } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));
+
+// The admin menu's counter. The clearinghouse switch is off here, so the board is never asked.
+const countNew = vi.hoisted(() => vi.fn(async () => 3));
+vi.mock("@/services", () => ({ services: { leadsAdmin: { countNew }, masleka: { myRole: vi.fn(), list: vi.fn(async () => []) } } }));
 
 // framer-motion's layout animations need APIs jsdom does not implement.
 vi.mock("framer-motion", async () => {
@@ -28,7 +33,12 @@ import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
 
 const renderHeader = (value: typeof auth.value) => {
   auth.value = value;
-  return render(<MemoryRouter><FloatingHeader /></MemoryRouter>);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter><FloatingHeader /></MemoryRouter>
+    </QueryClientProvider>,
+  );
 };
 
 const linksNamed = (name: string) => screen.queryAllByRole("link", { name });
@@ -48,12 +58,23 @@ describe("<FloatingHeader /> account links", () => {
     expect(linksNamed("ניהול בלוג")).toHaveLength(0);
   });
 
-  it("gives an admin both admin pages", () => {
+  /**
+   * The admin's pages left the site's navigation for a "ניהול" menu beside the
+   * call buttons: the public row is the site's, and nothing in it is hers alone.
+   */
+  it("keeps the admin's pages out of the site's navigation, behind a ניהול menu", async () => {
     renderHeader({ user: { email: "d@example.com", role: "admin" }, isAuthenticated: true });
-    linksNamed("ניהול פניות").forEach((l) => expect(l).toHaveAttribute("href", "/admin/leads"));
-    linksNamed("ניהול בלוג").forEach((l) => expect(l).toHaveAttribute("href", "/admin/blog"));
-    expect(linksNamed("ניהול פניות").length).toBeGreaterThan(0);
-    expect(linksNamed("ניהול בלוג").length).toBeGreaterThan(0);
+    expect(await screen.findByRole("button", { name: /^ניהול/ })).toHaveAttribute("aria-haspopup", "menu");
+    for (const name of ["ניהול פניות", "ניהול בלוג", "ניהול משתמשים", "האזור שלי"]) expect(linksNamed(name)).toHaveLength(0);
+    // Signing out moved into the menu as well.
+    expect(screen.queryAllByRole("button", { name: "יציאה" })).toHaveLength(0);
+  });
+
+  it("offers a client no ניהול menu", async () => {
+    renderHeader({ user: { email: "a@example.com", role: "user" }, isAuthenticated: true });
+    await Promise.resolve();
+    expect(screen.queryByRole("button", { name: /^ניהול/ })).toBeNull();
+    expect(countNew).not.toHaveBeenCalled();
   });
 
   it("offers no clearinghouse board link, even to an admin, while the switch is off", () => {
@@ -98,6 +119,14 @@ describe("<FloatingHeader /> account links", () => {
 });
 
 describe("<FloatingHeader /> phone menu", () => {
+  it("gives the admin one row into the admin interface, with what is waiting", async () => {
+    renderHeader({ user: { email: "d@example.com", role: "admin" }, isAuthenticated: true });
+    fireEvent.click(screen.getByRole("button", { name: "תפריט" }));
+    const row = await screen.findByRole("link", { name: /ממשק ניהול\s*3 פריטים ממתינים/ });
+    expect(row).toHaveAttribute("href", "/account");
+    expect(within(row.parentElement!).queryByRole("link", { name: "ניהול פניות" })).toBeNull();
+  });
+
   it("lists the support chat as well as the sticky bar's תמיכה", () => {
     renderHeader({ user: null, isAuthenticated: false });
     fireEvent.click(screen.getByRole("button", { name: "תפריט" }));

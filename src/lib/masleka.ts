@@ -9,6 +9,9 @@ import { MaslekaError, type MaslekaFailure, type MaslekaRequest } from "@/servic
  * from the server (masleka-submitted), so the board only counts down to it.
  */
 export const READY_AFTER_MS = 4 * 60 * 60 * 1000;
+
+/** The board's query — shared with the admin menu's counter, so both read one cache entry. */
+export const BOARD_KEY = ["admin", "masleka"] as const;
 const DAY_MS = 86_400_000;
 
 export interface BoardColumns {

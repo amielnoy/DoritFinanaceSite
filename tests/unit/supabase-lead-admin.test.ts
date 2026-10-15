@@ -250,3 +250,17 @@ describe("SupabaseLeadAdminService.transcriptLeadIds", () => {
     await expect(new SupabaseLeadAdminService(client).transcriptLeadIds()).rejects.toThrow(/chat_conversations read failed/);
   });
 });
+
+describe("SupabaseLeadAdminService.countNew", () => {
+  it("counts the leads still new, reading their ids alone", async () => {
+    const { client, calls } = byTable({ leads: { data: [{ id: "a" }, { id: "b" }, { id: "c" }], error: null } });
+    expect(await new SupabaseLeadAdminService(client).countNew()).toBe(3);
+    expect(calls).toContainEqual(["leads", "eq", "status", "new"]);
+    expect(calls).toContainEqual(["leads", "limit", 1000]);
+  });
+
+  it("throws on a refused read rather than counting none", async () => {
+    const { client } = byTable({ leads: { data: null, error: { message: "denied" } } });
+    await expect(new SupabaseLeadAdminService(client).countNew()).rejects.toThrow(/leads read failed/);
+  });
+});

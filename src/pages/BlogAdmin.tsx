@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
-import { Link } from "react-router-dom";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { services, type Article } from "@/services";
 import {
   useAdminArticles,
@@ -20,7 +20,6 @@ import {
   Eye,
   EyeOff,
   Pencil,
-  ArrowRight,
 } from "lucide-react";
 
 /* The admin list shows drafts as well as published posts, so it reads through
@@ -190,20 +189,11 @@ export default function BlogAdmin() {
   };
 
   return (
-    <div className="min-h-screen bg-background pt-28 pb-20">
+    <div className="min-h-screen bg-background pt-8 pb-20">
       <div className="max-w-[1200px] mx-auto px-6 md:px-10">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors mb-8"
-        >
-          <ArrowRight size={16} /> חזרה לאתר
-        </Link>
-
         <div className="flex items-center justify-between mb-10">
           <div>
-            <span className="text-sm text-accent">
-              Admin
-            </span>
+            <Eyebrow>תוכן והגדרות</Eyebrow>
             <h1 className="font-heading text-4xl md:text-5xl mt-3">ניהול בלוג</h1>
           </div>
           <button

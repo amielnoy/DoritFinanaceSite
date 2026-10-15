@@ -973,6 +973,8 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-LEADTX-006 | "lists each lead that has a conversation once, skipping conversations without a lead" | `["a","b"]` from rows with a repeat and a null |
 | UNIT-LEADTX-007 | "throws on a refused read" | `chat_conversations read failed` |
 | UNIT-LEADTX-008 | "finds an older linked conversation behind a thousand newer ones without a lead" | The read filters `lead_id not is null` before its 1,000-row limit: `["older"]` (triage 9) |
+| UNIT-LEADTX-009 | "counts the leads still new, reading their ids alone" | 3 rows → 3; filters `status = new`, limit 1,000 |
+| UNIT-LEADTX-010 | "throws on a refused read rather than counting none" | `leads read failed` |
 
 The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and its refusal to run without credentials (`tests/unit/eval-chat-lib.test.ts`). Nothing here calls the Anthropic API or a function; the harness itself is specified in [13-std-eval](13-std-eval.md) §6. The FAQ chat's personas and rubric (`tests/eval/chat/rubric-support.md`) are covered by 034..042. One row per declared `it`.
 
@@ -1484,6 +1486,19 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-MIG-003 | "passes when every migration is applied" | Exit 0 |
 | UNIT-MIG-004 | "warns, not fails, on an empty history" | Exit 0 with `::warning::` |
 | UNIT-MIG-005 | "warns, not fails, on an answer that is not a list" | An API error body: exit 0 with `::warning::` |
+
+### 4.60 The admin menu and sidebar — `tests/unit/admin-nav.test.ts`
+
+| ID | Test | Expect |
+|---|---|---|
+| UNIT-ANAV-001 | "gives the admin every page, grouped by task" | ראשי; טיפול שוטף: פניות, בקשות מסלקה; תוכן והגדרות: בלוג, משתמשים |
+| UNIT-ANAV-002 | "leaves the clearinghouse out while its switch is off" | טיפול שוטף holds פניות alone |
+| UNIT-ANAV-003 | "gives agency staff the clearinghouse alone, and drops the groups left empty" | One group, one item |
+| UNIT-ANAV-004 | "gives anyone else nothing" | `[]` for `null` |
+| UNIT-ANAV-005 | "names a route for every page, each once" | The five routes, no repeat |
+| UNIT-ANAV-006 | "sends the admin to her main page and staff to the board" | `/account`; `/admin/masleka` |
+| UNIT-ANAV-007 | "%s → %s" (`initials`) | דורית גוב ארי → דג; Dorit → D; an email → its name's letters; empty → ? |
+| UNIT-ANAV-008 | "counts the requests whose code has arrived and is not yet submitted" (`waitingCount`) | Two `code_received` of five → 2; none → 0 |
 
 ## 5. Pass criteria
 

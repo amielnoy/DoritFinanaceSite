@@ -130,10 +130,12 @@ React does not surface anywhere a visitor can see. The form simply stops.
 |---|---|---|
 | CMP-HDR-001 | "shows no personal-area link to a signed-out visitor" | No "האזור שלי" link |
 | CMP-HDR-002 | "links a signed-in visitor to /account, with no admin links" | "האזור שלי" points to `/account`; no "ניהול פניות" or "ניהול בלוג" |
-| CMP-HDR-003 | "gives an admin both admin pages" | "ניהול פניות" points to `/admin/leads` and "ניהול בלוג" to `/admin/blog` |
+| CMP-HDR-003 | "keeps the admin's pages out of the site's navigation, behind a ניהול menu" | A "ניהול" button with `aria-haspopup="menu"`; no "ניהול פניות", "ניהול בלוג", "ניהול משתמשים" or "האזור שלי" link, and no "יציאה" button in the row |
+| CMP-HDR-011 | "offers a client no ניהול menu" | No "ניהול" button; the new-lead count is never read |
 | CMP-HDR-004 | "offers no sign-out to a signed-out visitor" | No "יציאה" button |
 | CMP-HDR-005 | "signs a visitor out and sends them home" | "יציאה" calls `logout(true, <origin>/)` |
 | CMP-HDR-006 | "offers no clearinghouse board link, even to an admin, while the switch is off" | No "בקשות מסלקה" link with `VITE_MASLEKA_ENABLED` unset |
+| CMP-HDR-012 | "gives the admin one row into the admin interface, with what is waiting" (`describe` "phone menu") | The drawer's "ממשק ניהול" → `/account`, named with "3 פריטים ממתינים"; no "ניהול פניות" |
 | CMP-HDR-009 | "lists the support chat as well as the sticky bar's תמיכה" (`describe` "phone menu") | Opening "תפריט" shows "תמיכה — שאלה לעוזר" → `/faq#support-chat`; pressing it closes the menu (`SupportLink` now runs the caller's `onClick` before its own scroll) |
 | CMP-HDR-010 | "tags its support link header_menu, so click_chat says the menu sent the visitor" (`describe` "phone menu") | The drawer's "תמיכה — שאלה לעוזר" sits in `data-track-location="header_menu"` |
 
@@ -405,14 +407,15 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-MSKB-026 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
 | CMP-MSKB-027 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
 
-### 4.20 `<FloatingHeader />` — the clearinghouse board link, switched on — `tests/component/floating-header-masleka.test.tsx`
+### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-MSKH-001 | "links the admin to the board without asking for a membership" | "בקשות מסלקה" → `/admin/masleka`; no `myRole` call |
-| CMP-MSKH-002 | "links a member of the agency to the board" | `myRole` → `staff`: link shown |
-| CMP-MSKH-003 | "offers no board link to a signed-in client with no membership, or when the role cannot be read" | `myRole` → `null`, then rejecting: no link |
-| CMP-MSKH-004 | "asks nothing for a signed-out visitor" | No link; no `myRole` call |
+| CMP-MSKH-001 | "takes the admin to the admin interface without asking for a membership" | The drawer's "ממשק ניהול" → `/account`; no `myRole` call |
+| CMP-MSKH-002 | "gives a member of the agency a ניהול menu that leads to the board" | `myRole` → `staff`: a "ניהול" button, and "ממשק ניהול" → `/admin/masleka`; `countNew` never called |
+| CMP-MSKH-003 | "offers no ניהול menu to a signed-in client with no membership, or when the role cannot be read" | `myRole` → `null`, then rejecting: no button, no row |
+| CMP-MSKH-004 | "asks nothing for a signed-out visitor" | No row; no `myRole` call |
+| CMP-MSKH-005 | "counts new leads and the requests waiting to be submitted together" | 1 new lead + 2 `code_received` → "3 פריטים ממתינים" |
 
 ### 4.21 `<MaslekaGuide />` — registering as an advisor — `tests/component/masleka-guide.test.tsx`
 
@@ -720,6 +723,30 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 |---|---|---|
 | CMP-LCS-001 | "offers לקוח/ה, labels a client lead with it, and filters by it" | The label; the filter shows only the client |
 | CMP-LCS-002 | "marks a lead as a client" | `setStatus({ id, status: "client" })` |
+
+### 4.42 `<AdminMenu />` — "ניהול" in the public header — `tests/component/admin-menu.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-AMENU-001 | "says it opens a menu, and whether it is open" | `aria-haspopup="menu"`; `aria-expanded` false, then true after Enter |
+| CMP-AMENU-002 | "shows the initials, and the total waiting in the button's name" | "דג"; accessible name "ניהול 3 פריטים ממתינים" |
+| CMP-AMENU-003 | "lists the admin's name and role, her items with their counters, and a way out" | Name and "מנהל/ת"; items ממשק ניהול → `/account`, פניות חדשות → `/admin/leads`, בקשות מסלקה → `/admin/masleka`, יציאה calls `onSignOut` |
+| CMP-AMENU-004 | "gives agency staff the board alone" | "ממשק ניהול" → `/admin/masleka`; no "פניות חדשות" |
+| CMP-AMENU-005 | "shows no counter at zero" | Accessible name exactly "ניהול"; items without a number |
+| CMP-AMENU-006 | "closes on Escape and gives focus back to the button" | `aria-expanded` false; the button has focus |
+
+### 4.43 `<AdminLayout />` — the admin sidebar — `tests/component/admin-layout.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ALAY-001 | "groups the admin's pages by task, around the screen" | Groups "טיפול שוטף" (leads, masleka) and "תוכן והגדרות" (blog, users); ראשי → `/account`; צפייה באתר → `/` |
+| CMP-ALAY-002 | "marks the current page, and only it" | `aria-current="page"` on פניות alone at `/admin/leads` |
+| CMP-ALAY-003 | "keeps a page beneath the board under בקשות מסלקה" | `/admin/masleka/guide` marks בקשות מסלקה |
+| CMP-ALAY-004 | "counts new leads and waiting requests, and shows no zero" | "פניות 4 חדשות"; בקשות מסלקה with no number |
+| CMP-ALAY-005 | "gives agency staff the clearinghouse alone" | One link, `/admin/masleka`; `countNew` never called |
+| CMP-ALAY-006 | "shows a client's personal area without the frame" | `/account` for a client: the page, no sidebar |
+| CMP-ALAY-007 | "shows the admin's personal area as her main page, in the frame" | `/account` for the admin: the sidebar, ראשי current |
+| CMP-ALAY-008 | "signs out and sends her home" | "יציאה" calls `logout(true, <origin>/)` |
 
 ## 5. Pass criteria
 

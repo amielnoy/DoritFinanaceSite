@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft, User, LifeBuoy } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -6,9 +6,10 @@ import { CONTACT } from "@/config/contact";
 import { useAuth } from "@/lib/AuthContext";
 import { useSectionNav } from "@/hooks/useSectionNav";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
-import { useQuery } from "@tanstack/react-query";
-import { MASLEKA_ENABLED } from "@/config/masleka";
-import { services } from "@/services";
+import { useAdminAccess, useAdminCounts } from "@/hooks/useAdminMenu";
+import { SITE_ROLE_LABEL } from "@/lib/admin-users";
+import { adminHome } from "@/components/dorit/admin/adminNav";
+import CountBadge from "@/components/dorit/admin/CountBadge";
 import SupportLink from "./SupportLink";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
@@ -60,39 +61,10 @@ const NAV_LINK =
 const LOGIN_HREF = "/login?returnTo=/account";
 
 /**
- * The clearinghouse board's link, for the people its gate (StaffRoute) lets
- * in: the platform admin, or a member of the agency — asked of the database
- * (`my_staff_role`), since the token carries no membership. Mounted only while
- * VITE_MASLEKA_ENABLED is on, so a dark build neither shows it nor asks.
- * Only the link depends on this answer; the route and every action on the
- * board check again for themselves.
+ * "ניהול": the admin's and agency staff's way into the admin interface. Loaded
+ * only for them, so a visitor's page never carries the dropdown's code.
  */
-function MaslekaMenuLink({
-  className,
-  onClick,
-  children,
-}: {
-  className: string;
-  onClick?: () => void;
-  children: React.ReactNode;
-}) {
-  const { user } = useAuth();
-  const userId = typeof user?.id === "string" ? user.id : "";
-  const isAdmin = user?.role === "admin";
-  const role = useQuery({
-    queryKey: ["admin", "staff-role-menu", userId],
-    queryFn: () => services.masleka.myRole(),
-    enabled: !isAdmin && userId !== "",
-    staleTime: 5 * 60_000,
-    retry: false,
-  });
-  if (!isAdmin && !(typeof role.data === "string" && role.data)) return null;
-  return (
-    <Link to="/admin/masleka" className={className} onClick={onClick}>
-      {children}
-    </Link>
-  );
-}
+const AdminMenu = lazy(() => import("@/components/dorit/admin/AdminMenu"));
 
 export default function FloatingHeader() {
   const [open, setOpen] = useState<boolean>(false);
@@ -105,6 +77,11 @@ export default function FloatingHeader() {
   const lp = useLocalePath();
   const locale = useLocale();
   const nav = NAV.filter((n) => locale === "he" || !n.hebrewOnly);
+  // The admin's links live in the "ניהול" menu and the admin sidebar, not in
+  // the site's navigation. A client keeps "האזור שלי" and the sign-out here.
+  const access = useAdminAccess();
+  const counts = useAdminCounts(access);
+  const userName = (typeof user?.full_name === "string" && user.full_name) || (typeof user?.email === "string" && user.email) || "";
   // Home rather than this page: on /account or /admin/* the guard would bounce a
   // signed-out visitor straight to the login screen.
   const signOut = () => {
@@ -160,6 +137,19 @@ export default function FloatingHeader() {
 
         <div className="flex items-center gap-2.5">
           <LanguageSwitcher className="hidden md:inline-flex" />
+          {access ? (
+            <div className="hidden md:block">
+              <Suspense fallback={null}>
+                <AdminMenu
+                  access={access}
+                  counts={counts}
+                  name={userName}
+                  roleLabel={access === "admin" ? SITE_ROLE_LABEL.admin : "צוות מסלקה"}
+                  onSignOut={signOut}
+                />
+              </Suspense>
+            </div>
+          ) : null}
           <a
             href={lp("/#start")}
             onClick={(e) => goToSection(e, "#start")}
@@ -220,20 +210,10 @@ export default function FloatingHeader() {
                 {t("header.login")}
               </Link>
             ) : null}
-            {isAuthenticated ? (
+            {isAuthenticated && access !== "admin" ? (
               <Link to="/account" className={NAV_LINK}>{t("header.account")}</Link>
             ) : null}
-            {isAuthenticated && user?.role === "admin" ? (
-              <>
-                <Link to="/admin/leads" className={NAV_LINK}>ניהול פניות</Link>
-                <Link to="/admin/blog" className={NAV_LINK}>ניהול בלוג</Link>
-                <Link to="/admin/users" className={NAV_LINK}>ניהול משתמשים</Link>
-              </>
-            ) : null}
-            {MASLEKA_ENABLED && isAuthenticated ? (
-              <MaslekaMenuLink className={NAV_LINK}>בקשות מסלקה</MaslekaMenuLink>
-            ) : null}
-            {isAuthenticated ? (
+            {isAuthenticated && !access ? (
               <button type="button" onClick={signOut} className={NAV_LINK}>
                 {t("header.logout")}
               </button>
@@ -306,20 +286,13 @@ export default function FloatingHeader() {
             <span className="inline-flex items-center gap-2"><LifeBuoy size={18} aria-hidden="true" className="text-accent" />{t("header.support")}</span>
             <ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" />
           </SupportLink>
-          {isAuthenticated ? (
+          {access ? (
+            <Link to={adminHome(access)} className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ממשק ניהול</span><span className="inline-flex items-center gap-2"><CountBadge count={counts.total} label="פריטים ממתינים" /><ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" /></span></Link>
+          ) : null}
+          {isAuthenticated && access !== "admin" ? (
             <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>{t("header.account")}</span><ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" /></Link>
           ) : showLogin ? (
             <Link to={LOGIN_HREF} className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span className="inline-flex items-center gap-2"><User size={18} aria-hidden="true" className="text-accent" />{t("header.login")}</span><ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" /></Link>
-          ) : null}
-          {isAuthenticated && user?.role === "admin" ? (
-            <>
-              <Link to="/admin/leads" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול פניות</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
-              <Link to="/admin/blog" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול בלוג</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
-              <Link to="/admin/users" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול משתמשים</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
-            </>
-          ) : null}
-          {MASLEKA_ENABLED && isAuthenticated ? (
-            <MaslekaMenuLink className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>בקשות מסלקה</span><ChevronLeft size={18} className="text-muted-foreground" /></MaslekaMenuLink>
           ) : null}
           {isAuthenticated ? (
             <button type="button" onClick={signOut} className="w-full flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200 text-start">

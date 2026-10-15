@@ -284,6 +284,8 @@ export interface LeadAdminPort {
   transcript(leadId: string): Promise<TranscriptLine[]>;
   /** The ids of the leads that have a conversation behind them — the screen shows the tab for these and no others. */
   transcriptLeadIds(): Promise<string[]>;
+  /** How many leads are still `new` — the admin menu's counter. Ids only: no personal data leaves the table for it. */
+  countNew(): Promise<number>;
 }
 
 /** One of a user's organizations — a row of `memberships` with its agency's name. */

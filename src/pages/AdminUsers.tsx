@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowRight, ArrowUp, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { services } from "@/services";
 import type { AdminUser } from "@/services/ports";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -86,12 +87,9 @@ export default function AdminUsers() {
       <header className="border-b border-border/60 bg-card">
         <div className="max-w-[1200px] mx-auto px-6 py-5 flex items-center justify-between">
           <div>
-            <p className="text-sm text-accent">Admin</p>
+            <Eyebrow>תוכן והגדרות</Eyebrow>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">ניהול משתמשים</h1>
           </div>
-          <Link to="/" className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors">
-            חזרה לאתר <ArrowRight size={16} />
-          </Link>
         </div>
       </header>
 

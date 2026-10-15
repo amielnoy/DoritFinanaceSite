@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { CLEARINGHOUSE_ADVISOR_URL } from "@/config/masleka";
 import {
+  BOARD_KEY,
   boardColumns,
   copyOrFallback,
   deletionLabel,
@@ -44,7 +46,7 @@ export interface MaslekaBoardProps {
   confirm?: (message: string) => boolean;
 }
 
-export const BOARD_KEY = ["admin", "masleka"] as const;
+export { BOARD_KEY };
 export const SNAPSHOTS_KEY = ["admin", "masleka", "snapshots"] as const;
 
 /** How long a revealed value stays on the screen. */
@@ -458,15 +460,12 @@ export default function MaslekaBoard({
       <header className="border-b border-border/60 bg-card">
         <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-accent">Admin</p>
+            <Eyebrow>טיפול שוטף</Eyebrow>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">מסלקה</h1>
           </div>
           <div className="flex items-center gap-4 text-sm">
             <Link to="/admin/masleka/guide" className="underline">
               מדריך: הרשמה כיועץ במסלקה
-            </Link>
-            <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-accent">
-              חזרה לאתר <ArrowRight size={16} />
             </Link>
           </div>
         </div>

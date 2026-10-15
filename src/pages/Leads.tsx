@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { services, type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
 import { useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds } from "@/hooks/useAdmin";
-import { Link } from "react-router-dom";
-import { Loader2, Download, Trash2, ArrowRight } from "lucide-react";
+import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { Loader2, Download, Trash2 } from "lucide-react";
 import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
 
 type LeadItem = LeadRecord;
@@ -186,15 +186,9 @@ export default function Leads() {
       <header className="border-b border-border/60 bg-card">
         <div className="max-w-[1200px] mx-auto px-6 py-5 flex items-center justify-between">
           <div>
-            <p className="text-sm text-accent">Admin</p>
+            <Eyebrow>טיפול שוטף</Eyebrow>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">ניהול פניות</h1>
           </div>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"
-          >
-            חזרה לאתר <ArrowRight size={16} />
-          </Link>
         </div>
       </header>
 

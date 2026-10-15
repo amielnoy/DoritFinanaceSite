@@ -64,6 +64,8 @@
     --brand-whatsapp: 142 70% 49%;
     --destructive: 9 59% 40%;         /* #a23b2a — warmer, 6.2:1 */
     --destructive-foreground: 0 4% 95%;
+    --surface: 60 17% 98%;            /* #fafaf8 — the admin sidebar and its menu, a step above the ground */
+    --nav-active: 37 36% 88%;         /* #ece4d7 — the current admin page's row; gold ink on it 5.3:1 */
     --border: 40 4% 82%;              /* ≈ ink @16% on ground — the hairline */
     --input: 40 4% 78%;
     --ring: 36 55% 46%;
