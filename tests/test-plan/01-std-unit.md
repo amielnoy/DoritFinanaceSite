@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 939 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1606 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 941 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1609 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1423,6 +1423,15 @@ On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's l
 | UNIT-ORG-004 | "gives an unknown organization a palette colour by its id, the same every time, and its name's first letter" | A palette entry; identical on a second call; "א", "Z" |
 | UNIT-ORG-005 | "spreads different ids across the palette" | More than 3 colours over 40 ids |
 | UNIT-ORG-006 | "measures contrast as WCAG does" | Black on white 21; equal colours 1 |
+
+### 4.56 The Vercel functions' imports — `tests/unit/api-imports.test.ts`
+
+Every file under `api/` and everything it imports at run time: Vercel bundles the functions without the `@/` alias, so one runtime `@/` import crashes the function on load (`FUNCTION_INVOCATION_FAILED`) — as `src/lib/seo.ts`'s `@/i18n/locales` did to `api/og/blog.ts` from #212. Type-only imports are erased and allowed.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-API-001 | "finds the functions" | `api/og/blog.ts` among them |
+| UNIT-API-002 | "%s imports nothing through the \"@/\" alias at run time" (one case per function) | No runtime `@/` import in the graph |
 
 ## 5. Pass criteria
 
