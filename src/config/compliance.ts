@@ -232,6 +232,22 @@ export const CHAT_FUNCTION_SUPPORT_CONSENT_POINTS = [
 ] as const;
 
 /**
+ * v6 for the procedures chat: its own first three points — what it explains,
+ * the licence, and the stronger warning about pasting IDs and balances — and
+ * the FAQ chat's v6 fourth, for the same two reasons (an AI provider outside
+ * Israel processes the conversation; the transcript is kept 12 months).
+ *
+ * TODO(compliance): the same release gate as the FAQ chat's fourth point,
+ * before VITE_CHAT_AGENTS names procedures_agent.
+ */
+export const CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS = [
+  PROCEDURES_CONSENT_POINTS[0],
+  PROCEDURES_CONSENT_POINTS[1],
+  PROCEDURES_CONSENT_POINTS[2],
+  CHAT_FUNCTION_SUPPORT_CONSENT_POINTS[3],
+] as const;
+
+/**
  * The v6 notice of each agent the `chat` function may serve
  * (`CHAT_FUNCTION_AGENTS`), by agent name. A served agent missing here would
  * fall back to the interview's — a unit test fails first.
@@ -239,4 +255,5 @@ export const CHAT_FUNCTION_SUPPORT_CONSENT_POINTS = [
 export const CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT: Readonly<Record<string, readonly string[]>> = {
   needs_interview: CHAT_FUNCTION_CONSENT_POINTS,
   support_agent: CHAT_FUNCTION_SUPPORT_CONSENT_POINTS,
+  procedures_agent: CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS,
 };

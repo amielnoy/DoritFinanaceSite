@@ -951,9 +951,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
 | UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
-| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | `procedures_agent` and `blog_recommender` are dropped from `procedures_agent,needs_interview,blog_recommender`; `needs_interview` stays |
+| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | `blog_recommender` is dropped from `blog_recommender,needs_interview`; `needs_interview` stays |
 | UNIT-CHCONFIG-004 | "is empty without Supabase, whatever it says" | Not configured gives no agents |
-| UNIT-CHCONFIG-005 | "may serve the FAQ chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `support_agent`; empty switch gives none; `support_agent` and `needs_interview,support_agent` are read in order; without Supabase none; `procedures_agent,blog_recommender` none |
+| UNIT-CHCONFIG-005 | "may serve the FAQ chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `support_agent`; empty switch gives none; `support_agent` and `needs_interview,support_agent` are read in order; without Supabase none; `blog_recommender` none |
 | UNIT-CHCONFIG-006 | "exists for every one of them" (the v6 notice of each agent the function may serve) | `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` has an entry for every `CHAT_FUNCTION_AGENTS` name |
 | UNIT-CHCONFIG-007 | "is the interview's for the interview" | `needs_interview` maps to `CHAT_FUNCTION_CONSENT_POINTS` |
 | UNIT-CHCONFIG-008 | "is the FAQ chat's own for the FAQ chat: its first three points, never the interview's promise of a name, a phone and a meeting" | `support_agent` maps to `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`; its first three equal the first three of `SUPPORT_CONSENT_POINTS`; neither of the interview's points 1 and 3 appears; no "name and phone collected" or "arranges a meeting" wording |
