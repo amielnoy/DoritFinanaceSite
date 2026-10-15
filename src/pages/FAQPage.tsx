@@ -128,7 +128,7 @@ export default function FAQPage() {
     <div className="min-h-screen bg-background">
       <FloatingHeader />
 
-      <main className="pt-[104px] md:pt-40">
+      <main id="main" className="pt-[104px] md:pt-40">
         {/* Hero */}
         <section className="relative max-w-[1400px] mx-auto px-6 md:px-10 pb-6 md:pb-16">
           <Reveal>

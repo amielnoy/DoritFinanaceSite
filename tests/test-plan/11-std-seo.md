@@ -31,7 +31,7 @@ one.
 | Crawl directives | `public/robots.txt`, `public/sitemap.xml` |
 | Host rewriting | `scripts/vite-site-url-plugin.mjs` — rewrites the origin in `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` when `VITE_SITE_URL` names a different one |
 | The old Base44 host | `src/lib/legacy-host.ts` (the decision), `src/lib/legacy-host-boot.ts` (the boot step in `main.jsx`) — on `safe-arch-plan.base44.app` a page goes noindex, names production canonical, and moves to the same address on `govari-fin.co.il` |
-| Page-level declarations | `src/pages/{Home,Blog,BlogPost,Claims,PrivacyPolicy,Accessibility}.tsx`, `src/lib/PageNotFound.jsx` |
+| Page-level declarations | `src/pages/{Home,Blog,BlogPost,Claims,PrivacyPolicy,Accessibility}.tsx`, `src/pages/NotFound.tsx` |
 
 ## 3. Unit cases — `tests/unit/seo.dom.test.ts`
 

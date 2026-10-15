@@ -427,6 +427,12 @@ first and then renders the not-found page over it. The vercel.json `source`
 syntax is matched by `tests/helpers/vercel-routes.ts`, which covers the subset
 the file uses.
 
+**`main-landmark.contract.test.ts`.** Every `<main>` in `src/pages/*.tsx` and
+`src/components/AuthLayout.tsx` is `id="main"`: the skip link is
+`href="#main"`, and in the prerendered HTML, before the app runs, a page whose
+`<main>` is unnamed leaves it pointing nowhere (D-08). It covers the screens
+behind sign-in, which E2E-NAV-013 cannot reach.
+
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
 the environment supplies none, never overriding it; a checkout with no

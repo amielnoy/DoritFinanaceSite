@@ -178,8 +178,12 @@ test.describe("Routing — sanity", () => {
       if (!path || path === "/") continue;
       await test_step(`${path} is a registered route`, async () => {
         await gotoApp(page, path);
+        // The not-found page's own hook, not its heading's wording — the
+        // wording changed once (the English "404" template, D-04) and this
+        // check went on passing while looking for a heading nobody rendered.
+        await expect(page.locator("#main")).toBeVisible();
         await expect(
-          page.getByRole("heading", { name: "404" }),
+          page.getByTestId("not-found"),
           `${path} is linked from the site but renders the not-found page`,
         ).toHaveCount(0);
       });

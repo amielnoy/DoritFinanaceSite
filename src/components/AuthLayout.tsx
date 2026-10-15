@@ -10,8 +10,11 @@ export interface AuthLayoutProps {
 }
 
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }: AuthLayoutProps) {
+  // `<main id="main">`: the sign-in screen has no header or footer, so the whole screen
+  // is the page's content — and without a main landmark a screen reader had
+  // nowhere to jump to (D-08, manual test 2026-10-14).
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <main id="main" className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary mb-4">
@@ -27,6 +30,6 @@ export default function AuthLayout({ icon: Icon, title, subtitle, footer, childr
           <p className="text-center text-sm text-muted-foreground mt-6">{footer}</p>
         )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -98,6 +98,12 @@
     font-variant-numeric: lining-nums;
   }
 
+  /* The skip link focuses the page's <main> so the next Tab starts there; the
+     main itself is not a control, and a ring round the whole page is noise. */
+  main[tabindex="-1"]:focus {
+    outline: none;
+  }
+
   h1, h2, h3, h4 {
     font-family: var(--font-heading);
     letter-spacing: -0.01em;

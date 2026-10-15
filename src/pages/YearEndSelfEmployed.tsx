@@ -38,7 +38,7 @@ export default function YearEndSelfEmployed() {
   return (
     <div className="relative bg-background pb-14 md:pb-0">
       <FloatingHeader />
-      <main>
+      <main id="main">
         <section className="pt-40 pb-16 md:pt-48 md:pb-20 border-b border-border/50 max-md:pt-28">
           <div className="max-w-[1000px] mx-auto px-6 md:px-10">
             <Eyebrow>{t("eyebrow")}</Eyebrow>

@@ -792,6 +792,26 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-LOGIN-001 | "tells the visitor when Google's sign-in could not start" | A rejecting `signInWithGoogle` shows "לא הצלחנו להתחיל את ההתחברות. נסו שוב." |
 | CMP-LOGIN-002 | "says nothing while Google takes the visitor away" | No message; the call made |
 
+### 4.46 The not-found page and the skip link — `tests/component/not-found.test.tsx`
+
+Through `LocaleLayout`, as App.jsx routes them. Base44's template 404 said
+"Page Not Found … Go Home" in English, outside the header and footer, with a
+grey heading under the contrast floor and no `<main>`; no page had a skip link
+(D-04, D-07, D-08, manual test 2026-10-14).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-404-001 | "is in Hebrew, inside one <main>, with the h1 inside it" | One `<main>`; h1 "הדף שחיפשתם לא נמצא" inside it; no "Page Not Found" / "Go Home" |
+| CMP-404-002 | "keeps the site's header and footer, so the way back is the usual one" | A `<header>` and a `<footer>` |
+| CMP-404-003 | "links home and to the main pages" | "לעמוד הראשי" → `/`; the "דפים באתר" nav links `/tools`, `/claims`, `/blog`, `/faq` |
+| CMP-404-004 | "uses no grey that fails contrast: the heading and text are ink" | h1 `text-foreground`; no `text-slate-*` in `<main>` |
+| CMP-404-005 | "is noindex, and its canonical is the address asked for" | `robots` noindex; title "הדף לא נמצא \| דורית גוב ארי"; canonical path `/nope-xyz` |
+| CMP-404-006 | "speaks English under /en, links stay in English, and the Hebrew-only blog is left out" | English h1; home → `/en`; links `/en/tools`, `/en/claims`, `/en/faq`; canonical `/en/nope` |
+| CMP-SKIP-001 | "is the first focusable thing on the page" | The first focusable element reads "דילוג לתוכן הראשי" |
+| CMP-SKIP-002 | "moves focus to the page's <main>" | After the click `document.activeElement` is the `<main>`, given `tabindex="-1"` |
+| CMP-SKIP-003 | "is in the page's language" | "Aller au contenu principal" under `/fr` |
+| CMP-SKIP-004 | "names a target that exists, so it works before the app runs" | `href="#main"`, and `#main` is the `<main>` |
+
 ## 5. Pass criteria
 
 All 278 declared cases pass (vitest: 308 with expansions). A `submitLead` or `submitClaim` payload assertion failing

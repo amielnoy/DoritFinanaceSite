@@ -56,5 +56,13 @@
   "submit.report": "את הדיווח",
   "nav.call": "חיוג",
   "nav.phone": "טלפון",
-  "credentials.licence": "רישיון סוכן מרשות שוק ההון מספר"
+  "credentials.licence": "רישיון סוכן מרשות שוק ההון מספר",
+  "a11y.skipToMain": "דילוג לתוכן הראשי",
+  "notFound.seoTitle": "הדף לא נמצא | דורית גוב ארי",
+  "notFound.seoDescription": "הדף המבוקש אינו קיים. חזרו לעמוד הראשי כדי למצוא את מה שחיפשתם.",
+  "notFound.eyebrow": "שגיאה 404",
+  "notFound.title": "הדף שחיפשתם לא נמצא",
+  "notFound.text": "ייתכן שהכתובת הוקלדה עם שגיאה, או שהדף הועבר. אפשר להמשיך מכאן:",
+  "notFound.home": "לעמוד הראשי",
+  "notFound.linksLabel": "דפים באתר"
 }

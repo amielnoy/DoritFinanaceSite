@@ -125,7 +125,7 @@ export default function Account({
   if (error?.reason === "signed_out") return <Navigate to="/login?returnTo=/account" replace />;
 
   return (
-    <main className="min-h-screen bg-background">
+    <main id="main" className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-6 pt-32 pb-24 space-y-12">
         <header>
           <h1 className="font-heading text-4xl">האזור שלי</h1>

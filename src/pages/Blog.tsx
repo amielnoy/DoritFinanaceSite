@@ -182,7 +182,7 @@ export default function Blog() {
     <div className="relative bg-background min-h-screen pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
       <FloatingHeader />
 
-      <main>
+      <main id="main">
         {/* No fade-in here: text that arrives late moves the cards under a
             reader's thumb. */}
         <section data-track-location="blog_hero" className="pt-28 md:pt-36 pb-8 md:pb-10">

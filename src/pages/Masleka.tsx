@@ -64,7 +64,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <p className="text-sm text-muted-foreground mt-1">מתכננת פיננסית וסוכנת ביטוח</p>
         </div>
       </header>
-      <main className="max-w-[720px] mx-auto px-4 sm:px-6 py-8">{children}</main>
+      <main id="main" className="max-w-[720px] mx-auto px-4 sm:px-6 py-8">{children}</main>
     </div>
   );
 }
