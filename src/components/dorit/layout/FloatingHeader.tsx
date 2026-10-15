@@ -227,6 +227,7 @@ export default function FloatingHeader() {
               <>
                 <Link to="/admin/leads" className={NAV_LINK}>ניהול פניות</Link>
                 <Link to="/admin/blog" className={NAV_LINK}>ניהול בלוג</Link>
+                <Link to="/admin/users" className={NAV_LINK}>ניהול משתמשים</Link>
               </>
             ) : null}
             {MASLEKA_ENABLED && isAuthenticated ? (
@@ -314,6 +315,7 @@ export default function FloatingHeader() {
             <>
               <Link to="/admin/leads" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול פניות</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
               <Link to="/admin/blog" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול בלוג</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
+              <Link to="/admin/users" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ניהול משתמשים</span><ChevronLeft size={18} className="text-muted-foreground" /></Link>
             </>
           ) : null}
           {MASLEKA_ENABLED && isAuthenticated ? (

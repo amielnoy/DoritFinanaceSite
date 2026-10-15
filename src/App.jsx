@@ -35,6 +35,7 @@ const Accessibility = lazy(() => import('@/pages/Accessibility'));
 const Account = lazy(() => import('@/pages/Account'));
 const Login = lazy(() => import('@/pages/Login'));
 const Leads = lazy(() => import('@/pages/Leads'));
+const AdminUsers = lazy(() => import('@/pages/AdminUsers'));
 const Blog = lazy(() => import('@/pages/Blog'));
 const BlogPost = lazy(() => import('@/pages/BlogPost'));
 const BlogAdmin = lazy(() => import('@/pages/BlogAdmin'));
@@ -128,6 +129,7 @@ const AuthenticatedApp = () => {
         </Route>
         <Route element={<AdminRoute unauthenticatedElement={<LoginRedirect />} />}>
           <Route path="/admin/leads" element={<Leads />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/blog" element={<BlogAdmin />} />
         </Route>
         {/* The clearinghouse board: the admin or an agency member (StaffRoute).

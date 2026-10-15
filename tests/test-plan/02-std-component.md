@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 366 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 406 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 378 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 418 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -673,15 +673,34 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-022 | "keeps the year-end figures exact, and marks the Hebrew-only guide" | 16.5%, ₪38,400, ₪13,203, ₪20,566; "(in Hebrew)" → `/blog/sof-shana-atzmaim`; the disclosure |
 
 
-### 4.38 `<OrgBadge />`, `<OrgChip />` and `<Avatar org>` — `tests/component/org-badge.test.tsx`
+### 4.38 `<OrgBadge />`, `<OrgChip(s) />` and `<Avatar org>` — `tests/component/org-badge.test.tsx`
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-ORG-001 | "on a %ipx avatar: a %ipx badge, letter shown: %s" (64, 44, 40, 32, 24) | 26 / 20 / 20 / 12 / 12 px; the letter from 40px up; the name as `aria-label` |
-| CMP-ORG-002 | "sits at the inline-end bottom corner, with a white rim" | `inset-inline-end` and `bottom` −3px; 3px white border |
-| CMP-ORG-003 | "writes the name on the chip, in the ink on the tint, with the colour's square first" | Ink on tint; an `aria-hidden` square in the colour |
-| CMP-ORG-004 | "puts the badge on an avatar given an organization, sized to the avatar" | 26px with the fallback's letter on a 64px avatar |
-| CMP-ORG-005 | "leaves an avatar without an organization exactly as it was" | No badge; the original classes; no `style` |
+| CMP-ORG-001 | "on a %ipx avatar: a %ipx badge, code shown: %s" (64, 44, 40, 32, 24) | 26 / 20 / 20 / 12 / 12 px; the code from 40px up; "ארגון: …" as `aria-label` |
+| CMP-ORG-002 | "writes the code at 9–10px on a 40–44px avatar's badge" | 9 ≤ font ≤ 10 |
+| CMP-ORG-003 | "shows the organization's logo instead of its code when it has one" | An `<img>`; no code |
+| CMP-ORG-004 | "sits at the inline-end bottom corner, with a white rim" | `inset-inline-end` and `bottom` −3px; 3px white border |
+| CMP-ORG-005 | "opens its tooltip on keyboard focus, and on a tap" | `tabindex=0`; the tooltip after focus and after a touch tap |
+| CMP-ORG-006 | "writes the name on the chip, in the ink on the tint, with the colour's square first" | Ink on tint; the square in the colour |
+| CMP-ORG-007 | "shows two chips, then +N that lists the rest" | 2 chips; "ועוד 2 ארגונים" opens the other two |
+| CMP-ORG-008 | "puts the badge on an avatar given an organization, sized to the avatar" | 26px with "אי" on a 64px avatar |
+| CMP-ORG-009 | "leaves an avatar without an organization exactly as it was" | No badge; the original classes; no `style` |
+
+### 4.40 `/admin/users` — `tests/component/admin-users.test.tsx`
+
+`<AdminUsers />` with `services.usersAdmin.list` mocked.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-AU-001 | "shows skeletons while loading, then the count and every user sorted by name" | 4 skeletons; "מציג 3 מתוך 3 משתמשים"; name `aria-sort=ascending` |
+| CMP-AU-002 | "filters by organization with pressed buttons — ANY of them — and keeps it in the URL" | `aria-pressed`; ANY match; `?org=b,c` |
+| CMP-AU-003 | "searches after a short pause, combined with the filter, and reads both back from the URL" | `?org=b` + "yossi" → 1; `?q=yossi` |
+| CMP-AU-004 | "says when nothing matches, and clears the search and the filter" | The empty message; "ניקוי סינון" empties the URL and the field |
+| CMP-AU-005 | "sorts by a column, marking it with aria-sort, and turns it around on a second click" | ascending, then descending; the others "none" |
+| CMP-AU-006 | "shows the organization column in the table without avatar badges, and the badge on the cards" | No badge in the table; one per card (primary) |
+| CMP-AU-007 | "turns the filter into a searchable multi-select above six organizations, with removable chips" | No pill group; search narrows; a chip removes its choice |
+| CMP-AU-008 | "says so when there are no users at all, with nothing to clear" | "עדיין אין משתמשים"; no clear button |
 
 ### 4.39 /tools in English and French — `tests/component/i18n-tools.test.tsx`
 

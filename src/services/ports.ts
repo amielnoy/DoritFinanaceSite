@@ -281,6 +281,31 @@ export interface LeadAdminPort {
   transcriptLeadIds(): Promise<string[]>;
 }
 
+/** One of a user's organizations — a row of `memberships` with its agency's name. */
+export interface AdminUserMembership {
+  orgId: string;
+  orgName: string;
+  /** The user's role in that organization: owner, agent or staff. */
+  role: string;
+  joinedAt: string;
+}
+
+/** A signed-in account, as the users screen lists it. */
+export interface AdminUser {
+  id: string;
+  email: string | null;
+  /** The site-wide role (`profiles.role`). */
+  role: "admin" | "user";
+  createdAt: string;
+  /** Oldest first: the first is the user's primary organization. */
+  memberships: AdminUserMembership[];
+}
+
+/** The admin's view of the accounts. Read-only; every row is personal data. */
+export interface UsersAdminPort {
+  list(): Promise<AdminUser[]>;
+}
+
 export interface ArticleDraft {
   title: string;
   /**

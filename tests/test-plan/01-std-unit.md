@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 952 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1625 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 961 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1639 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1424,16 +1424,32 @@ On the anonymised fixture `tests/fixtures/har-habituach.ts` (the real export's l
 
 ### 4.55 Organizations — `tests/unit/organizations.test.ts`
 
-`src/config/organizations.ts`: every organization's colour and letter, and the fallback for one with none.
+`src/config/organizations.ts`: every organization's colours and code, the code derived when none is configured, and no two codes alike among the organizations shown together.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-ORG-001 | "defines each organization once, with a single letter" | Unique ids; one letter each |
-| UNIT-ORG-002 | "reads at 4.5:1 or more — the white letter on the colour, the ink on the tint — for every organization and every fallback" | Every ratio ≥ 4.5 |
-| UNIT-ORG-003 | "returns a defined organization as it is" | `orgFor("beta")` is the defined entry |
-| UNIT-ORG-004 | "gives an unknown organization a palette colour by its id, the same every time, and its name's first letter" | A palette entry; identical on a second call; "א", "Z" |
-| UNIT-ORG-005 | "spreads different ids across the palette" | More than 3 colours over 40 ids |
-| UNIT-ORG-006 | "measures contrast as WCAG does" | Black on white 21; equal colours 1 |
+| UNIT-ORG-001 | "defines each organization once, with a code of one or two characters" | Unique ids; codes of 1–2 characters |
+| UNIT-ORG-002 | "reads at 4.5:1 or more — the white code on the colour, the ink on the tint — for every organization and every fallback" | Every ratio ≥ 4.5 |
+| UNIT-ORG-003 | "derives a code: the first letters of the first two words, or a one-word name's first two letters" | "סא", "גפ", "ZP", "OM", "X" |
+| UNIT-ORG-004 | "keeps a configured organization's look, under the name it is given" | Its code and colour; the agency's own name |
+| UNIT-ORG-005 | "gives an unknown organization a palette colour by its id, the same every time, and a derived code" | A palette entry; "אי"; identical on a second call |
+| UNIT-ORG-006 | "never gives two organizations shown together the same code, and keeps configured codes" | "סא" kept; "סוכנות אור" → "סו", "סוכנות אביב" → "סכ" |
+| UNIT-ORG-007 | "gives the same set of organizations the same codes, whatever order they arrive in" | Equal maps |
+| UNIT-ORG-008 | "spreads different ids across the palette" | More than 3 colours over 40 ids |
+| UNIT-ORG-009 | "measures contrast as WCAG does" | Black on white 21; equal colours 1 |
+
+### 4.57 The users screen's logic — `tests/unit/admin-users.test.ts`
+
+`src/lib/admin-users.ts`: search, the organization filter, the primary organization and sorting.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AU-001 | "searches by name, by role in Hebrew or English, and by organization name" | Email, "מנהל"/"admin", organization names, organization roles |
+| UNIT-AU-002 | "matches a user in ANY selected organization, and everyone when none is selected" | Users in a or c |
+| UNIT-AU-003 | "combines the search and the organization filter (AND)" | Both must match |
+| UNIT-AU-004 | "takes the organization a user joined first as the primary one" | The oldest membership; none for a user with none |
+| UNIT-AU-005 | "sorts by name, by role and by primary organization, users without one last either way" | Collated Hebrew order; ties by name |
+| UNIT-AU-006 | "codes the organizations shown together without collisions" | Distinct codes |
 
 ### 4.56 The Vercel functions' imports — `tests/unit/api-imports.test.ts`
 
