@@ -14,7 +14,15 @@ vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));
 
 // The admin menu's counter. The clearinghouse switch is off here, so the board is never asked.
 const countNew = vi.hoisted(() => vi.fn(async () => 3));
-vi.mock("@/services", () => ({ services: { leadsAdmin: { countNew }, masleka: { myRole: vi.fn(), list: vi.fn(async () => []) } } }));
+// The operator's counter is the unassigned queue (agency roles); a client's role is none.
+const countUnassigned = vi.hoisted(() => vi.fn(async () => 3));
+vi.mock("@/services", () => ({
+  services: {
+    leadsAdmin: { countNew, countUnassigned },
+    masleka: { list: vi.fn(async () => []) },
+    agency: { myRole: vi.fn(async () => null), myAgencies: vi.fn(async () => []) },
+  },
+}));
 
 // framer-motion's layout animations need APIs jsdom does not implement.
 vi.mock("framer-motion", async () => {

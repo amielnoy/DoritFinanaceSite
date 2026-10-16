@@ -22,15 +22,23 @@ export function columnLetters(n: number): string {
   return s;
 }
 
+/**
+ * A cell as the visitor typed it. USER_ENTERED would read '0549988754' as a
+ * number and drop the zero, and would run a value starting with = + - @ (or a
+ * tab or carriage return) as a formula — a visitor's name could then fetch a
+ * URL or rewrite the sheet. A leading apostrophe stores either as text and is
+ * not shown. upsertContact's appendEventRow carries the same rule (contract).
+ */
+export function sheetCell(v: unknown): string {
+  const s = v == null ? '' : String(v);
+  return /^[=+\-@\t\r]/.test(s) || /^0\d+$/.test(s) ? `'${s}` : s;
+}
+
 export async function appendSheetRow(tab: string, columnCount: number, row: unknown[]): Promise<string> {
   const sheetId = (Deno.env.get('SHEET_ID') || '').trim();
   if (!sheetId) return 'לא מוגדר';
   const token = await googleAccessToken();
-  // USER_ENTERED would read '0549988754' as a number and drop the zero.
-  const cells = row.map((v) => {
-    const s = v == null ? '' : String(v);
-    return /^0\d+$/.test(s) ? `'${s}` : s;
-  });
+  const cells = row.map(sheetCell);
   const range = `${tab}!A:${columnLetters(columnCount)}`;
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range).replace(/%21/g, '!')}` +

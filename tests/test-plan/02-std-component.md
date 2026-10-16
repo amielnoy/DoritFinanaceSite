@@ -339,6 +339,9 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-CHATFN-007 | "keep the v5 notice, byte for byte" | A Base44 agent shows its v5 points and not the v6 fourth point |
 | CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
 | CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
+| CMP-CHATFN-015 | "says the message is still being answered, keeps it in the transcript, and does not hand it back" (a turn still running when the adapter stops waiting) | The send and every status request say busy: after 40 s + 60 s the panel shows "ההודעה התקבלה ועדיין בטיפול…", the visitor's line stays, and the input stays empty (review 2026-10-15, item 14) |
+| CMP-CHATFN-016 | "aborts the chat function's request and leaves the new conversation clean and usable" (a reset while a message is on its way) | Reset mid-send: the request's signal is aborted; the old line, an apology and the old text are all absent; the next message goes out under a new conversation id and its reply shows (review 2026-10-15, item 13) |
+| CMP-CHATFN-017 | "ignores what an earlier conversation's send ends with, even from an adapter that cannot abort" (a reset while a message is on its way) | A Base44 send that fails after the reset: the input stays empty and no apology appears (the panel's generation guard) |
 
 The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`, hooks stubbed). Read-only; visitor text is plain text.
 
@@ -371,55 +374,86 @@ The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`
 | CMP-MSK-016 | "is marked noindex" | SeoRouteGuard writes `noindex` on `/masleka` |
 | CMP-MSK-017 | "after a send that stored nothing says so plainly, and keeps both values for the retry" | `not_saved`: "השליחה לא עברה והקוד לא נשמר", "נסו לשלוח שוב", no "ייתכן"; a second click resends the same three values and thanks (decision 2026-10-14) |
 
-### 4.18 `<StaffRoute />` — the clearinghouse board's gate — `tests/component/staff-route.test.tsx`
+### 4.18 `<AgencyRoute />` — an agency screen's gate — `tests/component/agency-route.test.tsx`
+
+Replaces `<StaffRoute />` (agency roles). The role is asked of the database through `services.agency.myRole(agency)` for the current agency (`?agency=` when it is one of the person's, else their own, else agency 1).
 
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-STF-001 | "sends a signed-out visitor to sign in" | `unauthenticatedElement`; no role lookup |
-| CMP-STF-002 | "admits the platform admin without asking for a membership" | Outlet; no lookup |
-| CMP-STF-003 | "admits a member of the agency" | Outlet |
-| CMP-STF-004 | "turns away a signed-in user with no membership" | Redirect to `/` |
-| CMP-STF-005 | "says so when the role cannot be read, rather than guessing either way" | Alert; no outlet |
-| CMP-STF-006 | "waits while sign-in is still being checked" | Neither outlet nor redirect |
-| CMP-STF-007 | "turns away a membership answer of %s, never rendering the outlet" (3 cases: empty string, `superuser`, `Staff`) | Redirect to `/`; no outlet |
-| CMP-STF-008 | "alerts, never renders the outlet, when the membership answer is undefined" | Alert; no outlet |
-| CMP-STF-009 | "turns away a signed-in user who has no id, without asking" | Redirect to `/`; no lookup |
-| CMP-STF-010 | "does not take %s on the user for the platform admin" (3: `ADMIN`, no role, `owner`) | One lookup, then redirect to `/`; no outlet |
-| CMP-STF-011 | "does not let one user's role reach the next user who signs in" | Second user never sees the outlet; two lookups |
+| CMP-AGR-001 | "sends a signed-out visitor to sign in, asking nothing" | `unauthenticatedElement`; no role lookup |
+| CMP-AGR-002 | "admits the platform operator to every level, a member of no agency" | Outlet at `min="owner"` |
+| CMP-AGR-003..007 | "a %s at a %s screen: %s" | user@user, admin@user, owner@admin admitted; user@admin, admin@owner sent to `/` |
+| CMP-AGR-008 | "sends someone with no role in the agency home" | Redirect to `/` |
+| CMP-AGR-009 | "says it could not check, rather than guessing, when the role cannot be read" | Alert; no outlet |
+| CMP-AGR-010 | "asks about the agency in ?agency= when it is one of the person's" | `myRole(TRUST)`; Owner admitted |
+| CMP-AGR-011 | "ignores an ?agency= that is not the person's, and asks about their own" | Last lookup for agency 1 |
 
 ### 4.19 `<MaslekaBoard />` — the staff board — `tests/component/masleka-board.test.tsx`
 
+Since the redesign (2026-10-16) the board is one list of rows, each with one action (`actionFor`). Until the guided drawer (step 4), "להגשה" opens the copy controls under the row. Since step 4, "להגשה" opens the guided submit drawer: `card(name)` opens a client's (closing another's first), and `openWaiting()` waits for the list and opens רונית's. The phone layout (CMP-MSKB-054..057) is Tailwind's `max-sm:` variants, which jsdom does not apply, so those cases hold the markup. The rendering was checked in Chromium at 375px and 1280px: no horizontal page scroll at 375px, and both drawers full screen.
+
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-MSKB-001 | "lays the requests out by status, with the third column empty until PR B" | Each name in its region; empty-state text in "הושלם" |
-| CMP-MSKB-002 | "says when the files should be ready, and how long the clearinghouse keeps them" | Readiness and deletion labels per card |
+| CMP-MSKB-001 | "shows every request in one list: step, name, stage and the reason, with one action each" (the list) | רונית: `מוכן להגשה`, the code-received reason, `להגשה`; אורי: `קישור חדש` and the invited reason |
+| CMP-MSKB-002 | "says when the files should be ready, and how long the clearinghouse keeps them" (the list) | יעל: `הוגש … · יהיה מוכן בעוד כ־3–4 שעות`, `אין צורך בפעולה`; דן: `מוכן להורדה · יום אחד…`, `דחוף`, `להורדה במסלקה` in a new tab with no referrer |
 | CMP-MSKB-003 | "reports a list that failed to load" | Alert text |
 | CMP-MSKB-004 | "copies the ID to the clipboard, revealing it only on the click" | No reveal before the click; `writeText('000000018')`; "הועתק ✓" |
 | CMP-MSKB-005 | "falls back to a selected field when there is no clipboard" | Read-only field with the value; "העתק ידנית" |
 | CMP-MSKB-006 | "falls back when the browser refuses the clipboard" | Read-only field with the value |
 | CMP-MSKB-007 | "hides a manually-copied value when asked" | Value gone after "הסתר" |
 | CMP-MSKB-008 | "clears a manually-copied value after a minute" | `REVEAL_MS` is 60 000; value still shown at 59 s, gone at 60 s |
-| CMP-MSKB-009 | "clears a manually-copied value on the next click elsewhere, but not on a click in its field" | A click in the field keeps it; a click on the heading clears it |
-| CMP-MSKB-010 | "shows one value at a time: revealing another client's clears the first" | The second client's field shown; the first client's gone |
+| CMP-MSKB-009 | "clears a manually-copied value on the next click elsewhere, but not on a click in its field" | A click in the field keeps it; a click on the drawer's heading clears it |
+| CMP-MSKB-010 | "shows one value at a time: revealing another client's clears the first" | Opening the second client's drawer closes the first's; its value is gone when the first is opened again |
 | CMP-MSKB-011 | "drops a value that arrives after a newer reveal was asked for" | A slower answer for the first click never reaches the screen |
 | CMP-MSKB-012 | "copies nothing when a value arrives after the board is gone" | Unmounted before the answer: `writeText` never called |
-| CMP-MSKB-013 | "forgets a shown value once its row leaves the column, so it never comes back with the row" | Row moves to submitted and back on two refetches; value not shown again |
+| CMP-MSKB-013 | "forgets a shown value once its row leaves the stage, so it never comes back with the row" | The row moves to submitted (no `להגשה`) and back: the value is gone |
 | CMP-MSKB-014 | "keeps the revealed value out of the query cache, storage, the console and the address" | Not in any query or mutation state, any storage write, any console call, `location.href` |
-| CMP-MSKB-015 | "wipes on הגשתי only after asking first" | Declined confirm → nothing; accepted → `markSubmitted('r2')` and a refetch |
-| CMP-MSKB-016 | "shows a second הגשתי as already submitted, not as an error, and refreshes the row" | `already_submitted` → `role="status"` "כבר סומן כהוגש", no alert; refetch (Ruling 18) |
+| CMP-MSKB-015 | "asks inline before the wipe: 'עוד לא' sends nothing, 'כן, הגשתי' wipes and says what happens next" | `role="alert"` question with the name and the warning; עוד לא → nothing; כן, הגשתי → `markSubmitted('r2')`, "הוגש. מספר הזהות וקוד האימות נמחקו." and the 3–4 hours line; חזרה ללוח closes |
+| CMP-MSKB-016 | "shows a second הגשתי as already submitted, not as an error, and refreshes the row" | `already_submitted` → status "כבר סומן כהוגש" in the drawer; the question closes, no alert; list refetched |
 | CMP-MSKB-017 | "tells a staff member whose access was removed" | Alert "ההרשאה שלך הוסרה" (`staffMessage`) |
-| CMP-MSKB-018 | "words a failed list or a refused request in the staff vocabulary" | A forbidden list and an `invalid_email` create both say `staffMessage`'s text |
-| CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
-| CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל"; "פתיחת הקישור" opens it in a new tab, `noopener noreferrer` |
+| CMP-MSKB-018 | "words a refused list in the staff vocabulary" (the list) | `forbidden` → "ההרשאה שלך הוסרה" |
+| CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | The drawer's step 1 link: `_blank`, `noopener noreferrer` |
+| CMP-MSKB-020 | "sends by WhatsApp from the browser: a wa.me link with the link in the message, and the phone never sent" (the new-request drawer) | `create` without the phone (no digits of it in any call); "הקישור למשה כהן מוכן"; `https://wa.me/972501234567?text=…` with the link, in a new tab, no referrer; the link field, the gold "פעם אחת בלבד" box, and "לראות את הדף כמו שהלקוח יראה ↗" |
 | CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown, and "פתיחת הקישור" points at it |
-| CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves before the answer: never copied, never shown, no "הועתק ✓" when the row returns |
-| CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks in one tick → one `markSubmitted`, one refetch |
+| CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves the stage before the answer: never copied, never shown |
+| CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks on "כן, הגשתי" in one act → one `markSubmitted` |
 | CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |
-| CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | "הועתק ✓" gone right after `markSubmitted('r2')`, with the refetch rejecting |
-| CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | "לניתוח ולהמלצות" → `/admin/masleka/analysis/s7`; region "ניתוחים" lists a report with no request |
-| CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | A quiet "לא הצלחנו לטעון את הניתוחים."; the columns still work; no alert |
-| CMP-MSKB-026 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
-| CMP-MSKB-027 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
+| CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | The success view with no copied mark; the row, still listed after the failed refetch, opens clean |
+| CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | Stage 4: the row's `לניתוח` → s7; "ניתוחים ללא בקשה:" names the lead-less report (s8) and not the request's own; no separate "ניתוחים" region |
+| CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | The guided submit still copies; stage 4 says "לא הצלחנו לטעון את הניתוחים."; no alert |
+| CMP-MSKB-029 | "says a blank name is not valid, and sends nothing" (the new-request drawer) | Alert "השם אינו תקין" in the drawer; no `create` |
+| CMP-MSKB-030 | "says so when the invitation e-mail was asked for but not sent" (the new-request drawer) | "המייל ללקוח לא נשלח"; the link still shown |
+| CMP-MSKB-031 | "finds a client by name as you type, and says so when nothing is there" (the list) | `לוי`: both לוי rows only; no match: "אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד." |
+| CMP-MSKB-032 | "opens on 'לטיפול עכשיו': what needs action, urgent first, with each stage's count and hint" (the stage bar) | `aria-pressed` on now; counts 2 / 1 / 1 / 2 / 0 and the hints; rows דן (urgent) then רונית; יעל and אורי absent |
+| CMP-MSKB-033 | "shows one stage when chosen, and keeps it in ?stage= so a refresh opens on it" (the stage bar) | `?stage=submitted` after the click; a fresh render at that address opens on it; back to now drops the parameter |
+| CMP-MSKB-034 | "opens on 'now' for a stage it does not know" (the stage bar) | `?stage=everything` → now |
+| CMP-MSKB-035 | "hides a revealed value when the stage changes under an open drawer (the browser's back and forward)" (the stage bar) | A clipboard copy's mark survives a click in the drawer and goes when `?stage=` changes |
+| CMP-MSKB-036 | "names the board, says how many requests wait today, and links to how it works" (the header) | h1 מסלקה, eyebrow טיפול שוטף; "2 בקשות מחכות לך היום. שאר הבקשות מתקדמות לבד."; "איך זה עובד?" → `#masleka-how` |
+| CMP-MSKB-037 | "words the count for none and for one" (the header) | `waitingLine` 0 / 1 / 7 |
+| CMP-MSKB-038 | "keeps the new-request form off the page until '+ בקשה חדשה' opens its drawer" (the header) | No `שם הלקוח` on the page; present in the dialog |
+| CMP-MSKB-039 | "is a modal dialog that the X and Esc close, giving the focus back to the button" (the header) | `aria-modal="true"`, focus inside; the X (`סגירה`) and Esc close it; focus back on "בקשה חדשה" |
+| CMP-MSKB-040 | "opens from the row, named for the client, with when the code came and the ID's last digits" (the guided submit) | Dialog named רונית מזרחי, `aria-modal`, described by the code-received line; four steps |
+| CMP-MSKB-041 | "walks the four steps: the current one marked, each ticked as it is done" (the guided submit) | `aria-current="step"` moves 1 → 2 → 3 → 4 as the portal is opened and the ID and code copied; "הועתק ✓ — הדביקו במסלקה"; a step stays ticked after its value goes |
+| CMP-MSKB-042 | "hides a revealed value when the drawer closes, and opened again it starts clean" (the guided submit) | A clipboard copy's mark is gone on reopening; step 1 current again (fails without `hide()` on close) |
+| CMP-MSKB-043 | "hides a value copied by hand when the drawer closes" (the guided submit) | The manual field is gone |
+| CMP-MSKB-044 | "drops a value still on its way when the drawer closes: never copied, never shown" (the guided submit) | The answer lands after סגירה: no clipboard write, no mark (fails without `hide()` on close) |
+| CMP-MSKB-045 | "keeps the inline question to the drawer: no browser confirm" (the guided submit) | `window.confirm` never called |
+| CMP-MSKB-046 | "refuses a WhatsApp number that is not an Israeli mobile, beside the field, and sends nothing" (the new-request drawer) | `03-1234567`: the field's alert, `aria-invalid`; no `create` |
+| CMP-MSKB-047 | "sends by mail through the invitation, and says when it went" (the new-request drawer) | `sendInvite: true` with the address; "הקישור נשלח במייל ללקוח"; no WhatsApp link |
+| CMP-MSKB-048 | "words a refused address in the staff vocabulary, inside the drawer" (the new-request drawer) | `invalid_email` → "כתובת הדוא״ל אינה תקינה" as an alert in the drawer |
+| CMP-MSKB-049 | "only shows the link when the staff member will copy it themselves" (the new-request drawer) | `sendInvite: false`, no address; the link; no WhatsApp link, no mail status |
+| CMP-MSKB-050 | "offers the caller's open leads of the agency, fills what is empty, and sends the lead's id" (the new-request drawer) | Options: ללא שיוך and the open agency-1 lead only; choosing it fills the name and the mobile; `create` carries `leadId` |
+| CMP-MSKB-051 | "reads the leads only once the drawer opens" (the new-request drawer) | No leads read until "+ בקשה חדשה" |
+| CMP-MSKB-052 | "explains the four stages at the bottom, where 'איך זה עובד?' leads, with the advisor guide" (how a request moves) | Region `#masleka-how` "איך בקשה מתקדמת": ממתין ללקוח, מוכן להגשה, הוגש במסלקה, הושלם; the guide link; "קוד אימות", never "ייפוי" on the page |
+| CMP-MSKB-053 | "lists no report line outside stage 4" (how a request moves) | No "ניתוחים ללא בקשה" on "now" |
+| CMP-MSKB-054 | "makes '+ בקשה חדשה' a round 48px button named by its aria-label" (on a phone) | `aria-label="בקשה חדשה"`; `max-sm:h-12 max-sm:w-12 max-sm:rounded-full`; the visible label `max-sm:sr-only` |
+| CMP-MSKB-055 | "makes the stage bar one sideways-scrolling row of chips" (on a phone) | `max-sm:overflow-x-auto`, no wrap; each chip `max-sm:shrink-0` |
+| CMP-MSKB-056 | "gives each row's one action the full width" (on a phone) | The action's wrapper `max-sm:w-full max-sm:[&>*]:w-full` |
+| CMP-MSKB-057 | "opens the drawers full screen" (on a phone) | The dialog `fixed inset-y-0 left-0 w-full sm:max-w-md` |
+| CMP-MSKB-058 | "asks first, then sends the request back with a fresh link shown once — and stays open as the row moves to stage 1" (a code the clearinghouse refused) | The inline question (`role="alert"`); ביטול → nothing; כן, קישור חדש → `reissue('r2')`, "קישור חדש לרונית מזרחי מוכן.", the link once; the drawer stays after the refetch; חזרה ללוח closes |
+| CMP-MSKB-059 | "drops a value still on its way when the request goes back to the client" (a code the clearinghouse refused) | No clipboard write, nothing shown (fails without `hide()` on reissue) |
+| CMP-MSKB-060 | "makes one call for a double click" (a code the clearinghouse refused) | Two clicks in one act → one `reissue` |
+| CMP-MSKB-061 | "says why when it is refused, closes its question, and keeps the guided submit" (a code the clearinghouse refused) | `unavailable` → "השירות אינו זמין כרגע"; the question closed; the copy buttons still there |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 
@@ -580,6 +614,9 @@ Over an in-memory port (decisions stored and read back) and the made-up client i
 | CMP-MSKA-012 | "publishes the approved recommendations to the client's address" | Disabled without an address; then `publish('s1', email, items)` |
 | CMP-MSKA-013 | "asks before a republish replaces what the client sees" | Declined → no publish |
 | CMP-MSKA-014 | "shows the client's answers, the new ones counted, and marks them read" | "1 חדשות", the note; `markAnswersSeen`; `unpublish` |
+| CMP-MSKA-015 | "keeps a failed custom recommendation and retries the same item, clearing only after success" | Failure preserves title, body and priority; retry uses the same key; success clears the draft |
+| CMP-MSKA-016 | "keeps a pending recommendation intact and prevents another submission" | Fields retain text and are disabled while saving; one write; clears after confirmation |
+| CMP-MSKA-017 | "resets the recipient and preview when moving between cached client reports" | Cached route change resets to the new client's address and closes preview; publish uses the new id and address |
 
 ### 4.32 The growth brief: "בדיקת תיק פנסיוני", Cal.com and the WhatsApp channel — `tests/component/lead-growth.test.tsx`
 
@@ -823,3 +860,77 @@ grey heading under the contrast floor and no `<main>`; no page had a skip link
 All 278 declared cases pass (vitest: 308 with expansions). A `submitLead` or `submitClaim` payload assertion failing
 here is a contract break — cross-check [STD-03](03-std-contract.md) before
 changing the test.
+
+### 4.46 The screens by agency role — `tests/component/agency-roles-ui.test.tsx`
+
+What a User, an Admin and an Owner are offered, with `src/hooks/useAgency` replaced by `tests/helpers/agency-role-mock.ts` (whose `can()` reads the real permissions table). The same mock gives full access in `lead-transcript`, `lead-client-status`, `blog-admin-slug`, `admin-users` and `invite-user`, so their existing cases test what they did.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ROLEUI-001 | "shows a User 'הפניות שלי', with no assignment, no delete and no tracking panel" | Heading הפניות שלי; no מחיקה, no assignee select, no לא שויכו chip, no tracking panel |
+| CMP-ROLEUI-002 | "shows a backend-written status as it is, and not as a choice" | The select's value is `escalated`, its option disabled |
+| CMP-ROLEUI-003 | "gives an Admin the queue: an assignee per lead, the unassigned chip, and delete" | ניהול פניות; delete on each; לא שויכו shows the open unassigned lead only (not a closed one); the assignee options are the agency's members; a choice calls assign with `{ id, userId }` |
+| CMP-ROLEUI-004 | "offers everyone the escalated and partial chips" | Both chips, with counts |
+| CMP-ROLEUI-005 | "shows only the current agency's leads" | Another agency's lead absent |
+| CMP-ROLEUI-006 | "lets a User write drafts only: no publish toggle, no delete, no edit of a live article" | One עריכה (the draft's) |
+| CMP-ROLEUI-007 | "gives an Admin publishing and deleting" | Toggle and delete on both articles |
+| CMP-ROLEUI-008 | "shows a User the members, lets them leave, and offers no change to anyone else" | Three members; no הסרה or role select; עזיבת הסוכנות calls `leave(agency)` |
+| CMP-ROLEUI-009 | "lets an Admin remove a User, saying how many leads go back to the queue, and never touch the Owner" | No הסרה on the Owner; no role select (User only); the confirm names 2 open leads; `remove(agency, user)` |
+| CMP-ROLEUI-010 | "lets the Owner change roles and hand over ownership" | `setRole(agency, u2, 'admin')` — the value read at the change, not after React resets the controlled select; `transferOwnership(agency, u2)` |
+| CMP-ROLEUI-011 | "lets the Owner edit and save every field" | `updateProfile(agency, { displayName, … })` |
+| CMP-ROLEUI-012 | "shows anyone else the details read-only, with no save" | Inputs `readonly`; no שמירה |
+
+Changed for agency roles:
+- **`admin-layout.test.tsx`:**
+  - The operator's sidebar adds פרטי הסוכנות, and counts the unassigned queue.
+  - A User gets the agency's pages without פרטי הסוכנות, with their own new leads counted.
+  - Someone in two agencies gets a switcher, and every link keeps `?agency=`; one agency shows no switcher.
+- **`admin-menu.test.tsx`:**
+  - The operator reads "מפעיל הפלטפורמה" and the unassigned queue.
+  - A User gets הפניות שלי, with the leads as the way in.
+  - An Admin gets the queue.
+- **`floating-header(-masleka).test.tsx`:**
+  - A member's ניהול leads to `/admin/leads`.
+  - The operator's counter is the unassigned queue.
+- **`invite-user.test.tsx`:**
+  - An agency Admin is offered only their agencies and the User role.
+  - A User gets no invite button.
+  - The role offered by default is an Admin's (the operator may give it).
+
+### 4.47 "דורשות טיפול" — `tests/component/leads-attention.test.tsx`
+
+Review 2026-10-15, item 17. The `escalated` and `partial` chips and the disabled current-status option already came with the agency roles (CMP-ROLEUI-002 and 004). What remained: an escalated lead (a visitor who asked for Dorit herself) needs someone as much as a new one. The card counts both and its filter shows both, and so does the menu's counter for a User (UNIT-LEADTX-009).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ATTN-001 | "counts the new and the escalated leads together" | One new, one escalated, one contacted, one partial: the card reads 2 |
+| CMP-ATTN-002 | "shows the new and the escalated leads when clicked, and no other" | After the click: the new and the escalated lead; not the contacted or the partial one |
+
+### 4.48 The testimonials' writes — `tests/component/testimonials.test.tsx` (new cases)
+
+Review 2026-10-15, item 18. Dorit's controls in the home page's testimonials say what failed, in a `role="alert"`, and ask before a delete, as the leads and blog screens do. The services' content-admin and upload methods are spied on, so these cases hold on either backend.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-TESTIM-ADM-001 | "asks before deleting, and deletes nothing when the answer is no" (the admin's writes) | `confirm("למחוק את ההמלצה?")`; no → no delete; yes → `removeTestimonial("t1")` |
+| CMP-TESTIM-ADM-002 | "says so in an alert when a delete fails" (the admin's writes) | `role="alert"`: "ההמלצה לא נמחקה…" |
+| CMP-TESTIM-ADM-003 | "says so in an alert when the picture does not upload, and publishes nothing" (the admin's writes) | `role="alert"`: "התמונה לא הועלתה…"; `createTestimonial` not called |
+| CMP-TESTIM-ADM-004 | "says so in an alert when the testimonial is not saved" (the admin's writes) | `role="alert"`: "ההמלצה לא נשמרה…" |
+
+### 4.49 The claim form's documents — `tests/component/claim-form-files.test.tsx`
+
+Review 2026-10-15, item 19. Already in place: `accept`, the 10 MB and type checks with Hebrew copy (`claimDocumentProblem`, UNIT section 4.63), and clearing the input after each pick. Added: drag-and-drop on the zone, the input `sr-only` instead of `hidden`, and `role="alert"` on the form's error. The phone stays on `isContactPhone`, the rule `submit-claim` applies: a landline is a number Dorit can call back about a claim, and mobile-only would refuse what the function accepts.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CLAIMDOC-001 | "takes dropped files through the same checks as picked ones" | A dropped PDF is listed; a dropped `.exe` is not, and the alert names it with the type message |
+| CMP-CLAIMDOC-002 | "keeps the picker in the tab order: visually hidden, never display:none" | Class `sr-only`, not `hidden`; Tab reaches the input |
+| CMP-CLAIMDOC-003 | "accepts only the bucket's types, and says a picked file's problem in an alert" | `accept` lists PDF and HEIC; a 10 MB + 1 byte JPG gives the size message in `role="alert"`; the input's value is cleared |
+
+### 4.50 The home page's chat, loaded on demand — `tests/component/start-conversation-lazy-chat.test.tsx`
+
+Review 2026-10-15, item 22. `StartConversation` imports `AgentChat` with `lazy()`, so the chat and react-markdown leave the home page's first bundle. Measured with `CI=1 vite build` on this branch: the entry chunk went from 473,997 B (140,328 gzip) to 337,775 B (100,007 gzip). Everything the home page loads up front (entry and modulepreloads) went from 935,093 B (288,942 gzip) to 798,907 B (248,641 gzip), about −14% gzipped. `AgentChat` is its own 21,245 B chunk (7,118 gzip).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-LAZYCHAT-001 | "is not loaded with the section, and loads and shows once the visitor opens it" | The mocked module is not evaluated on render; after the צ'אט button, it is evaluated once and the chat shows |

@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import InviteUserDialog from "@/components/dorit/admin/InviteUserDialog";
+import AgencyMembers from "@/components/dorit/admin/AgencyMembers";
+import { useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { services } from "@/services";
@@ -71,6 +73,8 @@ export default function AdminUsers() {
   }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: users, isLoading, error } = useQuery({ queryKey: ["admin", "users"], queryFn: () => services.usersAdmin.list() });
+  const { agencyId } = useCurrentAgency();
+  const { can } = useAgencyRole(agencyId);
   const all = users ?? [];
   const dirOrgs = useMemo(() => directoryFor(all), [all]);
   const orgs = useMemo(() => [...dirOrgs.values()].sort((a, b) => a.name.localeCompare(b.name, "he")), [dirOrgs]);
@@ -91,11 +95,12 @@ export default function AdminUsers() {
             <Eyebrow>תוכן והגדרות</Eyebrow>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">ניהול משתמשים</h1>
           </div>
-          <InviteUserDialog />
+          {can("members.manageUsers") ? <InviteUserDialog /> : null}
         </div>
       </header>
 
-      <main id="main" className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col gap-5">
+      <main className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col gap-5">
+        <AgencyMembers />
         <div className="flex flex-col gap-3">
           <label className="relative block max-w-md">
             <span className="sr-only">חיפוש משתמשים</span>

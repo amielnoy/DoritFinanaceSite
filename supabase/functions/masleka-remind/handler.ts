@@ -112,7 +112,6 @@ export async function handler(req: Request): Promise<Response> {
         now.getTime() < addBusinessDays(new Date(instant(r.submitted_at)), CLEARINGHOUSE_RETENTION_BUSINESS_DAYS).getTime(),
     );
 
-    let recipients: string[] | null = null;
     let readySent = 0;
     let deadlineSent = 0;
     const digests: Array<[StaffNoticeKind, Record<string, unknown>[], 'ready_reminded_at' | 'deadline_reminded_at']> = [
@@ -136,12 +135,19 @@ export async function handler(req: Request): Promise<Response> {
         continue;
       }
       if (!claimed.length) continue;
-      recipients ??= await staffRecipients(log, rid);
-      const notice = buildStaffNotice(kind, claimed.map((r) => String(r.client_name ?? '')));
+      // Each request is told to its own people (its lead's assignee or its
+      // creator, and the agency's Admins and Owners), so the digest is built
+      // per recipient from the requests they handle.
+      const byRecipient = new Map<string, string[]>();
+      for (const r of claimed) {
+        for (const to of await staffRecipients(log, rid, String(r.id))) {
+          byRecipient.set(to, [...(byRecipient.get(to) ?? []), String(r.client_name ?? '')]);
+        }
+      }
       let sent = 0;
-      for (const to of recipients) {
+      for (const [to, names] of byRecipient) {
         try {
-          await sendMail(log, { to, ...notice, rid, role: 'staff' });
+          await sendMail(log, { to, ...buildStaffNotice(kind, names), rid, role: 'staff' });
           sent += 1;
         } catch (e) {
           log('warn', 'mail.failed', { rid, role: 'staff', kind, err: String((e as Error)?.message ?? e).slice(0, 200) });
@@ -187,7 +193,7 @@ export async function handler(req: Request): Promise<Response> {
         continue;
       }
       if (!claimed.length) continue;
-      recipients ??= await staffRecipients(log, rid);
+      const recipients = await staffRecipients(log, rid, requestId);
       const notice = buildWipeNotice({
         clientName: String(claimed[0].client_name ?? ''),
         contactEmail: typeof claimed[0].contact_email === 'string' ? claimed[0].contact_email : null,

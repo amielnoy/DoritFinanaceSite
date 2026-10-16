@@ -117,7 +117,7 @@ export async function handler(req: Request): Promise<Response> {
     }
 
     const ip = clientIp(req);
-    if (ip && !(await withinLimit(log, rid, `claim-ip:${await sha256Hex(ip)}`, 3600, CLAIMS_PER_IP_PER_HOUR))) {
+    if (!(await withinLimit(log, rid, `claim-ip:${await sha256Hex(ip)}`, 3600, CLAIMS_PER_IP_PER_HOUR))) {
       log('warn', 'request.rejected', { rid, reason: 'rate_limited' });
       return Response.json(
         { error: 'התקבלו כמה דיווחים ברצף. אפשר לנסות שוב בעוד שעה, או לפנות לדורית ישירות.', rid },

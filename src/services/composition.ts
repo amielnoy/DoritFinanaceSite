@@ -32,8 +32,10 @@ import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService"
 import { UnconfiguredMaslekaService } from "./unconfigured/UnconfiguredMaslekaService";
 import { RoutedAgentService } from "./RoutedAgentService";
 import type { Services } from "./index";
+import { SupabaseAgencyService, type SupabaseAgencyClient } from "./supabase/SupabaseAgencyService";
 import type {
   AccountPort,
+  AgencyPort,
   AgentPort,
   AuthPort,
   ContentAdminPort,
@@ -97,7 +99,7 @@ const contentAdmin: ContentAdminPort =
 
 /** The admin's leads: read and written in Supabase when it is configured, else through Base44 as before. */
 const leadsAdminPort: LeadAdminPort = tables
-  ? new SupabaseLeadAdminService(tables, supabase as unknown as SupabaseStorageClient | null)
+  ? new SupabaseLeadAdminService(tables, supabase as unknown as ContentFunctionsClient | null, sessionToken)
   : new Base44LeadAdminService(client);
 
 /**
@@ -128,6 +130,33 @@ const usersAdminPort: UsersAdminPort = tables
       organizations: async () => [],
       invite: async () => {
         throw new Error("אין חיבור למאגר המשתמשים.");
+      },
+      setRole: async () => {
+        throw new Error("אין חיבור למאגר המשתמשים.");
+      },
+      remove: async () => {
+        throw new Error("אין חיבור למאגר המשתמשים.");
+      },
+      leave: async () => {
+        throw new Error("אין חיבור למאגר המשתמשים.");
+      },
+      transferOwnership: async () => {
+        throw new Error("אין חיבור למאגר המשתמשים.");
+      },
+    };
+
+/**
+ * Who the signed-in person is in their agencies: Supabase only. Without it
+ * nobody belongs to an agency, so no agency screen is offered.
+ */
+const agencyPort: AgencyPort = supabase
+  ? new SupabaseAgencyService(supabase as unknown as SupabaseAgencyClient)
+  : {
+      myAgencies: async () => [],
+      myRole: async () => null,
+      profile: async () => null,
+      updateProfile: async () => {
+        throw new Error("אין חיבור למאגר.");
       },
     };
 
@@ -205,6 +234,7 @@ export const services: Services = {
   contentAdmin,
   account: accountPort,
   usersAdmin: usersAdminPort,
+  agency: agencyPort,
   masleka: maslekaPort,
 };
 

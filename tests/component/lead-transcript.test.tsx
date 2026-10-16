@@ -24,11 +24,16 @@ vi.mock("@/hooks/useAdmin", () => ({
   useLeads: () => ({ data: h.leads, isPending: false, isError: false }),
   useSetLeadStatus: () => ({ mutate: vi.fn(), isError: false }),
   useRemoveLead: () => ({ mutate: vi.fn(), isError: false }),
+  useAssignLead: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useAdminUsers: () => ({ data: [] }),
   useTranscriptLeadIds: () => ({ data: h.ids }),
   useLeadTranscript: (_id: string, enabled: boolean) => ({ data: enabled ? h.transcript : undefined, isLoading: false, error: null }),
 }));
 vi.mock("@/services", () => ({ services: { leadsAdmin: { documentLink: vi.fn() } } }));
 vi.mock("@/components/dorit/admin/LeadTrackingPanel", () => ({ default: () => null }));
+// The person's role in the agency (src/hooks/useAgency.ts): full access unless a case narrows it.
+const role = vi.hoisted(() => ({ role: "owner", isOperator: true }) as import("../helpers/agency-role-mock").RoleState);
+vi.mock("@/hooks/useAgency", async () => (await import("../helpers/agency-role-mock")).agencyHookMock(role));
 
 const { default: Leads } = await import("@/pages/Leads");
 const renderLeads = () => render(<MemoryRouter><Leads /></MemoryRouter>);

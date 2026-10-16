@@ -82,13 +82,22 @@ export async function sha256Hex(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** The key every caller with no address shares: such a caller is limited together, never not at all. */
+export const NO_ADDRESS = 'no-address';
+
 /**
- * The caller's address as Supabase's gateway reports it: the first entry of
- * x-forwarded-for. '' when absent, and an absent address is not limited.
+ * The caller's address, for the limiters (review 2026-10-15). Not the first
+ * entry of x-forwarded-for: a client sends that header itself, and the gateway
+ * appends the real address after whatever it was given ("spoofed, real"). So:
+ * the platform's own `cf-connecting-ip` when present, else the last entry the
+ * gateway appended, else NO_ADDRESS — a shared key, so a caller cannot escape
+ * the limit by arriving without one.
  */
 export function clientIp(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for') || '';
-  return forwarded.split(',')[0]?.trim().slice(0, 64) || '';
+  const direct = (req.headers.get('cf-connecting-ip') || '').trim();
+  if (direct) return direct.slice(0, 64);
+  const hops = (req.headers.get('x-forwarded-for') || '').split(',').map((h) => h.trim()).filter(Boolean);
+  return hops.length ? hops[hops.length - 1].slice(0, 64) : NO_ADDRESS;
 }
 
 /**

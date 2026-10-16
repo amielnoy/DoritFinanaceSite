@@ -77,6 +77,24 @@ export function setInternalBrowser(internal: boolean): void {
   }
 }
 
+/** The screens GA4 never measures: the admin area, whose URLs carry searches and record ids. */
+export const isUnmeasuredPath = (pathname: string): boolean => /^\/admin(\/|$)/.test(pathname);
+
+/**
+ * Google's own opt-out, set for the route on screen (review 2026-10-15). The
+ * history page views GA4 sends by itself ignore `send_page_view: false` and
+ * any `page_location` override, so on /admin the tag is switched off whole:
+ * no page view, no query string, no event. index.html sets the same flag for
+ * a page that loads on /admin, before the tag is configured.
+ */
+export function measureRoute(pathname: string): void {
+  try {
+    (window as unknown as Record<string, unknown>)[`ga-disable-${GA4_MEASUREMENT_ID}`] = isUnmeasuredPath(pathname);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** `?internal=1` marks this browser once; `?internal=0` clears it. */
 export function initInternalFlag(): void {
   try {

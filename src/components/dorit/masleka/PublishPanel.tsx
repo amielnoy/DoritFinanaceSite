@@ -1,4 +1,4 @@
-import React, { useId, useState } from "react";
+import React, { useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Loader2, Send } from "lucide-react";
 import SnapshotView from "@/components/dorit/account/SnapshotView";
@@ -34,43 +34,55 @@ export function CustomRecommendationForm({
   newKey = () => `${CUSTOM_PREFIX}${crypto.randomUUID()}`,
 }: {
   busy: boolean;
-  onAdd: (key: string, decision: ReviewDecision) => void;
+  onAdd: (key: string, decision: ReviewDecision) => Promise<unknown>;
   newKey?: () => string;
 }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [priority, setPriority] = useState<RecommendationPriority>("check");
+  const saving = useRef(false);
+  // A retry after an uncertain write updates the same recommendation.
+  const draftKey = useRef<string | null>(null);
   const id = useId();
   const ready = title.trim().length > 0 && body.trim().length > 0;
   return (
     <form
       aria-label="הוספת המלצה"
       className="rounded-[4px] border border-dashed border-border p-4 print:hidden"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        if (!ready) return;
-        onAdd(newKey(), { status: "approved", finalText: body.trim(), title: title.trim(), priority });
-        setTitle("");
-        setBody("");
-        setPriority("check");
+        if (!ready || busy || saving.current) return;
+        saving.current = true;
+        draftKey.current ??= newKey();
+        try {
+          await onAdd(draftKey.current, { status: "approved", finalText: body.trim(), title: title.trim(), priority });
+          setTitle("");
+          setBody("");
+          setPriority("check");
+          draftKey.current = null;
+        } catch {
+          // The parent's mutation displays the error; keep the draft for retry.
+        } finally {
+          saving.current = false;
+        }
       }}
     >
       <p className="font-medium">הוספת המלצה משלך</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
         <div>
           <label htmlFor={`${id}-title`} className="block text-sm text-muted-foreground">כותרת</label>
-          <input id={`${id}-title`} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} className="mt-1 w-full border border-border bg-background px-2 py-1.5" />
+          <input id={`${id}-title`} disabled={busy} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} className="mt-1 w-full border border-border bg-background px-2 py-1.5" />
         </div>
         <div>
           <label htmlFor={`${id}-priority`} className="block text-sm text-muted-foreground">עדיפות</label>
-          <select id={`${id}-priority`} value={priority} onChange={(e) => setPriority(e.target.value as RecommendationPriority)} className="mt-1 border border-border bg-background px-2 py-1.5">
+          <select id={`${id}-priority`} disabled={busy} value={priority} onChange={(e) => setPriority(e.target.value as RecommendationPriority)} className="mt-1 border border-border bg-background px-2 py-1.5">
             <option value="important">{PRIORITY_LABEL.important}</option>
             <option value="check">{PRIORITY_LABEL.check}</option>
           </select>
         </div>
       </div>
       <label htmlFor={`${id}-body`} className="mt-3 block text-sm text-muted-foreground">הסבר ללקוח</label>
-      <textarea id={`${id}-body`} value={body} onChange={(e) => setBody(e.target.value)} rows={4} maxLength={4000} className="mt-1 w-full border border-border bg-background p-2 text-sm" />
+      <textarea id={`${id}-body`} disabled={busy} value={body} onChange={(e) => setBody(e.target.value)} rows={4} maxLength={4000} className="mt-1 w-full border border-border bg-background p-2 text-sm" />
       <button type="submit" disabled={busy || !ready} className={`${buttonClass} mt-3 border-primary`}>
         הוספה ואישור
       </button>

@@ -12,8 +12,12 @@ import type { AdminUser } from "@/services/ports";
 const list = vi.fn<() => Promise<AdminUser[]>>();
 vi.mock("@/services", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services")>();
-  return { ...actual, services: { ...actual.services, usersAdmin: { list: () => list() } } };
+  return { ...actual, services: { ...actual.services, usersAdmin: { list: () => list() }, leadsAdmin: { list: async () => [] } } };
 });
+vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ user: { id: "me", role: "admin" }, isAuthenticated: true }) }));
+// The person's role in the agency (src/hooks/useAgency.ts): full access unless a case narrows it.
+const role = vi.hoisted(() => ({ role: "owner", isOperator: true }) as import("../helpers/agency-role-mock").RoleState);
+vi.mock("@/hooks/useAgency", async () => (await import("../helpers/agency-role-mock")).agencyHookMock(role));
 
 const { default: AdminUsers } = await import("@/pages/AdminUsers");
 

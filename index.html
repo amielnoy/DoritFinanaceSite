@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- No dark theme exists on this site — every colour in src/index.css is a
          single light palette, with no `prefers-color-scheme: dark` override
@@ -155,6 +155,8 @@
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag() { dataLayer.push(arguments); }
+      // The admin area is never measured: its URLs carry searches and record ids (src/lib/analytics.ts, measureRoute).
+      if (/^\/admin(\/|$)/.test(location.pathname)) window['ga-disable-G-LLSYPMGV58'] = true;
       gtag('js', new Date());
       gtag('config', 'G-LLSYPMGV58');
     </script>

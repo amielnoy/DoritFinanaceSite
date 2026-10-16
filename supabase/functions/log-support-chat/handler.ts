@@ -4,6 +4,7 @@
  * row — through the service account instead of a connector.
  */
 import { corsHeaders } from '../_shared/cors.ts';
+import { clientIp, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning } from '../_shared/mail.ts';
 import { appendSheetRow } from '../_shared/sheets.ts';
@@ -21,6 +22,14 @@ const OUTCOMES: Record<string, string> = {
   referred_to_interview: 'הופנה לראיון היכרות',
   abandoned: 'נקטע',
 };
+
+/**
+ * Rows per caller, and for every caller together. The chat sweep logs at most
+ * 10 conversations every 15 minutes, in-process; Base44's agents call from
+ * Base44's server, so one address stands for all of them. Both fit well under.
+ */
+const ROWS_PER_IP_PER_HOUR = 60;
+const ROWS_PER_HOUR = 300;
 
 /** ערוצים מוכרים. */
 const CHANNELS = ['site', 'whatsapp'];
@@ -49,6 +58,17 @@ export async function handler(req: Request): Promise<Response> {
     if (!(Deno.env.get('SHEET_ID') || '').trim()) {
       log('info', 'request.end', { rid, ms: Date.now() - startedAt, sheet: 'unconfigured' });
       return Response.json({ ok: true, rid, sheet: 'לא מוגדר' }, { headers: cors });
+    }
+
+    // A public door that writes to a sheet a person reads: one caller, or a
+    // flood from many, may not fill it.
+    const ip = clientIp(req);
+    const allowed =
+      (await withinLimit(log, rid, `support-ip:${await sha256Hex(ip)}`, 3600, ROWS_PER_IP_PER_HOUR)) &&
+      (await withinLimit(log, rid, 'support-log', 3600, ROWS_PER_HOUR));
+    if (!allowed) {
+      log('warn', 'request.rejected', { rid, reason: 'rate_limited' });
+      return Response.json({ error: 'יותר מדי רישומים ברצף.', rid }, { status: 429, headers: cors });
     }
 
     const safeTranscript: string = redact(transcript);

@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useSectionNav } from "@/hooks/useSectionNav";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { useAdminAccess, useAdminCounts } from "@/hooks/useAdminMenu";
-import { SITE_ROLE_LABEL } from "@/lib/admin-users";
+import { OPERATOR_LABEL, ROLE_LABELS } from "@/config/permissions";
 import { adminHome } from "@/components/dorit/admin/adminNav";
 import CountBadge from "@/components/dorit/admin/CountBadge";
 import SupportLink from "./SupportLink";
@@ -144,7 +144,7 @@ export default function FloatingHeader() {
                   access={access}
                   counts={counts}
                   name={userName}
-                  roleLabel={access === "admin" ? SITE_ROLE_LABEL.admin : "צוות מסלקה"}
+                  roleLabel={access === "operator" ? OPERATOR_LABEL : ROLE_LABELS[access]}
                   onSignOut={signOut}
                 />
               </Suspense>
@@ -210,7 +210,7 @@ export default function FloatingHeader() {
                 {t("header.login")}
               </Link>
             ) : null}
-            {isAuthenticated && access !== "admin" ? (
+            {isAuthenticated && access !== "operator" ? (
               <Link to="/account" className={NAV_LINK}>{t("header.account")}</Link>
             ) : null}
             {isAuthenticated && !access ? (
@@ -289,7 +289,7 @@ export default function FloatingHeader() {
           {access ? (
             <Link to={adminHome(access)} className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>ממשק ניהול</span><span className="inline-flex items-center gap-2"><CountBadge count={counts.total} label="פריטים ממתינים" /><ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" /></span></Link>
           ) : null}
-          {isAuthenticated && access !== "admin" ? (
+          {isAuthenticated && access !== "operator" ? (
             <Link to="/account" className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span>{t("header.account")}</span><ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" /></Link>
           ) : showLogin ? (
             <Link to={LOGIN_HREF} className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200" onClick={() => setOpen(false)}><span className="inline-flex items-center gap-2"><User size={18} aria-hidden="true" className="text-accent" />{t("header.login")}</span><ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" /></Link>

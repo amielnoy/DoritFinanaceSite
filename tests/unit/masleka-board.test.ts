@@ -2,7 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import { addBusinessDays } from "../../supabase/functions/_shared/business-days.ts";
 import * as edge from "../../supabase/functions/_shared/masleka.ts";
 import {
-  boardColumns,
+  actionFor,
+  boardTime,
+  nowRows,
+  planRows,
+  stageRows,
+  viewFromParam,
+  BOARD_VIEWS,
+  firstNameOf,
+  whatsappInviteUrl,
+  whatsappNumber,
   READY_AFTER_MS,
   clientMessage,
   copyOrFallback,
@@ -26,21 +35,128 @@ const request = (over: Partial<MaslekaRequest>): MaslekaRequest => ({
   submittedAt: null, clearinghouseDeletesAt: null, completedAt: null, ...over,
 });
 
-describe("boardColumns", () => {
-  it("puts each request in its column, oldest waiting first, and drops what left the board", () => {
-    const columns = boardColumns([
-      request({ id: "w2", status: "code_received", codeReceivedAt: iso(-HOUR) }),
-      request({ id: "w1", status: "code_received", codeReceivedAt: iso(-2 * HOUR) }),
-      request({ id: "s1", status: "submitted", submittedAt: iso(-HOUR) }),
-      request({ id: "i1", status: "invited" }),
-      request({ id: "c1", status: "completed", completedAt: iso(-HOUR) }),
-      request({ id: "x1", status: "expired" }),
-      request({ id: "x2", status: "cancelled" }),
-    ]);
-    expect(columns.waiting.map((r) => r.id)).toEqual(["w1", "w2"]);
-    expect(columns.submitted.map((r) => r.id)).toEqual(["s1"]);
-    expect(columns.invited.map((r) => r.id)).toEqual(["i1"]);
-    expect(columns.completed.map((r) => r.id)).toEqual(["c1"]);
+/** The board's "needs action" rule (the redesign's step 3), with no page. */
+describe("actionFor", () => {
+  const none = new Map<string, string>();
+
+  it("sends a received code to the guided submit, saying when it came and the ID's last digits", () => {
+    const plan = actionFor(request({ status: "code_received", codeReceivedAt: iso(-HOUR), idLast4: "0018" }), NOW, none);
+    expect(plan).toMatchObject({ step: 2, stage: "code_received", needsAction: true, urgent: false, action: { kind: "submit", label: "להגשה" } });
+    expect(plan.reason).toBe(`קוד האימות התקבל ${boardTime(iso(-HOUR))} · ת״ז מסתיימת ב־0018`);
+    expect(actionFor(request({ status: "code_received", codeReceivedAt: iso(-HOUR) }), NOW, none).reason).not.toContain("ת״ז");
+  });
+
+  it("sends a ready download to the clearinghouse, with its deletion countdown", () => {
+    const plan = actionFor(request({ status: "submitted", submittedAt: iso(-6 * HOUR), clearinghouseDeletesAt: iso(5 * DAY) }), NOW, none);
+    expect(plan).toMatchObject({ step: 3, needsAction: true, urgent: false, action: { kind: "download", label: "להורדה במסלקה" } });
+    expect(plan.reason).toBe("מוכן להורדה · 5 ימים עד מחיקה במסלקה");
+  });
+
+  it("marks a ready download urgent two days or fewer before the clearinghouse deletes it", () => {
+    const at = (days: number) => actionFor(request({ status: "submitted", submittedAt: iso(-6 * HOUR), clearinghouseDeletesAt: iso(days * DAY) }), NOW, none);
+    expect(at(3).urgent).toBe(false);
+    expect(at(2).urgent).toBe(true);
+    expect(at(1).urgent).toBe(true);
+    expect(at(1).reason).toBe("מוכן להורדה · יום אחד עד מחיקה במסלקה");
+  });
+
+  it("asks nothing of a submission still being prepared", () => {
+    const plan = actionFor(request({ status: "submitted", submittedAt: iso(-HOUR), clearinghouseDeletesAt: iso(DAY) }), NOW, none);
+    expect(plan).toMatchObject({ step: 3, needsAction: false, urgent: false, action: { kind: "none", label: "אין צורך בפעולה" } });
+    expect(plan.reason).toBe(`הוגש ${boardTime(iso(-HOUR))} · יהיה מוכן בעוד כ־3–4 שעות`);
+    expect(READY_AFTER_MS).toBe(4 * HOUR);
+  });
+
+  it("offers an invited client a fresh link always, and puts them in 'now' only after three days", () => {
+    const fresh = actionFor(request({ status: "invited", clientInvitedAt: iso(-2 * DAY) }), NOW, none);
+    expect(fresh).toMatchObject({ step: 1, needsAction: false, action: { kind: "relink", label: "קישור חדש" } });
+    expect(fresh.reason).toBe("קיבל/ה קישור לפני 2 ימים ועוד לא מילא/ה");
+    const stale = actionFor(request({ status: "invited", clientInvitedAt: iso(-4 * DAY) }), NOW, none);
+    expect(stale).toMatchObject({ needsAction: true, action: { kind: "relink" } });
+    expect(stale.reason).toBe("קיבל/ה קישור לפני 4 ימים ועוד לא מילא/ה");
+  });
+
+  it("counts an invitation from its creation when it was never mailed, and says today and yesterday in words", () => {
+    expect(actionFor(request({ status: "invited", createdAt: iso(-5 * DAY) }), NOW, none).needsAction).toBe(true);
+    expect(actionFor(request({ status: "invited", createdAt: iso(-HOUR) }), NOW, none).reason).toBe("קיבל/ה קישור היום ועוד לא מילא/ה");
+    expect(actionFor(request({ status: "invited", createdAt: iso(-DAY) }), NOW, none).reason).toBe("קיבל/ה קישור אתמול ועוד לא מילא/ה");
+  });
+
+  it("links a completed request to its analysis when there is one, and is never 'now'", () => {
+    const done = request({ id: "c1", status: "completed", completedAt: iso(-DAY) });
+    expect(actionFor(done, NOW, new Map([["c1", "snap-1"]]))).toMatchObject({
+      step: 4, needsAction: false, reason: `הושלם ${boardTime(iso(-DAY))}`, action: { kind: "analysis", label: "לניתוח", snapshotId: "snap-1" },
+    });
+    expect(actionFor(done, NOW, none).action.kind).toBe("none");
+  });
+});
+
+describe("nowRows and stageRows", () => {
+  const none = new Map<string, string>();
+  const rows = planRows(
+    [
+      request({ id: "invited-new", status: "invited", clientInvitedAt: iso(-DAY) }),
+      request({ id: "invited-old", status: "invited", clientInvitedAt: iso(-10 * DAY) }),
+      request({ id: "code", status: "code_received", codeReceivedAt: iso(-2 * HOUR) }),
+      request({ id: "ready", status: "submitted", submittedAt: iso(-30 * HOUR), clearinghouseDeletesAt: iso(5 * DAY) }),
+      request({ id: "urgent", status: "submitted", submittedAt: iso(-6 * HOUR), clearinghouseDeletesAt: iso(DAY) }),
+      request({ id: "preparing", status: "submitted", submittedAt: iso(-HOUR), clearinghouseDeletesAt: iso(9 * DAY) }),
+      request({ id: "done", status: "completed", completedAt: iso(-DAY) }),
+      request({ id: "gone", status: "expired" }),
+    ],
+    NOW,
+    none,
+  );
+
+  it("drops what left the board", () => {
+    expect(rows.map((r) => r.request.id)).not.toContain("gone");
+  });
+
+  it("puts the urgent first, then the oldest first, and only what needs action", () => {
+    expect(nowRows(rows).map((r) => r.request.id)).toEqual(["urgent", "invited-old", "ready", "code"]);
+  });
+
+  it("lists one stage oldest first, and the completed newest first", () => {
+    // Ready since 26 h ago, ready since 2 h ago, submitted an hour ago.
+    expect(stageRows(rows, "submitted").map((r) => r.request.id)).toEqual(["ready", "urgent", "preparing"]);
+    expect(stageRows(rows, "invited").map((r) => r.request.id)).toEqual(["invited-old", "invited-new"]);
+  });
+});
+
+describe("the stage bar's views", () => {
+  it("reads ?stage= as one of the bar's views, and anything else as 'now'", () => {
+    expect(BOARD_VIEWS.map((v) => v.view)).toEqual(["now", "invited", "code_received", "submitted", "completed"]);
+    for (const v of ["invited", "code_received", "submitted", "completed", "now"]) expect(viewFromParam(v)).toBe(v);
+    for (const v of [null, "", "waiting", "SUBMITTED", "<script>"]) expect(viewFromParam(v)).toBe("now");
+  });
+});
+
+describe("the WhatsApp invitation", () => {
+  const LINK = `https://govari-fin.co.il/masleka#t=${"N".repeat(43)}`;
+
+  it("writes an Israeli mobile as wa.me wants it: 972 and the number without its 0", () => {
+    for (const phone of ["0501234567", "050-123-4567", "050 123 4567", "+972501234567", "972-50-123-4567"]) {
+      expect(whatsappNumber(phone)).toBe("972501234567");
+    }
+    for (const phone of ["03-1234567", "12345", "", "0501234567890", "abc"]) expect(whatsappNumber(phone)).toBeNull();
+  });
+
+  it("puts the link in a short message, encoded so that # and spaces survive, and names no sender", () => {
+    const url = new URL(whatsappInviteUrl("0501234567", "משה כהן", LINK)!);
+    expect(url.origin + url.pathname).toBe("https://wa.me/972501234567");
+    expect(whatsappInviteUrl("0501234567", "משה כהן", LINK)).not.toMatch(/[ #א-ת]/);
+    const text = url.searchParams.get("text")!;
+    expect(text.startsWith("שלום משה, ")).toBe(true);
+    expect(text).toContain("קוד האימות");
+    expect(text).not.toContain("ייפוי");
+    expect(text.endsWith(LINK)).toBe(true);
+    expect(text).not.toMatch(/דורית/);
+  });
+
+  it("builds nothing for a number that is not a mobile, and greets plainly with no name", () => {
+    expect(whatsappInviteUrl("03-1234567", "משה", LINK)).toBeNull();
+    expect(new URL(whatsappInviteUrl("0501234567", "  ", LINK)!).searchParams.get("text")!.startsWith("שלום, ")).toBe(true);
+    expect(firstNameOf("  שירה  בן דוד ")).toBe("שירה");
   });
 });
 

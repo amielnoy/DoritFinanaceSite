@@ -14,8 +14,12 @@ const organizations = vi.fn(async () => [{ id: "org-a", name: "סוכנות אל
 const invite = vi.fn<(input: InviteInput) => Promise<InviteResult>>();
 vi.mock("@/services", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services")>();
-  return { ...actual, services: { ...actual.services, usersAdmin: { list: () => list(), organizations: () => organizations(), invite: (i: InviteInput) => invite(i) } } };
+  return { ...actual, services: { ...actual.services, usersAdmin: { list: () => list(), organizations: () => organizations(), invite: (i: InviteInput) => invite(i) }, leadsAdmin: { list: async () => [] } } };
 });
+vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ user: { id: "me", role: "admin" }, isAuthenticated: true }) }));
+// The person's role in the agency (src/hooks/useAgency.ts): full access unless a case narrows it.
+const role = vi.hoisted(() => ({ role: "owner", isOperator: true }) as import("../helpers/agency-role-mock").RoleState);
+vi.mock("@/hooks/useAgency", async () => (await import("../helpers/agency-role-mock")).agencyHookMock(role));
 
 const { default: AdminUsers } = await import("@/pages/AdminUsers");
 
@@ -36,7 +40,7 @@ async function openAndFill(email = "new@example.com") {
   if (email) await user.type(screen.getByLabelText("כתובת דוא״ל"), email);
   await screen.findByRole("option", { name: "משרד בטא" });
   await user.selectOptions(screen.getByLabelText("ארגון"), "org-b");
-  await user.selectOptions(screen.getByLabelText("תפקיד"), "staff");
+  await user.selectOptions(screen.getByLabelText("תפקיד"), "admin");
   return { user, dialog };
 }
 
@@ -44,6 +48,29 @@ describe("הוספת משתמש", () => {
   beforeEach(() => {
     invite.mockReset();
     list.mockClear();
+    role.role = "owner";
+    role.isOperator = true;
+    role.agencies = undefined;
+  });
+
+  it("offers an agency Admin only their own agencies, and only the User role (agency roles)", async () => {
+    role.role = "admin";
+    role.isOperator = false;
+    role.agencies = [{ id: "org-b", name: "משרד בטא", role: "admin" }];
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "הוספת משתמש" }));
+    await screen.findByRole("option", { name: "משרד בטא" });
+    expect(screen.queryByRole("option", { name: "סוכנות אלפא" })).toBeNull();
+    const roles = [...(screen.getByLabelText("תפקיד") as HTMLSelectElement).options].map((o) => o.value);
+    expect(roles).toEqual(["user"]);
+  });
+
+  it("is not offered to a User at all", async () => {
+    role.role = "user";
+    role.isOperator = false;
+    renderPage();
+    expect(screen.queryByRole("button", { name: "הוספת משתמש" })).toBeNull();
   });
 
   it("invites with the address, organization and role, says so, and reloads the list", async () => {
@@ -51,7 +78,7 @@ describe("הוספת משתמש", () => {
     const { user } = await openAndFill();
     const before = list.mock.calls.length;
     await user.click(screen.getByRole("button", { name: "שליחת הזמנה" }));
-    await waitFor(() => expect(invite).toHaveBeenCalledWith({ email: "new@example.com", orgId: "org-b", role: "staff" }));
+    await waitFor(() => expect(invite).toHaveBeenCalledWith({ email: "new@example.com", orgId: "org-b", role: "admin" }));
     expect(await screen.findByRole("status")).toHaveTextContent("ההזמנה נשלחה ל-new@example.com");
     await waitFor(() => expect(list.mock.calls.length).toBeGreaterThan(before));
   });

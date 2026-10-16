@@ -7,8 +7,29 @@ begin;
 -- ── anonymous visitor ───────────────────────────────────────────────────────
 set local role anon;
 
+-- Only the name the claim form makes: agency 1's folder, a random uuid, the
+-- sanitized file name (20261102000000). Anything else is refused.
+do $$
+declare
+  bad text;
+begin
+  foreach bad in array array[
+    '00000000-0000-0000-0000-000000000001/anon-upload.pdf',
+    'aaaaaaaa-0000-0000-0000-000000000002/1b4e28ba-2fa1-4d3b-a3f5-ef19b5a7633b-x.pdf',
+    '00000000-0000-0000-0000-000000000001/1b4e28ba-2fa1-4d3b-a3f5-ef19b5a7633b-../x.pdf',
+    '00000000-0000-0000-0000-000000000001/1b4e28ba-2fa1-4d3b-a3f5-ef19b5a7633b-',
+    'x.pdf'
+  ] loop
+    begin
+      insert into storage.objects (bucket_id, name) values ('claim-documents', bad);
+      raise exception 'a claim document went in under a name the form never makes: %', bad;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+end $$;
+
 insert into storage.objects (bucket_id, name)
-values ('claim-documents', '00000000-0000-0000-0000-000000000001/anon-upload.pdf');
+values ('claim-documents', '00000000-0000-0000-0000-000000000001/1b4e28ba-2fa1-4d3b-a3f5-ef19b5a7633b-anon-upload.pdf');
 
 do $$ begin
   -- The insert above must have gone through; this is not the assertion, the
@@ -34,7 +55,7 @@ set local role authenticated;
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-000000000099","role":"authenticated"}';
 
 insert into storage.objects (bucket_id, name)
-values ('claim-documents', '00000000-0000-0000-0000-000000000001/authenticated-upload.pdf');
+values ('claim-documents', '00000000-0000-0000-0000-000000000001/6f9619ff-8b86-4011-b42d-00c04fc964ff-authenticated-upload.pdf');
 
 do $$ begin
   if (select count(*) from storage.objects where bucket_id = 'claim-documents') <> 0 then

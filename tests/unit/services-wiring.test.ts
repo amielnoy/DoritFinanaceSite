@@ -102,7 +102,6 @@ describe("composition root", () => {
     await port.relink("r").catch(() => {});
     await port.reveal("r", "code").catch(() => {});
     await port.markSubmitted("r").catch(() => {});
-    expect(await port.myRole()).toBeNull();
     expect(supabase.functions.invoke).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalled();
   });

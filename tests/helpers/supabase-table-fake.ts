@@ -35,6 +35,10 @@ export function tableFake(
       calls.push(["not", column, operator, value]);
       return query;
     },
+    is(column, value) {
+      calls.push(["is", column, value]);
+      return query;
+    },
     order(column, options) {
       calls.push(["order", column, options]);
       return query;

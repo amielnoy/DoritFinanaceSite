@@ -17,10 +17,16 @@ const auth = vi.hoisted(() => ({
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));
 vi.mock("@/config/masleka", () => ({ MASLEKA_ENABLED: true }));
 
-const myRole = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
+const myRole = vi.hoisted(() => vi.fn<(agencyId: string) => Promise<string | null>>(async () => null));
+const myAgencies = vi.hoisted(() => vi.fn(async () => [] as { id: string; name: string; role: string }[]));
 const list = vi.hoisted(() => vi.fn(async () => [] as { status: string }[]));
 const countNew = vi.hoisted(() => vi.fn(async () => 0));
-vi.mock("@/services", () => ({ services: { masleka: { myRole, list }, leadsAdmin: { countNew } } }));
+const countUnassigned = vi.hoisted(() => vi.fn(async () => 0));
+vi.mock("@/services", () => ({
+  services: { masleka: { list }, leadsAdmin: { countNew, countUnassigned }, agency: { myRole, myAgencies } },
+}));
+const A1 = "00000000-0000-0000-0000-000000000001";
+const TRUST = "0abcfa0b-cc26-40f0-8971-54bd4d845139";
 
 import AdminLayout from "@/components/dorit/admin/AdminLayout";
 
@@ -59,7 +65,7 @@ describe("<AdminLayout />", () => {
     const daily = within(sidebar()).getByRole("group", { name: "טיפול שוטף" });
     expect(within(daily).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/admin/leads", "/admin/masleka"]);
     const setup = within(sidebar()).getByRole("group", { name: "תוכן והגדרות" });
-    expect(within(setup).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/admin/blog", "/admin/users"]);
+    expect(within(setup).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/admin/blog", "/admin/users", "/admin/agency"]);
     expect(within(sidebar()).getByRole("link", { name: "ראשי" })).toHaveAttribute("href", "/account");
     expect(screen.getByRole("link", { name: "צפייה באתר" })).toHaveAttribute("href", "/");
   });
@@ -76,23 +82,49 @@ describe("<AdminLayout />", () => {
     expect(within(sidebar()).getByRole("link", { name: /^בקשות מסלקה/ })).toHaveAttribute("aria-current", "page");
   });
 
-  it("counts new leads and waiting requests, and shows no zero", async () => {
-    countNew.mockResolvedValue(4);
+  it("counts the unassigned queue for the operator, and waiting requests, and shows no zero", async () => {
+    countUnassigned.mockResolvedValue(4);
     list.mockResolvedValue([{ status: "invited" }]);
     renderAt("/admin/leads");
-    expect(await within(sidebar()).findByRole("link", { name: /פניות\s*4 חדשות/ })).toBeInTheDocument();
+    expect(await within(sidebar()).findByRole("link", { name: /פניות\s*4 לא שויכו/ })).toBeInTheDocument();
     expect(within(sidebar()).getByRole("link", { name: "בקשות מסלקה" })).toHaveTextContent(/^בקשות מסלקה$/);
   });
 
-  it("gives agency staff the clearinghouse alone", async () => {
-    myRole.mockResolvedValue("agent");
+  it("gives a User the agency's pages but not its details, counting their own new leads (agency roles)", async () => {
+    myAgencies.mockResolvedValue([{ id: A1, name: "דורית", role: "user" }]);
+    myRole.mockResolvedValue("user");
+    countNew.mockResolvedValue(2);
+    countUnassigned.mockClear();
     renderAt("/admin/masleka", { id: "u2", email: "s@example.com", role: "user" });
     const nav = await screen.findByRole("navigation", { name: "ממשק ניהול" });
-    expect(within(nav).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/admin/masleka"]);
-    expect(countNew).not.toHaveBeenCalled();
+    expect(within(nav).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual([
+      "/admin/leads", "/admin/masleka", "/admin/blog", "/admin/users",
+    ]);
+    expect(await within(nav).findByRole("link", { name: /פניות\s*2 חדשות/ })).toBeInTheDocument();
+    expect(countUnassigned).not.toHaveBeenCalled();
+  });
+
+  it("gives someone in two agencies a switcher, and keeps the choice on every link", async () => {
+    myAgencies.mockResolvedValue([{ id: A1, name: "דורית", role: "user" }, { id: TRUST, name: "Trust", role: "owner" }]);
+    myRole.mockImplementation(async (id: string) => (id === TRUST ? "owner" : "user"));
+    renderAt(`/admin/leads?agency=${TRUST}`, { id: "u4", email: "t@example.com", role: "user" });
+    const picker = await screen.findByLabelText("סוכנות");
+    expect(picker).toHaveValue(TRUST);
+    const nav = await screen.findByRole("navigation", { name: "ממשק ניהול" });
+    expect(await within(nav).findByRole("link", { name: "פרטי הסוכנות" })).toHaveAttribute("href", `/admin/agency?agency=${TRUST}`);
+    myRole.mockImplementation(async () => null);
+  });
+
+  it("shows no switcher with one agency", async () => {
+    myAgencies.mockResolvedValue([{ id: A1, name: "דורית", role: "user" }]);
+    myRole.mockResolvedValue("user");
+    renderAt("/admin/leads", { id: "u5", email: "u@example.com", role: "user" });
+    await screen.findByRole("navigation", { name: "ממשק ניהול" });
+    expect(screen.queryByLabelText("סוכנות")).toBeNull();
   });
 
   it("shows a client's personal area without the frame", async () => {
+    myAgencies.mockResolvedValue([]);
     myRole.mockResolvedValue(null);
     renderAt("/account", { id: "u3", email: "c@example.com", role: "user" });
     expect(await screen.findByText("האזור האישי")).toBeInTheDocument();

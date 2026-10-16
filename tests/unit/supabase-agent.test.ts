@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CHAT_REQUEST_TIMEOUT_MS, STATUS_POLL_MS, STATUS_RECOVERY_MS, SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
+import { CHAT_REQUEST_TIMEOUT_MS, SendAbandoned, STATUS_POLL_MS, STATUS_RECOVERY_MS, STATUS_REQUEST_TIMEOUT_MS, SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
 import { AgentLimitError, AgentUnavailableError, LEAD_SAVED_WITHOUT_REPLY } from "@/services/agent-errors";
 import type { AgentMessage } from "@/services/ports";
 
@@ -8,16 +8,42 @@ const client = (invoke: Invoke) => ({ functions: { invoke: vi.fn(invoke) } });
 const ok = (data: unknown) => async () => ({ data, error: null });
 const refused = (status: number, body: unknown) => async () => ({ data: null, error: { message: "non-2xx", context: new Response(JSON.stringify(body), { status }) } });
 const META = { consent_version: "2026-10-agents-v6", consent_at: "2026-10-13T09:00:00.000Z", channel: "direct", campaign: "", landing_path: "/" };
+const T = "t".repeat(64);
+/** The conversation keys the adapter makes, numbered: conv-1, conv-2, … */
+const numberedKeys = () => {
+  let n = 0;
+  return () => ({ id: `conv-${++n}`, token: T });
+};
 
 describe("SupabaseAgentService", () => {
-  it("opens the conversation with consent and attribution on the first message, and the token after", async () => {
-    const c = client(ok({ ok: true, rid: "r", conversationId: "srv-1", token: "t".repeat(64), reply: "שלום", leadSaved: false }));
-    const svc = new SupabaseAgentService(c, () => "local-1");
+  it("opens the conversation under its own id and token, with consent and attribution on the first message only", async () => {
+    const c = client(ok({ ok: true, rid: "r", conversationId: "conv-1", turn: 1, reply: "שלום", leadSaved: false }));
+    const svc = new SupabaseAgentService(c, () => "local-1", numberedKeys());
     const conv = await svc.start("needs_interview", META);
     await svc.send(conv, "היי");
     await svc.send(conv, "ועוד");
-    expect(c.functions.invoke.mock.calls[0]).toEqual(["chat", { body: { agent: "needs_interview", message: "היי", consentVersion: META.consent_version, consentAt: META.consent_at, attribution: { channel: "direct", campaign: "", landingPath: "/" } }, signal: expect.any(AbortSignal) }]);
-    expect(c.functions.invoke.mock.calls[1][1].body).toEqual({ agent: "needs_interview", conversationId: "srv-1", token: "t".repeat(64), message: "ועוד" });
+    expect(c.functions.invoke.mock.calls[0]).toEqual([
+      "chat",
+      {
+        body: { agent: "needs_interview", conversationId: "conv-1", token: T, message: "היי", consentVersion: META.consent_version, consentAt: META.consent_at, attribution: { channel: "direct", campaign: "", landingPath: "/" } },
+        signal: expect.any(AbortSignal),
+      },
+    ]);
+    expect(c.functions.invoke.mock.calls[1][1].body).toEqual({ agent: "needs_interview", conversationId: "conv-1", token: T, message: "ועוד" });
+  });
+
+  it("makes a fresh uuid and a 64-hex token for each conversation by default", async () => {
+    const c = client(ok({ ok: true, reply: "שלום" }));
+    const svc = new SupabaseAgentService(c);
+    await svc.send(await svc.start("needs_interview", META), "1");
+    await svc.send(await svc.start("needs_interview", META), "2");
+    const [a, b] = c.functions.invoke.mock.calls.map((call) => call[1].body);
+    for (const body of [a, b]) {
+      expect(body.conversationId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      expect(body.token).toMatch(/^[0-9a-f]{64}$/);
+    }
+    expect(a.conversationId).not.toBe(b.conversationId);
+    expect(a.token).not.toBe(b.token);
   });
 
   it("hands the subscriber the whole transcript, the visitor's line with the reply", async () => {
@@ -106,13 +132,12 @@ describe("SupabaseAgentService", () => {
   it("starts a new server conversation after one was closed, under the same consent", async () => {
     let n = 0;
     const c = client(async () => (++n === 2 ? refused(409, { code: "closed" })() : ok({ ok: true, conversationId: `s${n}`, token: "t".repeat(64), reply: "r" })()));
-    const svc = new SupabaseAgentService(c, () => "l");
+    const svc = new SupabaseAgentService(c, () => "l", numberedKeys());
     const conv = await svc.start("needs_interview", META);
     await svc.send(conv, "1");
     await svc.send(conv, "2").catch(() => undefined);
     await svc.send(conv, "3");
-    expect(c.functions.invoke.mock.calls[2][1].body).toMatchObject({ consentVersion: META.consent_version, message: "3" });
-    expect(c.functions.invoke.mock.calls[2][1].body).not.toHaveProperty("conversationId");
+    expect(c.functions.invoke.mock.calls[2][1].body).toMatchObject({ conversationId: "conv-2", consentVersion: META.consent_version, message: "3" });
   });
 
   it.each([[503, { code: "unavailable", rid: "r9" }], [500, { code: "failed", rid: "r9" }]])("maps %i to AgentUnavailableError", async (status, body) => {
@@ -124,12 +149,12 @@ describe("SupabaseAgentService", () => {
 
   it("keeps the conversation a 503 opened, so the next message continues it", async () => {
     let n = 0;
-    const c = client(async () => (++n === 1 ? refused(503, { code: "unavailable", conversationId: "s1", token: "t".repeat(64) })() : ok({ ok: true, conversationId: "s1", reply: "r" })()));
-    const svc = new SupabaseAgentService(c, () => "l");
+    const c = client(async () => (++n === 1 ? refused(503, { code: "unavailable", conversationId: "conv-1", turn: 1 })() : ok({ ok: true, conversationId: "conv-1", reply: "r" })()));
+    const svc = new SupabaseAgentService(c, () => "l", numberedKeys());
     const conv = await svc.start("needs_interview", META);
     await svc.send(conv, "1").catch(() => undefined);
     await svc.send(conv, "2");
-    expect(c.functions.invoke.mock.calls[1][1].body).toMatchObject({ conversationId: "s1", token: "t".repeat(64) });
+    expect(c.functions.invoke.mock.calls[1][1].body).toEqual({ agent: "needs_interview", conversationId: "conv-1", token: T, message: "2" });
   });
 
   it("shows the visitor's message the moment it is sent, before the answer", async () => {
@@ -163,10 +188,10 @@ describe("SupabaseAgentService", () => {
     let n = 0;
     const c = client(async () =>
       ++n === 1
-        ? refused(503, { ok: false, code: "unavailable", rid: "r1", leadSaved: true, conversationId: "s1", token: "t".repeat(64) })()
+        ? refused(503, { ok: false, code: "unavailable", rid: "r1", leadSaved: true, conversationId: "conv-1", turn: 1 })()
         : refused(409, { code: "closed" })(),
     );
-    const svc = new SupabaseAgentService(c, () => "l");
+    const svc = new SupabaseAgentService(c, () => "l", numberedKeys());
     const conv = await svc.start("needs_interview", META);
     const cb = vi.fn();
     svc.subscribe(conv.id, cb);
@@ -175,9 +200,9 @@ describe("SupabaseAgentService", () => {
       { role: "user", content: "כן, זה נכון" },
       { role: "assistant", content: LEAD_SAVED_WITHOUT_REPLY, signal: "lead_saved", replyMissing: true },
     ]);
-    // The ids were adopted: the next message continues that conversation (and is told it is closed).
+    // The next message continues that conversation (and is told it is closed).
     await svc.send(conv, "עוד").catch(() => undefined);
-    expect(c.functions.invoke.mock.calls[1][1].body).toMatchObject({ conversationId: "s1", token: "t".repeat(64) });
+    expect(c.functions.invoke.mock.calls[1][1].body).toEqual({ agent: "needs_interview", conversationId: "conv-1", token: T, message: "עוד" });
   });
 
   describe("at the 40 second timeout", () => {
@@ -193,23 +218,29 @@ describe("SupabaseAgentService", () => {
       expect(signal?.aborted).toBe(false);
       await vi.advanceTimersByTimeAsync(40_000);
       expect(signal?.aborted).toBe(true);
+      // Every status request hangs too: each is cut off, and the window ends.
+      await vi.advanceTimersByTimeAsync(STATUS_RECOVERY_MS + STATUS_REQUEST_TIMEOUT_MS + STATUS_POLL_MS);
       expect(await result).toBeInstanceOf(AgentUnavailableError);
     });
 
-    it("adopts the conversation a late first answer opened, so the retry continues it", async () => {
+    it("sends a timed-out first message again under the same id and token, consent included", async () => {
       vi.useFakeTimers();
-      let release: (v: { data: unknown; error: null }) => void = () => undefined;
       let n = 0;
-      const c = client(() => (++n === 1 ? new Promise((r) => { release = r; }) : ok({ ok: true, conversationId: "late-1", reply: "r" })()));
-      const svc = new SupabaseAgentService(c, () => "l");
+      const c = client(async (_name, { body }) => {
+        if (++n === 1) return new Promise<never>(() => undefined);
+        // The first send never opened the row.
+        if (body.status === true) return refused(403, { ok: false, code: "gone" })();
+        return ok({ ok: true, conversationId: "conv-1", turn: 1, reply: "שלום" })();
+      });
+      const svc = new SupabaseAgentService(c, () => "l", numberedKeys());
       const conv = await svc.start("needs_interview", META);
-      const first = svc.send(conv, "1").catch((e) => e);
-      await vi.advanceTimersByTimeAsync(40_000);
+      const first = svc.send(conv, "שלום").catch((e) => e);
+      await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_POLL_MS);
       expect(await first).toBeInstanceOf(AgentUnavailableError);
-      release({ data: { ok: true, conversationId: "late-1", token: "t".repeat(64), reply: "late" }, error: null });
-      await vi.advanceTimersByTimeAsync(0);
-      await svc.send(conv, "2");
-      expect(c.functions.invoke.mock.calls[1][1].body).toEqual({ agent: "needs_interview", conversationId: "late-1", token: "t".repeat(64), message: "2" });
+      await svc.send(conv, "שלום");
+      const bodies = c.functions.invoke.mock.calls.map((call) => call[1].body);
+      expect(bodies[0]).toMatchObject({ conversationId: "conv-1", token: T, consentVersion: META.consent_version });
+      expect(bodies.at(-1)).toEqual(bodies[0]);
     });
   });
 });
@@ -223,7 +254,7 @@ describe("SupabaseAgentService", () => {
 describe("SupabaseAgentService — a reply that outlived the wait", () => {
   afterEach(() => vi.useRealTimers());
 
-  type Status = { busy: boolean; leadSaved?: boolean; last?: { role: string; content: string } | null };
+  type Status = { busy: boolean; leadSaved?: boolean; turns?: number; last?: { role: string; content: string } | null };
   /** The first message answers at once; the second never does; status requests answer from `statuses`, the last one repeating. */
   function hanging(statuses: Status[]) {
     const asked: Record<string, unknown>[] = [];
@@ -232,10 +263,10 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
       if (body.status === true) {
         asked.push(body);
         const next = statuses.length > 1 ? statuses.shift()! : statuses[0];
-        return { data: { ok: true, status: "open", leadSaved: false, last: null, ...next }, error: null };
+        return { data: { ok: true, status: "open", leadSaved: false, turns: 2, last: null, ...next }, error: null };
       }
       turns += 1;
-      if (turns === 1) return { data: { ok: true, conversationId: "srv-1", token: "t".repeat(64), reply: "שלום" }, error: null };
+      if (turns === 1) return { data: { ok: true, conversationId: "srv-1", token: "t".repeat(64), turn: 1, reply: "שלום" }, error: null };
       return new Promise(() => undefined);
     };
     return { invoke, asked };
@@ -244,7 +275,7 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
   async function secondMessage(statuses: Status[]) {
     vi.useFakeTimers();
     const { invoke, asked } = hanging(statuses);
-    const svc = new SupabaseAgentService(client(invoke), () => "l");
+    const svc = new SupabaseAgentService(client(invoke), () => "l", () => ({ id: "srv-1", token: T }));
     const conv = await svc.start("needs_interview", META);
     const cb = vi.fn();
     svc.subscribe(conv.id, cb);
@@ -261,7 +292,7 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
     ]);
     expect(outcome).toBe("ok");
     expect(cb.mock.calls.at(-1)![0].at(-1)).toEqual({ role: "assistant", content: "תודה, הפרטים אצל דורית", signal: "lead_saved" });
-    expect(asked[0]).toEqual({ agent: "needs_interview", conversationId: "srv-1", token: "t".repeat(64), status: true });
+    expect(asked[0]).toEqual({ agent: "needs_interview", conversationId: "srv-1", token: "t".repeat(64), status: true, turn: 2 });
   });
 
   it("says the details were saved when the turn saved the lead but left no reply", async () => {
@@ -276,20 +307,106 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
     expect(cb.mock.calls.at(-1)![0].map((m: AgentMessage) => m.content)).not.toContain("0521234567");
   });
 
-  it("stops asking after the recovery window and fails", async () => {
-    const { outcome, asked } = await secondMessage([{ busy: true }]);
+  it("fails, and never shows an earlier reply, when the turn it asked about never started", async () => {
+    const { outcome, cb } = await secondMessage([{ busy: false, leadSaved: true, turns: 1, last: { role: "assistant", content: "שלום" } }]);
     expect(outcome).toBeInstanceOf(AgentUnavailableError);
-    expect(asked.length).toBeLessThanOrEqual(Math.ceil(STATUS_RECOVERY_MS / STATUS_POLL_MS));
+    expect(cb.mock.calls.at(-1)![0]).toEqual([{ role: "user", content: "היי" }, { role: "assistant", content: "שלום" }]);
   });
 
-  it("asks nothing after a first message timed out: there is no conversation to ask about", async () => {
+  it("says the message is still being answered when the window ends with the turn still running, and keeps it on screen", async () => {
+    const { outcome, asked, cb } = await secondMessage([{ busy: true }]);
+    expect(outcome).toBeInstanceOf(AgentLimitError);
+    expect(outcome.reason).toBe("still_processing");
+    expect(asked.length).toBeLessThanOrEqual(Math.ceil(STATUS_RECOVERY_MS / STATUS_POLL_MS));
+    expect(cb.mock.calls.at(-1)![0]).toEqual([{ role: "user", content: "היי" }, { role: "assistant", content: "שלום" }, { role: "user", content: "0521234567" }]);
+  });
+
+  it("fails, not 'still processing', when the window ends with no answer at all", async () => {
     vi.useFakeTimers();
-    const invoke = vi.fn<Invoke>(() => new Promise(() => undefined));
+    let n = 0;
+    const invoke: Invoke = async (_name, { body }) => {
+      if (body.status === true) return { data: null, error: { message: "network" } };
+      return ++n === 1 ? { data: { ok: true, conversationId: "srv-1", turn: 1, reply: "שלום" }, error: null } : new Promise(() => undefined);
+    };
+    const svc = new SupabaseAgentService(client(invoke), () => "l");
+    const conv = await svc.start("needs_interview", META);
+    await svc.send(conv, "היי");
+    const sending = svc.send(conv, "שוב").then(() => "ok", (e) => e);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS + STATUS_POLL_MS);
+    expect(await sending).toBeInstanceOf(AgentUnavailableError);
+  });
+
+  it("recovers a first message too: it asks about turn 1 of the conversation it named", async () => {
+    vi.useFakeTimers();
+    const asked: Record<string, unknown>[] = [];
+    const invoke: Invoke = async (_name, { body }) => {
+      if (body.status !== true) return new Promise(() => undefined);
+      asked.push(body);
+      return { data: { ok: true, busy: false, status: "open", leadSaved: false, turns: 1, last: { role: "assistant", content: "שלום, במה אפשר לעזור?" } }, error: null };
+    };
+    const svc = new SupabaseAgentService(client(invoke), () => "l", () => ({ id: "srv-1", token: T }));
+    const conv = await svc.start("needs_interview", META);
+    const cb = vi.fn();
+    svc.subscribe(conv.id, cb);
+    const sending = svc.send(conv, "שלום").then(() => "ok", (e) => e);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_POLL_MS);
+    expect(await sending).toBe("ok");
+    expect(asked[0]).toEqual({ agent: "needs_interview", conversationId: "srv-1", token: T, status: true, turn: 1 });
+    expect(cb.mock.calls.at(-1)![0]).toEqual([{ role: "user", content: "שלום" }, { role: "assistant", content: "שלום, במה אפשר לעזור?" }]);
+  });
+
+  it("stops asking at once when the first message never opened the conversation", async () => {
+    vi.useFakeTimers();
+    const invoke = vi.fn<Invoke>(async (_name, { body }) => (body.status === true ? refused(403, { ok: false, code: "gone" })() : new Promise(() => undefined)));
     const svc = new SupabaseAgentService(client(invoke), () => "l");
     const conv = await svc.start("needs_interview", META);
     const sending = svc.send(conv, "שלום").then(() => "ok", (e) => e);
     await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS);
     expect(await sending).toBeInstanceOf(AgentUnavailableError);
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** The panel was reset or closed mid-send (review 2026-10-15, item 13): the adapter stops at once. */
+describe("SupabaseAgentService — a send the page abandons", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("aborts the request in flight and asks nothing after it", async () => {
+    vi.useFakeTimers();
+    const signals: AbortSignal[] = [];
+    const invoke = vi.fn((_n: string, o: { body: Record<string, unknown>; signal?: AbortSignal }) => {
+      if (o.signal) signals.push(o.signal);
+      return new Promise<never>(() => undefined);
+    });
+    const svc = new SupabaseAgentService({ functions: { invoke } }, () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const page = new AbortController();
+    const sending = svc.send(conv, "שלום", { signal: page.signal }).then(() => "ok", (e) => e);
+    page.abort();
+    expect(await sending).toBeInstanceOf(SendAbandoned);
+    expect(signals[0].aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS);
     expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops polling the status when abandoned during recovery", async () => {
+    vi.useFakeTimers();
+    let statusRequests = 0;
+    const invoke: Invoke = async (_n, { body }) => {
+      if (body.status !== true) return new Promise(() => undefined);
+      statusRequests += 1;
+      return { data: { ok: true, busy: true, status: "open", turns: 1, last: null }, error: null };
+    };
+    const svc = new SupabaseAgentService(client(invoke), () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const page = new AbortController();
+    const sending = svc.send(conv, "שלום", { signal: page.signal }).then(() => "ok", (e) => e);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + 2 * STATUS_POLL_MS);
+    const asked = statusRequests;
+    expect(asked).toBeGreaterThan(0);
+    page.abort();
+    expect(await sending).toBeInstanceOf(SendAbandoned);
+    await vi.advanceTimersByTimeAsync(STATUS_RECOVERY_MS);
+    expect(statusRequests).toBe(asked);
   });
 });

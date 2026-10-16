@@ -41,6 +41,23 @@ async function refusal(res: Response): Promise<string> {
   return typeof code === 'string' && /^[A-Z0-9]{1,10}$/.test(code) ? `:${code}` : '';
 }
 
+/**
+ * The code, and the message only when it is one of our own reasons — a
+ * function's `raise exception 'last_owner'` — never Postgres's prose, which can
+ * quote the row. Our reasons are lower-case words joined by underscores.
+ */
+async function reason(res: Response): Promise<string> {
+  const body = (await res.json().catch(() => null)) as { code?: unknown; message?: unknown } | null;
+  const code = typeof body?.code === 'string' && /^[A-Z0-9]{1,10}$/.test(body.code) ? `:${body.code}` : '';
+  const own = typeof body?.message === 'string' && /^[a-z]+(?:_[a-z]+)*$/.test(body.message) ? `:${body.message}` : '';
+  return `${code}${own}`;
+}
+
+/** Our reason out of an error rest.ts threw (`…:23514:last_owner` → 'last_owner'), or ''. */
+export function refusalReason(e: unknown): string {
+  return /:([a-z]+(?:_[a-z]+)*)$/.exec(String((e as Error)?.message ?? e))?.[1] ?? '';
+}
+
 function target(): { url: string; auth: Record<string, string> } {
   const url = (Deno.env.get('SUPABASE_URL') || '').trim();
   const auth = serviceAuth();
@@ -48,12 +65,13 @@ function target(): { url: string; auth: Record<string, string> } {
   return { url, auth };
 }
 
-/** Rows matching a PostgREST query string (`select=…&col=eq.…&order=…`). */
-export async function selectRows(table: string, query: string): Promise<Record<string, unknown>[]> {
+/** Rows matching a PostgREST query. A verified caller's token opts into that
+ * caller's RLS policies instead of the service role (invite-user). */
+export async function selectRows(table: string, query: string, sessionToken?: string): Promise<Record<string, unknown>[]> {
   const { url, auth } = target();
   const res = await fetch(`${url}/rest/v1/${table}?${query}`, {
     method: 'GET',
-    headers: { ...auth },
+    headers: { ...auth, ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}) },
     signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error(`select_http_${res.status}${await refusal(res)}`);
@@ -77,25 +95,25 @@ export async function updateRow(table: string, id: string, fields: Record<string
  * The rows a PostgREST filter (`id=eq.…&col=…`) matches, changed and handed
  * back: how a caller learns whether a conditional write applied, and to what.
  */
-export async function updateRows(table: string, filter: string, fields: Record<string, unknown>): Promise<Record<string, unknown>[]> {
+export async function updateRows(table: string, filter: string, fields: Record<string, unknown>, sessionToken?: string): Promise<Record<string, unknown>[]> {
   const { url, auth } = target();
   const res = await fetch(`${url}/rest/v1/${table}?${filter}`, {
     method: 'PATCH',
-    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    headers: { ...auth, ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}), 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify(fields),
     signal: AbortSignal.timeout(10000),
   });
-  if (!res.ok) throw new Error(`update_http_${res.status}${await refusal(res)}`);
+  if (!res.ok) throw new Error(`update_http_${res.status}${await reason(res)}`);
   const rows = await res.json();
   return Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
 }
 
 /** Insert or merge on a unique key — the booking row is written twice per request. */
-export async function upsertRow(table: string, row: Record<string, unknown>, onConflict: string): Promise<void> {
+export async function upsertRow(table: string, row: Record<string, unknown>, onConflict: string, sessionToken?: string): Promise<void> {
   const { url, auth } = target();
   const res = await fetch(`${url}/rest/v1/${table}?on_conflict=${onConflict}`, {
     method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+    headers: { ...auth, ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify(row),
     signal: AbortSignal.timeout(10000),
   });
@@ -217,18 +235,22 @@ export async function createAuthUser(email: string): Promise<{ id: string } | nu
  * for `allow_submission`, which only the service role may execute. Throws on
  * a refusal with the status alone, like insertRow.
  */
-export async function callRpc(fn: string, args: Record<string, unknown>): Promise<unknown> {
+/**
+ * A database function. With a verified caller's token it runs as that caller,
+ * so the function's own checks (set_member_role, can_see_lead) judge them.
+ */
+export async function callRpc(fn: string, args: Record<string, unknown>, sessionToken?: string): Promise<unknown> {
   const url = (Deno.env.get('SUPABASE_URL') || '').trim();
   const auth = serviceAuth();
   if (!url || !auth) throw new Error('supabase_not_configured');
 
   const res = await fetch(`${url}/rest/v1/rpc/${fn}`, {
     method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/json' },
+    headers: { ...auth, ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}), 'Content-Type': 'application/json' },
     body: JSON.stringify(args),
     signal: AbortSignal.timeout(5000),
   });
-  if (!res.ok) throw new Error(`rpc_http_${res.status}`);
+  if (!res.ok) throw new Error(`rpc_http_${res.status}${await reason(res)}`);
   return res.json();
 }
 

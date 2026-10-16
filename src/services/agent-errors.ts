@@ -7,7 +7,12 @@
 export const MAX_MESSAGE_CHARS = 1000;
 export const MAX_TURNS_PER_CONVERSATION = 40;
 
-export type AgentLimitReason = "too_long" | "too_many_turns" | "rate_limited" | "conversation_closed" | "busy";
+/**
+ * `still_processing`: the message arrived, and its turn was still running when
+ * the adapter stopped waiting (review 2026-10-15). Not a failure — the message
+ * stays on screen and is not handed back to be sent again.
+ */
+export type AgentLimitReason = "too_long" | "too_many_turns" | "rate_limited" | "conversation_closed" | "busy" | "still_processing";
 
 export class AgentLimitError extends Error {
   constructor(public readonly reason: AgentLimitReason) {

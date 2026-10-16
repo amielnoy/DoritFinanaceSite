@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect } from 'react';
-import { initClickTracking, initInternalFlag } from '@/lib/analytics';
+import { Suspense, lazy, useEffect, useLayoutEffect } from 'react';
+import { initClickTracking, initInternalFlag, measureRoute } from '@/lib/analytics';
 import { captureAttribution } from '@/lib/attribution';
 import { MotionConfig } from 'framer-motion';
 import { Toaster } from "@/components/ui/toaster"
@@ -26,8 +26,7 @@ import { stripFragment } from '@/lib/vercel-analytics';
 // page should not download the blog admin and the rich-text editor to read it.
 import Home from '@/pages/Home';
 import FloatingActions from '@/components/dorit/layout/FloatingActions';
-import AdminRoute from '@/components/AdminRoute';
-import StaffRoute from '@/components/StaffRoute';
+import AgencyRoute from '@/components/AgencyRoute';
 import { MASLEKA_ENABLED } from '@/config/masleka';
 
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
@@ -38,6 +37,7 @@ const Leads = lazy(() => import('@/pages/Leads'));
 // The admin interface's sidebar frame — inside the guards below, never instead of them.
 const AdminLayout = lazy(() => import('@/components/dorit/admin/AdminLayout'));
 const AdminUsers = lazy(() => import('@/pages/AdminUsers'));
+const AgencyProfile = lazy(() => import('@/pages/AgencyProfile'));
 const Blog = lazy(() => import('@/pages/Blog'));
 const BlogPost = lazy(() => import('@/pages/BlogPost'));
 const BlogAdmin = lazy(() => import('@/pages/BlogAdmin'));
@@ -89,6 +89,13 @@ const LoginRedirect = () => {
   return <Navigate to={`/login?returnTo=${encodeURIComponent(pathname + search)}`} replace />;
 };
 
+// GA4 is off on /admin, switched before the route's screen renders (measureRoute).
+const AnalyticsRouteGuard = () => {
+  const { pathname } = useLocation();
+  useLayoutEffect(() => measureRoute(pathname), [pathname]);
+  return null;
+};
+
 const AuthenticatedApp = () => {
   const { pathname } = useLocation();
   return (
@@ -132,18 +139,27 @@ const AuthenticatedApp = () => {
             <Route path="/account" element={<Account />} />
           </Route>
         </Route>
-        <Route element={<AdminRoute unauthenticatedElement={<LoginRedirect />} />}>
+        {/* An agency's screens, by the least role each needs in the current
+            agency (AgencyRoute; the platform operator passes every one). The
+            screens hide what a role may not do; row-level security and the
+            functions refuse it. */}
+        <Route element={<AgencyRoute min="user" unauthenticatedElement={<LoginRedirect />} />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin/leads" element={<Leads />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/blog" element={<BlogAdmin />} />
           </Route>
         </Route>
-        {/* The clearinghouse board: the admin or an agency member (StaffRoute).
-            Not registered at all until VITE_MASLEKA_ENABLED — a dark build
-            answers 404 here. */}
+        <Route element={<AgencyRoute min="owner" unauthenticatedElement={<LoginRedirect />} />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/agency" element={<AgencyProfile />} />
+          </Route>
+        </Route>
+        {/* The clearinghouse board: any member of the agency (a User sees their
+            own requests). Not registered at all until VITE_MASLEKA_ENABLED — a
+            dark build answers 404 here. */}
         {MASLEKA_ENABLED ? (
-          <Route element={<StaffRoute unauthenticatedElement={<LoginRedirect />} />}>
+          <Route element={<AgencyRoute min="user" unauthenticatedElement={<LoginRedirect />} />}>
             <Route element={<AdminLayout />}>
               <Route path="/admin/masleka" element={<MaslekaBoard />} />
               <Route path="/admin/masleka/guide" element={<MaslekaGuide />} />
@@ -181,6 +197,7 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
+          <AnalyticsRouteGuard />
           <SeoRouteGuard />
           {/* Mounted only where its endpoint exists. The beacon posts to
               `/_vercel/insights/*`, a path Vercel's edge synthesises and no

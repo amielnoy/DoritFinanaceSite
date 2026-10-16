@@ -153,12 +153,14 @@ describe("what every page load asks, without the SDKs", () => {
   });
 });
 
-describe("the clearinghouse port", () => {
+describe("the clearinghouse and agency ports", () => {
   it("loads the composition root on its first call and delegates to it", async () => {
-    const myRole = vi.fn(async () => "staff");
-    vi.doMock("@/services/composition", async () => ({ services: { masleka: { myRole } } }));
+    const list = vi.fn(async () => []);
+    const myRole = vi.fn(async () => "admin");
+    vi.doMock("@/services/composition", async () => ({ services: { masleka: { list }, agency: { myRole } } }));
     const services = await loadFront();
-    await expect(services.masleka.myRole()).resolves.toBe("staff");
-    expect(myRole).toHaveBeenCalledTimes(1);
+    await expect(services.masleka.list()).resolves.toEqual([]);
+    await expect(services.agency.myRole("a1")).resolves.toBe("admin");
+    expect(myRole).toHaveBeenCalledWith("a1");
   });
 });

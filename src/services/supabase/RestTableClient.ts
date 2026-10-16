@@ -54,6 +54,10 @@ class RestQuery implements SupabaseQuery {
     return this.with(column, `not.${operator}.${value === null ? "null" : String(value)}`);
   }
 
+  is(column: string, value: null): SupabaseQuery {
+    return this.with(column, `is.${String(value)}`);
+  }
+
   order(column: string, options: { ascending: boolean }): SupabaseQuery {
     return this.with("order", `${column}.${options.ascending ? "asc" : "desc"}`);
   }

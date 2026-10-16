@@ -37,6 +37,7 @@ something outside the repository.
 | `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
 | `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
 | `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
+| `groupOpenLeads`, `planAssignments`, `describeOpenLeads` | `scripts/assign-open-leads.mjs` |
 | `fetchPublishedArticles`, `planArticles`, `fixtureArticleFor`, `duplicateTitles` | `scripts/published-articles.mjs` |
 | `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
@@ -73,6 +74,9 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-PFC-013 | "grows existing savings alone when nothing is deposited" | `startingBalance` 100,000, 12% a year, 1 y, no deposits | `100,000 × 1.01¹²`; nothing deposited |
 | UNIT-PFC-014 | "charges the balance fee on the opening balance and counts it in what fees cost" | 200,000 opening, 0.5% a year, 10 y | Balance fees > 0; `lostToFees` ≥ them |
 | UNIT-PFC-015 | "is the calculator's own result when the opening balance is left out or not positive" | `startingBalance` 0 or −5 | Equal to the result without one |
+| UNIT-PFC-016 | "clamps years to 0–60: a billion years is sixty, not a loop of minutes" (review 2026-10-15) | `years` 1e9 | `PENSION_FEE_RANGES.years` is 0–60; the result equals 60 years' |
+| UNIT-PFC-017 | "clamps each percentage to 0–100, so no fee goes past the whole deposit or below nothing" (review 2026-10-15) | Deposit fee 500, annual fee −3, return 400, then both fees 500 | Equal to 100, 0 and 100; with both at 500 the balance is ≥ 0 and fees ≤ deposits |
+| UNIT-PFC-018 | "treats a negative deposit as nothing deposited" (review 2026-10-15) | `monthlyDeposit` −2,000 | Deposited 0, balance 0 |
 
 ### 4.2 Helpers — `tests/unit/utils.dom.test.ts`
 
@@ -808,7 +812,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 |---|---|---|
 | UNIT-CHSTORE-001 | "reads a conversation by id" | GET `chat_conversations?id=eq.<id>&select=*&limit=1`; the row returned |
 | UNIT-CHSTORE-002 | "never queries with an id that is not a uuid" | `null`, no request sent |
-| UNIT-CHSTORE-003 | "lists a conversation's messages in the order they were written" | `order=id.asc&limit=200`; `role` and `content` only |
+| UNIT-CHSTORE-003 | "lists a conversation's newest 200 messages, in the order they were written (review 2026-10-15)" | `order=id.desc&limit=200`, then reversed: the newest 200, oldest first; `role` and `content` only |
 | UNIT-CHSTORE-004 | "reads this month's totals through the RPC, as numbers" | POST `rpc/chat_month_usage` with `p_agency_id`, `p_since`; bigint strings become numbers |
 | UNIT-CHSTORE-005 | "claims the month's budget alert once: true on the insert, false on the conflict" | 201 gives `true`; 409 (23505) gives `false` |
 | UNIT-CHSTORE-006 | "creates a conversation and hands back the stored row" | POST `chat_conversations`; the stored row returned |
@@ -891,7 +895,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-065 | "answers no recommended field when the turn recommended nothing" (the blog role) | No `recommended` key |
 | UNIT-CHHANDLER-066 | "gives a recommendation turn room to list, read twice and recommend before it answers" (the blog role) | Four tool rounds then a reply: 200 for `blog_recommender` (`ROLE_TOOL_ROUNDS.blog = 5`); 503 for the FAQ chat (three) |
 | UNIT-CHHANDLER-067 | "says the turn is still running while it holds the conversation" (a status request) | `status: true` with the token: 200 `busy: true`; no model call |
-| UNIT-CHHANDLER-068 | "answers how the last turn ended: its reply, and whether the lead was saved" (a status request) | `busy: false`, the last non-tool message, `leadSaved` from the status |
+| UNIT-CHHANDLER-068 | "answers how the last turn ended: its reply, and whether the lead was saved" (a status request) | Asked about turn 1: `busy: false`, `turns: 1`, the last non-tool message, `leadSaved` from the status |
 | UNIT-CHHANDLER-069 | "refuses a status request without the conversation's token, and runs nothing" (a status request) | 403 `gone` |
 | UNIT-CHHANDLER-052 | "runs the sweep for the right token, and nothing of the chat" | `x-chat-sweep` with the right token: 200, `ok`, `logged: 2`, an `rid` passed to `sweepSheetLogs`; no model call, no conversation, no rate-limit check (Review Focus 5) |
 | UNIT-CHHANDLER-053 | "refuses %s with 401 and runs nothing" | A wrong token, an empty token and the evaluation token: 401 `unauthorized`; the sweep, the model and the store untouched (Review Focus 5) |
@@ -947,29 +951,33 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-CHADAPTER-001 | "opens the conversation with consent and attribution on the first message, and the token after" | First POST carries agent, message, consent version and time, attribution; the second carries `conversationId` and `token` instead |
+| UNIT-CHADAPTER-001 | "opens the conversation under its own id and token, with consent and attribution on the first message only" | Both POSTs carry the page's `conversationId` and `token`; the first adds consent version and time and attribution, the second does not (review 2026-10-15, item 12) |
+| UNIT-CHADAPTER-023 | "makes a fresh uuid and a 64-hex token for each conversation by default" | Two conversations: each `conversationId` a v4 uuid, each `token` 64 hex; neither repeats |
 | UNIT-CHADAPTER-002 | "hands the subscriber the whole transcript, the visitor's line with the reply" | The subscriber's last call is `[user, assistant]` |
 | UNIT-CHADAPTER-003 | "gives a late subscriber what already arrived" | A subscriber added after the send is called at once with the transcript |
 | UNIT-CHADAPTER-004 | "marks the reply that saved the lead" | `leadSaved: true` gives the assistant message `signal: "lead_saved"` |
 | UNIT-CHADAPTER-005 | "refuses a long message before any request" | `AgentLimitError("too_long")` for 1,001 characters; `invoke` not called |
 | UNIT-CHADAPTER-006 | "maps a %i answer to AgentLimitError(%s)" | 400 `too_many_turns`, 429 `rate_limited`, 403 `gone` and 409 `closed` (both `conversation_closed`), 409 `busy` (`busy`, I3) |
-| UNIT-CHADAPTER-007 | "starts a new server conversation after one was closed, under the same consent" | After a 409 the next send has the consent fields and no `conversationId` (Review Focus 5) |
+| UNIT-CHADAPTER-007 | "starts a new server conversation after one was closed, under the same consent" | After a 409 `closed` the next send has the consent fields and a new `conversationId` (Review Focus 5) |
 | UNIT-CHADAPTER-008 | "maps %i to AgentUnavailableError" | 503 `unavailable` and 500 `failed` give `AgentUnavailableError` carrying the `rid` |
-| UNIT-CHADAPTER-009 | "keeps the conversation a 503 opened, so the next message continues it" | The 503's `conversationId` and `token` are sent with the next message |
-| UNIT-CHADAPTER-010 | "aborts the request and throws AgentUnavailableError" | At 40 s the `signal` passed to `invoke` is aborted and `send` rejects with `AgentUnavailableError` |
-| UNIT-CHADAPTER-011 | "adopts the conversation a late first answer opened, so the retry continues it" | After a first-message timeout, a late answer's `conversationId` and `token` are sent with the next message; no second conversation |
+| UNIT-CHADAPTER-009 | "keeps the conversation a 503 opened, so the next message continues it" | After a 503 naming the conversation, the next message carries its id and token and no consent |
+| UNIT-CHADAPTER-010 | "aborts the request and throws AgentUnavailableError" | At 40 s the `signal` passed to `invoke` is aborted; with every status request hanging too (each cut at 10 s), `send` rejects with `AgentUnavailableError` when the window ends |
+| UNIT-CHADAPTER-011 | "sends a timed-out first message again under the same id and token, consent included" | The status request says 403 (the row was never opened); the resend's body equals the first's, so it reaches the same row (replaces "adopts the conversation a late first answer opened", whose branch could never run) |
 | UNIT-CHADAPTER-012 | "shows the visitor's message the moment it is sent, before the answer" | With the request pending the subscriber already has `[user]`; then `[user, assistant]` (I4) |
 | UNIT-CHADAPTER-013 | "takes the visitor's message back out when the send fails" | After a 503 the subscriber's last transcript is the one before the send (I4) |
-| UNIT-CHADAPTER-014 | "treats a 503 that says the lead was saved as a saved lead, not a failure" | `send` resolves; the transcript ends with `LEAD_SAVED_WITHOUT_REPLY`, `signal: lead_saved`, `replyMissing: true`; the 503's ids are sent with the next message (I5) |
+| UNIT-CHADAPTER-014 | "treats a 503 that says the lead was saved as a saved lead, not a failure" | `send` resolves; the transcript ends with `LEAD_SAVED_WITHOUT_REPLY`, `signal: lead_saved`, `replyMissing: true`; the next message continues the same conversation, without consent (I5) |
 | UNIT-CHADAPTER-015 | "hands the page the recommended articles as the block it reads, and the visitor none of it" | `recommended` → a ```` ```recommended ```` block `readRecommendation` reads; visible text unchanged |
 | UNIT-CHADAPTER-016 | "leaves a reply without recommendations as it came, and never writes a second block" | No `recommended`: content as sent; a reply with its own block keeps it alone |
-| UNIT-CHADAPTER-017 | "shows the reply the turn produced once it finished, instead of a failure" | After the 40 s wait, `status` polled every 3 s: busy, then the reply with `lead_saved` — shown, not a failure |
+| UNIT-CHADAPTER-017 | "shows the reply the turn produced once it finished, instead of a failure" | After the 40 s wait, `status` polled every 3 s, naming `turn: 2`: busy, then the reply with `lead_saved` — shown, not a failure |
 | UNIT-CHADAPTER-018 | "says the details were saved when the turn saved the lead but left no reply" | `LEAD_SAVED_WITHOUT_REPLY`, `replyMissing` |
 | UNIT-CHADAPTER-019 | "fails as before when the turn ended with neither a reply nor a saved lead" | `AgentUnavailableError`; the message taken off the screen |
-| UNIT-CHADAPTER-020 | "stops asking after the recovery window and fails" | At most 60 s / 3 s requests |
-| UNIT-CHADAPTER-021 | "asks nothing after a first message timed out: there is no conversation to ask about" | One request only |
+| UNIT-CHADAPTER-020 | "says the message is still being answered when the window ends with the turn still running, and keeps it on screen" | At most 60 s / 3 s requests, all busy: `AgentLimitError("still_processing")`; the visitor's line stays in the transcript (review 2026-10-15, item 14) |
+| UNIT-CHADAPTER-025 | "fails, not 'still processing', when the window ends with no answer at all" | Every status request fails: `AgentUnavailableError` |
+| UNIT-CHADAPTER-021 | "recovers a first message too: it asks about turn 1 of the conversation it named" | Status request `{conversationId, token, status: true, turn: 1}`; the reply is shown, not a failure (review 2026-10-15, item 12) |
+| UNIT-CHADAPTER-024 | "stops asking at once when the first message never opened the conversation" | A 403 status answer ends recovery: two requests in all, `AgentUnavailableError` |
 | UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |
 | UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
+| UNIT-CHROUTE-003 | "hands the page's abort signal to the adapter that sends (review 2026-10-15)" | `send(conv, "1", { signal })` reaches the chat port with the same options |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
 | UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
 | UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | an unknown agent is dropped from `some_other_agent,needs_interview`; `needs_interview` stays |
@@ -998,7 +1006,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-LEADTX-006 | "lists each lead that has a conversation once, skipping conversations without a lead" | `["a","b"]` from rows with a repeat and a null |
 | UNIT-LEADTX-007 | "throws on a refused read" | `chat_conversations read failed` |
 | UNIT-LEADTX-008 | "finds an older linked conversation behind a thousand newer ones without a lead" | The read filters `lead_id not is null` before its 1,000-row limit: `["older"]` (triage 9) |
-| UNIT-LEADTX-009 | "counts the leads still new, reading their ids alone" | 3 rows → 3; filters `status = new`, limit 1,000 |
+| UNIT-LEADTX-009 | "counts the leads that need someone — new or escalated — reading their ids alone (review 2026-10-15)" | 3 rows → 3; filters `or=(status.eq.new,status.eq.escalated)`, not `status = new` alone; limit 1,000 |
 | UNIT-LEADTX-010 | "throws on a refused read rather than counting none" | `leads read failed` |
 
 The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and its refusal to run without credentials (`tests/unit/eval-chat-lib.test.ts`). Nothing here calls the Anthropic API or a function; the harness itself is specified in [13-std-eval](13-std-eval.md) §6. The FAQ chat's personas and rubric (`tests/eval/chat/rubric-support.md`) are covered by 034..042. One row per declared `it`.
@@ -1129,13 +1137,21 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSH-010 | "answers who the token belongs to, asking the auth server with the service key" | `/auth/v1/user`, apikey + bearer |
 | UNIT-MSKSH-011 | "answers nobody for a token the auth server refuses" | `null` on 401 |
 | UNIT-MSKSH-012 | "throws when the auth server is down, rather than calling it a refusal" | `auth_http_503` |
-| UNIT-MSKSH-013 | "is anonymous without a bearer token, and asks nobody" | No fetch |
-| UNIT-MSKSH-014 | "is an outsider when the database knows no role for the user" | `outsider` |
-| UNIT-MSKSH-015 | "is an outsider for a role it does not recognise" | `outsider` |
-| UNIT-MSKSH-016 | "is staff with the role the database gives" | `staff`, role `staff` |
-| UNIT-MSKSH-017 | "mails each staff address once, in lower case, and skips what is not an address" | Deduplicated list |
+| UNIT-MSKSH-013 | "ranks owner over admin over user" | `meets`: owner ≥ admin; admin ≥ admin; user < admin; no role meets nothing |
+| UNIT-MSKSH-014 | "asks nobody without a bearer token, and answers 401" | `sessionCaller`: 401; no fetch |
+| UNIT-MSKSH-015 | "names the operator from profiles.role, never from the token" | `{ ok, userId, token, isOperator: true }` from `profiles.role = 'admin'` |
+| UNIT-MSKSH-016 | "passes a role at or above the minimum, in that agency, and refuses one below with 403" | `staff_role` asked with `{ p_user_id, p_agency_id }`; admin passes `admin`, user refused 403 |
+| UNIT-MSKSH-016a | "refuses a role the database does not name, and the old agent/staff, as no role" | `staff`, `agent`, unknown, null: 403 |
+| UNIT-MSKSH-016b | "lets the operator through with no membership, and only the operator onto a shared-library row" | Operator passes `owner` with `role: null`; agency `null` passes the operator, refuses an Owner |
+| UNIT-MSKSH-016c | "answers 500, not 403, when the role cannot be read" | `staff_role` 503 → 500 |
+| UNIT-MSKSH-016d | "asks can_see_lead and can_work_request as the caller, with their own token" | Both RPCs carry `Authorization: Bearer <caller>`; bodies `{ p_lead_id }`, `{ p_request_id }` |
+| UNIT-MSKSH-016e | "refuses with 403 when the database says no — and anything but a plain true is no" | `false`, `null`, `"true"`, `1`: 403 |
+| UNIT-MSKSH-016f | "sends the caller's token on Authorization, and keeps the service key on apikey" | `callRpc(…, token)` |
+| UNIT-MSKSH-016g | "names a function's own reason, and never Postgres's prose" | `rpc_http_400:23514:last_owner` → `refusalReason` `last_owner`; a 23505 whose message quotes the row → `update_http_409:23505`, reason `''` |
+| UNIT-MSKSH-017 | "asks for the request's own people, and mails each address once, in lower case, skipping what is not one" | `masleka_staff_emails({ p_request_id })`; deduplicated list |
 | UNIT-MSKSH-018 | "falls back to Dorit's mailbox when nobody can be read" | `dorit@govari-fin.co.il`, `staff.lookup_failed` |
-| UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the staff list is empty" | `dorit@govari-fin.co.il`, `staff.none` |
+| UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the request has nobody" | `dorit@govari-fin.co.il`, `staff.none` with the request id |
+| UNIT-MSKSH-019a | "asks for the agency's Admins and Owners while the request is not yet known" | `{ p_request_id: null }`; the answer's addresses |
 | UNIT-MSKSH-022 | "reads a phone as its local digits, however it was typed" | `054-111-2233`, `+972-54-111-2233`, `972541112233`, spaces and brackets all → `0541112233`; a landline keeps its 9 digits (decision 2026-10-14, the same contact) |
 | UNIT-MSKSH-023 | "reads nothing too short, or not a string, as a phone" | `''` for fewer than 9 digits, letters, `null`, `undefined`, a number — and `''` matches nothing |
 | UNIT-MSKSH-024 | "matches two addresses only when both are addresses, ignoring case and spaces at the ends" | Equal mailboxes match; two blanks, two nulls, two non-addresses, or one missing never match |
@@ -1183,6 +1199,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSVC-007 | "reads the open requests by the granted columns only, newest first" | `MASLEKA_COLUMNS` (no ciphertext/hash), four statuses, `created_at desc`, camelCase |
 | UNIT-MSKSVC-008 | "throws when the list cannot be read, so an outage never looks like an empty board" | Rejects |
 | UNIT-MSKSVC-009 | "creates a request and hands back its link" | Body and `MaslekaLink` |
+| UNIT-MSKSVC-030 | "sends the lead a request hangs off, and no lead key for one made by hand" | `leadId` in the body when given; no `leadId` key otherwise |
 | UNIT-MSKSVC-010 | "asks for a fresh link by request id" | `{ requestId }` |
 | UNIT-MSKSVC-011 | "returns a revealed value, and fails on an answer without one" | Value; `failed` |
 | UNIT-MSKSVC-012 | "marks a request submitted" | `masleka-submitted` |
@@ -1203,6 +1220,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSVC-027 | "tells an address the database refused apart from a failure" | 22023 + `invalid_email` → `invalid_email`; 22023 otherwise → `invalid`; else `failed` |
 | UNIT-MSKSVC-028 | "unpublishes and marks the answers seen by snapshot" | The two rpcs with `p_snapshot` |
 | UNIT-MSKSVC-029 | "reads the published items with the client's answers, in position order" | Items mapped; an unknown priority dropped; `order('position')` |
+| UNIT-MSKSVC-031 | "asks for a reissue by request id: back to the client, with a fresh link" | `masleka-create` with `{ requestId, reissue: true }`; the link |
 | UNIT-ACC-SNAP-001 | "reads my_snapshot's answer, dropping an item that does not fit" (`account-services.test.ts`) | Two of three items; statuses and notes kept |
 | UNIT-ACC-SNAP-002 | "is null when nothing is published, or the report cannot be read" | `null` for null, an unreadable report, no `published_at` |
 | UNIT-ACC-SNAP-003 | "reads my_snapshot over RPC" | `rpc('my_snapshot')`; null passes through |
@@ -1222,7 +1240,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-MSKBD-001 | "puts each request in its column, oldest waiting first, and drops what left the board" | Four columns; expired/cancelled absent |
+| UNIT-MSKBD-001 | (removed with `boardColumns`: the board is one list since the redesign, step 3; see UNIT-MSKBD-029..038) | — |
 | UNIT-MSKBD-002 | "says when the files should be ready, then that they are" | 4-hour threshold |
 | UNIT-MSKBD-003 | "counts the days the clearinghouse still keeps the files" | 5 / 1 / partial day = 1 |
 | UNIT-MSKBD-004 | "says when they are gone, and nothing when there is no date" | "נמחק במסלקה"; "" |
@@ -1250,6 +1268,20 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKBD-026 | "says a dead link is dead, and a switched-off service is unavailable" | link_invalid / disabled copy |
 | UNIT-MSKBD-027 | "treats anything that is not a MaslekaError as a failure" | Same as `failed` |
 | UNIT-MSKBD-028 | "tells a client plainly that a send which stored nothing did not go through, and to send again" | `not_saved`: exactly "השליחה לא עברה והקוד לא נשמר. נסו לשלוח שוב בעוד כמה דקות — הקישור עדיין בתוקף."; no "ייתכן" (decision 2026-10-14) |
+| UNIT-MSKBD-029 | "sends a received code to the guided submit, saying when it came and the ID's last digits" (actionFor) | Step 2, now, action `להגשה`; reason `קוד האימות התקבל <when> · ת״ז מסתיימת ב־0018`, no last-digits part without them |
+| UNIT-MSKBD-030 | "sends a ready download to the clearinghouse, with its deletion countdown" (actionFor) | Step 3, now, `להורדה במסלקה`; `מוכן להורדה · 5 ימים עד מחיקה במסלקה` |
+| UNIT-MSKBD-031 | "marks a ready download urgent two days or fewer before the clearinghouse deletes it" (actionFor) | 3 days: not urgent; 2 and 1: urgent |
+| UNIT-MSKBD-032 | "asks nothing of a submission still being prepared" (actionFor) | Not now; `אין צורך בפעולה`; `הוגש <when> · יהיה מוכן בעוד כ־3–4 שעות` |
+| UNIT-MSKBD-033 | "offers an invited client a fresh link always, and puts them in 'now' only after three days" (actionFor) | 2 days: `קישור חדש`, not now; 4 days: now; `קיבל/ה קישור לפני N ימים ועוד לא מילא/ה` |
+| UNIT-MSKBD-034 | "counts an invitation from its creation when it was never mailed, and says today and yesterday in words" (actionFor) | `createdAt` 5 days ago: now; `היום`, `אתמול` |
+| UNIT-MSKBD-035 | "links a completed request to its analysis when there is one, and is never 'now'" (actionFor) | `לניתוח` with the snapshot id; `none` without one |
+| UNIT-MSKBD-036 | "drops what left the board" (nowRows and stageRows) | An expired request is not planned |
+| UNIT-MSKBD-037 | "puts the urgent first, then the oldest first, and only what needs action" (nowRows and stageRows) | `urgent`, `invited-old`, `ready`, `code` |
+| UNIT-MSKBD-038 | "lists one stage oldest first, and the completed newest first" (nowRows and stageRows) | Submitted: `ready`, `urgent`, `preparing`; invited: oldest first |
+| UNIT-MSKBD-039 | "reads ?stage= as one of the bar's views, and anything else as 'now'" (the stage bar's views) | Five views in order; `null`, `""`, `waiting`, `SUBMITTED`, `<script>` → `now` |
+| UNIT-MSKBD-040 | "writes an Israeli mobile as wa.me wants it: 972 and the number without its 0" (the WhatsApp invitation) | Five spellings → `972501234567`; a landline, short, empty, long, letters → null |
+| UNIT-MSKBD-041 | "puts the link in a short message, encoded so that # and spaces survive, and names no sender" (the WhatsApp invitation) | `https://wa.me/972501234567`; no raw space, `#` or Hebrew in the URL; text starts "שלום משה, ", says קוד האימות (never ייפוי), ends with the link, names no דורית |
+| UNIT-MSKBD-042 | "builds nothing for a number that is not a mobile, and greets plainly with no name" (the WhatsApp invitation) | Landline → null; blank name → "שלום, "; `firstNameOf` |
 
 ### 4.45 Vercel Analytics beforeSend — `tests/unit/vercel-analytics.test.ts`
 
@@ -1258,6 +1290,9 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-VANA-001 | "drops the #t= token from a /masleka url" | `https://govari-fin.co.il/masleka`; the token appears nowhere in the event |
 | UNIT-VANA-002 | "leaves a url without a hash unchanged" | Same url |
 | UNIT-VANA-003 | "keeps the query and drops only the hash" | `…/masleka?utm=x&a=1` |
+| UNIT-VANA-004..007 | "ignores private admin events at %s" | `/admin`, `/admin/`, user searches and analysis routes return null for pageviews and custom events |
+| UNIT-VANA-008 | "removes free-text search while preserving public campaign parameters" | `q` and fragment removed; public UTM parameter retained |
+| UNIT-VANA-009 | "drops malformed URLs instead of passing them through" | Invalid URL returns null |
 
 ### 4.46 The calculator → lead message — `tests/unit/calculator-lead.test.ts`
 
@@ -1526,12 +1561,14 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 
 | ID | Test | Expect |
 |---|---|---|
-| UNIT-ANAV-001 | "gives the admin every page, grouped by task" | ראשי; טיפול שוטף: פניות, בקשות מסלקה; תוכן והגדרות: בלוג, משתמשים |
+| UNIT-ANAV-001 | "gives the platform operator every page, grouped by task" | ראשי; טיפול שוטף: פניות, בקשות מסלקה; תוכן והגדרות: בלוג, משתמשים, פרטי הסוכנות |
 | UNIT-ANAV-002 | "leaves the clearinghouse out while its switch is off" | טיפול שוטף holds פניות alone |
-| UNIT-ANAV-003 | "gives agency staff the clearinghouse alone, and drops the groups left empty" | One group, one item |
+| UNIT-ANAV-003 | "gives an Owner the agency's pages and its details, not the operator's main page" | No ראשי; פרטי הסוכנות |
+| UNIT-ANAV-003a | "gives an Admin and a User the same rows, but not the agency's details" | No פרטי הסוכנות |
+| UNIT-ANAV-003b | "counts the unassigned queue for Admin+, and a User's own new leads" | `unassigned` for operator/owner/admin; `newLeads` for a User |
 | UNIT-ANAV-004 | "gives anyone else nothing" | `[]` for `null` |
-| UNIT-ANAV-005 | "names a route for every page, each once" | The five routes, no repeat |
-| UNIT-ANAV-006 | "sends the admin to her main page and staff to the board" | `/account`; `/admin/masleka` |
+| UNIT-ANAV-005 | "names a route for every page, each once" | The six routes, no repeat |
+| UNIT-ANAV-006 | "sends the operator to their main page and an agency's members to the leads" | `/account`; `/admin/leads` |
 | UNIT-ANAV-007 | "%s → %s" (`initials`) | דורית גוב ארי → דג; Dorit → D; an email → its name's letters; empty → ? |
 | UNIT-ANAV-008 | "counts the requests whose code has arrived and is not yet submitted" (`waitingCount`) | Two `code_received` of five → 2; none → 0 |
 
@@ -1575,3 +1612,109 @@ uploaded, against the limits the bucket and `submit-claim` enforce anyway.
 
 All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
+
+### 4.64 Assigning the open leads before narrowing — `tests/unit/assign-open-leads.test.ts`
+
+The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). It lists every agency's open (any status but `closed`), unassigned leads and, given a plan, says which lead goes to which address. It is a dry run unless given `--apply`. Writes go to unassigned rows only, and the leads trigger refuses an assignee outside the lead's agency.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AOL-001 | "keeps open, unassigned leads per agency, oldest first" | `closed` and already-assigned leads dropped; grouped by `agency_id`; sorted by `created_at` |
+| UNIT-AOL-002 | "gives a lead's own key priority over its agency's" | The lead key's address for that lead, the `agency:<id>` address (trimmed, lower-cased) for the rest |
+| UNIT-AOL-003 | "reports what it cannot do instead of dropping it" | `not_open_or_unassigned`, `not_an_address`, `no_open_leads` |
+| UNIT-AOL-004 | "plans nothing without a plan" | Both lists empty |
+| UNIT-AOL-005 | "lists ids, Israel-time dates, statuses, sources and topics — never a name, phone or email" | `2026-10-01T09:00:00Z` shows as `2026-10-01 12:00`; no client name, phone or address |
+| UNIT-AOL-006 | "says when there is nothing to assign" | `no open unassigned leads` |
+
+### 4.65 Agency roles in the services — `tests/unit/supabase-agency.test.ts`, `tests/unit/supabase-lead-admin.test.ts` (changed), `tests/unit/masleka-services.test.ts` / `services-wiring` / `lazy-services` (changed)
+
+`SupabaseAgencyService` (the person's agencies and role, the agency profile), the members screen's changes in `SupabaseUsersAdminService`, and the lead service's assignment, unassigned count and claim-document links.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AGY-001 | "lists the person's agencies with their roles, leaving out what they cannot read or do not know" | Two agencies; a suspended (unreadable) one and a `staff` role dropped |
+| UNIT-AGY-002 | "asks my_agency_role for one agency, and reads anything but the three roles as none" | `rpc('my_agency_role', { p_agency_id })`; `staff`, `agent`, null, 1 → null |
+| UNIT-AGY-003 | "fails rather than guessing when the role cannot be read" | Throws |
+| UNIT-AGY-004 | "maps the profile's columns, and writes back only the fields given, by their column names" | `update({ display_name, licence_number })` |
+| UNIT-AGY-005 | "calls a save the policy filtered out an error — only the Owner may" | An empty answer throws |
+| UNIT-AGY-006..009 | "%s goes to member-admin as the person" | `setRole`, `remove`, `leave`, `transferOwnership` → `member-admin` with the op's body and the bearer |
+| UNIT-AGY-010 | "says the function's refusal in its own words, and asks nothing without a session" | `last_owner`'s Hebrew; no call without a token |
+| UNIT-SLA-DOC-001 | "asks claim-document-link, as the person, for this lead's document" | `{ leadId, path }` with the bearer; the returned URL |
+| UNIT-SLA-DOC-002 | "returns a Base44 file URL unchanged, asking nobody" | No call |
+| UNIT-SLA-DOC-003 | "says the function's own refusal — another User's lead, or a document not on it" | The Hebrew refusal |
+| UNIT-SLA-DOC-004 | "asks nothing without a session" | `נדרשת התחברות` |
+| UNIT-SLA-ASG-001 | "assigns through assign-lead, and back to the queue with null" | `{ leadId, userId }`, then `userId: null` |
+| UNIT-SLA-ASG-002 | "counts open leads nobody works, by ids only" | `select('id')`, `is('assigned_user_id', null)`, `not('status','eq','closed')` |
+
+`MaslekaPort.myRole` is gone (the role is the agency's, `services.agency.myRole`): its three cases are removed. `UnconfiguredMaslekaService` "is never available"; the lazy front delegates `masleka.list` and `agency.myRole`. In `admin-users.test.ts` the operator reads "מפעיל הפלטפורמה" and an agency Admin "מנהל/ת", and the search finds each by their own label.
+
+### 4.66 Whose address a limiter counts — `tests/unit/edge-client-ip.test.ts`, `tests/unit/chat-handler.test.ts` (new cases)
+
+`_shared/guard.ts`'s `clientIp` (review 2026-10-15). A client sets `x-forwarded-for` itself, and the gateway appends the real address after it. So the leftmost entry is never trusted, and a caller with no address shares one key instead of escaping the limit.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CIP-001 | "takes the platform's cf-connecting-ip first" | `cf-connecting-ip` over any forwarded entry |
+| UNIT-CIP-002 | "otherwise takes the last x-forwarded-for entry — the one the gateway appended" | `6.6.6.6, 203.0.113.7` → `203.0.113.7`; spaces and empty entries ignored |
+| UNIT-CIP-003 | "gives a caller with no address the one key they all share, never nothing" | `no-address` for no header, a blank list, or a blank cf header |
+| UNIT-CIP-004 | "keeps at most 64 characters" | 64 |
+| UNIT-CHHANDLER-070 | "answers 429 when one address opens too many conversations, counted by its hash (review 2026-10-15)" | `chat-new-ip:<64 hex>` (20 an hour, beside the global `chat-new`); the address appears in no key |
+| UNIT-CHHANDLER-071 | "hands the tools the address it resolved — the gateway's, never one the visitor put first" | The tool context's `forwardedFor` is `203.0.113.7` |
+
+### 4.67 The interview body's reference — `tests/unit/lead-bodies.test.ts`; `chat-tools.test.ts`, `needs-wizard.test.tsx` (changed)
+
+`interviewBody` carries `conversationRef` (empty when there is none). The chat tool posts `chat:<conversation id>`. The needs wizard's contact step and its details share one `wizard:<uuid>`.
+
+### 4.68 The consent time the chat keeps — `tests/unit/chat-handler.test.ts` (new cases)
+
+The browser sends the time the visitor ticked the consent box, and the chat function stores it on the conversation. Review 2026-10-15: that time is the client's own claim. `consentInstant` clamps it into the last `CONSENT_MAX_AGE_MS` (2 hours) up to the server's now.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHHANDLER-072 | "keeps the browser's time when it is plausible" (the consent time it keeps) | A time a minute before now is stored as sent |
+| UNIT-CHHANDLER-073 | "never dates consent after the server's now" (the consent time it keeps) | A time in 2030 becomes now |
+| UNIT-CHHANDLER-074 | "never further back than the gate could have been open" (the consent time it keeps) | A time years back becomes now − 2 h |
+| UNIT-CHHANDLER-075 | "stores the clamped time on the conversation it opens" (the consent time it keeps) | A 2030 `consentAt` is stored on the new row as now |
+
+### 4.69 Recovering the turn that timed out, and only that one — `tests/unit/chat-handler.test.ts`, `tests/unit/supabase-agent.test.ts` (new cases)
+
+Review 2026-10-15, item 11. Every turn's answer carries its number (`turn`), and a status request names the turn the page waits for. The function gives a reply only while the conversation's count is still that turn and the turn is over. A turn that never started, one still running, or a request that names no turn gets `last: null`, so an earlier reply never passes for the lost one.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHHANDLER-076 | "numbers every turn in its answer, the number a status request names" (a status request) | The opening answer has `turn: 1`, the next `turn: 2` |
+| UNIT-CHHANDLER-077 | "never hands an earlier turn's reply as the reply of the turn asked about" (a status request) | Asked about turn 2 after only turn 1 ran: `turns: 1`, `last: null`; no `turn`, or `"1"` as a string: `last: null` |
+| UNIT-CHHANDLER-078 | "gives no reply while the turn asked about still runs, whatever the newest message is" (a status request) | Turn 2 claimed and leased: `busy: true`, `turns: 2`, `last: null` |
+| UNIT-CHADAPTER-022 | "fails, and never shows an earlier reply, when the turn it asked about never started" | Status `turns: 1` for turn 2, even with `leadSaved` and turn 1's reply: `AgentUnavailableError`; the transcript is turn 1's |
+
+### 4.70 A conversation the page names — `tests/unit/chat-handler.test.ts` (new cases); adapter rows UNIT-CHADAPTER-001, 007, 009–011, 014, 021, 023, 024
+
+Review 2026-10-15, item 12. The page makes the conversation's id (a uuid) and token (64 hex) before the first message and sends them with every message. The function opens the row under that id the first time and continues it after that. So a first message whose answer was lost can be recovered, and a resend reaches the same row. A request with no id (a page from before) still gets a token made by the function.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHHANDLER-079 | "opens under the page's own id and token, and hands back no token of its own" (a conversation the page names) | 200 with `conversationId` the page's and `turn: 1`, no `token`; the row's `token_hash` is sha256 of the page's token |
+| UNIT-CHHANDLER-080 | "continues the same row when the first message is sent again, and counts no second opening" (a conversation the page names) | The resend is turn 2 of the one row; `chat-new` counted once |
+| UNIT-CHHANDLER-081 | "answers busy when the same first message arrives twice at once, opening one row" (a conversation the page names) | The second insert meets 409 / 23505: answered 409 `busy`; one row |
+| UNIT-CHHANDLER-082 | "refuses the id with another token, and an id it never saw without the consent, as gone" (a conversation the page names) | 403 `gone` for both; no model call; no new row |
+| UNIT-CHHANDLER-083 | "refuses an id or token that is not the expected shape, opening nothing" (a conversation the page names) | 403 for `not-a-uuid` and a short token; no row |
+
+### 4.71 A send the page abandons — `tests/unit/supabase-agent.test.ts`, `tests/unit/routed-agent.test.ts` (new cases)
+
+Review 2026-10-15, item 13. `AgentPort.send` takes an optional `signal`. When the panel is reset or closed, the chat function's adapter aborts its request and stops its status polling, and the send rejects with `SendAbandoned`. Base44's adapter has nothing to stop. The panel's own guard is in CMP-CHATFN-016 and 017.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHADAPTER-026 | "aborts the request in flight and asks nothing after it" (a send the page abandons) | The request's signal is aborted; `SendAbandoned`; one request in all, through the whole recovery window |
+| UNIT-CHADAPTER-027 | "stops polling the status when abandoned during recovery" (a send the page abandons) | No status request after the abort; `SendAbandoned` |
+
+### 4.72 GA4 off on the admin area — `tests/unit/analytics-admin-optout.dom.test.ts`
+
+Review 2026-10-15, item 21. GA4 sends history page views by itself, and those ignore `send_page_view: false` and any `page_location` override. So on `/admin`, where URLs carry searches (an email typed into the users screen) and record ids, the tag is switched off whole with Google's opt-out flag, `window['ga-disable-<id>']`. `measureRoute` sets the flag for every route (`AnalyticsRouteGuard` in `App.jsx`, before the screen renders). The inline snippet in `index.html` sets it for a page that loads on `/admin`, and its CSP hash in `vercel.json` is updated to match. What is left: the navigation that arrives at /admin from a public page may still be counted as a page view of its path. Menu links into /admin carry no query string.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-GAADMIN-001..004 | "does not measure %s" | `/admin`, `/admin/leads`, `/admin/users`, `/admin/masleka/analysis/abc` |
+| UNIT-GAADMIN-005..009 | "measures %s" | `/`, `/administration`, `/blog/admin`, `/en/claims`, `/account` |
+| UNIT-GAADMIN-010 | "switches the tag off on entering /admin and on again on leaving it" | The flag `true` on `/admin/users`, `false` on `/claims` |
+| UNIT-GAADMIN-011 | "is switched off by index.html, before the tag is configured, for a page that loads on /admin" | The inline script sets the flag before `gtag('config')`; its path rule agrees with `isUnmeasuredPath` on five paths |

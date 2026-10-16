@@ -61,7 +61,8 @@ describe("adapter → submitLead", () => {
   // asked for, which is worse than recording none — the field is evidence under
   // תיקון 13, and false evidence is the one failure mode not worth trading for
   // a fuller-looking record.
-  const AGENT_ONLY = ["summary", "track", "profile", "stage", "meetingTopic", "consent_version", "consent_at"];
+  // `conversationRef` ties an interview's saves together (review 2026-10-15); a form is one save.
+  const AGENT_ONLY = ["summary", "track", "profile", "stage", "meetingTopic", "consent_version", "consent_at", "conversationRef"];
 
   /**
    * Two call sites now, and both are the adapter's.

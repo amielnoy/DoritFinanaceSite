@@ -87,6 +87,64 @@ before it reaches an `href`; the plain-text copy is left
 unescaped on purpose, because escaping it would only make the mail unreadable;
 and the record stores the raw value, so it matches what was submitted.
 
+### 4.2a `submit-lead` — how often (review 2026-10-15) — `INT-LEAD-110..113`
+
+A public door with no sign-in: each caller is counted by a hash of their address, like submit-claim's `claim-ip`. The staff's mail and the diary are capped for every caller together, so a flood from many addresses cannot fill Dorit's inbox. Past the cap the lead is still saved.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-LEAD-110 | "counts the caller by a hash of the address, never the address itself" | `lead-ip:<64 hex>`; the address appears in no limiter key |
+| INT-LEAD-111 | "refuses a caller over the hourly limit, and writes and mails nothing" | 429 with `rid`; no lead, mail or invitation |
+| INT-LEAD-112 | "past the hourly staff cap, saves the lead and confirms to the visitor, but mails no staff and books nothing" | 200; one lead; `staff_notify_capped`; the visitor's confirmation goes out; no mail to Dorit or ops; no invitation; no calendar call |
+| INT-LEAD-113 | "asks the staff cap once per enquiry, and not for a partial interview" | One `lead-staff-notify` per full enquiry; none for a partial one |
+
+### 4.2b `escalate-to-human` — how often, and what it accepts (review 2026-10-15) — `INT-ESC-030..041`
+
+A hand-off that does not reach a person is a regulatory failure, so the limits never stand between an urgent reason and the staff. Base44's agents call from Base44's server, so one address stands for all their visitors: the per-caller limit is generous.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-ESC-030 | "holds back the staff mail over the hourly cap, and still records the hand-off" (changed) | `mail.skipped` logged at **error** level, so it alerts; the lead and the sheet row are written |
+| INT-ESC-031..032 | "never holds back an urgent hand-off (%s), whatever the caps say" | `complaint`, `privacy_request` with both caps exceeded: 200, staff mailed |
+| INT-ESC-033 | "refuses a caller over the hourly hand-off limit, for a reason that is not urgent, writing nothing" | 429 with `rid`; `escalate-ip:<64 hex>`; no lead, no mail |
+| INT-ESC-034..038 | "refuses a %s longer than its ceiling, writing and mailing nothing" | name 80, phone 30, topic 200, agent 60, email 254: 400 |
+| INT-ESC-039 | "drops an address that is not one, and still hands over" | 200; `email_invalid`; the lead's email empty; the injected recipient mailed nowhere |
+
+### 4.2c `log-support-chat` — how often (review 2026-10-15) — `INT-SUPPORT-020..022`
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-SUPPORT-020 | "counts a caller by a hash of the address, and every caller together (review 2026-10-15)" | `support-ip:<64 hex>` (60 an hour), then `support-log` (300 an hour, above the sweep's 40); the address appears in no key |
+| INT-SUPPORT-021..022 | "refuses past the %s limit with 429 and rid, and writes no row" | Either limit: 429 with `rid`; no sheet row |
+
+### 4.2d `submit-claim` — whose address is counted (review 2026-10-15)
+
+`submit-claim-edge.integration.test.ts` "how often" changed. "does not limit a request with no forwarded address" became "limits a request with no address under the one key such callers share": `claim-ip:` + the hash of `no-address`. A new case, "counts the address the gateway appended, not one the client put first", checks `6.6.6.6, 203.0.113.7` → the hash of `203.0.113.7`. The same `clientIp` serves submit-lead, escalate-to-human, log-support-chat, masleka-code and the chat. The `ip &&` guards that skipped a limit without an address are gone.
+
+### 4.2e `createConsultationEvent` — kept for stale clients, under a cap (review 2026-10-15) — `INT-CCE-001..003`
+
+`tests/integration/create-consultation-event.integration.test.ts`. Nothing in the current build calls it, but a stale client still can (it logs `client.stale`), and then its event is the only trace of that visitor's interview. So it is not retired with a 410: it keeps booking under a cap, and stops returning a provider's own error text.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CCE-001 | "still books, and asks the shared limiter once, for every caller together" | 200 `ok`; one `allow_submission` with `consultation-event`, 3600 s, 20 |
+| INT-CCE-002 | "refuses past the cap with 429 and rid, booking nothing" | 429 with `rid`; no calendar call |
+| INT-CCE-003 | "never hands a calendar provider's own error text to the browser" | A provider refusing with its own text: 200, and no `details` in `events`, the text nowhere in the answer (fails without the fix) |
+
+### 4.2f `submit-lead` — an interview's saves meet by the conversation (review 2026-10-15)
+
+A later save (complete, or the questionnaire's details) updates an earlier one only if both name the same `conversationRef`, which is stored as `leads.conversation_ref` (migration `20261101000000`). Nothing else matches: not the phone, not the name, not the address. A save without a reference is a new lead.
+- **The senders:** the chat tool sends `chat:<conversation id>`, the needs wizard one `wizard:<uuid>` per run, and the Base44 hand-off `base44:<conversation id>`.
+- **Fixtures:** the "partial interview" and "details" suites carry `REF`, and the leads they should adopt carry the same `conversation_ref`.
+- **"whose interview it is", rewritten:**
+  - the same number and name from another conversation is not adopted;
+  - nothing is adopted without a reference;
+  - a malformed reference is ignored and not stored;
+  - a completed interview is not reopened;
+  - the visitor's own interview is completed by its reference, whatever name it now gives;
+  - a new interview lead stores its reference.
+- **Changed:** "does not fill in another run's lead on the same phone and name" (details), and "does not adopt a Base44-era partial save by phone and name" (Edge-only).
+
 ### 4.3 `submitLead` — identifiers a visitor volunteered — `INT-LEAD-016/017`
 
 An ID number or card number in a model-written summary is redacted before anyone
@@ -444,6 +502,17 @@ notified anyone, every "היי" would reach Dorit's inbox. A new contact appends
 row to `Contacts`; a returning one does not, because a row per message would
 turn the list of people into a second event log.
 
+### 4.18a `upsertContact` — who may call, and what a caller may change (review 2026-10-15) — `INT-CONTACT-020..023`
+
+Every call now carries `X-Contact-Secret`, which must match the Base44 secret `CONTACT_FUNCTION_SECRET`. While no channel is connected the secret is unset, and the function refuses everyone (it fails closed).
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CONTACT-020 | "refuses a caller without the shared secret, or with the wrong one, and writes nothing" | 401 with `rid`; no row |
+| INT-CONTACT-021 | "refuses everyone while no secret is configured — no channel is connected yet" | 401 |
+| INT-CONTACT-022 | "never overwrites a known contact's name, email or note — it only fills what is empty" | The update keeps the existing name, email and note; `saved` reports them |
+| INT-CONTACT-023 | "refuses a caller over the hourly limit, counted by a hash of the address" | 429; `contact-ip:<64 hex>` (30 an hour); no row |
+
 ### 4.19 `logSupportChat` — what was actually asked — `INT-SUPPORT-001..012`
 
 The event log records that someone got in touch and the contact list records who
@@ -525,7 +594,9 @@ message types. The shared Edge modules have unit tests: `edge-google.test.ts`
 (service-account token: two scopes, cached for the hour, failure named without
 the endpoint's words), `edge-ics.test.ts` (the invitation: UTC, escaping,
 75-octet folding, size limit) and `edge-google-apis.test.ts` (calendar event,
-sheet append, PostgREST helpers). The live smoke asks `submit-lead` and
+sheet append — `sheetCell` stores a leading-zero number, and any value that
+starts with `=`, `+`, `-`, `@`, a tab or a carriage return, as text behind a
+leading apostrophe, so a visitor's words never run as a formula — PostgREST helpers). The live smoke asks `submit-lead` and
 `log-support-chat` an empty question in production.
 
 Invitations independent of the Google event — `INT-INV-001..007`, in the Edge
@@ -620,12 +691,14 @@ in-isolate check) and five an hour in all (`masleka-alerts`).
 | INT-MSKCODE-035 | "still answers not_saved when no alert can be delivered" | Every staff address refused: 500 `not_saved` |
 | INT-MSKCODE-036 | "raises no alert for what the client got wrong: a bad link, ID or code, or too many tries" | Unknown token, bad ID, bad code, link flood: no mail, no `masleka-alert` limiter call |
 
-### 4.26 `masleka-reveal` — a member decrypts one value — `INT-MSKREV-001..020`
+### 4.26 `masleka-reveal` — a member decrypts one value — `INT-MSKREV-001..024`
 
 `tests/integration/masleka-reveal.integration.test.ts`, through the in-process
 harness with its clearinghouse fakes (`MaslekaFake`: sessions for
-`GET /auth/v1/user`, roles for the `staff_role` RPC). Every call proves its
-caller (`staffCaller`); the request is read by its UUID-checked id and agency 1
+`GET /auth/v1/user`, per-user roles, lead assignments and the
+`can_work_request` RPC asked under the caller's token). Every call proves its
+caller (`sessionCaller`, then `allowRequest`: the request's lead's assignee, or
+the creator of a lead-less request, and Admin+); the request is read by its UUID-checked id and agency 1
 with named columns; the access row (who, which request, which field — its
 agency copied from the request) is written before the value is unsealed with
 `<id>:<field>` as its context, and a failed write reveals nothing.
@@ -635,10 +708,10 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKREV-001 | "answers disabled while MASLEKA_ENABLED is unset" | 404 exactly `{ error: 'disabled', rid }`; no fetch |
 | INT-MSKREV-002 | "stays dark for anything but exactly true, before reading the body" | `TRUE`, `1`, `yes`, `true1` with a non-JSON body: 404 `disabled` (not `invalid`); no fetch |
 | INT-MSKREV-003 | "refuses a caller with no session" | 401 `unauthorized` + rid; no `masleka_requests` call; no log row |
-| INT-MSKREV-004 | "refuses a session the auth server does not recognise" | 401; no `staff_role` call; no `masleka_requests` call |
+| INT-MSKREV-004 | "refuses a session the auth server does not recognise" | 401; no `can_work_request` call; no `masleka_requests` call |
 | INT-MSKREV-005 | "refuses a signed-in user who is not staff, and logs no access" | 403 `forbidden` + rid; no log row; no `masleka_requests` call |
 | INT-MSKREV-006 | "a membership removed between two calls is refused on the second" | 200 then 403 with the same session; no value, no log row on the second |
-| INT-MSKREV-007 | "asks the auth server and staff_role about the caller on every call" | One `GET /auth/v1/user` with the bearer token; one `staff_role` with `{ p_user_id }` |
+| INT-MSKREV-007 | "asks the auth server, then the database under the caller's own session, on every call" | One `GET /auth/v1/user` with the bearer token; one `can_work_request` with `{ p_request_id }` and the caller's bearer |
 | INT-MSKREV-008 | "decrypts the ID for a member, never cached, and logs who asked" | `{ ok, value, rid }` in that order; `no-store`; one log row whose keys are exactly agency_id, at, field, id, request_id, user_id |
 | INT-MSKREV-009 | "decrypts the code" | Value; one log row, field `code` |
 | INT-MSKREV-010 | "opens each value only with its own request and field as the context" | The code's ciphertext in the ID column, and an ID sealed for another row: 500 `failed`, no value |
@@ -652,6 +725,10 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKREV-018 | "reveals nothing without the key, or with one that is not 32 bytes" | Missing, 16-byte, non-base64: 503 `unavailable` + rid; no `masleka_requests` call; no log row |
 | INT-MSKREV-019 | "never writes a revealed value or the session token to a log line" | Across success (both fields), log failure, wrong context and an outsider: no code, ID, session token, ciphertext or client name in any line |
 | INT-MSKREV-020 | "answers the browser's preflight and does nothing else" | 204 with the site's origin allowed; no fetch |
+| INT-MSKREV-021 | "reveals on a request whose lead is assigned to them, and logs the reveal first" | A User: 200 with the value; one log row with their id |
+| INT-MSKREV-022 | "refuses a request on another User's lead, and reveals and logs nothing" | 403 `forbidden` + rid; no log row |
+| INT-MSKREV-023 | "refuses a request on an unassigned lead" | 403; no log row |
+| INT-MSKREV-024 | "reveals on a request with no lead that they created, not on one somebody else did" | 200 for their own; 403 and no log row for another's |
 
 ### 4.27 `masleka-submitted` — הגשתי wipes the ciphertext — `INT-MSKSUB-001..016`
 
@@ -667,14 +744,14 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKSUB-008 | "loses a race gracefully: a concurrent הגשתי that landed first is a refusal, not 'done'" | PATCH matches zero rows: 409 `already_submitted`, no `ok` |
 | INT-MSKSUB-009 | "a failed wipe is reported as a failure, not as done" | 500 `failed`, no `ok`; row still `code_received` with both ciphertexts |
 | INT-MSKSUB-010 | "refuses a request that is not waiting with a code, and changes nothing" | `invited`, `completed`, `expired`, `cancelled`: 409 `not_available`; row unchanged |
-| INT-MSKSUB-011 | "does not find a request that is not there, or not the agency's, and leaves the other agency's values alone" | 404 `not_found`; other agency's ciphertext untouched |
+| INT-MSKSUB-011 | "does not find a request that is not there, or not the agency's, and leaves the other agency's values alone" | Not there: 403 `forbidden`, refused by `can_work_request` before anything is read or written; another agency's: 404 `not_found` (the agency filter); its ciphertext untouched |
 | INT-MSKSUB-012 | "scopes the write to the agency, whatever the body says" | `agency_id=eq.<AGENCY_1>`; body's agency, status and `submitted_by` ignored |
 | INT-MSKSUB-013 | "refuses an id that is not one, before touching the table" | 400 `invalid` (not a UUID, injection, non-string, missing, bad JSON); no `masleka_requests` call |
 | INT-MSKSUB-014 | "lowercases the id once it is validated, so the filter and the answer agree" | Upper-case UUID: 200; filter `id=eq.<lowercase>` |
 | INT-MSKSUB-015 | "never writes a ciphertext, a name or the session token to a log line" | Across success, failed write and outsider: every line has `rid`; no ciphertext, client name, last4 or session token |
 | INT-MSKSUB-016 | "answers the browser's preflight and does nothing else" | 204, site origin allowed; no fetch |
 
-### 4.28 `masleka-create` — a hand-made request, or a fresh link — `INT-MSKNEW-001..023`
+### 4.28 `masleka-create` — a hand-made request (optionally on a lead), a fresh link, or a reissue — `INT-MSKNEW-001..039`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -697,10 +774,23 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKNEW-017 | "writes one conditional update scoped to the agency, naming the columns it gets back" | One PATCH: `id` (lowercased), `agency_id`, `status=eq.invited`, `select=id`, `return=representation`; three fields |
 | INT-MSKNEW-018 | "makes the old link stop working: the stored hash no longer matches it" | Stored hash is the new token's only |
 | INT-MSKNEW-019 | "extends the expiry, never shortens it: thirty days from now whatever was left" | Near and lapsed expiries both become >= 29 days on |
-| INT-MSKNEW-020 | "does not touch another agency's request, or one that is not there" | 409; hash unchanged |
+| INT-MSKNEW-020 | "does not touch another agency's request, or one that is not there" | Another agency's: 409, hash unchanged; one that is not there: 403 `forbidden`, no PATCH |
+| INT-MSKNEW-024 | "lets a User start a request by hand, as theirs, and fresh-link only their own (agency roles)" | A User's new request has `created_by` = them and no lead; a fresh link for another's lead-less request: 403, hash unchanged; for their own: 200 |
 | INT-MSKNEW-021 | "answers 500 and no link when the update fails" | 500 `failed`; no link |
 | INT-MSKNEW-022 | "refuses a request that is no longer waiting for a code" | 409; hash unchanged |
 | INT-MSKNEW-023 | "refuses an id that is not one" | 400 `invalid`; no `masleka_requests` call |
+| INT-MSKNEW-025 | "lets a User start a request on their own lead, and stores the lead" (for a lead) | 200; `lead_id` the lead, `created_by` the User |
+| INT-MSKNEW-026 | "refuses a User another User's lead with 403, and stores nothing" (for a lead) | 403 `forbidden` with `rid`; no row |
+| INT-MSKNEW-027 | "lets an Admin start one on any of the agency's leads" (for a lead) | 200; `lead_id` another User's lead, `created_by` the Admin |
+| INT-MSKNEW-028 | "refuses a lead of another agency, even one the caller can see" (for a lead) | 403 (`lead_in_agency` false); no row |
+| INT-MSKNEW-029 | "refuses a lead id that is not one, asking nothing about it" (for a lead) | `not-a-uuid`, a number, an object: 400; `can_see_lead` never asked |
+| INT-MSKNEW-030 | "keeps today's request when the lead is left out or null: lead-less, the caller's own" (for a lead) | 200; `lead_id` null, `created_by` the caller; `can_see_lead` never asked |
+| INT-MSKNEW-031 | "sends the request back to the client: the code, the ID and its last digits wiped, a fresh link" (a reissue) | 200, `invited: false`; the row `invited`, both ciphertexts, `id_last4` and `code_received_at` null, `ciphertext_wiped_at` set; the hash is the new link's |
+| INT-MSKNEW-032 | "writes one conditional update that matches only a request still waiting to be submitted" (a reissue) | One PATCH: `id=eq.`, `agency_id=eq.`, `status=eq.code_received`, `select=id` |
+| INT-MSKNEW-033..036 | "never reopens or wipes a request that is %s" (a reissue) | `invited`, `submitted`, `completed`, `expired`: 409 `not_available`, nothing changed, no link |
+| INT-MSKNEW-037 | "leaves a code that just arrived alone when the fresh link was a plain one" (a reissue) | A plain fresh link on a `code_received` row: 409; the ciphertexts kept |
+| INT-MSKNEW-038 | "is for whoever may work the request: another User is refused and nothing changes" (a reissue) | Another User: 403, nothing changed; the creator: 200 |
+| INT-MSKNEW-039 | "never writes the link, the token or a ciphertext to a log line" (a reissue) | `reissued: true` logged; no link, token, ciphertext or last digits |
 
 ### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..037`
 
@@ -805,18 +895,54 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-SRET-006 | "fails without clearing anything when the database cannot say who is live" | 500; no clear |
 | INT-SRET-007 | "logs counts, never a cell" | No name, phone, email or transcript in the answer |
 
-### 4.33 `invite-user` — "הוספת משתמש" — `INT-INV-001..009`
+### 4.33 `invite-user` — "הוספת משתמש" — `INT-INV-001..018`
 
-`invite-user.integration.test.ts` fakes Supabase Auth (the session, the admin create), PostgREST (profiles, agencies, the membership upsert) and lets the mailer stub record the invitation.
+`invite-user.integration.test.ts` fakes Supabase Auth (the session, the admin create), PostgREST (profiles, agencies under RLS), the `staff_role`, `set_member_role` and `invitee_for` RPCs over independent Auth/profile addresses, and lets the mailer stub record the invitation. The callers are the platform operator, an agency Admin, an Owner, and a signed-in member with no role.
 
 | ID | Title | Expected result |
 |---|---|---|
 | INT-INV-001 | "refuses a caller with no session, and one who is not an admin" | 401 / 403; no account, no membership |
-| INT-INV-002..005 | "refuses %s, and changes nothing" | A bad address, an unknown role (`admin` included), a malformed or missing organization: 400 |
-| INT-INV-006 | "makes an account for an address never seen, adds the membership, and mails the invitation" | Lower-cased address; `email_confirm: true`; the membership; the mail with the organization, the role and the sign-in link; no `/auth/v1/invite` |
-| INT-INV-007 | "adds an existing account without making another, and changes the role of a member already there" | No create; `on_conflict=user_id,agency_id`; the role replaced |
+| INT-INV-002..005 | "refuses %s, and changes nothing" | A bad address, an unknown role (the old `agent`), a malformed or missing organization: 400 |
+| INT-INV-006 | "makes an account for an address never seen, adds the membership, and mails the invitation" | Lower-cased address; `email_confirm: true`; the membership; the mail with the organization, the role in Hebrew (`משתמש/ת`) and the sign-in link; no `/auth/v1/invite` |
+| INT-INV-007 | "adds an existing account without making another, and changes the role of a member already there" | No create; the role replaced through `set_member_role`; no direct `memberships` call |
+| INT-INV-014 | "lets an agency Admin add a User, through set_member_role under the Admin's own session" | 200; the membership; one `set_member_role` with the Admin's token and `{ p_agency_id, p_user_id, p_role: 'user' }` |
+| INT-INV-015 | "refuses an agency Admin who would add an Admin or an Owner, before any account is made" | 403; no account, no membership |
+| INT-INV-016 | "lets the Owner add an Admin" | 200; role `admin` |
+| INT-INV-017 | "names the role in Hebrew in the invitation" | `מנהל/ת` |
+| INT-INV-018 | "answers the database's refusals as the person can read them, never as a failure" | `forbidden` → 403, no mail; `last_owner` → 409 naming the owner; `rid` on both |
 | INT-INV-008 | "keeps the membership and says so when the invitation mail does not go" | 200, `mailed: false`, `invite_email_failed` |
 | INT-INV-009 | "refuses an address Auth holds but no profile does, rather than guess at an account" | 409; no membership |
+| INT-INV-010 | "invites the current Auth owner when another profile still carries their address" | Membership goes to the current owner, never the historical profile match |
+| INT-INV-011 | "never grants a former Auth owner access when the old address is now unused" | New account invited; former owner receives no membership |
+| INT-INV-012 | "fails closed when the authoritative address lookup is unavailable" | 500; no account creation, membership or mail |
+| INT-INV-013 | "uses the verified admin session for tenant tables while keeping Auth and identity lookup server-side" | The agency read and `set_member_role` carry the caller's bearer; account creation and `invitee_for` keep service credentials |
+
+### 4.34 The agency-roles functions — `member-admin`, `assign-lead`, `claim-document-link` — `INT-ROLE-001..018`
+
+`tests/integration/agency-roles-edge.integration.test.ts`, through the in-process harness. Agency 1 has an Owner, an Admin and two Users; the platform operator has no membership; an outsider is signed in with no role. The harness answers `staff_role`, `can_see_lead` (under the caller's token), `set_member_role` / `remove_member` (recorded, or refused with a given reason), and the leads trigger's `assignee_not_member`. The database's own rules are `agency_roles_check.sql`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-ROLE-001 | "refuses a caller with no session, and changes nothing" | `member-admin`: 401; no RPC |
+| INT-ROLE-002 | "sets a role through set_member_role, as the caller" | `{ ok, warnings: [], rid }`; one call with the caller's session and `{ p_agency_id, p_user_id, p_role }` |
+| INT-ROLE-003 | "removes a member, and lets anyone leave by their own id" | `remove_member` for the target; `leave` uses the caller's id whatever the body says |
+| INT-ROLE-004 | "hands over ownership in order: the new Owner first, then the caller steps down" | Two calls: target → `owner`, then caller → `admin` |
+| INT-ROLE-005..007 | "answers the database's %s with %s and a message a person reads, never its text" | `forbidden` 403, `last_owner` 409, `not_found` 404; `rid`; the reason word is not in the message |
+| INT-ROLE-008 | "refuses an unknown role or op, or an id that is not one, before asking anything" | 400; no RPC |
+| INT-ROLE-009 | "assigns as the caller, and mails the assignee a link to the lead and nothing about the client" | `assign-lead`: the PATCH carries the Admin's bearer; mail "שויכה אלייך פנייה חדשה" with `…/admin/leads?lead=<id>`; neither the client's name nor phone in text or HTML |
+| INT-ROLE-010 | "refuses a User, and the operator assigns without a membership" | User: 403, no write, no mail; operator: 200 |
+| INT-ROLE-011 | "puts a lead back in the queue, and tells nobody" | `assigned_user_id: null`; no mail |
+| INT-ROLE-012 | "answers the trigger's refusal of someone outside the agency, and mails nobody" | 400 naming membership; no mail |
+| INT-ROLE-013 | "does not mail an Admin who takes a lead themselves" | 200; no mail |
+| INT-ROLE-014 | "answers 404 for a lead that is not there, and 400 for an id that is not one" | 404 / 400 |
+| INT-ROLE-015 | "signs a short link for the assignee, never cached" | `claim-document-link`: 200 with a signed `claim-documents` URL; `no-store`; `can_see_lead` asked with the caller's bearer |
+| INT-ROLE-016 | "refuses another User, and signs nothing" | 403; no sign call |
+| INT-ROLE-017 | "refuses a document that is not on that lead, even for an Admin" | 404; no sign call |
+| INT-ROLE-018 | "refuses a path that is not an object name, before asking anything" | `..`, empty, 301 characters: 400; no `can_see_lead` |
+
+Weakening `assign-lead`'s gate to `user`, or dropping `claim-document-link`'s lead check, fails INT-ROLE-010, -015 and -016.
+
+`content-admin-edge.integration.test.ts` gates per action (agency roles): a User writes and edits drafts, asked in agency 1; a User who would publish, edit a live article, unpublish, delete, or add or delete a testimonial is refused 403 and nothing is written; an agency Admin does all of them; a shared-library article (no agency) is the operator's alone; a `published` that is not a boolean (`"true"`, `1`, `null`) is refused 400 before the gate, which compares with `=== true` while PostgREST would cast it. Its refusal cases now assert "nothing is written": an edit or delete reads its row's agency first, and a caller with no session reads nothing at all. Fixture tokens are 20+ characters, as `bearer()` requires.
 
 ## 5. Pass criteria
 

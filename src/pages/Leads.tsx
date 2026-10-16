@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { services, type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
-import { useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds } from "@/hooks/useAdmin";
+import {
+  useAdminUsers, useAssignLead, useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds,
+} from "@/hooks/useAdmin";
+import { useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { csvCell } from "@/lib/csv";
 import { Loader2, Download, Trash2 } from "lucide-react";
@@ -56,13 +59,13 @@ const DOCUMENT_REF = /(storage:claim-documents\/[^\s|]+)/;
  * The tab is opened before the await: Safari blocks a window opened after one,
  * and the signing is a round trip.
  */
-function DocumentLink({ docRef, index }: { docRef: string; index: number }) {
+function DocumentLink({ docRef, index, leadId }: { docRef: string; index: number; leadId: string }) {
   const [error, setError] = useState<string | null>(null);
   const open = async () => {
     setError(null);
     const tab = window.open("about:blank", "_blank");
     try {
-      const url = await services.leadsAdmin.documentLink(docRef);
+      const url = await services.leadsAdmin.documentLink(docRef, leadId);
       if (tab) {
         tab.opener = null;
         tab.location.href = url;
@@ -118,7 +121,7 @@ function LeadDetails({ lead }: { lead: LeadRecord }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <DocumentLink key={i} docRef={part} index={(i + 1) / 2} />
+          <DocumentLink key={i} docRef={part} index={(i + 1) / 2} leadId={lead.id} />
         ) : (
           <React.Fragment key={i}>{part}</React.Fragment>
         ),
@@ -127,19 +130,64 @@ function LeadDetails({ lead }: { lead: LeadRecord }) {
   );
 }
 
+/** The chips past the settable statuses: what the backend writes, and the unassigned queue. */
+/**
+ * "דורשות טיפול": new leads, and escalated ones — a visitor who asked for Dorit
+ * herself (review 2026-10-15). The card counts both and its filter shows both.
+ */
+const NEEDS_ATTENTION: string[] = ["new", "escalated"];
+const ATTENTION = "attention";
+
+const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean }[] = [
+  { key: "escalated", label: "הועברו לטיפול" },
+  { key: "partial", label: "ראיונות שלא הושלמו" },
+  { key: "unassigned", label: "לא שויכו", adminOnly: true },
+];
+
+/**
+ * The agency's leads. A User sees only those assigned to them ("הפניות שלי")
+ * and may change their status; Admin+ see them all, assign them and delete
+ * them. Row-level security decides which rows arrive; the buttons follow
+ * src/config/permissions.ts and are refused by the database when shown wrongly.
+ */
 export default function Leads() {
   const { data, isPending: loading, isError } = useLeads();
+  const { agencyId } = useCurrentAgency();
+  const { can } = useAgencyRole(agencyId);
+  const assigns = can("leads.assign");
+  const deletes = can("leads.delete");
+  const members = useAdminUsers(assigns);
   const transcriptIds = useTranscriptLeadIds();
   const withTranscript = useMemo(() => new Set(transcriptIds.data ?? []), [transcriptIds.data]);
   const setStatus = useSetLeadStatus();
   const removeLead = useRemoveLead();
+  const assignLead = useAssignLead();
   const [filter, setFilter] = useState<string>("all");
 
-  const leads: LeadItem[] = data ?? [];
-  const busy = setStatus.isPending || removeLead.isPending;
-  const writeError = setStatus.isError || removeLead.isError;
+  // One agency at a time: someone in two sees the one the switcher names.
+  const leads: LeadItem[] = (data ?? []).filter((l) => !l.agency_id || l.agency_id === agencyId);
+  const busy = setStatus.isPending || removeLead.isPending || assignLead.isPending;
+  const writeError = setStatus.isError || removeLead.isError || assignLead.isError;
+  /** Who a lead of this agency may go to: its members, by address. */
+  const assignees = useMemo(
+    () =>
+      (members.data ?? [])
+        .filter((u) => u.memberships.some((m) => m.orgId === agencyId))
+        .map((u) => ({ id: u.id, label: u.email ?? u.id }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [members.data, agencyId],
+  );
+  const assigneeLabel = (id: string | null | undefined) => (id ? assignees.find((a) => a.id === id)?.label ?? "חבר/ה שכבר לא בסוכנות" : "—");
 
-  const filtered = leads.filter((l) => filter === "all" || l.status === filter);
+  const filtered = leads.filter(
+    (l) =>
+      filter === "all" ||
+      (filter === "unassigned"
+        ? !l.assigned_user_id && l.status !== "closed"
+        : filter === ATTENTION
+          ? NEEDS_ATTENTION.includes(l.status)
+          : l.status === filter),
+  );
 
   const exportCsv = (all: boolean) => {
     const source = all ? leads : filtered;
@@ -174,6 +222,7 @@ export default function Leads() {
 
   const counts = leads.reduce<Record<string, number>>((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
+    if (!l.assigned_user_id && l.status !== "closed") acc.unassigned = (acc.unassigned || 0) + 1;
     return acc;
   }, {});
 
@@ -183,13 +232,13 @@ export default function Leads() {
         <div className="max-w-[1200px] mx-auto px-6 py-5 flex items-center justify-between">
           <div>
             <Eyebrow>טיפול שוטף</Eyebrow>
-            <h1 className="font-heading text-2xl md:text-3xl mt-1">ניהול פניות</h1>
+            <h1 className="font-heading text-2xl md:text-3xl mt-1">{assigns ? "ניהול פניות" : "הפניות שלי"}</h1>
           </div>
         </div>
       </header>
 
-      <main id="main" className="max-w-[1200px] mx-auto px-6 py-8">
-        <LeadTrackingPanel />
+      <main className="max-w-[1200px] mx-auto px-6 py-8">
+        {assigns ? <LeadTrackingPanel /> : null}
 
         {/* תצוגת סיכום סטטוסים */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
@@ -202,12 +251,12 @@ export default function Leads() {
             <p className="text-xs text-muted-foreground mt-1">כל הרשומות במערכת</p>
           </button>
           <button
-            onClick={() => setFilter("new")}
-            className={`text-right p-5 border transition-colors ${filter === "new" ? "border-highlight bg-highlight/10" : "border-border/60 hover:border-highlight/50 bg-card"}`}
+            onClick={() => setFilter(ATTENTION)}
+            className={`text-right p-5 border transition-colors ${filter === ATTENTION ? "border-highlight bg-highlight/10" : "border-border/60 hover:border-highlight/50 bg-card"}`}
           >
             <p className="text-sm text-highlight-ink">דורשות טיפול</p>
-            <p className="font-heading text-3xl mt-2 text-highlight-ink">{counts.new || 0}</p>
-            <p className="text-xs text-muted-foreground mt-1">לקוחות חדשים — ליצור קשר</p>
+            <p className="font-heading text-3xl mt-2 text-highlight-ink">{(counts.new || 0) + (counts.escalated || 0)}</p>
+            <p className="text-xs text-muted-foreground mt-1">חדשות, ומי שביקשו את דורית — ליצור קשר</p>
           </button>
           <button
             onClick={() => setFilter("contacted")}
@@ -229,9 +278,12 @@ export default function Leads() {
 
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="flex flex-wrap items-center gap-2">
-            {["all", ...STATUS].map((s) => {
+            {[
+              { key: "all", label: "הכל" },
+              ...STATUS.map((s) => ({ key: s, label: STATUS_LABEL[s] })),
+              ...EXTRA_FILTERS.filter((f) => !f.adminOnly || assigns),
+            ].map(({ key: s, label }) => {
               const active = filter === s;
-              const label = s === "all" ? "הכל" : STATUS_LABEL[s as LeadStatus];
               const count = s === "all" ? leads.length : counts[s] || 0;
               return (
                 <button
@@ -296,6 +348,7 @@ export default function Leads() {
                   <th className="px-4 py-3 font-medium">מקור</th>
                   <th className="px-4 py-3 font-medium">פרטים</th>
                   <th className="px-4 py-3 font-medium">סטטוס</th>
+                  {assigns ? <th className="px-4 py-3 font-medium">משויכת ל</th> : null}
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -318,26 +371,52 @@ export default function Leads() {
                         {ANY_STATUS_LABEL[l.status] || l.status}
                       </span>
                     </td>
+                    {assigns ? (
+                      <td className="px-4 py-3">
+                        <select
+                          aria-label={`שיוך הפנייה של ${l.name}`}
+                          value={l.assigned_user_id ?? ""}
+                          onChange={(e) => assignLead.mutate({ id: l.id, userId: e.target.value || null })}
+                          disabled={busy}
+                          className="text-xs border border-border bg-background px-2 py-1 max-w-[12rem] focus:outline-none focus:border-accent"
+                        >
+                          <option value="">לא שויכה</option>
+                          {l.assigned_user_id && !assignees.some((a) => a.id === l.assigned_user_id) ? (
+                            <option value={l.assigned_user_id}>{assigneeLabel(l.assigned_user_id)}</option>
+                          ) : null}
+                          {assignees.map((a) => (
+                            <option key={a.id} value={a.id}>{a.label}</option>
+                          ))}
+                        </select>
+                      </td>
+                    ) : null}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <select
+                          aria-label={`סטטוס הפנייה של ${l.name}`}
                           value={l.status}
                           onChange={(e) => updateStatus(l.id, e.target.value as LeadStatus)}
                           disabled={busy}
                           className="text-xs border border-border bg-background px-2 py-1 focus:outline-none focus:border-accent"
                         >
+                          {/* A status the backend wrote shows as it is, and cannot be chosen back. */}
+                          {!STATUS.includes(l.status) ? (
+                            <option value={l.status} disabled>{ANY_STATUS_LABEL[l.status] || l.status}</option>
+                          ) : null}
                           {STATUS.map((s) => (
                             <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                           ))}
                         </select>
-                        <button
-                          onClick={() => remove(l.id)}
-                          disabled={busy}
-                          className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30"
-                          aria-label="מחיקה"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {deletes ? (
+                          <button
+                            onClick={() => remove(l.id)}
+                            disabled={busy}
+                            className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30"
+                            aria-label="מחיקה"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

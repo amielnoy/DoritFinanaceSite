@@ -53,6 +53,27 @@ export function useSetLeadStatus() {
   });
 }
 
+/**
+ * Give a lead to a member, or back to the queue (null) — Admin+, through
+ * assign-lead. The leads and every leads counter (they share the prefix) reload.
+ */
+export function useAssignLead() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, userId }: { id: string; userId: string | null }) => services.leadsAdmin.assign(id, userId),
+    onSuccess: () => client.invalidateQueries({ queryKey: adminKeys.leads }),
+  });
+}
+
+/** The accounts and their agencies, as the users screen reads them — also the assignee list. */
+export function useAdminUsers(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: () => services.usersAdmin.list(),
+    enabled,
+  });
+}
+
 export function useRemoveLead() {
   const client = useQueryClient();
   return useMutation({

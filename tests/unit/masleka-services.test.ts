@@ -83,21 +83,6 @@ describe("SupabaseMaslekaService — the client's page", () => {
 });
 
 describe("SupabaseMaslekaService — the staff board", () => {
-  it("asks the database for the caller's role", async () => {
-    const { service, calls } = fake({ rpc: { data: "owner", error: null } });
-    expect(await service.myRole()).toBe("owner");
-    expect(calls).toContainEqual(["rpc", "my_staff_role"]);
-  });
-
-  it("knows no role for null or an unknown answer", async () => {
-    expect(await fake({ rpc: { data: null, error: null } }).service.myRole()).toBeNull();
-    expect(await fake({ rpc: { data: "superuser", error: null } }).service.myRole()).toBeNull();
-  });
-
-  it("fails rather than guessing when the role cannot be read", async () => {
-    await expect(fake({ rpc: { data: null, error: { message: "boom" } } }).service.myRole()).rejects.toMatchObject({ reason: "failed" });
-  });
-
   it("reads the open requests by the granted columns only, newest first", async () => {
     const row = {
       id: "r1", client_name: "רונית מזרחי", contact_email: null, status: "code_received", lead_id: null,
@@ -134,6 +119,26 @@ describe("SupabaseMaslekaService — the staff board", () => {
     expect(client.functions.invoke).toHaveBeenCalledWith("masleka-create", {
       body: { clientName: "משה כהן", contactEmail: "moshe@example.com", sendInvite: true },
     });
+  });
+
+  it("sends the lead a request hangs off, and no lead key for one made by hand", async () => {
+    const { client, service } = fake({
+      invoke: async () => ({ data: { ok: true, requestId: "r9", link: "https://govari-fin.co.il/masleka#t=x", invited: false, rid: "q" }, error: null }),
+    });
+    await service.create({ clientName: "משה כהן", sendInvite: false, leadId: "22222222-2222-4222-8222-000000000001" });
+    expect(client.functions.invoke).toHaveBeenLastCalledWith("masleka-create", {
+      body: { clientName: "משה כהן", contactEmail: "", sendInvite: false, leadId: "22222222-2222-4222-8222-000000000001" },
+    });
+    await service.create({ clientName: "משה כהן", sendInvite: false });
+    expect(client.functions.invoke.mock.calls.at(-1)![1].body).not.toHaveProperty("leadId");
+  });
+
+  it("asks for a reissue by request id: back to the client, with a fresh link", async () => {
+    const { client, service } = fake({
+      invoke: async () => ({ data: { ok: true, requestId: "r2", link: "https://govari-fin.co.il/masleka#t=z", invited: false, rid: "q" }, error: null }),
+    });
+    expect((await service.reissue("r2")).link).toBe("https://govari-fin.co.il/masleka#t=z");
+    expect(client.functions.invoke).toHaveBeenCalledWith("masleka-create", { body: { requestId: "r2", reissue: true } });
   });
 
   it("asks for a fresh link by request id", async () => {
@@ -207,11 +212,10 @@ describe("SupabaseMaslekaService — the staff board", () => {
 });
 
 describe("UnconfiguredMaslekaService", () => {
-  it("is never available and gives nobody a role", async () => {
+  it("is never available", async () => {
     const service = new UnconfiguredMaslekaService();
     await expect(service.submitCode("t", "c", "i")).rejects.toMatchObject({ reason: "unavailable" });
     await expect(service.list()).rejects.toMatchObject({ reason: "unavailable" });
-    expect(await service.myRole()).toBeNull();
   });
 });
 

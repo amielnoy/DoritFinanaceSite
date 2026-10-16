@@ -177,6 +177,13 @@ one fewer person. One case pins the three copies byte-identical; another pins
 that each mailbox gets its own `try`, since one wrapped around the whole loop
 would let the first bounce swallow the rest.
 
+The **sheet cell rule** is duplicated the same way: `upsertContact`'s
+`appendEventRow` carries the line `_shared/sheets.ts`'s `sheetCell` returns, and
+one case pins both to the same text. Under `USER_ENTERED` a cell starting with
+`=`, `+`, `-`, `@`, a tab or a carriage return runs as a formula, so a visitor's
+name could fetch a URL or rewrite the sheet; the leading apostrophe stores it as
+text, as it already did for a phone's leading zero.
+
 A last block covers how the interview agent *ends*. A finished interview has to
 reach a person, and a bare `Lead.create` reaches nobody — it stores the summary
 and sends no mail, so it waits for whoever next opens the leads screen. The
@@ -685,7 +692,7 @@ itself is proved by `supabase/tests/masleka_check.sql` against a local
 | CTR-MSKD-008 | "lets submit-lead create or reuse a request only behind the same switch" | `await createRequest(` and `await findInvitedRequest(` each called once, inside the guarded block; `rotateMaslekaLink` called once, only under `if (masleka?.reuse)` |
 | CTR-MSKD-009 | "is off in a build that does not set VITE_MASLEKA_ENABLED" | `false` |
 | CTR-MSKD-010 | "is turned on by nothing in the repository" | No `MASLEKA_ENABLED=true` (comment lines aside) in Vercel, Playwright, Vitest, Supabase config, package.json or workflows |
-| CTR-MSKD-011 | "registers the staff pages only when switched on, and the client page always (it then says unavailable)" | Guarded `StaffRoute` block; `/masleka` route; page default `enabled = MASLEKA_ENABLED` |
+| CTR-MSKD-011 | "registers the staff pages only when switched on, and the client page always (it then says unavailable)" | Guarded `<AgencyRoute min="user">` block; `/masleka` route; page default `enabled = MASLEKA_ENABLED` |
 | CTR-MSKD-012 | "recognises "VITE_MASLEKA_ENABLED": "true" as switch-on: true" | Detected (JSON-quoted key with a string true) |
 | CTR-MSKD-013 | "recognises "MASLEKA_ENABLED":true as switch-on: true" | Detected (JSON-quoted key with a bare true) |
 | CTR-MSKD-014 | "recognises MASLEKA_ENABLED: true as switch-on: true" | Detected (unquoted YAML) |
@@ -740,11 +747,106 @@ Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behavi
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-INV-001 | "passes the same admin gate as content-admin, before reading its input" | `requireAdminSession` before `req.json()`; the gate reads `profiles.role` |
+| CTR-INV-001 | "checks the session before reading its input, then Admin+ in that agency" | `sessionCaller` before `req.json()`, then `allowRole(session, orgId, 'admin', …)`; content-admin uses the same session gate; the operator is read from `profiles.role` |
+| CTR-INV-001a | "lets an Admin grant User only, before making any account, and leaves the grant to set_member_role under the caller's session" | The Admin check precedes `createAuthUser`; `callRpc('set_member_role', …, sessionToken)`; no direct `memberships` write |
 | CTR-INV-002 | "checks the session itself, as content-admin does" | `verify_jwt = false` |
-| CTR-INV-003 | "gives only the three membership roles, never the site admin" | owner, agent, staff; no `role: 'admin'` |
+| CTR-INV-003 | "gives only the three agency roles, in Hebrew, and never the platform operator" | `owner: בעלים`, `admin: מנהל/ת`, `user: משתמש/ת`; `profiles` never written |
 | CTR-INV-004 | "mails through dorit-mailer, never Supabase Auth's invite" | No `/auth/v1/invite`; `sendMail` to the address |
 | CTR-INV-005 | "logs ids, never the invitee's address" | No `email` in any log call |
+| CTR-INV-006 | "resolves invitees from Auth through a service-role-only RPC" | `invitee_for` joins Auth to a profile by id, matches the current Auth address, uses an empty search path and revokes execution from public/anon/authenticated |
+| CTR-INV-007 | "never resolves an unconfirmed account, in the latest definition of each identity function" | The last migration to define `invitee_for` requires `u.email_confirmed_at is not null` (`20261031000000_invitee_confirmed.sql`: security definer, empty search path, revokes by name); the last `my_email` requires a confirmed address, and `my_enquiries` and `my_snapshot` go through it |
+
+`supabase/tests/invitee_identity_check.sql` verifies the resolver and execution grants in PostgreSQL with changed Auth addresses, stale profiles, a missing profile, an unconfirmed account, empty inputs and anon/authenticated/service_role callers. An unconfirmed account is not resolved, so `invite-user` cannot make an account for the address either and answers its existing 409. Apply `20261027000000_invitee_identity.sql` before deploying the updated `invite-user` function; without it invitations fail closed.
+
+### 4.19 Agency roles: Owner, Admin, User — `agency-roles-schema.contract.test.ts`
+
+The schema for `docs/superpowers/specs/2026-10-15-agency-roles-design.md`, read as source. Step 1 is `20261029000000_agency_roles_additive.sql`: it adds lead assignment, the role helpers, the membership audit, `set_member_role` / `remove_member`, and two guard triggers, and no policy reads any of it yet.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ROLE-001 | "sorts after every migration already applied" | After `20261027000000_invitee_identity.sql` |
+| CTR-ROLE-002 | "defines the role helpers, the member functions and the two guards" | `agency_role`, `has_role`, `can_see_lead`, `lead_assignee_ok`, `set_member_role`, `remove_member`, `memberships_keep_an_owner`, `leads_guard_assignment` |
+| CTR-ROLE-003 | "pins search_path on every function, and revokes each from public, anon and authenticated by name" | `set search_path = ''` in each; a `revoke execute … from public, anon, authenticated;` per function; no grant names `anon` |
+| CTR-ROLE-004 | "runs every function as its definer except the leads trigger, which must see its caller" | `security definer` on all but `leads_guard_assignment`, which reads `current_user` to tell a person from the server |
+| CTR-ROLE-005 | "ranks owner over admin over user, and gives a suspended agency's members nothing" | `array['user', 'admin', 'owner']`; `agency_role` requires `a.status = 'active'` and `auth.uid()` |
+| CTR-ROLE-006 | "lets a User see a lead only when it is assigned to them" | `can_see_lead`: Admin+ in the lead's agency, the assignee holding `user`, or `is_admin()` |
+| CTR-ROLE-007 | "lets an Admin grant only User, to someone who is a User or not yet a member" | The admin branch refuses any other role or target; only the three new roles are valid; every change writes `membership_events` |
+| CTR-ROLE-008 | "removes a member's assignments with them, and lets anyone leave" | `remove_member` unassigns the person's leads in the agency and records `left` for oneself, `removed` otherwise |
+| CTR-ROLE-009 | "refuses to demote or remove an agency's last Owner" | `last_owner` from a `before update or delete` trigger on `memberships` |
+| CTR-ROLE-010 | "keeps a lead in its agency, and assignment to Admin+ and to the agency's members" | `agency_fixed`; assignment needs `has_role(…, 'admin')` or `is_admin()`; the assignee must pass `lead_assignee_ok` |
+| CTR-ROLE-011 | "makes the membership history read-only to people" | `membership_events`: select to `authenticated` only; no insert, update or delete grant |
+
+Step 2 is `20261030000000_agency_roles_narrowing.sql`. It maps `agent`/`staff` to `user`, narrows the CHECK, redefines `can_see` through `has_role` (so a suspended agency is no longer visible), and replaces every policy on lead data with the lead-level rule. It adds `can_work`, `can_work_request`, `can_work_snapshot` and `can_see_conversation`. The clearinghouse publish functions now check the snapshot's lead. Members can be changed only through the functions. A profile can be read by people who share an agency with it, so the members screen can name members. `staff_role` / `my_staff_role` become `staff_role(user, agency)` / `my_agency_role(agency)`. `masleka_staff_emails(request)` mails the request's handler plus Admins and Owners.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ROLE-012 | "sorts after step 1" | After `20261029000000_agency_roles_additive.sql` |
+| CTR-ROLE-013 | "leaves no read policy on lead data resting on can_see alone" | Replays every migration's `create policy` / `drop policy`. No top-level `or` branch of a select or all policy's USING clause on `leads`, `meetings`, `contacts`, `chat_*`, `masleka_requests`, `masleka_access_log` or `clearinghouse_*` is bare `public.can_see(…)`, and none of those USING clauses is empty |
+| CTR-ROLE-014 | "is a guard that would catch a bare can_see" | The branch splitter finds a bare `can_see` and does not flag one inside a conjunction |
+| CTR-ROLE-015 | "gives every lead-data table a read policy" | One per table |
+| CTR-ROLE-016 | "maps agent and staff to user, then allows only the three roles" | The update runs before the narrowed CHECK |
+| CTR-ROLE-017 | "makes can_see a membership of an active agency" | `select public.has_role(p_agency_id, 'user')` |
+| CTR-ROLE-018 | "lets only Admin+ delete leads and read contacts, and only the Owner edit the agency profile" | `leads_delete_admin` and `contacts_read_admin` use Admin+; `agency_profiles_update_owner` uses Owner |
+| CTR-ROLE-019 | "changes members only through the functions" | `memberships_write_admin` dropped; insert, update and delete revoked from `authenticated` |
+| CTR-ROLE-020 | "checks the lead, not the agency, when publishing an analysis" | The three publish functions call `can_work_snapshot(p_snapshot)`, never `can_see` |
+| CTR-ROLE-021 | "lets a User write drafts, and only Admin+ publish or delete" | Drafts for `user`; delete and testimonials for Admin+ |
+| CTR-ROLE-022 | "asks the role per agency, and mails a request's handler plus Admins and Owners" | The old functions dropped; `staff_role(uuid, uuid)` and `masleka_staff_emails(uuid)` granted to the service role only |
+| CTR-ROLE-024 | "binds a row's lead and request to the row's own agency, so nobody files work under another agency" | `can_work` accepts a lead only when `lead_in_agency(lead, agency)`; a snapshot's insert requires `request_in_agency(request, agency, lead)` and, for a named lead, `lead_in_agency` and `can_see_lead` on their own; a meeting's update keeps it in its lead's agency |
+| CTR-ROLE-023 | "pins search_path on every new function and revokes each by name" | `set search_path = ''`; each new function revoked from public/anon/authenticated; no grant to `anon` |
+
+`agency_roles_check.sql` adds the full matrix after step 2:
+- **A User** reads only their assigned lead, its meeting, its chat (not a lead-less conversation), their requests (on their lead, or lead-less ones they created), the matching snapshots and published items, and only their own reveals. They read no contacts. They cannot change another User's lead or delete their own. They can publish the analysis of their own lead but not another's. They read the agency profile but cannot change it. They write drafts but cannot publish, edit a published article, or add a testimonial. They see the agency's members and their profiles, but nobody outside, and cannot write `memberships`.
+- **An Admin** reads the whole agency, publishes, adds testimonials and deletes leads, but cannot change the agency profile or write `memberships`.
+- **The Owner** can change the agency profile.
+- **A non-member, or a suspended agency's Owner,** reads nothing.
+- **The operator** reads every agency.
+
+It also checks that a User cannot file a snapshot under another agency by naming their own lead or request, cannot pin their own lead-less request, or a request on their own lead, to another User's lead, and cannot move a meeting to another agency; these cases failed against the unbound rules. Reopening the leads, chat or agency-profile policy, or `can_work`, makes it fail. In `masleka_check.sql`, `clearinghouse_analysis_check.sql` and `clearinghouse_publish_check.sql`, the agency-1 "staff" member is now an Admin, the role that still sees the whole agency. `masleka_check.sql` asks `my_agency_role(agency)` and `staff_role(user, agency)`, and checks that the request's mailing list holds the agency's Admins and Owners but not the platform operator. `agency_isolation_check.sql` expects the narrowed USING / WITH CHECK expressions.
+
+`supabase/tests/agency_roles_check.sql` proves the behaviour in PostgreSQL with synthetic agencies (an active A and B, and a suspended one) and people: an Owner, an Admin, two Users, a non-member, the operator, and a suspended agency's Owner. Covered: role ranks and suspension; `can_see_lead` for each person; the leads trigger refuses a User's assignment change and any change of agency, records `assigned_at` / `assigned_by` for an Admin, keeps those two columns from a direct write, clears them on unassign, and lets the server assign only to a member; `set_member_role` and `remove_member` follow the rules above, including last owner, an Admin who cannot touch another Admin, leaving (which unassigns), and transfer of ownership; anon cannot execute the functions; deleting an agency or an account is not refused as a demotion. Breaking any guard, the suspension check or `can_see_lead` makes it fail.
+
+### 4.20 The screens' permissions table — `permissions.contract.test.ts`
+
+`src/config/permissions.ts` chooses what the screens show; the functions and the database decide. This holds the two to one table.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-PERM-001 | "assigning a lead is Admin+ in assign-lead" | `leads.assign: admin`; `allowRole(…, 'admin', …)`; the leads trigger's Admin+ check |
+| CTR-PERM-002 | "deleting a lead and reading contacts are Admin+ in the policies" | `leads_delete_admin`, `contacts_read_admin` |
+| CTR-PERM-003 | "a User works their own leads: status, transcripts, documents and the clearinghouse" | Those actions `user`; `allowLead` / `allowRequest` / `allowRole(AGENCY_1, 'user')`; publish through `can_work_snapshot` |
+| CTR-PERM-004 | "drafts are any member's; publishing, deleting and testimonials are Admin+ in content-admin" | `draft?.published ? 'admin' : 'user'`; removes and `createTestimonial` at `admin` |
+| CTR-PERM-005 | "a shared-library article is the operator's alone" | `blog.sharedLibrary: operator`; a null agency in content-admin |
+| CTR-PERM-006 | "inviting is Admin+, an Admin grants User only, and only an Owner grants Admin or Owner" | invite-user's gate and pre-check; `set_member_role`'s admin branch; `grantableRoles` |
+| CTR-PERM-007 | "the agency profile is the Owner's" | `agency_profiles_update_owner` |
+| CTR-PERM-008 | "the membership history is Admin+" | `membership_events_read_admin` |
+| CTR-PERM-009..011 | `can`, `grantableRoles`, `canManage` | Ranks; no role → nothing; the operator everything but leaving an agency they are not in; nobody changes someone above what they may grant |
+
+### 4.21 An interview's conversation reference — `lead-conversation-ref.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-LCR-001 | "is a column with the reference's own shape, indexed where set" | `conversation_ref` CHECK `^[A-Za-z0-9:_-]{8,100}$`; a partial index |
+| CTR-LCR-002 | "is the only thing submit-lead finds an open interview by — never phone, name or address" | `findOpenInterview` filters `conversation_ref=eq.…` only; no reference, no match |
+| CTR-LCR-003 | "is taken from the body only when well-formed, and stored on a new interview lead" | The pattern check; `conversation_ref` on the insert |
+
+### 4.22 The claim document's object name — `claim-documents-object-name.contract.test.ts`
+
+`20261102000000_claim_documents_object_name.sql` limits uploads to the name the claim form makes: agency 1's folder, a random uuid, a safe file name. The bucket used to take any name from anyone. `supabase/tests/storage_check.sql` now uploads with real-shaped names and refuses five others. It failed under the old any-name rule.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CDN-001 | "is limited by the policy to agency 1's folder, a random uuid and a safe file name" | The insert policy replaced, `bucket_id` and `name ~ …` |
+| CTR-CDN-002..005 | "accepts the name the form makes for %j" | `agencyObjectPath` for Hebrew, spaced, upper-case and one-letter names matches the policy's own pattern |
+| CTR-CDN-006..009 | "refuses %j" | A fixed name, another agency's folder, `..`, a bare name |
+
+### 4.23 The site's own icon — `favicon.contract.test.ts`
+
+Review 2026-10-15, item 23. `public/favicon.svg` is a monogram ד drawn as shapes on the primary colour (`#1c1a19`, from `--primary` in `src/index.css`), with a gold rule. It replaces Base44's logo in `index.html` and in `public/manifest.json`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ICON-001 | "is /favicon.svg in the page and in the manifest, and Base44's logo is nowhere" | The `<link rel="icon">` and the manifest's one icon are `/favicon.svg`; no `base44.com/logo` |
+| CTR-ICON-002 | "is an SVG monogram ד on the site's primary colour" | A 32×32 SVG titled `ד — …`, its ground the `--primary` hex; no `<text>`, no external reference |
 
 ## 5. Runtime counterpart
 

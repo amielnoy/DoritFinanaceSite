@@ -4,9 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { UserPlus, X } from "lucide-react";
 import { services, type InviteInput } from "@/services";
 import { ORG_ROLE_LABEL } from "@/lib/admin-users";
+import { grantableRoles, meets } from "@/config/permissions";
+import { useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 
 /**
- * "הוספת משתמש": the admin adds someone to an organization in a role. The
+ * "הוספת משתמש": an agency's Admin or Owner (or the platform operator) adds
+ * someone to an organization in a role. Only the organizations the person may
+ * add to are offered, and only the roles they may give there — an Admin gives
+ * User alone; invite-user and set_member_role refuse anything else. The
  * invite-user Edge Function finds or makes the account and mails the
  * invitation — sign-in is Google's, with the invited address — so this form
  * asks for exactly those three things and says what happened.
@@ -15,21 +20,29 @@ import { ORG_ROLE_LABEL } from "@/lib/admin-users";
  * the close button returning focus to "הוספת משתמש".
  */
 const EMAIL = /^[^\s@<>()[\]\\,;:"]+@[^\s@]+\.[^\s@]{2,}$/;
-const ROLES: InviteInput["role"][] = ["agent", "staff", "owner"];
 
 const FIELD = "w-full min-h-11 px-3 border border-input rounded-sm bg-background text-[15px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 
 export default function InviteUserDialog() {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const { agencyId, agencies } = useCurrentAgency();
   const [orgId, setOrgId] = useState("");
-  const [role, setRole] = useState<InviteInput["role"]>("agent");
+  const [role, setRole] = useState<InviteInput["role"]>("user");
+  const chosen = useAgencyRole(orgId || agencyId);
+  const roles = grantableRoles(chosen.role, chosen.isOperator);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const ids = { email: useId(), org: useId(), role: useId() };
   const client = useQueryClient();
 
-  const orgs = useQuery({ queryKey: ["admin", "organizations"], queryFn: () => services.usersAdmin.organizations(), enabled: open });
+  const orgs = useQuery({
+    queryKey: ["admin", "organizations"],
+    queryFn: () => services.usersAdmin.organizations(),
+    enabled: open,
+    // The operator adds to any; anyone else, to an agency where they are Admin+.
+    select: (all) => (chosen.isOperator ? all : all.filter((o) => agencies.some((a) => a.id === o.id && meets(a.role, "admin")))),
+  });
   const send = useMutation({
     mutationFn: (input: InviteInput) => services.usersAdmin.invite(input),
     onSuccess: (result, input) => {
@@ -46,7 +59,7 @@ export default function InviteUserDialog() {
   const reset = () => {
     setEmail("");
     setOrgId("");
-    setRole("agent");
+    setRole("user");
     setError(null);
     setDone(null);
     send.reset();
@@ -59,6 +72,7 @@ export default function InviteUserDialog() {
     const address = email.trim();
     if (!EMAIL.test(address)) return setError("יש להזין כתובת דוא״ל תקינה.");
     if (!orgId) return setError("יש לבחור ארגון.");
+    if (!roles.includes(role)) return setError("אין לך הרשאה לתת את התפקיד הזה בארגון הזה.");
     send.mutate({ email: address, orgId, role });
   };
 
@@ -117,7 +131,7 @@ export default function InviteUserDialog() {
             <div className="flex flex-col gap-1.5">
               <label htmlFor={ids.role} className="text-sm">תפקיד</label>
               <select id={ids.role} value={role} onChange={(e) => setRole(e.target.value as InviteInput["role"])} className={FIELD}>
-                {ROLES.map((r) => (
+                {roles.map((r) => (
                   <option key={r} value={r}>
                     {ORG_ROLE_LABEL[r]}
                   </option>

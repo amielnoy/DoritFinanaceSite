@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { appendSheetRow } from "../../supabase/functions/_shared/sheets";
+import { appendSheetRow, sheetCell } from "../../supabase/functions/_shared/sheets";
 import { calendarConfigured, createCalendarEvent } from "../../supabase/functions/_shared/calendar";
 import { selectRows, updateRow, upsertRow } from "../../supabase/functions/_shared/rest";
 import { resetGoogleTokenCache } from "../../supabase/functions/_shared/google";
@@ -61,6 +61,13 @@ describe("appendSheetRow", () => {
     expect(status).toBe("נרשם ✓ — https://docs.google.com/spreadsheets/d/sheet-123/edit");
   });
 
+  it("stores a value that would start a formula as text", async () => {
+    await appendSheetRow("Events", 19, ['=IMPORTXML("https://x.test","//a")', "+972501234567", "-1+1", "@SUM(A1)", "\t=1", "\r=1", "דנה"]);
+    expect(calls[0].body).toEqual({
+      values: [["'=IMPORTXML(\"https://x.test\",\"//a\")", "'+972501234567", "'-1+1", "'@SUM(A1)", "'\t=1", "'\r=1", "דנה"]],
+    });
+  });
+
   it("says it is not configured, without calling Google, when there is no sheet", async () => {
     env.SHEET_ID = "";
     expect(await appendSheetRow("Events", 19, [])).toBe("לא מוגדר");
@@ -90,5 +97,35 @@ describe("PostgREST helpers", () => {
   it("reports a refusal by status and code only", async () => {
     answer = () => new Response('{"code":"23505","message":"Failing row contains (secret)"}', { status: 409 });
     await expect(upsertRow("meetings", {}, "lead_id")).rejects.toThrow(/^upsert_http_409:23505$/);
+  });
+});
+
+describe("sheetCell", () => {
+  it.each([
+    ["=1+1", "'=1+1"],
+    ["+1", "'+1"],
+    ["-1", "'-1"],
+    ["@x", "'@x"],
+    ["\tx", "'\tx"],
+    ["\rx", "'\rx"],
+    ["0536667788", "'0536667788"],
+  ])("prefixes %j", (input, expected) => {
+    expect(sheetCell(input)).toBe(expected);
+  });
+
+  it.each([
+    ["a=1", "a=1"],
+    [" =1", " =1"],
+    ["536667788", "536667788"],
+    ["0", "0"],
+    ["", ""],
+  ])("leaves %j as it is", (input, expected) => {
+    expect(sheetCell(input)).toBe(expected);
+  });
+
+  it("writes null and undefined as empty cells, and numbers as text", () => {
+    expect(sheetCell(null)).toBe("");
+    expect(sheetCell(undefined)).toBe("");
+    expect(sheetCell(19)).toBe("19");
   });
 });

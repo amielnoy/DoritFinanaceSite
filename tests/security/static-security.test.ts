@@ -160,43 +160,49 @@ describe("auth and token handling", () => {
     expect(login).toMatch(/services\.auth\.signInWithGoogle\(\s*returnTo\s*\)/);
   });
 
-  it("admin routes stay behind a gate that requires both sign-in and the admin role", () => {
-    // The admin pages used to sit directly inside ProtectedRoute, an auth-only
-    // gate. They now sit inside AdminRoute, which delegates to ProtectedRoute
-    // when signed out and additionally turns away non-admins — so this asserts
-    // the block that holds them *and* that the gate itself still gates. A gate
-    // that stopped doing either would pass a "is it wrapped" check alone.
+  it("admin routes stay behind a gate that requires sign-in and an agency role (agency roles)", () => {
+    // Each agency screen sits inside AgencyRoute at the least role it needs; the
+    // gate delegates to ProtectedRoute when signed out, asks the database for
+    // the role, and turns away anyone below. This asserts the blocks that hold
+    // the pages *and* that the gate itself still gates — a gate that stopped
+    // doing either would pass a "is it wrapped" check alone.
     const app = read(join(REPO_ROOT, "src/App.jsx"));
-    const gateStart = app.indexOf("<AdminRoute");
-    expect(gateStart, "the admin pages must be wrapped in AdminRoute").toBeGreaterThan(-1);
-
-    const gateBlock = app.slice(gateStart, app.indexOf("</Route>", gateStart));
-    for (const path of ["/admin/leads", "/admin/blog"]) {
-      expect(gateBlock, `${path} must be inside AdminRoute`).toContain(path);
+    const block = (open: string) => {
+      const at = app.indexOf(open);
+      expect(at, `${open} must exist`).toBeGreaterThan(-1);
+      return app.slice(at, app.indexOf("</Route>\n        </Route>", at));
+    };
+    const users = block('<AgencyRoute min="user"');
+    for (const path of ["/admin/leads", "/admin/blog", "/admin/users"]) {
+      expect(users, `${path} must be inside AgencyRoute min="user"`).toContain(path);
+    }
+    expect(block('<AgencyRoute min="owner"'), "the agency profile is the Owner's").toContain('path="/admin/agency"');
+    // Registered once each: no admin page outside its gate.
+    for (const path of ["/admin/leads", "/admin/blog", "/admin/users", "/admin/agency"]) {
+      expect(app.split(`path="${path}"`).length - 1, path).toBe(1);
     }
 
-    const gate = read(join(REPO_ROOT, "src/components/AdminRoute.jsx"));
-    expect(gate, "AdminRoute must fall back to the auth gate when signed out").toContain(
-      "<ProtectedRoute"
-    );
-    expect(gate, "AdminRoute must turn away non-admin roles").toMatch(/role\s*!==\s*['"]admin['"]/);
+    const gate = read(join(REPO_ROOT, "src/components/AgencyRoute.tsx"));
+    expect(gate, "AgencyRoute must fall back to the auth gate when signed out").toContain("<ProtectedRoute");
+    expect(gate, "AgencyRoute must turn away a role below the screen's").toMatch(/if \(!meets\(role, min\)\) return <Navigate to="\/" replace \/>;/);
+    const hook = read(join(REPO_ROOT, "src/hooks/useAgency.ts"));
+    expect(hook, "the role is asked of the database, not the token").toContain("services.agency.myRole(agencyId)");
+    // AdminRoute stays for the platform operator's own screens.
+    const admin = read(join(REPO_ROOT, "src/components/AdminRoute.jsx"));
+    expect(admin).toContain("<ProtectedRoute");
+    expect(admin).toMatch(/role\s*!==\s*['"]admin['"]/);
   });
 
-  it("keeps the clearinghouse board behind a gate that requires sign-in and a staff role, and only when switched on", () => {
+  it("keeps the clearinghouse board behind a gate that requires sign-in and an agency role, and only when switched on", () => {
     const app = read(join(REPO_ROOT, "src/App.jsx"));
-    const gateStart = app.indexOf("<StaffRoute");
-    expect(gateStart, "the clearinghouse pages must be wrapped in StaffRoute").toBeGreaterThan(-1);
-    const gateBlock = app.slice(gateStart, app.indexOf("</Route>", gateStart));
+    const gateStart = app.indexOf("{MASLEKA_ENABLED ? (");
+    expect(gateStart, "the clearinghouse pages must be switched").toBeGreaterThan(-1);
+    const gateBlock = app.slice(gateStart, app.indexOf(") : null}", gateStart));
+    expect(gateBlock).toMatch(/<AgencyRoute min="user"/);
     expect(gateBlock).toContain('path="/admin/masleka"');
     expect(gateBlock).toContain('path="/admin/masleka/guide"');
-    expect(app.slice(Math.max(0, gateStart - 80), gateStart)).toMatch(/MASLEKA_ENABLED \?/);
-    // Registered nowhere else: no /admin/masleka route outside the switched StaffRoute block.
+    // Registered nowhere else: no /admin/masleka route outside the switched block.
     expect(app.split('path="/admin/masleka').length - 1).toBe(gateBlock.split('path="/admin/masleka').length - 1);
-
-    const gate = read(join(REPO_ROOT, "src/components/StaffRoute.tsx"));
-    expect(gate, "StaffRoute must fall back to the auth gate when signed out").toContain("<ProtectedRoute");
-    expect(gate, "StaffRoute must turn away a user with no staff role").toMatch(/<Navigate to="\/" replace \/>/);
-    expect(gate, "StaffRoute must ask the database, not the token").toContain("myRole()");
   });
 
   it("the clearinghouse board keeps a revealed value out of storage, logs and the access log", () => {

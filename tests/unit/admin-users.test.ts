@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { AdminUser } from "@/services/ports";
 import { directoryFor, filterUsers, matchesOrgs, matchesSearch, orgsOf, primaryOrg, sortUsers } from "@/lib/admin-users";
 
-const m = (orgId: string, orgName: string, joinedAt: string, role = "agent") => ({ orgId, orgName, role, joinedAt });
+const m = (orgId: string, orgName: string, joinedAt: string, role = "user") => ({ orgId, orgName, role, joinedAt });
 const USERS: AdminUser[] = [
   { id: "1", email: "dana@example.com", role: "admin", createdAt: "2026-01-01", memberships: [m("a", "סוכנות אלפא", "2026-01-02", "owner"), m("b", "משרד בטא", "2026-03-01")] },
   { id: "2", email: "yossi@example.com", role: "user", createdAt: "2026-02-01", memberships: [m("b", "משרד בטא", "2026-02-02")] },
-  { id: "3", email: "avi@example.com", role: "user", createdAt: "2026-02-03", memberships: [m("c", "גמא פיננסים", "2026-02-04", "staff")] },
+  { id: "3", email: "avi@example.com", role: "user", createdAt: "2026-02-03", memberships: [m("c", "גמא פיננסים", "2026-02-04", "admin")] },
   { id: "4", email: "noa@example.com", role: "user", createdAt: "2026-02-05", memberships: [] },
 ];
 const ids = (users: AdminUser[]) => users.map((u) => u.id);
@@ -14,10 +14,12 @@ const ids = (users: AdminUser[]) => users.map((u) => u.id);
 describe("the users screen's logic", () => {
   it("searches by name, by role in Hebrew or English, and by organization name", () => {
     expect(ids(filterUsers(USERS, "YOSSI", []))).toEqual(["2"]);
-    expect(ids(filterUsers(USERS, "מנהל", []))).toEqual(["1"]);
-    expect(ids(filterUsers(USERS, "admin", []))).toEqual(["1"]);
+    // The platform operator and an agency's Admin read differently (agency roles).
+    expect(ids(filterUsers(USERS, "מפעיל", []))).toEqual(["1"]);
+    expect(ids(filterUsers(USERS, "מנהל", []))).toEqual(["3"]);
+    expect(ids(filterUsers(USERS, "admin", []))).toEqual(["1", "3"]);
     expect(ids(filterUsers(USERS, "בטא", []))).toEqual(["1", "2"]);
-    expect(ids(filterUsers(USERS, "צוות", []))).toEqual(["3"]);
+    expect(ids(filterUsers(USERS, "בעלים", []))).toEqual(["1"]);
     expect(ids(filterUsers(USERS, "  ", []))).toEqual(["1", "2", "3", "4"]);
   });
 

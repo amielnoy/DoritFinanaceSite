@@ -7,8 +7,9 @@ begin;
 insert into public.agencies (id, name, status) values
   ('aaaaaaaa-0000-0000-0000-000000000002', 'סוכנות ב׳', 'active');
 
--- A staff member of agency 1, a signed-in outsider, a platform admin, and a
--- member of agency 2.
+-- A staff member of agency 1 (an Admin since the agency roles: one who sees
+-- the whole agency), a signed-in outsider, a platform admin, and a member of
+-- agency 2. agency_roles_check.sql covers the User who sees only their own.
 insert into auth.users (instance_id, id, aud, role, email) values
   ('00000000-0000-0000-0000-000000000000','dddddddd-0000-0000-0000-000000000001','authenticated','authenticated','masleka-staff@example.com'),
   ('00000000-0000-0000-0000-000000000000','dddddddd-0000-0000-0000-000000000002','authenticated','authenticated','masleka-outsider@example.com'),
@@ -16,7 +17,7 @@ insert into auth.users (instance_id, id, aud, role, email) values
   ('00000000-0000-0000-0000-000000000000','dddddddd-0000-0000-0000-000000000004','authenticated','authenticated','masleka-other-agency@example.com');
 
 insert into public.memberships (user_id, agency_id, role) values
-  ('dddddddd-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'staff'),
+  ('dddddddd-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'admin'),
   ('dddddddd-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000002', 'owner');
 update public.profiles set role = 'admin' where id = 'dddddddd-0000-0000-0000-000000000003';
 
@@ -50,17 +51,17 @@ do $$ begin
   exception when insufficient_privilege then null;
   end;
   begin
-    perform public.my_staff_role();
-    raise exception 'anon called my_staff_role';
+    perform public.my_agency_role('00000000-0000-0000-0000-000000000001');
+    raise exception 'anon called my_agency_role';
   exception when insufficient_privilege then null;
   end;
   begin
-    perform public.staff_role('dddddddd-0000-0000-0000-000000000001');
+    perform public.staff_role('dddddddd-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001');
     raise exception 'anon called staff_role';
   exception when insufficient_privilege then null;
   end;
   begin
-    perform public.masleka_staff_emails();
+    perform public.masleka_staff_emails('cccccccc-0000-0000-0000-000000000001');
     raise exception 'anon read the staff addresses';
   exception when insufficient_privilege then null;
   end;
@@ -77,16 +78,16 @@ do $$ begin
   if (select count(id) from public.masleka_access_log) <> 0 then
     raise exception 'an outsider read the access log';
   end if;
-  if public.my_staff_role() is not null then
+  if public.my_agency_role('00000000-0000-0000-0000-000000000001') is not null then
     raise exception 'an outsider has a staff role';
   end if;
   begin
-    perform public.staff_role('dddddddd-0000-0000-0000-000000000001');
+    perform public.staff_role('dddddddd-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001');
     raise exception 'authenticated called staff_role directly';
   exception when insufficient_privilege then null;
   end;
   begin
-    perform public.masleka_staff_emails();
+    perform public.masleka_staff_emails('cccccccc-0000-0000-0000-000000000001');
     raise exception 'authenticated read the staff addresses';
   exception when insufficient_privilege then null;
   end;
@@ -106,8 +107,8 @@ do $$ begin
   if (select count(id) from public.masleka_access_log) <> 1 then
     raise exception 'staff member cannot read the access log';
   end if;
-  if public.my_staff_role() is distinct from 'staff' then
-    raise exception 'staff member''s role is not staff';
+  if public.my_agency_role('00000000-0000-0000-0000-000000000001') is distinct from 'admin' then
+    raise exception 'staff member''s role is not admin';
   end if;
   begin
     perform code_ciphertext from public.masleka_requests limit 1;
@@ -142,7 +143,7 @@ do $$ begin
   if (select count(id) from public.masleka_requests) <> 1 then
     raise exception 'agency 2 member does not see exactly their own request';
   end if;
-  if public.my_staff_role() is not null then
+  if public.my_agency_role('00000000-0000-0000-0000-000000000001') is not null then
     raise exception 'agency 2 member counts as agency 1 staff';
   end if;
 end $$;
@@ -153,8 +154,9 @@ do $$ begin
   if (select count(id) from public.masleka_requests) <> 6 then
     raise exception 'platform admin cannot read every request';
   end if;
-  if public.my_staff_role() is distinct from 'admin' then
-    raise exception 'platform admin''s role is not admin';
+  -- The operator holds no agency role; is_admin() is theirs.
+  if public.my_agency_role('00000000-0000-0000-0000-000000000001') is not null or not public.is_admin() then
+    raise exception 'the platform operator reads as an agency member, or not as the operator';
   end if;
 end $$;
 reset role;
@@ -162,12 +164,20 @@ reset role;
 -- ── the staff mailing list ─────────────────────────────────────────────────
 do $$
 declare
-  list text[] := public.masleka_staff_emails();
+  list text[] := public.masleka_staff_emails('cccccccc-0000-0000-0000-000000000001');
 begin
-  if not (list @> array['masleka-staff@example.com', 'masleka-admin@example.com']) then
-    raise exception 'staff addresses miss the member or the admin: %', list;
+  -- The agency's Admins and Owners (and the handler, none here); not the
+  -- platform operator, who belongs to no agency.
+  if not (list @> array['masleka-staff@example.com']) then
+    raise exception 'staff addresses miss the agency admin: %', list;
   end if;
-  if 'masleka-outsider@example.com' = any(list) or 'masleka-other-agency@example.com' = any(list) then
+  -- With no request, agency 1's Admins and Owners alone.
+  if not (public.masleka_staff_emails(null) @> array['masleka-staff@example.com'])
+     or 'masleka-other-agency@example.com' = any(public.masleka_staff_emails(null)) then
+    raise exception 'the no-request list is not agency 1''s Admins and Owners: %', public.masleka_staff_emails(null);
+  end if;
+  if 'masleka-outsider@example.com' = any(list) or 'masleka-other-agency@example.com' = any(list)
+     or 'masleka-admin@example.com' = any(list) then
     raise exception 'staff addresses include someone who is not staff: %', list;
   end if;
 end $$;
@@ -175,10 +185,10 @@ end $$;
 -- ── service_role alone may ask who is staff ────────────────────────────────
 set local role service_role;
 do $$ begin
-  if public.staff_role('dddddddd-0000-0000-0000-000000000001') is distinct from 'staff' then
+  if public.staff_role('dddddddd-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001') is distinct from 'admin' then
     raise exception 'service_role cannot ask staff_role';
   end if;
-  if cardinality(public.masleka_staff_emails()) < 2 then
+  if cardinality(public.masleka_staff_emails('cccccccc-0000-0000-0000-000000000001')) < 1 then
     raise exception 'service_role cannot read the staff addresses';
   end if;
 end $$;

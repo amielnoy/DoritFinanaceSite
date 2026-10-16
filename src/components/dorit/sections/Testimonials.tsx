@@ -12,6 +12,7 @@ import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { inputClass } from "@/components/dorit/primitives/Field";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useT } from "@/i18n/LocaleContext";
+import { AGENCY_1, useAgencyRole } from "@/hooks/useAgency";
 
 type TestimonialItem = Testimonial;
 
@@ -32,14 +33,16 @@ interface TestimonialForm {
  * card stays in the document — the others are beside it, not removed.
  */
 export default function Testimonials() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   // `tr`, not `t`: each testimonial below is `t`.
   const tr = useT("home");
   const he = useLocale() === "he";
-  // Adding and deleting are Dorit's. Since the personal area, ordinary visitors
-  // sign in too, and "signed in" no longer means "owner" — the writes were
-  // refused server-side, but the controls were on show.
-  const isAdmin = isAuthenticated && user?.role === "admin";
+  // Adding and deleting are Admin+ in agency 1 (or the platform operator) —
+  // content-admin and the testimonials policy refuse anyone else. Ordinary
+  // visitors sign in too, so "signed in" never shows the controls. A public
+  // section: the role answer is reused for a few minutes, as the header's is.
+  const { can } = useAgencyRole(AGENCY_1, { staleTime: 5 * 60_000 });
+  const isAdmin = isAuthenticated && can("testimonials.write");
   const { data, isPending: loading } = useTestimonials();
   const createTestimonial = useCreateTestimonial();
   const removeTestimonial = useRemoveTestimonial();
@@ -48,6 +51,8 @@ export default function Testimonials() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [uploading, setUploading] = useState<boolean>(false);
+  /** The picture did not upload: said in the form, beside the mutation's own failure (review 2026-10-15). */
+  const [uploadFailed, setUploadFailed] = useState<boolean>(false);
   const isDesktop = useMediaQuery(MD_UP, true);
   const strip = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState<number>(0);
@@ -66,17 +71,20 @@ export default function Testimonials() {
     setForm({ name: "", role: "", quote: "", image_url: "", rating: 5, source: "google" });
     setFile(null);
     setPreview("");
+    setUploadFailed(false);
     setOpen(false);
   };
 
   const submit = async () => {
     if (!form.name || !form.quote) return;
     let image_url = form.image_url;
+    setUploadFailed(false);
     if (file) {
       setUploading(true);
       try {
         ({ url: image_url } = await services.uploads.upload(file));
       } catch {
+        setUploadFailed(true);
         return;
       } finally {
         setUploading(false);
@@ -93,11 +101,15 @@ export default function Testimonials() {
       });
       reset();
     } catch {
-      /* the mutation's isError drives the notice below */
+      /* the mutation's isError drives the notice in the form */
     }
   };
 
-  const remove = (id: string) => removeTestimonial.mutate(id);
+  // Asked first, as on the leads and the blog screens: a deleted testimonial is gone for good.
+  const remove = (id: string) => {
+    if (!window.confirm("למחוק את ההמלצה?")) return;
+    removeTestimonial.mutate(id);
+  };
 
   const carousel = !isDesktop && items.length > 1;
   // The strip mounts at its first card: when it goes (a wider screen, a
@@ -259,6 +271,11 @@ export default function Testimonials() {
                     <option value="midrag">Midrag</option>
                   </select>
                 </div>
+                {(uploadFailed || createTestimonial.isError) && (
+                  <p role="alert" className="md:col-span-2 text-sm text-destructive">
+                    {uploadFailed ? "התמונה לא הועלתה. ניתן לנסות שוב, או לפרסם בלי תמונה." : "ההמלצה לא נשמרה. ניתן לנסות שוב."}
+                  </p>
+                )}
                 <div className="md:col-span-2 flex justify-end">
                   <button
                     onClick={submit}
@@ -272,6 +289,12 @@ export default function Testimonials() {
               </div>
             </div>
           </div>
+        )}
+
+        {isAdmin && removeTestimonial.isError && (
+          <p role="alert" className="mb-6 text-sm text-destructive">
+            ההמלצה לא נמחקה. ניתן לנסות שוב.
+          </p>
         )}
 
         {/* Grid */}

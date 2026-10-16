@@ -12,7 +12,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { deviceLabel } from '../_shared/device.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, sendMail } from '../_shared/mail.ts';
-import { withinLimit } from '../_shared/guard.ts';
+import { clientIp, isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { insertRow } from '../_shared/rest.ts';
 import { opsNotice } from '../_shared/ops-notice.ts';
 import { appendSheetRow } from '../_shared/sheets.ts';
@@ -26,9 +26,18 @@ import {
 const FN = 'escalate-to-human';
 const log = createLog(FN);
 
-// A global cap, not a per-caller one: every agent call reaches this function
-// from Base44's server, so one address would stand for every visitor.
+// The global cap on the staff's mail. Urgent reasons (URGENT: a complaint, a
+// privacy request…) are never held back by it — a hand-off that does not reach
+// a person is a regulatory failure — and hitting it alerts (an error line).
 const NOTIFY_PER_HOUR = 60;
+/**
+ * Hand-offs per caller. Generous: a Base44 agent's call reaches this function
+ * from Base44's server, so its address stands for every visitor those agents
+ * serve. Urgent reasons are never refused by it either.
+ */
+const HANDOFFS_PER_IP_PER_HOUR = 20;
+/** Longest value accepted per field: generous for a person, useless for a payload. */
+const FIELD_LIMITS = { name: 80, phone: 30, email: 254, topic: 200, agent: 60, summary: 8000 };
 
 // Every `err:` below is truncated inline: tests/contract/logging.contract.test.ts
 // reads each log call's text and requires the `.slice(0, N)` to be visible there.
@@ -53,11 +62,28 @@ export async function handler(req: Request): Promise<Response> {
       return Response.json({ error: 'אין מה להעביר', rid }, { status: 400, headers: cors });
     }
 
+    const oversized = oversizedField(body ?? {}, FIELD_LIMITS);
+    if (oversized) {
+      log('warn', 'request.rejected', { rid, reason: 'field_too_long', field: oversized });
+      return Response.json({ error: 'אחד השדות ארוך מדי. אפשר לקצר ולשלוח שוב.', rid }, { status: 400, headers: cors });
+    }
+
+    const reasonKnown = Object.prototype.hasOwnProperty.call(REASONS, reason);
+    const urgent = reasonKnown && URGENT.has(reason);
+    const ip = clientIp(req);
+    if (!urgent && !(await withinLimit(log, rid, `escalate-ip:${await sha256Hex(ip)}`, 3600, HANDOFFS_PER_IP_PER_HOUR))) {
+      log('warn', 'request.rejected', { rid, reason: 'rate_limited' });
+      return Response.json(
+        { error: 'התקבלו כמה בקשות ברצף. אפשר לנסות שוב בעוד שעה, או לפנות לדורית ישירות.', rid },
+        { status: 429, headers: cors },
+      );
+    }
+
     const safeChannel = validChannel(channel) || 'unknown';
     const safeCampaign = validCampaign(campaign);
     const safeLandingPath = validLandingPath(landingPath);
 
-    const safeReason: string = Object.prototype.hasOwnProperty.call(REASONS, reason) ? reason : 'uncertain';
+    const safeReason: string = reasonKnown ? reason : 'uncertain';
     const reasonText = (REASONS as Record<string, string>)[safeReason];
     const safeSummary: string = redact(summary);
     const contactable = Boolean(name && phone && validPhone(phone));
@@ -68,6 +94,13 @@ export async function handler(req: Request): Promise<Response> {
     // בשמירה במאגר אינו מונע אותה.
     const warnings: string[] = [];
     let leadId: string | null = null;
+    // Something that is not an address is dropped rather than refusing the
+    // hand-off: the phone still reaches Dorit, and a bad address mails nobody.
+    if (email && !isEmail(email)) {
+      log('warn', 'escalation.email_dropped', { rid, reason: 'invalid_address' });
+      warnings.push('email_invalid');
+    }
+    const safeEmail = email && isEmail(email) ? email : '';
 
     // הסיבה והסוכן — לא התקציר. ההעברה היא האירוע שהכי חשוב לעקוב אחריו,
     // והתקציר הוא בדיוק מה שהמבקר אמר.
@@ -78,7 +111,7 @@ export async function handler(req: Request): Promise<Response> {
         const row = await insertRow('leads', {
           name,
           phone,
-          email: email || '',
+          email: safeEmail,
           source: 'escalation',
           topic: topic || reasonText,
           timing: '',
@@ -103,10 +136,10 @@ export async function handler(req: Request): Promise<Response> {
     }
 
     const escalationAttribution = { channel: safeChannel, campaign: safeCampaign, landingPath: safeLandingPath };
-    const notification: string = buildNotification(safeReason, { name, phone, email, agent, summary: safeSummary, device: deviceLabel(req.headers.get('user-agent')), ...escalationAttribution });
+    const notification: string = buildNotification(safeReason, { name, phone, email: safeEmail, agent, summary: safeSummary, device: deviceLabel(req.headers.get('user-agent')), ...escalationAttribution });
     const subject = `${URGENT.has(safeReason) ? '🔴 ' : ''}העברה לטיפול אנושי — ${reasonText}${name ? ` · ${name}` : ''}`;
     const escalationHtml: string = buildEscalationHtml(safeReason, {
-      name, phone, email, agent, summary: safeSummary, contactable,
+      name, phone, email: safeEmail, agent, summary: safeSummary, contactable,
       device: deviceLabel(req.headers.get('user-agent')),
       ...escalationAttribution,
     });
@@ -122,9 +155,10 @@ export async function handler(req: Request): Promise<Response> {
     let notified = false;
     // Checked once per hand-off, not once per recipient. Over the cap the lead
     // and the sheet row are still written; only the staff mail is held back.
-    const mayNotify = await withinLimit(log, rid, 'escalate:notify', 3600, NOTIFY_PER_HOUR);
+    const mayNotify = urgent || (await withinLimit(log, rid, 'escalate:notify', 3600, NOTIFY_PER_HOUR));
     if (!mayNotify) {
-      log('warn', 'mail.skipped', { rid, role: 'ops', reason: 'rate_limited' });
+      // An error, so it alerts: hand-offs are arriving faster than anyone should.
+      log('error', 'mail.skipped', { rid, role: 'ops', reason: 'rate_limited' });
       warnings.push('notify_rate_limited');
     }
     // One sender for all three, through the mailer.
@@ -161,7 +195,7 @@ export async function handler(req: Request): Promise<Response> {
         '',                       // מועד מבוקש — אין בהעברה לאדם
         name || '',
         phone || '',
-        email || '',
+        safeEmail,
         leadId || '',
         safeReason,
         safeSummary,

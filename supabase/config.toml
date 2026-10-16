@@ -435,13 +435,27 @@ verify_jwt = false
 [functions.chat]
 verify_jwt = false
 
-# The admin's content writes. Off at the gateway like the others — the
-# publishable key is not a JWT — because the function's own gate is stricter
-# than "any valid JWT": a session Supabase Auth accepts, whose profile is admin.
+# Content writes. Off at the gateway like the others — the publishable key is
+# not a JWT — because the function's own gate is stricter than "any valid
+# JWT": a session Supabase Auth accepts, and the agency role each op needs
+# (_shared/staff.ts).
 [functions.content-admin]
 verify_jwt = false
 
-# "הוספת משתמש" on /admin/users: the same gate as content-admin — a session
-# whose profile is admin, checked by the function (_shared/admin.ts).
+# "הוספת משתמש" on /admin/users: a session, then Admin+ in the agency, checked
+# by the function (_shared/staff.ts); set_member_role decides the grant.
 [functions.invite-user]
+verify_jwt = false
+
+# Change a member's role, remove a member, or leave: the session is checked by
+# the function, and set_member_role / remove_member decide under it.
+[functions.member-admin]
+verify_jwt = false
+
+# Assign a lead (Admin+, checked by the function) and tell the assignee.
+[functions.assign-lead]
+verify_jwt = false
+
+# A short link to a claim's document, for whoever may see that lead.
+[functions.claim-document-link]
 verify_jwt = false

@@ -13,10 +13,14 @@ vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));
 // The switch on, as a build with VITE_MASLEKA_ENABLED=true would have it.
 vi.mock("@/config/masleka", () => ({ MASLEKA_ENABLED: true }));
 
-const myRole = vi.hoisted(() => vi.fn<() => Promise<string | null>>());
+const myRole = vi.hoisted(() => vi.fn<(agencyId: string) => Promise<string | null>>());
+const myAgencies = vi.hoisted(() => vi.fn(async () => [] as { id: string; name: string; role: string }[]));
 const list = vi.hoisted(() => vi.fn(async () => [] as { status: string }[]));
 const countNew = vi.hoisted(() => vi.fn(async () => 0));
-vi.mock("@/services", () => ({ services: { masleka: { myRole, list }, leadsAdmin: { countNew } } }));
+const countUnassigned = vi.hoisted(() => vi.fn(async () => 0));
+vi.mock("@/services", () => ({
+  services: { masleka: { list }, leadsAdmin: { countNew, countUnassigned }, agency: { myRole, myAgencies } },
+}));
 
 vi.mock("framer-motion", async () => {
   const React = await import("react");
@@ -49,22 +53,23 @@ const openDrawer = () => fireEvent.click(screen.getByRole("button", { name: "ת�
 const adminRows = () => screen.queryAllByRole("link", { name: /ממשק ניהול/ });
 
 describe("<FloatingHeader /> — the admin menu with the clearinghouse switched on", () => {
-  it("takes the admin to the admin interface without asking for a membership", async () => {
-    myRole.mockReset();
+  it("takes the platform operator to their main page, with no membership needed", async () => {
+    myRole.mockReset().mockResolvedValue(null);
     renderHeader({ user: { id: "u1", role: "admin" }, isAuthenticated: true });
     openDrawer();
     expect(await screen.findByRole("link", { name: /ממשק ניהול/ })).toHaveAttribute("href", "/account");
-    expect(myRole).not.toHaveBeenCalled();
   });
 
-  it("gives a member of the agency a ניהול menu that leads to the board", async () => {
-    myRole.mockReset().mockResolvedValue("staff");
+  it("gives a member of the agency a ניהול menu that leads to their leads (agency roles)", async () => {
+    myAgencies.mockResolvedValue([{ id: "00000000-0000-0000-0000-000000000001", name: "דורית", role: "user" }]);
+    myRole.mockReset().mockResolvedValue("user");
+    countUnassigned.mockClear();
     renderHeader({ user: { id: "u2", role: "user" }, isAuthenticated: true });
     expect(await screen.findByRole("button", { name: /^ניהול/ })).toBeInTheDocument();
     openDrawer();
-    expect(await screen.findByRole("link", { name: /ממשק ניהול/ })).toHaveAttribute("href", "/admin/masleka");
-    // Staff see no leads, so the leads are never counted for them.
-    expect(countNew).not.toHaveBeenCalled();
+    expect(await screen.findByRole("link", { name: /ממשק ניהול/ })).toHaveAttribute("href", "/admin/leads");
+    // A User assigns nothing, so the queue is never counted for them.
+    expect(countUnassigned).not.toHaveBeenCalled();
   });
 
   it("offers no ניהול menu to a signed-in client with no membership, or when the role cannot be read", async () => {
@@ -91,8 +96,9 @@ describe("<FloatingHeader /> — the admin menu with the clearinghouse switched 
     expect(myRole).not.toHaveBeenCalled();
   });
 
-  it("counts new leads and the requests waiting to be submitted together", async () => {
-    countNew.mockResolvedValue(1);
+  it("counts the unassigned leads and the requests waiting to be submitted together", async () => {
+    myRole.mockReset().mockResolvedValue(null);
+    countUnassigned.mockResolvedValue(1);
     list.mockResolvedValue([{ status: "code_received" }, { status: "invited" }, { status: "code_received" }]);
     renderHeader({ user: { id: "u1", role: "admin" }, isAuthenticated: true });
     openDrawer();

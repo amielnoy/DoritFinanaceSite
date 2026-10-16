@@ -78,6 +78,8 @@ export default function ClaimForm() {
    */
   const [phoneError, setPhoneError] = useState("");
   const error = uploadError || submitError;
+  /** A file is being dragged over the drop zone. */
+  const [dragging, setDragging] = useState(false);
 
   const set = (key: keyof ClaimFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (key === "phone") setPhoneError("");
@@ -262,7 +264,20 @@ export default function ClaimForm() {
           <span className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
             {t("form.attach")}
           </span>
-          <label className="flex flex-col items-center justify-center gap-2 p-8 border border-dashed border-border hover:border-accent transition-colors cursor-pointer text-center">
+          {/* Dropped files take the same checks as picked ones; the input stays reachable by keyboard (review 2026-10-15). */}
+          <label
+            className={`flex flex-col items-center justify-center gap-2 p-8 border border-dashed hover:border-accent transition-colors cursor-pointer text-center focus-within:ring-2 focus-within:ring-ring ${dragging ? "border-accent bg-accent/5" : "border-border"}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (!sending) setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              if (!sending) handleFiles(e.dataTransfer.files);
+            }}
+          >
             <Upload size={22} className="text-accent" />
             <span className="text-sm text-foreground/70">
               {t("form.pick")}
@@ -271,7 +286,7 @@ export default function ClaimForm() {
               type="file"
               multiple
               accept={CLAIM_DOCUMENT_ACCEPT}
-              className="hidden"
+              className="sr-only"
               onChange={(e) => {
                 handleFiles(e.target.files);
                 // The same file can be picked again after it is removed.
@@ -314,7 +329,8 @@ export default function ClaimForm() {
                 : t("form.send")}
           </CtaButton>
         </div>
-        <p aria-live="polite" className="text-sm text-destructive text-start empty:hidden">{error}</p>
+        {/* Inserted with its message: an alert is announced as it appears. */}
+        {error ? <p role="alert" className="text-sm text-destructive text-start">{error}</p> : null}
       </div>
     </div>
   );
