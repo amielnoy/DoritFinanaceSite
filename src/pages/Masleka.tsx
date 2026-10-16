@@ -44,8 +44,8 @@ const STEPS: MaslekaStep[] = [
     ),
   },
   {
-    title: "מפיקים קוד ייפוי כוח",
-    body: <>באזור האישי באתר המסלקה לוחצים על „הפקת קוד ייפוי כוח” ומעתיקים את הקוד שמתקבל.</>,
+    title: "מפיקים קוד אימות",
+    body: <>באזור האישי באתר המסלקה לוחצים על „הפקת קוד אימות” ומעתיקים את הקוד שמתקבל.</>,
   },
   {
     title: "מדביקים כאן את הקוד ואת מספר הזהות",
@@ -154,7 +154,7 @@ export default function Masleka({
       <form onSubmit={onSubmit} noValidate aria-label="מסירת קוד המסלקה" className="mt-10 space-y-5 border border-border/60 bg-card p-5">
         <div>
           <label htmlFor="masleka-code" className="block text-sm font-medium">
-            קוד ייפוי הכוח מאתר המסלקה
+            קוד האימות מאתר המסלקה
           </label>
           <input
             id="masleka-code"

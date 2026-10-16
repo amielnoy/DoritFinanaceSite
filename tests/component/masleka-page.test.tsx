@@ -22,7 +22,7 @@ const renderPage = (props: React.ComponentProps<typeof Masleka>) =>
   );
 
 const fill = async (code = "AB12-CD34", id = "000000018") => {
-  await userEvent.type(screen.getByLabelText("קוד ייפוי הכוח מאתר המסלקה"), code);
+  await userEvent.type(screen.getByLabelText("קוד האימות מאתר המסלקה"), code);
   await userEvent.type(screen.getByLabelText("מספר תעודת זהות"), id);
   await userEvent.click(screen.getByRole("button", { name: "שליחה" }));
 };
