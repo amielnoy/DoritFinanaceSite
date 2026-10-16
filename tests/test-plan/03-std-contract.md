@@ -814,6 +814,15 @@ It also checks that a User cannot file a snapshot under another agency by naming
 | CTR-CDN-002..005 | "accepts the name the form makes for %j" | `agencyObjectPath` for Hebrew, spaced, upper-case and one-letter names matches the policy's own pattern |
 | CTR-CDN-006..009 | "refuses %j" | A fixed name, another agency's folder, `..`, a bare name |
 
+### 4.23 The site's own icon — `favicon.contract.test.ts`
+
+Review 2026-10-15, item 23. `public/favicon.svg` is a monogram ד drawn as shapes on the primary colour (`#1c1a19`, from `--primary` in `src/index.css`), with a gold rule. It replaces Base44's logo in `index.html` and in `public/manifest.json`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ICON-001 | "is /favicon.svg in the page and in the manifest, and Base44's logo is nowhere" | The `<link rel="icon">` and the manifest's one icon are `/favicon.svg`; no `base44.com/logo` |
+| CTR-ICON-002 | "is an SVG monogram ד on the site's primary colour" | A 32×32 SVG titled `ד — …`, its ground the `--primary` hex; no `<text>`, no external reference |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
