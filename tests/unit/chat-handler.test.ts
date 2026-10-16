@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelClient, ModelRequest, ModelResponse } from "../../supabase/functions/chat/anthropic.ts";
 import { ModelError } from "../../supabase/functions/chat/anthropic.ts";
 import type { UsageTotals } from "../../supabase/functions/chat/budget.ts";
-import { createChatHandler, MAX_CONSENT_VERSION_CHARS, type ChatDeps } from "../../supabase/functions/chat/handler.ts";
+import { createChatHandler, MAX_CONSENT_VERSION_CHARS, type ChatDeps, consentInstant, CONSENT_MAX_AGE_MS } from "../../supabase/functions/chat/handler.ts";
 import { toFacts, type ChatStore, type ConversationRow, type NewConversation, type UpdateOptions } from "../../supabase/functions/chat/store.ts";
 import { createToolRunner, type EdgeHandler, type ToolCallContext, type ToolOutcome } from "../../supabase/functions/chat/tools.ts";
 import { createSheetLogSweep } from "../../supabase/functions/chat/sweep.ts";
@@ -210,6 +210,27 @@ describe("the first message", () => {
     expect([long.status, long.body.code]).toEqual([400, "consent_required"]);
     expect(store.conversations.size).toBe(0);
     expect((await json(await chat(post({ ...first(), consentVersion: "v".repeat(40) })))).status).toBe(200);
+  });
+});
+
+describe("the consent time it keeps (review 2026-10-15)", () => {
+  const now = Date.UTC(2026, 9, 13, 9, 0);
+  it("keeps the browser's time when it is plausible", () => {
+    expect(consentInstant("2026-10-13T08:59:00.000Z", now)).toBe("2026-10-13T08:59:00.000Z");
+  });
+
+  it("never dates consent after the server's now", () => {
+    expect(consentInstant("2030-01-01T00:00:00.000Z", now)).toBe("2026-10-13T09:00:00.000Z");
+  });
+
+  it("never further back than the gate could have been open", () => {
+    expect(consentInstant("2020-01-01T00:00:00.000Z", now)).toBe(new Date(now - CONSENT_MAX_AGE_MS).toISOString());
+  });
+
+  it("stores the clamped time on the conversation it opens", async () => {
+    const { chat, store } = setup();
+    await chat(post({ ...first(), consentAt: "2030-01-01T00:00:00.000Z" }));
+    expect([...store.conversations.values()][0].consent_at).toBe(new Date(clock.now).toISOString());
   });
 });
 

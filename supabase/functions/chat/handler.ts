@@ -43,6 +43,19 @@ export const PER_IP_PER_MINUTE = 20;
 /** Status requests, apart from messages: the page polls one turn every few seconds. */
 export const STATUS_PER_IP_PER_MINUTE = 60;
 export const NEW_CONVERSATIONS_PER_HOUR = 300;
+/** How long before the first message the consent gate may plausibly have been accepted. */
+export const CONSENT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * When consent was given, as the record keeps it (review 2026-10-15): the
+ * browser's time, but never after the server's now and never further back
+ * than CONSENT_MAX_AGE_MS. The time is evidence under Amendment 13; a client
+ * could otherwise date its consent to whenever it liked.
+ */
+export function consentInstant(claimed: string, nowMs: number): string {
+  const at = Date.parse(claimed);
+  return new Date(Math.min(nowMs, Math.max(nowMs - CONSENT_MAX_AGE_MS, at))).toISOString();
+}
 /** New conversations per caller, beside the global cap: one address may not open them all. */
 export const NEW_CONVERSATIONS_PER_IP_PER_HOUR = 20;
 /**
@@ -187,7 +200,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           role,
           token_hash: await sha256Hex(issuedToken),
           consent_version: consentVersion,
-          consent_at: new Date(consentAt).toISOString(),
+          consent_at: consentInstant(consentAt, deps.now()),
           attribution: {
             channel: validChannel(a.channel) ?? '',
             campaign: validCampaign(a.campaign) ?? '',
