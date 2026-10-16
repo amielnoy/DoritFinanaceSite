@@ -446,6 +446,15 @@ behind sign-in, which E2E-NAV-013 cannot reach.
 "required" (D-16). It finds the claim, quick-contact and pension-check forms'
 starred fields, so a new starred field is covered without listing it.
 
+**`site-hardening.contract.test.ts`.** D-18. Pages answered
+`access-control-allow-origin: *`, Vercel's default for static files. A
+vercel.json rule now sets it to `https://govari-fin.co.il` on everything but
+`/assets/`, `/fonts/` and `/api/` (the Base44 rewrite and the og and
+csp-report functions answer for themselves), and no rule hands out `*`.
+`public/.well-known/security.txt` exists with a contact on the site's domain,
+a canonical address, and an `Expires` in the future and at most a year out.
+That case fails once the date passes, on purpose: renew the file a year ahead.
+
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
 the environment supplies none, never overriding it; a checkout with no

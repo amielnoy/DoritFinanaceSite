@@ -123,7 +123,13 @@ function classify(search: string, referrer: string): Attribution {
   if (utmSource && utmSource in UTM_SOURCE_MAP) {
     return { channel: UTM_SOURCE_MAP[utmSource], campaign };
   }
-  return { channel: classifyReferrer(referrer), campaign };
+  const fromReferrer = classifyReferrer(referrer);
+  // A tagged link someone shared is not a typed-in address: an unrecognised
+  // utm_source was recorded as "direct" (D-17, manual test 2026-10-14).
+  // "referral" rather than a new channel, which the leads table's CHECK
+  // (20261009000000_lead_channel.sql) would refuse.
+  if (utmSource && fromReferrer === "direct") return { channel: "referral", campaign };
+  return { channel: fromReferrer, campaign };
 }
 
 /**

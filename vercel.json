@@ -93,6 +93,15 @@
       ]
     },
     {
+      "source": "/((?!assets/|fonts/|api/).*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://govari-fin.co.il"
+        }
+      ]
+    },
+    {
       "source": "/:page(login|account|masleka|app|404)",
       "headers": [
         {

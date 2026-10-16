@@ -49,6 +49,19 @@ describe("captureAttribution / getAttribution", () => {
     expect(getAttribution()).toEqual({ channel: "facebook", campaign: null });
   });
 
+  it("counts a tagged link with an unrecognised source as referral, not direct, and keeps its campaign", () => {
+    // D-17, manual test 2026-10-14: ?utm_source=probe&utm_campaign=qa was "direct".
+    setPage("?utm_source=probe&utm_campaign=qa", "");
+    captureAttribution();
+    expect(getAttribution()).toEqual({ channel: "referral", campaign: "qa" });
+  });
+
+  it("lets a recognised referrer win over an unrecognised utm_source", () => {
+    setPage("?utm_source=newsletter_x", "https://www.facebook.com/somepage");
+    captureAttribution();
+    expect(getAttribution()?.channel).toBe("facebook");
+  });
+
   it("classifies known AI-assistant referrers", () => {
     for (const referrer of [
       "https://chat.openai.com/",

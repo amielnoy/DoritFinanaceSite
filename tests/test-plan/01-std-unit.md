@@ -1724,3 +1724,12 @@ Review 2026-10-15, item 21. GA4 sends history page views by itself, and those ig
 | UNIT-GAADMIN-005..009 | "measures %s" | `/`, `/administration`, `/blog/admin`, `/en/claims`, `/account` |
 | UNIT-GAADMIN-010 | "switches the tag off on entering /admin and on again on leaving it" | The flag `true` on `/admin/users`, `false` on `/claims` |
 | UNIT-GAADMIN-011 | "is switched off by index.html, before the tag is configured, for a page that loads on /admin" | The inline script sets the flag before `gtag('config')`; its path rule agrees with `isUnmeasuredPath` on five paths |
+
+### 4.73 The channel a tagged link records — `tests/unit/attribution.test.ts` (new cases)
+
+D-17, manual test 2026-10-14. A link with an unrecognised `utm_source` (`?utm_source=probe&utm_campaign=qa`) was recorded as `direct`, as if the address had been typed in. It is now `referral` when the referrer says nothing better. A new `other` channel would need a migration: the leads table's CHECK names the channels (`20261009000000_lead_channel.sql`).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ATTR-001 | "counts a tagged link with an unrecognised source as referral, not direct, and keeps its campaign" | `{ channel: "referral", campaign: "qa" }` |
+| UNIT-ATTR-002 | "lets a recognised referrer win over an unrecognised utm_source" | A Facebook referrer with `utm_source=newsletter_x` is `facebook` |

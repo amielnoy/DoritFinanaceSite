@@ -1,0 +1,4 @@
+Contact: mailto:dorit@govari-fin.co.il
+Expires: 2027-10-15T00:00:00.000Z
+Preferred-Languages: he, en
+Canonical: https://govari-fin.co.il/.well-known/security.txt
