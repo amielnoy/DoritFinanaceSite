@@ -178,6 +178,20 @@ export default async function(req) {
   const startedAt = Date.now();
   try {
     log('info', 'request.start', { rid });
+
+    // Only a caller holding the shared secret (review 2026-10-15). No channel
+    // is connected yet (COMPLIANCE.md: built, tested and switched off), so
+    // without CONTACT_FUNCTION_SECRET set nobody gets in — it fails closed.
+    const secret = (Deno.env.get('CONTACT_FUNCTION_SECRET') || '').trim();
+    if (!secret || !(await sameSecret(req.headers.get('x-contact-secret') || '', secret))) {
+      log('warn', 'request.rejected', { rid, reason: secret ? 'bad_secret' : 'not_configured' });
+      return Response.json({ error: 'אין הרשאה.', rid }, { status: 401 });
+    }
+    if (!(await withinLimit(rid, `contact-ip:${await sha256Hex(clientIp(req))}`, 3600, CONTACTS_PER_IP_PER_HOUR))) {
+      log('warn', 'request.rejected', { rid, reason: 'rate_limited' });
+      return Response.json({ error: 'התקבלו כמה בקשות ברצף. אפשר לנסות שוב בעוד שעה.', rid }, { status: 429 });
+    }
+
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { phone, name, email, channel, notes } = body || {};
@@ -211,12 +225,14 @@ export default async function(req) {
     let created = false;
 
     if (existing?.id) {
-      // עדכון משלים ולא דורס: שם שכבר ידוע לא נמחק על ידי פנייה שלא מסרה אותו.
+      // עדכון משלים ולא דורס: שדה שכבר ידוע לא מוחלף ולא נמחק. רק שדה ריק
+      // מתמלא (review 2026-10-15) — מי שמחזיק במספר אינו יכול לשנות את השם או
+      // את האימייל של איש קשר קיים.
       try {
         await base44.asServiceRole.entities.Contact.update(existing.id, {
-          name: name || existing.name || '',
-          email: email || existing.email || '',
-          notes: safeNotes || existing.notes || '',
+          name: existing.name || name || '',
+          email: existing.email || email || '',
+          notes: existing.notes || safeNotes || '',
           last_seen: now,
         });
         contactId = existing.id;
@@ -252,12 +268,18 @@ export default async function(req) {
 
     // שיקוף ל-Supabase. אחרי ששני הענפים התכנסו, כך שהוא נקרא פעם אחת בדיוק
     // ורק אחרי שהכתיבה הסמכותית הצליחה.
+    // What was kept: an existing contact's own values first.
+    const kept = {
+      name: existing?.name || name || '',
+      email: existing?.email || email || '',
+      notes: existing?.notes || safeNotes || '',
+    };
     await mirrorContactToSupabase(rid, contactId, {
       phone: key,
-      name: name || existing?.name || '',
-      email: email || existing?.email || '',
+      name: kept.name,
+      email: kept.email,
       channel: ['whatsapp', 'site', 'phone', 'other'].includes(channel) ? channel : 'other',
-      notes: safeNotes || existing?.notes || '',
+      notes: kept.notes,
       last_seen: now,
     });
 
@@ -289,7 +311,7 @@ export default async function(req) {
       rid,
       contactId,
       created,
-      saved: { phone: key, name: name || '', email: email || '' },
+      saved: { phone: key, name: kept.name, email: kept.email },
       sheet,
       warnings,
     });
@@ -300,5 +322,51 @@ export default async function(req) {
     // shape of our internals. The id is the one thing that is useful to both —
     // they can quote it, and it finds the request in one search.
     return Response.json({ error: 'השמירה נכשלה. אפשר לנסות שוב, או לפנות לדורית ישירות.', rid }, { status: 500 });
+  }
+}
+
+// ── review 2026-10-15: who may call, and how often ─────────────────────────
+// Base44 functions are isolated entry points, so these are local copies of
+// the shared helpers (supabase/functions/_shared/guard.ts; submitClaim keeps
+// its own withinLimit the same way).
+
+const CONTACTS_PER_IP_PER_HOUR = 30;
+
+/** Constant-time comparison of the shared secret, through SHA-256 digests of equal length. */
+async function sameSecret(given, expected) {
+  const [a, b] = await Promise.all([sha256Hex(given), sha256Hex(expected)]);
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** The platform's cf-connecting-ip, else the last x-forwarded-for entry, else one shared key — as _shared/guard.ts. */
+function clientIp(req) {
+  const direct = (req.headers.get('cf-connecting-ip') || '').trim();
+  if (direct) return direct.slice(0, 64);
+  const hops = (req.headers.get('x-forwarded-for') || '').split(',').map((h) => h.trim()).filter(Boolean);
+  return hops.length ? hops[hops.length - 1].slice(0, 64) : 'no-address';
+}
+
+async function withinLimit(rid, key, windowSeconds, max) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const apiKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  if (!url || !apiKey) return true;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/allow_submission`, {
+      method: 'POST',
+      headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_key: key, p_window_seconds: windowSeconds, p_max: max }),
+    });
+    if (!res.ok) throw new Error(`rpc_http_${res.status}`);
+    return (await res.json()) !== false;
+  } catch (e) {
+    log('warn', 'limit.unavailable', { rid, err: String(e?.message ?? e).slice(0, 200) });
+    return true;
   }
 }

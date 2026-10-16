@@ -488,6 +488,17 @@ notified anyone, every "היי" would reach Dorit's inbox. A new contact appends
 row to `Contacts`; a returning one does not, because a row per message would
 turn the list of people into a second event log.
 
+### 4.18a `upsertContact` — who may call, and what a caller may change (review 2026-10-15) — `INT-CONTACT-020..023`
+
+Every call now carries `X-Contact-Secret`, which must match the Base44 secret `CONTACT_FUNCTION_SECRET`. While no channel is connected the secret is unset, and the function refuses everyone (it fails closed).
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CONTACT-020 | "refuses a caller without the shared secret, or with the wrong one, and writes nothing" | 401 with `rid`; no row |
+| INT-CONTACT-021 | "refuses everyone while no secret is configured — no channel is connected yet" | 401 |
+| INT-CONTACT-022 | "never overwrites a known contact's name, email or note — it only fills what is empty" | The update keeps the existing name, email and note; `saved` reports them |
+| INT-CONTACT-023 | "refuses a caller over the hourly limit, counted by a hash of the address" | 429; `contact-ip:<64 hex>` (30 an hour); no row |
+
 ### 4.19 `logSupportChat` — what was actually asked — `INT-SUPPORT-001..012`
 
 The event log records that someone got in touch and the contact list records who
