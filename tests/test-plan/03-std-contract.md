@@ -248,7 +248,9 @@ number is normalised before it becomes that key, and — the one that matters mo
 policy number or anything medical has no field to land in, so a reworded prompt
 alone cannot start storing them.
 
-**`logging.contract.test.ts` — `CTR-LOG-001..067`** — what the backend is
+**`logging.contract.test.ts` — `CTR-LOG-001..067`** — (it reads only the
+folders under `base44/functions`: a macOS `.DS_Store` there crashed the whole
+file with ENOTDIR) — what the backend is
 allowed to write down. These functions logged nothing until now, so the only
 diagnosis available was the warnings appendix in the operations email — which
 means only an enquiry whose mail went out could be diagnosed, and the failures
@@ -454,6 +456,11 @@ csp-report functions answer for themselves), and no rule hands out `*`.
 `public/.well-known/security.txt` exists with a contact on the site's domain,
 a canonical address, and an `Expires` in the future and at most a year out.
 That case fails once the date passes, on purpose: renew the file a year ahead.
+
+**`node-version.contract.test.ts`.** Nothing said which Node the project
+needs. `package.json` `engines.node` is `>=22.12.0` (Vite 8's floor), the
+lockfile's root entry agrees, `.nvmrc` names the major that `ci.yml`'s
+`NODE_VERSION` runs, and that major meets the floor.
 
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
