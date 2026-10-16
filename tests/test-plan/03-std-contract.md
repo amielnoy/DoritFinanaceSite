@@ -804,6 +804,16 @@ It also checks that a User cannot file a snapshot under another agency by naming
 | CTR-LCR-002 | "is the only thing submit-lead finds an open interview by — never phone, name or address" | `findOpenInterview` filters `conversation_ref=eq.…` only; no reference, no match |
 | CTR-LCR-003 | "is taken from the body only when well-formed, and stored on a new interview lead" | The pattern check; `conversation_ref` on the insert |
 
+### 4.22 The claim document's object name — `claim-documents-object-name.contract.test.ts`
+
+`20261102000000_claim_documents_object_name.sql` limits uploads to the name the claim form makes: agency 1's folder, a random uuid, a safe file name. The bucket used to take any name from anyone. `supabase/tests/storage_check.sql` now uploads with real-shaped names and refuses five others. It failed under the old any-name rule.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CDN-001 | "is limited by the policy to agency 1's folder, a random uuid and a safe file name" | The insert policy replaced, `bucket_id` and `name ~ …` |
+| CTR-CDN-002..005 | "accepts the name the form makes for %j" | `agencyObjectPath` for Hebrew, spaced, upper-case and one-letter names matches the policy's own pattern |
+| CTR-CDN-006..009 | "refuses %j" | A fixed name, another agency's folder, `..`, a bare name |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
