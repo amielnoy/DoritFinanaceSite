@@ -413,6 +413,26 @@ function NewRequest({
   );
 }
 
+/** "איך בקשה מתקדמת": the four stages, in the words the staff work in. */
+const HOW_IT_WORKS: { title: string; text: string }[] = [
+  {
+    title: "ממתין ללקוח",
+    text: "הלקוח מקבל קישור — בוואטסאפ, במייל או ממך — מפיק באתר המסלקה קוד אימות, ומוסר אותו בקישור יחד עם מספר הזהות. אחרי 3 ימים בלי קוד הבקשה עולה ל״לטיפול עכשיו״, ואפשר לשלוח קישור חדש.",
+  },
+  {
+    title: "מוכן להגשה",
+    text: "קוד האימות התקבל. ״להגשה״ פותח את ההגשה המודרכת: פורטל המסלקה, העתקת מספר הזהות וקוד האימות, וסימון כהוגש — ואז שניהם נמחקים מהמערכת.",
+  },
+  {
+    title: "הוגש במסלקה",
+    text: "המסלקה מכינה את הקבצים בתוך כ־3–4 שעות ושומרת אותם 7 ימי עסקים. כשהם מוכנים הבקשה עולה ל״לטיפול עכשיו״, ויומיים לפני המחיקה היא מסומנת דחוף.",
+  },
+  {
+    title: "הושלם",
+    text: "הקבצים נקלטו, והניתוח וההמלצות מחכים בשורה של הבקשה.",
+  },
+];
+
 /** The step dot: the request's place in the four steps. */
 function StepDot({ step }: { step: number }) {
   return (
@@ -689,6 +709,9 @@ export default function MaslekaBoard({
   const requests = useQuery({ queryKey: BOARD_KEY, queryFn: () => service.list(), refetchInterval: 60_000 });
   const snapshots = useQuery({ queryKey: SNAPSHOTS_KEY, queryFn: () => service.listSnapshots() });
   const analysisOf = new Map((snapshots.data ?? []).flatMap((s) => (s.requestId ? [[s.requestId, s.id] as const] : [])));
+  // Reports no request on the board owns: made by hand, or their request gone.
+  const onBoardIds = new Set((requests.data ?? []).map((r) => r.id));
+  const orphanReports = (snapshots.data ?? []).filter((r) => !r.requestId || !onBoardIds.has(r.requestId));
   const [notice, setNotice] = useState<Message | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: BOARD_KEY });
   const report = (e: unknown) => setNotice({ tone: staffMessage(e).tone, text: failureText(e) });
@@ -832,9 +855,6 @@ export default function MaslekaBoard({
             <a href="#masleka-how" className="inline-flex min-h-11 items-center underline">
               איך זה עובד?
             </a>
-            <Link to="/admin/masleka/guide" className="inline-flex min-h-11 items-center underline">
-              מדריך: הרשמה כיועץ במסלקה
-            </Link>
             <button type="button" onClick={() => setNewOpen(true)} className={primaryClass}>
               <Plus size={16} aria-hidden="true" />
               בקשה חדשה
@@ -940,26 +960,50 @@ export default function MaslekaBoard({
           </ul>
         )}
 
-        {/* Every stored report, newest first — also those made by hand or whose
-            request has gone. Quiet when there are none or they cannot be read:
+        {/* Stage 4 holds every stored report: a completed request's on its row
+            ("לניתוח"), and here the ones no request on the board owns — made
+            by hand, or whose request has gone. Quiet when they cannot be read:
             the board's own work does not depend on them. */}
-        {snapshots.isError ? (
-          <p className="text-xs text-muted-foreground">לא הצלחנו לטעון את הניתוחים.</p>
-        ) : snapshots.data && snapshots.data.length > 0 ? (
-          <section aria-labelledby="analyses-title">
-            <h2 id="analyses-title" className="font-heading text-xl">ניתוחים</h2>
-            <ul className="mt-3 space-y-2">
-              {snapshots.data.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-baseline gap-3 text-sm">
-                  <Link to={`/admin/masleka/analysis/${s.id}`} className="underline">
-                    {s.clientName}
-                  </Link>
-                  <span className="text-xs text-muted-foreground">דוח מ־{when(s.takenAt)}</span>
-                </li>
+        {view === "completed" ? (
+          snapshots.isError ? (
+            <p className="text-sm text-muted-foreground">לא הצלחנו לטעון את הניתוחים.</p>
+          ) : orphanReports.length > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              ניתוחים ללא בקשה:{" "}
+              {orphanReports.map((r, i) => (
+                <React.Fragment key={r.id}>
+                  {i > 0 ? " · " : null}
+                  <Link to={`/admin/masleka/analysis/${r.id}`} className="underline">
+                    {r.clientName}
+                  </Link>{" "}
+                  (דוח מ־{when(r.takenAt)})
+                </React.Fragment>
               ))}
-            </ul>
-          </section>
+            </p>
+          ) : null
         ) : null}
+
+        <section id="masleka-how" aria-labelledby="masleka-how-title" className="scroll-mt-6 border-t border-border/60 pt-8">
+          <h2 id="masleka-how-title" className="font-heading text-2xl">
+            איך בקשה מתקדמת
+          </h2>
+          <ol className="mt-4 grid gap-4 md:grid-cols-4">
+            {HOW_IT_WORKS.map((step, i) => (
+              <li key={step.title} className="border border-border/60 bg-card p-4">
+                <p className="flex items-center gap-3 font-medium">
+                  <StepDot step={i + 1} />
+                  {step.title}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{step.text}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-sm">
+            <Link to="/admin/masleka/guide" className="inline-flex min-h-11 items-center underline">
+              מדריך: הרשמה כיועץ במסלקה
+            </Link>
+          </p>
+        </section>
       </main>
 
       <SideDrawer

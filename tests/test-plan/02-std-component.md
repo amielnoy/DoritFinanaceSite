@@ -410,8 +410,8 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks on "כן, הגשתי" in one act → one `markSubmitted` |
 | CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |
 | CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | The success view with no copied mark; the row, still listed after the failed refetch, opens clean |
-| CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | The row's `לניתוח` → `/admin/masleka/analysis/s7`; the reports list names the lead-less one |
-| CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | A quiet "לא הצלחנו לטעון את הניתוחים."; the columns still work; no alert |
+| CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | Stage 4: the row's `לניתוח` → s7; "ניתוחים ללא בקשה:" names the lead-less report (s8) and not the request's own; no separate "ניתוחים" region |
+| CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | The guided submit still copies; stage 4 says "לא הצלחנו לטעון את הניתוחים."; no alert |
 | CMP-MSKB-029 | "says a blank name is not valid, and sends nothing" (the new-request drawer) | Alert "השם אינו תקין" in the drawer; no `create` |
 | CMP-MSKB-030 | "says so when the invitation e-mail was asked for but not sent" (the new-request drawer) | "המייל ללקוח לא נשלח"; the link still shown |
 | CMP-MSKB-031 | "finds a client by name as you type, and says so when nothing is there" (the list) | `לוי`: both לוי rows only; no match: "אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד." |
@@ -435,6 +435,8 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-049 | "only shows the link when the staff member will copy it themselves" (the new-request drawer) | `sendInvite: false`, no address; the link; no WhatsApp link, no mail status |
 | CMP-MSKB-050 | "offers the caller's open leads of the agency, fills what is empty, and sends the lead's id" (the new-request drawer) | Options: ללא שיוך and the open agency-1 lead only; choosing it fills the name and the mobile; `create` carries `leadId` |
 | CMP-MSKB-051 | "reads the leads only once the drawer opens" (the new-request drawer) | No leads read until "+ בקשה חדשה" |
+| CMP-MSKB-052 | "explains the four stages at the bottom, where 'איך זה עובד?' leads, with the advisor guide" (how a request moves) | Region `#masleka-how` "איך בקשה מתקדמת": ממתין ללקוח, מוכן להגשה, הוגש במסלקה, הושלם; the guide link; "קוד אימות", never "ייפוי" on the page |
+| CMP-MSKB-053 | "lists no report line outside stage 4" (how a request moves) | No "ניתוחים ללא בקשה" on "now" |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 

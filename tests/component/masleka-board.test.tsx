@@ -337,6 +337,27 @@ describe("<MaslekaBoard /> — the new-request drawer", () => {
   });
 });
 
+describe("<MaslekaBoard /> — how a request moves", () => {
+  it("explains the four stages at the bottom, where 'איך זה עובד?' leads, with the advisor guide", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    const how = within(screen.getByRole("region", { name: "איך בקשה מתקדמת" }));
+    expect(how.getAllByRole("listitem").map((li) => li.querySelector("p")!.textContent)).toEqual([
+      "1ממתין ללקוח", "2מוכן להגשה", "3הוגש במסלקה", "4הושלם",
+    ]);
+    expect(screen.getByRole("region", { name: "איך בקשה מתקדמת" })).toHaveAttribute("id", "masleka-how");
+    expect(how.getByRole("link", { name: "מדריך: הרשמה כיועץ במסלקה" })).toHaveAttribute("href", "/admin/masleka/guide");
+    expect(how.getByText(/קוד אימות/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/ייפוי/);
+  });
+
+  it("lists no report line outside stage 4", async () => {
+    const svc = service({ listSnapshots: vi.fn(async () => [{ id: "s8", requestId: null, clientName: "לקוח מהטלפון", takenAt: iso(-HOUR) }]) });
+    renderBoard({ service: svc, clipboard: null });
+    await screen.findByText("רונית מזרחי");
+    expect(screen.queryByText(/ניתוחים ללא בקשה/)).not.toBeInTheDocument();
+  });
+});
+
 describe("<MaslekaBoard /> — the stage bar", () => {
   const bar = () => within(screen.getByRole("navigation", { name: "שלבי הבקשה" }));
   const stageButton = (name: RegExp) => bar().getByRole("button", { name });
@@ -824,16 +845,24 @@ describe("<MaslekaBoard /> — acting", () => {
     });
     renderBoard({ service: svc, clipboard: null, stage: "completed" });
     expect(await screen.findByRole("link", { name: "לניתוח" })).toHaveAttribute("href", "/admin/masleka/analysis/s7");
-    const analyses = within(screen.getByRole("region", { name: "ניתוחים" }));
-    expect(analyses.getByRole("link", { name: "לקוח מהטלפון" })).toHaveAttribute("href", "/admin/masleka/analysis/s8");
+    // Folded into stage 4: the report with no request on a line under the list, the request's own on its row only.
+    const orphans = (await screen.findByText(/^ניתוחים ללא בקשה:/)).closest("p")!;
+    expect(within(orphans).getByRole("link", { name: "לקוח מהטלפון" })).toHaveAttribute("href", "/admin/masleka/analysis/s8");
+    expect(within(orphans).queryByRole("link", { name: "אורי לוי" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "ניתוחים" })).not.toBeInTheDocument();
   });
 
   it("keeps the board working when the reports cannot be read", async () => {
     renderBoard({ service: service({ listSnapshots: vi.fn(async () => Promise.reject(new Error("no table"))) }), clipboard: null });
+    expect((await openWaiting()).getByRole("button", { name: "העתק ת״ז" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /4 · הושלם/ }));
     expect(await screen.findByText("לא הצלחנו לטעון את הניתוחים.")).toBeInTheDocument();
-    expect(await (await openWaiting()).findByRole("button", { name: "העתק ת״ז" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
 
   it("issues a fresh link for an invited client", async () => {
     const svc = service();
