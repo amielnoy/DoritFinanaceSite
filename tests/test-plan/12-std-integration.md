@@ -131,6 +131,20 @@ A hand-off that does not reach a person is a regulatory failure, so the limits n
 | INT-CCE-002 | "refuses past the cap with 429 and rid, booking nothing" | 429 with `rid`; no calendar call |
 | INT-CCE-003 | "never hands a calendar provider's own error text to the browser" | A provider refusing with its own text: 200, and no `details` in `events`, the text nowhere in the answer (fails without the fix) |
 
+### 4.2f `submit-lead` — an interview's saves meet by the conversation (review 2026-10-15)
+
+A later save (complete, or the questionnaire's details) updates an earlier one only if both name the same `conversationRef`, which is stored as `leads.conversation_ref` (migration `20261101000000`). Nothing else matches: not the phone, not the name, not the address. A save without a reference is a new lead.
+- **The senders:** the chat tool sends `chat:<conversation id>`, the needs wizard one `wizard:<uuid>` per run, and the Base44 hand-off `base44:<conversation id>`.
+- **Fixtures:** the "partial interview" and "details" suites carry `REF`, and the leads they should adopt carry the same `conversation_ref`.
+- **"whose interview it is", rewritten:**
+  - the same number and name from another conversation is not adopted;
+  - nothing is adopted without a reference;
+  - a malformed reference is ignored and not stored;
+  - a completed interview is not reopened;
+  - the visitor's own interview is completed by its reference, whatever name it now gives;
+  - a new interview lead stores its reference.
+- **Changed:** "does not fill in another run's lead on the same phone and name" (details), and "does not adopt a Base44-era partial save by phone and name" (Edge-only).
+
 ### 4.3 `submitLead` — identifiers a visitor volunteered — `INT-LEAD-016/017`
 
 An ID number or card number in a model-written summary is redacted before anyone

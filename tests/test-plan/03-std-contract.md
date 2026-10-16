@@ -796,6 +796,14 @@ It also checks that a User cannot file a snapshot under another agency by naming
 | CTR-PERM-008 | "the membership history is Admin+" | `membership_events_read_admin` |
 | CTR-PERM-009..011 | `can`, `grantableRoles`, `canManage` | Ranks; no role → nothing; the operator everything but leaving an agency they are not in; nobody changes someone above what they may grant |
 
+### 4.21 An interview's conversation reference — `lead-conversation-ref.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-LCR-001 | "is a column with the reference's own shape, indexed where set" | `conversation_ref` CHECK `^[A-Za-z0-9:_-]{8,100}$`; a partial index |
+| CTR-LCR-002 | "is the only thing submit-lead finds an open interview by — never phone, name or address" | `findOpenInterview` filters `conversation_ref=eq.…` only; no reference, no match |
+| CTR-LCR-003 | "is taken from the body only when well-formed, and stored on a new interview lead" | The pattern check; `conversation_ref` on the insert |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed

@@ -339,6 +339,8 @@ export default function AgentChat({
         const attribution = getAttribution();
         const receipt = await services.leads.submitInterview({
           ...summary,
+          // This conversation, so a save from it is never matched by phone and name.
+          conversationRef: conversationId ? `base44:${conversationId}` : undefined,
           channel: attribution?.channel,
           campaign: attribution?.campaign ?? undefined,
           landingPath: window.location.pathname,

@@ -359,6 +359,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
         return (
           (!ids || ids.includes(String(l.id))) &&
           (!eq("phone") || l.phone === eq("phone")) &&
+          (!eq("conversation_ref") || l.conversation_ref === eq("conversation_ref")) &&
           (!eq("source") || l.source === eq("source")) &&
           (!eq("status") || l.status === eq("status")) &&
           (!since || !at || new Date(at).getTime() >= new Date(since).getTime())

@@ -1638,3 +1638,7 @@ The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). 
 | UNIT-CHHANDLER-070 | "answers 429 when one address opens too many conversations, counted by its hash (review 2026-10-15)" | `chat-new-ip:<64 hex>` (20 an hour, beside the global `chat-new`); the address appears in no key |
 | UNIT-CHHANDLER-071 | "hands the tools the address it resolved — the gateway's, never one the visitor put first" | The tool context's `forwardedFor` is `203.0.113.7` |
 
+### 4.67 The interview body's reference — `tests/unit/lead-bodies.test.ts`; `chat-tools.test.ts`, `needs-wizard.test.tsx` (changed)
+
+`interviewBody` carries `conversationRef` (empty when there is none). The chat tool posts `chat:<conversation id>`. The needs wizard's contact step and its details share one `wizard:<uuid>`.
+

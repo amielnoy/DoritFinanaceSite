@@ -163,6 +163,8 @@ export default function NeedsWizard() {
     result: "",
   });
   const started = useRef<boolean>(false);
+  // One run of the questionnaire: its details find the lead its contact step saved by this.
+  const runRef = useRef<string>(`wizard:${crypto.randomUUID()}`);
   const ackIndex = useRef<number>(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const moved = useRef<boolean>(false);
@@ -235,6 +237,7 @@ export default function NeedsWizard() {
     return {
       ...toInterviewSummary(state, new Date()),
       stage,
+      conversationRef: runRef.current,
       channel: attribution?.channel,
       campaign: attribution?.campaign ?? undefined,
       landingPath: window.location.pathname,

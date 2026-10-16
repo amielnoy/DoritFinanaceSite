@@ -69,28 +69,32 @@ interface OpenInterview {
  */
 const DETAILS_WINDOW_MS = 30 * 60_000;
 
+/** The conversation an interview save names: `chat:<id>`, `base44:<id>`, `wizard:<id>` — the column's own pattern. */
+const CONVERSATION_REF = /^[A-Za-z0-9:_-]{8,100}$/;
+
 /**
- * The visitor's open interview, if one is in the window: partial, on this
- * phone, and the same person by name and address (sameInterviewee). Newest
- * first, so a rerun joins the latest. Base44's findOpenInterview, as a query.
+ * The visitor's open interview, if one is in the window: an interview lead
+ * of this same conversation (`conversation_ref`, which the page or the chat
+ * function holds), partial (or new, for the details). Newest first, so a
+ * rerun joins the latest. Never by phone and name (review 2026-10-15): a
+ * number and a first name are not a secret, and matching on them let anyone
+ * complete — and overwrite — someone else's interview. No reference, no match.
  */
 async function findOpenInterview(
   rid: string,
-  phone: string,
-  name: unknown,
-  email: unknown,
+  conversationRef: string,
   { status = 'partial', windowMs = INTERVIEW_WINDOW_MS }: { status?: 'partial' | 'new'; windowMs?: number } = {},
 ): Promise<OpenInterview | null> {
-  if (!phone) return null;
+  if (!conversationRef) return null;
   try {
     const since = new Date(Date.now() - windowMs).toISOString();
     const rows = await selectRows(
       'leads',
       `select=id,name,email,timing,consent_version,consent_at,status,created_at` +
-        `&phone=eq.${encodeURIComponent(phone)}&source=eq.interview&status=eq.${status}` +
+        `&conversation_ref=eq.${encodeURIComponent(conversationRef)}&source=eq.interview&status=eq.${status}` +
         `&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc`,
     );
-    return (rows.find((lead) => sameInterviewee(lead, name, email)) as OpenInterview | undefined) ?? null;
+    return (rows[0] as unknown as OpenInterview | undefined) ?? null;
   } catch (e) {
     // Best-effort, as Base44's was: a duplicate beats a lost interview.
     log('warn', 'interview.lookup_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
@@ -205,7 +209,9 @@ export async function handler(req: Request): Promise<Response> {
     // A body that is not JSON is answered as what it amounts to — no name and
     // no phone — rather than as a server fault.
     const body = await req.json().catch(() => null);
-    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at, channel, campaign, landingPath } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at, channel, campaign, landingPath, conversationRef: rawRef } = body || {};
+    // Only a well-formed reference ties saves together; anything else is none.
+    const conversationRef = typeof rawRef === 'string' && CONVERSATION_REF.test(rawRef) ? rawRef : '';
     const safeChannel = validChannel(channel) || 'unknown';
     const safeCampaign = validCampaign(campaign);
     const safeLandingPath = validLandingPath(landingPath);
@@ -311,8 +317,8 @@ export async function handler(req: Request): Promise<Response> {
     const openInterview = source !== 'interview'
       ? null
       : details
-        ? await findOpenInterview(rid, phone, name, email, { status: 'new', windowMs: DETAILS_WINDOW_MS })
-        : await findOpenInterview(rid, phone, name, email);
+        ? await findOpenInterview(rid, conversationRef, { status: 'new', windowMs: DETAILS_WINDOW_MS })
+        : await findOpenInterview(rid, conversationRef);
     // Only a details save that found its lead is "further details"; one that did
     // not is the visitor's lead, and is announced as one.
     const subject: string = details && openInterview ? `פרטים נוספים — ${baseSubject}` : baseSubject;
@@ -377,6 +383,8 @@ export async function handler(req: Request): Promise<Response> {
         // A timestamptz: absent is null, as the mirror wrote it — '' is refused.
         consent_at: consent_at || null,
         ...meetingFields,
+        // Which conversation it came from, so its later saves find it.
+        ...(source === 'interview' && conversationRef ? { conversation_ref: conversationRef } : {}),
         channel: safeChannel,
         campaign: safeCampaign,
       });
