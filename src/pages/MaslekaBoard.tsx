@@ -13,6 +13,8 @@ import {
   boardTime,
   copyOrFallback,
   failureText,
+  firstNameOf,
+  whatsappInviteUrl,
   nowRows,
   planRows,
   staffMessage,
@@ -23,9 +25,12 @@ import {
   type Message,
   type PlannedRow,
 } from "@/lib/masleka";
+import { isIsraeliMobile } from "@/lib/phone";
+import { AGENCY_1 } from "@/hooks/useAgency";
 import {
   MaslekaError,
   services,
+  type LeadRecord,
   type MaslekaField,
   type MaslekaLink,
   type MaslekaPort,
@@ -51,10 +56,13 @@ export interface MaslekaBoardProps {
   service?: MaslekaPort;
   now?: () => Date;
   clipboard?: ClipboardLike | null;
+  /** The caller's leads, as row-level security shows them (a User: their own). */
+  leads?: () => Promise<LeadRecord[]>;
 }
 
 export { BOARD_KEY };
 export const SNAPSHOTS_KEY = ["admin", "masleka", "snapshots"] as const;
+const LEADS_KEY = ["admin", "masleka", "leads"] as const;
 
 /** How long a revealed value stays on the screen. */
 export const REVEAL_MS = 60_000;
@@ -167,24 +175,56 @@ function LinkPanel({
   );
 }
 
+type Channel = "whatsapp" | "mail" | "copy";
+const CHANNELS: { value: Channel; label: string }[] = [
+  { value: "whatsapp", label: "וואטסאפ" },
+  { value: "mail", label: "מייל" },
+  { value: "copy", label: "אעתיק בעצמי" },
+];
+const PHONE_ERROR = "מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות";
+const fieldClass = "mt-1 min-h-11 w-full border border-border bg-background px-3 py-2";
+
+/**
+ * The new-request drawer, in two steps. First: the client, how the link goes
+ * to them, and (optionally) the lead it is for. Then the link, once — with a
+ * WhatsApp click-to-chat built here in the browser (the number never reaches
+ * a server of ours), the invitation mail's outcome, or nothing but the copy.
+ */
 function NewRequest({
   service,
   clipboard,
+  leads,
   onStart,
   onCreated,
   onFailure,
 }: {
   service: MaslekaPort;
   clipboard: ClipboardLike | null;
+  /** The caller's open leads, for "שיוך לפנייה". */
+  leads: LeadRecord[];
   onStart: () => void;
   onCreated: () => Promise<unknown>;
   onFailure: (e: unknown) => void;
 }) {
   const [name, setName] = useState("");
+  const [channel, setChannel] = useState<Channel>("whatsapp");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [sendInvite, setSendInvite] = useState(true);
+  const [leadId, setLeadId] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ link: MaslekaLink; mailRequested: boolean } | null>(null);
+  const [result, setResult] = useState<{ link: MaslekaLink; channel: Channel; clientName: string; phone: string } | null>(null);
+  const [copied, setCopied] = useState<"idle" | "copied" | "manual">("idle");
+
+  const chooseLead = (id: string) => {
+    setLeadId(id);
+    const lead = leads.find((l) => l.id === id);
+    if (!lead) return;
+    // A start, not a rule: only fields still empty.
+    if (!name.trim()) setName(lead.name.slice(0, 80));
+    if (!phone.trim() && isIsraeliMobile(lead.phone)) setPhone(lead.phone);
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const clientName = name.trim();
@@ -194,17 +234,24 @@ function NewRequest({
       onFailure(new MaslekaError("invalid_name"));
       return;
     }
-    const mailRequested = sendInvite && Boolean(contactEmail);
+    if (channel === "whatsapp" && !isIsraeliMobile(phone)) {
+      setPhoneError(PHONE_ERROR);
+      return;
+    }
+    if (channel === "mail" && !contactEmail) {
+      onFailure(new MaslekaError("invalid_email"));
+      return;
+    }
     setBusy(true);
     try {
+      // The phone is not part of the request: it only builds the WhatsApp link below.
       const link = await service.create({
         clientName,
-        contactEmail: contactEmail || undefined,
-        sendInvite: mailRequested,
+        contactEmail: channel === "mail" ? contactEmail : undefined,
+        sendInvite: channel === "mail",
+        ...(leadId ? { leadId } : {}),
       });
-      setResult({ link, mailRequested });
-      setName("");
-      setEmail("");
+      setResult({ link, channel, clientName, phone });
       await onCreated();
     } catch (e) {
       onFailure(e);
@@ -213,26 +260,127 @@ function NewRequest({
     }
   };
 
-  return (
-    <div>
-      <p className="text-sm text-muted-foreground">ללקוח שפנה בטלפון. הקישור יוצג כאן פעם אחת.</p>
-      <form onSubmit={submit} aria-label="בקשה חדשה" className="mt-3 grid gap-3">
+  if (result) {
+    const { link, clientName } = result;
+    const wa = result.channel === "whatsapp" ? whatsappInviteUrl(result.phone, clientName, link.link) : null;
+    return (
+      <div className="space-y-4">
+        <h3 className="font-heading text-xl">הקישור ל{clientName} מוכן</h3>
+        {wa ? (
+          <a href={wa} target="_blank" rel="noopener noreferrer" className={`${primaryClass} w-full`}>
+            שליחה ל{firstNameOf(clientName)} בוואטסאפ
+          </a>
+        ) : null}
+        {result.channel === "mail" ? (
+          <p role="status" className="text-sm">
+            {link.invited
+              ? "הקישור נשלח במייל ללקוח. אפשר גם להעתיק אותו:"
+              : "המייל ללקוח לא נשלח. העבירו לו את הקישור בעצמכם:"}
+          </p>
+        ) : null}
         <div>
-          <label htmlFor="masleka-new-name" className="block text-sm">
-            שם הלקוח
+          <label htmlFor="masleka-new-link" className="block text-sm">
+            הקישור ללקוח
+          </label>
+          <div className="mt-1 flex gap-2">
+            <input
+              id="masleka-new-link"
+              readOnly
+              value={link.link}
+              dir="ltr"
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-h-11 w-full border border-border bg-background px-2 py-1 font-mono text-xs"
+            />
+            <button type="button" onClick={async () => setCopied(await copyOrFallback(link.link, clipboard))} className={buttonClass}>
+              {copied === "copied" ? "הועתק ✓" : "העתקה"}
+            </button>
+          </div>
+          {copied === "manual" ? (
+            <p className="mt-1 text-sm text-muted-foreground">העתק ידנית: סמנו את הקישור והעתיקו (Ctrl+C או ⌘C).</p>
+          ) : null}
+        </div>
+        <p className="border border-highlight bg-highlight/10 p-3 text-sm">
+          הקישור מוצג כאן פעם אחת בלבד. העתיקו אותו או שלחו אותו עכשיו — אחר כך אפשר רק להחליף אותו בקישור חדש.
+        </p>
+        {/* The client's page as the client will see it: a new tab, no referrer. */}
+        <a href={link.link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm underline">
+          לראות את הדף כמו שהלקוח יראה ↗
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} aria-label="בקשה חדשה" className="space-y-5" noValidate>
+      <div>
+        <label htmlFor="masleka-new-name" className="block text-sm">
+          שם הלקוח
+        </label>
+        <input
+          id="masleka-new-name"
+          required
+          maxLength={80}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className={fieldClass}
+        />
+      </div>
+      <fieldset>
+        <legend className="text-sm">איך לשלוח את הקישור?</legend>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {CHANNELS.map((c) => (
+            <label
+              key={c.value}
+              className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 border px-2 py-2 text-sm ${
+                channel === c.value ? "border-highlight bg-card" : "border-border/60"
+              }`}
+            >
+              <input
+                type="radio"
+                name="masleka-channel"
+                value={c.value}
+                checked={channel === c.value}
+                onChange={() => {
+                  setChannel(c.value);
+                  setPhoneError("");
+                }}
+              />
+              {c.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {channel === "whatsapp" ? (
+        <div>
+          <label htmlFor="masleka-new-phone" className="block text-sm">
+            נייד של הלקוח
           </label>
           <input
-            id="masleka-new-name"
-            required
-            maxLength={80}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 w-full border border-border bg-background px-2 py-1"
+            id="masleka-new-phone"
+            type="tel"
+            dir="ltr"
+            inputMode="tel"
+            autoComplete="off"
+            value={phone}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              setPhoneError("");
+            }}
+            aria-invalid={phoneError ? true : undefined}
+            aria-describedby={phoneError ? "masleka-new-phone-error" : undefined}
+            className={fieldClass}
           />
+          {phoneError ? (
+            <p id="masleka-new-phone-error" role="alert" className="mt-1 text-sm text-destructive">
+              {phoneError}
+            </p>
+          ) : null}
         </div>
+      ) : null}
+      {channel === "mail" ? (
         <div>
           <label htmlFor="masleka-new-email" className="block text-sm">
-            מייל (לא חובה)
+            מייל של הלקוח
           </label>
           <input
             id="masleka-new-email"
@@ -240,19 +388,28 @@ function NewRequest({
             dir="ltr"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full border border-border bg-background px-2 py-1"
+            className={fieldClass}
           />
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={sendInvite} onChange={(e) => setSendInvite(e.target.checked)} />
-          לשלוח ללקוח את הקישור במייל
+      ) : null}
+      <div>
+        <label htmlFor="masleka-new-lead" className="block text-sm">
+          שיוך לפנייה (לא חובה)
         </label>
-        <button type="submit" disabled={busy} className={primaryClass}>
-          צור בקשה
-        </button>
-      </form>
-      {result ? <LinkPanel link={result.link} mailRequested={result.mailRequested} clipboard={clipboard} /> : null}
-    </div>
+        <select id="masleka-new-lead" value={leadId} onChange={(e) => chooseLead(e.target.value)} className={fieldClass}>
+          <option value="">ללא שיוך</option>
+          {leads.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button type="submit" disabled={busy} className={`${primaryClass} w-full`}>
+        {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+        יצירת קישור
+      </button>
+    </form>
   );
 }
 
@@ -526,6 +683,7 @@ export default function MaslekaBoard({
   service = services.masleka,
   now = () => new Date(),
   clipboard = defaultClipboard(),
+  leads = () => services.leadsAdmin.list(),
 }: MaslekaBoardProps) {
   const client = useQueryClient();
   const requests = useQuery({ queryKey: BOARD_KEY, queryFn: () => service.list(), refetchInterval: 60_000 });
@@ -591,6 +749,11 @@ export default function MaslekaBoard({
     </p>
   ) : null;
   const [newOpen, setNewOpen] = useState(false);
+  // For "שיוך לפנייה": read when the drawer opens; the agency's open leads the caller can see.
+  const myLeads = useQuery({ queryKey: LEADS_KEY, queryFn: leads, enabled: newOpen });
+  const openLeads = (myLeads.data ?? [])
+    .filter((l) => l.status !== "closed" && (!l.agency_id || l.agency_id === AGENCY_1))
+    .sort((a, b) => Date.parse(b.created_date) - Date.parse(a.created_date));
 
   // The guided submit's drawer: the request it is for, and whether its הגשתי went through.
   const [submitFor, setSubmitFor] = useState<MaslekaRequest | null>(null);
@@ -828,7 +991,14 @@ export default function MaslekaBoard({
       <SideDrawer open={newOpen} onClose={() => setNewOpen(false)} title="בקשה חדשה">
         {/* Behind an open drawer the page is hidden from assistive technology: its notice shows here. */}
         {noticeView ? <div className="mb-4">{noticeView}</div> : null}
-        <NewRequest service={service} clipboard={clipboard} onStart={clearNotice} onCreated={refresh} onFailure={report} />
+        <NewRequest
+          service={service}
+          clipboard={clipboard}
+          leads={openLeads}
+          onStart={clearNotice}
+          onCreated={refresh}
+          onFailure={report}
+        />
       </SideDrawer>
     </div>
   );

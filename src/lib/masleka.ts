@@ -1,3 +1,4 @@
+import { isIsraeliMobile } from "@/lib/phone";
 import { israelToday } from "@/lib/wall-clock";
 import { MaslekaError, type MaslekaFailure, type MaslekaRequest } from "@/services/ports";
 
@@ -222,6 +223,33 @@ export function stageRows(rows: PlannedRow[], stage: BoardStage): PlannedRow[] {
   return rows
     .filter((r) => r.plan.stage === stage)
     .sort((a, b) => (stage === "completed" ? b.plan.since - a.plan.since : a.plan.since - b.plan.since));
+}
+
+/** The first word of a name, for "שליחה ל<first name>". */
+export const firstNameOf = (name: string): string => name.trim().split(/\s+/)[0] ?? "";
+
+/**
+ * An Israeli mobile as wa.me takes it: 972 and the number without its leading
+ * 0, digits only. Null for anything isIsraeliMobile refuses.
+ */
+export function whatsappNumber(phone: string): string | null {
+  if (!isIsraeliMobile(phone)) return null;
+  const digits = phone.replace(/\D/g, "");
+  return digits.startsWith("972") ? digits : `972${digits.replace(/^0/, "")}`;
+}
+
+/**
+ * The click-to-chat link that opens WhatsApp with the client's link in a
+ * short message — built in the browser, never sent anywhere: the number is not
+ * stored, and goes to no server of ours. No sender is named, since whoever
+ * sends it may not be Dorit.
+ */
+export function whatsappInviteUrl(phone: string, clientName: string, link: string): string | null {
+  const number = whatsappNumber(phone);
+  if (!number) return null;
+  const first = firstNameOf(clientName);
+  const text = `${first ? `שלום ${first}, ` : "שלום, "}זה הקישור האישי למסירת קוד האימות של המסלקה, יחד עם מספר הזהות. ההסבר המלא, צעד אחר צעד, מחכה בו:\n${link}`;
+  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
 
 export interface ClipboardLike {

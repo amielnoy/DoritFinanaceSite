@@ -1271,6 +1271,9 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKBD-037 | "puts the urgent first, then the oldest first, and only what needs action" (nowRows and stageRows) | `urgent`, `invited-old`, `ready`, `code` |
 | UNIT-MSKBD-038 | "lists one stage oldest first, and the completed newest first" (nowRows and stageRows) | Submitted: `ready`, `urgent`, `preparing`; invited: oldest first |
 | UNIT-MSKBD-039 | "reads ?stage= as one of the bar's views, and anything else as 'now'" (the stage bar's views) | Five views in order; `null`, `""`, `waiting`, `SUBMITTED`, `<script>` → `now` |
+| UNIT-MSKBD-040 | "writes an Israeli mobile as wa.me wants it: 972 and the number without its 0" (the WhatsApp invitation) | Five spellings → `972501234567`; a landline, short, empty, long, letters → null |
+| UNIT-MSKBD-041 | "puts the link in a short message, encoded so that # and spaces survive, and names no sender" (the WhatsApp invitation) | `https://wa.me/972501234567`; no raw space, `#` or Hebrew in the URL; text starts "שלום משה, ", says קוד האימות (never ייפוי), ends with the link, names no דורית |
+| UNIT-MSKBD-042 | "builds nothing for a number that is not a mobile, and greets plainly with no name" (the WhatsApp invitation) | Landline → null; blank name → "שלום, "; `firstNameOf` |
 
 ### 4.45 Vercel Analytics beforeSend — `tests/unit/vercel-analytics.test.ts`
 

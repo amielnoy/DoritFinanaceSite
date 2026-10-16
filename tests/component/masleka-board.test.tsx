@@ -62,7 +62,7 @@ function renderBoard(props: MaslekaBoardProps & { stage?: string }) {
   const view = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[stage ? `/admin/masleka?stage=${stage}` : "/admin/masleka"]}>
-        <MaslekaBoard now={() => NOW} {...props} />
+        <MaslekaBoard now={() => NOW} leads={vi.fn(async () => [])} {...props} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -150,6 +150,11 @@ describe("<MaslekaBoard /> — the list", () => {
     expect(screen.getByText("אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד.")).toBeInTheDocument();
   });
 
+  it("words a refused list in the staff vocabulary", async () => {
+    renderBoard({ service: service({ list: vi.fn(async () => Promise.reject(new MaslekaError("forbidden"))) }), clipboard: null });
+    expect(await screen.findByText("ההרשאה שלך הוסרה")).toBeInTheDocument();
+  });
+
   it("reports a list that failed to load", async () => {
     renderBoard({ service: service({ list: vi.fn(async () => Promise.reject(new MaslekaError("failed"))) }), clipboard: null });
     expect(await screen.findByText("לא הצלחנו לטעון את הבקשות. רעננו את הדף.")).toBeInTheDocument();
@@ -199,6 +204,136 @@ describe("<MaslekaBoard /> — the header", () => {
     await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     await waitFor(() => expect(opener).toHaveFocus());
+  });
+});
+
+describe("<MaslekaBoard /> — the new-request drawer", () => {
+  const LEADS = [
+    { id: "22222222-2222-4222-8222-000000000001", name: "שירה בן דוד", phone: "052-765-4321", source: "quick" as const, status: "new" as const, created_date: iso(-DAY), agency_id: "00000000-0000-0000-0000-000000000001" },
+    { id: "22222222-2222-4222-8222-000000000002", name: "סגורה כבר", phone: "0521111111", source: "quick" as const, status: "closed" as const, created_date: iso(-DAY) },
+    { id: "22222222-2222-4222-8222-000000000003", name: "של סוכנות אחרת", phone: "0522222222", source: "quick" as const, status: "new" as const, created_date: iso(-DAY), agency_id: "0abcfa0b-0000-4000-8000-000000000000" },
+  ];
+  const chooseChannel = (drawer: ReturnType<typeof within>, label: string) => userEvent.click(drawer.getByRole("radio", { name: label }));
+
+  it("sends by WhatsApp from the browser: a wa.me link with the link in the message, and the phone never sent", async () => {
+    const svc = service({ create: vi.fn(async () => ({ requestId: "r9", link: LINK, invited: false })) });
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openNew();
+    expect(drawer.getByRole("radio", { name: "וואטסאפ" })).toBeChecked();
+    await userEvent.type(drawer.getByLabelText("שם הלקוח"), "משה כהן");
+    await userEvent.type(drawer.getByLabelText("נייד של הלקוח"), "050-123-4567");
+    await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
+    expect(svc.create).toHaveBeenCalledWith({ clientName: "משה כהן", contactEmail: undefined, sendInvite: false });
+    expect(JSON.stringify(vi.mocked(svc.create).mock.calls)).not.toMatch(/123-?4567|501234567/);
+    expect(await drawer.findByRole("heading", { name: "הקישור למשה כהן מוכן" })).toBeInTheDocument();
+    const wa = drawer.getByRole("link", { name: "שליחה למשה בוואטסאפ" });
+    const url = new URL(wa.getAttribute("href")!);
+    expect(`${url.origin}${url.pathname}`).toBe("https://wa.me/972501234567");
+    expect(url.searchParams.get("text")).toContain(LINK);
+    expect(url.searchParams.get("text")).toMatch(/^שלום משה, /);
+    expect(wa).toHaveAttribute("target", "_blank");
+    expect(wa).toHaveAttribute("rel", "noopener noreferrer");
+    expect(drawer.getByLabelText("הקישור ללקוח")).toHaveValue(LINK);
+    expect(drawer.getByText(/^הקישור מוצג כאן פעם אחת בלבד/)).toBeInTheDocument();
+    const preview = drawer.getByRole("link", { name: "לראות את הדף כמו שהלקוח יראה ↗" });
+    expect(preview).toHaveAttribute("href", LINK);
+    expect(preview).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("refuses a WhatsApp number that is not an Israeli mobile, beside the field, and sends nothing", async () => {
+    const svc = service();
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openNew();
+    await userEvent.type(drawer.getByLabelText("שם הלקוח"), "משה כהן");
+    await userEvent.type(drawer.getByLabelText("נייד של הלקוח"), "03-1234567");
+    await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
+    expect(drawer.getByRole("alert")).toHaveTextContent("מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות");
+    expect(drawer.getByLabelText("נייד של הלקוח")).toHaveAttribute("aria-invalid", "true");
+    expect(svc.create).not.toHaveBeenCalled();
+  });
+
+  it("sends by mail through the invitation, and says when it went", async () => {
+    const svc = service();
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openNew();
+    await userEvent.type(drawer.getByLabelText("שם הלקוח"), "משה כהן");
+    await chooseChannel(drawer, "מייל");
+    expect(drawer.queryByLabelText("נייד של הלקוח")).not.toBeInTheDocument();
+    await userEvent.type(drawer.getByLabelText("מייל של הלקוח"), "moshe@example.com");
+    await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
+    expect(svc.create).toHaveBeenCalledWith({ clientName: "משה כהן", contactEmail: "moshe@example.com", sendInvite: true });
+    expect(await drawer.findByText(/הקישור נשלח במייל ללקוח/)).toBeInTheDocument();
+    expect(drawer.queryByRole("link", { name: /בוואטסאפ/ })).not.toBeInTheDocument();
+  });
+
+  it("says so when the invitation e-mail was asked for but not sent", async () => {
+    const svc = service({ create: vi.fn(async () => ({ requestId: "r9", link: LINK, invited: false })) });
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openNew();
+    await userEvent.type(drawer.getByLabelText("שם הלקוח"), "משה כהן");
+    await chooseChannel(drawer, "מייל");
+    await userEvent.type(drawer.getByLabelText("מייל של הלקוח"), "moshe@example.com");
+    await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
+    expect(await drawer.findByText(/המייל ללקוח לא נשלח/)).toBeInTheDocument();
+    expect(drawer.queryByText(/הקישור נשלח במייל ללקוח/)).not.toBeInTheDocument();
+    expect(drawer.getByLabelText("הקישור ללקוח")).toHaveValue(LINK);
+  });
+
+  it("words a refused address in the staff vocabulary, inside the drawer", async () => {
+    const svc = service({ create: vi.fn(async () => Promise.reject(new MaslekaError("invalid_email", "z3"))) });
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openNew();
+    await userEvent.type(drawer.getByLabelText("שם הלקוח"), "משה כהן");
+    await chooseChannel(drawer, "מייל");
+    await userEvent.type(drawer.getByLabelText("מייל של הלקוח"), "moshe@example");
+    await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
+    expect(await drawer.findByRole("alert")).toHaveTextContent(/כתובת הדוא״ל אינה תקינה/);
+  });
+
+  it("only shows the link when the staff member will copy it themselves", async () => {
+    const svc = service({ create: vi.fn(async () => ({ requestId: "r9", link: LINK, invited: false })) });
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openNew();
+    await userEvent.type(drawer.getByLabelText("שם הלקוח"), "משה כהן");
+    await chooseChannel(drawer, "אעתיק בעצמי");
+    await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
+    expect(svc.create).toHaveBeenCalledWith({ clientName: "משה כהן", contactEmail: undefined, sendInvite: false });
+    expect(await drawer.findByLabelText("הקישור ללקוח")).toHaveValue(LINK);
+    expect(drawer.queryByRole("link", { name: /בוואטסאפ/ })).not.toBeInTheDocument();
+    expect(drawer.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("says a blank name is not valid, and sends nothing", async () => {
+    const svc = service();
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openNew();
+    await userEvent.type(drawer.getByLabelText("שם הלקוח"), "   ");
+    await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
+    expect(await drawer.findByRole("alert")).toHaveTextContent("השם אינו תקין");
+    expect(svc.create).not.toHaveBeenCalled();
+  });
+
+  it("offers the caller's open leads of the agency, fills what is empty, and sends the lead's id", async () => {
+    const svc = service();
+    const leads = vi.fn(async () => LEADS);
+    renderBoard({ service: svc, clipboard: null, leads });
+    const drawer = await openNew();
+    const select = drawer.getByLabelText("שיוך לפנייה (לא חובה)");
+    await waitFor(() => expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["ללא שיוך", "שירה בן דוד"]));
+    await userEvent.selectOptions(select, "שירה בן דוד");
+    expect(drawer.getByLabelText("שם הלקוח")).toHaveValue("שירה בן דוד");
+    expect(drawer.getByLabelText("נייד של הלקוח")).toHaveValue("052-765-4321");
+    await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
+    expect(svc.create).toHaveBeenCalledWith({ clientName: "שירה בן דוד", contactEmail: undefined, sendInvite: false, leadId: LEADS[0].id });
+  });
+
+  it("reads the leads only once the drawer opens", async () => {
+    const leads = vi.fn(async () => LEADS);
+    renderBoard({ service: service(), clipboard: null, leads });
+    await screen.findByText("רונית מזרחי");
+    expect(leads).not.toHaveBeenCalled();
+    await openNew();
+    await waitFor(() => expect(leads).toHaveBeenCalledTimes(1));
   });
 });
 
@@ -604,18 +739,7 @@ describe("<MaslekaBoard /> — acting", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("ההרשאה שלך הוסרה");
   });
 
-  it("words a failed list or a refused request in the staff vocabulary", async () => {
-    const svc = service({
-      list: vi.fn(async () => Promise.reject(new MaslekaError("forbidden"))),
-      create: vi.fn(async () => Promise.reject(new MaslekaError("invalid_email", "z3"))),
-    });
-    renderBoard({ service: svc, clipboard: null });
-    expect(await screen.findByText("ההרשאה שלך הוסרה")).toBeInTheDocument();
-    await openNew();
-    await userEvent.type(screen.getByLabelText("שם הלקוח"), "משה כהן");
-    await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
-    expect(await screen.findByText(/כתובת הדוא״ל אינה תקינה/)).toBeInTheDocument();
-  });
+
 
   it("links to the clearinghouse portal in a new tab without a referrer", async () => {
     renderBoard({ service: service(), clipboard: null });
@@ -626,21 +750,7 @@ describe("<MaslekaBoard /> — acting", () => {
     expect(link.getAttribute("rel")).toMatch(/noreferrer/);
   });
 
-  it("creates a hand-made request and shows its link to copy", async () => {
-    const svc = service();
-    renderBoard({ service: svc, clipboard: null });
-    await openNew();
-    await userEvent.type(screen.getByLabelText("שם הלקוח"), "משה כהן");
-    await userEvent.type(screen.getByLabelText("מייל (לא חובה)"), "moshe@example.com");
-    await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
-    expect(svc.create).toHaveBeenCalledWith({ clientName: "משה כהן", contactEmail: "moshe@example.com", sendInvite: true });
-    expect(await screen.findByDisplayValue(LINK)).toBeInTheDocument();
-    expect(screen.getByText(/הקישור נשלח במייל ללקוח/)).toBeInTheDocument();
-    const open = screen.getByRole("link", { name: "פתיחת הקישור" });
-    expect(open).toHaveAttribute("href", LINK);
-    expect(open).toHaveAttribute("target", "_blank");
-    expect(open).toHaveAttribute("rel", "noopener noreferrer");
-  });
+
 
   it("makes one הגשתי call for a double click that lands before the button is disabled", async () => {
     const wipe = deferred<void>();
@@ -699,27 +809,9 @@ describe("<MaslekaBoard /> — acting", () => {
     expect(again.getByRole("button", { name: "העתק ת״ז" })).toBeInTheDocument();
   });
 
-  it("says a blank name is not valid, and sends nothing", async () => {
-    const svc = service();
-    renderBoard({ service: svc, clipboard: null });
-    const drawer = await openNew();
-    await userEvent.type(screen.getByLabelText("שם הלקוח"), "   ");
-    await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
-    expect(await drawer.findByRole("alert")).toHaveTextContent("השם אינו תקין");
-    expect(svc.create).not.toHaveBeenCalled();
-  });
 
-  it("says so when the invitation e-mail was asked for but not sent", async () => {
-    const svc = service({ create: vi.fn(async () => ({ requestId: "r9", link: LINK, invited: false })) });
-    renderBoard({ service: svc, clipboard: null });
-    await openNew();
-    await userEvent.type(screen.getByLabelText("שם הלקוח"), "משה כהן");
-    await userEvent.type(screen.getByLabelText("מייל (לא חובה)"), "moshe@example.com");
-    await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
-    expect(await screen.findByDisplayValue(LINK)).toBeInTheDocument();
-    expect(screen.getByText(/המייל ללקוח לא נשלח/)).toBeInTheDocument();
-    expect(screen.queryByText(/הקישור נשלח במייל ללקוח/)).not.toBeInTheDocument();
-  });
+
+
 
   it("links a completed request to its analysis, and lists every stored report", async () => {
     const done = row({ id: "r7", clientName: "אורי לוי", status: "completed", completedAt: iso(-HOUR) });

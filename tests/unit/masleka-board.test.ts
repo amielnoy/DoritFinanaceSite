@@ -9,6 +9,9 @@ import {
   stageRows,
   viewFromParam,
   BOARD_VIEWS,
+  firstNameOf,
+  whatsappInviteUrl,
+  whatsappNumber,
   READY_AFTER_MS,
   clientMessage,
   copyOrFallback,
@@ -125,6 +128,35 @@ describe("the stage bar's views", () => {
     expect(BOARD_VIEWS.map((v) => v.view)).toEqual(["now", "invited", "code_received", "submitted", "completed"]);
     for (const v of ["invited", "code_received", "submitted", "completed", "now"]) expect(viewFromParam(v)).toBe(v);
     for (const v of [null, "", "waiting", "SUBMITTED", "<script>"]) expect(viewFromParam(v)).toBe("now");
+  });
+});
+
+describe("the WhatsApp invitation", () => {
+  const LINK = `https://govari-fin.co.il/masleka#t=${"N".repeat(43)}`;
+
+  it("writes an Israeli mobile as wa.me wants it: 972 and the number without its 0", () => {
+    for (const phone of ["0501234567", "050-123-4567", "050 123 4567", "+972501234567", "972-50-123-4567"]) {
+      expect(whatsappNumber(phone)).toBe("972501234567");
+    }
+    for (const phone of ["03-1234567", "12345", "", "0501234567890", "abc"]) expect(whatsappNumber(phone)).toBeNull();
+  });
+
+  it("puts the link in a short message, encoded so that # and spaces survive, and names no sender", () => {
+    const url = new URL(whatsappInviteUrl("0501234567", "משה כהן", LINK)!);
+    expect(url.origin + url.pathname).toBe("https://wa.me/972501234567");
+    expect(whatsappInviteUrl("0501234567", "משה כהן", LINK)).not.toMatch(/[ #א-ת]/);
+    const text = url.searchParams.get("text")!;
+    expect(text.startsWith("שלום משה, ")).toBe(true);
+    expect(text).toContain("קוד האימות");
+    expect(text).not.toContain("ייפוי");
+    expect(text.endsWith(LINK)).toBe(true);
+    expect(text).not.toMatch(/דורית/);
+  });
+
+  it("builds nothing for a number that is not a mobile, and greets plainly with no name", () => {
+    expect(whatsappInviteUrl("03-1234567", "משה", LINK)).toBeNull();
+    expect(new URL(whatsappInviteUrl("0501234567", "  ", LINK)!).searchParams.get("text")!.startsWith("שלום, ")).toBe(true);
+    expect(firstNameOf("  שירה  בן דוד ")).toBe("שירה");
   });
 });
 

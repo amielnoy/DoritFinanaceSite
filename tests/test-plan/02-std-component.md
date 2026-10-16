@@ -402,9 +402,9 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-015 | "asks inline before the wipe: 'עוד לא' sends nothing, 'כן, הגשתי' wipes and says what happens next" | `role="alert"` question with the name and the warning; עוד לא → nothing; כן, הגשתי → `markSubmitted('r2')`, "הוגש. מספר הזהות וקוד האימות נמחקו." and the 3–4 hours line; חזרה ללוח closes |
 | CMP-MSKB-016 | "shows a second הגשתי as already submitted, not as an error, and refreshes the row" | `already_submitted` → status "כבר סומן כהוגש" in the drawer; the question closes, no alert; list refetched |
 | CMP-MSKB-017 | "tells a staff member whose access was removed" | Alert "ההרשאה שלך הוסרה" (`staffMessage`) |
-| CMP-MSKB-018 | "words a failed list or a refused request in the staff vocabulary" | A forbidden list and an `invalid_email` create both say `staffMessage`'s text |
+| CMP-MSKB-018 | "words a refused list in the staff vocabulary" (the list) | `forbidden` → "ההרשאה שלך הוסרה" |
 | CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | The drawer's step 1 link: `_blank`, `noopener noreferrer` |
-| CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל"; "פתיחת הקישור" opens it in a new tab, `noopener noreferrer` |
+| CMP-MSKB-020 | "sends by WhatsApp from the browser: a wa.me link with the link in the message, and the phone never sent" (the new-request drawer) | `create` without the phone (no digits of it in any call); "הקישור למשה כהן מוכן"; `https://wa.me/972501234567?text=…` with the link, in a new tab, no referrer; the link field, the gold "פעם אחת בלבד" box, and "לראות את הדף כמו שהלקוח יראה ↗" |
 | CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown, and "פתיחת הקישור" points at it |
 | CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves the stage before the answer: never copied, never shown |
 | CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks on "כן, הגשתי" in one act → one `markSubmitted` |
@@ -412,8 +412,8 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | The success view with no copied mark; the row, still listed after the failed refetch, opens clean |
 | CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | The row's `לניתוח` → `/admin/masleka/analysis/s7`; the reports list names the lead-less one |
 | CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | A quiet "לא הצלחנו לטעון את הניתוחים."; the columns still work; no alert |
-| CMP-MSKB-029 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
-| CMP-MSKB-030 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
+| CMP-MSKB-029 | "says a blank name is not valid, and sends nothing" (the new-request drawer) | Alert "השם אינו תקין" in the drawer; no `create` |
+| CMP-MSKB-030 | "says so when the invitation e-mail was asked for but not sent" (the new-request drawer) | "המייל ללקוח לא נשלח"; the link still shown |
 | CMP-MSKB-031 | "finds a client by name as you type, and says so when nothing is there" (the list) | `לוי`: both לוי rows only; no match: "אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד." |
 | CMP-MSKB-032 | "opens on 'לטיפול עכשיו': what needs action, urgent first, with each stage's count and hint" (the stage bar) | `aria-pressed` on now; counts 2 / 1 / 1 / 2 / 0 and the hints; rows דן (urgent) then רונית; יעל and אורי absent |
 | CMP-MSKB-033 | "shows one stage when chosen, and keeps it in ?stage= so a refresh opens on it" (the stage bar) | `?stage=submitted` after the click; a fresh render at that address opens on it; back to now drops the parameter |
@@ -429,6 +429,12 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-043 | "hides a value copied by hand when the drawer closes" (the guided submit) | The manual field is gone |
 | CMP-MSKB-044 | "drops a value still on its way when the drawer closes: never copied, never shown" (the guided submit) | The answer lands after סגירה: no clipboard write, no mark (fails without `hide()` on close) |
 | CMP-MSKB-045 | "keeps the inline question to the drawer: no browser confirm" (the guided submit) | `window.confirm` never called |
+| CMP-MSKB-046 | "refuses a WhatsApp number that is not an Israeli mobile, beside the field, and sends nothing" (the new-request drawer) | `03-1234567`: the field's alert, `aria-invalid`; no `create` |
+| CMP-MSKB-047 | "sends by mail through the invitation, and says when it went" (the new-request drawer) | `sendInvite: true` with the address; "הקישור נשלח במייל ללקוח"; no WhatsApp link |
+| CMP-MSKB-048 | "words a refused address in the staff vocabulary, inside the drawer" (the new-request drawer) | `invalid_email` → "כתובת הדוא״ל אינה תקינה" as an alert in the drawer |
+| CMP-MSKB-049 | "only shows the link when the staff member will copy it themselves" (the new-request drawer) | `sendInvite: false`, no address; the link; no WhatsApp link, no mail status |
+| CMP-MSKB-050 | "offers the caller's open leads of the agency, fills what is empty, and sends the lead's id" (the new-request drawer) | Options: ללא שיוך and the open agency-1 lead only; choosing it fills the name and the mobile; `create` carries `leadId` |
+| CMP-MSKB-051 | "reads the leads only once the drawer opens" (the new-request drawer) | No leads read until "+ בקשה חדשה" |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 
