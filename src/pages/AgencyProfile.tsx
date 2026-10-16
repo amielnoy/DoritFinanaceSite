@@ -68,7 +68,7 @@ export default function AgencyProfile() {
           <h1 className="font-heading text-2xl md:text-3xl mt-1">פרטי הסוכנות{name ? ` — ${name}` : ""}</h1>
         </div>
       </header>
-      <main className="max-w-[900px] mx-auto px-6 py-8">
+      <main id="main" className="max-w-[900px] mx-auto px-6 py-8">
         {profile.isLoading ? <p className="text-muted-foreground">טוען…</p> : null}
         {profile.isError ? (
           <p role="alert" className="text-destructive">

@@ -237,7 +237,7 @@ export default function Leads() {
         </div>
       </header>
 
-      <main className="max-w-[1200px] mx-auto px-6 py-8">
+      <main id="main" className="max-w-[1200px] mx-auto px-6 py-8">
         {assigns ? <LeadTrackingPanel /> : null}
 
         {/* תצוגת סיכום סטטוסים */}

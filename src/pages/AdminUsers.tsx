@@ -99,7 +99,7 @@ export default function AdminUsers() {
         </div>
       </header>
 
-      <main className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col gap-5">
+      <main id="main" className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col gap-5">
         <AgencyMembers />
         <div className="flex flex-col gap-3">
           <label className="relative block max-w-md">
