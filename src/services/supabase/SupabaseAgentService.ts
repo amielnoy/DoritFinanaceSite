@@ -134,6 +134,10 @@ export class SupabaseAgentService implements AgentPort {
       // telling the visitor it failed, or they send again what was already done.
       if (e instanceof TimedOut) {
         const ended = await this.recover(local);
+        if (ended === "running") {
+          // Still running when the window closed: received, not failed, so it stays on screen (review 2026-10-15).
+          throw new AgentLimitError("still_processing");
+        }
         if (ended === "saved") {
           this.publish(local, [...local.messages, { role: "assistant", content: LEAD_SAVED_WITHOUT_REPLY, signal: "lead_saved", replyMissing: true }]);
           return;
@@ -151,16 +155,18 @@ export class SupabaseAgentService implements AgentPort {
 
   /**
    * How the turn that outlived the wait ended, asked every STATUS_POLL_MS for
-   * STATUS_RECOVERY_MS: its reply, "saved" for a lead saved with no reply, or
-   * null when it ended with neither — or never stopped running in the window.
+   * STATUS_RECOVERY_MS: its reply, "saved" for a lead saved with no reply,
+   * "running" when the last answer in the window still said busy, or null when
+   * it ended with neither, or no answer came.
    * A status request that fails is asked again; it runs no turn. It names the
    * turn it asks about, and an answer about any other turn — one that never
    * started, or an earlier reply — is not this one's (review 2026-10-15).
    */
-  private async recover(local: LocalConversation): Promise<{ reply: string; leadSaved: boolean } | "saved" | null> {
+  private async recover(local: LocalConversation): Promise<{ reply: string; leadSaved: boolean } | "saved" | "running" | null> {
     const turn = local.turns + 1;
     const body = { agent: local.agent, conversationId: local.serverId, token: local.token, status: true, turn };
     const deadline = Date.now() + STATUS_RECOVERY_MS;
+    let running = false;
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, STATUS_POLL_MS));
       const { data, error } = await this.invokeWithin(body, STATUS_REQUEST_TIMEOUT_MS).catch(() => ({
@@ -172,16 +178,17 @@ export class SupabaseAgentService implements AgentPort {
       if (error || !data) continue;
       local.opened = true;
       const answer = data as { busy?: boolean; leadSaved?: boolean; turns?: unknown; last?: { role?: string; content?: unknown } | null };
-      if (answer.busy) continue;
-      // The server's count, so the next status request names the right turn.
+      // The server's count, so the next request names the right turn.
       if (typeof answer.turns === "number") local.turns = answer.turns;
+      running = answer.busy === true;
+      if (running) continue;
       if (answer.turns !== turn) return null;
       if (answer.last?.role === "assistant" && typeof answer.last.content === "string") {
         return { reply: answer.last.content, leadSaved: answer.leadSaved === true };
       }
       return answer.leadSaved === true ? "saved" : null;
     }
-    return null;
+    return running ? "running" : null;
   }
 
   private publish(local: LocalConversation, messages: AgentMessage[]): void {

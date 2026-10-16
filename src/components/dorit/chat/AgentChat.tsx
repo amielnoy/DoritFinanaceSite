@@ -143,6 +143,8 @@ const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
   conversation_closed: "השיחה הזו הסתיימה. אפשר להתחיל שיחה חדשה.",
   // Raised only by the chat function's adapter: one message per conversation at a time.
   busy: "הודעה קודמת עדיין בטיפול — רגע אחד.",
+  // Raised only by the chat function's adapter: received, its answer still being written.
+  still_processing: "ההודעה התקבלה ועדיין בטיפול. התשובה מתעכבת — אפשר לכתוב שוב בעוד דקה.",
 };
 
 /**
@@ -427,8 +429,9 @@ export default function AgentChat({
       // transcript only by way of the server echoing it, so a failed send
       // leaves it nowhere at all: cleared from the input, absent from the
       // conversation, one line of apology in its place. That is the difference
-      // between "try again" and "this site ate what I wrote".
-      setInput(text);
+      // between "try again" and "this site ate what I wrote". A message still
+      // being answered did arrive, and stays in the transcript: not handed back.
+      if (!(e instanceof AgentLimitError && e.reason === "still_processing")) setInput(text);
       if (e instanceof AgentUnavailableError) {
         showChannelsOnly();
         return;

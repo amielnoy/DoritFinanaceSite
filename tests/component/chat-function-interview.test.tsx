@@ -58,6 +58,7 @@ const { AGENTS } = await import("@/config/agents");
 const { CHAT_FUNCTION_CONSENT_POINTS, CHAT_FUNCTION_CONSENT_VERSION, CONSENT, CONSENT_VERSION, HUMAN_HANDOFF } = await import("@/config/compliance");
 const { LEAD_SAVED_WITHOUT_REPLY } = await import("@/services/agent-errors");
 const { leadEvents } = await import("@/lib/analytics");
+const { CHAT_REQUEST_TIMEOUT_MS, STATUS_POLL_MS, STATUS_RECOVERY_MS } = await import("@/services/supabase/SupabaseAgentService");
 
 async function startAndSend(text = "שלום") {
   const user = userEvent.setup();
@@ -213,5 +214,31 @@ describe("the no-reply watchdog", () => {
     expect(base44Send).toHaveBeenCalledTimes(1);
     await act(async () => vi.advanceTimersByTimeAsync(NO_REPLY_TIMEOUT_MS));
     expect(screen.getByText(/לא התקבלה כראוי/)).toBeTruthy();
+  });
+});
+
+/**
+ * The adapter stops asking how a timed-out turn ended after its recovery
+ * window; a turn still running then is received, not failed (review
+ * 2026-10-15, item 14).
+ */
+describe("a turn still running when the adapter stops waiting", () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("says the message is still being answered, keeps it in the transcript, and does not hand it back", async () => {
+    invoke.mockImplementation(async (_n: string, { body }: { body: Record<string, unknown> }) =>
+      body.status === true
+        ? { data: { ok: true, busy: true, status: "open", leadSaved: false, turns: 1, last: null }, error: null }
+        : new Promise(() => undefined),
+    );
+    await startAndSendSync(AGENTS.needsInterview, "מה עם הפנסיה שלי?");
+    await act(async () => vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS + STATUS_POLL_MS));
+    expect(screen.getByText(/ההודעה התקבלה ועדיין בטיפול/)).toBeTruthy();
+    expect(screen.getByText("מה עם הפנסיה שלי?")).toBeTruthy();
+    expect((screen.getByPlaceholderText("כתבו כאן…") as HTMLInputElement).value).toBe("");
   });
 });

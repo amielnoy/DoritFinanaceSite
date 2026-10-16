@@ -968,7 +968,8 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHADAPTER-017 | "shows the reply the turn produced once it finished, instead of a failure" | After the 40 s wait, `status` polled every 3 s, naming `turn: 2`: busy, then the reply with `lead_saved` — shown, not a failure |
 | UNIT-CHADAPTER-018 | "says the details were saved when the turn saved the lead but left no reply" | `LEAD_SAVED_WITHOUT_REPLY`, `replyMissing` |
 | UNIT-CHADAPTER-019 | "fails as before when the turn ended with neither a reply nor a saved lead" | `AgentUnavailableError`; the message taken off the screen |
-| UNIT-CHADAPTER-020 | "stops asking after the recovery window and fails" | At most 60 s / 3 s requests |
+| UNIT-CHADAPTER-020 | "says the message is still being answered when the window ends with the turn still running, and keeps it on screen" | At most 60 s / 3 s requests, all busy: `AgentLimitError("still_processing")`; the visitor's line stays in the transcript (review 2026-10-15, item 14) |
+| UNIT-CHADAPTER-025 | "fails, not 'still processing', when the window ends with no answer at all" | Every status request fails: `AgentUnavailableError` |
 | UNIT-CHADAPTER-021 | "recovers a first message too: it asks about turn 1 of the conversation it named" | Status request `{conversationId, token, status: true, turn: 1}`; the reply is shown, not a failure (review 2026-10-15, item 12) |
 | UNIT-CHADAPTER-024 | "stops asking at once when the first message never opened the conversation" | A 403 status answer ends recovery: two requests in all, `AgentUnavailableError` |
 | UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |

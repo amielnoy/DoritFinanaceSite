@@ -313,10 +313,27 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
     expect(cb.mock.calls.at(-1)![0]).toEqual([{ role: "user", content: "היי" }, { role: "assistant", content: "שלום" }]);
   });
 
-  it("stops asking after the recovery window and fails", async () => {
-    const { outcome, asked } = await secondMessage([{ busy: true }]);
-    expect(outcome).toBeInstanceOf(AgentUnavailableError);
+  it("says the message is still being answered when the window ends with the turn still running, and keeps it on screen", async () => {
+    const { outcome, asked, cb } = await secondMessage([{ busy: true }]);
+    expect(outcome).toBeInstanceOf(AgentLimitError);
+    expect(outcome.reason).toBe("still_processing");
     expect(asked.length).toBeLessThanOrEqual(Math.ceil(STATUS_RECOVERY_MS / STATUS_POLL_MS));
+    expect(cb.mock.calls.at(-1)![0]).toEqual([{ role: "user", content: "היי" }, { role: "assistant", content: "שלום" }, { role: "user", content: "0521234567" }]);
+  });
+
+  it("fails, not 'still processing', when the window ends with no answer at all", async () => {
+    vi.useFakeTimers();
+    let n = 0;
+    const invoke: Invoke = async (_name, { body }) => {
+      if (body.status === true) return { data: null, error: { message: "network" } };
+      return ++n === 1 ? { data: { ok: true, conversationId: "srv-1", turn: 1, reply: "שלום" }, error: null } : new Promise(() => undefined);
+    };
+    const svc = new SupabaseAgentService(client(invoke), () => "l");
+    const conv = await svc.start("needs_interview", META);
+    await svc.send(conv, "היי");
+    const sending = svc.send(conv, "שוב").then(() => "ok", (e) => e);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS + STATUS_POLL_MS);
+    expect(await sending).toBeInstanceOf(AgentUnavailableError);
   });
 
   it("recovers a first message too: it asks about turn 1 of the conversation it named", async () => {
