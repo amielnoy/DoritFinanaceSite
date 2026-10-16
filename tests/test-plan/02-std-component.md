@@ -846,3 +846,14 @@ Review 2026-10-15, item 17. The `escalated` and `partial` chips and the disabled
 |---|---|---|
 | CMP-ATTN-001 | "counts the new and the escalated leads together" | One new, one escalated, one contacted, one partial: the card reads 2 |
 | CMP-ATTN-002 | "shows the new and the escalated leads when clicked, and no other" | After the click: the new and the escalated lead; not the contacted or the partial one |
+
+### 4.48 The testimonials' writes — `tests/component/testimonials.test.tsx` (new cases)
+
+Review 2026-10-15, item 18. Dorit's controls in the home page's testimonials say what failed, in a `role="alert"`, and ask before a delete, as the leads and blog screens do. The services' content-admin and upload methods are spied on, so these cases hold on either backend.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-TESTIM-ADM-001 | "asks before deleting, and deletes nothing when the answer is no" (the admin's writes) | `confirm("למחוק את ההמלצה?")`; no → no delete; yes → `removeTestimonial("t1")` |
+| CMP-TESTIM-ADM-002 | "says so in an alert when a delete fails" (the admin's writes) | `role="alert"`: "ההמלצה לא נמחקה…" |
+| CMP-TESTIM-ADM-003 | "says so in an alert when the picture does not upload, and publishes nothing" (the admin's writes) | `role="alert"`: "התמונה לא הועלתה…"; `createTestimonial` not called |
+| CMP-TESTIM-ADM-004 | "says so in an alert when the testimonial is not saved" (the admin's writes) | `role="alert"`: "ההמלצה לא נשמרה…" |
