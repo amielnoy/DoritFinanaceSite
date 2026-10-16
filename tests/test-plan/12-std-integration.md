@@ -117,6 +117,10 @@ A hand-off that does not reach a person is a regulatory failure, so the limits n
 | INT-SUPPORT-020 | "counts a caller by a hash of the address, and every caller together (review 2026-10-15)" | `support-ip:<64 hex>` (60 an hour), then `support-log` (300 an hour, above the sweep's 40); the address appears in no key |
 | INT-SUPPORT-021..022 | "refuses past the %s limit with 429 and rid, and writes no row" | Either limit: 429 with `rid`; no sheet row |
 
+### 4.2d `submit-claim` — whose address is counted (review 2026-10-15)
+
+`submit-claim-edge.integration.test.ts` "how often" changed. "does not limit a request with no forwarded address" became "limits a request with no address under the one key such callers share": `claim-ip:` + the hash of `no-address`. A new case, "counts the address the gateway appended, not one the client put first", checks `6.6.6.6, 203.0.113.7` → the hash of `203.0.113.7`. The same `clientIp` serves submit-lead, escalate-to-human, log-support-chat, masleka-code and the chat. The `ip &&` guards that skipped a limit without an address are gone.
+
 ### 4.3 `submitLead` — identifiers a visitor volunteered — `INT-LEAD-016/017`
 
 An ID number or card number in a model-written summary is redacted before anyone

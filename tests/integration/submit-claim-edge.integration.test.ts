@@ -214,9 +214,18 @@ describe("submit-claim — how often", () => {
     expect(r.emails.map((e) => e.to)).toContain("ronit@example.com");
   });
 
-  it("does not limit a request with no forwarded address", async () => {
+  it("limits a request with no address under the one key such callers share (review 2026-10-15)", async () => {
+    const { createHash } = await import("node:crypto");
     const r = await invokeEdge("submit-claim", claim);
-    expect(limiterCalls(r).some((f) => String((f.body as { p_key: string }).p_key).startsWith("claim-ip:"))).toBe(false);
+    const key = limiterCalls(r).find((f) => String((f.body as { p_key: string }).p_key).startsWith("claim-ip:"));
+    expect((key!.body as { p_key: string }).p_key).toBe(`claim-ip:${createHash("sha256").update("no-address").digest("hex")}`);
+  });
+
+  it("counts the address the gateway appended, not one the client put first", async () => {
+    const { createHash } = await import("node:crypto");
+    const r = await invokeEdge("submit-claim", claim, { headers: { "x-forwarded-for": "6.6.6.6, 203.0.113.7" } });
+    const key = limiterCalls(r).find((f) => String((f.body as { p_key: string }).p_key).startsWith("claim-ip:"));
+    expect((key!.body as { p_key: string }).p_key).toBe(`claim-ip:${createHash("sha256").update("203.0.113.7").digest("hex")}`);
   });
 });
 

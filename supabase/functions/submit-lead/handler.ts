@@ -243,7 +243,7 @@ export async function handler(req: Request): Promise<Response> {
     // A public, no-sign-in door: one caller may not fill the table, as
     // submit-claim's claim-ip. The limiter stores a hash, never the address.
     const ip = clientIp(req);
-    if (ip && !(await withinLimit(log, rid, `lead-ip:${await sha256Hex(ip)}`, 3600, LEADS_PER_IP_PER_HOUR))) {
+    if (!(await withinLimit(log, rid, `lead-ip:${await sha256Hex(ip)}`, 3600, LEADS_PER_IP_PER_HOUR))) {
       log('warn', 'request.rejected', { rid, reason: 'rate_limited', source: source || 'quick' });
       return Response.json(
         { error: 'התקבלו כמה פניות ברצף. אפשר לנסות שוב בעוד שעה, או לפנות לדורית ישירות.', rid },

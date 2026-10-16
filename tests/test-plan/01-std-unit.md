@@ -1624,3 +1624,17 @@ The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). 
 | UNIT-SLA-ASG-002 | "counts open leads nobody works, by ids only" | `select('id')`, `is('assigned_user_id', null)`, `not('status','eq','closed')` |
 
 `MaslekaPort.myRole` is gone (the role is the agency's, `services.agency.myRole`): its three cases are removed. `UnconfiguredMaslekaService` "is never available"; the lazy front delegates `masleka.list` and `agency.myRole`. In `admin-users.test.ts` the operator reads "מפעיל הפלטפורמה" and an agency Admin "מנהל/ת", and the search finds each by their own label.
+
+### 4.66 Whose address a limiter counts — `tests/unit/edge-client-ip.test.ts`, `tests/unit/chat-handler.test.ts` (new cases)
+
+`_shared/guard.ts`'s `clientIp` (review 2026-10-15). A client sets `x-forwarded-for` itself, and the gateway appends the real address after it. So the leftmost entry is never trusted, and a caller with no address shares one key instead of escaping the limit.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CIP-001 | "takes the platform's cf-connecting-ip first" | `cf-connecting-ip` over any forwarded entry |
+| UNIT-CIP-002 | "otherwise takes the last x-forwarded-for entry — the one the gateway appended" | `6.6.6.6, 203.0.113.7` → `203.0.113.7`; spaces and empty entries ignored |
+| UNIT-CIP-003 | "gives a caller with no address the one key they all share, never nothing" | `no-address` for no header, a blank list, or a blank cf header |
+| UNIT-CIP-004 | "keeps at most 64 characters" | 64 |
+| UNIT-CHHANDLER-070 | "answers 429 when one address opens too many conversations, counted by its hash (review 2026-10-15)" | `chat-new-ip:<64 hex>` (20 an hour, beside the global `chat-new`); the address appears in no key |
+| UNIT-CHHANDLER-071 | "hands the tools the address it resolved — the gateway's, never one the visitor put first" | The tool context's `forwardedFor` is `203.0.113.7` |
+

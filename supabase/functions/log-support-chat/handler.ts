@@ -64,7 +64,7 @@ export async function handler(req: Request): Promise<Response> {
     // flood from many, may not fill it.
     const ip = clientIp(req);
     const allowed =
-      (!ip || (await withinLimit(log, rid, `support-ip:${await sha256Hex(ip)}`, 3600, ROWS_PER_IP_PER_HOUR))) &&
+      (await withinLimit(log, rid, `support-ip:${await sha256Hex(ip)}`, 3600, ROWS_PER_IP_PER_HOUR)) &&
       (await withinLimit(log, rid, 'support-log', 3600, ROWS_PER_HOUR));
     if (!allowed) {
       log('warn', 'request.rejected', { rid, reason: 'rate_limited' });

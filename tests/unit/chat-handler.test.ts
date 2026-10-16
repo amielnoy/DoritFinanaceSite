@@ -225,6 +225,23 @@ describe("limits", () => {
     expect((await json(await chat(post(first())))).status).toBe(429);
   });
 
+  it("answers 429 when one address opens too many conversations, counted by its hash (review 2026-10-15)", async () => {
+    const allow = vi.fn(async (_rid: string, key: string) => !key.startsWith("chat-new-ip:"));
+    const { chat } = setup({ allow });
+    expect((await json(await chat(post(first(), { "x-forwarded-for": "6.6.6.6, 203.0.113.7" })))).status).toBe(429);
+    const key = allow.mock.calls.map((c) => c[1]).find((k) => k.startsWith("chat-new-ip:"))!;
+    expect(key).toMatch(/^chat-new-ip:[0-9a-f]{64}$/);
+    expect(key).not.toContain("203.0.113.7");
+  });
+
+  it("hands the tools the address it resolved — the gateway's, never one the visitor put first", async () => {
+    const runTool = vi.fn(async (_n: string, _i: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolOutcome> =>
+      ({ name: "submitLead", status: "ok", forModel: "{}", isError: false }));
+    const { chat } = setup({ runTool }, [toolUse("submitLead", {}), text("נשמר.")]);
+    await chat(post(first(), { "x-forwarded-for": "6.6.6.6, 203.0.113.7" }));
+    expect(runTool.mock.calls[0][2].forwardedFor).toBe("203.0.113.7");
+  });
+
   it("lets an evaluation run past both limits", async () => {
     const { chat, store } = setup({ allow: vi.fn(async () => false) });
     const { status } = await json(await chat(post(first(), { "x-chat-eval": "eval-secret" })));

@@ -43,6 +43,8 @@ export const PER_IP_PER_MINUTE = 20;
 /** Status requests, apart from messages: the page polls one turn every few seconds. */
 export const STATUS_PER_IP_PER_MINUTE = 60;
 export const NEW_CONVERSATIONS_PER_HOUR = 300;
+/** New conversations per caller, beside the global cap: one address may not open them all. */
+export const NEW_CONVERSATIONS_PER_IP_PER_HOUR = 20;
 /**
  * How long a turn holds its conversation. The 25 s budget covers only the
  * model calls; tools run outside it, and saving a lead is several sequential
@@ -124,7 +126,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       // claims nothing, and is limited apart from messages.
       if (input.status === true) {
         const statusIp = clientIp(req);
-        if (statusIp && !(await deps.allow(rid, `chat-status-ip:${await sha256Hex(statusIp)}`, 60, STATUS_PER_IP_PER_MINUTE))) {
+        if (!(await deps.allow(rid, `chat-status-ip:${await sha256Hex(statusIp)}`, 60, STATUS_PER_IP_PER_MINUTE))) {
           return refuse(429, 'rate_limited');
         }
         const id = str(input.conversationId);
@@ -148,7 +150,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
 
       const evalMode = deps.evalToken !== '' && req.headers.get('x-chat-eval') === deps.evalToken;
       const ip = clientIp(req);
-      if (!evalMode && ip && !(await deps.allow(rid, `chat-ip:${await sha256Hex(ip)}`, 60, PER_IP_PER_MINUTE))) {
+      if (!evalMode && !(await deps.allow(rid, `chat-ip:${await sha256Hex(ip)}`, 60, PER_IP_PER_MINUTE))) {
         return refuse(429, 'rate_limited');
       }
       if (!deps.model) {
@@ -167,6 +169,9 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
         const consentAt = str(input.consentAt);
         if (!consentVersion || consentVersion.length > MAX_CONSENT_VERSION_CHARS || Number.isNaN(Date.parse(consentAt))) {
           return refuse(400, 'consent_required');
+        }
+        if (!evalMode && !(await deps.allow(rid, `chat-new-ip:${await sha256Hex(ip)}`, 3600, NEW_CONVERSATIONS_PER_IP_PER_HOUR))) {
+          return refuse(429, 'rate_limited');
         }
         if (!evalMode && !(await deps.allow(rid, 'chat-new', 3600, NEW_CONVERSATIONS_PER_HOUR))) {
           return refuse(429, 'rate_limited');
@@ -231,7 +236,9 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           agent,
           origin: req.headers.get('origin'),
           userAgent: req.headers.get('user-agent'),
-          forwardedFor: req.headers.get('x-forwarded-for'),
+          // The address the chat already resolved (clientIp), so the lead and
+          // hand-off functions count this visitor, not a header they could forge.
+          forwardedFor: ip,
           evalMode,
         };
 

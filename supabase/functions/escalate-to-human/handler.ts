@@ -71,7 +71,7 @@ export async function handler(req: Request): Promise<Response> {
     const reasonKnown = Object.prototype.hasOwnProperty.call(REASONS, reason);
     const urgent = reasonKnown && URGENT.has(reason);
     const ip = clientIp(req);
-    if (!urgent && ip && !(await withinLimit(log, rid, `escalate-ip:${await sha256Hex(ip)}`, 3600, HANDOFFS_PER_IP_PER_HOUR))) {
+    if (!urgent && !(await withinLimit(log, rid, `escalate-ip:${await sha256Hex(ip)}`, 3600, HANDOFFS_PER_IP_PER_HOUR))) {
       log('warn', 'request.rejected', { rid, reason: 'rate_limited' });
       return Response.json(
         { error: 'התקבלו כמה בקשות ברצף. אפשר לנסות שוב בעוד שעה, או לפנות לדורית ישירות.', rid },

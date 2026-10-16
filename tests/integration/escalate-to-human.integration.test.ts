@@ -478,7 +478,8 @@ describe("Edge escalate-to-human — what it refuses and what it holds back", ()
 
   it("counts one hand-off once, not once per recipient", async () => {
     const r = await invokeEdge("escalate-to-human", handoff);
-    const checks = r.fetches.filter((f) => f.url.endsWith("/rpc/allow_submission"));
+    // The caller's own limit is asked once too (escalate-ip); the staff cap once.
+    const checks = r.fetches.filter((f) => f.url.endsWith("/rpc/allow_submission") && (f.body as { p_key: string }).p_key === "escalate:notify");
     expect(checks).toHaveLength(1);
     expect(checks[0].body).toMatchObject({ p_key: "escalate:notify", p_window_seconds: 3600, p_max: 60 });
   });
