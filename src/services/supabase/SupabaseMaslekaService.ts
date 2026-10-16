@@ -15,14 +15,12 @@ import {
   type MaslekaRequest,
   type MaslekaStatus,
   type NewMaslekaRequest,
-  type StaffRole,
 } from "../ports";
 
 type PostgrestError = { message: string; code?: string } | null;
 
 /** Just the calls this adapter makes — narrowed for the reason SupabaseAuthClient is. */
 export interface SupabaseMaslekaClient {
-  rpc(fn: "my_staff_role"): PromiseLike<{ data: unknown; error: PostgrestError }>;
   rpc(
     fn: "clearinghouse_publish" | "clearinghouse_unpublish" | "clearinghouse_mark_answers_seen",
     args: Record<string, unknown>,
@@ -78,7 +76,6 @@ export const MASLEKA_COLUMNS =
 /** What the board shows; expired and cancelled requests leave it. */
 export const OPEN_STATUSES: readonly MaslekaStatus[] = ["invited", "code_received", "submitted", "completed"];
 
-const ROLES = new Set<string>(["admin", "owner", "agent", "staff"]);
 const REASONS = new Set<string>([
   "disabled", "link_invalid", "bad_id", "bad_code", "already_submitted", "rate_limited", "unauthorized", "forbidden",
   "not_found", "not_available", "invalid", "invalid_name", "invalid_email", "unavailable", "not_saved", "failed",
@@ -152,12 +149,6 @@ export class SupabaseMaslekaService implements MaslekaPort {
 
   async submitCode(token: string, code: string, idNumber: string): Promise<void> {
     await this.call("masleka-code", { token, code, idNumber });
-  }
-
-  async myRole(): Promise<StaffRole | null> {
-    const { data, error } = await this.client.rpc("my_staff_role");
-    if (error) throw new MaslekaError("failed");
-    return typeof data === "string" && ROLES.has(data) ? (data as StaffRole) : null;
   }
 
   async list(): Promise<MaslekaRequest[]> {

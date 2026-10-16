@@ -56,6 +56,15 @@ export class Base44LeadAdminService implements LeadAdminPort {
     return (await this.list()).filter((lead) => lead.status === "new").length;
   }
 
+  /** Base44 has no agencies or assignment: the rollback path has one admin and no queue. */
+  async assign(): Promise<{ mailed: boolean }> {
+    throw new Error("שיוך פניות זמין רק עם Supabase.");
+  }
+
+  async countUnassigned(): Promise<number> {
+    return 0;
+  }
+
   private async write(payload: Record<string, unknown>): Promise<void> {
     const receipt = await invokeFunction<{ ok?: boolean; error?: string; rid?: string }>(
       this.client,

@@ -60,6 +60,9 @@ vi.mock("@/hooks/useAdmin", () => ({
   useRemoveArticle: () => ({ mutate: h.remove, isError: false }),
 }));
 vi.mock("@/services", () => ({ services: { uploads: { upload: vi.fn() } } }));
+// The person's role in the agency (src/hooks/useAgency.ts): full access unless a case narrows it.
+const role = vi.hoisted(() => ({ role: "owner", isOperator: true }) as import("../helpers/agency-role-mock").RoleState);
+vi.mock("@/hooks/useAgency", async () => (await import("../helpers/agency-role-mock")).agencyHookMock(role));
 
 const { default: BlogAdmin } = await import("@/pages/BlogAdmin");
 

@@ -1,9 +1,6 @@
 import type { LeadAdminPort, LeadRecord, LeadStatus, TranscriptLine } from "../ports";
-import {
-  CLAIM_DOCUMENT_REF_PREFIX,
-  CLAIM_DOCUMENTS_BUCKET,
-  type SupabaseStorageClient,
-} from "./SupabaseUploadService";
+import type { ContentFunctionsClient } from "./EdgeContentAdminService";
+import { CLAIM_DOCUMENT_REF_PREFIX } from "./SupabaseUploadService";
 import {
   fetchRows,
   toPortRow,
@@ -14,7 +11,7 @@ import {
 /** The port's fields. Not `*`: a lead row also carries the visitor's summary,
  *  profile and consent record, none of which this list shows, and personal data
  *  the screen does not need stays out of the browser. */
-const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at";
+const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id";
 
 /** Leads per read; PostgREST's own default cap is 1,000. */
 export const LEAD_PAGE = 1000;
@@ -23,14 +20,14 @@ export const LEAD_LIST_MAX = 20_000;
 
 const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת";
 
-/** How long a document link from the leads screen opens the file: long enough to open it, not to keep it. */
-const DOCUMENT_LINK_SECONDS = 5 * 60;
-
 /**
- * The admin's leads, read and written in Supabase under her own session.
+ * The agency's leads, read and written in Supabase under the person's own session.
  *
  * `leads_read_admin`, `leads_update_admin` and `leads_delete_admin` are the gate:
- * `can_see(agency_id) or is_admin()`. No backend function is involved.
+ * Admin+ in the lead's agency, or the User it is assigned to (who may change
+ * its status but not delete it), or the platform operator. Assigning and a
+ * claim document's link go through Edge Functions (assign-lead,
+ * claim-document-link), which ask the same rules under the same session.
  *
  * Leads are handed out under their Supabase `id`, not `base44_id ?? id` as
  * `toPortRow` does for content — the writes below act on `id`, and claims
@@ -39,8 +36,22 @@ const DOCUMENT_LINK_SECONDS = 5 * 60;
 export class SupabaseLeadAdminService implements LeadAdminPort {
   constructor(
     private readonly client: SupabaseLeadTableClient,
-    private readonly storage: SupabaseStorageClient | null = null,
+    private readonly functions: ContentFunctionsClient | null = null,
+    private readonly accessToken: () => Promise<string | null> = async () => null,
   ) {}
+
+  /** An Edge Function as the signed-in person; its refusal in its own words. */
+  private async call(name: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const token = await this.accessToken();
+    if (!token || !this.functions) throw new Error("נדרשת התחברות.");
+    const { data, error } = await this.functions.functions.invoke(name, { body, headers: { Authorization: `Bearer ${token}` } });
+    if (error) {
+      const res = error.context instanceof Response ? error.context : null;
+      const answer = res ? ((await res.json().catch(() => null)) as { error?: string } | null) : null;
+      throw new Error(answer?.error ?? `הפעולה נכשלה (${res?.status ?? "ללא תשובה"}).`);
+    }
+    return (data ?? {}) as Record<string, unknown>;
+  }
 
   /**
    * Every lead, newest first, a page at a time: "כל הפניות", the counts and
@@ -69,19 +80,29 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
   }
 
   /**
-   * A storage reference signed for five minutes under the admin's session —
-   * `claim_documents_read_admin` is what allows it. Anything else (a Base44
-   * file URL from before the switch) is returned as it is.
+   * A storage reference signed for five minutes by claim-document-link, for
+   * whoever may see the lead it belongs to. Anything else (a Base44 file URL
+   * from before the switch) is returned as it is.
    */
-  async documentLink(ref: string): Promise<string> {
+  async documentLink(ref: string, leadId: string): Promise<string> {
     if (!ref.startsWith(CLAIM_DOCUMENT_REF_PREFIX)) return ref;
-    if (!this.storage) throw new Error("אין חיבור לאחסון המסמכים");
-    const path = ref.slice(CLAIM_DOCUMENT_REF_PREFIX.length);
-    const { data, error } = await this.storage.storage
-      .from(CLAIM_DOCUMENTS_BUCKET)
-      .createSignedUrl(path, DOCUMENT_LINK_SECONDS);
-    if (error || !data) throw new Error(`לא ניתן לפתוח את המסמך: ${error?.message ?? "no data"}`);
-    return data.signedUrl;
+    const answer = await this.call("claim-document-link", { leadId, path: ref.slice(CLAIM_DOCUMENT_REF_PREFIX.length) });
+    if (typeof answer.url !== "string" || !answer.url) throw new Error("לא ניתן לפתוח את המסמך");
+    return answer.url;
+  }
+
+  async assign(leadId: string, userId: string | null): Promise<{ mailed: boolean }> {
+    const answer = await this.call("assign-lead", { leadId, userId });
+    return { mailed: answer.mailed === true };
+  }
+
+  /** Open (not closed) leads with nobody on them; capped at a thousand, as countNew. */
+  async countUnassigned(): Promise<number> {
+    const rows = await fetchRows(
+      this.client.from("leads").select("id").is("assigned_user_id", null).not("status", "eq", "closed").limit(1000),
+      "leads",
+    );
+    return rows.length;
   }
 
   /**

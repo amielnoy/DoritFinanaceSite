@@ -1,16 +1,19 @@
 /**
- * "הוספת משתמש" on /admin/users: the admin adds someone to an organization,
- * and they are told by mail how to come in.
+ * "הוספת משתמש" on /admin/users: an agency's Admin or Owner (or the platform
+ * operator) adds someone to the agency, and they are told by mail how to come in.
  *
- * POST { email, orgId, role } with the admin's session on Authorization.
- *   1. The admin gate (_shared/admin.ts) — a session whose profile is admin.
- *   2. The organization must exist; the role is owner, agent or staff.
+ * POST { email, orgId, role } with the caller's session on Authorization.
+ *   1. The session (_shared/staff.ts), then at least Admin in that agency.
+ *      An Admin invites Users only; the database's set_member_role has the
+ *      last word on who may grant what.
+ *   2. The organization must exist; the role is owner, admin or user.
  *   3. The account: the current Auth owner with an application profile, or a new
  *      Supabase Auth account made for it (no password, address confirmed).
  *      Sign-in is Google's: when they sign in with that address, Auth links
  *      the Google identity to this account, so the membership is theirs.
- *   4. The membership, upserted: inviting someone already in the organization
- *      changes their role rather than failing.
+ *   4. The membership, through set_member_role under the caller's own session
+ *      (memberships are written only through it): inviting someone already in
+ *      the organization changes their role, by the same rules, rather than failing.
  *   5. The invitation, through dorit-mailer — not Supabase Auth's own invite
  *      mail, whose default sender delivers only to the project's own team.
  *      A mail that does not go is reported (`mailed: false`), never a reason
@@ -18,18 +21,18 @@
  *
  * Logged by ids alone: the invitee's address is personal and stays out.
  */
-import { requireAdminSession } from '../_shared/admin.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { isEmail } from '../_shared/guard.ts';
 import { buildClientHtml } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, sendMail } from '../_shared/mail.ts';
-import { callRpc, createAuthUser, selectRows, upsertRow } from '../_shared/rest.ts';
+import { callRpc, createAuthUser, refusalReason, selectRows } from '../_shared/rest.ts';
+import { allowRole, sessionCaller } from '../_shared/staff.ts';
 
 const FN = 'invite-user';
 const log = createLog(FN);
 
-export const ROLES: Record<string, string> = { owner: 'בעלים', agent: 'סוכן/ת', staff: 'צוות' };
+export const ROLES: Record<string, string> = { owner: 'בעלים', admin: 'מנהל/ת', user: 'משתמש/ת' };
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Where a new member lands: the clearinghouse board is what an agency member opens. */
 export const SIGN_IN_URL = 'https://govari-fin.co.il/login?returnTo=/admin/masleka';
@@ -46,9 +49,9 @@ export async function handler(req: Request): Promise<Response> {
   try {
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-    const gate = await requireAdminSession(req, rid, log);
-    if (!gate.ok) return json({ error: gate.error }, gate.status);
-    const sessionToken = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    const session = await sessionCaller(req, rid, log);
+    if (!session.ok) return json({ error: session.error }, session.status);
+    const sessionToken = session.token;
 
     const body = (await req.json().catch(() => null)) as { email?: unknown; orgId?: unknown; role?: unknown } | null;
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
@@ -57,6 +60,15 @@ export async function handler(req: Request): Promise<Response> {
     if (!isEmail(email)) return json({ error: 'כתובת הדוא״ל אינה תקינה.' }, 400);
     if (!(role in ROLES)) return json({ error: 'התפקיד אינו מוכר.' }, 400);
     if (!UUID_PATTERN.test(orgId)) return json({ error: 'הארגון אינו מוכר.' }, 400);
+
+    const gate = await allowRole(session, orgId, 'admin', rid, log);
+    if (!gate.ok) return json({ error: gate.error }, gate.status);
+    // Checked again by set_member_role; asked here too, so an Admin's refused
+    // grant does not leave an Auth account behind for an address nobody added.
+    if (!session.isOperator && gate.role !== 'owner' && role !== 'user') {
+      log('warn', 'invite.grant_refused', { rid, role });
+      return json({ error: 'מנהל/ת יכול/ה להוסיף משתמשים בלבד.' }, 403);
+    }
 
     // Tenant tables deliberately revoke service_role. Use the verified admin's
     // RLS policies, for the organization read AND the membership write.
@@ -81,7 +93,22 @@ export async function handler(req: Request): Promise<Response> {
       created = true;
     }
 
-    await upsertRow('memberships', { user_id: userId, agency_id: orgId, role }, 'user_id,agency_id', sessionToken);
+    // As the caller: set_member_role decides whether they may grant this role
+    // to this person, and refuses to demote an agency's last Owner.
+    try {
+      await callRpc('set_member_role', { p_agency_id: orgId, p_user_id: userId, p_role: role }, sessionToken);
+    } catch (e) {
+      const why = refusalReason(e);
+      if (why === 'forbidden') {
+        log('warn', 'invite.grant_refused', { rid, role, created });
+        return json({ error: 'אין לך הרשאה לתת את התפקיד הזה.' }, 403);
+      }
+      if (why === 'last_owner') {
+        log('warn', 'invite.last_owner', { rid, created });
+        return json({ error: 'לארגון חייב להישאר בעלים אחד לפחות.' }, 409);
+      }
+      throw e;
+    }
     log('info', 'invite.member', { rid, userId, orgId, role, created });
 
     let mailed = true;

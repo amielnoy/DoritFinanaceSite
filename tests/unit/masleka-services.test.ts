@@ -83,21 +83,6 @@ describe("SupabaseMaslekaService — the client's page", () => {
 });
 
 describe("SupabaseMaslekaService — the staff board", () => {
-  it("asks the database for the caller's role", async () => {
-    const { service, calls } = fake({ rpc: { data: "owner", error: null } });
-    expect(await service.myRole()).toBe("owner");
-    expect(calls).toContainEqual(["rpc", "my_staff_role"]);
-  });
-
-  it("knows no role for null or an unknown answer", async () => {
-    expect(await fake({ rpc: { data: null, error: null } }).service.myRole()).toBeNull();
-    expect(await fake({ rpc: { data: "superuser", error: null } }).service.myRole()).toBeNull();
-  });
-
-  it("fails rather than guessing when the role cannot be read", async () => {
-    await expect(fake({ rpc: { data: null, error: { message: "boom" } } }).service.myRole()).rejects.toMatchObject({ reason: "failed" });
-  });
-
   it("reads the open requests by the granted columns only, newest first", async () => {
     const row = {
       id: "r1", client_name: "רונית מזרחי", contact_email: null, status: "code_received", lead_id: null,
@@ -207,11 +192,10 @@ describe("SupabaseMaslekaService — the staff board", () => {
 });
 
 describe("UnconfiguredMaslekaService", () => {
-  it("is never available and gives nobody a role", async () => {
+  it("is never available", async () => {
     const service = new UnconfiguredMaslekaService();
     await expect(service.submitCode("t", "c", "i")).rejects.toMatchObject({ reason: "unavailable" });
     await expect(service.list()).rejects.toMatchObject({ reason: "unavailable" });
-    expect(await service.myRole()).toBeNull();
   });
 });
 

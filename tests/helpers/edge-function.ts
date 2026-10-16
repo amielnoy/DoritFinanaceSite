@@ -32,8 +32,28 @@ export interface MaslekaFake {
   requests?: Record<string, unknown>[];
   /** Bearer token → the user id `GET /auth/v1/user` answers; any other token gets Auth's own refusal (403 bad_jwt). */
   sessions?: Record<string, string>;
-  /** User id → what `staff_role` answers; absent means null (no membership). */
+  /**
+   * User id → their agency role ('owner' | 'admin' | 'user'): what
+   * `staff_role(user, agency)` answers, for any agency; absent means null (no
+   * membership). It also decides the fakes of `can_see_lead` and
+   * `can_work_request` below.
+   */
   roles?: Record<string, string | null>;
+  /** Users whose profile is the platform operator (`profiles.role = 'admin'`). */
+  operators?: string[];
+  /** User id → their profile e-mail, as `profiles` answers it. */
+  emails?: Record<string, string>;
+  /**
+   * Lead id → the user it is assigned to. `can_see_lead` (asked under the
+   * caller's token) answers true for the operator, an Admin or Owner, and the
+   * assignee; `can_work_request` the same through the request's lead, or the
+   * request's `created_by` when it has none.
+   */
+  assigned?: Record<string, string>;
+  /** Who a lead may be assigned to (the leads trigger's check); anyone else is refused `assignee_not_member`. */
+  members?: string[];
+  /** `set_member_role` and `remove_member` refuse with this reason (as PostgREST relays a function's exception). */
+  refuse?: string;
   /** What `masleka_staff_emails` answers. */
   staffEmails?: string[];
   /** `masleka_staff_emails` answers 500. */
@@ -120,6 +140,8 @@ export interface EdgeInvocation {
   accessLog: Record<string, unknown>[];
   /** Each PATCH to `masleka_requests`: its query string and the fields it set. */
   requestPatches: { query: string; fields: Record<string, unknown> }[];
+  /** Each call to `set_member_role` / `remove_member`: the function, its arguments, and whose session made it. */
+  memberCalls: { fn: string; args: Record<string, unknown>; as: string | null }[];
   callsTo(fragment: string): FetchCall[];
 }
 
@@ -218,7 +240,18 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
   const maslekaRequests: Record<string, unknown>[] = (masleka.requests ?? []).map((r) => ({ ...r }));
   const accessLog: Record<string, unknown>[] = [];
   const requestPatches: { query: string; fields: Record<string, unknown> }[] = [];
+  const memberCalls: { fn: string; args: Record<string, unknown>; as: string | null }[] = [];
   let raced = false;
+  /** Whose session a call carries: the user its bearer token names, or null for the service key. */
+  const sessionOf = (headers: unknown): string | null => {
+    const auth = String((headers as Record<string, string> | undefined)?.Authorization ?? "").replace(/^Bearer /, "");
+    return masleka.sessions?.[auth] ?? null;
+  };
+  /** The operator, or an agency's Admin or Owner: sees every lead (the fakes' one agency). */
+  const seesAll = (user: string | null) =>
+    !!user && ((masleka.operators ?? []).includes(user) || ["admin", "owner"].includes(String(masleka.roles?.[user])));
+  const canSeeLead = (user: string | null, leadId: unknown) =>
+    seesAll(user) || (!!user && masleka.roles?.[user] === "user" && masleka.assigned?.[String(leadId)] === user);
 
   const fetchImpl = async (url: string, init: RequestInit = {}) => {
     const u = String(url);
@@ -301,10 +334,17 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       return new Response("{}", { status: 200 });
     }
     if (u.startsWith(`${SUPABASE_URL}/rest/v1/leads?id=eq.`) && method === "PATCH") {
-      const id = decodeURIComponent(u.split("id=eq.")[1]);
+      const q = new URLSearchParams(u.split("?")[1]);
+      const id = decodeURIComponent(q.get("id")!.replace(/^eq\./, ""));
+      // The leads trigger: an assignee outside the agency is refused.
+      const assignee = parsed?.assigned_user_id;
+      if (masleka.members && typeof assignee === "string" && !masleka.members.includes(assignee)) {
+        return new Response(JSON.stringify({ code: "23503", message: "assignee_not_member", details: null, hint: null }), { status: 409 });
+      }
       leadUpdates.push({ id, fields: parsed });
       const row = stored.find((l) => l.id === id);
       if (row) Object.assign(row, parsed);
+      if (q.get("select")) return new Response(JSON.stringify(row ? [postgrestProject(row, q.get("select"))] : []), { status: 200 });
       return new Response(null, { status: 204 });
     }
     if (u.startsWith(`${SUPABASE_URL}/rest/v1/leads?`) && method === "GET") {
@@ -313,7 +353,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       const eq = (k: string) => q.get(k)?.replace(/^eq\./, "");
       const since = q.get("created_at")?.replace(/^gte\./, ""); // rows older than this bound are not returned; undated rows are kept
       // `id=in.(a,b)`: the clearinghouse's same-contact check reads leads by id.
-      const ids = q.get("id")?.match(/^in\.\((.*)\)$/)?.[1].split(",");
+      const ids = q.get("id")?.match(/^in\.\((.*)\)$/)?.[1].split(",") ?? (eq("id") ? [eq("id")!] : undefined);
       const rows = stored.filter((l) => {
         const at = (l.created_at ?? l.created_date) as string | undefined;
         return (
@@ -349,6 +389,26 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     }
     if (u === `${SUPABASE_URL}/rest/v1/rpc/staff_role` && method === "POST") {
       return new Response(JSON.stringify(masleka.roles?.[parsed.p_user_id] ?? null), { status: 200 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/rpc/can_see_lead` && method === "POST") {
+      return new Response(JSON.stringify(canSeeLead(sessionOf(init.headers), parsed.p_lead_id)), { status: 200 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/rpc/can_work_request` && method === "POST") {
+      const user = sessionOf(init.headers);
+      const r = maslekaRequests.find((x) => x.id === parsed.p_request_id);
+      const ok = !!r && (seesAll(user) || (r.lead_id ? canSeeLead(user, r.lead_id) : !!user && masleka.roles?.[user] === "user" && r.created_by === user));
+      return new Response(JSON.stringify(ok), { status: 200 });
+    }
+    if ((u === `${SUPABASE_URL}/rest/v1/rpc/set_member_role` || u === `${SUPABASE_URL}/rest/v1/rpc/remove_member`) && method === "POST") {
+      memberCalls.push({ fn: u.split("/rpc/")[1], args: parsed, as: sessionOf(init.headers) });
+      if (masleka.refuse) return new Response(JSON.stringify({ code: "P0001", message: masleka.refuse, details: null, hint: null }), { status: 400 });
+      return new Response("null", { status: 200 });
+    }
+    if (u.startsWith(`${SUPABASE_URL}/rest/v1/profiles?`) && method === "GET") {
+      const q = new URLSearchParams(u.split("?")[1]);
+      const id = q.get("id")?.replace(/^eq\./, "") ?? "";
+      const row = { id, role: (masleka.operators ?? []).includes(id) ? "admin" : "user", email: masleka.emails?.[id] ?? null };
+      return new Response(JSON.stringify([postgrestProject(row, q.get("select"))]), { status: 200 });
     }
     if (u === `${SUPABASE_URL}/rest/v1/rpc/masleka_staff_emails` && method === "POST") {
       if (masleka.failStaffEmails) return new Response('{"message":"simulated"}', { status: 500 });
@@ -444,6 +504,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     maslekaRequests,
     accessLog,
     requestPatches,
+    memberCalls,
     callsTo: (fragment) => fetches.filter((f) => f.url.includes(fragment)),
     mailTo(address) {
       const found = emails.filter((e) => e.to === address);

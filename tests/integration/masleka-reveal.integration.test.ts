@@ -45,7 +45,7 @@ function run(b: unknown, o: EdgeOptions & { fake?: MaslekaFake; token?: string |
     masleka: {
       requests: [waiting()],
       sessions: { [STAFF_TOKEN]: STAFF, [OUTSIDER_TOKEN]: OUTSIDER },
-      roles: { [STAFF]: "staff", [OUTSIDER]: null },
+      roles: { [STAFF]: "admin", [OUTSIDER]: null },
       ...fake,
     },
   });
@@ -66,7 +66,7 @@ describe("masleka-reveal — who may", () => {
   it("answers disabled while MASLEKA_ENABLED is unset", async () => {
     const r = await invokeEdge("masleka-reveal", { requestId: REQUEST_ID, field: "id" }, {
       headers: { authorization: `Bearer ${STAFF_TOKEN}` },
-      masleka: { requests: [waiting()], sessions: { [STAFF_TOKEN]: STAFF }, roles: { [STAFF]: "staff" } },
+      masleka: { requests: [waiting()], sessions: { [STAFF_TOKEN]: STAFF }, roles: { [STAFF]: "admin" } },
     });
     expect(r.status).toBe(404);
     expect(r.json).toEqual({ error: "disabled", rid: expect.any(String) });
@@ -116,15 +116,61 @@ describe("masleka-reveal — who may", () => {
     expect(second.accessLog).toHaveLength(0);
   });
 
-  it("asks the auth server and staff_role about the caller on every call", async () => {
+  it("asks the auth server, then the database under the caller's own session, on every call", async () => {
     const r = await run({ requestId: REQUEST_ID, field: "code" });
     expect(r.status).toBe(200);
     const auth = r.callsTo("/auth/v1/user");
     expect(auth).toHaveLength(1);
     expect(auth[0].headers.Authorization).toBe(`Bearer ${STAFF_TOKEN}`);
-    const role = r.callsTo("/rpc/staff_role");
-    expect(role).toHaveLength(1);
-    expect(role[0].body).toEqual({ p_user_id: STAFF });
+    // can_work_request decides: the request's lead, or its creator, or Admin+.
+    const access = r.callsTo("/rpc/can_work_request");
+    expect(access).toHaveLength(1);
+    expect(access[0].body).toEqual({ p_request_id: REQUEST_ID });
+    expect(access[0].headers.Authorization).toBe(`Bearer ${STAFF_TOKEN}`);
+  });
+});
+
+describe("masleka-reveal — a User, on their own clients only (agency roles)", () => {
+  const LEAD = "bbbbbbbb-1111-4111-8111-000000000001";
+  const OTHERS_LEAD = "bbbbbbbb-1111-4111-8111-000000000002";
+  const USER = "aaaaaaaa-1111-4111-8111-000000000003";
+  const USER_TOKEN = "user-session-token-0123456789";
+  const asUser = (request: Record<string, unknown>, assigned: Record<string, string>) =>
+    run({ requestId: REQUEST_ID, field: "id" }, {
+      token: USER_TOKEN,
+      fake: {
+        requests: [waiting(request)],
+        sessions: { [USER_TOKEN]: USER },
+        roles: { [USER]: "user" },
+        assigned,
+      },
+    });
+
+  it("reveals on a request whose lead is assigned to them, and logs the reveal first", async () => {
+    const r = await asUser({ lead_id: LEAD }, { [LEAD]: USER });
+    expect(r.status).toBe(200);
+    expect(r.json.value).toBe(ID_NUMBER);
+    expect(r.accessLog).toEqual([expect.objectContaining({ request_id: REQUEST_ID, user_id: USER, field: "id" })]);
+  });
+
+  it("refuses a request on another User's lead, and reveals and logs nothing", async () => {
+    const r = await asUser({ lead_id: OTHERS_LEAD }, { [OTHERS_LEAD]: OUTSIDER, [LEAD]: USER });
+    expect(r.status).toBe(403);
+    expect(r.json).toEqual({ error: "forbidden", rid: expect.any(String) });
+    expect(r.accessLog).toHaveLength(0);
+  });
+
+  it("refuses a request on an unassigned lead", async () => {
+    const r = await asUser({ lead_id: OTHERS_LEAD }, {});
+    expect(r.status).toBe(403);
+    expect(r.accessLog).toHaveLength(0);
+  });
+
+  it("reveals on a request with no lead that they created, not on one somebody else did", async () => {
+    expect((await asUser({ lead_id: null, created_by: USER }, {})).status).toBe(200);
+    const theirs = await asUser({ lead_id: null, created_by: OUTSIDER }, {});
+    expect(theirs.status).toBe(403);
+    expect(theirs.accessLog).toHaveLength(0);
   });
 });
 

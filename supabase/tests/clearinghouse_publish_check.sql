@@ -17,7 +17,7 @@ insert into auth.users (instance_id, id, aud, role, email, email_confirmed_at) v
   ('00000000-0000-0000-0000-000000000000','ffffffff-0000-0000-0000-000000000004','authenticated','authenticated','pub-other@example.com', now());
 
 insert into public.memberships (user_id, agency_id, role) values
-  ('ffffffff-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'staff'),
+  ('ffffffff-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'admin'),
   ('ffffffff-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000002', 'owner');
 
 insert into public.clearinghouse_snapshots (id, agency_id, client_name, taken_at, interface_version, data) values

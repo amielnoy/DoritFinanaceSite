@@ -57,6 +57,21 @@ describe("masleka-create — who may", () => {
     expect(rotate.maslekaRequests[0].token_hash).toBe("a".repeat(64));
   });
 
+  it("lets a User start a request by hand, as theirs, and fresh-link only their own (agency roles)", async () => {
+    const USER = "aaaaaaaa-1111-4111-8111-000000000003";
+    const USER_TOKEN = "user-session-token-0123456789";
+    const asUser = { token: USER_TOKEN, fake: { sessions: { [USER_TOKEN]: USER }, roles: { [USER]: "user" } } };
+    const made = await run({ clientName: "משה כהן" }, asUser);
+    expect(made.status).toBe(200);
+    expect(made.maslekaRequests[0]).toMatchObject({ created_by: USER, lead_id: null });
+    const someoneElses = { id: REQUEST_ID, agency_id: AGENCY_1, status: "invited", token_hash: "a".repeat(64), lead_id: null, created_by: STAFF };
+    const refused = await run({ requestId: REQUEST_ID }, { ...asUser, fake: { ...asUser.fake, requests: [someoneElses] } });
+    expect(refused.status).toBe(403);
+    expect(refused.maslekaRequests[0].token_hash).toBe("a".repeat(64));
+    const own = await run({ requestId: REQUEST_ID }, { ...asUser, fake: { ...asUser.fake, requests: [{ ...someoneElses, created_by: USER }] } });
+    expect(own.status).toBe(200);
+  });
+
   it("answers disabled before reading the body or calling anything", async () => {
     const r = await invokeEdge("masleka-create", undefined, {
       rawBody: "{not json",
@@ -238,7 +253,12 @@ describe("masleka-create — a fresh link", () => {
     const other = await run({ requestId: REQUEST_ID }, { fake: { requests: [invited({ agency_id: "aaaaaaaa-0000-0000-0000-000000000002" })] } });
     expect(other.status).toBe(409);
     expect(other.maslekaRequests[0].token_hash).toBe("a".repeat(64));
-    expect((await run({ requestId: REQUEST_ID })).status).toBe(409);
+    // One that is not there: the database's access check refuses it first
+    // (can_work_request is false), without saying whether it exists.
+    const missing = await run({ requestId: REQUEST_ID });
+    expect(missing.status).toBe(403);
+    expect(missing.json).toEqual({ error: "forbidden", rid: expect.any(String) });
+    expect(missing.requestPatches).toHaveLength(0);
   });
 
   it("answers 500 and no link when the update fails", async () => {

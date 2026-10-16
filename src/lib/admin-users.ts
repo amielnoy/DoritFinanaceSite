@@ -1,4 +1,5 @@
 import type { AdminUser } from "@/services/ports";
+import { OPERATOR_LABEL, ROLE_LABELS } from "@/config/permissions";
 import { organizationDirectory, type Organization } from "@/config/organizations";
 
 /**
@@ -7,8 +8,13 @@ import { organizationDirectory, type Organization } from "@/config/organizations
  * primary one. tests/unit/admin-users.test.ts covers it.
  */
 
-export const SITE_ROLE_LABEL: Record<AdminUser["role"], string> = { admin: "מנהל/ת", user: "משתמש/ת" };
-export const ORG_ROLE_LABEL: Record<string, string> = { owner: "בעלים", agent: "סוכן/ת", staff: "צוות" };
+/**
+ * The site-wide role. `admin` is the platform operator — not an agency's
+ * Admin, whose label is ORG_ROLE_LABEL.admin — so the two never read alike.
+ */
+export const SITE_ROLE_LABEL: Record<AdminUser["role"], string> = { admin: OPERATOR_LABEL, user: "משתמש/ת" };
+/** A role in an organization: owner, admin, user (src/config/permissions.ts). */
+export const ORG_ROLE_LABEL: Record<string, string> = ROLE_LABELS;
 
 /** A user's name on the screen. Accounts keep no name of their own, so it is the email. */
 export const displayName = (u: Pick<AdminUser, "email">): string => u.email ?? "ללא אימייל";

@@ -12,6 +12,7 @@ import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { inputClass } from "@/components/dorit/primitives/Field";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useT } from "@/i18n/LocaleContext";
+import { AGENCY_1, useAgencyRole } from "@/hooks/useAgency";
 
 type TestimonialItem = Testimonial;
 
@@ -32,14 +33,16 @@ interface TestimonialForm {
  * card stays in the document — the others are beside it, not removed.
  */
 export default function Testimonials() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   // `tr`, not `t`: each testimonial below is `t`.
   const tr = useT("home");
   const he = useLocale() === "he";
-  // Adding and deleting are Dorit's. Since the personal area, ordinary visitors
-  // sign in too, and "signed in" no longer means "owner" — the writes were
-  // refused server-side, but the controls were on show.
-  const isAdmin = isAuthenticated && user?.role === "admin";
+  // Adding and deleting are Admin+ in agency 1 (or the platform operator) —
+  // content-admin and the testimonials policy refuse anyone else. Ordinary
+  // visitors sign in too, so "signed in" never shows the controls. A public
+  // section: the role answer is reused for a few minutes, as the header's is.
+  const { can } = useAgencyRole(AGENCY_1, { staleTime: 5 * 60_000 });
+  const isAdmin = isAuthenticated && can("testimonials.write");
   const { data, isPending: loading } = useTestimonials();
   const createTestimonial = useCreateTestimonial();
   const removeTestimonial = useRemoveTestimonial();

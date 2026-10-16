@@ -1,9 +1,10 @@
 import React, { useId } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useSearchParams } from "react-router-dom";
 import { ExternalLink, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { MASLEKA_ENABLED } from "@/config/masleka";
 import { useAdminAccess, useAdminCounts, type AdminCounts } from "@/hooks/useAdminMenu";
+import { useCurrentAgency } from "@/hooks/useAgency";
 import { useT } from "@/i18n/LocaleContext";
 import { cn } from "@/lib/utils";
 import { adminNavFor, type AdminNavGroup, type AdminNavItem } from "./adminNav";
@@ -14,9 +15,12 @@ import CountBadge from "./CountBadge";
  * screen beside it. Below 900px the sidebar becomes a band across the top,
  * its rows wrapping and its group titles dropped.
  *
- * A layout route only — it sits inside AdminRoute or StaffRoute in App.jsx,
- * which decide who gets in. With `adminOnly` (the personal area, which every
- * signed-in client also has) anyone but the admin gets the bare page.
+ * A layout route only — it sits inside AgencyRoute in App.jsx, which decides
+ * who gets in. With `adminOnly` (the personal area, which every signed-in
+ * client also has) anyone but the platform operator gets the bare page.
+ *
+ * Someone in more than one agency gets a switcher; the choice lives in the
+ * URL (`?agency=`), and every sidebar link carries it on.
  */
 const ROW =
   "relative flex items-center gap-3 min-h-11 px-3 text-[15px] text-foreground rounded-sm transition-colors duration-200 hover:bg-nav-active/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
@@ -26,8 +30,10 @@ const ACTIVE = "bg-nav-active before:absolute before:inset-y-0 before:start-0 be
 
 function SidebarLink({ item, counts }: { item: AdminNavItem; counts: AdminCounts }) {
   const Icon = item.icon;
+  const [params] = useSearchParams();
+  const agency = params.get("agency");
   return (
-    <NavLink to={item.to} end={item.end} className={({ isActive }) => cn(ROW, isActive && ACTIVE)}>
+    <NavLink to={agency ? { pathname: item.to, search: `?agency=${encodeURIComponent(agency)}` } : item.to} end={item.end} className={({ isActive }) => cn(ROW, isActive && ACTIVE)}>
       <Icon size={18} strokeWidth={1.5} aria-hidden="true" className="shrink-0 text-accent" />
       <span>{item.label}</span>
       {item.counter ? <CountBadge count={counts[item.counter.key]} label={item.counter.label} className="ms-auto" /> : null}
@@ -55,13 +61,39 @@ function SidebarGroup({ group, counts }: { group: AdminNavGroup; counts: AdminCo
   );
 }
 
+/** Which agency the screens act on — only for someone in more than one. */
+export function AgencySwitcher() {
+  const { agencyId, agencies, setAgency } = useCurrentAgency();
+  const id = useId();
+  if (agencies.length < 2) return null;
+  return (
+    <div className="px-5 py-3 border-b border-border">
+      <label htmlFor={id} className="block text-xs text-muted-foreground mb-1">
+        סוכנות
+      </label>
+      <select
+        id={id}
+        value={agencyId}
+        onChange={(e) => setAgency(e.target.value)}
+        className="w-full min-h-11 rounded-sm border border-border bg-background px-2 text-[15px]"
+      >
+        {agencies.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export default function AdminLayout({ adminOnly = false }: { adminOnly?: boolean }) {
   const access = useAdminAccess();
   const counts = useAdminCounts(access);
   const { logout } = useAuth();
   const t = useT("common");
 
-  if (!access || (adminOnly && access !== "admin")) return <Outlet />;
+  if (!access || (adminOnly && access !== "operator")) return <Outlet />;
 
   const groups = adminNavFor(access, MASLEKA_ENABLED);
   return (
@@ -79,6 +111,7 @@ export default function AdminLayout({ adminOnly = false }: { adminOnly?: boolean
             <span className="text-[13px] text-muted-foreground">ממשק ניהול</span>
           </span>
         </div>
+        <AgencySwitcher />
         <nav
           aria-label="ממשק ניהול"
           className="flex-1 overflow-y-auto px-3 py-3 flex flex-wrap gap-1 min-[900px]:py-5 min-[900px]:flex-col min-[900px]:flex-nowrap min-[900px]:gap-5"

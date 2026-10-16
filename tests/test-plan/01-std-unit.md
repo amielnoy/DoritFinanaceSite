@@ -37,6 +37,7 @@ something outside the repository.
 | `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
 | `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
 | `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
+| `groupOpenLeads`, `planAssignments`, `describeOpenLeads` | `scripts/assign-open-leads.mjs` |
 | `fetchPublishedArticles`, `planArticles`, `fixtureArticleFor`, `duplicateTitles` | `scripts/published-articles.mjs` |
 | `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
@@ -1129,13 +1130,21 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSH-010 | "answers who the token belongs to, asking the auth server with the service key" | `/auth/v1/user`, apikey + bearer |
 | UNIT-MSKSH-011 | "answers nobody for a token the auth server refuses" | `null` on 401 |
 | UNIT-MSKSH-012 | "throws when the auth server is down, rather than calling it a refusal" | `auth_http_503` |
-| UNIT-MSKSH-013 | "is anonymous without a bearer token, and asks nobody" | No fetch |
-| UNIT-MSKSH-014 | "is an outsider when the database knows no role for the user" | `outsider` |
-| UNIT-MSKSH-015 | "is an outsider for a role it does not recognise" | `outsider` |
-| UNIT-MSKSH-016 | "is staff with the role the database gives" | `staff`, role `staff` |
-| UNIT-MSKSH-017 | "mails each staff address once, in lower case, and skips what is not an address" | Deduplicated list |
+| UNIT-MSKSH-013 | "ranks owner over admin over user" | `meets`: owner ≥ admin; admin ≥ admin; user < admin; no role meets nothing |
+| UNIT-MSKSH-014 | "asks nobody without a bearer token, and answers 401" | `sessionCaller`: 401; no fetch |
+| UNIT-MSKSH-015 | "names the operator from profiles.role, never from the token" | `{ ok, userId, token, isOperator: true }` from `profiles.role = 'admin'` |
+| UNIT-MSKSH-016 | "passes a role at or above the minimum, in that agency, and refuses one below with 403" | `staff_role` asked with `{ p_user_id, p_agency_id }`; admin passes `admin`, user refused 403 |
+| UNIT-MSKSH-016a | "refuses a role the database does not name, and the old agent/staff, as no role" | `staff`, `agent`, unknown, null: 403 |
+| UNIT-MSKSH-016b | "lets the operator through with no membership, and only the operator onto a shared-library row" | Operator passes `owner` with `role: null`; agency `null` passes the operator, refuses an Owner |
+| UNIT-MSKSH-016c | "answers 500, not 403, when the role cannot be read" | `staff_role` 503 → 500 |
+| UNIT-MSKSH-016d | "asks can_see_lead and can_work_request as the caller, with their own token" | Both RPCs carry `Authorization: Bearer <caller>`; bodies `{ p_lead_id }`, `{ p_request_id }` |
+| UNIT-MSKSH-016e | "refuses with 403 when the database says no — and anything but a plain true is no" | `false`, `null`, `"true"`, `1`: 403 |
+| UNIT-MSKSH-016f | "sends the caller's token on Authorization, and keeps the service key on apikey" | `callRpc(…, token)` |
+| UNIT-MSKSH-016g | "names a function's own reason, and never Postgres's prose" | `rpc_http_400:23514:last_owner` → `refusalReason` `last_owner`; a 23505 whose message quotes the row → `update_http_409:23505`, reason `''` |
+| UNIT-MSKSH-017 | "asks for the request's own people, and mails each address once, in lower case, skipping what is not one" | `masleka_staff_emails({ p_request_id })`; deduplicated list |
 | UNIT-MSKSH-018 | "falls back to Dorit's mailbox when nobody can be read" | `dorit@govari-fin.co.il`, `staff.lookup_failed` |
-| UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the staff list is empty" | `dorit@govari-fin.co.il`, `staff.none` |
+| UNIT-MSKSH-019 | "falls back to Dorit's mailbox when the request has nobody" | `dorit@govari-fin.co.il`, `staff.none` with the request id |
+| UNIT-MSKSH-019a | "asks for the agency's Admins and Owners while the request is not yet known" | `{ p_request_id: null }`; the answer's addresses |
 | UNIT-MSKSH-022 | "reads a phone as its local digits, however it was typed" | `054-111-2233`, `+972-54-111-2233`, `972541112233`, spaces and brackets all → `0541112233`; a landline keeps its 9 digits (decision 2026-10-14, the same contact) |
 | UNIT-MSKSH-023 | "reads nothing too short, or not a string, as a phone" | `''` for fewer than 9 digits, letters, `null`, `undefined`, a number — and `''` matches nothing |
 | UNIT-MSKSH-024 | "matches two addresses only when both are addresses, ignoring case and spaces at the ends" | Equal mailboxes match; two blanks, two nulls, two non-addresses, or one missing never match |
@@ -1529,12 +1538,14 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 
 | ID | Test | Expect |
 |---|---|---|
-| UNIT-ANAV-001 | "gives the admin every page, grouped by task" | ראשי; טיפול שוטף: פניות, בקשות מסלקה; תוכן והגדרות: בלוג, משתמשים |
+| UNIT-ANAV-001 | "gives the platform operator every page, grouped by task" | ראשי; טיפול שוטף: פניות, בקשות מסלקה; תוכן והגדרות: בלוג, משתמשים, פרטי הסוכנות |
 | UNIT-ANAV-002 | "leaves the clearinghouse out while its switch is off" | טיפול שוטף holds פניות alone |
-| UNIT-ANAV-003 | "gives agency staff the clearinghouse alone, and drops the groups left empty" | One group, one item |
+| UNIT-ANAV-003 | "gives an Owner the agency's pages and its details, not the operator's main page" | No ראשי; פרטי הסוכנות |
+| UNIT-ANAV-003a | "gives an Admin and a User the same rows, but not the agency's details" | No פרטי הסוכנות |
+| UNIT-ANAV-003b | "counts the unassigned queue for Admin+, and a User's own new leads" | `unassigned` for operator/owner/admin; `newLeads` for a User |
 | UNIT-ANAV-004 | "gives anyone else nothing" | `[]` for `null` |
-| UNIT-ANAV-005 | "names a route for every page, each once" | The five routes, no repeat |
-| UNIT-ANAV-006 | "sends the admin to her main page and staff to the board" | `/account`; `/admin/masleka` |
+| UNIT-ANAV-005 | "names a route for every page, each once" | The six routes, no repeat |
+| UNIT-ANAV-006 | "sends the operator to their main page and an agency's members to the leads" | `/account`; `/admin/leads` |
 | UNIT-ANAV-007 | "%s → %s" (`initials`) | דורית גוב ארי → דג; Dorit → D; an email → its name's letters; empty → ? |
 | UNIT-ANAV-008 | "counts the requests whose code has arrived and is not yet submitted" (`waitingCount`) | Two `code_received` of five → 2; none → 0 |
 
@@ -1578,3 +1589,38 @@ uploaded, against the limits the bucket and `submit-claim` enforce anyway.
 
 All 705 declared cases pass (vitest: 1181 with expansions). Any failure is a functional defect, not an environment issue —
 these tests have no external dependencies.
+
+### 4.64 Assigning the open leads before narrowing — `tests/unit/assign-open-leads.test.ts`
+
+The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). It lists every agency's open (any status but `closed`), unassigned leads and, given a plan, says which lead goes to which address. It is a dry run unless given `--apply`. Writes go to unassigned rows only, and the leads trigger refuses an assignee outside the lead's agency.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AOL-001 | "keeps open, unassigned leads per agency, oldest first" | `closed` and already-assigned leads dropped; grouped by `agency_id`; sorted by `created_at` |
+| UNIT-AOL-002 | "gives a lead's own key priority over its agency's" | The lead key's address for that lead, the `agency:<id>` address (trimmed, lower-cased) for the rest |
+| UNIT-AOL-003 | "reports what it cannot do instead of dropping it" | `not_open_or_unassigned`, `not_an_address`, `no_open_leads` |
+| UNIT-AOL-004 | "plans nothing without a plan" | Both lists empty |
+| UNIT-AOL-005 | "lists ids, Israel-time dates, statuses, sources and topics — never a name, phone or email" | `2026-10-01T09:00:00Z` shows as `2026-10-01 12:00`; no client name, phone or address |
+| UNIT-AOL-006 | "says when there is nothing to assign" | `no open unassigned leads` |
+
+### 4.65 Agency roles in the services — `tests/unit/supabase-agency.test.ts`, `tests/unit/supabase-lead-admin.test.ts` (changed), `tests/unit/masleka-services.test.ts` / `services-wiring` / `lazy-services` (changed)
+
+`SupabaseAgencyService` (the person's agencies and role, the agency profile), the members screen's changes in `SupabaseUsersAdminService`, and the lead service's assignment, unassigned count and claim-document links.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AGY-001 | "lists the person's agencies with their roles, leaving out what they cannot read or do not know" | Two agencies; a suspended (unreadable) one and a `staff` role dropped |
+| UNIT-AGY-002 | "asks my_agency_role for one agency, and reads anything but the three roles as none" | `rpc('my_agency_role', { p_agency_id })`; `staff`, `agent`, null, 1 → null |
+| UNIT-AGY-003 | "fails rather than guessing when the role cannot be read" | Throws |
+| UNIT-AGY-004 | "maps the profile's columns, and writes back only the fields given, by their column names" | `update({ display_name, licence_number })` |
+| UNIT-AGY-005 | "calls a save the policy filtered out an error — only the Owner may" | An empty answer throws |
+| UNIT-AGY-006..009 | "%s goes to member-admin as the person" | `setRole`, `remove`, `leave`, `transferOwnership` → `member-admin` with the op's body and the bearer |
+| UNIT-AGY-010 | "says the function's refusal in its own words, and asks nothing without a session" | `last_owner`'s Hebrew; no call without a token |
+| UNIT-SLA-DOC-001 | "asks claim-document-link, as the person, for this lead's document" | `{ leadId, path }` with the bearer; the returned URL |
+| UNIT-SLA-DOC-002 | "returns a Base44 file URL unchanged, asking nobody" | No call |
+| UNIT-SLA-DOC-003 | "says the function's own refusal — another User's lead, or a document not on it" | The Hebrew refusal |
+| UNIT-SLA-DOC-004 | "asks nothing without a session" | `נדרשת התחברות` |
+| UNIT-SLA-ASG-001 | "assigns through assign-lead, and back to the queue with null" | `{ leadId, userId }`, then `userId: null` |
+| UNIT-SLA-ASG-002 | "counts open leads nobody works, by ids only" | `select('id')`, `is('assigned_user_id', null)`, `not('status','eq','closed')` |
+
+`MaslekaPort.myRole` is gone (the role is the agency's, `services.agency.myRole`): its three cases are removed. `UnconfiguredMaslekaService` "is never available"; the lazy front delegates `masleka.list` and `agency.myRole`. In `admin-users.test.ts` the operator reads "מפעיל הפלטפורמה" and an agency Admin "מנהל/ת", and the search finds each by their own label.

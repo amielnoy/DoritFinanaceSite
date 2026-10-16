@@ -50,6 +50,32 @@ npx skills add base44/skills
   Supabase first, then Base44. The browser must not write Base44's `Lead` entity
   directly — Supabase would keep the old status and the deleted enquiry, and the
   personal area reads Supabase. See A-73.
+- **Agency roles: Owner, Admin, User**
+  (`docs/superpowers/specs/2026-10-15-agency-roles-design.md`).
+  - **`can_see_lead(lead)` is the read rule for lead data.** A User sees only
+    the leads assigned to them (`leads.assigned_user_id`) and what hangs off
+    them: meetings, chats, clearinghouse requests and snapshots, claim
+    documents. `can_see(agency)` means only "a member of an active agency" and
+    must not be the read rule on lead data. A read policy that rests on it
+    alone reopens the agency's whole lead list to every User, and
+    `tests/contract/agency-roles-schema.contract.test.ts` fails on one. A
+    policy or check that accepts a lead or a request for a row also binds it
+    to the row's own agency (`lead_in_agency`, `request_in_agency`), or a User
+    can file a row under another agency.
+  - **Memberships change only through `set_member_role` and `remove_member`.**
+    Direct writes to `memberships` are revoked from `authenticated`, and the
+    Edge Functions call both functions with the caller's own session. The
+    functions hold the rules: an Admin manages Users only; nobody grants above
+    their own role; every agency keeps an Owner. Do not add a service-role
+    write around them.
+  - **`is_admin()` means the platform operator, not an agency Admin.** It is
+    `profiles.role = 'admin'`; the UI calls it "מפעיל הפלטפורמה". An agency's
+    Admin is `memberships.role = 'admin'`, asked through `has_role` /
+    `agency_role` in SQL, and through `_shared/staff.ts` (`allowRole`,
+    `allowLead`, `allowRequest`) in the Edge Functions. Never use one for the
+    other. `src/config/permissions.ts` mirrors the permissions table for the
+    screens, and `tests/contract/permissions.contract.test.ts` holds it to the
+    gates.
 - `src/services/supabase/SupabaseLeadAdminService.ts`: with Supabase configured,
   the admin's lead writes go straight to `leads` under her session
   (`leads_update_admin` / `leads_delete_admin`), by Supabase `id`, and ask for
@@ -181,6 +207,9 @@ npx skills add base44/skills
   deletes, so it is a dry run unless given `--apply` — check its output before
   adding the flag. `reconcile-stores.mjs` exits non-zero on drift. `reconcile-leads.mjs` is a dry run
   unless given `--apply` and deletes Supabase leads Base44 no longer has.
+  `assign-open-leads.mjs` lists each agency's open, unassigned leads, and
+  assigns them from a `--plan` file only with `--apply`. Run it before the
+  agency-roles narrowing ships, or every User's list goes blank.
   `seed-blog.mjs --apply` writes `content/blog/` to Base44 through `base44 exec
   --privileged --data-env prod` (the CLI's signed-in owner, no password) and
   mirrors each post to Supabase on `base44_id`; it needs `SUPABASE_URL` and

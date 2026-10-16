@@ -10,6 +10,7 @@ import type {
   ContentPort,
   LeadAdminPort,
   UsersAdminPort,
+  AgencyPort,
   LeadPort,
   MaslekaPort,
   SupportPort,
@@ -58,6 +59,8 @@ export interface Services {
   account: AccountPort;
   /** The accounts and their organizations — the admin's users screen. */
   usersAdmin: UsersAdminPort;
+  /** Who the signed-in person is in their agencies, and the agency's own details. */
+  agency: AgencyPort;
   /** The clearinghouse requests: the client's page and the staff board. */
   masleka: MaslekaPort;
 }
@@ -164,7 +167,9 @@ export const services: Services = {
     list: (limit) => real().then((s) => s.leadsAdmin.list(limit)),
     setStatus: (id, status) => real().then((s) => s.leadsAdmin.setStatus(id, status)),
     remove: (id) => real().then((s) => s.leadsAdmin.remove(id)),
-    documentLink: (ref) => real().then((s) => s.leadsAdmin.documentLink(ref)),
+    documentLink: (ref, leadId) => real().then((s) => s.leadsAdmin.documentLink(ref, leadId)),
+    assign: (leadId, userId) => real().then((s) => s.leadsAdmin.assign(leadId, userId)),
+    countUnassigned: () => real().then((s) => s.leadsAdmin.countUnassigned()),
     transcript: (leadId) => real().then((s) => s.leadsAdmin.transcript(leadId)),
     transcriptLeadIds: () => real().then((s) => s.leadsAdmin.transcriptLeadIds()),
     countNew: () => real().then((s) => s.leadsAdmin.countNew()),
@@ -182,6 +187,16 @@ export const services: Services = {
     list: () => real().then((s) => s.usersAdmin.list()),
     organizations: () => real().then((s) => s.usersAdmin.organizations()),
     invite: (input) => real().then((s) => s.usersAdmin.invite(input)),
+    setRole: (agencyId, userId, role) => real().then((s) => s.usersAdmin.setRole(agencyId, userId, role)),
+    remove: (agencyId, userId) => real().then((s) => s.usersAdmin.remove(agencyId, userId)),
+    leave: (agencyId) => real().then((s) => s.usersAdmin.leave(agencyId)),
+    transferOwnership: (agencyId, userId) => real().then((s) => s.usersAdmin.transferOwnership(agencyId, userId)),
+  },
+  agency: {
+    myAgencies: (userId) => real().then((s) => s.agency.myAgencies(userId)),
+    myRole: (agencyId) => real().then((s) => s.agency.myRole(agencyId)),
+    profile: (agencyId) => real().then((s) => s.agency.profile(agencyId)),
+    updateProfile: (agencyId, fields) => real().then((s) => s.agency.updateProfile(agencyId, fields)),
   },
   account: {
     myEnquiries: () => real().then((s) => s.account.myEnquiries()),
@@ -190,7 +205,6 @@ export const services: Services = {
   },
   masleka: {
     submitCode: (token, code, idNumber) => real().then((s) => s.masleka.submitCode(token, code, idNumber)),
-    myRole: () => real().then((s) => s.masleka.myRole()),
     list: () => real().then((s) => s.masleka.list()),
     create: (input) => real().then((s) => s.masleka.create(input)),
     relink: (requestId) => real().then((s) => s.masleka.relink(requestId)),

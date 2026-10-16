@@ -121,40 +121,65 @@ describe("SupabaseLeadAdminService writes", () => {
   });
 });
 
-describe("SupabaseLeadAdminService.documentLink", () => {
-  const storageOf = (result: { data: { signedUrl: string } | null; error: { message: string } | null }) => {
-    const createSignedUrl = vi.fn().mockResolvedValue(result);
-    const from = vi.fn(() => ({ upload: vi.fn(), createSignedUrl }));
-    return { storage: { storage: { from } }, from, createSignedUrl };
+describe("SupabaseLeadAdminService — claim-document links and assignment (agency roles)", () => {
+  /** A functions client that answers `answer`, recording what was asked. */
+  const functionsOf = (answer: { data: unknown; error: { message: string; context?: unknown } | null }) => {
+    const invoke = vi.fn().mockResolvedValue(answer);
+    return { client: { functions: { invoke } }, invoke };
   };
+  const token = async () => "session-token";
   const ref = "storage:claim-documents/00000000-0000-0000-0000-000000000001/abc-tz.pdf";
+  const LEAD = "bbbbbbbb-0000-4000-8000-000000000001";
 
-  it("signs a stored document for five minutes, by its path in the private bucket", async () => {
+  it("asks claim-document-link, as the person, for this lead's document", async () => {
     const { client } = tableFake({ data: [], error: null });
-    const s = storageOf({ data: { signedUrl: "https://project.supabase.co/signed" }, error: null });
-    const link = await new SupabaseLeadAdminService(client, s.storage).documentLink(ref);
+    const f = functionsOf({ data: { ok: true, url: "https://project.supabase.co/signed" }, error: null });
+    const link = await new SupabaseLeadAdminService(client, f.client, token).documentLink(ref, LEAD);
     expect(link).toBe("https://project.supabase.co/signed");
-    expect(s.from).toHaveBeenCalledWith("claim-documents");
-    expect(s.createSignedUrl).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000001/abc-tz.pdf", 300);
+    expect(f.invoke).toHaveBeenCalledWith("claim-document-link", {
+      body: { leadId: LEAD, path: "00000000-0000-0000-0000-000000000001/abc-tz.pdf" },
+      headers: { Authorization: "Bearer session-token" },
+    });
   });
 
-  it("returns a Base44 file URL unchanged, without asking storage", async () => {
+  it("returns a Base44 file URL unchanged, asking nobody", async () => {
     const { client } = tableFake({ data: [], error: null });
-    const s = storageOf({ data: null, error: null });
+    const f = functionsOf({ data: null, error: null });
     const url = "https://base44.app/api/files/tz.pdf";
-    expect(await new SupabaseLeadAdminService(client, s.storage).documentLink(url)).toBe(url);
-    expect(s.createSignedUrl).not.toHaveBeenCalled();
+    expect(await new SupabaseLeadAdminService(client, f.client, token).documentLink(url, LEAD)).toBe(url);
+    expect(f.invoke).not.toHaveBeenCalled();
   });
 
-  it("says so when storage refuses — not an admin, or the file is gone", async () => {
+  it("says the function's own refusal — another User's lead, or a document not on it", async () => {
     const { client } = tableFake({ data: [], error: null });
-    const s = storageOf({ data: null, error: { message: "Object not found" } });
-    await expect(new SupabaseLeadAdminService(client, s.storage).documentLink(ref)).rejects.toThrow("לא ניתן לפתוח");
+    const context = new Response(JSON.stringify({ error: "אין לך הרשאה לפעולה הזו.", rid: "r1" }), { status: 403 });
+    const f = functionsOf({ data: null, error: { message: "non-2xx", context } });
+    await expect(new SupabaseLeadAdminService(client, f.client, token).documentLink(ref, LEAD)).rejects.toThrow("אין לך הרשאה");
   });
 
-  it("refuses a stored document when it has no storage client", async () => {
+  it("asks nothing without a session", async () => {
     const { client } = tableFake({ data: [], error: null });
-    await expect(new SupabaseLeadAdminService(client).documentLink(ref)).rejects.toThrow();
+    const f = functionsOf({ data: null, error: null });
+    await expect(new SupabaseLeadAdminService(client, f.client, async () => null).documentLink(ref, LEAD)).rejects.toThrow("נדרשת התחברות");
+    expect(f.invoke).not.toHaveBeenCalled();
+  });
+
+  it("assigns through assign-lead, and back to the queue with null", async () => {
+    const { client } = tableFake({ data: [], error: null });
+    const f = functionsOf({ data: { ok: true, mailed: true }, error: null });
+    const service = new SupabaseLeadAdminService(client, f.client, token);
+    expect(await service.assign(LEAD, "u2")).toEqual({ mailed: true });
+    expect(f.invoke).toHaveBeenLastCalledWith("assign-lead", { body: { leadId: LEAD, userId: "u2" }, headers: { Authorization: "Bearer session-token" } });
+    await service.assign(LEAD, null);
+    expect(f.invoke).toHaveBeenLastCalledWith("assign-lead", { body: { leadId: LEAD, userId: null }, headers: { Authorization: "Bearer session-token" } });
+  });
+
+  it("counts open leads nobody works, by ids only", async () => {
+    const { client, calls } = tableFake({ data: [{ id: "a" }, { id: "b" }], error: null });
+    expect(await new SupabaseLeadAdminService(client).countUnassigned()).toBe(2);
+    expect(calls).toContainEqual(["select", "id"]);
+    expect(calls).toContainEqual(["is", "assigned_user_id", null]);
+    expect(calls).toContainEqual(["not", "status", "eq", "closed"]);
   });
 });
 
@@ -167,6 +192,7 @@ function byTable(answers: Record<string, SupabaseReadResult>) {
     const q: SupabaseQuery = {
       eq: (c, v) => (calls.push([table, "eq", c, v]), q),
       or: () => q,
+      is: (c, v) => (calls.push([table, "is", c, v]), q),
       not: (c, op, v) => {
         calls.push([table, "not", c, op, v]);
         if (rows && op === "is" && v === null) rows = rows.filter((row) => (row as Record<string, unknown>)[c] != null);

@@ -94,7 +94,7 @@ describe("the clearinghouse pipeline ships dark", () => {
   });
 
   it("registers the staff pages only when switched on, and the client page always (it then says unavailable)", () => {
-    expect(read("src/App.jsx")).toMatch(/\{MASLEKA_ENABLED \? \(\s*<Route element=\{<StaffRoute/);
+    expect(read("src/App.jsx")).toMatch(/\{MASLEKA_ENABLED \? \(\s*<Route element=\{<AgencyRoute min="user"/);
     expect(read("src/App.jsx")).toContain('<Route path="/masleka" element={<Masleka />} />');
     expect(read("src/pages/Masleka.tsx")).toContain("enabled = MASLEKA_ENABLED");
   });

@@ -10,6 +10,7 @@ import {
 } from "@/hooks/useAdmin";
 import { Image } from "@/components/ui/image";
 import { SLUG_TAKEN, articlePath, slugProblem } from "@/lib/articlePath";
+import { AGENCY_1, useAgencyRole } from "@/hooks/useAgency";
 import {
   Plus,
   X,
@@ -83,6 +84,12 @@ const refusalText = (err: unknown): string | null => {
 
 export default function BlogAdmin() {
   const { data, isPending: loading, isError } = useAdminArticles();
+  // The site's articles are agency 1's (content-admin writes them there). A
+  // User writes drafts; publishing, editing a live article and deleting are
+  // Admin+ — content-admin and the policies refuse them otherwise.
+  const { can } = useAgencyRole(AGENCY_1);
+  const publishes = can("blog.publish");
+  const deletes = can("blog.delete");
   const saveArticle = useSaveArticle();
   const setPublished = useSetArticlePublished();
   const removeArticle = useRemoveArticle();
@@ -319,6 +326,7 @@ export default function BlogAdmin() {
                 </label>
               </div>
               <div className="md:col-span-2 flex items-center gap-3">
+                {publishes ? (
                 <button
                   type="button"
                   onClick={() =>
@@ -333,6 +341,9 @@ export default function BlogAdmin() {
                   {editing.published ? <Eye size={16} /> : <EyeOff size={16} />}
                   {editing.published ? "פורסם" : "טיוטה"}
                 </button>
+                ) : (
+                  <span className="text-sm text-muted-foreground">טיוטה — הפרסום אצל מנהלי הסוכנות</span>
+                )}
                 <button
                   onClick={save}
                   disabled={busy || !editing.title || !editing.body || Boolean(slugError)}
@@ -396,27 +407,33 @@ export default function BlogAdmin() {
                     {p.published ? "פורסם" : "טיוטה"}
                   </p>
                 </div>
-                <button
-                  onClick={() => togglePublished(p)}
-                  className="text-muted-foreground hover:text-accent transition-colors"
-                  aria-label="החלפת פרסום"
-                >
-                  {p.published ? <Eye size={18} /> : <EyeOff size={18} />}
-                </button>
-                <button
-                  onClick={() => startEdit(p)}
-                  className="text-muted-foreground hover:text-accent transition-colors"
-                  aria-label="עריכה"
-                >
-                  <Pencil size={18} />
-                </button>
-                <button
-                  onClick={() => remove(p)}
-                  className="text-muted-foreground hover:text-destructive transition-colors"
-                  aria-label="מחיקה"
-                >
-                  <Trash2 size={18} />
-                </button>
+                {publishes ? (
+                  <button
+                    onClick={() => togglePublished(p)}
+                    className="text-muted-foreground hover:text-accent transition-colors"
+                    aria-label="החלפת פרסום"
+                  >
+                    {p.published ? <Eye size={18} /> : <EyeOff size={18} />}
+                  </button>
+                ) : null}
+                {publishes || !p.published ? (
+                  <button
+                    onClick={() => startEdit(p)}
+                    className="text-muted-foreground hover:text-accent transition-colors"
+                    aria-label="עריכה"
+                  >
+                    <Pencil size={18} />
+                  </button>
+                ) : null}
+                {deletes ? (
+                  <button
+                    onClick={() => remove(p)}
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    aria-label="מחיקה"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>
