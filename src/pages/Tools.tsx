@@ -53,7 +53,7 @@ export default function Tools() {
   return (
     <div className="relative bg-background pb-14 md:pb-0">
       <FloatingHeader />
-      <main>
+      <main id="main">
         <section className="pt-40 pb-16 md:pt-48 md:pb-20 border-b border-border/50">
           <div className="max-w-[1400px] mx-auto px-6 md:px-10">
             <Reveal>

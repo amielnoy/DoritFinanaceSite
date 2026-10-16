@@ -255,6 +255,12 @@ featured row's deadline does not decide the outcome of an unrelated run.
 | CMP-BLOG-022 | "keeps a keyword the new topic still carries" | Still pressed after the switch |
 | CMP-BLOG-023 | "hides the featured row while a keyword is chosen" | No featured row; only matching cards |
 | CMP-BLOG-024 | "links each card and the blog's JSON-LD to the slug, or to the id where the store has none" | `/blog/maslul-hashkaa` and `/blog/pen-2` in the cards and in `Blog.blogPost[].url` |
+| CMP-BLOG-025 | "keeps the filters and holds a screen's height for the grid, so the prerendered page does not jump" | With the read pending: the topic group and the search box are there, and the spinner's box is `min-h-screen` (D-06) |
+| CMP-BLOG-026 | "says so and offers a retry, rather than saying there are no articles" | A failed read shows `role="alert"` "לא הצלחנו לטעון את המאמרים…", not "עדיין אין מאמרים"; "לנסות שוב" reads again and the cards appear (D-09) |
+| CMP-BLOG-027 | "still says there are none when the read succeeds empty" | "עדיין אין מאמרים"; no topic group |
+
+The suite's `loaded()` waits for the spinner to go, not for the topic group:
+the group now renders while the read is pending (CMP-BLOG-025).
 
 ### 4.13 Reading-recommender filter — `tests/component/blog-recommendation-filter.test.tsx`
 
@@ -828,6 +834,26 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 |---|---|---|
 | CMP-LOGIN-001 | "tells the visitor when Google's sign-in could not start" | A rejecting `signInWithGoogle` shows "לא הצלחנו להתחיל את ההתחברות. נסו שוב." |
 | CMP-LOGIN-002 | "says nothing while Google takes the visitor away" | No message; the call made |
+
+### 4.46 The not-found page and the skip link — `tests/component/not-found.test.tsx`
+
+Through `LocaleLayout`, as App.jsx routes them. Base44's template 404 said
+"Page Not Found … Go Home" in English, outside the header and footer, with a
+grey heading under the contrast floor and no `<main>`; no page had a skip link
+(D-04, D-07, D-08, manual test 2026-10-14).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-404-001 | "is in Hebrew, inside one <main>, with the h1 inside it" | One `<main>`; h1 "הדף שחיפשתם לא נמצא" inside it; no "Page Not Found" / "Go Home" |
+| CMP-404-002 | "keeps the site's header and footer, so the way back is the usual one" | A `<header>` and a `<footer>` |
+| CMP-404-003 | "links home and to the main pages" | "לעמוד הראשי" → `/`; the "דפים באתר" nav links `/tools`, `/claims`, `/blog`, `/faq` |
+| CMP-404-004 | "uses no grey that fails contrast: the heading and text are ink" | h1 `text-foreground`; no `text-slate-*` in `<main>` |
+| CMP-404-005 | "is noindex, and its canonical is the address asked for" | `robots` noindex; title "הדף לא נמצא \| דורית גוב ארי"; canonical path `/nope-xyz` |
+| CMP-404-006 | "speaks English under /en, links stay in English, and the Hebrew-only blog is left out" | English h1; home → `/en`; links `/en/tools`, `/en/claims`, `/en/faq`; canonical `/en/nope` |
+| CMP-SKIP-001 | "is the first focusable thing on the page" | The first focusable element reads "דילוג לתוכן הראשי" |
+| CMP-SKIP-002 | "moves focus to the page's <main>" | After the click `document.activeElement` is the `<main>`, given `tabindex="-1"` |
+| CMP-SKIP-003 | "is in the page's language" | "Aller au contenu principal" under `/fr` |
+| CMP-SKIP-004 | "names a target that exists, so it works before the app runs" | `href="#main"`, and `#main` is the `<main>` |
 
 ## 5. Pass criteria
 

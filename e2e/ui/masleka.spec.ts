@@ -29,6 +29,6 @@ test.describe("Clearinghouse — dark by default", () => {
 
   test("the staff board does not exist in a dark build", async ({ page }) => {
     await gotoApp(page, "/admin/masleka");
-    await expect(page.getByRole("heading", { name: "404" })).toBeVisible();
+    await expect(page.getByTestId("not-found")).toBeVisible();
   });
 });

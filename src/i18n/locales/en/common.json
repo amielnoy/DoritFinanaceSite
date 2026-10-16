@@ -56,5 +56,13 @@
   "submit.report": "the report",
   "nav.call": "Call",
   "nav.phone": "Phone",
-  "credentials.licence": "Agent licence from the Capital Market Authority, no."
+  "credentials.licence": "Agent licence from the Capital Market Authority, no.",
+  "a11y.skipToMain": "Skip to main content",
+  "notFound.seoTitle": "Page not found | Dorit Gov Ari",
+  "notFound.seoDescription": "The page you asked for does not exist. Go back to the home page to find what you were looking for.",
+  "notFound.eyebrow": "Error 404",
+  "notFound.title": "We couldn't find that page",
+  "notFound.text": "The address may have a typo, or the page has moved. You can carry on from here:",
+  "notFound.home": "To the home page",
+  "notFound.linksLabel": "Pages on the site"
 }

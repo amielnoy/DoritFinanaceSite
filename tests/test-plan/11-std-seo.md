@@ -31,7 +31,7 @@ one.
 | Crawl directives | `public/robots.txt`, `public/sitemap.xml` |
 | Host rewriting | `scripts/vite-site-url-plugin.mjs` — rewrites the origin in `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` when `VITE_SITE_URL` names a different one |
 | The old Base44 host | `src/lib/legacy-host.ts` (the decision), `src/lib/legacy-host-boot.ts` (the boot step in `main.jsx`) — on `safe-arch-plan.base44.app` a page goes noindex, names production canonical, and moves to the same address on `govari-fin.co.il` |
-| Page-level declarations | `src/pages/{Home,Blog,BlogPost,Claims,PrivacyPolicy,Accessibility}.tsx`, `src/lib/PageNotFound.jsx` |
+| Page-level declarations | `src/pages/{Home,Blog,BlogPost,Claims,PrivacyPolicy,Accessibility}.tsx`, `src/pages/NotFound.tsx` |
 
 ## 3. Unit cases — `tests/unit/seo.dom.test.ts`
 
@@ -73,6 +73,15 @@ one.
 | SEO-IDX-007..008 | "`/login` and `/admin/leads` are kept out of the index" | `noindex` present |
 | SEO-IDX-011 | "a missing blog post is noindex, not a thin indexable page" | Not-found view sends `noindex` |
 | SEO-IDX-012 | "the 404 page is noindex" | `noindex` present |
+
+**The 404 status itself is not asserted here.** `vite preview`, which this
+suite runs against, answers every unknown path with `index.html` and a 200; it
+does not read vercel.json. On Vercel an address no rewrite claims gets
+`dist/404.html` — the not-found page, prerendered — with a 404 status, and
+`/login`, `/account`, `/masleka` and `/admin/*` carry `X-Robots-Tag: noindex`
+(D-05, manual test 2026-10-14). Both are pinned on the config by
+`tests/contract/spa-routes.contract.test.ts` (STD-03), and are checked on a
+deployment with `curl -I`.
 
 ### 4.3 Social sharing
 

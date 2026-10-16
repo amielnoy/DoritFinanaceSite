@@ -45,11 +45,14 @@ export default function Perspective() {
           <Eyebrow>
             נקודת מבט · מתוך השטח
           </Eyebrow>
-          <h2 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
+          {/* The page's h1: this section is /perspective's opening and is
+              rendered nowhere else. It was an h2, which left the page with no
+              h1 at all (D-08, manual test 2026-10-14). */}
+          <h1 className="font-heading text-4xl md:text-6xl mt-5 leading-tight">
             בזמנים לא ודאיים,
             <br />
             הקול השקול הוא הנכס
-          </h2>
+          </h1>
           <div className="mt-6 h-px w-16 bg-highlight-muted/60" />
         </div>
 

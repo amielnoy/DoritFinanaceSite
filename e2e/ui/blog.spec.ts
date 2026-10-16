@@ -123,5 +123,37 @@ test.describe("Blog — sanity", () => {
       await expect(page.locator("#root")).not.toBeEmpty();
       expect(errors.filter((e) => e.startsWith("pageerror"))).toEqual([]);
     });
+
+    await test_step("it says the articles could not be loaded, not that there are none (D-09)", async () => {
+      await expect(page.getByRole("alert").filter({ hasText: "לא הצלחנו לטעון את המאמרים" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "לנסות שוב" })).toBeVisible();
+      await expect(page.getByText(/עדיין אין מאמרים/)).toHaveCount(0);
+    });
+  });
+
+  test("the prerendered list does not jump when the app takes over", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "layout-shift entries are Chromium's alone");
+    // D-06, manual test 2026-10-14: CLS 0.444 on /blog, every other page 0.
+    // The page arrives prerendered with its filters and cards; the app used to
+    // hide them while it read the articles again, then put them back.
+    await page.addInitScript(() => {
+      (window as unknown as { __cls: number }).__cls = 0;
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries() as unknown as { value: number; hadRecentInput: boolean }[]) {
+          if (!e.hadRecentInput) (window as unknown as { __cls: number }).__cls += e.value;
+        }
+      }).observe({ type: "layout-shift", buffered: true });
+    });
+
+    await test_step("open /blog and let the articles arrive", async () => {
+      await gotoApp(page, "/blog");
+      await expect(page.getByText(BLOG_POSTS[0].title).first()).toBeVisible();
+      await page.waitForTimeout(1000);
+    });
+
+    await test_step("the cumulative layout shift is under 0.1, Google's 'good'", async () => {
+      const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
+      expect(cls).toBeLessThan(0.1);
+    });
   });
 });

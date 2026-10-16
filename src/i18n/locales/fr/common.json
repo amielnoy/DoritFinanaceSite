@@ -56,5 +56,13 @@
   "submit.report": "le signalement",
   "nav.call": "Appeler",
   "nav.phone": "Téléphone",
-  "credentials.licence": "Licence d'agent de l'Autorité des marchés des capitaux, n°"
+  "credentials.licence": "Licence d'agent de l'Autorité des marchés des capitaux, n°",
+  "a11y.skipToMain": "Aller au contenu principal",
+  "notFound.seoTitle": "Page introuvable | Dorit Gov Ari",
+  "notFound.seoDescription": "La page demandée n'existe pas. Revenez à l'accueil pour trouver ce que vous cherchiez.",
+  "notFound.eyebrow": "Erreur 404",
+  "notFound.title": "Cette page est introuvable",
+  "notFound.text": "L'adresse contient peut-être une faute de frappe, ou la page a été déplacée. Vous pouvez continuer d'ici :",
+  "notFound.home": "Vers l'accueil",
+  "notFound.linksLabel": "Pages du site"
 }

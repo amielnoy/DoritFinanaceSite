@@ -30,7 +30,7 @@ export default function Perspective() {
   return (
     <div className="relative bg-background pb-14 md:pb-0">
       <FloatingHeader />
-      <main className="pt-24 md:pt-28">
+      <main id="main" className="pt-24 md:pt-28">
         <PerspectiveSection />
         <About />
       </main>

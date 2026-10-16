@@ -51,23 +51,26 @@ export default function BlogPost() {
 
   if (notFound || !post) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 text-center">
-        <p className="font-heading text-3xl">המאמר לא נמצא</p>
+      <main id="main" className="min-h-screen flex flex-col items-center justify-center bg-background px-6 text-center">
+        <h1 className="font-heading text-3xl">המאמר לא נמצא</h1>
         <Link
           to="/blog"
           className="mt-6 inline-flex items-center gap-2 text-accent hover:underline"
         >
           חזרה לבלוג <ArrowRight size={16} />
         </Link>
-      </div>
+      </main>
     );
   }
 
+  // The header and footer outside `<main id="main">`, and the article inside it: the
+  // whole page used to be one `<article>` with no `<main id="main">` (D-08, manual test
+  // 2026-10-14).
   return (
-    <article className="relative bg-background min-h-screen">
+    <div className="relative bg-background min-h-screen">
       <FloatingHeader />
-      <div className="pt-32 md:pt-36 pb-24">
-        <div className="max-w-3xl mx-auto px-6 md:px-10">
+      <main id="main" className="pt-32 md:pt-36 pb-24">
+        <article className="max-w-3xl mx-auto px-6 md:px-10">
           <Link
             to="/blog"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"
@@ -124,10 +127,10 @@ export default function BlogPost() {
           </div>
 
           <ShareButtons title={post.title} />
-        </div>
-      </div>
+        </article>
+      </main>
       <Footer />
-    </article>
+    </div>
   );
 }
 

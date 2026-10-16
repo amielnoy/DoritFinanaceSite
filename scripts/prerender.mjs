@@ -16,12 +16,14 @@
 // to `dist/<route>.html`. No second copy of the metadata to drift, because
 // nothing here knows what any route's title should be — it renders and asks.
 //
-// Two files, deliberately:
+// Three files, deliberately:
 //
 //   dist/index.html — the prerendered home page, served at `/`.
-//   dist/app.html   — the untouched SPA shell, the rewrite target (`/app`) for anything
-//                     without a prerendered file (an article published since
-//                     the last build, 404s).
+//   dist/app.html   — the untouched SPA shell, the rewrite target (`/app`) for a
+//                     route vercel.json names that has no prerendered file (an
+//                     article published since the last build, the private screens).
+//   dist/404.html   — the not-found page, which Vercel serves with a 404 status
+//                     for any address no file and no rewrite claims.
 //
 // Without the split, the SPA fallback would be the prerendered *home* page, and
 // a crawler fetching an article not yet prebuilt would be served the home
@@ -72,6 +74,15 @@ const ROUTES = [
   '/privacy',
   '/accessibility',
 ]
+
+/**
+ * The not-found page, written to `dist/404.html`. Vercel serves that file, with
+ * a 404 status, for any address no file and no rewrite in vercel.json claims —
+ * which is how an unknown path stopped being a 200 carrying the home page's
+ * canonical and `index, follow` (D-05, manual test 2026-10-14). Not a sitemap
+ * route: build-seo-files.mjs keeps its own list.
+ */
+const NOT_FOUND_ROUTE = '/404'
 
 /** The route is rendered when its own canonical has replaced the static one. */
 const canonicalFor = (route) => (route === '/' ? '/' : route.replace(/\/+$/, ''))
@@ -162,6 +173,10 @@ async function main() {
   } else {
     await cp(indexPath, shellPath)
   }
+  // Until the not-found page is rendered below — and for good when Chromium is
+  // missing — the shell answers unknown addresses: still a 404 status, and the
+  // app shows its not-found page once it runs.
+  await cp(shellPath, join(DIST, '404.html'))
 
   // Which articles to prebuild. The environment is read the way `vite build`
   // read it — the env files, with the process environment winning — so the list
@@ -178,7 +193,12 @@ async function main() {
   // English and French, when the build serves them (VITE_LOCALES): the same
   // pages under /en and /fr, each written to dist/en/<route>.html. Unset, this
   // adds nothing and the build is what it was.
-  const routes = [...ROUTES, ...translatedRoutes(enabledLocales(env.VITE_LOCALES)), ...articles.routes]
+  const routes = [
+    ...ROUTES,
+    ...translatedRoutes(enabledLocales(env.VITE_LOCALES)),
+    ...articles.routes,
+    NOT_FOUND_ROUTE,
+  ]
 
   const server = await preview({
     preview: { port: PORT, host: '127.0.0.1', strictPort: true },
@@ -289,7 +309,7 @@ async function main() {
         // shipped eight prerendered files that nothing ever requested. The
         // sibling file answers `/faq` and `/faq/` on `vite preview`, and on
         // Vercel because `vercel.json` sets `cleanUrls: true` — without it no
-        // file named `faq` exists and the catch-all rewrite serves the empty
+        // file named `faq` exists and the shell rewrite serves the empty
         // shell. With it the literal `/faq.html` answers a 308 to `/faq`.
         // Every copy declares `/faq` as its canonical. An article is
         // `dist/blog/<slug>.html`, beside `dist/blog.html`.

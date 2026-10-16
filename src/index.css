@@ -98,6 +98,12 @@
     font-variant-numeric: lining-nums;
   }
 
+  /* The skip link focuses the page's <main> so the next Tab starts there; the
+     main itself is not a control, and a ring round the whole page is noise. */
+  main[tabindex="-1"]:focus {
+    outline: none;
+  }
+
   h1, h2, h3, h4 {
     font-family: var(--font-heading);
     letter-spacing: -0.01em;
@@ -175,8 +181,12 @@
   .blog-body ul { list-style: disc; padding-right: 1.5rem; margin: 1.5rem 0; }
   .blog-body ol { list-style: decimal; padding-right: 1.5rem; margin: 1.5rem 0; }
   .blog-body li { margin: 0.6rem 0; padding-right: 0.25rem; }
-  /* Thick enough to see, offset enough not to cut the descenders of ק and ן. */
-  .blog-body a { color: hsl(var(--accent)); text-decoration: underline; text-decoration-color: hsl(var(--highlight) / 0.5); text-decoration-thickness: 1px; text-underline-offset: 5px; }
+  /* Thick enough to see, offset enough not to cut the descenders of ק and ן.
+     Not inside a `.not-prose` box: the contact box after the third paragraph
+     sits in the body, and this rule's gold, more specific than its buttons'
+     own colour, turned the WhatsApp label gold on green — 3.37:1 (D-07,
+     manual test 2026-10-14). */
+  .blog-body a:not(.not-prose a) { color: hsl(var(--accent)); text-decoration: underline; text-decoration-color: hsl(var(--highlight) / 0.5); text-decoration-thickness: 1px; text-underline-offset: 5px; }
   .blog-body blockquote { border-right: 1px solid hsl(var(--highlight)); padding-right: 1.25rem; margin: 2rem 0; color: hsl(var(--foreground)); }
   .blog-body strong { font-weight: 700; color: hsl(var(--foreground)); }
   .blog-body hr { margin: 3rem 0; border: 0; border-top: 1px solid hsl(var(--border)); }

@@ -58,7 +58,7 @@ export default function MaslekaGuide({ screenshots }: { screenshots?: StepScreen
           </Link>
         </div>
       </header>
-      <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-8">
+      <main id="main" className="max-w-[900px] mx-auto px-4 sm:px-6 py-8">
         <MaslekaSteps steps={steps} screenshots={screenshots} />
       </main>
     </div>

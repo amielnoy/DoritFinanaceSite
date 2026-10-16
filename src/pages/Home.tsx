@@ -56,7 +56,7 @@ export default function Home() {
     <div className="relative bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
       <ErrorBoundary><SecurityScroll /></ErrorBoundary>
       <ErrorBoundary><FloatingHeader /></ErrorBoundary>
-      <main>
+      <main id="main">
         <ErrorBoundary><Hero /></ErrorBoundary>
         <ErrorBoundary><CarrierLogos /></ErrorBoundary>
         <ErrorBoundary><About variant="brief" /></ErrorBoundary>

@@ -248,7 +248,7 @@ export default function MaslekaAnalysis({
   return (
     <div dir="rtl" className="min-h-screen bg-background print:bg-white">
       {header(`ניתוח מסלקה — ${clientName}`)}
-      <main className="max-w-[1000px] mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <main id="main" className="max-w-[1000px] mx-auto px-4 sm:px-6 py-8 space-y-8">
         <p className="text-sm text-muted-foreground">
           דוח מסלקה מ־{day(takenAt)} · ממשק {snapshot.interfaceVersion}
           {snapshot.client.age !== null ? ` · גיל ${snapshot.client.age}` : ""}

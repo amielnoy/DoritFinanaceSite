@@ -56,15 +56,15 @@ describe("Vercel functions under api/", () => {
     expect(old).toBeLessThan(rules.findIndex((r) => r.destination === "/app"));
   });
 
-  it("serves dist/<route>.html at /<route>: cleanUrls on, the catch-all serves the shell at /app", () => {
-    // Without cleanUrls no file named `faq` exists, so the catch-all rewrite
+  it("serves dist/<route>.html at /<route>: cleanUrls on, the shell rules serve it at /app", () => {
+    // Without cleanUrls no file named `faq` exists, so the shell rewrite
     // answered /faq, /faq/ and /tools with the empty shell. With it, a literal
-    // `/app.html` is a 308 to `/app`, so the rewrite must not use the `.html`
-    // spelling.
+    // `/app.html` is a 308 to `/app`, so no rewrite may use the `.html`
+    // spelling. Which addresses get the shell: spa-routes.contract.test.ts.
     expect((vercelConfig as { cleanUrls?: boolean }).cleanUrls).toBe(true);
-    const catchAll = vercelConfig.rewrites.find((r) => r.source === "/((?!assets/).*)");
-    expect(catchAll?.destination).toBe("/app");
-    const fn = readFileSync(join(REPO_ROOT, "api/og/blog.ts"), "utf8");
+    const html = vercelConfig.rewrites.filter((r) => /\.html($|\?)/.test(r.destination));
+    expect(html, "a rewrite to a .html path is a 308").toEqual([]);
+    expect(vercelConfig.rewrites.some((r) => r.destination === "/app")).toBe(true);
   });
 
   it("fetches the shell from the canonical origin: no includeFiles, no VERCEL_URL", () => {

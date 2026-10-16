@@ -43,8 +43,8 @@ timezone `Asia/Jerusalem`.
 | E2E-NAV-010 | "in-page anchors move the viewport to the right section" | `#services` in viewport after clicking the visible anchor |
 | E2E-NAV-011 | "the main menu reaches a home section from another route" | From `/blog`, the header's `שירותים` lands on `/#services` with the section in view |
 | E2E-NAV-012 | "the footer reaches a home section from another route" | From `/blog`, the footer's `אודות` lands on `/#about` with the section in view |
-| E2E-NAV-013 | "no link anywhere points at a section the page does not have" | On every public route, every `a[href^="#"]` resolves to an element on that route |
-| E2E-NAV-014 | "every internal link lands on a real route, not the not-found page" | Every internal `href` collected from the home page renders without the 404 heading |
+| E2E-NAV-013 | "no link anywhere points at a section the page does not have" | On every public route, every `a[href^="#"]` resolves to an element on that route — the skip link's `#main` included, which is why every page's `<main>` is `id="main"` (`tests/contract/main-landmark.contract.test.ts`) |
+| E2E-NAV-014 | "every internal link lands on a real route, not the not-found page" | Every internal `href` collected from the home page renders a `#main` and no `data-testid="not-found"`. It looked for a heading named "404", which stopped existing with the English template (D-04); a test id does not change with the wording |
 | E2E-NAV-015 | "every link in the footer menu goes where its label says" | All seven footer nav links, clicked from `/blog`, reach their documented URL (the `#start` link reads "לשיחה קצרה") |
 | E2E-NAV-016 | "navigating between routes scrolls back to the top" | `scrollY < 50` after a route change (verifies `ScrollToTop`) |
 | E2E-NAV-017 | "browser back returns to the previous route" | Back from `/blog` lands on `/` with `#top` visible |
@@ -117,8 +117,9 @@ because the backend still accepts leads recorded under them.
 | E2E-BLG-003 | "opens a post and renders its markdown body" | Heading, `##` subheading and list items rendered |
 | E2E-BLG-004 | "shows a friendly not-found for a missing post" | "המאמר לא נמצא" plus a back link; no `pageerror` |
 | E2E-BLG-005 | "share buttons point at real share endpoints" | ≥1 wa.me/facebook/linkedin/x link |
-| E2E-BLG-006 | "degrades gracefully when the blog backend errors" | Root non-empty; no `pageerror` |
+| E2E-BLG-006 | "degrades gracefully when the blog backend errors" | Root non-empty; no `pageerror`; a `role="alert"` "לא הצלחנו לטעון את המאמרים" with "לנסות שוב", and no "עדיין אין מאמרים" (D-09) |
 | E2E-BLG-007 | "the first article is on the first screen and a half" (375×812) | First `article-card` (the featured one, seeded) starts < 1,250px from the top; it was ~2,300px before the redesign |
+| E2E-BLG-008 | "the prerendered list does not jump when the app takes over" (Chromium projects; layout-shift entries are Chromium's alone) | Cumulative layout shift, observed from the first paint to a second after the cards appear, is < 0.1. It was 0.444 on production and 0.18 here before the fix (D-06) |
 
 ### 3.7 Desktop chrome — `mobile.spec.ts` (desktop projects only)
 
@@ -188,7 +189,7 @@ Giving it one is a separate change.
 | ID | Title | Expected result |
 |---|---|---|
 | E2E-MSK-001 | "the client page says the service is unavailable, offers no form, and is not indexed" | Opening `/masleka#t=<43 characters>` shows the heading "השירות אינו זמין כרגע" and no `form`; the URL ends exactly `/masleka` (no fragment, so the token is out of the address bar); `meta[name=robots]` contains `noindex`; no `/functions/v1/` request is made |
-| E2E-MSK-002 | "the staff board does not exist in a dark build" | `/admin/masleka` renders the 404 page |
+| E2E-MSK-002 | "the staff board does not exist in a dark build" | `/admin/masleka` renders the not-found page (`data-testid="not-found"`) |
 
 The enabled flow is covered in-process (CMP-MSK-*, the `INT-MSK*` cases); an
 e2e of one request end to end needs the switch on in a test build and belongs

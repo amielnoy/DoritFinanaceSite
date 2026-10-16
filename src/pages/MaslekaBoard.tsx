@@ -963,7 +963,7 @@ export default function MaslekaBoard({
         </div>
       </header>
 
-      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <main id="main" className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 space-y-6">
         {newOpen || submitFor ? null : noticeView}
 
 

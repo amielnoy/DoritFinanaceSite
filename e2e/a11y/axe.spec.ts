@@ -366,3 +366,50 @@ test.describe("Article legibility", () => {
     });
   });
 });
+
+/**
+ * The contact box after an article's third paragraph sits inside `.blog-body`,
+ * whose gold link rule is more specific than the box's own colours. On
+ * production it turned the WhatsApp label gold on green, 3.37:1 (D-07, manual
+ * test 2026-10-14). The fixture article is too short to get the inline box,
+ * which is why the page sweep above never saw it — so this one is long.
+ */
+test.describe("The contact box inside an article", () => {
+  const LONG_POST = {
+    id: "long-post",
+    slug: "long-post",
+    title: "מאמר ארוך עם תיבת יצירת קשר",
+    excerpt: "",
+    body: ["פסקה ראשונה.", "פסקה שנייה.", "פסקה שלישית.", "פסקה רביעית, אחרי התיבה."].join("\n\n"),
+    tags: "פנסיה",
+    published: true,
+    created_date: "2026-03-10T09:00:00Z",
+  };
+
+  test("keeps its own colours and clears 4.5:1", async ({ page, mockApi }) => {
+    test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    mockApi.setEntityDoc("BlogPost", LONG_POST.id, LONG_POST);
+    await gotoApp(page, `/blog/${LONG_POST.id}`);
+    const box = page.getByTestId("article_inline");
+    await expect(box).toBeVisible();
+
+    await test_step("the WhatsApp label is ink, not the article's link gold", async () => {
+      const [label, ink] = await box.getByRole("link", { name: /וואטסאפ/ }).evaluate((a) => [
+        getComputedStyle(a).color,
+        getComputedStyle(document.body).color,
+      ]);
+      expect(label).toBe(ink);
+    });
+
+    await test_step("axe finds no contrast failure in the box", async () => {
+      await box.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(600);
+      const { violations } = await new AxeBuilder({ page })
+        .include('[data-testid="article_inline"]')
+        .withRules([CONTRAST_RULE])
+        .analyze();
+      expect(violations, summarise(violations)).toEqual([]);
+    });
+  });
+});
