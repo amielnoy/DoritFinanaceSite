@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
-import MaslekaBoard, { REVEAL_MS, type MaslekaBoardProps } from "@/pages/MaslekaBoard";
+import MaslekaBoard, { REVEAL_MS, waitingLine, type MaslekaBoardProps } from "@/pages/MaslekaBoard";
 import { MaslekaError, type MaslekaPort, type MaslekaRequest } from "@/services/ports";
 
 const NOW = new Date("2026-10-13T12:00:00Z");
@@ -80,6 +80,11 @@ const card = (name: string) => {
   if (open) fireEvent.click(open);
   return within(li);
 };
+/** The header's "+ בקשה חדשה": the new-request drawer. */
+async function openNew() {
+  await userEvent.click(screen.getByRole("button", { name: "בקשה חדשה" }));
+  return within(await screen.findByRole("dialog", { name: "בקשה חדשה" }));
+}
 /** Once the list is in: every row waiting to be submitted opened, as the old column showed them. */
 async function openWaiting() {
   for (const button of await screen.findAllByRole("button", { name: "להגשה" })) {
@@ -152,6 +157,47 @@ describe("<MaslekaBoard /> — the list", () => {
 function Where() {
   return <output data-testid="where">{useLocation().search}</output>;
 }
+
+describe("<MaslekaBoard /> — the header", () => {
+  it("names the board, says how many requests wait today, and links to how it works", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    expect(screen.getByRole("heading", { level: 1, name: "מסלקה" })).toBeInTheDocument();
+    expect(screen.getByText("טיפול שוטף")).toBeInTheDocument();
+    expect(await screen.findByText("2 בקשות מחכות לך היום. שאר הבקשות מתקדמות לבד.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "איך זה עובד?" })).toHaveAttribute("href", "#masleka-how");
+  });
+
+  it("words the count for none and for one", () => {
+    expect(waitingLine(0)).toBe("אין בקשות שמחכות לך היום. שאר הבקשות מתקדמות לבד.");
+    expect(waitingLine(1)).toBe("בקשה אחת מחכה לך היום. שאר הבקשות מתקדמות לבד.");
+    expect(waitingLine(7)).toBe("7 בקשות מחכות לך היום. שאר הבקשות מתקדמות לבד.");
+  });
+
+  it("keeps the new-request form off the page until '+ בקשה חדשה' opens its drawer", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    await screen.findByText("רונית מזרחי");
+    expect(screen.queryByLabelText("שם הלקוח")).not.toBeInTheDocument();
+    const drawer = await openNew();
+    expect(drawer.getByLabelText("שם הלקוח")).toBeInTheDocument();
+  });
+
+  it("is a modal dialog that the X and Esc close, giving the focus back to the button", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    await screen.findByText("רונית מזרחי");
+    const opener = screen.getByRole("button", { name: "בקשה חדשה" });
+    await openNew();
+    const dialog = screen.getByRole("dialog", { name: "בקשה חדשה" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    await userEvent.click(within(dialog).getByRole("button", { name: "סגירה" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(opener).toHaveFocus());
+    await openNew();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+});
 
 describe("<MaslekaBoard /> — the stage bar", () => {
   const bar = () => within(screen.getByRole("navigation", { name: "שלבי הבקשה" }));
@@ -452,6 +498,7 @@ describe("<MaslekaBoard /> — acting", () => {
     });
     renderBoard({ service: svc, clipboard: null });
     expect(await screen.findByText("ההרשאה שלך הוסרה")).toBeInTheDocument();
+    await openNew();
     await userEvent.type(screen.getByLabelText("שם הלקוח"), "משה כהן");
     await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
     expect(await screen.findByText(/כתובת הדוא״ל אינה תקינה/)).toBeInTheDocument();
@@ -469,6 +516,7 @@ describe("<MaslekaBoard /> — acting", () => {
   it("creates a hand-made request and shows its link to copy", async () => {
     const svc = service();
     renderBoard({ service: svc, clipboard: null });
+    await openNew();
     await userEvent.type(screen.getByLabelText("שם הלקוח"), "משה כהן");
     await userEvent.type(screen.getByLabelText("מייל (לא חובה)"), "moshe@example.com");
     await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
@@ -533,15 +581,17 @@ describe("<MaslekaBoard /> — acting", () => {
   it("says a blank name is not valid, and sends nothing", async () => {
     const svc = service();
     renderBoard({ service: svc, clipboard: null });
+    const drawer = await openNew();
     await userEvent.type(screen.getByLabelText("שם הלקוח"), "   ");
     await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("השם אינו תקין");
+    expect(await drawer.findByRole("alert")).toHaveTextContent("השם אינו תקין");
     expect(svc.create).not.toHaveBeenCalled();
   });
 
   it("says so when the invitation e-mail was asked for but not sent", async () => {
     const svc = service({ create: vi.fn(async () => ({ requestId: "r9", link: LINK, invited: false })) });
     renderBoard({ service: svc, clipboard: null });
+    await openNew();
     await userEvent.type(screen.getByLabelText("שם הלקוח"), "משה כהן");
     await userEvent.type(screen.getByLabelText("מייל (לא חובה)"), "moshe@example.com");
     await userEvent.click(screen.getByRole("button", { name: "צור בקשה" }));

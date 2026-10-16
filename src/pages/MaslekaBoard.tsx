@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import SideDrawer from "@/components/dorit/admin/SideDrawer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { CLEARINGHOUSE_ADVISOR_URL } from "@/config/masleka";
 import {
   BOARD_KEY,
@@ -68,6 +69,14 @@ const buttonClass =
   "inline-flex min-h-11 items-center justify-center gap-1 border border-border/60 px-3 py-1.5 text-sm hover:border-accent disabled:opacity-60";
 const primaryClass =
   "inline-flex min-h-11 items-center justify-center gap-1 bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60";
+
+/** The header's line: how many requests wait for someone today. */
+export function waitingLine(n: number): string {
+  const rest = "שאר הבקשות מתקדמות לבד.";
+  if (n === 0) return `אין בקשות שמחכות לך היום. ${rest}`;
+  if (n === 1) return `בקשה אחת מחכה לך היום. ${rest}`;
+  return `${n} בקשות מחכות לך היום. ${rest}`;
+}
 
 /** What the board is showing for one row's field after a copy button. */
 type Shown =
@@ -176,8 +185,6 @@ function NewRequest({
   const [sendInvite, setSendInvite] = useState(true);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ link: MaslekaLink; mailRequested: boolean } | null>(null);
-  const headingId = useId();
-
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const clientName = name.trim();
@@ -207,12 +214,9 @@ function NewRequest({
   };
 
   return (
-    <section aria-labelledby={headingId} className="border border-border/60 bg-card p-4">
-      <h2 id={headingId} className="font-heading text-lg">
-        בקשה חדשה ביד
-      </h2>
+    <div>
       <p className="text-sm text-muted-foreground">ללקוח שפנה בטלפון. הקישור יוצג כאן פעם אחת.</p>
-      <form onSubmit={submit} aria-label="בקשה חדשה" className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+      <form onSubmit={submit} aria-label="בקשה חדשה" className="mt-3 grid gap-3">
         <div>
           <label htmlFor="masleka-new-name" className="block text-sm">
             שם הלקוח
@@ -243,12 +247,12 @@ function NewRequest({
           <input type="checkbox" checked={sendInvite} onChange={(e) => setSendInvite(e.target.checked)} />
           לשלוח ללקוח את הקישור במייל
         </label>
-        <button type="submit" disabled={busy} className={buttonClass}>
+        <button type="submit" disabled={busy} className={primaryClass}>
           צור בקשה
         </button>
       </form>
       {result ? <LinkPanel link={result.link} mailRequested={result.mailRequested} clipboard={clipboard} /> : null}
-    </section>
+    </div>
   );
 }
 
@@ -285,9 +289,9 @@ function BoardRow({
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-medium">{request.clientName}</span>
-            <span className="text-xs text-muted-foreground">{STAGE_LABEL[plan.stage]}</span>
+            <span className="text-sm text-muted-foreground">{STAGE_LABEL[plan.stage]}</span>
             {plan.urgent ? (
-              <span className="border border-destructive/60 px-1.5 text-xs text-destructive">דחוף</span>
+              <span className="border border-destructive/60 px-1.5 text-sm text-destructive">דחוף</span>
             ) : null}
           </p>
           <p className={plan.urgent ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{plan.reason}</p>
@@ -437,6 +441,21 @@ export default function MaslekaBoard({
   useEffect(() => {
     hide();
   }, [view, hide]);
+  const waitingNow = nowRows(planned).length;
+  const noticeView = notice ? (
+    <p
+      role={notice.tone === "state" ? "status" : "alert"}
+      className={
+        notice.tone === "state"
+          ? "border border-border/60 bg-card p-3 text-sm"
+          : "border border-destructive/40 bg-destructive/5 p-3 text-sm"
+      }
+    >
+      {notice.text}
+    </p>
+  ) : null;
+  const [newOpen, setNewOpen] = useState(false);
+
   // The rows whose copy controls are open ("להגשה").
   const [openSubmit, setOpenSubmit] = useState<ReadonlySet<string>>(new Set());
   const toggleSubmit = (id: string) =>
@@ -501,30 +520,26 @@ export default function MaslekaBoard({
           <div>
             <Eyebrow>טיפול שוטף</Eyebrow>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">מסלקה</h1>
+            {requests.isSuccess ? <p className="mt-1 text-sm text-muted-foreground">{waitingLine(waitingNow)}</p> : null}
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <Link to="/admin/masleka/guide" className="underline">
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <a href="#masleka-how" className="inline-flex min-h-11 items-center underline">
+              איך זה עובד?
+            </a>
+            <Link to="/admin/masleka/guide" className="inline-flex min-h-11 items-center underline">
               מדריך: הרשמה כיועץ במסלקה
             </Link>
+            <button type="button" onClick={() => setNewOpen(true)} className={primaryClass}>
+              <Plus size={16} aria-hidden="true" />
+              בקשה חדשה
+            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {notice ? (
-          <p
-            role={notice.tone === "state" ? "status" : "alert"}
-            className={
-              notice.tone === "state"
-                ? "border border-border/60 bg-card p-3 text-sm"
-                : "border border-destructive/40 bg-destructive/5 p-3 text-sm"
-            }
-          >
-            {notice.text}
-          </p>
-        ) : null}
+        {newOpen ? null : noticeView}
 
-        <NewRequest service={service} clipboard={clipboard} onStart={clearNotice} onCreated={refresh} onFailure={report} />
 
         {requests.isError ? (
           <div role="alert" className="text-sm">
@@ -550,7 +565,7 @@ export default function MaslekaBoard({
                     {v.label}
                     <span className="font-heading text-accent">{requests.isSuccess ? rowsOf(v.view).length : "–"}</span>
                   </span>
-                  <span className="text-xs text-muted-foreground">{v.hint}</span>
+                  <span className="text-sm text-muted-foreground">{v.hint}</span>
                 </button>
               </li>
             ))}
@@ -656,6 +671,12 @@ export default function MaslekaBoard({
           </section>
         ) : null}
       </main>
+
+      <SideDrawer open={newOpen} onClose={() => setNewOpen(false)} title="בקשה חדשה">
+        {/* Behind an open drawer the page is hidden from assistive technology: its notice shows here. */}
+        {noticeView ? <div className="mb-4">{noticeView}</div> : null}
+        <NewRequest service={service} clipboard={clipboard} onStart={clearNotice} onCreated={refresh} onFailure={report} />
+      </SideDrawer>
     </div>
   );
 }

@@ -419,6 +419,10 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-033 | "shows one stage when chosen, and keeps it in ?stage= so a refresh opens on it" (the stage bar) | `?stage=submitted` after the click; a fresh render at that address opens on it; back to now drops the parameter |
 | CMP-MSKB-034 | "opens on 'now' for a stage it does not know" (the stage bar) | `?stage=everything` → now |
 | CMP-MSKB-035 | "hides a revealed value when another stage is chosen, even one the row is on" (the stage bar) | A clipboard copy's mark survives an outside click and goes on the stage change (fails without the hide) |
+| CMP-MSKB-036 | "names the board, says how many requests wait today, and links to how it works" (the header) | h1 מסלקה, eyebrow טיפול שוטף; "2 בקשות מחכות לך היום. שאר הבקשות מתקדמות לבד."; "איך זה עובד?" → `#masleka-how` |
+| CMP-MSKB-037 | "words the count for none and for one" (the header) | `waitingLine` 0 / 1 / 7 |
+| CMP-MSKB-038 | "keeps the new-request form off the page until '+ בקשה חדשה' opens its drawer" (the header) | No `שם הלקוח` on the page; present in the dialog |
+| CMP-MSKB-039 | "is a modal dialog that the X and Esc close, giving the focus back to the button" (the header) | `aria-modal="true"`, focus inside; the X (`סגירה`) and Esc close it; focus back on "בקשה חדשה" |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 
