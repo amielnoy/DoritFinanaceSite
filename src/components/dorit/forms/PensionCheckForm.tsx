@@ -93,7 +93,7 @@ export default function PensionCheckForm({ location, context, heading }: Pension
       {heading ? <h3 className="font-heading text-xl md:text-2xl leading-snug">{heading}</h3> : null}
       <div className={`grid gap-4 sm:grid-cols-2 ${heading ? "mt-4" : ""}`}>
         <Field label={t("form.name")}>
-          <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={inputClass()} />
+          <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" aria-required="true" className={inputClass()} />
         </Field>
         <Field label={t("form.phone")}>
           <input
@@ -103,6 +103,7 @@ export default function PensionCheckForm({ location, context, heading }: Pension
             onChange={(e) => setPhone(e.target.value)}
             placeholder={HUMAN_HANDOFF.phonePlaceholder}
             autoComplete="tel"
+            aria-required="true"
             aria-invalid={invalid === "form.errorPhone"}
             className={inputClass()}
           />

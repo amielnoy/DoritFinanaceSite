@@ -440,6 +440,12 @@ the file uses.
 `<main>` is unnamed leaves it pointing nowhere (D-08). It covers the screens
 behind sign-in, which E2E-NAV-013 cannot reach.
 
+**`required-fields.contract.test.ts`.** Every `<Field>` in
+`src/components/dorit/forms/` whose Hebrew label ends in "*" gives its input
+`aria-required="true"` (or `required`): the star alone is not announced as
+"required" (D-16). It finds the claim, quick-contact and pension-check forms'
+starred fields, so a new starred field is covered without listing it.
+
 **`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
 bundle reach a real backend. The app id falls back to the linked app only when
 the environment supplies none, never overriding it; a checkout with no

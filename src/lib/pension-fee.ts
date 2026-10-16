@@ -38,22 +38,30 @@ const num = (v: number | string | undefined | null): number => Number(v) || 0;
  * הטווחים שהחישוב מקבל — כמו RANGES ב-retirement-projection.ts: ערך שהוקלד מעבר להם נחתך.
  * What the math takes (review 2026-10-15): 1e9 years looped for minutes and a
  * 500% fee went negative. Anything typed past a range is clamped to it.
+ *
+ * The ceilings are what a real saver can have, not what arithmetic survives:
+ * at 0–100% the calculator still priced a 100% fee, a hundred years and
+ * ₪1,000,000 a month (D-15, manual test 2026-10-14). Deposit fees go to 15%,
+ * above today's legal 6% so an old managers' policy still fits; the balance
+ * fee to 3%; a career to 50 years; a nominal return to 15%. The calculator's
+ * fields carry the same numbers (PensionFeeCalculator).
  */
 export const PENSION_FEE_RANGES = {
-  years: { min: 0, max: 60 },
-  depositFee: { min: 0, max: 100 },
-  annualFee: { min: 0, max: 100 },
-  annualReturn: { min: 0, max: 100 },
+  monthlyDeposit: { min: 0, max: 50_000 },
+  years: { min: 0, max: 50 },
+  depositFee: { min: 0, max: 15 },
+  annualFee: { min: 0, max: 3 },
+  annualReturn: { min: 0, max: 15 },
 } as const;
 
-const clamp = (v: number, { min, max }: { min: number; max: number }): number => Math.min(max, Math.max(min, v));
+export const clamp = (v: number, { min, max }: { min: number; max: number }): number => Math.min(max, Math.max(min, v));
 
 /**
  * מודל חודשי: תשואה → הפקדה בניכוי דמי הפקדה → גביית דמי ניהול שוטפים.
  * `lostToFees` מושווה לתרחיש אידיאלי באותה תשואה וללא דמי ניהול כלל.
  */
 export function computePensionFees(input: PensionFeeInput): PensionFeeResult {
-  const monthly = Math.max(0, num(input.monthlyDeposit));
+  const monthly = clamp(num(input.monthlyDeposit), PENSION_FEE_RANGES.monthlyDeposit);
   const depositFeeRate = clamp(num(input.depositFee), PENSION_FEE_RANGES.depositFee) / 100;
   const annualFeeRate = clamp(num(input.annualFee), PENSION_FEE_RANGES.annualFee) / 100;
   const years = clamp(num(input.years), PENSION_FEE_RANGES.years);

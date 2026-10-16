@@ -46,6 +46,15 @@ describe("insurance self-assessment", () => {
     expect(recs.map((r) => r.title)).not.toContain("בחינת קרן השתלמות / פנסיה");
   });
 
+  it("gives a parent a pension reason about their stage, not about retirement being near", () => {
+    // D-14, manual test 2026-10-14: parent + employee + mortgage + history
+    // was told "ככל שמתקרבים לפרישה".
+    const pension = buildRecommendations({ stage: "parent", work: "employee", mortgage: "yes", health: "yes" }).find((r) => r.id === "pension");
+    expect(pension?.reason).toBe("pension.parent");
+    expect(pension?.why).toMatch(/ילדים/);
+    expect(pension?.why).not.toMatch(/מתקרבים לפרישה|לקראת פרישה/);
+  });
+
   it("never returns the same insurance type twice, and gives every result a reason", () => {
     for (const stage of ["single", "couple", "parent", "retiree"])
       for (const work of ["employee", "selfemployed", "none"])

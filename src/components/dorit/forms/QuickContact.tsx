@@ -105,6 +105,7 @@ export default function QuickContact({ embedded = false, className }: { embedded
                       setValidationError(null);
                     }}
                     autoComplete="name"
+                    aria-required="true"
                     className={inputClass()}
                   />
                 </Field>
@@ -120,6 +121,7 @@ export default function QuickContact({ embedded = false, className }: { embedded
                     }}
                     placeholder={HUMAN_HANDOFF.phonePlaceholder}
                     autoComplete="tel"
+                    aria-required="true"
                     aria-invalid={validationError === "quick.errorPhoneInvalid" || undefined}
                     className={inputClass()}
                   />

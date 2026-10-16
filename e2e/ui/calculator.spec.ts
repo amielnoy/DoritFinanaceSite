@@ -110,6 +110,23 @@ test.describe("Pension fee calculator — sanity", () => {
       await expect(page.locator("#fee-calculator")).not.toContainText("NaN");
       await expect(field(page, "שנות חיסכון")).toBeEditable();
     });
+
+    // D-15, manual test 2026-10-14: 100% fees, 100 years and ₪1,000,000 a
+    // month were all priced. Leaving a field brings it to its ceiling, so the
+    // result is for the figure on screen.
+    await test_step("leaving each field brings an absurd value down to the calculator's ceiling", async () => {
+      await field(page, "הפקדה חודשית (₪)").fill("1000000");
+      await field(page, "דמי ניהול בהפקדה (%)").fill("100");
+      await field(page, "דמי ניהול שוטפים (% שנתי)").fill("100");
+      await field(page, "שנות חיסכון").focus();
+      await expect(field(page, "הפקדה חודשית (₪)")).toHaveValue("50000");
+      await expect(field(page, "דמי ניהול בהפקדה (%)")).toHaveValue("15");
+      await expect(field(page, "דמי ניהול שוטפים (% שנתי)")).toHaveValue("3");
+      await expect(field(page, "שנות חיסכון")).toHaveAttribute("max", "50");
+      await field(page, "הפקדה חודשית (₪)").focus();
+      await expect(field(page, "שנות חיסכון")).toHaveValue("50");
+      await expect(field(page, "תשואה שנתית צפויה (%)")).toHaveValue("15");
+    });
   });
 
   test("its CTA points at the contact form", async ({ page }) => {
