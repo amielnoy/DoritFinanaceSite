@@ -308,6 +308,9 @@ published. See [A-65](10-known-issues.md).
 | UNIT-SEED-012 | "refuses a file name that cannot be an address" | Throws naming kebab-case |
 | UNIT-SEED-013 | "carries cta_headline and og_image to Supabase only (Base44's BlogPost has neither)" | In the mirror row; not in the Base44 payload |
 | UNIT-SEED-014 | "mirrors an article without them as null, which the column checks accept (an empty string is refused)" | `cta_headline: null`, `og_image: null` |
+| UNIT-SEED-015 | "takes every article when --only is not given" (selectArticles) | All three |
+| UNIT-SEED-016 | "takes only the named ones, with or without .md, in either spelling of the list" (selectArticles) | `shana-lifnei-prisha.md,mutavim` → those two; ` tofes-101 , ` → one |
+| UNIT-SEED-017 | "refuses a name with no article file, and an empty list, so a typo seeds nothing" (selectArticles) | A misspelt name throws naming it; `""` and `" , "` throw |
 
 ### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
 

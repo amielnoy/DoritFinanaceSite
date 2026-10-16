@@ -26,6 +26,11 @@
  *
  *   node --env-file=.env.local scripts/seed-blog.mjs --apply
  *
+ * `--only a.md,b.md` takes just those articles (the `.md` may be left out). A
+ * new article goes up without re-writing every other one: a re-run updates
+ * each existing post from its file, which would put back over an edit made in
+ * /admin/blog. A name with no file is refused, so a typo seeds nothing.
+ *
  * Posts are matched by title: an existing post is updated, a new one created.
  * New posts are drafts — publishing is דורית's call, from /admin/blog — and a
  * re-run never touches `published` on a post that already exists, so
@@ -40,6 +45,31 @@ import { isValidSlug } from "./published-articles.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTENT_DIR = join(ROOT, "content/blog");
 const apply = process.argv.includes("--apply");
+
+/** `--only <list>` or `--only=<list>`, if given. */
+function onlyFromArgv(argv) {
+  const eq = argv.find((a) => a.startsWith("--only="));
+  if (eq) return eq.slice("--only=".length);
+  const at = argv.indexOf("--only");
+  return at >= 0 ? (argv[at + 1] ?? "") : undefined;
+}
+
+/**
+ * The articles `--only` names — all of them without it. Throws on a name no
+ * article file has, and on an empty list, so a mistake seeds nothing.
+ */
+export function selectArticles(articles, only) {
+  if (only === undefined) return articles;
+  const names = only
+    .split(",")
+    .map((n) => n.trim())
+    .filter(Boolean)
+    .map((n) => (n.endsWith(".md") ? n : `${n}.md`));
+  if (names.length === 0) throw new Error("--only: no article named");
+  const missing = names.filter((n) => !articles.some((a) => a.file === n));
+  if (missing.length) throw new Error(`--only: no such article in content/blog: ${missing.join(", ")}`);
+  return articles.filter((a) => names.includes(a.file));
+}
 
 /** Minimal front-matter reader — `key: "value"` pairs, one per line. */
 function parseArticle(raw) {
@@ -177,7 +207,7 @@ async function upsertSupabase(url, key, row) {
 }
 
 async function main() {
-  const articles = loadArticles();
+  const articles = selectArticles(loadArticles(), onlyFromArgv(process.argv));
 
   console.log(`נמצאו ${articles.length} מאמרים ב-content/blog:\n`);
   for (const a of articles) {

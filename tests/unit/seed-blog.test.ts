@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — plain .mjs tooling, imported for its pure planning step.
-import { planSeed, mirrorRow, parseArticle, readExecResult, slugFromFile } from "../../scripts/seed-blog.mjs";
+import { planSeed, mirrorRow, parseArticle, readExecResult, selectArticles, slugFromFile } from "../../scripts/seed-blog.mjs";
 
 /**
  * Seeding writes the repo's articles to both stores.
@@ -119,5 +119,25 @@ describe("the article's address", () => {
 
   it("refuses a file name that cannot be an address", () => {
     expect(() => slugFromFile("Horadat Dmei.md")).toThrow(/kebab-case/);
+  });
+});
+
+/** `--only`: a new article goes up without re-writing the others over edits made in /admin/blog. */
+describe("selectArticles", () => {
+  const all = [{ file: "mutavim.md" }, { file: "tofes-101.md" }, { file: "shana-lifnei-prisha.md" }];
+
+  it("takes every article when --only is not given", () => {
+    expect(selectArticles(all, undefined)).toEqual(all);
+  });
+
+  it("takes only the named ones, with or without .md, in either spelling of the list", () => {
+    expect(selectArticles(all, "shana-lifnei-prisha.md,mutavim").map((a: { file: string }) => a.file)).toEqual(["mutavim.md", "shana-lifnei-prisha.md"]);
+    expect(selectArticles(all, " tofes-101 , ").map((a: { file: string }) => a.file)).toEqual(["tofes-101.md"]);
+  });
+
+  it("refuses a name with no article file, and an empty list, so a typo seeds nothing", () => {
+    expect(() => selectArticles(all, "tofes-101,shana-lifni-prisha")).toThrow(/no such article.*shana-lifni-prisha\.md/);
+    expect(() => selectArticles(all, "")).toThrow(/no article named/);
+    expect(() => selectArticles(all, " , ")).toThrow(/no article named/);
   });
 });
