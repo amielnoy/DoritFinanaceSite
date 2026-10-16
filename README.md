@@ -490,6 +490,14 @@ these tables, so using service credentials there answers 403/42501 even after
 the admin gate succeeds. Auth account creation and `invitee_for` stay under
 service credentials. The mailer uses the secrets already configured.
 
+**Making someone a site admin** is separate from those organization roles: the
+admin menu, `AdminRoute` and `_shared/admin.ts` read `profiles.role = 'admin'`,
+and no screen sets it. Run `scripts/set-site-admin.sh <email>` (or
+`… <email> user` to revoke). It matches the account on `auth.users.email`,
+updates production through `psql` with `DB_SUPABASE_PASSWORD` from `.env.local`,
+and prints the updated row. Exit 2 means the address has never signed in, so
+there is no profile yet; ask them to sign in once with Google, then run it again.
+
 ### Lead functions on Supabase
 
 `submitLead`, `escalateToHuman` and `logSupportChat` also exist as Supabase Edge
