@@ -132,6 +132,17 @@ export function allowLead(session: Session, leadId: string, rid: string, log: Lo
 }
 
 /**
+ * allowLead, and the lead is in `agencyId` (`lead_in_agency`): the check for a
+ * row filed under that agency with this lead on it, or a User could hang
+ * another agency's lead on their row.
+ */
+export async function allowLeadIn(session: Session, leadId: string, agencyId: string, rid: string, log: Log): Promise<Session | Refusal> {
+  const seen = await allowLead(session, leadId, rid, log);
+  if (!seen.ok) return seen;
+  return askAsCaller(session, 'lead_in_agency', { p_lead_id: leadId, p_agency_id: agencyId }, rid, log);
+}
+
+/**
  * The caller may work this clearinghouse request: as its lead (allowLead's
  * rule), or — for a request with no lead — as whoever created it; Admin+ and
  * the operator always (`can_work_request`).

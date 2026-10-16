@@ -167,12 +167,18 @@ export class SupabaseMaslekaService implements MaslekaPort {
         clientName: input.clientName,
         contactEmail: input.contactEmail ?? "",
         sendInvite: input.sendInvite,
+        // Only when there is one: a request made by hand sends no key at all.
+        ...(input.leadId ? { leadId: input.leadId } : {}),
       }),
     );
   }
 
   async relink(requestId: string): Promise<MaslekaLink> {
     return linkFrom(await this.call("masleka-create", { requestId }));
+  }
+
+  async reissue(requestId: string): Promise<MaslekaLink> {
+    return linkFrom(await this.call("masleka-create", { requestId, reissue: true }));
   }
 
   async reveal(requestId: string, field: MaslekaField): Promise<string> {

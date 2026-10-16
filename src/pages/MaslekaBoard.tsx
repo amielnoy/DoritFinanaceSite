@@ -1,23 +1,36 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import SideDrawer from "@/components/dorit/admin/SideDrawer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { CLEARINGHOUSE_ADVISOR_URL } from "@/config/masleka";
 import {
   BOARD_KEY,
-  boardColumns,
+  BOARD_VIEWS,
+  actionFor,
+  STAGE_LABEL,
+  boardTime,
   copyOrFallback,
-  deletionLabel,
   failureText,
-  readinessLabel,
+  firstNameOf,
+  whatsappInviteUrl,
+  nowRows,
+  planRows,
   staffMessage,
+  stageRows,
+  viewFromParam,
+  type BoardView,
   type ClipboardLike,
   type Message,
+  type PlannedRow,
 } from "@/lib/masleka";
+import { isIsraeliMobile } from "@/lib/phone";
+import { AGENCY_1 } from "@/hooks/useAgency";
 import {
   MaslekaError,
   services,
+  type LeadRecord,
   type MaslekaField,
   type MaslekaLink,
   type MaslekaPort,
@@ -43,11 +56,13 @@ export interface MaslekaBoardProps {
   service?: MaslekaPort;
   now?: () => Date;
   clipboard?: ClipboardLike | null;
-  confirm?: (message: string) => boolean;
+  /** The caller's leads, as row-level security shows them (a User: their own). */
+  leads?: () => Promise<LeadRecord[]>;
 }
 
 export { BOARD_KEY };
 export const SNAPSHOTS_KEY = ["admin", "masleka", "snapshots"] as const;
+const LEADS_KEY = ["admin", "masleka", "leads"] as const;
 
 /** How long a revealed value stays on the screen. */
 export const REVEAL_MS = 60_000;
@@ -55,20 +70,21 @@ export const REVEAL_MS = 60_000;
 const defaultClipboard = (): ClipboardLike | null =>
   typeof navigator !== "undefined" && navigator.clipboard ? navigator.clipboard : null;
 
-const when = (iso: string | null): string =>
-  iso
-    ? new Date(iso).toLocaleString("he-IL", {
-        timeZone: "Asia/Jerusalem",
-        day: "numeric",
-        month: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+const when = boardTime;
 
-
+/** Every control on the board is at least 44px tall. */
 const buttonClass =
-  "inline-flex items-center gap-1 border border-border/60 px-3 py-1.5 text-sm hover:border-accent disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center gap-1 border border-border/60 px-3 py-1.5 text-sm hover:border-accent disabled:opacity-60";
+const primaryClass =
+  "inline-flex min-h-11 items-center justify-center gap-1 bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60";
+
+/** The header's line: how many requests wait for someone today. */
+export function waitingLine(n: number): string {
+  const rest = "שאר הבקשות מתקדמות לבד.";
+  if (n === 0) return `אין בקשות שמחכות לך היום. ${rest}`;
+  if (n === 1) return `בקשה אחת מחכה לך היום. ${rest}`;
+  return `${n} בקשות מחכות לך היום. ${rest}`;
+}
 
 /** What the board is showing for one row's field after a copy button. */
 type Shown =
@@ -159,37 +175,91 @@ function LinkPanel({
   );
 }
 
-function Column({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
+/** A client's link, shown this once: the field with "העתקה", the gold "once only" box, and the client's page. */
+function LinkOnce({ link, clipboard }: { link: string; clipboard: ClipboardLike | null }) {
+  const [copied, setCopied] = useState<"idle" | "copied" | "manual">("idle");
   const id = useId();
   return (
-    <section aria-labelledby={id} className="border border-border/60 bg-card p-4">
-      <h2 id={id} className="font-heading text-lg mb-3">
-        {title}
-      </h2>
-      {children.length ? <ul className="space-y-3">{children}</ul> : <p className="text-sm text-muted-foreground">{empty}</p>}
-    </section>
+    <>
+      <div>
+        <label htmlFor={id} className="block text-sm">
+          הקישור ללקוח
+        </label>
+        <div className="mt-1 flex gap-2">
+          <input
+            id={id}
+            readOnly
+            value={link}
+            dir="ltr"
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-h-11 w-full border border-border bg-background px-2 py-1 font-mono text-xs"
+          />
+          <button type="button" onClick={async () => setCopied(await copyOrFallback(link, clipboard))} className={buttonClass}>
+            {copied === "copied" ? "הועתק ✓" : "העתקה"}
+          </button>
+        </div>
+        {copied === "manual" ? (
+          <p className="mt-1 text-sm text-muted-foreground">העתק ידנית: סמנו את הקישור והעתיקו (Ctrl+C או ⌘C).</p>
+        ) : null}
+      </div>
+      <p className="border border-highlight bg-highlight/10 p-3 text-sm">
+        הקישור מוצג כאן פעם אחת בלבד. העתיקו אותו או שלחו אותו עכשיו — אחר כך אפשר רק להחליף אותו בקישור חדש.
+      </p>
+      {/* The client's page as the client will see it: a new tab, no referrer. */}
+      <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm underline">
+        לראות את הדף כמו שהלקוח יראה ↗
+      </a>
+    </>
   );
 }
 
+type Channel = "whatsapp" | "mail" | "copy";
+const CHANNELS: { value: Channel; label: string }[] = [
+  { value: "whatsapp", label: "וואטסאפ" },
+  { value: "mail", label: "מייל" },
+  { value: "copy", label: "אעתיק בעצמי" },
+];
+const PHONE_ERROR = "מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות";
+const fieldClass = "mt-1 min-h-11 w-full border border-border bg-background px-3 py-2";
+
+/**
+ * The new-request drawer, in two steps. First: the client, how the link goes
+ * to them, and (optionally) the lead it is for. Then the link, once — with a
+ * WhatsApp click-to-chat built here in the browser (the number never reaches
+ * a server of ours), the invitation mail's outcome, or nothing but the copy.
+ */
 function NewRequest({
   service,
   clipboard,
+  leads,
   onStart,
   onCreated,
   onFailure,
 }: {
   service: MaslekaPort;
   clipboard: ClipboardLike | null;
+  /** The caller's open leads, for "שיוך לפנייה". */
+  leads: LeadRecord[];
   onStart: () => void;
   onCreated: () => Promise<unknown>;
   onFailure: (e: unknown) => void;
 }) {
   const [name, setName] = useState("");
+  const [channel, setChannel] = useState<Channel>("whatsapp");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [sendInvite, setSendInvite] = useState(true);
+  const [leadId, setLeadId] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ link: MaslekaLink; mailRequested: boolean } | null>(null);
-  const headingId = useId();
+  const [result, setResult] = useState<{ link: MaslekaLink; channel: Channel; clientName: string; phone: string } | null>(null);
+  const chooseLead = (id: string) => {
+    setLeadId(id);
+    const lead = leads.find((l) => l.id === id);
+    if (!lead) return;
+    // A start, not a rule: only fields still empty.
+    if (!name.trim()) setName(lead.name.slice(0, 80));
+    if (!phone.trim() && isIsraeliMobile(lead.phone)) setPhone(lead.phone);
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -200,17 +270,24 @@ function NewRequest({
       onFailure(new MaslekaError("invalid_name"));
       return;
     }
-    const mailRequested = sendInvite && Boolean(contactEmail);
+    if (channel === "whatsapp" && !isIsraeliMobile(phone)) {
+      setPhoneError(PHONE_ERROR);
+      return;
+    }
+    if (channel === "mail" && !contactEmail) {
+      onFailure(new MaslekaError("invalid_email"));
+      return;
+    }
     setBusy(true);
     try {
+      // The phone is not part of the request: it only builds the WhatsApp link below.
       const link = await service.create({
         clientName,
-        contactEmail: contactEmail || undefined,
-        sendInvite: mailRequested,
+        contactEmail: channel === "mail" ? contactEmail : undefined,
+        sendInvite: channel === "mail",
+        ...(leadId ? { leadId } : {}),
       });
-      setResult({ link, mailRequested });
-      setName("");
-      setEmail("");
+      setResult({ link, channel, clientName, phone });
       await onCreated();
     } catch (e) {
       onFailure(e);
@@ -219,29 +296,100 @@ function NewRequest({
     }
   };
 
+  if (result) {
+    const { link, clientName } = result;
+    const wa = result.channel === "whatsapp" ? whatsappInviteUrl(result.phone, clientName, link.link) : null;
+    return (
+      <div className="space-y-4">
+        <h3 className="font-heading text-xl">הקישור ל{clientName} מוכן</h3>
+        {wa ? (
+          <a href={wa} target="_blank" rel="noopener noreferrer" className={`${primaryClass} w-full`}>
+            שליחה ל{firstNameOf(clientName)} בוואטסאפ
+          </a>
+        ) : null}
+        {result.channel === "mail" ? (
+          <p role="status" className="text-sm">
+            {link.invited
+              ? "הקישור נשלח במייל ללקוח. אפשר גם להעתיק אותו:"
+              : "המייל ללקוח לא נשלח. העבירו לו את הקישור בעצמכם:"}
+          </p>
+        ) : null}
+        <LinkOnce link={link.link} clipboard={clipboard} />
+      </div>
+    );
+  }
+
   return (
-    <section aria-labelledby={headingId} className="border border-border/60 bg-card p-4">
-      <h2 id={headingId} className="font-heading text-lg">
-        בקשה חדשה ביד
-      </h2>
-      <p className="text-sm text-muted-foreground">ללקוח שפנה בטלפון. הקישור יוצג כאן פעם אחת.</p>
-      <form onSubmit={submit} aria-label="בקשה חדשה" className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+    <form onSubmit={submit} aria-label="בקשה חדשה" className="space-y-5" noValidate>
+      <div>
+        <label htmlFor="masleka-new-name" className="block text-sm">
+          שם הלקוח
+        </label>
+        <input
+          id="masleka-new-name"
+          required
+          maxLength={80}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className={fieldClass}
+        />
+      </div>
+      <fieldset>
+        <legend className="text-sm">איך לשלוח את הקישור?</legend>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {CHANNELS.map((c) => (
+            <label
+              key={c.value}
+              className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 border px-2 py-2 text-sm ${
+                channel === c.value ? "border-highlight bg-card" : "border-border/60"
+              }`}
+            >
+              <input
+                type="radio"
+                name="masleka-channel"
+                value={c.value}
+                checked={channel === c.value}
+                onChange={() => {
+                  setChannel(c.value);
+                  setPhoneError("");
+                }}
+              />
+              {c.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {channel === "whatsapp" ? (
         <div>
-          <label htmlFor="masleka-new-name" className="block text-sm">
-            שם הלקוח
+          <label htmlFor="masleka-new-phone" className="block text-sm">
+            נייד של הלקוח
           </label>
           <input
-            id="masleka-new-name"
-            required
-            maxLength={80}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 w-full border border-border bg-background px-2 py-1"
+            id="masleka-new-phone"
+            type="tel"
+            dir="ltr"
+            inputMode="tel"
+            autoComplete="off"
+            value={phone}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              setPhoneError("");
+            }}
+            aria-invalid={phoneError ? true : undefined}
+            aria-describedby={phoneError ? "masleka-new-phone-error" : undefined}
+            className={fieldClass}
           />
+          {phoneError ? (
+            <p id="masleka-new-phone-error" role="alert" className="mt-1 text-sm text-destructive">
+              {phoneError}
+            </p>
+          ) : null}
         </div>
+      ) : null}
+      {channel === "mail" ? (
         <div>
           <label htmlFor="masleka-new-email" className="block text-sm">
-            מייל (לא חובה)
+            מייל של הלקוח
           </label>
           <input
             id="masleka-new-email"
@@ -249,61 +397,289 @@ function NewRequest({
             dir="ltr"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full border border-border bg-background px-2 py-1"
+            className={fieldClass}
           />
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={sendInvite} onChange={(e) => setSendInvite(e.target.checked)} />
-          לשלוח ללקוח את הקישור במייל
+      ) : null}
+      <div>
+        <label htmlFor="masleka-new-lead" className="block text-sm">
+          שיוך לפנייה (לא חובה)
         </label>
-        <button type="submit" disabled={busy} className={buttonClass}>
-          צור בקשה
-        </button>
-      </form>
-      {result ? <LinkPanel link={result.link} mailRequested={result.mailRequested} clipboard={clipboard} /> : null}
-    </section>
+        <select id="masleka-new-lead" value={leadId} onChange={(e) => chooseLead(e.target.value)} className={fieldClass}>
+          <option value="">ללא שיוך</option>
+          {leads.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <button type="submit" disabled={busy} className={`${primaryClass} w-full`}>
+        {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+        יצירת קישור
+      </button>
+    </form>
   );
 }
 
-function InvitedRow({
+/** "איך בקשה מתקדמת": the four stages, in the words the staff work in. */
+const HOW_IT_WORKS: { title: string; text: string }[] = [
+  {
+    title: "ממתין ללקוח",
+    text: "הלקוח מקבל קישור — בוואטסאפ, במייל או ממך — מפיק באתר המסלקה קוד אימות, ומוסר אותו בקישור יחד עם מספר הזהות. אחרי 3 ימים בלי קוד הבקשה עולה ל״לטיפול עכשיו״, ואפשר לשלוח קישור חדש.",
+  },
+  {
+    title: "מוכן להגשה",
+    text: "קוד האימות התקבל. ״להגשה״ פותח את ההגשה המודרכת: פורטל המסלקה, העתקת מספר הזהות וקוד האימות, וסימון כהוגש — ואז שניהם נמחקים מהמערכת.",
+  },
+  {
+    title: "הוגש במסלקה",
+    text: "המסלקה מכינה את הקבצים בתוך כ־3–4 שעות ושומרת אותם 7 ימי עסקים. כשהם מוכנים הבקשה עולה ל״לטיפול עכשיו״, ויומיים לפני המחיקה היא מסומנת דחוף.",
+  },
+  {
+    title: "הושלם",
+    text: "הקבצים נקלטו, והניתוח וההמלצות מחכים בשורה של הבקשה.",
+  },
+];
+
+/** The step dot: the request's place in the four steps. */
+function StepDot({ step }: { step: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-highlight font-heading text-sm text-accent"
+    >
+      {step}
+    </span>
+  );
+}
+
+/**
+ * One request: who, where it stands, why, and the one thing to do. `children`
+ * is what opens under it (a fresh link, the copy controls).
+ */
+function BoardRow({
+  row,
+  action,
+  children,
+}: {
+  row: PlannedRow;
+  action: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  const { request, plan } = row;
+  return (
+    <li className="border border-border/60 bg-card p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <StepDot step={plan.step} />
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-medium">{request.clientName}</span>
+            <span className="text-sm text-muted-foreground">{STAGE_LABEL[plan.stage]}</span>
+            {plan.urgent ? (
+              <span className="border border-destructive/60 px-1.5 text-sm text-destructive">דחוף</span>
+            ) : null}
+          </p>
+          <p className={plan.urgent ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{plan.reason}</p>
+        </div>
+        {/* On a phone the row is a card, and its one action takes the full width. */}
+        <div className="max-sm:w-full max-sm:[&>*]:w-full sm:ms-auto">{action}</div>
+      </div>
+      {children}
+    </li>
+  );
+}
+
+/** One numbered step of the guided submit: done (✓), the current one (outlined), or still ahead. */
+function GuideStep({
+  n,
+  title,
+  state,
+  children,
+}: {
+  n: number;
+  title: string;
+  state: "done" | "current" | "ahead";
+  children: React.ReactNode;
+}) {
+  return (
+    <li
+      aria-current={state === "current" ? "step" : undefined}
+      className={`border p-4 ${state === "current" ? "border-highlight bg-card" : "border-border/60"}`}
+    >
+      <p className="flex items-center gap-3 font-medium">
+        <span
+          aria-hidden="true"
+          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-heading text-sm ${
+            state === "done" ? "border-accent bg-accent text-primary-foreground" : "border-highlight text-accent"
+          }`}
+        >
+          {state === "done" ? "✓" : n}
+        </span>
+        {title}
+        {state === "done" ? <span className="sr-only">(בוצע)</span> : null}
+      </p>
+      <div className="mt-3 ps-10">{children}</div>
+    </li>
+  );
+}
+
+/**
+ * The guided submit, in the drawer: open the portal, copy the ID, copy the
+ * code, mark it submitted — each step ticked as it is done. The values come
+ * through the board's one reveal (`copy`), so every secrecy rule of the board
+ * holds here: closing the drawer hides them. "סימון כהוגש" asks inline before
+ * the wipe; the board keeps the one-call guard.
+ */
+function SubmitGuide({
   request,
-  service,
+  copyButton,
+  copiedField,
+  manual,
+  onConfirm,
+  pending,
+  succeeded,
+  onBack,
+  onReissue,
+  reissuing,
+  reissued,
   clipboard,
-  onStart,
-  onFailure,
 }: {
   request: MaslekaRequest;
-  service: MaslekaPort;
+  copyButton: (field: MaslekaField) => React.ReactNode;
+  /** The field this request has on show now (copied or for copying by hand), if any. */
+  copiedField: MaslekaField | null;
+  manual: React.ReactNode;
+  onConfirm: () => void;
+  pending: boolean;
+  succeeded: boolean;
+  onBack: () => void;
+  /** "קוד האימות לא עובד במסלקה?": back to the client with a fresh link (masleka-create's reissue). */
+  onReissue: () => void;
+  reissuing: boolean;
+  /** The fresh link, once the request has gone back to the client. */
+  reissued: string | null;
   clipboard: ClipboardLike | null;
-  onStart: () => void;
-  onFailure: (e: unknown) => void;
 }) {
-  const [link, setLink] = useState<MaslekaLink | null>(null);
-  const [busy, setBusy] = useState(false);
-  const relink = async () => {
-    onStart();
-    setBusy(true);
-    try {
-      setLink(await service.relink(request.id));
-    } catch (e) {
-      onFailure(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <li className="border border-border/60 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-medium">{request.clientName}</span>
-        <span className="text-xs text-muted-foreground">
-          {request.clientInvitedAt ? `הוזמן במייל ${when(request.clientInvitedAt)}` : `נוצר ${when(request.createdAt)}`}
-        </span>
-        <button type="button" onClick={relink} disabled={busy} className={buttonClass}>
-          קישור חדש
+  const [portalOpened, setPortalOpened] = useState(false);
+  const [askingReissue, setAskingReissue] = useState(false);
+  const [copied, setCopied] = useState<{ id: boolean; code: boolean }>({ id: false, code: false });
+  const [confirming, setConfirming] = useState(false);
+  // A step stays ticked after its value has left the screen.
+  useEffect(() => {
+    if (copiedField) setCopied((c) => (c[copiedField] ? c : { ...c, [copiedField]: true }));
+  }, [copiedField]);
+  // A הגשתי that settled without going through (a failure, "already submitted"): the question closes, the notice says why.
+  const wasPending = useRef(false);
+  useEffect(() => {
+    if (wasPending.current && !pending && !succeeded) setConfirming(false);
+    wasPending.current = pending;
+  }, [pending, succeeded]);
+  const wasReissuing = useRef(false);
+  useEffect(() => {
+    if (wasReissuing.current && !reissuing && !reissued) setAskingReissue(false);
+    wasReissuing.current = reissuing;
+  }, [reissuing, reissued]);
+
+  if (reissued) {
+    return (
+      <div className="space-y-4">
+        <div role="status" className="space-y-1">
+          <p className="font-medium">קישור חדש ל{request.clientName} מוכן.</p>
+          <p className="text-sm text-muted-foreground">
+            קוד האימות ומספר הזהות נמחקו, והבקשה חזרה לשלב 1 — ממתין ללקוח. הקישור הקודם כבר לא עובד.
+          </p>
+        </div>
+        <LinkOnce link={reissued} clipboard={clipboard} />
+        <button type="button" onClick={onBack} className={primaryClass}>
+          חזרה ללוח
         </button>
       </div>
-      {link ? <LinkPanel link={link} clipboard={clipboard} /> : null}
-    </li>
+    );
+  }
+
+  if (succeeded) {
+    return (
+      <div role="status" className="space-y-3">
+        <p className="font-medium">הוגש. מספר הזהות וקוד האימות נמחקו.</p>
+        <p className="text-sm text-muted-foreground">הקבצים יהיו מוכנים להורדה בעוד כ־3–4 שעות. נזכיר לך במייל.</p>
+        <button type="button" onClick={onBack} className={primaryClass}>
+          חזרה ללוח
+        </button>
+      </div>
+    );
+  }
+
+  const done = [portalOpened, copied.id, copied.code];
+  const current = done.indexOf(false) === -1 ? 3 : done.indexOf(false);
+  const stateOf = (i: number): "done" | "current" | "ahead" => (i < 3 && done[i] ? "done" : i === current ? "current" : "ahead");
+  return (
+    <>
+      <ol className="space-y-3">
+        <GuideStep n={1} title="פותחים את פורטל המסלקה" state={stateOf(0)}>
+          {/* A new tab and no referrer: the board's address stays out of the portal's requests. */}
+          <a
+            href={CLEARINGHOUSE_ADVISOR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setPortalOpened(true)}
+            className={buttonClass}
+          >
+            פתיחת פורטל המסלקה ↗
+          </a>
+        </GuideStep>
+        <GuideStep n={2} title="מעתיקים את מספר הזהות" state={stateOf(1)}>
+          {copyButton("id")}
+          {copiedField === "id" ? manual : null}
+        </GuideStep>
+        <GuideStep n={3} title="מעתיקים את קוד האימות" state={stateOf(2)}>
+          {copyButton("code")}
+          {copiedField === "code" ? manual : null}
+        </GuideStep>
+        <GuideStep n={4} title="סיימתם להגיש?" state={stateOf(3)}>
+          {confirming ? (
+            <div role="alert" className="space-y-2 border border-destructive/40 bg-destructive/5 p-3">
+              <p className="font-medium">לסמן את הבקשה של {request.clientName} כהוגשה?</p>
+              <p className="text-sm">לא תוכלו להעתיק שוב את מספר הזהות או את קוד האימות.</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={onConfirm} disabled={pending} className={primaryClass}>
+                  {pending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+                  כן, הגשתי
+                </button>
+                <button type="button" onClick={() => setConfirming(false)} disabled={pending} className={buttonClass}>
+                  עוד לא
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirming(true)} className={buttonClass}>
+              סימון כהוגש
+            </button>
+          )}
+        </GuideStep>
+      </ol>
+      <div className="mt-6 border-t border-border/60 pt-4">
+        {askingReissue ? (
+          <div role="alert" className="space-y-2 border border-destructive/40 bg-destructive/5 p-3">
+            <p className="font-medium">לשלוח ל{request.clientName} קישור חדש?</p>
+            <p className="text-sm">קוד האימות ומספר הזהות שנמסרו יימחקו, והבקשה תחזור לשלב 1 — ממתין ללקוח.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={onReissue} disabled={reissuing} className={primaryClass}>
+                {reissuing ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+                כן, קישור חדש
+              </button>
+              <button type="button" onClick={() => setAskingReissue(false)} disabled={reissuing} className={buttonClass}>
+                ביטול
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setAskingReissue(true)} className="inline-flex min-h-11 items-center text-sm underline">
+            קוד האימות לא עובד במסלקה? שליחת קישור חדש
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -393,12 +769,15 @@ export default function MaslekaBoard({
   service = services.masleka,
   now = () => new Date(),
   clipboard = defaultClipboard(),
-  confirm = (message) => window.confirm(message),
+  leads = () => services.leadsAdmin.list(),
 }: MaslekaBoardProps) {
   const client = useQueryClient();
   const requests = useQuery({ queryKey: BOARD_KEY, queryFn: () => service.list(), refetchInterval: 60_000 });
   const snapshots = useQuery({ queryKey: SNAPSHOTS_KEY, queryFn: () => service.listSnapshots() });
   const analysisOf = new Map((snapshots.data ?? []).flatMap((s) => (s.requestId ? [[s.requestId, s.id] as const] : [])));
+  // Reports no request on the board owns: made by hand, or their request gone.
+  const onBoardIds = new Set((requests.data ?? []).map((r) => r.id));
+  const orphanReports = (snapshots.data ?? []).filter((r) => !r.requestId || !onBoardIds.has(r.requestId));
   const [notice, setNotice] = useState<Message | null>(null);
   const refresh = () => client.invalidateQueries({ queryKey: BOARD_KEY });
   const report = (e: unknown) => setNotice({ tone: staffMessage(e).tone, text: failureText(e) });
@@ -421,23 +800,124 @@ export default function MaslekaBoard({
     },
   });
 
-  const columns = boardColumns(requests.data ?? []);
   const at = now();
+  const planned = planRows(requests.data ?? [], at, analysisOf);
+  const [search, setSearch] = useState("");
+  const needle = search.trim().toLocaleLowerCase("he");
+  const matches = (r: PlannedRow) => !needle || r.request.clientName.toLocaleLowerCase("he").includes(needle);
+  // The stage on show, kept in the address (?stage=) so a refresh keeps it; "now" is the default and is left out.
+  const [params, setParams] = useSearchParams();
+  const view = viewFromParam(params.get("stage"));
+  const rowsOf = (v: BoardView) => (v === "now" ? nowRows(planned) : stageRows(planned, v));
+  const shownRows = rowsOf(view).filter(matches);
+  const choose = (v: BoardView) =>
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (v === "now") next.delete("stage");
+        else next.set("stage", v);
+        return next;
+      },
+      { replace: true },
+    );
+  // Another stage on screen: nothing revealed stays behind from the last one.
+  useEffect(() => {
+    hide();
+  }, [view, hide]);
+  const waitingNow = nowRows(planned).length;
+  const noticeView = notice ? (
+    <p
+      role={notice.tone === "state" ? "status" : "alert"}
+      className={
+        notice.tone === "state"
+          ? "border border-border/60 bg-card p-3 text-sm"
+          : "border border-destructive/40 bg-destructive/5 p-3 text-sm"
+      }
+    >
+      {notice.text}
+    </p>
+  ) : null;
+  const [newOpen, setNewOpen] = useState(false);
+  // For "שיוך לפנייה": read when the drawer opens; the agency's open leads the caller can see.
+  const myLeads = useQuery({ queryKey: LEADS_KEY, queryFn: leads, enabled: newOpen });
+  const openLeads = (myLeads.data ?? [])
+    .filter((l) => l.status !== "closed" && (!l.agency_id || l.agency_id === AGENCY_1))
+    .sort((a, b) => Date.parse(b.created_date) - Date.parse(a.created_date));
 
-  // A value whose row has left "ממתין להגשה" (submitted, expired) goes with it,
+  // The guided submit's drawer: the request it is for, and whether its הגשתי went through.
+  const [submitFor, setSubmitFor] = useState<MaslekaRequest | null>(null);
+  const [submitSucceeded, setSubmitSucceeded] = useState(false);
+  const [reissued, setReissued] = useState<string | null>(null);
+  const [reissuing, setReissuing] = useState(false);
+  const reissuingRef = useRef(false);
+  const closeSubmit = useCallback(() => {
+    // Closing the drawer takes any revealed value with it.
+    hide();
+    setSubmitFor(null);
+    setSubmitSucceeded(false);
+    setReissued(null);
+  }, [hide]);
+  const reissue = async (request: MaslekaRequest) => {
+    // One call per click, as for הגשתי.
+    if (reissuingRef.current) return;
+    reissuingRef.current = true;
+    clearNotice();
+    setReissuing(true);
+    try {
+      const link = await service.reissue(request.id);
+      // Wiped server-side: nothing revealed stays on the screen, and no answer still on its way lands.
+      hide();
+      setReissued(link.link);
+      void refresh();
+    } catch (e) {
+      report(e);
+      if (staffMessage(e).tone === "state") void refresh();
+    } finally {
+      reissuingRef.current = false;
+      setReissuing(false);
+    }
+  };
+  // A request that left "מוכן להגשה" while its drawer was open (submitted elsewhere, expired): the drawer goes too.
+  const submitStillWaiting =
+    submitFor === null ||
+    submitSucceeded ||
+    reissued !== null ||
+    (requests.data ?? []).some((r) => r.id === submitFor.id && r.status === "code_received");
+  useEffect(() => {
+    if (!submitStillWaiting) closeSubmit();
+  }, [submitStillWaiting, closeSubmit]);
+  // A fresh link per invited row, shown once under it.
+  const [links, setLinks] = useState<Record<string, MaslekaLink>>({});
+  const [relinking, setRelinking] = useState<string | null>(null);
+
+  // A value whose row has left "מוכן להגשה" (submitted, expired) goes with it,
   // and so does an answer for that row still on its way.
-  const activeRowWaiting = activeId === null || columns.waiting.some((r) => r.id === activeId);
+  const activeRowWaiting =
+    activeId === null || (requests.data ?? []).some((r) => r.id === activeId && r.status === "code_received");
   useEffect(() => {
     if (!activeRowWaiting) hide();
   }, [activeRowWaiting, hide]);
 
+  const relink = async (request: MaslekaRequest) => {
+    clearNotice();
+    setRelinking(request.id);
+    try {
+      const link = await service.relink(request.id);
+      setLinks((l) => ({ ...l, [request.id]: link }));
+    } catch (e) {
+      report(e);
+    } finally {
+      setRelinking(null);
+    }
+  };
+
   const onSubmitted = (request: MaslekaRequest) => {
     // One call per הגשתי: a double click lands before the button is disabled.
     if (submitting.current) return;
-    if (!confirm(`להגיש עבור ${request.clientName}? הקוד ומספר הזהות יימחקו מהמערכת.`)) return;
     submitting.current = true;
     clearNotice();
     submitted.mutate(request.id, {
+      onSuccess: () => setSubmitSucceeded(true),
       onSettled: () => {
         submitting.current = false;
       },
@@ -450,7 +930,7 @@ export default function MaslekaBoard({
     return (
       <button type="button" onClick={() => void reveal(request, field)} disabled={isBusy} className={buttonClass}>
         {isBusy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
-        {isCopied ? "הועתק ✓" : field === "id" ? "העתק ת״ז" : "העתק קוד"}
+        {isCopied ? "הועתק ✓ — הדביקו במסלקה" : field === "id" ? "העתק ת״ז" : "העתק קוד"}
       </button>
     );
   };
@@ -458,34 +938,34 @@ export default function MaslekaBoard({
   return (
     <div dir="rtl" className="min-h-screen bg-background">
       <header className="border-b border-border/60 bg-card">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
+        {/* A phone: the title and the round "+" share the row; nothing wraps under it. */}
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 flex items-start justify-between gap-3 sm:flex-wrap sm:items-center">
+          <div className="min-w-0">
             <Eyebrow>טיפול שוטף</Eyebrow>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">מסלקה</h1>
+            {requests.isSuccess ? <p className="mt-1 text-sm text-muted-foreground">{waitingLine(waitingNow)}</p> : null}
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <Link to="/admin/masleka/guide" className="underline">
-              מדריך: הרשמה כיועץ במסלקה
-            </Link>
+          <div className="flex shrink-0 items-center gap-4 text-sm max-sm:gap-2">
+            <a href="#masleka-how" className="inline-flex min-h-11 items-center underline">
+              איך זה עובד?
+            </a>
+            {/* A phone: a round 48px "+", named by its aria-label. */}
+            <button
+              type="button"
+              aria-label="בקשה חדשה"
+              onClick={() => setNewOpen(true)}
+              className={`${primaryClass} relative max-sm:h-12 max-sm:w-12 max-sm:rounded-full max-sm:p-0`}
+            >
+              <Plus size={16} aria-hidden="true" className="max-sm:h-6 max-sm:w-6" />
+              <span className="max-sm:sr-only">בקשה חדשה</span>
+            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {notice ? (
-          <p
-            role={notice.tone === "state" ? "status" : "alert"}
-            className={
-              notice.tone === "state"
-                ? "border border-border/60 bg-card p-3 text-sm"
-                : "border border-destructive/40 bg-destructive/5 p-3 text-sm"
-            }
-          >
-            {notice.text}
-          </p>
-        ) : null}
+        {newOpen || submitFor ? null : noticeView}
 
-        <NewRequest service={service} clipboard={clipboard} onStart={clearNotice} onCreated={refresh} onFailure={report} />
 
         {requests.isError ? (
           <div role="alert" className="text-sm">
@@ -495,97 +975,182 @@ export default function MaslekaBoard({
         ) : null}
         {requests.isPending ? <Loader2 className="animate-spin" aria-label="טוען" /> : null}
 
-        <Column title="הוזמנו — ממתינים לקוד" empty="אין לקוחות שממתינים לקוד.">
-          {columns.invited.map((r) => (
-            <InvitedRow key={r.id} request={r} service={service} clipboard={clipboard} onStart={clearNotice} onFailure={report} />
-          ))}
-        </Column>
-
-        <div className="grid gap-6 md:grid-cols-3">
-          <Column title="ממתין להגשה" empty="אין קודים שממתינים להגשה.">
-            {columns.waiting.map((r) => (
-              <li key={r.id} className="border border-border/60 p-3">
-                <p className="font-medium">{r.clientName}</p>
-                <p className="text-xs text-muted-foreground">
-                  התקבל {when(r.codeReceivedAt)}
-                  {r.idLast4 ? ` · ת״ז מסתיימת ב־${r.idLast4}` : ""}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {revealButton(r, "id")}
-                  {revealButton(r, "code")}
-                  <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className={buttonClass}>
-                    פתח את המסלקה
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => onSubmitted(r)}
-                    disabled={submitted.isPending}
-                    className={`${buttonClass} border-primary`}
-                  >
-                    הגשתי
-                  </button>
-                </div>
-                {shown?.kind === "manual" && shown.requestId === r.id ? (
-                  <ManualCopy
-                    value={shown.value}
-                    label={fieldLabel(shown.field, r.clientName)}
-                    inputRef={fieldRef}
-                    onClose={hide}
-                  />
-                ) : null}
+        <nav aria-label="שלבי הבקשה">
+          {/* A phone: one row of chips that scrolls sideways, with the hints left for wider screens (kept for
+              screen readers; each chip is `relative`, or the sr-only hint escapes the scroll and widens the page). */}
+          <ul className="flex gap-2 max-sm:-mx-4 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 sm:flex-wrap">
+            {BOARD_VIEWS.map((v) => (
+              <li key={v.view} className="max-sm:shrink-0">
+                <button
+                  type="button"
+                  aria-pressed={view === v.view}
+                  onClick={() => choose(v.view)}
+                  className={`relative flex min-h-11 flex-col items-start border px-3 py-2 text-start max-sm:justify-center max-sm:whitespace-nowrap max-sm:rounded-full ${
+                    view === v.view ? "border-highlight bg-card" : "border-border/60 hover:border-accent"
+                  }`}
+                >
+                  <span className="flex items-baseline gap-2 text-sm font-medium">
+                    {v.label}
+                    <span className="font-heading text-accent">{requests.isSuccess ? rowsOf(v.view).length : "–"}</span>
+                  </span>
+                  <span className="text-sm text-muted-foreground max-sm:sr-only">{v.hint}</span>
+                </button>
               </li>
             ))}
-          </Column>
+          </ul>
+        </nav>
 
-          <Column title="הוגש — ממתין להורדה" empty="אין בקשות שהוגשו.">
-            {columns.submitted.map((r) => (
-              <li key={r.id} className="border border-border/60 p-3">
-                <p className="font-medium">{r.clientName}</p>
-                <p className="text-sm">{readinessLabel(r.submittedAt, at)}</p>
-                <p className="text-xs text-muted-foreground">{deletionLabel(r.clearinghouseDeletesAt, at)}</p>
-                <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm underline">
-                  לפורטל המסלקה
-                </a>
-              </li>
-            ))}
-          </Column>
-
-          <Column title="הושלם" empty="בקשות יופיעו כאן אחרי שקובצי המסלקה ייקלטו.">
-            {columns.completed.map((r) => (
-              <li key={r.id} className="border border-border/60 p-3">
-                <p className="font-medium">{r.clientName}</p>
-                <p className="text-xs text-muted-foreground">הושלם {when(r.completedAt)}</p>
-                {analysisOf.has(r.id) ? (
-                  <Link to={`/admin/masleka/analysis/${analysisOf.get(r.id)}`} className="mt-2 inline-block text-sm underline">
-                    לניתוח ולהמלצות
-                  </Link>
-                ) : null}
-              </li>
-            ))}
-          </Column>
+        <div>
+          <label htmlFor="masleka-search" className="sr-only">
+            חיפוש לקוח
+          </label>
+          <input
+            id="masleka-search"
+            type="search"
+            placeholder="חיפוש לקוח"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="min-h-11 w-full max-w-sm border border-border bg-background px-3 py-2 text-sm"
+          />
         </div>
 
-        {/* Every stored report, newest first — also those made by hand or whose
-            request has gone. Quiet when there are none or they cannot be read:
-            the board's own work does not depend on them. */}
-        {snapshots.isError ? (
-          <p className="text-xs text-muted-foreground">לא הצלחנו לטעון את הניתוחים.</p>
-        ) : snapshots.data && snapshots.data.length > 0 ? (
-          <section aria-labelledby="analyses-title">
-            <h2 id="analyses-title" className="font-heading text-xl">ניתוחים</h2>
-            <ul className="mt-3 space-y-2">
-              {snapshots.data.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-baseline gap-3 text-sm">
-                  <Link to={`/admin/masleka/analysis/${s.id}`} className="underline">
-                    {s.clientName}
+        {requests.isSuccess && shownRows.length === 0 ? (
+          <p className="border border-border/60 bg-card p-6 text-center text-sm text-muted-foreground">
+            אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד.
+          </p>
+        ) : (
+          <ul aria-label="בקשות" className="space-y-3">
+            {shownRows.map((row) => {
+              const r = row.request;
+              const a = row.plan.action;
+              const action =
+                a.kind === "submit" ? (
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    onClick={() => {
+                      clearNotice();
+                      setSubmitSucceeded(false);
+                      setReissued(null);
+                      setSubmitFor(r);
+                    }}
+                    className={primaryClass}
+                  >
+                    {a.label}
+                  </button>
+                ) : a.kind === "download" ? (
+                  // A new tab and no referrer: the board's address stays out of the portal's requests.
+                  <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className={primaryClass}>
+                    {a.label}
+                  </a>
+                ) : a.kind === "relink" ? (
+                  <button type="button" onClick={() => void relink(r)} disabled={relinking === r.id} className={buttonClass}>
+                    {a.label}
+                  </button>
+                ) : a.kind === "analysis" ? (
+                  <Link to={`/admin/masleka/analysis/${a.snapshotId}`} className={buttonClass}>
+                    {a.label}
                   </Link>
-                  <span className="text-xs text-muted-foreground">דוח מ־{when(s.takenAt)}</span>
-                </li>
+                ) : (
+                  <span className="text-sm text-muted-foreground">{a.label}</span>
+                );
+              return (
+                <BoardRow key={r.id} row={row} action={action}>
+                  {a.kind === "relink" && links[r.id] ? <LinkPanel link={links[r.id]} clipboard={clipboard} /> : null}
+                </BoardRow>
+              );
+            })}
+          </ul>
+        )}
+
+        {/* Stage 4 holds every stored report: a completed request's on its row
+            ("לניתוח"), and here the ones no request on the board owns — made
+            by hand, or whose request has gone. Quiet when they cannot be read:
+            the board's own work does not depend on them. */}
+        {view === "completed" ? (
+          snapshots.isError ? (
+            <p className="text-sm text-muted-foreground">לא הצלחנו לטעון את הניתוחים.</p>
+          ) : orphanReports.length > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              ניתוחים ללא בקשה:{" "}
+              {orphanReports.map((r, i) => (
+                <React.Fragment key={r.id}>
+                  {i > 0 ? " · " : null}
+                  <Link to={`/admin/masleka/analysis/${r.id}`} className="underline">
+                    {r.clientName}
+                  </Link>{" "}
+                  (דוח מ־{when(r.takenAt)})
+                </React.Fragment>
               ))}
-            </ul>
-          </section>
+            </p>
+          ) : null
         ) : null}
+
+        <section id="masleka-how" aria-labelledby="masleka-how-title" className="scroll-mt-6 border-t border-border/60 pt-8">
+          <h2 id="masleka-how-title" className="font-heading text-2xl">
+            איך בקשה מתקדמת
+          </h2>
+          <ol className="mt-4 grid gap-4 md:grid-cols-4">
+            {HOW_IT_WORKS.map((step, i) => (
+              <li key={step.title} className="border border-border/60 bg-card p-4">
+                <p className="flex items-center gap-3 font-medium">
+                  <StepDot step={i + 1} />
+                  {step.title}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{step.text}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 text-sm">
+            <Link to="/admin/masleka/guide" className="inline-flex min-h-11 items-center underline">
+              מדריך: הרשמה כיועץ במסלקה
+            </Link>
+          </p>
+        </section>
       </main>
+
+      <SideDrawer
+        open={submitFor !== null}
+        onClose={closeSubmit}
+        title={submitFor?.clientName ?? ""}
+        subtitle={submitFor ? actionFor(submitFor, at, analysisOf).reason : undefined}
+      >
+        {noticeView ? <div className="mb-4">{noticeView}</div> : null}
+        {submitFor ? (
+          <SubmitGuide
+            key={submitFor.id}
+            request={submitFor}
+            copyButton={(field) => revealButton(submitFor, field)}
+            copiedField={shown?.requestId === submitFor.id ? shown.field : null}
+            manual={
+              shown?.kind === "manual" && shown.requestId === submitFor.id ? (
+                <ManualCopy value={shown.value} label={fieldLabel(shown.field, submitFor.clientName)} inputRef={fieldRef} onClose={hide} />
+              ) : null
+            }
+            onConfirm={() => onSubmitted(submitFor)}
+            pending={submitted.isPending}
+            succeeded={submitSucceeded}
+            onBack={closeSubmit}
+            onReissue={() => void reissue(submitFor)}
+            reissuing={reissuing}
+            reissued={reissued}
+            clipboard={clipboard}
+          />
+        ) : null}
+      </SideDrawer>
+
+      <SideDrawer open={newOpen} onClose={() => setNewOpen(false)} title="בקשה חדשה">
+        {/* Behind an open drawer the page is hidden from assistive technology: its notice shows here. */}
+        {noticeView ? <div className="mb-4">{noticeView}</div> : null}
+        <NewRequest
+          service={service}
+          clipboard={clipboard}
+          leads={openLeads}
+          onStart={clearNotice}
+          onCreated={refresh}
+          onFailure={report}
+        />
+      </SideDrawer>
     </div>
   );
 }

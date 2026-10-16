@@ -84,6 +84,70 @@ describe("masleka-create — who may", () => {
   });
 });
 
+/**
+ * A request started for a lead (the board's new-request drawer): the caller
+ * must see that lead — a User their own, an Admin any of the agency's — and it
+ * must be the agency's. Without a lead, today's request, the caller's own.
+ */
+describe("masleka-create — for a lead", () => {
+  const USER = "aaaaaaaa-1111-4111-8111-000000000003";
+  const OTHER_USER = "aaaaaaaa-1111-4111-8111-000000000004";
+  const ADMIN = "aaaaaaaa-1111-4111-8111-000000000005";
+  const USER_TOKEN = "user-session-token-0123456789";
+  const ADMIN_TOKEN = "admin-session-token-012345678";
+  const MINE = "22222222-2222-4222-8222-000000000001";
+  const THEIRS = "22222222-2222-4222-8222-000000000002";
+  const TRUSTS = "22222222-2222-4222-8222-000000000003";
+  const fake = {
+    sessions: { [USER_TOKEN]: USER, [ADMIN_TOKEN]: ADMIN },
+    roles: { [USER]: "user", [OTHER_USER]: "user", [ADMIN]: "admin" },
+    assigned: { [MINE]: USER, [THEIRS]: OTHER_USER, [TRUSTS]: USER },
+    leadAgency: { [TRUSTS]: "0abcfa0b-0000-4000-8000-000000000000" },
+  };
+
+  it("lets a User start a request on their own lead, and stores the lead", async () => {
+    const r = await run({ clientName: NAME, leadId: MINE }, { token: USER_TOKEN, fake });
+    expect(r.status).toBe(200);
+    expect(r.maslekaRequests[0]).toMatchObject({ lead_id: MINE, created_by: USER });
+  });
+
+  it("refuses a User another User's lead with 403, and stores nothing", async () => {
+    const r = await run({ clientName: NAME, leadId: THEIRS }, { token: USER_TOKEN, fake });
+    expect(r.status).toBe(403);
+    expect(r.json).toMatchObject({ error: "forbidden", rid: expect.any(String) });
+    expect(r.maslekaRequests).toHaveLength(0);
+  });
+
+  it("lets an Admin start one on any of the agency's leads", async () => {
+    const r = await run({ clientName: NAME, leadId: THEIRS }, { token: ADMIN_TOKEN, fake });
+    expect(r.status).toBe(200);
+    expect(r.maslekaRequests[0]).toMatchObject({ lead_id: THEIRS, created_by: ADMIN });
+  });
+
+  it("refuses a lead of another agency, even one the caller can see", async () => {
+    const r = await run({ clientName: NAME, leadId: TRUSTS }, { token: USER_TOKEN, fake });
+    expect(r.status).toBe(403);
+    expect(r.maslekaRequests).toHaveLength(0);
+  });
+
+  it("refuses a lead id that is not one, asking nothing about it", async () => {
+    for (const leadId of ["not-a-uuid", 7, { id: MINE }]) {
+      const r = await run({ clientName: NAME, leadId }, { token: USER_TOKEN, fake });
+      expect(r.status).toBe(400);
+      expect(r.fetches.some((f) => String(f.url).includes("/rpc/can_see_lead"))).toBe(false);
+    }
+  });
+
+  it("keeps today's request when the lead is left out or null: lead-less, the caller's own", async () => {
+    for (const body of [{ clientName: NAME }, { clientName: NAME, leadId: null }]) {
+      const r = await run(body, { token: USER_TOKEN, fake });
+      expect(r.status).toBe(200);
+      expect(r.maslekaRequests[0]).toMatchObject({ lead_id: null, created_by: USER });
+      expect(r.fetches.some((f) => String(f.url).includes("/rpc/can_see_lead"))).toBe(false);
+    }
+  });
+});
+
 describe("masleka-create — a new request", () => {
   it("creates an invited request, mails the client the link, and returns it for copying", async () => {
     const r = await run({ clientName: " משה כהן ", contactEmail: "moshe@example.com", sendInvite: true });
@@ -284,3 +348,82 @@ describe("masleka-create — a fresh link", () => {
     }
   });
 });
+
+/**
+ * A reissue (the guided submit's "קוד האימות לא עובד במסלקה? שליחת קישור
+ * חדש"): the clearinghouse refused the code, so the request goes back to
+ * "invited", the code and the ID wiped, with a fresh link for the client.
+ */
+describe("masleka-create — a reissue", () => {
+  const waiting = (over: Record<string, unknown> = {}) => ({
+    id: REQUEST_ID,
+    agency_id: AGENCY_1,
+    client_name: "רונית מזרחי",
+    status: "code_received",
+    code_ciphertext: "enc:code",
+    id_ciphertext: "enc:id",
+    id_last4: "0018",
+    code_received_at: "2026-10-16T08:00:00.000Z",
+    token_hash: "a".repeat(64),
+    token_expires_at: "2026-10-20T00:00:00.000Z",
+    client_reminded_at: null,
+    lead_id: null,
+    created_by: STAFF,
+    ...over,
+  });
+
+  it("sends the request back to the client: the code, the ID and its last digits wiped, a fresh link", async () => {
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { fake: { requests: [waiting()] } });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, requestId: REQUEST_ID, invited: false, rid: expect.any(String) });
+    const row = r.maslekaRequests[0];
+    expect(row).toMatchObject({ status: "invited", code_ciphertext: null, id_ciphertext: null, id_last4: null, code_received_at: null });
+    expect(row.ciphertext_wiped_at).toEqual(expect.any(String));
+    expect(row.token_hash).toBe(sha(tokenOf(r.json.link)));
+    expect(row.token_hash).not.toBe("a".repeat(64));
+  });
+
+  it("writes one conditional update that matches only a request still waiting to be submitted", async () => {
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { fake: { requests: [waiting()] } });
+    const patches = r.fetches.filter((f) => f.method === "PATCH" && String(f.url).includes("/rest/v1/masleka_requests"));
+    expect(patches).toHaveLength(1);
+    expect(String(patches[0].url)).toContain(`id=eq.${REQUEST_ID}`);
+    expect(String(patches[0].url)).toContain(`agency_id=eq.${AGENCY_1}`);
+    expect(String(patches[0].url)).toContain("status=eq.code_received");
+    expect(String(patches[0].url)).toContain("select=id");
+  });
+
+  it.each(["invited", "submitted", "completed", "expired"])("never reopens or wipes a request that is %s", async (status) => {
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { fake: { requests: [waiting({ status, code_ciphertext: null, id_ciphertext: null })] } });
+    expect(r.status).toBe(409);
+    expect(r.json).toMatchObject({ error: "not_available" });
+    expect(r.maslekaRequests[0]).toMatchObject({ status, token_hash: "a".repeat(64), id_last4: "0018" });
+    expect(r.json).not.toHaveProperty("link");
+  });
+
+  it("leaves a code that just arrived alone when the fresh link was a plain one", async () => {
+    const r = await run({ requestId: REQUEST_ID }, { fake: { requests: [waiting()] } });
+    expect(r.status).toBe(409);
+    expect(r.maslekaRequests[0]).toMatchObject({ status: "code_received", code_ciphertext: "enc:code", id_ciphertext: "enc:id" });
+  });
+
+  it("is for whoever may work the request: another User is refused and nothing changes", async () => {
+    const USER = "aaaaaaaa-1111-4111-8111-000000000003";
+    const USER_TOKEN = "user-session-token-0123456789";
+    const fake = { sessions: { [USER_TOKEN]: USER }, roles: { [USER]: "user" }, requests: [waiting()] };
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { token: USER_TOKEN, fake });
+    expect(r.status).toBe(403);
+    expect(r.maslekaRequests[0]).toMatchObject({ status: "code_received", code_ciphertext: "enc:code" });
+    const own = await run({ requestId: REQUEST_ID, reissue: true }, { token: USER_TOKEN, fake: { ...fake, requests: [waiting({ created_by: USER })] } });
+    expect(own.status).toBe(200);
+  });
+
+  it("never writes the link, the token or a ciphertext to a log line", async () => {
+    const lines = captureLogs();
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { fake: { requests: [waiting()] } });
+    const all = lines.join("\n");
+    expect(all).toContain('"reissued":true');
+    for (const secret of [String(r.json.link), tokenOf(r.json.link), "enc:code", "enc:id", "0018"]) expect(all).not.toContain(secret);
+  });
+});
+

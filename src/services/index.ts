@@ -208,6 +208,7 @@ export const services: Services = {
     list: () => real().then((s) => s.masleka.list()),
     create: (input) => real().then((s) => s.masleka.create(input)),
     relink: (requestId) => real().then((s) => s.masleka.relink(requestId)),
+    reissue: (requestId) => real().then((s) => s.masleka.reissue(requestId)),
     reveal: (requestId, field) => real().then((s) => s.masleka.reveal(requestId, field)),
     markSubmitted: (requestId) => real().then((s) => s.masleka.markSubmitted(requestId)),
     listSnapshots: () => real().then((s) => s.masleka.listSnapshots()),

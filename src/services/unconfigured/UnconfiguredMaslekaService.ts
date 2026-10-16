@@ -24,6 +24,9 @@ export class UnconfiguredMaslekaService implements MaslekaPort {
   async relink(): Promise<never> {
     throw new MaslekaError("unavailable");
   }
+  async reissue(): Promise<never> {
+    throw new MaslekaError("unavailable");
+  }
   async reveal(): Promise<never> {
     throw new MaslekaError("unavailable");
   }

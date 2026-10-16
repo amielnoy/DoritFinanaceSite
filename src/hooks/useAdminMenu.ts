@@ -47,7 +47,7 @@ export interface AdminCounts {
 export const NEW_LEADS_KEY = ["admin", "leads", "new-count"] as const;
 const REFRESH_MS = 60_000;
 
-/** The requests the board shows under "ממתין להגשה" (`boardColumns`). */
+/** The requests at the board's "מוכן להגשה" stage: the code is in, waiting to be submitted. */
 export const waitingCount = (requests: MaslekaRequest[]): number =>
   requests.filter((r) => r.status === "code_received").length;
 
