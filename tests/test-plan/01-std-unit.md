@@ -1270,6 +1270,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKBD-036 | "drops what left the board" (nowRows and stageRows) | An expired request is not planned |
 | UNIT-MSKBD-037 | "puts the urgent first, then the oldest first, and only what needs action" (nowRows and stageRows) | `urgent`, `invited-old`, `ready`, `code` |
 | UNIT-MSKBD-038 | "lists one stage oldest first, and the completed newest first" (nowRows and stageRows) | Submitted: `ready`, `urgent`, `preparing`; invited: oldest first |
+| UNIT-MSKBD-039 | "reads ?stage= as one of the bar's views, and anything else as 'now'" (the stage bar's views) | Five views in order; `null`, `""`, `waiting`, `SUBMITTED`, `<script>` → `now` |
 
 ### 4.45 Vercel Analytics beforeSend — `tests/unit/vercel-analytics.test.ts`
 

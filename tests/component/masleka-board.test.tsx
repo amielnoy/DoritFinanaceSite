@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
@@ -54,11 +54,14 @@ function service(over: Partial<MaslekaPort> = {}): MaslekaPort {
   };
 }
 
-function renderBoard(props: MaslekaBoardProps) {
+/** `stage` opens the board at `?stage=<stage>`; without it, "לטיפול עכשיו". */
+function renderBoard(props: MaslekaBoardProps & { stage?: string }) {
+  const { stage, ...rest } = props;
+  props = rest;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[stage ? `/admin/masleka?stage=${stage}` : "/admin/masleka"]}>
         <MaslekaBoard now={() => NOW} {...props} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -99,18 +102,19 @@ afterEach(() => {
 });
 
 describe("<MaslekaBoard /> — the list", () => {
-  it("shows every request in one list: step, name, stage and the reason, with one action each", async () => {
+  it("shows each row's step, name, stage and reason, with one action", async () => {
     renderBoard({ service: service(), clipboard: null });
     const ronit = within((await screen.findByText("רונית מזרחי")).closest("li")!);
     expect(ronit.getByText("מוכן להגשה")).toBeInTheDocument();
     expect(ronit.getByText(/^קוד האימות התקבל .* · ת״ז מסתיימת ב־0018$/)).toBeInTheDocument();
     expect(ronit.getByRole("button", { name: "להגשה" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /1 · ממתין ללקוח/ }));
     expect(rowOf("אורי לוי").getByRole("button", { name: "קישור חדש" })).toBeInTheDocument();
     expect(rowOf("אורי לוי").getByText("קיבל/ה קישור לפני 2 ימים ועוד לא מילא/ה")).toBeInTheDocument();
   });
 
   it("says when the files should be ready, and how long the clearinghouse keeps them", async () => {
-    renderBoard({ service: service(), clipboard: null });
+    renderBoard({ service: service(), clipboard: null, stage: "submitted" });
     const yael = within((await screen.findByText("יעל כהן")).closest("li")!);
     expect(yael.getByText(/^הוגש .* · יהיה מוכן בעוד כ־3–4 שעות$/)).toBeInTheDocument();
     expect(yael.getByText("אין צורך בפעולה")).toBeInTheDocument();
@@ -128,9 +132,12 @@ describe("<MaslekaBoard /> — the list", () => {
     renderBoard({ service: service(), clipboard: null });
     await screen.findByText("רונית מזרחי");
     await userEvent.type(screen.getByRole("searchbox", { name: "חיפוש לקוח" }), "לוי");
-    expect(list().getByText("אורי לוי")).toBeInTheDocument();
     expect(list().getByText("דן לוי")).toBeInTheDocument();
     expect(list().queryByText("רונית מזרחי")).not.toBeInTheDocument();
+    // The stage on show: אורי לוי, invited two days ago, is in stage 1, not in "now".
+    expect(list().queryByText("אורי לוי")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /1 · ממתין ללקוח/ }));
+    expect(list().getByText("אורי לוי")).toBeInTheDocument();
     await userEvent.type(screen.getByRole("searchbox", { name: "חיפוש לקוח" }), "זזז");
     expect(screen.getByText("אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד.")).toBeInTheDocument();
   });
@@ -138,6 +145,78 @@ describe("<MaslekaBoard /> — the list", () => {
   it("reports a list that failed to load", async () => {
     renderBoard({ service: service({ list: vi.fn(async () => Promise.reject(new MaslekaError("failed"))) }), clipboard: null });
     expect(await screen.findByText("לא הצלחנו לטעון את הבקשות. רעננו את הדף.")).toBeInTheDocument();
+  });
+});
+
+/** The address the board keeps its stage in. */
+function Where() {
+  return <output data-testid="where">{useLocation().search}</output>;
+}
+
+describe("<MaslekaBoard /> — the stage bar", () => {
+  const bar = () => within(screen.getByRole("navigation", { name: "שלבי הבקשה" }));
+  const stageButton = (name: RegExp) => bar().getByRole("button", { name });
+
+  it("opens on 'לטיפול עכשיו': what needs action, urgent first, with each stage's count and hint", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    await screen.findByText("רונית מזרחי");
+    expect(stageButton(/לטיפול עכשיו/)).toHaveAttribute("aria-pressed", "true");
+    expect(stageButton(/לטיפול עכשיו/)).toHaveTextContent("2");
+    expect(stageButton(/1 · ממתין ללקוח/)).toHaveTextContent("1");
+    expect(stageButton(/1 · ממתין ללקוח/)).toHaveTextContent("קיבלו קישור, טרם מילאו");
+    expect(stageButton(/2 · מוכן להגשה/)).toHaveTextContent("קוד האימות התקבל");
+    expect(stageButton(/3 · הוגש במסלקה/)).toHaveTextContent("2");
+    expect(stageButton(/3 · הוגש במסלקה/)).toHaveTextContent("ממתין להורדה");
+    expect(stageButton(/4 · הושלם/)).toHaveTextContent("0");
+    expect(stageButton(/4 · הושלם/)).toHaveTextContent("ניתוח והמלצות");
+    // דן's download is deleted tomorrow: first. יעל's is still being prepared, אורי was invited two days ago: neither.
+    expect(list().getAllByRole("listitem").map((li) => within(li).getByText(/^(דן לוי|רונית מזרחי)$/).textContent)).toEqual(["דן לוי", "רונית מזרחי"]);
+    expect(list().queryByText("יעל כהן")).not.toBeInTheDocument();
+    expect(list().queryByText("אורי לוי")).not.toBeInTheDocument();
+  });
+
+  it("shows one stage when chosen, and keeps it in ?stage= so a refresh opens on it", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const svc = service();
+    const board = (entry: string) => (
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[entry]}>
+          <MaslekaBoard now={() => NOW} service={svc} clipboard={null} />
+          <Where />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const view = render(board("/admin/masleka"));
+    await screen.findByText("רונית מזרחי");
+    await userEvent.click(stageButton(/3 · הוגש במסלקה/));
+    expect(stageButton(/3 · הוגש במסלקה/)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("where")).toHaveTextContent("?stage=submitted");
+    expect(list().getByText("יעל כהן")).toBeInTheDocument();
+    expect(list().queryByText("רונית מזרחי")).not.toBeInTheDocument();
+    view.unmount();
+    render(board("/admin/masleka?stage=submitted"));
+    expect(await list().findByText("יעל כהן")).toBeInTheDocument();
+    expect(stageButton(/3 · הוגש במסלקה/)).toHaveAttribute("aria-pressed", "true");
+    // Back to "now": the parameter goes.
+    await userEvent.click(stageButton(/לטיפול עכשיו/));
+    expect(screen.getByTestId("where")).toHaveTextContent(/^$/);
+  });
+
+  it("opens on 'now' for a stage it does not know", async () => {
+    renderBoard({ service: service(), clipboard: null, stage: "everything" });
+    await screen.findByText("רונית מזרחי");
+    expect(stageButton(/לטיפול עכשיו/)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("hides a revealed value when another stage is chosen, even one the row is on", async () => {
+    // Copied to the clipboard: an outside click leaves the mark, so only the stage change can take it.
+    renderBoard({ service: service(), clipboard: { writeText: vi.fn(async () => {}) } });
+    await userEvent.click((await openWaiting()).getByRole("button", { name: "העתק ת״ז" }));
+    expect(await card("רונית מזרחי").findByRole("button", { name: "הועתק ✓" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("searchbox", { name: "חיפוש לקוח" }));
+    expect(card("רונית מזרחי").getByRole("button", { name: "הועתק ✓" })).toBeInTheDocument();
+    await userEvent.click(stageButton(/2 · מוכן להגשה/));
+    expect(card("רונית מזרחי").queryByRole("button", { name: "הועתק ✓" })).not.toBeInTheDocument();
   });
 });
 
@@ -258,11 +337,12 @@ describe("<MaslekaBoard /> — copying", () => {
     await act(async () => {
       await client.invalidateQueries();
     });
-    await waitFor(() => expect(rowOf("רונית מזרחי").queryByRole("button", { name: "להגשה" })).not.toBeInTheDocument());
+    // Submitted a moment ago: off "now" altogether.
+    await waitFor(() => expect(screen.queryByText("רונית מזרחי")).not.toBeInTheDocument());
     await act(async () => {
       await client.invalidateQueries();
     });
-    expect(await rowOf("רונית מזרחי").findByRole("button", { name: "להגשה" })).toBeInTheDocument();
+    await screen.findByText("רונית מזרחי");
     card("רונית מזרחי");
     expect(screen.queryByDisplayValue("000000018")).not.toBeInTheDocument();
   });
@@ -319,7 +399,7 @@ describe("<MaslekaBoard /> — copying", () => {
     await act(async () => {
       await client.invalidateQueries();
     });
-    await waitFor(() => expect(rowOf("רונית מזרחי").queryByRole("button", { name: "להגשה" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("רונית מזרחי")).not.toBeInTheDocument());
     await act(async () => {
       slow.resolve("000000018");
       await slow.promise;
@@ -327,7 +407,7 @@ describe("<MaslekaBoard /> — copying", () => {
     await act(async () => {
       await client.invalidateQueries();
     });
-    expect(await rowOf("רונית מזרחי").findByRole("button", { name: "להגשה" })).toBeInTheDocument();
+    await screen.findByText("רונית מזרחי");
     expect(clipboard.writeText).not.toHaveBeenCalled();
     expect(screen.queryByDisplayValue("000000018")).not.toBeInTheDocument();
     expect(card("רונית מזרחי").queryByRole("button", { name: "הועתק ✓" })).not.toBeInTheDocument();
@@ -479,7 +559,7 @@ describe("<MaslekaBoard /> — acting", () => {
         { id: "s8", requestId: null, clientName: "לקוח מהטלפון", takenAt: iso(-3 * HOUR) },
       ]),
     });
-    renderBoard({ service: svc, clipboard: null });
+    renderBoard({ service: svc, clipboard: null, stage: "completed" });
     expect(await screen.findByRole("link", { name: "לניתוח" })).toHaveAttribute("href", "/admin/masleka/analysis/s7");
     const analyses = within(screen.getByRole("region", { name: "ניתוחים" }));
     expect(analyses.getByRole("link", { name: "לקוח מהטלפון" })).toHaveAttribute("href", "/admin/masleka/analysis/s8");
@@ -494,7 +574,7 @@ describe("<MaslekaBoard /> — acting", () => {
 
   it("issues a fresh link for an invited client", async () => {
     const svc = service();
-    renderBoard({ service: svc, clipboard: null });
+    renderBoard({ service: svc, clipboard: null, stage: "invited" });
     await screen.findByText("אורי לוי");
     await userEvent.click(rowOf("אורי לוי").getByRole("button", { name: "קישור חדש" }));
     expect(svc.relink).toHaveBeenCalledWith("r1");

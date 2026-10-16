@@ -7,6 +7,8 @@ import {
   nowRows,
   planRows,
   stageRows,
+  viewFromParam,
+  BOARD_VIEWS,
   READY_AFTER_MS,
   clientMessage,
   copyOrFallback,
@@ -115,6 +117,14 @@ describe("nowRows and stageRows", () => {
     // Ready since 26 h ago, ready since 2 h ago, submitted an hour ago.
     expect(stageRows(rows, "submitted").map((r) => r.request.id)).toEqual(["ready", "urgent", "preparing"]);
     expect(stageRows(rows, "invited").map((r) => r.request.id)).toEqual(["invited-old", "invited-new"]);
+  });
+});
+
+describe("the stage bar's views", () => {
+  it("reads ?stage= as one of the bar's views, and anything else as 'now'", () => {
+    expect(BOARD_VIEWS.map((v) => v.view)).toEqual(["now", "invited", "code_received", "submitted", "completed"]);
+    for (const v of ["invited", "code_received", "submitted", "completed", "now"]) expect(viewFromParam(v)).toBe(v);
+    for (const v of [null, "", "waiting", "SUBMITTED", "<script>"]) expect(viewFromParam(v)).toBe("now");
   });
 });
 

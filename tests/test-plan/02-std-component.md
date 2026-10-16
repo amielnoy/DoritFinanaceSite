@@ -415,6 +415,10 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-029 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
 | CMP-MSKB-030 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
 | CMP-MSKB-031 | "finds a client by name as you type, and says so when nothing is there" (the list) | `לוי`: both לוי rows only; no match: "אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד." |
+| CMP-MSKB-032 | "opens on 'לטיפול עכשיו': what needs action, urgent first, with each stage's count and hint" (the stage bar) | `aria-pressed` on now; counts 2 / 1 / 1 / 2 / 0 and the hints; rows דן (urgent) then רונית; יעל and אורי absent |
+| CMP-MSKB-033 | "shows one stage when chosen, and keeps it in ?stage= so a refresh opens on it" (the stage bar) | `?stage=submitted` after the click; a fresh render at that address opens on it; back to now drops the parameter |
+| CMP-MSKB-034 | "opens on 'now' for a stage it does not know" (the stage bar) | `?stage=everything` → now |
+| CMP-MSKB-035 | "hides a revealed value when another stage is chosen, even one the row is on" (the stage bar) | A clipboard copy's mark survives an outside click and goes on the stage change (fails without the hide) |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 

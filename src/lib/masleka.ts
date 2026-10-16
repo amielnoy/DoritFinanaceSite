@@ -195,6 +195,21 @@ export function planRows(requests: MaslekaRequest[], now: Date, snapshotIdByRequ
   return requests.filter(onBoard).map((request) => ({ request, plan: actionFor(request, now, snapshotIdByRequest) }));
 }
 
+/** The stage bar: "now" first, then the four stages in order. */
+export type BoardView = "now" | BoardStage;
+export const BOARD_VIEWS: readonly { view: BoardView; label: string; hint: string }[] = [
+  { view: "now", label: "לטיפול עכשיו", hint: "מה שמחכה לפעולה שלך" },
+  { view: "invited", label: "1 · ממתין ללקוח", hint: "קיבלו קישור, טרם מילאו" },
+  { view: "code_received", label: "2 · מוכן להגשה", hint: "קוד האימות התקבל" },
+  { view: "submitted", label: "3 · הוגש במסלקה", hint: "ממתין להורדה" },
+  { view: "completed", label: "4 · הושלם", hint: "ניתוח והמלצות" },
+];
+
+/** `?stage=` as the bar reads it: one of its views, else "now". */
+export function viewFromParam(value: string | null): BoardView {
+  return BOARD_VIEWS.some((v) => v.view === value) ? (value as BoardView) : "now";
+}
+
 /** "לטיפול עכשיו": the rows that need someone, urgent first, then the oldest first. */
 export function nowRows(rows: PlannedRow[]): PlannedRow[] {
   return rows

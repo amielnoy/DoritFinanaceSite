@@ -1,19 +1,22 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { CLEARINGHOUSE_ADVISOR_URL } from "@/config/masleka";
 import {
   BOARD_KEY,
-  BOARD_STAGES,
+  BOARD_VIEWS,
   STAGE_LABEL,
   boardTime,
   copyOrFallback,
   failureText,
+  nowRows,
   planRows,
   staffMessage,
   stageRows,
+  viewFromParam,
+  type BoardView,
   type ClipboardLike,
   type Message,
   type PlannedRow,
@@ -415,7 +418,25 @@ export default function MaslekaBoard({
   const [search, setSearch] = useState("");
   const needle = search.trim().toLocaleLowerCase("he");
   const matches = (r: PlannedRow) => !needle || r.request.clientName.toLocaleLowerCase("he").includes(needle);
-  const shownRows = BOARD_STAGES.flatMap((stage) => stageRows(planned, stage)).filter(matches);
+  // The stage on show, kept in the address (?stage=) so a refresh keeps it; "now" is the default and is left out.
+  const [params, setParams] = useSearchParams();
+  const view = viewFromParam(params.get("stage"));
+  const rowsOf = (v: BoardView) => (v === "now" ? nowRows(planned) : stageRows(planned, v));
+  const shownRows = rowsOf(view).filter(matches);
+  const choose = (v: BoardView) =>
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (v === "now") next.delete("stage");
+        else next.set("stage", v);
+        return next;
+      },
+      { replace: true },
+    );
+  // Another stage on screen: nothing revealed stays behind from the last one.
+  useEffect(() => {
+    hide();
+  }, [view, hide]);
   // The rows whose copy controls are open ("להגשה").
   const [openSubmit, setOpenSubmit] = useState<ReadonlySet<string>>(new Set());
   const toggleSubmit = (id: string) =>
@@ -512,6 +533,29 @@ export default function MaslekaBoard({
           </div>
         ) : null}
         {requests.isPending ? <Loader2 className="animate-spin" aria-label="טוען" /> : null}
+
+        <nav aria-label="שלבי הבקשה">
+          <ul className="flex flex-wrap gap-2">
+            {BOARD_VIEWS.map((v) => (
+              <li key={v.view}>
+                <button
+                  type="button"
+                  aria-pressed={view === v.view}
+                  onClick={() => choose(v.view)}
+                  className={`flex min-h-11 flex-col items-start border px-3 py-2 text-start ${
+                    view === v.view ? "border-highlight bg-card" : "border-border/60 hover:border-accent"
+                  }`}
+                >
+                  <span className="flex items-baseline gap-2 text-sm font-medium">
+                    {v.label}
+                    <span className="font-heading text-accent">{requests.isSuccess ? rowsOf(v.view).length : "–"}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">{v.hint}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         <div>
           <label htmlFor="masleka-search" className="sr-only">
