@@ -1232,7 +1232,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-MSKBD-001 | "puts each request in its column, oldest waiting first, and drops what left the board" | Four columns; expired/cancelled absent |
+| UNIT-MSKBD-001 | (removed with `boardColumns`: the board is one list since the redesign, step 3; see UNIT-MSKBD-029..038) | — |
 | UNIT-MSKBD-002 | "says when the files should be ready, then that they are" | 4-hour threshold |
 | UNIT-MSKBD-003 | "counts the days the clearinghouse still keeps the files" | 5 / 1 / partial day = 1 |
 | UNIT-MSKBD-004 | "says when they are gone, and nothing when there is no date" | "נמחק במסלקה"; "" |
@@ -1260,6 +1260,16 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKBD-026 | "says a dead link is dead, and a switched-off service is unavailable" | link_invalid / disabled copy |
 | UNIT-MSKBD-027 | "treats anything that is not a MaslekaError as a failure" | Same as `failed` |
 | UNIT-MSKBD-028 | "tells a client plainly that a send which stored nothing did not go through, and to send again" | `not_saved`: exactly "השליחה לא עברה והקוד לא נשמר. נסו לשלוח שוב בעוד כמה דקות — הקישור עדיין בתוקף."; no "ייתכן" (decision 2026-10-14) |
+| UNIT-MSKBD-029 | "sends a received code to the guided submit, saying when it came and the ID's last digits" (actionFor) | Step 2, now, action `להגשה`; reason `קוד האימות התקבל <when> · ת״ז מסתיימת ב־0018`, no last-digits part without them |
+| UNIT-MSKBD-030 | "sends a ready download to the clearinghouse, with its deletion countdown" (actionFor) | Step 3, now, `להורדה במסלקה`; `מוכן להורדה · 5 ימים עד מחיקה במסלקה` |
+| UNIT-MSKBD-031 | "marks a ready download urgent two days or fewer before the clearinghouse deletes it" (actionFor) | 3 days: not urgent; 2 and 1: urgent |
+| UNIT-MSKBD-032 | "asks nothing of a submission still being prepared" (actionFor) | Not now; `אין צורך בפעולה`; `הוגש <when> · יהיה מוכן בעוד כ־3–4 שעות` |
+| UNIT-MSKBD-033 | "offers an invited client a fresh link always, and puts them in 'now' only after three days" (actionFor) | 2 days: `קישור חדש`, not now; 4 days: now; `קיבל/ה קישור לפני N ימים ועוד לא מילא/ה` |
+| UNIT-MSKBD-034 | "counts an invitation from its creation when it was never mailed, and says today and yesterday in words" (actionFor) | `createdAt` 5 days ago: now; `היום`, `אתמול` |
+| UNIT-MSKBD-035 | "links a completed request to its analysis when there is one, and is never 'now'" (actionFor) | `לניתוח` with the snapshot id; `none` without one |
+| UNIT-MSKBD-036 | "drops what left the board" (nowRows and stageRows) | An expired request is not planned |
+| UNIT-MSKBD-037 | "puts the urgent first, then the oldest first, and only what needs action" (nowRows and stageRows) | `urgent`, `invited-old`, `ready`, `code` |
+| UNIT-MSKBD-038 | "lists one stage oldest first, and the completed newest first" (nowRows and stageRows) | Submitted: `ready`, `urgent`, `preparing`; invited: oldest first |
 
 ### 4.45 Vercel Analytics beforeSend — `tests/unit/vercel-analytics.test.ts`
 

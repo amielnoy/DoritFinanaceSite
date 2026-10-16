@@ -6,14 +6,17 @@ import { Loader2 } from "lucide-react";
 import { CLEARINGHOUSE_ADVISOR_URL } from "@/config/masleka";
 import {
   BOARD_KEY,
-  boardColumns,
+  BOARD_STAGES,
+  STAGE_LABEL,
+  boardTime,
   copyOrFallback,
-  deletionLabel,
   failureText,
-  readinessLabel,
+  planRows,
   staffMessage,
+  stageRows,
   type ClipboardLike,
   type Message,
+  type PlannedRow,
 } from "@/lib/masleka";
 import {
   MaslekaError,
@@ -55,20 +58,13 @@ export const REVEAL_MS = 60_000;
 const defaultClipboard = (): ClipboardLike | null =>
   typeof navigator !== "undefined" && navigator.clipboard ? navigator.clipboard : null;
 
-const when = (iso: string | null): string =>
-  iso
-    ? new Date(iso).toLocaleString("he-IL", {
-        timeZone: "Asia/Jerusalem",
-        day: "numeric",
-        month: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+const when = boardTime;
 
-
+/** Every control on the board is at least 44px tall. */
 const buttonClass =
-  "inline-flex items-center gap-1 border border-border/60 px-3 py-1.5 text-sm hover:border-accent disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center gap-1 border border-border/60 px-3 py-1.5 text-sm hover:border-accent disabled:opacity-60";
+const primaryClass =
+  "inline-flex min-h-11 items-center justify-center gap-1 bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60";
 
 /** What the board is showing for one row's field after a copy button. */
 type Shown =
@@ -156,18 +152,6 @@ function LinkPanel({
         <p className="mt-1 text-xs text-muted-foreground">העתק ידנית: סמנו את הקישור והעתיקו (Ctrl+C או ⌘C).</p>
       ) : null}
     </div>
-  );
-}
-
-function Column({ title, empty, children }: { title: string; empty: string; children: React.ReactNode[] }) {
-  const id = useId();
-  return (
-    <section aria-labelledby={id} className="border border-border/60 bg-card p-4">
-      <h2 id={id} className="font-heading text-lg mb-3">
-        {title}
-      </h2>
-      {children.length ? <ul className="space-y-3">{children}</ul> : <p className="text-sm text-muted-foreground">{empty}</p>}
-    </section>
   );
 }
 
@@ -265,44 +249,49 @@ function NewRequest({
   );
 }
 
-function InvitedRow({
-  request,
-  service,
-  clipboard,
-  onStart,
-  onFailure,
-}: {
-  request: MaslekaRequest;
-  service: MaslekaPort;
-  clipboard: ClipboardLike | null;
-  onStart: () => void;
-  onFailure: (e: unknown) => void;
-}) {
-  const [link, setLink] = useState<MaslekaLink | null>(null);
-  const [busy, setBusy] = useState(false);
-  const relink = async () => {
-    onStart();
-    setBusy(true);
-    try {
-      setLink(await service.relink(request.id));
-    } catch (e) {
-      onFailure(e);
-    } finally {
-      setBusy(false);
-    }
-  };
+/** The step dot: the request's place in the four steps. */
+function StepDot({ step }: { step: number }) {
   return (
-    <li className="border border-border/60 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-medium">{request.clientName}</span>
-        <span className="text-xs text-muted-foreground">
-          {request.clientInvitedAt ? `הוזמן במייל ${when(request.clientInvitedAt)}` : `נוצר ${when(request.createdAt)}`}
-        </span>
-        <button type="button" onClick={relink} disabled={busy} className={buttonClass}>
-          קישור חדש
-        </button>
+    <span
+      aria-hidden="true"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-highlight font-heading text-sm text-accent"
+    >
+      {step}
+    </span>
+  );
+}
+
+/**
+ * One request: who, where it stands, why, and the one thing to do. `children`
+ * is what opens under it (a fresh link, the copy controls).
+ */
+function BoardRow({
+  row,
+  action,
+  children,
+}: {
+  row: PlannedRow;
+  action: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  const { request, plan } = row;
+  return (
+    <li className="border border-border/60 bg-card p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <StepDot step={plan.step} />
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-medium">{request.clientName}</span>
+            <span className="text-xs text-muted-foreground">{STAGE_LABEL[plan.stage]}</span>
+            {plan.urgent ? (
+              <span className="border border-destructive/60 px-1.5 text-xs text-destructive">דחוף</span>
+            ) : null}
+          </p>
+          <p className={plan.urgent ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{plan.reason}</p>
+        </div>
+        <div className="ms-auto">{action}</div>
       </div>
-      {link ? <LinkPanel link={link} clipboard={clipboard} /> : null}
+      {children}
     </li>
   );
 }
@@ -421,15 +410,44 @@ export default function MaslekaBoard({
     },
   });
 
-  const columns = boardColumns(requests.data ?? []);
   const at = now();
+  const planned = planRows(requests.data ?? [], at, analysisOf);
+  const [search, setSearch] = useState("");
+  const needle = search.trim().toLocaleLowerCase("he");
+  const matches = (r: PlannedRow) => !needle || r.request.clientName.toLocaleLowerCase("he").includes(needle);
+  const shownRows = BOARD_STAGES.flatMap((stage) => stageRows(planned, stage)).filter(matches);
+  // The rows whose copy controls are open ("להגשה").
+  const [openSubmit, setOpenSubmit] = useState<ReadonlySet<string>>(new Set());
+  const toggleSubmit = (id: string) =>
+    setOpenSubmit((open) => {
+      const next = new Set(open);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  // A fresh link per invited row, shown once under it.
+  const [links, setLinks] = useState<Record<string, MaslekaLink>>({});
+  const [relinking, setRelinking] = useState<string | null>(null);
 
-  // A value whose row has left "ממתין להגשה" (submitted, expired) goes with it,
+  // A value whose row has left "מוכן להגשה" (submitted, expired) goes with it,
   // and so does an answer for that row still on its way.
-  const activeRowWaiting = activeId === null || columns.waiting.some((r) => r.id === activeId);
+  const activeRowWaiting =
+    activeId === null || (requests.data ?? []).some((r) => r.id === activeId && r.status === "code_received");
   useEffect(() => {
     if (!activeRowWaiting) hide();
   }, [activeRowWaiting, hide]);
+
+  const relink = async (request: MaslekaRequest) => {
+    clearNotice();
+    setRelinking(request.id);
+    try {
+      const link = await service.relink(request.id);
+      setLinks((l) => ({ ...l, [request.id]: link }));
+    } catch (e) {
+      report(e);
+    } finally {
+      setRelinking(null);
+    }
+  };
 
   const onSubmitted = (request: MaslekaRequest) => {
     // One call per הגשתי: a double click lands before the button is disabled.
@@ -495,75 +513,83 @@ export default function MaslekaBoard({
         ) : null}
         {requests.isPending ? <Loader2 className="animate-spin" aria-label="טוען" /> : null}
 
-        <Column title="הוזמנו — ממתינים לקוד" empty="אין לקוחות שממתינים לקוד.">
-          {columns.invited.map((r) => (
-            <InvitedRow key={r.id} request={r} service={service} clipboard={clipboard} onStart={clearNotice} onFailure={report} />
-          ))}
-        </Column>
+        <div>
+          <label htmlFor="masleka-search" className="sr-only">
+            חיפוש לקוח
+          </label>
+          <input
+            id="masleka-search"
+            type="search"
+            placeholder="חיפוש לקוח"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="min-h-11 w-full max-w-sm border border-border bg-background px-3 py-2 text-sm"
+          />
+        </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <Column title="ממתין להגשה" empty="אין קודים שממתינים להגשה.">
-            {columns.waiting.map((r) => (
-              <li key={r.id} className="border border-border/60 p-3">
-                <p className="font-medium">{r.clientName}</p>
-                <p className="text-xs text-muted-foreground">
-                  התקבל {when(r.codeReceivedAt)}
-                  {r.idLast4 ? ` · ת״ז מסתיימת ב־${r.idLast4}` : ""}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {revealButton(r, "id")}
-                  {revealButton(r, "code")}
-                  <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className={buttonClass}>
-                    פתח את המסלקה
-                  </a>
+        {requests.isSuccess && shownRows.length === 0 ? (
+          <p className="border border-border/60 bg-card p-6 text-center text-sm text-muted-foreground">
+            אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד.
+          </p>
+        ) : (
+          <ul aria-label="בקשות" className="space-y-3">
+            {shownRows.map((row) => {
+              const r = row.request;
+              const a = row.plan.action;
+              const action =
+                a.kind === "submit" ? (
                   <button
                     type="button"
-                    onClick={() => onSubmitted(r)}
-                    disabled={submitted.isPending}
-                    className={`${buttonClass} border-primary`}
+                    aria-expanded={openSubmit.has(r.id)}
+                    onClick={() => toggleSubmit(r.id)}
+                    className={primaryClass}
                   >
-                    הגשתי
+                    {a.label}
                   </button>
-                </div>
-                {shown?.kind === "manual" && shown.requestId === r.id ? (
-                  <ManualCopy
-                    value={shown.value}
-                    label={fieldLabel(shown.field, r.clientName)}
-                    inputRef={fieldRef}
-                    onClose={hide}
-                  />
-                ) : null}
-              </li>
-            ))}
-          </Column>
-
-          <Column title="הוגש — ממתין להורדה" empty="אין בקשות שהוגשו.">
-            {columns.submitted.map((r) => (
-              <li key={r.id} className="border border-border/60 p-3">
-                <p className="font-medium">{r.clientName}</p>
-                <p className="text-sm">{readinessLabel(r.submittedAt, at)}</p>
-                <p className="text-xs text-muted-foreground">{deletionLabel(r.clearinghouseDeletesAt, at)}</p>
-                <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm underline">
-                  לפורטל המסלקה
-                </a>
-              </li>
-            ))}
-          </Column>
-
-          <Column title="הושלם" empty="בקשות יופיעו כאן אחרי שקובצי המסלקה ייקלטו.">
-            {columns.completed.map((r) => (
-              <li key={r.id} className="border border-border/60 p-3">
-                <p className="font-medium">{r.clientName}</p>
-                <p className="text-xs text-muted-foreground">הושלם {when(r.completedAt)}</p>
-                {analysisOf.has(r.id) ? (
-                  <Link to={`/admin/masleka/analysis/${analysisOf.get(r.id)}`} className="mt-2 inline-block text-sm underline">
-                    לניתוח ולהמלצות
+                ) : a.kind === "download" ? (
+                  // A new tab and no referrer: the board's address stays out of the portal's requests.
+                  <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className={primaryClass}>
+                    {a.label}
+                  </a>
+                ) : a.kind === "relink" ? (
+                  <button type="button" onClick={() => void relink(r)} disabled={relinking === r.id} className={buttonClass}>
+                    {a.label}
+                  </button>
+                ) : a.kind === "analysis" ? (
+                  <Link to={`/admin/masleka/analysis/${a.snapshotId}`} className={buttonClass}>
+                    {a.label}
                   </Link>
-                ) : null}
-              </li>
-            ))}
-          </Column>
-        </div>
+                ) : (
+                  <span className="text-sm text-muted-foreground">{a.label}</span>
+                );
+              return (
+                <BoardRow key={r.id} row={row} action={action}>
+                  {a.kind === "submit" && openSubmit.has(r.id) ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {revealButton(r, "id")}
+                      {revealButton(r, "code")}
+                      <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className={buttonClass}>
+                        פתח את המסלקה
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => onSubmitted(r)}
+                        disabled={submitted.isPending}
+                        className={`${buttonClass} border-primary`}
+                      >
+                        הגשתי
+                      </button>
+                    </div>
+                  ) : null}
+                  {a.kind === "submit" && shown?.kind === "manual" && shown.requestId === r.id ? (
+                    <ManualCopy value={shown.value} label={fieldLabel(shown.field, r.clientName)} inputRef={fieldRef} onClose={hide} />
+                  ) : null}
+                  {a.kind === "relink" && links[r.id] ? <LinkPanel link={links[r.id]} clipboard={clipboard} /> : null}
+                </BoardRow>
+              );
+            })}
+          </ul>
+        )}
 
         {/* Every stored report, newest first — also those made by hand or whose
             request has gone. Quiet when there are none or they cannot be read:

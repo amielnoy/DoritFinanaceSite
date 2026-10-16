@@ -14,25 +14,7 @@ export const READY_AFTER_MS = 4 * 60 * 60 * 1000;
 export const BOARD_KEY = ["admin", "masleka"] as const;
 const DAY_MS = 86_400_000;
 
-export interface BoardColumns {
-  invited: MaslekaRequest[];
-  waiting: MaslekaRequest[];
-  submitted: MaslekaRequest[];
-  completed: MaslekaRequest[];
-}
-
 const time = (iso: string | null): number => (iso ? Date.parse(iso) || 0 : 0);
-
-/** Each request in its column; the longest-waiting first, so the oldest is worked first. */
-export function boardColumns(requests: MaslekaRequest[]): BoardColumns {
-  const of = (status: MaslekaRequest["status"]) => requests.filter((r) => r.status === status);
-  return {
-    invited: of("invited").sort((a, b) => time(a.createdAt) - time(b.createdAt)),
-    waiting: of("code_received").sort((a, b) => time(a.codeReceivedAt) - time(b.codeReceivedAt)),
-    submitted: of("submitted").sort((a, b) => time(a.submittedAt) - time(b.submittedAt)),
-    completed: of("completed").sort((a, b) => time(b.completedAt) - time(a.completedAt)),
-  };
-}
 
 export function readinessLabel(submittedAt: string | null, now: Date): string {
   if (!submittedAt) return "";
@@ -62,6 +44,169 @@ export function deletionLabel(iso: string | null, now: Date): string {
   if (days <= 0) return "נמחק במסלקה";
   if (days === 1) return "יום אחד עד מחיקה במסלקה";
   return `${days} ימים עד מחיקה במסלקה`;
+}
+
+/** A time a person reads on the board: Israel time, day and month and the hour. */
+export function boardTime(iso: string | null): string {
+  return iso
+    ? new Date(iso).toLocaleString("he-IL", {
+        timeZone: "Asia/Jerusalem",
+        day: "numeric",
+        month: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+}
+
+/** The board's four stages, in the order a request moves through them. */
+export const BOARD_STAGES = ["invited", "code_received", "submitted", "completed"] as const;
+export type BoardStage = (typeof BOARD_STAGES)[number];
+
+export const STAGE_LABEL: Record<BoardStage, string> = {
+  invited: "ממתין ללקוח",
+  code_received: "מוכן להגשה",
+  submitted: "הוגש במסלקה",
+  completed: "הושלם",
+};
+
+/** An invited client is chased after this many days without a code. */
+export const INVITE_NUDGE_DAYS = 3;
+/** A download this many days or fewer from its deletion is urgent. */
+export const URGENT_DAYS = 2;
+
+/** The one thing a row offers. `none` is a sentence, not a button. */
+export type BoardAction =
+  | { kind: "submit"; label: "להגשה" }
+  | { kind: "download"; label: "להורדה במסלקה" }
+  | { kind: "relink"; label: "קישור חדש" }
+  | { kind: "analysis"; label: "לניתוח"; snapshotId: string }
+  | { kind: "none"; label: "אין צורך בפעולה" };
+
+export interface RowPlan {
+  /** 1–4: the request's step. */
+  step: 1 | 2 | 3 | 4;
+  stage: BoardStage;
+  reason: string;
+  action: BoardAction;
+  /** In "לטיפול עכשיו". */
+  needsAction: boolean;
+  /** A download about to be deleted by the clearinghouse: first in "now", said in red. */
+  urgent: boolean;
+  /** When the request entered its stage, for "oldest first". */
+  since: number;
+}
+
+const NONE: BoardAction = { kind: "none", label: "אין צורך בפעולה" };
+
+/** "היום", "אתמול", or "לפני N ימים", counted on the Israeli calendar. */
+function daysAgo(iso: string, now: Date): string {
+  const day = (d: Date) => Date.parse(`${israelToday(d)}T00:00:00Z`);
+  const n = Math.max(0, Math.round((day(now) - day(new Date(iso))) / DAY_MS));
+  return n === 0 ? "היום" : n === 1 ? "אתמול" : `לפני ${n} ימים`;
+}
+
+/**
+ * What one row says and offers, and whether it waits for someone now — the
+ * board's whole "needs action" rule, here so it is tested without a page.
+ *
+ * - code_received: the code is in; "להגשה" (the guided submit). Now.
+ * - submitted and ready (READY_AFTER_MS): "להורדה במסלקה". Now; urgent when
+ *   the clearinghouse deletes the files in URGENT_DAYS or fewer.
+ * - submitted, not ready yet: nothing to do.
+ * - invited: "קישור חדש" always; now only after INVITE_NUDGE_DAYS.
+ * - completed: "לניתוח" when a report exists; never now.
+ */
+export function actionFor(request: MaslekaRequest, now: Date, snapshotIdByRequest: ReadonlyMap<string, string>): RowPlan {
+  switch (request.status) {
+    case "code_received": {
+      const last4 = request.idLast4 ? ` · ת״ז מסתיימת ב־${request.idLast4}` : "";
+      return {
+        step: 2,
+        stage: "code_received",
+        reason: `קוד האימות התקבל ${boardTime(request.codeReceivedAt)}${last4}`,
+        action: { kind: "submit", label: "להגשה" },
+        needsAction: true,
+        urgent: false,
+        since: time(request.codeReceivedAt),
+      };
+    }
+    case "submitted": {
+      const submittedAt = time(request.submittedAt);
+      if (now.getTime() - submittedAt >= READY_AFTER_MS) {
+        const days = daysUntil(request.clearinghouseDeletesAt, now);
+        const deletion = deletionLabel(request.clearinghouseDeletesAt, now);
+        return {
+          step: 3,
+          stage: "submitted",
+          reason: deletion ? `מוכן להורדה · ${deletion}` : "מוכן להורדה",
+          action: { kind: "download", label: "להורדה במסלקה" },
+          needsAction: true,
+          urgent: days !== null && days <= URGENT_DAYS,
+          since: submittedAt + READY_AFTER_MS,
+        };
+      }
+      return {
+        step: 3,
+        stage: "submitted",
+        reason: `הוגש ${boardTime(request.submittedAt)} · יהיה מוכן בעוד כ־3–4 שעות`,
+        action: NONE,
+        needsAction: false,
+        urgent: false,
+        since: submittedAt,
+      };
+    }
+    case "completed": {
+      const snapshotId = snapshotIdByRequest.get(request.id);
+      return {
+        step: 4,
+        stage: "completed",
+        reason: `הושלם ${boardTime(request.completedAt)}`,
+        action: snapshotId ? { kind: "analysis", label: "לניתוח", snapshotId } : NONE,
+        needsAction: false,
+        urgent: false,
+        since: time(request.completedAt),
+      };
+    }
+    default: {
+      const sent = request.clientInvitedAt ?? request.createdAt;
+      return {
+        step: 1,
+        stage: "invited",
+        reason: `קיבל/ה קישור ${daysAgo(sent, now)} ועוד לא מילא/ה`,
+        action: { kind: "relink", label: "קישור חדש" },
+        needsAction: now.getTime() - time(sent) > INVITE_NUDGE_DAYS * DAY_MS,
+        urgent: false,
+        since: time(sent),
+      };
+    }
+  }
+}
+
+export interface PlannedRow {
+  request: MaslekaRequest;
+  plan: RowPlan;
+}
+
+const onBoard = (r: MaslekaRequest): boolean => (BOARD_STAGES as readonly string[]).includes(r.status);
+
+/** Every request still on the board (not expired or cancelled), with its plan. */
+export function planRows(requests: MaslekaRequest[], now: Date, snapshotIdByRequest: ReadonlyMap<string, string>): PlannedRow[] {
+  return requests.filter(onBoard).map((request) => ({ request, plan: actionFor(request, now, snapshotIdByRequest) }));
+}
+
+/** "לטיפול עכשיו": the rows that need someone, urgent first, then the oldest first. */
+export function nowRows(rows: PlannedRow[]): PlannedRow[] {
+  return rows
+    .filter((r) => r.plan.needsAction)
+    .sort((a, b) => Number(b.plan.urgent) - Number(a.plan.urgent) || a.plan.since - b.plan.since);
+}
+
+/** One stage's rows, oldest first — except "הושלם", newest first. */
+export function stageRows(rows: PlannedRow[], stage: BoardStage): PlannedRow[] {
+  return rows
+    .filter((r) => r.plan.stage === stage)
+    .sort((a, b) => (stage === "completed" ? b.plan.since - a.plan.since : a.plan.since - b.plan.since));
 }
 
 export interface ClipboardLike {

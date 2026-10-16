@@ -381,10 +381,12 @@ Replaces `<StaffRoute />` (agency roles). The role is asked of the database thro
 
 ### 4.19 `<MaslekaBoard />` — the staff board — `tests/component/masleka-board.test.tsx`
 
+Since the redesign (2026-10-16) the board is one list of rows, each with one action (`actionFor`). Until the guided drawer (step 4), "להגשה" opens the copy controls under the row. The test helper `card(name)` opens them, and `openWaiting()` opens every such row, so the secrecy cases read as before.
+
 | ID | Title | Expected result |
 |---|---|---|
-| CMP-MSKB-001 | "lays the requests out by status, with the third column empty until PR B" | Each name in its region; empty-state text in "הושלם" |
-| CMP-MSKB-002 | "says when the files should be ready, and how long the clearinghouse keeps them" | Readiness and deletion labels per card |
+| CMP-MSKB-001 | "shows every request in one list: step, name, stage and the reason, with one action each" (the list) | רונית: `מוכן להגשה`, the code-received reason, `להגשה`; אורי: `קישור חדש` and the invited reason |
+| CMP-MSKB-002 | "says when the files should be ready, and how long the clearinghouse keeps them" (the list) | יעל: `הוגש … · יהיה מוכן בעוד כ־3–4 שעות`, `אין צורך בפעולה`; דן: `מוכן להורדה · יום אחד…`, `דחוף`, `להורדה במסלקה` in a new tab with no referrer |
 | CMP-MSKB-003 | "reports a list that failed to load" | Alert text |
 | CMP-MSKB-004 | "copies the ID to the clipboard, revealing it only on the click" | No reveal before the click; `writeText('000000018')`; "הועתק ✓" |
 | CMP-MSKB-005 | "falls back to a selected field when there is no clipboard" | Read-only field with the value; "העתק ידנית" |
@@ -395,7 +397,7 @@ Replaces `<StaffRoute />` (agency roles). The role is asked of the database thro
 | CMP-MSKB-010 | "shows one value at a time: revealing another client's clears the first" | The second client's field shown; the first client's gone |
 | CMP-MSKB-011 | "drops a value that arrives after a newer reveal was asked for" | A slower answer for the first click never reaches the screen |
 | CMP-MSKB-012 | "copies nothing when a value arrives after the board is gone" | Unmounted before the answer: `writeText` never called |
-| CMP-MSKB-013 | "forgets a shown value once its row leaves the column, so it never comes back with the row" | Row moves to submitted and back on two refetches; value not shown again |
+| CMP-MSKB-013 | "forgets a shown value once its row leaves the stage, so it never comes back with the row" | The row moves to submitted (no `להגשה`) and back: the value is gone |
 | CMP-MSKB-014 | "keeps the revealed value out of the query cache, storage, the console and the address" | Not in any query or mutation state, any storage write, any console call, `location.href` |
 | CMP-MSKB-015 | "wipes on הגשתי only after asking first" | Declined confirm → nothing; accepted → `markSubmitted('r2')` and a refetch |
 | CMP-MSKB-016 | "shows a second הגשתי as already submitted, not as an error, and refreshes the row" | `already_submitted` → `role="status"` "כבר סומן כהוגש", no alert; refetch (Ruling 18) |
@@ -404,14 +406,15 @@ Replaces `<StaffRoute />` (agency roles). The role is asked of the database thro
 | CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
 | CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל"; "פתיחת הקישור" opens it in a new tab, `noopener noreferrer` |
 | CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown, and "פתיחת הקישור" points at it |
-| CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves before the answer: never copied, never shown, no "הועתק ✓" when the row returns |
+| CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves the stage before the answer: never copied, never shown |
 | CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks in one tick → one `markSubmitted`, one refetch |
 | CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |
 | CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | "הועתק ✓" gone right after `markSubmitted('r2')`, with the refetch rejecting |
-| CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | "לניתוח ולהמלצות" → `/admin/masleka/analysis/s7`; region "ניתוחים" lists a report with no request |
+| CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | The row's `לניתוח` → `/admin/masleka/analysis/s7`; the reports list names the lead-less one |
 | CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | A quiet "לא הצלחנו לטעון את הניתוחים."; the columns still work; no alert |
-| CMP-MSKB-026 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
-| CMP-MSKB-027 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
+| CMP-MSKB-029 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
+| CMP-MSKB-030 | "says so when the invitation e-mail was asked for but not sent" | `invited: false` with an address given → "המייל ללקוח לא נשלח"; not "נשלח במייל" |
+| CMP-MSKB-031 | "finds a client by name as you type, and says so when nothing is there" (the list) | `לוי`: both לוי rows only; no match: "אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד." |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 
