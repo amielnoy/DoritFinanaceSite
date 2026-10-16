@@ -77,7 +77,7 @@ describe("invite-user — an agency Admin's act, and nothing wider", () => {
     expect(latest("my_enquiries")).toContain("public.my_email()");
     expect(latest("my_snapshot")).toContain("public.my_email()");
 
-    const sql = read("supabase/migrations/20261028000000_invitee_confirmed.sql");
+    const sql = read("supabase/migrations/20261031000000_invitee_confirmed.sql");
     expect(sql).toContain("security definer");
     expect(sql).toContain("set search_path = ''");
     expect(sql).toContain("revoke execute on function public.invitee_for(text) from public, anon, authenticated");
