@@ -26,6 +26,15 @@ describe("RoutedAgentService", () => {
     expect(chat.subscribe).toHaveBeenCalledWith("c-1", expect.any(Function));
   });
 
+  it("hands the page's abort signal to the adapter that sends (review 2026-10-15)", async () => {
+    const chat = port("c");
+    const routed = new RoutedAgentService(port("b"), chat, new Set(["needs_interview"]));
+    const conv = await routed.start("needs_interview");
+    const { signal } = new AbortController();
+    await routed.send(conv, "1", { signal });
+    expect(chat.send).toHaveBeenCalledWith(conv, "1", { signal });
+  });
+
   it("uses Base44 for everything when there is no chat adapter", async () => {
     const base44 = port("b");
     const routed = new RoutedAgentService(base44, null, new Set(["needs_interview"]));

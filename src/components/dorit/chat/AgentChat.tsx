@@ -305,7 +305,27 @@ export default function AgentChat({
     if (messages[messages.length - 1]?.role === "assistant") clearNoReplyTimeout();
   }, [messages]);
 
-  useEffect(() => clearNoReplyTimeout, []);
+  /**
+   * Each conversation this panel shows, numbered, and the send in flight
+   * (review 2026-10-15). Reset and unmount move to the next number and abort
+   * the send — its request and its status polling — and whatever an earlier
+   * number's send finishes with touches nothing on screen.
+   */
+  const generationRef = useRef(0);
+  const inFlightRef = useRef<AbortController | null>(null);
+  const abandonSend = () => {
+    generationRef.current += 1;
+    inFlightRef.current?.abort();
+    inFlightRef.current = null;
+  };
+
+  useEffect(
+    () => () => {
+      clearNoReplyTimeout();
+      abandonSend();
+    },
+    [],
+  );
 
   /**
    * The close of the interview, submitted by the page.
@@ -380,6 +400,7 @@ export default function AgentChat({
 
   const ensureConversation = useCallback(async () => {
     if (conversationId) return { id: conversationId };
+    const generation = generationRef.current;
     const conv = await services.agents.start(descriptor.agent, {
       name: descriptor.conversationName,
       description: descriptor.conversationDescription,
@@ -393,7 +414,8 @@ export default function AgentChat({
         ? { channel: getAttribution()?.channel ?? "", campaign: getAttribution()?.campaign ?? "", landing_path: window.location.pathname }
         : {}),
     });
-    setConversationId(conv.id);
+    // Opened for a conversation the visitor has since reset: not this panel's.
+    if (generation === generationRef.current) setConversationId(conv.id);
     return conv;
   }, [conversationId, consentAt, descriptor, consentVersion, viaChatFunction]);
 
@@ -420,9 +442,16 @@ export default function AgentChat({
         say(NO_REPLY_COPY);
       }, NO_REPLY_TIMEOUT_MS);
     }
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    inFlightRef.current = controller;
     try {
-      await services.agents.send(await ensureConversation(), text);
+      const conversation = await ensureConversation();
+      if (generation !== generationRef.current) return;
+      await services.agents.send(conversation, text, { signal: controller.signal });
     } catch (e) {
+      // A send the visitor abandoned (reset): the panel shows another conversation now.
+      if (generation !== generationRef.current) return;
       // A failed send says so itself, below; it is not "no reply".
       clearNoReplyTimeout();
       // Put the text back in the box. The visitor's own message reaches the
@@ -442,7 +471,8 @@ export default function AgentChat({
           : "מצטערת, לא הצלחתי לשלוח את ההודעה כרגע. ניתן לנסות שוב."
       );
     } finally {
-      setSending(false);
+      if (inFlightRef.current === controller) inFlightRef.current = null;
+      if (generation === generationRef.current) setSending(false);
     }
   };
 
@@ -528,6 +558,8 @@ export default function AgentChat({
 
   const reset = () => {
     clearNoReplyTimeout();
+    abandonSend();
+    setSending(false);
     setConversationId(null);
     setMessages([{ role: "assistant", content: descriptor.greeting }]);
     setInput("");

@@ -334,6 +334,8 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
 | CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
 | CMP-CHATFN-015 | "says the message is still being answered, keeps it in the transcript, and does not hand it back" (a turn still running when the adapter stops waiting) | The send and every status request say busy: after 40 s + 60 s the panel shows "ההודעה התקבלה ועדיין בטיפול…", the visitor's line stays, and the input stays empty (review 2026-10-15, item 14) |
+| CMP-CHATFN-016 | "aborts the chat function's request and leaves the new conversation clean and usable" (a reset while a message is on its way) | Reset mid-send: the request's signal is aborted; the old line, an apology and the old text are all absent; the next message goes out under a new conversation id and its reply shows (review 2026-10-15, item 13) |
+| CMP-CHATFN-017 | "ignores what an earlier conversation's send ends with, even from an adapter that cannot abort" (a reset while a message is on its way) | A Base44 send that fails after the reset: the input stays empty and no apology appears (the panel's generation guard) |
 
 The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`, hooks stubbed). Read-only; visitor text is plain text.
 

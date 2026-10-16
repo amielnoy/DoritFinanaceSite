@@ -1,4 +1,4 @@
-import type { AgentConversation, AgentMessage, AgentPort } from "./ports";
+import type { AgentConversation, AgentMessage, AgentPort, AgentSendOptions } from "./ports";
 
 /**
  * Each agent to whoever serves it: the `chat` function for the agents in
@@ -21,8 +21,8 @@ export class RoutedAgentService implements AgentPort {
     return conversation;
   }
 
-  send(conversation: AgentConversation, text: string): Promise<void> {
-    return (this.owner.get(conversation.id) ?? this.fallback).send(conversation, text);
+  send(conversation: AgentConversation, text: string, options?: AgentSendOptions): Promise<void> {
+    return (this.owner.get(conversation.id) ?? this.fallback).send(conversation, text, options);
   }
 
   subscribe(conversationId: string, onMessages: (messages: AgentMessage[]) => void): () => void {

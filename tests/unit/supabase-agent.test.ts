@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CHAT_REQUEST_TIMEOUT_MS, STATUS_POLL_MS, STATUS_RECOVERY_MS, STATUS_REQUEST_TIMEOUT_MS, SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
+import { CHAT_REQUEST_TIMEOUT_MS, SendAbandoned, STATUS_POLL_MS, STATUS_RECOVERY_MS, STATUS_REQUEST_TIMEOUT_MS, SupabaseAgentService } from "@/services/supabase/SupabaseAgentService";
 import { AgentLimitError, AgentUnavailableError, LEAD_SAVED_WITHOUT_REPLY } from "@/services/agent-errors";
 import type { AgentMessage } from "@/services/ports";
 
@@ -364,5 +364,49 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
     await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS);
     expect(await sending).toBeInstanceOf(AgentUnavailableError);
     expect(invoke).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** The panel was reset or closed mid-send (review 2026-10-15, item 13): the adapter stops at once. */
+describe("SupabaseAgentService — a send the page abandons", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("aborts the request in flight and asks nothing after it", async () => {
+    vi.useFakeTimers();
+    const signals: AbortSignal[] = [];
+    const invoke = vi.fn((_n: string, o: { body: Record<string, unknown>; signal?: AbortSignal }) => {
+      if (o.signal) signals.push(o.signal);
+      return new Promise<never>(() => undefined);
+    });
+    const svc = new SupabaseAgentService({ functions: { invoke } }, () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const page = new AbortController();
+    const sending = svc.send(conv, "שלום", { signal: page.signal }).then(() => "ok", (e) => e);
+    page.abort();
+    expect(await sending).toBeInstanceOf(SendAbandoned);
+    expect(signals[0].aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + STATUS_RECOVERY_MS);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops polling the status when abandoned during recovery", async () => {
+    vi.useFakeTimers();
+    let statusRequests = 0;
+    const invoke: Invoke = async (_n, { body }) => {
+      if (body.status !== true) return new Promise(() => undefined);
+      statusRequests += 1;
+      return { data: { ok: true, busy: true, status: "open", turns: 1, last: null }, error: null };
+    };
+    const svc = new SupabaseAgentService(client(invoke), () => "l");
+    const conv = await svc.start("needs_interview", META);
+    const page = new AbortController();
+    const sending = svc.send(conv, "שלום", { signal: page.signal }).then(() => "ok", (e) => e);
+    await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS + 2 * STATUS_POLL_MS);
+    const asked = statusRequests;
+    expect(asked).toBeGreaterThan(0);
+    page.abort();
+    expect(await sending).toBeInstanceOf(SendAbandoned);
+    await vi.advanceTimersByTimeAsync(STATUS_RECOVERY_MS);
+    expect(statusRequests).toBe(asked);
   });
 });

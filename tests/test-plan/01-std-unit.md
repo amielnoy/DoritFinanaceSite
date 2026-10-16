@@ -974,6 +974,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHADAPTER-024 | "stops asking at once when the first message never opened the conversation" | A 403 status answer ends recovery: two requests in all, `AgentUnavailableError` |
 | UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |
 | UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
+| UNIT-CHROUTE-003 | "hands the page's abort signal to the adapter that sends (review 2026-10-15)" | `send(conv, "1", { signal })` reaches the chat port with the same options |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
 | UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
 | UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | an unknown agent is dropped from `some_other_agent,needs_interview`; `needs_interview` stays |
@@ -1678,3 +1679,12 @@ Review 2026-10-15, item 12. The page makes the conversation's id (a uuid) and to
 | UNIT-CHHANDLER-081 | "answers busy when the same first message arrives twice at once, opening one row" (a conversation the page names) | The second insert meets 409 / 23505: answered 409 `busy`; one row |
 | UNIT-CHHANDLER-082 | "refuses the id with another token, and an id it never saw without the consent, as gone" (a conversation the page names) | 403 `gone` for both; no model call; no new row |
 | UNIT-CHHANDLER-083 | "refuses an id or token that is not the expected shape, opening nothing" (a conversation the page names) | 403 for `not-a-uuid` and a short token; no row |
+
+### 4.71 A send the page abandons — `tests/unit/supabase-agent.test.ts`, `tests/unit/routed-agent.test.ts` (new cases)
+
+Review 2026-10-15, item 13. `AgentPort.send` takes an optional `signal`. When the panel is reset or closed, the chat function's adapter aborts its request and stops its status polling, and the send rejects with `SendAbandoned`. Base44's adapter has nothing to stop. The panel's own guard is in CMP-CHATFN-016 and 017.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHADAPTER-026 | "aborts the request in flight and asks nothing after it" (a send the page abandons) | The request's signal is aborted; `SendAbandoned`; one request in all, through the whole recovery window |
+| UNIT-CHADAPTER-027 | "stops polling the status when abandoned during recovery" (a send the page abandons) | No status request after the abort; `SendAbandoned` |

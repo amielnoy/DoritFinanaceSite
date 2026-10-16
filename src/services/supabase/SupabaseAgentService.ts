@@ -1,5 +1,5 @@
 import { AgentLimitError, AgentUnavailableError, LEAD_SAVED_WITHOUT_REPLY, MAX_MESSAGE_CHARS } from "../agent-errors";
-import type { AgentConversation, AgentMessage, AgentPort } from "../ports";
+import type { AgentConversation, AgentMessage, AgentPort, AgentSendOptions } from "../ports";
 import type { SupabaseFunctionsClient } from "./SupabaseLeadService";
 
 /** Longer than the function's own 25-second turn budget plus a tool call. */
@@ -12,6 +12,27 @@ export const STATUS_REQUEST_TIMEOUT_MS = 10_000;
 
 /** The wait ran out; the turn may still be running on the server. */
 class TimedOut extends AgentUnavailableError {}
+
+/** The page abandoned the send (reset, or the panel closed): nothing more is asked or published. */
+export class SendAbandoned extends Error {
+  constructor() {
+    super("agent_send_abandoned");
+    this.name = "SendAbandoned";
+  }
+}
+
+/** Waits `ms`, or less when `signal` aborts first. */
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, ms);
+    function done() {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    }
+    signal?.addEventListener("abort", done, { once: true });
+  });
+}
 
 interface LocalConversation {
   agent: string;
@@ -93,7 +114,7 @@ export class SupabaseAgentService implements AgentPort {
     return { id };
   }
 
-  async send(conversation: AgentConversation, text: string): Promise<void> {
+  async send(conversation: AgentConversation, text: string, { signal }: AgentSendOptions = {}): Promise<void> {
     const local = this.conversations.get(conversation.id);
     if (!local) throw new Error("agent_conversation_gone");
     if (text.length > MAX_MESSAGE_CHARS) throw new AgentLimitError("too_long");
@@ -112,7 +133,7 @@ export class SupabaseAgentService implements AgentPort {
     const sent: AgentMessage = { role: "user", content: text };
     this.publish(local, [...local.messages, sent]);
     try {
-      const { data, error } = await this.invokeWithin(body, CHAT_REQUEST_TIMEOUT_MS);
+      const { data, error } = await this.invokeWithin(body, CHAT_REQUEST_TIMEOUT_MS, signal);
       if (error) {
         const failed = await this.failure(local, error);
         if (failed !== SAVED) throw failed;
@@ -129,11 +150,14 @@ export class SupabaseAgentService implements AgentPort {
         { role: "assistant", content: withRecommendation(answer.reply, answer.recommended), ...(answer.leadSaved ? { signal: "lead_saved" as const } : {}) },
       ]);
     } catch (e) {
+      // Abandoned by the page: its panel no longer shows this conversation.
+      if (signal?.aborted) throw new SendAbandoned();
       // The wait ran out, but the turn may have run on — its tools are not in the
       // model's 25 s budget — and saved the lead (review 2026-10-15). Ask before
       // telling the visitor it failed, or they send again what was already done.
       if (e instanceof TimedOut) {
-        const ended = await this.recover(local);
+        const ended = await this.recover(local, signal);
+        if (signal?.aborted) throw new SendAbandoned();
         if (ended === "running") {
           // Still running when the window closed: received, not failed, so it stays on screen (review 2026-10-15).
           throw new AgentLimitError("still_processing");
@@ -162,14 +186,15 @@ export class SupabaseAgentService implements AgentPort {
    * turn it asks about, and an answer about any other turn — one that never
    * started, or an earlier reply — is not this one's (review 2026-10-15).
    */
-  private async recover(local: LocalConversation): Promise<{ reply: string; leadSaved: boolean } | "saved" | "running" | null> {
+  private async recover(local: LocalConversation, signal?: AbortSignal): Promise<{ reply: string; leadSaved: boolean } | "saved" | "running" | null> {
     const turn = local.turns + 1;
     const body = { agent: local.agent, conversationId: local.serverId, token: local.token, status: true, turn };
     const deadline = Date.now() + STATUS_RECOVERY_MS;
     let running = false;
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, STATUS_POLL_MS));
-      const { data, error } = await this.invokeWithin(body, STATUS_REQUEST_TIMEOUT_MS).catch(() => ({
+    while (Date.now() < deadline && !signal?.aborted) {
+      await pause(STATUS_POLL_MS, signal);
+      if (signal?.aborted) break;
+      const { data, error } = await this.invokeWithin(body, STATUS_REQUEST_TIMEOUT_MS, signal).catch(() => ({
         data: null,
         error: { message: "network" } as { message: string; context?: unknown },
       }));
@@ -230,20 +255,31 @@ export class SupabaseAgentService implements AgentPort {
   }
 
   /**
-   * One request, cancelled at the timeout. The turn may still run on; `recover`
-   * asks how it ended. The conversation's ids are the page's own, so nothing a
-   * late answer carries is needed (review 2026-10-15).
+   * One request, cancelled at the timeout or when the page abandons the send.
+   * The turn may still run on; `recover` asks how it ended. The conversation's
+   * ids are the page's own, so nothing a late answer carries is needed
+   * (review 2026-10-15).
    */
-  private invokeWithin(body: Record<string, unknown>, ms: number) {
+  private invokeWithin(body: Record<string, unknown>, ms: number, signal?: AbortSignal) {
     const controller = new AbortController();
     const request = this.client.functions.invoke("chat", { body, signal: controller.signal });
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
+    let onAbort: (() => void) | undefined;
+    const cutOff = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         controller.abort();
         reject(new TimedOut());
       }, ms);
+      onAbort = () => {
+        controller.abort();
+        reject(new SendAbandoned());
+      };
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener("abort", onAbort, { once: true });
     });
-    return Promise.race([request, timeout]).finally(() => clearTimeout(timer));
+    return Promise.race([request, cutOff]).finally(() => {
+      clearTimeout(timer);
+      if (onAbort) signal?.removeEventListener("abort", onAbort);
+    });
   }
 }

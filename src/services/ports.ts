@@ -154,10 +154,19 @@ export interface AgentConversation {
   id: string;
 }
 
+export interface AgentSendOptions {
+  signal?: AbortSignal;
+}
+
 /** Driving one of the on-site LLM agents. */
 export interface AgentPort {
   start(agentName: string, metadata?: Record<string, unknown>): Promise<AgentConversation>;
-  send(conversation: AgentConversation, text: string): Promise<void>;
+  /**
+   * `signal` abandons the send (the panel was reset or closed): the chat
+   * function's adapter stops its request and its status polling and publishes
+   * nothing more. Base44's adapter has nothing to stop and ignores it.
+   */
+  send(conversation: AgentConversation, text: string, options?: AgentSendOptions): Promise<void>;
   subscribe(conversationId: string, onMessages: (messages: AgentMessage[]) => void): () => void;
 }
 

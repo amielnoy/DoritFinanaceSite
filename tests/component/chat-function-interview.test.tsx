@@ -43,8 +43,8 @@ vi.mock("@/services", async (importOriginal) => {
       starts.push([agent, meta]);
       return agent === "needs_interview" ? chat.start(agent, meta) : { id: "b44_1" };
     },
-    send: async (conv: { id: string }, text: string) =>
-      conv.id === "b44_1" ? base44Send() : chat.send(conv, text),
+    send: async (conv: { id: string }, text: string, options?: { signal?: AbortSignal }) =>
+      conv.id === "b44_1" ? base44Send() : chat.send(conv, text, options),
     subscribe: (id: string, cb: (m: any[]) => void) => (id === "b44_1" ? () => undefined : chat.subscribe(id, cb)),
   };
   return {
@@ -240,5 +240,51 @@ describe("a turn still running when the adapter stops waiting", () => {
     expect(screen.getByText(/ההודעה התקבלה ועדיין בטיפול/)).toBeTruthy();
     expect(screen.getByText("מה עם הפנסיה שלי?")).toBeTruthy();
     expect((screen.getByPlaceholderText("כתבו כאן…") as HTMLInputElement).value).toBe("");
+  });
+});
+
+/**
+ * A reset while a message is on its way (review 2026-10-15, item 13): the send
+ * is abandoned, and nothing it finishes with reaches the new conversation.
+ */
+describe("a reset while a message is on its way", () => {
+  beforeEach(() => {
+    invoke.mockReset();
+    base44Send.mockReset();
+  });
+
+  it("aborts the chat function's request and leaves the new conversation clean and usable", async () => {
+    let signal: AbortSignal | undefined;
+    invoke.mockImplementationOnce((_n: string, o: { signal?: AbortSignal }) => {
+      signal = o.signal;
+      return new Promise(() => undefined);
+    });
+    await startAndSend("הודעה ראשונה");
+    await userEvent.click(screen.getByRole("button", { name: "התחלה מחדש" }));
+    expect(signal?.aborted).toBe(true);
+    expect(screen.queryByText("הודעה ראשונה")).toBeNull();
+    expect(screen.queryByText(/לא הצלחתי לשלוח/)).toBeNull();
+    expect((screen.getByPlaceholderText("כתבו כאן…") as HTMLInputElement).value).toBe("");
+
+    invoke.mockResolvedValueOnce({ data: { ok: true, conversationId: "x", turn: 1, reply: "שיחה חדשה" }, error: null });
+    await userEvent.type(screen.getByPlaceholderText("כתבו כאן…"), "שוב");
+    await userEvent.click(screen.getByRole("button", { name: "שליחה" }));
+    expect(await screen.findByText("שיחה חדשה")).toBeTruthy();
+    expect(invoke.mock.calls[1][1].body.conversationId).not.toBe(invoke.mock.calls[0][1].body.conversationId);
+  });
+
+  it("ignores what an earlier conversation's send ends with, even from an adapter that cannot abort", async () => {
+    let fail: (e: Error) => void = () => undefined;
+    base44Send.mockImplementationOnce(() => new Promise((_resolve, reject) => (fail = reject)));
+    const user = userEvent.setup();
+    render(<MemoryRouter><AgentChat descriptor={AGENTS.support} /></MemoryRouter>);
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /התחלת השיחה/ }));
+    await user.type(screen.getByPlaceholderText("כתבו כאן…"), "הודעה ישנה");
+    await user.click(screen.getByRole("button", { name: "שליחה" }));
+    await user.click(screen.getByRole("button", { name: "התחלה מחדש" }));
+    await act(async () => fail(new Error("late failure")));
+    expect((screen.getByPlaceholderText("כתבו כאן…") as HTMLInputElement).value).toBe("");
+    expect(screen.queryByText(/לא הצלחתי לשלוח/)).toBeNull();
   });
 });
