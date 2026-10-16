@@ -87,6 +87,17 @@ before it reaches an `href`; the plain-text copy is left
 unescaped on purpose, because escaping it would only make the mail unreadable;
 and the record stores the raw value, so it matches what was submitted.
 
+### 4.2a `submit-lead` — how often (review 2026-10-15) — `INT-LEAD-110..113`
+
+A public door with no sign-in: each caller is counted by a hash of their address, like submit-claim's `claim-ip`. The staff's mail and the diary are capped for every caller together, so a flood from many addresses cannot fill Dorit's inbox. Past the cap the lead is still saved.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-LEAD-110 | "counts the caller by a hash of the address, never the address itself" | `lead-ip:<64 hex>`; the address appears in no limiter key |
+| INT-LEAD-111 | "refuses a caller over the hourly limit, and writes and mails nothing" | 429 with `rid`; no lead, mail or invitation |
+| INT-LEAD-112 | "past the hourly staff cap, saves the lead and confirms to the visitor, but mails no staff and books nothing" | 200; one lead; `staff_notify_capped`; the visitor's confirmation goes out; no mail to Dorit or ops; no invitation; no calendar call |
+| INT-LEAD-113 | "asks the staff cap once per enquiry, and not for a partial interview" | One `lead-staff-notify` per full enquiry; none for a partial one |
+
 ### 4.3 `submitLead` — identifiers a visitor volunteered — `INT-LEAD-016/017`
 
 An ID number or card number in a model-written summary is redacted before anyone

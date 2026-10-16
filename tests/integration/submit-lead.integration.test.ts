@@ -393,6 +393,46 @@ describe.each(IMPLEMENTATIONS)("$label — the public entry point's limits", ({ 
     expect(r.emails.some((e) => e.to.includes("victim"))).toBe(false);
   });
 
+  const fromIp = { headers: { "x-forwarded-for": "203.0.113.7" } };
+  const limiterKeys = (r: Result) =>
+    (r as unknown as { fetches: { url: string; body: unknown }[] }).fetches
+      .filter((f) => f.url.endsWith("/rest/v1/rpc/allow_submission"))
+      .map((f) => String((f.body as { p_key: string }).p_key));
+
+  it("counts the caller by a hash of the address, never the address itself", async () => {
+    const r = await run(consultation, fromIp);
+    expect(r.status).toBe(200);
+    expect(limiterKeys(r).find((k) => k.startsWith("lead-ip:"))).toMatch(/^lead-ip:[0-9a-f]{64}$/);
+    expect(JSON.stringify(limiterKeys(r))).not.toContain("203.0.113.7");
+  });
+
+  it("refuses a caller over the hourly limit, and writes and mails nothing", async () => {
+    const r = await run(consultation, { ...fromIp, overLimit: ["lead-ip:"] });
+    expect(r.status).toBe(429);
+    expect(r.json.rid).toBeTruthy();
+    expect(r.leads).toHaveLength(0);
+    expect(r.emails).toHaveLength(0);
+    expect(r.invitations ?? []).toEqual([]);
+  });
+
+  it("past the hourly staff cap, saves the lead and confirms to the visitor, but mails no staff and books nothing", async () => {
+    const r = await run(consultation, { overLimit: ["lead-staff-notify"] });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+    expect(r.json.warnings).toContain("staff_notify_capped");
+    const to = r.emails.map((e) => e.to);
+    expect(to).toContain("yael@example.com");
+    for (const staff of [AGENCY, OPS, OPS2]) expect(to).not.toContain(staff);
+    expect(r.invitations ?? []).toEqual([]);
+    expect((r as unknown as { fetches: { url: string }[] }).fetches.some((f) => f.url.includes("/calendar/v3/calendars/"))).toBe(false);
+  });
+
+  it("asks the staff cap once per enquiry, and not for a partial interview", async () => {
+    const full = await run(consultation);
+    expect(limiterKeys(full).filter((k) => k === "lead-staff-notify")).toHaveLength(1);
+    const partial = await run({ ...consultation, source: "interview", stage: "partial" });
+    expect(limiterKeys(partial)).not.toContain("lead-staff-notify");
+  });
 });
 
 describe.each(IMPLEMENTATIONS)("$label — identifiers a visitor volunteered", ({ run }) => {
