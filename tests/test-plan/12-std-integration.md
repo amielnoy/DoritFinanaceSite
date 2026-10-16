@@ -614,7 +614,7 @@ Invitations independent of the Google event — `INT-INV-001..007`, in the Edge
 With the Google event created, the one existing case asserts that the two
 invitations carry the event's own UID and that none goes to `amielnoy@gmail.com`.
 
-### 4.24 `contentAdmin` — the article's address — `INT-CNT-001..008`
+### 4.24 `contentAdmin` — the article's address, and who may write — `INT-CNT-001..014`
 
 `content-admin.integration.test.ts`. The slug is the Supabase mirror's alone,
 so it is validated and checked for uniqueness before Base44 is written — a
@@ -633,6 +633,15 @@ is a failure, never a silently created row.
 | INT-CNT-006 | "lets an article keep its own slug, and sends it to the mirror only" | 200; Base44 update has no `slug`; PATCH carries it |
 | INT-CNT-007 | "fails an update whose mirror row is missing" | 500 |
 | INT-CNT-008 | "refuses to rename an article to a slug another one has" | 409; no Base44 update |
+
+**Who may write** (agency roles, 2026-10-16): the platform operator, or an Admin or Owner of agency 1 (`staff_role`), as the screens offer the controls. Dorit, the agency's Owner and not the operator, was refused on every publish toggle before this.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CNT-009..010 | "lets an agency %s who is not the operator publish an article" (owner, admin) | 200; the mirror PATCH made; `staff_role` asked with the caller and agency 1 |
+| INT-CNT-011..012 | "refuses an agency %s (or no membership) with 403, and writes nothing" (user, null) | 403 "הפעולה מותרת למנהלים בלבד." with `rid`; no mirror write |
+| INT-CNT-013 | "answers 500 — not 'not an admin' — when the agency role cannot be read, and writes nothing" | `staff_role` 500 → 500; no mirror write |
+| INT-CNT-014 | "lets the operator through without asking the agency role" | 200; `staff_role` never called |
 
 ### 4.25 `masleka-code` — the client hands over the code — `INT-MSKCODE-001..036`
 
