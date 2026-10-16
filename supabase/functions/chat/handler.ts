@@ -147,13 +147,21 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
         const found = UUID.test(id) && TOKEN.test(token) ? await deps.store.getConversation(id) : null;
         if (!found || found.role !== role || found.token_hash !== (await sha256Hex(token))) return refuse(403, 'gone');
         const busy = found.busy_until !== null && Date.parse(found.busy_until) > deps.now();
-        const last = [...(await deps.store.listMessages(found.id))].reverse().find((m) => m.role !== 'tool');
+        // The page names the turn it waits for (review 2026-10-15). The newest message
+        // is that turn's only while the count is still that turn and the turn is over:
+        // a turn that never started, or one still running, has no reply to give, and an
+        // older one's must never pass for it.
+        const turn = typeof input.turn === 'number' && Number.isInteger(input.turn) && input.turn > 0 ? input.turn : 0;
+        const last = !busy && found.turns === turn
+          ? [...(await deps.store.listMessages(found.id))].reverse().find((m) => m.role !== 'tool')
+          : undefined;
         log('info', 'request.end', { rid, ms: Date.now() - startedAt, conversation: found.id, statusRequest: true, busy });
         return respond(200, {
           ok: true,
           busy,
           status: found.status,
           leadSaved: found.status === 'lead_saved',
+          turns: found.turns,
           last: last ? { role: last.role, content: last.content } : null,
         });
       }
@@ -331,7 +339,8 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           // The store clips to the column's 8,000 characters, past anything MAX_REPLY_TOKENS allows in practice.
           await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'assistant', content: redactChat(result.reply) });
         }
-        const continuation = { conversationId: id, ...(issuedToken ? { token: issuedToken } : {}) };
+        // `turn` is this turn's number, which a status request names (review 2026-10-15).
+        const continuation = { conversationId: id, turn: conversation.turns, ...(issuedToken ? { token: issuedToken } : {}) };
         if (!result) {
           log('warn', 'model.failed', { rid, conversation: id, reason: failure?.reason ?? 'unknown', ms: Date.now() - startedAt });
           return respond(503, { ok: false, code: 'unavailable', leadSaved, ...continuation });

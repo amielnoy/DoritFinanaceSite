@@ -892,7 +892,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHHANDLER-065 | "answers no recommended field when the turn recommended nothing" (the blog role) | No `recommended` key |
 | UNIT-CHHANDLER-066 | "gives a recommendation turn room to list, read twice and recommend before it answers" (the blog role) | Four tool rounds then a reply: 200 for `blog_recommender` (`ROLE_TOOL_ROUNDS.blog = 5`); 503 for the FAQ chat (three) |
 | UNIT-CHHANDLER-067 | "says the turn is still running while it holds the conversation" (a status request) | `status: true` with the token: 200 `busy: true`; no model call |
-| UNIT-CHHANDLER-068 | "answers how the last turn ended: its reply, and whether the lead was saved" (a status request) | `busy: false`, the last non-tool message, `leadSaved` from the status |
+| UNIT-CHHANDLER-068 | "answers how the last turn ended: its reply, and whether the lead was saved" (a status request) | Asked about turn 1: `busy: false`, `turns: 1`, the last non-tool message, `leadSaved` from the status |
 | UNIT-CHHANDLER-069 | "refuses a status request without the conversation's token, and runs nothing" (a status request) | 403 `gone` |
 | UNIT-CHHANDLER-052 | "runs the sweep for the right token, and nothing of the chat" | `x-chat-sweep` with the right token: 200, `ok`, `logged: 2`, an `rid` passed to `sweepSheetLogs`; no model call, no conversation, no rate-limit check (Review Focus 5) |
 | UNIT-CHHANDLER-053 | "refuses %s with 401 and runs nothing" | A wrong token, an empty token and the evaluation token: 401 `unauthorized`; the sweep, the model and the store untouched (Review Focus 5) |
@@ -964,7 +964,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHADAPTER-014 | "treats a 503 that says the lead was saved as a saved lead, not a failure" | `send` resolves; the transcript ends with `LEAD_SAVED_WITHOUT_REPLY`, `signal: lead_saved`, `replyMissing: true`; the 503's ids are sent with the next message (I5) |
 | UNIT-CHADAPTER-015 | "hands the page the recommended articles as the block it reads, and the visitor none of it" | `recommended` → a ```` ```recommended ```` block `readRecommendation` reads; visible text unchanged |
 | UNIT-CHADAPTER-016 | "leaves a reply without recommendations as it came, and never writes a second block" | No `recommended`: content as sent; a reply with its own block keeps it alone |
-| UNIT-CHADAPTER-017 | "shows the reply the turn produced once it finished, instead of a failure" | After the 40 s wait, `status` polled every 3 s: busy, then the reply with `lead_saved` — shown, not a failure |
+| UNIT-CHADAPTER-017 | "shows the reply the turn produced once it finished, instead of a failure" | After the 40 s wait, `status` polled every 3 s, naming `turn: 2`: busy, then the reply with `lead_saved` — shown, not a failure |
 | UNIT-CHADAPTER-018 | "says the details were saved when the turn saved the lead but left no reply" | `LEAD_SAVED_WITHOUT_REPLY`, `replyMissing` |
 | UNIT-CHADAPTER-019 | "fails as before when the turn ended with neither a reply nor a saved lead" | `AgentUnavailableError`; the message taken off the screen |
 | UNIT-CHADAPTER-020 | "stops asking after the recovery window and fails" | At most 60 s / 3 s requests |
@@ -1652,3 +1652,14 @@ The browser sends the time the visitor ticked the consent box, and the chat func
 | UNIT-CHHANDLER-073 | "never dates consent after the server's now" (the consent time it keeps) | A time in 2030 becomes now |
 | UNIT-CHHANDLER-074 | "never further back than the gate could have been open" (the consent time it keeps) | A time years back becomes now − 2 h |
 | UNIT-CHHANDLER-075 | "stores the clamped time on the conversation it opens" (the consent time it keeps) | A 2030 `consentAt` is stored on the new row as now |
+
+### 4.69 Recovering the turn that timed out, and only that one — `tests/unit/chat-handler.test.ts`, `tests/unit/supabase-agent.test.ts` (new cases)
+
+Review 2026-10-15, item 11. Every turn's answer carries its number (`turn`), and a status request names the turn the page waits for. The function gives a reply only while the conversation's count is still that turn and the turn is over. A turn that never started, one still running, or a request that names no turn gets `last: null`, so an earlier reply never passes for the lost one.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHHANDLER-076 | "numbers every turn in its answer, the number a status request names" (a status request) | The opening answer has `turn: 1`, the next `turn: 2` |
+| UNIT-CHHANDLER-077 | "never hands an earlier turn's reply as the reply of the turn asked about" (a status request) | Asked about turn 2 after only turn 1 ran: `turns: 1`, `last: null`; no `turn`, or `"1"` as a string: `last: null` |
+| UNIT-CHHANDLER-078 | "gives no reply while the turn asked about still runs, whatever the newest message is" (a status request) | Turn 2 claimed and leased: `busy: true`, `turns: 2`, `last: null` |
+| UNIT-CHADAPTER-022 | "fails, and never shows an earlier reply, when the turn it asked about never started" | Status `turns: 1` for turn 2, even with `leadSaved` and turn 1's reply: `AgentUnavailableError`; the transcript is turn 1's |

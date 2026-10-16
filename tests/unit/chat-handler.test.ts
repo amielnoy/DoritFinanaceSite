@@ -642,10 +642,10 @@ describe("privacy", () => {
   it("answers only the wire contract's fields, never the stored row or its token hash", async () => {
     const { chat, store } = setup({}, [text("שלום"), text("ועוד")]);
     const firstAnswer = await json(await chat(post(first())));
-    expect(Object.keys(firstAnswer.body).sort()).toEqual(["conversationId", "leadSaved", "ok", "reply", "rid", "status", "token"]);
+    expect(Object.keys(firstAnswer.body).sort()).toEqual(["conversationId", "leadSaved", "ok", "reply", "rid", "status", "token", "turn"]);
     const hash = [...store.conversations.values()][0].token_hash;
     const later = await json(await chat(post(next(firstAnswer.body.conversationId))));
-    expect(Object.keys(later.body).sort()).toEqual(["conversationId", "leadSaved", "ok", "reply", "rid", "status"]);
+    expect(Object.keys(later.body).sort()).toEqual(["conversationId", "leadSaved", "ok", "reply", "rid", "status", "turn"]);
     for (const answer of [firstAnswer, later]) expect(JSON.stringify(answer.body)).not.toContain(hash);
   });
 
@@ -780,7 +780,7 @@ describe("HTTP", () => {
  * of telling the visitor it failed (review 2026-10-15). A status request runs no turn.
  */
 describe("a status request", () => {
-  const status = (id: unknown, token = TOKEN) => ({ agent: "needs_interview", conversationId: id, token, status: true });
+  const status = (id: unknown, token = TOKEN, turn: unknown = 1) => ({ agent: "needs_interview", conversationId: id, token, status: true, turn });
 
   it("says the turn is still running while it holds the conversation", async () => {
     const { chat, store, model } = setup({}, [text("שלום! מה שלומך?")]);
@@ -799,9 +799,34 @@ describe("a status request", () => {
     const { body } = await json(await chat(post(first())));
     const id = body.conversationId as string;
     const res = await json(await chat(post(status(id))));
-    expect(res.body).toMatchObject({ ok: true, busy: false, leadSaved: false, last: { role: "assistant", content: "שלום! מה שלומך?" } });
+    expect(res.body).toMatchObject({ ok: true, busy: false, leadSaved: false, turns: 1, last: { role: "assistant", content: "שלום! מה שלומך?" } });
     store.conversations.get(id)!.status = "lead_saved";
     expect((await json(await chat(post(status(id))))).body).toMatchObject({ leadSaved: true });
+  });
+
+  it("numbers every turn in its answer, the number a status request names", async () => {
+    const { chat } = setup({}, [text("שלום"), text("ועוד")]);
+    const opened = await json(await chat(post(first())));
+    expect(opened.body.turn).toBe(1);
+    expect((await json(await chat(post(next(opened.body.conversationId))))).body.turn).toBe(2);
+  });
+
+  it("never hands an earlier turn's reply as the reply of the turn asked about", async () => {
+    const { chat } = setup({}, [text("שלום! מה שלומך?")]);
+    const id = (await json(await chat(post(first())))).body.conversationId;
+    // Turn 2 never started (its request died before the claim): turn 1's reply is not its.
+    const never = await json(await chat(post(status(id, TOKEN, 2))));
+    expect(never.body).toMatchObject({ ok: true, busy: false, turns: 1, last: null });
+    // A request that names no turn — a page from before turns were numbered — gets no reply either.
+    expect((await json(await chat(post({ agent: "needs_interview", conversationId: id, token: TOKEN, status: true })))).body).toMatchObject({ last: null });
+    expect((await json(await chat(post(status(id, TOKEN, "1"))))).body).toMatchObject({ last: null });
+  });
+
+  it("gives no reply while the turn asked about still runs, whatever the newest message is", async () => {
+    const { chat, store } = setup({}, [text("שלום! מה שלומך?")]);
+    const id = (await json(await chat(post(first())))).body.conversationId as string;
+    Object.assign(store.conversations.get(id)!, { turns: 2, busy_until: new Date(Date.now() + 60_000).toISOString() });
+    expect((await json(await chat(post(status(id, TOKEN, 2))))).body).toMatchObject({ busy: true, turns: 2, last: null });
   });
 
   it("refuses a status request without the conversation's token, and runs nothing", async () => {

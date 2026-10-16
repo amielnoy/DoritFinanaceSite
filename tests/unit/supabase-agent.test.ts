@@ -223,7 +223,7 @@ describe("SupabaseAgentService", () => {
 describe("SupabaseAgentService — a reply that outlived the wait", () => {
   afterEach(() => vi.useRealTimers());
 
-  type Status = { busy: boolean; leadSaved?: boolean; last?: { role: string; content: string } | null };
+  type Status = { busy: boolean; leadSaved?: boolean; turns?: number; last?: { role: string; content: string } | null };
   /** The first message answers at once; the second never does; status requests answer from `statuses`, the last one repeating. */
   function hanging(statuses: Status[]) {
     const asked: Record<string, unknown>[] = [];
@@ -232,10 +232,10 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
       if (body.status === true) {
         asked.push(body);
         const next = statuses.length > 1 ? statuses.shift()! : statuses[0];
-        return { data: { ok: true, status: "open", leadSaved: false, last: null, ...next }, error: null };
+        return { data: { ok: true, status: "open", leadSaved: false, turns: 2, last: null, ...next }, error: null };
       }
       turns += 1;
-      if (turns === 1) return { data: { ok: true, conversationId: "srv-1", token: "t".repeat(64), reply: "שלום" }, error: null };
+      if (turns === 1) return { data: { ok: true, conversationId: "srv-1", token: "t".repeat(64), turn: 1, reply: "שלום" }, error: null };
       return new Promise(() => undefined);
     };
     return { invoke, asked };
@@ -261,7 +261,7 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
     ]);
     expect(outcome).toBe("ok");
     expect(cb.mock.calls.at(-1)![0].at(-1)).toEqual({ role: "assistant", content: "תודה, הפרטים אצל דורית", signal: "lead_saved" });
-    expect(asked[0]).toEqual({ agent: "needs_interview", conversationId: "srv-1", token: "t".repeat(64), status: true });
+    expect(asked[0]).toEqual({ agent: "needs_interview", conversationId: "srv-1", token: "t".repeat(64), status: true, turn: 2 });
   });
 
   it("says the details were saved when the turn saved the lead but left no reply", async () => {
@@ -274,6 +274,12 @@ describe("SupabaseAgentService — a reply that outlived the wait", () => {
     const { outcome, cb } = await secondMessage([{ busy: false, last: { role: "user", content: "0521234567" } }]);
     expect(outcome).toBeInstanceOf(AgentUnavailableError);
     expect(cb.mock.calls.at(-1)![0].map((m: AgentMessage) => m.content)).not.toContain("0521234567");
+  });
+
+  it("fails, and never shows an earlier reply, when the turn it asked about never started", async () => {
+    const { outcome, cb } = await secondMessage([{ busy: false, leadSaved: true, turns: 1, last: { role: "assistant", content: "שלום" } }]);
+    expect(outcome).toBeInstanceOf(AgentUnavailableError);
+    expect(cb.mock.calls.at(-1)![0]).toEqual([{ role: "user", content: "היי" }, { role: "assistant", content: "שלום" }]);
   });
 
   it("stops asking after the recovery window and fails", async () => {

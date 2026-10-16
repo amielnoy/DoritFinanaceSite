@@ -16,6 +16,8 @@ interface LocalConversation {
   metadata: Record<string, unknown>;
   serverId: string | null;
   token: string | null;
+  /** The number of the server's last turn this page knows of; a status request names the next. */
+  turns: number;
   messages: AgentMessage[];
   listeners: Set<(messages: AgentMessage[]) => void>;
 }
@@ -26,6 +28,8 @@ interface ChatAnswer {
   code?: string;
   conversationId?: string;
   token?: string;
+  /** This turn's number in the conversation. */
+  turn?: number;
   reply?: string;
   leadSaved?: boolean;
   /** The articles the blog recommender's turn highlighted (recommendArticles). */
@@ -67,7 +71,7 @@ export class SupabaseAgentService implements AgentPort {
 
   async start(agentName: string, metadata: Record<string, unknown> = {}): Promise<AgentConversation> {
     const id = this.newId();
-    this.conversations.set(id, { agent: agentName, metadata, serverId: null, token: null, messages: [], listeners: new Set() });
+    this.conversations.set(id, { agent: agentName, metadata, serverId: null, token: null, turns: 0, messages: [], listeners: new Set() });
     return { id };
   }
 
@@ -105,6 +109,7 @@ export class SupabaseAgentService implements AgentPort {
       if (answer.ok !== true || typeof answer.reply !== "string") throw new AgentUnavailableError(answer.rid);
       if (answer.conversationId) local.serverId = answer.conversationId;
       if (answer.token) local.token = answer.token;
+      if (typeof answer.turn === "number") local.turns = answer.turn;
       this.publish(local, [
         ...local.messages,
         { role: "assistant", content: withRecommendation(answer.reply, answer.recommended), ...(answer.leadSaved ? { signal: "lead_saved" as const } : {}) },
@@ -134,16 +139,22 @@ export class SupabaseAgentService implements AgentPort {
    * How the turn that outlived the wait ended, asked every STATUS_POLL_MS for
    * STATUS_RECOVERY_MS: its reply, "saved" for a lead saved with no reply, or
    * null when it ended with neither — or never stopped running in the window.
-   * A status request that fails is asked again; it runs no turn.
+   * A status request that fails is asked again; it runs no turn. It names the
+   * turn it asks about, and an answer about any other turn — one that never
+   * started, or an earlier reply — is not this one's (review 2026-10-15).
    */
   private async recover(local: LocalConversation): Promise<{ reply: string; leadSaved: boolean } | "saved" | null> {
-    const body = { agent: local.agent, conversationId: local.serverId, token: local.token, status: true };
+    const turn = local.turns + 1;
+    const body = { agent: local.agent, conversationId: local.serverId, token: local.token, status: true, turn };
     for (let waited = 0; waited < STATUS_RECOVERY_MS; waited += STATUS_POLL_MS) {
       await new Promise((resolve) => setTimeout(resolve, STATUS_POLL_MS));
       const { data, error } = await this.client.functions.invoke("chat", { body }).catch(() => ({ data: null, error: { message: "network" } }));
       if (error || !data) continue;
-      const answer = data as { busy?: boolean; leadSaved?: boolean; last?: { role?: string; content?: unknown } | null };
+      const answer = data as { busy?: boolean; leadSaved?: boolean; turns?: unknown; last?: { role?: string; content?: unknown } | null };
       if (answer.busy) continue;
+      // The server's count, so the next status request names the right turn.
+      if (typeof answer.turns === "number") local.turns = answer.turns;
+      if (answer.turns !== turn) return null;
       if (answer.last?.role === "assistant" && typeof answer.last.content === "string") {
         return { reply: answer.last.content, leadSaved: answer.leadSaved === true };
       }
@@ -171,6 +182,7 @@ export class SupabaseAgentService implements AgentPort {
     // A 503 may already have opened the conversation; keep it so the next message continues it.
     if (body?.conversationId) local.serverId = body.conversationId;
     if (body?.token) local.token = body.token;
+    if (typeof body?.turn === "number") local.turns = body.turn;
     // A turn whose tool saved the lead and whose closing reply then failed.
     if (body?.leadSaved === true) return SAVED;
     if (body?.code === "too_long") return new AgentLimitError("too_long");
@@ -181,6 +193,7 @@ export class SupabaseAgentService implements AgentPort {
     if (body?.code === "gone" || body?.code === "closed") {
       local.serverId = null;
       local.token = null;
+      local.turns = 0;
       return new AgentLimitError("conversation_closed");
     }
     return new AgentUnavailableError(body?.rid);
