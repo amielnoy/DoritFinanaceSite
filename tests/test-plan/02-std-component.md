@@ -857,3 +857,13 @@ Review 2026-10-15, item 18. Dorit's controls in the home page's testimonials say
 | CMP-TESTIM-ADM-002 | "says so in an alert when a delete fails" (the admin's writes) | `role="alert"`: "ההמלצה לא נמחקה…" |
 | CMP-TESTIM-ADM-003 | "says so in an alert when the picture does not upload, and publishes nothing" (the admin's writes) | `role="alert"`: "התמונה לא הועלתה…"; `createTestimonial` not called |
 | CMP-TESTIM-ADM-004 | "says so in an alert when the testimonial is not saved" (the admin's writes) | `role="alert"`: "ההמלצה לא נשמרה…" |
+
+### 4.49 The claim form's documents — `tests/component/claim-form-files.test.tsx`
+
+Review 2026-10-15, item 19. Already in place: `accept`, the 10 MB and type checks with Hebrew copy (`claimDocumentProblem`, UNIT section 4.63), and clearing the input after each pick. Added: drag-and-drop on the zone, the input `sr-only` instead of `hidden`, and `role="alert"` on the form's error. The phone stays on `isContactPhone`, the rule `submit-claim` applies: a landline is a number Dorit can call back about a claim, and mobile-only would refuse what the function accepts.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CLAIMDOC-001 | "takes dropped files through the same checks as picked ones" | A dropped PDF is listed; a dropped `.exe` is not, and the alert names it with the type message |
+| CMP-CLAIMDOC-002 | "keeps the picker in the tab order: visually hidden, never display:none" | Class `sr-only`, not `hidden`; Tab reaches the input |
+| CMP-CLAIMDOC-003 | "accepts only the bucket's types, and says a picked file's problem in an alert" | `accept` lists PDF and HEIC; a 10 MB + 1 byte JPG gives the size message in `role="alert"`; the input's value is cleared |
