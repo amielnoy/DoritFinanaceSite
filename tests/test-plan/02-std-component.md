@@ -441,6 +441,10 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-055 | "makes the stage bar one sideways-scrolling row of chips" (on a phone) | `max-sm:overflow-x-auto`, no wrap; each chip `max-sm:shrink-0` |
 | CMP-MSKB-056 | "gives each row's one action the full width" (on a phone) | The action's wrapper `max-sm:w-full max-sm:[&>*]:w-full` |
 | CMP-MSKB-057 | "opens the drawers full screen" (on a phone) | The dialog `fixed inset-y-0 left-0 w-full sm:max-w-md` |
+| CMP-MSKB-058 | "asks first, then sends the request back with a fresh link shown once — and stays open as the row moves to stage 1" (a code the clearinghouse refused) | The inline question (`role="alert"`); ביטול → nothing; כן, קישור חדש → `reissue('r2')`, "קישור חדש לרונית מזרחי מוכן.", the link once; the drawer stays after the refetch; חזרה ללוח closes |
+| CMP-MSKB-059 | "drops a value still on its way when the request goes back to the client" (a code the clearinghouse refused) | No clipboard write, nothing shown (fails without `hide()` on reissue) |
+| CMP-MSKB-060 | "makes one call for a double click" (a code the clearinghouse refused) | Two clicks in one act → one `reissue` |
+| CMP-MSKB-061 | "says why when it is refused, closes its question, and keeps the guided submit" (a code the clearinghouse refused) | `unavailable` → "השירות אינו זמין כרגע"; the question closed; the copy buttons still there |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 

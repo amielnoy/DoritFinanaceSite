@@ -177,6 +177,10 @@ export class SupabaseMaslekaService implements MaslekaPort {
     return linkFrom(await this.call("masleka-create", { requestId }));
   }
 
+  async reissue(requestId: string): Promise<MaslekaLink> {
+    return linkFrom(await this.call("masleka-create", { requestId, reissue: true }));
+  }
+
   async reveal(requestId: string, field: MaslekaField): Promise<string> {
     const data = await this.call("masleka-reveal", { requestId, field });
     if (typeof data.value !== "string") throw new MaslekaError("failed");

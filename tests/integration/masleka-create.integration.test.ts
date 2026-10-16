@@ -348,3 +348,82 @@ describe("masleka-create — a fresh link", () => {
     }
   });
 });
+
+/**
+ * A reissue (the guided submit's "קוד האימות לא עובד במסלקה? שליחת קישור
+ * חדש"): the clearinghouse refused the code, so the request goes back to
+ * "invited", the code and the ID wiped, with a fresh link for the client.
+ */
+describe("masleka-create — a reissue", () => {
+  const waiting = (over: Record<string, unknown> = {}) => ({
+    id: REQUEST_ID,
+    agency_id: AGENCY_1,
+    client_name: "רונית מזרחי",
+    status: "code_received",
+    code_ciphertext: "enc:code",
+    id_ciphertext: "enc:id",
+    id_last4: "0018",
+    code_received_at: "2026-10-16T08:00:00.000Z",
+    token_hash: "a".repeat(64),
+    token_expires_at: "2026-10-20T00:00:00.000Z",
+    client_reminded_at: null,
+    lead_id: null,
+    created_by: STAFF,
+    ...over,
+  });
+
+  it("sends the request back to the client: the code, the ID and its last digits wiped, a fresh link", async () => {
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { fake: { requests: [waiting()] } });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, requestId: REQUEST_ID, invited: false, rid: expect.any(String) });
+    const row = r.maslekaRequests[0];
+    expect(row).toMatchObject({ status: "invited", code_ciphertext: null, id_ciphertext: null, id_last4: null, code_received_at: null });
+    expect(row.ciphertext_wiped_at).toEqual(expect.any(String));
+    expect(row.token_hash).toBe(sha(tokenOf(r.json.link)));
+    expect(row.token_hash).not.toBe("a".repeat(64));
+  });
+
+  it("writes one conditional update that matches only a request still waiting to be submitted", async () => {
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { fake: { requests: [waiting()] } });
+    const patches = r.fetches.filter((f) => f.method === "PATCH" && String(f.url).includes("/rest/v1/masleka_requests"));
+    expect(patches).toHaveLength(1);
+    expect(String(patches[0].url)).toContain(`id=eq.${REQUEST_ID}`);
+    expect(String(patches[0].url)).toContain(`agency_id=eq.${AGENCY_1}`);
+    expect(String(patches[0].url)).toContain("status=eq.code_received");
+    expect(String(patches[0].url)).toContain("select=id");
+  });
+
+  it.each(["invited", "submitted", "completed", "expired"])("never reopens or wipes a request that is %s", async (status) => {
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { fake: { requests: [waiting({ status, code_ciphertext: null, id_ciphertext: null })] } });
+    expect(r.status).toBe(409);
+    expect(r.json).toMatchObject({ error: "not_available" });
+    expect(r.maslekaRequests[0]).toMatchObject({ status, token_hash: "a".repeat(64), id_last4: "0018" });
+    expect(r.json).not.toHaveProperty("link");
+  });
+
+  it("leaves a code that just arrived alone when the fresh link was a plain one", async () => {
+    const r = await run({ requestId: REQUEST_ID }, { fake: { requests: [waiting()] } });
+    expect(r.status).toBe(409);
+    expect(r.maslekaRequests[0]).toMatchObject({ status: "code_received", code_ciphertext: "enc:code", id_ciphertext: "enc:id" });
+  });
+
+  it("is for whoever may work the request: another User is refused and nothing changes", async () => {
+    const USER = "aaaaaaaa-1111-4111-8111-000000000003";
+    const USER_TOKEN = "user-session-token-0123456789";
+    const fake = { sessions: { [USER_TOKEN]: USER }, roles: { [USER]: "user" }, requests: [waiting()] };
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { token: USER_TOKEN, fake });
+    expect(r.status).toBe(403);
+    expect(r.maslekaRequests[0]).toMatchObject({ status: "code_received", code_ciphertext: "enc:code" });
+    const own = await run({ requestId: REQUEST_ID, reissue: true }, { token: USER_TOKEN, fake: { ...fake, requests: [waiting({ created_by: USER })] } });
+    expect(own.status).toBe(200);
+  });
+
+  it("never writes the link, the token or a ciphertext to a log line", async () => {
+    const lines = captureLogs();
+    const r = await run({ requestId: REQUEST_ID, reissue: true }, { fake: { requests: [waiting()] } });
+    const all = lines.join("\n");
+    expect(all).toContain('"reissued":true');
+    for (const secret of [String(r.json.link), tokenOf(r.json.link), "enc:code", "enc:id", "0018"]) expect(all).not.toContain(secret);
+  });
+});
+

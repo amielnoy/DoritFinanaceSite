@@ -680,7 +680,7 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKSUB-015 | "never writes a ciphertext, a name or the session token to a log line" | Across success, failed write and outsider: every line has `rid`; no ciphertext, client name, last4 or session token |
 | INT-MSKSUB-016 | "answers the browser's preflight and does nothing else" | 204, site origin allowed; no fetch |
 
-### 4.28 `masleka-create` — a hand-made request (optionally on a lead), or a fresh link — `INT-MSKNEW-001..030`
+### 4.28 `masleka-create` — a hand-made request (optionally on a lead), a fresh link, or a reissue — `INT-MSKNEW-001..039`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -714,6 +714,12 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKNEW-028 | "refuses a lead of another agency, even one the caller can see" (for a lead) | 403 (`lead_in_agency` false); no row |
 | INT-MSKNEW-029 | "refuses a lead id that is not one, asking nothing about it" (for a lead) | `not-a-uuid`, a number, an object: 400; `can_see_lead` never asked |
 | INT-MSKNEW-030 | "keeps today's request when the lead is left out or null: lead-less, the caller's own" (for a lead) | 200; `lead_id` null, `created_by` the caller; `can_see_lead` never asked |
+| INT-MSKNEW-031 | "sends the request back to the client: the code, the ID and its last digits wiped, a fresh link" (a reissue) | 200, `invited: false`; the row `invited`, both ciphertexts, `id_last4` and `code_received_at` null, `ciphertext_wiped_at` set; the hash is the new link's |
+| INT-MSKNEW-032 | "writes one conditional update that matches only a request still waiting to be submitted" (a reissue) | One PATCH: `id=eq.`, `agency_id=eq.`, `status=eq.code_received`, `select=id` |
+| INT-MSKNEW-033..036 | "never reopens or wipes a request that is %s" (a reissue) | `invited`, `submitted`, `completed`, `expired`: 409 `not_available`, nothing changed, no link |
+| INT-MSKNEW-037 | "leaves a code that just arrived alone when the fresh link was a plain one" (a reissue) | A plain fresh link on a `code_received` row: 409; the ciphertexts kept |
+| INT-MSKNEW-038 | "is for whoever may work the request: another User is refused and nothing changes" (a reissue) | Another User: 403, nothing changed; the creator: 200 |
+| INT-MSKNEW-039 | "never writes the link, the token or a ciphertext to a log line" (a reissue) | `reissued: true` logged; no link, token, ciphertext or last digits |
 
 ### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..037`
 

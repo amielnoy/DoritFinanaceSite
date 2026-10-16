@@ -44,6 +44,7 @@ function service(over: Partial<MaslekaPort> = {}): MaslekaPort {
     list: vi.fn(async () => ROWS),
     create: vi.fn(async () => ({ requestId: "r9", link: LINK, invited: true })),
     relink: vi.fn(async () => ({ requestId: "r1", link: LINK2, invited: false })),
+    reissue: vi.fn(async () => ({ requestId: "r2", link: LINK2, invited: false })),
     reveal: vi.fn(async (_id: string, field: "id" | "code") => (field === "id" ? "000000018" : "AB12-CD34")),
     markSubmitted: vi.fn(async () => {}),
     listSnapshots: vi.fn(async () => []),
@@ -556,6 +557,82 @@ describe("<MaslekaBoard /> — the guided submit", () => {
     await userEvent.click(drawer.getByRole("button", { name: "כן, הגשתי" }));
     expect(await drawer.findByText("הוגש. מספר הזהות וקוד האימות נמחקו.")).toBeInTheDocument();
     expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
+/** "קוד האימות לא עובד במסלקה? שליחת קישור חדש": the request goes back to the client. */
+describe("<MaslekaBoard /> — a code the clearinghouse refused", () => {
+  const footer = (drawer: ReturnType<typeof card>) => drawer.getByRole("button", { name: "קוד האימות לא עובד במסלקה? שליחת קישור חדש" });
+
+  it("asks first, then sends the request back with a fresh link shown once — and stays open as the row moves to stage 1", async () => {
+    const back = ROWS.map((r) => (r.id === "r2" ? { ...r, status: "invited" as const, codeReceivedAt: null, idLast4: null } : r));
+    const list = vi.fn().mockResolvedValueOnce(ROWS).mockResolvedValue(back);
+    const svc = service({ list });
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openWaiting();
+    await userEvent.click(footer(drawer));
+    const ask = drawer.getByRole("alert");
+    expect(ask).toHaveTextContent("לשלוח לרונית מזרחי קישור חדש?");
+    expect(ask).toHaveTextContent("קוד האימות ומספר הזהות שנמסרו יימחקו, והבקשה תחזור לשלב 1 — ממתין ללקוח.");
+    await userEvent.click(within(ask).getByRole("button", { name: "ביטול" }));
+    expect(svc.reissue).not.toHaveBeenCalled();
+    await userEvent.click(footer(drawer));
+    await userEvent.click(drawer.getByRole("button", { name: "כן, קישור חדש" }));
+    expect(svc.reissue).toHaveBeenCalledWith("r2");
+    expect(await drawer.findByText("קישור חדש לרונית מזרחי מוכן.")).toBeInTheDocument();
+    expect(drawer.getByLabelText("הקישור ללקוח")).toHaveValue(LINK2);
+    expect(drawer.getByText(/^הקישור מוצג כאן פעם אחת בלבד/)).toBeInTheDocument();
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    // The row is back at stage 1: the drawer still shows the link until it is closed.
+    expect(screen.getByRole("dialog", { name: "רונית מזרחי" })).toBeInTheDocument();
+    await userEvent.click(drawer.getByRole("button", { name: "חזרה ללוח" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("drops a value still on its way when the request goes back to the client", async () => {
+    const slow = deferred<string>();
+    const clipboard = { writeText: vi.fn(async () => {}) };
+    renderBoard({ service: service({ reveal: vi.fn(async () => slow.promise) }), clipboard });
+    const drawer = await openWaiting();
+    await userEvent.click(drawer.getByRole("button", { name: "העתק ת״ז" }));
+    await userEvent.click(footer(drawer));
+    await userEvent.click(drawer.getByRole("button", { name: "כן, קישור חדש" }));
+    expect(await drawer.findByText("קישור חדש לרונית מזרחי מוכן.")).toBeInTheDocument();
+    await act(async () => {
+      slow.resolve("000000018");
+      await slow.promise;
+    });
+    expect(clipboard.writeText).not.toHaveBeenCalled();
+    expect(screen.queryByDisplayValue("000000018")).not.toBeInTheDocument();
+  });
+
+  it("makes one call for a double click", async () => {
+    const answer = deferred<{ requestId: string; link: string; invited: boolean }>();
+    const svc = service({ reissue: vi.fn(() => answer.promise) });
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openWaiting();
+    await userEvent.click(footer(drawer));
+    const yes = drawer.getByRole("button", { name: "כן, קישור חדש" });
+    act(() => {
+      yes.click();
+      yes.click();
+    });
+    await act(async () => {
+      answer.resolve({ requestId: "r2", link: LINK2, invited: false });
+      await answer.promise;
+    });
+    expect(svc.reissue).toHaveBeenCalledTimes(1);
+  });
+
+  it("says why when it is refused, closes its question, and keeps the guided submit", async () => {
+    const svc = service({ reissue: vi.fn(async () => Promise.reject(new MaslekaError("unavailable", "z5"))) });
+    renderBoard({ service: svc, clipboard: null });
+    const drawer = await openWaiting();
+    await userEvent.click(footer(drawer));
+    await userEvent.click(drawer.getByRole("button", { name: "כן, קישור חדש" }));
+    expect(await drawer.findByRole("alert")).toHaveTextContent("השירות אינו זמין כרגע");
+    expect(drawer.queryByRole("button", { name: "כן, קישור חדש" })).not.toBeInTheDocument();
+    expect(drawer.getByRole("button", { name: "העתק ת״ז" })).toBeInTheDocument();
   });
 });
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import SideDrawer from "@/components/dorit/admin/SideDrawer";
@@ -175,6 +175,44 @@ function LinkPanel({
   );
 }
 
+/** A client's link, shown this once: the field with "העתקה", the gold "once only" box, and the client's page. */
+function LinkOnce({ link, clipboard }: { link: string; clipboard: ClipboardLike | null }) {
+  const [copied, setCopied] = useState<"idle" | "copied" | "manual">("idle");
+  const id = useId();
+  return (
+    <>
+      <div>
+        <label htmlFor={id} className="block text-sm">
+          הקישור ללקוח
+        </label>
+        <div className="mt-1 flex gap-2">
+          <input
+            id={id}
+            readOnly
+            value={link}
+            dir="ltr"
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-h-11 w-full border border-border bg-background px-2 py-1 font-mono text-xs"
+          />
+          <button type="button" onClick={async () => setCopied(await copyOrFallback(link, clipboard))} className={buttonClass}>
+            {copied === "copied" ? "הועתק ✓" : "העתקה"}
+          </button>
+        </div>
+        {copied === "manual" ? (
+          <p className="mt-1 text-sm text-muted-foreground">העתק ידנית: סמנו את הקישור והעתיקו (Ctrl+C או ⌘C).</p>
+        ) : null}
+      </div>
+      <p className="border border-highlight bg-highlight/10 p-3 text-sm">
+        הקישור מוצג כאן פעם אחת בלבד. העתיקו אותו או שלחו אותו עכשיו — אחר כך אפשר רק להחליף אותו בקישור חדש.
+      </p>
+      {/* The client's page as the client will see it: a new tab, no referrer. */}
+      <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm underline">
+        לראות את הדף כמו שהלקוח יראה ↗
+      </a>
+    </>
+  );
+}
+
 type Channel = "whatsapp" | "mail" | "copy";
 const CHANNELS: { value: Channel; label: string }[] = [
   { value: "whatsapp", label: "וואטסאפ" },
@@ -214,8 +252,6 @@ function NewRequest({
   const [phoneError, setPhoneError] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ link: MaslekaLink; channel: Channel; clientName: string; phone: string } | null>(null);
-  const [copied, setCopied] = useState<"idle" | "copied" | "manual">("idle");
-
   const chooseLead = (id: string) => {
     setLeadId(id);
     const lead = leads.find((l) => l.id === id);
@@ -278,34 +314,7 @@ function NewRequest({
               : "המייל ללקוח לא נשלח. העבירו לו את הקישור בעצמכם:"}
           </p>
         ) : null}
-        <div>
-          <label htmlFor="masleka-new-link" className="block text-sm">
-            הקישור ללקוח
-          </label>
-          <div className="mt-1 flex gap-2">
-            <input
-              id="masleka-new-link"
-              readOnly
-              value={link.link}
-              dir="ltr"
-              onFocus={(e) => e.currentTarget.select()}
-              className="min-h-11 w-full border border-border bg-background px-2 py-1 font-mono text-xs"
-            />
-            <button type="button" onClick={async () => setCopied(await copyOrFallback(link.link, clipboard))} className={buttonClass}>
-              {copied === "copied" ? "הועתק ✓" : "העתקה"}
-            </button>
-          </div>
-          {copied === "manual" ? (
-            <p className="mt-1 text-sm text-muted-foreground">העתק ידנית: סמנו את הקישור והעתיקו (Ctrl+C או ⌘C).</p>
-          ) : null}
-        </div>
-        <p className="border border-highlight bg-highlight/10 p-3 text-sm">
-          הקישור מוצג כאן פעם אחת בלבד. העתיקו אותו או שלחו אותו עכשיו — אחר כך אפשר רק להחליף אותו בקישור חדש.
-        </p>
-        {/* The client's page as the client will see it: a new tab, no referrer. */}
-        <a href={link.link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm underline">
-          לראות את הדף כמו שהלקוח יראה ↗
-        </a>
+        <LinkOnce link={link.link} clipboard={clipboard} />
       </div>
     );
   }
@@ -531,6 +540,10 @@ function SubmitGuide({
   pending,
   succeeded,
   onBack,
+  onReissue,
+  reissuing,
+  reissued,
+  clipboard,
 }: {
   request: MaslekaRequest;
   copyButton: (field: MaslekaField) => React.ReactNode;
@@ -541,8 +554,15 @@ function SubmitGuide({
   pending: boolean;
   succeeded: boolean;
   onBack: () => void;
+  /** "קוד האימות לא עובד במסלקה?": back to the client with a fresh link (masleka-create's reissue). */
+  onReissue: () => void;
+  reissuing: boolean;
+  /** The fresh link, once the request has gone back to the client. */
+  reissued: string | null;
+  clipboard: ClipboardLike | null;
 }) {
   const [portalOpened, setPortalOpened] = useState(false);
+  const [askingReissue, setAskingReissue] = useState(false);
   const [copied, setCopied] = useState<{ id: boolean; code: boolean }>({ id: false, code: false });
   const [confirming, setConfirming] = useState(false);
   // A step stays ticked after its value has left the screen.
@@ -555,6 +575,28 @@ function SubmitGuide({
     if (wasPending.current && !pending && !succeeded) setConfirming(false);
     wasPending.current = pending;
   }, [pending, succeeded]);
+  const wasReissuing = useRef(false);
+  useEffect(() => {
+    if (wasReissuing.current && !reissuing && !reissued) setAskingReissue(false);
+    wasReissuing.current = reissuing;
+  }, [reissuing, reissued]);
+
+  if (reissued) {
+    return (
+      <div className="space-y-4">
+        <div role="status" className="space-y-1">
+          <p className="font-medium">קישור חדש ל{request.clientName} מוכן.</p>
+          <p className="text-sm text-muted-foreground">
+            קוד האימות ומספר הזהות נמחקו, והבקשה חזרה לשלב 1 — ממתין ללקוח. הקישור הקודם כבר לא עובד.
+          </p>
+        </div>
+        <LinkOnce link={reissued} clipboard={clipboard} />
+        <button type="button" onClick={onBack} className={primaryClass}>
+          חזרה ללוח
+        </button>
+      </div>
+    );
+  }
 
   if (succeeded) {
     return (
@@ -572,49 +614,72 @@ function SubmitGuide({
   const current = done.indexOf(false) === -1 ? 3 : done.indexOf(false);
   const stateOf = (i: number): "done" | "current" | "ahead" => (i < 3 && done[i] ? "done" : i === current ? "current" : "ahead");
   return (
-    <ol className="space-y-3">
-      <GuideStep n={1} title="פותחים את פורטל המסלקה" state={stateOf(0)}>
-        {/* A new tab and no referrer: the board's address stays out of the portal's requests. */}
-        <a
-          href={CLEARINGHOUSE_ADVISOR_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => setPortalOpened(true)}
-          className={buttonClass}
-        >
-          פתיחת פורטל המסלקה ↗
-        </a>
-      </GuideStep>
-      <GuideStep n={2} title="מעתיקים את מספר הזהות" state={stateOf(1)}>
-        {copyButton("id")}
-        {copiedField === "id" ? manual : null}
-      </GuideStep>
-      <GuideStep n={3} title="מעתיקים את קוד האימות" state={stateOf(2)}>
-        {copyButton("code")}
-        {copiedField === "code" ? manual : null}
-      </GuideStep>
-      <GuideStep n={4} title="סיימתם להגיש?" state={stateOf(3)}>
-        {confirming ? (
+    <>
+      <ol className="space-y-3">
+        <GuideStep n={1} title="פותחים את פורטל המסלקה" state={stateOf(0)}>
+          {/* A new tab and no referrer: the board's address stays out of the portal's requests. */}
+          <a
+            href={CLEARINGHOUSE_ADVISOR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setPortalOpened(true)}
+            className={buttonClass}
+          >
+            פתיחת פורטל המסלקה ↗
+          </a>
+        </GuideStep>
+        <GuideStep n={2} title="מעתיקים את מספר הזהות" state={stateOf(1)}>
+          {copyButton("id")}
+          {copiedField === "id" ? manual : null}
+        </GuideStep>
+        <GuideStep n={3} title="מעתיקים את קוד האימות" state={stateOf(2)}>
+          {copyButton("code")}
+          {copiedField === "code" ? manual : null}
+        </GuideStep>
+        <GuideStep n={4} title="סיימתם להגיש?" state={stateOf(3)}>
+          {confirming ? (
+            <div role="alert" className="space-y-2 border border-destructive/40 bg-destructive/5 p-3">
+              <p className="font-medium">לסמן את הבקשה של {request.clientName} כהוגשה?</p>
+              <p className="text-sm">לא תוכלו להעתיק שוב את מספר הזהות או את קוד האימות.</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={onConfirm} disabled={pending} className={primaryClass}>
+                  {pending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+                  כן, הגשתי
+                </button>
+                <button type="button" onClick={() => setConfirming(false)} disabled={pending} className={buttonClass}>
+                  עוד לא
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirming(true)} className={buttonClass}>
+              סימון כהוגש
+            </button>
+          )}
+        </GuideStep>
+      </ol>
+      <div className="mt-6 border-t border-border/60 pt-4">
+        {askingReissue ? (
           <div role="alert" className="space-y-2 border border-destructive/40 bg-destructive/5 p-3">
-            <p className="font-medium">לסמן את הבקשה של {request.clientName} כהוגשה?</p>
-            <p className="text-sm">לא תוכלו להעתיק שוב את מספר הזהות או את קוד האימות.</p>
+            <p className="font-medium">לשלוח ל{request.clientName} קישור חדש?</p>
+            <p className="text-sm">קוד האימות ומספר הזהות שנמסרו יימחקו, והבקשה תחזור לשלב 1 — ממתין ללקוח.</p>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={onConfirm} disabled={pending} className={primaryClass}>
-                {pending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
-                כן, הגשתי
+              <button type="button" onClick={onReissue} disabled={reissuing} className={primaryClass}>
+                {reissuing ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+                כן, קישור חדש
               </button>
-              <button type="button" onClick={() => setConfirming(false)} disabled={pending} className={buttonClass}>
-                עוד לא
+              <button type="button" onClick={() => setAskingReissue(false)} disabled={reissuing} className={buttonClass}>
+                ביטול
               </button>
             </div>
           </div>
         ) : (
-          <button type="button" onClick={() => setConfirming(true)} className={buttonClass}>
-            סימון כהוגש
+          <button type="button" onClick={() => setAskingReissue(true)} className="inline-flex min-h-11 items-center text-sm underline">
+            קוד האימות לא עובד במסלקה? שליחת קישור חדש
           </button>
         )}
-      </GuideStep>
-    </ol>
+      </div>
+    </>
   );
 }
 
@@ -782,15 +847,42 @@ export default function MaslekaBoard({
   // The guided submit's drawer: the request it is for, and whether its הגשתי went through.
   const [submitFor, setSubmitFor] = useState<MaslekaRequest | null>(null);
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
+  const [reissued, setReissued] = useState<string | null>(null);
+  const [reissuing, setReissuing] = useState(false);
+  const reissuingRef = useRef(false);
   const closeSubmit = useCallback(() => {
     // Closing the drawer takes any revealed value with it.
     hide();
     setSubmitFor(null);
     setSubmitSucceeded(false);
+    setReissued(null);
   }, [hide]);
+  const reissue = async (request: MaslekaRequest) => {
+    // One call per click, as for הגשתי.
+    if (reissuingRef.current) return;
+    reissuingRef.current = true;
+    clearNotice();
+    setReissuing(true);
+    try {
+      const link = await service.reissue(request.id);
+      // Wiped server-side: nothing revealed stays on the screen, and no answer still on its way lands.
+      hide();
+      setReissued(link.link);
+      void refresh();
+    } catch (e) {
+      report(e);
+      if (staffMessage(e).tone === "state") void refresh();
+    } finally {
+      reissuingRef.current = false;
+      setReissuing(false);
+    }
+  };
   // A request that left "מוכן להגשה" while its drawer was open (submitted elsewhere, expired): the drawer goes too.
   const submitStillWaiting =
-    submitFor === null || submitSucceeded || (requests.data ?? []).some((r) => r.id === submitFor.id && r.status === "code_received");
+    submitFor === null ||
+    submitSucceeded ||
+    reissued !== null ||
+    (requests.data ?? []).some((r) => r.id === submitFor.id && r.status === "code_received");
   useEffect(() => {
     if (!submitStillWaiting) closeSubmit();
   }, [submitStillWaiting, closeSubmit]);
@@ -939,6 +1031,7 @@ export default function MaslekaBoard({
                     onClick={() => {
                       clearNotice();
                       setSubmitSucceeded(false);
+                      setReissued(null);
                       setSubmitFor(r);
                     }}
                     className={primaryClass}
@@ -1038,6 +1131,10 @@ export default function MaslekaBoard({
             pending={submitted.isPending}
             succeeded={submitSucceeded}
             onBack={closeSubmit}
+            onReissue={() => void reissue(submitFor)}
+            reissuing={reissuing}
+            reissued={reissued}
+            clipboard={clipboard}
           />
         ) : null}
       </SideDrawer>

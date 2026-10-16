@@ -21,6 +21,13 @@
  * most thirty days out), and a person who sends a link by hand is not handed one
  * that dies sooner. The raw token appears only in the answer to the staff
  * member and in the client's mail; it is never logged.
+ *
+ * A reissue (`reissue: true`) is for a request whose code the clearinghouse
+ * refused: it goes back to "invited" — the code and the ID wiped, their
+ * last digits too — with a fresh link for the client to send both again. It
+ * matches only a request still `code_received`, in one conditional write, so
+ * a code that just arrived is never wiped by a plain fresh link, and a request
+ * already submitted is never reopened.
  */
 import { corsHeaders } from '../_shared/cors.ts';
 import { isEmail } from '../_shared/guard.ts';
@@ -73,6 +80,31 @@ export async function handler(req: Request): Promise<Response> {
       const allowed = await allowRequest(session, requestId, rid, log);
       if (!allowed.ok) return refused(allowed);
       const token = newToken();
+      if (input.reissue === true) {
+        const now = new Date().toISOString();
+        // `select=id` names the only column handed back (never a ciphertext or the hash).
+        const reopened = await updateWhere(
+          'masleka_requests',
+          `id=eq.${requestId}&agency_id=eq.${AGENCY_1}&status=eq.code_received&select=id`,
+          {
+            status: 'invited',
+            code_ciphertext: null,
+            id_ciphertext: null,
+            id_last4: null,
+            ciphertext_wiped_at: now,
+            code_received_at: null,
+            token_hash: await tokenHash(token),
+            token_expires_at: tokenExpiry(),
+            client_reminded_at: now,
+          },
+        );
+        if (!reopened.length) {
+          log('warn', 'request.rejected', { rid, reason: 'not_available', requestId, reissue: true });
+          return Response.json({ error: 'not_available', rid }, { status: 409, headers: cors });
+        }
+        log('info', 'request.end', { rid, ms: Date.now() - startedAt, requestId, reissued: true });
+        return Response.json({ ok: true, requestId, link: maslekaLink(token), invited: false, rid }, { headers: noStore });
+      }
       // The id is UUID-checked and lowercased, the agency is a fixed literal, and
       // `select=id` names the only column handed back (never a ciphertext or the hash).
       const rows = await updateWhere(

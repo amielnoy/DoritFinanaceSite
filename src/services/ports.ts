@@ -645,6 +645,12 @@ export interface MaslekaPort {
   create(input: NewMaslekaRequest): Promise<MaslekaLink>;
   /** A fresh link for a request still waiting for its code. */
   relink(requestId: string): Promise<MaslekaLink>;
+  /**
+   * The clearinghouse refused the code: the request goes back to the client —
+   * the code and the ID wiped — with a fresh link. Only for one still waiting
+   * to be submitted.
+   */
+  reissue(requestId: string): Promise<MaslekaLink>;
   /** One decrypted value, logged server-side. */
   reveal(requestId: string, field: MaslekaField): Promise<string>;
   /** הגשתי: wipes the code and the ID. */

@@ -1213,6 +1213,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSVC-027 | "tells an address the database refused apart from a failure" | 22023 + `invalid_email` → `invalid_email`; 22023 otherwise → `invalid`; else `failed` |
 | UNIT-MSKSVC-028 | "unpublishes and marks the answers seen by snapshot" | The two rpcs with `p_snapshot` |
 | UNIT-MSKSVC-029 | "reads the published items with the client's answers, in position order" | Items mapped; an unknown priority dropped; `order('position')` |
+| UNIT-MSKSVC-031 | "asks for a reissue by request id: back to the client, with a fresh link" | `masleka-create` with `{ requestId, reissue: true }`; the link |
 | UNIT-ACC-SNAP-001 | "reads my_snapshot's answer, dropping an item that does not fit" (`account-services.test.ts`) | Two of three items; statuses and notes kept |
 | UNIT-ACC-SNAP-002 | "is null when nothing is published, or the report cannot be read" | `null` for null, an unreadable report, no `published_at` |
 | UNIT-ACC-SNAP-003 | "reads my_snapshot over RPC" | `rpc('my_snapshot')`; null passes through |

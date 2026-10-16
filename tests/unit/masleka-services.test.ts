@@ -133,6 +133,14 @@ describe("SupabaseMaslekaService — the staff board", () => {
     expect(client.functions.invoke.mock.calls.at(-1)![1].body).not.toHaveProperty("leadId");
   });
 
+  it("asks for a reissue by request id: back to the client, with a fresh link", async () => {
+    const { client, service } = fake({
+      invoke: async () => ({ data: { ok: true, requestId: "r2", link: "https://govari-fin.co.il/masleka#t=z", invited: false, rid: "q" }, error: null }),
+    });
+    expect((await service.reissue("r2")).link).toBe("https://govari-fin.co.il/masleka#t=z");
+    expect(client.functions.invoke).toHaveBeenCalledWith("masleka-create", { body: { requestId: "r2", reissue: true } });
+  });
+
   it("asks for a fresh link by request id", async () => {
     const { client, service } = fake({
       invoke: async () => ({ data: { ok: true, requestId: "r1", link: "https://govari-fin.co.il/masleka#t=y", invited: false, rid: "q" }, error: null }),
