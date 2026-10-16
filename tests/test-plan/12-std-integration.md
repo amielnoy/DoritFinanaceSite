@@ -98,6 +98,18 @@ A public door with no sign-in: each caller is counted by a hash of their address
 | INT-LEAD-112 | "past the hourly staff cap, saves the lead and confirms to the visitor, but mails no staff and books nothing" | 200; one lead; `staff_notify_capped`; the visitor's confirmation goes out; no mail to Dorit or ops; no invitation; no calendar call |
 | INT-LEAD-113 | "asks the staff cap once per enquiry, and not for a partial interview" | One `lead-staff-notify` per full enquiry; none for a partial one |
 
+### 4.2b `escalate-to-human` — how often, and what it accepts (review 2026-10-15) — `INT-ESC-030..041`
+
+A hand-off that does not reach a person is a regulatory failure, so the limits never stand between an urgent reason and the staff. Base44's agents call from Base44's server, so one address stands for all their visitors: the per-caller limit is generous.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-ESC-030 | "holds back the staff mail over the hourly cap, and still records the hand-off" (changed) | `mail.skipped` logged at **error** level, so it alerts; the lead and the sheet row are written |
+| INT-ESC-031..032 | "never holds back an urgent hand-off (%s), whatever the caps say" | `complaint`, `privacy_request` with both caps exceeded: 200, staff mailed |
+| INT-ESC-033 | "refuses a caller over the hourly hand-off limit, for a reason that is not urgent, writing nothing" | 429 with `rid`; `escalate-ip:<64 hex>`; no lead, no mail |
+| INT-ESC-034..038 | "refuses a %s longer than its ceiling, writing and mailing nothing" | name 80, phone 30, topic 200, agent 60, email 254: 400 |
+| INT-ESC-039 | "drops an address that is not one, and still hands over" | 200; `email_invalid`; the lead's email empty; the injected recipient mailed nowhere |
+
 ### 4.3 `submitLead` — identifiers a visitor volunteered — `INT-LEAD-016/017`
 
 An ID number or card number in a model-written summary is redacted before anyone

@@ -418,13 +418,55 @@ describe("Edge escalate-to-human — what it refuses and what it holds back", ()
 
   it("holds back the staff mail over the hourly cap, and still records the hand-off", async () => {
     const { result: r, lines } = await withLogs(() => invokeEdge("escalate-to-human", handoff, { overLimit: ["escalate:notify"] }));
-    expect(lines).toContainEqual(expect.objectContaining({ level: "warn", event: "mail.skipped", reason: "rate_limited" }));
+    // An error, so it alerts (review 2026-10-15).
+    expect(lines).toContainEqual(expect.objectContaining({ level: "error", event: "mail.skipped", reason: "rate_limited" }));
     expect(r.status).toBe(200);
     expect(r.emails).toHaveLength(0);
     expect(r.json).toMatchObject({ ok: true, notified: false, recorded: true });
     expect(r.json.warnings).toContain("notify_rate_limited");
     expect(r.leads).toHaveLength(1);
     expect(r.sheetRows).toHaveLength(1);
+  });
+
+  it.each(["complaint", "privacy_request"])("never holds back an urgent hand-off (%s), whatever the caps say", async (reason) => {
+    const r = await invokeEdge("escalate-to-human", { ...handoff, reason }, {
+      headers: { "x-forwarded-for": "203.0.113.9" },
+      overLimit: ["escalate:notify", "escalate-ip:"],
+    });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ ok: true, notified: true });
+    expect(r.emails.length).toBeGreaterThan(0);
+  });
+
+  it("refuses a caller over the hourly hand-off limit, for a reason that is not urgent, writing nothing", async () => {
+    const r = await invokeEdge("escalate-to-human", handoff, { headers: { "x-forwarded-for": "203.0.113.9" }, overLimit: ["escalate-ip:"] });
+    expect(r.status).toBe(429);
+    expect(r.json.rid).toBeTruthy();
+    expect(r.leads).toHaveLength(0);
+    expect(r.emails).toHaveLength(0);
+    const key = r.fetches.find((f) => String((f.body as { p_key?: string })?.p_key ?? "").startsWith("escalate-ip:"));
+    expect(String((key!.body as { p_key: string }).p_key)).toMatch(/^escalate-ip:[0-9a-f]{64}$/);
+  });
+
+  it.each([
+    ["name", "x".repeat(81)],
+    ["phone", "0".repeat(31)],
+    ["topic", "x".repeat(201)],
+    ["agent", "x".repeat(61)],
+    ["email", `${"a".repeat(250)}@x.co`],
+  ])("refuses a %s longer than its ceiling, writing and mailing nothing", async (field, value) => {
+    const r = await invokeEdge("escalate-to-human", { ...handoff, [field]: value });
+    expect(r.status).toBe(400);
+    expect(r.leads).toHaveLength(0);
+    expect(r.emails).toHaveLength(0);
+  });
+
+  it("drops an address that is not one, and still hands over", async () => {
+    const r = await invokeEdge("escalate-to-human", { ...handoff, email: "dana@example.com\nbcc: victim@example.com" });
+    expect(r.status).toBe(200);
+    expect(r.json.warnings).toContain("email_invalid");
+    expect(r.leads[0].email).toBe("");
+    expect(r.emails.some((e) => e.to.includes("victim") || e.text?.includes("victim"))).toBe(false);
   });
 
   it("mails staff when the limiter is unreachable: it fails open", async () => {
