@@ -31,10 +31,11 @@ describe("restStore", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("lists a conversation's messages in the order they were written", async () => {
-    answer = () => new Response(JSON.stringify([{ role: "user", content: "א" }]), { status: 200 });
-    expect(await restStore.listMessages(ID)).toEqual([{ role: "user", content: "א" }]);
-    expect(calls[0].url).toBe(`${URL_}/rest/v1/chat_messages?conversation_id=eq.${ID}&select=role,content&order=id.asc&limit=200`);
+  it("lists a conversation's newest 200 messages, in the order they were written (review 2026-10-15)", async () => {
+    // PostgREST answers newest first for order=id.desc; the store turns them back.
+    answer = () => new Response(JSON.stringify([{ role: "assistant", content: "ב" }, { role: "user", content: "א" }]), { status: 200 });
+    expect(await restStore.listMessages(ID)).toEqual([{ role: "user", content: "א" }, { role: "assistant", content: "ב" }]);
+    expect(calls[0].url).toBe(`${URL_}/rest/v1/chat_messages?conversation_id=eq.${ID}&select=role,content&order=id.desc&limit=200`);
   });
 
   it("reads this month's totals through the RPC, as numbers", async () => {

@@ -118,10 +118,13 @@ export const restStore: ChatStore = {
     const rows = await selectRows('chat_conversations', `id=eq.${id}&select=*&limit=1`);
     return (rows[0] as unknown as ConversationRow | undefined) ?? null;
   },
+  // The newest MESSAGE_LIMIT, oldest first (review 2026-10-15): reading the
+  // first 200 in id order left a long conversation's latest turns — the ones
+  // the model needs and the status reply reads — out of the window.
   async listMessages(conversationId) {
     if (!UUID.test(conversationId)) return [];
-    const rows = await selectRows('chat_messages', `conversation_id=eq.${conversationId}&select=role,content&order=id.asc&limit=${MESSAGE_LIMIT}`);
-    return rows.map((r) => ({ role: r.role as StoredMessage['role'], content: String(r.content ?? '') }));
+    const rows = await selectRows('chat_messages', `conversation_id=eq.${conversationId}&select=role,content&order=id.desc&limit=${MESSAGE_LIMIT}`);
+    return rows.reverse().map((r) => ({ role: r.role as StoredMessage['role'], content: String(r.content ?? '') }));
   },
   async addMessage(m) {
     await insertRow('chat_messages', { ...m, content: clip(m.content) });
