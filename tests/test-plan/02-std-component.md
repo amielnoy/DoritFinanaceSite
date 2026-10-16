@@ -381,7 +381,7 @@ Replaces `<StaffRoute />` (agency roles). The role is asked of the database thro
 
 ### 4.19 `<MaslekaBoard />` — the staff board — `tests/component/masleka-board.test.tsx`
 
-Since the redesign (2026-10-16) the board is one list of rows, each with one action (`actionFor`). Until the guided drawer (step 4), "להגשה" opens the copy controls under the row. The test helper `card(name)` opens them, and `openWaiting()` opens every such row, so the secrecy cases read as before.
+Since the redesign (2026-10-16) the board is one list of rows, each with one action (`actionFor`). Until the guided drawer (step 4), "להגשה" opens the copy controls under the row. Since step 4, "להגשה" opens the guided submit drawer: `card(name)` opens a client's (closing another's first), and `openWaiting()` waits for the list and opens רונית's. The phone layout (CMP-MSKB-054..057) is Tailwind's `max-sm:` variants, which jsdom does not apply, so those cases hold the markup. The rendering was checked in Chromium at 375px and 1280px: no horizontal page scroll at 375px, and both drawers full screen.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -437,6 +437,10 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-051 | "reads the leads only once the drawer opens" (the new-request drawer) | No leads read until "+ בקשה חדשה" |
 | CMP-MSKB-052 | "explains the four stages at the bottom, where 'איך זה עובד?' leads, with the advisor guide" (how a request moves) | Region `#masleka-how` "איך בקשה מתקדמת": ממתין ללקוח, מוכן להגשה, הוגש במסלקה, הושלם; the guide link; "קוד אימות", never "ייפוי" on the page |
 | CMP-MSKB-053 | "lists no report line outside stage 4" (how a request moves) | No "ניתוחים ללא בקשה" on "now" |
+| CMP-MSKB-054 | "makes '+ בקשה חדשה' a round 48px button named by its aria-label" (on a phone) | `aria-label="בקשה חדשה"`; `max-sm:h-12 max-sm:w-12 max-sm:rounded-full`; the visible label `max-sm:sr-only` |
+| CMP-MSKB-055 | "makes the stage bar one sideways-scrolling row of chips" (on a phone) | `max-sm:overflow-x-auto`, no wrap; each chip `max-sm:shrink-0` |
+| CMP-MSKB-056 | "gives each row's one action the full width" (on a phone) | The action's wrapper `max-sm:w-full max-sm:[&>*]:w-full` |
+| CMP-MSKB-057 | "opens the drawers full screen" (on a phone) | The dialog `fixed inset-y-0 left-0 w-full sm:max-w-md` |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 

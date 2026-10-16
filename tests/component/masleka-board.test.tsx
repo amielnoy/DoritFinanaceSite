@@ -358,6 +358,42 @@ describe("<MaslekaBoard /> — how a request moves", () => {
   });
 });
 
+/**
+ * The phone layout (≤ 640px) is Tailwind's max-sm variants, which jsdom does
+ * not apply: these cases hold the markup that carries it. The rendering itself
+ * was checked in a browser at 375px and 1280px.
+ */
+describe("<MaslekaBoard /> — on a phone", () => {
+  it("makes '+ בקשה חדשה' a round 48px button named by its aria-label", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    const plus = screen.getByRole("button", { name: "בקשה חדשה" });
+    expect(plus).toHaveAttribute("aria-label", "בקשה חדשה");
+    expect(plus.className).toMatch(/max-sm:h-12 max-sm:w-12 max-sm:rounded-full/);
+    expect(within(plus).getByText("בקשה חדשה").className).toContain("max-sm:sr-only");
+  });
+
+  it("makes the stage bar one sideways-scrolling row of chips", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    const row = within(screen.getByRole("navigation", { name: "שלבי הבקשה" })).getByRole("list");
+    expect(row.className).toMatch(/max-sm:overflow-x-auto/);
+    expect(row.className).not.toMatch(/(^| )flex-wrap/);
+    for (const li of within(row).getAllByRole("listitem")) expect(li.className).toContain("max-sm:shrink-0");
+  });
+
+  it("gives each row's one action the full width", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    const action = (await screen.findByRole("button", { name: "להגשה" })).parentElement!;
+    expect(action.className).toMatch(/max-sm:w-full max-sm:\[&>\*\]:w-full/);
+  });
+
+  it("opens the drawers full screen", async () => {
+    renderBoard({ service: service(), clipboard: null });
+    await openNew();
+    const classes = screen.getByRole("dialog").className.split(/\s+/);
+    for (const c of ["fixed", "inset-y-0", "left-0", "w-full", "sm:max-w-md"]) expect(classes).toContain(c);
+  });
+});
+
 describe("<MaslekaBoard /> — the stage bar", () => {
   const bar = () => within(screen.getByRole("navigation", { name: "שלבי הבקשה" }));
   const stageButton = (name: RegExp) => bar().getByRole("button", { name });

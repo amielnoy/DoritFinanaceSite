@@ -473,7 +473,8 @@ function BoardRow({
           </p>
           <p className={plan.urgent ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{plan.reason}</p>
         </div>
-        <div className="ms-auto">{action}</div>
+        {/* On a phone the row is a card, and its one action takes the full width. */}
+        <div className="max-sm:w-full max-sm:[&>*]:w-full sm:ms-auto">{action}</div>
       </div>
       {children}
     </li>
@@ -845,19 +846,26 @@ export default function MaslekaBoard({
   return (
     <div dir="rtl" className="min-h-screen bg-background">
       <header className="border-b border-border/60 bg-card">
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
+        {/* A phone: the title and the round "+" share the row; nothing wraps under it. */}
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 flex items-start justify-between gap-3 sm:flex-wrap sm:items-center">
+          <div className="min-w-0">
             <Eyebrow>טיפול שוטף</Eyebrow>
             <h1 className="font-heading text-2xl md:text-3xl mt-1">מסלקה</h1>
             {requests.isSuccess ? <p className="mt-1 text-sm text-muted-foreground">{waitingLine(waitingNow)}</p> : null}
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-sm">
+          <div className="flex shrink-0 items-center gap-4 text-sm max-sm:gap-2">
             <a href="#masleka-how" className="inline-flex min-h-11 items-center underline">
               איך זה עובד?
             </a>
-            <button type="button" onClick={() => setNewOpen(true)} className={primaryClass}>
-              <Plus size={16} aria-hidden="true" />
-              בקשה חדשה
+            {/* A phone: a round 48px "+", named by its aria-label. */}
+            <button
+              type="button"
+              aria-label="בקשה חדשה"
+              onClick={() => setNewOpen(true)}
+              className={`${primaryClass} relative max-sm:h-12 max-sm:w-12 max-sm:rounded-full max-sm:p-0`}
+            >
+              <Plus size={16} aria-hidden="true" className="max-sm:h-6 max-sm:w-6" />
+              <span className="max-sm:sr-only">בקשה חדשה</span>
             </button>
           </div>
         </div>
@@ -876,14 +884,16 @@ export default function MaslekaBoard({
         {requests.isPending ? <Loader2 className="animate-spin" aria-label="טוען" /> : null}
 
         <nav aria-label="שלבי הבקשה">
-          <ul className="flex flex-wrap gap-2">
+          {/* A phone: one row of chips that scrolls sideways, with the hints left for wider screens (kept for
+              screen readers; each chip is `relative`, or the sr-only hint escapes the scroll and widens the page). */}
+          <ul className="flex gap-2 max-sm:-mx-4 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 sm:flex-wrap">
             {BOARD_VIEWS.map((v) => (
-              <li key={v.view}>
+              <li key={v.view} className="max-sm:shrink-0">
                 <button
                   type="button"
                   aria-pressed={view === v.view}
                   onClick={() => choose(v.view)}
-                  className={`flex min-h-11 flex-col items-start border px-3 py-2 text-start ${
+                  className={`relative flex min-h-11 flex-col items-start border px-3 py-2 text-start max-sm:justify-center max-sm:whitespace-nowrap max-sm:rounded-full ${
                     view === v.view ? "border-highlight bg-card" : "border-border/60 hover:border-accent"
                   }`}
                 >
@@ -891,7 +901,7 @@ export default function MaslekaBoard({
                     {v.label}
                     <span className="font-heading text-accent">{requests.isSuccess ? rowsOf(v.view).length : "–"}</span>
                   </span>
-                  <span className="text-sm text-muted-foreground">{v.hint}</span>
+                  <span className="text-sm text-muted-foreground max-sm:sr-only">{v.hint}</span>
                 </button>
               </li>
             ))}
