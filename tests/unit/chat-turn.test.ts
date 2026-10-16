@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ModelError, type ModelClient, type ModelRequest, type ModelResponse } from "../../supabase/functions/chat/anthropic.ts";
-import { MAX_REPLY_TOKENS, runTurn, toModelHistory, TurnFailure } from "../../supabase/functions/chat/turn.ts";
+import { MAX_REPLY_TOKENS, RECOMMENDED_FALLBACK_REPLY, runTurn, toModelHistory, TurnFailure } from "../../supabase/functions/chat/turn.ts";
 import type { ToolOutcome } from "../../supabase/functions/chat/tools.ts";
 
 const usage = { input: 100, cached: 0, output: 10 };
@@ -166,5 +166,22 @@ describe("runTurn", () => {
     const err = await runTurn({ ...base, model, runTool: vi.fn(async () => ok) }).catch((e) => e);
     expect(err.reason).toBe("empty_reply");
     expect(model.calls).toHaveLength(3);
+  });
+
+  // The evaluation of 2026-10-16: after recommendArticles the model answered with
+  // one empty token twice — the cards were its answer — and the blog turn was a 503.
+  it("introduces the recommended articles instead of failing when the reply after a recommendation is empty twice", async () => {
+    const recommended: ToolOutcome = { name: "recommendArticles", status: "ok", forModel: "{}", isError: false, recommended: ["dmei-nihul"] };
+    const model = scripted([toolUse("recommendArticles", { slugs: ["dmei-nihul"] }), text(""), text("")]);
+    const result = await runTurn({ ...base, model, runTool: vi.fn(async () => recommended) });
+    expect(result.reply).toBe(RECOMMENDED_FALLBACK_REPLY);
+    expect(result.tools.map((t) => t.recommended)).toEqual([["dmei-nihul"]]);
+  });
+
+  it("still fails an empty reply after a recommendation that found no article", async () => {
+    const none: ToolOutcome = { name: "recommendArticles", status: "error", forModel: "{}", isError: true };
+    const model = scripted([toolUse("recommendArticles", { slugs: ["nope"] }), text(""), text("")]);
+    const err = await runTurn({ ...base, model, runTool: vi.fn(async () => none) }).catch((e) => e);
+    expect(err.reason).toBe("empty_reply");
   });
 });

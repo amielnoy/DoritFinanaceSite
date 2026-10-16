@@ -180,7 +180,7 @@ export function createToolRunner(handlers: { submitLead: EdgeHandler; escalateTo
           else dropped.push(slug);
         }
         return kept.length
-          ? { name, status: 'ok', isError: false, recommended: kept, forModel: JSON.stringify({ ok: true, recommended: kept, dropped }) }
+          ? { name, status: 'ok', isError: false, recommended: kept, forModel: JSON.stringify({ ok: true, recommended: kept, dropped, next: RECOMMENDED_NEXT }) }
           : { name, status: 'error', isError: true, forModel: JSON.stringify({ ok: false, error: 'no_known_article', dropped }) };
       }
       if (name === 'submitLead') return await submitLead(handlers.submitLead, input, ctx);
@@ -274,6 +274,14 @@ function savedForModel(stage: 'partial' | 'complete'): string {
 }
 
 /** A second save or hand-off changes nothing; the model still owes the visitor a reply. */
+/**
+ * What the model does after recommending. Told nothing, it took the cards as the
+ * whole answer and replied with one empty token, twice — a 503 on the first
+ * blog question of the evaluation of 2026-10-16.
+ */
+export const RECOMMENDED_NEXT =
+  'ההמלצות יוצגו למבקר ככרטיסים מתחת לתשובה. כתוב עכשיו תשובה קצרה בעברית — משפט או שניים שמסבירים למה המאמרים האלה עונים על מה ששאל. אל תעתיק את רשימת המאמרים.';
+
 const ALREADY_DONE_NEXT = 'זה כבר נעשה קודם בשיחה, ולא נשלח שוב. ענה למבקר על מה שכתב עכשיו, בקצרה.';
 
 /** The hand-off is a fact of its own; status becomes 'escalated' only from 'open', never over 'lead_saved' or 'closed'. */

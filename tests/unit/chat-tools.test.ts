@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  RECOMMENDED_NEXT,
   ESCALATE_TOOL,
   INTERVIEW_TOOLS,
   LIST_ARTICLES_TOOL,
@@ -452,6 +453,12 @@ describe("recommendArticles", () => {
     const out = await run("recommendArticles", { slugs: ["dmei-nihul", "made-up", "tikun-190", "pensia", "kupat-gemel"] }, ctx());
     expect(out).toMatchObject({ status: "ok", isError: false, recommended: ["dmei-nihul", "tikun-190", "pensia"] });
     expect(JSON.parse(out.forModel)).toMatchObject({ ok: true, recommended: ["dmei-nihul", "tikun-190", "pensia"], dropped: ["made-up"] });
+  });
+
+  it("tells the model to answer in words after recommending, not to stop (evaluation of 2026-10-16)", async () => {
+    const out = await run("recommendArticles", { slugs: ["dmei-nihul"] }, ctx());
+    expect(JSON.parse(out.forModel).next).toBe(RECOMMENDED_NEXT);
+    expect(RECOMMENDED_NEXT).toMatch(/כתוב עכשיו תשובה קצרה/);
   });
 
   it("refuses a call with no slug it can show", async () => {
