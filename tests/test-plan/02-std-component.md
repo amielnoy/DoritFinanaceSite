@@ -728,7 +728,7 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-014 | "renders %s with no Hebrew but the switcher's עברית" (/en/faq, /fr/faq) | The category heading and the first question in the language; no Hebrew outside `lang="he"` |
 | CMP-I18N-015 | "opens an answer, and moves between topics" | "General" pressed; the first-meeting answer visible |
 | CMP-I18N-016 | "declares its questions in English to search engines, and no Hebrew-only chat" | FAQPage JSON-LD: 24 English questions, no Hebrew; no chat; canonical `/en/faq` |
-| CMP-I18N-017 | "keeps the Hebrew page Hebrew, its English subtitles and its JSON-LD" | "Income Tax · 5 שאלות"; the chat; the Hebrew first question |
+| CMP-I18N-017 | "keeps the Hebrew page Hebrew, its English subtitles and its JSON-LD" | "Income Tax · 6 שאלות"; the chat; the Hebrew first question |
 | CMP-I18N-018 | "brings the common questions back to the English home page, linking to /en/faq" | "Common questions"; "All the questions" → `/en/faq` |
 
 ### 4.37 /claims and /atzmaim-31-12 in English and French — `tests/component/i18n-claims.test.tsx`
