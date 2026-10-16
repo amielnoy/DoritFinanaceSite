@@ -867,3 +867,11 @@ Review 2026-10-15, item 19. Already in place: `accept`, the 10 MB and type check
 | CMP-CLAIMDOC-001 | "takes dropped files through the same checks as picked ones" | A dropped PDF is listed; a dropped `.exe` is not, and the alert names it with the type message |
 | CMP-CLAIMDOC-002 | "keeps the picker in the tab order: visually hidden, never display:none" | Class `sr-only`, not `hidden`; Tab reaches the input |
 | CMP-CLAIMDOC-003 | "accepts only the bucket's types, and says a picked file's problem in an alert" | `accept` lists PDF and HEIC; a 10 MB + 1 byte JPG gives the size message in `role="alert"`; the input's value is cleared |
+
+### 4.50 The home page's chat, loaded on demand — `tests/component/start-conversation-lazy-chat.test.tsx`
+
+Review 2026-10-15, item 22. `StartConversation` imports `AgentChat` with `lazy()`, so the chat and react-markdown leave the home page's first bundle. Measured with `CI=1 vite build` on this branch: the entry chunk went from 473,997 B (140,328 gzip) to 337,775 B (100,007 gzip). Everything the home page loads up front (entry and modulepreloads) went from 935,093 B (288,942 gzip) to 798,907 B (248,641 gzip), about −14% gzipped. `AgentChat` is its own 21,245 B chunk (7,118 gzip).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-LAZYCHAT-001 | "is not loaded with the section, and loads and shows once the visitor opens it" | The mocked module is not evaluated on render; after the צ'אט button, it is evaluated once and the chat shows |

@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { CalendarDays, MessageCircle, MessagesSquare, Phone, Send } from "lucide-react";
-import AgentChat from "@/components/dorit/chat/AgentChat";
 import NeedsWizard from "@/components/dorit/forms/NeedsWizard";
 import QuickContact from "@/components/dorit/forms/QuickContact";
 import { AGENTS } from "@/config/agents";
@@ -10,6 +9,12 @@ import { ctaClass } from "@/components/dorit/primitives/Cta";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { useLocale, useT } from "@/i18n/LocaleContext";
+
+/*
+ * The chat opens only when the visitor asks for it, so it — and react-markdown
+ * with it — loads then, not with the home page (review 2026-10-15).
+ */
+const AgentChat = lazy(() => import("@/components/dorit/chat/AgentChat"));
 
 /**
  * The one place on the home page where a visitor makes contact.
@@ -159,7 +164,9 @@ export default function StartConversation() {
             disclaimer, which describe the agent and so travel with it. */}
         {he && chatOpen ? (
           <div id="interview-chat" ref={chatRef} className="flex flex-col gap-10 scroll-mt-28">
-            <AgentChat descriptor={AGENTS.needsInterview} embedded />
+            <Suspense fallback={<div className="min-h-[420px]" aria-busy="true" />}>
+              <AgentChat descriptor={AGENTS.needsInterview} embedded />
+            </Suspense>
             {/* The fence, published beside the chat.
                 It used to render in AgentChat's heading column, which the embedded
                 layout does not draw — and the boundary a visitor can read is half of
