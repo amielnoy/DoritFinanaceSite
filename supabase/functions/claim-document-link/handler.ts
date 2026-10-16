@@ -55,7 +55,7 @@ export async function handler(req: Request): Promise<Response> {
     const rows = await selectRows('leads', `id=eq.${leadId}&select=message`);
     const message = typeof rows[0]?.message === 'string' ? rows[0].message : '';
     // A whole reference, not a prefix of a longer one.
-    const refs = message.match(/storage:claim-documents\/[^\s|]+/g) ?? [];
+    const refs: string[] = message.match(/storage:claim-documents\/[^\s|]+/g) ?? [];
     if (!refs.includes(`${REF_PREFIX}${path}`)) {
       log('warn', 'document.not_on_lead', { rid, leadId });
       return json({ error: 'המסמך לא נמצא בפנייה הזו.' }, 404);
