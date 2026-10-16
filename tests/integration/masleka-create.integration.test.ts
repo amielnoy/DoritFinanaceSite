@@ -84,6 +84,70 @@ describe("masleka-create — who may", () => {
   });
 });
 
+/**
+ * A request started for a lead (the board's new-request drawer): the caller
+ * must see that lead — a User their own, an Admin any of the agency's — and it
+ * must be the agency's. Without a lead, today's request, the caller's own.
+ */
+describe("masleka-create — for a lead", () => {
+  const USER = "aaaaaaaa-1111-4111-8111-000000000003";
+  const OTHER_USER = "aaaaaaaa-1111-4111-8111-000000000004";
+  const ADMIN = "aaaaaaaa-1111-4111-8111-000000000005";
+  const USER_TOKEN = "user-session-token-0123456789";
+  const ADMIN_TOKEN = "admin-session-token-012345678";
+  const MINE = "22222222-2222-4222-8222-000000000001";
+  const THEIRS = "22222222-2222-4222-8222-000000000002";
+  const TRUSTS = "22222222-2222-4222-8222-000000000003";
+  const fake = {
+    sessions: { [USER_TOKEN]: USER, [ADMIN_TOKEN]: ADMIN },
+    roles: { [USER]: "user", [OTHER_USER]: "user", [ADMIN]: "admin" },
+    assigned: { [MINE]: USER, [THEIRS]: OTHER_USER, [TRUSTS]: USER },
+    leadAgency: { [TRUSTS]: "0abcfa0b-0000-4000-8000-000000000000" },
+  };
+
+  it("lets a User start a request on their own lead, and stores the lead", async () => {
+    const r = await run({ clientName: NAME, leadId: MINE }, { token: USER_TOKEN, fake });
+    expect(r.status).toBe(200);
+    expect(r.maslekaRequests[0]).toMatchObject({ lead_id: MINE, created_by: USER });
+  });
+
+  it("refuses a User another User's lead with 403, and stores nothing", async () => {
+    const r = await run({ clientName: NAME, leadId: THEIRS }, { token: USER_TOKEN, fake });
+    expect(r.status).toBe(403);
+    expect(r.json).toMatchObject({ error: "forbidden", rid: expect.any(String) });
+    expect(r.maslekaRequests).toHaveLength(0);
+  });
+
+  it("lets an Admin start one on any of the agency's leads", async () => {
+    const r = await run({ clientName: NAME, leadId: THEIRS }, { token: ADMIN_TOKEN, fake });
+    expect(r.status).toBe(200);
+    expect(r.maslekaRequests[0]).toMatchObject({ lead_id: THEIRS, created_by: ADMIN });
+  });
+
+  it("refuses a lead of another agency, even one the caller can see", async () => {
+    const r = await run({ clientName: NAME, leadId: TRUSTS }, { token: USER_TOKEN, fake });
+    expect(r.status).toBe(403);
+    expect(r.maslekaRequests).toHaveLength(0);
+  });
+
+  it("refuses a lead id that is not one, asking nothing about it", async () => {
+    for (const leadId of ["not-a-uuid", 7, { id: MINE }]) {
+      const r = await run({ clientName: NAME, leadId }, { token: USER_TOKEN, fake });
+      expect(r.status).toBe(400);
+      expect(r.fetches.some((f) => String(f.url).includes("/rpc/can_see_lead"))).toBe(false);
+    }
+  });
+
+  it("keeps today's request when the lead is left out or null: lead-less, the caller's own", async () => {
+    for (const body of [{ clientName: NAME }, { clientName: NAME, leadId: null }]) {
+      const r = await run(body, { token: USER_TOKEN, fake });
+      expect(r.status).toBe(200);
+      expect(r.maslekaRequests[0]).toMatchObject({ lead_id: null, created_by: USER });
+      expect(r.fetches.some((f) => String(f.url).includes("/rpc/can_see_lead"))).toBe(false);
+    }
+  });
+});
+
 describe("masleka-create — a new request", () => {
   it("creates an invited request, mails the client the link, and returns it for copying", async () => {
     const r = await run({ clientName: " משה כהן ", contactEmail: "moshe@example.com", sendInvite: true });

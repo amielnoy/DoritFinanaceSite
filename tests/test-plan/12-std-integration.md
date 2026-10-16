@@ -680,7 +680,7 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKSUB-015 | "never writes a ciphertext, a name or the session token to a log line" | Across success, failed write and outsider: every line has `rid`; no ciphertext, client name, last4 or session token |
 | INT-MSKSUB-016 | "answers the browser's preflight and does nothing else" | 204, site origin allowed; no fetch |
 
-### 4.28 `masleka-create` — a hand-made request, or a fresh link — `INT-MSKNEW-001..024`
+### 4.28 `masleka-create` — a hand-made request (optionally on a lead), or a fresh link — `INT-MSKNEW-001..030`
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -708,6 +708,12 @@ agency copied from the request) is written before the value is unsealed with
 | INT-MSKNEW-021 | "answers 500 and no link when the update fails" | 500 `failed`; no link |
 | INT-MSKNEW-022 | "refuses a request that is no longer waiting for a code" | 409; hash unchanged |
 | INT-MSKNEW-023 | "refuses an id that is not one" | 400 `invalid`; no `masleka_requests` call |
+| INT-MSKNEW-025 | "lets a User start a request on their own lead, and stores the lead" (for a lead) | 200; `lead_id` the lead, `created_by` the User |
+| INT-MSKNEW-026 | "refuses a User another User's lead with 403, and stores nothing" (for a lead) | 403 `forbidden` with `rid`; no row |
+| INT-MSKNEW-027 | "lets an Admin start one on any of the agency's leads" (for a lead) | 200; `lead_id` another User's lead, `created_by` the Admin |
+| INT-MSKNEW-028 | "refuses a lead of another agency, even one the caller can see" (for a lead) | 403 (`lead_in_agency` false); no row |
+| INT-MSKNEW-029 | "refuses a lead id that is not one, asking nothing about it" (for a lead) | `not-a-uuid`, a number, an object: 400; `can_see_lead` never asked |
+| INT-MSKNEW-030 | "keeps today's request when the lead is left out or null: lead-less, the caller's own" (for a lead) | 200; `lead_id` null, `created_by` the caller; `can_see_lead` never asked |
 
 ### 4.29 `masleka-remind` — the hourly chase — `INT-MSKREM-001..037`
 

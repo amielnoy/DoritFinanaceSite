@@ -50,6 +50,8 @@ export interface MaslekaFake {
    * request's `created_by` when it has none.
    */
   assigned?: Record<string, string>;
+  /** Lead id → its agency, as `lead_in_agency` reads it; a lead not named here is agency 1's. */
+  leadAgency?: Record<string, string>;
   /** Who a lead may be assigned to (the leads trigger's check); anyone else is refused `assignee_not_member`. */
   members?: string[];
   /** `set_member_role` and `remove_member` refuse with this reason (as PostgREST relays a function's exception). */
@@ -392,6 +394,10 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     }
     if (u === `${SUPABASE_URL}/rest/v1/rpc/can_see_lead` && method === "POST") {
       return new Response(JSON.stringify(canSeeLead(sessionOf(init.headers), parsed.p_lead_id)), { status: 200 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/rpc/lead_in_agency` && method === "POST") {
+      const agency = masleka.leadAgency?.[parsed.p_lead_id] ?? "00000000-0000-0000-0000-000000000001";
+      return new Response(JSON.stringify(agency === parsed.p_agency_id), { status: 200 });
     }
     if (u === `${SUPABASE_URL}/rest/v1/rpc/can_work_request` && method === "POST") {
       const user = sessionOf(init.headers);

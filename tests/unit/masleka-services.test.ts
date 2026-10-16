@@ -121,6 +121,18 @@ describe("SupabaseMaslekaService — the staff board", () => {
     });
   });
 
+  it("sends the lead a request hangs off, and no lead key for one made by hand", async () => {
+    const { client, service } = fake({
+      invoke: async () => ({ data: { ok: true, requestId: "r9", link: "https://govari-fin.co.il/masleka#t=x", invited: false, rid: "q" }, error: null }),
+    });
+    await service.create({ clientName: "משה כהן", sendInvite: false, leadId: "22222222-2222-4222-8222-000000000001" });
+    expect(client.functions.invoke).toHaveBeenLastCalledWith("masleka-create", {
+      body: { clientName: "משה כהן", contactEmail: "", sendInvite: false, leadId: "22222222-2222-4222-8222-000000000001" },
+    });
+    await service.create({ clientName: "משה כהן", sendInvite: false });
+    expect(client.functions.invoke.mock.calls.at(-1)![1].body).not.toHaveProperty("leadId");
+  });
+
   it("asks for a fresh link by request id", async () => {
     const { client, service } = fake({
       invoke: async () => ({ data: { ok: true, requestId: "r1", link: "https://govari-fin.co.il/masleka#t=y", invited: false, rid: "q" }, error: null }),

@@ -607,6 +607,8 @@ export interface NewMaslekaRequest {
   clientName: string;
   contactEmail?: string;
   sendInvite: boolean;
+  /** A lead the caller can see, to hang the request off; absent for one made by hand. */
+  leadId?: string;
 }
 
 export type MaslekaFailure =

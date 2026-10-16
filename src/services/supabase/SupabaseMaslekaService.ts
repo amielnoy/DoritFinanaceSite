@@ -167,6 +167,8 @@ export class SupabaseMaslekaService implements MaslekaPort {
         clientName: input.clientName,
         contactEmail: input.contactEmail ?? "",
         sendInvite: input.sendInvite,
+        // Only when there is one: a request made by hand sends no key at all.
+        ...(input.leadId ? { leadId: input.leadId } : {}),
       }),
     );
   }

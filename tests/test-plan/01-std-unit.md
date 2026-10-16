@@ -1192,6 +1192,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKSVC-007 | "reads the open requests by the granted columns only, newest first" | `MASLEKA_COLUMNS` (no ciphertext/hash), four statuses, `created_at desc`, camelCase |
 | UNIT-MSKSVC-008 | "throws when the list cannot be read, so an outage never looks like an empty board" | Rejects |
 | UNIT-MSKSVC-009 | "creates a request and hands back its link" | Body and `MaslekaLink` |
+| UNIT-MSKSVC-030 | "sends the lead a request hangs off, and no lead key for one made by hand" | `leadId` in the body when given; no `leadId` key otherwise |
 | UNIT-MSKSVC-010 | "asks for a fresh link by request id" | `{ requestId }` |
 | UNIT-MSKSVC-011 | "returns a revealed value, and fails on an answer without one" | Value; `failed` |
 | UNIT-MSKSVC-012 | "marks a request submitted" | `masleka-submitted` |
