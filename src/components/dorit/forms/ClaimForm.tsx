@@ -329,7 +329,8 @@ export default function ClaimForm() {
                 : t("form.send")}
           </CtaButton>
         </div>
-        <p role="alert" className="text-sm text-destructive text-start empty:hidden">{error}</p>
+        {/* Inserted with its message: an alert is announced as it appears. */}
+        {error ? <p role="alert" className="text-sm text-destructive text-start">{error}</p> : null}
       </div>
     </div>
   );
