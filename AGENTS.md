@@ -210,11 +210,11 @@ npx skills add base44/skills
   `assign-open-leads.mjs` lists each agency's open, unassigned leads, and
   assigns them from a `--plan` file only with `--apply`. Run it before the
   agency-roles narrowing ships, or every User's list goes blank.
-  `seed-blog.mjs --apply` writes `content/blog/` to Base44 through `base44 exec
-  --privileged --data-env prod` (the CLI's signed-in owner, no password) and
-  mirrors each post to Supabase on `base44_id`; it needs `SUPABASE_URL` and
-  `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` and never changes `published` on a
-  post that exists. See A-65.
+  `seed-blog.mjs --apply` writes `content/blog/` to Supabase `blog_posts` only
+  (Base44 is no longer written), matching posts by slug then title; it needs
+  `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, never changes
+  `published` or the slug of a post that exists, and should be run with
+  `--only <file>.md` so other posts' /admin/blog edits survive. See A-65.
 - `vite.config.js`: Vite config and Base44 Vite plugin setup.
 - `.env.local`: local-only environment values; never commit secrets.
 - `tests/test-plan/`: the test plan and one Software Test Description per suite.

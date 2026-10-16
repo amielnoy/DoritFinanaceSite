@@ -34,7 +34,7 @@ something outside the repository.
 | FAQ content | `src/content/faq.ts` |
 | Insurance self-assessment | `src/lib/insurance-assessment.ts` |
 | `reconcile-stores`, `prune-vercel-deployments` | `scripts/*.mjs` |
-| `planSeed`, `mirrorRow`, `readExecResult` | `scripts/seed-blog.mjs` |
+| `planSeed`, `rowFor`, `selectArticles` | `scripts/seed-blog.mjs` |
 | `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
 | `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
 | `groupOpenLeads`, `planAssignments`, `describeOpenLeads` | `scripts/assign-open-leads.mjs` |
@@ -285,32 +285,30 @@ failing `/agents/` call.
 | UNIT-AGT-008 | "drops content that is not a non-empty string" | `[]` for an object, a missing `content` and an empty one. An object reaches `<ReactMarkdown>` as a React child and, with no error boundary above the chat, whites out the SPA |
 | UNIT-AGT-009 | "passes the survivors through in order" | Order preserved after filtering |
 
-### 4.12 Seeding the articles into both stores — `tests/unit/seed-blog.test.ts`
+### 4.12 Seeding the articles into Supabase — `tests/unit/seed-blog.test.ts`
 
-The repo's articles are written to Base44 first — the site and the blog
-recommender still read it — and mirrored to Supabase on `base44_id`. The case
-worth pinning is what a re-run must not do: take down a post Dorit has
-published. See [A-65](10-known-issues.md).
+The repo's articles are written to Supabase's `blog_posts` only, the store the
+site and /admin/blog use. The cases worth pinning are what a re-run must not
+do: add a second copy of a post, take down one Dorit has published, or move one
+to a new address. See [A-65](10-known-issues.md).
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-SEED-001 | "creates an article Base44 has never seen, as a draft" | `op: create`, `published: false` |
-| UNIT-SEED-002 | "updates the post with the same title instead of adding a second one" | `op: update` on the matched id |
-| UNIT-SEED-003 | "leaves a published post published when the content is re-seeded" | The update payload carries no `published` |
-| UNIT-SEED-004 | "carries the Base44 id, so the two copies are one row" | Mirror row has `base44_id` |
-| UNIT-SEED-005 | "mirrors the published state Base44 actually holds" | Mirror `published` follows Base44, not the file |
-| UNIT-SEED-006 | "finds the marked result among the CLI's own output" | Parsed past npm notices and the update banner |
-| UNIT-SEED-007 | "says the CLI may be signed out rather than parsing nothing" | Throws naming `base44 login` |
-| UNIT-SEED-008 | "carries the action time from the front matter to both stores" | `action_time` in the parsed article, the Base44 payload and the mirror row |
-| UNIT-SEED-009 | "sends an empty action time for an article that has none" | `action_time: ""` |
-| UNIT-SEED-010 | "mirrors the file name as the slug, and keeps it out of the Base44 payload" | Mirror row `slug`; payload has none |
+| UNIT-SEED-001 | "creates an article the table has never seen, as a draft with the file's slug" | `op: create`; row `slug` = file name, `published: false` |
+| UNIT-SEED-002 | "updates the post with the same slug, even when its title was edited" | `op: update` on that post's id |
+| UNIT-SEED-003 | "updates the post with the same title when its slug was changed, and keeps that slug" | `op: update`; row has no `slug` |
+| UNIT-SEED-004 | "prefers the slug match over a title match on another post" | The slug-matched id |
+| UNIT-SEED-005 | "leaves a published post published when the content is re-seeded" | The update row carries no `published` |
+| UNIT-SEED-006 | "carries the action time from the front matter" (rowFor) | `action_time` in the parsed article and the row |
+| UNIT-SEED-007 | "sends an empty action time for an article that has none" (rowFor) | `action_time: ""` |
+| UNIT-SEED-008 | "carries cta_headline and og_image" (rowFor) | Both in the row |
+| UNIT-SEED-009 | "writes an article without them as null, which the column checks accept (an empty string is refused)" (rowFor) | `cta_headline: null`, `og_image: null` |
+| UNIT-SEED-010 | "never writes a Base44 id or an agency: the column defaults decide them" (rowFor) | No `base44_id`, no `agency_id` |
 | UNIT-SEED-011 | "takes the slug from the file name" | `horadat-dmei-nihul` |
 | UNIT-SEED-012 | "refuses a file name that cannot be an address" | Throws naming kebab-case |
-| UNIT-SEED-013 | "carries cta_headline and og_image to Supabase only (Base44's BlogPost has neither)" | In the mirror row; not in the Base44 payload |
-| UNIT-SEED-014 | "mirrors an article without them as null, which the column checks accept (an empty string is refused)" | `cta_headline: null`, `og_image: null` |
-| UNIT-SEED-015 | "takes every article when --only is not given" (selectArticles) | All three |
-| UNIT-SEED-016 | "takes only the named ones, with or without .md, in either spelling of the list" (selectArticles) | `shana-lifnei-prisha.md,mutavim` → those two; ` tofes-101 , ` → one |
-| UNIT-SEED-017 | "refuses a name with no article file, and an empty list, so a typo seeds nothing" (selectArticles) | A misspelt name throws naming it; `""` and `" , "` throw |
+| UNIT-SEED-013 | "takes every article when --only is not given" (selectArticles) | All three |
+| UNIT-SEED-014 | "takes only the named ones, with or without .md, in either spelling of the list" (selectArticles) | `shana-lifnei-prisha.md,mutavim` → those two; ` tofes-101 , ` → one |
+| UNIT-SEED-015 | "refuses a name with no article file, and an empty list, so a typo seeds nothing" (selectArticles) | A misspelt name throws naming it; `""` and `" , "` throw |
 
 ### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
 
