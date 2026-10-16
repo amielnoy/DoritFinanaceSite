@@ -1003,7 +1003,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-LEADTX-006 | "lists each lead that has a conversation once, skipping conversations without a lead" | `["a","b"]` from rows with a repeat and a null |
 | UNIT-LEADTX-007 | "throws on a refused read" | `chat_conversations read failed` |
 | UNIT-LEADTX-008 | "finds an older linked conversation behind a thousand newer ones without a lead" | The read filters `lead_id not is null` before its 1,000-row limit: `["older"]` (triage 9) |
-| UNIT-LEADTX-009 | "counts the leads still new, reading their ids alone" | 3 rows → 3; filters `status = new`, limit 1,000 |
+| UNIT-LEADTX-009 | "counts the leads that need someone — new or escalated — reading their ids alone (review 2026-10-15)" | 3 rows → 3; filters `or=(status.eq.new,status.eq.escalated)`, not `status = new` alone; limit 1,000 |
 | UNIT-LEADTX-010 | "throws on a refused read rather than counting none" | `leads read failed` |
 
 The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and its refusal to run without credentials (`tests/unit/eval-chat-lib.test.ts`). Nothing here calls the Anthropic API or a function; the harness itself is specified in [13-std-eval](13-std-eval.md) §6. The FAQ chat's personas and rubric (`tests/eval/chat/rubric-support.md`) are covered by 034..042. One row per declared `it`.

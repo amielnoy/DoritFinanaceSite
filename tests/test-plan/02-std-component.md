@@ -837,3 +837,12 @@ Changed for agency roles:
   - An agency Admin is offered only their agencies and the User role.
   - A User gets no invite button.
   - The role offered by default is an Admin's (the operator may give it).
+
+### 4.47 "דורשות טיפול" — `tests/component/leads-attention.test.tsx`
+
+Review 2026-10-15, item 17. The `escalated` and `partial` chips and the disabled current-status option already came with the agency roles (CMP-ROLEUI-002 and 004). What remained: an escalated lead (a visitor who asked for Dorit herself) needs someone as much as a new one. The card counts both and its filter shows both, and so does the menu's counter for a User (UNIT-LEADTX-009).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ATTN-001 | "counts the new and the escalated leads together" | One new, one escalated, one contacted, one partial: the card reads 2 |
+| CMP-ATTN-002 | "shows the new and the escalated leads when clicked, and no other" | After the click: the new and the escalated lead; not the contacted or the partial one |

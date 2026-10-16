@@ -191,7 +191,7 @@ function byTable(answers: Record<string, SupabaseReadResult>) {
     let rows = answers[table].data;
     const q: SupabaseQuery = {
       eq: (c, v) => (calls.push([table, "eq", c, v]), q),
-      or: () => q,
+      or: (f) => (calls.push([table, "or", f]), q),
       is: (c, v) => (calls.push([table, "is", c, v]), q),
       not: (c, op, v) => {
         calls.push([table, "not", c, op, v]);
@@ -294,10 +294,11 @@ describe("SupabaseLeadAdminService.transcriptLeadIds", () => {
 });
 
 describe("SupabaseLeadAdminService.countNew", () => {
-  it("counts the leads still new, reading their ids alone", async () => {
+  it("counts the leads that need someone — new or escalated — reading their ids alone (review 2026-10-15)", async () => {
     const { client, calls } = byTable({ leads: { data: [{ id: "a" }, { id: "b" }, { id: "c" }], error: null } });
     expect(await new SupabaseLeadAdminService(client).countNew()).toBe(3);
-    expect(calls).toContainEqual(["leads", "eq", "status", "new"]);
+    expect(calls).toContainEqual(["leads", "or", "status.eq.new,status.eq.escalated"]);
+    expect(calls).not.toContainEqual(["leads", "eq", "status", "new"]);
     expect(calls).toContainEqual(["leads", "limit", 1000]);
   });
 

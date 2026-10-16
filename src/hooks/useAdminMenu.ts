@@ -34,7 +34,7 @@ export const reaches = (access: AdminAccess, min: AgencyRole | "operator"): bool
   access === "operator" || (min !== "operator" && meets(access === null ? null : access, min));
 
 export interface AdminCounts {
-  /** A User's leads still `new` — row-level security counts only their own. */
+  /** A User's leads still `new` or `escalated` — row-level security counts only their own. */
   newLeads: number;
   /** Open leads nobody works yet — Admin+, who assign them. */
   unassigned: number;
