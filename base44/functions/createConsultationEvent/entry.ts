@@ -183,6 +183,13 @@ export default async function(req) {
     };
     log('error', 'client.stale', { rid, ...staleClient });
 
+    // Kept working, not retired (review 2026-10-15): for a stale client the
+    // event this books is the only trace its interview leaves. Capped instead.
+    if (!(await withinLimit(rid, 'consultation-event', 3600, BOOKINGS_PER_HOUR))) {
+      log('error', 'request.rejected', { rid, reason: 'rate_limited' });
+      return Response.json({ error: 'התקבלו כמה בקשות ברצף. אפשר לנסות שוב בעוד שעה, או לפנות לדורית ישירות.', rid }, { status: 429 });
+    }
+
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { name, phone, email, topic, timing, notes, scheduledAt } = body || {};
@@ -301,7 +308,9 @@ export default async function(req) {
       rid,
       eventId: created[0].eventId,
       htmlLink: created[0].link,
-      events,
+      // Which calendars took it — never a provider's own error text (review
+      // 2026-10-15): that is logged, and tells a browser our internals.
+      events: events.map(({ details: _details, ...e }) => e),
       warnings,
     });
   } catch (error) {
@@ -311,5 +320,29 @@ export default async function(req) {
     // shape of our internals. The id is the one thing that is useful to both —
     // they can quote it, and it finds the request in one search.
     return Response.json({ error: 'השמירה נכשלה. אפשר לנסות שוב, או לפנות לדורית ישירות.', rid }, { status: 500 });
+  }
+}
+
+/**
+ * Bookings per hour, for every caller together (review 2026-10-15). Only a
+ * stale client still calls this, rarely; anything faster is not a visitor.
+ * The shared limiter (allow_submission), as in submitClaim; it fails open.
+ */
+const BOOKINGS_PER_HOUR = 20;
+async function withinLimit(rid, key, windowSeconds, max) {
+  const url = (Deno.env.get('SUPABASE_URL') || '').trim();
+  const apiKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  if (!url || !apiKey) return true;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/allow_submission`, {
+      method: 'POST',
+      headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_key: key, p_window_seconds: windowSeconds, p_max: max }),
+    });
+    if (!res.ok) throw new Error(`rpc_http_${res.status}`);
+    return (await res.json()) !== false;
+  } catch (e) {
+    log('warn', 'limit.unavailable', { rid, err: String(e?.message ?? e).slice(0, 200) });
+    return true;
   }
 }

@@ -121,6 +121,16 @@ A hand-off that does not reach a person is a regulatory failure, so the limits n
 
 `submit-claim-edge.integration.test.ts` "how often" changed. "does not limit a request with no forwarded address" became "limits a request with no address under the one key such callers share": `claim-ip:` + the hash of `no-address`. A new case, "counts the address the gateway appended, not one the client put first", checks `6.6.6.6, 203.0.113.7` → the hash of `203.0.113.7`. The same `clientIp` serves submit-lead, escalate-to-human, log-support-chat, masleka-code and the chat. The `ip &&` guards that skipped a limit without an address are gone.
 
+### 4.2e `createConsultationEvent` — kept for stale clients, under a cap (review 2026-10-15) — `INT-CCE-001..003`
+
+`tests/integration/create-consultation-event.integration.test.ts`. Nothing in the current build calls it, but a stale client still can (it logs `client.stale`), and then its event is the only trace of that visitor's interview. So it is not retired with a 410: it keeps booking under a cap, and stops returning a provider's own error text.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CCE-001 | "still books, and asks the shared limiter once, for every caller together" | 200 `ok`; one `allow_submission` with `consultation-event`, 3600 s, 20 |
+| INT-CCE-002 | "refuses past the cap with 429 and rid, booking nothing" | 429 with `rid`; no calendar call |
+| INT-CCE-003 | "never hands a calendar provider's own error text to the browser" | A provider refusing with its own text: 200, and no `details` in `events`, the text nowhere in the answer (fails without the fix) |
+
 ### 4.3 `submitLead` — identifiers a visitor volunteered — `INT-LEAD-016/017`
 
 An ID number or card number in a model-written summary is redacted before anyone
