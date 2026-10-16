@@ -182,10 +182,24 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       let conversation: ConversationRow;
       let issuedToken: string | null = null;
       const conversationId = str(input.conversationId);
+      const token = str(input.token);
       // One turn at a time (I3): a turn claims the row until this time and lets go when done.
       const leaseUntil = new Date(deps.now() + TURN_LEASE_MS).toISOString();
 
-      if (!conversationId) {
+      // The page makes the conversation's id and token itself and sends them with every
+      // message, the first included (review 2026-10-15). A first message whose answer was
+      // lost can then be asked about, and a resend reaches the same row: one lead, one
+      // hand-off. A request with no id is a page from before that, given a token made here.
+      let found: ConversationRow | null = null;
+      if (conversationId) {
+        if (!UUID.test(conversationId) || !TOKEN.test(token)) return refuse(403, 'gone');
+        found = await deps.store.getConversation(conversationId);
+        if (found && (found.role !== role || found.token_hash !== (await sha256Hex(token)))) return refuse(403, 'gone');
+        // An id never seen opens a conversation only on a message carrying the consent; otherwise its row is gone.
+        if (!found && !str(input.consentVersion)) return refuse(403, 'gone');
+      }
+
+      if (!found) {
         const consentVersion = str(input.consentVersion).trim();
         const consentAt = str(input.consentAt);
         if (!consentVersion || consentVersion.length > MAX_CONSENT_VERSION_CHARS || Number.isNaN(Date.parse(consentAt))) {
@@ -201,12 +215,13 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           log('warn', 'budget.reached', { rid, ms: Date.now() - startedAt });
           return respond(503, { ok: false, code: 'unavailable' });
         }
-        issuedToken = deps.newToken();
+        const ownToken = conversationId ? token : (issuedToken = deps.newToken());
         const a = (input.attribution && typeof input.attribution === 'object' ? input.attribution : {}) as Record<string, unknown>;
-        conversation = await deps.store.createConversation({
+        const opening = {
+          ...(conversationId ? { id: conversationId } : {}),
           agency_id: AGENCY.id,
           role,
-          token_hash: await sha256Hex(issuedToken),
+          token_hash: await sha256Hex(ownToken),
           consent_version: consentVersion,
           consent_at: consentInstant(consentAt, deps.now()),
           attribution: {
@@ -219,12 +234,16 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           turns: 1,
           busy_until: leaseUntil,
           ...(evalMode ? { delete_after: new Date(deps.now() + EVAL_RETENTION_MS).toISOString() } : {}),
-        });
+        };
+        try {
+          conversation = await deps.store.createConversation(opening);
+        } catch (e) {
+          // The same first message sent twice at once: the other request's row holds the turn.
+          if (conversationId && String((e as Error)?.message ?? e).startsWith('insert_http_409')) return refuse(409, 'busy');
+          throw e;
+        }
         log('info', 'conversation.created', { rid, conversation: conversation.id, role, evalMode });
       } else {
-        const token = str(input.token);
-        const found = UUID.test(conversationId) && TOKEN.test(token) ? await deps.store.getConversation(conversationId) : null;
-        if (!found || found.role !== role || found.token_hash !== (await sha256Hex(token))) return refuse(403, 'gone');
         conversation = found;
         if (CLOSED.has(conversation.status)) return refuse(409, 'closed');
         if (deps.now() - Date.parse(conversation.last_message_at) > IDLE_MS) {

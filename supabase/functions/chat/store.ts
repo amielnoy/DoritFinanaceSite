@@ -35,6 +35,8 @@ export interface ConversationRow {
 }
 
 export interface NewConversation {
+  /** The page's own id for it (review 2026-10-15); the column's default when absent. */
+  id?: string;
   agency_id: string;
   role: string;
   token_hash: string;

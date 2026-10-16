@@ -948,27 +948,29 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-CHADAPTER-001 | "opens the conversation with consent and attribution on the first message, and the token after" | First POST carries agent, message, consent version and time, attribution; the second carries `conversationId` and `token` instead |
+| UNIT-CHADAPTER-001 | "opens the conversation under its own id and token, with consent and attribution on the first message only" | Both POSTs carry the page's `conversationId` and `token`; the first adds consent version and time and attribution, the second does not (review 2026-10-15, item 12) |
+| UNIT-CHADAPTER-023 | "makes a fresh uuid and a 64-hex token for each conversation by default" | Two conversations: each `conversationId` a v4 uuid, each `token` 64 hex; neither repeats |
 | UNIT-CHADAPTER-002 | "hands the subscriber the whole transcript, the visitor's line with the reply" | The subscriber's last call is `[user, assistant]` |
 | UNIT-CHADAPTER-003 | "gives a late subscriber what already arrived" | A subscriber added after the send is called at once with the transcript |
 | UNIT-CHADAPTER-004 | "marks the reply that saved the lead" | `leadSaved: true` gives the assistant message `signal: "lead_saved"` |
 | UNIT-CHADAPTER-005 | "refuses a long message before any request" | `AgentLimitError("too_long")` for 1,001 characters; `invoke` not called |
 | UNIT-CHADAPTER-006 | "maps a %i answer to AgentLimitError(%s)" | 400 `too_many_turns`, 429 `rate_limited`, 403 `gone` and 409 `closed` (both `conversation_closed`), 409 `busy` (`busy`, I3) |
-| UNIT-CHADAPTER-007 | "starts a new server conversation after one was closed, under the same consent" | After a 409 the next send has the consent fields and no `conversationId` (Review Focus 5) |
+| UNIT-CHADAPTER-007 | "starts a new server conversation after one was closed, under the same consent" | After a 409 `closed` the next send has the consent fields and a new `conversationId` (Review Focus 5) |
 | UNIT-CHADAPTER-008 | "maps %i to AgentUnavailableError" | 503 `unavailable` and 500 `failed` give `AgentUnavailableError` carrying the `rid` |
-| UNIT-CHADAPTER-009 | "keeps the conversation a 503 opened, so the next message continues it" | The 503's `conversationId` and `token` are sent with the next message |
-| UNIT-CHADAPTER-010 | "aborts the request and throws AgentUnavailableError" | At 40 s the `signal` passed to `invoke` is aborted and `send` rejects with `AgentUnavailableError` |
-| UNIT-CHADAPTER-011 | "adopts the conversation a late first answer opened, so the retry continues it" | After a first-message timeout, a late answer's `conversationId` and `token` are sent with the next message; no second conversation |
+| UNIT-CHADAPTER-009 | "keeps the conversation a 503 opened, so the next message continues it" | After a 503 naming the conversation, the next message carries its id and token and no consent |
+| UNIT-CHADAPTER-010 | "aborts the request and throws AgentUnavailableError" | At 40 s the `signal` passed to `invoke` is aborted; with every status request hanging too (each cut at 10 s), `send` rejects with `AgentUnavailableError` when the window ends |
+| UNIT-CHADAPTER-011 | "sends a timed-out first message again under the same id and token, consent included" | The status request says 403 (the row was never opened); the resend's body equals the first's, so it reaches the same row (replaces "adopts the conversation a late first answer opened", whose branch could never run) |
 | UNIT-CHADAPTER-012 | "shows the visitor's message the moment it is sent, before the answer" | With the request pending the subscriber already has `[user]`; then `[user, assistant]` (I4) |
 | UNIT-CHADAPTER-013 | "takes the visitor's message back out when the send fails" | After a 503 the subscriber's last transcript is the one before the send (I4) |
-| UNIT-CHADAPTER-014 | "treats a 503 that says the lead was saved as a saved lead, not a failure" | `send` resolves; the transcript ends with `LEAD_SAVED_WITHOUT_REPLY`, `signal: lead_saved`, `replyMissing: true`; the 503's ids are sent with the next message (I5) |
+| UNIT-CHADAPTER-014 | "treats a 503 that says the lead was saved as a saved lead, not a failure" | `send` resolves; the transcript ends with `LEAD_SAVED_WITHOUT_REPLY`, `signal: lead_saved`, `replyMissing: true`; the next message continues the same conversation, without consent (I5) |
 | UNIT-CHADAPTER-015 | "hands the page the recommended articles as the block it reads, and the visitor none of it" | `recommended` → a ```` ```recommended ```` block `readRecommendation` reads; visible text unchanged |
 | UNIT-CHADAPTER-016 | "leaves a reply without recommendations as it came, and never writes a second block" | No `recommended`: content as sent; a reply with its own block keeps it alone |
 | UNIT-CHADAPTER-017 | "shows the reply the turn produced once it finished, instead of a failure" | After the 40 s wait, `status` polled every 3 s, naming `turn: 2`: busy, then the reply with `lead_saved` — shown, not a failure |
 | UNIT-CHADAPTER-018 | "says the details were saved when the turn saved the lead but left no reply" | `LEAD_SAVED_WITHOUT_REPLY`, `replyMissing` |
 | UNIT-CHADAPTER-019 | "fails as before when the turn ended with neither a reply nor a saved lead" | `AgentUnavailableError`; the message taken off the screen |
 | UNIT-CHADAPTER-020 | "stops asking after the recovery window and fails" | At most 60 s / 3 s requests |
-| UNIT-CHADAPTER-021 | "asks nothing after a first message timed out: there is no conversation to ask about" | One request only |
+| UNIT-CHADAPTER-021 | "recovers a first message too: it asks about turn 1 of the conversation it named" | Status request `{conversationId, token, status: true, turn: 1}`; the reply is shown, not a failure (review 2026-10-15, item 12) |
+| UNIT-CHADAPTER-024 | "stops asking at once when the first message never opened the conversation" | A 403 status answer ends recovery: two requests in all, `AgentUnavailableError` |
 | UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |
 | UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
@@ -1663,3 +1665,15 @@ Review 2026-10-15, item 11. Every turn's answer carries its number (`turn`), and
 | UNIT-CHHANDLER-077 | "never hands an earlier turn's reply as the reply of the turn asked about" (a status request) | Asked about turn 2 after only turn 1 ran: `turns: 1`, `last: null`; no `turn`, or `"1"` as a string: `last: null` |
 | UNIT-CHHANDLER-078 | "gives no reply while the turn asked about still runs, whatever the newest message is" (a status request) | Turn 2 claimed and leased: `busy: true`, `turns: 2`, `last: null` |
 | UNIT-CHADAPTER-022 | "fails, and never shows an earlier reply, when the turn it asked about never started" | Status `turns: 1` for turn 2, even with `leadSaved` and turn 1's reply: `AgentUnavailableError`; the transcript is turn 1's |
+
+### 4.70 A conversation the page names — `tests/unit/chat-handler.test.ts` (new cases); adapter rows UNIT-CHADAPTER-001, 007, 009–011, 014, 021, 023, 024
+
+Review 2026-10-15, item 12. The page makes the conversation's id (a uuid) and token (64 hex) before the first message and sends them with every message. The function opens the row under that id the first time and continues it after that. So a first message whose answer was lost can be recovered, and a resend reaches the same row. A request with no id (a page from before) still gets a token made by the function.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHHANDLER-079 | "opens under the page's own id and token, and hands back no token of its own" (a conversation the page names) | 200 with `conversationId` the page's and `turn: 1`, no `token`; the row's `token_hash` is sha256 of the page's token |
+| UNIT-CHHANDLER-080 | "continues the same row when the first message is sent again, and counts no second opening" (a conversation the page names) | The resend is turn 2 of the one row; `chat-new` counted once |
+| UNIT-CHHANDLER-081 | "answers busy when the same first message arrives twice at once, opening one row" (a conversation the page names) | The second insert meets 409 / 23505: answered 409 `busy`; one row |
+| UNIT-CHHANDLER-082 | "refuses the id with another token, and an id it never saw without the consent, as gone" (a conversation the page names) | 403 `gone` for both; no model call; no new row |
+| UNIT-CHHANDLER-083 | "refuses an id or token that is not the expected shape, opening nothing" (a conversation the page names) | 403 for `not-a-uuid` and a short token; no row |

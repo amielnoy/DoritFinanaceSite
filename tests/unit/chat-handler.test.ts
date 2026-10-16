@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelClient, ModelRequest, ModelResponse } from "../../supabase/functions/chat/anthropic.ts";
 import { ModelError } from "../../supabase/functions/chat/anthropic.ts";
@@ -30,9 +31,11 @@ class MemoryStore implements ChatStore {
   }
   async createConversation(row: NewConversation) {
     this.check();
+    // The primary key: PostgREST refuses a second row under the same id with 409 / 23505.
+    if (row.id && this.conversations.has(row.id)) throw new Error("insert_http_409:23505");
     const id = `00000000-0000-4000-8000-${String(++this.n).padStart(12, "0")}`;
     const full = { id, status: "open" as const, lead_id: null, escalated_at: null, turns: 0, busy_until: null as string | null, last_message_at: new Date(clock.now).toISOString(), ...row };
-    this.conversations.set(id, full);
+    this.conversations.set(full.id, full);
     return { ...full };
   }
   async getConversation(id: string) {
@@ -771,6 +774,69 @@ describe("HTTP", () => {
     const { chat } = setup();
     const res = await chat(new Request("https://edge.test/functions/v1/chat", { method: "POST", body: "not json" }));
     expect([res.status, ((await res.json()) as Record<string, unknown>).code]).toEqual([400, "unknown_agent"]);
+  });
+});
+
+/**
+ * The page makes the conversation's id and token (review 2026-10-15, item 12),
+ * so a first message whose answer was lost can be asked about, and a resend
+ * reaches the same row instead of opening a second — one lead, one hand-off.
+ */
+describe("a conversation the page names", () => {
+  const PAGE_ID = "3f2a6c1e-8b4d-4e7a-9c0f-1a2b3c4d5e6f";
+  const PAGE_TOKEN = "c".repeat(64);
+  const opening = (message = "שלום") => ({ ...first(message), conversationId: PAGE_ID, token: PAGE_TOKEN });
+  const hash = (t: string) => createHash("sha256").update(t).digest("hex");
+
+  it("opens under the page's own id and token, and hands back no token of its own", async () => {
+    const { chat, store } = setup();
+    const res = await json(await chat(post(opening())));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, conversationId: PAGE_ID, turn: 1 });
+    expect(res.body).not.toHaveProperty("token");
+    expect(store.conversations.get(PAGE_ID)).toMatchObject({ token_hash: hash(PAGE_TOKEN), turns: 1 });
+  });
+
+  it("continues the same row when the first message is sent again, and counts no second opening", async () => {
+    const allow = vi.fn(async () => true);
+    const { chat, store } = setup({ allow }, [text("שלום"), text("שוב שלום")]);
+    await chat(post(opening()));
+    const again = await json(await chat(post(opening())));
+    expect(again.status).toBe(200);
+    expect(again.body).toMatchObject({ conversationId: PAGE_ID, turn: 2 });
+    expect(store.conversations.size).toBe(1);
+    expect(allow.mock.calls.filter(([, key]) => key === "chat-new")).toHaveLength(1);
+  });
+
+  it("answers busy when the same first message arrives twice at once, opening one row", async () => {
+    const { chat, store } = setup();
+    await chat(post(opening()));
+    // The second request read before the first one's row existed.
+    vi.spyOn(store, "getConversation").mockResolvedValueOnce(null);
+    const res = await json(await chat(post(opening())));
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ ok: false, code: "busy" });
+    expect(store.conversations.size).toBe(1);
+  });
+
+  it("refuses the id with another token, and an id it never saw without the consent, as gone", async () => {
+    const { chat, store, model } = setup();
+    await chat(post(opening()));
+    const calls = model.calls.length;
+    const wrong = await json(await chat(post({ ...opening(), token: "d".repeat(64) })));
+    expect(wrong).toMatchObject({ status: 403, body: { code: "gone" } });
+    const unknown = await json(await chat(post(next("9e8d7c6b-5a49-4382-b716-0f1e2d3c4b5a"))));
+    expect(unknown).toMatchObject({ status: 403, body: { code: "gone" } });
+    expect(store.conversations.size).toBe(1);
+    expect(model.calls.length).toBe(calls);
+  });
+
+  it("refuses an id or token that is not the expected shape, opening nothing", async () => {
+    const { chat, store } = setup();
+    for (const body of [{ ...opening(), conversationId: "not-a-uuid" }, { ...opening(), token: "short" }]) {
+      expect((await json(await chat(post(body)))).status).toBe(403);
+    }
+    expect(store.conversations.size).toBe(0);
   });
 });
 
