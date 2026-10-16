@@ -26,7 +26,7 @@ describe("the interview's conversation reference", () => {
   });
 
   it("is taken from the body only when well-formed, and stored on a new interview lead", () => {
-    expect(handler).toMatch(/const conversationRef = typeof rawRef === 'string' && CONVERSATION_REF\.test\(rawRef\) \? rawRef : '';/);
-    expect(handler).toMatch(/source === 'interview' && conversationRef \? \{ conversation_ref: conversationRef \}/);
+    expect(handler).toMatch(/const safeRef = typeof conversationRef === 'string' && CONVERSATION_REF\.test\(conversationRef\) \? conversationRef : '';/);
+    expect(handler).toMatch(/source === 'interview' && safeRef \? \{ conversation_ref: safeRef \}/);
   });
 });

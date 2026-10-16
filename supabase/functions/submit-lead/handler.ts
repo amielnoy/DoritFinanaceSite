@@ -209,9 +209,9 @@ export async function handler(req: Request): Promise<Response> {
     // A body that is not JSON is answered as what it amounts to — no name and
     // no phone — rather than as a server fault.
     const body = await req.json().catch(() => null);
-    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at, channel, campaign, landingPath, conversationRef: rawRef } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at, channel, campaign, landingPath, conversationRef } = body || {};
     // Only a well-formed reference ties saves together; anything else is none.
-    const conversationRef = typeof rawRef === 'string' && CONVERSATION_REF.test(rawRef) ? rawRef : '';
+    const safeRef = typeof conversationRef === 'string' && CONVERSATION_REF.test(conversationRef) ? conversationRef : '';
     const safeChannel = validChannel(channel) || 'unknown';
     const safeCampaign = validCampaign(campaign);
     const safeLandingPath = validLandingPath(landingPath);
@@ -317,8 +317,8 @@ export async function handler(req: Request): Promise<Response> {
     const openInterview = source !== 'interview'
       ? null
       : details
-        ? await findOpenInterview(rid, conversationRef, { status: 'new', windowMs: DETAILS_WINDOW_MS })
-        : await findOpenInterview(rid, conversationRef);
+        ? await findOpenInterview(rid, safeRef, { status: 'new', windowMs: DETAILS_WINDOW_MS })
+        : await findOpenInterview(rid, safeRef);
     // Only a details save that found its lead is "further details"; one that did
     // not is the visitor's lead, and is announced as one.
     const subject: string = details && openInterview ? `פרטים נוספים — ${baseSubject}` : baseSubject;
@@ -384,7 +384,7 @@ export async function handler(req: Request): Promise<Response> {
         consent_at: consent_at || null,
         ...meetingFields,
         // Which conversation it came from, so its later saves find it.
-        ...(source === 'interview' && conversationRef ? { conversation_ref: conversationRef } : {}),
+        ...(source === 'interview' && safeRef ? { conversation_ref: safeRef } : {}),
         channel: safeChannel,
         campaign: safeCampaign,
       });
