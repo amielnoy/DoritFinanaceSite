@@ -1691,3 +1691,14 @@ Review 2026-10-15, item 13. `AgentPort.send` takes an optional `signal`. When th
 |---|---|---|
 | UNIT-CHADAPTER-026 | "aborts the request in flight and asks nothing after it" (a send the page abandons) | The request's signal is aborted; `SendAbandoned`; one request in all, through the whole recovery window |
 | UNIT-CHADAPTER-027 | "stops polling the status when abandoned during recovery" (a send the page abandons) | No status request after the abort; `SendAbandoned` |
+
+### 4.72 GA4 off on the admin area — `tests/unit/analytics-admin-optout.dom.test.ts`
+
+Review 2026-10-15, item 21. GA4 sends history page views by itself, and those ignore `send_page_view: false` and any `page_location` override. So on `/admin`, where URLs carry searches (an email typed into the users screen) and record ids, the tag is switched off whole with Google's opt-out flag, `window['ga-disable-<id>']`. `measureRoute` sets the flag for every route (`AnalyticsRouteGuard` in `App.jsx`, before the screen renders). The inline snippet in `index.html` sets it for a page that loads on `/admin`, and its CSP hash in `vercel.json` is updated to match. What is left: the navigation that arrives at /admin from a public page may still be counted as a page view of its path. Menu links into /admin carry no query string.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-GAADMIN-001..004 | "does not measure %s" | `/admin`, `/admin/leads`, `/admin/users`, `/admin/masleka/analysis/abc` |
+| UNIT-GAADMIN-005..009 | "measures %s" | `/`, `/administration`, `/blog/admin`, `/en/claims`, `/account` |
+| UNIT-GAADMIN-010 | "switches the tag off on entering /admin and on again on leaving it" | The flag `true` on `/admin/users`, `false` on `/claims` |
+| UNIT-GAADMIN-011 | "is switched off by index.html, before the tag is configured, for a page that loads on /admin" | The inline script sets the flag before `gtag('config')`; its path rule agrees with `isUnmeasuredPath` on five paths |
