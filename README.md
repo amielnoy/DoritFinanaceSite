@@ -1720,28 +1720,29 @@ licensed agent carries a mandatory גילוי נאות block, and a disclosure t
 exists only as a database row is one nobody reviews.
 
 ```bash
-npm run seed:blog                                         # dry run — lists what would be written
-node --env-file=.env.local scripts/seed-blog.mjs --apply  # writes both stores
+node --env-file=.env.local scripts/seed-blog.mjs                          # dry run — create or update, per article
+node --env-file=.env.local scripts/seed-blog.mjs --apply --only <file>.md # writes that article
 ```
 
-`--apply` writes each post to **Base44 first** — the site and the blog
-recommender still read it — through `base44 exec --privileged --data-env prod`,
-as whoever the CLI is signed in as (`base44 login` once, as the app owner; no
-admin password is kept anywhere). It then mirrors the post into Supabase's
-`blog_posts`, keyed on `base44_id`, the same contract `contentAdmin` keeps for
-edits from `/admin/blog`. It refuses to start without `SUPABASE_URL` and
-`SUPABASE_SERVICE_ROLE_KEY`, which live in `.env.local` (no `VITE_` prefix, so
-neither reaches the bundle).
+The seed writes Supabase's `blog_posts` only — the one store the site,
+`/admin/blog` and the blog recommender use since `VITE_CONTENT_WRITES=supabase`
+(2026-10-16). Base44's `BlogPost` is no longer written. It needs
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which live in `.env.local` (no
+`VITE_` prefix, so neither reaches the bundle). With them, the dry run reads the
+table and says which articles would be created and which updated.
 
-Posts are matched by title (update if present, create if not). New posts are
-**drafts** — publishing stays a decision made from `/admin/blog` — and a re-run
-never touches `published` on a post that exists, so correcting an article cannot
-take down one that is live.
+Use `--only`: without it every article is re-written from its file, over any
+edit made to it in `/admin/blog`.
 
-Each post's address, `/blog/<slug>`, is its **file name**, so a file must be
+Posts are matched by slug — the file name — and then by title, so a post whose
+title or slug was edited in `/admin/blog` is updated rather than copied. New
+posts are **drafts** — publishing stays a decision made from `/admin/blog` — and
+a re-run never touches `published` or the slug of a post that exists, so
+correcting an article cannot take down one that is live or move its address.
+
+Each new post's address, `/blog/<slug>`, is its **file name**, so a file must be
 named in Latin kebab-case (`horadat-dmei-nihul.md`); the script refuses any
-other. The slug goes to Supabase only — Base44's `BlogPost` has no such field —
-and a re-seed writes the file name back over a slug changed in `/admin/blog`.
+other.
 
 ### Contact boxes inside an article
 
