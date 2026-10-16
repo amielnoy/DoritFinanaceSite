@@ -8,6 +8,7 @@ import { CLEARINGHOUSE_ADVISOR_URL } from "@/config/masleka";
 import {
   BOARD_KEY,
   BOARD_VIEWS,
+  actionFor,
   STAGE_LABEL,
   boardTime,
   copyOrFallback,
@@ -50,7 +51,6 @@ export interface MaslekaBoardProps {
   service?: MaslekaPort;
   now?: () => Date;
   clipboard?: ClipboardLike | null;
-  confirm?: (message: string) => boolean;
 }
 
 export { BOARD_KEY };
@@ -303,6 +303,143 @@ function BoardRow({
   );
 }
 
+/** One numbered step of the guided submit: done (✓), the current one (outlined), or still ahead. */
+function GuideStep({
+  n,
+  title,
+  state,
+  children,
+}: {
+  n: number;
+  title: string;
+  state: "done" | "current" | "ahead";
+  children: React.ReactNode;
+}) {
+  return (
+    <li
+      aria-current={state === "current" ? "step" : undefined}
+      className={`border p-4 ${state === "current" ? "border-highlight bg-card" : "border-border/60"}`}
+    >
+      <p className="flex items-center gap-3 font-medium">
+        <span
+          aria-hidden="true"
+          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-heading text-sm ${
+            state === "done" ? "border-accent bg-accent text-primary-foreground" : "border-highlight text-accent"
+          }`}
+        >
+          {state === "done" ? "✓" : n}
+        </span>
+        {title}
+        {state === "done" ? <span className="sr-only">(בוצע)</span> : null}
+      </p>
+      <div className="mt-3 ps-10">{children}</div>
+    </li>
+  );
+}
+
+/**
+ * The guided submit, in the drawer: open the portal, copy the ID, copy the
+ * code, mark it submitted — each step ticked as it is done. The values come
+ * through the board's one reveal (`copy`), so every secrecy rule of the board
+ * holds here: closing the drawer hides them. "סימון כהוגש" asks inline before
+ * the wipe; the board keeps the one-call guard.
+ */
+function SubmitGuide({
+  request,
+  copyButton,
+  copiedField,
+  manual,
+  onConfirm,
+  pending,
+  succeeded,
+  onBack,
+}: {
+  request: MaslekaRequest;
+  copyButton: (field: MaslekaField) => React.ReactNode;
+  /** The field this request has on show now (copied or for copying by hand), if any. */
+  copiedField: MaslekaField | null;
+  manual: React.ReactNode;
+  onConfirm: () => void;
+  pending: boolean;
+  succeeded: boolean;
+  onBack: () => void;
+}) {
+  const [portalOpened, setPortalOpened] = useState(false);
+  const [copied, setCopied] = useState<{ id: boolean; code: boolean }>({ id: false, code: false });
+  const [confirming, setConfirming] = useState(false);
+  // A step stays ticked after its value has left the screen.
+  useEffect(() => {
+    if (copiedField) setCopied((c) => (c[copiedField] ? c : { ...c, [copiedField]: true }));
+  }, [copiedField]);
+  // A הגשתי that settled without going through (a failure, "already submitted"): the question closes, the notice says why.
+  const wasPending = useRef(false);
+  useEffect(() => {
+    if (wasPending.current && !pending && !succeeded) setConfirming(false);
+    wasPending.current = pending;
+  }, [pending, succeeded]);
+
+  if (succeeded) {
+    return (
+      <div role="status" className="space-y-3">
+        <p className="font-medium">הוגש. מספר הזהות וקוד האימות נמחקו.</p>
+        <p className="text-sm text-muted-foreground">הקבצים יהיו מוכנים להורדה בעוד כ־3–4 שעות. נזכיר לך במייל.</p>
+        <button type="button" onClick={onBack} className={primaryClass}>
+          חזרה ללוח
+        </button>
+      </div>
+    );
+  }
+
+  const done = [portalOpened, copied.id, copied.code];
+  const current = done.indexOf(false) === -1 ? 3 : done.indexOf(false);
+  const stateOf = (i: number): "done" | "current" | "ahead" => (i < 3 && done[i] ? "done" : i === current ? "current" : "ahead");
+  return (
+    <ol className="space-y-3">
+      <GuideStep n={1} title="פותחים את פורטל המסלקה" state={stateOf(0)}>
+        {/* A new tab and no referrer: the board's address stays out of the portal's requests. */}
+        <a
+          href={CLEARINGHOUSE_ADVISOR_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => setPortalOpened(true)}
+          className={buttonClass}
+        >
+          פתיחת פורטל המסלקה ↗
+        </a>
+      </GuideStep>
+      <GuideStep n={2} title="מעתיקים את מספר הזהות" state={stateOf(1)}>
+        {copyButton("id")}
+        {copiedField === "id" ? manual : null}
+      </GuideStep>
+      <GuideStep n={3} title="מעתיקים את קוד האימות" state={stateOf(2)}>
+        {copyButton("code")}
+        {copiedField === "code" ? manual : null}
+      </GuideStep>
+      <GuideStep n={4} title="סיימתם להגיש?" state={stateOf(3)}>
+        {confirming ? (
+          <div role="alert" className="space-y-2 border border-destructive/40 bg-destructive/5 p-3">
+            <p className="font-medium">לסמן את הבקשה של {request.clientName} כהוגשה?</p>
+            <p className="text-sm">לא תוכלו להעתיק שוב את מספר הזהות או את קוד האימות.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={onConfirm} disabled={pending} className={primaryClass}>
+                {pending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
+                כן, הגשתי
+              </button>
+              <button type="button" onClick={() => setConfirming(false)} disabled={pending} className={buttonClass}>
+                עוד לא
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirming(true)} className={buttonClass}>
+            סימון כהוגש
+          </button>
+        )}
+      </GuideStep>
+    </ol>
+  );
+}
+
 /**
  * The one revealed value on the board, if any: at most one at a time, and
  * only the answer to the latest ask is ever used — a slower answer to an
@@ -389,7 +526,6 @@ export default function MaslekaBoard({
   service = services.masleka,
   now = () => new Date(),
   clipboard = defaultClipboard(),
-  confirm = (message) => window.confirm(message),
 }: MaslekaBoardProps) {
   const client = useQueryClient();
   const requests = useQuery({ queryKey: BOARD_KEY, queryFn: () => service.list(), refetchInterval: 60_000 });
@@ -456,14 +592,21 @@ export default function MaslekaBoard({
   ) : null;
   const [newOpen, setNewOpen] = useState(false);
 
-  // The rows whose copy controls are open ("להגשה").
-  const [openSubmit, setOpenSubmit] = useState<ReadonlySet<string>>(new Set());
-  const toggleSubmit = (id: string) =>
-    setOpenSubmit((open) => {
-      const next = new Set(open);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+  // The guided submit's drawer: the request it is for, and whether its הגשתי went through.
+  const [submitFor, setSubmitFor] = useState<MaslekaRequest | null>(null);
+  const [submitSucceeded, setSubmitSucceeded] = useState(false);
+  const closeSubmit = useCallback(() => {
+    // Closing the drawer takes any revealed value with it.
+    hide();
+    setSubmitFor(null);
+    setSubmitSucceeded(false);
+  }, [hide]);
+  // A request that left "מוכן להגשה" while its drawer was open (submitted elsewhere, expired): the drawer goes too.
+  const submitStillWaiting =
+    submitFor === null || submitSucceeded || (requests.data ?? []).some((r) => r.id === submitFor.id && r.status === "code_received");
+  useEffect(() => {
+    if (!submitStillWaiting) closeSubmit();
+  }, [submitStillWaiting, closeSubmit]);
   // A fresh link per invited row, shown once under it.
   const [links, setLinks] = useState<Record<string, MaslekaLink>>({});
   const [relinking, setRelinking] = useState<string | null>(null);
@@ -492,10 +635,10 @@ export default function MaslekaBoard({
   const onSubmitted = (request: MaslekaRequest) => {
     // One call per הגשתי: a double click lands before the button is disabled.
     if (submitting.current) return;
-    if (!confirm(`להגיש עבור ${request.clientName}? הקוד ומספר הזהות יימחקו מהמערכת.`)) return;
     submitting.current = true;
     clearNotice();
     submitted.mutate(request.id, {
+      onSuccess: () => setSubmitSucceeded(true),
       onSettled: () => {
         submitting.current = false;
       },
@@ -508,7 +651,7 @@ export default function MaslekaBoard({
     return (
       <button type="button" onClick={() => void reveal(request, field)} disabled={isBusy} className={buttonClass}>
         {isBusy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : null}
-        {isCopied ? "הועתק ✓" : field === "id" ? "העתק ת״ז" : "העתק קוד"}
+        {isCopied ? "הועתק ✓ — הדביקו במסלקה" : field === "id" ? "העתק ת״ז" : "העתק קוד"}
       </button>
     );
   };
@@ -538,7 +681,7 @@ export default function MaslekaBoard({
       </header>
 
       <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {newOpen ? null : noticeView}
+        {newOpen || submitFor ? null : noticeView}
 
 
         {requests.isError ? (
@@ -599,8 +742,12 @@ export default function MaslekaBoard({
                 a.kind === "submit" ? (
                   <button
                     type="button"
-                    aria-expanded={openSubmit.has(r.id)}
-                    onClick={() => toggleSubmit(r.id)}
+                    aria-haspopup="dialog"
+                    onClick={() => {
+                      clearNotice();
+                      setSubmitSucceeded(false);
+                      setSubmitFor(r);
+                    }}
                     className={primaryClass}
                   >
                     {a.label}
@@ -623,26 +770,6 @@ export default function MaslekaBoard({
                 );
               return (
                 <BoardRow key={r.id} row={row} action={action}>
-                  {a.kind === "submit" && openSubmit.has(r.id) ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {revealButton(r, "id")}
-                      {revealButton(r, "code")}
-                      <a href={CLEARINGHOUSE_ADVISOR_URL} target="_blank" rel="noopener noreferrer" className={buttonClass}>
-                        פתח את המסלקה
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => onSubmitted(r)}
-                        disabled={submitted.isPending}
-                        className={`${buttonClass} border-primary`}
-                      >
-                        הגשתי
-                      </button>
-                    </div>
-                  ) : null}
-                  {a.kind === "submit" && shown?.kind === "manual" && shown.requestId === r.id ? (
-                    <ManualCopy value={shown.value} label={fieldLabel(shown.field, r.clientName)} inputRef={fieldRef} onClose={hide} />
-                  ) : null}
                   {a.kind === "relink" && links[r.id] ? <LinkPanel link={links[r.id]} clipboard={clipboard} /> : null}
                 </BoardRow>
               );
@@ -671,6 +798,32 @@ export default function MaslekaBoard({
           </section>
         ) : null}
       </main>
+
+      <SideDrawer
+        open={submitFor !== null}
+        onClose={closeSubmit}
+        title={submitFor?.clientName ?? ""}
+        subtitle={submitFor ? actionFor(submitFor, at, analysisOf).reason : undefined}
+      >
+        {noticeView ? <div className="mb-4">{noticeView}</div> : null}
+        {submitFor ? (
+          <SubmitGuide
+            key={submitFor.id}
+            request={submitFor}
+            copyButton={(field) => revealButton(submitFor, field)}
+            copiedField={shown?.requestId === submitFor.id ? shown.field : null}
+            manual={
+              shown?.kind === "manual" && shown.requestId === submitFor.id ? (
+                <ManualCopy value={shown.value} label={fieldLabel(shown.field, submitFor.clientName)} inputRef={fieldRef} onClose={hide} />
+              ) : null
+            }
+            onConfirm={() => onSubmitted(submitFor)}
+            pending={submitted.isPending}
+            succeeded={submitSucceeded}
+            onBack={closeSubmit}
+          />
+        ) : null}
+      </SideDrawer>
 
       <SideDrawer open={newOpen} onClose={() => setNewOpen(false)} title="בקשה חדשה">
         {/* Behind an open drawer the page is hidden from assistive technology: its notice shows here. */}

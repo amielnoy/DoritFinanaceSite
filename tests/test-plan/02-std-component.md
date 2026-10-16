@@ -393,23 +393,23 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-006 | "falls back when the browser refuses the clipboard" | Read-only field with the value |
 | CMP-MSKB-007 | "hides a manually-copied value when asked" | Value gone after "הסתר" |
 | CMP-MSKB-008 | "clears a manually-copied value after a minute" | `REVEAL_MS` is 60 000; value still shown at 59 s, gone at 60 s |
-| CMP-MSKB-009 | "clears a manually-copied value on the next click elsewhere, but not on a click in its field" | A click in the field keeps it; a click on the heading clears it |
-| CMP-MSKB-010 | "shows one value at a time: revealing another client's clears the first" | The second client's field shown; the first client's gone |
+| CMP-MSKB-009 | "clears a manually-copied value on the next click elsewhere, but not on a click in its field" | A click in the field keeps it; a click on the drawer's heading clears it |
+| CMP-MSKB-010 | "shows one value at a time: revealing another client's clears the first" | Opening the second client's drawer closes the first's; its value is gone when the first is opened again |
 | CMP-MSKB-011 | "drops a value that arrives after a newer reveal was asked for" | A slower answer for the first click never reaches the screen |
 | CMP-MSKB-012 | "copies nothing when a value arrives after the board is gone" | Unmounted before the answer: `writeText` never called |
 | CMP-MSKB-013 | "forgets a shown value once its row leaves the stage, so it never comes back with the row" | The row moves to submitted (no `להגשה`) and back: the value is gone |
 | CMP-MSKB-014 | "keeps the revealed value out of the query cache, storage, the console and the address" | Not in any query or mutation state, any storage write, any console call, `location.href` |
-| CMP-MSKB-015 | "wipes on הגשתי only after asking first" | Declined confirm → nothing; accepted → `markSubmitted('r2')` and a refetch |
-| CMP-MSKB-016 | "shows a second הגשתי as already submitted, not as an error, and refreshes the row" | `already_submitted` → `role="status"` "כבר סומן כהוגש", no alert; refetch (Ruling 18) |
+| CMP-MSKB-015 | "asks inline before the wipe: 'עוד לא' sends nothing, 'כן, הגשתי' wipes and says what happens next" | `role="alert"` question with the name and the warning; עוד לא → nothing; כן, הגשתי → `markSubmitted('r2')`, "הוגש. מספר הזהות וקוד האימות נמחקו." and the 3–4 hours line; חזרה ללוח closes |
+| CMP-MSKB-016 | "shows a second הגשתי as already submitted, not as an error, and refreshes the row" | `already_submitted` → status "כבר סומן כהוגש" in the drawer; the question closes, no alert; list refetched |
 | CMP-MSKB-017 | "tells a staff member whose access was removed" | Alert "ההרשאה שלך הוסרה" (`staffMessage`) |
 | CMP-MSKB-018 | "words a failed list or a refused request in the staff vocabulary" | A forbidden list and an `invalid_email` create both say `staffMessage`'s text |
-| CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | `_blank`, `noopener noreferrer` |
+| CMP-MSKB-019 | "links to the clearinghouse portal in a new tab without a referrer" | The drawer's step 1 link: `_blank`, `noopener noreferrer` |
 | CMP-MSKB-020 | "creates a hand-made request and shows its link to copy" | `create` body; link shown; "נשלח במייל"; "פתיחת הקישור" opens it in a new tab, `noopener noreferrer` |
 | CMP-MSKB-021 | "issues a fresh link for an invited client" | `relink('r1')`; new link shown, and "פתיחת הקישור" points at it |
 | CMP-MSKB-022 | "drops a value still on its way when its row leaves the column" | The row leaves the stage before the answer: never copied, never shown |
-| CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks in one tick → one `markSubmitted`, one refetch |
+| CMP-MSKB-023 | "makes one הגשתי call for a double click that lands before the button is disabled" | Two clicks on "כן, הגשתי" in one act → one `markSubmitted` |
 | CMP-MSKB-024 | "clears an old failure when the next action starts" | A failed reveal's alert is gone once the next reveal succeeds |
-| CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | "הועתק ✓" gone right after `markSubmitted('r2')`, with the refetch rejecting |
+| CMP-MSKB-025 | "takes a row's copied mark off at once when its הגשתי succeeds, even if the refetch fails" | The success view with no copied mark; the row, still listed after the failed refetch, opens clean |
 | CMP-MSKB-026 | "links a completed request to its analysis, and lists every stored report" | The row's `לניתוח` → `/admin/masleka/analysis/s7`; the reports list names the lead-less one |
 | CMP-MSKB-027 | "keeps the board working when the reports cannot be read" | A quiet "לא הצלחנו לטעון את הניתוחים."; the columns still work; no alert |
 | CMP-MSKB-029 | "says a blank name is not valid, and sends nothing" | Whitespace-only name → alert "השם אינו תקין" (`staffMessage`); no `create` |
@@ -418,11 +418,17 @@ Since the redesign (2026-10-16) the board is one list of rows, each with one act
 | CMP-MSKB-032 | "opens on 'לטיפול עכשיו': what needs action, urgent first, with each stage's count and hint" (the stage bar) | `aria-pressed` on now; counts 2 / 1 / 1 / 2 / 0 and the hints; rows דן (urgent) then רונית; יעל and אורי absent |
 | CMP-MSKB-033 | "shows one stage when chosen, and keeps it in ?stage= so a refresh opens on it" (the stage bar) | `?stage=submitted` after the click; a fresh render at that address opens on it; back to now drops the parameter |
 | CMP-MSKB-034 | "opens on 'now' for a stage it does not know" (the stage bar) | `?stage=everything` → now |
-| CMP-MSKB-035 | "hides a revealed value when another stage is chosen, even one the row is on" (the stage bar) | A clipboard copy's mark survives an outside click and goes on the stage change (fails without the hide) |
+| CMP-MSKB-035 | "hides a revealed value when the stage changes under an open drawer (the browser's back and forward)" (the stage bar) | A clipboard copy's mark survives a click in the drawer and goes when `?stage=` changes |
 | CMP-MSKB-036 | "names the board, says how many requests wait today, and links to how it works" (the header) | h1 מסלקה, eyebrow טיפול שוטף; "2 בקשות מחכות לך היום. שאר הבקשות מתקדמות לבד."; "איך זה עובד?" → `#masleka-how` |
 | CMP-MSKB-037 | "words the count for none and for one" (the header) | `waitingLine` 0 / 1 / 7 |
 | CMP-MSKB-038 | "keeps the new-request form off the page until '+ בקשה חדשה' opens its drawer" (the header) | No `שם הלקוח` on the page; present in the dialog |
 | CMP-MSKB-039 | "is a modal dialog that the X and Esc close, giving the focus back to the button" (the header) | `aria-modal="true"`, focus inside; the X (`סגירה`) and Esc close it; focus back on "בקשה חדשה" |
+| CMP-MSKB-040 | "opens from the row, named for the client, with when the code came and the ID's last digits" (the guided submit) | Dialog named רונית מזרחי, `aria-modal`, described by the code-received line; four steps |
+| CMP-MSKB-041 | "walks the four steps: the current one marked, each ticked as it is done" (the guided submit) | `aria-current="step"` moves 1 → 2 → 3 → 4 as the portal is opened and the ID and code copied; "הועתק ✓ — הדביקו במסלקה"; a step stays ticked after its value goes |
+| CMP-MSKB-042 | "hides a revealed value when the drawer closes, and opened again it starts clean" (the guided submit) | A clipboard copy's mark is gone on reopening; step 1 current again (fails without `hide()` on close) |
+| CMP-MSKB-043 | "hides a value copied by hand when the drawer closes" (the guided submit) | The manual field is gone |
+| CMP-MSKB-044 | "drops a value still on its way when the drawer closes: never copied, never shown" (the guided submit) | The answer lands after סגירה: no clipboard write, no mark (fails without `hide()` on close) |
+| CMP-MSKB-045 | "keeps the inline question to the drawer: no browser confirm" (the guided submit) | `window.confirm` never called |
 
 ### 4.20 `<FloatingHeader />` — the admin menu with the clearinghouse switched on — `tests/component/floating-header-masleka.test.tsx`
 
