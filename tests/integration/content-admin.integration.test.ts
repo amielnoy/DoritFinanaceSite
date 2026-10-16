@@ -46,6 +46,57 @@ describe("contentAdmin — the harness reaches it", () => {
   });
 });
 
+/**
+ * Who may write (agency roles): the platform operator, or an Admin or Owner of
+ * agency 1 — whose content this is — as the screens offer the controls
+ * (blog.publish, blog.delete, testimonials.write: "admin"). Dorit is the
+ * agency's Owner and not the operator; before this, her publish toggle was
+ * refused on every click.
+ */
+describe("contentAdmin — who may write", () => {
+  const asMember = (agencyRole: string | null) => [
+    { match: "/auth/v1/user", status: 200, json: { id: "member-1" } },
+    { match: "/rest/v1/profiles", status: 200, json: [{ role: "user" }] },
+    { match: "/rest/v1/rpc/staff_role", status: 200, json: agencyRole },
+    slugFree,
+    rowFound,
+  ];
+  const publish = { op: "updateArticle", id: "post-1", draft: { published: true } };
+  const mirrored = (r: { callsTo: (u: string) => { method: string }[] }) =>
+    r.callsTo("/rest/v1/blog_posts?base44_id=eq.").some((c) => c.method === "PATCH");
+
+  it.each(["owner", "admin"])("lets an agency %s who is not the operator publish an article", async (agencyRole) => {
+    const r = await invokeFunction("contentAdmin", publish, { env, headers, routes: asMember(agencyRole) });
+    expect(r.status).toBe(200);
+    expect(mirrored(r)).toBe(true);
+    const ask = r.callsTo("/rest/v1/rpc/staff_role")[0] as { body: unknown };
+    expect(ask.body).toEqual({ p_user_id: "member-1", p_agency_id: "00000000-0000-0000-0000-000000000001" });
+  });
+
+  it.each([["user"], [null]])("refuses an agency %s (or no membership) with 403, and writes nothing", async (agencyRole) => {
+    const r = await invokeFunction("contentAdmin", publish, { env, headers, routes: asMember(agencyRole) });
+    expect(r.status).toBe(403);
+    expect(r.json).toMatchObject({ error: "הפעולה מותרת למנהלים בלבד.", rid: expect.any(String) });
+    expect(mirrored(r)).toBe(false);
+  });
+
+  it("answers 500 — not 'not an admin' — when the agency role cannot be read, and writes nothing", async () => {
+    const r = await invokeFunction("contentAdmin", publish, {
+      env,
+      headers,
+      routes: [...asMember("owner").slice(0, 2), { match: "/rest/v1/rpc/staff_role", status: 500, text: "down" }, slugFree, rowFound],
+    });
+    expect(r.status).toBe(500);
+    expect(mirrored(r)).toBe(false);
+  });
+
+  it("lets the operator through without asking the agency role", async () => {
+    const r = await invokeFunction("contentAdmin", publish, { env, headers, routes: asAdminWithBlog });
+    expect(r.status).toBe(200);
+    expect(r.callsTo("/rest/v1/rpc/staff_role")).toHaveLength(0);
+  });
+});
+
 describe("contentAdmin — the Supabase mirror", () => {
   it("answers 200 with the Base44 id, and stamps that id into Supabase", async () => {
     const r = await invokeFunction("contentAdmin", ops[0][1], { env, headers, routes: asAdminWithBlog });

@@ -31,9 +31,13 @@ const newRequestId = () => crypto.randomUUID().slice(0, 8);
  * לפני כל פעולה ולא רק לפני חלקן.
  *
  * האסימון מגיע בכותרת משלו ולא ב-Authorization, ש-Base44 כבר קורא לעצמו.
- * האימות נעשה מול Supabase — חתימה מזויפת נדחית שם, לא כאן — ואז התפקיד נקרא
- * מטבלת `profiles`, שהיא הסמכות היחידה על מי מנהל.
+ * האימות נעשה מול Supabase — חתימה מזויפת נדחית שם, לא כאן — ואז ההרשאה נקראת:
+ * מפעיל הפלטפורמה (`profiles.role = 'admin'`), או מנהל/ת או בעלים של סוכנות 1
+ * (`staff_role`), כמו שהמסכים מציגים את הפעולות.
  */
+/** The site's articles and testimonials are agency 1's (content-admin writes them there). */
+const CONTENT_AGENCY = '00000000-0000-0000-0000-000000000001';
+
 async function requireAdmin(req, rid) {
   const url = (Deno.env.get('SUPABASE_URL') || '').trim();
   const key = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
@@ -70,12 +74,33 @@ async function requireAdmin(req, rid) {
   }
   const rows = await res.json();
   const role = rows?.[0]?.role ?? null;
-  if (role !== 'admin') {
+  if (role === 'admin') {
+    log('info', 'auth.ok', { rid, userId: user.id, as: 'operator' });
+    return { ok: true, userId: user.id };
+  }
+
+  // The agency's own Admins and Owners write its articles and testimonials too
+  // (agency roles, 2026-10-15): the screens offer them these controls
+  // (src/config/permissions.ts — blog.publish, blog.delete, testimonials.write
+  // are "admin"), so this gate must agree, or an Owner who is not the platform
+  // operator — Dorit — sees a publish toggle that every click is refused by.
+  // `staff_role` reads the membership of an active agency; service role only.
+  const member = await fetch(`${url}/rest/v1/rpc/staff_role`, {
+    method: 'POST',
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_user_id: user.id, p_agency_id: CONTENT_AGENCY }),
+  });
+  if (!member.ok) {
+    log('error', 'auth.agency_role_read_failed', { rid, status: member.status });
+    return { ok: false, status: 500, error: 'לא הצלחנו לאמת את ההרשאה.' };
+  }
+  const agencyRole = await member.json().catch(() => null);
+  if (agencyRole !== 'owner' && agencyRole !== 'admin') {
     log('warn', 'auth.not_admin', { rid, userId: user.id });
     return { ok: false, status: 403, error: 'הפעולה מותרת למנהלים בלבד.' };
   }
 
-  log('info', 'auth.ok', { rid, userId: user.id });
+  log('info', 'auth.ok', { rid, userId: user.id, as: agencyRole });
   return { ok: true, userId: user.id };
 }
 
