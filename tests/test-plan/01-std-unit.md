@@ -565,17 +565,26 @@ or a bracket in it would rewrite the filter.
 | UNIT-ART-007 | "never asks about %j" (6 keys) | `status: 404`; no call recorded |
 | UNIT-ART-008 | "fails, rather than answering 'not found', when the read fails" | `blog_posts read failed`; no `status` |
 
-### 4.25 Publishing by title — `tests/unit/publish-blog.test.ts` (`publishInSupabase`)
+### 4.25 Publishing by title — `tests/unit/publish-blog.test.ts`
 
-The Supabase half of a publish is a PATCH by `base44_id`: it changes
-`published` and nothing else, and a row that is not there is a failure rather
-than a row silently created.
+`scripts/publish-blog.mjs` reads and writes Supabase's `blog_posts` only. Each
+title resolves to one post, or is reported: not found, or shared by two posts.
+The write is a PATCH by id that changes `published` and nothing else, and a
+row that is not there is a failure rather than a row silently created.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-PUB-001 | "PATCHes the one row by base44_id" | `PATCH …?base44_id=eq.b44-7`, `{ published: true }`, `return=representation` |
-| UNIT-PUB-002 | "fails when no Supabase row has the id, rather than reporting it published" | Throws `no Supabase row` |
-| UNIT-PUB-003 | "fails on a refusal, naming the status" | Throws `401` |
+| UNIT-PUB-001 | "marks a draft found by title as ready to publish" (planPublish) | `found: true`, the id and slug, `alreadyPublished: false` |
+| UNIT-PUB-002 | "marks an already-published title as a no-op rather than re-writing it" (planPublish) | `alreadyPublished: true` |
+| UNIT-PUB-003 | "reports a title that matches no post, instead of throwing or silently skipping it" (planPublish) | `found: false` |
+| UNIT-PUB-004 | "refuses a title two posts share, naming both, rather than publishing either" (planPublish) | `found: false`, `ambiguous: [both slugs]` |
+| UNIT-PUB-005 | "resolves every title independently, in the order given" (planPublish) | Three outcomes, input order |
+| UNIT-PUB-006 | "reads every post, drafts included, with the service role" (listPosts) | `select=id,slug,title,published&limit=1000`; bearer = the key |
+| UNIT-PUB-007 | "fails on a refusal, naming the status" (listPosts) | Throws `401` |
+| UNIT-PUB-008 | "fails on an answer that is not a list" (listPosts) | Throws `not a list` |
+| UNIT-PUB-009 | "PATCHes the one row by id, touching only `published`" (publishInSupabase) | `PATCH …?id=eq.uuid-7`, `{ published: true }`, `return=representation` |
+| UNIT-PUB-010 | "fails when no row has the id, rather than reporting it published" (publishInSupabase) | Throws `no blog_posts row` |
+| UNIT-PUB-011 | "fails on a refusal, naming the status" (publishInSupabase) | Throws `401` |
 
 ### 4.26 The Base44 export backfill — `tests/unit/base44-repair-scripts.test.ts`
 
