@@ -154,10 +154,19 @@ export interface AgentConversation {
   id: string;
 }
 
+export interface AgentSendOptions {
+  signal?: AbortSignal;
+}
+
 /** Driving one of the on-site LLM agents. */
 export interface AgentPort {
   start(agentName: string, metadata?: Record<string, unknown>): Promise<AgentConversation>;
-  send(conversation: AgentConversation, text: string): Promise<void>;
+  /**
+   * `signal` abandons the send (the panel was reset or closed): the chat
+   * function's adapter stops its request and its status polling and publishes
+   * nothing more. Base44's adapter has nothing to stop and ignores it.
+   */
+  send(conversation: AgentConversation, text: string, options?: AgentSendOptions): Promise<void>;
   subscribe(conversationId: string, onMessages: (messages: AgentMessage[]) => void): () => void;
 }
 
@@ -292,7 +301,7 @@ export interface LeadAdminPort {
   transcript(leadId: string): Promise<TranscriptLine[]>;
   /** The ids of the leads that have a conversation behind them — the screen shows the tab for these and no others. */
   transcriptLeadIds(): Promise<string[]>;
-  /** How many leads are still `new` — the admin menu's counter. Ids only: no personal data leaves the table for it. */
+  /** How many leads need someone — `new` or `escalated` — the admin menu's counter. Ids only: no personal data leaves the table for it. */
   countNew(): Promise<number>;
 }
 

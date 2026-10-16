@@ -130,7 +130,7 @@ const auth: AuthPort = {
 
 const agents: AgentPort = {
   start: (agentName, metadata) => real().then((s) => s.agents.start(agentName, metadata)),
-  send: (conversation, text) => real().then((s) => s.agents.send(conversation, text)),
+  send: (conversation, text, options) => real().then((s) => s.agents.send(conversation, text, options)),
   subscribe: (conversationId, onMessages) => {
     let unsubscribe: (() => void) | null = null;
     let cancelled = false;

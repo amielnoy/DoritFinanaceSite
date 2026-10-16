@@ -177,6 +177,13 @@ one fewer person. One case pins the three copies byte-identical; another pins
 that each mailbox gets its own `try`, since one wrapped around the whole loop
 would let the first bounce swallow the rest.
 
+The **sheet cell rule** is duplicated the same way: `upsertContact`'s
+`appendEventRow` carries the line `_shared/sheets.ts`'s `sheetCell` returns, and
+one case pins both to the same text. Under `USER_ENTERED` a cell starting with
+`=`, `+`, `-`, `@`, a tab or a carriage return runs as a formula, so a visitor's
+name could fetch a URL or rewrite the sheet; the leading apostrophe stores it as
+text, as it already did for a phone's leading zero.
+
 A last block covers how the interview agent *ends*. A finished interview has to
 reach a person, and a bare `Lead.create` reaches nobody — it stores the summary
 and sends no mail, so it waits for whoever next opens the leads screen. The
@@ -722,8 +729,9 @@ Reads `supabase/migrations/20261024000000_clearinghouse_publish.sql`; the behavi
 | CTR-INV-004 | "mails through dorit-mailer, never Supabase Auth's invite" | No `/auth/v1/invite`; `sendMail` to the address |
 | CTR-INV-005 | "logs ids, never the invitee's address" | No `email` in any log call |
 | CTR-INV-006 | "resolves invitees from Auth through a service-role-only RPC" | `invitee_for` joins Auth to a profile by id, matches the current Auth address, uses an empty search path and revokes execution from public/anon/authenticated |
+| CTR-INV-007 | "never resolves an unconfirmed account, in the latest definition of each identity function" | The last migration to define `invitee_for` requires `u.email_confirmed_at is not null` (`20261031000000_invitee_confirmed.sql`: security definer, empty search path, revokes by name); the last `my_email` requires a confirmed address, and `my_enquiries` and `my_snapshot` go through it |
 
-`supabase/tests/invitee_identity_check.sql` verifies the resolver and execution grants in PostgreSQL with changed Auth addresses, stale profiles, a missing profile, empty inputs and anon/authenticated/service_role callers. Apply `20261027000000_invitee_identity.sql` before deploying the updated `invite-user` function; without it invitations fail closed.
+`supabase/tests/invitee_identity_check.sql` verifies the resolver and execution grants in PostgreSQL with changed Auth addresses, stale profiles, a missing profile, an unconfirmed account, empty inputs and anon/authenticated/service_role callers. An unconfirmed account is not resolved, so `invite-user` cannot make an account for the address either and answers its existing 409. Apply `20261027000000_invitee_identity.sql` before deploying the updated `invite-user` function; without it invitations fail closed.
 
 ### 4.19 Agency roles: Owner, Admin, User — `agency-roles-schema.contract.test.ts`
 
@@ -787,6 +795,33 @@ It also checks that a User cannot file a snapshot under another agency by naming
 | CTR-PERM-007 | "the agency profile is the Owner's" | `agency_profiles_update_owner` |
 | CTR-PERM-008 | "the membership history is Admin+" | `membership_events_read_admin` |
 | CTR-PERM-009..011 | `can`, `grantableRoles`, `canManage` | Ranks; no role → nothing; the operator everything but leaving an agency they are not in; nobody changes someone above what they may grant |
+
+### 4.21 An interview's conversation reference — `lead-conversation-ref.contract.test.ts`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-LCR-001 | "is a column with the reference's own shape, indexed where set" | `conversation_ref` CHECK `^[A-Za-z0-9:_-]{8,100}$`; a partial index |
+| CTR-LCR-002 | "is the only thing submit-lead finds an open interview by — never phone, name or address" | `findOpenInterview` filters `conversation_ref=eq.…` only; no reference, no match |
+| CTR-LCR-003 | "is taken from the body only when well-formed, and stored on a new interview lead" | The pattern check; `conversation_ref` on the insert |
+
+### 4.22 The claim document's object name — `claim-documents-object-name.contract.test.ts`
+
+`20261102000000_claim_documents_object_name.sql` limits uploads to the name the claim form makes: agency 1's folder, a random uuid, a safe file name. The bucket used to take any name from anyone. `supabase/tests/storage_check.sql` now uploads with real-shaped names and refuses five others. It failed under the old any-name rule.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-CDN-001 | "is limited by the policy to agency 1's folder, a random uuid and a safe file name" | The insert policy replaced, `bucket_id` and `name ~ …` |
+| CTR-CDN-002..005 | "accepts the name the form makes for %j" | `agencyObjectPath` for Hebrew, spaced, upper-case and one-letter names matches the policy's own pattern |
+| CTR-CDN-006..009 | "refuses %j" | A fixed name, another agency's folder, `..`, a bare name |
+
+### 4.23 The site's own icon — `favicon.contract.test.ts`
+
+Review 2026-10-15, item 23. `public/favicon.svg` is a monogram ד drawn as shapes on the primary colour (`#1c1a19`, from `--primary` in `src/index.css`), with a gold rule. It replaces Base44's logo in `index.html` and in `public/manifest.json`.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ICON-001 | "is /favicon.svg in the page and in the manifest, and Base44's logo is nowhere" | The `<link rel="icon">` and the manifest's one icon are `/favicon.svg`; no `base44.com/logo` |
+| CTR-ICON-002 | "is an SVG monogram ד on the site's primary colour" | A 32×32 SVG titled `ד — …`, its ground the `--primary` hex; no `<text>`, no external reference |
 
 ## 5. Runtime counterpart
 

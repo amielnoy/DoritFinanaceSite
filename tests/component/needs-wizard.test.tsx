@@ -216,6 +216,9 @@ describe("the three optional questions", () => {
     expect(submitInterview).toHaveBeenCalledTimes(2);
     const details = submitInterview.mock.calls[1][0];
     expect(details).toMatchObject({ stage: "details", name: "רונית אבני", email: "ronit@example.com", timing: "ערב", notes: "עדיף אחרי 19:00" });
+    // The details find their lead by this run's reference, which the contact step sent too (review 2026-10-15).
+    expect(details.conversationRef).toMatch(/^wizard:[0-9a-f-]{36}$/);
+    expect(details.conversationRef).toBe(submitInterview.mock.calls[0][0].conversationRef);
     expect(details.profile).toMatchObject({ goal: "הורדת עלויות", clearinghouse_report: "לא", clearinghouse: "מעוניין/ת", urgency: "דחוף — אשמח לשיחה השבוע" });
     expect(completedFollowup).toHaveBeenCalledWith(3);
     expect(completed).toHaveBeenCalledTimes(1);

@@ -188,4 +188,22 @@ describe("Edge log-support-chat — what only it does", () => {
     const r = await invokeEdge("log-support-chat", null, { method: "OPTIONS" });
     expect(r.status).toBe(204);
   });
+
+  const row = { channel: "site", topic: "שאלה", transcript: "שלום", outcome: "answered" };
+  const keys = (r: Awaited<ReturnType<typeof invokeEdge>>) =>
+    r.fetches.filter((f) => f.url.endsWith("/rpc/allow_submission")).map((f) => String((f.body as { p_key: string }).p_key));
+
+  it("counts a caller by a hash of the address, and every caller together (review 2026-10-15)", async () => {
+    const r = await invokeEdge("log-support-chat", row, { headers: { "x-forwarded-for": "203.0.113.5" } });
+    expect(r.status).toBe(200);
+    expect(keys(r)).toEqual([expect.stringMatching(/^support-ip:[0-9a-f]{64}$/), "support-log"]);
+    expect(JSON.stringify(keys(r))).not.toContain("203.0.113.5");
+  });
+
+  it.each(["support-ip:", "support-log"])("refuses past the %s limit with 429 and rid, and writes no row", async (prefix) => {
+    const r = await invokeEdge("log-support-chat", row, { headers: { "x-forwarded-for": "203.0.113.5" }, overLimit: [prefix] });
+    expect(r.status).toBe(429);
+    expect(r.json.rid).toBeTruthy();
+    expect(r.sheetRows).toEqual([]);
+  });
 });

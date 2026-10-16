@@ -77,6 +77,8 @@ const IMPLEMENTATIONS = [
 ];
 
 const AGENCY = "dorit@govari-fin.co.il";
+/** The conversation an interview's saves share (review 2026-10-15: never phone and name). */
+const REF = "chat:11111111-2222-4333-8444-555555555555";
 const OPS = "amielnoy@gmail.com";
 const OPS2 = "amielnoy@outlook.com";
 
@@ -393,6 +395,46 @@ describe.each(IMPLEMENTATIONS)("$label — the public entry point's limits", ({ 
     expect(r.emails.some((e) => e.to.includes("victim"))).toBe(false);
   });
 
+  const fromIp = { headers: { "x-forwarded-for": "203.0.113.7" } };
+  const limiterKeys = (r: Result) =>
+    (r as unknown as { fetches: { url: string; body: unknown }[] }).fetches
+      .filter((f) => f.url.endsWith("/rest/v1/rpc/allow_submission"))
+      .map((f) => String((f.body as { p_key: string }).p_key));
+
+  it("counts the caller by a hash of the address, never the address itself", async () => {
+    const r = await run(consultation, fromIp);
+    expect(r.status).toBe(200);
+    expect(limiterKeys(r).find((k) => k.startsWith("lead-ip:"))).toMatch(/^lead-ip:[0-9a-f]{64}$/);
+    expect(JSON.stringify(limiterKeys(r))).not.toContain("203.0.113.7");
+  });
+
+  it("refuses a caller over the hourly limit, and writes and mails nothing", async () => {
+    const r = await run(consultation, { ...fromIp, overLimit: ["lead-ip:"] });
+    expect(r.status).toBe(429);
+    expect(r.json.rid).toBeTruthy();
+    expect(r.leads).toHaveLength(0);
+    expect(r.emails).toHaveLength(0);
+    expect(r.invitations ?? []).toEqual([]);
+  });
+
+  it("past the hourly staff cap, saves the lead and confirms to the visitor, but mails no staff and books nothing", async () => {
+    const r = await run(consultation, { overLimit: ["lead-staff-notify"] });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+    expect(r.json.warnings).toContain("staff_notify_capped");
+    const to = r.emails.map((e) => e.to);
+    expect(to).toContain("yael@example.com");
+    for (const staff of [AGENCY, OPS, OPS2]) expect(to).not.toContain(staff);
+    expect(r.invitations ?? []).toEqual([]);
+    expect((r as unknown as { fetches: { url: string }[] }).fetches.some((f) => f.url.includes("/calendar/v3/calendars/"))).toBe(false);
+  });
+
+  it("asks the staff cap once per enquiry, and not for a partial interview", async () => {
+    const full = await run(consultation);
+    expect(limiterKeys(full).filter((k) => k === "lead-staff-notify")).toHaveLength(1);
+    const partial = await run({ ...consultation, source: "interview", stage: "partial" });
+    expect(limiterKeys(partial)).not.toContain("lead-staff-notify");
+  });
 });
 
 describe.each(IMPLEMENTATIONS)("$label — identifiers a visitor volunteered", ({ run }) => {
@@ -1136,7 +1178,7 @@ describe.each(IMPLEMENTATIONS)("$label — the operations mailboxes", ({ run }) 
 describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert that completes it", ({ run }) => {
   const partial = {
     name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
-    stage: "partial", track: "pension",
+    stage: "partial", track: "pension", conversationRef: REF,
     profile: { life_stage: "בן 52", goal: "פרישה", concern: "דמי ניהול" },
   };
 
@@ -1163,7 +1205,7 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
   it("updates that row on completion rather than creating a second", async () => {
     const existing = {
       id: "LEAD-EXISTING", name: "אורי לוי", phone: "0541112233", source: "interview",
-      status: "partial", email: "", created_date: new Date().toISOString(),
+      status: "partial", email: "", created_date: new Date().toISOString(), conversation_ref: REF,
     };
     const r = await run({
       ...partial,
@@ -1190,7 +1232,7 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
     // completed one (status "new") is no longer an open interview.
     const opened = () => ({
       id: "LEAD-EXISTING", name: "אורי", phone: "0541112233", source: "interview",
-      status: "partial", email: "", timing: "", created_date: new Date().toISOString(),
+      status: "partial", email: "", timing: "", created_date: new Date().toISOString(), conversation_ref: REF,
     });
 
     it("carries the agreed time and the full name into the update", async () => {
@@ -1210,7 +1252,7 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
     // partial — so the six-hour window is the only thing that can turn it away.
     const stale = {
       id: "LEAD-OLD", name: "אורי לוי", phone: "0541112233", email: "", source: "interview", status: "partial",
-      created_date: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+      created_date: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(), conversation_ref: REF,
     };
     const r = await run({ ...partial, stage: "complete" }, { existingLeads: [stale] });
     expect(r.leadUpdates).toHaveLength(0);
@@ -1222,7 +1264,7 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
     const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
     const older = {
       id: "LEAD-OLDER", name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
-      status: "partial", created_date: hoursAgo(2),
+      status: "partial", created_date: hoursAgo(2), conversation_ref: REF,
     };
     const newer = { ...older, id: "LEAD-NEWER", created_date: hoursAgo(1) };
     const r = await run({ ...partial, stage: "complete" }, { existingLeads: [older, newer] });
@@ -1241,53 +1283,61 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
   });
 
   /**
-   * A phone number is not a secret. Before, anyone who knew one could submit
-   * `source: "interview"` with it and overwrite that person's open interview —
-   * the email, the message and the status, in both stores.
+   * A phone number is not a secret, and neither is a first name. Matching on
+   * them let anyone who knew both complete — and overwrite — someone else's
+   * open interview (review 2026-10-15). Only the conversation's own reference
+   * ties a later save to an earlier one.
    */
   describe("whose interview it is", () => {
     const victims = (over: Record<string, unknown> = {}) => [{
       id: "LEAD-VICTIM", name: "אורי לוי", phone: "0541112233", source: "interview",
-      status: "partial", email: "uri@example.com", created_date: new Date().toISOString(), ...over,
+      status: "partial", email: "uri@example.com", created_date: new Date().toISOString(),
+      conversation_ref: "chat:99999999-2222-4333-8444-555555555555", ...over,
     }];
 
-    it("does not adopt the same number under another name", async () => {
-      const r = await run({ ...partial, name: "מישהו אחר", email: "attacker@example.com", stage: "complete" },
-        { existingLeads: victims() },
-      );
+    it("does not adopt the same number and the same name from another conversation", async () => {
+      const r = await run({ ...partial, email: "uri@example.com", stage: "complete" }, { existingLeads: victims() });
       expect(r.leadUpdates).toHaveLength(0);
       expect(r.leads).toHaveLength(1);
     });
 
-    it("does not adopt it when the address on file says someone else", async () => {
-      const r = await run({ ...partial, email: "attacker@example.com", stage: "complete" },
-        { existingLeads: victims() },
-      );
+    it("adopts nothing without a reference, even the same number, name and address", async () => {
+      const { conversationRef: _none, ...anonymous } = partial;
+      const r = await run({ ...anonymous, email: "uri@example.com", stage: "complete" },
+        { existingLeads: victims({ conversation_ref: null }) });
       expect(r.leadUpdates).toHaveLength(0);
       expect(r.leads).toHaveLength(1);
+    });
+
+    it("ignores a reference that is not one", async () => {
+      const r = await run({ ...partial, conversationRef: "x' or 1=1", stage: "complete" }, { existingLeads: victims() });
+      expect(r.leadUpdates).toHaveLength(0);
+      expect(r.leads).toHaveLength(1);
+      expect(r.leads[0].conversation_ref).toBeUndefined();
     });
 
     it("does not reopen an interview that was already completed", async () => {
-      const r = await run({ ...partial, email: "uri@example.com", stage: "complete" },
-        { existingLeads: victims({ status: "new" }) },
-      );
+      const r = await run({ ...partial, stage: "complete" }, { existingLeads: victims({ status: "new", conversation_ref: REF }) });
       expect(r.leadUpdates).toHaveLength(0);
       expect(r.leads).toHaveLength(1);
     });
 
-    it("still completes the visitor's own interview", async () => {
-      const r = await run({ ...partial, name: "  אורי   לוי ", email: "URI@example.com", stage: "complete" },
-        { existingLeads: victims() },
-      );
+    it("completes the visitor's own interview, by its reference, whatever name it now gives", async () => {
+      const r = await run({ ...partial, name: "  אורי   לוי ", stage: "complete" }, { existingLeads: victims({ conversation_ref: REF }) });
       expect(r.leadUpdates.map((u) => u.id)).toEqual(["LEAD-VICTIM"]);
       expect(r.leads).toHaveLength(0);
+    });
+
+    it("stores the reference on a new interview lead, so its later saves find it", async () => {
+      const r = await run(partial);
+      expect(r.leads[0].conversation_ref).toBe(REF);
     });
   });
 
   it("does not adopt a lead that was never an interview", async () => {
     const form = {
       id: "LEAD-FORM", phone: "0541112233", source: "consultation",
-      status: "new", created_date: new Date().toISOString(),
+      status: "new", created_date: new Date().toISOString(), conversation_ref: REF,
     };
     const r = await run({ ...partial, stage: "complete" }, { existingLeads: [form] });
     expect(r.leadUpdates).toHaveLength(0);
@@ -2084,9 +2134,10 @@ describe("Edge submit-lead — what only it does", () => {
     });
   });
 
-  it("completes an interview whose partial save came through Base44", async () => {
-    // The switch-over day: the partial row was mirrored from Base44 (it has a
-    // base44_id); the completion reaches Edge. One row, updated.
+  it("does not adopt a Base44-era partial save by phone and name: it has no conversation reference", async () => {
+    // Before review 2026-10-15 a completion on the switch-over day found the
+    // mirrored partial row by phone and name. That match is gone by design: a
+    // save adopts only a lead of its own conversation (conversation_ref).
     const partial = {
       id: "00000000-0000-4000-8000-0000000000aa", base44_id: "b44-partial-1", name: "אורי לוי",
       phone: "0541112233", email: "", source: "interview", status: "partial",
@@ -2095,9 +2146,8 @@ describe("Edge submit-lead — what only it does", () => {
     const r = await invokeEdge("submit-lead", {
       name: "אורי לוי", phone: "0541112233", source: "interview", stage: "complete", track: "pension",
     }, { existingLeads: [partial] });
-    expect(r.leads).toHaveLength(0);
-    expect(r.leadUpdates.map((u) => u.id)).toEqual(["00000000-0000-4000-8000-0000000000aa"]);
-    expect(r.leadUpdates[0].fields).toMatchObject({ status: "new" });
+    expect(r.leadUpdates).toHaveLength(0);
+    expect(r.leads).toHaveLength(1);
   });
 });
 
@@ -2109,12 +2159,12 @@ describe("Edge submit-lead — what only it does", () => {
 describe.each(IMPLEMENTATIONS)("$label — the questionnaire's details, after the lead was saved", ({ run }) => {
   const details = {
     name: "אורי לוי", phone: "0541112233", email: "", source: "interview",
-    stage: "details", track: "pension",
+    stage: "details", track: "pension", conversationRef: REF,
     profile: { concern: "דמי ניהול", life_stage: "בן 52", goal: "פרישה" },
   };
   const saved = (over: Record<string, unknown> = {}) => [{
     id: "LEAD-SAVED", name: "אורי לוי", phone: "0541112233", source: "interview",
-    status: "new", email: "", created_date: new Date().toISOString(), ...over,
+    status: "new", email: "", created_date: new Date().toISOString(), conversation_ref: REF, ...over,
   }];
 
   it("fills in the visitor's lead from a few minutes ago instead of creating a second", async () => {
@@ -2145,8 +2195,8 @@ describe.each(IMPLEMENTATIONS)("$label — the questionnaire's details, after th
     expect(r.leads).toHaveLength(1);
   });
 
-  it("does not fill in another person's lead on the same phone", async () => {
-    const r = await run(details, { existingLeads: saved({ name: "מישהו אחר" }) });
+  it("does not fill in another run's lead on the same phone and name", async () => {
+    const r = await run(details, { existingLeads: saved({ conversation_ref: "wizard:another-run-0001" }) });
     expect(r.leadUpdates).toHaveLength(0);
     expect(r.leads).toHaveLength(1);
   });

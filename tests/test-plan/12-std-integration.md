@@ -87,6 +87,64 @@ before it reaches an `href`; the plain-text copy is left
 unescaped on purpose, because escaping it would only make the mail unreadable;
 and the record stores the raw value, so it matches what was submitted.
 
+### 4.2a `submit-lead` — how often (review 2026-10-15) — `INT-LEAD-110..113`
+
+A public door with no sign-in: each caller is counted by a hash of their address, like submit-claim's `claim-ip`. The staff's mail and the diary are capped for every caller together, so a flood from many addresses cannot fill Dorit's inbox. Past the cap the lead is still saved.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-LEAD-110 | "counts the caller by a hash of the address, never the address itself" | `lead-ip:<64 hex>`; the address appears in no limiter key |
+| INT-LEAD-111 | "refuses a caller over the hourly limit, and writes and mails nothing" | 429 with `rid`; no lead, mail or invitation |
+| INT-LEAD-112 | "past the hourly staff cap, saves the lead and confirms to the visitor, but mails no staff and books nothing" | 200; one lead; `staff_notify_capped`; the visitor's confirmation goes out; no mail to Dorit or ops; no invitation; no calendar call |
+| INT-LEAD-113 | "asks the staff cap once per enquiry, and not for a partial interview" | One `lead-staff-notify` per full enquiry; none for a partial one |
+
+### 4.2b `escalate-to-human` — how often, and what it accepts (review 2026-10-15) — `INT-ESC-030..041`
+
+A hand-off that does not reach a person is a regulatory failure, so the limits never stand between an urgent reason and the staff. Base44's agents call from Base44's server, so one address stands for all their visitors: the per-caller limit is generous.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-ESC-030 | "holds back the staff mail over the hourly cap, and still records the hand-off" (changed) | `mail.skipped` logged at **error** level, so it alerts; the lead and the sheet row are written |
+| INT-ESC-031..032 | "never holds back an urgent hand-off (%s), whatever the caps say" | `complaint`, `privacy_request` with both caps exceeded: 200, staff mailed |
+| INT-ESC-033 | "refuses a caller over the hourly hand-off limit, for a reason that is not urgent, writing nothing" | 429 with `rid`; `escalate-ip:<64 hex>`; no lead, no mail |
+| INT-ESC-034..038 | "refuses a %s longer than its ceiling, writing and mailing nothing" | name 80, phone 30, topic 200, agent 60, email 254: 400 |
+| INT-ESC-039 | "drops an address that is not one, and still hands over" | 200; `email_invalid`; the lead's email empty; the injected recipient mailed nowhere |
+
+### 4.2c `log-support-chat` — how often (review 2026-10-15) — `INT-SUPPORT-020..022`
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-SUPPORT-020 | "counts a caller by a hash of the address, and every caller together (review 2026-10-15)" | `support-ip:<64 hex>` (60 an hour), then `support-log` (300 an hour, above the sweep's 40); the address appears in no key |
+| INT-SUPPORT-021..022 | "refuses past the %s limit with 429 and rid, and writes no row" | Either limit: 429 with `rid`; no sheet row |
+
+### 4.2d `submit-claim` — whose address is counted (review 2026-10-15)
+
+`submit-claim-edge.integration.test.ts` "how often" changed. "does not limit a request with no forwarded address" became "limits a request with no address under the one key such callers share": `claim-ip:` + the hash of `no-address`. A new case, "counts the address the gateway appended, not one the client put first", checks `6.6.6.6, 203.0.113.7` → the hash of `203.0.113.7`. The same `clientIp` serves submit-lead, escalate-to-human, log-support-chat, masleka-code and the chat. The `ip &&` guards that skipped a limit without an address are gone.
+
+### 4.2e `createConsultationEvent` — kept for stale clients, under a cap (review 2026-10-15) — `INT-CCE-001..003`
+
+`tests/integration/create-consultation-event.integration.test.ts`. Nothing in the current build calls it, but a stale client still can (it logs `client.stale`), and then its event is the only trace of that visitor's interview. So it is not retired with a 410: it keeps booking under a cap, and stops returning a provider's own error text.
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CCE-001 | "still books, and asks the shared limiter once, for every caller together" | 200 `ok`; one `allow_submission` with `consultation-event`, 3600 s, 20 |
+| INT-CCE-002 | "refuses past the cap with 429 and rid, booking nothing" | 429 with `rid`; no calendar call |
+| INT-CCE-003 | "never hands a calendar provider's own error text to the browser" | A provider refusing with its own text: 200, and no `details` in `events`, the text nowhere in the answer (fails without the fix) |
+
+### 4.2f `submit-lead` — an interview's saves meet by the conversation (review 2026-10-15)
+
+A later save (complete, or the questionnaire's details) updates an earlier one only if both name the same `conversationRef`, which is stored as `leads.conversation_ref` (migration `20261101000000`). Nothing else matches: not the phone, not the name, not the address. A save without a reference is a new lead.
+- **The senders:** the chat tool sends `chat:<conversation id>`, the needs wizard one `wizard:<uuid>` per run, and the Base44 hand-off `base44:<conversation id>`.
+- **Fixtures:** the "partial interview" and "details" suites carry `REF`, and the leads they should adopt carry the same `conversation_ref`.
+- **"whose interview it is", rewritten:**
+  - the same number and name from another conversation is not adopted;
+  - nothing is adopted without a reference;
+  - a malformed reference is ignored and not stored;
+  - a completed interview is not reopened;
+  - the visitor's own interview is completed by its reference, whatever name it now gives;
+  - a new interview lead stores its reference.
+- **Changed:** "does not fill in another run's lead on the same phone and name" (details), and "does not adopt a Base44-era partial save by phone and name" (Edge-only).
+
 ### 4.3 `submitLead` — identifiers a visitor volunteered — `INT-LEAD-016/017`
 
 An ID number or card number in a model-written summary is redacted before anyone
@@ -444,6 +502,17 @@ notified anyone, every "היי" would reach Dorit's inbox. A new contact appends
 row to `Contacts`; a returning one does not, because a row per message would
 turn the list of people into a second event log.
 
+### 4.18a `upsertContact` — who may call, and what a caller may change (review 2026-10-15) — `INT-CONTACT-020..023`
+
+Every call now carries `X-Contact-Secret`, which must match the Base44 secret `CONTACT_FUNCTION_SECRET`. While no channel is connected the secret is unset, and the function refuses everyone (it fails closed).
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CONTACT-020 | "refuses a caller without the shared secret, or with the wrong one, and writes nothing" | 401 with `rid`; no row |
+| INT-CONTACT-021 | "refuses everyone while no secret is configured — no channel is connected yet" | 401 |
+| INT-CONTACT-022 | "never overwrites a known contact's name, email or note — it only fills what is empty" | The update keeps the existing name, email and note; `saved` reports them |
+| INT-CONTACT-023 | "refuses a caller over the hourly limit, counted by a hash of the address" | 429; `contact-ip:<64 hex>` (30 an hour); no row |
+
 ### 4.19 `logSupportChat` — what was actually asked — `INT-SUPPORT-001..012`
 
 The event log records that someone got in touch and the contact list records who
@@ -525,7 +594,9 @@ message types. The shared Edge modules have unit tests: `edge-google.test.ts`
 (service-account token: two scopes, cached for the hour, failure named without
 the endpoint's words), `edge-ics.test.ts` (the invitation: UTC, escaping,
 75-octet folding, size limit) and `edge-google-apis.test.ts` (calendar event,
-sheet append, PostgREST helpers). The live smoke asks `submit-lead` and
+sheet append — `sheetCell` stores a leading-zero number, and any value that
+starts with `=`, `+`, `-`, `@`, a tab or a carriage return, as text behind a
+leading apostrophe, so a visitor's words never run as a formula — PostgREST helpers). The live smoke asks `submit-lead` and
 `log-support-chat` an empty question in production.
 
 Invitations independent of the Google event — `INT-INV-001..007`, in the Edge

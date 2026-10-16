@@ -32,6 +32,7 @@ const auth = vi.hoisted(() => ({ isAuthenticated: false, user: null as null | { 
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth }));
 
 import Testimonials from "@/components/dorit/sections/Testimonials";
+import { services } from "@/services";
 
 const render_ = () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -110,6 +111,76 @@ describe("<Testimonials />", () => {
  * `matchMedia` is stubbed to a width, as in needs-wizard.test.tsx; without it
  * (jsdom's default, every case above) the section is the desktop's grid.
  */
+/**
+ * Dorit's controls say what failed and ask before a delete, as the leads and
+ * blog screens do (review 2026-10-15, item 18).
+ */
+describe("<Testimonials /> — the admin's writes", () => {
+  const one = [{ id: "t1", name: "רונית לוי", quote: "ליווי מקצועי", rating: 5, source: "google" }];
+  let remove: ReturnType<typeof vi.fn>;
+  let create: ReturnType<typeof vi.fn>;
+  let upload: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    auth.isAuthenticated = true;
+    auth.user = { role: "admin" };
+    remove = vi.spyOn(services.contentAdmin, "removeTestimonial").mockResolvedValue(undefined) as never;
+    create = vi.spyOn(services.contentAdmin, "createTestimonial").mockResolvedValue(undefined as never) as never;
+    upload = vi.spyOn(services.uploads, "upload").mockResolvedValue({ url: "https://example.test/f.png" }) as never;
+    // jsdom has no object URLs; the form previews the picked file with one.
+    if (!URL.createObjectURL) Object.defineProperty(URL, "createObjectURL", { value: () => "blob:preview", configurable: true });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  /** Opens the form and fills the two required fields. */
+  async function fillForm(container: HTMLElement) {
+    fireEvent.click(await screen.findByRole("button", { name: /הוספת המלצה/ }));
+    const [name] = Array.from(container.querySelectorAll<HTMLInputElement>("input:not([type=file])"));
+    fireEvent.change(name, { target: { value: "דנה כהן" } });
+    fireEvent.change(container.querySelector("textarea")!, { target: { value: "שירות מצוין" } });
+  }
+
+  it("asks before deleting, and deletes nothing when the answer is no", async () => {
+    base44Mock.entities.Testimonial.list.mockResolvedValue(one);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    render_();
+    fireEvent.click(await screen.findByRole("button", { name: "מחיקה" }));
+    expect(confirm).toHaveBeenCalledWith("למחוק את ההמלצה?");
+    expect(remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "מחיקה" }));
+    await waitFor(() => expect(remove).toHaveBeenCalledWith("t1"));
+  });
+
+  it("says so in an alert when a delete fails", async () => {
+    base44Mock.entities.Testimonial.list.mockResolvedValue(one);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    remove.mockRejectedValueOnce(new Error("denied"));
+    render_();
+    fireEvent.click(await screen.findByRole("button", { name: "מחיקה" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("ההמלצה לא נמחקה");
+  });
+
+  it("says so in an alert when the picture does not upload, and publishes nothing", async () => {
+    base44Mock.entities.Testimonial.list.mockResolvedValue([]);
+    upload.mockRejectedValueOnce(new Error("too big"));
+    const { container } = render_();
+    await fillForm(container);
+    const file = new File(["x"], "face.png", { type: "image/png" });
+    fireEvent.change(container.querySelector("input[type=file]")!, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: /פרסום המלצה/ }));
+    expect((await screen.findByRole("alert")).textContent).toContain("התמונה לא הועלתה");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("says so in an alert when the testimonial is not saved", async () => {
+    base44Mock.entities.Testimonial.list.mockResolvedValue([]);
+    create.mockRejectedValueOnce(new Error("denied"));
+    const { container } = render_();
+    await fillForm(container);
+    fireEvent.click(screen.getByRole("button", { name: /פרסום המלצה/ }));
+    expect((await screen.findByRole("alert")).textContent).toContain("ההמלצה לא נשמרה");
+  });
+});
+
 describe("<Testimonials /> on a phone", () => {
   function viewport(width: number) {
     Object.defineProperty(window, "matchMedia", {

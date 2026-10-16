@@ -143,6 +143,8 @@ const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
   conversation_closed: "השיחה הזו הסתיימה. אפשר להתחיל שיחה חדשה.",
   // Raised only by the chat function's adapter: one message per conversation at a time.
   busy: "הודעה קודמת עדיין בטיפול — רגע אחד.",
+  // Raised only by the chat function's adapter: received, its answer still being written.
+  still_processing: "ההודעה התקבלה ועדיין בטיפול. התשובה מתעכבת — אפשר לכתוב שוב בעוד דקה.",
 };
 
 /**
@@ -303,7 +305,27 @@ export default function AgentChat({
     if (messages[messages.length - 1]?.role === "assistant") clearNoReplyTimeout();
   }, [messages]);
 
-  useEffect(() => clearNoReplyTimeout, []);
+  /**
+   * Each conversation this panel shows, numbered, and the send in flight
+   * (review 2026-10-15). Reset and unmount move to the next number and abort
+   * the send — its request and its status polling — and whatever an earlier
+   * number's send finishes with touches nothing on screen.
+   */
+  const generationRef = useRef(0);
+  const inFlightRef = useRef<AbortController | null>(null);
+  const abandonSend = () => {
+    generationRef.current += 1;
+    inFlightRef.current?.abort();
+    inFlightRef.current = null;
+  };
+
+  useEffect(
+    () => () => {
+      clearNoReplyTimeout();
+      abandonSend();
+    },
+    [],
+  );
 
   /**
    * The close of the interview, submitted by the page.
@@ -339,6 +361,8 @@ export default function AgentChat({
         const attribution = getAttribution();
         const receipt = await services.leads.submitInterview({
           ...summary,
+          // This conversation, so a save from it is never matched by phone and name.
+          conversationRef: conversationId ? `base44:${conversationId}` : undefined,
           channel: attribution?.channel,
           campaign: attribution?.campaign ?? undefined,
           landingPath: window.location.pathname,
@@ -376,6 +400,7 @@ export default function AgentChat({
 
   const ensureConversation = useCallback(async () => {
     if (conversationId) return { id: conversationId };
+    const generation = generationRef.current;
     const conv = await services.agents.start(descriptor.agent, {
       name: descriptor.conversationName,
       description: descriptor.conversationDescription,
@@ -389,7 +414,8 @@ export default function AgentChat({
         ? { channel: getAttribution()?.channel ?? "", campaign: getAttribution()?.campaign ?? "", landing_path: window.location.pathname }
         : {}),
     });
-    setConversationId(conv.id);
+    // Opened for a conversation the visitor has since reset: not this panel's.
+    if (generation === generationRef.current) setConversationId(conv.id);
     return conv;
   }, [conversationId, consentAt, descriptor, consentVersion, viaChatFunction]);
 
@@ -416,17 +442,25 @@ export default function AgentChat({
         say(NO_REPLY_COPY);
       }, NO_REPLY_TIMEOUT_MS);
     }
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    inFlightRef.current = controller;
     try {
-      await services.agents.send(await ensureConversation(), text);
+      const conversation = await ensureConversation();
+      if (generation !== generationRef.current) return;
+      await services.agents.send(conversation, text, { signal: controller.signal });
     } catch (e) {
+      // A send the visitor abandoned (reset): the panel shows another conversation now.
+      if (generation !== generationRef.current) return;
       // A failed send says so itself, below; it is not "no reply".
       clearNoReplyTimeout();
       // Put the text back in the box. The visitor's own message reaches the
       // transcript only by way of the server echoing it, so a failed send
       // leaves it nowhere at all: cleared from the input, absent from the
       // conversation, one line of apology in its place. That is the difference
-      // between "try again" and "this site ate what I wrote".
-      setInput(text);
+      // between "try again" and "this site ate what I wrote". A message still
+      // being answered did arrive, and stays in the transcript: not handed back.
+      if (!(e instanceof AgentLimitError && e.reason === "still_processing")) setInput(text);
       if (e instanceof AgentUnavailableError) {
         showChannelsOnly();
         return;
@@ -437,7 +471,8 @@ export default function AgentChat({
           : "מצטערת, לא הצלחתי לשלוח את ההודעה כרגע. ניתן לנסות שוב."
       );
     } finally {
-      setSending(false);
+      if (inFlightRef.current === controller) inFlightRef.current = null;
+      if (generation === generationRef.current) setSending(false);
     }
   };
 
@@ -523,6 +558,8 @@ export default function AgentChat({
 
   const reset = () => {
     clearNoReplyTimeout();
+    abandonSend();
+    setSending(false);
     setConversationId(null);
     setMessages([{ role: "assistant", content: descriptor.greeting }]);
     setInput("");

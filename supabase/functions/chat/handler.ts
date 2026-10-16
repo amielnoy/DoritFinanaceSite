@@ -43,6 +43,21 @@ export const PER_IP_PER_MINUTE = 20;
 /** Status requests, apart from messages: the page polls one turn every few seconds. */
 export const STATUS_PER_IP_PER_MINUTE = 60;
 export const NEW_CONVERSATIONS_PER_HOUR = 300;
+/** How long before the first message the consent gate may plausibly have been accepted. */
+export const CONSENT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * When consent was given, as the record keeps it (review 2026-10-15): the
+ * browser's time, but never after the server's now and never further back
+ * than CONSENT_MAX_AGE_MS. The time is evidence under Amendment 13; a client
+ * could otherwise date its consent to whenever it liked.
+ */
+export function consentInstant(claimed: string, nowMs: number): string {
+  const at = Date.parse(claimed);
+  return new Date(Math.min(nowMs, Math.max(nowMs - CONSENT_MAX_AGE_MS, at))).toISOString();
+}
+/** New conversations per caller, beside the global cap: one address may not open them all. */
+export const NEW_CONVERSATIONS_PER_IP_PER_HOUR = 20;
 /**
  * How long a turn holds its conversation. The 25 s budget covers only the
  * model calls; tools run outside it, and saving a lead is several sequential
@@ -124,7 +139,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       // claims nothing, and is limited apart from messages.
       if (input.status === true) {
         const statusIp = clientIp(req);
-        if (statusIp && !(await deps.allow(rid, `chat-status-ip:${await sha256Hex(statusIp)}`, 60, STATUS_PER_IP_PER_MINUTE))) {
+        if (!(await deps.allow(rid, `chat-status-ip:${await sha256Hex(statusIp)}`, 60, STATUS_PER_IP_PER_MINUTE))) {
           return refuse(429, 'rate_limited');
         }
         const id = str(input.conversationId);
@@ -132,13 +147,21 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
         const found = UUID.test(id) && TOKEN.test(token) ? await deps.store.getConversation(id) : null;
         if (!found || found.role !== role || found.token_hash !== (await sha256Hex(token))) return refuse(403, 'gone');
         const busy = found.busy_until !== null && Date.parse(found.busy_until) > deps.now();
-        const last = [...(await deps.store.listMessages(found.id))].reverse().find((m) => m.role !== 'tool');
+        // The page names the turn it waits for (review 2026-10-15). The newest message
+        // is that turn's only while the count is still that turn and the turn is over:
+        // a turn that never started, or one still running, has no reply to give, and an
+        // older one's must never pass for it.
+        const turn = typeof input.turn === 'number' && Number.isInteger(input.turn) && input.turn > 0 ? input.turn : 0;
+        const last = !busy && found.turns === turn
+          ? [...(await deps.store.listMessages(found.id))].reverse().find((m) => m.role !== 'tool')
+          : undefined;
         log('info', 'request.end', { rid, ms: Date.now() - startedAt, conversation: found.id, statusRequest: true, busy });
         return respond(200, {
           ok: true,
           busy,
           status: found.status,
           leadSaved: found.status === 'lead_saved',
+          turns: found.turns,
           last: last ? { role: last.role, content: last.content } : null,
         });
       }
@@ -148,7 +171,7 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
 
       const evalMode = deps.evalToken !== '' && req.headers.get('x-chat-eval') === deps.evalToken;
       const ip = clientIp(req);
-      if (!evalMode && ip && !(await deps.allow(rid, `chat-ip:${await sha256Hex(ip)}`, 60, PER_IP_PER_MINUTE))) {
+      if (!evalMode && !(await deps.allow(rid, `chat-ip:${await sha256Hex(ip)}`, 60, PER_IP_PER_MINUTE))) {
         return refuse(429, 'rate_limited');
       }
       if (!deps.model) {
@@ -159,14 +182,31 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
       let conversation: ConversationRow;
       let issuedToken: string | null = null;
       const conversationId = str(input.conversationId);
+      const token = str(input.token);
       // One turn at a time (I3): a turn claims the row until this time and lets go when done.
       const leaseUntil = new Date(deps.now() + TURN_LEASE_MS).toISOString();
 
-      if (!conversationId) {
+      // The page makes the conversation's id and token itself and sends them with every
+      // message, the first included (review 2026-10-15). A first message whose answer was
+      // lost can then be asked about, and a resend reaches the same row: one lead, one
+      // hand-off. A request with no id is a page from before that, given a token made here.
+      let found: ConversationRow | null = null;
+      if (conversationId) {
+        if (!UUID.test(conversationId) || !TOKEN.test(token)) return refuse(403, 'gone');
+        found = await deps.store.getConversation(conversationId);
+        if (found && (found.role !== role || found.token_hash !== (await sha256Hex(token)))) return refuse(403, 'gone');
+        // An id never seen opens a conversation only on a message carrying the consent; otherwise its row is gone.
+        if (!found && !str(input.consentVersion)) return refuse(403, 'gone');
+      }
+
+      if (!found) {
         const consentVersion = str(input.consentVersion).trim();
         const consentAt = str(input.consentAt);
         if (!consentVersion || consentVersion.length > MAX_CONSENT_VERSION_CHARS || Number.isNaN(Date.parse(consentAt))) {
           return refuse(400, 'consent_required');
+        }
+        if (!evalMode && !(await deps.allow(rid, `chat-new-ip:${await sha256Hex(ip)}`, 3600, NEW_CONVERSATIONS_PER_IP_PER_HOUR))) {
+          return refuse(429, 'rate_limited');
         }
         if (!evalMode && !(await deps.allow(rid, 'chat-new', 3600, NEW_CONVERSATIONS_PER_HOUR))) {
           return refuse(429, 'rate_limited');
@@ -175,14 +215,15 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           log('warn', 'budget.reached', { rid, ms: Date.now() - startedAt });
           return respond(503, { ok: false, code: 'unavailable' });
         }
-        issuedToken = deps.newToken();
+        const ownToken = conversationId ? token : (issuedToken = deps.newToken());
         const a = (input.attribution && typeof input.attribution === 'object' ? input.attribution : {}) as Record<string, unknown>;
-        conversation = await deps.store.createConversation({
+        const opening = {
+          ...(conversationId ? { id: conversationId } : {}),
           agency_id: AGENCY.id,
           role,
-          token_hash: await sha256Hex(issuedToken),
+          token_hash: await sha256Hex(ownToken),
           consent_version: consentVersion,
-          consent_at: new Date(consentAt).toISOString(),
+          consent_at: consentInstant(consentAt, deps.now()),
           attribution: {
             channel: validChannel(a.channel) ?? '',
             campaign: validCampaign(a.campaign) ?? '',
@@ -193,12 +234,16 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           turns: 1,
           busy_until: leaseUntil,
           ...(evalMode ? { delete_after: new Date(deps.now() + EVAL_RETENTION_MS).toISOString() } : {}),
-        });
+        };
+        try {
+          conversation = await deps.store.createConversation(opening);
+        } catch (e) {
+          // The same first message sent twice at once: the other request's row holds the turn.
+          if (conversationId && String((e as Error)?.message ?? e).startsWith('insert_http_409')) return refuse(409, 'busy');
+          throw e;
+        }
         log('info', 'conversation.created', { rid, conversation: conversation.id, role, evalMode });
       } else {
-        const token = str(input.token);
-        const found = UUID.test(conversationId) && TOKEN.test(token) ? await deps.store.getConversation(conversationId) : null;
-        if (!found || found.role !== role || found.token_hash !== (await sha256Hex(token))) return refuse(403, 'gone');
         conversation = found;
         if (CLOSED.has(conversation.status)) return refuse(409, 'closed');
         if (deps.now() - Date.parse(conversation.last_message_at) > IDLE_MS) {
@@ -231,7 +276,9 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           agent,
           origin: req.headers.get('origin'),
           userAgent: req.headers.get('user-agent'),
-          forwardedFor: req.headers.get('x-forwarded-for'),
+          // The address the chat already resolved (clientIp), so the lead and
+          // hand-off functions count this visitor, not a header they could forge.
+          forwardedFor: ip,
           evalMode,
         };
 
@@ -311,7 +358,8 @@ export function createChatHandler(deps: ChatDeps): (req: Request) => Promise<Res
           // The store clips to the column's 8,000 characters, past anything MAX_REPLY_TOKENS allows in practice.
           await deps.store.addMessage({ conversation_id: id, agency_id: agencyId, role: 'assistant', content: redactChat(result.reply) });
         }
-        const continuation = { conversationId: id, ...(issuedToken ? { token: issuedToken } : {}) };
+        // `turn` is this turn's number, which a status request names (review 2026-10-15).
+        const continuation = { conversationId: id, turn: conversation.turns, ...(issuedToken ? { token: issuedToken } : {}) };
         if (!result) {
           log('warn', 'model.failed', { rid, conversation: id, reason: failure?.reason ?? 'unknown', ms: Date.now() - startedAt });
           return respond(503, { ok: false, code: 'unavailable', leadSaved, ...continuation });

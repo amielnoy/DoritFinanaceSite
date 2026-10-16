@@ -15,7 +15,9 @@ import { invokeFunction, MAILER_URL } from "../helpers/base44-function";
  * a second message erasing what the first one established.
  */
 
-const ENV = { MAILER_URL, MAILER_TOKEN: "test-only-token", SHEET_ID: "sheet-1" };
+const ENV = { MAILER_URL, MAILER_TOKEN: "test-only-token", SHEET_ID: "sheet-1", CONTACT_FUNCTION_SECRET: "contact-secret-test" };
+/** The legitimate caller's shared secret (review 2026-10-15). */
+const AUTH = { "x-contact-secret": "contact-secret-test" };
 
 const whatsapp = (fields: Record<string, unknown> = {}) => ({
   phone: "972501234567",
@@ -25,7 +27,7 @@ const whatsapp = (fields: Record<string, unknown> = {}) => ({
 
 describe("upsertContact — who the sender is", () => {
   it("creates a contact from the number the message arrived on", async () => {
-    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV });
+    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV, headers: AUTH });
     expect(run.status).toBe(200);
     expect(run.json.created).toBe(true);
     expect(run.leads[0]).toMatchObject({ phone: "0501234567", name: "יעל", channel: "whatsapp" });
@@ -39,7 +41,7 @@ describe("upsertContact — who the sender is", () => {
       const run = await invokeFunction(
         "upsertContact",
         { phone: spelling, channel: "whatsapp" },
-        { env: ENV },
+        { env: ENV, headers: AUTH },
       );
       expect(run.json.saved, spelling).toMatchObject({ phone: "0501234567" });
     }
@@ -48,6 +50,7 @@ describe("upsertContact — who the sender is", () => {
   it("updates rather than duplicates when the number is already known", async () => {
     const run = await invokeFunction("upsertContact", whatsapp({ email: "yael@example.com" }), {
       env: ENV,
+      headers: AUTH,
       existingLeads: [{ id: "C-1", phone: "0501234567", name: "יעל" }],
     });
     expect(run.json.created).toBe(false);
@@ -63,6 +66,7 @@ describe("upsertContact — who the sender is", () => {
     // first one established: an update is what was learned, not what was sent.
     const run = await invokeFunction("upsertContact", whatsapp(), {
       env: ENV,
+      headers: AUTH,
       existingLeads: [{ id: "C-1", phone: "0501234567", name: "יעל", email: "yael@example.com" }],
     });
     expect(run.leadUpdates[0].fields).toMatchObject({
@@ -72,9 +76,10 @@ describe("upsertContact — who the sender is", () => {
   });
 
   it("stamps last_seen on both paths so a quiet contact is visible", async () => {
-    const created = await invokeFunction("upsertContact", whatsapp(), { env: ENV });
+    const created = await invokeFunction("upsertContact", whatsapp(), { env: ENV, headers: AUTH });
     const updated = await invokeFunction("upsertContact", whatsapp(), {
       env: ENV,
+      headers: AUTH,
       existingLeads: [{ id: "C-1", phone: "0501234567" }],
     });
     expect(String(created.leads[0].last_seen)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
@@ -83,7 +88,7 @@ describe("upsertContact — who the sender is", () => {
 
   it("refuses a number that is not a number", async () => {
     for (const phone of ["", "12", "not-a-phone", undefined]) {
-      const run = await invokeFunction("upsertContact", { phone, channel: "whatsapp" }, { env: ENV });
+      const run = await invokeFunction("upsertContact", { phone, channel: "whatsapp" }, { env: ENV, headers: AUTH });
       expect(run.status, String(phone)).toBe(400);
     }
   });
@@ -92,7 +97,7 @@ describe("upsertContact — who the sender is", () => {
     const run = await invokeFunction(
       "upsertContact",
       { phone: "0501234567", channel: "<script>" },
-      { env: ENV },
+      { env: ENV, headers: AUTH },
     );
     expect(run.leads[0].channel).toBe("other");
   });
@@ -102,6 +107,7 @@ describe("upsertContact — who the sender is", () => {
     // annoyance, a dropped enquiry is someone nobody calls back.
     const run = await invokeFunction("upsertContact", whatsapp(), {
       env: ENV,
+      headers: AUTH,
       failLeadLookup: true,
     });
     expect(run.status).toBe(200);
@@ -111,6 +117,7 @@ describe("upsertContact — who the sender is", () => {
   it("reports the failure when the write itself fails", async () => {
     const run = await invokeFunction("upsertContact", whatsapp(), {
       env: ENV,
+      headers: AUTH,
       failLeadWrite: true,
     });
     expect(run.status).toBe(500);
@@ -123,7 +130,7 @@ describe("upsertContact — what the agent reads back", () => {
     // The agent is told to confirm details by reading `saved`. If that echoed
     // the request, it would confirm a number that is not the key anything was
     // filed under, and the confirmation would be theatre.
-    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV });
+    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV, headers: AUTH });
     expect(run.json.saved).toEqual({ phone: "0501234567", name: "יעל", email: "" });
   });
 });
@@ -133,7 +140,7 @@ describe("upsertContact — privacy", () => {
     const run = await invokeFunction(
       "upsertContact",
       whatsapp({ notes: "ת\"ז 123456789 ופוליסה 4580111122223333" }),
-      { env: ENV },
+      { env: ENV, headers: AUTH },
     );
     const notes = String(run.leads[0].notes);
     expect(notes).not.toContain("123456789");
@@ -144,7 +151,7 @@ describe("upsertContact — privacy", () => {
   it("sends no mail at all", async () => {
     // Recording a contact is not an enquiry. If this notified anyone, every
     // "היי" on WhatsApp would reach Dorit's inbox.
-    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV });
+    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV, headers: AUTH });
     expect(run.emails).toHaveLength(0);
     expect(run.callsTo("send-email")).toHaveLength(0);
   });
@@ -152,7 +159,7 @@ describe("upsertContact — privacy", () => {
 
 describe("upsertContact — the contacts sheet", () => {
   it("appends a new contact to the Contacts tab", async () => {
-    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV });
+    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV, headers: AUTH });
     const [append] = run.callsTo("sheets.googleapis.com");
     expect(decodeURIComponent(append.url)).toContain("Contacts!A:F");
     // `'` forces Sheets to keep this as text; see the note in `appendEventRow`.
@@ -168,7 +175,7 @@ describe("upsertContact — the contacts sheet", () => {
   });
 
   it("writes the normalised number, the one the entity is keyed on", async () => {
-    const run = await invokeFunction("upsertContact", whatsapp(), { env: ENV });
+    const run = await invokeFunction("upsertContact", whatsapp(), { env: ENV, headers: AUTH });
     const [append] = run.callsTo("sheets.googleapis.com");
     // `'` forces Sheets to keep this as text; see the note in `appendEventRow`.
     // Without it the leading zero is lost to numeric coercion.
@@ -180,6 +187,7 @@ describe("upsertContact — the contacts sheet", () => {
     // event log, and the event log already exists.
     const run = await invokeFunction("upsertContact", whatsapp(), {
       env: ENV,
+      headers: AUTH,
       existingLeads: [{ id: "C-1", phone: "0501234567" }],
     });
     expect(run.callsTo("sheets.googleapis.com")).toHaveLength(0);
@@ -188,6 +196,7 @@ describe("upsertContact — the contacts sheet", () => {
   it("keeps the contact when the sheet refuses", async () => {
     const run = await invokeFunction("upsertContact", whatsapp(), {
       env: ENV,
+      headers: AUTH,
       fetchStatus: 403,
     });
     expect(run.status).toBe(200);
@@ -197,10 +206,52 @@ describe("upsertContact — the contacts sheet", () => {
 
   it("skips the sheet quietly when none is configured", async () => {
     const run = await invokeFunction("upsertContact", whatsapp(), {
-      env: { MAILER_URL, MAILER_TOKEN: "test-only-token" },
+      env: { MAILER_URL, MAILER_TOKEN: "test-only-token", CONTACT_FUNCTION_SECRET: "contact-secret-test" },
+      headers: AUTH,
     });
     expect(run.status).toBe(200);
     expect(run.json.sheet).toBe("לא מוגדר");
     expect(run.callsTo("sheets.googleapis.com")).toHaveLength(0);
+  });
+});
+
+describe("upsertContact — who may call, and what a caller may change (review 2026-10-15)", () => {
+  it("refuses a caller without the shared secret, or with the wrong one, and writes nothing", async () => {
+    for (const headers of [{}, { "x-contact-secret": "guess" }]) {
+      const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env: ENV, headers });
+      expect(run.status).toBe(401);
+      expect(run.json.rid).toEqual(expect.any(String));
+      expect(run.leads).toHaveLength(0);
+    }
+  });
+
+  it("refuses everyone while no secret is configured — no channel is connected yet", async () => {
+    const { CONTACT_FUNCTION_SECRET: _unset, ...env } = ENV;
+    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), { env, headers: AUTH });
+    expect(run.status).toBe(401);
+    expect(run.leads).toHaveLength(0);
+  });
+
+  it("never overwrites a known contact's name, email or note — it only fills what is empty", async () => {
+    const run = await invokeFunction("upsertContact", whatsapp({ name: "מתחזה", email: "attacker@example.com", notes: "הערה חדשה" }), {
+      env: ENV,
+      headers: AUTH,
+      existingLeads: [{ id: "C-1", phone: "0501234567", name: "יעל", email: "yael@example.com", notes: "לקוחה ותיקה" }],
+    });
+    expect(run.status).toBe(200);
+    expect(run.leadUpdates[0].fields).toMatchObject({ name: "יעל", email: "yael@example.com", notes: "לקוחה ותיקה" });
+    expect(run.json.saved).toEqual({ phone: "0501234567", name: "יעל", email: "yael@example.com" });
+  });
+
+  it("refuses a caller over the hourly limit, counted by a hash of the address", async () => {
+    const run = await invokeFunction("upsertContact", whatsapp({ name: "יעל" }), {
+      env: { ...ENV, SUPABASE_URL: "https://project-ref.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "service-role-test" },
+      headers: { ...AUTH, "x-forwarded-for": "6.6.6.6, 203.0.113.7" },
+      rpc: { allow_submission: false },
+    });
+    expect(run.status).toBe(429);
+    expect(run.leads).toHaveLength(0);
+    const key = run.fetches.find((f) => String(f.url).endsWith("/rpc/allow_submission"))!.body as { p_key: string };
+    expect(key.p_key).toMatch(/^contact-ip:[0-9a-f]{64}$/);
   });
 });

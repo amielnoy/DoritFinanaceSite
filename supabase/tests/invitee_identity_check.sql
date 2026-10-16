@@ -5,7 +5,8 @@ begin;
 insert into auth.users (instance_id, id, aud, role, email, email_confirmed_at) values
   ('00000000-0000-0000-0000-000000000000', 'ffffffff-2700-0000-0000-000000000001', 'authenticated', 'authenticated', 'former@example.test', now()),
   ('00000000-0000-0000-0000-000000000000', 'ffffffff-2700-0000-0000-000000000002', 'authenticated', 'authenticated', 'current@example.test', now()),
-  ('00000000-0000-0000-0000-000000000000', 'ffffffff-2700-0000-0000-000000000003', 'authenticated', 'authenticated', 'orphan@example.test', now());
+  ('00000000-0000-0000-0000-000000000000', 'ffffffff-2700-0000-0000-000000000003', 'authenticated', 'authenticated', 'orphan@example.test', now()),
+  ('00000000-0000-0000-0000-000000000000', 'ffffffff-2700-0000-0000-000000000004', 'authenticated', 'authenticated', 'unconfirmed@example.test', null);
 
 -- Auth changed; the profiles retain the old addresses.
 update auth.users set email = 'moved@example.test' where id = 'ffffffff-2700-0000-0000-000000000001';
@@ -25,6 +26,9 @@ do $$ begin
   end if;
   if public.invitee_for('orphan@example.test') is not null then
     raise exception 'account without a profile matched';
+  end if;
+  if public.invitee_for('unconfirmed@example.test') is not null then
+    raise exception 'unconfirmed account matched';
   end if;
   if public.invitee_for('') is not null or public.invitee_for(null) is not null then
     raise exception 'empty address matched';

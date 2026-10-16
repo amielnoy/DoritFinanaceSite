@@ -11,7 +11,7 @@
   "theme_color": "#F9F7F2",
   "icons": [
     {
-      "src": "https://base44.com/logo_v2.svg",
+      "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

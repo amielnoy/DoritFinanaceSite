@@ -21,7 +21,7 @@ import {
 } from '../_shared/masleka.ts';
 import { deliveryWarning, mailerConfigured, sendMail } from '../_shared/mail.ts';
 import { insertRow, selectRows, supabaseConfigured, updateRow, updateWhere, upsertRow } from '../_shared/rest.ts';
-import { isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
+import { clientIp, isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { contactPhone } from '../_shared/phone.ts';
 import { googleConfigured } from '../_shared/google.ts';
 import { calendarConfigured, createCalendarEvent } from '../_shared/calendar.ts';
@@ -40,6 +40,14 @@ import {
 const FN = 'submit-lead';
 const log = createLog(FN);
 const CONFIRMATIONS_PER_ADDRESS_PER_DAY = 3;
+/** Saves per caller: an interview saves two or three times, a form once. */
+const LEADS_PER_IP_PER_HOUR = 30;
+/**
+ * Enquiries that may mail the staff and write the diary, all callers together.
+ * Past it the lead is still saved (and listed on /admin/leads); only Dorit's
+ * mail, the operations notice, the calendar event and the invitations wait.
+ */
+const STAFF_NOTIFY_PER_HOUR = 60;
 const INVITE_DESCRIPTION_MAX = 4_000;
 
 /** The leads sheet, for the link in the mail; sheets.ts reads the same setting to append. */
@@ -61,28 +69,32 @@ interface OpenInterview {
  */
 const DETAILS_WINDOW_MS = 30 * 60_000;
 
+/** The conversation an interview save names: `chat:<id>`, `base44:<id>`, `wizard:<id>` — the column's own pattern. */
+const CONVERSATION_REF = /^[A-Za-z0-9:_-]{8,100}$/;
+
 /**
- * The visitor's open interview, if one is in the window: partial, on this
- * phone, and the same person by name and address (sameInterviewee). Newest
- * first, so a rerun joins the latest. Base44's findOpenInterview, as a query.
+ * The visitor's open interview, if one is in the window: an interview lead
+ * of this same conversation (`conversation_ref`, which the page or the chat
+ * function holds), partial (or new, for the details). Newest first, so a
+ * rerun joins the latest. Never by phone and name (review 2026-10-15): a
+ * number and a first name are not a secret, and matching on them let anyone
+ * complete — and overwrite — someone else's interview. No reference, no match.
  */
 async function findOpenInterview(
   rid: string,
-  phone: string,
-  name: unknown,
-  email: unknown,
+  conversationRef: string,
   { status = 'partial', windowMs = INTERVIEW_WINDOW_MS }: { status?: 'partial' | 'new'; windowMs?: number } = {},
 ): Promise<OpenInterview | null> {
-  if (!phone) return null;
+  if (!conversationRef) return null;
   try {
     const since = new Date(Date.now() - windowMs).toISOString();
     const rows = await selectRows(
       'leads',
       `select=id,name,email,timing,consent_version,consent_at,status,created_at` +
-        `&phone=eq.${encodeURIComponent(phone)}&source=eq.interview&status=eq.${status}` +
+        `&conversation_ref=eq.${encodeURIComponent(conversationRef)}&source=eq.interview&status=eq.${status}` +
         `&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc`,
     );
-    return (rows.find((lead) => sameInterviewee(lead, name, email)) as OpenInterview | undefined) ?? null;
+    return (rows[0] as unknown as OpenInterview | undefined) ?? null;
   } catch (e) {
     // Best-effort, as Base44's was: a duplicate beats a lost interview.
     log('warn', 'interview.lookup_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
@@ -197,7 +209,9 @@ export async function handler(req: Request): Promise<Response> {
     // A body that is not JSON is answered as what it amounts to — no name and
     // no phone — rather than as a server fault.
     const body = await req.json().catch(() => null);
-    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at, channel, campaign, landingPath } = body || {};
+    const { name, phone, email, source, topic, timing, message, notes, scheduledAt, summary, profile, track, stage, meetingTopic, consent_version, consent_at, channel, campaign, landingPath, conversationRef } = body || {};
+    // Only a well-formed reference ties saves together; anything else is none.
+    const safeRef = typeof conversationRef === 'string' && CONVERSATION_REF.test(conversationRef) ? conversationRef : '';
     const safeChannel = validChannel(channel) || 'unknown';
     const safeCampaign = validCampaign(campaign);
     const safeLandingPath = validLandingPath(landingPath);
@@ -230,6 +244,17 @@ export async function handler(req: Request): Promise<Response> {
     if (oversized) {
       log('warn', 'request.rejected', { rid, reason: 'field_too_long', field: oversized, source: source || 'quick' });
       return Response.json({ error: 'אחד השדות ארוך מדי. אפשר לקצר ולשלוח שוב.', rid }, { status: 400, headers: cors });
+    }
+
+    // A public, no-sign-in door: one caller may not fill the table, as
+    // submit-claim's claim-ip. The limiter stores a hash, never the address.
+    const ip = clientIp(req);
+    if (!(await withinLimit(log, rid, `lead-ip:${await sha256Hex(ip)}`, 3600, LEADS_PER_IP_PER_HOUR))) {
+      log('warn', 'request.rejected', { rid, reason: 'rate_limited', source: source || 'quick' });
+      return Response.json(
+        { error: 'התקבלו כמה פניות ברצף. אפשר לנסות שוב בעוד שעה, או לפנות לדורית ישירות.', rid },
+        { status: 429, headers: cors },
+      );
     }
 
     // התקציר נכתב על ידי מודל, ולכן עובר סינון לפני שהוא נשלח לאן שהוא.
@@ -292,8 +317,8 @@ export async function handler(req: Request): Promise<Response> {
     const openInterview = source !== 'interview'
       ? null
       : details
-        ? await findOpenInterview(rid, phone, name, email, { status: 'new', windowMs: DETAILS_WINDOW_MS })
-        : await findOpenInterview(rid, phone, name, email);
+        ? await findOpenInterview(rid, safeRef, { status: 'new', windowMs: DETAILS_WINDOW_MS })
+        : await findOpenInterview(rid, safeRef);
     // Only a details save that found its lead is "further details"; one that did
     // not is the visitor's lead, and is announced as one.
     const subject: string = details && openInterview ? `פרטים נוספים — ${baseSubject}` : baseSubject;
@@ -358,6 +383,8 @@ export async function handler(req: Request): Promise<Response> {
         // A timestamptz: absent is null, as the mirror wrote it — '' is refused.
         consent_at: consent_at || null,
         ...meetingFields,
+        // Which conversation it came from, so its later saves find it.
+        ...(source === 'interview' && safeRef ? { conversation_ref: safeRef } : {}),
         channel: safeChannel,
         campaign: safeCampaign,
       });
@@ -533,14 +560,24 @@ export async function handler(req: Request): Promise<Response> {
       }
     })();
 
+    // The staff's mail and the diary, capped for every caller together: a flood
+    // from many addresses passes each one's limit but not this. The lead is
+    // already saved, so this costs a notification, never an enquiry.
+    const staffNotify = await withinLimit(log, rid, 'lead-staff-notify', 3600, STAFF_NOTIFY_PER_HOUR);
+    if (!staffNotify) {
+      log('warn', 'notify.capped', { rid, source: source || 'quick', leadId });
+      warnings.push('staff_notify_capped');
+    }
+
     // אירוע ביומן של דורית — מיטבי, רק עבור בקשות ייעוץ. הראיון מתאם פגישה
     // בעצמו מאז שסוכן התיאום מוזג לתוכו, ולכן הוא מקבל אירוע בדיוק כמו בקשת
     // ייעוץ — אבל רק כשבאמת סוכם מועד.
-    const booksCalendar = source === 'consultation' || (source === 'interview' && Boolean(scheduledAt));
+    const wantsCalendar = source === 'consultation' || (source === 'interview' && Boolean(scheduledAt));
+    const booksCalendar = wantsCalendar && staffNotify;
     // "לא רלוונטי" על ראיון בלי מועד היה מטעה: הוא נקרא כמו החלטה, בזמן שמה
     // שקרה הוא שהסוכן לא שלח scheduledAt. מי שקרא את המייל לא ידע שיש מה לתקן.
-    let calendar = booksCalendar
-      ? 'לא נוצר'
+    let calendar = wantsCalendar
+      ? (staffNotify ? 'לא נוצר' : 'לא נוצר — עומס פניות, ראו מסך הפניות')
       : (source === 'interview' ? 'לא נקבע מועד' : 'לא רלוונטי');
     // The slot the hold was actually placed on, which is not always the slot
     // that was agreed — it falls back to tomorrow 09:00 when nothing was.
@@ -549,7 +586,7 @@ export async function handler(req: Request): Promise<Response> {
     // shared with the service account), without attendees; and, independently
     // of it, an invitation by mail to Dorit and to amielnoy@outlook.com. When
     // the event exists the invitations carry its UID — one meeting.
-    let invites = booksCalendar ? 'לא נשלחו' : 'לא רלוונטי';
+    let invites = wantsCalendar ? 'לא נשלחו' : 'לא רלוונטי';
     if (booksCalendar) {
       const calStartIso = wallClock(scheduledAt) ?? `${tomorrowInIsrael()}T09:00:00`;
       const calEndIso = wallClock(calStartIso, 30) as string;
@@ -668,21 +705,23 @@ export async function handler(req: Request): Promise<Response> {
         ? `נרשם ✓ — https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`
         : sheet,
     };
-    try {
-      await sendMail(log, {
-        to: SECONDARY_EMAIL,
-        subject,
-        // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
-        // `as never`: lead.js is untyped, and Deno's checker reads its
-        // `links = null` default as the parameter's type.
-        html: buildAgentHtml(source, data, null, links as never),
-        text: [agentBody, buildLinksFooter(links)].filter(Boolean).join('\n\n'),
-        rid,
-        role: 'agency',
-      });
-    } catch (e) {
-      log('warn', 'mail.failed', { rid, role: 'agency', err: String((e as Error)?.message ?? e).slice(0, 200) });
-      warnings.push(deliveryWarning('secondary_email_failed', e));
+    if (staffNotify) {
+      try {
+        await sendMail(log, {
+          to: SECONDARY_EMAIL,
+          subject,
+          // אותה פנייה, בעיצוב האתר. הטקסט נשלח לצידו כגיבוי ולא במקומו.
+          // `as never`: lead.js is untyped, and Deno's checker reads its
+          // `links = null` default as the parameter's type.
+          html: buildAgentHtml(source, data, null, links as never),
+          text: [agentBody, buildLinksFooter(links)].filter(Boolean).join('\n\n'),
+          rid,
+          role: 'agency',
+        });
+      } catch (e) {
+        log('warn', 'mail.failed', { rid, role: 'agency', err: String((e as Error)?.message ?? e).slice(0, 200) });
+        warnings.push(deliveryWarning('secondary_email_failed', e));
+      }
     }
 
     // הודעה לצוות התפעול: שהגיעה פנייה, מאיזה סוג, ומה עלה בגורל היומן,
@@ -711,21 +750,23 @@ export async function handler(req: Request): Promise<Response> {
         ['תקלות', warnings.length ? warnings.join(', ') : 'אין'],
       ],
     );
-    await Promise.all(NOTIFY_EMAILS.map(async (to: string) => {
-      try {
-        await sendMail(log, {
-          to,
-          subject: notice.subject,
-          html: notice.html,
-          text: notice.text,
-          rid,
-          role: 'ops',
-        });
-      } catch (e) {
-        log('warn', 'mail.failed', { rid, role: 'ops', err: String((e as Error)?.message ?? e).slice(0, 200) });
-        warnings.push(deliveryWarning('notify_email_failed', e));
-      }
-    }));
+    if (staffNotify) {
+      await Promise.all(NOTIFY_EMAILS.map(async (to: string) => {
+        try {
+          await sendMail(log, {
+            to,
+            subject: notice.subject,
+            html: notice.html,
+            text: notice.text,
+            rid,
+            role: 'ops',
+          });
+        } catch (e) {
+          log('warn', 'mail.failed', { rid, role: 'ops', err: String((e as Error)?.message ?? e).slice(0, 200) });
+          warnings.push(deliveryWarning('notify_email_failed', e));
+        }
+      }));
+    }
 
     log('info', 'request.end', { rid, ms: Date.now() - startedAt, leadId, source: source || 'quick', warnings: warnings.length });
     return Response.json({ ok: true, rid, leadId, warnings }, { headers: cors });

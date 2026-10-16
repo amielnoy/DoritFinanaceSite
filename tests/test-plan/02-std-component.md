@@ -333,6 +333,9 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-CHATFN-007 | "keep the v5 notice, byte for byte" | A Base44 agent shows its v5 points and not the v6 fourth point |
 | CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
 | CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
+| CMP-CHATFN-015 | "says the message is still being answered, keeps it in the transcript, and does not hand it back" (a turn still running when the adapter stops waiting) | The send and every status request say busy: after 40 s + 60 s the panel shows "ההודעה התקבלה ועדיין בטיפול…", the visitor's line stays, and the input stays empty (review 2026-10-15, item 14) |
+| CMP-CHATFN-016 | "aborts the chat function's request and leaves the new conversation clean and usable" (a reset while a message is on its way) | Reset mid-send: the request's signal is aborted; the old line, an apology and the old text are all absent; the next message goes out under a new conversation id and its reply shows (review 2026-10-15, item 13) |
+| CMP-CHATFN-017 | "ignores what an earlier conversation's send ends with, even from an adapter that cannot abort" (a reset while a message is on its way) | A Base44 send that fails after the reset: the input stays empty and no apology appears (the panel's generation guard) |
 
 The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`, hooks stubbed). Read-only; visitor text is plain text.
 
@@ -834,3 +837,41 @@ Changed for agency roles:
   - An agency Admin is offered only their agencies and the User role.
   - A User gets no invite button.
   - The role offered by default is an Admin's (the operator may give it).
+
+### 4.47 "דורשות טיפול" — `tests/component/leads-attention.test.tsx`
+
+Review 2026-10-15, item 17. The `escalated` and `partial` chips and the disabled current-status option already came with the agency roles (CMP-ROLEUI-002 and 004). What remained: an escalated lead (a visitor who asked for Dorit herself) needs someone as much as a new one. The card counts both and its filter shows both, and so does the menu's counter for a User (UNIT-LEADTX-009).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ATTN-001 | "counts the new and the escalated leads together" | One new, one escalated, one contacted, one partial: the card reads 2 |
+| CMP-ATTN-002 | "shows the new and the escalated leads when clicked, and no other" | After the click: the new and the escalated lead; not the contacted or the partial one |
+
+### 4.48 The testimonials' writes — `tests/component/testimonials.test.tsx` (new cases)
+
+Review 2026-10-15, item 18. Dorit's controls in the home page's testimonials say what failed, in a `role="alert"`, and ask before a delete, as the leads and blog screens do. The services' content-admin and upload methods are spied on, so these cases hold on either backend.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-TESTIM-ADM-001 | "asks before deleting, and deletes nothing when the answer is no" (the admin's writes) | `confirm("למחוק את ההמלצה?")`; no → no delete; yes → `removeTestimonial("t1")` |
+| CMP-TESTIM-ADM-002 | "says so in an alert when a delete fails" (the admin's writes) | `role="alert"`: "ההמלצה לא נמחקה…" |
+| CMP-TESTIM-ADM-003 | "says so in an alert when the picture does not upload, and publishes nothing" (the admin's writes) | `role="alert"`: "התמונה לא הועלתה…"; `createTestimonial` not called |
+| CMP-TESTIM-ADM-004 | "says so in an alert when the testimonial is not saved" (the admin's writes) | `role="alert"`: "ההמלצה לא נשמרה…" |
+
+### 4.49 The claim form's documents — `tests/component/claim-form-files.test.tsx`
+
+Review 2026-10-15, item 19. Already in place: `accept`, the 10 MB and type checks with Hebrew copy (`claimDocumentProblem`, UNIT section 4.63), and clearing the input after each pick. Added: drag-and-drop on the zone, the input `sr-only` instead of `hidden`, and `role="alert"` on the form's error. The phone stays on `isContactPhone`, the rule `submit-claim` applies: a landline is a number Dorit can call back about a claim, and mobile-only would refuse what the function accepts.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CLAIMDOC-001 | "takes dropped files through the same checks as picked ones" | A dropped PDF is listed; a dropped `.exe` is not, and the alert names it with the type message |
+| CMP-CLAIMDOC-002 | "keeps the picker in the tab order: visually hidden, never display:none" | Class `sr-only`, not `hidden`; Tab reaches the input |
+| CMP-CLAIMDOC-003 | "accepts only the bucket's types, and says a picked file's problem in an alert" | `accept` lists PDF and HEIC; a 10 MB + 1 byte JPG gives the size message in `role="alert"`; the input's value is cleared |
+
+### 4.50 The home page's chat, loaded on demand — `tests/component/start-conversation-lazy-chat.test.tsx`
+
+Review 2026-10-15, item 22. `StartConversation` imports `AgentChat` with `lazy()`, so the chat and react-markdown leave the home page's first bundle. Measured with `CI=1 vite build` on this branch: the entry chunk went from 473,997 B (140,328 gzip) to 337,775 B (100,007 gzip). Everything the home page loads up front (entry and modulepreloads) went from 935,093 B (288,942 gzip) to 798,907 B (248,641 gzip), about −14% gzipped. `AgentChat` is its own 21,245 B chunk (7,118 gzip).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-LAZYCHAT-001 | "is not loaded with the section, and loads and shows once the visitor opens it" | The mocked module is not evaluated on render; after the צ'אט button, it is evaluated once and the chat shows |

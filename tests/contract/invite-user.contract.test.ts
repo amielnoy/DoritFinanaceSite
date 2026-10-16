@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
@@ -56,6 +56,29 @@ describe("invite-user — an agency Admin's act, and nothing wider", () => {
     expect(fn).toContain("callRpc('invitee_for', { p_email: email })");
     expect(sql).toMatch(/from auth\.users u\s+join public\.profiles p on p\.id = u\.id/);
     expect(sql).toMatch(/where lower\(u\.email\) = nullif\(lower\(btrim\(p_email\)\), ''\)/);
+    expect(sql).toContain("set search_path = ''");
+    expect(sql).toContain("revoke execute on function public.invitee_for(text) from public, anon, authenticated");
+    expect(sql).toContain("grant execute on function public.invitee_for(text) to service_role");
+  });
+
+  it("never resolves an unconfirmed account, in the latest definition of each identity function", () => {
+    const dir = join(REPO_ROOT, "supabase/migrations");
+    const migrations = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+    // The body of the last migration that (re)defines a function.
+    const latest = (name: string) => {
+      const pattern = new RegExp(`create (?:or replace )?function public\\.${name}\\([^]*?\\$\\$([^]*?)\\$\\$`, "i");
+      let body = "";
+      for (const file of migrations) body = pattern.exec(readFileSync(join(dir, file), "utf8"))?.[1] ?? body;
+      expect(body, `${name} is defined`).not.toBe("");
+      return body;
+    };
+    expect(latest("invitee_for")).toMatch(/u\.email_confirmed_at is not null/);
+    expect(latest("my_email")).toMatch(/email_confirmed_at is not null/);
+    expect(latest("my_enquiries")).toContain("public.my_email()");
+    expect(latest("my_snapshot")).toContain("public.my_email()");
+
+    const sql = read("supabase/migrations/20261031000000_invitee_confirmed.sql");
+    expect(sql).toContain("security definer");
     expect(sql).toContain("set search_path = ''");
     expect(sql).toContain("revoke execute on function public.invitee_for(text) from public, anon, authenticated");
     expect(sql).toContain("grant execute on function public.invitee_for(text) to service_role");

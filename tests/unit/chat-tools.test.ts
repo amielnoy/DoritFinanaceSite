@@ -68,6 +68,8 @@ describe("submitLead", () => {
       consent_at: "2026-10-13T09:00:00.000Z",
       channel: "google",
       landingPath: "/",
+      // Its partial and complete saves meet by the conversation, never by phone and name.
+      conversationRef: "chat:00000000-0000-4000-8000-000000000001",
     });
     expect(req.headers.get("origin")).toBe("https://govari-fin.co.il");
     expect(req.headers.get("x-forwarded-for")).toBe("203.0.113.9");

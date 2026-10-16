@@ -39,6 +39,7 @@ export function interviewBody(summary: InterviewSummary): Record<string, unknown
     channel: summary.channel ?? "",
     campaign: summary.campaign ?? "",
     landingPath: summary.landingPath ?? "",
+    conversationRef: summary.conversationRef ?? "",
   };
 }
 

@@ -82,7 +82,7 @@ export async function handler(req: Request): Promise<Response> {
     const input = (await req.json().catch(() => null)) as Record<string, unknown> | null;
 
     const ip = clientIp(req);
-    if (ip && !(await withinLimit(log, rid, `masleka-ip:${await sha256Hex(ip)}`, 3600, PER_IP_PER_HOUR))) {
+    if (!(await withinLimit(log, rid, `masleka-ip:${await sha256Hex(ip)}`, 3600, PER_IP_PER_HOUR))) {
       log('warn', 'request.rejected', { rid, reason: 'rate_limited_ip' });
       return Response.json({ error: 'rate_limited', rid }, { status: 429, headers: cors });
     }

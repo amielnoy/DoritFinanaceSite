@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePensionFees, formatIls } from "@/lib/pension-fee";
+import { computePensionFees, formatIls, PENSION_FEE_RANGES } from "@/lib/pension-fee";
 
 const BASE = {
   monthlyDeposit: 2000,
@@ -126,6 +126,29 @@ describe("computePensionFees — hostile input", () => {
   it("floors fractional years to whole months rather than looping oddly", () => {
     const r = computePensionFees({ ...BASE, years: 1.5 });
     expect(r.totalDeposited).toBe(2000 * 18);
+  });
+});
+
+/** As retirement-projection.ts clamps with RANGES (review 2026-10-15, item 20). */
+describe("computePensionFees — the ranges it takes", () => {
+  it("clamps years to 0–60: a billion years is sixty, not a loop of minutes", () => {
+    expect(PENSION_FEE_RANGES.years).toEqual({ min: 0, max: 60 });
+    expect(computePensionFees({ ...BASE, years: 1e9 })).toEqual(computePensionFees({ ...BASE, years: 60 }));
+  });
+
+  it("clamps each percentage to 0–100, so no fee goes past the whole deposit or below nothing", () => {
+    expect(computePensionFees({ ...BASE, depositFee: 500 })).toEqual(computePensionFees({ ...BASE, depositFee: 100 }));
+    expect(computePensionFees({ ...BASE, annualFee: -3 })).toEqual(computePensionFees({ ...BASE, annualFee: 0 }));
+    expect(computePensionFees({ ...BASE, annualReturn: 400 })).toEqual(computePensionFees({ ...BASE, annualReturn: 100 }));
+    const r = computePensionFees({ ...BASE, depositFee: 500, annualFee: 500 });
+    expect(r.balance).toBeGreaterThanOrEqual(0);
+    expect(r.totalFees).toBeLessThanOrEqual(r.totalDeposited);
+  });
+
+  it("treats a negative deposit as nothing deposited", () => {
+    const r = computePensionFees({ ...BASE, monthlyDeposit: -2000 });
+    expect(r.totalDeposited).toBe(0);
+    expect(r.balance).toBe(0);
   });
 });
 

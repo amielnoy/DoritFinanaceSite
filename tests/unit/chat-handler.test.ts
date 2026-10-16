@@ -1,8 +1,9 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelClient, ModelRequest, ModelResponse } from "../../supabase/functions/chat/anthropic.ts";
 import { ModelError } from "../../supabase/functions/chat/anthropic.ts";
 import type { UsageTotals } from "../../supabase/functions/chat/budget.ts";
-import { createChatHandler, MAX_CONSENT_VERSION_CHARS, type ChatDeps } from "../../supabase/functions/chat/handler.ts";
+import { createChatHandler, MAX_CONSENT_VERSION_CHARS, type ChatDeps, consentInstant, CONSENT_MAX_AGE_MS } from "../../supabase/functions/chat/handler.ts";
 import { toFacts, type ChatStore, type ConversationRow, type NewConversation, type UpdateOptions } from "../../supabase/functions/chat/store.ts";
 import { createToolRunner, type EdgeHandler, type ToolCallContext, type ToolOutcome } from "../../supabase/functions/chat/tools.ts";
 import { createSheetLogSweep } from "../../supabase/functions/chat/sweep.ts";
@@ -30,9 +31,11 @@ class MemoryStore implements ChatStore {
   }
   async createConversation(row: NewConversation) {
     this.check();
+    // The primary key: PostgREST refuses a second row under the same id with 409 / 23505.
+    if (row.id && this.conversations.has(row.id)) throw new Error("insert_http_409:23505");
     const id = `00000000-0000-4000-8000-${String(++this.n).padStart(12, "0")}`;
     const full = { id, status: "open" as const, lead_id: null, escalated_at: null, turns: 0, busy_until: null as string | null, last_message_at: new Date(clock.now).toISOString(), ...row };
-    this.conversations.set(id, full);
+    this.conversations.set(full.id, full);
     return { ...full };
   }
   async getConversation(id: string) {
@@ -213,6 +216,27 @@ describe("the first message", () => {
   });
 });
 
+describe("the consent time it keeps (review 2026-10-15)", () => {
+  const now = Date.UTC(2026, 9, 13, 9, 0);
+  it("keeps the browser's time when it is plausible", () => {
+    expect(consentInstant("2026-10-13T08:59:00.000Z", now)).toBe("2026-10-13T08:59:00.000Z");
+  });
+
+  it("never dates consent after the server's now", () => {
+    expect(consentInstant("2030-01-01T00:00:00.000Z", now)).toBe("2026-10-13T09:00:00.000Z");
+  });
+
+  it("never further back than the gate could have been open", () => {
+    expect(consentInstant("2020-01-01T00:00:00.000Z", now)).toBe(new Date(now - CONSENT_MAX_AGE_MS).toISOString());
+  });
+
+  it("stores the clamped time on the conversation it opens", async () => {
+    const { chat, store } = setup();
+    await chat(post({ ...first(), consentAt: "2030-01-01T00:00:00.000Z" }));
+    expect([...store.conversations.values()][0].consent_at).toBe(new Date(clock.now).toISOString());
+  });
+});
+
 describe("limits", () => {
   it("answers 429 when the visitor's address is over its limit", async () => {
     const { chat } = setup({ allow: vi.fn(async (_rid: string, key: string) => !key.startsWith("chat-ip:")) });
@@ -223,6 +247,23 @@ describe("limits", () => {
   it("answers 429 when the site is over its new-conversation limit", async () => {
     const { chat } = setup({ allow: vi.fn(async (_rid: string, key: string) => key !== "chat-new") });
     expect((await json(await chat(post(first())))).status).toBe(429);
+  });
+
+  it("answers 429 when one address opens too many conversations, counted by its hash (review 2026-10-15)", async () => {
+    const allow = vi.fn(async (_rid: string, key: string) => !key.startsWith("chat-new-ip:"));
+    const { chat } = setup({ allow });
+    expect((await json(await chat(post(first(), { "x-forwarded-for": "6.6.6.6, 203.0.113.7" })))).status).toBe(429);
+    const key = allow.mock.calls.map((c) => c[1]).find((k) => k.startsWith("chat-new-ip:"))!;
+    expect(key).toMatch(/^chat-new-ip:[0-9a-f]{64}$/);
+    expect(key).not.toContain("203.0.113.7");
+  });
+
+  it("hands the tools the address it resolved — the gateway's, never one the visitor put first", async () => {
+    const runTool = vi.fn(async (_n: string, _i: Record<string, unknown>, _ctx: ToolCallContext): Promise<ToolOutcome> =>
+      ({ name: "submitLead", status: "ok", forModel: "{}", isError: false }));
+    const { chat } = setup({ runTool }, [toolUse("submitLead", {}), text("נשמר.")]);
+    await chat(post(first(), { "x-forwarded-for": "6.6.6.6, 203.0.113.7" }));
+    expect(runTool.mock.calls[0][2].forwardedFor).toBe("203.0.113.7");
   });
 
   it("lets an evaluation run past both limits", async () => {
@@ -604,10 +645,10 @@ describe("privacy", () => {
   it("answers only the wire contract's fields, never the stored row or its token hash", async () => {
     const { chat, store } = setup({}, [text("שלום"), text("ועוד")]);
     const firstAnswer = await json(await chat(post(first())));
-    expect(Object.keys(firstAnswer.body).sort()).toEqual(["conversationId", "leadSaved", "ok", "reply", "rid", "status", "token"]);
+    expect(Object.keys(firstAnswer.body).sort()).toEqual(["conversationId", "leadSaved", "ok", "reply", "rid", "status", "token", "turn"]);
     const hash = [...store.conversations.values()][0].token_hash;
     const later = await json(await chat(post(next(firstAnswer.body.conversationId))));
-    expect(Object.keys(later.body).sort()).toEqual(["conversationId", "leadSaved", "ok", "reply", "rid", "status"]);
+    expect(Object.keys(later.body).sort()).toEqual(["conversationId", "leadSaved", "ok", "reply", "rid", "status", "turn"]);
     for (const answer of [firstAnswer, later]) expect(JSON.stringify(answer.body)).not.toContain(hash);
   });
 
@@ -737,12 +778,75 @@ describe("HTTP", () => {
 });
 
 /**
+ * The page makes the conversation's id and token (review 2026-10-15, item 12),
+ * so a first message whose answer was lost can be asked about, and a resend
+ * reaches the same row instead of opening a second — one lead, one hand-off.
+ */
+describe("a conversation the page names", () => {
+  const PAGE_ID = "3f2a6c1e-8b4d-4e7a-9c0f-1a2b3c4d5e6f";
+  const PAGE_TOKEN = "c".repeat(64);
+  const opening = (message = "שלום") => ({ ...first(message), conversationId: PAGE_ID, token: PAGE_TOKEN });
+  const hash = (t: string) => createHash("sha256").update(t).digest("hex");
+
+  it("opens under the page's own id and token, and hands back no token of its own", async () => {
+    const { chat, store } = setup();
+    const res = await json(await chat(post(opening())));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, conversationId: PAGE_ID, turn: 1 });
+    expect(res.body).not.toHaveProperty("token");
+    expect(store.conversations.get(PAGE_ID)).toMatchObject({ token_hash: hash(PAGE_TOKEN), turns: 1 });
+  });
+
+  it("continues the same row when the first message is sent again, and counts no second opening", async () => {
+    const allow = vi.fn(async () => true);
+    const { chat, store } = setup({ allow }, [text("שלום"), text("שוב שלום")]);
+    await chat(post(opening()));
+    const again = await json(await chat(post(opening())));
+    expect(again.status).toBe(200);
+    expect(again.body).toMatchObject({ conversationId: PAGE_ID, turn: 2 });
+    expect(store.conversations.size).toBe(1);
+    expect(allow.mock.calls.filter(([, key]) => key === "chat-new")).toHaveLength(1);
+  });
+
+  it("answers busy when the same first message arrives twice at once, opening one row", async () => {
+    const { chat, store } = setup();
+    await chat(post(opening()));
+    // The second request read before the first one's row existed.
+    vi.spyOn(store, "getConversation").mockResolvedValueOnce(null);
+    const res = await json(await chat(post(opening())));
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ ok: false, code: "busy" });
+    expect(store.conversations.size).toBe(1);
+  });
+
+  it("refuses the id with another token, and an id it never saw without the consent, as gone", async () => {
+    const { chat, store, model } = setup();
+    await chat(post(opening()));
+    const calls = model.calls.length;
+    const wrong = await json(await chat(post({ ...opening(), token: "d".repeat(64) })));
+    expect(wrong).toMatchObject({ status: 403, body: { code: "gone" } });
+    const unknown = await json(await chat(post(next("9e8d7c6b-5a49-4382-b716-0f1e2d3c4b5a"))));
+    expect(unknown).toMatchObject({ status: 403, body: { code: "gone" } });
+    expect(store.conversations.size).toBe(1);
+    expect(model.calls.length).toBe(calls);
+  });
+
+  it("refuses an id or token that is not the expected shape, opening nothing", async () => {
+    const { chat, store } = setup();
+    for (const body of [{ ...opening(), conversationId: "not-a-uuid" }, { ...opening(), token: "short" }]) {
+      expect((await json(await chat(post(body)))).status).toBe(403);
+    }
+    expect(store.conversations.size).toBe(0);
+  });
+});
+
+/**
  * The page stops waiting at 40 s while a turn may run on — its tools outside the
  * 25 s model budget — and save the lead. It then asks how the turn ended instead
  * of telling the visitor it failed (review 2026-10-15). A status request runs no turn.
  */
 describe("a status request", () => {
-  const status = (id: unknown, token = TOKEN) => ({ agent: "needs_interview", conversationId: id, token, status: true });
+  const status = (id: unknown, token = TOKEN, turn: unknown = 1) => ({ agent: "needs_interview", conversationId: id, token, status: true, turn });
 
   it("says the turn is still running while it holds the conversation", async () => {
     const { chat, store, model } = setup({}, [text("שלום! מה שלומך?")]);
@@ -761,9 +865,34 @@ describe("a status request", () => {
     const { body } = await json(await chat(post(first())));
     const id = body.conversationId as string;
     const res = await json(await chat(post(status(id))));
-    expect(res.body).toMatchObject({ ok: true, busy: false, leadSaved: false, last: { role: "assistant", content: "שלום! מה שלומך?" } });
+    expect(res.body).toMatchObject({ ok: true, busy: false, leadSaved: false, turns: 1, last: { role: "assistant", content: "שלום! מה שלומך?" } });
     store.conversations.get(id)!.status = "lead_saved";
     expect((await json(await chat(post(status(id))))).body).toMatchObject({ leadSaved: true });
+  });
+
+  it("numbers every turn in its answer, the number a status request names", async () => {
+    const { chat } = setup({}, [text("שלום"), text("ועוד")]);
+    const opened = await json(await chat(post(first())));
+    expect(opened.body.turn).toBe(1);
+    expect((await json(await chat(post(next(opened.body.conversationId))))).body.turn).toBe(2);
+  });
+
+  it("never hands an earlier turn's reply as the reply of the turn asked about", async () => {
+    const { chat } = setup({}, [text("שלום! מה שלומך?")]);
+    const id = (await json(await chat(post(first())))).body.conversationId;
+    // Turn 2 never started (its request died before the claim): turn 1's reply is not its.
+    const never = await json(await chat(post(status(id, TOKEN, 2))));
+    expect(never.body).toMatchObject({ ok: true, busy: false, turns: 1, last: null });
+    // A request that names no turn — a page from before turns were numbered — gets no reply either.
+    expect((await json(await chat(post({ agent: "needs_interview", conversationId: id, token: TOKEN, status: true })))).body).toMatchObject({ last: null });
+    expect((await json(await chat(post(status(id, TOKEN, "1"))))).body).toMatchObject({ last: null });
+  });
+
+  it("gives no reply while the turn asked about still runs, whatever the newest message is", async () => {
+    const { chat, store } = setup({}, [text("שלום! מה שלומך?")]);
+    const id = (await json(await chat(post(first())))).body.conversationId as string;
+    Object.assign(store.conversations.get(id)!, { turns: 2, busy_until: new Date(Date.now() + 60_000).toISOString() });
+    expect((await json(await chat(post(status(id, TOKEN, 2))))).body).toMatchObject({ busy: true, turns: 2, last: null });
   });
 
   it("refuses a status request without the conversation's token, and runs nothing", async () => {

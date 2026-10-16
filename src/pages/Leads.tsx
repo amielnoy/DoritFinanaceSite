@@ -131,6 +131,13 @@ function LeadDetails({ lead }: { lead: LeadRecord }) {
 }
 
 /** The chips past the settable statuses: what the backend writes, and the unassigned queue. */
+/**
+ * "דורשות טיפול": new leads, and escalated ones — a visitor who asked for Dorit
+ * herself (review 2026-10-15). The card counts both and its filter shows both.
+ */
+const NEEDS_ATTENTION: string[] = ["new", "escalated"];
+const ATTENTION = "attention";
+
 const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean }[] = [
   { key: "escalated", label: "הועברו לטיפול" },
   { key: "partial", label: "ראיונות שלא הושלמו" },
@@ -173,7 +180,13 @@ export default function Leads() {
   const assigneeLabel = (id: string | null | undefined) => (id ? assignees.find((a) => a.id === id)?.label ?? "חבר/ה שכבר לא בסוכנות" : "—");
 
   const filtered = leads.filter(
-    (l) => filter === "all" || (filter === "unassigned" ? !l.assigned_user_id && l.status !== "closed" : l.status === filter),
+    (l) =>
+      filter === "all" ||
+      (filter === "unassigned"
+        ? !l.assigned_user_id && l.status !== "closed"
+        : filter === ATTENTION
+          ? NEEDS_ATTENTION.includes(l.status)
+          : l.status === filter),
   );
 
   const exportCsv = (all: boolean) => {
@@ -238,12 +251,12 @@ export default function Leads() {
             <p className="text-xs text-muted-foreground mt-1">כל הרשומות במערכת</p>
           </button>
           <button
-            onClick={() => setFilter("new")}
-            className={`text-right p-5 border transition-colors ${filter === "new" ? "border-highlight bg-highlight/10" : "border-border/60 hover:border-highlight/50 bg-card"}`}
+            onClick={() => setFilter(ATTENTION)}
+            className={`text-right p-5 border transition-colors ${filter === ATTENTION ? "border-highlight bg-highlight/10" : "border-border/60 hover:border-highlight/50 bg-card"}`}
           >
             <p className="text-sm text-highlight-ink">דורשות טיפול</p>
-            <p className="font-heading text-3xl mt-2 text-highlight-ink">{counts.new || 0}</p>
-            <p className="text-xs text-muted-foreground mt-1">לקוחות חדשים — ליצור קשר</p>
+            <p className="font-heading text-3xl mt-2 text-highlight-ink">{(counts.new || 0) + (counts.escalated || 0)}</p>
+            <p className="text-xs text-muted-foreground mt-1">חדשות, ומי שביקשו את דורית — ליצור קשר</p>
           </button>
           <button
             onClick={() => setFilter("contacted")}

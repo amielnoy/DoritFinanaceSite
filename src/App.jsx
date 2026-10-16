@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect } from 'react';
-import { initClickTracking, initInternalFlag } from '@/lib/analytics';
+import { Suspense, lazy, useEffect, useLayoutEffect } from 'react';
+import { initClickTracking, initInternalFlag, measureRoute } from '@/lib/analytics';
 import { captureAttribution } from '@/lib/attribution';
 import { MotionConfig } from 'framer-motion';
 import { Toaster } from "@/components/ui/toaster"
@@ -87,6 +87,13 @@ const RouteFallback = () => (
 const LoginRedirect = () => {
   const { pathname, search } = useLocation();
   return <Navigate to={`/login?returnTo=${encodeURIComponent(pathname + search)}`} replace />;
+};
+
+// GA4 is off on /admin, switched before the route's screen renders (measureRoute).
+const AnalyticsRouteGuard = () => {
+  const { pathname } = useLocation();
+  useLayoutEffect(() => measureRoute(pathname), [pathname]);
+  return null;
 };
 
 const AuthenticatedApp = () => {
@@ -190,6 +197,7 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
+          <AnalyticsRouteGuard />
           <SeoRouteGuard />
           {/* Mounted only where its endpoint exists. The beacon posts to
               `/_vercel/insights/*`, a path Vercel's edge synthesises and no

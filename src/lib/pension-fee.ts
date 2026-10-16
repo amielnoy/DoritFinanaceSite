@@ -35,15 +35,29 @@ export interface PensionFeeResult {
 const num = (v: number | string | undefined | null): number => Number(v) || 0;
 
 /**
+ * הטווחים שהחישוב מקבל — כמו RANGES ב-retirement-projection.ts: ערך שהוקלד מעבר להם נחתך.
+ * What the math takes (review 2026-10-15): 1e9 years looped for minutes and a
+ * 500% fee went negative. Anything typed past a range is clamped to it.
+ */
+export const PENSION_FEE_RANGES = {
+  years: { min: 0, max: 60 },
+  depositFee: { min: 0, max: 100 },
+  annualFee: { min: 0, max: 100 },
+  annualReturn: { min: 0, max: 100 },
+} as const;
+
+const clamp = (v: number, { min, max }: { min: number; max: number }): number => Math.min(max, Math.max(min, v));
+
+/**
  * מודל חודשי: תשואה → הפקדה בניכוי דמי הפקדה → גביית דמי ניהול שוטפים.
  * `lostToFees` מושווה לתרחיש אידיאלי באותה תשואה וללא דמי ניהול כלל.
  */
 export function computePensionFees(input: PensionFeeInput): PensionFeeResult {
-  const monthly = num(input.monthlyDeposit);
-  const depositFeeRate = num(input.depositFee) / 100;
-  const annualFeeRate = num(input.annualFee) / 100;
-  const years = num(input.years);
-  const returnRate = num(input.annualReturn) / 100;
+  const monthly = Math.max(0, num(input.monthlyDeposit));
+  const depositFeeRate = clamp(num(input.depositFee), PENSION_FEE_RANGES.depositFee) / 100;
+  const annualFeeRate = clamp(num(input.annualFee), PENSION_FEE_RANGES.annualFee) / 100;
+  const years = clamp(num(input.years), PENSION_FEE_RANGES.years);
+  const returnRate = clamp(num(input.annualReturn), PENSION_FEE_RANGES.annualReturn) / 100;
 
   const months = Math.max(0, Math.floor(years * 12));
   const monthlyReturn = returnRate / 12;
