@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Publishes specific BlogPost drafts by exact title — never "every current
- * draft" — the same two-store write `contentAdmin` makes from /admin/blog,
- * run from the CLI (or GitHub Actions) instead of a click in the browser.
+ * Publishes specific blog drafts by exact title — never "every current
+ * draft" — the same write the eye button makes in /admin/blog, run from the
+ * CLI (or GitHub Actions) instead of a click in the browser.
  *
- *   TITLES=$'כותרת ראשונה\nכותרת שנייה' node scripts/publish-blog.mjs
+ *   TITLES=$'כותרת ראשונה\nכותרת שנייה' node --env-file=.env.local scripts/publish-blog.mjs
  *   TITLES=$'כותרת ראשונה\nכותרת שנייה' node --env-file=.env.local scripts/publish-blog.mjs --apply
  *
  * `TITLES` is newline-separated so a GitHub Actions multiline input maps onto
@@ -12,75 +12,66 @@
  * prune-vercel.mjs: it reports what each title resolves to and changes
  * nothing until `--apply` is given.
  *
- * Needs `base44 login` (once, as the app owner) and, for `--apply`,
- * SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — the same two stores seed-blog.mjs
- * writes, kept in sync for the same reason: a post nobody can see on the site
- * is worse than one not yet marked published.
+ * Supabase's `blog_posts` is the only store — the site and /admin/blog
+ * (VITE_CONTENT_WRITES=supabase) read and write it, and Base44's BlogPost is
+ * no longer written. Both the preview and `--apply` need SUPABASE_URL and
+ * SUPABASE_SERVICE_ROLE_KEY: `blog_posts` holds drafts only an admin or the
+ * service role can see.
  */
-import { execFileSync } from "node:child_process";
 
 const apply = process.argv.includes("--apply");
 
 /**
- * What each requested title resolves to, against what Base44 already holds.
+ * What each requested title resolves to, against the posts `blog_posts` holds.
  *
- * Pure, so the three outcomes — found and draft, found and already
- * published, not found at all — are testable without a database. A title
+ * Pure, so the outcomes — found and draft, found and already published, not
+ * found, and found more than once — are testable without a database. A title
  * that matches nothing is reported, never silently skipped: a typo in the
- * input must not look like a successful run that published nothing.
+ * input must not look like a successful run that published nothing. Titles
+ * are not unique in the table, and a title two posts share is refused rather
+ * than publishing whichever comes first.
  */
 export function planPublish(titles, existing) {
   return titles.map((title) => {
-    const match = existing.find((p) => p.title === title);
-    if (!match) return { title, found: false };
-    return { title, found: true, id: match.id, alreadyPublished: Boolean(match.published) };
+    const matches = existing.filter((p) => p.title === title);
+    if (matches.length === 0) return { title, found: false };
+    if (matches.length > 1) return { title, found: false, ambiguous: matches.map((p) => p.slug) };
+    const [match] = matches;
+    return { title, found: true, id: match.id, slug: match.slug, alreadyPublished: Boolean(match.published) };
   });
 }
 
-/** Precedes the one line of JSON an exec script prints, among the CLI's own output. */
-const RESULT = "@@publish-blog@@";
-
-/** The JSON an exec script printed, out of everything else on stdout. */
-export function readExecResult(stdout) {
-  const line = stdout.split("\n").find((l) => l.startsWith(RESULT));
-  if (!line) throw new Error("base44 exec printed no result — is the CLI signed in? (`base44 login`)");
-  return JSON.parse(line.slice(RESULT.length));
+function headers(key, extra = {}) {
+  return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...extra };
 }
 
-/** Run a script against production data as the CLI's signed-in user. */
-function base44Exec(code) {
-  const stdout = execFileSync("npx", ["base44", "exec", "--privileged", "--data-env", "prod"], {
-    input: code,
-    encoding: "utf8",
-    maxBuffer: 16 * 1024 * 1024,
-    stdio: ["pipe", "pipe", "inherit"],
+/** Every post's id, slug, title and state — drafts included, which needs the service role. */
+export async function listPosts(url, key, fetchImpl = fetch) {
+  const res = await fetchImpl(`${url}/rest/v1/blog_posts?select=id,slug,title,published&limit=1000`, {
+    headers: headers(key),
   });
-  return readExecResult(stdout);
+  if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
+  const rows = await res.json();
+  if (!Array.isArray(rows)) throw new Error("blog_posts answered with something that is not a list");
+  return rows;
 }
 
 /**
- * Publish the Supabase copy in place.
+ * Publish one post in place.
  *
- * A PATCH, not an upsert: publishing changes `published` and nothing else,
- * and must never create a row Base44 does not have. An empty answer means no
- * row had this base44_id — reported as a failure, never counted as published.
+ * A PATCH by id that changes `published` and nothing else, and never creates a
+ * row. An empty answer means no row had this id — reported as a failure,
+ * never counted as published.
  */
-export async function publishInSupabase(url, key, base44Id, fetchImpl = fetch) {
-  const res = await fetchImpl(`${url}/rest/v1/blog_posts?base44_id=eq.${encodeURIComponent(base44Id)}`, {
+export async function publishInSupabase(url, key, id, fetchImpl = fetch) {
+  const res = await fetchImpl(`${url}/rest/v1/blog_posts?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
+    headers: headers(key, { Prefer: "return=representation" }),
     body: JSON.stringify({ published: true }),
   });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
   const rows = await res.json().catch(() => null);
-  if (!Array.isArray(rows) || rows.length === 0) {
-    throw new Error("no Supabase row has this base44_id — run scripts/reconcile-stores.mjs");
-  }
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error("no blog_posts row has this id");
 }
 
 function loadTitles() {
@@ -93,17 +84,21 @@ function loadTitles() {
 async function main() {
   const titles = loadTitles();
 
-  const existing = base44Exec(
-    `const rows = await base44.entities.BlogPost.list("-created_date", 200);
-     console.log(${JSON.stringify(RESULT)} + JSON.stringify(rows.map((r) => ({ id: r.id, title: r.title, published: r.published }))));`
-  );
-  const steps = planPublish(titles, existing);
+  const { SUPABASE_SERVICE_ROLE_KEY: key } = process.env;
+  const url = process.env.SUPABASE_URL?.replace(/\/+$/, "");
+  if (!url || !key) {
+    console.error("חסרים משתני סביבה: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.");
+    process.exit(1);
+  }
+
+  const steps = planPublish(titles, await listPosts(url, key));
 
   console.log(`${steps.length} כותרת/ות התבקשו:\n`);
   for (const s of steps) {
-    if (!s.found) console.log(`  ✗ לא נמצא: ${s.title}`);
-    else if (s.alreadyPublished) console.log(`  = כבר פורסם: ${s.title} (${s.id})`);
-    else console.log(`  → טיוטה, יפורסם: ${s.title} (${s.id})`);
+    if (s.ambiguous) console.log(`  ✗ כמה מאמרים בכותרת הזו (${s.ambiguous.join(", ")}): ${s.title}`);
+    else if (!s.found) console.log(`  ✗ לא נמצא: ${s.title}`);
+    else if (s.alreadyPublished) console.log(`  = כבר פורסם: ${s.title} (/blog/${s.slug})`);
+    else console.log(`  → טיוטה, יפורסם: ${s.title} (/blog/${s.slug})`);
   }
 
   const notFound = steps.filter((s) => !s.found);
@@ -121,28 +116,14 @@ async function main() {
     return;
   }
 
-  const { SUPABASE_SERVICE_ROLE_KEY } = process.env;
-  const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/+$/, "");
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("חסרים משתני סביבה: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.");
-    process.exit(1);
-  }
-
-  const ids = toPublish.map((s) => s.id);
-  base44Exec(
-    `const ids = ${JSON.stringify(ids)};
-     for (const id of ids) { await base44.entities.BlogPost.update(id, { published: true }); }
-     console.log(${JSON.stringify(RESULT)} + JSON.stringify("ok"));`
-  );
-
   let failed = 0;
   for (const s of toPublish) {
     try {
-      await publishInSupabase(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, s.id);
+      await publishInSupabase(url, key, s.id);
       console.log(`פורסם: ${s.title}`);
     } catch (e) {
       failed++;
-      console.error(`Base44 פורסם, Supabase נכשל — ${s.title}: ${e.message}`);
+      console.error(`נכשל — ${s.title}: ${e.message}`);
     }
   }
 
