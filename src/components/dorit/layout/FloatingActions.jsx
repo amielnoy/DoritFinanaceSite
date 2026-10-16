@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, MessageCircle, LifeBuoy } from "lucide-react";
+import { Phone, MessageCircle, CircleHelp } from "lucide-react";
 import { CONTACT } from "@/config/contact";
 import SupportLink from "./SupportLink";
 
@@ -29,7 +29,7 @@ export default function FloatingActions() {
         title="תמיכה — שאלה לעוזר של דורית"
         className="group w-14 h-14 rounded-full bg-card text-accent border border-accent/40 flex items-center justify-center shadow-lg hover:scale-105 transition-transform duration-300"
       >
-        <LifeBuoy size={24} className="group-hover:rotate-6 transition-transform" />
+        <CircleHelp size={24} className="group-hover:rotate-6 transition-transform" />
       </SupportLink>
     </div>
   );

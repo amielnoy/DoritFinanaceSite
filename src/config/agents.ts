@@ -1,4 +1,4 @@
-import { BookOpen, FileSearch, LifeBuoy, MessagesSquare } from "lucide-react";
+import { BookOpen, FileSearch, CircleHelp, MessagesSquare } from "lucide-react";
 import type { AgentDescriptor } from "@/components/dorit/chat/AgentChat";
 import { BLOG_RECOMMENDER_CONSENT_POINTS, PROCEDURES_CONSENT_POINTS,
   SUPPORT_CONSENT_POINTS } from "@/config/compliance";
@@ -121,7 +121,7 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
 
   support: {
     agent: "support_agent",
-    icon: LifeBuoy,
+    icon: CircleHelp,
     sectionId: "support-chat",
     // py-12 below md: on a phone this section is a short card, not the chat.
     sectionClassName: "py-12 md:py-32 border-t border-border/60",
