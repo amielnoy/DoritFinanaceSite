@@ -809,7 +809,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 |---|---|---|
 | UNIT-CHSTORE-001 | "reads a conversation by id" | GET `chat_conversations?id=eq.<id>&select=*&limit=1`; the row returned |
 | UNIT-CHSTORE-002 | "never queries with an id that is not a uuid" | `null`, no request sent |
-| UNIT-CHSTORE-003 | "lists a conversation's messages in the order they were written" | `order=id.asc&limit=200`; `role` and `content` only |
+| UNIT-CHSTORE-003 | "lists a conversation's newest 200 messages, in the order they were written (review 2026-10-15)" | `order=id.desc&limit=200`, then reversed: the newest 200, oldest first; `role` and `content` only |
 | UNIT-CHSTORE-004 | "reads this month's totals through the RPC, as numbers" | POST `rpc/chat_month_usage` with `p_agency_id`, `p_since`; bigint strings become numbers |
 | UNIT-CHSTORE-005 | "claims the month's budget alert once: true on the insert, false on the conflict" | 201 gives `true`; 409 (23505) gives `false` |
 | UNIT-CHSTORE-006 | "creates a conversation and hands back the stored row" | POST `chat_conversations`; the stored row returned |
@@ -1642,3 +1642,13 @@ The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). 
 
 `interviewBody` carries `conversationRef` (empty when there is none). The chat tool posts `chat:<conversation id>`. The needs wizard's contact step and its details share one `wizard:<uuid>`.
 
+### 4.68 The consent time the chat keeps — `tests/unit/chat-handler.test.ts` (new cases)
+
+The browser sends the time the visitor ticked the consent box, and the chat function stores it on the conversation. Review 2026-10-15: that time is the client's own claim. `consentInstant` clamps it into the last `CONSENT_MAX_AGE_MS` (2 hours) up to the server's now.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CHHANDLER-072 | "keeps the browser's time when it is plausible" (the consent time it keeps) | A time a minute before now is stored as sent |
+| UNIT-CHHANDLER-073 | "never dates consent after the server's now" (the consent time it keeps) | A time in 2030 becomes now |
+| UNIT-CHHANDLER-074 | "never further back than the gate could have been open" (the consent time it keeps) | A time years back becomes now − 2 h |
+| UNIT-CHHANDLER-075 | "stores the clamped time on the conversation it opens" (the consent time it keeps) | A 2030 `consentAt` is stored on the new row as now |
