@@ -757,6 +757,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTOOL-037 | "does not follow up once the conversation has a lead" | `hasLead: true`: `already_escalated` |
 | UNIT-CHTOOL-038 | "keeps the slugs the store has, in order, at most three" (recommendArticles) | Five asked, one unknown: three kept in order; the unknown named in `dropped` |
 | UNIT-CHTOOL-039 | "refuses a call with no slug it can show" (recommendArticles) | No `slugs`, a string, only unknowns: an error |
+| UNIT-CHTOOL-040 | "tells the model to answer in words after recommending, not to stop (evaluation of 2026-10-16)" (recommendArticles) | The model's result carries `next: RECOMMENDED_NEXT`: write a short Hebrew answer, the cards show below |
 
 ### 4.32a The chat's article source — `tests/unit/chat-articles.test.ts`
 
@@ -797,6 +798,8 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHTURN-010 | "fails a reply cut off at max_tokens inside a tool call, without running the tool or returning its text" | `stop_reason: max_tokens` with a partial `submitLead`: `TurnFailure` `truncated_tool_call`, usage kept, `runTool` never called (I1) |
 | UNIT-CHTURN-011 | "asks for up to 4,096 reply tokens, room for a full Hebrew profile and summary" | `MAX_REPLY_TOKENS` is 4096 and the request carries it (I1; 2,048 cut a complete save off in the evaluation of 2026-10-14) |
 | UNIT-CHTURN-012 | "still fails when the model asks for a tool even with tools switched off" | `TurnFailure` `too_many_tool_rounds`, three tool outcomes kept |
+| UNIT-CHTURN-013 | "introduces the recommended articles instead of failing when the reply after a recommendation is empty twice" | Two empty replies after a successful `recommendArticles`: reply `RECOMMENDED_FALLBACK_REPLY`, the recommendation kept (evaluation of 2026-10-16) |
+| UNIT-CHTURN-014 | "still fails an empty reply after a recommendation that found no article" | A failed `recommendArticles` then two empty replies: `empty_reply` |
 | UNIT-CHBUDGET-001 | "prices Haiku tokens per million" | 1M input + 1M cached + 1M output = $0.61 |
 | UNIT-CHBUDGET-002 | "prices an unknown model at the most expensive known rate, never at zero" | 1M input tokens = $2 |
 | UNIT-CHBUDGET-003 | "accepts the totals as PostgREST sends bigints" | String token counts are summed as numbers |

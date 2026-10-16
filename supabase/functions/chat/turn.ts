@@ -17,6 +17,12 @@ export const RETRY_WINDOW_MS = 10_000;
  * in the evaluation of 2026-10-14; a reply that short costs no more at 4,096.
  */
 export const MAX_REPLY_TOKENS = 4096;
+/**
+ * The reply when the model, having recommended articles, still answers with
+ * nothing: the recommendation cards are the answer, so the turn introduces them
+ * rather than failing. Any other empty reply still fails (empty_reply).
+ */
+export const RECOMMENDED_FALLBACK_REPLY = 'הנה כמה מאמרים שיכולים לעזור לך בנושא:';
 
 export interface StoredMessage {
   role: 'user' | 'assistant' | 'tool';
@@ -134,6 +140,9 @@ export async function runTurn(args: {
           askedAgain = true;
           round--;
           continue;
+        }
+        if (tools.some((t) => !t.isError && (t.recommended?.length ?? 0) > 0)) {
+          return { reply: RECOMMENDED_FALLBACK_REPLY, usage, tools, toolCalls };
         }
         throw new TurnFailure('empty_reply', tools, usage);
       }
