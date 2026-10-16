@@ -74,6 +74,9 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-PFC-013 | "grows existing savings alone when nothing is deposited" | `startingBalance` 100,000, 12% a year, 1 y, no deposits | `100,000 × 1.01¹²`; nothing deposited |
 | UNIT-PFC-014 | "charges the balance fee on the opening balance and counts it in what fees cost" | 200,000 opening, 0.5% a year, 10 y | Balance fees > 0; `lostToFees` ≥ them |
 | UNIT-PFC-015 | "is the calculator's own result when the opening balance is left out or not positive" | `startingBalance` 0 or −5 | Equal to the result without one |
+| UNIT-PFC-016 | "clamps years to 0–60: a billion years is sixty, not a loop of minutes" (review 2026-10-15) | `years` 1e9 | `PENSION_FEE_RANGES.years` is 0–60; the result equals 60 years' |
+| UNIT-PFC-017 | "clamps each percentage to 0–100, so no fee goes past the whole deposit or below nothing" (review 2026-10-15) | Deposit fee 500, annual fee −3, return 400, then both fees 500 | Equal to 100, 0 and 100; with both at 500 the balance is ≥ 0 and fees ≤ deposits |
+| UNIT-PFC-018 | "treats a negative deposit as nothing deposited" (review 2026-10-15) | `monthlyDeposit` −2,000 | Deposited 0, balance 0 |
 
 ### 4.2 Helpers — `tests/unit/utils.dom.test.ts`
 
