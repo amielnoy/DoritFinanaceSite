@@ -110,6 +110,13 @@ A hand-off that does not reach a person is a regulatory failure, so the limits n
 | INT-ESC-034..038 | "refuses a %s longer than its ceiling, writing and mailing nothing" | name 80, phone 30, topic 200, agent 60, email 254: 400 |
 | INT-ESC-039 | "drops an address that is not one, and still hands over" | 200; `email_invalid`; the lead's email empty; the injected recipient mailed nowhere |
 
+### 4.2c `log-support-chat` — how often (review 2026-10-15) — `INT-SUPPORT-020..022`
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-SUPPORT-020 | "counts a caller by a hash of the address, and every caller together (review 2026-10-15)" | `support-ip:<64 hex>` (60 an hour), then `support-log` (300 an hour, above the sweep's 40); the address appears in no key |
+| INT-SUPPORT-021..022 | "refuses past the %s limit with 429 and rid, and writes no row" | Either limit: 429 with `rid`; no sheet row |
+
 ### 4.3 `submitLead` — identifiers a visitor volunteered — `INT-LEAD-016/017`
 
 An ID number or card number in a model-written summary is redacted before anyone
