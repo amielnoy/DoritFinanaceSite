@@ -890,6 +890,16 @@ Review 2026-10-15, item 23. `public/favicon.svg` is a monogram ד drawn as shape
 | CTR-MTG-012 | "does not repeat an enquiry for a follow-up meeting" | `enquiries_for` reads `kind = 'first'`, `limit 1` |
 | CTR-MTG-013 | "judges a lead stale by its latest meeting, and clears the new free text with it" | `max(scheduled_at)`; summary, place and request notes nulled |
 
+### 4.25 Many meetings per lead — `client-meetings-many.contract.test.ts`
+
+`20261104000000_client_meetings_many.sql` (rollout 3) drops the one-meeting key an upsert on `lead_id` needs. A writer that came back to that upsert would fail in production with "no unique constraint matching", so the repository is searched for one.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-MTGM-001 | "sorts after the additive migration it depends on" | After `20261103000000` |
+| CTR-MTGM-002 | "drops the one-meeting key and indexes a lead's meetings by time" | `drop constraint meetings_lead_id_key`; `(lead_id, scheduled_at)` index |
+| CTR-MTGM-003 | "leaves no writer upserting meetings on lead_id" | No `on_conflict=lead_id`, `onConflict: 'lead_id'`, `on conflict (lead_id)` or `upsertRow('meetings'` in functions, pages, Base44 functions, scripts or migrations |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed

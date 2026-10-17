@@ -89,8 +89,9 @@ describe("PostgREST helpers", () => {
   });
 
   it("upserts on the named key", async () => {
-    await upsertRow("meetings", { lead_id: "abc", topic: "x" }, "lead_id");
-    expect(calls[0].url).toBe("https://p.supabase.test/rest/v1/meetings?on_conflict=lead_id");
+    // Any table and key: meetings no longer upserts (20261104000000_client_meetings_many.sql).
+    await upsertRow("contacts", { phone: "0501234567", name: "x" }, "phone");
+    expect(calls[0].url).toBe("https://p.supabase.test/rest/v1/contacts?on_conflict=phone");
     expect(calls[0].headers.Prefer).toBe("resolution=merge-duplicates,return=minimal");
   });
 

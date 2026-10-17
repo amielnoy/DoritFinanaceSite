@@ -284,3 +284,15 @@ follow-ups agreed in a meeting ("להביא טופס 106", "דורית שולח�
 - **`meeting_requests` grants.** Supabase's default privileges hand a new table
   to `anon` and `authenticated` in full, so the migration revokes them before
   granting staff `select` and `update (status, handled_at)` only.
+
+## Step 3 (2026-10-17)
+
+`20261104000000_client_meetings_many.sql` drops `meetings_lead_id_key` and adds
+`meetings_lead_id_scheduled (lead_id, scheduled_at)`. Checked first: no Edge
+Function, page, Base44 function, script or migration upserts `meetings` on
+`lead_id` (`tests/contract/client-meetings-many.contract.test.ts` now holds
+that), no SQL function in production does, and the only triggers on `meetings`
+are `meetings_fill_lead_id` and `meetings_touch`. Once applied, a signed-in
+client's rebooking joins their booked lead and staff can add a second meeting
+to it — `lead_for_email()` and the staff insert lift with no deploy.
+

@@ -169,11 +169,11 @@ describe("the meetings tab", () => {
   });
 
   it("says why a meeting was not added, in the service's words", async () => {
-    h.service.addMeeting.mockRejectedValue(new Error("לפנייה הזו כבר יש פגישה. עד העדכון הבא אפשר לשמור פגישה אחת לכל פנייה."));
+    h.service.addMeeting.mockRejectedValue(new Error("הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת"));
     const dialog = await openMeetings();
     fireEvent.click(within(dialog).getByRole("button", { name: /פגישה חדשה/ }));
     fireEvent.click(within(dialog).getByRole("button", { name: "שמירת הפגישה" }));
-    expect(await within(dialog).findByRole("alert")).toHaveProperty("textContent", expect.stringContaining("כבר יש פגישה"));
+    expect(await within(dialog).findByRole("alert")).toHaveProperty("textContent", expect.stringContaining("לא בוצעה"));
   });
 });
 
