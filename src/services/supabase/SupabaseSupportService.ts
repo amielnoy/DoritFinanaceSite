@@ -1,7 +1,7 @@
 import type { EscalationReceipt, EscalationRequest, SupportPort } from "../ports";
 import { escalationBody } from "../lead-bodies";
 import type { SupabaseFunctionsClient } from "./SupabaseLeadService";
-import { FALLBACK_CONTACT } from "../base44/Base44SupportService";
+import { FALLBACK_CONTACT } from "../fallback-contact";
 
 /**
  * The hand-off, on the `escalate-to-human` Edge Function. Like the Base44

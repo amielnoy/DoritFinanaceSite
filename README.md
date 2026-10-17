@@ -573,7 +573,7 @@ after load.
 `tests/contract/masleka-dark-launch.contract.test.ts` fails if either default
 changes or anything in the repo turns them on, and `e2e/ui/masleka.spec.ts`
 proves the dark page in the built site. Do not turn them on before Dorit's
-compliance adviser has signed off (`base44/agents/COMPLIANCE.md` §10).
+compliance adviser has signed off (`docs/COMPLIANCE.md` §10).
 
 **Secrets** (Supabase Edge Function secrets, set by hand):
 `MASLEKA_KEY` — `openssl rand -base64 32` (exactly 32 bytes; losing it makes
@@ -649,8 +649,8 @@ runs in CI):
 - [x] **The resubmitted-interview duplicate** — decided 2026-10-14, implemented. `submit-lead` reuses the contact's open `invited` request (see **Automatic invitations** for "the same contact"): it mails a new link in the confirmation and rotates the request's token only once that mail is accepted, restarting the thirty days and the one reminder. No second request.
 - [ ] Verify at swiftness.co.il whether the advisor portal needs the ID number besides the code; if not, a later PR drops `id_ciphertext`, `id_last4` and the form field. Confirm the saver-registration and advisor-portal URLs (`CLEARINGHOUSE_SAVER_URL` / `CLEARINGHOUSE_ADVISOR_URL`).
 - [ ] When the step screenshots are captured, confirm the portal's wording in `/admin/masleka/guide` against the real screens (the guide quotes no portal menu label until then).
-- [ ] **Privacy policy gate:** the privacy policy is updated to cover collecting the Israeli ID number and the clearinghouse code (purpose, retention of at most 9 days, access by staff, wipe) and the compliance adviser has approved the wording (`base44/agents/COMPLIANCE.md` §10, point 7). Not before switch-on, no switch-on.
-- [ ] The compliance adviser has approved the points in `base44/agents/COMPLIANCE.md` §10, including the interview and wizard wording that still promises a signed mandate.
+- [ ] **Privacy policy gate:** the privacy policy is updated to cover collecting the Israeli ID number and the clearinghouse code (purpose, retention of at most 9 days, access by staff, wipe) and the compliance adviser has approved the wording (`docs/COMPLIANCE.md` §10, point 7). Not before switch-on, no switch-on.
+- [ ] The compliance adviser has approved the points in `docs/COMPLIANCE.md` §10, including the interview and wizard wording that still promises a signed mandate.
 - [ ] After switch-on, open one test link with GA4 DebugView and confirm no `#t=` appears in `page_location`.
 - [ ] After switch-on, open one test link with the browser's network tab open and confirm the Vercel Web Analytics beacon (`/_vercel/insights/view`) carries a url with no `#t=`.
 - [ ] Staff memberships added (SQL above), Dorit's own `owner` row confirmed: `select * from public.memberships;`. **Blocked 2026-10-14:** Dorit has never signed in, so she has no `auth.users` row to attach a membership to.
@@ -1288,7 +1288,7 @@ The rest lives in the prompts, and `tests/contract/agents.contract.test.ts`
 fails if a mandatory clause disappears from any of them.
 
 Full description of the layer, what is enforced where, and one open question
-for דורית's compliance adviser: [`base44/agents/COMPLIANCE.md`](base44/agents/COMPLIANCE.md).
+for דורית's compliance adviser: [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
 
 ## How do I actually do this?
 
@@ -1411,7 +1411,7 @@ mail at all. The accepted risk: a visitor who mistyped an address that is
 another person's real, verified one exposes the enquiry to that person once
 they sign in. Decided 2026-10-06 by the site operator; the privacy policy says
 so, and the wording needs Dorit's and her compliance adviser's approval (see
-`base44/agents/COMPLIANCE.md` section 6). Data is reached only through
+`docs/COMPLIANCE.md` section 6). Data is reached only through
 `enquiries_for` in Supabase (migration `20261006000000_personal_area.sql`), via
 `my_enquiries()` — a wrapper that calls `enquiries_for(my_email())`. (The Base44
 function `myAccount`, which served Base44 sign-in, was removed on 2026-10-12.) Phone, name, notes and
@@ -2249,7 +2249,7 @@ display ← Events (or Key events ← New key event), once per name.
 
 **Open:** the privacy policy does not mention Google Analytics or cookies, and
 there is no consent banner. That is a question for Dorit's compliance adviser
-(`base44/agents/COMPLIANCE.md`, section 8), not something the code decides.
+(`docs/COMPLIANCE.md`, section 8), not something the code decides.
 
 ## The meeting, and which diary it lands in
 
