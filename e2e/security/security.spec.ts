@@ -1,11 +1,11 @@
-import { XSS_POST } from "../fixtures/data";
+import { AGENCY_ID, XSS_POST } from "../fixtures/data";
 import { collectPageErrors, expect, gotoApp, test, test_step } from "../fixtures/app";
 
 test.describe("XSS — untrusted content stays inert", () => {
   test("markdown from a blog post cannot execute script", async ({ page, mockApi }) => {
     await test_step("serve a post whose markdown tries four different injections", async () => {
-      mockApi.setEntityDoc("BlogPost", XSS_POST.id, XSS_POST);
-      await gotoApp(page, `/blog/${XSS_POST.id}`);
+      mockApi.setRow("blog_posts", XSS_POST);
+      await gotoApp(page, `/blog/${XSS_POST.slug}`);
       await expect(page.locator(".blog-body")).toBeVisible();
     });
 
@@ -22,8 +22,8 @@ test.describe("XSS — untrusted content stays inert", () => {
 
   test("HTML in a post body is rendered as visible text, not as markup", async ({ page, mockApi }) => {
     await test_step("open the hostile post", async () => {
-      mockApi.setEntityDoc("BlogPost", XSS_POST.id, XSS_POST);
-      await gotoApp(page, `/blog/${XSS_POST.id}`);
+      mockApi.setRow("blog_posts", XSS_POST);
+      await gotoApp(page, `/blog/${XSS_POST.slug}`);
     });
 
     await test_step("the tags are shown as text and never became elements", async () => {
@@ -36,8 +36,8 @@ test.describe("XSS — untrusted content stays inert", () => {
 
   test("a javascript: URL in markdown never becomes a live href", async ({ page, mockApi }) => {
     await test_step("open the hostile post", async () => {
-      mockApi.setEntityDoc("BlogPost", XSS_POST.id, XSS_POST);
-      await gotoApp(page, `/blog/${XSS_POST.id}`);
+      mockApi.setRow("blog_posts", XSS_POST);
+      await gotoApp(page, `/blog/${XSS_POST.slug}`);
     });
 
     await test_step("no rendered link carries a javascript: scheme", async () => {
@@ -50,8 +50,8 @@ test.describe("XSS — untrusted content stays inert", () => {
 
   test("a hostile post title is escaped in the heading", async ({ page, mockApi }) => {
     await test_step("open a post whose title is an <img onerror> payload", async () => {
-      mockApi.setEntityDoc("BlogPost", XSS_POST.id, XSS_POST);
-      await gotoApp(page, `/blog/${XSS_POST.id}`);
+      mockApi.setRow("blog_posts", XSS_POST);
+      await gotoApp(page, `/blog/${XSS_POST.slug}`);
     });
 
     await test_step("the heading shows the payload as text, not as an image", async () => {
@@ -63,22 +63,25 @@ test.describe("XSS — untrusted content stays inert", () => {
 
   test("a hostile testimonial cannot inject markup on the home page", async ({ page, mockApi }) => {
     await test_step("seed a testimonial whose name and quote carry payloads", async () => {
-      mockApi.setEntity("Testimonial", [
+      mockApi.setTable("testimonials", [
         {
-          id: "evil",
+          id: "7e570000-0000-4000-8000-0000000000ee",
+          base44_id: null,
           name: '<img src=x onerror="window.__xss_t=1">',
           role: "",
           quote: "<script>window.__xss_t = 1<\/script>",
-          rating: 5,
+          image_url: null,
+          rating: "5",
           source: "google",
-          created_date: "2026-01-01T00:00:00Z",
+          agency_id: AGENCY_ID,
+          created_at: "2026-01-01T00:00:00+00:00",
         },
       ]);
     });
 
     await test_step("render the home page with that testimonial", async () => {
       await gotoApp(page);
-      await mockApi.waitForRequest("/entities/Testimonial");
+      await mockApi.waitForRequest("/rest/v1/testimonials");
     });
 
     await test_step("nothing executed", async () => {
@@ -218,7 +221,7 @@ test.describe("Client-side security posture", () => {
     });
 
     await test_step("no lead was read on the way to the login screen", async () => {
-      expect(mockApi.requestsTo("/entities/Lead").filter((r) => r.method === "GET")).toHaveLength(0);
+      expect(mockApi.requestsTo("/rest/v1/leads")).toHaveLength(0);
     });
   });
 

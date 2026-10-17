@@ -88,7 +88,7 @@ test.describe("Claim submission", () => {
     });
 
     await test_step("nothing was sent along the way", async () => {
-      expect(mockApi.requestsTo("/functions/submitClaim")).toHaveLength(0);
+      expect(mockApi.requestsTo("/functions/v1/submit-claim")).toHaveLength(0);
     });
   });
 
@@ -107,7 +107,7 @@ test.describe("Claim submission", () => {
     await test_step("submit it", async () => form.submit.click());
 
     const req = await test_step("the report reaches the backend function", () =>
-      mockApi.waitForRequest("/functions/submitClaim")
+      mockApi.waitForRequest("/functions/v1/submit-claim")
     );
 
     await test_step("it carries what the visitor entered", async () => {
@@ -127,7 +127,7 @@ test.describe("Claim submission", () => {
   });
 
   test("keeps the report on screen and offers a fallback when the backend fails", async ({ page, mockApi }) => {
-    mockApi.failOn("/functions/submitClaim", 500, { error: "down" });
+    mockApi.failOn("/functions/v1/submit-claim", 500, { error: "down", rid: "e2e-rid" });
     const form = new ClaimFormPage(page);
     await form.open();
 
@@ -158,8 +158,8 @@ test.describe("Claim submission", () => {
     });
 
     await test_step("exactly one report was filed", async () => {
-      await mockApi.waitForRequest("/functions/submitClaim");
-      expect(mockApi.requestsTo("/functions/submitClaim")).toHaveLength(1);
+      await mockApi.waitForRequest("/functions/v1/submit-claim");
+      expect(mockApi.requestsTo("/functions/v1/submit-claim")).toHaveLength(1);
     });
   });
 
@@ -181,15 +181,18 @@ test.describe("Claim submission", () => {
       await expect(page.getByText(/"setup\.exe" — ניתן לצרף PDF או תמונה/)).toBeVisible();
       await expect(page.getByText("receipt.pdf")).toBeVisible();
       await expect(page.getByText("setup.exe", { exact: true })).toHaveCount(0);
-      expect(mockApi.requestsTo("/UploadFile")).toHaveLength(0);
+      expect(mockApi.requestsTo("/storage/v1/object/claim-documents/")).toHaveLength(0);
     });
 
     await test_step("send: the PDF is uploaded, then the report carries it", async () => {
       await form.fillMinimum(REPORTER.name, REPORTER.phone);
       await form.submit.click();
-      const report = await mockApi.waitForRequest("/functions/submitClaim");
-      expect(mockApi.requestsTo("/UploadFile")).toHaveLength(1);
-      expect((report.body as { documents: string[] }).documents).toHaveLength(1);
+      const report = await mockApi.waitForRequest("/functions/v1/submit-claim");
+      expect(mockApi.requestsTo("/storage/v1/object/claim-documents/")).toHaveLength(1);
+      const documents = (report.body as { documents: string[] }).documents;
+      expect(documents).toHaveLength(1);
+      // The object's path in the private bucket, never a link (SupabaseUploadService).
+      expect(documents[0]).toMatch(/^storage:claim-documents\/.+receipt\.pdf$/);
     });
   });
 });

@@ -12,7 +12,7 @@ import { evalEnabled as enabled, openConversation, questionCount } from "../help
  * asserted about by reading it, only by running it.
  *
  * So these drive the **real deployed agent** over the same API the site uses,
- * and read its replies. They are opt-in, following `e2e/api/base44-contract.spec.ts`:
+ * and read its replies. They are opt-in, following `e2e/api/supabase-live.spec.ts`:
  *
  *   EVAL_BASE44_APP_ID=<id> EVAL_BASE44_TOKEN=<token> npm run test:eval
  *

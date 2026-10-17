@@ -1,5 +1,5 @@
 import { devices } from "@playwright/test";
-import { expect, gotoApp, test, test_step, waitForAppLive } from "../fixtures/app";
+import { AGAINST_A_DEPLOYMENT, expect, gotoApp, stubBackend, test, test_step, waitForAppLive } from "../fixtures/app";
 
 /**
  * Google indexes and ranks the site from its *mobile* render. If the phone
@@ -21,23 +21,8 @@ test.describe("Mobile-first indexing parity", { tag: "@desktop-only" }, () => {
     );
     const page = await context.newPage();
 
-    // The suite's API stubs live on the fixture's page, so stub here too.
-    await page.route(/googletagmanager\.com|google-analytics\.com/, (r) => r.abort());
-    await page.route("**/api/**", (route) => {
-      const path = new URL(route.request().url()).pathname;
-      if (path.includes("/public-settings/")) {
-        return route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ id: "e2e-sanity-app", public_settings: {} }),
-        });
-      }
-      return route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([]),
-      });
-    });
+    // The suite's backend fake lives on the fixture's page, so install it on this one too.
+    const backend = await stubBackend(page);
 
     const out: Record<string, { title: string; description: string; canonical: string; robots: string; ldTypes: string[]; text: number }> = {};
     for (const path of ROUTES) {
@@ -74,6 +59,7 @@ test.describe("Mobile-first indexing parity", { tag: "@desktop-only" }, () => {
       }));
     }
 
+    if (!AGAINST_A_DEPLOYMENT) expect(backend.unmodelled, "requests the e2e backend does not model").toEqual([]);
     await context.close();
     return out;
   }
