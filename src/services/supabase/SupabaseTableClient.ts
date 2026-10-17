@@ -29,12 +29,13 @@ export interface SupabaseWriteQuery {
   eq(column: string, value: unknown): { select(columns: string): PromiseLike<SupabaseReadResult> };
 }
 
-/** The table client with the two writes the lead admin makes. */
+/** The table client with the writes the lead admin makes: update and delete, and a meeting's insert. */
 export interface SupabaseLeadTableClient extends SupabaseTableClient {
   from(table: string): {
     select(columns: string): SupabaseQuery;
     update(values: Record<string, unknown>): SupabaseWriteQuery;
     delete(): SupabaseWriteQuery;
+    insert(values: Record<string, unknown>): { select(columns: string): PromiseLike<SupabaseReadResult> };
   };
 }
 

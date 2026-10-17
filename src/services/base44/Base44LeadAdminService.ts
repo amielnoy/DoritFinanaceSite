@@ -1,5 +1,5 @@
 import { invokeFunction, type FunctionInvoker } from "./invoke";
-import type { LeadAdminPort, LeadRecord, LeadStatus, TranscriptLine } from "../ports";
+import type { LeadAdminPort, LeadMeeting, LeadRecord, LeadStatus, TranscriptLine } from "../ports";
 
 /** What this adapter needs: Lead reads through the entity, writes through the `adminLead` function. */
 export interface LeadAdminClient extends FunctionInvoker {
@@ -9,6 +9,8 @@ export interface LeadAdminClient extends FunctionInvoker {
     };
   };
 }
+
+const MEETINGS_SUPABASE_ONLY = "פגישות נשמרות רק ב-Supabase.";
 
 /**
  * Admin side of the lead store.
@@ -50,6 +52,26 @@ export class Base44LeadAdminService implements LeadAdminPort {
 
   async transcriptLeadIds(): Promise<string[]> {
     return [];
+  }
+
+  /**
+   * Meetings live in Supabase only (the Base44 bridge is not extended — spec
+   * 2026-10-17-client-meetings-design.md): no rows here, and every write is refused.
+   */
+  async meetings(): Promise<LeadMeeting[]> {
+    return [];
+  }
+
+  async addMeeting(): Promise<void> {
+    throw new Error(MEETINGS_SUPABASE_ONLY);
+  }
+
+  async updateMeeting(): Promise<void> {
+    throw new Error(MEETINGS_SUPABASE_ONLY);
+  }
+
+  async handleMeetingRequest(): Promise<void> {
+    throw new Error(MEETINGS_SUPABASE_ONLY);
   }
 
   async countNew(): Promise<number> {

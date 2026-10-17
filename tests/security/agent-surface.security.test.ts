@@ -145,7 +145,8 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
     const leads = read(join(REPO_ROOT, "src/pages/Leads.tsx"));
     expect(leads).not.toMatch(/dangerouslySetInnerHTML|innerHTML|react-markdown|ReactMarkdown/);
     const adapter = read(join(REPO_ROOT, "src/services/supabase/SupabaseLeadAdminService.ts"));
-    const transcript = adapter.slice(adapter.indexOf("async transcript("), adapter.indexOf("\n}\n", adapter.indexOf("async transcript(")));
+    // The method alone: the class also holds the meeting writes (client meetings, rollout 2).
+    const transcript = adapter.slice(adapter.indexOf("async transcript("), adapter.indexOf("\n  }\n", adapter.indexOf("async transcript(")));
     expect(transcript).toMatch(/chat_messages/);
     expect(transcript).not.toMatch(/\.(update|delete|insert|upsert|rpc)\(/);
     expect(adapter).not.toMatch(/service_role|SERVICE_ROLE/);

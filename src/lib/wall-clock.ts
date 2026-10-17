@@ -88,3 +88,46 @@ export function hebrewDay(ymd: Ymd): string {
   const [, m, d] = ymd.split("-");
   return `יום ${days[weekday(ymd)]}, ${Number(d)}.${m}`;
 }
+
+/** Israel's offset from UTC, in minutes, at the instant `at` (+120 or +180). */
+function israelOffsetMinutes(at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ, hourCycle: "h23",
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).formatToParts(at);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const wall = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
+  return Math.round((wall - Math.floor(at.getTime() / 60_000) * 60_000) / 60_000);
+}
+
+/**
+ * The instant at which Israel's wall clock reads `ymd` `hhmm` — what a
+ * staff member means by "14.12 at 17:30", as an ISO string for a timestamptz.
+ *
+ * The offset is read at the guess and again at the corrected instant, so a
+ * time on either side of a daylight-saving change lands on the right hour.
+ * Null for a day or time that does not parse.
+ */
+export function israelInstant(ymd: Ymd, hhmm: string): string | null {
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  const time = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  if (!day || !time) return null;
+  const naive = Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]), Number(time[1]), Number(time[2]));
+  if (Number.isNaN(naive)) return null;
+  let at = new Date(naive - israelOffsetMinutes(new Date(naive)) * 60_000);
+  at = new Date(naive - israelOffsetMinutes(at) * 60_000);
+  return at.toISOString();
+}
+
+/** An instant as Israel's wall clock shows it: the day and "HH:MM". */
+export function israelWallClock(iso: string): { ymd: Ymd; hhmm: string } | null {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ, hourCycle: "h23",
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).formatToParts(at);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return { ymd: `${get("year")}-${get("month")}-${get("day")}`, hhmm: `${get("hour")}:${get("minute")}` };
+}
+

@@ -945,3 +945,21 @@ D-10, manual test 2026-10-14. The support chat on the Base44 engine linked `/blo
 | CMP-CHATLINK-002 | "keep the old address for an article with no slug, or one the list does not have" | Both hrefs unchanged |
 | CMP-CHATLINK-003 | "leave slug links and other links alone, and do not read the articles for them" | Hrefs unchanged; `listArticles` not called |
 | CMP-CHATLINK-004 | "still links the old address when the articles cannot be read" | A failed read leaves `/blog/<id>`, which still reaches the article through the 301 |
+
+### 4.52 The lead drawer and its meetings — `tests/component/lead-meetings.test.tsx`
+
+docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2, behind `VITE_MEETINGS_STAFF`: the lead's name opens a drawer with "פרטים" and "פגישות · N" (the user's choice of 2026-10-17 — the table had no drawer). The meeting hooks are real; the service is the fake, so each button's payload is checked.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-MTG-001 | "leaves the table as it was when the switch is off" | The name is text; no meetings read |
+| CMP-MTG-002 | "opens on the lead's name, with its details and a meetings tab that counts them" | `פרטים` selected; `פגישות · 2`; read for that lead |
+| CMP-MTG-003 | "publishes the client summary, with the time it was published" | `updateMeeting(m-1, { clientSummary: trimmed, summaryPublishedAt: ISO })` |
+| CMP-MTG-004 | "does not offer to publish an empty summary" | Button disabled |
+| CMP-MTG-005 | "unpublishes a published summary, and says when it was published" | `פורסם ללקוח · 23.9, 09:12`; `{ summaryPublishedAt: null }` |
+| CMP-MTG-006 | "keeps Dorit's notes labelled as staff-only, apart from the client's summary" | Notes field labelled `— רק הצוות רואה`; summary empty |
+| CMP-MTG-007 | "shows the client's open request and marks it handled" | Banner with kind and note; `handleMeetingRequest(r-1)`; the meeting untouched |
+| CMP-MTG-008 | "adds a meeting in the lead's agency, on Israel's clock" | 2026-12-14 17:30 → `15:30Z`, the lead's agency |
+| CMP-MTG-009 | "says why a meeting was not added, in the service's words" | The 23505 explanation as an alert |
+| CMP-MTG-010 | "opens only the leads the table holds — their assigned ones — and reads only that lead's meetings" | A User: one lead; meetings read for it alone |
+| CMP-MTG-011 | "is told when a write is refused, rather than shown it saved" | Alert `לא בוצעה` |

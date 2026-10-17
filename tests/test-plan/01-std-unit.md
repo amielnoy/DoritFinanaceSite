@@ -1743,3 +1743,25 @@ D-17, manual test 2026-10-14. A link with an unrecognised `utm_source` (`?utm_so
 |---|---|---|
 | UNIT-ATTR-001 | "counts a tagged link with an unrecognised source as referral, not direct, and keeps its campaign" | `{ channel: "referral", campaign: "qa" }` |
 | UNIT-ATTR-002 | "lets a recognised referrer win over an unrecognised utm_source" | A Facebook referrer with `utm_source=newsletter_x` is `facebook` |
+
+### 4.74 A lead's meetings, for staff — `tests/unit/supabase-lead-admin.test.ts` (new cases), `tests/unit/meetings-time.test.ts`
+
+docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2. The adapter reads and writes `meetings` and `meeting_requests` under the person's own session; an insert or update that row-level security filtered out is a failure (`applied`), and the one-meeting key's refusal (23505, until migration 2) is explained in words. A staff member's "14.12 at 17:30" is Israel's wall clock (A-63), on either side of a daylight-saving change.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-MTGADM-001 | "reads one lead's meetings, newest first, with Dorit's notes and any open request on its meeting" | `eq lead_id`, `order scheduled_at desc`, open requests matched to their meeting only |
+| UNIT-MTGADM-002 | "puts a meeting with no time last, where Postgres's descending order puts it first" | Dated, then undated |
+| UNIT-MTGADM-003 | "adds a meeting in the lead's own agency, and asks for the row back" | Insert with `lead_id`, `agency_id`, `status: scheduled`; no `created_by` |
+| UNIT-MTGADM-004 | "reports an insert row-level security refused as a failure, not as added" | Throws `לא בוצעה` |
+| UNIT-MTGADM-005 | "explains the one-meeting key until migration 2 drops it" | 23505 → `כבר יש פגישה` |
+| UNIT-MTGADM-006 | "publishes and unpublishes a summary by its column names, on one meeting" | `client_summary` + `summary_published_at`; then `summary_published_at: null` |
+| UNIT-MTGADM-007 | "reports an update that changed nothing — another User's lead — as a failure" | Throws |
+| UNIT-MTGADM-008 | "marks a client's request handled, and nothing else" | `status`, `handled_at` only |
+| UNIT-MTGTIME-001 | "reads summer time (+03:00) before the change" | 2026-10-24 10:00 → 07:00Z |
+| UNIT-MTGTIME-002 | "reads winter time (+02:00) after the change" | 2026-10-26 10:00 → 08:00Z |
+| UNIT-MTGTIME-003 | "reads winter time in December too" | 17:30 → 15:30Z |
+| UNIT-MTGTIME-004 | "refuses a day or time that does not parse" | `null` |
+| UNIT-MTGTIME-005 | "round-trips: the instant shows the same day and hour" | Three times across the change |
+| UNIT-MTGTIME-006 | "names a meeting by Israel's day, not UTC's, near midnight" | `15.12 · 00:30` |
+

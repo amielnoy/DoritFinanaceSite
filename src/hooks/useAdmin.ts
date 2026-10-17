@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { services } from "@/services";
-import type { Article, ArticleDraft, LeadRecord, LeadStatus, TestimonialDraft } from "@/services";
+import type { Article, ArticleDraft, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, TestimonialDraft } from "@/services";
 
 /**
  * The admin screens' data idiom, matching `useContent.ts` for the public site.
@@ -43,6 +43,35 @@ export function useLeadTranscript(leadId: string, enabled: boolean) {
     enabled,
   });
 }
+
+/** A lead's meetings — the drawer's "פגישות" tab. Its count shows on the tab, so it loads with the drawer. */
+export const leadMeetingsKey = (leadId: string) => ["admin", "lead-meetings", leadId] as const;
+
+export function useLeadMeetings(leadId: string, enabled = true) {
+  return useQuery({
+    queryKey: leadMeetingsKey(leadId),
+    queryFn: () => services.leadsAdmin.meetings(leadId),
+    enabled,
+  });
+}
+
+/** Every meeting write reloads that lead's meetings, and nothing else. */
+function useMeetingWrite<T>(leadId: string, write: (input: T) => Promise<void>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: write,
+    onSuccess: () => client.invalidateQueries({ queryKey: leadMeetingsKey(leadId) }),
+  });
+}
+
+export const useAddMeeting = (leadId: string) =>
+  useMeetingWrite(leadId, (meeting: NewLeadMeeting) => services.leadsAdmin.addMeeting(meeting));
+
+export const useUpdateMeeting = (leadId: string) =>
+  useMeetingWrite(leadId, ({ id, update }: { id: string; update: LeadMeetingUpdate }) => services.leadsAdmin.updateMeeting(id, update));
+
+export const useHandleMeetingRequest = (leadId: string) =>
+  useMeetingWrite(leadId, (requestId: string) => services.leadsAdmin.handleMeetingRequest(requestId));
 
 export function useSetLeadStatus() {
   const client = useQueryClient();
