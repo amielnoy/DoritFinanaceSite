@@ -32,8 +32,10 @@
 
 import { access, cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { buildEnv, duplicateTitles, fixtureArticleFor, hebrewTitledLocalePages, planArticles } from './published-articles.mjs'
+import { buildEnv, duplicateTitles, hebrewTitledLocalePages, planArticles } from './published-articles.mjs'
 import { enabledLocales, translatedRoutes } from '../src/i18n/locales.ts'
+import { E2E_SUPABASE_URL } from '../e2e/build-env.ts'
+import { answerRestRead } from '../e2e/fixtures/supabase-fake.ts'
 
 const DIST = join(process.cwd(), 'dist')
 const PORT = Number(process.env.PRERENDER_PORT ?? 4183)
@@ -133,22 +135,41 @@ function dropVercelBeacon(html) {
 }
 
 /**
- * Answer a prerendered article page's Base44 read from the fixture file.
+ * Answer the e2e build's Supabase reads from the fixture file.
  *
- * Only in the e2e build (`PRERENDER_ARTICLES_FIXTURE`), whose bundle has no
- * Supabase and so reads the article through the Base44 SDK, which nothing
- * serves at build time. `planArticles` refuses the fixture anywhere it could
- * reach a deployment.
+ * Only in the e2e build (`PRERENDER_ARTICLES_FIXTURE`), whose bundle reads the
+ * fake host of e2e/build-env.ts, which nothing serves at build time. The
+ * article pages and the blog list read `blog_posts` (the fixture's rows); the
+ * home page reads `testimonials` (none). Any other request to that host is
+ * refused, and nothing else is touched: `planArticles` accepts the fixture
+ * only when the bundle reads the fake host, and never in a Vercel build, so a
+ * real build's reads always reach its real project.
  */
-async function serveFixtureArticles(page, rows) {
-  await page.route(/\/entities\/BlogPost\/[^/?#]+/, (route) => {
-    const row = fixtureArticleFor(route.request().url(), rows)
-    return route.fulfill({
-      status: row ? 200 : 404,
-      contentType: 'application/json',
-      body: JSON.stringify(row ?? { error: 'not found' }),
-    })
-  })
+async function serveFixtureSupabase(page, rows) {
+  const origin = new URL(E2E_SUPABASE_URL).origin
+  const tables = new Map([
+    ['blog_posts', rows],
+    ['testimonials', []],
+  ])
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }
+  await page.route(
+    (url) => url.origin === origin,
+    (route) => {
+      const request = route.request()
+      if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
+      const url = new URL(request.url())
+      const answer =
+        request.method() === 'GET' && url.pathname.startsWith('/rest/v1/')
+          ? answerRestRead(url, tables)
+          : { status: 501, body: { message: `the prerender serves only table reads: ${request.method()} ${url.pathname}` } }
+      return route.fulfill({
+        status: answer.status,
+        contentType: 'application/json',
+        headers: { ...cors, ...answer.headers },
+        body: JSON.stringify(answer.body),
+      })
+    },
+  )
 }
 
 async function main() {
@@ -251,8 +272,8 @@ async function main() {
         // to Google Analytics for every route it renders.
         await page.route(/googletagmanager\.com|google-analytics\.com/, (r) => r.abort())
 
-        if (articles.fixtureRows && route.startsWith('/blog/')) {
-          await serveFixtureArticles(page, articles.fixtureRows)
+        if (articles.fixtureRows) {
+          await serveFixtureSupabase(page, articles.fixtureRows)
         }
 
         await page.goto(`http://127.0.0.1:${PORT}${route}`, {

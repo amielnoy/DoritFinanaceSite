@@ -10,6 +10,7 @@
 // `published=eq.true` filter says so explicitly as well.
 
 import { readFile } from 'node:fs/promises'
+import { E2E_SUPABASE_URL } from '../e2e/build-env.ts'
 
 /**
  * Latin kebab-case, never shaped like a Base44 id. The same rule as
@@ -91,9 +92,11 @@ export async function fetchPublishedArticles({
  * environment. One function so the prerender and the SEO files cannot disagree
  * about what is published. Rules:
  *
- *   PRERENDER_ARTICLES_FIXTURE     A JSON file of rows with a slug, for the e2e
- *                                  build. Refused in a Vercel build and in a
- *                                  bundle that reads Supabase.
+ *   PRERENDER_ARTICLES_FIXTURE     A JSON file of blog_posts rows, for the e2e
+ *                                  build only: accepted when the bundle reads
+ *                                  the fake Supabase host of e2e/build-env.ts
+ *                                  and no other, never in a Vercel build. The
+ *                                  prerender answers that host from the file.
  *   VITE_SUPABASE_URL +
  *   VITE_SUPABASE_PUBLISHABLE_KEY  The live list, with the columns asked for.
  *   PRERENDER_REQUIRED=1           A list that cannot be had throws. Without it
@@ -114,16 +117,23 @@ export async function loadPublishedArticles(
         'PRERENDER_ARTICLES_FIXTURE is set in a Vercel build — refusing to prebuild test articles into a deployment.',
       )
     }
-    if (url && key) {
+    // Exactly the fake host: a real project's URL, or none (a bundle that
+    // reads Base44), must never be answered from a test file.
+    if (url !== E2E_SUPABASE_URL) {
       throw new Error(
-        'PRERENDER_ARTICLES_FIXTURE answers Base44 reads, but this bundle reads Supabase. ' +
-          'Build with VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY empty.',
+        `PRERENDER_ARTICLES_FIXTURE answers the e2e build's reads at ${E2E_SUPABASE_URL}, but this bundle reads ` +
+          `${url ? url : 'no Supabase'}. Build the e2e bundle with npm run build:e2e, and a real one without the fixture.`,
       )
     }
     const rows = JSON.parse(await readFileImpl(fixture, 'utf8'))
     if (!Array.isArray(rows) || rows.length === 0) throw new Error(`${fixture}: expected a non-empty list of articles`)
     assertSlugs(rows, fixture)
     return { rows, fromFixture: true, warning: null }
+  }
+
+  if (url === E2E_SUPABASE_URL) {
+    // The fake host resolves nowhere; only the fixture can stand behind it.
+    throw new Error(`${E2E_SUPABASE_URL} is the e2e build's fake Supabase host, and PRERENDER_ARTICLES_FIXTURE is not set.`)
   }
 
   if (!url || !key) {
@@ -153,12 +163,6 @@ export async function planArticles(env, opts = {}) {
     fixtureRows: fromFixture ? rows : null,
     warning: warning && warning.replace('articles are left out', 'articles are not prebuilt'),
   }
-}
-
-/** The fixture row a prerendered page's Base44 read asks for, by the key at the end of its URL. */
-export function fixtureArticleFor(requestUrl, rows) {
-  const key = decodeURIComponent(new URL(requestUrl).pathname.split('/').pop() ?? '')
-  return rows.find((r) => r.slug === key) ?? null
 }
 
 /** Each title more than one route was rendered with, and the routes that share it. */
