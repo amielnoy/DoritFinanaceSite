@@ -72,7 +72,7 @@ being committed.
 | E2E-CAL-002 | "recomputes live when the saver changes an input" | set deposit to 4000 | Contributions become ₪1,200,000; balance grows |
 | E2E-CAL-003 | "higher management fees shrink the projected balance" | annual fee → 1.5% | Balance strictly lower |
 | E2E-CAL-004 | "never renders NaN or ₪NaN when fields are cleared" | clear all five inputs | No `NaN`/`Infinity` on screen; no console errors |
-| E2E-CAL-005 | "shrugs off absurd input instead of hanging the tab" | 120 years at 99% | No `NaN`; inputs still editable |
+| E2E-CAL-005 | "shrugs off absurd input instead of hanging the tab" | 120 years at 99%; then ₪1,000,000 a month and 100% fees, leaving each field | No `NaN`; inputs still editable; on leaving, each field shows its ceiling — ₪50,000, 15%, 3%, 50 years, 15% (D-15) |
 | E2E-CAL-006 | "its CTA points at the contact form" | — | `a[href="/#start"]` visible |
 | E2E-CAL-007 | "the fee calculator offers Dorit's check on WhatsApp, its result written in, and counts it once" | open /tools; wait 2 s; type into the deposit, then 3000; press the box's button (navigation prevented) | Box heading, "not advice" line and the calculator's disclaimer visible; `wa.me/972508311776?text=` with "לאורך 25 שנות חיסכון"; no `calculator_result` for the defaults; exactly one `{tool: fee_calculator}` after typing, no digit in any queued parameter; the message now says 3,000; `click_whatsapp` with `location: calculator` |
 | E2E-CAL-008 | "the insurance self-check ends with the same box, its result in the message, counted once" | answer the four questions | No box before; then the box, a message listing "…סוגי ביטוח לבחון: …ביטוח חיים…"; both disclaimers visible; `calculator_result` tools are exactly `[insurance_assessment]` |

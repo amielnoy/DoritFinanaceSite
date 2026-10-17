@@ -20,6 +20,7 @@ import { servedByChatFunction } from "@/config/chat-agents";
 import { CONTACT } from "@/config/contact";
 import { readHandoff } from "@/lib/interview-handoff";
 import { readRecommendation } from "@/lib/blog-recommendation";
+import { articlePath } from "@/lib/articlePath";
 import { getAttribution } from "@/lib/attribution";
 import { leadEvents, type ChatMethod } from "@/lib/analytics";
 import ContactChannels from "./ContactChannels";
@@ -47,6 +48,15 @@ import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
  */
 const allowTel = (url: string): string =>
   url.startsWith("tel:") ? url : defaultUrlTransform(url);
+
+/**
+ * An article link the Base44 agents write: `/blog/<record id>`. Their
+ * BlogPost has no slug, so that is all they can name, and the address only
+ * worked through the 301 to the slug (D-10, manual test 2026-10-14). The chat
+ * shows the slug's address instead, once it knows it.
+ */
+const LEGACY_ARTICLE_LINK = /^\/blog\/([0-9a-f]{24})$/;
+const hasLegacyArticleLink = (text: string) => /\]\(\/blog\/[0-9a-f]{24}\)/.test(text);
 
 /** GA4's name for each chat — a technical label, never what was said in it. */
 const CHAT_METHOD: Record<string, ChatMethod> = {
@@ -217,6 +227,27 @@ export default function AgentChat({
   ]);
   const [input, setInput] = useState<string>(initialInput ?? "");
   const [sending, setSending] = useState<boolean>(false);
+  // Read only once a reply carries an old-style article link, and once: a
+  // failed read leaves the old address, which still reaches the article.
+  const [articlePaths, setArticlePaths] = useState<Map<string, string> | null>(null);
+  const needsArticlePaths = messages.some((m) => m.role === "assistant" && hasLegacyArticleLink(m.content));
+  useEffect(() => {
+    if (!needsArticlePaths || articlePaths) return;
+    let live = true;
+    Promise.resolve()
+      .then(() => services.content.listArticles())
+      .then((list) => {
+        if (live) setArticlePaths(new Map(list.map((a) => [a.id, articlePath(a)])));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [needsArticlePaths, articlePaths]);
+  const chatHref = (href: string | undefined) => {
+    const id = href?.match(LEGACY_ARTICLE_LINK)?.[1];
+    return (id && articlePaths?.get(id)) || href;
+  };
   useEffect(() => {
     if (initialInput) setInput(initialInput);
   }, [initialInput]);
@@ -946,7 +977,7 @@ export default function AgentChat({
                               components={{
                                 a: ({ href, children }) => (
                                   <a
-                                    href={href}
+                                    href={chatHref(href)}
                                     className="text-accent underline underline-offset-4 hover:text-highlight transition-colors"
                                   >
                                     {children}

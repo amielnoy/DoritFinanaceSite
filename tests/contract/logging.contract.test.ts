@@ -35,7 +35,12 @@ const FUNCTIONS_DIR = join(REPO_ROOT, "base44/functions");
  * back (agents.contract.test.ts pins that). The diary is the Edge function's.
  */
 const FORWARDERS = ["submitLead", "escalateToHuman", "logSupportChat"];
-const functionNames = readdirSync(FUNCTIONS_DIR).filter((n) => !FORWARDERS.includes(n)).sort();
+// Folders only: macOS drops a .DS_Store beside them, and opening
+// ".DS_Store/entry.ts" crashed the whole file with ENOTDIR.
+const functionNames = readdirSync(FUNCTIONS_DIR, { withFileTypes: true })
+  .filter((e) => e.isDirectory() && !FORWARDERS.includes(e.name))
+  .map((e) => e.name)
+  .sort();
 const sources = Object.fromEntries(
   functionNames.map((name) => [name, read(join(FUNCTIONS_DIR, name, "entry.ts"))]),
 );

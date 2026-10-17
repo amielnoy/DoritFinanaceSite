@@ -127,7 +127,7 @@ describe("/faq in English and French", () => {
 
   it("keeps the Hebrew page Hebrew, its English subtitles and its JSON-LD", () => {
     renderAt("/faq");
-    expect(screen.getByText("Income Tax · 5 שאלות")).toBeInTheDocument();
+    expect(screen.getByText("Income Tax · 6 שאלות")).toBeInTheDocument();
     expect(screen.getByTestId("agent-chat")).toBeInTheDocument();
     expect(faqLd().mainEntity[0].name).toBe("כיצד תכנון מס נכון חוסך בחיסכון הפנסיוני?");
   });

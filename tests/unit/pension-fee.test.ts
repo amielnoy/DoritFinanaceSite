@@ -131,18 +131,29 @@ describe("computePensionFees — hostile input", () => {
 
 /** As retirement-projection.ts clamps with RANGES (review 2026-10-15, item 20). */
 describe("computePensionFees — the ranges it takes", () => {
-  it("clamps years to 0–60: a billion years is sixty, not a loop of minutes", () => {
-    expect(PENSION_FEE_RANGES.years).toEqual({ min: 0, max: 60 });
-    expect(computePensionFees({ ...BASE, years: 1e9 })).toEqual(computePensionFees({ ...BASE, years: 60 }));
+  it("clamps years to 0–50: a billion years is fifty, not a loop of minutes", () => {
+    expect(PENSION_FEE_RANGES.years).toEqual({ min: 0, max: 50 });
+    expect(computePensionFees({ ...BASE, years: 1e9 })).toEqual(computePensionFees({ ...BASE, years: 50 }));
+    expect(computePensionFees({ ...BASE, years: 100 })).toEqual(computePensionFees({ ...BASE, years: 50 }));
   });
 
-  it("clamps each percentage to 0–100, so no fee goes past the whole deposit or below nothing", () => {
-    expect(computePensionFees({ ...BASE, depositFee: 500 })).toEqual(computePensionFees({ ...BASE, depositFee: 100 }));
+  it("caps each percentage at what a real product can charge or earn, and never below nothing", () => {
+    // D-15, manual test 2026-10-14: a 100% fee was still priced.
+    expect(PENSION_FEE_RANGES.depositFee.max).toBe(15);
+    expect(PENSION_FEE_RANGES.annualFee.max).toBe(3);
+    expect(PENSION_FEE_RANGES.annualReturn.max).toBe(15);
+    expect(computePensionFees({ ...BASE, depositFee: 100 })).toEqual(computePensionFees({ ...BASE, depositFee: 15 }));
+    expect(computePensionFees({ ...BASE, annualFee: 100 })).toEqual(computePensionFees({ ...BASE, annualFee: 3 }));
     expect(computePensionFees({ ...BASE, annualFee: -3 })).toEqual(computePensionFees({ ...BASE, annualFee: 0 }));
-    expect(computePensionFees({ ...BASE, annualReturn: 400 })).toEqual(computePensionFees({ ...BASE, annualReturn: 100 }));
+    expect(computePensionFees({ ...BASE, annualReturn: 400 })).toEqual(computePensionFees({ ...BASE, annualReturn: 15 }));
     const r = computePensionFees({ ...BASE, depositFee: 500, annualFee: 500 });
     expect(r.balance).toBeGreaterThanOrEqual(0);
     expect(r.totalFees).toBeLessThanOrEqual(r.totalDeposited);
+  });
+
+  it("caps the monthly deposit at ₪50,000", () => {
+    expect(PENSION_FEE_RANGES.monthlyDeposit).toEqual({ min: 0, max: 50_000 });
+    expect(computePensionFees({ ...BASE, monthlyDeposit: 1_000_000 })).toEqual(computePensionFees({ ...BASE, monthlyDeposit: 50_000 }));
   });
 
   it("treats a negative deposit as nothing deposited", () => {

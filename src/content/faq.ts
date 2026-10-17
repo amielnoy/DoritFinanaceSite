@@ -86,6 +86,12 @@ export const FAQ_ENTRIES: readonly FaqEntry[] = [
     a: heFaq["pension-tax-refund.a"],
   },
   {
+    id: "rights-fixing",
+    category: "tax",
+    q: heFaq["rights-fixing.q"],
+    a: heFaq["rights-fixing.a"],
+  },
+  {
     id: "pension-vs-gemel-vs-hishtalmut",
     category: "pension",
     q: heFaq["pension-vs-gemel-vs-hishtalmut.q"],
@@ -136,12 +142,6 @@ export const FAQ_ENTRIES: readonly FaqEntry[] = [
     q: heFaq["supplementary-health.q"],
     a: heFaq["supplementary-health.a"],
     tip: { n: 5, title: heFaq["supplementary-health.tip"] },
-  },
-  {
-    id: "rights-fixing",
-    category: "insurance",
-    q: heFaq["rights-fixing.q"],
-    a: heFaq["rights-fixing.a"],
   },
   {
     id: "disability-cover",

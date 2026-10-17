@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Calculator, TrendingDown, Wallet, PiggyBank } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { CtaLink } from "@/components/dorit/primitives/Cta";
-import { computePensionFees, type PensionFeeResult } from "@/lib/pension-fee";
+import { PENSION_FEE_RANGES, clamp, computePensionFees, type PensionFeeResult } from "@/lib/pension-fee";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import CalculatorLeadBox from "@/components/dorit/sections/CalculatorLeadBox";
 import { feeCalculatorMessageIn, formatIlsIn } from "@/i18n/tools";
@@ -16,7 +16,7 @@ interface NumFieldProps {
   value: number | string;
   onChange: (v: string) => void;
   step?: number;
-  min?: number;
+  range: { min: number; max: number };
 }
 
 interface ResultCardProps {
@@ -93,28 +93,28 @@ export default function PensionFeeCalculator() {
               value={monthlyDeposit}
               onChange={edit(setMonthlyDeposit)}
               step={100}
-              min={0}
+              range={PENSION_FEE_RANGES.monthlyDeposit}
             />
             <NumField
               label={t("fee.years")}
               value={years}
               onChange={edit(setYears)}
               step={1}
-              min={1}
+              range={{ ...PENSION_FEE_RANGES.years, min: 1 }}
             />
             <NumField
               label={t("fee.depositFee")}
               value={depositFee}
               onChange={edit(setDepositFee)}
               step={0.1}
-              min={0}
+              range={PENSION_FEE_RANGES.depositFee}
             />
             <NumField
               label={t("fee.annualFee")}
               value={annualFee}
               onChange={edit(setAnnualFee)}
               step={0.05}
-              min={0}
+              range={PENSION_FEE_RANGES.annualFee}
             />
             <div className="sm:col-span-2">
               <NumField
@@ -122,7 +122,7 @@ export default function PensionFeeCalculator() {
                 value={annualReturn}
                 onChange={edit(setAnnualReturn)}
                 step={0.5}
-                min={0}
+                range={PENSION_FEE_RANGES.annualReturn}
               />
             </div>
           </div>
@@ -186,8 +186,21 @@ export default function PensionFeeCalculator() {
   );
 }
 
-function NumField({ label, value, onChange, step = 1, min = 0 }: NumFieldProps) {
+/**
+ * A number field with the calculator's own limits (PENSION_FEE_RANGES). The
+ * math clamps on its own; leaving the field clamps what it shows too, so the
+ * visitor never reads a result for a figure other than the one on screen.
+ * An emptied field stays empty until they type again.
+ */
+function NumField({ label, value, onChange, step = 1, range }: NumFieldProps) {
   const id = React.useId();
+  const settle = () => {
+    if (value === "") return;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return;
+    const kept = clamp(n, range);
+    if (kept !== n) onChange(String(kept));
+  };
   return (
     <div>
       <label htmlFor={id} className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
@@ -197,9 +210,11 @@ function NumField({ label, value, onChange, step = 1, min = 0 }: NumFieldProps) 
         id={id}
         type="number"
         value={value}
-        min={min}
+        min={range.min}
+        max={range.max}
         step={step}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={settle}
         className="w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
       />
     </div>

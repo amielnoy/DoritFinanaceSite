@@ -74,9 +74,10 @@ the fee rate). Hostile input is exercised because every field is a free-text
 | UNIT-PFC-013 | "grows existing savings alone when nothing is deposited" | `startingBalance` 100,000, 12% a year, 1 y, no deposits | `100,000 × 1.01¹²`; nothing deposited |
 | UNIT-PFC-014 | "charges the balance fee on the opening balance and counts it in what fees cost" | 200,000 opening, 0.5% a year, 10 y | Balance fees > 0; `lostToFees` ≥ them |
 | UNIT-PFC-015 | "is the calculator's own result when the opening balance is left out or not positive" | `startingBalance` 0 or −5 | Equal to the result without one |
-| UNIT-PFC-016 | "clamps years to 0–60: a billion years is sixty, not a loop of minutes" (review 2026-10-15) | `years` 1e9 | `PENSION_FEE_RANGES.years` is 0–60; the result equals 60 years' |
-| UNIT-PFC-017 | "clamps each percentage to 0–100, so no fee goes past the whole deposit or below nothing" (review 2026-10-15) | Deposit fee 500, annual fee −3, return 400, then both fees 500 | Equal to 100, 0 and 100; with both at 500 the balance is ≥ 0 and fees ≤ deposits |
+| UNIT-PFC-016 | "clamps years to 0–50: a billion years is fifty, not a loop of minutes" (review 2026-10-15; D-15) | `years` 1e9, 100 | `PENSION_FEE_RANGES.years` is 0–50; both results equal 50 years' |
+| UNIT-PFC-017 | "caps each percentage at what a real product can charge or earn, and never below nothing" (review 2026-10-15; D-15) | Deposit fee 100, annual fee 100 and −3, return 400, then both fees 500 | Ceilings 15 / 3 / 15%; equal to 15, 3, 0 and 15; with both at 500 the balance is ≥ 0 and fees ≤ deposits |
 | UNIT-PFC-018 | "treats a negative deposit as nothing deposited" (review 2026-10-15) | `monthlyDeposit` −2,000 | Deposited 0, balance 0 |
+| UNIT-PFC-019 | "caps the monthly deposit at ₪50,000" (D-15) | `monthlyDeposit` 1,000,000 | Range 0–50,000; equal to ₪50,000 a month |
 
 ### 4.2 Helpers — `tests/unit/utils.dom.test.ts`
 
@@ -232,6 +233,7 @@ rich-result defect.
 | UNIT-FAQ-004 | "numbers the home-page tips 1..n with no gaps or repeats" | Contiguous from 1 |
 | UNIT-FAQ-005 | "resolves every home-page common question to a real entry, once" | No dangling reference, no repeat |
 | UNIT-FAQ-006 | "does not repeat an answer under two questions" | Distinct answers |
+| UNIT-FAQ-007 | "files rights fixing under tax, and describes the tax procedure" | `rights-fixing` is in `tax`; its answer names Form 161ד and the Tax Authority (D-12) |
 
 ### 4.10 Insurance self-assessment — `tests/unit/insurance-assessment.test.ts`
 
@@ -250,6 +252,7 @@ abandons the form halfway still gets a screen.
 | UNIT-ASM-006 | "puts pension planning first for someone approaching retirement" | Ranked first |
 | UNIT-ASM-007 | "never returns the same insurance type twice, and gives every result a reason" | Deduplicated; every item carries its reason |
 | UNIT-ASM-008 | "copes with unanswered questions" | A result, not a throw |
+| UNIT-ASM-009 | "gives a parent a pension reason about their stage, not about retirement being near" | The parent reason speaks of children, not of retirement approaching (D-14) |
 
 ### 4.11 Submission state machine — `tests/unit/use-submission.dom.test.ts`
 
@@ -1731,3 +1734,12 @@ Review 2026-10-15, item 21. GA4 sends history page views by itself, and those ig
 | UNIT-GAADMIN-005..009 | "measures %s" | `/`, `/administration`, `/blog/admin`, `/en/claims`, `/account` |
 | UNIT-GAADMIN-010 | "switches the tag off on entering /admin and on again on leaving it" | The flag `true` on `/admin/users`, `false` on `/claims` |
 | UNIT-GAADMIN-011 | "is switched off by index.html, before the tag is configured, for a page that loads on /admin" | The inline script sets the flag before `gtag('config')`; its path rule agrees with `isUnmeasuredPath` on five paths |
+
+### 4.73 The channel a tagged link records — `tests/unit/attribution.test.ts` (new cases)
+
+D-17, manual test 2026-10-14. A link with an unrecognised `utm_source` (`?utm_source=probe&utm_campaign=qa`) was recorded as `direct`, as if the address had been typed in. It is now `referral` when the referrer says nothing better. A new `other` channel would need a migration: the leads table's CHECK names the channels (`20261009000000_lead_channel.sql`).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ATTR-001 | "counts a tagged link with an unrecognised source as referral, not direct, and keeps its campaign" | `{ channel: "referral", campaign: "qa" }` |
+| UNIT-ATTR-002 | "lets a recognised referrer win over an unrecognised utm_source" | A Facebook referrer with `utm_source=newsletter_x` is `facebook` |

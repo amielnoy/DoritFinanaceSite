@@ -489,6 +489,7 @@ export default function NeedsWizard() {
               </Field>
               <Field label="טלפון">
                 <input
+                  type="tel"
                   className={inputClass()}
                   value={claim.phone}
                   onChange={(e) => setClaim((c) => ({ ...c, phone: e.target.value }))}

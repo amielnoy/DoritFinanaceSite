@@ -51,4 +51,13 @@ describe("FAQ content", () => {
     const answers = FAQ_ENTRIES.map((e) => e.a);
     expect(new Set(answers).size).toBe(answers.length);
   });
+
+  it("files rights fixing under tax, and describes the tax procedure", () => {
+    // D-12, manual test 2026-10-14: it sat under ביטוח with an answer about
+    // medical underwriting. Rights fixing is Form 161ד with the Tax Authority.
+    const entry = faqByIds(["rights-fixing"])[0];
+    expect(entry.category).toBe("tax");
+    expect(entry.a).toContain("161ד");
+    expect(entry.a).toContain("רשות המסים");
+  });
 });

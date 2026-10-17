@@ -728,7 +728,7 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-014 | "renders %s with no Hebrew but the switcher's עברית" (/en/faq, /fr/faq) | The category heading and the first question in the language; no Hebrew outside `lang="he"` |
 | CMP-I18N-015 | "opens an answer, and moves between topics" | "General" pressed; the first-meeting answer visible |
 | CMP-I18N-016 | "declares its questions in English to search engines, and no Hebrew-only chat" | FAQPage JSON-LD: 24 English questions, no Hebrew; no chat; canonical `/en/faq` |
-| CMP-I18N-017 | "keeps the Hebrew page Hebrew, its English subtitles and its JSON-LD" | "Income Tax · 5 שאלות"; the chat; the Hebrew first question |
+| CMP-I18N-017 | "keeps the Hebrew page Hebrew, its English subtitles and its JSON-LD" | "Income Tax · 6 שאלות"; the chat; the Hebrew first question |
 | CMP-I18N-018 | "brings the common questions back to the English home page, linking to /en/faq" | "Common questions"; "All the questions" → `/en/faq` |
 
 ### 4.37 /claims and /atzmaim-31-12 in English and French — `tests/component/i18n-claims.test.tsx`
@@ -934,3 +934,14 @@ Review 2026-10-15, item 22. `StartConversation` imports `AgentChat` with `lazy()
 | ID | Title | Expected result |
 |---|---|---|
 | CMP-LAZYCHAT-001 | "is not loaded with the section, and loads and shows once the visitor opens it" | The mocked module is not evaluated on render; after the צ'אט button, it is evaluated once and the chat shows |
+
+### 4.51 Article links in a chat reply — `tests/component/chat-article-links.test.tsx`
+
+D-10, manual test 2026-10-14. The support chat on the Base44 engine linked `/blog/6ac496b66444c62d843db5b9`. Base44's `BlogPost` has no slug, so its record id is all the agent can name, and the address worked only through the 301. `AgentChat` now reads the articles once a reply carries a `/blog/<24 hex>` link, and renders `articlePath(article)` for it. Supabase articles carry the Base44 id as `id` (`toPortRow`). The agents' own JSON block (`recommended`) keeps the ids, which the blog page reads.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CHATLINK-001 | "point at the article's slug, not the Base44 record id" | `/blog/6ac4…` renders as `/blog/horadat-dmei-nihul`; the articles are read once |
+| CMP-CHATLINK-002 | "keep the old address for an article with no slug, or one the list does not have" | Both hrefs unchanged |
+| CMP-CHATLINK-003 | "leave slug links and other links alone, and do not read the articles for them" | Hrefs unchanged; `listArticles` not called |
+| CMP-CHATLINK-004 | "still links the old address when the articles cannot be read" | A failed read leaves `/blog/<id>`, which still reaches the article through the 301 |
