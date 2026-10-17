@@ -1800,12 +1800,11 @@ the next production deploy. Two things make one without anyone asking:
   on `main` with `deploy` ticked (`gh workflow run ci.yml --ref main -f
   deploy=true`, with the workflow's own token — `workflow_dispatch` is the one
   event `GITHUB_TOKEN` may start, so there is no new secret). Only after a real
-  publish; a preview dispatches nothing. That is a **full production deploy**: it
-  also publishes Base44 (the agents and the functions), which the nightly run
-  never does.
+  publish; a preview dispatches nothing. That is a **full production deploy**,
+  the same as a push to `main`.
 - **The nightly CI run** (22:00 Israel summer time) deploys the Supabase
   functions and promotes the Vercel build, which picks up anything published or
-  edited from `/admin/blog` that day. It does not publish Base44.
+  edited from `/admin/blog` that day.
 
 The same deploy refreshes the sitemap, `llms.txt` and `llms-full.txt`.
 
@@ -1814,8 +1813,7 @@ The same deploy refreshes the sitemap, `llms.txt` and `llms-full.txt`.
 Unpublishing or deleting an article in `/admin/blog` does not remove its prebuilt
 page: it stays live until the next green production deploy (tonight's run, or
 later if the nightly run is red). To remove it at once: Actions → CI → Run
-workflow on `main` with `deploy` ticked (this is a full deploy, including
-Base44), then confirm `https://govari-fin.co.il/blog/<slug>` no longer serves the
+workflow on `main` with `deploy` ticked (a full production deploy), then confirm `https://govari-fin.co.il/blog/<slug>` no longer serves the
 article. The admin page says as much after an unpublish or a delete.
 
 #### When the production build fails on an article

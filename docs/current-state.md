@@ -57,10 +57,11 @@ tracing requests. Removing a chat name or reverting a provider flag restores tha
 adapter on the next build, but does not copy records between stores. Content created
 only in Supabase cannot be edited through the Base44 content rollback path.
 
-Content writes were held on Base44 while a Base44 agent still read `BlogPost`. With
-all four roles on the chat function — `needs_interview`, `support_agent`,
-`procedures_agent`, `blog_recommender` — that reason is gone, but switching
-`VITE_CONTENT_WRITES` remains a deliberate release step.
+Content writes were held on Base44 while a Base44 agent still read `BlogPost`.
+Production switched to `VITE_CONTENT_WRITES=supabase` on 2026-10-16, and all four
+roles now run on the chat function — `needs_interview`, `support_agent`,
+`procedures_agent`, `blog_recommender` — so `blog_posts` is the one article store;
+`scripts/seed-blog.mjs` writes only there.
 
 ## Agency access
 
