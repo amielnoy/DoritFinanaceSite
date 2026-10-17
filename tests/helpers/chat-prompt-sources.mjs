@@ -14,7 +14,7 @@
 //   blog.md       = base44/agents/blog_recommender.jsonc's instructions, placeholders
 //                   likewise; its BlogPost reads name listArticles/readArticle and
 //                   the hidden ```recommended block becomes recommendArticles;
-//   compliance.md = base44/agents/COMPLIANCE.md §3 and §5, verbatim.
+//   compliance.md = docs/COMPLIANCE.md §3 and §5, verbatim.
 // tests/contract/chat-prompts.contract.test.ts holds the files to these rules.
 import { readFileSync } from 'node:fs';
 

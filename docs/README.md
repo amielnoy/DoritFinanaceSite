@@ -14,7 +14,7 @@ environment variables, publishing and operational runbooks.
 | [Design drift review](../CodeReview.html) | Recorded design-system findings |
 | [Base44 exit record](base44-exit/README.md) | Historical measurements and migration evidence |
 | [Agency roles design](superpowers/specs/2026-10-15-agency-roles-design.md) | Owner/Admin/User permissions and rollout |
-| [Agent compliance](../base44/agents/COMPLIANCE.md) | Compliance constraints and unresolved decisions |
+| [Agent compliance](COMPLIANCE.md) | Compliance constraints and unresolved decisions |
 | [UI typing guide](../src/components/ui/README-types.md) | Shared UI component typing conventions |
 
 [`superpowers/specs/`](superpowers/specs/README.md) records designs;

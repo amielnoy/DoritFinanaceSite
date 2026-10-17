@@ -65,11 +65,11 @@ describe("interview.md against the prompt Base44 runs today", () => {
 
 describe("compliance.md", () => {
   it("is COMPLIANCE.md §3 and §5, verbatim", () => {
-    expect(PROMPTS.compliance).toBe(complianceExcerpt(read("base44/agents/COMPLIANCE.md")));
+    expect(PROMPTS.compliance).toBe(complianceExcerpt(read("docs/COMPLIANCE.md")));
   });
 
   it("no longer lists createConsultationEvent as an interview tool", () => {
-    expect(read("base44/agents/COMPLIANCE.md")).not.toMatch(/`submitLead`, `createConsultationEvent`/);
+    expect(read("docs/COMPLIANCE.md")).not.toMatch(/`submitLead`, `createConsultationEvent`/);
   });
 });
 
