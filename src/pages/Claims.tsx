@@ -26,6 +26,7 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
 import type { KeyOf } from "@/i18n/resources";
 import type { Locale } from "@/i18n/locales";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 const IN_LANGUAGE: Record<Locale, string> = { he: "he-IL", en: "en", fr: "fr" };
 
@@ -100,7 +101,7 @@ export default function Claims() {
               {t("hero.titleLine2")}
             </h1>
             <p className="mt-8 text-lg text-foreground/70 max-w-2xl leading-relaxed">
-              {t("hero.intro")}
+              <Glossed text={t("hero.intro")} />
             </p>
           </Reveal>
 
@@ -166,7 +167,7 @@ export default function Claims() {
                   <div className="h-full bg-background p-8 flex flex-col">
                     <span className="font-heading text-5xl text-highlight-ink leading-none">{s.n}</span>
                     <h3 className="font-heading text-xl mt-6 mb-3">{t(`steps.${s.id}.title`)}</h3>
-                    <p className="text-foreground/70 leading-relaxed text-sm">{t(`steps.${s.id}.body`)}</p>
+                    <p className="text-foreground/70 leading-relaxed text-sm"><Glossed text={t(`steps.${s.id}.body`)} /></p>
                   </div>
                 </Reveal>
               ))}
@@ -186,7 +187,7 @@ export default function Claims() {
                   {t("types.title")}
                 </h2>
                 <p className="mt-5 text-foreground/70 leading-relaxed">
-                  {t("types.intro")}
+                  <Glossed text={t("types.intro")} />
                 </p>
               </div>
             </Reveal>
@@ -204,7 +205,7 @@ export default function Claims() {
                       {Array.from({ length: c.points }, (_, k) => `types.${c.id}.p${k + 1}`).map((p) => (
                         <li key={p} className="flex items-start gap-3 text-foreground/75 leading-relaxed">
                           <CheckCircle2 size={18} className="text-highlight mt-1 shrink-0" />
-                          <span>{t(p as KeyOf<"claims">)}</span>
+                          <span><Glossed text={t(p as KeyOf<"claims">)} /></span>
                         </li>
                       ))}
                     </ul>
@@ -267,7 +268,7 @@ export default function Claims() {
                   {t("report.title")}
                 </h2>
                 <p className="mt-5 text-foreground/70 leading-relaxed">
-                  {t("report.intro")}
+                  <Glossed text={t("report.intro")} />
                 </p>
               </div>
             </Reveal>
@@ -286,7 +287,7 @@ export default function Claims() {
                 {t("close.title")}
               </h2>
               <p className="mt-6 text-foreground/70 leading-relaxed">
-                {t("close.text")}
+                <Glossed text={t("close.text")} />
               </p>
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a

@@ -138,7 +138,8 @@ async function faqParts(page: Page) {
  */
 async function questionShift(page: Page) {
   const panel = page.locator("main aside ~ div > div:not([hidden])").first();
-  const triggers = panel.locator("button[aria-expanded]");
+  // Not the glossary terms inside an open answer, which carry aria-expanded too.
+  const triggers = panel.locator("button[aria-expanded]:not([data-term])");
   await triggers.nth(0).click();
   await page.waitForTimeout(500);
   const second = triggers.nth(1);

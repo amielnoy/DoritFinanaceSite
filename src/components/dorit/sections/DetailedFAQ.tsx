@@ -14,6 +14,7 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 const QA = faqByIds(HOME_COMMON_QUESTION_IDS);
 
@@ -88,7 +89,7 @@ export default function DetailedFAQ() {
                   {item.q}
                 </AccordionTrigger>
                 <AccordionContent className="max-w-[680px] text-foreground/80 leading-[1.8] text-lg pb-7">
-                  {item.a}
+                  <Glossed text={item.a} />
                 </AccordionContent>
               </AccordionItem>
             ))}

@@ -5,6 +5,7 @@ import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useT } from "@/i18n/LocaleContext";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 interface Pillar {
   icon: LucideIcon;
@@ -142,7 +143,7 @@ export default function ServiceMatrix() {
                         {p.sub}
                       </p>
                     ) : null}
-                    <p className="m-0 mt-1.5 text-[17px] leading-[1.7] text-foreground/80">{t(`services.${p.id}.desc`)}</p>
+                    <p className="m-0 mt-1.5 text-[17px] leading-[1.7] text-foreground/80"><Glossed text={t(`services.${p.id}.desc`)} /></p>
                   </div>
                 </div>
               );
@@ -172,7 +173,7 @@ export default function ServiceMatrix() {
                     left alone: a fade stacked on a fade measured 3.98:1 here
                     once, and neither class looked wrong on its own. */}
                 <p className="max-w-[560px] text-lg leading-[1.75] text-foreground/80">
-                  {t(`services.${p.id}.desc`)}
+                  <Glossed text={t(`services.${p.id}.desc`)} />
                 </p>
               </div>
             );

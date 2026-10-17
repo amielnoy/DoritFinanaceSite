@@ -26,6 +26,7 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
 import type { Locale } from "@/i18n/locales";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 const IN_LANGUAGE: Record<Locale, string> = { he: "he-IL", en: "en", fr: "fr" };
 
@@ -257,7 +258,7 @@ export default function FAQPage() {
                           {item.q}
                         </AccordionTrigger>
                         <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
-                          {item.a}
+                          <Glossed text={item.a} />
                         </AccordionContent>
                       </AccordionItem>
                     ))}

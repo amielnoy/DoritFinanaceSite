@@ -15,6 +15,8 @@ import { articlePath } from "@/lib/articlePath";
 import { BLOG_POST_NOT_FOUND_SEO, computeBlogSeoConfig } from "@/lib/blogSeo";
 import { splitAfterParagraph } from "@/lib/articleCta";
 import ArticleContactBox from "@/components/dorit/blog/ArticleContactBox";
+import { GlossedChildren } from "@/components/dorit/primitives/Glossed";
+import { newGlossScope, type GlossScope } from "@/lib/glossary";
 
 export default function BlogPost() {
   /** A slug, or — from a link made before slugs — a Base44 id or a uuid. */
@@ -137,18 +139,40 @@ export default function BlogPost() {
 /** The body, with a contact box after its third paragraph when more follows. */
 function ArticleBody({ post }: { post: Article }) {
   const split = splitAfterParagraph(post.body || "", 3);
+  // One underline per term across the whole article, not one per paragraph.
+  const components = React.useMemo(() => glossedMarkdown(newGlossScope()), [post.body]);
   if (!split) {
     return (
       <div className="mt-10 blog-body">
-        <ReactMarkdown>{post.body || ""}</ReactMarkdown>
+        <ReactMarkdown components={components}>{post.body || ""}</ReactMarkdown>
       </div>
     );
   }
   return (
     <div className="mt-10 blog-body">
-      <ReactMarkdown>{split[0]}</ReactMarkdown>
+      <ReactMarkdown components={components}>{split[0]}</ReactMarkdown>
       <ArticleContactBox post={post} placement="article_inline" />
-      <ReactMarkdown>{split[1]}</ReactMarkdown>
+      <ReactMarkdown components={components}>{split[1]}</ReactMarkdown>
     </div>
   );
+}
+
+/**
+ * Paragraphs and list items gloss their plain text; headings, links and
+ * emphasis are left as written. The `node` prop react-markdown passes is
+ * dropped so it does not reach the DOM.
+ */
+function glossedMarkdown(scope: GlossScope) {
+  return {
+    p: ({ node: _node, children, ...rest }: React.ComponentPropsWithoutRef<"p"> & { node?: unknown }) => (
+      <p {...rest}>
+        <GlossedChildren scope={scope}>{children}</GlossedChildren>
+      </p>
+    ),
+    li: ({ node: _node, children, ...rest }: React.ComponentPropsWithoutRef<"li"> & { node?: unknown }) => (
+      <li {...rest}>
+        <GlossedChildren scope={scope}>{children}</GlossedChildren>
+      </li>
+    ),
+  };
 }

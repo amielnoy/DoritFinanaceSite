@@ -10,6 +10,7 @@ import { useCalculatorResultEvent } from "@/hooks/useCalculatorResultEvent";
 import { TOOL_SECTION } from "@/config/tools";
 import PensionCheckForm from "@/components/dorit/forms/PensionCheckForm";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 interface NumFieldProps {
   label: string;
@@ -78,7 +79,7 @@ export default function PensionFeeCalculator() {
             {t("fee.titleLine2")}
           </h2>
           <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">
-            {t("fee.intro")}
+            <Glossed text={t("fee.intro")} />
           </p>
           <div className="mt-10 flex items-center gap-3 text-sm text-muted-foreground">
             <Calculator size={16} className="text-accent" />

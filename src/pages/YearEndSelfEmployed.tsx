@@ -8,6 +8,7 @@ import { YEAR_END } from "@/config/offers";
 import { breadcrumbLd, siteNameIn, useSeo } from "@/lib/seo";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 import { localePath } from "@/i18n/locales";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 /**
  * /atzmaim-31-12 — the year-end campaign for the self-employed (growth brief,
@@ -46,14 +47,14 @@ export default function YearEndSelfEmployed() {
               {t("title")}
             </h1>
             <p className="mt-6 text-lg text-foreground/80 max-w-2xl leading-relaxed">
-              {t("intro")}
+              <Glossed text={t("intro")} />
             </p>
 
             <ul className="mt-10 grid gap-4 md:grid-cols-3 list-none p-0">
               {POINTS.map((p) => (
                 <li key={p} className="rounded-[4px] border border-border p-5">
                   <h2 className="font-heading text-xl">{t(`${p}.title`)}</h2>
-                  <p className="mt-2 text-[16px] leading-relaxed text-foreground/80">{t(`${p}.body`)}</p>
+                  <p className="mt-2 text-[16px] leading-relaxed text-foreground/80"><Glossed text={t(`${p}.body`)} /></p>
                 </li>
               ))}
             </ul>

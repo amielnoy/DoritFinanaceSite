@@ -7,6 +7,7 @@ import { PENSION_CHECK } from "@/config/offers";
 import { breadcrumbLd, siteNameIn, useSeo } from "@/lib/seo";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 import { localePath } from "@/i18n/locales";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 /**
  * /pension-check — the flagship (growth brief, 2026-10-14): Dorit looks at the
@@ -47,7 +48,7 @@ export default function PensionCheck() {
             <Eyebrow>{t("page.eyebrow")}</Eyebrow>
             <h1 className="font-heading text-5xl md:text-7xl mt-5 leading-tight max-md:text-4xl">{t("page.title")}</h1>
             <p className="mt-6 text-lg text-foreground/80 max-w-2xl leading-relaxed">
-              {t("page.intro")}
+              <Glossed text={t("page.intro")} />
             </p>
 
             <ol className="mt-10 grid gap-4 md:grid-cols-3 list-none p-0">
@@ -55,7 +56,7 @@ export default function PensionCheck() {
                 <li key={title} className="rounded-[4px] border border-border p-5">
                   <span className="font-heading text-2xl text-accent lining-nums">{String(i + 1).padStart(2, "0")}</span>
                   <h2 className="font-heading text-xl mt-2">{t(title)}</h2>
-                  <p className="mt-2 text-[16px] leading-relaxed text-foreground/80">{t(text)}</p>
+                  <p className="mt-2 text-[16px] leading-relaxed text-foreground/80"><Glossed text={t(text)} /></p>
                 </li>
               ))}
             </ol>

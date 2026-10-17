@@ -979,3 +979,17 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4, behind `
 | CMP-CLMTG-007 | "keeps the sheet open with the refusal in its own words" | Alert with the function's text |
 | CMP-CLMTG-008 | "renders a summary as text, never as markup" | Literal `<b>…</b> **…**`; no `<b>` element |
 | CMP-CLMTG-009 | "offers a booking when there is no meeting yet" | `עוד אין כאן פגישות`; link to `/#start` |
+
+### 4.54 Glossary tooltips — `tests/component/glossary-term.test.tsx`
+
+`Glossed` marks a text's glossary terms with `Term`: a dotted underline and a definition in a Radix popover, which opens on touch where a tooltip would not. The definition is rendered only while open, so the page's text — and what a crawler reads — does not change.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-GLOSS-001 | "keeps the paragraph's text as written, and renders no definition until one is opened" | Same `textContent`; `data-term` buttons; no tooltip |
+| CMP-GLOSS-002 | "opens on a tap, describes the term, and closes on a second tap" | `role=tooltip`, `dir=rtl`, `aria-describedby`; focus stays on the term |
+| CMP-GLOSS-003 | "opens on Enter and closes on Escape" | Keyboard parity |
+| CMP-GLOSS-004 | "opens when a mouse rests on the term, and closes when it leaves" | Closes after the 150 ms delay |
+| CMP-GLOSS-005 | "does not open on a touch's pointer-enter, only on its tap" | No tooltip |
+| CMP-GLOSS-006 | "speaks the page's language" | English definition, `dir=ltr` |
+| CMP-GLOSS-007 | "renders an unknown id as plain text" | No button |
