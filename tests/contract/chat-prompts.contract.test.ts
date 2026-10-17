@@ -6,23 +6,12 @@ import { AGENCY_PROFILE } from "@/config/agencyProfile";
 import { AGENCY } from "../../supabase/functions/_shared/agency.ts";
 import { PROMPTS } from "../../supabase/functions/chat/prompts.generated.ts";
 import { fillPlaceholders } from "../../supabase/functions/chat/prompt.ts";
-import {
-  INTERVIEW_TOOL_SECTION,
-  SUPPORT_TOOL_SECTION,
-  PROCEDURES_TOOL_SECTION,
-  BLOG_TOOL_SECTION,
-  collapseBlankRuns,
-  complianceExcerpt,
-  readAgentInstructions,
-  readInterviewInstructions,
-  withToolSection,
-  // @ts-expect-error — plain .mjs helper, imported for its pure steps.
-} from "../helpers/chat-prompt-sources.mjs";
+// @ts-expect-error — plain .mjs helper, imported for its pure steps.
+import { complianceExcerpt } from "../helpers/chat-prompt-sources.mjs";
 // @ts-expect-error — plain .mjs tooling.
 import { renderPromptsModule, OUTPUT } from "../../scripts/build-chat-prompts.mjs";
 
 const read = (p: string) => readFileSync(join(REPO_ROOT, p), "utf8");
-const instructions: string = readInterviewInstructions(join(REPO_ROOT, "base44/agents/needs_interview.jsonc"));
 
 describe("the agency copy the chat function fills prompts from", () => {
   it.each(["displayName", "phoneDisplay", "email", "licenceEntity", "licenceNumber", "licenceRegulator"] as const)(
@@ -37,15 +26,15 @@ describe("the agency copy the chat function fills prompts from", () => {
   });
 });
 
-describe("interview.md against the prompt Base44 runs today", () => {
-  it("each tool-section change matches exactly one line of today's instructions", () => {
-    for (const change of INTERVIEW_TOOL_SECTION) {
-      expect(instructions.split("\n").filter((l) => l.startsWith(change.startsWith)), change.startsWith).toHaveLength(1);
+// The Markdown prompts are the only source since the agents left Base44
+// (2026-10-17); until then each was held, line for line, to the Base44 agent
+// definition it replaced. What stays checked is what each prompt must say.
+describe("interview.md", () => {
+  it("carries the agency's details as placeholders, not literals", () => {
+    for (const literal of ["050-831-1776", "dorit@govari-fin.co.il", "L-00107009"]) {
+      expect(PROMPTS.interview).not.toContain(literal);
     }
-  });
-
-  it("renders, for Dorit, to today's text byte for byte apart from the three tool-section lines and the two language lines", () => {
-    expect(fillPlaceholders(PROMPTS.interview)).toBe(withToolSection(instructions, (s: string) => fillPlaceholders(s)));
+    expect(fillPlaceholders(PROMPTS.interview)).not.toMatch(/\{\{agency\./);
   });
 
   it("interviews a visitor who writes in English in English, and keeps what reaches Dorit in Hebrew", () => {
@@ -79,22 +68,7 @@ describe("prompts.generated.ts", () => {
   });
 });
 
-const supportInstructions: string = readAgentInstructions(join(REPO_ROOT, "base44/agents/support_agent.jsonc"));
-
-describe("support.md against the prompt Base44 runs today", () => {
-  it("each replaced or removed line exists exactly once today", () => {
-    const lines = supportInstructions.split("\n");
-    for (const c of SUPPORT_TOOL_SECTION) {
-      expect(lines.filter((l: string) => l.startsWith(c.startsWith)), c.startsWith).toHaveLength(1);
-    }
-  });
-
-  it("equals today's instructions with only the tool section changed", () => {
-    expect(fillPlaceholders(PROMPTS.support)).toBe(
-      collapseBlankRuns(withToolSection(supportInstructions, (s: string) => fillPlaceholders(s), SUPPORT_TOOL_SECTION)),
-    );
-  });
-
+describe("support.md", () => {
   it("names its real tools and no Base44 one", () => {
     expect(PROMPTS.support).toMatch(/listArticles/);
     expect(PROMPTS.support).toMatch(/readArticle/);
@@ -110,22 +84,7 @@ describe("support.md against the prompt Base44 runs today", () => {
   });
 });
 
-const proceduresInstructions: string = readAgentInstructions(join(REPO_ROOT, "base44/agents/procedures_agent.jsonc"));
-
-describe("procedures.md against the prompt Base44 runs today", () => {
-  it("each replaced or removed line exists exactly once today", () => {
-    const lines = proceduresInstructions.split("\n");
-    for (const c of PROCEDURES_TOOL_SECTION) {
-      expect(lines.filter((l: string) => l.startsWith(c.startsWith)), c.startsWith).toHaveLength(1);
-    }
-  });
-
-  it("equals today's instructions with only the tool section changed", () => {
-    expect(fillPlaceholders(PROMPTS.procedures)).toBe(
-      collapseBlankRuns(withToolSection(proceduresInstructions, (s: string) => fillPlaceholders(s), PROCEDURES_TOOL_SECTION)),
-    );
-  });
-
+describe("procedures.md", () => {
   it("names its real tools and no Base44 one", () => {
     expect(PROMPTS.procedures).toMatch(/listArticles/);
     expect(PROMPTS.procedures).toMatch(/readArticle/);
@@ -141,21 +100,7 @@ describe("procedures.md against the prompt Base44 runs today", () => {
   });
 });
 
-const blogInstructions: string = readAgentInstructions(join(REPO_ROOT, "base44/agents/blog_recommender.jsonc"));
-const matches = (l: string, c: { startsWith?: string; equals?: string }) => (c.equals !== undefined ? l === c.equals : l.startsWith(c.startsWith!));
-
-describe("blog.md against the prompt Base44 runs today", () => {
-  it("each replaced or removed line exists exactly once today", () => {
-    const lines = blogInstructions.split("\n");
-    for (const c of BLOG_TOOL_SECTION) expect(lines.filter((l: string) => matches(l, c)), JSON.stringify(c).slice(0, 60)).toHaveLength(1);
-  });
-
-  it("equals today's instructions with only the tool section changed", () => {
-    expect(fillPlaceholders(PROMPTS.blog)).toBe(
-      collapseBlankRuns(withToolSection(blogInstructions, (s: string) => fillPlaceholders(s), BLOG_TOOL_SECTION)),
-    );
-  });
-
+describe("blog.md", () => {
   it("recommends through the tool, never a fenced block, and names no Base44 tool", () => {
     expect(PROMPTS.blog).toMatch(/recommendArticles/);
     expect(PROMPTS.blog).toMatch(/listArticles/);
