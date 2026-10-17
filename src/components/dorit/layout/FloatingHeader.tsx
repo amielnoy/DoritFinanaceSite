@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft, User, LifeBuoy } from "lucide-react";
+import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft, User, CircleHelp } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CONTACT } from "@/config/contact";
 import { useAuth } from "@/lib/AuthContext";
@@ -283,7 +283,7 @@ export default function FloatingHeader() {
             data-track-location="header_menu"
             className="flex items-center justify-between px-4 py-4 text-lg border-b border-border/60 hover:bg-highlight/5 hover:text-accent transition-colors duration-200"
           >
-            <span className="inline-flex items-center gap-2"><LifeBuoy size={18} aria-hidden="true" className="text-accent" />{t("header.support")}</span>
+            <span className="inline-flex items-center gap-2"><CircleHelp size={18} aria-hidden="true" className="text-accent" />{t("header.support")}</span>
             <ChevronLeft size={18} className="text-muted-foreground ltr:rotate-180" />
           </SupportLink>
           {access ? (

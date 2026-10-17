@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, MessageCircle, MessagesSquare, LifeBuoy } from "lucide-react";
+import { Phone, MessageCircle, MessagesSquare, CircleHelp } from "lucide-react";
 import { CONTACT } from "@/config/contact";
 import { useSectionNav } from "@/hooks/useSectionNav";
 import SupportLink from "./SupportLink";
@@ -65,7 +65,7 @@ export default function MobileStickyBar() {
           {t("sticky.call")}
         </a>
         <SupportLink className={`${CELL} border border-border bg-card text-accent`}>
-          <LifeBuoy size={18} aria-hidden="true" />
+          <CircleHelp size={18} aria-hidden="true" />
           {t("sticky.ask")}
         </SupportLink>
       </div>
