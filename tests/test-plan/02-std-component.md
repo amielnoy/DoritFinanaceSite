@@ -963,3 +963,19 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2, behind `
 | CMP-MTG-009 | "says why a meeting was not added, in the service's words" | The service's refusal as an alert |
 | CMP-MTG-010 | "opens only the leads the table holds — their assigned ones — and reads only that lead's meetings" | A User: one lead; meetings read for it alone |
 | CMP-MTG-011 | "is told when a write is refused, rather than shown it saved" | Alert `לא בוצעה` |
+
+### 4.53 "הפגישות שלי" in /account — `tests/component/account-meetings.test.tsx`
+
+docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4, behind `VITE_MEETINGS_CLIENT` (the canvas "הפגישות שלי — לקוח": phone, desktop, the change-request sheet). Off until the privacy wording is approved.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-CLMTG-001 | "is absent, and the page as it was, when the switch is off" | No tab |
+| CMP-CLMTG-002 | "opens first, with the next meeting on its own card, on Israel's clock" | `10:00–10:45 · 45 דקות`, `ביומן של דורית`, "הוספה ליומן שלי" |
+| CMP-CLMTG-003 | "shows a published summary under 'מה סיכמנו', and nothing for a meeting without one" | Summary shown; no empty box |
+| CMP-CLMTG-004 | "keeps cancelled meetings collapsed, and the pension-marketing line under the summaries" | `פגישה אחת בוטלה`; `compliance.pensionMarketing` |
+| CMP-CLMTG-005 | "shows an open request as waiting for Dorit, with no button to ask again" | Disabled `ביקשת מועד אחר — דורית תחזור אליך` |
+| CMP-CLMTG-006 | "sends a change request from the sheet, and says the meeting stays until Dorit confirms" | `requestChange(m-next, cancel, trimmed note)`; the sheet closes |
+| CMP-CLMTG-007 | "keeps the sheet open with the refusal in its own words" | Alert with the function's text |
+| CMP-CLMTG-008 | "renders a summary as text, never as markup" | Literal `<b>…</b> **…**`; no `<b>` element |
+| CMP-CLMTG-009 | "offers a booking when there is no meeting yet" | `עוד אין כאן פגישות`; link to `/#start` |

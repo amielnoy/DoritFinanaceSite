@@ -1,5 +1,5 @@
 import { readSnapshot } from "@/lib/clearinghouse/snapshot";
-import type { ClientSnapshot, Enquiry, PublishedRecommendation, RecommendationPriority } from "./ports";
+import type { ClientMeeting, ClientSnapshot, Enquiry, PublishedRecommendation, RecommendationPriority } from "./ports";
 
 const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
 
@@ -68,3 +68,33 @@ export function toClientSnapshot(value: unknown): ClientSnapshot | null {
     : [];
   return { takenAt: typeof v.taken_at === "string" ? v.taken_at : snapshot.takenAt, publishedAt: v.published_at, snapshot, items };
 }
+
+const one = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(value as T) ? (value as T) : fallback;
+
+/**
+ * A row of `my_meetings()` — its twelve columns and no others. A value outside
+ * a column's set falls back rather than reaching the page as a raw key; a
+ * summary is shown only with its publication time, as the function sends it.
+ */
+export function toClientMeeting(row: Record<string, unknown>): ClientMeeting {
+  const text = (v: unknown) => (typeof v === "string" ? v : "");
+  const time = (v: unknown) => (typeof v === "string" && !Number.isNaN(new Date(v).getTime()) ? v : null);
+  const publishedAt = time(row.summary_published_at);
+  const summary = text(row.client_summary).trim();
+  return {
+    id: text(row.id),
+    scheduledAt: time(row.scheduled_at),
+    durationMin: typeof row.duration_min === "number" ? row.duration_min : null,
+    topic: text(row.topic),
+    kind: one(row.kind, ["first", "follow_up", "annual_review", "other"] as const, "other"),
+    status: one(row.status, ["scheduled", "done", "cancelled", "no_show"] as const, "scheduled"),
+    mode: row.mode === "office" || row.mode === "phone" || row.mode === "video" ? row.mode : null,
+    location: text(row.location),
+    clientSummary: publishedAt && summary ? summary : null,
+    summaryPublishedAt: publishedAt,
+    inCalendar: row.in_calendar === true,
+    openRequest: row.open_request === "reschedule" || row.open_request === "cancel" ? row.open_request : null,
+  };
+}
+
