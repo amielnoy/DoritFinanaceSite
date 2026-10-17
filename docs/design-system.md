@@ -2,6 +2,11 @@
 
 Three inks, four surfaces, and one rule that does most of the work.
 
+Token values are defined in [`src/index.css`](../src/index.css); the table below
+was checked against that source on 2026-10-15. Contrast figures retain their
+original measurement context. See the [documentation index](README.md) for
+architecture, operations and test guidance.
+
 Every ratio below was measured against the live tokens rather than estimated.
 Where a number is given, it is the **worst case** across every surface the ink is
 allowed to sit on — not its best case on the lightest one, which is how a
@@ -38,7 +43,7 @@ the values moved (`src/index.css`, `:root`).
 
 | Token | Value | Ratio (handoff) | Use |
 |---|---|---|---|
-| `--foreground` | `40 5% 12%` · `#201f1d` | body copy, headings |
+| `--foreground` | `40 5% 12%` · `#201f1d` | — | body copy, headings |
 | `--muted-foreground` | `0 2% 37%` · `#605d5d` | 6.0 on the ground | captions, labels, meta |
 | `--accent` / `--highlight-ink` / `--highlight-foreground` | `37 76% 28%` · `#7d5411` | 6.9 | **any text in gold**, eyebrows, figures, label on an outlined CTA |
 | `--highlight-on-dark` | `35 67% 64%` · `#e1ad66` | | gold text and strokes on the colophon band (`text-highlight-on-dark`) |

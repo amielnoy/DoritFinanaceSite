@@ -609,7 +609,7 @@ In `docs/superpowers/specs/2026-10-10-multi-agent-platform-design.md`, find the 
 Change it to:
 
 ```
-| Phase 1 · Tenant schema — **done**, see [2026-10-10-multi-agent-phase1-tenant-schema-design.md](2026-10-10-multi-agent-phase1-tenant-schema-design.md) | `agencies`, `memberships`, `agency_id` on every table, backfilled; policies use `can_see()` | A user of agency B reads zero rows of agency A, in every table |
+| Phase 1 · Tenant schema — **done**, see [2026-10-10-multi-agent-phase1-tenant-schema-design.md](../specs/2026-10-10-multi-agent-phase1-tenant-schema-design.md) | `agencies`, `memberships`, `agency_id` on every table, backfilled; policies use `can_see()` | A user of agency B reads zero rows of agency A, in every table |
 ```
 
 - [ ] **Step 4: Commit**

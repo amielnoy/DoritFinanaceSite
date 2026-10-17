@@ -5,6 +5,9 @@
 This is a Base44 app repository. Treat it as user-owned application code, keep changes focused on the user's request, and preserve existing project conventions.
 
 Start with `README.md` for local setup, environment variables, and publish workflow.
+`docs/README.md` indexes the documentation; `docs/current-state.md` records current
+adapter selection, release gates and agency access. Keep dated plans and incident
+measurements distinguishable from current operations.
 
 ## Base44 References
 

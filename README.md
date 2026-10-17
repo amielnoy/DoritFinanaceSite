@@ -1,40 +1,38 @@
-# Base44 Project
+# Dorit Gov-Ari Finance Site
 
-Use this repository to run and edit the app locally, then publish changes back through Base44.
+Hebrew (RTL) financial planning and insurance site for Dorit Gov-Ari, built with React 18 and Vite, hosted on Vercel, with Supabase for auth, data, storage and Edge Functions. The Base44 code still in the repo is a rollback path, removed in Base44 cleanup 2 (on or after 2026-10-29).
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
+Start with the [documentation index](docs/README.md) and [current architecture and operations](docs/current-state.md). The latter describes repository behavior as of 2026-10-17; deployment settings still require checking in the relevant account.
 
-## The two environments
+The Base44 Builder still syncs from `main`, but nothing is published to Base44 any more.
 
-| | Host | URL | Deploys when |
-| --- | --- | --- | --- |
-| **Production** | Base44 | <https://safe-arch-plan.base44.app> | a push to `main`, **only if the whole run is green** |
-| **Staging** | Vercel | the `deploy-vercel` job's URL, on the run summary | a push to `main` or `builder`, **even when the tests are red** |
+## The deployed environments
 
-That difference is the point of having two, not an oversight. A failing run is exactly
-when you want the broken build somewhere you can open it, next to the Allure report that
-says what broke — so staging takes it anyway, behind Vercel's login. Only the build
-itself has to have succeeded, since otherwise there is nothing to deploy. Production is
-gated: the publish job in `.github/workflows/ci.yml` refuses to run unless `build`,
-`test-node` and every `test-e2e` shard succeeded.
+| Target | Host | Deploys when |
+| --- | --- | --- |
+| Production — `https://govari-fin.co.il` | Vercel | Green `main`, after the Supabase functions deploy; also the nightly scheduled rebuild |
+| Preview / staging | Vercel | A successful build on `main` or `builder`, including red test runs; see the run summary for its URL |
+| Old site — `https://safe-arch-plan.base44.app` | Base44 | Never, since 2026-10-17: it serves the last version published there and redirects visitors to production |
 
-On `builder` the Vercel deploy is a *preview* of one change rather than a site anyone
-lives on, which is why the run summary's table is written on `main` only.
+`.github/workflows/ci.yml` is the release source of truth. A red run can publish a
+preview but cannot promote Vercel production. Supabase Edge Functions deploy before
+either production publish. Feature branches run checks without CI site deployment;
+Vercel's Git integration can still provide PR previews.
 
-Neither URL is written into the pipeline. Production comes from the `PRODUCTION_URL`
-repository variable (falling back to `BASE44_URL`) and staging from the deploy job's own
-output, both reported in the **Deployed sites** table on every `main` run — so the table
-kept telling the truth through the domain move described in [Moving production to the
-custom domain](#moving-production-to-the-custom-domain). Since 2026-10-11
-`PRODUCTION_URL` is `https://govari-fin.co.il`, served by Vercel, and `BASE44_URL` is
-`https://safe-arch-plan.base44.app`.
+`PRODUCTION_URL` identifies the customer-facing origin, and production smoke
+requires a Vercel production promotion in the same run.
 
 ## Prerequisites
+
+For frontend work against Supabase, `npm install` and `npm run dev` are enough:
+Vite reads the Supabase settings from `.env.local`, which is gitignored (ask for
+its values; never commit them). The Base44 CLI steps below run the retained
+Base44 backend, and go with cleanup 2.
 
 1. Clone the repository using the project's Git URL.
 2. Navigate to the project directory.
 3. Install dependencies: `npm install`.
-4. Install the Base44 CLI: `npm install -g base44@latest`.
+4. Use the Base44 CLI through `npx base44` (authenticate and link as below).
 5. Install [Deno](https://docs.deno.com/runtime/getting_started/installation/) — the local Base44 backend runs on it.
 
 Run `base44 --help` (or see the [CLI reference](https://docs.base44.com/developers/references/cli/commands/introduction)) for the full command surface.
@@ -54,7 +52,7 @@ Open the frontend URL that `base44 dev` prints (typically `http://localhost:5173
 Notes:
 
 - **Every fresh clone needs `base44 link`.** It writes `base44/.app.jsonc` (the app-id pointer), which is deliberately gitignored. Your app id is in the Builder URL (`app.base44.com/apps/<id>/...`); `base44 link --help` shows the non-interactive flags.
-- **`base44 dev` runs the frontend for you** (via `site.serveCommand` in this repo's `base44/config.jsonc`) — never run `npm run dev` yourself: alone it serves a UI with no backend behind it (`[base44] Proxy not enabled`, every `/api` call fails), and alongside `base44 dev` the second Vite silently takes the next port and you end up looking at the wrong one.
+- **`base44 dev` runs the frontend for you** (via `site.serveCommand` in this repo's `base44/config.jsonc`) — do not start a second Vite beside it. Use `npm run dev` only for frontend work with hosted-backend configuration; it does not start a local Base44 backend.
 - **The app must be published at least once for the UI to load under `base44 dev`.** The frontend boots by fetching app settings from the hosted app; before the first publish that fails and every page redirects to login. The local API works regardless.
 - Entities, functions, and auth run locally — entity data is **in-memory only**, wiped when `base44 dev` restarts. Everything else (Core integrations, OAuth login) is forwarded to your deployed app. Full breakdown: [Local development overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview).
 
@@ -104,13 +102,14 @@ not the site being broken.
 
 ## Publish Your Changes
 
-After pushing your changes to git, open the Base44 dashboard and publish the app:
+Push changes through the repository workflow. CI publishes from a clean `main`
+checkout after the checks pass: Supabase functions first, then Vercel production.
+Prompt changes ship with the chat function. Avoid deploying a local tree outside
+this workflow: it can diverge from git.
 
-```bash
-base44 dashboard open
-```
-
-This repo syncs to Base44 through git, so publish from the dashboard rather than `base44 deploy` — a CLI deploy ships your local tree directly, bypassing the sync, and the deployed state silently diverges from the repo.
+For credentials, promotion conditions and rollback switches, see
+[current operations](docs/current-state.md). No deployment is needed for a local
+review of documentation changes.
 
 ### Published is not the same as running
 
@@ -191,8 +190,10 @@ where it was.
 
 ## Moving production to the custom domain
 
-*Status, 2026-10-12:* the move is done except for the Base44 half of step 4 and the
-Search Console resubmission in step 6. Since 2026-10-11 the client-facing site is
+*Repository status, 2026-10-15:* the hosting move is complete. The Base44 half of
+step 4 is no longer required: the canonical origin defaults to production, and
+the old host redirects visitors and marks itself `noindex`. Search Console
+resubmission still requires an account check; the historical steps follow. Since 2026-10-11 the client-facing site is
 `govari-fin.co.il` on Vercel. Each step below carries its own status line.
 
 The client-facing site used to be `safe-arch-plan.base44.app`, where Base44 served
@@ -301,11 +302,17 @@ does not resolve is worse than one pointing at the old site.
    (`google-site-verification=pSXd…aiI`) is live at DTNT. What remains is to verify
    the property in Search Console and submit `https://govari-fin.co.il/sitemap.xml`.
 
-Base44 keeps being deployed throughout. It still owns auth, the agents, the entity
-store and the connectors; what changes is that the browser reaches it through Vercel
-instead of directly.
+Base44 was kept as a compatibility backend and agent fallback until 2026-10-17,
+when CI stopped publishing to it (#262). Auth is Supabase-only, and other
+capabilities follow the provider switches in
+[the current-state guide](docs/current-state.md). The hosting move and the backend
+cutovers were separate changes.
 
 ### Publishing from the Base44 dashboard stays supported
+
+**Status, 2026-10-17:** still possible, but no longer part of any release: CI does
+not publish to Base44, and a dashboard publish would only change the old host. It
+goes with the Base44 code in cleanup 2.
 
 Nothing above takes it away, and that is deliberate rather than incidental. The GitHub
 App still syncs the repo into the Builder, and `base44 dashboard open` → publish works
@@ -1565,7 +1572,7 @@ live production, all three naming the home page as their canonical.
 
 Measured 2026-10-05 against both live copies:
 
-| | Base44 (production today) | Vercel |
+| | Base44 (production on 2026-10-05) | Vercel |
 |---|---|---|
 | HTML served | 25,708 bytes | 109,870 bytes |
 | `rel="canonical"` | `rel="canonical"/` — **no href** | filled |
@@ -1581,8 +1588,8 @@ The JSON-LD blocks are correct in both, because the build plugin rewrites static
 files. It is precisely the two tags patched at runtime that are empty in the
 document.
 
-So the copy serving production is the one that is bad for search, and the
-staging copy is the good one. Prerendering on Base44 instead would need Chromium
+At that measurement, production lacked the prerendered HTML and staging had it.
+Since 2026-10-11 Vercel serves production. Prerendering on Base44 instead would need Chromium
 in its build environment — `scripts/prerender.mjs` launches Playwright and fails
 loudly without it — which puts a browser install in front of the production
 publish for a host we intend to leave. The fix is the move below, and
@@ -1990,8 +1997,9 @@ error:
 The report carries the client's copy and failure screenshots of her site, so it
 must not be world-readable. **CI enforces that rather than trusting it**: after
 each deploy it fetches both published hostnames — the branch alias and the
-per-deploy URL — anonymously, and fails the run if the report comes back from
-either. Access is applied per hostname, so checking only one proves only one. A
+per-deploy URL — anonymously, and emits a warning if the report comes back from
+either. This check is currently non-blocking; do not treat a green run as proof
+that Cloudflare Access protects the report. Access is applied per hostname, so checking only one proves only one. A
 protection nothing checks is one that silently lapses.
 
 Cloudflare Access is what provides it, and there is a trap in how it applies:
@@ -2125,8 +2133,9 @@ up to be hard to fire by accident:
 
 | Target | Deploys when |
 |---|---|
-| **Vercel** — staging, login-protected | the build succeeds, tests green **or red** |
-| **Base44** — production, client-facing | every suite passed |
+| **Vercel production** — client-facing | green `main`, Supabase deployed, Base44 published (except scheduled rebuilds) |
+| **Vercel preview** — staging | the build succeeds on `main` or `builder`, tests green **or red** |
+| **Base44** — compatibility backend and old site | green `main` push or requested manual release |
 
 A failing run is exactly when you want the broken build somewhere you can open
 it, so staging takes it either way; production does not.
@@ -2193,11 +2202,9 @@ to execute an HTML document as a script (A-42/A-43 in
 `scripts/prerender.mjs`. Both are needed — the Vercel build is the one case
 where the component *does* mount and the prerenderer *does* run.
 
-While production is still on Base44 there is nothing to read anyway: until the
-[domain move](#moving-production-to-the-custom-domain) puts the client-facing
-site on Vercel, these numbers describe **staging traffic**, which is mostly CI
-and the two of us. Vercel Analytics also has to be enabled once for the project
-in the dashboard; without it the beacon is unanswered even on Vercel.
+Production has been on Vercel since 2026-10-11, so these numbers can include
+customer traffic. Vercel Analytics must also be enabled for the project in its
+dashboard; the build flag alone does not enable the service.
 
 ## Reporting leads to GA4
 
@@ -2248,72 +2255,42 @@ there is no consent banner. That is a question for Dorit's compliance adviser
 
 ## The meeting, and which diary it lands in
 
-An interview that settles on a time books it. Not as a second step the model has
-to remember — `submitLead` writes the diary itself, inside the request that saved
-the enquiry, because a meeting that exists only when a model chooses to make one
-more tool call is a guarantee living in a prompt, and this repo puts guarantees
-in code.
+An interview with an agreed time books through the Supabase `submit-lead`
+implementation, including when called through the Base44 `submitLead` forwarder.
+`supabase/functions/_shared/calendar.ts` writes to `GOOGLE_CALENDAR_ID` using the
+Google service account, with `Asia/Jerusalem` wall-clock times. This event has no
+attendees: a service account cannot invite on a consumer calendar.
 
-It writes **both** calendars:
+`_shared/ics.ts` builds the invitation delivered by mail for Outlook. Calendar
+creation and invitation delivery are separate results; inspect both when a meeting
+is missing. `_shared/recipients.ts` defines the invitees from `SECONDARY_EMAIL`
+plus `NOTIFY_EMAILS` and accounts for the Google calendar owner. Confirm the actual
+owner and sharing permissions in the Google account.
 
-| | Outlook (Microsoft Graph) | Google Calendar |
-| --- | --- | --- |
-| connector | `outlook` | `googlecalendar` |
-| timezone name | `Israel Standard Time` | `Asia/Jerusalem` |
-| invitations | sent by Graph | only with `sendUpdates=all` |
-
-`CALENDAR_PROVIDERS` chooses them and defaults to `outlook,google`. Outlook is
-first because it is the diary דורית actually keeps — `govari-fin.co.il` is
-Microsoft 365 — so if only one is configured, that is the one that gets the
-meeting.
-
-Those differences look cosmetic and are not. **Each API accepts the other's
-timezone name in silence and files the meeting at the wrong hour**, and Google
-accepts an attendee without ever telling them. Every one of them fails by being
-accepted, which is why they live in one provider table rather than at each call
-site, hand-duplicated across the two writers with a contract test that fails the
-moment the copies differ. The bill for learning this: meetings sat three hours
-out in Outlook for as long as two copies of that code existed (A-47).
-
-The mailboxes in `CALENDAR_ATTENDEES` are invited to the event, so the meeting
-appears in their calendar and not only in דורית's. They are the same addresses
-as `NOTIFY_EMAILS`, enforced equal by contract — the same team that already
-receives the enquiry by mail, which is why this adds a channel and not a
-recipient.
-
-A connector that is declared in `base44/connectors/` but never authorised in the
-Base44 dashboard yields no token, and the write is skipped with a warning rather
-than failing the enquiry — the other calendar can still take it. **Declared is
-not connected**, and the operations mail is where you find out: it names the
-calendars the event landed in — `יומן: אירוע נוצר ✓ (outlook, google)` — or,
-when one refused, says which. A bare "created" would have hidden exactly the
-case where one diary took the meeting and the other did not.
+The historical Base44 `createConsultationEvent` writer retains the OAuth connector
+path and provider-specific timezone names (`Israel Standard Time` for Outlook,
+`Asia/Jerusalem` for Google). Its presence does not mean new interviews use those
+connectors. Preserve contracts on the retained copies while that path remains.
+See the earlier connectors runbook and [current operations](docs/current-state.md).
 
 ## Dorit's notifications through Resend
 
-`submitLead`, `submitClaim`, and `escalateToHuman` send Dorit's copy through
-[Resend's email API](https://resend.com/docs/api-reference/emails/send-email).
-She does not need a Base44 account. Operations copies and customer confirmations
-still use Base44's existing email integration and its registered-user restrictions.
+All outbound messages go through the Cloudflare Pages Function in
+`dorit-mailer/functions/api/send-email.js`, which calls Resend. The Resend key,
+verified sender and recipient configuration belong to the Pages project, not
+the browser or the Base44 functions.
 
-Before publishing:
+Configure `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO`, `MAILER_TOKEN`,
+`MAILER_TOKEN_SUPABASE` and `ALLOWED_ORIGIN` on the mailer. Configure `MAILER_URL`
+and the corresponding `MAILER_TOKEN` in each calling backend: Base44 uses the
+mailer's Base44 token; Supabase uses its separate Supabase token. See the earlier
+mailer runbook in this README for rotation and deployment details.
 
-1. Add a sending domain in Resend (for example `mail.govari-fin.co.il`), add the
-   DNS records Resend provides, and wait until Resend marks it verified.
-2. Create a Resend API key with sending permission for that domain.
-3. Set **backend secrets** in Base44:
-   - `RESEND_API_KEY`: the Resend API key.
-   - `RESEND_FROM_EMAIL`: an address on the verified domain, optionally with a
-     display name, e.g. `Dorit Gov Ari <notifications@mail.govari-fin.co.il>`.
-   These are server secrets, never `VITE_` variables or committed values.
-4. Publish through the normal git/dashboard workflow above. Check a real
-   submission's delivery in Resend and Dorit's inbox.
-
-The recipient and Reply-To are fixed to `dorit@govari-fin.co.il` in the backend.
-Missing configuration, rejected sends, and network timeouts produce delivery
-warnings while retaining the saved enquiry and attempting the operations copies.
-There is no fallback to Base44 for Dorit, since it cannot deliver to her without
-registration. API acceptance is not confirmation of inbox delivery.
+Use the Resend-verified sending subdomain; the apex domain is Microsoft 365.
+Check acceptance in the provider and delivery in the mailbox separately. A saved
+enquiry can carry delivery warnings; provider acceptance alone proves no inbox
+receipt. Runtime notification recipients and calendar invitees are described in
+[current operations](docs/current-state.md).
 
 ### Production smoke says the deployed page is missing `#start`
 
