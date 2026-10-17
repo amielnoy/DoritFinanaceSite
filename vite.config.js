@@ -13,7 +13,10 @@ export default defineConfig({
       legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === 'true',
       hmrNotifier: true,
       navigationNotifier: true,
-      analyticsTracker: true,
+      // Off (2026-10-17): its page-view logger posted every navigation to Base44,
+      // which serves nothing of the site any more, through an inline script the
+      // CSP had to carry a hash for.
+      analyticsTracker: false,
       visualEditAgent: true
     }),
     react(),

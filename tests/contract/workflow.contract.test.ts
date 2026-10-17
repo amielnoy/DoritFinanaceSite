@@ -177,7 +177,7 @@ describe("the workflow tests every PR commit once and deploys from only two bran
   });
 
   it("gates every deploying job on the ref, so a feature branch ships nothing", () => {
-    for (const name of ["deploy", "deploy-vercel"]) {
+    for (const name of ["deploy-supabase", "deploy-vercel"]) {
       const condition = workflow.jobs[name].if ?? "";
       expect(condition, `${name} must check the branch`).toMatch(/github\.ref == 'refs\/heads\//);
     }
@@ -191,12 +191,12 @@ describe("the workflow tests every PR commit once and deploys from only two bran
     expect(schedule![0].cron).toBe("0 19 * * *");
   });
 
-  it("keeps the Base44 publish off the nightly run", () => {
-    // Publishing Base44 ships the agents too, and the nightly run has nobody
-    // watching it. A push, or a deliberate manual run, only.
-    const condition = workflow.jobs.deploy.if ?? "";
-    expect(condition).toMatch(/github\.event_name == 'push'/);
-    expect(condition).not.toMatch(/schedule/);
+  it("publishes nothing to Base44", () => {
+    // The site, its content and all four agents left Base44 (2026-10-16/17):
+    // no publish job, no CLI, no credential for one.
+    expect(workflow.jobs.deploy, "the Publish to Base44 job is back").toBeUndefined();
+    const text = readFileSync(join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8");
+    expect(text).not.toMatch(/base44 deploy|secrets\.BASE44_/);
   });
 
   it("rebuilds the Vercel site nightly, with the functions deployed first (CTR-REB-001)", () => {
@@ -214,11 +214,15 @@ describe("the workflow tests every PR commit once and deploys from only two bran
     expect(concurrency["cancel-in-progress"]).toContain("github.event_name != 'schedule'");
   });
 
-  it("skips the agent-conversation probes on the nightly smoke (M6)", () => {
+  it("smokes the live Supabase backend, not Base44's", () => {
+    // The "Live Base44 backend" block in base44-contract.spec.ts needs
+    // E2E_LIVE_APP_ID; the smoke no longer sets it, so only the live Supabase
+    // probes (supabase-live.spec.ts) run against production.
     const smoke = stepsOf(workflow.jobs.smoke).find((s) => s.name === "Smoke the deployment");
-    expect(smoke?.env?.E2E_SKIP_AGENT_PROBES).toContain("github.event_name != 'schedule'");
+    expect(smoke?.env?.E2E_LIVE_API_URL).toBe("${{ vars.PRODUCTION_URL }}");
+    expect(smoke?.env).not.toHaveProperty("E2E_LIVE_APP_ID");
     const spec = readFileSync(join(REPO_ROOT, "e2e/api/base44-contract.spec.ts"), "utf8");
-    expect(spec).toMatch(/E2E_SKIP_AGENT_PROBES === "1"/);
+    expect(spec).toMatch(/test\.skip\(!LIVE_URL \|\| !LIVE_APP_ID/);
   });
 
   it("tells the smoke which lead function the deployment posts to", () => {

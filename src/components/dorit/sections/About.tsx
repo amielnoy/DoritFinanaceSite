@@ -1,16 +1,18 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronLeft } from "lucide-react";
-import { Image } from "@/components/ui/image";
+import Photo from "@/components/dorit/primitives/Photo";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 
-const ATMOS =
-  "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/5b05202dd_generated_7c8e0421.jpg";
-const PEN =
-  "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/199524e64_generated_35057100.jpg";
+// The two plates share a 3fr/2fr row: half the section from lg up, the
+// whole width below it.
+const ATMOS = "/images/about-glass";
+const ATMOS_SIZES = "(min-width: 1024px) 30vw, 60vw";
+const PEN = "/images/about-pen";
+const PEN_SIZES = "(min-width: 1024px) 20vw, 40vw";
 
 // Three, not four. "97% שיעור תביעות שאושרו" was here and is gone: a licensed
 // agent quoting a performance figure is a regulated claim, and nothing in this
@@ -51,20 +53,10 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
       <div className={`max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] grid grid-cols-1 lg:grid-cols-2 gap-[clamp(40px,6vw,96px)] items-center${brief ? " max-md:py-10" : ""}`}>
         <div className={`order-2 lg:order-1 grid grid-cols-[3fr_2fr] gap-4${brief ? " max-md:hidden" : ""}`}>
           <div className="plate h-[clamp(220px,28vw,360px)]">
-            <Image
-              src={ATMOS}
-              alt={t("about.imgAtmos")}
-              className="w-full h-full object-cover"
-              fittingType="fill"
-            />
+            <Photo base={ATMOS} sizes={ATMOS_SIZES} alt={t("about.imgAtmos")} className="w-full h-full object-cover" />
           </div>
           <div className="plate h-[clamp(220px,28vw,360px)]">
-            <Image
-              src={PEN}
-              alt={t("about.imgPen")}
-              className="w-full h-full object-cover"
-              fittingType="fill"
-            />
+            <Photo base={PEN} sizes={PEN_SIZES} alt={t("about.imgPen")} className="w-full h-full object-cover" />
           </div>
         </div>
 

@@ -40,7 +40,7 @@ describe("production has one promoter", () => {
 
   it("keeps CI the thing that deploys", () => {
     expect(workflow).toContain("vercel deploy --prebuilt");
-    expect(workflow).toMatch(/deploy-vercel:[\s\S]*?needs: \[build, test-node, test-e2e, deploy-supabase, deploy\]/);
+    expect(workflow).toMatch(/deploy-vercel:[\s\S]*?needs: \[build, test-node, test-e2e, deploy-supabase\]/);
   });
 
   it("promotes to production only when the suites went green", () => {
@@ -77,22 +77,15 @@ describe("production has one promoter", () => {
 describe('production smoke requires the actual production publisher', () => {
   it('emits publish evidence only after the deploy command succeeds', () => {
     const workflow = read('.github/workflows/ci.yml');
-    expect(workflow).toContain('published: ${{ steps.publish.outputs.published }}');
-    // Non-interactive, or the job hangs instead of failing: `deploy` prompts to
-    // confirm and again about building the site. `base44 link` is deliberately
-    // absent — its `--non-interactive` flag was removed from the CLI, which is
-    // what broke this step, and the app id travels in BASE44_APP_ID anyway.
-    expect(workflow).toMatch(/base44 deploy --yes --build\s+echo "published=true"/);
-    // Anchored to a command line, so the comment explaining its absence does
-    // not read as its presence.
-    expect(workflow, "base44 link is back, and it prompts").not.toMatch(/^\s*base44 link/m);
     expect(workflow).toContain('deployed: ${{ steps.deploy.outputs.deployed }}');
     expect(workflow).toMatch(/echo "url=\$url"[^\n]*\n\s+echo "deployed=true"/);
     const smoke = workflow.slice(workflow.indexOf('  smoke:'), workflow.indexOf('  # ── 7.'));
     expect(smoke.indexOf('node scripts/check-production-publish.mjs')).toBeLessThan(smoke.indexOf('npx playwright test'));
-    for (const output of ['needs.deploy.outputs.published', 'needs.deploy-vercel.outputs.deployed', 'needs.deploy-vercel.outputs.kind']) {
+    for (const output of ['needs.deploy-vercel.outputs.deployed', 'needs.deploy-vercel.outputs.kind']) {
       expect(smoke).toContain(output);
     }
+    // Vercel is the one publisher: nothing reads the removed Base44 job.
+    expect(workflow).not.toMatch(/needs\.deploy\.|BASE44_PUBLISHED/);
     expect(smoke).toContain("github.ref == 'refs/heads/main'");
   });
 
@@ -123,16 +116,10 @@ describe('production smoke requires the actual production publisher', () => {
    * Absent credentials still skip, because a fork has none and should get green
    * CI. Present-but-wrong is a misconfiguration and must be loud.
    */
-  it('rejects a key that is not a workspace key rather than hanging on a prompt', () => {
+  it('publishes nothing to Base44, so holds no Base44 credential', () => {
     const workflow = read('.github/workflows/ci.yml');
-    const deploy = workflow.slice(workflow.indexOf('  deploy:'), workflow.indexOf('  deploy-vercel:'));
-
-    expect(deploy, 'no prefix check on the API key').toContain('b44k_');
-    // It has to exit non-zero: a notice would let the job go green and the
-    // smoke would then fail somewhere far from the cause.
-    expect(deploy).toMatch(/b44k_[\s\S]{0,600}?exit 1/);
-    // And absence must still skip rather than fail.
-    expect(deploy).toMatch(/ready=false[\s\S]{0,300}?::notice::/);
+    expect(workflow).not.toMatch(/\n {2}deploy:\n/);
+    expect(workflow).not.toMatch(/base44 deploy|secrets\.BASE44_API_KEY|secrets\.BASE44_ACCESS_TOKEN/);
   });
 
   it('waits for the new release to be served before opening a browser', () => {
@@ -142,7 +129,7 @@ describe('production smoke requires the actual production publisher', () => {
     expect(smoke).toContain('node scripts/wait-for-deployment.mjs');
     // It needs the fingerprint taken before the publish, or it has nothing to
     // compare against and would wait on nothing.
-    expect(smoke).toContain('needs.deploy.outputs.previous_asset');
+    expect(smoke).toContain("needs['deploy-vercel'].outputs.previous_asset");
     expect(workflow).toContain('previous_asset: ${{ steps.before.outputs.asset }}');
 
     // And the asset the Vercel job just built, so an unchanged bundle is
@@ -168,12 +155,13 @@ describe('production smoke requires the actual production publisher', () => {
 
   it('records what production served before replacing it', () => {
     const workflow = read('.github/workflows/ci.yml');
-    const deploy = workflow.slice(workflow.indexOf('  deploy:'), workflow.indexOf('  deploy-vercel:'));
-    // Taken before the publish step, or it fingerprints the new release and the
+    const vercel = workflow.slice(workflow.indexOf('  deploy-vercel:'), workflow.indexOf('  smoke:'));
+    // Taken before the deploy step, or it fingerprints the new release and the
     // comparison can never change.
-    expect(deploy.indexOf('id: before')).toBeLessThan(deploy.indexOf('id: publish'));
-    // And it must not fail the publish if the host is briefly unreachable.
-    expect(deploy).toMatch(/id: before\n\s+continue-on-error: true/);
+    expect(vercel.indexOf('id: before')).toBeGreaterThan(-1);
+    expect(vercel.indexOf('id: before')).toBeLessThan(vercel.indexOf('id: deploy\n'));
+    // And it must not fail the deploy if the host is briefly unreachable.
+    expect(vercel).toMatch(/id: before[\s\S]{0,200}?continue-on-error: true/);
   });
 });
 /**
@@ -327,7 +315,7 @@ describe("the Vercel build gets the real app id", () => {
   });
 });
 
-describe("the site and the agents go live together", () => {
+describe("production waits for the tests and the functions, and nothing else", () => {
   const workflow = read(".github/workflows/ci.yml");
   const vercel = workflow.slice(workflow.indexOf("  deploy-vercel:"), workflow.indexOf("  smoke:"));
   const step = workflow.slice(
@@ -335,44 +323,27 @@ describe("the site and the agents go live together", () => {
     workflow.indexOf("- name: Build for Vercel"),
   );
 
-  it("orders the Vercel deploy after the Base44 publish", () => {
-    expect(vercel).toMatch(/needs: \[[^\]]*\bdeploy\]/);
+  it("no longer waits on a Base44 publish", () => {
+    // It did while Base44 carried the agents' instructions (removed 2026-10-17:
+    // all four agents run on the Supabase chat function).
+    expect(vercel).not.toMatch(/needs: \[[^\]]*\bdeploy\]/);
+    expect(step).not.toMatch(/AGENTS|agents_ok|held_for_agents/);
+    expect(vercel).not.toContain("Fail when production waited for the agents");
   });
 
-  it("promotes production only when the agents were published", () => {
-    // An expired Base44 session used to skip the agents with a notice while the
-    // site went live and the run stayed green — the FAQ chat kept its old
-    // instructions next to a site that had moved on.
-    expect(step).toContain("AGENTS: ${{ needs.deploy.outputs.published }}");
-    expect(step).toMatch(/\$AGENTS" = "true"[\s\S]*?agents_ok=true[\s\S]*?\$agents_ok" = "true"[\s\S]*?prod=--prod/);
-  });
-
-  it("lets the nightly rebuild promote without a Base44 publish", () => {
-    // The Base44 job does not run on `schedule`; holding the nightly rebuild
-    // for it would stop prebuilt article pages from ever refreshing.
-    expect(step).toMatch(/GITHUB_EVENT_NAME" = "schedule" \] \|\| \[ "\$AGENTS" = "true"/);
-  });
-
-  it("deploys the preview, then fails the run when only the agents held it back", () => {
-    expect(step).toContain('echo "held_for_agents=true"');
-    const fail = vercel.slice(vercel.indexOf("- name: Fail when production waited for the agents"));
-    expect(fail).toContain("steps.target.outputs.held_for_agents == 'true'");
-    expect(fail).toMatch(/::error::[\s\S]*?exit 1/);
-    // Last in the job, after the preview is deployed and verified.
-    expect(vercel.indexOf("- name: Fail when production waited for the agents"))
-      .toBeGreaterThan(vercel.indexOf("- name: Deploy\n"));
-    expect(vercel.indexOf("- name: Fail when production waited for the agents"))
-      .toBeGreaterThan(vercel.indexOf("- name: Verify the deployment serves the app"));
+  it("promotes production on green tests and deployed functions", () => {
+    expect(step).toMatch(/\$UNIT" = "success" \] && \[ "\$E2E" = "success" \][\s\S]*?\$FUNCTIONS" = "success" \]; then\s*echo "prod=--prod"/);
   });
 });
 
 describe("Supabase Edge Functions deploy from green main, before production", () => {
   const workflow = read(".github/workflows/ci.yml");
-  const job = workflow.slice(workflow.indexOf("  deploy-supabase:"), workflow.indexOf("\n  deploy:\n"));
+  // The job alone: the "§5" comment above deploy-vercel quotes `!cancelled()`.
+  const job = workflow.slice(workflow.indexOf("  deploy-supabase:"), workflow.indexOf("  # ── 5."));
 
-  it("exists, ahead of the Base44 publish", () => {
+  it("exists, ahead of the Vercel deploy", () => {
     expect(workflow.indexOf("  deploy-supabase:")).toBeGreaterThan(-1);
-    expect(workflow.indexOf("  deploy-supabase:")).toBeLessThan(workflow.indexOf("\n  deploy:\n"));
+    expect(workflow.indexOf("  deploy-supabase:")).toBeLessThan(workflow.indexOf("  deploy-vercel:"));
   });
 
   it("runs only on main, only after the suites pass", () => {
@@ -395,9 +366,6 @@ describe("Supabase Edge Functions deploy from green main, before production", ()
     expect(job).not.toMatch(/::notice::SUPABASE_ACCESS_TOKEN/);
   });
 
-  it("holds the Base44 publish until the functions are deployed", () => {
-    expect(workflow).toMatch(/\n  deploy:\n[\s\S]*?needs: \[build, test-node, test-e2e, deploy-supabase\]/);
-  });
 
   it("promotes Vercel to production only once the functions are deployed", () => {
     const step = workflow.slice(

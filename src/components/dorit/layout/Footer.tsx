@@ -1,5 +1,5 @@
 import React from "react";
-import { Image } from "@/components/ui/image";
+import Photo from "@/components/dorit/primitives/Photo";
 import { ChevronDown, Phone, Mail, MapPin, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CONTACT } from "@/config/contact";
@@ -9,8 +9,9 @@ import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
 import type { KeyOf } from "@/i18n/resources";
 
-const HANDSHAKE =
-  "https://media.base44.com/images/public/6a9e6144d2bee5cdfb4ddf74/8f139c5ff_generated_14b746d4.jpg";
+// Half the 1400px band from md up; the band is hidden below md.
+const HANDSHAKE = "/images/footer-handshake";
+const HANDSHAKE_SIZES = "(min-width: 1400px) 660px, 50vw";
 
 interface FooterLink {
   l: KeyOf<"common">;
@@ -76,12 +77,7 @@ export default function Footer() {
           and the quote alone was still 200px of a phone screen on every page. */}
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,112px)] grid grid-cols-1 md:grid-cols-2 gap-12 items-center border-b border-primary-foreground/[0.14] max-md:hidden">
         <div className="plate plate-dark h-[280px] max-md:hidden">
-          <Image
-            src={HANDSHAKE}
-            alt={t("footer.imageAlt")}
-            className="w-full h-full object-cover"
-            fittingType="fill"
-          />
+          <Photo base={HANDSHAKE} sizes={HANDSHAKE_SIZES} alt={t("footer.imageAlt")} className="w-full h-full object-cover" />
         </div>
         <div className="flex flex-col gap-[18px]">
           <p className="font-heading font-light text-[clamp(32px,3.6vw,46px)] leading-[1.25]">
