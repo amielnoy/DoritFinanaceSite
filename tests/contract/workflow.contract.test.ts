@@ -215,24 +215,28 @@ describe("the workflow tests every PR commit once and deploys from only two bran
   });
 
   it("smokes the live Supabase backend, not Base44's", () => {
-    // The "Live Base44 backend" block in base44-contract.spec.ts needs
-    // E2E_LIVE_APP_ID; the smoke no longer sets it, so only the live Supabase
-    // probes (supabase-live.spec.ts) run against production.
+    // The live Base44 block left with base44-contract.spec.ts (2026-10-18), so
+    // only the live Supabase probes (supabase-live.spec.ts) run against
+    // production, and nothing asks for a Base44 app id.
     const smoke = stepsOf(workflow.jobs.smoke).find((s) => s.name === "Smoke the deployment");
     expect(smoke?.env?.E2E_LIVE_API_URL).toBe("${{ vars.PRODUCTION_URL }}");
     expect(smoke?.env).not.toHaveProperty("E2E_LIVE_APP_ID");
-    const spec = readFileSync(join(REPO_ROOT, "e2e/api/base44-contract.spec.ts"), "utf8");
-    expect(spec).toMatch(/test\.skip\(!LIVE_URL \|\| !LIVE_APP_ID/);
+    const e2e = readdirSync(join(REPO_ROOT, "e2e/api")).map((f) => readFileSync(join(REPO_ROOT, "e2e/api", f), "utf8"));
+    for (const spec of e2e) expect(spec).not.toContain("E2E_LIVE_APP_ID");
   });
 
-  it("tells the smoke which lead function the deployment posts to", () => {
+  it("observes the lead the smoke's form posts on submit-lead, the one function both builds use", () => {
+    // It used to ask, through E2E_LEAD_FUNCTIONS, whether the deployment posted
+    // to Base44's submitLead or Supabase's submit-lead. Both the e2e build and
+    // production post to submit-lead now, so nothing asks.
     const smoke = stepsOf(workflow.jobs.smoke).find((s) => s.name === "Smoke the deployment");
-    expect(smoke?.env?.E2E_LEAD_FUNCTIONS).toBe("${{ vars.LEAD_FUNCTIONS }}");
-    const spec = readFileSync(join(REPO_ROOT, "e2e/api/base44-contract.spec.ts"), "utf8");
-    expect(spec).toContain("LEAD_VIA_SUPABASE");
+    expect(smoke?.env).not.toHaveProperty("E2E_LEAD_FUNCTIONS");
+    const spec = readFileSync(join(REPO_ROOT, "e2e/api/backend-contract.spec.ts"), "utf8");
+    expect(spec).toContain('mockApi.waitForRequest("/functions/v1/submit-lead")');
     const fixture = readFileSync(join(REPO_ROOT, "e2e/fixtures/app.ts"), "utf8");
-    expect(fixture).toContain("process.env.E2E_LEAD_FUNCTIONS");
-    expect(fixture).toContain("process.env.VITE_LEAD_FUNCTIONS");
+    expect(fixture).not.toContain("E2E_LEAD_FUNCTIONS");
+    // Stubbed against a deployment too: the smoke files no real lead.
+    expect(fixture).toMatch(/url\.pathname\.startsWith\("\/functions\/v1\/"\)/);
   });
 
   it("builds the e2e matrix from the plan job rather than hard-coding it", () => {
@@ -316,23 +320,30 @@ describe("articles are prebuilt from the right list", () => {
   });
 
   it("prebuilds the e2e fixture article in the tested build and nowhere else (CTR-REB-004)", () => {
-    expect(step("build", "Build")?.env?.PRERENDER_ARTICLES_FIXTURE).toBe("e2e/fixtures/prerender-articles.json");
-    // Not workflow-wide: a workflow-level env would reach every job, the Vercel build included.
-    expect(JSON.stringify(workflow.env ?? {}), "workflow-level env").not.toContain("PRERENDER_ARTICLES_FIXTURE");
-    // Within the build job, only the Build step carries it.
-    for (const s of stepsOf(workflow.jobs.build) as Step[]) {
-      if (s.name === "Build") continue;
-      expect(JSON.stringify(s), `build job step "${s.name}"`).not.toContain("PRERENDER_ARTICLES_FIXTURE");
+    // The fixture lives in e2e/build-env.ts, which only `npm run build:e2e` applies.
+    const buildEnv = readFileSync(join(REPO_ROOT, "e2e/build-env.ts"), "utf8");
+    expect(buildEnv).toMatch(/PRERENDER_ARTICLES_FIXTURE: E2E_ARTICLES_FIXTURE/);
+    expect(buildEnv).toContain('E2E_ARTICLES_FIXTURE = "e2e/fixtures/prerender-articles.json"');
+    const scripts: Record<string, string> = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")).scripts;
+    expect(scripts["build:e2e"]).toBe("node scripts/build-e2e.mjs");
+    expect(readFileSync(join(REPO_ROOT, "scripts/build-e2e.mjs"), "utf8")).toMatch(/process\.env\.VERCEL === '1' \|\| process\.env\.VERCEL_ENV/);
+
+    expect(step("build", "Build")?.run).toBe("npm run build:e2e");
+    // Not workflow-wide, and in no step but the build job's Build: the e2e
+    // bundle is the artifact the shards test and nothing else.
+    for (const marker of ["PRERENDER_ARTICLES_FIXTURE", "build:e2e"]) {
+      expect(JSON.stringify(workflow.env ?? {}), "workflow-level env").not.toContain(marker);
+      for (const s of stepsOf(workflow.jobs.build) as Step[]) {
+        if (s.name === "Build") continue;
+        expect(JSON.stringify(s), `build job step "${s.name}"`).not.toContain(marker);
+      }
+      for (const [name, job] of jobs) {
+        if (name === "build") continue;
+        expect(JSON.stringify(job), `${name} must not build the e2e bundle`).not.toContain(marker);
+      }
+      expect(JSON.stringify(step("deploy-vercel", "Build for Vercel"))).not.toContain(marker);
+      expect(readFileSync(join(REPO_ROOT, "vercel.json"), "utf8")).not.toContain(marker);
     }
-    expect(JSON.stringify({ ...workflow.jobs.build, steps: undefined })).not.toContain("PRERENDER_ARTICLES_FIXTURE");
-    for (const [name, job] of jobs) {
-      if (name === "build") continue;
-      expect(JSON.stringify(job), `${name} must not prebuild the fixture article`).not.toContain(
-        "PRERENDER_ARTICLES_FIXTURE",
-      );
-    }
-    expect(JSON.stringify(step("deploy-vercel", "Build for Vercel"))).not.toContain("PRERENDER_ARTICLES_FIXTURE");
-    expect(readFileSync(join(REPO_ROOT, "vercel.json"), "utf8")).not.toContain("PRERENDER_ARTICLES_FIXTURE");
   });
 
   it("checks that a production deployment still serves /blog its own page (CTR-REB-005)", () => {
