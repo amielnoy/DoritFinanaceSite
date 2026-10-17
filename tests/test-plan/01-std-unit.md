@@ -1746,7 +1746,7 @@ D-17, manual test 2026-10-14. A link with an unrecognised `utm_source` (`?utm_so
 
 ### 4.74 A lead's meetings, for staff — `tests/unit/supabase-lead-admin.test.ts` (new cases), `tests/unit/meetings-time.test.ts`
 
-docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2. The adapter reads and writes `meetings` and `meeting_requests` under the person's own session; an insert or update that row-level security filtered out is a failure (`applied`), and the one-meeting key's refusal (23505, until migration 2) is explained in words. A staff member's "14.12 at 17:30" is Israel's wall clock (A-63), on either side of a daylight-saving change.
+docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2. The adapter reads and writes `meetings` and `meeting_requests` under the person's own session; an insert or update that row-level security filtered out is a failure (`applied`). A staff member's "14.12 at 17:30" is Israel's wall clock (A-63), on either side of a daylight-saving change.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -1754,7 +1754,7 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2. The adap
 | UNIT-MTGADM-002 | "puts a meeting with no time last, where Postgres's descending order puts it first" | Dated, then undated |
 | UNIT-MTGADM-003 | "adds a meeting in the lead's own agency, and asks for the row back" | Insert with `lead_id`, `agency_id`, `status: scheduled`; no `created_by` |
 | UNIT-MTGADM-004 | "reports an insert row-level security refused as a failure, not as added" | Throws `לא בוצעה` |
-| UNIT-MTGADM-005 | "explains the one-meeting key until migration 2 drops it" | 23505 → `כבר יש פגישה` |
+| UNIT-MTGADM-005 | (retired with migration 2: a lead may hold many meetings, so the one-meeting refusal no longer exists) | — |
 | UNIT-MTGADM-006 | "publishes and unpublishes a summary by its column names, on one meeting" | `client_summary` + `summary_published_at`; then `summary_published_at: null` |
 | UNIT-MTGADM-007 | "reports an update that changed nothing — another User's lead — as a failure" | Throws |
 | UNIT-MTGADM-008 | "marks a client's request handled, and nothing else" | `status`, `handled_at` only |

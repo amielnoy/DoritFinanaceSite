@@ -218,7 +218,6 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
         status: "scheduled",
       }).select("id"),
       "meeting insert",
-      MEETING_INSERT_REFUSED,
     );
   }
 
@@ -234,13 +233,6 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
   }
 }
 
-/**
- * Until migration 2 drops `meetings_lead_id_key`, a lead holds one meeting
- * (docs/superpowers/specs/2026-10-17-client-meetings-design.md, Rollout 3).
- */
-const MEETING_INSERT_REFUSED: Record<string, string> = {
-  "23505": "לפנייה הזו כבר יש פגישה. עד העדכון הבא אפשר לשמור פגישה אחת לכל פנייה.",
-};
 
 /**
  * A write that changed exactly the row it named, or an error.
@@ -250,12 +242,8 @@ const MEETING_INSERT_REFUSED: Record<string, string> = {
  * to tell "done" from "not allowed", and the screen must not show a refused
  * deletion as a deleted lead.
  */
-async function applied(
-  query: PromiseLike<SupabaseReadResult>,
-  action: string,
-  known: Record<string, string> = {},
-): Promise<void> {
+async function applied(query: PromiseLike<SupabaseReadResult>, action: string): Promise<void> {
   const { data, error } = await query;
-  if (error) throw new Error((error.code && known[error.code]) || `leads ${action} failed: ${error.message}`);
+  if (error) throw new Error(`leads ${action} failed: ${error.message}`);
   if (!data || data.length === 0) throw new Error(NOT_APPLIED);
 }

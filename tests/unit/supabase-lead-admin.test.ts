@@ -384,15 +384,6 @@ describe("SupabaseLeadAdminService — a lead's meetings", () => {
     ).rejects.toThrow(/לא בוצעה/);
   });
 
-  it("explains the one-meeting key until migration 2 drops it", async () => {
-    const { client } = tableFake({ data: [], error: null }, { data: null, error: { message: "duplicate key", code: "23505" } });
-    await expect(
-      new SupabaseLeadAdminService(client).addMeeting({
-        leadId: "lead-1", agencyId: "agency-1", scheduledAt: "x", durationMin: 45, mode: "office", location: "", kind: "other", topic: "",
-      }),
-    ).rejects.toThrow(/כבר יש פגישה/);
-  });
-
   it("publishes and unpublishes a summary by its column names, on one meeting", async () => {
     const { client, calls } = tableFake({ data: [], error: null }, { data: [{ id: "m-1" }], error: null });
     const service = new SupabaseLeadAdminService(client);

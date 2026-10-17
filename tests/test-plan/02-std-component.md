@@ -960,6 +960,6 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2, behind `
 | CMP-MTG-006 | "keeps Dorit's notes labelled as staff-only, apart from the client's summary" | Notes field labelled `— רק הצוות רואה`; summary empty |
 | CMP-MTG-007 | "shows the client's open request and marks it handled" | Banner with kind and note; `handleMeetingRequest(r-1)`; the meeting untouched |
 | CMP-MTG-008 | "adds a meeting in the lead's agency, on Israel's clock" | 2026-12-14 17:30 → `15:30Z`, the lead's agency |
-| CMP-MTG-009 | "says why a meeting was not added, in the service's words" | The 23505 explanation as an alert |
+| CMP-MTG-009 | "says why a meeting was not added, in the service's words" | The service's refusal as an alert |
 | CMP-MTG-010 | "opens only the leads the table holds — their assigned ones — and reads only that lead's meetings" | A User: one lead; meetings read for it alone |
 | CMP-MTG-011 | "is told when a write is refused, rather than shown it saved" | Alert `לא בוצעה` |

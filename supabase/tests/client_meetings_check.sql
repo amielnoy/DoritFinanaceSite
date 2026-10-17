@@ -39,7 +39,9 @@ insert into public.meetings (id, lead_id, scheduled_at, topic, notes, calendar_s
 
 -- Before migration 2 a lead holds one meeting: submit-lead is not offered a
 -- lead that already has one, so a rebooking makes a new lead instead of failing.
+-- Asked only while the key exists (a database without 20261104000000).
 do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'meetings_lead_id_key') then return; end if;
   if public.lead_for_email('client@example.com', '00000000-0000-0000-0000-000000000001') is not null then
     raise exception 'lead_for_email offered a lead that cannot take a second meeting yet';
   end if;
@@ -49,9 +51,17 @@ do $$ begin
   end if;
 end $$;
 
--- The world after migration 2: many meetings per lead. Dropped here, inside
--- the rolled-back transaction, so the many-meetings cases can be asked now.
-alter table public.meetings drop constraint meetings_lead_id_key;
+-- The world after migration 2: many meetings per lead. Dropped here when it
+-- is still there, inside the rolled-back transaction.
+alter table public.meetings drop constraint if exists meetings_lead_id_key;
+
+-- With the key gone, the client's booked lead is offered for a rebooking.
+do $$ begin
+  if public.lead_for_email('client@example.com', '00000000-0000-0000-0000-000000000001')
+       is distinct from '11111111-0000-0000-0000-000000000001' then
+    raise exception 'lead_for_email did not offer a booked lead once many meetings are allowed';
+  end if;
+end $$;
 
 -- ── staff add a meeting to a lead they can see, and only that ──────────────
 set local role authenticated;
