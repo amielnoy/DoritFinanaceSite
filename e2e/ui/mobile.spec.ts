@@ -1354,7 +1354,8 @@ test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
     });
 
     await test_step("the five services are open rows, with no accordion buttons", async () => {
-      await expect(page.locator("#services button[aria-expanded]")).toHaveCount(0);
+      // A glossary term is a button with aria-expanded too; it is not an accordion.
+      await expect(page.locator("#services button[aria-expanded]:not([data-term])")).toHaveCount(0);
       await expect(page.locator("#services").getByText(/ליווי צמוד ברגע האמת/)).toBeVisible();
     });
 

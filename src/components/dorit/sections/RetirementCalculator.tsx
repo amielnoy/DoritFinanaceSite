@@ -15,6 +15,7 @@ import {
   WHAT_IF,
   type RetirementInput,
 } from "@/lib/retirement-projection";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 /**
  * /tools — "מחשבון פרישה": where today's savings and deposits could reach by
@@ -178,7 +179,7 @@ export default function RetirementCalculator() {
             לאן החיסכון יכול להגיע?
           </h2>
           <p className="mt-6 text-foreground/70 max-w-md leading-relaxed">
-            הזיזו את הנתונים וראו איך הגיל, ההפקדה ודמי הניהול משנים את הקצבה הצפויה.
+            <Glossed text="הזיזו את הנתונים וראו איך הגיל, ההפקדה ודמי הניהול משנים את הקצבה הצפויה." />
           </p>
           <p className="mt-8 flex items-start gap-3 text-sm text-muted-foreground max-w-md">
             <Info size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />

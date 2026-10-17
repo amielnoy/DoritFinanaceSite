@@ -13,6 +13,7 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { AGENTS } from "@/config/agents";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 import { localePath } from "@/i18n/locales";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 /**
  * The two self-assessment tools, off the home page.
@@ -62,7 +63,7 @@ export default function Tools() {
                 {t("page.title")}
               </h1>
               <p className="mt-8 text-muted-foreground max-w-2xl leading-relaxed">
-                {t("page.intro")}
+                <Glossed text={t("page.intro")} />
               </p>
             </Reveal>
           </div>

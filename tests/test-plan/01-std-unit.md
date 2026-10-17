@@ -1786,3 +1786,22 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4. The tab'
 | UNIT-CLMTG-013 | "asks through the meeting-request function, so Dorit is mailed" | `invoke("meeting-request", { meetingId, kind, note })` |
 | UNIT-CLMTG-014 | "passes the function's own refusal through" | The 409's `error` text |
 
+
+### 4.76 The glossary — `tests/unit/glossary.test.ts`
+
+`src/content/glossary.ts` defines the basic terms a visitor meets in the copy; `glossSegments` (`src/lib/glossary.ts`) finds them in running text. The compliance rules that bind the copy bind the definitions: descriptive only, no yearly figures, no promise, no advice.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-GLOSS-001 | "has unique ids and a title, definition and forms in every language" | he, en, fr all filled |
+| UNIT-GLOSS-002 | "never maps one form to two entries in the same language" | One entry per form |
+| UNIT-GLOSS-003 | "promises nothing: no percent figures and no 'saves'" | No `%`, no "חוסכים לכם" / "saves you" |
+| UNIT-GLOSS-004 | "explains and never advises: no 'worth doing' or 'recommended'" | No "כדאי" / "מומלץ" / "worth" / "recommend" |
+| UNIT-GLOSS-005 | "keeps the text intact" | The segments join back to the input |
+| UNIT-GLOSS-006 | "matches Hebrew prefixes with the term" | "ובקרן השתלמות", "לפנסיה" underlined whole |
+| UNIT-GLOSS-007 | "underlines the whole name when a prefix replaces its ה" | "במסלקה הפנסיונית" → clearinghouse |
+| UNIT-GLOSS-008 | "prefers the longest form" | "קופת גמל להשקעה" over "קופת גמל" |
+| UNIT-GLOSS-009 | "does not match inside a longer word" | "פנסיוני", "Pensioners" untouched |
+| UNIT-GLOSS-010 | "marks each entry once per text" | One underline |
+| UNIT-GLOSS-011 | "shares the once-only rule across a scope, and returns the same split on a re-render" | An article underlines a term once |
+| UNIT-GLOSS-012 | "matches English and French case-insensitively" | `management-fees`, `study-fund` |

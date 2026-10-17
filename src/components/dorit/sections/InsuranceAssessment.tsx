@@ -11,6 +11,7 @@ import { leadEvents } from "@/lib/analytics";
 import { TOOL_SECTION } from "@/config/tools";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
 import type { KeyOf } from "@/i18n/resources";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 export default function InsuranceAssessment() {
   const [step, setStep] = useState(0);
@@ -61,7 +62,7 @@ export default function InsuranceAssessment() {
             {t("assess.title")}
           </h2>
           <p className="mt-6 text-muted-foreground leading-relaxed">
-            {t("assess.intro")}
+            <Glossed text={t("assess.intro")} />
           </p>
         </div>
 
@@ -196,7 +197,7 @@ export default function InsuranceAssessment() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{t(`assess.why.${rec.reason}` as KeyOf<"tools">)}</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed"><Glossed text={t(`assess.why.${rec.reason}` as KeyOf<"tools">)} /></p>
                           </div>
                         </motion.div>
                       );

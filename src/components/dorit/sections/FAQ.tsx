@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/accordion";
 import { faqTips } from "@/content/faq";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 const TIPS = faqTips();
 
@@ -42,7 +43,7 @@ export default function FAQ() {
                   {`טיפ ${item.tip.n} · ${item.tip.title}`}
                 </AccordionTrigger>
                 <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
-                  {item.a}
+                  <Glossed text={item.a} />
                 </AccordionContent>
               </AccordionItem>
             ))}

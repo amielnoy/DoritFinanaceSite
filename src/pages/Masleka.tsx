@@ -6,6 +6,7 @@ import { CLEARINGHOUSE_SAVER_URL, MASLEKA_ENABLED } from "@/config/masleka";
 import { normalizeIsraeliId } from "@/lib/israeli-id";
 import { clientMessage, isPlausibleCode, readTokenFromHash } from "@/lib/masleka";
 import { services } from "@/services";
+import Glossed from "@/components/dorit/primitives/Glossed";
 
 /**
  * /masleka — where a client hands over the clearinghouse power-of-attorney
@@ -145,8 +146,7 @@ export default function Masleka({
     <Shell>
       <h1 className="font-heading text-2xl md:text-3xl">מסירת קוד המסלקה</h1>
       <p className="mt-4 text-muted-foreground leading-relaxed">
-        כדי שדורית תוכל להכין לפגישה תמונה מלאה של הפנסיה, הגמל וההשתלמות שלכם, היא צריכה את אישורכם במסלקה
-        הפנסיונית. שלושה צעדים, כמה דקות:
+        <Glossed text="כדי שדורית תוכל להכין לפגישה תמונה מלאה של הפנסיה, הגמל וההשתלמות שלכם, היא צריכה את אישורכם במסלקה הפנסיונית. שלושה צעדים, כמה דקות:" />
       </p>
       <div className="mt-8">
         <MaslekaSteps steps={STEPS} screenshots={screenshots} />
