@@ -21,27 +21,17 @@
 # job that merged `builder` into `main` would race that and leave the two
 # disagreeing about what happened.
 #
-# The two deployment targets are gated differently, on purpose:
+# Deployment: Vercel serves production (govari-fin.co.il) since 2026-10-11,
+# promoted only when every test passed and the Supabase functions deployed; a
+# red `main` run deploys a login-protected preview instead, because a failing
+# run is when you most want to open it. So a test failure costs you
+# production, never staging.
 #
-#   Vercel — production (govari-fin.co.il) since 2026-10-11, promoted only
-#   when every test passed; a red `main` run deploys a login-protected
-#   preview instead, because a failing run is when you most want to open it.
-#
-#   Base44 — the agents and functions, published only when every test passed.
-#
-# So a test failure costs you production, never staging.
-#
-# Deploy note: this repo syncs to Base44 through git (see README), and a git
-# sync still needs a Publish in the Builder to reach users. The deploy job can
-# do that publish unattended instead, then smoke-test the live site. It is
-# opt-in — it runs only when the BASE44_API_KEY secret and BASE44_APP_ID
-# variable are set, so a fork or a fresh clone gets a green CI with no
-# credentials.
-#
-# BASE44_API_KEY is a workspace API key — it starts with `b44k_`. It is the only
-# credential the CLI reads from the environment besides a BASE44_ACCESS_TOKEN /
-# BASE44_REFRESH_TOKEN pair, which expires and so cannot live in a secret;
-# `base44 login` is a device-code flow and cannot run unattended.
+# Nothing is published to Base44 any more (2026-10-17): the site, its content
+# writes and all four chat agents run on Vercel and Supabase, and the
+# "Publish to Base44" job, the gate that held Vercel for it, and the nightly
+# Base44 log archive are gone. The Base44 code still in the repo is removed
+# in a follow-up once the rollback window closes (docs/base44-exit/).
 name: CI
 
 on:
@@ -73,15 +63,13 @@ on:
     # Scheduled runs use the default branch. They deploy the Supabase functions
     # and promote the Vercel build (the usual green gate applies), so an
     # article published or edited from /admin/blog has its prebuilt page by
-    # the next night. They never publish Base44: that ships the agents, and
-    # nobody is watching at 22:00 — the `deploy` job still requires a push or
-    # a manual run with `deploy` ticked.
+    # the next night.
     - cron: "0 19 * * *"
 
   workflow_dispatch:
     inputs:
       deploy:
-        description: "Publish to Base44 after the tests pass"
+        description: "Deploy to production after the tests pass"
         type: boolean
         default: false
 
@@ -553,163 +541,6 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api
 
-  deploy:
-    name: Publish to Base44
-    outputs:
-      published: ${{ steps.publish.outputs.published }}
-      previous_asset: ${{ steps.before.outputs.asset }}
-    runs-on: ubuntu-latest
-    needs: [build, test-node, test-e2e, deploy-supabase]
-    if: >-
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || inputs.deploy)
-    environment:
-      name: production
-      url: ${{ vars.PRODUCTION_URL }}
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Pin npm (honours the .npmrc release cooldown)
-        run: npm i -g npm@${{ env.NPM_VERSION }}
-
-      - run: npm ci
-
-      # What production serves *now*, before anything replaces it. The smoke
-      # job waits for this to change rather than assuming a returned CLI means
-      # a served release — see scripts/wait-for-deployment.mjs.
-      - name: Record the release production is serving
-        id: before
-        continue-on-error: true
-        run: |
-          asset=$(curl -fsSL --max-time 30 "${{ vars.PRODUCTION_URL }}" \
-            | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1 || true)
-          echo "asset=$asset" >> "$GITHUB_OUTPUT"
-          echo "Production currently serves: ${asset:-unknown}"
-
-      # Absent credentials skip the publish; *wrong* ones fail it. A skip on
-      # main still stops the site: Deploy to Vercel will not promote production
-      # without `published=true` from this job, and fails the run instead.
-      #
-      # The CLI only treats BASE44_API_KEY as a key when it starts with `b44k_`:
-      #
-      #     function usingWorkspaceApiKey(): boolean {
-      #       return process.env.BASE44_API_KEY?.trim().startsWith("b44k_") ?? false;
-      #     }
-      #
-      # Any other value — a `B44U_` user token, say — is ignored, and the CLI
-      # falls back to its device-code login. On a runner that is not an error
-      # but a prompt nobody can answer: the step sat for five minutes and was
-      # killed with an orphan node process, which says nothing about the cause.
-      # One prefix check turns that into an instant, legible failure.
-      # Two ways to authenticate, because only one of them exists on every plan.
-      #
-      #   1. BASE44_API_KEY — a *workspace* API key, `b44k_…`. Scoped to the
-      #      workspace, does not expire, and the right answer. It needs the
-      #      Business plan: below that the "Workspace API Keys" tab in the
-      #      dashboard is greyed out and no such key can be created at all.
-      #
-      #   2. BASE44_ACCESS_TOKEN + BASE44_REFRESH_TOKEN — the pair a local
-      #      `base44 login` leaves in ~/.base44/auth/auth.json. The CLI's
-      #      `seedAuthFromEnv()` writes them into its own auth file at startup,
-      #      which is the supported way to run it unattended without a
-      #      workspace key. Both are required — it discards a session it has no
-      #      way to refresh.
-      #
-      # The second is a wider credential than the first: it acts as the user,
-      # across every app in the workspace, and it expires. When it does, the
-      # publish fails or skips, and neither the agents nor the site reach
-      # production until it is re-seeded.
-      - name: Check publish credentials
-        id: creds
-        env:
-          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
-          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
-          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
-        run: |
-          # Order matters, and it is "can we authenticate" rather than "is
-          # every secret tidy". A leftover BASE44_API_KEY from before the
-          # workspace-key tab turned out to need the Business plan must not
-          # fail a run that has a perfectly good session to publish with — that
-          # is what happened on the merge of #48, where all three secrets were
-          # present and the stale one decided the outcome.
-          #
-          # Reaching the CLI with a non-`b44k_` key is harmless: every consumer
-          # of it guards with `isWorkspaceApiKey()` first, so the value is inert
-          # and the seeded session is used instead. The Publish step below
-          # unsets it anyway, so that this stays true without depending on the
-          # CLI's internals.
-          if [ -z "${{ vars.BASE44_APP_ID }}" ]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::BASE44_APP_ID is unset — skipping the publish step. Production stays on whatever was last published by hand."
-          elif [ -n "$BASE44_API_KEY" ] && [ "${BASE44_API_KEY#b44k_}" != "$BASE44_API_KEY" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Publishing with the workspace API key."
-          elif [ -n "$BASE44_ACCESS_TOKEN" ] && [ -n "$BASE44_REFRESH_TOKEN" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Publishing with a seeded personal session. That credential expires — when this step starts skipping, re-seed it from ~/.base44/auth/auth.json."
-            if [ -n "$BASE44_API_KEY" ]; then
-              echo "::warning::BASE44_API_KEY is set but is not a workspace API key, so it is ignored. Delete the secret — a credential nobody uses is one nobody rotates."
-            fi
-          elif [ -n "$BASE44_API_KEY" ]; then
-            # The original reason this check exists, and still the right answer
-            # when it is the *only* credential: the CLI ignores a non-`b44k_`
-            # value and falls back to an interactive device login, which on a
-            # runner is a prompt nobody can answer. It hung for five minutes
-            # and was killed with an orphan node process, saying nothing about
-            # the cause. Failing instantly and legibly is better.
-            echo "::error::BASE44_API_KEY is set but is not a workspace API key — those start with 'b44k_' — and there is no BASE44_ACCESS_TOKEN + BASE44_REFRESH_TOKEN pair to fall back on. The CLI would fall back to an interactive device login, which cannot be answered on a runner. Replace it with a workspace key, or set the token pair."
-            exit 1
-          elif [ -n "$BASE44_ACCESS_TOKEN" ]; then
-            echo "::error::BASE44_ACCESS_TOKEN is set without BASE44_REFRESH_TOKEN. The CLI needs both and ignores a session it cannot refresh."
-            exit 1
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No Base44 credentials are configured — skipping the publish step. Production stays on whatever was last published by hand."
-          fi
-
-      # Three npm 12 defaults block this install: the CLI pulls `@deno/loader`
-      # from a remote URL, refused as EALLOWREMOTE unless --allow-remote is
-      # given, and the postinstalls for workerd and esbuild are skipped unless
-      # they are named in --allow-scripts — the CLI needs both to bundle the
-      # functions. All are scoped to this one global install, not to the repo's
-      # dependencies.
-      #
-      # `base44 link` is not called. It existed to write the gitignored app-id
-      # pointer, and its `--non-interactive` flag no longer exists — the CLI
-      # dropped it, which is what broke this step. The app id travels in
-      # BASE44_APP_ID, which the CLI reads directly, so there is nothing to link.
-      #
-      # `deploy` prompts twice without these flags — once to confirm and once
-      # about building the site — and a prompt in CI is a hung job, not an
-      # error.
-      - name: Publish
-        id: publish
-        if: steps.creds.outputs.ready == 'true'
-        env:
-          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
-          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
-          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
-          BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
-        run: |
-          # A key that is not a workspace key is not a credential, and passing
-          # one leaves the CLI to decide what to do with it. It currently
-          # ignores it — every read guards with `isWorkspaceApiKey()` — but the
-          # step above has already chosen which credential to publish with, and
-          # that choice should not depend on an implementation detail of a
-          # package we install at `@latest`.
-          if [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
-            unset BASE44_API_KEY
-          fi
-          npm install -g base44@latest --allow-remote=all --allow-scripts=workerd,esbuild
-          base44 deploy --yes --build
-          echo "published=true" >> "$GITHUB_OUTPUT"
-
   # ── 5. Deploy the built site to Vercel ───────────────────────────────────
   #
   # Staging deploys even when the tests are red — that is the point of it. A
@@ -727,17 +558,13 @@ jobs:
   deploy-vercel:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
-    # `deploy` (the Base44 publish) too: the site and the agents' instructions
-    # go live together. The FAQ chat's answers are written by a Base44 agent,
-    # and a site that links to something the agent was told about must not
-    # reach customers while the agent still says the old thing. See the
-    # "Choose production or preview" step for the gate itself.
-    needs: [build, test-node, test-e2e, deploy-supabase, deploy]
+    needs: [build, test-node, test-e2e, deploy-supabase]
     outputs:
       url: ${{ steps.deploy.outputs.url }}
       deployed: ${{ steps.deploy.outputs.deployed }}
       kind: ${{ steps.target.outputs.kind }}
       asset: ${{ steps.built.outputs.asset }}
+      previous_asset: ${{ steps.before.outputs.asset }}
     # Also on `builder`, where it deploys a *preview* rather than production.
     # That is the point of the branch: a Builder edit gets a URL you can open
     # and look at before you merge it, instead of being judged from a diff.
@@ -808,41 +635,22 @@ jobs:
       #
       # So a red run still deploys — as a preview, on its own URL, which is the
       # artefact you actually wanted. Only `--prod` waits for green.
-      #
-      # It also waits for the Base44 publish, which carries the agents'
-      # instructions (base44/agents/). Without that, an expired Base44 session
-      # skipped the agents with a notice while the site went live anyway, and
-      # the run stayed green. The nightly `schedule` run is exempt: the Base44
-      # job does not run on it, and nothing in base44/ changed since the push
-      # that already passed this gate.
-      #
-      # When the agents are what held production back, the job deploys the
-      # preview and then fails (last step), so the run is red, not quiet.
       - name: Choose production or preview
         id: target
         env:
           UNIT: ${{ needs.test-node.result }}
           E2E: ${{ needs.test-e2e.result }}
           FUNCTIONS: ${{ needs.deploy-supabase.result }}
-          AGENTS: ${{ needs.deploy.outputs.published }}
         run: |
-          agents_ok=false
-          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$AGENTS" = "true" ]; then
-            agents_ok=true
-          fi
           if [ "$GITHUB_REF" = "refs/heads/main" ] \
             && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ] \
-            && [ "$FUNCTIONS" = "success" ] && [ "$agents_ok" = "true" ]; then
+            && [ "$FUNCTIONS" = "success" ]; then
             echo "prod=--prod" >> "$GITHUB_OUTPUT"
             echo "env=production" >> "$GITHUB_OUTPUT"
             echo "kind=production" >> "$GITHUB_OUTPUT"
           else
             if [ "$GITHUB_REF" = "refs/heads/main" ]; then
-              echo "::warning::Not promoting (unit: ${UNIT}, e2e: ${E2E}, functions: ${FUNCTIONS}, agents published: ${AGENTS:-no}) — deploying this as a preview instead of production."
-              if [ "$UNIT" = "success" ] && [ "$E2E" = "success" ] \
-                && [ "$FUNCTIONS" = "success" ] && [ "$agents_ok" != "true" ]; then
-                echo "held_for_agents=true" >> "$GITHUB_OUTPUT"
-              fi
+              echo "::warning::Not promoting (unit: ${UNIT}, e2e: ${E2E}, functions: ${FUNCTIONS}) — deploying this as a preview instead of production."
             fi
             echo "prod=" >> "$GITHUB_OUTPUT"
             echo "env=preview" >> "$GITHUB_OUTPUT"
@@ -899,6 +707,19 @@ jobs:
           asset=$(grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' .vercel/output/static/index.html | head -1 || true)
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
           echo "This deploy serves: ${asset:-unknown}"
+
+      # What production serves *now*, before this deploy replaces it — the
+      # smoke's fallback when the asset below cannot be read
+      # (scripts/wait-for-deployment.mjs).
+      - name: Record the release production is serving
+        id: before
+        if: steps.creds.outputs.ready == 'true' && steps.target.outputs.env == 'production'
+        continue-on-error: true
+        run: |
+          asset=$(curl -fsSL --max-time 30 "${{ vars.PRODUCTION_URL }}" \
+            | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1 || true)
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "Production currently serves: ${asset:-unknown}"
 
       - name: Deploy
         id: deploy
@@ -965,13 +786,6 @@ jobs:
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
         run: node scripts/indexnow.mjs
 
-      # Last, so the preview above is still deployed and linked from the run.
-      - name: Fail when production waited for the agents
-        if: steps.creds.outputs.ready == 'true' && steps.target.outputs.held_for_agents == 'true'
-        run: |
-          echo "::error::Tests and functions are green, but the Base44 publish did not run, so production was NOT updated (deployed as a preview). The agents' instructions and the site go live together. Usually the Base44 session expired: run \`base44 login\` and copy the new pair from ~/.base44/auth/auth.json into BASE44_ACCESS_TOKEN and BASE44_REFRESH_TOKEN, then re-run this workflow."
-          exit 1
-
   # ── 6. Post-deploy smoke test against the live site ──────────────────────
   #
   # Waits on both publishes and smokes whatever `PRODUCTION_URL` names, rather
@@ -985,12 +799,12 @@ jobs:
   smoke:
     name: Production smoke test
     runs-on: ubuntu-latest
-    needs: [deploy, deploy-vercel]
+    needs: [deploy-vercel]
     if: >-
       !cancelled() &&
       github.ref == 'refs/heads/main' &&
       vars.PRODUCTION_URL != '' &&
-      (needs.deploy.result == 'success' || needs['deploy-vercel'].result == 'success')
+      needs['deploy-vercel'].result == 'success'
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -1007,20 +821,18 @@ jobs:
         run: node scripts/check-production-publish.mjs
         env:
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
-          BASE44_URL: ${{ vars.BASE44_URL }}
-          BASE44_PUBLISHED: ${{ needs.deploy.outputs.published }}
           VERCEL_DEPLOYED: ${{ needs.deploy-vercel.outputs.deployed }}
           VERCEL_KIND: ${{ needs.deploy-vercel.outputs.kind }}
 
-      # A publish that returned is not a release that is being served. Base44's
-      # edge can keep handing out the previous bundle for minutes, and the smoke
+      # A deploy that returned is not a release that is being served. An edge
+      # can keep handing out the previous bundle for minutes, and the smoke
       # then fails on whatever the new release added — which is exactly how
       # `#start` went red at publish time and green against the same URL later.
       - name: Wait for the new release to reach the edge
         run: node scripts/wait-for-deployment.mjs
         env:
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
-          PREVIOUS_ASSET: ${{ needs.deploy.outputs.previous_asset }}
+          PREVIOUS_ASSET: ${{ needs['deploy-vercel'].outputs.previous_asset }}
           EXPECTED_ASSET: ${{ needs['deploy-vercel'].outputs.asset }}
 
       # The Vercel functions are bundled apart from the app, without the "@/"
@@ -1047,12 +859,14 @@ jobs:
       # Against a real deployment the API/UI/a11y suites run untouched; the
       # security suite additionally enforces the transport hardening headers.
       #
-      # E2E_LIVE_* additionally turns on the opt-in "Live Base44 backend" block
-      # in e2e/api/base44-contract.spec.ts, which is the only part of the
-      # battery that talks to the backend rather than to a stub. Without it this
-      # job smoke-tests the published *bundle* against a mock and reports green
+      # E2E_LIVE_API_URL additionally turns on the opt-in live block in
+      # e2e/api/supabase-live.spec.ts, the part of the battery that talks to
+      # the real backend (Supabase and its Edge functions, with the key the
+      # deployed bundle carries) rather than to a stub. Without it this job
+      # smoke-tests the published *bundle* against a mock and reports green
       # while every call behind it 401s — which is exactly how three dead chats
-      # went unnoticed for ten days (A-42).
+      # went unnoticed for ten days (A-42). The "Live Base44 backend" block is
+      # no longer run here: production does not use Base44 (2026-10-17).
       # A skip is a pass, and this job is the one place where that is fatal:
       # its whole purpose is to answer "does the deployed thing work". Assert
       # the inputs exist before the suite runs, so a missing variable fails
@@ -1061,11 +875,9 @@ jobs:
       - name: The live backend probes must be able to run
         env:
           LIVE_URL: ${{ vars.PRODUCTION_URL }}
-          LIVE_APP_ID: ${{ vars.BASE44_APP_ID }}
         run: |
           missing=""
-          [ -n "$LIVE_URL" ]    || missing="$missing vars.PRODUCTION_URL"
-          [ -n "$LIVE_APP_ID" ] || missing="$missing vars.BASE44_APP_ID"
+          [ -n "$LIVE_URL" ] || missing="$missing vars.PRODUCTION_URL"
           if [ -n "$missing" ]; then
             echo "::error::The live-backend probes would skip silently. Missing:${missing}"
             exit 1
@@ -1076,23 +888,16 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: ${{ vars.PRODUCTION_URL }}
           E2E_ENFORCE_SECURITY_HEADERS: "0"
-          # PRODUCTION_URL, not BASE44_URL. `vars.BASE44_URL` does not exist —
-          # it resolved to empty, the live block's `test.skip(!LIVE_URL || ...)`
-          # skipped all eight cases, and the job went green having tested
-          # nothing against the backend. That is the exact failure these probes
-          # were written to end, one level up, so the guard below now makes a
-          # skip here impossible rather than merely unlikely.
+          # The guard above makes a skip of the live block impossible rather
+          # than merely unlikely: an empty URL once skipped every live case and
+          # the job went green having tested nothing against the backend.
           E2E_LIVE_API_URL: ${{ vars.PRODUCTION_URL }}
-          E2E_LIVE_APP_ID: ${{ vars.BASE44_APP_ID }}
           # "supabase" once the lead functions are switched on: the smoke then
           # requires submit-lead to report Google ready. Unset, it is not asked.
           E2E_EXPECT_GOOGLE: ${{ vars.LEAD_FUNCTIONS }}
           # The same variable tells base44-contract.spec.ts which function the
           # form posts to: submit-lead on Supabase, or submitLead on Base44.
           E2E_LEAD_FUNCTIONS: ${{ vars.LEAD_FUNCTIONS }}
-          # The nightly run has nobody watching it and publishes no Base44, so
-          # it skips the probes that open (empty) agent conversations.
-          E2E_SKIP_AGENT_PROBES: ${{ github.event_name != 'schedule' && '0' || '1' }}
 
       - name: Upload smoke report
         if: always()
@@ -1109,7 +914,7 @@ jobs:
   sites:
     name: Deployed sites
     runs-on: ubuntu-latest
-    needs: [deploy-vercel, deploy, test-node, test-e2e, allure]
+    needs: [deploy-vercel, test-node, test-e2e, allure]
     # `main` only. On `builder` the URL is a preview of one change rather than
     # a site anyone lives on, and merge-readiness already reports it — two
     # tables calling the same URL different things is worse than one. On a
@@ -1120,15 +925,9 @@ jobs:
     steps:
       - name: Write the site links to the run summary
         env:
-          # Where the Base44 app lives, which stops being the same thing as where
-          # customers go the moment the custom domain points at Vercel. They were one
-          # variable until now because the two happened to coincide.
-          BASE44_URL: ${{ vars.BASE44_URL }}
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
           VERCEL_URL: ${{ needs.deploy-vercel.outputs.url }}
           VERCEL_RESULT: ${{ needs.deploy-vercel.result }}
-          BASE44_RESULT: ${{ needs.deploy.result }}
-          BASE44_PUBLISHED: ${{ needs.deploy.outputs.published }}
           UNIT_RESULT: ${{ needs.test-node.result }}
           TESTS_RESULT: ${{ needs.test-e2e.result }}
           ALLURE_RESULT: ${{ needs.allure.result }}
@@ -1170,33 +969,12 @@ jobs:
             *)        vercel_state="⚠️ $VERCEL_RESULT" ;;
           esac
 
-          case "$BASE44_RESULT" in
-            success)
-              if [ "$BASE44_PUBLISHED" = "true" ]; then
-                base44_state="✅ published this run"
-              else
-                base44_state="⏭️ not published — publishing credentials are missing; production is unchanged"
-              fi ;;
-            failure)  base44_state="❌ publish failed" ;;
-            skipped)
-              if [ "$tests_green" = true ]; then
-                base44_state="⏭️ not published (no credentials, or not a push to main)"
-              else
-                base44_state="🛑 held back — the tests were red"
-              fi ;;
-            *)        base44_state="⚠️ $BASE44_RESULT" ;;
-          esac
 
           {
             echo "## Deployed sites"
             echo
             echo "| Environment | URL | This run |"
             echo "| --- | --- | --- |"
-            echo "| **Base44** (app, backend functions, auth) | ${BASE44_URL:-https://safe-arch-plan.base44.app} | ${base44_state} |"
-            # Named rather than asserted. Which of Base44 and Vercel is client-facing
-            # is a deployment decision that is in the middle of changing, and a
-            # hardcoded label would have gone stale silently at exactly the wrong
-            # moment. ("the two above" until the staging row moved below this one.)
             if [ -n "$PRODUCTION_URL" ]; then
               echo "| **Production** (client-facing) | ${PRODUCTION_URL} | smoke-tested after every publish |"
             fi
@@ -1329,7 +1107,12 @@ jobs:
       # split report — the one Cloudflare already hosts — which has to be served
       # rather than opened from disk (`npx allure open allure-report`). Any
       # other failure still fails the job.
+      # A bigger heap: at ~4,500 tests the generator died at Node's default
+      # (~4 GB, "JavaScript heap out of memory", 17 October 2026) with every
+      # suite green. The repository is public, so the runner has 16 GB.
       - name: Generate the report
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
           set -o pipefail
           if npm run allure:generate 2>&1 | tee allure-generate.log; then exit 0; fi
@@ -1585,7 +1368,6 @@ jobs:
           # nothing else, so the one address the verdict is actually protecting
           # was the one you had to go and look up.
           PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
-          BASE44_URL: ${{ vars.BASE44_URL }}
         run: |
           # The report's permanent home — the `main` alias, newest trunk report.
           # This job runs on every branch but `main`, and a feature branch never
@@ -1719,130 +1501,12 @@ jobs:
           echo "::error::Not safe to merge — see the verdict on the PR and in the run summary."
           exit 1
 
-  # ── The daily log archive ──────────────────────────────────────────────────
-  #
-  # Base44 keeps function logs and serves them through `base44 logs`, but not
-  # forever, and only through a CLI that needs a workspace key. That is fine for
-  # "what happened in the last hour" and useless for "what changed between last
-  # Tuesday and today" — which is the question that actually gets asked after a
-  # complaint about a lead that never arrived.
-  #
-  # So once a day the previous 24 hours are fetched and kept as an artifact.
-  # They are deliberately *not* committed: this repository is public, and the
-  # lines — timings, volumes, escalation reasons for a real agency — are not
-  # something to publish, even though they carry no personal data by design.
-  # An artifact is visible to collaborators and expires on its own, which is the
-  # right shape for an operational record.
-  logs:
-    name: Archive yesterday's logs
-    runs-on: ubuntu-latest
-    # Only the nightly run. A push has nothing new to archive, and archiving on
-    # every branch push would spend the private-repo minutes on duplicates.
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      # Either credential path, exactly as the publish job accepts them.
-      - name: Check credentials
-        id: creds
-        env:
-          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
-          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
-          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
-        run: |
-          # Same precedence as the publish job: a usable credential wins over a
-          # stale one sitting beside it. Nothing here ever fails the run — an
-          # unarchived day is a gap in an operational record, not a broken
-          # build, and a nightly job that reddens the badge is a job everyone
-          # learns to ignore.
-          if [ -z "${{ vars.BASE44_APP_ID }}" ]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::BASE44_APP_ID is unset — no logs were archived."
-          elif [ -n "$BASE44_API_KEY" ] && [ "${BASE44_API_KEY#b44k_}" != "$BASE44_API_KEY" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          elif [ -n "$BASE44_ACCESS_TOKEN" ] && [ -n "$BASE44_REFRESH_TOKEN" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No Base44 credentials — no logs were archived. Yesterday's lines stay only in Base44's own retention."
-          fi
-
-      - name: Install the CLI
-        if: steps.creds.outputs.ready == 'true'
-        run: npm ci --ignore-scripts
-
-      - name: Fetch the last 24 hours
-        if: steps.creds.outputs.ready == 'true'
-        env:
-          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
-          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
-          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
-          BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
-        run: |
-          if [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
-            unset BASE44_API_KEY
-          fi
-          npm run logs:archive
-
-      # The draft, which is where the agents actually run.
-      #
-      # A function called over HTTP logs to `prod`; a function called by an
-      # agent logs to `preview`. So every interview, every submitLead the model
-      # triggers, every calendar write behind a completed conversation — the
-      # whole agent-driven half of this system — is recorded only in the
-      # environment this job was not archiving.
-      #
-      # That cost two investigations in one day. A visitor reported a failed
-      # interview, prod logs showed nothing, and the reasonable conclusion was
-      # that the function had never been called. The run was in `preview` all
-      # along, and by the time anyone looked there it had aged out: Base44's
-      # retention on the draft is roughly a day (A-53).
-      #
-      # Same credentials, same window, its own directory, and the same promise
-      # the step above makes — a missing archive is a gap in a record, never a
-      # red build.
-      - name: Fetch the last 24 hours from the draft
-        if: steps.creds.outputs.ready == 'true'
-        continue-on-error: true
-        env:
-          BASE44_API_KEY: ${{ secrets.BASE44_API_KEY }}
-          BASE44_ACCESS_TOKEN: ${{ secrets.BASE44_ACCESS_TOKEN }}
-          BASE44_REFRESH_TOKEN: ${{ secrets.BASE44_REFRESH_TOKEN }}
-          BASE44_APP_ID: ${{ vars.BASE44_APP_ID }}
-          LOG_ENV: preview
-          LOG_DIR: logs/preview
-        run: |
-          if [ "${BASE44_API_KEY#b44k_}" = "$BASE44_API_KEY" ]; then
-            unset BASE44_API_KEY
-          fi
-          npm run logs:archive
-
-      - name: Keep them
-        if: steps.creds.outputs.ready == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs-${{ github.run_id }}
-          path: logs/
-          # Long enough to answer "what happened last quarter", short enough
-          # that an operational record does not become an archive nobody
-          # decided to keep.
-          retention-days: 90
-          if-no-files-found: warn
-
   prune-vercel:
     name: Prune old Vercel previews
     runs-on: ubuntu-latest
-    # The nightly run only — and unlike the archive job beside it, not
-    # `workflow_dispatch`. This one deletes. A manual trigger sitting next to
-    # the "Publish to Base44" button is how someone clears a preview they were
-    # halfway through reading, and there is no undo. The schedule is the whole
+    # The nightly run only, not `workflow_dispatch`. This one deletes. A manual
+    # trigger sitting next to the "deploy" button is how someone clears a
+    # preview they were halfway through reading, and there is no undo. The schedule is the whole
     # interface; to preview what it would do, run `npm run prune:vercel` with
     # no `--apply` locally.
     if: ${{ github.event_name == 'schedule' }}

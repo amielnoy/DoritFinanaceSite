@@ -17,10 +17,6 @@
       "destination": "https://safe-arch-plan.base44.app/api/:path*"
     },
     {
-      "source": "/ws-user-apps/:path*",
-      "destination": "https://safe-arch-plan.base44.app/ws-user-apps/:path*"
-    },
-    {
       "source": "/blog/:id([0-9a-f]{24})",
       "destination": "/api/og/blog?id=:id"
     },
@@ -148,7 +144,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://www.googletagmanager.com 'sha256-rkx8REg+QNSzaGknwZcO9drpaf+3v1f74Qr6jPG/6FM=' 'sha256-e+vlOT20Qwy4PgGocJvj5eilZioNzvfLgxaBuNzKdl0='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://hjowdyiwjjrqceumkvgt.supabase.co/storage/v1/object/public/content-images/ https://media.base44.com https://base44.com https://base44.app https://safe-arch-plan.base44.app https://static.wixstatic.com https://www.googletagmanager.com https://*.google-analytics.com; font-src 'self'; connect-src 'self' https://safe-arch-plan.base44.app wss://safe-arch-plan.base44.app https://hjowdyiwjjrqceumkvgt.supabase.co https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; report-uri /api/csp-report; report-to csp"
+          "value": "default-src 'self'; script-src 'self' https://www.googletagmanager.com 'sha256-rkx8REg+QNSzaGknwZcO9drpaf+3v1f74Qr6jPG/6FM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://hjowdyiwjjrqceumkvgt.supabase.co/storage/v1/object/public/content-images/ https://static.wixstatic.com https://www.googletagmanager.com https://*.google-analytics.com; font-src 'self'; connect-src 'self' https://safe-arch-plan.base44.app wss://safe-arch-plan.base44.app https://hjowdyiwjjrqceumkvgt.supabase.co https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; report-uri /api/csp-report; report-to csp"
         },
         {
           "key": "Content-Security-Policy-Report-Only",

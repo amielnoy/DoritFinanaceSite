@@ -99,32 +99,13 @@ describe("the canonical host has a single source", () => {
     ).toEqual([]);
   });
 
-  it("proxies the agent socket to Base44 rather than serving it the app", () => {
-    // `/ws-user-apps/*` is how the chat receives its transcript. It is a
-    // backend path, and without a rewrite the catch-all answers it with the
-    // SPA shell — socket.io asks for an engine.io handshake and is handed
-    // `<!doctype html>` with a 200, so the subscription can never connect.
-    //
-    // Measured on the deployed site before this existed. The chat on the Vercel
-    // copy could not send, while the same calls made directly to Base44
-    // succeeded — the HTTP half of the transport was fine all along.
-    const rewrites = JSON.parse(read("vercel.json")).rewrites as {
-      source: string;
-      destination: string;
-    }[];
-    const ws = rewrites.find((r) => r.source.startsWith("/ws-user-apps"));
-    expect(ws, "nothing proxies the agent socket").toBeDefined();
-    expect(ws!.destination).toContain("base44.app");
-
-    // Before the rules that serve the app shell, or a later broadening of
-    // them could swallow it.
-    const at = (pred: (r: { source: string; destination: string }) => boolean) => rewrites.findIndex(pred);
-    const shell = at((r) => r.destination === "/app");
-    expect(shell, "no rule serves the app shell").toBeGreaterThan(-1);
-    expect(
-      at((r) => r.source.startsWith("/ws-user-apps")),
-      "the catch-all swallows the socket path",
-    ).toBeLessThan(shell);
+  it("no longer proxies the Base44 agent socket", () => {
+    // `/ws-user-apps/*` carried the Base44 chat's transcript. All four agents
+    // run on the Supabase chat function since 2026-10-16, and the SDK's
+    // fallback reaches Base44 directly (VITE_BASE44_SERVER_URL), not through
+    // this host — so the rewrite went with the Base44 publish (2026-10-17).
+    const rewrites = JSON.parse(read("vercel.json")).rewrites as { source: string }[];
+    expect(rewrites.map((r) => r.source)).not.toContain("/ws-user-apps/:path*");
   });
 
   it("still points the API rewrite at Base44, which is a backend address and not the canonical host", () => {

@@ -134,8 +134,12 @@ created.
 
 ### Which releases ship the agents
 
+**CI no longer publishes to Base44** (2026-10-17): all four chat agents run on
+the Supabase chat function, and the "Publish to Base44" job is gone. What
+follows is how a Base44 release worked, kept until the Base44 code is removed.
+
 **`base44 deploy` ships `base44/agents/`; narrower commands do not.** CI's
-"Publish to Base44" job runs `base44 deploy --yes --build`, which deploys
+"Publish to Base44" job ran `base44 deploy --yes --build`, which deploys
 entities, functions, agents and the site together. Verified 2026-10-06: the
 job's log reads `Deploying: 5 entities · 7 functions · 4 agents · Site`, and a
 fresh `base44 agents pull` of the live definitions matched `base44/agents/`
@@ -1511,13 +1515,10 @@ them, in the least reachable place. `tests/contract/logging.contract.test.ts`
 enforces this mechanically, because it is the kind of rule that holds until the
 first afternoon somebody is debugging something urgent.
 
-Base44's own retention answers "what is happening now". For "what changed since
-last Tuesday", the nightly CI run archives the previous 24 hours as
-`logs/YYYY-MM-DD.jsonl` and uploads it as an artifact kept for 90 days. It is
-not committed: this repository is public, and enquiry timings, volumes and
-escalation reasons for a real agency are not something to publish even when they
-carry no personal data. `npm run logs:archive` does the same thing locally, into
-a gitignored `logs/`.
+The site's functions run on Supabase now, and their logs are in the Supabase
+dashboard (Edge Functions → Logs), searchable by the `rid` every answer carries.
+The nightly archive of Base44's function logs was removed with the Base44
+publish on 2026-10-17: nothing the site serves runs there any more.
 
 ## The practice the site describes
 
@@ -2104,9 +2105,9 @@ removes preview deployments older than a month.
 It is the one job in the pipeline whose effect cannot be undone, so it is set
 up to be hard to fire by accident:
 
-- **Schedule only.** Unlike the log-archive job beside it, it has no
-  `workflow_dispatch`. A manual trigger sitting next to *Publish to Base44* is
-  how somebody clears a preview they were halfway through reading.
+- **Schedule only.** It has no `workflow_dispatch`. A manual trigger sitting
+  next to the deploy button is how somebody clears a preview they were halfway
+  through reading.
 - **Two guards, asserted in a unit test.** It deletes only a deployment whose
   `target` is exactly `preview` and which has no alias — an alias is evidence
   something points at it. Both are checked in `scripts/prune-vercel-deployments.mjs`
@@ -2323,10 +2324,8 @@ page while Vercel updated, then new smoke tests ran against the older Base44 sit
 CI now checks actual publish outputs for the host named by `PRODUCTION_URL`
 before starting smoke tests. Missing publication fails immediately with the
 relevant deployment configuration, and the run summary reports no publication.
-`scripts/check-production-publish.mjs` picks the publisher by comparing origins.
-Since `PRODUCTION_URL` became `https://govari-fin.co.il`, it requires a Vercel
-**production** promotion; a preview does not count. If `PRODUCTION_URL` ever names the
-Base44 host again, it requires the Base44 publish instead, which needs the
-`BASE44_API_KEY` secret and `BASE44_APP_ID` variable available to the `production`
-environment. Changing test selectors or increasing timeouts cannot update an older
-deployment.
+`scripts/check-production-publish.mjs` requires a Vercel **production**
+promotion in this run; a preview does not count. (It also accepted a Base44
+publish while `PRODUCTION_URL` could name the Base44 host; that went with the
+Base44 publish on 2026-10-17.) Changing test selectors or increasing timeouts
+cannot update an older deployment.

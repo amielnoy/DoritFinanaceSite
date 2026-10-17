@@ -23,7 +23,7 @@ than in production.
 | Frontend write paths | `base44.entities.*.create/update/filter`, `integrations.Core.SendEmail` |
 | Backend functions | `base44/functions/{createConsultationEvent,escalateToHuman,upsertContact,logSupportChat}/entry.ts` |
 | Connectors | `base44/connectors/{googlecalendar,googlesheets}.jsonc` |
-| Function logging | every `base44/functions/*/entry.ts`, `scripts/archive-logs.mjs`, the `logs` job in `ci.yml` |
+| Function logging | every `base44/functions/*/entry.ts` and Edge Function (the nightly Base44 log archive and its credential gate were removed with the Base44 publish, 2026-10-17) |
 
 ## 3. Approach
 
