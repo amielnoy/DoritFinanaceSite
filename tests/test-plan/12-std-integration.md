@@ -953,6 +953,36 @@ Weakening `assign-lead`'s gate to `user`, or dropping `claim-document-link`'s le
 
 `content-admin-edge.integration.test.ts` gates per action (agency roles): a User writes and edits drafts, asked in agency 1; a User who would publish, edit a live article, unpublish, delete, or add or delete a testimonial is refused 403 and nothing is written; an agency Admin does all of them; a shared-library article (no agency) is the operator's alone; a `published` that is not a boolean (`"true"`, `1`, `null`) is refused 400 before the gate, which compares with `=== true` while PostgREST would cast it. Its refusal cases now assert "nothing is written": an edit or delete reads its row's agency first, and a caller with no session reads nothing at all. Fixture tokens are 20+ characters, as `bearer()` requires.
 
+### 4.35 A client's meetings — `submit-lead` by id, and `meeting-request` — `INT-MTG-001..021`
+
+docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 1. `submit-lead` inserts its booking and hands back the id, and writes the calendar outcome to that id — never an upsert on `lead_id`, the key migration 2 drops. A signed-in client booking from the consultation form joins their own lead (the user's decision of 2026-10-17). `meeting-request` runs `request_meeting_change` under the client's session and mails staff without the client's note.
+
+`tests/integration/submit-lead.integration.test.ts`, "Edge — a client's meetings, written by id":
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MTG-001 | "writes the calendar outcome to the booking it inserted, by that id" | One insert; the outcome a PATCH `id=eq.<booking>`; no `on_conflict` |
+| INT-MTG-002 | "updates an open interview's booking instead of adding one per save" | No insert; the first booking updated |
+| INT-MTG-003 | "puts a signed-in client's booking on their own lead, as a follow-up" | No new lead; `kind: follow_up` on the existing lead; the lead untouched; mail sent |
+| INT-MTG-004 | "asks for the lead in agency 1 only" | `lead_for_email` with the verified address and agency 1 |
+| INT-MTG-005 | "never crosses agencies: another agency's lead with the address is not offered" | A new lead, `kind: first` |
+| INT-MTG-006 | "makes a new lead for an anonymous visitor, even with a matching address" | No lookup |
+| INT-MTG-007 | "makes a new lead when the session's address is not verified" | `my_email()` refused; no lookup |
+| INT-MTG-008 | "matches only the booking form: a signed-in client's interview is its own lead" | `my_email()` never asked |
+
+`tests/integration/meeting-request.integration.test.ts`:
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-MTG-009 | "asks Postgres with the client's own session, and answers the request id" | The RPC with the client's bearer; `requestId`, `notified: true`, `rid` |
+| INT-MTG-010 | "tells the team, the assigned user and the agency's admins — once each" | Recipients merged and de-duplicated |
+| INT-MTG-011 | "never carries the client's note, in the subject or anywhere in the mail" | Subject `בקשה לשינוי פגישה: מועד אחר`; no note text |
+| INT-MTG-012 | "gives the meeting's time in Israel, not UTC" | 10:00, not 08:00 |
+| INT-MTG-013..015 | "answers Postgres's %s as %i, and mails nobody" | `already_open` 409, `not_found` 404, `unverified` 403 |
+| INT-MTG-016 | "asks nothing without a session" | 401; no RPC |
+| INT-MTG-017..020 | "refuses a malformed request before asking Postgres (%j)" | 400 for a bad id, kind, long or non-text note |
+| INT-MTG-021 | "keeps the request when the mail does not go, and says so" | 200, `notified: false` |
+
 ## 5. Pass criteria
 
 All 171 declared cases pass (vitest: 751 with expansions). These assert behaviour, not shape — a failure means the

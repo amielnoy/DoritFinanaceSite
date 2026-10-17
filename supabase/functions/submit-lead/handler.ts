@@ -20,7 +20,8 @@ import {
   AGENCY_1, UUID, createRequest, maslekaEnabled, maslekaLink, newToken, normalizePhone, sameAddress, tokenExpiry, tokenHash,
 } from '../_shared/masleka.ts';
 import { deliveryWarning, mailerConfigured, sendMail } from '../_shared/mail.ts';
-import { insertRow, selectRows, supabaseConfigured, updateRow, updateWhere, upsertRow } from '../_shared/rest.ts';
+import { callRpc, insertRow, selectRows, supabaseConfigured, updateRow, updateWhere } from '../_shared/rest.ts';
+import { bearer } from '../_shared/staff.ts';
 import { clientIp, isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { contactPhone } from '../_shared/phone.ts';
 import { googleConfigured } from '../_shared/google.ts';
@@ -100,6 +101,47 @@ async function findOpenInterview(
     log('warn', 'interview.lookup_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
     return null;
   }
+}
+
+/**
+ * A signed-in client booking again: their existing lead in this agency, so the
+ * new meeting joins their record (kind 'follow_up') instead of starting a
+ * second lead. Only for a caller whose address is verified — my_email() asks
+ * Postgres with the caller's own session, and answers nothing for an
+ * unconfirmed address or an anonymous visitor (supabase-js sends the anon key,
+ * which my_email() is not granted to). The match is lead_for_email's exact one.
+ *
+ * Best-effort: any failure answers null, and the booking makes a new lead as
+ * it always has.
+ */
+async function signedInClientLead(rid: string, req: Request): Promise<string | null> {
+  const token = bearer(req);
+  if (!token) return null;
+  let email: unknown;
+  try {
+    email = await callRpc('my_email', {}, token);
+  } catch {
+    // The anon key, or an expired session: a visitor, not a signed-in client.
+    return null;
+  }
+  if (typeof email !== 'string' || !email) return null;
+  try {
+    const leadId = await callRpc('lead_for_email', { p_email: email, p_agency_id: AGENCY_1 });
+    return typeof leadId === 'string' && UUID.test(leadId) ? leadId : null;
+  } catch (e) {
+    log('warn', 'rebooking.lookup_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+    return null;
+  }
+}
+
+/**
+ * The first booking an open interview already wrote, so its later saves update
+ * that meeting instead of adding one per save. Null when there is none yet.
+ */
+async function firstMeetingOf(leadId: string): Promise<string | null> {
+  const rows = await selectRows('meetings', `select=id&lead_id=eq.${leadId}&kind=eq.first&order=created_at.asc&limit=1`);
+  const id = rows[0]?.id;
+  return typeof id === 'string' ? id : null;
 }
 
 /**
@@ -313,6 +355,13 @@ export async function handler(req: Request): Promise<Response> {
     // enquiry; only a failed write is reported to the caller as an error.
     let leadId: string | null = null;
 
+    // A signed-in client booking from the consultation form joins their own
+    // lead (the user's decision of 2026-10-17: the booking form only — an
+    // interview or a quick contact still makes a lead of its own). The lead's
+    // own fields are left as they are; the booking's topic, time and notes go
+    // on the meeting, and Dorit is mailed as for any booking.
+    const rebookLeadId = source === 'consultation' ? await signedInClientLead(rid, req) : null;
+
     // ראיון שכבר נפתח בשיחה הזו מתעדכן במקום להיווצר מחדש.
     const openInterview = source !== 'interview'
       ? null
@@ -365,6 +414,9 @@ export async function handler(req: Request): Promise<Response> {
           { status: 500, headers: cors }
         );
       }
+    } else if (rebookLeadId) {
+      leadId = rebookLeadId;
+      log('info', 'lead.rebooked', { rid, leadId });
     } else try {
       const row = await insertRow('leads', {
         name,
@@ -407,17 +459,27 @@ export async function handler(req: Request): Promise<Response> {
     const warnings: string[] = [];
     // Both meetings writes can fail; the warning is pushed once.
     let meetingWriteFailed = false;
-    if (booking) {
+    // The booking's own row, by id: a lead may hold many meetings, so the
+    // calendar outcome below is written to this one and no other.
+    let bookingId: string | null = null;
+    if (booking && leadId) {
+      const meeting = {
+        scheduled_at: israelInstant(scheduledAt),
+        topic: meetingTopic || effectiveTopic || '',
+        timing: timing || '',
+        notes: notes || '',
+        track: track || '',
+        source: source === 'consultation' || source === 'interview' ? source : null,
+      };
       try {
-        await upsertRow('meetings', {
-          scheduled_at: israelInstant(scheduledAt),
-          topic: meetingTopic || effectiveTopic || '',
-          timing: timing || '',
-          notes: notes || '',
-          track: track || '',
-          source: source === 'consultation' || source === 'interview' ? source : null,
-          lead_id: leadId,
-        }, 'lead_id');
+        // An open interview's later save updates the booking its earlier save wrote.
+        bookingId = openInterview?.id ? await firstMeetingOf(leadId) : null;
+        if (bookingId) {
+          await updateRow('meetings', bookingId, meeting);
+        } else {
+          const row = await insertRow('meetings', { ...meeting, lead_id: leadId, kind: rebookLeadId ? 'follow_up' : 'first' });
+          bookingId = typeof row.id === 'string' ? row.id : null;
+        }
       } catch (e) {
         log('warn', 'meeting.write_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
         if (!meetingWriteFailed) { meetingWriteFailed = true; warnings.push('meeting_write_failed'); }
@@ -660,13 +722,12 @@ export async function handler(req: Request): Promise<Response> {
     // The outcome, written back onto the booking. `scheduled_at` is what was
     // agreed and this is what the diary took — tonight's fault was precisely
     // that those two can differ with nothing anywhere saying so.
-    if (booking) {
+    if (bookingId) {
       try {
-        await upsertRow('meetings', {
+        await updateRow('meetings', bookingId, {
           calendar_status: calendar,
           calendar_at: israelInstant(calendarStartedAt),
-          lead_id: leadId,
-        }, 'lead_id');
+        });
       } catch (e) {
         log('warn', 'meeting.write_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
         if (!meetingWriteFailed) { meetingWriteFailed = true; warnings.push('meeting_write_failed'); }

@@ -459,3 +459,8 @@ verify_jwt = false
 # A short link to a claim's document, for whoever may see that lead.
 [functions.claim-document-link]
 verify_jwt = false
+
+# A client's request to move or cancel a meeting (/account). The session is
+# checked by request_meeting_change itself, under the caller's own token.
+[functions.meeting-request]
+verify_jwt = false

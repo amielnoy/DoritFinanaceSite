@@ -584,8 +584,9 @@ describe.each(IMPLEMENTATIONS)("$label — what it stores about the meeting", ({
   // The rows written to Supabase: Base44's mirror, or the Edge function's own
   // writes. Writes only — the Edge function reads `leads` first, for an open
   // interview.
+  // Writes: a POST, and — for the Edge function's meetings, written by id — a PATCH.
   const bodyOf = (r: Result, table: string) => {
-    const calls = r.callsTo(`/rest/v1/${table}`).filter((c) => c.method === "POST");
+    const calls = r.callsTo(`/rest/v1/${table}`).filter((c) => c.method === "POST" || c.method === "PATCH");
     expect(calls.length, `no write reached ${table}`).toBeGreaterThan(0);
     return calls.map((c) => c.body as Record<string, unknown>);
   };
@@ -618,10 +619,17 @@ describe.each(IMPLEMENTATIONS)("$label — what it stores about the meeting", ({
   it("writes the booking to the meetings table, keyed on the lead", async () => {
     const r = await run(booked, { env });
     const calls = r.callsTo("/rest/v1/meetings");
-    // Base44 keys the booking by its own lead id; the Edge function's lead
-    // exists only in Supabase, so by `leads.id` (spec, "A migration for meetings").
+    // Base44 keys the booking by its own lead id. The Edge function inserts
+    // the booking as its own row — a lead may hold many meetings
+    // (20261103000000_client_meetings.sql) — and hands back its id.
     const key = edge ? { lead_id: r.leads[0].id } : { lead_base44_id: "LEAD-1" };
-    expect(calls[0].url).toContain(`on_conflict=${Object.keys(key)[0]}`);
+    if (edge) {
+      expect(calls[0].method).toBe("POST");
+      expect(calls[0].url).not.toContain("on_conflict");
+      expect(calls[0].body).toMatchObject({ kind: "first" });
+    } else {
+      expect(calls[0].url).toContain(`on_conflict=${Object.keys(key)[0]}`);
+    }
     expect(calls[0].body).toMatchObject({
       ...key,
       scheduled_at: "2026-09-24T07:00:00.000Z",
@@ -2230,5 +2238,107 @@ describe.each(IMPLEMENTATIONS)("$label — urgency and the clearinghouse report"
     const r = await run({ ...lead, profile: { ...lead.profile, clearinghouse_report: "כן" } });
     expect(r.leads[0].message as string).toContain("דוח מסלקה פנסיונית: כן");
     expect(r.json).not.toHaveProperty("masleka");
+  });
+});
+
+/**
+ * Many meetings per lead (docs/superpowers/specs/2026-10-17-client-meetings-design.md,
+ * Rollout 1). The booking is written by id, not upserted on lead_id — the key
+ * migration 2 drops — and a signed-in client booking again from the
+ * consultation form joins their own lead.
+ */
+describe("Edge — a client's meetings, written by id", () => {
+  const SIGNED_IN = { Authorization: "Bearer client-session-token-0123456789" };
+  const sessions = { "client-session-token-0123456789": "yael@example.com" };
+  const existingLead = {
+    id: "00000000-0000-4000-8000-0000000000aa",
+    name: "יעל כהן",
+    phone: "0521234567",
+    email: " Yael@Example.com ",
+    source: "consultation",
+    status: "client",
+    agency_id: "00000000-0000-0000-0000-000000000001",
+    created_at: "2026-01-10T10:00:00Z",
+  };
+
+  it("writes the calendar outcome to the booking it inserted, by that id", async () => {
+    const r = await invokeEdge("submit-lead", consultation);
+    expect(r.meetings).toHaveLength(1);
+    const patch = r.callsTo("/rest/v1/meetings").find((c) => c.method === "PATCH");
+    expect(patch?.url).toContain(`id=eq.${r.meetings[0].id}`);
+    expect(patch?.body).toHaveProperty("calendar_status");
+    expect(patch?.body).not.toHaveProperty("lead_id");
+    expect(r.callsTo("/rest/v1/meetings").some((c) => c.url.includes("on_conflict"))).toBe(false);
+  });
+
+  it("updates an open interview's booking instead of adding one per save", async () => {
+    const ref = "conv-0123456789abcdef";
+    const interview = {
+      name: "דנה", phone: "0527654321", source: "interview", track: "pension",
+      timing: "חמישי", meetingTopic: "פנסיה", conversationRef: ref,
+    };
+    const lead = { id: "00000000-0000-4000-8000-0000000000bb", name: "דנה", phone: "0527654321", source: "interview",
+      status: "partial", conversation_ref: ref, created_at: new Date().toISOString() };
+    const booking = { id: "00000000-0000-4000-9000-0000000000bb", lead_id: lead.id, kind: "first", timing: "רביעי" };
+    const r = await invokeEdge("submit-lead", { ...interview, stage: "partial" }, { existingLeads: [lead], existingMeetings: [booking] });
+    expect(r.callsTo("/rest/v1/meetings").filter((c) => c.method === "POST")).toEqual([]);
+    expect(r.meetings).toHaveLength(1);
+    expect(r.meetings[0]).toMatchObject({ id: booking.id, timing: "חמישי" });
+  });
+
+  it("puts a signed-in client's booking on their own lead, as a follow-up", async () => {
+    const r = await invokeEdge("submit-lead", consultation, {
+      existingLeads: [existingLead], clientSessions: sessions, headers: SIGNED_IN,
+    });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(0);
+    expect(r.json.leadId).toBe(existingLead.id);
+    expect(r.meetings).toHaveLength(1);
+    expect(r.meetings[0]).toMatchObject({ lead_id: existingLead.id, kind: "follow_up" });
+    // The lead's own record is left as it was.
+    expect(r.leadUpdates).toEqual([]);
+    // Dorit still hears about the booking.
+    expect(r.emails.length).toBeGreaterThan(0);
+  });
+
+  it("asks for the lead in agency 1 only", async () => {
+    const r = await invokeEdge("submit-lead", consultation, {
+      existingLeads: [existingLead], clientSessions: sessions, headers: SIGNED_IN,
+    });
+    const lookup = r.callsTo("/rest/v1/rpc/lead_for_email")[0];
+    expect(lookup.body).toEqual({ p_email: "yael@example.com", p_agency_id: "00000000-0000-0000-0000-000000000001" });
+  });
+
+  it("never crosses agencies: another agency's lead with the address is not offered", async () => {
+    const r = await invokeEdge("submit-lead", consultation, {
+      existingLeads: [{ ...existingLead, agency_id: "aaaaaaaa-0000-0000-0000-000000000002" }],
+      clientSessions: sessions, headers: SIGNED_IN,
+    });
+    expect(r.leads).toHaveLength(1);
+    expect(r.meetings[0]).toMatchObject({ lead_id: r.leads[0].id, kind: "first" });
+  });
+
+  it("makes a new lead for an anonymous visitor, even with a matching address", async () => {
+    const r = await invokeEdge("submit-lead", consultation, { existingLeads: [existingLead], clientSessions: sessions });
+    expect(r.leads).toHaveLength(1);
+    expect(r.callsTo("/rest/v1/rpc/lead_for_email")).toEqual([]);
+    expect(r.meetings[0]).toMatchObject({ kind: "first" });
+  });
+
+  it("makes a new lead when the session's address is not verified", async () => {
+    // my_email() answers nothing for an unconfirmed address, or the anon key.
+    const r = await invokeEdge("submit-lead", consultation, {
+      existingLeads: [existingLead], clientSessions: {}, headers: SIGNED_IN,
+    });
+    expect(r.leads).toHaveLength(1);
+    expect(r.callsTo("/rest/v1/rpc/lead_for_email")).toEqual([]);
+  });
+
+  it("matches only the booking form: a signed-in client's interview is its own lead", async () => {
+    const r = await invokeEdge("submit-lead", { ...consultation, source: "interview", track: "pension" }, {
+      existingLeads: [existingLead], clientSessions: sessions, headers: SIGNED_IN,
+    });
+    expect(r.callsTo("/rest/v1/rpc/my_email")).toEqual([]);
+    expect(r.leads).toHaveLength(1);
   });
 });
