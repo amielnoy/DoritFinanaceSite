@@ -1,5 +1,9 @@
 # Step 1 — hosting → Vercel: what is ready, and what is not
 
+> For current deployment gates and backend routing, see
+> [current architecture and operations](../current-state.md). The probes below
+> retain their original dates; they were not repeated for this documentation update.
+
 Probed 2026-10-05 against both live copies. Nothing was changed. Statuses
 re-measured 2026-10-12; the 2026-10-05 measurements are kept below as history.
 

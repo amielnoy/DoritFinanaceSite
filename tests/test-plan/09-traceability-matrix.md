@@ -49,17 +49,32 @@ gap is visible and a failure points at a feature.
 | 4 | A conversation in a turn, one the handler has not yet closed plus a 5-minute margin (active in the last 2 h 5 min), or an evaluation one is not logged; a logged one cannot continue | UNIT-CHHANDLER-058, UNIT-CHHANDLER-060, UNIT-CHSWEEP-007, UNIT-CHSTORE-016 |
 | 5 | The sweep route refuses a missing or wrong token and runs no chat logic | UNIT-CHHANDLER-052..054, CTR-CHSCH-012 |
 
+## Agency permissions and assignment (2026-10-15)
+
+| Capability | Evidence |
+| --- | --- |
+| Assigned-lead visibility and cross-agency isolation | `agency-roles-schema.contract.test.ts`, `supabase/tests/agency_roles_check.sql` |
+| UI permissions match backend gates | `permissions.contract.test.ts`, `agency-roles-ui.test.tsx`, `agency-route.test.tsx` |
+| Membership changes and ownership transfer use the caller's session | `agency-roles-edge.integration.test.ts`, `agency_roles_check.sql` |
+| Admin assignment, unassignment and safe notification | `agency-roles-edge.integration.test.ts` |
+| Assignment rollout plan and dry-run boundary | `assign-open-leads.test.ts` |
+
+See [STD-03](03-std-contract.md) for the role and permission contract cases, and
+[the current-state guide](../../docs/current-state.md) for rollout dependencies.
+SQL checks require the database test environment; their presence does not imply
+that a production migration or live-account check has run.
+
 ## Coverage gaps (accepted)
 
 | Gap | Why it is accepted |
 |---|---|
 | The detailed contact form and the three-step consultation builder (was F-05, E2E-FRM-005..011, API-CTR-004) | Both were removed from the site; the interview agent in `#start` and the short form beside it replaced them. Nothing is untested — there is nothing left to test. See [STD-06 §3.4](06-std-ui-e2e.md) |
-| Registration, password reset, OTP flows | Base44 starter screens, unmodified by this project |
+| Registration, password reset, OTP flows against a live identity provider | Supabase adapters and return-to handling have unit coverage (`supabase-auth.test.ts`, `auth-return-to.dom.test.ts`); live delivery and provider redirects require configured integration checks. The retained Base44 JSX pages are inert shadows, not the active auth implementation |
 | `BlogAdmin` and `Leads` admin UIs end-to-end | Require an authenticated admin session; covered statically (CTR-BLG-*, SEC-STA-022) and by RLS assertions |
 | Google Calendar event creation | Third-party side effect; the client contract and error handling are covered (CTR-FN-*, INT-LEAD-025..030) |
 | Visual regression | No baseline strategy chosen; layout is guarded indirectly by E2E-MOB-005 |
-| Blog post URLs in the static sitemap | Posts are entity-backed, so their URLs are unknown at build time; they are reachable from `/blog` and each carries its own canonical and `BlogPosting` markup (SEO-LD-004) |
+| Article changes after a production build | Published article routes are included during prerender and SEO-file generation (`published-articles.test.ts`, `seo-files.test.ts`); edits require the next rebuild before static HTML and sitemap reflect them |
 | Performance / Core Web Vitals | Out of scope for a sanity suite |
 | Real-device iOS/Android | Needs a device lab; see [STD-07 §1](07-std-mobile.md) |
-| What an agent actually says in a live conversation | The reply comes from a model, so it cannot be asserted. What is testable is split out and tested: the shell's gates (E2E-AGT-*) and the presence of every mandatory clause in the prompts (CTR-AGT-*). See [`base44/agents/COMPLIANCE.md`](../../base44/agents/COMPLIANCE.md) §4 for which rules are enforced where |
+| Live model behavior in the default hermetic run | Opt-in conversation evals and the chat evaluation runner exercise model behavior; ordinary CI checks shell gates and prompt contracts without a live model. See [STD-13](13-std-eval.md) for credentials, scenarios and limits |
 | The `escalateToHuman` notification reaching דורית | A third-party side effect; the function's contract and its error path are covered (CTR-AGT-*, E2E-AGT-005) |

@@ -1,26 +1,29 @@
 # Master Test Plan — Dorit Gov-Ari Finance Site
 
-**Document ID:** MTP-01 · **Version:** 1.0 · **Status:** Baseline
+**Document ID:** MTP-01 · **Version:** 1.1 · **Status:** Maintained · **Updated:** 2026-10-17
 
 ---
 
 ## 1. Scope
 
-The system under test (SUT) is a Base44 application: a React 18 + Vite
+The system under test (SUT) is a React 18 + Vite
 single-page marketing and lead-generation site for an insurance and financial
-adviser, in Hebrew (RTL), backed by Base44 entities, Core integrations, eight
-Deno backend functions, and a Cloudflare Pages Function that sends the mail.
+adviser, in Hebrew (RTL), hosted on Vercel and backed by Supabase auth, tables,
+storage and Edge Functions; the chat agents run on the Supabase chat function.
+Base44 adapters remain as a build-time rollback until cleanup 2. A
+Cloudflare Pages Function sends outbound mail. Adapter selection is documented in
+[the current-state guide](../../docs/current-state.md).
 
 In scope:
 
 | Layer | What is tested |
 |---|---|
-| Pure logic | Pension fee maths, URL/class helpers, the open-redirect guard, contact config, the submission state machine, the admin data services, published FAQ and self-assessment content, and the two maintenance scripts |
+| Pure logic | Pension fee maths, URL/class helpers, the open-redirect guard, contact config, the submission state machine, the admin data services, published FAQ and self-assessment content, and maintenance scripts |
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
-| Contracts | Frontend payloads ↔ `base44/entities/*.jsonc`, the `createConsultationEvent` and `escalateToHuman` functions, RLS rules |
-| Integration | The Base44 functions executed in-process against a recording client — what is stored, who is mailed, what each recipient sees, and what survives a failure |
-| Eval | The deployed interview, FAQ (chat function) and procedures agents driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank the procedures cases come from |
-| Agent compliance | The three agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
+| Contracts | Frontend payloads and Base44 entities, Supabase schemas and function configuration, agency permissions and RLS, prompt sources, release gates and generated artifacts |
+| Integration | The Base44 and Supabase Edge Function handlers executed in-process against recording dependencies — what is stored, who is mailed, what each recipient sees, and what survives a failure |
+| Eval | The deployed interview, FAQ, procedures and blog agents driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank the procedures cases come from |
+| Agent compliance | The four agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
 | UI e2e | Landing page, routing, calculator, the quick contact form and the claim report, blog, the agent chat's regulatory shell |
 | Mobile web | iOS Safari and Android Chrome behaviour and layout |
@@ -48,8 +51,8 @@ an admin actually takes, with adversarial input where a defect would be
 expensive (money maths, redirects, untrusted markdown), rather than exhaustive
 enumeration.
 
-The e2e suites are **hermetic**: `e2e/fixtures/app.ts` intercepts the whole
-`/api/**` surface plus third-party beacons, so no test needs credentials,
+The e2e suites are **hermetic**: `e2e/fixtures/app.ts` intercepts the
+`/api/**` and `/functions/v1/**` surfaces plus third-party beacons, so no test needs credentials,
 a linked Base44 app, or network access, and no test can touch production data.
 An opt-in block (`E2E_LIVE_API_URL`) runs the same contract against a real
 backend when one is available.

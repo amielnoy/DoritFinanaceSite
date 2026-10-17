@@ -1,5 +1,9 @@
 # Test Plan & Software Test Descriptions
 
+For backend routing, agency roles and release gates, see
+[current architecture and operations](../../docs/current-state.md). Test descriptions
+record coverage; live probes and model evals remain opt-in.
+
 Structured documentation for every automated test in this repository, in the
 shape of an IEEE 829-style Test Plan (`00-master-test-plan.md`) plus one
 Software Test Description (STD) per suite.

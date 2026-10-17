@@ -1,5 +1,9 @@
 # Phase 0 — what Base44 actually holds
 
+> Historical inventory: counts and adapter descriptions below belong to their
+> measurement dates. For current routing and dependencies, see
+> [current architecture and operations](../current-state.md).
+
 Measured 2026-10-05 against the live app (`6a9e6144d2bee5cdfb4ddf74`). Nothing
 here was changed; every number below was read, not estimated.
 
