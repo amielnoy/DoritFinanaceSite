@@ -1,4 +1,4 @@
-import type { LeadAdminPort, LeadRecord, LeadStatus, TranscriptLine } from "../ports";
+import type { LeadAdminPort, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, TranscriptLine } from "../ports";
 import type { ContentFunctionsClient } from "./EdgeContentAdminService";
 import { CLAIM_DOCUMENT_REF_PREFIX } from "./SupabaseUploadService";
 import {
@@ -19,6 +19,19 @@ export const LEAD_PAGE = 1000;
 export const LEAD_LIST_MAX = 20_000;
 
 const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת";
+
+/** A meeting's columns for staff — Dorit's notes included, which the client's door never returns. */
+const MEETING_COLUMNS = "id,scheduled_at,duration_min,topic,kind,status,mode,location,notes,client_summary,summary_published_at,source";
+
+/** The port's update, in the table's column names. Only the fields given. */
+function meetingColumns(update: LeadMeetingUpdate): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (update.status !== undefined) out.status = update.status;
+  if (update.notes !== undefined) out.notes = update.notes;
+  if (update.clientSummary !== undefined) out.client_summary = update.clientSummary;
+  if (update.summaryPublishedAt !== undefined) out.summary_published_at = update.summaryPublishedAt;
+  return out;
+}
 
 /**
  * The agency's leads, read and written in Supabase under the person's own session.
@@ -149,7 +162,85 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     const rows = await fetchRows(this.client.from("leads").select("id").or("status.eq.new,status.eq.escalated").limit(1000), "leads");
     return rows.length;
   }
+
+  /**
+   * A lead's meetings, newest first (no time last), under the person's own
+   * session: `meetings_read_admin` and `meeting_requests_read_lead` both rest
+   * on can_see_lead, so a User reads only their assigned leads' meetings.
+   */
+  async meetings(leadId: string): Promise<LeadMeeting[]> {
+    const rows = await fetchRows(
+      this.client.from("meetings").select(MEETING_COLUMNS).eq("lead_id", leadId).order("scheduled_at", { ascending: false }).limit(200),
+      "meetings",
+    );
+    if (rows.length === 0) return [];
+    const ids = new Set(rows.map((r) => String(r.id)));
+    const requests = await fetchRows(
+      this.client.from("meeting_requests").select("id,meeting_id,kind,note").eq("status", "open").limit(500),
+      "meeting_requests",
+    );
+    const open = new Map(requests.filter((r) => ids.has(String(r.meeting_id))).map((r) => [String(r.meeting_id), r]));
+    const str = (v: unknown) => (typeof v === "string" ? v : "");
+    const meetings = rows.map((r): LeadMeeting => {
+      const request = open.get(String(r.id));
+      return {
+        id: String(r.id),
+        scheduledAt: typeof r.scheduled_at === "string" ? r.scheduled_at : null,
+        durationMin: typeof r.duration_min === "number" ? r.duration_min : null,
+        topic: str(r.topic),
+        kind: (r.kind as LeadMeeting["kind"]) ?? "first",
+        status: (r.status as LeadMeeting["status"]) ?? "scheduled",
+        mode: (r.mode as LeadMeeting["mode"]) ?? null,
+        location: str(r.location),
+        notes: str(r.notes),
+        clientSummary: str(r.client_summary),
+        summaryPublishedAt: typeof r.summary_published_at === "string" ? r.summary_published_at : null,
+        source: typeof r.source === "string" ? r.source : null,
+        openRequest: request ? { id: String(request.id), kind: request.kind as "reschedule" | "cancel", note: str(request.note) } : null,
+      };
+    });
+    // Postgres puts nulls first in a descending order; a meeting with no time goes last.
+    return [...meetings.filter((m) => m.scheduledAt), ...meetings.filter((m) => !m.scheduledAt)];
+  }
+
+  /** As the signed-in person: `created_by` defaults to them, and the policy holds them to it. */
+  addMeeting(meeting: NewLeadMeeting): Promise<void> {
+    return applied(
+      this.client.from("meetings").insert({
+        lead_id: meeting.leadId,
+        agency_id: meeting.agencyId,
+        scheduled_at: meeting.scheduledAt,
+        duration_min: meeting.durationMin,
+        mode: meeting.mode,
+        location: meeting.location || null,
+        kind: meeting.kind,
+        topic: meeting.topic,
+        status: "scheduled",
+      }).select("id"),
+      "meeting insert",
+      MEETING_INSERT_REFUSED,
+    );
+  }
+
+  updateMeeting(id: string, update: LeadMeetingUpdate): Promise<void> {
+    return applied(this.client.from("meetings").update(meetingColumns(update)).eq("id", id).select("id"), "meeting update");
+  }
+
+  handleMeetingRequest(requestId: string): Promise<void> {
+    return applied(
+      this.client.from("meeting_requests").update({ status: "handled", handled_at: new Date().toISOString() }).eq("id", requestId).select("id"),
+      "meeting request",
+    );
+  }
 }
+
+/**
+ * Until migration 2 drops `meetings_lead_id_key`, a lead holds one meeting
+ * (docs/superpowers/specs/2026-10-17-client-meetings-design.md, Rollout 3).
+ */
+const MEETING_INSERT_REFUSED: Record<string, string> = {
+  "23505": "לפנייה הזו כבר יש פגישה. עד העדכון הבא אפשר לשמור פגישה אחת לכל פנייה.",
+};
 
 /**
  * A write that changed exactly the row it named, or an error.
@@ -159,8 +250,12 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
  * to tell "done" from "not allowed", and the screen must not show a refused
  * deletion as a deleted lead.
  */
-async function applied(query: PromiseLike<SupabaseReadResult>, action: string): Promise<void> {
+async function applied(
+  query: PromiseLike<SupabaseReadResult>,
+  action: string,
+  known: Record<string, string> = {},
+): Promise<void> {
   const { data, error } = await query;
-  if (error) throw new Error(`leads ${action} failed: ${error.message}`);
+  if (error) throw new Error((error.code && known[error.code]) || `leads ${action} failed: ${error.message}`);
   if (!data || data.length === 0) throw new Error(NOT_APPLIED);
 }

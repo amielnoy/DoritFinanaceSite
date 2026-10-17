@@ -85,6 +85,15 @@ export function tableFake(
           calls.push(["delete"]);
           return write;
         },
+        insert(values) {
+          calls.push(["insert", values]);
+          return {
+            select(columns) {
+              calls.push(["select", columns]);
+              return { then: (onFulfilled, onRejected) => Promise.resolve(writeResult).then(onFulfilled, onRejected) };
+            },
+          };
+        },
       };
     },
   };

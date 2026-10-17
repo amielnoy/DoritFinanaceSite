@@ -8,6 +8,8 @@ import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { csvCell } from "@/lib/csv";
 import { Loader2, Download, Trash2 } from "lucide-react";
 import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
+import LeadDrawer from "@/components/dorit/admin/LeadDrawer";
+import { MEETINGS_STAFF } from "@/config/meetings";
 
 type LeadItem = LeadRecord;
 
@@ -163,6 +165,8 @@ export default function Leads() {
   const removeLead = useRemoveLead();
   const assignLead = useAssignLead();
   const [filter, setFilter] = useState<string>("all");
+  // The lead open in the drawer (VITE_MEETINGS_STAFF), by id so a reload keeps it current.
+  const [openLeadId, setOpenLeadId] = useState<string | null>(null);
 
   // One agency at a time: someone in two sees the one the switcher names.
   const leads: LeadItem[] = (data ?? []).filter((l) => !l.agency_id || l.agency_id === agencyId);
@@ -219,6 +223,8 @@ export default function Leads() {
     if (!window.confirm("למחוק את הפנייה?")) return;
     removeLead.mutate(id);
   };
+
+  const openLead = openLeadId ? leads.find((l) => l.id === openLeadId) ?? null : null;
 
   const counts = leads.reduce<Record<string, number>>((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
@@ -358,7 +364,19 @@ export default function Leads() {
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                       {l.created_date ? new Date(l.created_date).toLocaleDateString("he-IL") : "—"}
                     </td>
-                    <td className="px-4 py-3 font-medium">{l.name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {MEETINGS_STAFF ? (
+                        <button
+                          type="button"
+                          onClick={() => setOpenLeadId(l.id)}
+                          className="text-right underline decoration-highlight underline-offset-4 hover:text-accent"
+                        >
+                          {l.name}
+                        </button>
+                      ) : (
+                        l.name
+                      )}
+                    </td>
                     <td className="px-4 py-3" dir="ltr">{l.phone}</td>
                     <td className="px-4 py-3 text-foreground/70" dir="ltr">{l.email || "—"}</td>
                     <td className="px-4 py-3 text-foreground/70">{SOURCE_LABEL[l.source] || "—"}</td>
@@ -426,6 +444,34 @@ export default function Leads() {
           </div>
         )}
       </main>
+
+      {MEETINGS_STAFF ? (
+        <LeadDrawer
+          lead={openLead}
+          onClose={() => setOpenLeadId(null)}
+          subtitle={openLead ? `${ANY_STATUS_LABEL[openLead.status] || openLead.status} · ${SOURCE_LABEL[openLead.source] || "—"}` : ""}
+          details={
+            openLead ? (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+                <dt className="text-muted-foreground">תאריך</dt>
+                <dd>{openLead.created_date ? new Date(openLead.created_date).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" }) : "—"}</dd>
+                <dt className="text-muted-foreground">טלפון</dt>
+                {/* Text, not a tel: link — the number is visitor-typed (agent-surface.security). */}
+                <dd dir="ltr" className="text-right">{openLead.phone}</dd>
+                <dt className="text-muted-foreground">אימייל</dt>
+                <dd dir="ltr" className="text-right">{openLead.email || "—"}</dd>
+                <dt className="text-muted-foreground">משויכת ל</dt>
+                <dd>{assigneeLabel(openLead.assigned_user_id)}</dd>
+                <dt className="text-muted-foreground">פרטים</dt>
+                <dd className="whitespace-pre-wrap">
+                  <LeadDetails lead={openLead} />
+                  {withTranscript.has(openLead.id) && <LeadTranscript leadId={openLead.id} />}
+                </dd>
+              </dl>
+            ) : null
+          }
+        />
+      ) : null}
     </div>
   );
 }

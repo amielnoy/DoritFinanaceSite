@@ -1,3 +1,4 @@
+import type { MeetingKind, MeetingMode, MeetingRequestKind, MeetingStatus } from "@/lib/meetings";
 import type { InterviewSummary } from "@/lib/interview-handoff";
 import type { Snapshot } from "@/lib/clearinghouse/snapshot";
 
@@ -281,6 +282,48 @@ export interface TranscriptLine {
   at: string;
 }
 
+/** A meeting on a lead, as staff see it — Dorit's notes included. */
+export interface LeadMeeting {
+  id: string;
+  scheduledAt: string | null;
+  durationMin: number | null;
+  topic: string;
+  kind: MeetingKind;
+  status: MeetingStatus;
+  mode: MeetingMode | null;
+  location: string;
+  /** Dorit's working notes: staff only, never shown to the client. */
+  notes: string;
+  /** What the client will see once published. */
+  clientSummary: string;
+  summaryPublishedAt: string | null;
+  /** 'consultation' or 'interview' for a booking from the site; null for one staff added. */
+  source: string | null;
+  /** The client's open request to move or cancel it, if any. */
+  openRequest: { id: string; kind: MeetingRequestKind; note: string } | null;
+}
+
+/** A meeting staff add to a lead (`meetings_insert_lead`). */
+export interface NewLeadMeeting {
+  leadId: string;
+  /** The lead's own agency: the policy refuses any other. */
+  agencyId: string;
+  scheduledAt: string;
+  durationMin: number;
+  mode: MeetingMode;
+  location: string;
+  kind: MeetingKind;
+  topic: string;
+}
+
+/** What staff change on a meeting. `summaryPublishedAt: null` unpublishes. */
+export type LeadMeetingUpdate = Partial<{
+  status: MeetingStatus;
+  notes: string;
+  clientSummary: string;
+  summaryPublishedAt: string | null;
+}>;
+
 export interface LeadAdminPort {
   list(limit?: number): Promise<LeadRecord[]>;
   setStatus(id: string, status: LeadStatus): Promise<void>;
@@ -303,6 +346,14 @@ export interface LeadAdminPort {
   transcriptLeadIds(): Promise<string[]>;
   /** How many leads need someone — `new` or `escalated` — the admin menu's counter. Ids only: no personal data leaves the table for it. */
   countNew(): Promise<number>;
+  /** A lead's meetings, newest first, with any open client request. `can_see_lead` is the gate. */
+  meetings(leadId: string): Promise<LeadMeeting[]>;
+  /** Add a meeting to a lead the person can see, as themselves. */
+  addMeeting(meeting: NewLeadMeeting): Promise<void>;
+  /** Change a meeting; an update row-level security filtered out is an error, not a success. */
+  updateMeeting(id: string, update: LeadMeetingUpdate): Promise<void>;
+  /** Mark a client's request handled. The meeting itself is changed separately, or not. */
+  handleMeetingRequest(requestId: string): Promise<void>;
 }
 
 /** One of a user's organizations — a row of `memberships` with its agency's name. */

@@ -307,3 +307,116 @@ describe("SupabaseLeadAdminService.countNew", () => {
     await expect(new SupabaseLeadAdminService(client).countNew()).rejects.toThrow(/leads read failed/);
   });
 });
+
+/**
+ * A lead's meetings (docs/superpowers/specs/2026-10-17-client-meetings-design.md,
+ * Staff): read and written under the person's own session, so a write that
+ * row-level security filters out must read as a failure, never as saved.
+ */
+describe("SupabaseLeadAdminService — a lead's meetings", () => {
+  const meetingRow = (over: Record<string, unknown> = {}) => ({
+    id: "m-1", scheduled_at: "2026-12-14T15:30:00+00:00", duration_min: 45, topic: "בדיקת כפלים",
+    kind: "follow_up", status: "scheduled", mode: "video", location: "https://meet.example/x", notes: "פנימי",
+    client_summary: null, summary_published_at: null, source: null, ...over,
+  });
+
+  /** One answer per table: the meetings read, then the open requests. */
+  function twoTables(meetings: unknown[], requests: unknown[]) {
+    const calls: unknown[][] = [];
+    const chain = (data: unknown[]): SupabaseQuery => {
+      const q: SupabaseQuery = {
+        eq: (c, v) => (calls.push(["eq", c, v]), q),
+        or: () => q, not: () => q, is: () => q,
+        order: (c, o) => (calls.push(["order", c, o]), q),
+        limit: () => q,
+        then: (ok, bad) => Promise.resolve({ data, error: null } as SupabaseReadResult).then(ok, bad),
+      };
+      return q;
+    };
+    const client = {
+      from: (table: string) => {
+        calls.push(["from", table]);
+        return { select: (cols: string) => (calls.push(["select", table, cols]), chain(table === "meetings" ? meetings : requests)) };
+      },
+    } as unknown as SupabaseLeadTableClient;
+    return { client, calls };
+  }
+
+  it("reads one lead's meetings, newest first, with Dorit's notes and any open request on its meeting", async () => {
+    const { client, calls } = twoTables(
+      [meetingRow(), meetingRow({ id: "m-2", scheduled_at: null, kind: "first", source: "interview" })],
+      [{ id: "r-1", meeting_id: "m-1", kind: "reschedule", note: "אחר הצהריים" }, { id: "r-9", meeting_id: "other-lead", kind: "cancel", note: null }],
+    );
+    const meetings = await new SupabaseLeadAdminService(client).meetings("lead-1");
+    expect(calls).toContainEqual(["eq", "lead_id", "lead-1"]);
+    expect(calls).toContainEqual(["order", "scheduled_at", { ascending: false }]);
+    expect(calls).toContainEqual(["eq", "status", "open"]);
+    expect(meetings.map((m) => m.id)).toEqual(["m-1", "m-2"]);
+    expect(meetings[0]).toMatchObject({ notes: "פנימי", durationMin: 45, mode: "video", openRequest: { id: "r-1", kind: "reschedule", note: "אחר הצהריים" } });
+    expect(meetings[1]).toMatchObject({ scheduledAt: null, source: "interview", openRequest: null });
+  });
+
+  it("puts a meeting with no time last, where Postgres's descending order puts it first", async () => {
+    const { client } = twoTables([meetingRow({ id: "none", scheduled_at: null }), meetingRow({ id: "dated" })], []);
+    const meetings = await new SupabaseLeadAdminService(client).meetings("lead-1");
+    expect(meetings.map((m) => m.id)).toEqual(["dated", "none"]);
+  });
+
+  it("adds a meeting in the lead's own agency, and asks for the row back", async () => {
+    const { client, calls } = tableFake({ data: [], error: null }, { data: [{ id: "m-new" }], error: null });
+    await new SupabaseLeadAdminService(client).addMeeting({
+      leadId: "lead-1", agencyId: "agency-1", scheduledAt: "2026-12-14T15:30:00.000Z", durationMin: 45,
+      mode: "office", location: "", kind: "annual_review", topic: "סקירה שנתית",
+    });
+    expect(calls).toContainEqual(["from", "meetings"]);
+    const insert = calls.find((c) => c[0] === "insert")![1] as Record<string, unknown>;
+    expect(insert).toMatchObject({ lead_id: "lead-1", agency_id: "agency-1", kind: "annual_review", status: "scheduled", location: null });
+    // created_by is the column's default (auth.uid()); the policy holds it to the caller.
+    expect(insert).not.toHaveProperty("created_by");
+  });
+
+  it("reports an insert row-level security refused as a failure, not as added", async () => {
+    const { client } = tableFake({ data: [], error: null }, { data: [], error: null });
+    await expect(
+      new SupabaseLeadAdminService(client).addMeeting({
+        leadId: "lead-1", agencyId: "agency-1", scheduledAt: "x", durationMin: 45, mode: "office", location: "", kind: "other", topic: "",
+      }),
+    ).rejects.toThrow(/לא בוצעה/);
+  });
+
+  it("explains the one-meeting key until migration 2 drops it", async () => {
+    const { client } = tableFake({ data: [], error: null }, { data: null, error: { message: "duplicate key", code: "23505" } });
+    await expect(
+      new SupabaseLeadAdminService(client).addMeeting({
+        leadId: "lead-1", agencyId: "agency-1", scheduledAt: "x", durationMin: 45, mode: "office", location: "", kind: "other", topic: "",
+      }),
+    ).rejects.toThrow(/כבר יש פגישה/);
+  });
+
+  it("publishes and unpublishes a summary by its column names, on one meeting", async () => {
+    const { client, calls } = tableFake({ data: [], error: null }, { data: [{ id: "m-1" }], error: null });
+    const service = new SupabaseLeadAdminService(client);
+    await service.updateMeeting("m-1", { clientSummary: "סיכמנו", summaryPublishedAt: "2026-10-17T09:00:00.000Z" });
+    await service.updateMeeting("m-1", { summaryPublishedAt: null });
+    const updates = calls.filter((c) => c[0] === "update").map((c) => c[1]);
+    expect(updates).toEqual([
+      { client_summary: "סיכמנו", summary_published_at: "2026-10-17T09:00:00.000Z" },
+      { summary_published_at: null },
+    ]);
+    expect(calls).toContainEqual(["eq", "id", "m-1"]);
+  });
+
+  it("reports an update that changed nothing — another User's lead — as a failure", async () => {
+    const { client } = tableFake({ data: [], error: null }, { data: [], error: null });
+    await expect(new SupabaseLeadAdminService(client).updateMeeting("m-1", { status: "done" })).rejects.toThrow(/לא בוצעה/);
+  });
+
+  it("marks a client's request handled, and nothing else", async () => {
+    const { client, calls } = tableFake({ data: [], error: null }, { data: [{ id: "r-1" }], error: null });
+    await new SupabaseLeadAdminService(client).handleMeetingRequest("r-1");
+    expect(calls).toContainEqual(["from", "meeting_requests"]);
+    const update = calls.find((c) => c[0] === "update")![1] as Record<string, unknown>;
+    expect(Object.keys(update).sort()).toEqual(["handled_at", "status"]);
+    expect(update.status).toBe("handled");
+  });
+});
