@@ -107,7 +107,7 @@ export const PROCEDURES_CONSENT_POINTS = [
 
 /**
  * The gate for the reading recommender, as approved by Dorit's compliance
- * adviser on 2026-10-10 (base44/agents/COMPLIANCE.md §9).
+ * adviser on 2026-10-10 (docs/COMPLIANCE.md §9).
  *
  * The recommender points at articles already published and runs no interview,
  * yet it showed the interview's notice — "נאספים שם וטלפון… מתאם פגישה", a
@@ -249,7 +249,7 @@ export const CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS = [
 
 /**
  * v6 for the reading recommender: the two lines Dorit's compliance adviser
- * approved on 2026-10-10 (base44/agents/COMPLIANCE.md §9), and the v6 line —
+ * approved on 2026-10-10 (docs/COMPLIANCE.md §9), and the v6 line —
  * who processes the conversation (an AI provider outside Israel) and that the
  * transcript is kept 12 months, which the function newly does.
  *

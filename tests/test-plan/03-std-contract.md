@@ -615,14 +615,15 @@ transcript and usage rows.
 
 ### 4.11 The chat prompts — `chat-prompts.contract.test.ts`
 
-The chat function's prompts are Markdown files under `supabase/functions/chat/prompts/`, built into `prompts.generated.ts`. `interview.md`, filled for Dorit, must equal today's `needs_interview.jsonc` instructions apart from three tool-section lines; `compliance.md` is `COMPLIANCE.md` §3 and §5 verbatim; the function's agency copy must equal `agencyProfile.ts`.
+The chat function's prompts are Markdown files under `supabase/functions/chat/prompts/`, built into `prompts.generated.ts` — their only source since the agents left Base44 (2026-10-17). Until then each was held, line for line, to the Base44 agent definition it replaced (the retired rows below); what stays checked is what each prompt must say. `compliance.md` is `docs/COMPLIANCE.md` §3 and §5 verbatim; the function's agency copy must equal `agencyProfile.ts`.
 
 | ID | Title | Expected result |
 |---|---|---|
 | CTR-CHPROMPT-001 | "%s equals agencyProfile.ts" | `AGENCY` (the function's copy) equals `AGENCY_PROFILE`, field by field (6 cases) |
 | CTR-CHPROMPT-002 | "names the agency the tenant migration seeds" | The tenant migration inserts `AGENCY.id` |
-| CTR-CHPROMPT-003 | "each tool-section change matches exactly one line of today's instructions" | The five `startsWith` prefixes (three tool-section, two language) each match one line of `needs_interview.jsonc` |
-| CTR-CHPROMPT-004 | "renders, for Dorit, to today's text byte for byte apart from the three tool-section lines and the two language lines" | `interview.md` filled for agency 1 equals today's instructions with only the three lines replaced |
+| CTR-CHPROMPT-003 | (retired 2026-10-17: parity with the Base44 agent definition, which is no longer published) | — |
+| CTR-CHPROMPT-004 | (retired 2026-10-17: parity with the Base44 agent definition, which is no longer published) | — |
+| CTR-CHPROMPT-022 | "carries the agency's details as placeholders, not literals" (interview.md) | No phone, email or licence literal; filled for Dorit, no `{{agency.` placeholder is left |
 | CTR-CHPROMPT-005 | "asks for submitLead and never for a fenced block" | `interview.md` has no fenced `lead` block and requests the `submitLead` call |
 | CTR-CHPROMPT-013 | "interviews a visitor who writes in English in English, and keeps what reaches Dorit in Hebrew" | `PROMPTS.interview` has no "דבר רק בעברית"; it says to interview an English writer in English, not to hand them off for the language alone, and that summary/profile sent to Dorit are always Hebrew (the user's decision of 2026-10-14; en-01) |
 | CTR-CHPROMPT-006 | "is COMPLIANCE.md §3 and §5, verbatim" | `compliance.md` equals the §3 + §5 excerpt of `COMPLIANCE.md` |
@@ -633,8 +634,8 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-CHPROMPT-009 | "each replaced or removed line exists exactly once today" (support.md against the prompt Base44 runs today) | Each of the six `SUPPORT_TOOL_SECTION` prefixes matches one line of `support_agent.jsonc` |
-| CTR-CHPROMPT-010 | "equals today's instructions with only the tool section changed" | `PROMPTS.support` filled equals today's instructions with the six lines replaced or dropped and blank runs collapsed |
+| CTR-CHPROMPT-009 | (retired 2026-10-17: parity with the Base44 agent definition, which is no longer published) | — |
+| CTR-CHPROMPT-010 | (retired 2026-10-17: parity with the Base44 agent definition, which is no longer published) | — |
 | CTR-CHPROMPT-011 | "names its real tools and no Base44 one" | Names `listArticles`, `readArticle`, `escalateToHuman` and the `(/blog/<slug>)` link form; not `BlogPost` or `logSupportChat` |
 | CTR-CHPROMPT-012 | "carries the agency's details as placeholders, not literals" | No `050-831-1776`, `dorit@govari-fin.co.il` or `L-00107009` in `PROMPTS.support` |
 
@@ -642,8 +643,8 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-CHPROMPT-014 | "each replaced or removed line exists exactly once today" (procedures.md against the prompt Base44 runs today) | Each of the three `PROCEDURES_TOOL_SECTION` prefixes matches one line of `procedures_agent.jsonc` |
-| CTR-CHPROMPT-015 | "equals today's instructions with only the tool section changed" (procedures.md) | `PROMPTS.procedures` filled equals today's instructions with the three lines replaced or dropped and blank runs collapsed |
+| CTR-CHPROMPT-014 | (retired 2026-10-17: parity with the Base44 agent definition, which is no longer published) | — |
+| CTR-CHPROMPT-015 | (retired 2026-10-17: parity with the Base44 agent definition, which is no longer published) | — |
 | CTR-CHPROMPT-016 | "names its real tools and no Base44 one" (procedures.md) | Names `listArticles`, `readArticle`, `escalateToHuman` and `(/blog/<slug>)`; not `BlogPost` or `logSupportChat` |
 | CTR-CHPROMPT-017 | "carries the agency's details as placeholders, not literals" (procedures.md) | No `050-831-1776`, `dorit@govari-fin.co.il` or `L-00107009` in `PROMPTS.procedures` |
 
@@ -651,8 +652,8 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-CHPROMPT-018 | "each replaced or removed line exists exactly once today" (blog.md) | Each `BLOG_TOOL_SECTION` entry matches one line |
-| CTR-CHPROMPT-019 | "equals today's instructions with only the tool section changed" (blog.md) | `PROMPTS.blog` filled equals today's with the section applied |
+| CTR-CHPROMPT-018 | (retired 2026-10-17: parity with the Base44 agent definition, which is no longer published) | — |
+| CTR-CHPROMPT-019 | (retired 2026-10-17: parity with the Base44 agent definition, which is no longer published) | — |
 | CTR-CHPROMPT-020 | "recommends through the tool, never a fenced block, and names no Base44 tool" (blog.md) | `recommendArticles`, `listArticles`, `escalateToHuman`, `(/blog/<slug>)`; no ```` ```recommended ````, `BlogPost`, `#consultation` or `/blog/<id>` |
 | CTR-CHPROMPT-021 | "carries the agency's details as placeholders, not literals" (blog.md) | No phone, email or licence literal |
 

@@ -125,7 +125,7 @@ Never return internal exception messages or log personal data. Keep request IDs
 through the response and logs. Analytics goes through `src/lib/analytics.ts` and
 its restricted parameters; saved leads count only after successful persistence.
 GA4 disclosure and consent remain an open compliance item in
-[COMPLIANCE.md](../base44/agents/COMPLIANCE.md).
+[COMPLIANCE.md](COMPLIANCE.md).
 
 ## Verification and document maintenance
 

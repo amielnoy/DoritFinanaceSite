@@ -86,7 +86,7 @@ npx skills add base44/skills
   returns no error, so an empty answer is an error, never a success.
 - `supabase/functions/chat/`: the on-site agents served by our own function (`VITE_CHAT_AGENTS`; the interview first).
   - The prompts' source of truth is `prompts/*.md`. Run `npm run build:chat-prompts` after editing one; a contract test fails while `prompts.generated.ts` is stale.
-  - `interview.md` must render to `needs_interview.jsonc`'s instructions byte for byte apart from the three lines in `tests/helpers/chat-prompt-sources.mjs`, while the `.jsonc` still serves Base44. Change both, or neither. `support.md` is held to `support_agent.jsonc` the same way, apart from `SUPPORT_TOOL_SECTION`, `procedures.md` to `procedures_agent.jsonc`, apart from `PROCEDURES_TOOL_SECTION`, and `blog.md` to `blog_recommender.jsonc`, apart from `BLOG_TOOL_SECTION`.
+  - The `.md` files are the prompts' only source: the `base44/agents/*.jsonc` copies are no longer published or compared (2026-10-17). `compliance.md` is `docs/COMPLIANCE.md` §3 and §5 verbatim — change the record, then the prompt.
   - Each role gets only its own tools (`ROLE_TOOLS` in `handler.ts`); a tool outside the set answers `unknown_tool` and never runs. The FAQ and procedures chats' Support-tab rows are written by the 15-minute sweep (`sweep.ts`, the `x-chat-sweep` route), never by the model.
   - `_shared/agency.ts` is a pinned copy of `agencyProfile.ts`.
   - The tool names stay `submitLead` and `escalateToHuman`, because the prompt names them.

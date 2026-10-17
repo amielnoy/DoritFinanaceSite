@@ -1,5 +1,6 @@
 import base44 from "@base44/vite-plugin"
 import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import { base44Backend } from './scripts/vite-base44-backend-plugin.mjs'
 import { siteUrl } from './scripts/vite-site-url-plugin.mjs'
@@ -47,6 +48,10 @@ export default defineConfig({
    */
   resolve: {
     extensions: ['.mjs', '.mts', '.ts', '.tsx', '.js', '.jsx', '.json'],
+    // `@/x` is `src/x`. Declared here rather than left to @base44/vite-plugin,
+    // which has supplied it until now and leaves with the rest of Base44;
+    // vitest.config.ts spells the same alias.
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   /**
    * Stable vendor code gets its own chunks, so a deploy that only touches site
