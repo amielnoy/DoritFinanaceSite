@@ -848,6 +848,26 @@ Review 2026-10-15, item 23. `public/favicon.svg` is a monogram ד drawn as shape
 | CTR-ICON-001 | "is /favicon.svg in the page and in the manifest, and Base44's logo is nowhere" | The `<link rel="icon">` and the manifest's one icon are `/favicon.svg`; no `base44.com/logo` |
 | CTR-ICON-002 | "is an SVG monogram ד on the site's primary colour" | A 32×32 SVG titled `ד — …`, its ground the `--primary` hex; no `<text>`, no external reference |
 
+### 4.24 A client's meetings — `client-meetings-schema.contract.test.ts`
+
+`20261103000000_client_meetings.sql` (docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 1): many meetings per lead, a client summary kept apart from Dorit's notes, `my_meetings()` and `request_meeting_change()`. Read as source; the behaviour is proved by `supabase/tests/client_meetings_check.sql` against a local Supabase.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-MTG-001 | "sorts after every migration already applied to production" | After `20261102000000` |
+| CTR-MTG-002 | "keeps the one-meeting key: migration 2 drops it, after submit-lead writes by id" | No `drop constraint meetings_lead_id_key` |
+| CTR-MTG-003 | "shows the client exactly twelve columns, from meetings_for and my_meetings alike" | The twelve names, both functions |
+| CTR-MTG-004 | "never selects Dorit's notes or the private columns for the client" | No `notes`, `timing`, `lead_id`, `agency_id`, `track`, `created_by` in the select list; the diary as a boolean |
+| CTR-MTG-005 | "keeps a summary invisible until it is published" | `case when summary_published_at is not null` |
+| CTR-MTG-006 | "answers only the signed-in user's verified address, and only for a whole lead" | `meetings_for(my_email())`; `anonymized_at is null` |
+| CTR-MTG-007 | "rechecks ownership on a change request, and allows one open request per meeting" | `my_email()`, `status = 'scheduled'`, `already_open`, the partial unique index |
+| CTR-MTG-008 | "lets staff add a meeting only to a lead they can see, in its agency, as themselves" | `can_see_lead`, `lead_in_agency`, `created_by = auth.uid()` |
+| CTR-MTG-009 | "gives clients no direct write to requests, and staff only the answer" | No insert policy; table revoked; `update (status, handled_at)` only |
+| CTR-MTG-010 | "lets only the service role call meetings_for and the server lookups, and nobody anonymous call anything" | Three service-role grants; no `anon` |
+| CTR-MTG-011 | "matches a rebooking client by the exact address, never a pattern" | `lower(trim()) =`, no `like`, one agency |
+| CTR-MTG-012 | "does not repeat an enquiry for a follow-up meeting" | `enquiries_for` reads `kind = 'first'`, `limit 1` |
+| CTR-MTG-013 | "judges a lead stale by its latest meeting, and clears the new free text with it" | `max(scheduled_at)`; summary, place and request notes nulled |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed

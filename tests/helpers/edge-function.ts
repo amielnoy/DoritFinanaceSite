@@ -13,6 +13,8 @@ import { MAILER_URL, type EmailCall, type FetchCall } from "./base44-function";
  * every outbound call is recorded and answered here. Nothing reaches a network.
  */
 
+const AGENCY_1_ID = "00000000-0000-0000-0000-000000000001";
+
 export const SUPABASE_URL = "https://project-ref.supabase.test";
 const SERVICE_KEY = "service-role-test";
 
@@ -103,8 +105,16 @@ export interface EdgeOptions {
   failGoogle?: "token" | "calendar" | "sheets";
   /** The calendar answers this status. */
   calendarStatus?: number;
-  /** The meetings upsert answers 404. */
+  /** Every meetings write (insert or update) answers 404. */
   failMeetings?: boolean;
+  /** Meetings already stored, which the first-booking lookup and updates by id see. */
+  existingMeetings?: Record<string, unknown>[];
+  /**
+   * Signed-in callers: a bearer token → the verified address `my_email()`
+   * answers for it. Any other token (the anon key) is refused, as PostgREST
+   * refuses my_email() to anon.
+   */
+  clientSessions?: Record<string, string>;
   /** The env has no GOOGLE_SERVICE_ACCOUNT_JSON. */
   noGoogle?: boolean;
   /** Changes to the default env: a value sets the key, `null` removes it. Ignored with `env`. */
@@ -232,7 +242,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
   const emails: EmailCall[] = [];
   const fetches: FetchCall[] = [];
   const leadUpdates: { id: string; fields: Record<string, unknown> }[] = [];
-  const meetings: Record<string, unknown>[] = [];
+  const meetings: Record<string, unknown>[] = (options.existingMeetings ?? []).map((m) => ({ ...m }));
   const calendarEvents: Record<string, unknown>[] = [];
   const sheetRows: { tab: string; row: unknown[] }[] = [];
   // Copies: a PATCH writes into the stored row, and a suite that runs the same
@@ -374,12 +384,42 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
       }
       return new Response(JSON.stringify(rows), { status: 200 });
     }
-    if (u === `${SUPABASE_URL}/rest/v1/meetings?on_conflict=lead_id` && method === "POST") {
+    // The booking by id (migration 20261103000000): an insert that hands its
+    // id back, an update by that id, and the first booking of a lead.
+    if (u === `${SUPABASE_URL}/rest/v1/meetings` && method === "POST") {
       if (options.failMeetings) return new Response("{}", { status: 404 });
-      const at = meetings.findIndex((m) => m.lead_id === parsed.lead_id);
-      if (at >= 0) Object.assign(meetings[at], parsed);
-      else meetings.push({ ...parsed });
-      return new Response(null, { status: 201 });
+      const row = { id: `00000000-0000-4000-9000-${String(meetings.length + 1).padStart(12, "0")}`, ...parsed };
+      meetings.push(row);
+      return new Response(JSON.stringify([row]), { status: 201 });
+    }
+    if (u.startsWith(`${SUPABASE_URL}/rest/v1/meetings?`) && method === "PATCH") {
+      if (options.failMeetings) return new Response("{}", { status: 404 });
+      const id = decodeURIComponent(new URLSearchParams(u.split("?")[1]).get("id")!.replace(/^eq\./, ""));
+      const row = meetings.find((m) => m.id === id);
+      if (row) Object.assign(row, parsed);
+      return new Response(null, { status: 204 });
+    }
+    if (u.startsWith(`${SUPABASE_URL}/rest/v1/meetings?`) && method === "GET") {
+      const q = new URLSearchParams(u.split("?")[1]);
+      const lead = q.get("lead_id")?.replace(/^eq\./, "");
+      const kind = q.get("kind")?.replace(/^eq\./, "");
+      const rows = meetings.filter((m) => (!lead || m.lead_id === lead) && (!kind || (m.kind ?? "first") === kind));
+      return new Response(JSON.stringify(rows.slice(0, 1).map((m) => ({ id: m.id }))), { status: 200 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/rpc/my_email` && method === "POST") {
+      const token = String((init.headers as Record<string, string> | undefined)?.Authorization ?? "").replace(/^Bearer /, "");
+      const email = options.clientSessions?.[token];
+      return email
+        ? new Response(JSON.stringify(email), { status: 200 })
+        : new Response('{"code":"42501","message":"permission denied for function my_email"}', { status: 401 });
+    }
+    if (u === `${SUPABASE_URL}/rest/v1/rpc/lead_for_email` && method === "POST") {
+      // The exact, normalised match, in one agency, newest whole lead first.
+      const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
+      const match = [...stored]
+        .filter((l) => norm(l.email) === norm(parsed.p_email) && (l.agency_id ?? AGENCY_1_ID) === parsed.p_agency_id && !l.anonymized_at)
+        .sort((a, b) => new Date(String(b.created_at ?? 0)).getTime() - new Date(String(a.created_at ?? 0)).getTime())[0];
+      return new Response(JSON.stringify(match?.id ?? null), { status: 200 });
     }
     if (u === `${SUPABASE_URL}/auth/v1/user` && method === "GET") {
       const header = String((init.headers as Record<string, string> | undefined)?.Authorization ?? "");
