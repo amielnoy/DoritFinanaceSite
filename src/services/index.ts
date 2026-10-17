@@ -206,6 +206,8 @@ export const services: Services = {
     myEnquiries: () => real().then((s) => s.account.myEnquiries()),
     mySnapshot: () => real().then((s) => s.account.mySnapshot()),
     respondToRecommendation: (itemId, status, note) => real().then((s) => s.account.respondToRecommendation(itemId, status, note)),
+    myMeetings: () => real().then((s) => s.account.myMeetings()),
+    requestMeetingChange: (meetingId, kind, note) => real().then((s) => s.account.requestMeetingChange(meetingId, kind, note)),
   },
   masleka: {
     submitCode: (token, code, idNumber) => real().then((s) => s.masleka.submitCode(token, code, idNumber)),

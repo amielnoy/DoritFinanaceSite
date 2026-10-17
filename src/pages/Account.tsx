@@ -3,9 +3,12 @@ import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { services } from "@/services";
-import { AccountLoadError, type ClientAnswer, type ClientSnapshot, type Enquiry } from "@/services/ports";
+import { AccountLoadError, type ClientAnswer, type ClientMeeting, type ClientSnapshot, type Enquiry } from "@/services/ports";
 import SnapshotView from "@/components/dorit/account/SnapshotView";
+import MeetingsTab from "@/components/dorit/account/MeetingsTab";
 import { SNAPSHOT_HOME } from "@/config/snapshot";
+import { MEETINGS_CLIENT } from "@/config/meetings";
+import type { MeetingRequestKind } from "@/lib/meetings";
 import { PENSION_CHECK } from "@/config/offers";
 
 // A row with no stored date arrives as "" — print nothing rather than "Invalid Date".
@@ -97,17 +100,30 @@ export default function Account({
   loadEnquiries = () => services.account.myEnquiries(),
   loadSnapshot = () => services.account.mySnapshot(),
   respond = (itemId, status, note) => services.account.respondToRecommendation(itemId, status, note),
+  loadMeetings = () => services.account.myMeetings(),
+  requestChange = (meetingId, kind, note) => services.account.requestMeetingChange(meetingId, kind, note),
   snapshotEnabled = SNAPSHOT_HOME,
+  meetingsEnabled = MEETINGS_CLIENT,
   now = new Date(),
 }: {
   loadEnquiries?: () => Promise<Enquiry[]>;
   loadSnapshot?: () => Promise<ClientSnapshot | null>;
   respond?: (itemId: string, status: ClientAnswer, note?: string) => Promise<void>;
+  loadMeetings?: () => Promise<ClientMeeting[]>;
+  requestChange?: (meetingId: string, kind: MeetingRequestKind, note?: string) => Promise<void>;
   /** VITE_SNAPSHOT_HOME: the "תמונת מצב" tab comes first; off, the page is as it was. */
   snapshotEnabled?: boolean;
+  /** VITE_MEETINGS_CLIENT: a "הפגישות שלי" tab from my_meetings(); off, the page is as it was. */
+  meetingsEnabled?: boolean;
   now?: Date;
 }) {
-  const [tab, setTab] = useState<"snapshot" | "enquiries">(snapshotEnabled ? "snapshot" : "enquiries");
+  type Tab = "snapshot" | "meetings" | "enquiries";
+  const tabs: [Tab, string][] = [
+    ...(snapshotEnabled ? [["snapshot", "תמונת מצב"] as [Tab, string]] : []),
+    ...(meetingsEnabled ? [["meetings", "הפגישות שלי"] as [Tab, string]] : []),
+    ["enquiries", "הפניות שלי"],
+  ];
+  const [tab, setTab] = useState<Tab>(tabs[0][0]);
   const { user, logout } = useAuth();
   const query = useQuery<Enquiry[], unknown>({
     // Keyed by the signed-in user, so a session switch cannot show the previous user's rows.
@@ -146,9 +162,9 @@ export default function Account({
           </button>
         </section>
 
-        {snapshotEnabled ? (
+        {tabs.length > 1 ? (
           <div role="tablist" aria-label="האזור שלי" className="flex gap-2 border-b border-border">
-            {([["snapshot", "תמונת מצב"], ["enquiries", "הפניות שלי"]] as const).map(([id, label]) => (
+            {tabs.map(([id, label]) => (
               <button
                 key={id}
                 type="button"
@@ -169,9 +185,13 @@ export default function Account({
           <div role="tabpanel" id="panel-snapshot" aria-labelledby="tab-snapshot">
             <SnapshotTab userKey={String(user?.id ?? user?.email ?? "anonymous")} load={loadSnapshot} respond={respond} />
           </div>
+        ) : meetingsEnabled && tab === "meetings" ? (
+          <div role="tabpanel" id="panel-meetings" aria-labelledby="tab-meetings">
+            <MeetingsTab userKey={String(user?.id ?? user?.email ?? "anonymous")} load={loadMeetings} requestChange={requestChange} now={now} />
+          </div>
         ) : (
         // The enquiries, as they were; a tab panel only when there are tabs.
-        <div {...(snapshotEnabled ? { role: "tabpanel", id: "panel-enquiries", "aria-labelledby": "tab-enquiries" } : {})} className="space-y-12">
+        <div {...(tabs.length > 1 ? { role: "tabpanel", id: "panel-enquiries", "aria-labelledby": "tab-enquiries" } : {})} className="space-y-12">
         {query.isPending ? <p role="status" className="text-muted-foreground">טוען…</p> : null}
 
         {error?.reason === "unverified" ? (
@@ -190,6 +210,8 @@ export default function Account({
 
         {!query.isPending && !error && enquiries.length > 0 ? (
           <>
+            {/* With the meetings tab, the meetings live there (my_meetings), not here. */}
+            {!meetingsEnabled ? (
             <section aria-labelledby="meetings">
               <h2 id="meetings" className="font-heading text-2xl mb-3">הפגישות שלי</h2>
               {meetings.length === 0 ? <p>אין כאן פגישות</p> : (
@@ -204,6 +226,7 @@ export default function Account({
                 </ul>
               )}
             </section>
+            ) : null}
 
             <section aria-labelledby="interviews">
               <h2 id="interviews" className="font-heading text-2xl mb-3">סיכומי ההיכרות שלי</h2>

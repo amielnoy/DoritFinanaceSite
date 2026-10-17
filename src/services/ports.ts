@@ -1,4 +1,6 @@
-import type { MeetingKind, MeetingMode, MeetingRequestKind, MeetingStatus } from "@/lib/meetings";
+import type { ClientMeeting, MeetingKind, MeetingMode, MeetingRequestKind, MeetingStatus } from "@/lib/meetings";
+
+export type { ClientMeeting };
 import type { InterviewSummary } from "@/lib/interview-handoff";
 import type { Snapshot } from "@/lib/clearinghouse/snapshot";
 
@@ -581,6 +583,10 @@ export interface AccountPort {
   mySnapshot(): Promise<ClientSnapshot | null>;
   /** "כן, לטפל בזה" / "יש לי שאלה" (or back to open) on one of the user's own recommendations. */
   respondToRecommendation(itemId: string, status: ClientAnswer, note?: string): Promise<void>;
+  /** The signed-in user's meetings with Dorit (`my_meetings()`), newest first. Rejects with `AccountLoadError`. */
+  myMeetings(): Promise<ClientMeeting[]>;
+  /** Ask to move or cancel one of the user's own upcoming meetings; Dorit is mailed. The meeting itself is unchanged. */
+  requestMeetingChange(meetingId: string, kind: MeetingRequestKind, note?: string): Promise<void>;
 }
 
 export type RecommendationPriority = "important" | "check";

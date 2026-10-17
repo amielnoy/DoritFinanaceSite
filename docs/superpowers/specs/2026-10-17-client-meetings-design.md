@@ -296,3 +296,13 @@ are `meetings_fill_lead_id` and `meetings_touch`. Once applied, a signed-in
 client's rebooking joins their booked lead and staff can add a second meeting
 to it — `lead_for_email()` and the staff insert lift with no deploy.
 
+## Step 4 (2026-10-17)
+
+The client tab is built behind `VITE_MEETINGS_CLIENT` and stays off until
+Dorit's compliance adviser approves the privacy wording (Rollout 4). Built as
+the canvas "הפגישות שלי — לקוח" shows, with one omission: its "כדאי להביא" line
+is phase 2's checklist (`meeting_items`, not designed here). The change request
+goes through the `meeting-request` function, not the RPC directly, so Dorit is
+always mailed. Calendar files carry UTC instants (…Z), which hold Israel's hour
+across a daylight-saving change.
+

@@ -1765,3 +1765,24 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2. The adap
 | UNIT-MTGTIME-005 | "round-trips: the instant shows the same day and hour" | Three times across the change |
 | UNIT-MTGTIME-006 | "names a meeting by Israel's day, not UTC's, near midnight" | `15.12 · 00:30` |
 
+### 4.75 A client's meetings — `tests/unit/client-meetings.test.ts`
+
+docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4. The tab's order; a row of `my_meetings()` as the page reads it; the calendar files (D6), made in the browser as UTC instants so 10:00 in Israel stays 10:00 across the daylight-saving change (25.10.2026); and the account adapter, whose change request goes through the `meeting-request` function so Dorit is mailed.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-CLMTG-001 | "puts the soonest upcoming meeting first, then the rest soonest first, then the past most recent first" | next / upcoming / past |
+| UNIT-CLMTG-002 | "keeps cancelled meetings apart, and counts a scheduled meeting whose time has gone by as past" | cancelled apart; a lapsed one in past |
+| UNIT-CLMTG-003 | "lists an undated scheduled meeting as upcoming, never as the next one" | next null |
+| UNIT-CLMTG-004 | "maps the twelve columns" (toClientMeeting) | The page's shape |
+| UNIT-CLMTG-005 | "shows no summary without its publication time" | `clientSummary: null` |
+| UNIT-CLMTG-006 | "falls back rather than passing a raw key through" | kind/status/mode/request fall back |
+| UNIT-CLMTG-007 | "writes 10:00 in Israel as 07:00Z in summer time and 08:00Z in winter time" | DTSTART/DTEND; both shown as 10:00–10:45 |
+| UNIT-CLMTG-008 | "is a well-formed VEVENT, its text escaped and its lines folded to 75 octets" | UID, escaped `,` `;`, every line ≤ 75 octets |
+| UNIT-CLMTG-009 | "carries no summary or note, only the title, time and place" | No summary text |
+| UNIT-CLMTG-010 | "builds Google's add-event link with UTC times and Israel's zone" | `dates=…Z/…Z`, `ctz=Asia/Jerusalem` |
+| UNIT-CLMTG-011 | "offers nothing for a meeting with no time" | `null` |
+| UNIT-CLMTG-012 | "reads my_meetings, and treats a signed-out call as signed out" | `rpc("my_meetings")`; 42501 → `signed_out` |
+| UNIT-CLMTG-013 | "asks through the meeting-request function, so Dorit is mailed" | `invoke("meeting-request", { meetingId, kind, note })` |
+| UNIT-CLMTG-014 | "passes the function's own refusal through" | The 409's `error` text |
+
