@@ -14,9 +14,21 @@ broken.
 
 ## 2. Environment
 
-The production bundle served by `vite preview`; the Base44 API and all
-third-party beacons intercepted by `e2e/fixtures/app.ts`. Locale `he-IL`,
-timezone `Asia/Jerusalem`.
+The production bundle served by `vite preview`, built by `npm run build:e2e` with
+production's configuration (`e2e/build-env.ts`: `VITE_LEAD_FUNCTIONS`,
+`VITE_CONTENT_WRITES`, `VITE_UPLOAD_PROVIDER` and `VITE_CONTENT_IMAGES` on
+`supabase`, all four agents in `VITE_CHAT_AGENTS`, `VITE_MEETINGS_STAFF` on;
+`VITE_MASLEKA_ENABLED` stays off for §3.10) and Supabase at
+`https://supabase.e2e.invalid`, a host that never resolves. `e2e/fixtures/app.ts`
+answers that host — PostgREST reads over seeded tables in Supabase row shape
+(`e2e/fixtures/data.ts`), the Edge Functions per function, storage and auth — and
+aborts the third-party beacons. A request it does not model, and any `/api` call
+but the site's own Vercel functions and the Base44 SDK's telemetry, fails the
+test at teardown. Locale `he-IL`, timezone `Asia/Jerusalem`.
+
+Until 2026-10-18 the bundle was built with no Supabase, so every adapter fell
+back to Base44 and the fixture stubbed Base44's `/api`; the cases below were
+re-pointed at the Supabase path that day, case for case.
 
 ## 3. Test cases
 
@@ -24,13 +36,13 @@ timezone `Asia/Jerusalem`.
 
 | ID | Title | Expected result |
 |---|---|---|
-| E2E-HOM-001 | "boots past the auth/bootstrap spinner and renders the page shell" | `#top` and `main` visible; no spinner; no console errors; public-settings requested |
+| E2E-HOM-001 | "boots past the auth/bootstrap spinner and renders the page shell" | `#top` and `main` visible; no spinner; no console errors; no `/auth/v1/` request (it read "public-settings requested" until 2026-10-18; Base44's bootstrap is gone) |
 | E2E-HOM-002 | "has the RTL Hebrew document contract search engines rely on" | `lang=he`, `dir=rtl`, title present, and the description is the home route's own (applied by `useSeo`, not the static one from `index.html`) |
 | E2E-HOM-003 | "renders every top-level section of the landing page" | All 8 section ids present (the default fixture carries testimonials, so `testimonials` is among them) (`top`, `about`, `services`, `start`, `quick-contact`, `proof`, `testimonials`, `common-questions`) |
 | E2E-HOM-004 | "exposes exactly one h1 and a sane heading order" | One `h1`; no heading level skipped by more than one |
-| E2E-HOM-005 | "renders the reviews pulled from the backend" | Stubbed testimonial name visible |
-| E2E-HOM-008 | "leaves the testimonials section out when there are none" | Empty `Testimonial` list → no `#testimonials`, no "לקוחות מספרים" heading, no `a[href$="#testimonials"]`; `#common-questions` still present |
-| E2E-HOM-006 | "survives a backend that is completely down" | All entity calls 500 → page still renders, `h1` visible, no `pageerror` |
+| E2E-HOM-005 | "renders the reviews pulled from the backend" | `GET /rest/v1/testimonials` made; the seeded testimonial's name visible |
+| E2E-HOM-008 | "leaves the testimonials section out when there are none" | Empty `testimonials` table → no `#testimonials`, no "לקוחות מספרים" heading, no `a[href$="#testimonials"]`; `#common-questions` still present |
+| E2E-HOM-006 | "survives a backend that is completely down" | Every `/rest/v1/` read and every `/functions/v1/` call 500 → page still renders, `h1` visible, no `pageerror` |
 | E2E-HOM-007 | "wires the primary CTAs to real targets" | Visible `#consultation` CTA; visible `tel:+972508311776` link |
 
 ### 3.2 Routing — `navigation.spec.ts`
@@ -84,9 +96,9 @@ E2E-CAL-009 (`@mobile-only`, phone projects) is in [STD-07](07-std-mobile.md).
 | ID | Title | Expected result |
 |---|---|---|
 | E2E-FRM-001 | "names what's missing instead of silently disabling submit" | Submit stays enabled; each send names what is missing — both fields, the phone, then a phone Dorit could not call back (`abc`, D-01); the alert clears once both are valid |
-| E2E-FRM-002 | "submits, confirms, and sends the payload the backend expects" | Confirmation shown; the `submitLead` payload carries the name and phone and `source: quick` |
-| E2E-FRM-003 | "shows a recoverable error and a direct mail fallback when sending fails" | Error message; input preserved; button re-enabled |
-| E2E-FRM-004 | "still records the lead when only the optional secondary copy fails" | Exactly one lead written |
+| E2E-FRM-002 | "submits, confirms, and sends the payload the backend expects" | Confirmation shown; the `POST /functions/v1/submit-lead` body carries the name and phone and `source: quick` |
+| E2E-FRM-003 | "shows a recoverable error and a direct mail fallback when sending fails" | `submit-lead` 500 → error message; input preserved; button re-enabled |
+| E2E-FRM-004 | "still records the lead when only the optional secondary copy fails" | Exactly one `POST /functions/v1/submit-lead` |
 
 **Why this section shrank.** `E2E-FRM-005..011` covered a detailed contact form
 and a three-step consultation builder. Both were deleted from the site: the
@@ -102,22 +114,22 @@ because the backend still accepts leads recorded under them.
 | ID | Title | Expected result |
 |---|---|---|
 | E2E-CLM-001 | "every control on the form has an accessible name" | Every input, select and file control is reachable by name |
-| E2E-CLM-002 | "refuses to submit without a name and phone" | Submit disabled; nothing sent |
-| E2E-CLM-003 | "reports an event and confirms to the visitor" | `submitClaim` invoked; confirmation shown |
-| E2E-CLM-004 | "keeps the report on screen and offers a fallback when the backend fails" | Typed report preserved; direct contact offered |
-| E2E-CLM-005 | "does not file two reports on a double click" | Exactly one invocation |
-| E2E-CLM-006 | "keeps documents in the browser until the report is sent, and turns away the wrong ones" | An `.exe` is named and left out, a PDF is listed, no upload until send; then one upload and `documents` of one (D-02) |
+| E2E-CLM-002 | "refuses to submit without a name and phone" | Submit disabled; no `/functions/v1/submit-claim` request |
+| E2E-CLM-003 | "reports an event and confirms to the visitor" | `POST /functions/v1/submit-claim` carrying what was typed; confirmation shown |
+| E2E-CLM-004 | "keeps the report on screen and offers a fallback when the backend fails" | `submit-claim` 500 → typed report preserved; direct contact offered |
+| E2E-CLM-005 | "does not file two reports on a double click" | Exactly one `submit-claim` call |
+| E2E-CLM-006 | "keeps documents in the browser until the report is sent, and turns away the wrong ones" | An `.exe` is named and left out, a PDF is listed, no upload until send; then one upload to `/storage/v1/object/claim-documents/` and `documents` of one, the object's path (`storage:claim-documents/…receipt.pdf`), never a link (D-02) |
 
 ### 3.6 Blog — `blog.spec.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
 | E2E-BLG-001 | "lists only published posts" | Draft title absent |
-| E2E-BLG-002 | "filters server-side on the published flag" | Request carries `q = {"published":true}` |
+| E2E-BLG-002 | "filters server-side on the published flag" | `GET /rest/v1/blog_posts` carries `published=eq.true` and `order=created_at.desc` (it read `q = {"published":true}`, Base44's filter, until 2026-10-18) |
 | E2E-BLG-003 | "opens a post and renders its markdown body" | Heading, `##` subheading and list items rendered |
 | E2E-BLG-004 | "shows a friendly not-found for a missing post" | "המאמר לא נמצא" plus a back link; no `pageerror` |
 | E2E-BLG-005 | "share buttons point at real share endpoints" | ≥1 wa.me/facebook/linkedin/x link |
-| E2E-BLG-006 | "degrades gracefully when the blog backend errors" | Root non-empty; no `pageerror`; a `role="alert"` "לא הצלחנו לטעון את המאמרים" with "לנסות שוב", and no "עדיין אין מאמרים" (D-09) |
+| E2E-BLG-006 | "degrades gracefully when the blog backend errors" | `blog_posts` read 500 → root non-empty; no `pageerror`; a `role="alert"` "לא הצלחנו לטעון את המאמרים" with "לנסות שוב", and no "עדיין אין מאמרים" (D-09) |
 | E2E-BLG-007 | "the first article is on the first screen and a half" (375×812) | First `article-card` (the featured one, seeded) starts < 1,250px from the top; it was ~2,300px before the redesign |
 | E2E-BLG-008 | "the prerendered list does not jump when the app takes over" (Chromium projects; layout-shift entries are Chromium's alone) | Cumulative layout shift, observed from the first paint to a second after the cards appear, is < 0.1. It was 0.444 on production and 0.18 here before the fix (D-06) |
 
@@ -134,24 +146,28 @@ because the backend still accepts leads recorded under them.
 
 The chat widgets are driven by prompts, and a prompt is a request to a model.
 These ten cases cover only what the shell enforces regardless of what the
-model does — the part that is a gate rather than an instruction.
+model does — the part that is a gate rather than an instruction. Every chat here
+is served by the `chat` Edge Function (one POST to `/functions/v1/chat` per
+message), and the hand-off goes to `/functions/v1/escalate-to-human` — as in
+production since 2026-10-14; until 2026-10-18 the e2e build ran them on Base44.
 
 | ID | Title | Expected result |
 |---|---|---|
-| E2E-AGT-001 | "a visitor cannot type before accepting the consent notice" | Message box disabled with the "יש לאשר את ההסכמה" placeholder; **zero** requests to `/agents/`; accepting the notice enables the box |
+| E2E-AGT-001 | "a visitor cannot type before accepting the consent notice" | Message box disabled with the "יש לאשר את ההסכמה" placeholder; **zero** requests to `/functions/v1/chat`; accepting the notice enables the box |
 | E2E-AGT-002 | "the notice discloses the bot, the licence and the data collected" | "עוזר אוטומטי", `L-00107009`, the marketing-not-advice line, the ban on typing an ID number, and a link to `/privacy` all visible |
 | E2E-AGT-003 | "the fence is published beside the interview agent" | The tagline and the כללי הגדר block (what it does / does not do / when it hands over) visible in `#interview` |
 | E2E-AGT-004 | "a standing disclaimer sits under every message box" | The "אינו ייעוץ, שיווק פנסיוני או המלצה אישית" line visible in all three sections |
-| E2E-AGT-005 | "the route to a person works without the model, and before consent" | Handoff button present on first frame; pressing it POSTs to `escalateToHuman`; phone and WhatsApp links render even though the visitor never consented and no conversation exists |
-| E2E-AGT-006 | "a visitor cannot type before accepting the notice" (support) | The support chat on `/faq` gates the same way: box disabled, **zero** requests to `/agents/`, accepting unlocks it. On the phone projects E2E-AGT-006–008 first open the chat from the card ("שאלו את העוזר"), where it is a full-screen layer — see E2E-MOB-011–014 |
+| E2E-AGT-005 | "the route to a person works without the model, and before consent" | Handoff button present on first frame; pressing it POSTs the name and phone to `/functions/v1/escalate-to-human`; phone and WhatsApp links render even though the visitor never consented and no conversation exists |
+| E2E-AGT-006 | "a visitor cannot type before accepting the notice" (support) | The support chat on `/faq` gates the same way: box disabled, **zero** requests to `/functions/v1/chat`, accepting unlocks it. On the phone projects E2E-AGT-006–008 first open the chat from the card ("שאלו את העוזר"), where it is a full-screen layer — see E2E-MOB-011–014 |
 | E2E-AGT-007 | "the notice describes this chat and not the interview" | The support notice states the conversation itself is kept and why; the interview's "נאספים שם וטלפון בלבד" is **absent**; the licence and affiliation still present |
-| E2E-AGT-008 | "the route to a person is here too" | The handoff button on `/faq` POSTs to `escalateToHuman` |
-
-| E2E-AGT-009 | "a refused conversation gives the visitor their message back" | With `/agents/` stubbed 401 — the exact production failure — the chat reports it, and the typed text is still in the box |
-| E2E-AGT-010 | "the direct channels appear even when the escalation itself fails" | With `escalateToHuman` stubbed 500, the phone and WhatsApp links still render |
+| E2E-AGT-008 | "the route to a person is here too" | The handoff button on `/faq` POSTs to `/functions/v1/escalate-to-human` |
+| E2E-AGT-009 | "a refused conversation gives the visitor their message back" | The first message reaches `/functions/v1/chat` (agent `needs_interview`, the text typed) and is answered 401 `Invalid API key`, as the gateway answers a key it does not accept. The chat says so with `HUMAN_HANDOFF.failure` and the direct phone link — on the chat function an unavailable agent hands over the channels (AgentChat's `showChannelsOnly`), where Base44's path said "לא הצלחתי לשלוח את ההודעה כרגע" (the check until 2026-10-18) — and the typed text is still in the box |
+| E2E-AGT-010 | "the direct channels appear even when the escalation itself fails" | With `/functions/v1/escalate-to-human` stubbed 500, the phone and WhatsApp links still render |
+| E2E-AGT-011 | "a visitor who will not leave a number still gets hers, and nobody is paged" | "רק הפרטים של דורית" shows the phone link; zero `escalate-to-human` calls |
+| E2E-AGT-012 | "sending with no number asks for one instead of paging her empty-handed" | A name and no phone → an alert asking for "מספר טלפון"; zero `escalate-to-human` calls (A-55) |
 
 E2E-AGT-009 and E2E-AGT-010 are the first cases anywhere to exercise a failing
-`/agents/` call. The `catch` in `AgentChat.send()` had never once executed under
+chat call. The `catch` in `AgentChat.send()` had never once executed under
 test — which is how a total backend outage came to be reported in the same words
 as a bad moment on the train (A-42), and how a failed send came to erase what
 the visitor had written: their own message reaches the transcript only by way of
@@ -181,8 +197,8 @@ does.
 | E2E-ACC-001 | "bounces an anonymous visitor to login, remembering /account as the return target" | `/account` without a session ends on `/login?returnTo=/account` |
 
 The signed-in path is covered by the component cases CMP-ACC-*: the e2e fixture
-answers `/entities/User/me` with 401 unconditionally and has no session path.
-Giving it one is a separate change.
+answers `/auth/v1/user` with 401 unconditionally and has no session path (no
+`/auth/v1/token`). Giving it one is a separate change.
 
 ### 3.10 Clearinghouse, dark — `masleka.spec.ts`
 

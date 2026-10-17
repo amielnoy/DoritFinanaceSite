@@ -346,15 +346,25 @@ first, because `--prod` waits for them), and a companion case keeps the Base44
 publish — which ships the agents — off it. CTR-REB-002 pins that the publish
 workflow ends by dispatching `ci.yml` on `main` with `deploy=true`, with
 `actions: write` and only after a real publish. CTR-REB-003 requires
-`PRERENDER_REQUIRED=1` on the production Vercel build only; CTR-REB-004 keeps
-`PRERENDER_ARTICLES_FIXTURE` in the e2e `build` job's `Build` step and out of the
-workflow-level `env`, every other job and `vercel.json`; CTR-REB-005 requires the
+`PRERENDER_REQUIRED=1` on the production Vercel build only; CTR-REB-004 keeps the
+fixture article in the e2e build alone: `PRERENDER_ARTICLES_FIXTURE` is spelled in
+`e2e/build-env.ts`, which only `npm run build:e2e` applies (and refuses in a Vercel
+build), the e2e `build` job's `Build` step runs `npm run build:e2e`, and neither it
+nor the fixture appears in the workflow-level `env`, any other step or job, the
+Vercel build or `vercel.json` (until 2026-10-18 the variable sat in that step's
+`env`); CTR-REB-005 requires the
 production deploy check to fetch `/blog`, which now shares its name with the
 `blog/` directory of articles. CTR-REB-006 requires the workflow's `cancel-in-progress`
 to be false on `schedule`, so the nightly run queues behind an in-flight push rather
 than cancelling it (Vercel on new code, Base44 on old); CTR-REB-007 requires the
 production smoke to skip the agent-conversation probes on `schedule`, and the spec to
-honour `E2E_SKIP_AGENT_PROBES`. `prerender-hermetic.contract.test.ts` (CTR-REB-008)
+honour `E2E_SKIP_AGENT_PROBES` (retired 2026-10-18: the probes were Base44's
+`createConversation`, and left with `e2e/api/base44-contract.spec.ts`). Two
+unnumbered cases pin the smoke's backend: it sets `E2E_LIVE_API_URL` and no
+`E2E_LIVE_APP_ID`, and no spec under `e2e/api` reads one; and it sets no
+`E2E_LEAD_FUNCTIONS` — the form posts to `submit-lead` in the e2e build and in
+production alike, `backend-contract.spec.ts` waits for exactly that, and the
+fixture stubs `/functions/v1/` on any host, so the smoke files no real lead. `prerender-hermetic.contract.test.ts` (CTR-REB-008)
 pins that `scripts/prerender.mjs` aborts `googletagmanager.com` / `google-analytics.com`
 before navigating, as the e2e fixture does, so a build sends no fake page_views.
 `article-slug.contract.test.ts` (CTR-SLG-REF) pins the 400 and 409 slug-refusal texts
@@ -901,10 +911,25 @@ Review 2026-10-15, item 23. `public/favicon.svg` is a monogram ד drawn as shape
 | CTR-MTGM-002 | "drops the one-meeting key and indexes a lead's meetings by time" | `drop constraint meetings_lead_id_key`; `(lead_id, scheduled_at)` index |
 | CTR-MTGM-003 | "leaves no writer upserting meetings on lead_id" | No `on_conflict=lead_id`, `onConflict: 'lead_id'`, `on conflict (lead_id)` or `upsertRow('meetings'` in functions, pages, Base44 functions, scripts or migrations |
 
+### 4.26 The e2e build is production's configuration — `e2e-build-env.contract.test.ts`
+
+Until 2026-10-18 the e2e bundle was built with Supabase empty, so every adapter
+fell back to Base44 and the suite tested a path no visitor takes. It is now built
+from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-E2E-001 | "points Supabase at a host that can never resolve" | `VITE_SUPABASE_URL` is `https://` on a `.invalid` host (RFC 2606), and a publishable key is set |
+| CTR-E2E-002 | "switches on what production switches on" | `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`, `VITE_UPLOAD_PROVIDER`, `VITE_CONTENT_IMAGES` = `supabase`; `VITE_MEETINGS_STAFF=true`; `VITE_MASLEKA_ENABLED` and `VITE_MEETINGS_CLIENT` empty (E2E-MSK-* assert the dark build); `VITE_BASE44_APP_BASE_URL` empty; `VITE_CHAT_AGENTS` is exactly `CHAT_FUNCTION_AGENTS` |
+| CTR-E2E-003 | "is built from that one file by every entry point" | `scripts/build-e2e.mjs` applies it over the process environment; `playwright.config.ts` builds with `npm run build:e2e` and gives the preview the same env; `scripts/run-tests.sh` runs `npm run build:e2e` and exports no `VITE_*` and no fixture of its own (CI's job: CTR-REB-004) |
+| CTR-E2E-004 | "answers the fake host only, so a deployment's reads stay live" | The fixture's Supabase route matches the fake origin, or a `/functions/v1/` path on any host; the prerender's matches the fake origin alone |
+
 ## 5. Runtime counterpart
 
-[STD-05 §4.2](05-std-api.md) re-checks the same contract against **observed
-browser traffic**, and an opt-in block re-checks it against a **live backend**.
+[STD-05 §4](05-std-api.md) re-checks the same contract against **observed
+browser traffic** (`backend-contract.spec.ts`: what `submit-lead` reads, what
+`leads.source` allows), and `supabase-live.spec.ts` re-checks it against a **live
+backend**.
 The static tests catch drift at review time; the runtime ones catch it at run
 time.
 

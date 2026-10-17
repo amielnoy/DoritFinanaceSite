@@ -133,7 +133,10 @@ For application changes run `npm run lint`, `npm run typecheck`,
 `npm run build:prerender`, the five Vitest suites (`test:unit`, `test:component`,
 `test:contract`, `test:integration`, `test:security`) and `npm run test:e2e`, or
 `./scripts/run-tests.sh`. Contract tests read component and workflow source, so a
-change that looks UI-only can still fail them. Live API and model evals are opt-in
+change that looks UI-only can still fail them. Since 2026-10-18 the e2e bundle is
+built with production's switches (`e2e/build-env.ts`, `npm run build:e2e`) against
+a fake Supabase host the e2e fixture answers, so the suite exercises the Supabase
+adapters rather than the Base44 rollback path. Live API and model evals are opt-in
 and can contact deployed services; consult [the test plan](../tests/test-plan/README.md)
 first. Update the relevant STD when tests change. Documentation-only changes need
 link, command and source checks; record exactly which checks ran.

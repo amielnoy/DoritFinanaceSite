@@ -1,7 +1,7 @@
 # STD-05 — API Tests
 
 **Suite:** `api` · **Runner:** `npm run test:e2e:api` (Playwright)
-**Location:** `e2e/api/` · **Cases:** 11 HTTP-surface + 6 observed-traffic + 7 opt-in live
+**Location:** `e2e/api/` · **Cases:** 14 HTTP-surface + 5 observed-traffic (`backend-contract.spec.ts`) + the opt-in live Supabase probes (`supabase-live.spec.ts`)
 
 ---
 
@@ -12,14 +12,21 @@ Two things sit under "API" for this app:
 1. **The site's own HTTP surface** — what a browser, a crawler or a monitor gets
    back from the deployment: the SPA shell, the SEO files, the hashed assets.
    Tested with Playwright's `request` fixture, no browser involved.
-2. **The Base44 API contract as actually exercised** — the requests the running
-   app puts on the wire, validated against the entity schemas.
+2. **The backend contract as actually exercised** — the requests the running
+   app puts on the wire to Supabase, checked against what the backend accepts:
+   the fields `submit-lead` reads off its body and the values `leads.source`
+   allows, both read from their own source. (Until 2026-10-18 this was the Base44
+   API contract, checked against `base44/entities`; the e2e build then ran on
+   Base44's adapters.)
 
 ## 2. Environment
 
 Runs against `PLAYWRIGHT_BASE_URL` when set (a deployment, used by the CI smoke
 job), otherwise against the local production preview. The observed-traffic cases
-use the stubbed backend from `e2e/fixtures/app.ts`.
+use the Supabase fake from `e2e/fixtures/app.ts`, which answers the e2e build's
+fake host (`e2e/build-env.ts`). Against a deployment only the functions are
+stubbed — the reads are the live project's — so the cases that need seeded reads
+skip there, and the lead cases still run (no real lead is filed).
 
 ## 3. Test cases — HTTP surface (`http-surface.spec.ts`)
 
@@ -44,54 +51,42 @@ use the stubbed backend from `e2e/fixtures/app.ts`.
 > `/manifest.json`, which did not exist and was silently answered with the SPA
 > shell. The file was added; see [10-known-issues](10-known-issues.md).
 
-## 4. Test cases — observed Base44 traffic (`base44-contract.spec.ts`)
+## 4. Test cases — observed backend traffic (`backend-contract.spec.ts`)
+
+`e2e/api/base44-contract.spec.ts` was renamed to `backend-contract.spec.ts` on
+2026-10-18 and its cases re-pointed at the Supabase path; the ids are kept.
 
 | ID | Title | Expected result |
 |---|---|---|
-| API-CTR-001 | "bootstraps through the documented public-settings endpoint" | `GET /api/apps/public/prod/public-settings/by-id/:appId` |
-| API-CTR-002 | "lists testimonials with a bounded, sorted query" | `sort=-created_date`, `0 < limit ≤ 100` |
-| API-CTR-003 | "POSTs a Lead that validates against the Lead entity schema" | JSON content type; `source` is an enum value `Lead.jsonc` declares; no field outside what `submitLead` accepts — `{name,phone,email,source,topic,timing,message,notes,scheduledAt}`. When the build posts leads to Supabase (`VITE_LEAD_FUNCTIONS=supabase` locally, `E2E_LEAD_FUNCTIONS=supabase` against a deployment) the captured request is `POST /functions/v1/submit-lead`, checked the same way |
-| API-CTR-005 | "every API call is same-origin and relative to /api" | Every observed request shares the page origin and starts with `/api/` |
-| API-CTR-006 | "never puts personal data or tokens in a query string" | No phone, email, `access_token`, `password` or `api_key` in any query string, on `/api` requests and on Supabase `/functions/v1/` requests alike |
-| API-CTR-007 | "an anonymous visitor never triggers an authenticated user fetch" | Zero requests to `/entities/User/me` |
+| API-CTR-001 | (retired 2026-10-18: "bootstraps through the documented public-settings endpoint", latterly "no longer calls the retired public-settings endpoint" — a Base44 endpoint; the fixture now fails any test whose page reaches Base44's `/api`) | — |
+| API-CTR-002 | "lists testimonials with a bounded, sorted query" | `GET /rest/v1/testimonials` with `order=created_at.desc`, `0 < limit ≤ 100`; the publishable key as `apikey` and as the bearer (it read `sort=-created_date` until 2026-10-18). Hermetic only |
+| API-CTR-003 | "POSTs a lead that submit-lead accepts" | `POST /functions/v1/submit-lead`, JSON; no body field outside those `supabase/functions/submit-lead/handler.ts` destructures; `source` is a value the `leads.source` CHECK allows (`20260921000000_initial_schema.sql`). Was "POSTs a Lead that validates against the Lead entity schema", against `base44/entities/Lead.jsonc` and a hand-kept field list. Runs against a deployment too |
+| API-CTR-005 | "every request stays on the site, its Supabase host and the allowed third parties" | Every request the page starts goes to the site, the e2e Supabase host, or the aborted Google Analytics hosts; none of the site's goes to `/api/` but the Vercel functions and the Base44 SDK's telemetry (which goes with the SDK, Base44 cleanup 2 part B). Was "every API call is same-origin and relative to /api". Hermetic only |
+| API-CTR-006 | "never puts personal data or tokens in a query string" | No phone, email, `access_token`, `password`, `api_key` or `apikey` in the query string of any request the page made, to any host (it checked the stubbed `/api` and `/functions/v1/` requests only, until 2026-10-18). Runs against a deployment too |
+| API-CTR-007 | "an anonymous visitor never triggers an authenticated user fetch" | Zero `/auth/v1/` requests and zero `profiles` reads (it counted `/entities/User/me` until 2026-10-18). Hermetic only |
 
 > `API-CTR-004` observed the consultation function being invoked from the
 > three-step booking wizard. That wizard was removed from the site (see
 > [STD-06 §3.4](06-std-ui-e2e.md)), so there is no longer browser traffic to
 > observe. The function itself is still covered statically by `CTR-FN-*` in
-> [STD-03](03-std-contract.md) and against a live backend by `API-LIV-004`
-> below. Ids are not reused.
+> [STD-03](03-std-contract.md). Ids are not reused.
 
-## 5. Test cases — live backend (opt-in)
-
-Enabled with `E2E_LIVE_API_URL` **and** `E2E_LIVE_APP_ID`; skipped otherwise so
-CI never touches production data.
+## 5. Test cases — live Base44 backend (retired)
 
 | ID | Title | Expected result |
 |---|---|---|
-| API-LIV-001 | "public settings are served for the linked app" | 200 with a `public_settings` key |
-| API-LIV-002 | "published blog posts are readable without authentication" | 200, array |
-| API-LIV-003 | "leads are NOT readable without an admin session (RLS)" | 401 or 403 |
-| API-LIV-004 | "the consultation function rejects a body without name/phone" | 400 with an `error` key |
-| API-LIV-005 | "blog_recommender opens a conversation for a signed-out visitor" | 200 with an `id` |
-| API-LIV-006 | "needs_interview opens a conversation for a signed-out visitor" | 200 with an `id` |
-| API-LIV-007 | "support_agent opens a conversation for a signed-out visitor" | 200 with an `id` |
+| API-LIV-001 | (retired 2026-10-18: "public settings are served for the linked app" — Base44's own API) | — |
+| API-LIV-002 | (retired 2026-10-18: "published blog posts are readable without authentication" — Base44's `BlogPost`; the site reads `blog_posts`, probed by `supabase-live.spec.ts`) | — |
+| API-LIV-003 | (retired 2026-10-18: "leads are NOT readable without an admin session (RLS)" — Base44's `Lead`; the Supabase RLS probes are in `supabase-live.spec.ts`) | — |
+| API-LIV-004 | (retired 2026-10-18: "the consultation function rejects a body without name/phone" — a Base44 function) | — |
+| API-LIV-005..007 | (retired 2026-10-18: "\<agent\> opens a conversation for a signed-out visitor" — Base44's `createConversation`; production's chats are on the `chat` Edge Function since 2026-10-14) | — |
 
-`API-LIV-005..007` are the only checks in the battery that would have caught
-A-42. They send `x-base44-anonymous-id`, which is how Base44 identifies a
-signed-out person; without it the backend answers 401 with the same message a
-closed agent gives, and the probe cannot tell a refused visitor from no visitor
-at all (A-49). The static contract tests read the repo, and the repo was correct; what
-was wrong was the value in the running backend. The hermetic e2e suite stubs
-`**/api/**` by design, and the production smoke job reuses those same specs, so
-it verified the *bundle* was published and nothing about whether anything
-behind it answered. CI now sets `E2E_LIVE_API_URL`/`E2E_LIVE_APP_ID` on the
-smoke job, which turns this whole block on against production. Cost: three
-empty conversations per publish — `createConversation` invokes no model and
-stores no message.
+The block needed `E2E_LIVE_APP_ID`, which the production smoke stopped setting on
+2026-10-17 (production does not use Base44); it had not run since. `API-LIV-005..007`
+were the checks that would have caught A-42 on Base44 — a signed-out visitor
+refused by the running backend while the repo was correct. The same class on the
+chat function is the live Supabase block's to catch.
 
 ## 6. Pass criteria
 
-All HTTP-surface and observed-traffic cases pass. The live block is expected to
-be skipped in CI; when run, all four must pass — API-LIV-003 in particular is a
-production RLS verification.
+All HTTP-surface and observed-traffic cases pass.

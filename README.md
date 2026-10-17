@@ -92,9 +92,10 @@ hosting supplies are missing from a local build, and the repo now fills both in:
 ⚠️ That proxy points at **production data** — a form you submit through it creates
 a real lead and sends real email. It stays off by default for that reason, and
 because `npm run test:e2e` serves the site from this same preview server: its
-specs are hermetic only because `e2e/fixtures/app.ts` stubs every `/api` call, and
-a proxy that switched itself on would turn any request the fixture missed into a
-write against the live app.
+specs are hermetic only because the e2e bundle calls nothing real — its Supabase
+is a fake host `e2e/fixtures/app.ts` answers, and any `/api` call fails the test —
+and a proxy that switched itself on would turn any request the fixture missed into
+a write against the live app.
 
 Without the variable, `/api` simply 404s and every form on the site reports
 *"לא הצלחנו לשלוח את הבקשה כרגע"*. That is the preview server having no backend,
@@ -164,9 +165,10 @@ to end, while every chat on the site went on answering `401` because the value
 the backend held had never been replaced (A-42). Whatever path that release
 took, it did not include the agents.
 
-Two things now look. `e2e/api/base44-contract.spec.ts` opens an anonymous
-conversation with each agent against the live backend, and the production smoke
-job runs it after every publish. And to see what the backend actually holds,
+One thing now looks. (The live probe that opened an anonymous conversation with
+each agent on Base44 left with `e2e/api/base44-contract.spec.ts` on 2026-10-18:
+production's chats are on the `chat` Edge Function, which
+`e2e/api/supabase-live.spec.ts` probes instead.) To see what the backend holds,
 pull into a scratch checkout — never this one, since a pull overwrites
 `base44/agents/` — and compare:
 
@@ -1633,10 +1635,14 @@ Worth knowing before changing it:
   shipping a blog without its pages; any other build warns and prebuilds the
   static routes only.
 - **The e2e build prebuilds a fixture article**, not a real one.
-  `PRERENDER_ARTICLES_FIXTURE=e2e/fixtures/prerender-articles.json` (set by the
-  CI `build` job, `playwright.config.ts` and `scripts/run-tests.sh`) makes the
-  prerender answer the page's read from that file. It is refused in a Vercel
-  build and in a bundle that reads Supabase, so it cannot reach a deployment.
+  `npm run build:e2e` builds with `e2e/build-env.ts` — production's switches, with
+  Supabase at the fake host `https://supabase.e2e.invalid` — and its
+  `PRERENDER_ARTICLES_FIXTURE=e2e/fixtures/prerender-articles.json` makes the
+  prerender answer that host's table reads from the file (`blog_posts` from it,
+  `testimonials` empty). The CI `build` job, `playwright.config.ts` and
+  `scripts/run-tests.sh` all run it. The fixture is refused in a Vercel build and
+  for any Supabase URL but the fake host, so it cannot reach a deployment, and a
+  real build always reads its real table.
 
 `e2e/seo/prerender.spec.ts` is what keeps it honest. It uses Playwright's
 `request`, never `page`, so nothing in it can pass because a browser repaired
@@ -1891,11 +1897,16 @@ the repo ever runs them — the other suites match strings against their source.
 client and reports what it stored, who it mailed, what each recipient saw, and
 what survived a failure.
 
-The end-to-end suites are hermetic: `e2e/fixtures/app.ts` intercepts the whole
-Base44 `/api` surface plus third-party beacons, so they need no credentials, no
-`base44 link`, and can never write to production data. They run against the
-production build served by `vite preview` — point `PLAYWRIGHT_BASE_URL` at a
-deployment to smoke-test it instead.
+The end-to-end suites are hermetic and run production's configuration: the bundle
+is built by `npm run build:e2e` with `e2e/build-env.ts` — the provider switches
+Vercel sets, and Supabase at `https://supabase.e2e.invalid`, a host that never
+resolves. `e2e/fixtures/app.ts` answers that host (PostgREST reads over seeded
+tables, the Edge Functions, storage, auth) and aborts third-party beacons, so the
+suites need no credentials and can never write to production data. Any `/api`
+request but the site's own Vercel functions (and, until the SDK goes, its
+telemetry) fails the test: that is the Base44 path the bundle no longer takes.
+They run against the build served by `vite preview` — point `PLAYWRIGHT_BASE_URL`
+at a deployment to smoke-test it instead; there only the functions are stubbed.
 
 **Device-specific e2e blocks are chosen by tag, never by a skip callback.** A
 `describe` that only makes sense on a phone is tagged `{ tag: "@mobile-only" }`;

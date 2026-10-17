@@ -88,7 +88,7 @@ deployment with `curl -I`.
 | ID | Title | Expected result |
 |---|---|---|
 | SEO-OG-001 | "the home page ships a complete Open Graph card" | og:title/description/type/locale/image/image:alt + `summary_large_image` |
-| SEO-OG-002 | "a blog post shares as an article with its own image and date" | `og:type=article`, the post's own image, its published time, its tags |
+| SEO-OG-002 | "a blog post shares as an article with its own image and date" | `og:type=article`, the post's own image (a `content-images` public URL, served by the fixture), its published time (the row's `created_at`), its tags |
 | SEO-OG-003 | "a post without its own image falls back to the site card" | An https image is always present |
 
 ### 4.4 Structured data
@@ -113,7 +113,10 @@ deployment with `curl -I`.
 ## 5. Mobile SEO cases — `e2e/seo/mobile-parity.spec.ts`
 
 Google indexes and ranks from the mobile render, so a phone viewport that shows
-less content than the desktop one loses the desktop version's rankings.
+less content than the desktop one loses the desktop version's rankings. The two
+contexts these cases open get the suite's backend fake (`stubBackend` from
+`e2e/fixtures/app.ts`) — the seeded articles and testimonials, where until
+2026-10-18 they had a stub of their own answering every `/api` read with `[]`.
 
 | ID | Title | Method | Expected result |
 |---|---|---|---|
@@ -146,10 +149,16 @@ what fails if `scripts/prerender.mjs` silently stops running.
 | SEO-PRE-013 | "an article is served as full HTML: its body, its canonical and its BlogPosting" | The body's first sentence is in the HTML; canonical and `BlogPosting.mainEntityOfPage` are `/blog/<slug>`; `headline` is the title |
 
 > Published articles are prerendered too (`dist/blog/<slug>.html`). In this
-> suite the build prebuilds one fixture article from
-> `e2e/fixtures/prerender-articles.json` (`PRERENDER_ARTICLES_FIXTURE`), so the
-> cases are hermetic; production lists the real ones from Supabase. SEO-PRE-009
-> and SEO-PRE-011 include it.
+> suite the build (`npm run build:e2e`) prebuilds one fixture article from
+> `e2e/fixtures/prerender-articles.json` (`PRERENDER_ARTICLES_FIXTURE`, in
+> `e2e/build-env.ts`), so the cases are hermetic; production lists the real ones
+> from Supabase. SEO-PRE-009 and SEO-PRE-011 include it. Since 2026-10-18 the
+> bundle reads Supabase at the e2e build's fake host, and the prerender answers
+> that host's table reads from the file — `blog_posts` from its rows (so `/blog`
+> is prebuilt listing it, as production's lists the real ones), `testimonials`
+> empty; until then it answered Base44's `/entities/BlogPost/<slug>` for the
+> article pages alone. The fixture is refused for any other Supabase URL and in
+> any Vercel build.
 
 **These cases test an artifact, so the artifact has to be the right one.** In CI
 the e2e shards run with `SKIP_BUILD=1` against the `dist` uploaded by the `build`
@@ -210,7 +219,7 @@ cases pin both halves: what a page booted there does, and what is never touched.
 | SEO-OLD-012 | DOM: "marks the page noindex, points canonical and og:url at production, and moves the visitor" | `robots`/`googlebot` `noindex`; canonical and `og:url` on production; one `location.replace` |
 | SEO-OLD-013 | DOM: notice, sign-in in flight, frame, misconfigured origin, and three other hosts | Notice links to the target; staying pages are still noindex; other hosts' heads are byte-identical |
 | SEO-OLD-014 | DOM: "applySeo keeps the old host out of the index after boot" | `noindex` (`noindex, nofollow` on private routes) there; unchanged on production |
-| SEO-OLD-015 | e2e: "sends a visitor to the same address on the production domain" | The browser, told the old host is this build, lands on the production stub with path, query and fragment; no backend call on the way but Base44's own page-view log |
+| SEO-OLD-015 | e2e: "sends a visitor to the same address on the production domain" | The browser, told the old host is this build, lands on the production stub with path, query and fragment; no backend call on the way but Base44's own page-view log (none since the logger went, 2026-10-17; and an `/api` call there would fail the test at the fixture's teardown) |
 | SEO-OLD-016 | e2e: "keeps a page whose sign-in is in flight, marked noindex with the canonical on production" | After the route's own `useSeo`, still `noindex` with a production canonical |
 | SEO-OLD-017 | e2e: "stays inside a frame, as in the Base44 dashboard, and is still noindex" | The frame renders the page on the old host |
 | SEO-OLD-018 | e2e: "is left as it was: indexable, and not redirected" | The local host keeps `index, follow, …` |
