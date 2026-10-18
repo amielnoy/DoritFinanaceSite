@@ -1,11 +1,12 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { readFile, readdir, rm } from "node:fs/promises";
+import { readFile, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const RESULTS_DIR = path.join(ROOT, "allure-results");
+const DIST_DIR = path.join(ROOT, "dist");
 const PAGE = fileURLToPath(new URL("./index.html", import.meta.url));
 const PORT = Number(process.env.LOCAL_RUNNER_PORT || 4400);
 const SUITES = ["lint", "typecheck", "unit", "component", "contract", "integration", "security", "e2e"];
@@ -14,8 +15,9 @@ const TEST_FILE = /\.(spec|test)\.tsx?$/;
 const TRACES = ["on", "off", "retain-on-failure", "on-first-retry", "on-all-retries"];
 const PROJECTS = ["web-chromium", "web-webkit", "ios-safari", "android-chrome", "*"];
 const REPORTERS = ["list", "line", "dot"];
+const SHUTDOWN_GRACE_MS = 10_000;
 
-const run = { child: null, suites: [], single: null, output: "", exitCode: null, startedAt: null, finishedAt: null };
+const run = { busy: false, child: null, onFinish: null, suites: [], single: null, output: "", exitCode: null, startedAt: null, finishedAt: null };
 
 function sendJson(res, status, body) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -36,35 +38,57 @@ async function readBody(req) {
   return parseJson(data) || {};
 }
 
-function launch(command, args, { suites = [], single = null } = {}) {
+// A dist/ written since the run started is the `build:e2e` bundle (fake Supabase host
+// inlined). run-tests.sh deletes it after a finished e2e suite; a single e2e file
+// (built by playwright.config.ts's webServer) or a stopped run never gets there.
+async function removeE2eBuild(since) {
+  const builtDuringRun = await stat(DIST_DIR).then((info) => info.mtimeMs >= since, () => false);
+  if (builtDuringRun) await rm(DIST_DIR, { recursive: true, force: true });
+}
+
+function launch(command, args, { suites = [], single = null, e2e = false } = {}) {
   run.suites = suites;
   run.single = single;
   run.output = `$ ${[command, ...args].join(" ")}\n`;
   run.exitCode = null;
   run.startedAt = Date.now();
   run.finishedAt = null;
-  run.child = spawn(command, args, {
+  const startedAt = run.startedAt;
+  const child = spawn(command, args, {
     cwd: ROOT,
     detached: true,
     env: { ...process.env, NO_REPORT: "1", NO_COLOR: "1", FORCE_COLOR: "0" },
   });
+  run.child = child;
 
   const append = (chunk) => {
     run.output += chunk.toString();
   };
-  run.child.stdout.on("data", append);
-  run.child.stderr.on("data", append);
-  run.child.on("close", (code, signal) => {
-    run.exitCode = code ?? signal;
+  let finished = false;
+  const finish = async (exitCode) => {
+    if (finished) return;
+    finished = true;
+    if (e2e) await removeE2eBuild(startedAt).catch((error) => append(`\nCould not remove dist/: ${error.message}\n`));
+    run.exitCode = exitCode;
     run.finishedAt = Date.now();
     run.child = null;
+    run.busy = false;
+    run.onFinish?.();
+  };
+  child.stdout.on("data", append);
+  child.stderr.on("data", append);
+  child.on("error", (error) => {
+    append(`\n${error.message}\n`);
+    if (child.pid === undefined) finish(1);
   });
+  child.on("close", (code, signal) => finish(code ?? signal));
 }
 
 function startRun({ suites = [], args = "" }) {
   const chosen = [].concat(suites).filter((suite) => SUITES.includes(suite));
   const flags = String(args).split(/\s+/).filter((arg) => arg.startsWith("-"));
-  launch("bash", ["scripts/run-tests.sh", ...chosen, ...flags], { suites: chosen.length ? chosen : SUITES });
+  const ran = chosen.length ? chosen : SUITES;
+  launch("bash", ["scripts/run-tests.sh", ...chosen, ...flags], { suites: ran, e2e: ran.includes("e2e") });
 }
 
 async function listTests() {
@@ -112,16 +136,30 @@ function vitestArgs(file, flags) {
   return args;
 }
 
-async function startSingle({ file, flags = {} }) {
+async function startSingle({ file, flags }) {
   if (!(await listTests()).includes(file)) return false;
   await rm(RESULTS_DIR, { recursive: true, force: true });
-  const args = file.startsWith("e2e/") ? playwrightArgs(file, flags) : vitestArgs(file, flags);
-  launch("npx", args, { single: file });
+  const e2e = file.startsWith("e2e/");
+  const args = e2e ? playwrightArgs(file, flags || {}) : vitestArgs(file, flags || {});
+  launch("npx", args, { single: file, e2e });
   return true;
 }
 
-function stopRun() {
-  if (run.child) process.kill(-run.child.pid, "SIGTERM");
+// Claimed before any await, so a double-clicked Run can't start two runs.
+function claimRun() {
+  if (run.busy) return false;
+  run.busy = true;
+  return true;
+}
+
+function signalRun(signal) {
+  if (!run.child?.pid) return;
+  try {
+    process.kill(-run.child.pid, signal);
+  } catch (error) {
+    // ESRCH: the group has exited and "close" hasn't fired yet.
+    if (error.code !== "ESRCH") throw error;
+  }
 }
 
 function collectAttachments(node) {
@@ -161,7 +199,7 @@ async function serveFile(res, file, contentType) {
   }
 }
 
-const server = createServer(async (req, res) => {
+async function handle(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const isJsonPost = req.method === "POST" && req.headers["content-type"] === "application/json";
 
@@ -193,8 +231,14 @@ const server = createServer(async (req, res) => {
   }
 
   if (isJsonPost && url.pathname === "/api/run") {
-    if (run.child) return sendJson(res, 409, { error: "A run is already in progress" });
-    startRun(await readBody(req));
+    const body = await readBody(req);
+    if (!claimRun()) return sendJson(res, 409, { error: "A run is already in progress" });
+    try {
+      startRun(body);
+    } catch (error) {
+      run.busy = false;
+      throw error;
+    }
     return sendJson(res, 202, { started: true });
   }
 
@@ -203,18 +247,54 @@ const server = createServer(async (req, res) => {
   }
 
   if (isJsonPost && url.pathname === "/api/run-single") {
-    if (run.child) return sendJson(res, 409, { error: "A run is already in progress" });
-    const started = await startSingle(await readBody(req));
+    const body = await readBody(req);
+    if (!claimRun()) return sendJson(res, 409, { error: "A run is already in progress" });
+    let started = false;
+    try {
+      started = await startSingle(body);
+    } finally {
+      if (!started) run.busy = false;
+    }
     return started ? sendJson(res, 202, { started: true }) : sendJson(res, 400, { error: "Unknown test file" });
   }
 
   if (isJsonPost && url.pathname === "/api/stop") {
-    stopRun();
+    signalRun("SIGTERM");
     return sendJson(res, 200, { stopped: true });
   }
 
   sendJson(res, 404, { error: "Not found" });
+}
+
+const server = createServer(async (req, res) => {
+  try {
+    await handle(req, res);
+  } catch (error) {
+    if (res.headersSent) res.end();
+    else sendJson(res, 500, { error: error.message });
+  }
 });
+
+// The run has its own process group (so Stop reaches all of it), which also puts it out
+// of reach of Ctrl+C here. Stop it and wait for its cleanup; a second signal, or a run
+// still alive after the grace period, gets SIGKILL.
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown || !run.child) {
+    signalRun("SIGKILL");
+    process.exit(shuttingDown ? 1 : 0);
+  }
+  shuttingDown = true;
+  console.log("\nStopping the current run…");
+  server.close();
+  run.onFinish = () => process.exit(0);
+  signalRun("SIGTERM");
+  setTimeout(() => {
+    signalRun("SIGKILL");
+    process.exit(1);
+  }, SHUTDOWN_GRACE_MS).unref();
+}
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(signal, shutdown);
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`Local test runner on http://127.0.0.1:${PORT}`);
