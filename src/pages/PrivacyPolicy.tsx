@@ -4,6 +4,7 @@ import Footer from "@/components/dorit/layout/Footer";
 import { breadcrumbLd, useSeo } from "@/lib/seo";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { CONTACT } from "@/config/contact";
+import { MEETINGS_CLIENT } from "@/config/meetings";
 
 export default function PrivacyPolicy() {
   useSeo({
@@ -67,8 +68,19 @@ export default function PrivacyPolicy() {
                 שלו — נושא, מועד הפגישה, ובראיון ההיכרות גם הסיכום והתשובות שנמסרו בו.
                 הזיהוי נעשה לפי כתובת המייל שהוזנה בפנייה, ולכן מי שהקליד בטעות כתובת
                 של אדם אחר עלול לחשוף לאותו אדם את פנייתו כשיתחבר. לא מוצגים מספר
-                טלפון, הערות פנימיות או סטטוס הטיפול. אפשר לבקש עיון, תיקון או מחיקה
-                בכל עת, וכן לדווח על פנייה שאינה שלכם.
+                טלפון, הערות פנימיות או סטטוס הטיפול.
+                {/* With the client's meetings tab (VITE_MEETINGS_CLIENT): the wording from #261, shown with the tab and not before it. */}
+                {MEETINGS_CLIENT ? (
+                  <>
+                    {" "}
+                    סיכומי פגישות שדורית בוחרת לפרסם, ומועדי הפגישות שלכם איתה, מוצגים
+                    באזור האישי — רק למי שמתחבר עם כתובת המייל המאומתת שמסר בפנייה. סיכום
+                    הוא תיעוד של מה שדובר בפגישה ואינו ייעוץ בכתב, ואינו מחליף מסמך שהדין
+                    מחייב (כגון מסמך הנמקה). בקשה לשינוי מועד שנשלחת מהאזור האישי נשמרת
+                    אצל דורית יחד עם הפנייה, ונמחקת יחד איתה.
+                  </>
+                ) : null}{" "}
+                אפשר לבקש עיון, תיקון או מחיקה בכל עת, וכן לדווח על פנייה שאינה שלכם.
               </li>
             </ul>
           </section>
