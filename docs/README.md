@@ -9,6 +9,7 @@ environment variables, publishing and operational runbooks.
 | [Contributor instructions](../AGENTS.md) | Repository conventions and invariants |
 | [Design system](design-system.md) | UI foundations and component conventions |
 | [Test plan and STDs](../tests/test-plan/README.md) | Coverage, commands, traceability and known issues |
+| [Local test runner](local-runner.md) | Running and analyzing tests from a local page |
 | [Architecture review](../Architecture.html) | Architecture and dated review findings |
 | [System map](../SystemMap.html) | Visual component and service inventory |
 | [Design drift review](../CodeReview.html) | Recorded design-system findings |
