@@ -142,6 +142,12 @@ function LeadDetails({ lead }: { lead: LeadRecord }) {
  */
 const NEEDS_ATTENTION: string[] = ["new", "escalated"];
 const ATTENTION = "attention";
+/**
+ * The row's actions (status, delete), pinned to the table's left edge: in this
+ * right-to-left table they are the last column, the first one a screen too
+ * narrow for every column scrolled out of sight — with the trash in it.
+ */
+const PINNED = "sticky left-0 bg-background shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)]";
 
 const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean }[] = [
   { key: "escalated", label: "הועברו לטיפול" },
@@ -363,9 +369,11 @@ export default function Leads() {
 
   const updateStatus = (id: string, status: LeadStatus) => setStatus.mutate({ id, status });
 
-  const remove = (id: string) => {
-    if (!window.confirm("למחוק את הפנייה?")) return;
-    removeLead.mutate(id);
+  // The lead's meetings and their requests go with it (on delete cascade), so it
+  // leaves both tabs at once; the confirmation says so.
+  const remove = (lead: LeadItem) => {
+    if (!window.confirm(`למחוק את הפנייה של ${lead.name}, עם כל הפגישות שלה? אי אפשר לשחזר.`)) return;
+    removeLead.mutate(lead.id, { onSuccess: () => setOpenLeadId((open) => (open === lead.id ? null : open)) });
   };
 
   const openLead = openLeadId ? leads.find((l) => l.id === openLeadId) ?? null : null;
@@ -495,7 +503,9 @@ export default function Leads() {
                       <th className="px-4 py-3 font-medium">סטטוס</th>
                       {assigns ? <th className="px-4 py-3 font-medium">משויכת ל</th> : null}
                       {staff ? <th className="px-4 py-3 font-medium whitespace-nowrap">הפגישה הבאה</th> : null}
-                      <th className="px-4 py-3 font-medium"></th>
+                      <th className={`px-4 py-3 font-medium ${PINNED} bg-[image:linear-gradient(hsl(var(--secondary)/0.4),hsl(var(--secondary)/0.4))]`}>
+                        <span className="sr-only">פעולות</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -561,7 +571,7 @@ export default function Leads() {
                             />
                           </td>
                         ) : null}
-                        <td className="px-4 py-3">
+                        <td className={`px-4 py-3 ${PINNED}`}>
                           <div className="flex items-center gap-2">
                             <select
                               aria-label={`סטטוס הפנייה של ${l.name}`}
@@ -580,7 +590,7 @@ export default function Leads() {
                             </select>
                             {deletes ? (
                               <button
-                                onClick={() => remove(l.id)}
+                                onClick={() => remove(l)}
                                 disabled={busy}
                                 className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30"
                                 aria-label="מחיקה"
@@ -671,6 +681,9 @@ export default function Leads() {
               meetingId={drawerStart.meetingId}
               startAdding={drawerStart.adding}
               onClose={() => setOpenLeadId(null)}
+              onDelete={deletes && openLead ? () => remove(openLead) : undefined}
+              deleting={removeLead.isPending}
+              deleteFailed={removeLead.isError}
               subtitle={openLead ? `${ANY_STATUS_LABEL[openLead.status] || openLead.status} · ${SOURCE_LABEL[openLead.source] || "—"}` : ""}
               details={
                 openLead ? (
