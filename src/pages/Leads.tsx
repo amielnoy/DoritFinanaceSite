@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { services, type AgendaMeeting, type LeadRecord, type LeadSource, type LeadStatus } from "@/services";
+import type { AgendaMeeting, LeadRecord, LeadSource, LeadStatus } from "@/services";
 import {
   useAdminUsers, useAgencyMeetings, useAssignLead, useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds,
 } from "@/hooks/useAdmin";
@@ -10,6 +10,7 @@ import { csvCell } from "@/lib/csv";
 import { Loader2, Download, Trash2 } from "lucide-react";
 import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
 import LeadDrawer, { type LeadDrawerTab } from "@/components/dorit/admin/LeadDrawer";
+import LeadDetails from "@/components/dorit/admin/LeadDetails";
 import MeetingsAgenda from "@/components/dorit/admin/MeetingsAgenda";
 import { MEETINGS_STAFF } from "@/config/meetings";
 import { agendaCounts, nextMeetingByLead, nextMeetingLabel } from "@/lib/meetings-agenda";
@@ -54,44 +55,6 @@ const SOURCE_LABEL: Record<LeadSource, string> = {
   interview: "ראיון היכרות",
 };
 
-/** A claim document stored in Supabase, as `submit-claim` writes it into the message. */
-const DOCUMENT_REF = /(storage:claim-documents\/[^\s|]+)/;
-
-/**
- * Opens one claim document. The link is signed on the click, for five minutes,
- * so nothing long-lived sits in the page or in a copied URL.
- *
- * The tab is opened before the await: Safari blocks a window opened after one,
- * and the signing is a round trip.
- */
-function DocumentLink({ docRef, index, leadId }: { docRef: string; index: number; leadId: string }) {
-  const [error, setError] = useState<string | null>(null);
-  const open = async () => {
-    setError(null);
-    const tab = window.open("about:blank", "_blank");
-    try {
-      const url = await services.leadsAdmin.documentLink(docRef, leadId);
-      if (tab) {
-        tab.opener = null;
-        tab.location.href = url;
-      } else {
-        setError("הדפדפן חסם את החלון — אפשר לאשר חלונות קופצים ולנסות שוב");
-      }
-    } catch (e) {
-      tab?.close();
-      setError(e instanceof Error ? e.message : "לא ניתן לפתוח את המסמך");
-    }
-  };
-  return (
-    <span>
-      <button type="button" onClick={open} className="underline text-accent hover:text-foreground">
-        מסמך {index}
-      </button>
-      {error && <span className="block text-xs text-destructive">{error}</span>}
-    </span>
-  );
-}
-
 /** The interview behind a lead, read-only — what the client actually said, for the meeting. Plain text only: it is visitor-typed. */
 function LeadTranscript({ leadId }: { leadId: string }) {
   const [open, setOpen] = useState(false);
@@ -114,24 +77,6 @@ function LeadTranscript({ leadId }: { leadId: string }) {
         </div>
       )}
     </div>
-  );
-}
-
-/** The details column: topic, time and message, with any stored document as a button. */
-function LeadDetails({ lead }: { lead: LeadRecord }) {
-  const text = [lead.topic, lead.timing, lead.message].filter(Boolean).join(" · ");
-  if (!text) return <>—</>;
-  const parts = text.split(DOCUMENT_REF);
-  return (
-    <>
-      {parts.map((part, i) =>
-        i % 2 === 1 ? (
-          <DocumentLink key={i} docRef={part} index={(i + 1) / 2} leadId={lead.id} />
-        ) : (
-          <React.Fragment key={i}>{part}</React.Fragment>
-        ),
-      )}
-    </>
   );
 }
 
@@ -534,7 +479,7 @@ export default function Leads() {
                         <td className="px-4 py-3" dir="ltr">{l.phone}</td>
                         <td className="px-4 py-3 text-foreground/70" dir="ltr">{l.email || "—"}</td>
                         <td className="px-4 py-3 text-foreground/70">{SOURCE_LABEL[l.source] || "—"}</td>
-                        <td className="px-4 py-3 text-foreground/70 max-w-xs">
+                        <td className="px-4 py-3">
                           <LeadDetails lead={l} />
                           {withTranscript.has(l.id) && <LeadTranscript leadId={l.id} />}
                         </td>
@@ -698,8 +643,8 @@ export default function Leads() {
                     <dt className="text-muted-foreground">משויכת ל</dt>
                     <dd>{assigneeLabel(openLead.assigned_user_id)}</dd>
                     <dt className="text-muted-foreground">פרטים</dt>
-                    <dd className="whitespace-pre-wrap">
-                      <LeadDetails lead={openLead} />
+                    <dd>
+                      <LeadDetails lead={openLead} compact={false} />
                       {withTranscript.has(openLead.id) && <LeadTranscript leadId={openLead.id} />}
                     </dd>
                   </dl>
