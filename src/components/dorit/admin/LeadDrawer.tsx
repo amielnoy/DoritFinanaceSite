@@ -4,7 +4,8 @@ import { useLeadMeetings } from "@/hooks/useAdmin";
 import SideDrawer from "@/components/dorit/admin/SideDrawer";
 import LeadMeetings from "@/components/dorit/admin/LeadMeetings";
 
-type Tab = "details" | "meetings";
+export type LeadDrawerTab = "details" | "meetings";
+type Tab = LeadDrawerTab;
 
 /**
  * One lead, in a side drawer over /admin/leads: "פרטים" and "פגישות · N"
@@ -17,14 +18,25 @@ export default function LeadDrawer({
   subtitle,
   details,
   onClose,
+  initialTab = "details",
+  meetingId = null,
+  startAdding = false,
 }: {
   lead: LeadRecord | null;
   subtitle: string;
   /** The "פרטים" tab: what the table's row knows, laid out by the page. */
   details: React.ReactNode;
   onClose: () => void;
+  /**
+   * Where it opens. The agenda opens a lead on "פגישות", with its meeting
+   * expanded (`meetingId`) or the new-meeting form open (`startAdding`). Read
+   * when the drawer mounts: the page gives it a new key for each opening.
+   */
+  initialTab?: Tab;
+  meetingId?: string | null;
+  startAdding?: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>("details");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const meetings = useLeadMeetings(lead?.id ?? "", Boolean(lead));
   const count = meetings.data?.length;
   const tabs: { key: Tab; label: string }[] = [
@@ -53,7 +65,7 @@ export default function LeadDrawer({
         ))}
       </div>
       <div role="tabpanel" id={`lead-panel-${tab}`} aria-labelledby={`lead-tab-${tab}`}>
-        {lead ? (tab === "details" ? details : <LeadMeetings lead={lead} />) : null}
+        {lead ? (tab === "details" ? details : <LeadMeetings lead={lead} initialOpenId={meetingId} startAdding={startAdding} />) : null}
       </div>
     </SideDrawer>
   );

@@ -967,6 +967,8 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 2, behind `
 | CMP-MTG-010 | "opens only the leads the table holds — their assigned ones — and reads only that lead's meetings" | A User: one lead; meetings read for it alone |
 | CMP-MTG-011 | "is told when a write is refused, rather than shown it saved" | Alert `לא בוצעה` |
 
+With the switch on, the page around the drawer is "פניות ופגישות" (§4.55); these cases open the drawer from the leads tab, which they reach unchanged.
+
 ### 4.53 "הפגישות שלי" in /account — `tests/component/account-meetings.test.tsx`
 
 docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4, behind `VITE_MEETINGS_CLIENT` (the canvas "הפגישות שלי — לקוח": phone, desktop, the change-request sheet). Off until the privacy wording is approved.
@@ -996,3 +998,29 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4, behind `
 | CMP-GLOSS-005 | "does not open on a touch's pointer-enter, only on its tap" | No tooltip |
 | CMP-GLOSS-006 | "speaks the page's language" | English definition, `dir=ltr` |
 | CMP-GLOSS-007 | "renders an unknown id as plain text" | No button |
+
+### 4.55 "פניות ופגישות" — `tests/component/leads-meetings-screen.test.tsx`
+
+/admin/leads behind `VITE_MEETINGS_STAFF`: the leads and the agency's agenda as two tabs, the tab in the URL (`?tab=leads|meetings`, beside `?agency=`), the leads table's "הפגישה הבאה". The hooks are real; the port (`@/services`) is the fake, answering what a role's session would read. "Now" is Thursday 22.10.2026, 09:00 in Israel (`Date` faked alone).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-AGENDA-001 | "is the leads screen as it was: no tabs, no next-meeting column, no meetings read" | Switch off: ניהול פניות; no tablist; no הפגישה הבאה; `agencyMeetings` not called |
+| CMP-AGENDA-002 | "are a tablist of two, under the heading 'פניות ופגישות', with the leads first" | h1 פניות ופגישות; tabs `leads-tab-leads`, `leads-tab-meetings`; `aria-selected`; each `aria-controls` names a panel; roving `tabIndex` |
+| CMP-AGENDA-003 | "count the leads and the meetings, the unassigned for Admin+" | `4`, `3 דורשות טיפול · 1 לא שויכו`; `2 השבוע`, `1 היום · 1 בקשות שינוי · 1 בלי סיכום` |
+| CMP-AGENDA-004 | "switch on a click and keep the choice in the URL, beside ?agency=" | `tab=meetings`, then `tab=leads`; `agency` kept |
+| CMP-AGENDA-005 | "open on the tab the URL names" | `?tab=meetings` → the agenda |
+| CMP-AGENDA-006 | "move with the arrow keys — left to 'פגישות' in a right-to-left page — and Home and End" | ArrowLeft → פגישות, ArrowRight → פניות, End, Home; the focus follows |
+| CMP-AGENDA-007 | "offers a %s what the leads screen offered it" (user, admin, owner) | Assignee select, delete, tracking panel and the לא שויכו chip for Admin+ only; status and export for all; a User's tab reads הפניות שלי, without the unassigned count |
+| CMP-AGENDA-008 | "names each lead's next meeting on Israel's clock, and offers one where there is none" | `היום 10:00`, `מחר 17:30`, `רביעי 12:00` (winter time); a lead with only a past meeting: `+ קביעת פגישה` |
+| CMP-AGENDA-009 | "goes to the meetings tab" | A next meeting → `tab=meetings` |
+| CMP-AGENDA-010 | "'+ קביעת פגישה' opens the lead's drawer on its meetings, with the new-meeting form open" | Drawer tab פגישות selected; the form; that lead's meetings read |
+| CMP-AGENDA-011 | "shows '—' rather than '+ קביעת פגישה' while the meetings cannot be read" | No offer to schedule on a failed read |
+| CMP-AGENDA-012 | "groups by Israel's day across midnight and across the change from summer time" | היום (23:30), מחר (00:15), "יום ראשון, 25.10" holding 00:30 (+03) and 23:30 (+02) |
+| CMP-AGENDA-013 | "shows a client's open request on top of its meeting, as plain text, and marks it handled" | Strip named by `MEETING_REQUEST_LABEL`; the note's `<b>` as text; `handleMeetingRequest(r-1)`; the agenda reads again; no meeting update |
+| CMP-AGENDA-014 | "narrows to held meetings without a summary, from the chip and from the card" | בלי סיכום: one card, "כתיבת סיכום"; קרובות: the meeting ahead and the one waiting; the card does the same |
+| CMP-AGENDA-015 | "opens the client's name in the lead's drawer, on its meetings, with that meeting expanded" | Drawer on פגישות; that meeting `aria-expanded=true` with its notes, the other closed |
+| CMP-AGENDA-016 | "shows a name, topic and place as typed, never as markup" | No `img`, `i` or `a` in the card; the text as typed |
+| CMP-AGENDA-017 | "lets Admin+ narrow to one member, and does not offer a User the select" | צוות select narrows to `u-2` and shows its address; a User: no select, both rows their session read |
+| CMP-AGENDA-018 | "adds a meeting from 'פגישה חדשה': a lead picked by search, then the drawer's form" | Search narrows to one; `addMeeting({ leadId: l-3, agencyId, scheduledAt: 15:30Z })` |
+| CMP-AGENDA-019 | "says when there is nothing to show, and when the meetings cannot be read" | אין פגישות להצגה.; alert לא הצלחנו לטעון את הפגישות |

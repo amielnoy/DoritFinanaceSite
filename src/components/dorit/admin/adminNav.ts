@@ -1,6 +1,7 @@
 import { Building2, ClipboardList, Inbox, LayoutDashboard, Newspaper, Users, type LucideIcon } from "lucide-react";
 import type { AgencyRole } from "@/config/permissions";
 import { reaches, type AdminAccess, type AdminCounts } from "@/hooks/useAdminMenu";
+import { MEETINGS_STAFF } from "@/config/meetings";
 
 /**
  * The admin sidebar, grouped by task rather than by table: what Dorit handles
@@ -34,7 +35,14 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
   {
     title: "טיפול שוטף",
     items: [
-      { to: "/admin/leads", label: "פניות", icon: Inbox, min: "user", counter: { key: "newLeads", label: "חדשות" } },
+      // "פניות ופגישות" once the screen holds the agenda (VITE_MEETINGS_STAFF); the counter is the leads' either way.
+      {
+        to: "/admin/leads",
+        label: MEETINGS_STAFF ? "פניות ופגישות" : "פניות",
+        icon: Inbox,
+        min: "user",
+        counter: { key: "newLeads", label: "חדשות" },
+      },
       {
         to: "/admin/masleka",
         label: "בקשות מסלקה",

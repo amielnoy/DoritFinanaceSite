@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Check, Eye, Lock, Loader2, Plus } from "lucide-react";
 import type { LeadMeeting, LeadRecord } from "@/services";
 import { useAddMeeting, useHandleMeetingRequest, useLeadMeetings, useUpdateMeeting } from "@/hooks/useAdmin";
@@ -26,10 +26,20 @@ import { israelInstant, israelToday } from "@/lib/wall-clock";
 const small = (extra?: string, opts?: { muted?: boolean }) => ctaClass(`min-h-11 px-4 text-base ${extra ?? ""}`, opts);
 const errorText = (e: unknown) => (e instanceof Error ? e.message : "הפעולה לא נשמרה. ניתן לנסות שוב.");
 
-export default function LeadMeetings({ lead }: { lead: LeadRecord }) {
+export default function LeadMeetings({
+  lead,
+  initialOpenId = null,
+  startAdding = false,
+}: {
+  lead: LeadRecord;
+  /** A meeting to show expanded on arrival — the agenda's "פתיחה". */
+  initialOpenId?: string | null;
+  /** Open the new-meeting form on arrival — the leads table's "+ קביעת פגישה". */
+  startAdding?: boolean;
+}) {
   const { data, isPending, isError } = useLeadMeetings(lead.id);
-  const [adding, setAdding] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(startAdding);
+  const [openId, setOpenId] = useState<string | null>(initialOpenId);
 
   return (
     <section aria-labelledby="lead-meetings" className="flex flex-col gap-4">
@@ -81,8 +91,14 @@ function MeetingCard({ leadId, meeting: m, open, onToggle }: { leadId: string; m
   const handled = useHandleMeetingRequest(leadId);
   const past = m.status !== "scheduled";
   const panelId = `meeting-${m.id}`;
+  // A meeting opened from the agenda may sit below the drawer's fold: bring it into view once.
+  const card = useRef<HTMLElement>(null);
+  const openedOnArrival = useRef(open);
+  useEffect(() => {
+    if (openedOnArrival.current) card.current?.scrollIntoView?.({ block: "nearest" });
+  }, []);
   return (
-    <article className={`flex flex-col rounded-[4px] border ${open ? "border-highlight" : "border-border"}`}>
+    <article ref={card} className={`flex flex-col rounded-[4px] border ${open ? "border-highlight" : "border-border"}`}>
       {m.openRequest ? (
         <div role="status" className="flex items-center justify-between gap-3 border-b border-highlight-muted bg-highlight/10 px-4 py-2.5">
           <span>
@@ -229,8 +245,11 @@ function MeetingEditor({ leadId, meeting: m, id }: { leadId: string; meeting: Le
   );
 }
 
-/** A meeting staff add: Israel's wall clock in, an instant out (A-63). */
-function NewMeetingForm({ lead, onDone }: { lead: LeadRecord; onDone: () => void }) {
+/**
+ * A meeting staff add: Israel's wall clock in, an instant out (A-63). Also the
+ * agenda's "פגישה חדשה", once a lead is picked.
+ */
+export function NewMeetingForm({ lead, onDone }: { lead: LeadRecord; onDone: () => void }) {
   const add = useAddMeeting(lead.id);
   const [day, setDay] = useState(israelToday(new Date()));
   const [time, setTime] = useState("10:00");

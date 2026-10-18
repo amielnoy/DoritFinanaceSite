@@ -1,4 +1,4 @@
-import type { LeadAdminPort, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, TranscriptLine } from "../ports";
+import type { AgendaMeeting, LeadAdminPort, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, TranscriptLine } from "../ports";
 import type { ContentFunctionsClient } from "./EdgeContentAdminService";
 import { CLAIM_DOCUMENT_REF_PREFIX } from "./SupabaseUploadService";
 import {
@@ -22,6 +22,19 @@ const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או ש�
 
 /** A meeting's columns for staff — Dorit's notes included, which the client's door never returns. */
 const MEETING_COLUMNS = "id,scheduled_at,duration_min,topic,kind,status,mode,location,notes,client_summary,summary_published_at,source";
+
+/**
+ * The agenda's columns: a meeting's card, its lead's name and assignee, and its
+ * requests (the open one is picked here). No notes, no summary text.
+ */
+const AGENDA_COLUMNS =
+  "id,lead_id,scheduled_at,duration_min,topic,kind,status,mode,location,summary_published_at,source," +
+  "lead:leads!lead_id(name,assigned_user_id),meeting_requests(id,kind,note,status)";
+
+/** A bound on one agenda read, far past what the agency holds; the oldest fall off first. */
+export const AGENDA_MAX = 1000;
+
+const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 /** The port's update, in the table's column names. Only the fields given. */
 function meetingColumns(update: LeadMeetingUpdate): Record<string, unknown> {
@@ -200,6 +213,50 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
       };
     });
     // Postgres puts nulls first in a descending order; a meeting with no time goes last.
+    return [...meetings.filter((m) => m.scheduledAt), ...meetings.filter((m) => !m.scheduledAt)];
+  }
+
+  /**
+   * The agency's agenda in one read: its meetings, newest first (no time
+   * last), with the lead's name and assignee and the requests on each, embedded
+   * by PostgREST. Under the person's own session, as `meetings()`:
+   * `meetings_read_admin`, `leads_read_admin` and `meeting_requests_read_lead`
+   * all rest on can_see_lead, so a User's agenda holds their assigned leads'
+   * meetings and nothing else. `leads!lead_id` names the key, because the old
+   * `lead_base44_id` is a second one to `leads`. Notes and the summary's text
+   * stay out: the agenda shows neither.
+   */
+  async agencyMeetings(agencyId: string): Promise<AgendaMeeting[]> {
+    const rows = await fetchRows(
+      this.client
+        .from("meetings")
+        .select(AGENDA_COLUMNS)
+        .eq("agency_id", agencyId)
+        .order("scheduled_at", { ascending: false })
+        .limit(AGENDA_MAX),
+      "meetings",
+    );
+    const meetings = rows.map((r): AgendaMeeting => {
+      const lead = (Array.isArray(r.lead) ? r.lead[0] : r.lead) as Record<string, unknown> | null | undefined;
+      const requests = Array.isArray(r.meeting_requests) ? (r.meeting_requests as Record<string, unknown>[]) : [];
+      const request = requests.find((q) => q.status === "open");
+      return {
+        id: String(r.id),
+        leadId: String(r.lead_id ?? ""),
+        leadName: str(lead?.name),
+        assignedUserId: typeof lead?.assigned_user_id === "string" ? lead.assigned_user_id : null,
+        scheduledAt: typeof r.scheduled_at === "string" ? r.scheduled_at : null,
+        durationMin: typeof r.duration_min === "number" ? r.duration_min : null,
+        topic: str(r.topic),
+        kind: (r.kind as AgendaMeeting["kind"]) ?? "first",
+        status: (r.status as AgendaMeeting["status"]) ?? "scheduled",
+        mode: (r.mode as AgendaMeeting["mode"]) ?? null,
+        location: str(r.location),
+        summaryPublishedAt: typeof r.summary_published_at === "string" ? r.summary_published_at : null,
+        source: typeof r.source === "string" ? r.source : null,
+        openRequest: request ? { id: String(request.id), kind: request.kind as "reschedule" | "cancel", note: str(request.note) } : null,
+      };
+    });
     return [...meetings.filter((m) => m.scheduledAt), ...meetings.filter((m) => !m.scheduledAt)];
   }
 
