@@ -411,3 +411,83 @@ describe("SupabaseLeadAdminService — a lead's meetings", () => {
     expect(update.status).toBe("handled");
   });
 });
+
+/**
+ * The agenda on /admin/leads ("פגישות"): one read of the agency's meetings,
+ * with each lead's name and assignee and its requests embedded. Under the
+ * person's own session — can_see_lead decides the rows; nothing here filters
+ * by role.
+ */
+describe("SupabaseLeadAdminService.agencyMeetings", () => {
+  const agendaRow = (over: Record<string, unknown> = {}) => ({
+    id: "m-1",
+    lead_id: "lead-1",
+    scheduled_at: "2026-10-20T07:00:00+00:00",
+    duration_min: 45,
+    topic: "פנסיה",
+    kind: "follow_up",
+    status: "scheduled",
+    mode: "office",
+    location: "רחוב הרצל 1",
+    summary_published_at: null,
+    source: null,
+    lead: { name: "יעל כהן", assigned_user_id: "u-1" },
+    meeting_requests: [],
+    ...over,
+  });
+
+  it("reads the agency's meetings in one query, newest first, with the lead and requests embedded", async () => {
+    const { client, calls } = tableFake({ data: [], error: null });
+    await new SupabaseLeadAdminService(client).agencyMeetings("agency-1");
+    expect(calls[0]).toEqual(["from", "meetings"]);
+    expect(calls).toContainEqual(["eq", "agency_id", "agency-1"]);
+    expect(calls).toContainEqual(["order", "scheduled_at", { ascending: false }]);
+    expect(calls.filter((c) => c[0] === "from")).toHaveLength(1);
+    const select = String(calls.find((c) => c[0] === "select")![1]);
+    // `leads!lead_id`: meetings has a second key to leads (lead_base44_id), so the embed names its own.
+    expect(select).toContain("lead:leads!lead_id(name,assigned_user_id)");
+    expect(select).toContain("meeting_requests(id,kind,note,status)");
+  });
+
+  it("leaves Dorit's notes and the summary's text out of the agenda", async () => {
+    const { client, calls } = tableFake({ data: [], error: null });
+    await new SupabaseLeadAdminService(client).agencyMeetings("agency-1");
+    const columns = String(calls.find((c) => c[0] === "select")![1]).split(",");
+    expect(columns).not.toContain("notes");
+    expect(columns).not.toContain("client_summary");
+  });
+
+  it("hands back each meeting with its lead's name and assignee, and its open request only", async () => {
+    const { client } = tableFake({
+      data: [
+        agendaRow({
+          meeting_requests: [
+            { id: "r-old", kind: "cancel", note: "", status: "handled" },
+            { id: "r-1", kind: "reschedule", note: "אחר הצהריים", status: "open" },
+          ],
+        }),
+        agendaRow({ id: "m-2", lead_id: "lead-2", lead: { name: "דן", assigned_user_id: null } }),
+      ],
+      error: null,
+    });
+    const [first, second] = await new SupabaseLeadAdminService(client).agencyMeetings("agency-1");
+    expect(first).toMatchObject({
+      id: "m-1", leadId: "lead-1", leadName: "יעל כהן", assignedUserId: "u-1", durationMin: 45, location: "רחוב הרצל 1",
+      openRequest: { id: "r-1", kind: "reschedule", note: "אחר הצהריים" },
+    });
+    expect(first).not.toHaveProperty("notes");
+    expect(second).toMatchObject({ leadName: "דן", assignedUserId: null, openRequest: null });
+  });
+
+  it("puts a meeting with no time last, and survives a lead out of view", async () => {
+    const { client } = tableFake({ data: [agendaRow({ id: "none", scheduled_at: null, lead: null }), agendaRow({ id: "dated" })], error: null });
+    const meetings = await new SupabaseLeadAdminService(client).agencyMeetings("agency-1");
+    expect(meetings.map((m) => m.id)).toEqual(["dated", "none"]);
+    expect(meetings[1]).toMatchObject({ leadName: "", assignedUserId: null });
+  });
+
+  it("throws on a failed read rather than showing an empty agenda", async () => {
+    const { client } = tableFake({ data: null, error: { message: "permission denied for table meetings", code: "42501" } });
+    await expect(new SupabaseLeadAdminService(client).agencyMeetings("agency-1")).rejects.toThrow(/meetings read failed/);
+  });
+});

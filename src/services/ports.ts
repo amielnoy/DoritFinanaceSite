@@ -305,6 +305,18 @@ export interface LeadMeeting {
   openRequest: { id: string; kind: MeetingRequestKind; note: string } | null;
 }
 
+/**
+ * A meeting on the agency's agenda (/admin/leads, "פגישות"): what its card
+ * shows, with whose lead it is. Not Dorit's notes nor the summary's text — the
+ * agenda shows neither, and opens the lead's drawer for both.
+ */
+export interface AgendaMeeting extends Omit<LeadMeeting, "notes" | "clientSummary"> {
+  leadId: string;
+  /** The lead's name as the visitor typed it — plain text. Empty when the lead is out of view. */
+  leadName: string;
+  assignedUserId: string | null;
+}
+
 /** A meeting staff add to a lead (`meetings_insert_lead`). */
 export interface NewLeadMeeting {
   leadId: string;
@@ -350,6 +362,13 @@ export interface LeadAdminPort {
   countNew(): Promise<number>;
   /** A lead's meetings, newest first, with any open client request. `can_see_lead` is the gate. */
   meetings(leadId: string): Promise<LeadMeeting[]>;
+  /**
+   * The agency's meetings, newest first, each with its lead's name and
+   * assignee and any open client request — the agenda. `can_see_lead` is the
+   * gate, so a User gets their assigned leads' meetings only; nothing here
+   * filters by role.
+   */
+  agencyMeetings(agencyId: string): Promise<AgendaMeeting[]>;
   /** Add a meeting to a lead the person can see, as themselves. */
   addMeeting(meeting: NewLeadMeeting): Promise<void>;
   /** Change a meeting; an update row-level security filtered out is an error, not a success. */

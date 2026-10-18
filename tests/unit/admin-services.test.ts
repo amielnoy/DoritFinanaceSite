@@ -92,6 +92,13 @@ describe("Base44LeadAdminService", () => {
     client.functions.invoke = vi.fn(async () => ({ data: { error: "x", rid: "r2" }, status: 200, headers: {} }));
     await expect(new Base44LeadAdminService(client).remove("l1")).rejects.toThrow();
   });
+
+  it("has no agenda: Base44 holds no meetings, and reads nothing for one", async () => {
+    const client = leadClient();
+    await expect(new Base44LeadAdminService(client).agencyMeetings()).resolves.toEqual([]);
+    expect(client.entities.Lead.list).not.toHaveBeenCalled();
+    expect(client.functions.invoke).not.toHaveBeenCalled();
+  });
 });
 
 describe("Base44ContentAdminService", () => {

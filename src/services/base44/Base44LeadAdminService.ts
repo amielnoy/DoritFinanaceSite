@@ -1,5 +1,5 @@
 import { invokeFunction, type FunctionInvoker } from "./invoke";
-import type { LeadAdminPort, LeadMeeting, LeadRecord, LeadStatus, TranscriptLine } from "../ports";
+import type { AgendaMeeting, LeadAdminPort, LeadMeeting, LeadRecord, LeadStatus, TranscriptLine } from "../ports";
 
 /** What this adapter needs: Lead reads through the entity, writes through the `adminLead` function. */
 export interface LeadAdminClient extends FunctionInvoker {
@@ -59,6 +59,11 @@ export class Base44LeadAdminService implements LeadAdminPort {
    * 2026-10-17-client-meetings-design.md): no rows here, and every write is refused.
    */
   async meetings(): Promise<LeadMeeting[]> {
+    return [];
+  }
+
+  /** The agenda, for the same reason: Base44 holds no meetings. */
+  async agencyMeetings(): Promise<AgendaMeeting[]> {
     return [];
   }
 

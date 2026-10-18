@@ -55,12 +55,36 @@ export function useLeadMeetings(leadId: string, enabled = true) {
   });
 }
 
-/** Every meeting write reloads that lead's meetings, and nothing else. */
+/**
+ * The agency's agenda — the "פגישות" tab of /admin/leads, its counts and the
+ * leads table's "הפגישה הבאה". One read for all three.
+ */
+export const agendaKeys = {
+  all: ["admin", "meetings-agenda"] as const,
+  agency: (agencyId: string) => ["admin", "meetings-agenda", agencyId] as const,
+};
+
+export function useAgencyMeetings(agencyId: string, enabled = true) {
+  return useQuery({
+    queryKey: agendaKeys.agency(agencyId),
+    queryFn: () => services.leadsAdmin.agencyMeetings(agencyId),
+    enabled,
+  });
+}
+
+/**
+ * Every meeting write reloads that lead's meetings and the agenda, and nothing
+ * else — so a change made in the drawer shows on the agenda behind it.
+ */
 function useMeetingWrite<T>(leadId: string, write: (input: T) => Promise<void>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: write,
-    onSuccess: () => client.invalidateQueries({ queryKey: leadMeetingsKey(leadId) }),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: leadMeetingsKey(leadId) }),
+        client.invalidateQueries({ queryKey: agendaKeys.all }),
+      ]),
   });
 }
 
@@ -90,7 +114,9 @@ export function useAssignLead() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ id, userId }: { id: string; userId: string | null }) => services.leadsAdmin.assign(id, userId),
-    onSuccess: () => client.invalidateQueries({ queryKey: adminKeys.leads }),
+    // The agenda shows each meeting's assignee, so it reloads too.
+    onSuccess: () =>
+      Promise.all([client.invalidateQueries({ queryKey: adminKeys.leads }), client.invalidateQueries({ queryKey: agendaKeys.all })]),
   });
 }
 
@@ -107,7 +133,9 @@ export function useRemoveLead() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => services.leadsAdmin.remove(id),
-    onSuccess: () => client.invalidateQueries({ queryKey: adminKeys.leads }),
+    // Deleting a lead deletes its meetings (on delete cascade): the agenda reloads too.
+    onSuccess: () =>
+      Promise.all([client.invalidateQueries({ queryKey: adminKeys.leads }), client.invalidateQueries({ queryKey: agendaKeys.all })]),
   });
 }
 
