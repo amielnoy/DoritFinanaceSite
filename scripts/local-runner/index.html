@@ -130,7 +130,9 @@
   .toolbar input { max-width: 320px; }
   .rows { max-height: 520px; overflow: auto; }
   .row { display: grid; grid-template-columns: 90px 90px minmax(0, 1fr) 70px; gap: 12px; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--border); cursor: pointer; }
-  .row:hover { background: var(--panel-2); }
+  .row:hover, .row.active { background: var(--panel-2); }
+  .ci { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+  .ci .rows { height: 420px; }
   .row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row-suite { font-size: 12px; color: var(--muted); text-transform: capitalize; }
   .row-time { text-align: right; font-size: 12px; color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
@@ -141,11 +143,13 @@
   .modal-body { padding: 18px 20px; overflow: auto; }
   .modal-body pre { margin: 0 0 14px; padding: 12px; border-radius: 10px; background: #0b0e14; border: 1px solid var(--border); font: 12px/1.6 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
   .modal-body pre.error { color: var(--fail); }
+  .modal-body pre.analysis { font-family: inherit; font-size: 13px; border-color: var(--accent); }
+  .analysis-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
   .evidence img, .evidence video { display: block; max-width: 100%; margin-bottom: 12px; border-radius: 10px; border: 1px solid var(--border); }
   .evidence a { display: inline-block; margin: 0 12px 12px 0; color: var(--accent); }
 
   @media (max-width: 900px) {
-    .split, .summary, .controls, .single { grid-template-columns: 1fr; }
+    .split, .summary, .controls, .single, .ci { grid-template-columns: 1fr; }
     .options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .counts { justify-content: space-between; }
     .row { grid-template-columns: 80px minmax(0, 1fr) 60px; }
@@ -241,6 +245,20 @@
     </div>
   </section>
 
+  <section class="card ci">
+    <div>
+      <div class="single-head">
+        <h2>CI runs</h2>
+        <button class="btn btn-small" id="refreshCi">Refresh</button>
+      </div>
+      <div class="rows" id="ciRuns"></div>
+    </div>
+    <div>
+      <div class="selected-file" id="ciTitle">Select a GitHub Actions run to see its failures</div>
+      <div class="failures" id="ciFailures"></div>
+    </div>
+  </section>
+
   <section class="card summary">
     <div class="ring">
       <svg width="96" height="96" viewBox="0 0 96 96">
@@ -321,6 +339,7 @@
     ticks: 0,
     tests: [],
     selectedTest: null,
+    ciRun: null,
   };
 
   function element(tag, props = {}, children = []) {
@@ -482,7 +501,7 @@
   }
 
   function attachmentUrl(attachment) {
-    return `/files/${encodeURIComponent(attachment.source)}`;
+    return attachment.url;
   }
 
   function suiteOutput(key) {
@@ -537,20 +556,84 @@
       $("failures").replaceChildren(element("div", { className: "empty", textContent: state.run?.running ? "No failures so far" : "No failures" }));
       return;
     }
-    $("failures").replaceChildren(
-      ...failures.map((result) => {
-        const images = result.attachments.filter((attachment) => attachment.type?.startsWith("image/")).slice(0, 3);
-        const card = element("button", { className: "failure", onclick: () => openResult(result) }, [
-          element("div", { className: "failure-title", textContent: result.name }),
-          element("div", { className: "failure-file", textContent: fileOf(result) }),
-          element("div", { className: "failure-error", textContent: result.message }),
-        ]);
-        if (images.length) {
-          card.append(element("div", { className: "thumbs" }, images.map((image) => element("img", { src: attachmentUrl(image), alt: image.name }))));
-        }
-        return card;
-      }),
+    $("failures").replaceChildren(...failures.map(failureCard));
+  }
+
+  function failureCard(result) {
+    const images = result.attachments.filter((attachment) => attachment.type?.startsWith("image/")).slice(0, 3);
+    const card = element("button", { className: "failure", onclick: () => openResult(result) }, [
+      element("div", { className: "failure-title", textContent: result.name }),
+      element("div", { className: "failure-file", textContent: fileOf(result) }),
+      element("div", { className: "failure-error", textContent: result.message }),
+    ]);
+    if (images.length) {
+      card.append(element("div", { className: "thumbs" }, images.map((image) => element("img", { src: attachmentUrl(image), alt: image.name }))));
+    }
+    return card;
+  }
+
+  function ciStatus(run) {
+    if (run.status !== "completed") return "running";
+    return { success: "passed", failure: "failed", timed_out: "failed", startup_failure: "failed", cancelled: "stopped" }[run.conclusion] || "skipped";
+  }
+
+  async function fetchJson(url) {
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      return response.ok ? { data } : { error: data.error };
+    } catch {
+      return { error: "Could not reach the runner server." };
+    }
+  }
+
+  async function loadCiRuns() {
+    $("ciRuns").replaceChildren(element("div", { className: "empty", textContent: "Loading runs from GitHub" }));
+    const { data: runs, error } = await fetchJson("/api/ci/runs");
+    if (error) {
+      $("ciRuns").replaceChildren(element("div", { className: "empty", textContent: error }));
+      return;
+    }
+    $("ciRuns").replaceChildren(
+      ...runs.map((run) =>
+        element("div", { className: "row", onclick: (event) => loadCiRun(run, event.currentTarget) }, [
+          element("span", { className: `badge s-${ciStatus(run)}`, textContent: run.conclusion || run.status }),
+          element("span", { className: "row-suite", textContent: new Date(run.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) }),
+          element("span", { className: "row-name", textContent: run.displayTitle, title: run.headBranch }),
+          element("span", { className: "row-time", textContent: run.event === "pull_request" ? "PR" : run.event }),
+        ]),
+      ),
     );
+  }
+
+  function jobFailure(job) {
+    const errors = job.log.split("\n").filter((line) => /\b(error|fail(ed|ure)?)\b/i.test(line) && !line.startsWith("##[error]Process completed"));
+    return {
+      name: `${job.name} job failed`,
+      fullName: "",
+      status: "failed",
+      duration: 0,
+      message: errors.slice(-3).reverse().join("\n") || job.log.trim().split("\n").slice(-5).join("\n"),
+      trace: job.log,
+      attachments: [],
+    };
+  }
+
+  async function loadCiRun(run, row) {
+    state.ciRun = run.databaseId;
+    document.querySelectorAll("#ciRuns .row").forEach((other) => other.classList.toggle("active", other === row));
+    $("ciTitle").replaceChildren(element("strong", { textContent: run.displayTitle }), ` on ${run.headBranch}`);
+    $("ciFailures").replaceChildren(element("div", { className: "empty", textContent: "Downloading the run's test results from GitHub" }));
+    const { data, error } = await fetchJson(`/api/ci/runs/${run.databaseId}`);
+    if (state.ciRun !== run.databaseId) return;
+    if (error) {
+      $("ciFailures").replaceChildren(element("div", { className: "empty", textContent: error }));
+      return;
+    }
+    const counts = tally(data.results);
+    const failures = [...data.jobs.map(jobFailure), ...data.results.filter((result) => FAILED.includes(result.status))];
+    $("ciTitle").append(element("div", { className: "meta", textContent: `${counts.passed} passed, ${counts.failed} failed, ${counts.skipped} skipped. ${data.note}` }));
+    $("ciFailures").replaceChildren(...(failures.length ? failures.map(failureCard) : [element("div", { className: "empty", textContent: "No failures in this run" })]));
   }
 
   function renderRows() {
@@ -593,10 +676,34 @@
     return element("a", { href: src, download: attachment.source, textContent: `Download ${attachment.name}` });
   }
 
+  function analysisSection(result) {
+    const note = element("span", { className: "meta", textContent: "Ask Claude for the likely cause and a fix." });
+    const output = element("pre", { className: "analysis", hidden: true });
+    const button = element("button", { className: "btn btn-primary btn-small", textContent: "Analyze with Claude" });
+    button.onclick = async () => {
+      button.disabled = true;
+      note.textContent = "Claude is reading the test and the code it covers. This can take a minute or two.";
+      try {
+        const response = await post("/api/analyze", { name: result.name, file: fileOf(result), message: result.message, trace: result.trace });
+        const { analysis, error } = await response.json();
+        output.className = response.ok ? "analysis" : "error";
+        output.textContent = response.ok ? analysis : error;
+      } catch {
+        output.className = "error";
+        output.textContent = "Could not reach the runner server.";
+      }
+      note.textContent = "";
+      output.hidden = false;
+      button.disabled = false;
+    };
+    return element("div", {}, [element("div", { className: "analysis-bar" }, [button, note]), output]);
+  }
+
   function openResult(result) {
     $("modalTitle").textContent = result.name;
     $("modalFile").textContent = fileOf(result);
     const body = [];
+    if (FAILED.includes(result.status)) body.push(analysisSection(result));
     if (result.message) body.push(element("pre", { className: "error", textContent: result.message }));
     if (result.trace) body.push(element("pre", { textContent: result.trace }));
     if (result.attachments.length) body.push(element("div", { className: "evidence" }, result.attachments.map(renderEvidence)));
@@ -751,6 +858,7 @@
   $("runSingle").addEventListener("click", () => start("/api/run-single", { file: state.selectedTest, flags: singleFlags() }, "singleError"));
   $("testFilter").addEventListener("input", renderTests);
   $("refreshTests").addEventListener("click", loadTests);
+  $("refreshCi").addEventListener("click", loadCiRuns);
 
   $("stop").addEventListener("click", () => post("/api/stop"));
   $("search").addEventListener("input", renderRows);
@@ -761,6 +869,7 @@
 
   renderChips();
   loadTests();
+  loadCiRuns();
   pollLoop();
 </script>
 </body>

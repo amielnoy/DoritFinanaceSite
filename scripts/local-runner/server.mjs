@@ -1,8 +1,10 @@
 import { createServer } from "node:http";
-import { spawn } from "node:child_process";
-import { readFile, readdir, rm, stat } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { readFile, readdir, rename, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const RESULTS_DIR = path.join(ROOT, "allure-results");
@@ -16,6 +18,14 @@ const TRACES = ["on", "off", "retain-on-failure", "on-first-retry", "on-all-retr
 const PROJECTS = ["web-chromium", "web-webkit", "ios-safari", "android-chrome", "*"];
 const REPORTERS = ["list", "line", "dot"];
 const SHUTDOWN_GRACE_MS = 10_000;
+const ANALYSIS_TIMEOUT_MS = 300_000;
+const ANALYSIS_TRACE_CHARS = 20_000;
+const CI_DIR = path.join(tmpdir(), "dorit-local-runner-ci");
+const CI_WORKFLOW = "ci.yml";
+const CI_LOG_LINES = 150;
+const CI_FAILED_JOBS = ["failure", "timed_out", "cancelled", "startup_failure"];
+const ciLoads = new Map();
+const execFileAsync = promisify(execFile);
 const HOSTS = [`127.0.0.1:${PORT}`, `localhost:${PORT}`];
 
 const run = { busy: false, child: null, onFinish: null, suites: [], single: null, output: "", exitCode: null, startedAt: null, finishedAt: null };
@@ -195,18 +205,18 @@ function signalRun(signal) {
   }
 }
 
-function collectAttachments(node) {
+function collectAttachments(node, filesUrl) {
   const own = node.attachments || [];
-  const nested = (node.steps || []).flatMap(collectAttachments);
-  return [...own, ...nested].map(({ name, source, type }) => ({ name, source, type }));
+  const nested = (node.steps || []).flatMap((step) => collectAttachments(step, filesUrl));
+  return [...own.map(({ name, source, type }) => ({ name, source, type, url: `${filesUrl}/${encodeURIComponent(source)}` })), ...nested];
 }
 
-async function readResults() {
-  const files = await readdir(RESULTS_DIR).catch(() => []);
+async function readResults(dir = RESULTS_DIR, filesUrl = "/files") {
+  const files = await readdir(dir).catch(() => []);
   const results = await Promise.all(
     files
       .filter((file) => file.endsWith("-result.json"))
-      .map(async (file) => parseJson(await readFile(path.join(RESULTS_DIR, file), "utf8").catch(() => ""))),
+      .map(async (file) => parseJson(await readFile(path.join(dir, file), "utf8").catch(() => ""))),
   );
 
   return results.filter(Boolean).map((result) => ({
@@ -217,8 +227,101 @@ async function readResults() {
     duration: result.stop - result.start,
     message: result.statusDetails?.message || "",
     trace: result.statusDetails?.trace || "",
-    attachments: collectAttachments(result),
+    attachments: collectAttachments(result, filesUrl),
   }));
+}
+
+async function gh(args) {
+  try {
+    const { stdout } = await execFileAsync("gh", args, { cwd: ROOT, maxBuffer: 256 * 1024 * 1024 });
+    return stdout;
+  } catch (error) {
+    if (error.code === "ENOENT") throw new Error("Could not start the GitHub CLI. Install it with brew install gh, then run gh auth login.");
+    throw new Error(String(error.stderr || error.message).trim());
+  }
+}
+
+async function listCiRuns() {
+  const fields = "databaseId,displayTitle,conclusion,status,headBranch,event,createdAt,url";
+  return JSON.parse(await gh(["run", "list", "--workflow", CI_WORKFLOW, "--limit", "50", "--json", fields]));
+}
+
+async function downloadCiResults(id, { status, attempt }) {
+  const target = path.join(CI_DIR, `${id}-${attempt}`);
+  if (await stat(target).then(() => true, () => false)) return target;
+  const partial = `${target}.part`;
+  await rm(partial, { recursive: true, force: true });
+  await gh(["run", "download", id, "--pattern", "allure-results-*", "--dir", partial]);
+  if (status !== "completed") return partial;
+  await rename(partial, target);
+  return target;
+}
+
+function cleanLog(log) {
+  const lines = log.split("\n");
+  const end = lines.findLastIndex((line) => line.includes("##[error]")) + 1 || lines.length;
+  return lines
+    .slice(Math.max(0, end - CI_LOG_LINES), end)
+    .map((line) => line.replace(/^\S+Z /, "").replace(/\u001b\[[\d;]*m/g, ""))
+    .join("\n");
+}
+
+function failedJobs(jobs) {
+  return Promise.all(
+    jobs
+      .filter((job) => CI_FAILED_JOBS.includes(job.conclusion))
+      .map(async (job) => ({
+        name: job.name,
+        log: await gh(["api", `repos/{owner}/{repo}/actions/jobs/${job.databaseId}/logs`]).then(cleanLog, (error) => error.message),
+      })),
+  );
+}
+
+async function loadCiRun(id) {
+  const run = JSON.parse(await gh(["run", "view", id, "--json", "jobs,status,attempt"]));
+  const [jobs, download] = await Promise.all([
+    failedJobs(run.jobs),
+    downloadCiResults(id, run).then((dir) => ({ dir }), (error) => ({ error: error.message })),
+  ]);
+  const artifacts = download.dir ? await readdir(download.dir) : [];
+  const filesUrl = (artifact) => `/ci-files/${path.basename(download.dir)}/${artifact}`;
+  const results = await Promise.all(artifacts.map((artifact) => readResults(path.join(download.dir, artifact), filesUrl(artifact))));
+  return { results: results.flat(), jobs, note: download.error || "" };
+}
+
+function loadCiRunOnce(id) {
+  if (!ciLoads.has(id)) ciLoads.set(id, loadCiRun(id).finally(() => ciLoads.delete(id)));
+  return ciLoads.get(id);
+}
+
+function analysisPrompt({ name, file, message, trace }) {
+  return [
+    "A test in this repository failed. Find the most likely root cause and how to fix it.",
+    "Read the failing test and the application code it exercises before answering. Do not change any files.",
+    "Answer in plain text without Markdown, in three short sections titled Cause, Evidence (with file:line references) and Fix. Say whether the bug is in the test or in the application.",
+    `Test: ${text(name)}`,
+    `File: ${text(file)}`,
+    `Error:\n${text(message)}`,
+    `Output:\n${text(trace).slice(-ANALYSIS_TRACE_CHARS)}`,
+  ].join("\n\n");
+}
+
+function analyze(prompt) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("claude", ["-p", "--tools", "Read,Grep,Glob", "--no-session-persistence", "--output-format", "text"], { cwd: ROOT });
+    let output = "";
+    let errors = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => (output += chunk));
+    child.stderr.setEncoding("utf8").on("data", (chunk) => (errors += chunk));
+    const timer = setTimeout(() => child.kill(), ANALYSIS_TIMEOUT_MS);
+    child.on("error", () => reject(new Error("Could not start the claude CLI. Install Claude Code and make sure claude is on your PATH.")));
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      if (code === 0) resolve(output.trim());
+      else reject(new Error(errors.trim() || (signal ? "The analysis timed out" : `claude exited with code ${code}`)));
+    });
+    child.stdin.end(prompt);
+  });
 }
 
 async function serveFile(res, file, contentType) {
@@ -267,6 +370,21 @@ async function handle(req, res) {
     return serveFile(res, path.join(RESULTS_DIR, name));
   }
 
+  if (req.method === "GET" && url.pathname === "/api/ci/runs") {
+    return sendJson(res, 200, await listCiRuns());
+  }
+
+  const ciRun = url.pathname.match(/^\/api\/ci\/runs\/(\d+)$/);
+  if (req.method === "GET" && ciRun) {
+    return sendJson(res, 200, await loadCiRunOnce(ciRun[1]));
+  }
+
+  const ciFile = url.pathname.match(/^\/ci-files\/(\d+-\d+(?:\.part)?)\/(allure-results-[\w-]+)\/([^/]+)$/);
+  if (req.method === "GET" && ciFile) {
+    const [, id, artifact, file] = ciFile.map((part) => path.basename(decodeURIComponent(part)));
+    return serveFile(res, path.join(CI_DIR, id, artifact, file));
+  }
+
   if (isJsonPost && url.pathname === "/api/run") {
     const body = await readBody(req);
     const { flags, error } = parseFlags(body.args);
@@ -295,6 +413,10 @@ async function handle(req, res) {
       if (!started) run.busy = false;
     }
     return started ? sendJson(res, 202, { started: true }) : sendJson(res, 400, { error: "Unknown test file" });
+  }
+
+  if (isJsonPost && url.pathname === "/api/analyze") {
+    return sendJson(res, 200, { analysis: await analyze(analysisPrompt(await readBody(req))) });
   }
 
   if (isJsonPost && url.pathname === "/api/stop") {
