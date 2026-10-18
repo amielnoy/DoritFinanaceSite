@@ -213,6 +213,7 @@ the service adds of its own would overwrite a column nobody edited.
 | UNIT-ADM-005 | "deletes through the adminLead function, not the entity" | `invoke("adminLead", { action: "delete", id })`; no entity delete |
 | UNIT-ADM-010 | "rejects when the function call fails, so the screen shows its write error" | `setStatus` and `remove` both reject |
 | UNIT-ADM-011 | "rejects when the function answers with an error body and no throw" | A body without `ok: true` rejects |
+| UNIT-ADM-012 | "has no agenda: Base44 holds no meetings, and reads nothing for one" | `agencyMeetings()` → `[]`; no entity read, no function call |
 | UNIT-ADM-006 | "lists every article, drafts included" | No published filter |
 | UNIT-ADM-007 | "creates an article with published coerced to a boolean" | `true`/`false`, not `"on"` |
 | UNIT-ADM-008 | "forwards a partial update without inventing the fields it was not given" | Payload has exactly the edited keys |
@@ -1596,6 +1597,8 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 | UNIT-ANAV-006 | "sends the operator to their main page and an agency's members to the leads" | `/account`; `/admin/leads` |
 | UNIT-ANAV-007 | "%s → %s" (`initials`) | דורית גוב ארי → דג; Dorit → D; an email → its name's letters; empty → ? |
 | UNIT-ANAV-008 | "counts the requests whose code has arrived and is not yet submitted" (`waitingCount`) | Two `code_received` of five → 2; none → 0 |
+| UNIT-ANAV-009 | "is named 'פניות ופגישות' for every role" (`tests/unit/admin-nav-meetings.test.ts`, VITE_MEETINGS_STAFF on) | The leads row's label, operator to User; off, it stays פניות (UNIT-ANAV-001) |
+| UNIT-ANAV-010 | "keeps the leads' counter" (same file) | `unassigned` for Admin+, `newLeads` for a User — unchanged |
 
 ### 4.61 The users port — `tests/unit/supabase-users-admin.test.ts`
 
@@ -1795,6 +1798,31 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4. The tab'
 | UNIT-CLMTG-013 | "asks through the meeting-request function, so Dorit is mailed" | `invoke("meeting-request", { meetingId, kind, note })` |
 | UNIT-CLMTG-014 | "passes the function's own refusal through" | The 409's `error` text |
 
+
+### 4.77 The meetings agenda on /admin/leads — `tests/unit/supabase-lead-admin.test.ts` (new cases), `tests/unit/meetings-agenda.test.ts`
+
+"פניות ופגישות" (VITE_MEETINGS_STAFF). `agencyMeetings` is one agency-scoped read of `meetings` with the lead's name and assignee and the requests embedded, under the person's own session — can_see_lead decides the rows, nothing filters by role. `src/lib/meetings-agenda.ts` sorts the result into the views and Israel's days; the week below crosses midnights and the change from summer time (02:00, Sunday 25.10.2026). "Now" is Thursday 22.10.2026, 10:00 in Israel.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AGENDA-001 | "reads the agency's meetings in one query, newest first, with the lead and requests embedded" | One `from("meetings")`; `eq agency_id`; `order scheduled_at desc`; `lead:leads!lead_id(name,assigned_user_id)` (the second key, `lead_base44_id`, makes the hint necessary) and `meeting_requests(id,kind,note,status)` |
+| UNIT-AGENDA-002 | "leaves Dorit's notes and the summary's text out of the agenda" | No `notes`, no `client_summary` column |
+| UNIT-AGENDA-003 | "hands back each meeting with its lead's name and assignee, and its open request only" | `leadId`, `leadName`, `assignedUserId`; a handled request ignored; no `notes` on the result |
+| UNIT-AGENDA-004 | "puts a meeting with no time last, and survives a lead out of view" | Dated, then undated; a null lead → `leadName: ""`, `assignedUserId: null` |
+| UNIT-AGENDA-005 | "throws on a failed read rather than showing an empty agenda" | `meetings read failed` |
+| UNIT-AGENDA-010 | "files a meeting by Israel's calendar across midnight, not by UTC's" | Thu 23:59 and 08:00 (hour gone, not marked held) under היום; Fri 00:15 (the 22nd in UTC) under מחר |
+| UNIT-AGENDA-011 | "keeps a day whole across the change from summer to winter time" | Sun 00:30 (+03, the 24th in UTC) and Sun 23:30 (+02) under "יום ראשון, 25.10"; Mon 01:30 (the 25th in UTC) under Monday |
+| UNIT-AGENDA-012 | "puts the undated last, then the held meetings waiting for a summary, most recent first" | Days, ללא מועד, then "התקיימו — ממתינות לסיכום"; no cancelled, no summarised, no forgotten past one |
+| UNIT-AGENDA-013 | "shows the past most recent day first, without the cancelled" | Wednesday before Tuesday; times descending |
+| UNIT-AGENDA-014 | "narrows to requests, to held meetings without a summary, and to the cancelled" | One meeting each |
+| UNIT-AGENDA-015 | "holds today, and this week to Saturday, for the two cards" | Sunday is next week |
+| UNIT-AGENDA-016 | "counts today, the rest of the week, open requests and held meetings without a summary" | `{ today: 1, week: 2, requests: 1, unsummarised: 1 }` |
+| UNIT-AGENDA-017 | "ends the week on Saturday" | Thu 22 → Sat 24; Sun 25 → Sat 31 |
+| UNIT-AGENDA-018 | "is the soonest scheduled one not yet over — one in progress still counts" | The 09:30–10:15 meeting at 10:00; none from a cancelled or undated one |
+| UNIT-AGENDA-019 | "reads 'היום', 'מחר', a weekday within the week ahead, and a date beyond it" | `היום 10:00`, `מחר 17:30`, `רביעי 12:00`, `14.12 · 17:30` |
+| UNIT-AGENDA-020 | "names the hour on Israel's clock on either side of the change" | `ראשון 00:30`, `ראשון 23:30` |
+| UNIT-AGENDA-021 | "asks for a summary once a meeting is held or its time has passed, until one is published" | `needsSummary`: held or passed → true; ahead, published or cancelled → false |
+| UNIT-AGENDA-022 | "labels days relative to Israel's today" | היום, מחר, "יום רביעי, 21.10" |
 
 ### 4.76 The glossary — `tests/unit/glossary.test.ts`
 

@@ -78,7 +78,7 @@ carries a `<script>`, an `<img onerror>`, a `javascript:` markdown link and a
 | SEC-LNK-001 | "every new-tab link is protected against reverse tabnabbing" | Load `/` | Every rendered `target=_blank` anchor has `noopener` |
 | SEC-MIX-001 | "no mixed content: the page loads nothing over plain http" | Load `/`, scroll to the bottom | Zero non-localhost `http://` requests |
 | SEC-BND-001 | "the shipped bundle contains no secret-shaped literals" | Fetch every `<script src>` | No Stripe/AWS/private-key/JWT patterns |
-| SEC-RLS-001 | "admin data is never fetched before authentication" | Open `/admin/leads` anonymously | Redirected to `/login`; zero `/rest/v1/leads` requests (it counted `GET /entities/Lead` until 2026-10-18) |
+| SEC-RLS-001 | "admin data is never fetched before authentication" | Open `/admin/leads` anonymously | Redirected to `/login`; zero `/rest/v1/leads` and zero `/rest/v1/meetings` requests (it counted `GET /entities/Lead` until 2026-10-18; meetings since the agenda, VITE_MEETINGS_STAFF) |
 | SEC-ERR-001 | "the app boots without any uncaught client-side error" | Load `/`, scroll | No `pageerror` |
 | SEC-HDR-001 | "the document response carries the expected hardening headers" | — | **Skipped by default.** Enable with `E2E_ENFORCE_SECURITY_HEADERS=1` against a deployment; asserts `x-content-type-options`, `referrer-policy`, HSTS and a CSP |
 | SEC-HDR-002 | "reports which hardening headers are present (informational)" | Fetch `/` | Always passes; records the missing headers as a test annotation |

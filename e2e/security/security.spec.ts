@@ -220,8 +220,10 @@ test.describe("Client-side security posture", () => {
       await expect(page).toHaveURL(/\/login/);
     });
 
-    await test_step("no lead was read on the way to the login screen", async () => {
+    await test_step("no lead and no meeting was read on the way to the login screen", async () => {
       expect(mockApi.requestsTo("/rest/v1/leads")).toHaveLength(0);
+      // The screen's agenda (VITE_MEETINGS_STAFF, on in this build) reads meetings — never before a session.
+      expect(mockApi.requestsTo("/rest/v1/meetings")).toHaveLength(0);
     });
   });
 
