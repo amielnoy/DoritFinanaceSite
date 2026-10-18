@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Trash2 } from "lucide-react";
 import type { LeadRecord } from "@/services";
 import { useLeadMeetings } from "@/hooks/useAdmin";
 import SideDrawer from "@/components/dorit/admin/SideDrawer";
@@ -21,6 +22,9 @@ export default function LeadDrawer({
   initialTab = "details",
   meetingId = null,
   startAdding = false,
+  onDelete,
+  deleting = false,
+  deleteFailed = false,
 }: {
   lead: LeadRecord | null;
   subtitle: string;
@@ -35,6 +39,14 @@ export default function LeadDrawer({
   initialTab?: Tab;
   meetingId?: string | null;
   startAdding?: boolean;
+  /**
+   * Deletes the lead, with its meetings (on delete cascade), from either tab:
+   * the agenda opens the drawer on "פגישות", where the table's trash isn't.
+   * Absent for those who may not delete.
+   */
+  onDelete?: () => void;
+  deleting?: boolean;
+  deleteFailed?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const meetings = useLeadMeetings(lead?.id ?? "", Boolean(lead));
@@ -67,6 +79,23 @@ export default function LeadDrawer({
       <div role="tabpanel" id={`lead-panel-${tab}`} aria-labelledby={`lead-tab-${tab}`}>
         {lead ? (tab === "details" ? details : <LeadMeetings lead={lead} initialOpenId={meetingId} startAdding={startAdding} />) : null}
       </div>
+      {lead && onDelete ? (
+        <div className="mt-8 border-t border-border pt-4">
+          {deleteFailed ? (
+            <p role="alert" className="mb-2 text-sm text-destructive">
+              הפנייה לא נמחקה. ניתן לנסות שוב.
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={deleting}
+            className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40"
+          >
+            <Trash2 size={15} /> מחיקת הפנייה
+          </button>
+        </div>
+      ) : null}
     </SideDrawer>
   );
 }

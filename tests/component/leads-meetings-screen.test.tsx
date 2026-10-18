@@ -214,6 +214,69 @@ describe("the leads tab, by role", () => {
   });
 });
 
+describe("deleting a lead", () => {
+  beforeEach(() => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    h.leadsAdmin.remove.mockImplementation(async (id: string) => {
+      // As the database does: the lead goes, and its meetings with it.
+      h.leads = h.leads.filter((l) => l.id !== id);
+      h.agenda = h.agenda.filter((m) => m.leadId !== id);
+    });
+  });
+  afterEach(() => vi.mocked(window.confirm).mockRestore());
+
+  it("from the agenda's drawer, removes the lead from both tabs, after saying its meetings go too", async () => {
+    h.agenda = [agendaMeeting("m-1", "l-2", "2026-10-23T07:00:00Z", { topic: "סקירה" })];
+    show();
+    const panel = await toMeetings();
+    fireEvent.click(await within(panel).findByRole("button", { name: "דן לוי" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "מחיקת הפנייה" }));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/דן לוי.*הפגישות/));
+    await waitFor(() => expect(h.leadsAdmin.remove).toHaveBeenCalledWith("l-2"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(within(panel).queryByRole("button", { name: "דן לוי" })).toBeNull());
+    fireEvent.click(tab(/^פניות/));
+    await screen.findByText("יעל כהן");
+    expect(screen.queryByText("דן לוי")).toBeNull();
+  });
+
+  it("does nothing when the confirmation is declined", async () => {
+    vi.mocked(window.confirm).mockReturnValue(false);
+    show();
+    await screen.findByText("יעל כהן");
+    fireEvent.click(within(screen.getByText("יעל כהן").closest("tr")!).getByRole("button", { name: "מחיקה" }));
+    expect(h.leadsAdmin.remove).not.toHaveBeenCalled();
+  });
+
+  it("keeps the drawer open and says so when the delete fails", async () => {
+    h.leadsAdmin.remove.mockRejectedValue(new Error("rls"));
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "יעל כהן" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "מחיקת הפנייה" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("הפנייה לא נמחקה");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("is not offered to a User, in the table or the drawer", async () => {
+    role.role = "user";
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "יעל כהן" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByRole("button", { name: "מחיקת הפנייה" })).toBeNull();
+    expect(screen.queryAllByRole("button", { name: "מחיקה" })).toHaveLength(0);
+  });
+
+  it("keeps the row's actions pinned in view when the table scrolls sideways", async () => {
+    show();
+    await screen.findByText("יעל כהן");
+    const cell = within(screen.getByText("יעל כהן").closest("tr")!).getByRole("button", { name: "מחיקה" }).closest("td")!;
+    expect(cell.className).toMatch(/\bsticky\b/);
+    expect(cell.className).toMatch(/\bleft-0\b/);
+  });
+});
+
 describe("הפגישה הבאה", () => {
   beforeEach(() => {
     h.agenda = [
