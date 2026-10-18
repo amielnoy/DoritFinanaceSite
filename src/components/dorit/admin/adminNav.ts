@@ -20,6 +20,8 @@ export interface AdminNavItem {
   masleka?: boolean;
   /** Which counter sits on the row, and the word a screen reader hears after the number. */
   counter?: { key: Exclude<keyof AdminCounts, "total">; label: string };
+  /** A second counter after it, in the alert colour: what a client is waiting on. */
+  alert?: { key: Exclude<keyof AdminCounts, "total">; label: string };
   /** Active on this exact path only (the main page), not on everything beneath it. */
   end?: boolean;
 }
@@ -35,13 +37,15 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
   {
     title: "טיפול שוטף",
     items: [
-      // "פניות ופגישות" once the screen holds the agenda (VITE_MEETINGS_STAFF); the counter is the leads' either way.
+      // "פניות ופגישות" once the screen holds the agenda (VITE_MEETINGS_STAFF); the counter is the leads' either way,
+      // and beside it, the clients' open requests to move or cancel a meeting.
       {
         to: "/admin/leads",
         label: MEETINGS_STAFF ? "פניות ופגישות" : "פניות",
         icon: Inbox,
         min: "user",
         counter: { key: "newLeads", label: "חדשות" },
+        alert: MEETINGS_STAFF ? { key: "meetingRequests", label: "בקשות שינוי" } : undefined,
       },
       {
         to: "/admin/masleka",

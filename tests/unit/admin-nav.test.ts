@@ -46,6 +46,11 @@ describe("adminNavFor", () => {
     expect(leadsRow("user")).toBe("newLeads");
   });
 
+  it("has no meeting-requests counter without the meetings switch", () => {
+    const rows = adminNavFor("admin", true).flatMap((g) => g.items);
+    expect(rows.some((i) => i.alert)).toBe(false);
+  });
+
   it("gives anyone else nothing", () => {
     expect(adminNavFor(null, true)).toEqual([]);
   });

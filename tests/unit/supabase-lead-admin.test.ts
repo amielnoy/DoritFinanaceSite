@@ -308,6 +308,20 @@ describe("SupabaseLeadAdminService.countNew", () => {
   });
 });
 
+describe("SupabaseLeadAdminService.countOpenMeetingRequests", () => {
+  it("counts clients' open requests to move or cancel a meeting", async () => {
+    const { client, calls } = byTable({ meeting_requests: { data: [{ id: "r1" }, { id: "r2" }], error: null } });
+    expect(await new SupabaseLeadAdminService(client).countOpenMeetingRequests()).toBe(2);
+    expect(calls).toContainEqual(["meeting_requests", "eq", "status", "open"]);
+    expect(calls).toContainEqual(["meeting_requests", "limit", 1000]);
+  });
+
+  it("throws on a refused read rather than counting none", async () => {
+    const { client } = byTable({ meeting_requests: { data: null, error: { message: "denied" } } });
+    await expect(new SupabaseLeadAdminService(client).countOpenMeetingRequests()).rejects.toThrow(/meeting_requests read failed/);
+  });
+});
+
 /**
  * A lead's meetings (docs/superpowers/specs/2026-10-17-client-meetings-design.md,
  * Staff): read and written under the person's own session, so a write that

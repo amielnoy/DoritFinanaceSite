@@ -16,7 +16,7 @@ const renderMenu = (props: Partial<AdminMenuProps> = {}) => {
     <MemoryRouter>
       <AdminMenu
         access="operator"
-        counts={{ newLeads: 0, unassigned: 2, maslekaWaiting: 1, total: 3 }}
+        counts={{ newLeads: 0, unassigned: 2, maslekaWaiting: 1, meetingRequests: 0, total: 3 }}
         name="דורית גוב ארי"
         roleLabel="מפעיל הפלטפורמה"
         onSignOut={onSignOut}

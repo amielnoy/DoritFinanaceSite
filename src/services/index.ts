@@ -173,6 +173,7 @@ export const services: Services = {
     transcript: (leadId) => real().then((s) => s.leadsAdmin.transcript(leadId)),
     transcriptLeadIds: () => real().then((s) => s.leadsAdmin.transcriptLeadIds()),
     countNew: () => real().then((s) => s.leadsAdmin.countNew()),
+    countOpenMeetingRequests: () => real().then((s) => s.leadsAdmin.countOpenMeetingRequests()),
     meetings: (leadId) => real().then((s) => s.leadsAdmin.meetings(leadId)),
     agencyMeetings: (agencyId) => real().then((s) => s.leadsAdmin.agencyMeetings(agencyId)),
     addMeeting: (meeting) => real().then((s) => s.leadsAdmin.addMeeting(meeting)),

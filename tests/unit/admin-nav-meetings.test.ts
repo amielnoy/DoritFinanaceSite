@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 /*
  * With VITE_MEETINGS_STAFF the leads screen holds the agenda too, and its row in
  * the sidebar says so — "פניות ופגישות". The counter on it stays the leads' own
- * (the unassigned queue for Admin+, a User's new leads).
+ * (the unassigned queue for Admin+, a User's new leads), and a second one,
+ * in the alert colour, counts the clients' open requests to move or cancel a meeting.
  */
 vi.mock("@/config/meetings", () => ({ MEETINGS_STAFF: true, MEETINGS_CLIENT: false }));
 
@@ -20,5 +21,11 @@ describe("the leads row, with the meetings switch on", () => {
   it("keeps the leads' counter", () => {
     expect(leadsRow("admin")?.counter).toEqual({ key: "unassigned", label: "לא שויכו" });
     expect(leadsRow("user")?.counter).toEqual({ key: "newLeads", label: "חדשות" });
+  });
+
+  it("adds the open meeting requests beside it, for every role", () => {
+    for (const access of ["operator", "owner", "admin", "user"] as const) {
+      expect(leadsRow(access)?.alert).toEqual({ key: "meetingRequests", label: "בקשות שינוי" });
+    }
   });
 });
