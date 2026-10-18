@@ -127,42 +127,30 @@ has security  && run_suite "security (static)" npx vitest run tests/security
 
 if has e2e; then
   if [[ -z "${PLAYWRIGHT_BASE_URL:-}" && "${SKIP_BUILD:-}" != "1" ]]; then
-    # The app id has to be set on the *build*, not on the preview server.
-    # Vite inlines `import.meta.env.VITE_BASE44_APP_ID` into the bundle, so a
-    # value handed to `vite preview` arrives after the only moment it could
-    # have been read. playwright.config.ts sets it on its own webServer — which
-    # covers the case where that server runs the build — but this branch builds
-    # first and then sets SKIP_BUILD=1, and used to leave the id unset: every
-    # form in the bundle under test posted to `/api/apps/undefined/...`. The
-    # suite passed anyway, because e2e/fixtures/app.ts stubs `**/api/**` and
-    # never looks at the app id, so the run proved nothing about the one path a
-    # visitor actually takes.
-    export VITE_BASE44_APP_ID="${VITE_BASE44_APP_ID:-e2e-sanity-app}"
-    # The other one the webServer sets, for the same reason: Vite inlines
-    # `import.meta.env.*` at build time, so a value handed to `vite preview` —
-    # or to `playwright test` — arrives after the only moment it could be read.
-    # Once SKIP_BUILD=1 the bundle is sealed and the config's `env` block has
-    # nothing left to affect, so whatever is in .env.local wins instead.
-    export VITE_BASE44_APP_BASE_URL=""
-    # Same for Supabase — see playwright.config.ts. Empty, not unset: Vite
-    # lets process env override .env.local only when the variable exists.
-    export VITE_SUPABASE_URL=""
-    export VITE_SUPABASE_PUBLISHABLE_KEY=""
-    # The one article the e2e build prebuilds, without Supabase — see playwright.config.ts.
-    export PRERENDER_ARTICLES_FIXTURE="e2e/fixtures/prerender-articles.json"
-    # `build:prerender`, not `build`. This built the client shell and then set
-    # SKIP_BUILD=1, so playwright.config.ts skipped its own `build:prerender`
-    # and the suite was pointed at a dist/ with no prerendered routes at all.
-    # Every case in e2e/seo/prerender.spec.ts then failed — each route served
-    # the shell's title, no route had its own canonical, and the FAQPage markup
-    # was absent — reporting a regression in the thing it exists to protect
-    # while the actual build pipeline was fine. `npx playwright test` on its own
-    # passed throughout, which is what made it look like a code fault.
-    run_suite "build" npm run build:prerender
+    # The environment has to be set on the *build*, not on the preview server:
+    # Vite inlines `import.meta.env.*` into the bundle, so a value handed to
+    # `vite preview` — or to `playwright test` — arrives after the only moment
+    # it could have been read. This branch builds first and then sets
+    # SKIP_BUILD=1, and used to export its own copy of the variables here; it
+    # once left the app id out, and every form in the bundle under test posted
+    # to `/api/apps/undefined/...` while the suite stayed green.
+    #
+    # `build:e2e` builds with e2e/build-env.ts — production's provider switches,
+    # pointed at a Supabase host only e2e/fixtures/app.ts answers — the same
+    # file playwright.config.ts and CI's build job use, so there is one copy.
+    #
+    # `build:prerender` underneath, not `build`. This once built the client
+    # shell and then set SKIP_BUILD=1, so playwright.config.ts skipped its own
+    # prerender and the suite was pointed at a dist/ with no prerendered routes
+    # at all. Every case in e2e/seo/prerender.spec.ts then failed — each route
+    # served the shell's title, no route had its own canonical, and the FAQPage
+    # markup was absent — reporting a regression in the thing it exists to
+    # protect while the actual build pipeline was fine.
+    run_suite "build" npm run build:e2e
     # Built here; tell the preview server not to build it again.
     export SKIP_BUILD=1
-    # And remember that what is now in dist/ is wired to an app that does not
-    # exist, so it can be thrown away below.
+    # And remember that what is now in dist/ is wired to a backend that does
+    # not exist, so it can be thrown away below.
     BUILT_SENTINEL_DIST=1
   fi
   # playwright.config.ts marks every project but web-chromium `default: false`,
@@ -176,9 +164,10 @@ if has e2e; then
   done
   run_suite "e2e (web + iOS + Android)" npx playwright test \
     ${E2E_PROJECTS[@]+"${E2E_PROJECTS[@]}"} ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
-  # The bundle just tested has `e2e-sanity-app` inlined as the app id — Vite
-  # seals that in at build time. dist/ is also what `vite preview` serves, so
-  # leaving it here hands the next person a site whose every backend call 404s,
+  # The bundle just tested has the fake Supabase host and `e2e-sanity-app`
+  # inlined — Vite seals them in at build time. dist/ is also what `vite
+  # preview` serves, so leaving it here hands the next person a site whose every
+  # backend call fails,
   # reported on screen as the same "try again" line a real outage produces.
   # Keeping it saves one rebuild and costs an afternoon.
   if [[ "${BUILT_SENTINEL_DIST:-}" == "1" ]]; then

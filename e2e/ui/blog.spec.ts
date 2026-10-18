@@ -5,15 +5,15 @@ import { collectPageErrors, expect, gotoApp, test, test_step } from "../fixtures
 test.describe("Blog — sanity", () => {
   test("lists only published posts", async ({ page, mockApi }) => {
     await test_step("seed the backend with one published post and one draft", async () => {
-      mockApi.setEntity("BlogPost", [
+      mockApi.setTable("blog_posts", [
         ...BLOG_POSTS,
-        { ...BLOG_POSTS[0], id: "draft", title: "טיוטה שלא פורסמה", published: false },
+        { ...BLOG_POSTS[0], id: "b1000000-0000-4000-8000-0000000000d1", slug: "draft", title: "טיוטה שלא פורסמה", published: false },
       ]);
     });
 
     await test_step("open the blog list and let it load the posts", async () => {
       await gotoApp(page, "/blog");
-      await mockApi.waitForRequest("/entities/BlogPost");
+      await mockApi.waitForRequest("/rest/v1/blog_posts");
     });
 
     await test_step("the published post is listed and the draft is not", async () => {
@@ -25,19 +25,19 @@ test.describe("Blog — sanity", () => {
   test("filters server-side on the published flag", async ({ page, mockApi }) => {
     const req = await test_step("open the blog list and capture its query", async () => {
       await gotoApp(page, "/blog");
-      return mockApi.waitForRequest("/entities/BlogPost");
+      return mockApi.waitForRequest("/rest/v1/blog_posts");
     });
 
     await test_step("the published filter is sent to the backend, not applied in the browser", async () => {
-      const q = new URL(req.url).searchParams.get("q");
-      expect(q, "the list must be filtered by the backend, not in the browser").not.toBeNull();
-      expect(JSON.parse(q!)).toEqual({ published: true });
+      const params = new URL(req.url).searchParams;
+      expect(params.get("published"), "the list must be filtered by the backend, not in the browser").toBe("eq.true");
+      expect(params.get("order")).toBe("created_at.desc");
     });
   });
 
   test("opens a post and renders its markdown body", async ({ page }) => {
     await test_step(`open the post "${BLOG_POSTS[0].title}"`, async () => {
-      await gotoApp(page, `/blog/${BLOG_POSTS[0].id}`);
+      await gotoApp(page, `/blog/${BLOG_POSTS[0].slug}`);
     });
 
     await test_step("the post title is the page heading", async () => {
@@ -69,7 +69,7 @@ test.describe("Blog — sanity", () => {
 
   test("share buttons point at real share endpoints", async ({ page }) => {
     await test_step("open a published post", async () => {
-      await gotoApp(page, `/blog/${BLOG_POSTS[0].id}`);
+      await gotoApp(page, `/blog/${BLOG_POSTS[0].slug}`);
       await expect(page.getByRole("heading", { name: BLOG_POSTS[0].title })).toBeVisible();
     });
 
@@ -87,8 +87,15 @@ test.describe("Blog — sanity", () => {
       // first card ~2,300px down. Seeded with the featured article too, so the
       // featured row's own height is part of what is measured.
       await test_step("seed the posts, the featured deadline article among them", async () => {
-        mockApi.setEntity("BlogPost", [
-          { ...BLOG_POSTS[0], id: "featured", title: FEATURED.title, tags: "מיסוי, עצמאים", action_time: "חצי שעה" },
+        mockApi.setTable("blog_posts", [
+          {
+            ...BLOG_POSTS[0],
+            id: "b1000000-0000-4000-8000-0000000000f0",
+            slug: "featured",
+            title: FEATURED.title,
+            tags: "מיסוי, עצמאים",
+            action_time: "חצי שעה",
+          },
           ...BLOG_POSTS,
         ]);
       });
@@ -112,7 +119,7 @@ test.describe("Blog — sanity", () => {
     const { errors } = collectPageErrors(page);
 
     await test_step("make the blog endpoint fail with a 500", async () => {
-      mockApi.failOn("/entities/BlogPost", 500, { error: "boom" });
+      mockApi.failOn("/rest/v1/blog_posts", 500, { code: "XX000", message: "boom" });
     });
 
     await test_step("open the blog list against the broken backend", async () => {

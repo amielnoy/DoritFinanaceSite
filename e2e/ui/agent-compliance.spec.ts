@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { HUMAN_HANDOFF } from "../../src/config/compliance";
 import { expect, gotoApp, test, test_step } from "../fixtures/app";
 
 /**
@@ -15,7 +16,7 @@ const handoffForm = (section: Locator) =>
 /**
  * The compliance behaviour of the on-site agents, checked in a real browser.
  *
- * The prompts in `base44/agents/` carry the same rules, but a prompt is a
+ * The prompts in `supabase/functions/chat/prompts/` carry the same rules, but a prompt is a
  * request to a model and this is a gate: a visitor must not be able to send a
  * first message before accepting the notice, and must be able to reach a person
  * without the model's cooperation. Those two are enforced by the shell, so they
@@ -23,6 +24,14 @@ const handoffForm = (section: Locator) =>
  */
 
 const INTERVIEW = "#start";
+
+/**
+ * Where the chats talk to: the `chat` Edge Function for every agent production
+ * serves from it (VITE_CHAT_AGENTS, e2e/build-env.ts), one POST per message,
+ * and `escalate-to-human` for the hand-off (src/services/supabase/).
+ */
+const CHAT = "/functions/v1/chat";
+const HANDOFF = "/functions/v1/escalate-to-human";
 
 // Reduced motion for every chat here. Opening a chat scrolls it into view
 // smoothly, and a click whose target moves between pointerdown and mouseup
@@ -77,8 +86,8 @@ test.describe("Agent chat — regulatory shell", () => {
       await expect(box).toHaveAttribute("placeholder", "יש לאשר את ההסכמה כדי להתחיל");
     });
 
-    await test_step("no conversation was opened with the backend", async () => {
-      expect(mockApi.requestsTo("/agents/")).toHaveLength(0);
+    await test_step("no message reached the chat function", async () => {
+      expect(mockApi.requestsTo(CHAT)).toHaveLength(0);
     });
 
     await test_step("accepting the notice unlocks the box", async () => {
@@ -237,7 +246,7 @@ test.describe("Agent chat — regulatory shell", () => {
       await handoffForm(section).getByLabel("שם").fill("רונית אבני");
       await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
       await section.getByRole("button", { name: "שלחו לדורית" }).click();
-      const req = await mockApi.waitForRequest("escalateToHuman");
+      const req = await mockApi.waitForRequest(HANDOFF);
       expect(req.method).toBe("POST");
       expect(req.body).toMatchObject({ name: "רונית אבני", phone: "052-7654321" });
     });
@@ -286,7 +295,7 @@ test.describe("Support chat — the open question", () => {
 
     await test_step("the message box is disabled until the notice is accepted", async () => {
       await expect(box).toBeDisabled();
-      expect(mockApi.requestsTo("/agents/")).toHaveLength(0);
+      expect(mockApi.requestsTo(CHAT)).toHaveLength(0);
     });
 
     await test_step("accepting it unlocks the box", async () => {
@@ -333,7 +342,7 @@ test.describe("Support chat — the open question", () => {
     });
 
     await test_step("Dorit is told, from here as well", async () => {
-      const req = await mockApi.waitForRequest("escalateToHuman");
+      const req = await mockApi.waitForRequest(HANDOFF);
       expect(req.method).toBe("POST");
     });
   });
@@ -341,11 +350,12 @@ test.describe("Support chat — the open question", () => {
 /**
  * What the chat does when the backend says no.
  *
- * Nothing in the battery exercised a failing `/agents/` call until these — the
+ * Nothing in the battery exercised a failing chat call until these — the
  * `catch` in `AgentChat.send()` had never once executed under test. That is not
- * an academic gap: `allow_anonymous_access: false` made every conversation 401
- * for ten days, and the only thing the visitor got was one line telling them to
- * try again (A-42).
+ * an academic gap: on Base44, `allow_anonymous_access: false` made every
+ * conversation 401 for ten days, and the only thing the visitor got was one
+ * line telling them to try again (A-42). The `chat` function's gateway answers
+ * the same way to a key it does not accept.
  */
 test.describe("Agent chat — when the backend refuses", () => {
   test("a refused conversation gives the visitor their message back", async ({ page, mockApi }) => {
@@ -358,24 +368,31 @@ test.describe("Agent chat — when the backend refuses", () => {
       await expect(box).toBeEnabled();
     });
 
-    await test_step("the backend refuses the conversation, exactly as production did", async () => {
-      mockApi.failOn("/agents/", 401, {
-        detail: "User must be authenticated to create a conversation",
-      });
+    await test_step("the backend refuses the message, as a gateway refuses a key it does not accept", async () => {
+      mockApi.failOn(CHAT, 401, { message: "Invalid API key" });
     });
 
     const typed = "שלום, אני מתלבטת לגבי הפנסיה";
 
-    await test_step("the failure is reported rather than swallowed", async () => {
+    await test_step("the message reached the function, and was refused", async () => {
       await box.fill(typed);
       await section.getByRole("button", { name: "שליחה" }).click();
-      await expect(section.getByText(/לא הצלחתי לשלוח את ההודעה כרגע/)).toBeVisible();
+      const sent = await mockApi.waitForRequest(CHAT);
+      expect(sent.body).toMatchObject({ agent: "needs_interview", message: typed });
+    });
+
+    await test_step("the failure is reported rather than swallowed, with a way to reach her", async () => {
+      // On the chat function an unavailable agent hands over the direct
+      // channels (AgentChat's showChannelsOnly) instead of Base44's "try
+      // again" line: there is no socket to wait on, so the answer is final.
+      await expect(section.getByText(HUMAN_HANDOFF.failure)).toBeVisible();
+      await expect(page.locator("#interview-chat").getByRole("link", { name: /050-831-1776/ })).toBeVisible();
     });
 
     await test_step("and what the visitor wrote is still where they can send it again", async () => {
-      // The user's own message reaches the transcript only by way of the server
-      // echoing it back, so before this it was nowhere at all: cleared from the
-      // box, absent from the conversation, one apology in its place.
+      // The message is on screen while it is sent, and taken off it again
+      // when the send fails: without this it would be nowhere at all — cleared
+      // from the box, absent from the conversation, one apology in its place.
       await expect(box).toHaveValue(typed);
     });
   });
@@ -387,8 +404,8 @@ test.describe("Agent chat — when the backend refuses", () => {
     await openInterviewChat(page);
     const section = page.locator(INTERVIEW);
 
-    await test_step("escalateToHuman is down", async () => {
-      mockApi.failOn("escalateToHuman", 500);
+    await test_step("escalate-to-human is down", async () => {
+      mockApi.failOn(HANDOFF, 500, { error: "down", rid: "e2e-rid" });
     });
 
     await test_step("a visitor who asked for a person still gets one", async () => {
@@ -415,7 +432,7 @@ test.describe("Agent chat — when the backend refuses", () => {
     });
 
     await test_step("and it raised no alert she could not act on", async () => {
-      expect(mockApi.requestsTo("escalateToHuman")).toHaveLength(0);
+      expect(mockApi.requestsTo(HANDOFF)).toHaveLength(0);
     });
   });
 
@@ -438,7 +455,7 @@ test.describe("Agent chat — when the backend refuses", () => {
 
     await test_step("and Dorit is not paged with someone she cannot reach", async () => {
       // The whole point. She received three of those in one morning (A-55).
-      expect(mockApi.requestsTo("escalateToHuman")).toHaveLength(0);
+      expect(mockApi.requestsTo(HANDOFF)).toHaveLength(0);
     });
   });
 });
@@ -453,7 +470,7 @@ test.describe("Agent chat — when the backend refuses", () => {
  * would read as perfectly plausible in its place while promising something
  * else entirely.
  *
- * `base44/agents/procedures_agent.jsonc` carries the same distinction for the
+ * `supabase/functions/chat/prompts/procedures.md` carries the same distinction for the
  * model. These cases cover the half of it the shell can actually enforce.
  */
 test.describe("Procedures chat — reading the regulator's data", () => {
@@ -469,7 +486,7 @@ test.describe("Procedures chat — reading the regulator's data", () => {
 
     await test_step("the message box is disabled until the notice is accepted", async () => {
       await expect(box).toBeDisabled();
-      expect(mockApi.requestsTo("/agents/")).toHaveLength(0);
+      expect(mockApi.requestsTo(CHAT)).toHaveLength(0);
     });
 
     await test_step("accepting it unlocks the box", async () => {
@@ -555,7 +572,7 @@ test.describe("Procedures chat — reading the regulator's data", () => {
     await section.getByRole("button", { name: "מעבר לטיפול אנושי" }).click();
     await handoffForm(section).getByLabel("טלפון").fill("052-7654321");
     await section.getByRole("button", { name: "שלחו לדורית" }).click();
-    const req = await mockApi.waitForRequest("escalateToHuman");
+    const req = await mockApi.waitForRequest(HANDOFF);
     expect(req.method).toBe("POST");
   });
 });

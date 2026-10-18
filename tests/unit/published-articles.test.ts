@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { E2E_SUPABASE_PUBLISHABLE_KEY, E2E_SUPABASE_URL } from "../../e2e/build-env";
+import { answerRestRead } from "../../e2e/fixtures/supabase-fake";
 import {
   articleRoute,
   duplicateTitles,
   fetchPublishedArticles,
-  fixtureArticleFor,
   isValidSlug,
   loadPublishedArticles,
   planArticles,
@@ -20,14 +21,17 @@ import {
 const URL_ = "https://project-ref.supabase.co";
 const KEY = "sb_publishable_test";
 const SUPABASE_ENV = { VITE_SUPABASE_URL: URL_, VITE_SUPABASE_PUBLISHABLE_KEY: KEY };
+/** The e2e build's Supabase: the fake host only the e2e fixture and the prerender answer. */
+const E2E_ENV = { VITE_SUPABASE_URL: E2E_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY: E2E_SUPABASE_PUBLISHABLE_KEY };
 const FIXTURE = [
   {
-    id: "e2e-article-1",
+    id: "e2e00000-0000-4000-8000-000000000001",
+    base44_id: null,
     slug: "bdikat-maslul-e2e",
     title: "t",
     body: "b",
     published: true,
-    created_date: "2026-10-01T09:00:00Z",
+    created_at: "2026-10-01T09:00:00+00:00",
   },
 ];
 
@@ -124,7 +128,7 @@ describe("planArticles", () => {
   it("takes the fixture's articles in the e2e build, without asking Supabase", async () => {
     const fetchImpl = answer([]);
     const plan = await planArticles(
-      { PRERENDER_ARTICLES_FIXTURE: "e2e/fixtures/prerender-articles.json", PRERENDER_REQUIRED: "1" },
+      { ...E2E_ENV, PRERENDER_ARTICLES_FIXTURE: "e2e/fixtures/prerender-articles.json", PRERENDER_REQUIRED: "1" },
       { fetchImpl, readFileImpl: readFixture(FIXTURE) },
     );
     expect(plan.routes).toEqual(["/blog/bdikat-maslul-e2e"]);
@@ -136,33 +140,90 @@ describe("planArticles", () => {
     "refuses the fixture in a Vercel build (%j)",
     async (vercel) => {
       await expect(
-        planArticles({ PRERENDER_ARTICLES_FIXTURE: "f.json", ...vercel }, { readFileImpl: readFixture(FIXTURE) }),
+        planArticles({ ...E2E_ENV, PRERENDER_ARTICLES_FIXTURE: "f.json", ...vercel }, { readFileImpl: readFixture(FIXTURE) }),
       ).rejects.toThrow(/Vercel build/);
     },
   );
 
-  it("refuses the fixture in a bundle that reads Supabase", async () => {
+  it.each([
+    ["a real project", URL_],
+    ["the fake host with a trailing slash", `${E2E_SUPABASE_URL}/`],
+    ["a look-alike host", "https://supabase.e2e.invalid.example.com"],
+  ])("refuses the fixture in a bundle that reads %s", async (_what, url) => {
+    const readFileImpl = readFixture(FIXTURE);
     await expect(
-      planArticles({ PRERENDER_ARTICLES_FIXTURE: "f.json", ...SUPABASE_ENV }, { readFileImpl: readFixture(FIXTURE) }),
-    ).rejects.toThrow(/reads Supabase/);
+      planArticles(
+        { PRERENDER_ARTICLES_FIXTURE: "f.json", VITE_SUPABASE_URL: url, VITE_SUPABASE_PUBLISHABLE_KEY: KEY },
+        { readFileImpl },
+      ),
+    ).rejects.toThrow(/answers the e2e build's reads at https:\/\/supabase\.e2e\.invalid/);
+    expect(readFileImpl).not.toHaveBeenCalled();
+  });
+
+  it("refuses the fixture in a bundle that reads no Supabase (the Base44 path)", async () => {
+    await expect(
+      planArticles({ PRERENDER_ARTICLES_FIXTURE: "f.json" }, { readFileImpl: readFixture(FIXTURE) }),
+    ).rejects.toThrow(/this bundle reads no Supabase/);
+  });
+
+  it("reads the real table in a production build: a real project and no fixture", async () => {
+    // The production build: no fixture, a real URL — the live list, by fetch.
+    const fetchImpl = answer([{ slug: "live" }]);
+    const plan = await planArticles({ ...SUPABASE_ENV, PRERENDER_REQUIRED: "1" }, { fetchImpl });
+    expect(plan).toEqual({ routes: ["/blog/live"], fixtureRows: null, warning: null });
+    expect(new URL(fetchImpl.mock.calls[0][0]).origin).toBe(URL_);
+  });
+
+  it("refuses the fake host without its fixture, rather than asking a host that never answers", async () => {
+    const fetchImpl = answer([]);
+    await expect(planArticles(E2E_ENV, { fetchImpl })).rejects.toThrow(/fake Supabase host/);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("refuses a fixture article with an unusable slug", async () => {
     await expect(
-      planArticles({ PRERENDER_ARTICLES_FIXTURE: "f.json" }, { readFileImpl: readFixture([{ slug: "Bad" }]) }),
+      planArticles({ ...E2E_ENV, PRERENDER_ARTICLES_FIXTURE: "f.json" }, { readFileImpl: readFixture([{ slug: "Bad" }]) }),
     ).rejects.toThrow(/unusable slug/);
   });
 });
 
-describe("fixtureArticleFor", () => {
-  it("answers the page's Base44 read by the slug at the end of its URL", () => {
-    expect(
-      fixtureArticleFor("http://127.0.0.1:4183/api/apps/e2e-sanity-app/entities/BlogPost/bdikat-maslul-e2e", FIXTURE),
-    ).toBe(FIXTURE[0]);
+/**
+ * The PostgREST subset the e2e fake answers (e2e/fixtures/supabase-fake.ts) —
+ * shared by the e2e fixture and the prerender, so it is pinned once here.
+ */
+describe("answerRestRead (the e2e Supabase fake)", () => {
+  const rows = [
+    { id: "1", slug: "a", base44_id: null, published: true, created_at: "2026-01-01" },
+    { id: "2", slug: "b", base44_id: "68b0c0ffee0000000000bb02", published: false, created_at: "2026-03-01" },
+    { id: "3", slug: "c", base44_id: null, published: true, created_at: "2026-02-01" },
+  ];
+  const tables = new Map([["blog_posts", rows]]);
+  const read = (query: string) => answerRestRead(new URL(`${E2E_SUPABASE_URL}/rest/v1/blog_posts?${query}`), tables);
+  const slugs = (query: string) => (read(query).body as Array<{ slug: string }>).map((r) => r.slug);
+
+  it("filters with eq., orders and limits, as the blog list asks", () => {
+    expect(slugs("select=id,slug&published=eq.true&order=created_at.desc&limit=50")).toEqual(["c", "a"]);
+    expect(slugs("order=created_at.asc&limit=2")).toEqual(["a", "c"]);
   });
 
-  it("answers null for any other key", () => {
-    expect(fixtureArticleFor("http://127.0.0.1:4183/api/apps/x/entities/BlogPost/other", FIXTURE)).toBeNull();
+  it("answers an or=() over slug and base44_id, as one article's read asks", () => {
+    expect(slugs("or=(slug.eq.b,base44_id.eq.b)&limit=3")).toEqual(["b"]);
+    expect(slugs("or=(slug.eq.68b0c0ffee0000000000bb02,base44_id.eq.68b0c0ffee0000000000bb02)")).toEqual(["b"]);
+    expect(slugs("or=(slug.eq.none,base44_id.eq.none)")).toEqual([]);
+  });
+
+  it("answers is.null and not.is.null", () => {
+    expect(slugs("base44_id=is.null&order=slug.asc")).toEqual(["a", "c"]);
+    expect(slugs("base44_id=not.is.null")).toEqual(["b"]);
+  });
+
+  it("refuses a table nobody seeded, and a filter outside the subset, loudly", () => {
+    const missing = answerRestRead(new URL(`${E2E_SUPABASE_URL}/rest/v1/agencies?select=*`), tables);
+    expect(missing.status).toBe(404);
+    expect((missing.body as { code: string }).code).toBe("PGRST205");
+    const unsupported = read("title=ilike.*x*");
+    expect(unsupported.status).toBe(400);
+    expect((unsupported.body as { code: string }).code).toBe("PGRST100");
   });
 });
 
@@ -244,7 +305,7 @@ describe("loadPublishedArticles — the same rules for every build step", () => 
 
   it("returns the fixture rows in the e2e build", async () => {
     const out = await loadPublishedArticles(
-      { PRERENDER_ARTICLES_FIXTURE: "f.json" },
+      { ...E2E_ENV, PRERENDER_ARTICLES_FIXTURE: "f.json" },
       { readFileImpl: readFixture(FIXTURE) },
     );
     expect(out.fromFixture).toBe(true);

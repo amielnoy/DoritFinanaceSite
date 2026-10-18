@@ -84,8 +84,8 @@ test.describe("Quick contact form", () => {
     });
 
     const submission = await test_step(
-      "the browser hands the lead to the submitLead backend function",
-      async () => mockApi.waitForRequest("/functions/submitLead")
+      "the browser hands the lead to the submit-lead function",
+      async () => mockApi.waitForRequest("/functions/v1/submit-lead")
     );
 
     await test_step("it carries the shape the function destructures", async () => {
@@ -103,7 +103,7 @@ test.describe("Quick contact form", () => {
 
   test("shows a recoverable error and a direct mail fallback when sending fails", async ({ page, mockApi }) => {
     await test_step("break the mail integration with a 500", async () => {
-      mockApi.failOn("/functions/submitLead", 500, { error: "backend down" });
+      mockApi.failOn("/functions/v1/submit-lead", 500, { error: "backend down", rid: "e2e-rid" });
     });
 
     const form = new QuickContactForm(page);
@@ -129,7 +129,7 @@ test.describe("Quick contact form", () => {
 
     await test_step("the visitor is confirmed and exactly one lead is written", async () => {
       await expect(form.root.getByText("ההודעה נשלחה. תודה.")).toBeVisible();
-      expect(mockApi.requestsTo("/functions/submitLead").filter((r) => r.method === "POST")).toHaveLength(1);
+      expect(mockApi.requestsTo("/functions/v1/submit-lead").filter((r) => r.method === "POST")).toHaveLength(1);
     });
   });
 });

@@ -51,9 +51,14 @@ an admin actually takes, with adversarial input where a defect would be
 expensive (money maths, redirects, untrusted markdown), rather than exhaustive
 enumeration.
 
-The e2e suites are **hermetic**: `e2e/fixtures/app.ts` intercepts the
-`/api/**` and `/functions/v1/**` surfaces plus third-party beacons, so no test needs credentials,
-a linked Base44 app, or network access, and no test can touch production data.
+The e2e suites are **hermetic** and run **production's configuration**: the bundle
+is built by `npm run build:e2e` with `e2e/build-env.ts` (production's provider
+switches, Supabase at the never-resolving `https://supabase.e2e.invalid`), and
+`e2e/fixtures/app.ts` answers that host — `/rest/v1`, `/functions/v1`,
+`/storage/v1`, `/auth/v1` — and aborts third-party beacons, so no test needs
+credentials or network access, and no test can touch production data. A Base44
+`/api` request fails the test (since 2026-10-18; before that the build ran the
+Base44 adapters and the fixture stubbed `/api/**`).
 An opt-in block (`E2E_LIVE_API_URL`) runs the same contract against a real
 backend when one is available.
 

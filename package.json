@@ -11,6 +11,7 @@
     "build": "vite build",
     "build:chat-prompts": "node scripts/build-chat-prompts.mjs",
     "build:prerender": "vite build && node scripts/prerender.mjs && node scripts/build-seo-files.mjs",
+    "build:e2e": "node scripts/build-e2e.mjs",
     "prerender": "node scripts/prerender.mjs",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",

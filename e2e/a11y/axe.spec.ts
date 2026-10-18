@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE, expect, gotoApp, test, test_step } from "../fixtures/app";
+import { BLOG_POSTS, blogPostRow } from "../fixtures/data";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -313,7 +314,7 @@ test.describe("Accessibility — structural sanity", () => {
 test.describe("Article legibility", () => {
   test("an article is set for people who find reading hard", async ({ page }) => {
     test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
-    await gotoApp(page, "/blog/post-1");
+    await gotoApp(page, `/blog/${BLOG_POSTS[0].slug}`);
     const body = page.locator(".blog-body");
     await expect(body).toBeVisible();
 
@@ -375,22 +376,20 @@ test.describe("Article legibility", () => {
  * which is why the page sweep above never saw it — so this one is long.
  */
 test.describe("The contact box inside an article", () => {
-  const LONG_POST = {
-    id: "long-post",
+  const LONG_POST = blogPostRow({
+    id: "b1000000-0000-4000-8000-00000000001a",
     slug: "long-post",
     title: "מאמר ארוך עם תיבת יצירת קשר",
     excerpt: "",
     body: ["פסקה ראשונה.", "פסקה שנייה.", "פסקה שלישית.", "פסקה רביעית, אחרי התיבה."].join("\n\n"),
     tags: "פנסיה",
-    published: true,
-    created_date: "2026-03-10T09:00:00Z",
-  };
+  });
 
   test("keeps its own colours and clears 4.5:1", async ({ page, mockApi }) => {
     test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     await page.emulateMedia({ reducedMotion: "reduce" });
-    mockApi.setEntityDoc("BlogPost", LONG_POST.id, LONG_POST);
-    await gotoApp(page, `/blog/${LONG_POST.id}`);
+    mockApi.setRow("blog_posts", LONG_POST);
+    await gotoApp(page, `/blog/${LONG_POST.slug}`);
     const box = page.getByTestId("article_inline");
     await expect(box).toBeVisible();
 

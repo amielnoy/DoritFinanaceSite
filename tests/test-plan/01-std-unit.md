@@ -38,7 +38,8 @@ something outside the repository.
 | `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
 | `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
 | `groupOpenLeads`, `planAssignments`, `describeOpenLeads` | `scripts/assign-open-leads.mjs` |
-| `fetchPublishedArticles`, `planArticles`, `fixtureArticleFor`, `duplicateTitles` | `scripts/published-articles.mjs` |
+| `fetchPublishedArticles`, `planArticles`, `duplicateTitles` | `scripts/published-articles.mjs` |
+| `answerRestRead` — the PostgREST subset the e2e fake and the e2e prerender answer | `e2e/fixtures/supabase-fake.ts` |
 | `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
 
 > **Note.** `computePensionFees` was extracted from `PensionFeeCalculator.tsx`
@@ -538,17 +539,25 @@ and test articles can never reach a deployment.
 | UNIT-PUBART-012 | "fails when articles are required and Supabase is not configured" | Throws |
 | UNIT-PUBART-013 | "warns when Supabase cannot be read and articles are not required" | Warning naming `HTTP 503` |
 | UNIT-PUBART-014 | "fails when Supabase cannot be read and articles are required" | Throws `HTTP 503` |
-| UNIT-PUBART-015 | "takes the fixture's articles in the e2e build, without asking Supabase" | Fixture routes and rows; no request |
-| UNIT-PUBART-016..017 | "refuses the fixture in a Vercel build (%j)" | `VERCEL=1` or `VERCEL_ENV` → throws |
-| UNIT-PUBART-018 | "refuses the fixture in a bundle that reads Supabase" | Throws |
+| UNIT-PUBART-015 | "takes the fixture's articles in the e2e build, without asking Supabase" | With the fake host of `e2e/build-env.ts`: fixture routes and rows; no request |
+| UNIT-PUBART-016..017 | "refuses the fixture in a Vercel build (%j)" | `VERCEL=1` or `VERCEL_ENV` → throws, even with the fake host |
+| UNIT-PUBART-018 | (retired 2026-10-18: "refuses the fixture in a bundle that reads Supabase" — the e2e bundle reads Supabase now; UNIT-PUBART-034..037 hold the narrower rule) | — |
 | UNIT-PUBART-019 | "refuses a fixture article with an unusable slug" | Throws |
-| UNIT-PUBART-020 | "answers the page's Base44 read by the slug at the end of its URL" | The fixture row |
-| UNIT-PUBART-021 | "answers null for any other key" | `null` |
+| UNIT-PUBART-020 | (retired 2026-10-18: `fixtureArticleFor` answered a Base44 `/entities/BlogPost/<slug>` read; the prerender answers `/rest/v1/blog_posts` through `answerRestRead`, UNIT-PUBART-040..043) | — |
+| UNIT-PUBART-021 | (retired 2026-10-18: with UNIT-PUBART-020) | — |
 | UNIT-PUBART-022 | "names each title more than one route was rendered with" | `{ title, routes }` |
 | UNIT-PUBART-023 | "is empty when every title is distinct" | `[]` |
 | UNIT-PUBART-024 | "are the app's rule and address" | Same verdicts as `articlePath.ts` |
 | UNIT-PUBART-025..029 | "fetchPublishedArticles — every row, or an error" (asks for an exact count and a range; reads page after page until the total is reached; refuses fewer rows than the total; refuses an answer with no total; accepts an empty list when the total says zero) | `Prefer`, `Range-Unit`, `Range: 0-999`; two pages of a three-row list; `incomplete: 1 of 5`; `Content-Range` error; `[]` |
 | UNIT-PUBART-030..033 | "loadPublishedArticles — the same rules for every build step" (live rows with the columns asked for; fixture rows; warns when not required; throws when required) | `{ rows, fromFixture, warning }`; `select=slug%2Ctitle`; `HTTP 500` warning or throw |
+| UNIT-PUBART-034..036 | "refuses the fixture in a bundle that reads %s" (a real project; the fake host with a trailing slash; a look-alike host) | Throws naming the fake host; the fixture file is never read |
+| UNIT-PUBART-037 | "refuses the fixture in a bundle that reads no Supabase (the Base44 path)" | Throws `this bundle reads no Supabase` |
+| UNIT-PUBART-038 | "reads the real table in a production build: a real project and no fixture" | One request to the real project's origin; its rows' routes; `fixtureRows: null` |
+| UNIT-PUBART-039 | "refuses the fake host without its fixture, rather than asking a host that never answers" | Throws `fake Supabase host`; no request |
+| UNIT-PUBART-040 | "filters with eq., orders and limits, as the blog list asks" (`answerRestRead`) | `published=eq.true&order=created_at.desc` → newest published first; `limit` honoured |
+| UNIT-PUBART-041 | "answers an or=() over slug and base44_id, as one article's read asks" | The row by slug, or by Base44 id; none for an unknown key |
+| UNIT-PUBART-042 | "answers is.null and not.is.null" | The rows with and without a Base44 id |
+| UNIT-PUBART-043 | "refuses a table nobody seeded, and a filter outside the subset, loudly" | 404 `PGRST205`; 400 `PGRST100` |
 
 ### 4.23 Reading one article — `tests/unit/supabase-content.test.ts` (`getArticle`)
 

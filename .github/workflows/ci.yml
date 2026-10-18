@@ -146,6 +146,14 @@ jobs:
       # right and the artifact was a step behind. Changing the webServer command
       # in playwright.config.ts fixes the local run and nothing in CI.
       #
+      # `build:e2e` is `build:prerender` with e2e/build-env.ts: production's
+      # provider switches, pointed at a Supabase host only e2e/fixtures/app.ts
+      # answers, and one fixture article for the prerender instead of the live
+      # list. The same file playwright.config.ts and scripts/run-tests.sh build
+      # with. The fixture is refused in any Vercel build and for any other
+      # Supabase host (scripts/published-articles.mjs); workflow.contract.test.ts
+      # keeps build:e2e out of every other job.
+      #
       # The Base44-builder guard below deliberately stays on the plain `build`:
       # that is the command Base44 runs, and prerendering it would test a build
       # nobody performs.
@@ -157,11 +165,7 @@ jobs:
           # Fail here if the browser is unavailable, rather than shipping a
           # plain bundle that fails the prerender suite three jobs later.
           PRERENDER_REQUIRED: "1"
-          # This bundle is the e2e artifact and has no Supabase, so it prebuilds
-          # one fixture article instead of the live list. Refused in any Vercel
-          # build; workflow.contract.test.ts keeps it out of every other job.
-          PRERENDER_ARTICLES_FIXTURE: e2e/fixtures/prerender-articles.json
-        run: npm run build:prerender
+        run: npm run build:e2e
 
       # Publishing from the Base44 dashboard stays supported, so the build has to
       # keep working without anything this workflow supplies. CI sets
@@ -895,9 +899,9 @@ jobs:
           # "supabase" once the lead functions are switched on: the smoke then
           # requires submit-lead to report Google ready. Unset, it is not asked.
           E2E_EXPECT_GOOGLE: ${{ vars.LEAD_FUNCTIONS }}
-          # The same variable tells base44-contract.spec.ts which function the
-          # form posts to: submit-lead on Supabase, or submitLead on Base44.
-          E2E_LEAD_FUNCTIONS: ${{ vars.LEAD_FUNCTIONS }}
+          # No E2E_LEAD_FUNCTIONS any more: the form posts to submit-lead in the
+          # e2e build and in production alike, so backend-contract.spec.ts no
+          # longer asks which (2026-10-18).
 
       - name: Upload smoke report
         if: always()

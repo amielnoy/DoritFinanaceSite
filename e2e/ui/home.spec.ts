@@ -18,8 +18,8 @@ test.describe("Home — sanity", () => {
       expect(errors, errors.join("\n")).toEqual([]);
     });
 
-    await test_step("the shell no longer asks the backend for public settings", async () => {
-      expect(mockApi.requestsTo("/public-settings/")).toHaveLength(0);
+    await test_step("the shell asks the backend nothing about who the visitor is", async () => {
+      expect(mockApi.requestsTo("/auth/v1/")).toHaveLength(0);
     });
   });
 
@@ -101,7 +101,7 @@ test.describe("Home — sanity", () => {
     });
 
     await test_step("the page requested the testimonials", async () => {
-      await mockApi.waitForRequest("/entities/Testimonial");
+      await mockApi.waitForRequest("/rest/v1/testimonials");
     });
 
     await test_step("a testimonial from the backend is on screen", async () => {
@@ -113,12 +113,12 @@ test.describe("Home — sanity", () => {
 
     test.skip(AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE);
     await test_step("the backend has no testimonials", async () => {
-      mockApi.setEntity("Testimonial", []);
+      mockApi.setTable("testimonials", []);
     });
 
     await test_step("open the home page", async () => {
       await gotoApp(page);
-      await mockApi.waitForRequest("/entities/Testimonial");
+      await mockApi.waitForRequest("/rest/v1/testimonials");
     });
 
     await test_step("no section, no heading and no link to it", async () => {
@@ -132,8 +132,9 @@ test.describe("Home — sanity", () => {
   test("survives a backend that is completely down", async ({ page, mockApi }) => {
     const { errors } = collectPageErrors(page);
 
-    await test_step("make every entity endpoint fail with a 500", async () => {
-      mockApi.failOn("/entities/", 500, { error: "boom" });
+    await test_step("make every table read and every function fail with a 500", async () => {
+      mockApi.failOn("/rest/v1/", 500, { code: "XX000", message: "boom" });
+      mockApi.failOn("/functions/v1/", 500, { error: "boom", rid: "e2e-rid" });
     });
 
     await test_step("open the home page against the broken backend", async () => {

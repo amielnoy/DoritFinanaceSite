@@ -1,4 +1,5 @@
 import { defineConfig, devices, type ReporterDescription } from "@playwright/test";
+import { E2E_BUILD_ENV } from "./e2e/build-env";
 
 /**
  * Sanity e2e suite: UI, API, security and accessibility, run across desktop web,
@@ -9,10 +10,11 @@ import { defineConfig, devices, type ReporterDescription } from "@playwright/tes
  * user agent, touch, DPR) on the matching engine: WebKit for Safari on iOS,
  * Chromium for Chrome on Android.
  *
- * The suite is hermetic: the Base44 backend is stubbed at the network layer by
- * e2e/fixtures/app.ts, so it runs without `base44 link`, without credentials and
- * without touching production data. Point PLAYWRIGHT_BASE_URL at a running
- * `base44 dev` if you want to drive the real backend instead.
+ * The suite is hermetic: the bundle is built with production's configuration
+ * (e2e/build-env.ts) but pointed at a Supabase host that does not exist, and
+ * e2e/fixtures/app.ts answers that host at the network layer — so it runs
+ * without credentials and without touching production data. Point
+ * PLAYWRIGHT_BASE_URL at a deployment to smoke-test it instead.
  */
 
 const PORT = Number(process.env.PLAYWRIGHT_PORT || 4173);
@@ -144,7 +146,7 @@ export default defineConfig({
         // --host 127.0.0.1: vite preview otherwise binds ::1 only, which the
         // baseURL health check cannot reach.
         command: [
-          skipBuild ? null : "npm run build:prerender",
+          skipBuild ? null : "npm run build:e2e",
           `npx vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
         ]
           .filter(Boolean)
@@ -152,33 +154,17 @@ export default defineConfig({
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,
-        env: {
-          // The stubbed backend keys off this id; it never reaches a real app.
-          //
-          // It matters here only while this command still runs `npm run build`:
-          // Vite inlines `import.meta.env.VITE_BASE44_APP_ID` at build time, so
-          // once SKIP_BUILD=1 the bundle is already sealed and this value has
-          // nothing left to affect. scripts/run-tests.sh, which is what sets
-          // SKIP_BUILD, exports the same default around its own build.
-          VITE_BASE44_APP_ID: process.env.VITE_BASE44_APP_ID || "e2e-sanity-app",
-          // Hold the preview server's /api proxy off, whatever the developer's
-          // .env.local says. Setting this variable is how you point a local
-          // preview at the live backend (see the README), and it is the same
-          // variable the Base44 Vite plugin uses for `vite dev` — so it is
-          // exactly the sort of thing that ends up in .env.local and stays
-          // there. This suite is hermetic because e2e/fixtures/app.ts stubs
-          // every /api call; a request that slipped past the fixture has to
-          // 404, not create a real lead and send real email.
-          VITE_BASE44_APP_BASE_URL: "",
-          // The same reasoning for Supabase: the e2e fixtures stub Base44, so a
-          // build that inlined .env.local's Supabase credentials would read the
-          // live project for every blog, testimonial and admin list instead.
-          VITE_SUPABASE_URL: "",
-          VITE_SUPABASE_PUBLISHABLE_KEY: "",
-          // One fixture article for the prerender to prebuild. The build has no
-          // Supabase (above), so the article list comes from this file and the
-          // page's Base44 read is answered from it — scripts/published-articles.mjs.
-          PRERENDER_ARTICLES_FIXTURE: "e2e/fixtures/prerender-articles.json",
-        },
+        // The build's environment is e2e/build-env.ts, applied by `npm run
+        // build:e2e`. Given to the preview server as well, for the one value it
+        // reads at serve time rather than at build time: VITE_BASE44_APP_BASE_URL,
+        // empty, which holds the preview's /api proxy off whatever .env.local
+        // says. This suite is hermetic because e2e/fixtures/app.ts answers the
+        // fake Supabase host the bundle calls; a request that slipped past it
+        // has to fail, not create a real lead and send real email.
+        //
+        // Once SKIP_BUILD=1 (scripts/run-tests.sh, CI) the bundle is already
+        // sealed — Vite inlines `import.meta.env.*` at build time — and nothing
+        // here can change what it calls.
+        env: { ...E2E_BUILD_ENV },
       },
 });

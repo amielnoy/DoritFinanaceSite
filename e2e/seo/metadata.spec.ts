@@ -12,7 +12,7 @@ import { expect, gotoApp, test, test_step } from "../fixtures/app";
 const PUBLIC_ROUTES = [
   { path: "/", name: "home", titleContains: "דורית גוב ארי" },
   { path: "/blog", name: "blog list", titleContains: "בלוג" },
-  { path: `/blog/${BLOG_POSTS[0].id}`, name: "blog post", titleContains: BLOG_POSTS[0].title },
+  { path: `/blog/${BLOG_POSTS[0].slug}`, name: "blog post", titleContains: BLOG_POSTS[0].title },
   { path: "/claims", name: "claims", titleContains: "תביעות" },
   { path: "/privacy", name: "privacy", titleContains: "פרטיות" },
   { path: "/accessibility", name: "accessibility", titleContains: "נגישות" },
@@ -177,18 +177,18 @@ test.describe("Social sharing cards", () => {
   });
 
   test("a blog post shares as an article with its own image and date", async ({ page }) => {
-    await openRoute(page, { path: `/blog/${BLOG_POSTS[0].id}`, titleContains: BLOG_POSTS[0].title });
+    await openRoute(page, { path: `/blog/${BLOG_POSTS[0].slug}`, titleContains: BLOG_POSTS[0].title });
 
     await test_step("the post shares as an article, with its own image and publish date", async () => {
       expect(await head.og(page, "og:type")).toBe("article");
       expect(await head.og(page, "og:image")).toBe(BLOG_POSTS[0].image_url);
-      expect(await head.og(page, "article:published_time")).toBe(BLOG_POSTS[0].created_date);
+      expect(await head.og(page, "article:published_time")).toBe(BLOG_POSTS[0].created_at);
       expect(await page.locator('head meta[property="article:tag"]').count()).toBe(2);
     });
   });
 
   test("a post without its own image falls back to the site card", async ({ page }) => {
-    await openRoute(page, { path: `/blog/${BLOG_POSTS[1].id}`, titleContains: BLOG_POSTS[1].title });
+    await openRoute(page, { path: `/blog/${BLOG_POSTS[1].slug}`, titleContains: BLOG_POSTS[1].title });
 
     await test_step("the site's own card image is used instead", async () => {
       expect(await head.og(page, "og:image")).toMatch(/^https:\/\//);
@@ -279,7 +279,7 @@ test.describe("Structured data", () => {
   });
 
   test("a blog post publishes BlogPosting markup with author and publisher", async ({ page }) => {
-    await openRoute(page, { path: `/blog/${BLOG_POSTS[0].id}`, titleContains: BLOG_POSTS[0].title });
+    await openRoute(page, { path: `/blog/${BLOG_POSTS[0].slug}`, titleContains: BLOG_POSTS[0].title });
 
     const posting = await test_step("read the post's BlogPosting block", async () => {
       const found = (await head.jsonLd(page)).find((b) => b["@type"] === "BlogPosting");
@@ -289,10 +289,10 @@ test.describe("Structured data", () => {
 
     await test_step("it names the article, its date, its author and its publisher", async () => {
       expect(posting.headline).toBe(BLOG_POSTS[0].title);
-      expect(posting.datePublished).toBe(BLOG_POSTS[0].created_date);
+      expect(posting.datePublished).toBe(BLOG_POSTS[0].created_at);
       expect(posting.author).toMatchObject({ "@type": "Person", name: "דורית גוב ארי" });
       expect(posting.publisher["@type"]).toBe("Organization");
-      expect(posting.mainEntityOfPage["@id"]).toContain(`/blog/${BLOG_POSTS[0].id}`);
+      expect(posting.mainEntityOfPage["@id"]).toContain(`/blog/${BLOG_POSTS[0].slug}`);
     });
 
     await test_step("its description is prose, not raw markdown", async () => {

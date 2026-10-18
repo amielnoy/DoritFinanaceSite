@@ -270,7 +270,7 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
 
     await test_step("the message is confirmed and the lead reaches the backend", async () => {
       await expect(form.getByText("ההודעה נשלחה. תודה.")).toBeVisible();
-      const lead = await mockApi.waitForRequest("/functions/submitLead");
+      const lead = await mockApi.waitForRequest("/functions/v1/submit-lead");
       expect(lead.body).toMatchObject({ source: "quick" });
     });
   });
