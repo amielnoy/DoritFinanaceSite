@@ -12,7 +12,8 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { base44Mock } from "./base44-mock";
+import type { Article } from "@/services";
+import { resetServicesMock, servicesMock } from "./services-mock";
 
 if (typeof (globalThis as any).ResizeObserver === "undefined") {
   (globalThis as any).ResizeObserver = class {
@@ -22,8 +23,7 @@ if (typeof (globalThis as any).ResizeObserver === "undefined") {
   };
 }
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 
 const auth = vi.hoisted(() => ({ isAuthenticated: false, user: null as null | { role: string } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth }));
@@ -44,7 +44,7 @@ vi.mock("framer-motion", async () => {
 const { default: BlogPost } = await import("@/pages/BlogPost");
 
 const B44 = "64f0a1b2c3d4e5f6a7b8c9d0";
-const ARTICLE = {
+const ARTICLE: Article = {
   id: B44,
   slug: "horadat-dmei-nihul",
   title: "להוריד דמי ניהול בפנסיה",
@@ -79,29 +79,27 @@ const renderAt = (path: string) =>
 
 const where = () => screen.getByTestId("where").textContent;
 
-beforeEach(() => {
-  base44Mock.entities.BlogPost.get.mockReset();
-});
+beforeEach(() => resetServicesMock());
 
 describe("an article reached by an old-form address", () => {
   it("takes its slug address, keeping the query and the hash", async () => {
-    base44Mock.entities.BlogPost.get.mockResolvedValue(ARTICLE);
+    servicesMock.content.getArticle.mockResolvedValue(ARTICLE);
     renderAt(`/blog/${B44}?utm_source=whatsapp#mah-bodkim`);
     await screen.findByRole("heading", { level: 1, name: ARTICLE.title });
     await waitFor(() => expect(where()).toBe("/blog/horadat-dmei-nihul?utm_source=whatsapp#mah-bodkim"));
     // Put under its new key before the switch, so the slug address costs no second read.
-    expect(base44Mock.entities.BlogPost.get).toHaveBeenCalledTimes(1);
+    expect(servicesMock.content.getArticle).toHaveBeenCalledTimes(1);
   });
 
   it("stays where it is when the address already is the slug", async () => {
-    base44Mock.entities.BlogPost.get.mockResolvedValue(ARTICLE);
+    servicesMock.content.getArticle.mockResolvedValue(ARTICLE);
     renderAt("/blog/horadat-dmei-nihul");
     await screen.findByRole("heading", { level: 1, name: ARTICLE.title });
     expect(where()).toBe("/blog/horadat-dmei-nihul");
   });
 
   it("stays on the id where the store has no slug (a build reading Base44)", async () => {
-    base44Mock.entities.BlogPost.get.mockResolvedValue({ ...ARTICLE, slug: undefined });
+    servicesMock.content.getArticle.mockResolvedValue({ ...ARTICLE, slug: undefined });
     renderAt(`/blog/${B44}`);
     await screen.findByRole("heading", { level: 1, name: ARTICLE.title });
     expect(where()).toBe(`/blog/${B44}`);

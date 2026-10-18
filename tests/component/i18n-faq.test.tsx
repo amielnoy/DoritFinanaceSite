@@ -5,12 +5,11 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { base44Mock, resetBase44Mock } from "./base44-mock";
+import { resetServicesMock } from "./services-mock";
 
 /* /faq in English and French (slice 3), and the home page's FAQ block back on /en. */
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 vi.mock("@/i18n/locales", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/i18n/locales")>();
   return { ...actual, ENABLED_LOCALES: ["he", "en", "fr"] };
@@ -73,8 +72,7 @@ const faqLd = () =>
     .find((d) => d["@type"] === "FAQPage");
 
 beforeEach(() => {
-  resetBase44Mock();
-  base44Mock.entities.Testimonial.list.mockResolvedValue([]);
+  resetServicesMock();
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     writable: true,

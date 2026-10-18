@@ -10,7 +10,8 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { base44Mock, resetBase44Mock } from "./base44-mock";
+import type { Article } from "@/services";
+import { resetServicesMock, servicesMock } from "./services-mock";
 import { FEATURED } from "@/config/blog-topics";
 
 if (typeof (globalThis as any).ResizeObserver === "undefined") {
@@ -21,8 +22,7 @@ if (typeof (globalThis as any).ResizeObserver === "undefined") {
   };
 }
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 
 const auth = vi.hoisted(() => ({ isAuthenticated: false, user: null as null | { role: string } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth }));
@@ -46,7 +46,7 @@ vi.mock("@/components/dorit/chat/AgentChat", () => ({
   ),
 }));
 
-const post = (id: string, tags: string, over: Record<string, unknown> = {}) => ({
+const post = (id: string, tags: string, over: Partial<Article> = {}): Article => ({
   id,
   title: `מאמר ${id}`,
   excerpt: `תקציר ${id}`,
@@ -121,8 +121,8 @@ const topicButton = (name: RegExp) =>
 const featuredRow = () => screen.queryByRole("region", { name: "מומלץ עכשיו" });
 
 beforeEach(() => {
-  resetBase44Mock();
-  base44Mock.entities.BlogPost.filter.mockResolvedValue(POSTS);
+  resetServicesMock();
+  servicesMock.content.listArticles.mockResolvedValue(POSTS);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-15T10:00:00Z"));
 });
@@ -294,7 +294,7 @@ describe("the featured row", () => {
   });
 
   it("is gone when the featured article is not published", async () => {
-    base44Mock.entities.BlogPost.filter.mockResolvedValue(POSTS.slice(1));
+    servicesMock.content.listArticles.mockResolvedValue(POSTS.slice(1));
     renderBlog();
     await loaded();
     expect(featuredRow()).toBeNull();
@@ -378,7 +378,7 @@ describe("the contact band", () => {
 
 describe("article links", () => {
   it("links each card and the blog's JSON-LD to the slug, or to the id where the store has none", async () => {
-    base44Mock.entities.BlogPost.filter.mockResolvedValue([
+    servicesMock.content.listArticles.mockResolvedValue([
       post("pen-1", "פנסיה", { slug: "maslul-hashkaa" }),
       post("pen-2", "פנסיה"),
     ]);
@@ -399,7 +399,7 @@ describe("while the articles load", () => {
   it("keeps the filters and holds a screen's height for the grid, so the prerendered page does not jump", async () => {
     // D-06, manual test 2026-10-14: hiding the filters until the read answered
     // gave /blog a layout shift of 0.444.
-    base44Mock.entities.BlogPost.filter.mockReturnValue(new Promise(() => {}));
+    servicesMock.content.listArticles.mockReturnValue(new Promise(() => {}));
     renderBlog();
     expect(await screen.findByRole("group", { name: "סינון לפי נושא" }, { timeout: 5000 })).toBeTruthy();
     expect(screen.getByLabelText("חיפוש מאמרים")).toBeTruthy();
@@ -411,20 +411,20 @@ describe("while the articles load", () => {
 describe("when the articles cannot be read", () => {
   it("says so and offers a retry, rather than saying there are no articles", async () => {
     // D-09, manual test 2026-10-14.
-    base44Mock.entities.BlogPost.filter.mockRejectedValue(new Error("network"));
+    servicesMock.content.listArticles.mockRejectedValue(new Error("network"));
     renderBlog();
     const alert = await screen.findByRole("alert", {}, { timeout: 5000 });
     expect(alert.textContent).toContain("לא הצלחנו לטעון את המאמרים");
     expect(screen.queryByText(/עדיין אין מאמרים/)).toBeNull();
 
-    base44Mock.entities.BlogPost.filter.mockResolvedValue(POSTS);
+    servicesMock.content.listArticles.mockResolvedValue(POSTS);
     fireEvent.click(within(alert).getByRole("button", { name: "לנסות שוב" }));
     await until(() => gridIds().length > 0, "the cards after a retry");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("still says there are none when the read succeeds empty", async () => {
-    base44Mock.entities.BlogPost.filter.mockResolvedValue([]);
+    servicesMock.content.listArticles.mockResolvedValue([]);
     renderBlog();
     expect(await screen.findByText(/עדיין אין מאמרים/, {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.queryByRole("group", { name: "סינון לפי נושא" })).toBeNull();

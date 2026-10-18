@@ -5,10 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { base44Mock } from "./base44-mock";
-
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 vi.mock("@/lib/AuthContext", () => ({
   useAuth: () => ({ user: { full_name: "רונית", email: "ronit@example.com", id: "u1" }, isAuthenticated: true, logout: vi.fn() }),
 }));

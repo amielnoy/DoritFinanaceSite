@@ -9,7 +9,10 @@
 
 Sanity-check every first-party component that carries behaviour: that it
 renders, exposes the accessible names screen readers and the e2e suite depend
-on, and calls the Base44 client with the payload the backend contract expects.
+on, and asks the services (`@/services`) for what it needs with the domain
+objects the ports take. What each adapter then sends over the wire is held by
+the adapter unit tests and `tests/contract/frontend-payloads.contract.test.ts`,
+not here.
 
 ## 2. Test items
 
@@ -21,7 +24,7 @@ on, and calls the Base44 client with the payload the backend contract expects.
 
 | Concern | Handling |
 |---|---|
-| Base44 SDK | `vi.mock("@/api/base44Client")` → `tests/component/base44-mock.ts`; assertions are on the recorded calls |
+| Services | `vi.mock("@/services")` → `tests/component/services-mock.ts`: every port method a `vi.fn`, unscripted answering as a build without Supabase does (nobody signed in, the clearinghouse unavailable, the public writes succeed); `resetServicesMock()` drops a case's script. Assertions are on the recorded port calls. No test reaches a backend adapter, the Base44 SDK client or `@/lib/app-params`, so neither is mocked |
 | `framer-motion` | Replaced with a pass-through proxy; jsdom has no layout engine for its animations |
 | Router | Components using `<Link>` are wrapped in `MemoryRouter` |
 | Queries | Role and label based (`getByRole`, `getByLabelText`) — the same accessibility surface the e2e suite asserts on |
@@ -69,10 +72,10 @@ The lead box under both /tools calculators is §4.25.
 | ID | Title | Steps | Expected result |
 |---|---|---|---|
 | CMP-QCF-001 | "disables submit until name and phone are present" | type name, then phone | Submit enabled only after both |
-| CMP-QCF-002 | "hands the lead to the submitLead backend function" | fill + submit | `functions.invoke("submitLead", {name, phone, email, source:"quick"})`; `SendEmail` and `Lead.create` are **not** called — the mail and the write moved into the function |
+| CMP-QCF-002 | "hands the lead to the lead port's submitLead" | fill + submit | `leads.submitLead` once with `{name, phone, email, source:"quick"}`; no other port is asked to save or send (`submitClaim`, `requestConsultationEvent`, `support.escalate`) — the mail and the write live in the backend function, which the adapter calls (`submitLead` / `submit-lead`, frontend-payloads contract) |
 | CMP-QCF-003 | "confirms to the visitor and clears the form after a successful send" | submit, then "send another" | Confirmation shown; fields reset |
-| CMP-QCF-004 | "keeps the visitor's input and offers a fallback when sending fails" | `SendEmail` rejects | Error message shown; typed name still present |
-| CMP-QCF-005 | "does not submit twice on a double click" | double-click submit | The function is invoked exactly once |
+| CMP-QCF-004 | "keeps the visitor's input and offers a fallback when sending fails" | `submitLead` rejects | Error message shown; typed name still present |
+| CMP-QCF-005 | "does not submit twice on a double click" | double-click submit | `submitLead` is called exactly once |
 | CMP-QCF-006 | "refuses a phone Dorit could not call back, and says so" | name + phone `abc`, submit; then `+972 50 123 4567` | Alert "מספר הטלפון לא נראה תקין", phone `aria-invalid`, nothing sent; the +972 number is sent (D-01) |
 
 ### 4.5 `<ClaimForm />` — the claim report
@@ -83,8 +86,8 @@ React does not surface anywhere a visitor can see. The form simply stops.
 
 | ID | Title | Steps | Expected result |
 |---|---|---|---|
-| CMP-CLM-001 | "hands the report to the submitClaim backend function with uploaded document urls" | fill, attach a file, submit | The file is uploaded on send, then `functions.invoke("submitClaim", {name, phone, documents:[url]})` |
-| CMP-CLM-002 | "reports a failed upload on send instead of crashing, sends nothing, and uploads once on the retry" | `UploadFile` rejects once, then send again | Upload error shown; `submitClaim` not called; submit still enabled; the retry uploads and sends |
+| CMP-CLM-001 | "hands the report to the lead port's submitClaim with uploaded document urls" | fill, attach a file, submit | The file goes to `claimDocuments.upload` on send, then `leads.submitClaim` once with `{name, phone, documents:[url]}` |
+| CMP-CLM-002 | "reports a failed upload on send instead of crashing, sends nothing, and uploads once on the retry" | `claimDocuments.upload` rejects once, then send again | Upload error shown; `submitClaim` not called; submit still enabled; the retry uploads and sends |
 | CMP-CLM-006 | "uploads nothing when a file is picked — only on send" | pick a file, remove it, send | No upload at any point; `documents: []` (D-02) |
 | CMP-CLM-007 | "names a file it will not take, by its name and why, and keeps the rest" | pick an `.exe`, a 30 MB PDF and a PDF | Each refusal names its file and reason; only the good PDF is listed (D-02) |
 | CMP-CLM-008 | "offers only the bucket's types in the file picker" | render | `accept` has `application/pdf` and `.heic`, no wildcard |
@@ -99,9 +102,9 @@ React does not surface anywhere a visitor can see. The form simply stops.
 |---|---|---|
 | CMP-FAQ-001 | "renders questions as buttons and reveals the answer on click" | Content grows after clicking the first question |
 | CMP-SHR-001 | "renders share targets that all use https and a safe rel" | Every `target=_blank` href is `https:` or `mailto:`; `rel` contains `noopener` |
-| CMP-RVW-001 | "asks the backend for testimonials on mount" | `Testimonial.list("-created_date", 50)` |
+| CMP-RVW-001 | "asks the backend for testimonials on mount" | `content.listTestimonials(50)`; newest first is the port's promise, held by each adapter's own test (`supabase-content.test.ts`) |
 | CMP-RVW-002 | "renders without crashing when the backend returns nothing" | No throw on an empty list |
-| CMP-RVW-003 | "survives a backend error without throwing" | No throw when `list` rejects |
+| CMP-RVW-003 | "survives a backend error without throwing" | No throw when `listTestimonials` rejects |
 
 ### 4.7 `<Account />` — the personal area
 
@@ -581,7 +584,7 @@ or while there are no deposits to compute from (`useCalculatorResultEvent`). Fak
 
 ### 4.27 The article contact boxes — `tests/component/article-contact-boxes.test.tsx`
 
-`BlogPost` over the Base44 mock (as in §blog-post-redirect); `framer-motion` stubbed.
+`BlogPost` over `services.content.getArticle` mocked (as in §blog-post-redirect); `framer-motion` stubbed.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -707,7 +710,7 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 
 ### 4.35 The home page in English and French — `tests/component/i18n-home.test.tsx`
 
-`<Home />` through `LocaleLayout` at `/en`, `/fr` and `/`; Base44 mocked (one Hebrew testimonial), `submitLead` mocked, a desktop `matchMedia`.
+`<Home />` through `LocaleLayout` at `/en`, `/fr` and `/`; `services` mocked (one Hebrew testimonial from `content.listTestimonials`; `leads.submitLead` recorded), a desktop `matchMedia`.
 
 | ID | Title | Expected result |
 |---|---|---|

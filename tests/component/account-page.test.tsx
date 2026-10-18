@@ -5,11 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { base44Mock } from "./base44-mock";
-
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-// The page imports the composition root, which reads the stored-token flag.
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+// The page's defaults read `@/services`; these cases pass every load in as a prop.
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 
 const auth = vi.hoisted(() => ({ user: { full_name: "רונית אבני", email: "ronit@example.com" } as Record<string, unknown> }));
 const logoutSpy = vi.hoisted(() => vi.fn());

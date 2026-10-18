@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { base44Mock } from "./base44-mock";
 
 /*
  * The not-found page and the skip link, through LocaleLayout as App.jsx routes
@@ -21,8 +20,7 @@ if (typeof (globalThis as any).ResizeObserver === "undefined") {
   };
 }
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 vi.mock("@/i18n/locales", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/i18n/locales")>();
   return { ...actual, ENABLED_LOCALES: ["he", "en", "fr"] };

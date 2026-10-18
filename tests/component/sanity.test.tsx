@@ -2,8 +2,10 @@
  * @vitest-environment jsdom
  *
  * Sanity component tests: each first-party component renders, exposes the
- * accessible names the e2e suite and screen readers rely on, and calls the
- * Base44 client with the payload the backend contract expects.
+ * accessible names the e2e suite and screen readers rely on, and asks the
+ * services (`@/services`) for what it needs with the domain objects the ports
+ * take. The wire shape each adapter sends is held by the adapter tests and
+ * tests/contract/frontend-payloads.contract.test.ts.
  */
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -11,12 +13,13 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { base44Mock, resetBase44Mock } from "./base44-mock";
+import { resetServicesMock, servicesMock } from "./services-mock";
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-// The composition root reads the stored-token flag from app-params, which
-// bootstraps the SDK's token handling at import; components never sign in.
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
+
+const { submitLead, submitClaim } = servicesMock.leads;
+const { upload } = servicesMock.claimDocuments;
+const { listTestimonials } = servicesMock.content;
 
 // framer-motion's layout animations need APIs jsdom does not implement.
 vi.mock("framer-motion", async () => {
@@ -64,7 +67,7 @@ const withProviders = (ui: React.ReactElement) => {
   );
 };
 
-beforeEach(() => resetBase44Mock());
+beforeEach(() => resetServicesMock());
 
 describe("<Stars />", () => {
   it("exposes the rating as an image with an accessible name", () => {
@@ -228,15 +231,15 @@ describe("<QuickContact />", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("מספר הטלפון לא נראה תקין");
     expect(screen.getByLabelText(/טלפון/)).toHaveAttribute("aria-invalid", "true");
-    expect(base44Mock.functions.invoke).not.toHaveBeenCalled();
+    expect(submitLead).not.toHaveBeenCalled();
 
     await user.clear(screen.getByLabelText(/טלפון/));
     await user.type(screen.getByLabelText(/טלפון/), "+972 50 123 4567");
     await user.click(screen.getByRole("button", { name: /שליחת הודעה/ }));
-    await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(submitLead).toHaveBeenCalledTimes(1));
   });
 
-  it("hands the lead to the submitLead backend function", async () => {
+  it("hands the lead to the lead port's submitLead", async () => {
     const user = userEvent.setup();
     render(<QuickContact />);
 
@@ -245,19 +248,19 @@ describe("<QuickContact />", () => {
     await user.type(screen.getByLabelText(/אימייל/), "a@b.co");
     await user.click(screen.getByRole("button", { name: /שליחת הודעה/ }));
 
-    // Email delivery and the Lead write now live in the backend function, so
-    // the component's whole contract is this one call.
-    await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalled());
-    const [fnName, payload] = base44Mock.functions.invoke.mock.calls[0] as [string, any];
-    expect(fnName).toBe("submitLead");
-    expect(payload).toMatchObject({
+    // Email delivery and the lead write live in the backend function, so the
+    // component's whole contract is this one call: no other port is asked to
+    // save or send anything.
+    await waitFor(() => expect(submitLead).toHaveBeenCalledTimes(1));
+    expect(submitLead.mock.calls[0][0]).toMatchObject({
       name: "ישראלה",
       phone: "050-1234567",
       email: "a@b.co",
       source: "quick",
     });
-    expect(base44Mock.integrations.Core.SendEmail).not.toHaveBeenCalled();
-    expect(base44Mock.entities.Lead.create).not.toHaveBeenCalled();
+    expect(submitClaim).not.toHaveBeenCalled();
+    expect(servicesMock.leads.requestConsultationEvent).not.toHaveBeenCalled();
+    expect(servicesMock.support.escalate).not.toHaveBeenCalled();
   });
 
   it("confirms to the visitor and clears the form after a successful send", async () => {
@@ -275,7 +278,7 @@ describe("<QuickContact />", () => {
 
   it("keeps the visitor's input and offers a fallback when sending fails", async () => {
     const user = userEvent.setup();
-    base44Mock.functions.invoke.mockRejectedValueOnce(new Error("backend down"));
+    submitLead.mockRejectedValueOnce(new Error("backend down"));
     render(<QuickContact />);
 
     await user.type(screen.getByLabelText(/שם מלא/), "ישראלה");
@@ -293,7 +296,7 @@ describe("<QuickContact />", () => {
     (window as any).gtag = gtag;
     const user = userEvent.setup();
     try {
-      base44Mock.functions.invoke.mockRejectedValueOnce(new Error("backend down"));
+      submitLead.mockRejectedValueOnce(new Error("backend down"));
       render(<QuickContact />);
       await user.type(screen.getByLabelText(/שם מלא/), "ישראלה");
       await user.type(screen.getByLabelText(/טלפון/), "050-1234567");
@@ -319,7 +322,7 @@ describe("<QuickContact />", () => {
     const submit = screen.getByRole("button", { name: /שליחת הודעה/ });
     await user.dblClick(submit);
 
-    await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(submitLead).toHaveBeenCalledTimes(1));
   });
 });
 
@@ -329,7 +332,7 @@ describe("<ClaimForm />", () => {
     await user.type(screen.getByLabelText(/טלפון/), "050-1234567");
   };
 
-  it("hands the report to the submitClaim backend function with uploaded document urls", async () => {
+  it("hands the report to the lead port's submitClaim with uploaded document urls", async () => {
     const user = userEvent.setup();
     render(<ClaimForm />);
 
@@ -339,10 +342,9 @@ describe("<ClaimForm />", () => {
     expect(await screen.findByText("receipt.png")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
-    await waitFor(() => expect(base44Mock.functions.invoke).toHaveBeenCalled());
-    const [fnName, payload] = base44Mock.functions.invoke.mock.calls[0] as [string, any];
-    expect(fnName).toBe("submitClaim");
-    expect(payload).toMatchObject({
+    await waitFor(() => expect(submitClaim).toHaveBeenCalledTimes(1));
+    expect(upload).toHaveBeenCalledWith(file);
+    expect(submitClaim.mock.calls[0][0]).toMatchObject({
       name: "ישראלה",
       phone: "050-1234567",
       documents: ["https://example.test/f.png"],
@@ -362,7 +364,7 @@ describe("<ClaimForm />", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("נא להזין מספר טלפון ישראלי");
     expect(phone).toHaveAttribute("aria-invalid", "true");
     expect(phone).toHaveAccessibleDescription(/נא להזין מספר טלפון ישראלי/);
-    expect(base44Mock.functions.invoke).not.toHaveBeenCalled();
+    expect(submitClaim).not.toHaveBeenCalled();
 
     // Editing the field clears the message until the next send.
     await user.clear(phone);
@@ -386,15 +388,14 @@ describe("<ClaimForm />", () => {
     await fill(user);
     await user.upload(screen.getByLabelText(/לחצו לבחירת קבצים/), new File(["x"], "receipt.png", { type: "image/png" }));
     expect(await screen.findByText("receipt.png")).toBeInTheDocument();
-    expect(base44Mock.integrations.Core.UploadFile).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
 
     // Removed before sending, it never leaves the browser.
     await user.click(screen.getByRole("button", { name: "הסרה" }));
     await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
     await screen.findByText("הדיווח התקבל");
-    expect(base44Mock.integrations.Core.UploadFile).not.toHaveBeenCalled();
-    const [, payload] = base44Mock.functions.invoke.mock.calls[0] as [string, any];
-    expect(payload.documents).toEqual([]);
+    expect(upload).not.toHaveBeenCalled();
+    expect(submitClaim.mock.calls[0][0].documents).toEqual([]);
   });
 
   it("names a file it will not take, by its name and why, and keeps the rest", async () => {
@@ -427,7 +428,7 @@ describe("<ClaimForm />", () => {
     // Regression: this path used to call a setter that did not exist and threw
     // a ReferenceError out of the change handler.
     const user = userEvent.setup();
-    base44Mock.integrations.Core.UploadFile.mockRejectedValueOnce(new Error("storage down"));
+    upload.mockRejectedValueOnce(new Error("storage down"));
     render(<ClaimForm />);
 
     await fill(user);
@@ -437,18 +438,18 @@ describe("<ClaimForm />", () => {
     await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
 
     expect(await screen.findByText(/העלאת מסמך נכשלה/)).toBeInTheDocument();
-    expect(base44Mock.functions.invoke).not.toHaveBeenCalled();
+    expect(submitClaim).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /שליחת דיווח/ })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
     await screen.findByText("הדיווח התקבל");
-    expect(base44Mock.integrations.Core.UploadFile).toHaveBeenCalledTimes(2);
-    expect(base44Mock.functions.invoke).toHaveBeenCalledTimes(1);
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(submitClaim).toHaveBeenCalledTimes(1);
   });
 
   it("does not upload a document twice when the send fails after the uploads", async () => {
     const user = userEvent.setup();
-    base44Mock.functions.invoke.mockRejectedValueOnce(new Error("backend down"));
+    submitClaim.mockRejectedValueOnce(new Error("backend down"));
     render(<ClaimForm />);
 
     await fill(user);
@@ -458,9 +459,8 @@ describe("<ClaimForm />", () => {
 
     await user.click(screen.getByRole("button", { name: /שליחת דיווח/ }));
     await screen.findByText("הדיווח התקבל");
-    expect(base44Mock.integrations.Core.UploadFile).toHaveBeenCalledTimes(1);
-    const [, payload] = base44Mock.functions.invoke.mock.calls[1] as [string, any];
-    expect(payload.documents).toEqual(["https://example.test/f.png"]);
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(submitClaim.mock.calls[1][0].documents).toEqual(["https://example.test/f.png"]);
   });
 
   it("offers a blank form again after a successful report", async () => {
@@ -532,22 +532,23 @@ describe("<ShareButtons />", () => {
 describe("<ReviewsWidget />", () => {
   it("asks the backend for testimonials on mount", async () => {
     withProviders(<ReviewsWidget />);
-    await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
-    // The limit is the port's default; the sort is the contract the widget relies on.
-    expect(base44Mock.entities.Testimonial.list).toHaveBeenCalledWith("-created_date", 50);
+    await waitFor(() => expect(listTestimonials).toHaveBeenCalled());
+    // The limit is the hook's default. Newest first is the port's promise, held
+    // by each adapter's own test (supabase-content.test.ts).
+    expect(listTestimonials).toHaveBeenCalledWith(50);
   });
 
   it("renders without crashing when the backend returns nothing", async () => {
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce([]);
+    listTestimonials.mockResolvedValueOnce([]);
     const { container } = withProviders(<ReviewsWidget />);
-    await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
+    await waitFor(() => expect(listTestimonials).toHaveBeenCalled());
     expect(container).toBeTruthy();
   });
 
   it("survives a backend error without throwing", async () => {
-    base44Mock.entities.Testimonial.list.mockRejectedValueOnce(new Error("boom"));
+    listTestimonials.mockRejectedValueOnce(new Error("boom"));
     const { container } = withProviders(<ReviewsWidget />);
-    await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
+    await waitFor(() => expect(listTestimonials).toHaveBeenCalled());
     expect(container).toBeTruthy();
   });
 });
