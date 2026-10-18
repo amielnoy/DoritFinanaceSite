@@ -12,13 +12,13 @@
 
 ## Decisions
 
-The three open ones, each with a recommendation. The plan below is written for the recommendation; the alternative is noted where it changes a task.
+Decided by the user on 2026-10-18: all three as recommended. Execution: subagent-driven (a fresh implementer per task, a reviewer before the next), starting on or after 2026-10-29.
 
-| # | Question | Finding (2026-10-18) | Recommendation |
+| # | Question | Finding (2026-10-18) | Decision |
 |---|---|---|---|
 | D1 | Password-reset page | `src/pages/{Login,Register,ForgotPassword,ResetPassword,OAuthConsent}.jsx` are Base44 templates **no route serves** — `/login` resolves to `Login.tsx` (`.tsx` first in `resolve.extensions`). The live sign-in has no reset link today; accounts are provisioned in the Supabase dashboard, which can send a recovery mail. | **Delete the five dead pages in B1.** A Supabase reset flow (`resetPasswordForEmail` + a `/reset-password` page on `PASSWORD_RECOVERY`) is a separate, small feature PR if wanted — not part of a deletion. |
 | D2 | CI eval step | `tests/eval/{interview,procedures}-agent.eval.test.ts` drive the **Base44** agents through `@base44/sdk` (`tests/helpers/eval-conversation.ts`) and skip without `EVAL_BASE44_*`, which CI never sets — the step has never run a case. The chat function's real gate is `npm run test:eval:chat` (`scripts/eval-chat.mjs`), run by hand against the deployed function. | **Delete** the two eval files, the helper, `test:eval` and the CI step. Keep `test:eval:chat` and `tests/eval/chat/`. |
-| D3 | Legacy-host code | `safe-arch-plan.base44.app` still answers 200 — but with Base44's **last published** build, frozen since publishing stopped (2026-10-17). Our repo's `legacy-host.ts` only runs in a build served on that host, and no build of ours will be again; the frozen copy carries its own. | **Delete** `src/lib/legacy-host.ts`, `legacy-host-boot.ts`, the `isLegacyHost`/`applyLegacyHostHead` parts of `seo.ts`, the boot call in `main.jsx`, and their tests. The old host stops serving when the Base44 app is deleted (your action, after part B). *Alternative: keep them; then Task 5 skips the legacy-host step.* |
+| D3 | Legacy-host code | `safe-arch-plan.base44.app` still answers 200 — but with Base44's **last published** build, frozen since publishing stopped (2026-10-17). Our repo's `legacy-host.ts` only runs in a build served on that host, and no build of ours will be again; the frozen copy carries its own. | **Delete** `src/lib/legacy-host.ts`, `legacy-host-boot.ts`, the `isLegacyHost`/`applyLegacyHostHead` parts of `seo.ts`, the boot call in `main.jsx`, and their tests. The old host stops serving when the Base44 app is deleted (your action, after part B). |
 
 Implied decisions, no input needed: the four switch modules are deleted rather than pinned to one value; `base44_id` columns, the `/blog/<24 hex>` 301s (`api/og/blog.ts`, `BlogPost.tsx`) and `BASE44_ID_PATTERN` stay — old links and indexed URLs still use them; `supabase/migrations/` is history and is not edited; `docs/base44-exit/` and dated specs/plans are history: they get a "done" note, not a rewrite.
 
