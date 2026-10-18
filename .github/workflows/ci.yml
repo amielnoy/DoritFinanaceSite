@@ -1311,6 +1311,152 @@ jobs:
 
 
 
+  # ── 8b. Why did it fail? AI triage of the Allure results ───────────────────
+  #
+  # A red run used to mean opening the report and working out, failure by
+  # failure, whether the site broke, the test broke, or CI broke. This job does
+  # that first pass. Claude Code runs headless against the merged Allure
+  # results through a small read-only MCP server (scripts/ci-triage/), groups
+  # the failures by error signature, and labels each group PRODUCT_BUG,
+  # AUTOMATION_BUG, CONFIGURATION_BUG or NEEDS_HUMAN, with the evidence: the
+  # message and stack, retries, Allure history, attachments, and what this
+  # branch changed in app code, test code and config.
+  #
+  # Only on a red test job, and only advisory. It never changes the colour of a
+  # run: "Safe to merge?" still decides from the test results alone, and folds
+  # this job's write-up into its one PR comment. On `main` it goes to the run
+  # summary.
+  #
+  # Opt-in, like every deploy here: without the ANTHROPIC_API_KEY secret (or on
+  # a fork PR, which gets no secrets) it says so and stops green. The agent may
+  # use the MCP tools and nothing else: no shell, no edits, no web, because
+  # test output is untrusted text and could contain instructions.
+  triage:
+    name: Triage the failures (AI)
+    runs-on: ubuntu-latest
+    # `allure` so its history cache for this run exists before it is restored.
+    needs: [test-node, test-e2e, allure]
+    if: ${{ !cancelled() && (needs.test-node.result == 'failure' || needs.test-e2e.result == 'failure') }}
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The diff against the base is evidence: a failure right after an
+          # app-code change reads differently from one after a config change.
+          fetch-depth: 0
+
+      - name: Collect the results from every platform
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: allure-parts
+
+      - name: Merge into one results directory
+        run: |
+          mkdir -p allure-results
+          find allure-parts -type f -exec cp -n {} allure-results/ \; 2>/dev/null || true
+          echo "merged $(ls allure-results | wc -l) result files"
+
+      # Includes this run's own entry; the MCP server ignores runs newer than
+      # the earliest result, so the history it reports is the past only.
+      - name: Restore report history
+        uses: actions/cache/restore@v4
+        with:
+          path: allure-history
+          key: allure-history-${{ github.run_id }}
+          restore-keys: allure-history-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run the triage agent
+        id: run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASE_CANDIDATE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::notice::No ANTHROPIC_API_KEY secret, so no AI triage this run. Add it under Settings → Secrets and variables → Actions to turn it on."
+            exit 0
+          fi
+
+          # A new branch's push carries an all-zero `before`, and a nightly run
+          # carries none: fall back to the previous commit.
+          base="$BASE_CANDIDATE"
+          if [ -z "$base" ] || ! git rev-parse --verify --quiet "${base}^{commit}" >/dev/null; then
+            base="HEAD~1"
+          fi
+
+          # mcp 2.x renamed the server API this script uses, hence the cap.
+          pip install --quiet "mcp>=1.2,<2"
+          npm i -g @anthropic-ai/claude-code
+
+          cat > "$RUNNER_TEMP/mcp.json" <<JSON
+          {
+            "mcpServers": {
+              "allure_triage": {
+                "command": "python",
+                "args": ["${GITHUB_WORKSPACE}/scripts/ci-triage/allure_triage_mcp.py"],
+                "env": {
+                  "ALLURE_RESULTS_DIR": "${GITHUB_WORKSPACE}/allure-results",
+                  "ALLURE_HISTORY_FILE": "${GITHUB_WORKSPACE}/allure-history/history.jsonl",
+                  "TRIAGE_BASE_REF": "${base}",
+                  "TEST_PATH_REGEX": "^(e2e|tests)/",
+                  "CONFIG_PATH_REGEX": "^\\\\.github/|^package(-lock)?\\\\.json$|^\\\\.npmrc$|^(playwright|playwright\\\\.measure|vitest)\\\\.config\\\\.ts$|^vite\\\\.config\\\\.js$|^vercel\\\\.json$|^supabase/config\\\\.toml$|^allurerc\\\\.mjs$|^Dockerfile|^docker-compose|^tsconfig\\\\.json$|^eslint\\\\.config\\\\.js$"
+                }
+              }
+            }
+          }
+          JSON
+
+          # Never fatal: a triage that cannot run is reported, not failed.
+          if claude -p "$(cat scripts/ci-triage/triage-prompt.md)" \
+              --mcp-config "$RUNNER_TEMP/mcp.json" --strict-mcp-config \
+              --allowedTools "mcp__allure_triage" \
+              --disallowedTools "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Task" \
+              --max-turns 40 \
+              --output-format text > triage.md 2> triage.err; then
+            echo "::notice::AI triage written."
+          else
+            echo "::warning::The AI triage did not finish — see this step's log."
+            cat triage.err
+            printf '### 🧪 Failure triage (AI)\n\n_The triage agent did not finish on this run; the Allure report has the details._\n' > triage.md
+          fi
+
+          # The machine-readable verdict, for anything that wants to act on it.
+          python - <<'PY'
+          import json, re
+          text = open("triage.md", encoding="utf-8").read()
+          blocks = re.findall(r"```json\s*(\{.*?\})\s*```", text, re.S)
+          try:
+              data = json.loads(blocks[-1]) if blocks else {"clusters": []}
+          except json.JSONDecodeError:
+              data = {"clusters": [], "error": "unparseable json block"}
+          json.dump(data, open("triage.json", "w"), indent=2)
+          # The JSON block is for machines; the comment reads better without it.
+          open("triage.md", "w", encoding="utf-8").write(
+              re.sub(r"\s*```json\s*\{.*?\}\s*```\s*$", "\n", text, flags=re.S))
+          for c in ("PRODUCT_BUG", "AUTOMATION_BUG", "CONFIGURATION_BUG", "NEEDS_HUMAN"):
+              n = sum(x.get("count", 1) for x in data.get("clusters", []) if x.get("category") == c)
+              print(f"{c}: {n} test(s)")
+          PY
+
+          cat triage.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach the triage to this run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-triage
+          path: |
+            triage.md
+            triage.json
+          if-no-files-found: ignore
+          retention-days: 14
+
   # ── 9. Is this safe to merge? ────────────────────────────────────────────
   #
   # This job was gated to `builder` and skipped everywhere else, which meant the
@@ -1342,7 +1488,8 @@ jobs:
   merge-readiness:
     name: Safe to merge?
     runs-on: ubuntu-latest
-    needs: [build, test-node, test-e2e, deploy-vercel, allure]
+    # `triage` only adds its write-up to the comment; the verdict ignores it.
+    needs: [build, test-node, test-e2e, deploy-vercel, allure, triage]
     # `!cancelled()` rather than `always()`. `always()` includes cancellation,
     # and this workflow sets `cancel-in-progress: true` — so pushing twice in
     # quick succession cancelled run #1, whose verdict job still ran, read
@@ -1452,6 +1599,24 @@ jobs:
             fi
             echo "<sub>[This run](${RUN_URL}) · re-runs replace this comment rather than adding one.</sub>"
           } > verdict.md
+
+      # The AI triage, when the tests failed and it ran. Appended to this
+      # comment rather than posted as its own, because the comment below is
+      # edited with --edit-last: a second comment from the same bot would be
+      # the one overwritten. Missing artifact = nothing to add.
+      - name: Fetch the failure triage, if there is one
+        if: needs.triage.result == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: failure-triage
+          path: triage
+
+      - name: Add it to the verdict
+        run: |
+          if [ -s triage/triage.md ]; then
+            { echo; echo "---"; echo; cat triage/triage.md; } >> verdict.md
+          fi
 
       - name: Write it to the run summary
         run: cat verdict.md >> "$GITHUB_STEP_SUMMARY"
