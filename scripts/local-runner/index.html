@@ -167,7 +167,7 @@
     <h2>Suites</h2>
     <div class="chips" id="suiteChips"></div>
     <div class="controls">
-      <label class="field">Extra flags, for example --project=web-chromium or --grep=home
+      <label class="field">Extra flags as --flag=value, for example --project=web-chromium or --grep="home page"
         <input type="text" id="args" placeholder="--project=web-chromium">
       </label>
       <div class="actions">
@@ -175,6 +175,7 @@
         <button class="btn btn-danger" id="stop" disabled>Stop</button>
       </div>
     </div>
+    <div class="meta" id="runError" style="color:var(--fail)" hidden></div>
     <div class="links" style="margin-top:10px">
       <button id="selectAll">Select all</button>
       <button id="selectNone">Clear</button>
@@ -236,6 +237,7 @@
         <label class="field">Grep invert<input type="text" id="optGrepInvert" placeholder="exclude" data-playwright></label>
       </div>
       <button class="btn btn-primary" id="runSingle" disabled>Run single test</button>
+      <div class="meta" id="singleError" style="color:var(--fail)" hidden></div>
     </div>
   </section>
 
@@ -306,7 +308,20 @@
   const RING = 2 * Math.PI * 40;
 
   const $ = (id) => document.getElementById(id);
-  const state = { offset: 0, log: "", run: null, results: [], filter: "failed", polling: null, ticks: 0, tests: [], selectedTest: null };
+  const state = {
+    startedAt: undefined,
+    offset: 0,
+    log: "",
+    partial: "",
+    starts: new Set(),
+    ends: {},
+    run: null,
+    results: [],
+    filter: "failed",
+    ticks: 0,
+    tests: [],
+    selectedTest: null,
+  };
 
   function element(tag, props = {}, children = []) {
     const node = Object.assign(document.createElement(tag), props);
@@ -347,16 +362,36 @@
     );
   }
 
+  // Banners are read once, line by line, as output arrives; a line still being
+  // written waits in state.partial until its newline (or the end of the run).
+  function scanLines(lines) {
+    for (const line of lines) {
+      for (const [key, { label }] of Object.entries(SUITES)) {
+        if (line.startsWith(`┌─ ${label} `)) state.starts.add(key);
+        else if (line.startsWith(`└─ ${label} `)) state.ends[key] ??= line;
+      }
+    }
+  }
+
+  function appendLog(output, running) {
+    state.log += output;
+    const lines = (state.partial + output).split("\n");
+    state.partial = lines.pop();
+    if (!running && state.partial) {
+      lines.push(state.partial);
+      state.partial = "";
+    }
+    scanLines(lines);
+  }
+
   function suiteStatus(key) {
-    const { label } = SUITES[key];
-    const lines = state.log.split("\n");
-    const end = lines.find((line) => line.startsWith(`└─ ${label} `));
+    const end = state.ends[key];
     if (end) {
       const duration = end.match(/\((\d+)s\)/)?.[1];
       const status = end.includes(" passed") ? "passed" : end.includes("known failures") ? "broken" : "failed";
       return { status, duration: duration ? `${duration}s` : "" };
     }
-    if (lines.some((line) => line.startsWith(`┌─ ${label} `))) {
+    if (state.starts.has(key)) {
       return { status: state.run?.running ? "running" : "stopped", duration: "" };
     }
     return { status: "pending", duration: "" };
@@ -642,28 +677,44 @@
     state.results = await (await fetch("/api/results")).json();
   }
 
-  async function poll() {
+  async function fetchState(since) {
+    return (await fetch(`/api/state?since=${since}`)).json();
+  }
+
+  function resetForRun(startedAt) {
+    Object.assign(state, { startedAt, offset: 0, log: "", partial: "", starts: new Set(), ends: {}, results: [], filter: "failed", ticks: 0 });
+    $("log").textContent = "";
+  }
+
+  async function pollOnce() {
     try {
-      const run = await (await fetch(`/api/state?since=${state.offset}`)).json();
+      let run = await fetchState(state.offset);
+      // A different run from the one on screen: started here, in another tab, by
+      // curl, or the server restarted. Its output has to be read from the start.
+      const newRun = run.startedAt !== state.startedAt;
+      if (newRun) {
+        if (state.offset) run = await fetchState(0);
+        resetForRun(run.startedAt);
+      }
       setConnection(true);
       const log = $("log");
       const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
-      state.log += run.output;
+      appendLog(run.output, run.running);
       state.offset = run.length;
       log.append(run.output);
       if (atBottom) log.scrollTop = log.scrollHeight;
 
       const finished = state.run?.running && !run.running;
+      const changed = newRun || finished || Boolean(run.output);
       state.run = run;
       state.ticks += 1;
-      if (finished || !run.running || state.ticks % 3 === 0) await loadResults();
+      // An idle tab doesn't re-read allure-results: nothing writes it between runs.
+      if (newRun || finished || (run.running && state.ticks % 3 === 0)) await loadResults();
 
       $("run").disabled = run.running;
       $("runSingle").disabled = run.running || !state.selectedTest;
       $("stop").disabled = !run.running;
-      if (run.running) startPolling();
-      else stopPolling();
-      renderAll();
+      if (run.running || changed) renderAll();
       return run;
     } catch {
       setConnection(false);
@@ -671,29 +722,33 @@
     }
   }
 
-  function startPolling() {
-    if (!state.polling) state.polling = setInterval(poll, 1000);
+  // Polls run one after another, never side by side, so two can't read the
+  // same offset and append the same output twice.
+  let polls = Promise.resolve();
+  function poll() {
+    polls = polls.then(pollOnce);
+    return polls;
   }
 
-  function stopPolling() {
-    clearInterval(state.polling);
-    state.polling = null;
+  async function pollLoop() {
+    const run = await poll();
+    setTimeout(pollLoop, run?.running ? 1000 : 5000);
   }
 
   function post(path, body = {}) {
     return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   }
 
-  async function start(path, body) {
+  async function start(path, body, errorId) {
     const response = await post(path, body);
-    if (!response.ok) return;
-    Object.assign(state, { offset: 0, log: "", results: [], filter: "failed", ticks: 0 });
-    $("log").textContent = "";
-    await poll();
+    const error = response.ok ? "" : (await response.json().catch(() => ({}))).error || `The server answered ${response.status}`;
+    $(errorId).textContent = error;
+    $(errorId).hidden = !error;
+    if (response.ok) await poll();
   }
 
-  $("run").addEventListener("click", () => start("/api/run", { suites: selectedSuites(), args: $("args").value }));
-  $("runSingle").addEventListener("click", () => start("/api/run-single", { file: state.selectedTest, flags: singleFlags() }));
+  $("run").addEventListener("click", () => start("/api/run", { suites: selectedSuites(), args: $("args").value }, "runError"));
+  $("runSingle").addEventListener("click", () => start("/api/run-single", { file: state.selectedTest, flags: singleFlags() }, "singleError"));
   $("testFilter").addEventListener("input", renderTests);
   $("refreshTests").addEventListener("click", loadTests);
 
@@ -706,8 +761,7 @@
 
   renderChips();
   loadTests();
-  poll();
-  setInterval(() => !state.polling && poll(), 5000);
+  pollLoop();
 </script>
 </body>
 </html>

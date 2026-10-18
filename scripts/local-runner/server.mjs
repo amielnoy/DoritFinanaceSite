@@ -16,6 +16,7 @@ const TRACES = ["on", "off", "retain-on-failure", "on-first-retry", "on-all-retr
 const PROJECTS = ["web-chromium", "web-webkit", "ios-safari", "android-chrome", "*"];
 const REPORTERS = ["list", "line", "dot"];
 const SHUTDOWN_GRACE_MS = 10_000;
+const HOSTS = [`127.0.0.1:${PORT}`, `localhost:${PORT}`];
 
 const run = { busy: false, child: null, onFinish: null, suites: [], single: null, output: "", exitCode: null, startedAt: null, finishedAt: null };
 
@@ -75,6 +76,10 @@ function launch(command, args, { suites = [], single = null, e2e = false } = {})
     run.busy = false;
     run.onFinish?.();
   };
+  // Decoded by the stream, so a multi-byte character (the ┌─/└─ banners) split
+  // across two chunks isn't turned into U+FFFD.
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
   child.stdout.on("data", append);
   child.stderr.on("data", append);
   child.on("error", (error) => {
@@ -84,9 +89,37 @@ function launch(command, args, { suites = [], single = null, e2e = false } = {})
   child.on("close", (code, signal) => finish(code ?? signal));
 }
 
-function startRun({ suites = [], args = "" }) {
+// Splits the extra-flags field like a shell would for quotes, so --grep="home page"
+// arrives as one argument. A bare word is refused rather than dropped:
+// `--project web-chromium` would otherwise run as a bare --project, which
+// run-tests.sh doesn't read as a project choice.
+function parseFlags(text) {
+  const tokens = [];
+  let token = null;
+  let quote = null;
+  for (const char of String(text ?? "")) {
+    if (quote) {
+      if (char === quote) quote = null;
+      else token += char;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      token ??= "";
+    } else if (/\s/.test(char)) {
+      if (token !== null) tokens.push(token);
+      token = null;
+    } else {
+      token = (token ?? "") + char;
+    }
+  }
+  if (quote) return { error: `Unclosed ${quote} in the extra flags` };
+  if (token !== null) tokens.push(token);
+  const bare = tokens.find((arg) => !arg.startsWith("-"));
+  if (bare !== undefined) return { error: `"${bare}" isn't a flag; write a flag's value with =, e.g. --project=web-chromium` };
+  return { flags: tokens };
+}
+
+function startRun({ suites = [] }, flags) {
   const chosen = [].concat(suites).filter((suite) => SUITES.includes(suite));
-  const flags = String(args).split(/\s+/).filter((arg) => arg.startsWith("-"));
   const ran = chosen.length ? chosen : SUITES;
   launch("bash", ["scripts/run-tests.sh", ...chosen, ...flags], { suites: ran, e2e: ran.includes("e2e") });
 }
@@ -200,6 +233,10 @@ async function serveFile(res, file, contentType) {
 }
 
 async function handle(req, res) {
+  // Binding to 127.0.0.1 doesn't stop DNS rebinding: a page whose hostname now
+  // resolves here is same-origin to the browser, but still sends its own Host.
+  if (!HOSTS.includes(req.headers.host)) return sendJson(res, 403, { error: "Unexpected Host header" });
+
   const url = new URL(req.url, `http://${req.headers.host}`);
   const isJsonPost = req.method === "POST" && req.headers["content-type"] === "application/json";
 
@@ -232,9 +269,11 @@ async function handle(req, res) {
 
   if (isJsonPost && url.pathname === "/api/run") {
     const body = await readBody(req);
+    const { flags, error } = parseFlags(body.args);
+    if (error) return sendJson(res, 400, { error });
     if (!claimRun()) return sendJson(res, 409, { error: "A run is already in progress" });
     try {
-      startRun(body);
+      startRun(body, flags);
     } catch (error) {
       run.busy = false;
       throw error;
