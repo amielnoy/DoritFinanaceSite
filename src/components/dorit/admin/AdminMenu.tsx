@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MASLEKA_ENABLED } from "@/config/masleka";
+import { MEETINGS_STAFF } from "@/config/meetings";
 import { reaches, type AdminAccess, type AdminCounts } from "@/hooks/useAdminMenu";
 import { adminHome } from "./adminNav";
 import CountBadge from "./CountBadge";
@@ -88,6 +89,14 @@ export default function AdminMenu({ access, counts, name, roleLabel, onSignOut }
             </Link>
           </DropdownMenuItem>
         )}
+        {MEETINGS_STAFF ? (
+          <DropdownMenuItem asChild className={ITEM}>
+            <Link to="/admin/leads?tab=meetings">
+              <span>בקשות שינוי בפגישות</span>
+              <CountBadge count={counts.meetingRequests} label="פתוחות" tone="alert" className="ms-auto" />
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         {MASLEKA_ENABLED ? (
           <DropdownMenuItem asChild className={ITEM}>
             <Link to="/admin/masleka">

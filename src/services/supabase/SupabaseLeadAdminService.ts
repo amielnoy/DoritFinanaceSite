@@ -177,6 +177,17 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
   }
 
   /**
+   * Clients' open requests to move or cancel a meeting — what the agenda's
+   * "בקשות שינוי" chip counts. `meeting_requests_read_lead` is the gate, so a
+   * User counts their assigned leads' requests only. Ids only, capped at a
+   * thousand, as countNew.
+   */
+  async countOpenMeetingRequests(): Promise<number> {
+    const rows = await fetchRows(this.client.from("meeting_requests").select("id").eq("status", "open").limit(1000), "meeting_requests");
+    return rows.length;
+  }
+
+  /**
    * A lead's meetings, newest first (no time last), under the person's own
    * session: `meetings_read_admin` and `meeting_requests_read_lead` both rest
    * on can_see_lead, so a User reads only their assigned leads' meetings.

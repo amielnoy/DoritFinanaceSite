@@ -97,6 +97,7 @@ export const servicesMock = {
     transcript: async () => [],
     transcriptLeadIds: async () => [],
     countNew: async () => 0,
+    countOpenMeetingRequests: async () => 0,
     meetings: async () => [],
     addMeeting: async () => {},
     updateMeeting: async () => {},

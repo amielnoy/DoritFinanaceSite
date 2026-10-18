@@ -3,6 +3,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { meets, type AgencyRole } from "@/config/permissions";
 import { useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import { MASLEKA_ENABLED } from "@/config/masleka";
+import { MEETINGS_STAFF } from "@/config/meetings";
+import { agendaKeys } from "@/hooks/useAdmin";
 import { BOARD_KEY } from "@/lib/masleka";
 import { services } from "@/services";
 import type { MaslekaRequest } from "@/services/ports";
@@ -40,6 +42,8 @@ export interface AdminCounts {
   unassigned: number;
   /** Clearinghouse requests waiting to be submitted — the client sent the code. */
   maslekaWaiting: number;
+  /** Clients' open requests to move or cancel a meeting (VITE_MEETINGS_STAFF) — row-level security counts only leads the person sees. */
+  meetingRequests: number;
   total: number;
 }
 
@@ -53,6 +57,9 @@ export const waitingCount = (requests: MaslekaRequest[]): number =>
 
 /** Under the leads' own key too, so an assignment refreshes the counter. */
 export const UNASSIGNED_KEY = ["admin", "leads", "unassigned-count"] as const;
+
+/** Under the agenda's key, so "טופל" — which reloads the agenda — refreshes the counter too. */
+export const MEETING_REQUESTS_KEY = [...agendaKeys.all, "open-requests-count"] as const;
 
 export function useAdminCounts(access: AdminAccess): AdminCounts {
   const assigns = reaches(access, "admin");
@@ -79,9 +86,17 @@ export function useAdminCounts(access: AdminAccess): AdminCounts {
     select: waitingCount,
     retry: false,
   });
+  const requests = useQuery({
+    queryKey: MEETING_REQUESTS_KEY,
+    queryFn: () => services.leadsAdmin.countOpenMeetingRequests(),
+    enabled: MEETINGS_STAFF && access !== null,
+    refetchInterval: REFRESH_MS,
+    retry: false,
+  });
   // A failed read counts as nothing: a counter is a hint, and the screens behind it say what failed.
   const newLeads = access !== null && !assigns ? leads.data ?? 0 : 0;
   const unassigned = assigns ? queue.data ?? 0 : 0;
   const maslekaWaiting = access !== null ? masleka.data ?? 0 : 0;
-  return { newLeads, unassigned, maslekaWaiting, total: newLeads + unassigned + maslekaWaiting };
+  const meetingRequests = MEETINGS_STAFF && access !== null ? requests.data ?? 0 : 0;
+  return { newLeads, unassigned, maslekaWaiting, meetingRequests, total: newLeads + unassigned + maslekaWaiting + meetingRequests };
 }

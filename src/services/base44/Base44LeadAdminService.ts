@@ -92,6 +92,11 @@ export class Base44LeadAdminService implements LeadAdminPort {
     return 0;
   }
 
+  /** Base44 holds no meetings, so no client can have asked to move one. */
+  async countOpenMeetingRequests(): Promise<number> {
+    return 0;
+  }
+
   private async write(payload: Record<string, unknown>): Promise<void> {
     const receipt = await invokeFunction<{ ok?: boolean; error?: string; rid?: string }>(
       this.client,

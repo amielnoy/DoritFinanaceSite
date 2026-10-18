@@ -360,6 +360,8 @@ export interface LeadAdminPort {
   transcriptLeadIds(): Promise<string[]>;
   /** How many leads need someone — `new` or `escalated` — the admin menu's counter. Ids only: no personal data leaves the table for it. */
   countNew(): Promise<number>;
+  /** Clients' open requests to move or cancel a meeting — the leads row's second counter. `can_see_lead` is the gate. Ids only. */
+  countOpenMeetingRequests(): Promise<number>;
   /** A lead's meetings, newest first, with any open client request. `can_see_lead` is the gate. */
   meetings(leadId: string): Promise<LeadMeeting[]>;
   /**

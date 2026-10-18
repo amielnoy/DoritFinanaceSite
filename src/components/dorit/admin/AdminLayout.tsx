@@ -36,7 +36,12 @@ function SidebarLink({ item, counts }: { item: AdminNavItem; counts: AdminCounts
     <NavLink to={agency ? { pathname: item.to, search: `?agency=${encodeURIComponent(agency)}` } : item.to} end={item.end} className={({ isActive }) => cn(ROW, isActive && ACTIVE)}>
       <Icon size={18} strokeWidth={1.5} aria-hidden="true" className="shrink-0 text-accent" />
       <span>{item.label}</span>
-      {item.counter ? <CountBadge count={counts[item.counter.key]} label={item.counter.label} className="ms-auto" /> : null}
+      {item.counter || item.alert ? (
+        <span className="ms-auto flex items-center gap-1.5">
+          {item.counter ? <CountBadge count={counts[item.counter.key]} label={item.counter.label} /> : null}
+          {item.alert ? <CountBadge count={counts[item.alert.key]} label={item.alert.label} tone="alert" /> : null}
+        </span>
+      ) : null}
     </NavLink>
   );
 }
