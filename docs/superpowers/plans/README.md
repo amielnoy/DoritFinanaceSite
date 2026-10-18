@@ -21,6 +21,7 @@ routing, permissions and release conditions.
 | [Chat PR 2 — the FAQ agent on our own `chat` function: Implementation Plan](2026-10-14-chat-pr2-support-agent.md) |
 | [Chat PR 3 — the procedures chat on the `chat` function — Implementation Plan](2026-10-15-chat-pr3-procedures-agent.md) |
 | [Chat PR 4 — the blog recommender on the `chat` function — Implementation Plan](2026-10-15-chat-pr4-blog-recommender.md) |
+| [Base44 exit, cleanup 2 part B — the deletion — Implementation Plan](2026-10-18-base44-exit-part-b.md) |
 
 When a design changes, record the new decision and its relationship to the old
 one. Preserve incident measurements and original implementation steps; update
