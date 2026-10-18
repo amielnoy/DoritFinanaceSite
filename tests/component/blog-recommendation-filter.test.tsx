@@ -13,7 +13,8 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { base44Mock, resetBase44Mock } from "./base44-mock";
+import type { Article } from "@/services";
+import { resetServicesMock, servicesMock } from "./services-mock";
 
 if (typeof (globalThis as any).ResizeObserver === "undefined") {
   (globalThis as any).ResizeObserver = class {
@@ -23,8 +24,7 @@ if (typeof (globalThis as any).ResizeObserver === "undefined") {
   };
 }
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 
 const auth = vi.hoisted(() => ({ isAuthenticated: false, user: null as null | { role: string } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth }));
@@ -52,7 +52,7 @@ vi.mock("@/components/dorit/chat/AgentChat", () => ({
   },
 }));
 
-const POSTS = [
+const POSTS: Article[] = [
   { id: "post-a", title: "דמי ניהול בפנסיה", excerpt: "", tags: "פנסיה", created_date: "2026-01-01" },
   { id: "post-b", title: "ביטוח חיים ומשכנתא", excerpt: "", tags: "ביטוח", created_date: "2026-01-02" },
   { id: "post-c", slug: "livui-tviot", title: "ליווי תביעות", excerpt: "", tags: "תביעות", created_date: "2026-01-03" },
@@ -93,9 +93,9 @@ const shownIds = () =>
   Array.from(document.querySelectorAll<HTMLElement>('[id^="post-post-"]')).map((el) => el.id.slice(5));
 
 beforeEach(() => {
-  resetBase44Mock();
+  resetServicesMock();
   capturedOnAssistantMessage = undefined;
-  base44Mock.entities.BlogPost.filter.mockResolvedValue(POSTS);
+  servicesMock.content.listArticles.mockResolvedValue(POSTS);
   if (!("scrollIntoView" in Element.prototype)) {
     Object.defineProperty(Element.prototype, "scrollIntoView", { value: vi.fn(), writable: true });
   }

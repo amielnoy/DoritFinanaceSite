@@ -5,7 +5,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { base44Mock, resetBase44Mock } from "./base44-mock";
+import { resetServicesMock, servicesMock } from "./services-mock";
 
 /*
  * The home page in English and French (slice 2): every section through
@@ -14,8 +14,7 @@ import { base44Mock, resetBase44Mock } from "./base44-mock";
  * the PR; here, that /en and /fr carry no Hebrew but what is meant to stay.
  */
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 vi.mock("@/i18n/locales", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/i18n/locales")>();
   return { ...actual, ENABLED_LOCALES: ["he", "en", "fr"] };
@@ -23,11 +22,7 @@ vi.mock("@/i18n/locales", async (importOriginal) => {
 vi.mock("@/lib/AuthContext", () => ({
   useAuth: () => ({ user: null, isAuthenticated: false, isLoadingAuth: false, logout: vi.fn() }),
 }));
-const submitLead = vi.fn(async () => ({ ok: true }));
-vi.mock("@/services", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/services")>();
-  return { ...actual, services: { ...actual.services, leads: { ...actual.services.leads, submitLead } } };
-});
+const { submitLead } = servicesMock.leads;
 vi.mock("framer-motion", async () => {
   const React = await import("react");
   const passthrough = new Proxy({}, { get: (_t, tag: string) => ({ children, ...props }: any) => React.createElement(tag, props, children) });
@@ -74,12 +69,11 @@ function renderAt(path: string) {
 
 const scrollBy = vi.fn();
 beforeEach(() => {
-  resetBase44Mock();
-  submitLead.mockClear();
+  resetServicesMock();
   scrollBy.mockClear();
   Element.prototype.scrollBy = scrollBy as unknown as Element["scrollBy"];
-  base44Mock.entities.Testimonial.list.mockResolvedValue([
-    { id: "t1", name: "רונית", quote: "ליווי מקצועי ואישי", rating: 5, source: "google" },
+  servicesMock.content.listTestimonials.mockResolvedValue([
+    { id: "t1", name: "רונית", quote: "ליווי מקצועי ואישי", rating: 5, source: "google", created_date: "2026-10-01T09:00:00Z" },
   ]);
   // A desktop viewport, as far as matchMedia("(min-width: …)") is concerned.
   Object.defineProperty(window, "matchMedia", {
@@ -163,6 +157,6 @@ describe("the home page in English and French", () => {
     const proof = within(document.getElementById("proof")!);
     await userEvent.click(proof.getByRole("button", { name: "הקודם" }));
     expect((scrollBy.mock.calls.at(-1)![0] as ScrollToOptions).left).toBeGreaterThan(0);
-    await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
+    await waitFor(() => expect(servicesMock.content.listTestimonials).toHaveBeenCalled());
   });
 });

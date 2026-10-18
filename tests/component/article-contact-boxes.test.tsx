@@ -10,7 +10,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { base44Mock } from "./base44-mock";
+import type { Article } from "@/services";
+import { resetServicesMock, servicesMock } from "./services-mock";
 
 if (typeof (globalThis as any).ResizeObserver === "undefined") {
   (globalThis as any).ResizeObserver = class {
@@ -20,8 +21,7 @@ if (typeof (globalThis as any).ResizeObserver === "undefined") {
   };
 }
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ isAuthenticated: false, user: null }) }));
 vi.mock("framer-motion", async () => {
   const R = await import("react");
@@ -39,7 +39,7 @@ vi.mock("framer-motion", async () => {
 const { default: BlogPost } = await import("@/pages/BlogPost");
 const { ARTICLE_CTA_FALLBACK } = await import("@/lib/articleCta");
 
-const ARTICLE = {
+const ARTICLE: Article = {
   id: "64f0a1b2c3d4e5f6a7b8c9d0",
   slug: "horadat-dmei-nihul",
   title: "להוריד דמי ניהול בפנסיה",
@@ -49,8 +49,8 @@ const ARTICLE = {
   created_date: "2026-10-01T09:00:00Z",
 };
 
-const renderArticle = async (over: Record<string, unknown> = {}) => {
-  base44Mock.entities.BlogPost.get.mockResolvedValue({ ...ARTICLE, ...over });
+const renderArticle = async (over: Partial<Article> = {}) => {
+  servicesMock.content.getArticle.mockResolvedValue({ ...ARTICLE, ...over });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter initialEntries={["/blog/horadat-dmei-nihul"]}>
@@ -63,10 +63,7 @@ const renderArticle = async (over: Record<string, unknown> = {}) => {
   await screen.findByRole("heading", { level: 1 });
 };
 
-beforeEach(() => {
-  base44Mock.entities.BlogPost.get.mockReset();
-  base44Mock.entities.BlogPost.filter?.mockReset?.();
-});
+beforeEach(() => resetServicesMock());
 
 describe("ArticleContactBox in an article", () => {
   it("puts one box after the third paragraph and one at the end, each tracked at its place", async () => {

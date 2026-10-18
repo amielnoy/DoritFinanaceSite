@@ -27,9 +27,9 @@ export default defineConfig({
     environment: "node",
     // Every test run takes the Base44 fallback, as CI always has. Vitest loads
     // .env.local, which holds real Supabase credentials on a developer's
-    // machine — without this, a component test that mocks the Base44 client
-    // would read the live Supabase project instead, and pass or fail on
-    // whatever production holds that day. Tests that want a Supabase client
+    // machine — without this, a test that lets a call through to a real port
+    // (rather than tests/component/services-mock.ts) would read the live
+    // Supabase project, and pass or fail on whatever production holds that day. Tests that want a Supabase client
     // mock `@/api/supabaseClient` explicitly. The clearinghouse switch is
     // pinned off the same way: a developer's VITE_MASLEKA_ENABLED=true must not
     // turn on the header's board link (and its role lookup) in every suite.

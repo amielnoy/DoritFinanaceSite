@@ -12,23 +12,19 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { base44Mock } from "./base44-mock";
-
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
-
 const submitInterview = vi.hoisted(() => vi.fn());
 const escalate = vi.hoisted(() => vi.fn());
 const backend = vi.hoisted(() => ({ updatesInterviews: true }));
 
 vi.mock("@/services", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services")>();
+  const { servicesMock } = await import("./services-mock");
   return {
     ...actual,
     services: {
-      ...actual.services,
+      ...servicesMock,
       leads: {
-        ...actual.services.leads,
+        ...servicesMock.leads,
         submitInterview,
         get updatesInterviews() {
           return backend.updatesInterviews;

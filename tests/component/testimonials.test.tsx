@@ -9,10 +9,10 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { base44Mock, resetBase44Mock } from "./base44-mock";
+import type { Testimonial } from "@/services";
+import { resetServicesMock, servicesMock } from "./services-mock";
 
-vi.mock("@/api/base44Client", () => ({ base44: base44Mock }));
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
+vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
 
 // framer-motion's layout animations need APIs jsdom does not implement.
 vi.mock("framer-motion", async () => {
@@ -32,7 +32,9 @@ const auth = vi.hoisted(() => ({ isAuthenticated: false, user: null as null | { 
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth }));
 
 import Testimonials from "@/components/dorit/sections/Testimonials";
-import { services } from "@/services";
+
+const T1: Testimonial = { id: "t1", name: "רונית לוי", quote: "ליווי מקצועי", rating: 5, source: "google", created_date: "2026-10-01T09:00:00Z" };
+const T2: Testimonial = { id: "t2", name: "אבי כהן", quote: "חסכה לי כסף אמיתי", rating: 5, source: "midrag", created_date: "2026-10-02T09:00:00Z" };
 
 const render_ = () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -46,17 +48,17 @@ const render_ = () => {
 };
 
 beforeEach(() => {
-  resetBase44Mock();
+  resetServicesMock();
   auth.isAuthenticated = false;
   auth.user = null;
 });
 
 describe("<Testimonials />", () => {
   it("renders nothing while loading and nothing when there are no testimonials", async () => {
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce([]);
+    servicesMock.content.listTestimonials.mockResolvedValueOnce([]);
     const { container } = render_();
     expect(container.querySelector("#testimonials")).toBeNull();
-    await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
+    await waitFor(() => expect(servicesMock.content.listTestimonials).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(container.querySelector("#testimonials")).toBeNull();
     expect(screen.queryByRole("heading", { name: "לקוחות מספרים" })).toBeNull();
@@ -64,9 +66,7 @@ describe("<Testimonials />", () => {
   });
 
   it("renders the section and its heading when there are testimonials", async () => {
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce([
-      { id: "t1", name: "רונית לוי", quote: "ליווי מקצועי", rating: 5, source: "google" },
-    ]);
+    servicesMock.content.listTestimonials.mockResolvedValueOnce([T1]);
     const { container } = render_();
     expect(await screen.findByRole("heading", { name: "לקוחות מספרים" })).toBeTruthy();
     expect(container.querySelector("section#testimonials")).not.toBeNull();
@@ -76,7 +76,7 @@ describe("<Testimonials />", () => {
   it("keeps the section for an admin when empty, so the first one can be added", async () => {
     auth.isAuthenticated = true;
     auth.user = { role: "admin" };
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce([]);
+    servicesMock.content.listTestimonials.mockResolvedValueOnce([]);
     render_();
     expect(await screen.findByRole("button", { name: /הוספת המלצה/ })).toBeTruthy();
   });
@@ -85,9 +85,7 @@ describe("<Testimonials />", () => {
     // Ordinary visitors sign in for the personal area; Dorit's controls are not theirs.
     auth.isAuthenticated = true;
     auth.user = { role: "user" };
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce([
-      { id: "t1", name: "רונית לוי", quote: "ליווי מקצועי", rating: 5, source: "google" },
-    ]);
+    servicesMock.content.listTestimonials.mockResolvedValueOnce([T1]);
     const { container } = render_();
     expect(await screen.findByText("ליווי מקצועי")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /הוספת המלצה/ })).toBeNull();
@@ -97,9 +95,9 @@ describe("<Testimonials />", () => {
   it("hides the empty section from a signed-in visitor who is not an admin", async () => {
     auth.isAuthenticated = true;
     auth.user = { role: "user" };
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce([]);
+    servicesMock.content.listTestimonials.mockResolvedValueOnce([]);
     const { container } = render_();
-    await waitFor(() => expect(base44Mock.entities.Testimonial.list).toHaveBeenCalled());
+    await waitFor(() => expect(servicesMock.content.listTestimonials).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(container.querySelector("#testimonials")).toBeNull();
   });
@@ -116,16 +114,12 @@ describe("<Testimonials />", () => {
  * blog screens do (review 2026-10-15, item 18).
  */
 describe("<Testimonials /> — the admin's writes", () => {
-  const one = [{ id: "t1", name: "רונית לוי", quote: "ליווי מקצועי", rating: 5, source: "google" }];
-  let remove: ReturnType<typeof vi.fn>;
-  let create: ReturnType<typeof vi.fn>;
-  let upload: ReturnType<typeof vi.fn>;
+  const one = [T1];
+  const { removeTestimonial: remove, createTestimonial: create } = servicesMock.contentAdmin;
+  const { upload } = servicesMock.uploads;
   beforeEach(() => {
     auth.isAuthenticated = true;
     auth.user = { role: "admin" };
-    remove = vi.spyOn(services.contentAdmin, "removeTestimonial").mockResolvedValue(undefined) as never;
-    create = vi.spyOn(services.contentAdmin, "createTestimonial").mockResolvedValue(undefined as never) as never;
-    upload = vi.spyOn(services.uploads, "upload").mockResolvedValue({ url: "https://example.test/f.png" }) as never;
     // jsdom has no object URLs; the form previews the picked file with one.
     if (!URL.createObjectURL) Object.defineProperty(URL, "createObjectURL", { value: () => "blob:preview", configurable: true });
   });
@@ -140,7 +134,7 @@ describe("<Testimonials /> — the admin's writes", () => {
   }
 
   it("asks before deleting, and deletes nothing when the answer is no", async () => {
-    base44Mock.entities.Testimonial.list.mockResolvedValue(one);
+    servicesMock.content.listTestimonials.mockResolvedValue(one);
     const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
     render_();
     fireEvent.click(await screen.findByRole("button", { name: "מחיקה" }));
@@ -151,7 +145,7 @@ describe("<Testimonials /> — the admin's writes", () => {
   });
 
   it("says so in an alert when a delete fails", async () => {
-    base44Mock.entities.Testimonial.list.mockResolvedValue(one);
+    servicesMock.content.listTestimonials.mockResolvedValue(one);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     remove.mockRejectedValueOnce(new Error("denied"));
     render_();
@@ -160,7 +154,7 @@ describe("<Testimonials /> — the admin's writes", () => {
   });
 
   it("says so in an alert when the picture does not upload, and publishes nothing", async () => {
-    base44Mock.entities.Testimonial.list.mockResolvedValue([]);
+    servicesMock.content.listTestimonials.mockResolvedValue([]);
     upload.mockRejectedValueOnce(new Error("too big"));
     const { container } = render_();
     await fillForm(container);
@@ -172,7 +166,7 @@ describe("<Testimonials /> — the admin's writes", () => {
   });
 
   it("says so in an alert when the testimonial is not saved", async () => {
-    base44Mock.entities.Testimonial.list.mockResolvedValue([]);
+    servicesMock.content.listTestimonials.mockResolvedValue([]);
     create.mockRejectedValueOnce(new Error("denied"));
     const { container } = render_();
     await fillForm(container);
@@ -204,14 +198,11 @@ describe("<Testimonials /> on a phone", () => {
   afterEach(() => {
     delete (window as unknown as { matchMedia?: unknown }).matchMedia;
   });
-  const TWO = [
-    { id: "t1", name: "רונית לוי", quote: "ליווי מקצועי", rating: 5, source: "google" },
-    { id: "t2", name: "אבי כהן", quote: "חסכה לי כסף אמיתי", rating: 5, source: "midrag" },
-  ];
+  const TWO = [T1, T2];
 
   it("shows two or more as a focusable strip, every card in it, with prev and next buttons", async () => {
     viewport(390);
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce(TWO);
+    servicesMock.content.listTestimonials.mockResolvedValueOnce(TWO);
     render_();
     const strip = await screen.findByRole("region", { name: "לקוחות מספרים — גלילה אופקית" });
     expect(strip.getAttribute("tabindex")).toBe("0");
@@ -232,7 +223,7 @@ describe("<Testimonials /> on a phone", () => {
 
   it("next scrolls the strip by one card; prev at the first card does nothing", async () => {
     viewport(390);
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce(TWO);
+    servicesMock.content.listTestimonials.mockResolvedValueOnce(TWO);
     render_();
     const strip = await screen.findByRole("region", { name: "לקוחות מספרים — גלילה אופקית" });
     const scrollTo = vi.fn();
@@ -245,7 +236,7 @@ describe("<Testimonials /> on a phone", () => {
 
   it("shows a single testimonial as it is, with no strip and no buttons", async () => {
     viewport(390);
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce(TWO.slice(0, 1));
+    servicesMock.content.listTestimonials.mockResolvedValueOnce(TWO.slice(0, 1));
     render_();
     expect(await screen.findByText("ליווי מקצועי")).toBeTruthy();
     expect(screen.queryByRole("region")).toBeNull();
@@ -254,7 +245,7 @@ describe("<Testimonials /> on a phone", () => {
 
   it("from md up, the grid: no strip and no buttons", async () => {
     viewport(1440);
-    base44Mock.entities.Testimonial.list.mockResolvedValueOnce(TWO);
+    servicesMock.content.listTestimonials.mockResolvedValueOnce(TWO);
     const { container } = render_();
     expect(await screen.findByText("חסכה לי כסף אמיתי")).toBeTruthy();
     expect(screen.queryByRole("region")).toBeNull();
