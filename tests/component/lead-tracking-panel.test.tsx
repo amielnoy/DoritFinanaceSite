@@ -57,6 +57,14 @@ describe("<LeadTrackingPanel />", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 
+  it("shows whole, with no fold, in its own tab", () => {
+    render(<LeadTrackingPanel collapsible={false} />);
+    expect(screen.queryByRole("button", { name: /מעקב לידים ב-Google Analytics/ })).toBeNull();
+    expect(screen.getByRole("heading", { name: /מעקב לידים ב-Google Analytics/ })).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /פתיחת הדוחות/ })).toBeInTheDocument();
+  });
+
   it("lists every event the site sends", async () => {
     await renderOpen();
     for (const e of LEAD_EVENTS) expect(screen.getByText(e.name)).toBeInTheDocument();

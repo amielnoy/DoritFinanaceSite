@@ -151,13 +151,15 @@ React does not surface anywhere a visitor can see. The form simply stops.
 
 ### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
-The admins' view of GA4 lead tracking, at the top of `/admin/leads`. Folded by default, so
-the leads stay on screen; CMP-GA4-001 to 005 open it first.
+The Owner's view of GA4 lead tracking: the leftmost tab of `/admin/leads` ("מעקב לידים",
+`leads.tracking`), shown whole. Without `VITE_MEETINGS_STAFF` there are no tabs and it sits
+folded above the leads; CMP-GA4-001 to 005 open it first.
 
 | ID | Title | Expected result |
 |---|---|---|
 | CMP-GA4-006 | "starts folded, showing only its heading" | Toggle has `aria-expanded="false"`; no table, no reports link |
 | CMP-GA4-007 | "opens on a click, and folds again on a second" | `aria-expanded` flips to `true` with the table shown, then back with it gone |
+| CMP-GA4-008 | "shows whole, with no fold, in its own tab" | `collapsible={false}`: no toggle button; heading, table and reports link shown |
 | CMP-GA4-001 | "lists every event the site sends" | Every `LEAD_EVENTS` name shown |
 | CMP-GA4-002 | "says when the tag is blocked in this browser" | "כנראה חוסם פרסומות" |
 | CMP-GA4-003 | "says when the tag is running" | "אירועים נשלחים" |

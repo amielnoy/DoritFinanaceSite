@@ -129,17 +129,18 @@ describe("without VITE_MEETINGS_STAFF", () => {
 });
 
 describe("the tabs", () => {
-  it("are a tablist of two, under the heading 'פניות ופגישות', with the leads first", async () => {
+  it("are a tablist of three for the Owner, under the heading 'פניות ופגישות', with the leads first and the tracking leftmost", async () => {
     show();
     expect(screen.getByRole("heading", { level: 1, name: "פניות ופגישות" })).toBeInTheDocument();
     const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
-    expect(tabs.map((t) => t.getAttribute("id"))).toEqual(["leads-tab-leads", "leads-tab-meetings"]);
+    expect(tabs.map((t) => t.getAttribute("id"))).toEqual(["leads-tab-leads", "leads-tab-meetings", "leads-tab-tracking"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     expect(tabs[1]).toHaveAttribute("aria-selected", "false");
+    expect(tabs[2]).toHaveAttribute("aria-selected", "false");
     for (const t of tabs) expect(document.getElementById(t.getAttribute("aria-controls")!)).not.toBeNull();
     expect(screen.getByRole("tabpanel", { name: /^פניות/ })).toHaveAttribute("id", "leads-panel-leads");
     // Only the selected tab is in the tab order.
-    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1]);
+    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1]);
   });
 
   it("count the leads and the meetings, the unassigned for Admin+", async () => {
@@ -185,8 +186,8 @@ describe("the tabs", () => {
     expect(tab(/^פניות/)).toHaveAttribute("aria-selected", "true");
     expect(document.activeElement).toBe(tab(/^פניות/));
     fireEvent.keyDown(tab(/^פניות/), { key: "End" });
-    expect(tab(/^פגישות/)).toHaveAttribute("aria-selected", "true");
-    fireEvent.keyDown(tab(/^פגישות/), { key: "Home" });
+    expect(tab(/^מעקב לידים/)).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(tab(/^מעקב לידים/), { key: "Home" });
     expect(tab(/^פניות/)).toHaveAttribute("aria-selected", "true");
     expect(search().get("tab")).toBe("leads");
   });
@@ -203,7 +204,8 @@ describe("the leads tab, by role", () => {
     await screen.findByText("יעל כהן");
     expect(screen.queryAllByRole("combobox", { name: /שיוך הפנייה/ }).length > 0).toBe(adminPlus);
     expect(screen.queryAllByRole("button", { name: "מחיקה" }).length > 0).toBe(adminPlus);
-    expect(screen.queryByText("מעקב לידים") !== null).toBe(adminPlus);
+    // The GA4 panel is no longer above the leads, for anyone: it is the Owner's own tab.
+    expect(within(screen.getByRole("tabpanel", { name: /^(פניות|הפניות שלי)/ })).queryByText("מעקב לידים")).toBeNull();
     expect(screen.queryByRole("button", { name: /לא שויכו/ }) !== null).toBe(adminPlus);
     // Every role may change a status and export.
     expect(screen.getAllByRole("combobox", { name: /סטטוס הפנייה/ })).toHaveLength(4);
@@ -211,6 +213,29 @@ describe("the leads tab, by role", () => {
     // A User's tab keeps the screen's old name, without the unassigned count.
     expect(tab(adminPlus ? /^פניות/ : /^הפניות שלי/).textContent).toContain(adminPlus ? "לא שויכו" : "דורשות טיפול");
     if (!adminPlus) expect(tab(/^הפניות שלי/).textContent).not.toContain("לא שויכו");
+  });
+});
+
+describe("the lead-tracking tab", () => {
+  it("is the Owner's: it opens the GA4 panel, whole, and keeps the choice in the URL", async () => {
+    show();
+    fireEvent.click(tab(/^מעקב לידים/));
+    const panel = await screen.findByRole("tabpanel", { name: /^מעקב לידים/ });
+    expect(panel).toHaveAttribute("id", "leads-panel-tracking");
+    expect(within(panel).getByText("מעקב לידים")).toBeInTheDocument();
+    expect(search().get("tab")).toBe("tracking");
+    expect(search().get("agency")).toBe(A1);
+  });
+
+  it.each(["admin", "user"] as const)("is not offered to a %s, and ?tab=tracking opens the leads instead", async (r) => {
+    role.role = r;
+    show(`/admin/leads?agency=${A1}&tab=tracking`);
+    await screen.findByText("יעל כהן");
+    const tabs = within(screen.getByRole("tablist")).getAllByRole("tab");
+    expect(tabs.map((t) => t.getAttribute("id"))).toEqual(["leads-tab-leads", "leads-tab-meetings"]);
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(document.getElementById("leads-panel-tracking")).toBeNull();
+    expect(screen.queryByText("מעקב לידים")).toBeNull();
   });
 });
 

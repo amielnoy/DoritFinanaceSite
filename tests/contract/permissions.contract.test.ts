@@ -71,6 +71,12 @@ describe("the permissions table matches the gates that decide", () => {
     expect(narrowing).toMatch(/create policy agency_profiles_update_owner[\s\S]*?using \(public\.has_role\(agency_id, 'owner'\) or public\.is_admin\(\)\)/);
   });
 
+  it("the GA4 lead-tracking tab is the Owner's, and display only", () => {
+    expect(PERMISSIONS["leads.tracking"]).toBe("owner");
+    expect(can("admin", false, "leads.tracking")).toBe(false);
+    expect(can("owner", false, "leads.tracking")).toBe(true);
+  });
+
   it("the membership history is Admin+", () => {
     expect(PERMISSIONS["audit.read"]).toBe("admin");
     expect(additive).toMatch(/membership_events_read_admin[\s\S]*?public\.has_role\(agency_id, 'admin'\) or public\.is_admin\(\)/);

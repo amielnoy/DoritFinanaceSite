@@ -18,13 +18,15 @@ const GA4_REPORTS = "https://analytics.google.com/analytics/web/";
  * counted. The last matters most: Dorit testing the site from her own phone
  * would otherwise show up as leads.
  *
- * Folded by default. It sits above the leads list on /admin/leads, and it is
- * reference, read once in a while; open, it pushed the leads — the thing the
- * page is for — below the fold. The header is the toggle, and the body is not
- * rendered while folded.
+ * On /admin/leads it is the Owner's "מעקב לידים" tab, the leftmost, and shows
+ * whole (`collapsible={false}`). Without VITE_MEETINGS_STAFF there are no tabs,
+ * and it sits above the leads folded, as before: it is reference, read once in
+ * a while, and open it pushed the leads below the fold. Folded, the header is
+ * the toggle and the body is not rendered.
  */
-export default function LeadTrackingPanel() {
-  const [open, setOpen] = useState(false);
+export default function LeadTrackingPanel({ collapsible = true }: { collapsible?: boolean }) {
+  const [unfolded, setUnfolded] = useState(false);
+  const open = !collapsible || unfolded;
   const [internal, setInternal] = useState(false);
   const [tagLoaded, setTagLoaded] = useState(false);
 
@@ -41,30 +43,28 @@ export default function LeadTrackingPanel() {
   return (
     <section aria-labelledby="lead-tracking-title" className="mb-10 border border-border/60 bg-card">
       <h2 id="lead-tracking-title" className="font-heading text-xl">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          aria-controls="lead-tracking-body"
-          className={`w-full px-6 py-5 flex items-center gap-3 text-right hover:bg-secondary/30 transition-colors ${
-            open ? "border-b border-border/60" : ""
-          }`}
-        >
-          <BarChart3 size={20} className="text-accent shrink-0" aria-hidden="true" />
-          <span className="flex-1">
-            <span className="block">מעקב לידים ב-Google Analytics</span>
-            <span className="block font-body text-sm font-normal text-muted-foreground mt-0.5">
-              {open
-                ? "מה האתר מדווח, ואיך רואים את זה. המספרים עצמם נמצאים ב-Google Analytics."
-                : "לחצו להצגת האירועים, מצב התג וההגדרות לדפדפן הזה."}
-            </span>
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setUnfolded((o) => !o)}
+            aria-expanded={open}
+            aria-controls="lead-tracking-body"
+            className={`w-full px-6 py-5 flex items-center gap-3 text-right hover:bg-secondary/30 transition-colors ${
+              open ? "border-b border-border/60" : ""
+            }`}
+          >
+            <Heading open={open} />
+            <ChevronDown
+              size={20}
+              className={`shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </button>
+        ) : (
+          <span className="px-6 py-5 flex items-center gap-3 border-b border-border/60">
+            <Heading open />
           </span>
-          <ChevronDown
-            size={20}
-            className={`shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
-            aria-hidden="true"
-          />
-        </button>
+        )}
       </h2>
 
       {open ? (
@@ -141,6 +141,22 @@ export default function LeadTrackingPanel() {
       </div>
       ) : null}
     </section>
+  );
+}
+
+function Heading({ open }: { open: boolean }) {
+  return (
+    <>
+      <BarChart3 size={20} className="text-accent shrink-0" aria-hidden="true" />
+      <span className="flex-1">
+        <span className="block">מעקב לידים ב-Google Analytics</span>
+        <span className="block font-body text-sm font-normal text-muted-foreground mt-0.5">
+          {open
+            ? "מה האתר מדווח, ואיך רואים את זה. המספרים עצמם נמצאים ב-Google Analytics."
+            : "לחצו להצגת האירועים, מצב התג וההגדרות לדפדפן הזה."}
+        </span>
+      </span>
+    </>
   );
 }
 

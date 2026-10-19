@@ -59,6 +59,12 @@ export const PERMISSIONS = {
   "members.leave": "user",
   "agencyProfile.edit": "owner",
   "audit.read": "admin",
+  /**
+   * The "מעקב לידים" tab on /admin/leads: what the site reports to GA4.
+   * Display only — it reads no agency data, and GA4 itself asks for a Google
+   * account — so no gate stands behind it.
+   */
+  "leads.tracking": "owner",
   "agencies.manage": "operator",
 } as const satisfies Record<string, AgencyRole | "operator">;
 
