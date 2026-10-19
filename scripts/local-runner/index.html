@@ -259,6 +259,20 @@
     </div>
   </section>
 
+  <section class="card ci">
+    <div>
+      <div class="single-head">
+        <h2>History</h2>
+        <button class="btn btn-small" id="refreshHistory">Refresh</button>
+      </div>
+      <div class="rows" id="historyRuns"></div>
+    </div>
+    <div>
+      <div class="selected-file" id="historyTitle">Select a saved run to see its failures</div>
+      <div class="failures" id="historyFailures"></div>
+    </div>
+  </section>
+
   <section class="card summary">
     <div class="ring">
       <svg width="96" height="96" viewBox="0 0 96 96">
@@ -340,6 +354,7 @@
     tests: [],
     selectedTest: null,
     ciRun: null,
+    historyRun: null,
   };
 
   function element(tag, props = {}, children = []) {
@@ -619,6 +634,49 @@
     };
   }
 
+  function savedStatus(saved) {
+    if (typeof saved.exitCode === "string") return "stopped";
+    return saved.exitCode === 0 ? "passed" : "failed";
+  }
+
+  async function loadHistory() {
+    const { data: runs, error } = await fetchJson("/api/history");
+    if (error || !runs.length) {
+      $("historyRuns").replaceChildren(element("div", { className: "empty", textContent: error || "No saved runs yet. Every run is saved here when it finishes." }));
+      return;
+    }
+    $("historyRuns").replaceChildren(
+      ...runs.map((saved) =>
+        element("div", { className: `row${saved.id === state.historyRun ? " active" : ""}`, onclick: (event) => loadHistoryRun(saved, event.currentTarget) }, [
+          element("span", { className: `badge s-${savedStatus(saved)}`, textContent: savedStatus(saved) }),
+          element("span", { className: "row-suite", textContent: new Date(saved.startedAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) }),
+          element("span", { className: "row-name", textContent: saved.target, title: saved.command }),
+          element("span", { className: "row-time", textContent: `${saved.failed}/${saved.passed + saved.failed}`, title: `${saved.failed} failed of ${saved.passed + saved.failed}` }),
+        ]),
+      ),
+    );
+  }
+
+  async function loadHistoryRun(saved, row) {
+    state.historyRun = saved.id;
+    document.querySelectorAll("#historyRuns .row").forEach((other) => other.classList.toggle("active", other === row));
+    const { data, error } = await fetchJson(`/api/history/${saved.id}`);
+    if (state.historyRun !== saved.id) return;
+    if (error) {
+      $("historyFailures").replaceChildren(element("div", { className: "empty", textContent: error }));
+      return;
+    }
+    const unreported = !data.failures.length && savedStatus(data) === "failed";
+    const failures = unreported
+      ? [{ name: `${data.target} failed without a test result`, fullName: "", status: "failed", duration: 0, message: errorLines(data.output) || "The run exited with an error before reporting a test result.", trace: data.output, attachments: [] }]
+      : data.failures;
+    $("historyTitle").replaceChildren(
+      element("strong", { textContent: data.command }),
+      element("div", { className: "meta", textContent: `${data.passed} passed, ${data.failed} failed, ${data.skipped} skipped in ${seconds(data.finishedAt - data.startedAt)}` }),
+    );
+    $("historyFailures").replaceChildren(...(failures.length ? failures.map(failureCard) : [element("div", { className: "empty", textContent: savedStatus(data) === "stopped" ? "This run was stopped" : "No failures in this run" })]));
+  }
+
   async function loadCiRun(run, row) {
     state.ciRun = run.databaseId;
     document.querySelectorAll("#ciRuns .row").forEach((other) => other.classList.toggle("active", other === row));
@@ -817,6 +875,7 @@
       state.ticks += 1;
       // An idle tab doesn't re-read allure-results: nothing writes it between runs.
       if (newRun || finished || (run.running && state.ticks % 3 === 0)) await loadResults();
+      if (finished) loadHistory();
 
       $("run").disabled = run.running;
       $("runSingle").disabled = run.running || !state.selectedTest;
@@ -859,6 +918,7 @@
   $("testFilter").addEventListener("input", renderTests);
   $("refreshTests").addEventListener("click", loadTests);
   $("refreshCi").addEventListener("click", loadCiRuns);
+  $("refreshHistory").addEventListener("click", loadHistory);
 
   $("stop").addEventListener("click", () => post("/api/stop"));
   $("search").addEventListener("input", renderRows);
@@ -870,6 +930,7 @@
   renderChips();
   loadTests();
   loadCiRuns();
+  loadHistory();
   pollLoop();
 </script>
 </body>

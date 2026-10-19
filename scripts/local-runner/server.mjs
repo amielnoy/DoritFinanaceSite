@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { execFile, spawn } from "node:child_process";
-import { readFile, readdir, rename, rm, stat } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,8 +27,67 @@ const CI_FAILED_JOBS = ["failure", "timed_out", "cancelled", "startup_failure"];
 const ciLoads = new Map();
 const execFileAsync = promisify(execFile);
 const HOSTS = [`127.0.0.1:${PORT}`, `localhost:${PORT}`];
+const FAILED = ["failed", "broken"];
+const HISTORY_DB = path.join(ROOT, ".local-runner", "history.db");
+const HISTORY_RUNS = 100;
+const HISTORY_OUTPUT_CHARS = 200_000;
 
 const run = { busy: false, child: null, onFinish: null, suites: [], single: null, output: "", exitCode: null, startedAt: null, finishedAt: null };
+
+const history = await openHistory();
+
+async function openHistory() {
+  try {
+    const { DatabaseSync } = await import("node:sqlite");
+    await mkdir(path.dirname(HISTORY_DB), { recursive: true });
+    const db = new DatabaseSync(HISTORY_DB);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, target TEXT, command TEXT, started_at INTEGER, finished_at INTEGER, exit_code, passed INTEGER, failed INTEGER, skipped INTEGER, output TEXT);
+      CREATE TABLE IF NOT EXISTS failures (run_id INTEGER, name TEXT, full_name TEXT, status TEXT, message TEXT, trace TEXT);
+      CREATE INDEX IF NOT EXISTS failures_run_id ON failures (run_id);
+    `);
+    return { db };
+  } catch (error) {
+    return { error: `Run history is off because node:sqlite is not available (${error.message}). It needs Node 22.13 or newer.` };
+  }
+}
+
+async function saveRun() {
+  if (!history.db) return;
+  const results = await readResults();
+  const failures = results.filter((result) => FAILED.includes(result.status));
+  const passed = results.filter((result) => result.status === "passed").length;
+  const { lastInsertRowid } = history.db
+    .prepare("INSERT INTO runs (target, command, started_at, finished_at, exit_code, passed, failed, skipped, output) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(
+      run.single || run.suites.join(", "),
+      run.output.slice(2, run.output.indexOf("\n")),
+      run.startedAt,
+      run.finishedAt,
+      run.exitCode,
+      passed,
+      failures.length,
+      results.length - passed - failures.length,
+      run.output.slice(-HISTORY_OUTPUT_CHARS),
+    );
+  const insert = history.db.prepare("INSERT INTO failures (run_id, name, full_name, status, message, trace) VALUES (?, ?, ?, ?, ?, ?)");
+  for (const result of failures) insert.run(lastInsertRowid, result.name || "", result.fullName || "", result.status, result.message, result.trace);
+}
+
+function listHistory() {
+  return history.db
+    .prepare("SELECT id, target, command, started_at AS startedAt, finished_at AS finishedAt, exit_code AS exitCode, passed, failed, skipped FROM runs ORDER BY id DESC LIMIT ?")
+    .all(HISTORY_RUNS);
+}
+
+function historyRun(id) {
+  const saved = history.db
+    .prepare("SELECT id, target, command, started_at AS startedAt, finished_at AS finishedAt, exit_code AS exitCode, passed, failed, skipped, output FROM runs WHERE id = ?")
+    .get(id);
+  if (!saved) return null;
+  const failures = history.db.prepare("SELECT name, full_name AS fullName, status, message, trace FROM failures WHERE run_id = ?").all(id);
+  return { ...saved, failures: failures.map((failure) => ({ ...failure, duration: 0, attachments: [] })) };
+}
 
 function sendJson(res, status, body) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -82,6 +141,7 @@ function launch(command, args, { suites = [], single = null, e2e = false } = {})
     if (e2e) await removeE2eBuild(startedAt).catch((error) => append(`\nCould not remove dist/: ${error.message}\n`));
     run.exitCode = exitCode;
     run.finishedAt = Date.now();
+    await saveRun().catch((error) => append(`\nCould not save the run to history: ${error.message}\n`));
     run.child = null;
     run.busy = false;
     run.onFinish?.();
@@ -368,6 +428,20 @@ async function handle(req, res) {
   if (req.method === "GET" && url.pathname.startsWith("/files/")) {
     const name = path.basename(decodeURIComponent(url.pathname.slice("/files/".length)));
     return serveFile(res, path.join(RESULTS_DIR, name));
+  }
+
+  if (req.method === "GET" && url.pathname.startsWith("/api/history") && history.error) {
+    return sendJson(res, 503, { error: history.error });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/history") {
+    return sendJson(res, 200, listHistory());
+  }
+
+  const historyId = url.pathname.match(/^\/api\/history\/(\d+)$/);
+  if (req.method === "GET" && historyId) {
+    const saved = historyRun(Number(historyId[1]));
+    return saved ? sendJson(res, 200, saved) : sendJson(res, 404, { error: "Run not found" });
   }
 
   if (req.method === "GET" && url.pathname === "/api/ci/runs") {

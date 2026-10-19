@@ -50,6 +50,7 @@ base44/.app.jsonc
 /allure-report
 /allure-report-site
 /allure-history
+/.local-runner
 .vercel
 .env*
 
