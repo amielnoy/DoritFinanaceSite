@@ -1315,9 +1315,10 @@ jobs:
   #
   # A red run used to mean opening the report and working out, failure by
   # failure, whether the site broke, the test broke, or CI broke. This job does
-  # that first pass. Claude Code runs headless against the merged Allure
-  # results through a small read-only MCP server (scripts/ci-triage/), groups
-  # the failures by error signature, and labels each group PRODUCT_BUG,
+  # that first pass. A script (scripts/ci-triage/groq_triage.py) gathers the
+  # merged Allure results through the read-only triage helpers, groups the
+  # failures by error signature, and one call to a Groq-hosted model (free
+  # plan) labels each group PRODUCT_BUG,
   # AUTOMATION_BUG, CONFIGURATION_BUG or NEEDS_HUMAN, with the evidence: the
   # message and stack, retries, Allure history, attachments, and what this
   # branch changed in app code, test code and config.
@@ -1327,10 +1328,10 @@ jobs:
   # this job's write-up into its one PR comment. On `main` it goes to the run
   # summary.
   #
-  # Opt-in, like every deploy here: without the ANTHROPIC_API_KEY secret (or on
-  # a fork PR, which gets no secrets) it says so and stops green. The agent may
-  # use the MCP tools and nothing else: no shell, no edits, no web, because
-  # test output is untrusted text and could contain instructions.
+  # Opt-in, like every deploy here: without the GROQ_API_KEY secret (or on a
+  # fork PR, which gets no secrets) it says so and stops green. The model gets
+  # the evidence as text and no tools at all, because test output is untrusted
+  # text and could contain instructions.
   triage:
     name: Triage the failures (AI)
     runs-on: ubuntu-latest
@@ -1372,14 +1373,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run the triage agent
+      - name: Run the triage
         id: run
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          # Optional repository variable; the script's default is openai/gpt-oss-120b.
+          GROQ_MODEL: ${{ vars.GROQ_MODEL }}
           BASE_CANDIDATE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "::notice::No ANTHROPIC_API_KEY secret, so no AI triage this run. Add it under Settings → Secrets and variables → Actions to turn it on."
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "::notice::No GROQ_API_KEY secret, so no AI triage this run. Add it under Settings → Secrets and variables → Actions to turn it on."
             exit 0
           fi
 
@@ -1390,40 +1393,23 @@ jobs:
             base="HEAD~1"
           fi
 
-          # mcp 2.x renamed the server API this script uses, hence the cap.
+          # mcp 2.x renamed the server API the helpers use, hence the cap.
           pip install --quiet "mcp>=1.2,<2"
-          npm i -g @anthropic-ai/claude-code
 
-          cat > "$RUNNER_TEMP/mcp.json" <<JSON
-          {
-            "mcpServers": {
-              "allure_triage": {
-                "command": "python",
-                "args": ["${GITHUB_WORKSPACE}/scripts/ci-triage/allure_triage_mcp.py"],
-                "env": {
-                  "ALLURE_RESULTS_DIR": "${GITHUB_WORKSPACE}/allure-results",
-                  "ALLURE_HISTORY_FILE": "${GITHUB_WORKSPACE}/allure-history/history.jsonl",
-                  "TRIAGE_BASE_REF": "${base}",
-                  "TEST_PATH_REGEX": "^(e2e|tests)/",
-                  "CONFIG_PATH_REGEX": "^\\\\.github/|^package(-lock)?\\\\.json$|^\\\\.npmrc$|^(playwright|playwright\\\\.measure|vitest)\\\\.config\\\\.ts$|^vite\\\\.config\\\\.js$|^vercel\\\\.json$|^supabase/config\\\\.toml$|^allurerc\\\\.mjs$|^Dockerfile|^docker-compose|^tsconfig\\\\.json$|^eslint\\\\.config\\\\.js$"
-                }
-              }
-            }
-          }
-          JSON
+          export ALLURE_RESULTS_DIR="$GITHUB_WORKSPACE/allure-results"
+          export ALLURE_HISTORY_FILE="$GITHUB_WORKSPACE/allure-history/history.jsonl"
+          export TRIAGE_BASE_REF="$base"
+          export TEST_PATH_REGEX='^(e2e|tests)/'
+          export CONFIG_PATH_REGEX='^\.github/|^package(-lock)?\.json$|^\.npmrc$|^(playwright|playwright\.measure|vitest)\.config\.ts$|^vite\.config\.js$|^vercel\.json$|^supabase/config\.toml$|^allurerc\.mjs$|^Dockerfile|^docker-compose|^tsconfig\.json$|^eslint\.config\.js$'
+          [ -n "$GROQ_MODEL" ] || unset GROQ_MODEL
 
           # Never fatal: a triage that cannot run is reported, not failed.
-          if claude -p "$(cat scripts/ci-triage/triage-prompt.md)" \
-              --mcp-config "$RUNNER_TEMP/mcp.json" --strict-mcp-config \
-              --allowedTools "mcp__allure_triage" \
-              --disallowedTools "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Task" \
-              --max-turns 40 \
-              --output-format text > triage.md 2> triage.err; then
+          if python scripts/ci-triage/groq_triage.py > triage.md 2> triage.err; then
             echo "::notice::AI triage written."
           else
             echo "::warning::The AI triage did not finish — see this step's log."
             cat triage.err
-            printf '### 🧪 Failure triage (AI)\n\n_The triage agent did not finish on this run; the Allure report has the details._\n' > triage.md
+            printf '### 🧪 Failure triage (AI)\n\n_The triage did not finish on this run; the Allure report has the details._\n' > triage.md
           fi
 
           # The machine-readable verdict, for anything that wants to act on it.
