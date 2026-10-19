@@ -1,9 +1,9 @@
 # The local test runner
 
 A page on your own machine for running the test suites, watching them live and
-reading failures, including failures from GitHub Actions and an analysis of a
-failure by Claude. It runs the same
-commands as `npm run test:all`, so a result here matches a result in the terminal.
+reading failures, including failures from GitHub Actions, a history of past runs
+and an analysis of a failure by Claude. It runs the same commands as
+`npm run test:all`, so a result here matches a result in the terminal.
 
 The code is in [`scripts/local-runner/`](../scripts/local-runner/): `server.mjs`
 (a Node server with no dependencies) and `index.html` (the page). See the
@@ -28,6 +28,8 @@ Requirements:
 
 - Node **22.6 or newer** for the e2e suite. The e2e build imports `.ts` files
   directly, which older Node versions cannot do.
+- Node **22.13 or newer** for the run history, which uses Node's built-in SQLite.
+  On an older Node the runner works and the History card says history is off.
 - `npm ci` and `npx playwright install` already run, as for any test run.
 - The [Claude Code](https://claude.com/claude-code) CLI on your `PATH`, signed in,
   only for failure analysis.
@@ -117,6 +119,22 @@ see its failures.
 **Analyze with Claude** works on CI failures too. Claude reads the code as it is
 in your checkout, which may differ from the commit the run tested.
 
+## History
+
+Every run is saved when it finishes, whether it passed, failed or was stopped.
+The **History** card lists the last 100, newest first, with their result, start
+time, target (the suites or the file) and failed tests out of those that ran.
+Click a run to see its command, counts, duration and failures.
+
+- The database is `.local-runner/history.db` in the repository, a SQLite file
+  that git ignores. Delete the folder to clear the history.
+- A run keeps its failed tests (name, error and stack trace) and the last
+  200,000 characters of its output. A run that failed before reporting any test,
+  such as a type error, shows the error lines from that output instead.
+- Screenshots, video and traces are not kept: the next run empties
+  `allure-results/`, where they live.
+- **Analyze with Claude** works on saved failures too.
+
 ## Failure analysis with Claude
 
 In the window of a failed test, **Analyze with Claude** asks Claude for the likely
@@ -157,4 +175,5 @@ The server is meant for one person on their own machine.
 | e2e fails with the port already in use | A `vite preview` from an earlier run is still alive. Find it with `lsof -i :4173` and stop it. |
 | "Could not start the GitHub CLI" | Install it with `brew install gh` and run `gh auth login`. |
 | "Could not start the claude CLI" | Install Claude Code, sign in, and make sure `claude` is on the `PATH` of the terminal that started the runner. |
+| "Run history is off" | Node is older than 22.13. Run `nvm install 22 && nvm use 22`. |
 | The analysis times out | Run it again; a very long output can make it slow. |
