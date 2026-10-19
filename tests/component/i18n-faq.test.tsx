@@ -130,11 +130,12 @@ describe("/faq in English and French", () => {
     expect(faqLd().mainEntity[0].name).toBe("כיצד תכנון מס נכון חוסך בחיסכון הפנסיוני?");
   });
 
-  it("brings the common questions back to the English home page, linking to /en/faq", () => {
+  it("gives the English home page its common-questions link, to /en/faq", () => {
     const { container } = renderAt("/en");
     const block = within(container.querySelector("#common-questions") as HTMLElement);
     expect(block.getByRole("heading", { name: "Common questions" })).toBeInTheDocument();
-    expect(block.getByRole("button", { name: "Does the first introductory meeting cost anything?" })).toBeInTheDocument();
+    // The questions themselves left the home page with the Short take (2026-10-19).
+    expect(block.queryAllByRole("button")).toHaveLength(0);
     expect(block.getByRole("link", { name: "All the questions" })).toHaveAttribute("href", "/en/faq");
   });
 });

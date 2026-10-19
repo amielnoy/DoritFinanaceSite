@@ -144,19 +144,5 @@ describe("the home page in English and French", () => {
     expect(screen.getByText("Les témoignages sont présentés dans leur version originale, en hébreu.")).toBeInTheDocument();
   });
 
-  it("turns the cases' arrows with the page: back is to the left in English, to the right in Hebrew", async () => {
-    renderAt("/en");
-    const proof = within(document.getElementById("proof")!);
-    await userEvent.click(proof.getByRole("button", { name: "Previous" }));
-    expect((scrollBy.mock.calls.at(-1)![0] as ScrollToOptions).left).toBeLessThan(0);
-    await screen.findByText("ליווי מקצועי ואישי", {}, { timeout: 5000 });
-  });
 
-  it("keeps the Hebrew page's arrows as they were", async () => {
-    renderAt("/");
-    const proof = within(document.getElementById("proof")!);
-    await userEvent.click(proof.getByRole("button", { name: "הקודם" }));
-    expect((scrollBy.mock.calls.at(-1)![0] as ScrollToOptions).left).toBeGreaterThan(0);
-    await waitFor(() => expect(servicesMock.content.listTestimonials).toHaveBeenCalled());
-  });
 });

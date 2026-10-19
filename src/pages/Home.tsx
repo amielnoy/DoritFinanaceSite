@@ -7,9 +7,8 @@ import About from "@/components/dorit/sections/About";
 import CarrierLogos from "@/components/dorit/primitives/CarrierLogos";
 import ServiceMatrix from "@/components/dorit/sections/ServiceMatrix";
 import StartConversation from "@/components/dorit/sections/StartConversation";
-import ProofCarousel from "@/components/dorit/sections/ProofCarousel";
 import Testimonials from "@/components/dorit/sections/Testimonials";
-import DetailedFAQ from "@/components/dorit/sections/DetailedFAQ";
+import CommonQuestionsLink from "@/components/dorit/sections/CommonQuestionsLink";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Footer from "@/components/dorit/layout/Footer";
 import MobileStickyBar from "@/components/dorit/layout/MobileStickyBar";
@@ -33,6 +32,11 @@ import { useLocale, useT } from "@/i18n/LocaleContext";
  * The tools moved to `/tools`, the essay to `/perspective`, the reading
  * recommender to the top of `/blog` — nothing was deleted except the duplicate
  * routes to the same conversation.
+ *
+ * Then shorter still (2026-10-19, the "Short" take on the Visualizer Studio
+ * board): one round of evidence, the testimonials, and a link to `/faq` in
+ * place of its questions. The cases carousel (ProofCarousel) and the common
+ * questions accordion (DetailedFAQ) left the page, at every width.
  */
 export default function Home() {
   const t = useT("home");
@@ -65,9 +69,8 @@ export default function Home() {
         {/* Hebrew only for now, like the tools its buttons open. */}
         {SNAPSHOT_HOME && he ? <ErrorBoundary><SnapshotHome /></ErrorBoundary> : null}
         <ErrorBoundary><StartConversation /></ErrorBoundary>
-        <ErrorBoundary><ProofCarousel /></ErrorBoundary>
         <ErrorBoundary><Testimonials /></ErrorBoundary>
-        <ErrorBoundary><DetailedFAQ /></ErrorBoundary>
+        <ErrorBoundary><CommonQuestionsLink /></ErrorBoundary>
       </main>
       <ErrorBoundary><MobileStickyBar /></ErrorBoundary>
       <ErrorBoundary><Footer /></ErrorBoundary>

@@ -52,14 +52,15 @@ test.describe("Home — sanity", () => {
     // The new order, top to bottom. `perspective`, `fee-calculator` and
     // `assessment` moved to their own pages; `consultation` and
     // `detailed-contact` were deleted — the page offered five ways to send the
-    // same name and phone number and now offers one. See src/pages/Home.tsx.
+    // same name and phone number and now offers one. `proof` left with the
+    // "Short" home page, and `common-questions` is now a link to /faq. See
+    // src/pages/Home.tsx.
     for (const id of [
       "top",
       "about",
       "services",
       "start",
       "quick-contact",
-      "proof",
       "testimonials",
       "common-questions",
     ]) {
