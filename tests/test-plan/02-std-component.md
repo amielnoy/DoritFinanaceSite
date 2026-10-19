@@ -151,10 +151,13 @@ React does not surface anywhere a visitor can see. The form simply stops.
 
 ### 4.9 `<LeadTrackingPanel />` — `tests/component/lead-tracking-panel.test.tsx`
 
-The admins' view of GA4 lead tracking, at the top of `/admin/leads`.
+The admins' view of GA4 lead tracking, at the top of `/admin/leads`. Folded by default, so
+the leads stay on screen; CMP-GA4-001 to 005 open it first.
 
 | ID | Title | Expected result |
 |---|---|---|
+| CMP-GA4-006 | "starts folded, showing only its heading" | Toggle has `aria-expanded="false"`; no table, no reports link |
+| CMP-GA4-007 | "opens on a click, and folds again on a second" | `aria-expanded` flips to `true` with the table shown, then back with it gone |
 | CMP-GA4-001 | "lists every event the site sends" | Every `LEAD_EVENTS` name shown |
 | CMP-GA4-002 | "says when the tag is blocked in this browser" | "כנראה חוסם פרסומות" |
 | CMP-GA4-003 | "says when the tag is running" | "אירועים נשלחים" |
@@ -163,6 +166,24 @@ The admins' view of GA4 lead tracking, at the top of `/admin/leads`.
 
 `sanity.test.tsx` also pins the rule that a lead counts only once saved:
 CMP-QCF-006 "reports a lead to GA4 after a successful send, and not after a failed one".
+
+### 4.9a `<LeadDetails />` — `tests/component/lead-details.test.tsx`
+
+The "פרטים" cell on `/admin/leads`, and the details in the lead drawer. An interview's
+"label: value" profile reads top to bottom: topic, urgency badge, time, then each answer's
+label above its value. The table folds after three answers; the drawer shows them all.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-LDT-001 | "splits an interview profile into rows, and lifts the urgency out" | Five labelled rows in order; `דחיפות` becomes the badge |
+| CMP-LDT-002 | "keeps a free-text message as prose, even when it holds a colon" | No rows; the note unchanged |
+| CMP-LDT-003 | "shows the topic, the time and the urgency, then three answers and 'עוד'" | First three answers shown, the rest hidden; "עוד 2 פרטים" with `aria-expanded="false"` |
+| CMP-LDT-004 | "unfolds the rest in place, and folds it back" | The hidden answer appears, then "פחות" hides it again |
+| CMP-LDT-005 | "shows everything, with no fold, in the drawer" | `compact={false}`: every answer, no button |
+| CMP-LDT-006 | "shows a short quick-form message as it is, with no fold" | The message shown; no button |
+| CMP-LDT-007 | "keeps a time range in reading order inside the Hebrew" | `12:00–15:00` sits in a `bdi[dir=ltr]` |
+| CMP-LDT-008 | "shows a dash for a lead with no details" | "—" |
+| CMP-LDT-009 | "turns a stored claim document into a button, not a link" | "מסמך 1" button; the storage ref not shown |
 
 ### 4.10 `<ErrorBoundary />` — `tests/component/error-boundary.test.tsx`
 

@@ -2006,7 +2006,8 @@ describe("a claim document stored in Supabase", () => {
     const handler = read(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"));
     const m = handler.match(/STORAGE_REF_PREFIX = '([^']+)'/);
     expect(m?.[1]).toBe(CLAIM_DOCUMENT_REF_PREFIX);
-    const leads = read(join(REPO_ROOT, "src/pages/Leads.tsx"));
-    expect(leads).toContain("storage:claim-documents\\/");
+    // The leads screen's details cell turns the ref into a "מסמך" button.
+    const details = read(join(REPO_ROOT, "src/components/dorit/admin/LeadDetails.tsx"));
+    expect(details).toContain("storage:claim-documents\\/");
   });
 });

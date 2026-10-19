@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BarChart3, Check, ExternalLink, X } from "lucide-react";
+import { BarChart3, Check, ChevronDown, ExternalLink, X } from "lucide-react";
 import {
   GA4_MEASUREMENT_ID,
   LEAD_EVENTS,
@@ -17,8 +17,14 @@ const GA4_REPORTS = "https://analytics.google.com/analytics/web/";
  * each one means, which to mark as Key Events, and whether this browser is
  * counted. The last matters most: Dorit testing the site from her own phone
  * would otherwise show up as leads.
+ *
+ * Folded by default. It sits above the leads list on /admin/leads, and it is
+ * reference, read once in a while; open, it pushed the leads — the thing the
+ * page is for — below the fold. The header is the toggle, and the body is not
+ * rendered while folded.
  */
 export default function LeadTrackingPanel() {
+  const [open, setOpen] = useState(false);
   const [internal, setInternal] = useState(false);
   const [tagLoaded, setTagLoaded] = useState(false);
 
@@ -34,17 +40,35 @@ export default function LeadTrackingPanel() {
 
   return (
     <section aria-labelledby="lead-tracking-title" className="mb-10 border border-border/60 bg-card">
-      <div className="px-6 py-5 border-b border-border/60 flex items-center gap-3">
-        <BarChart3 size={20} className="text-accent shrink-0" aria-hidden="true" />
-        <div>
-          <h2 id="lead-tracking-title" className="font-heading text-xl">
-            מעקב לידים ב-Google Analytics
-          </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            מה האתר מדווח, ואיך רואים את זה. המספרים עצמם נמצאים ב-Google Analytics.
-          </p>
-        </div>
-      </div>
+      <h2 id="lead-tracking-title" className="font-heading text-xl">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls="lead-tracking-body"
+          className={`w-full px-6 py-5 flex items-center gap-3 text-right hover:bg-secondary/30 transition-colors ${
+            open ? "border-b border-border/60" : ""
+          }`}
+        >
+          <BarChart3 size={20} className="text-accent shrink-0" aria-hidden="true" />
+          <span className="flex-1">
+            <span className="block">מעקב לידים ב-Google Analytics</span>
+            <span className="block font-body text-sm font-normal text-muted-foreground mt-0.5">
+              {open
+                ? "מה האתר מדווח, ואיך רואים את זה. המספרים עצמם נמצאים ב-Google Analytics."
+                : "לחצו להצגת האירועים, מצב התג וההגדרות לדפדפן הזה."}
+            </span>
+          </span>
+          <ChevronDown
+            size={20}
+            className={`shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+      </h2>
+
+      {open ? (
+      <div id="lead-tracking-body">
 
       <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border/60">
         <Status
@@ -114,6 +138,8 @@ export default function LeadTrackingPanel() {
         </p>
         <p>לא נשלחים ל-Google שם, טלפון, מייל, תוכן הודעה או תוכן שיחה — רק שם האירוע, מאיפה בדף הוא קרה ובאיזה כלי.</p>
       </div>
+      </div>
+      ) : null}
     </section>
   );
 }
