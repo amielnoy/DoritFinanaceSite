@@ -100,8 +100,12 @@ const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean }[] = [
   { key: "unassigned", label: "לא שויכו", adminOnly: true },
 ];
 
-type PageTab = "leads" | "meetings";
-const PAGE_TABS: PageTab[] = ["leads", "meetings"];
+type PageTab = "leads" | "meetings" | "tracking";
+/**
+ * In reading order, right to left: "מעקב לידים" is the leftmost, and the
+ * Owner's alone (`leads.tracking`). Whoever may not see it gets the other two.
+ */
+const PAGE_TABS: PageTab[] = ["leads", "meetings", "tracking"];
 
 /** What the screen adds with VITE_MEETINGS_STAFF: the agenda's one read, the clock, and the tab in the URL. */
 interface StaffView {
@@ -131,11 +135,21 @@ function useNow(): Date {
  * calls none of them and is the leads screen exactly as it was. `?tab=` is set
  * beside `?agency=`, never in place of it.
  */
-function WithStaffView({ agencyId, children }: { agencyId: string; children: (view: StaffView) => React.ReactNode }) {
+function WithStaffView({
+  agencyId,
+  tabs,
+  children,
+}: {
+  agencyId: string;
+  /** The tabs this person may open; `?tab=` naming another opens "פניות". */
+  tabs: PageTab[];
+  children: (view: StaffView) => React.ReactNode;
+}) {
   const agenda = useAgencyMeetings(agencyId);
   const now = useNow();
   const [params, setParams] = useSearchParams();
-  const tab: PageTab = params.get("tab") === "meetings" ? "meetings" : "leads";
+  const asked = params.get("tab") as PageTab | null;
+  const tab: PageTab = asked && tabs.includes(asked) ? asked : "leads";
   const [focusMeetingId, setFocusMeetingId] = useState<string | null>(null);
   const setTab = useCallback(
     (next: PageTab) =>
@@ -166,36 +180,38 @@ function WithStaffView({ agencyId, children }: { agencyId: string; children: (vi
 }
 
 /**
- * "פניות" and "פגישות", side by side under the heading: a real tablist, its
- * choice in the URL, the arrow keys moving between the two (in a right-to-left
- * page the left arrow goes to the left tab, "פגישות").
+ * "פניות", "פגישות" and, for the Owner, "מעקב לידים", side by side under the
+ * heading: a real tablist, its choice in the URL, the arrow keys moving between
+ * them (in a right-to-left page the left arrow goes to the next tab on the left).
  */
 function PageTabs({
+  tabs,
   tab,
   onSelect,
   labels,
 }: {
+  tabs: PageTab[];
   tab: PageTab;
   onSelect(tab: PageTab): void;
   labels: Record<PageTab, { title: string; figure: string; line: string }>;
 }) {
-  const refs = useRef<Record<PageTab, HTMLButtonElement | null>>({ leads: null, meetings: null });
+  const refs = useRef<Record<PageTab, HTMLButtonElement | null>>({ leads: null, meetings: null, tracking: null });
   const go = (next: PageTab) => {
     onSelect(next);
     refs.current[next]?.focus();
   };
   const onKeyDown = (event: React.KeyboardEvent, current: PageTab) => {
-    const at = PAGE_TABS.indexOf(current);
+    const at = tabs.indexOf(current);
     const step = { ArrowLeft: 1, ArrowRight: -1 }[event.key];
-    if (step !== undefined) go(PAGE_TABS[(at + step + PAGE_TABS.length) % PAGE_TABS.length]);
-    else if (event.key === "Home") go(PAGE_TABS[0]);
-    else if (event.key === "End") go(PAGE_TABS[PAGE_TABS.length - 1]);
+    if (step !== undefined) go(tabs[(at + step + tabs.length) % tabs.length]);
+    else if (event.key === "Home") go(tabs[0]);
+    else if (event.key === "End") go(tabs[tabs.length - 1]);
     else return;
     event.preventDefault();
   };
   return (
-    <div role="tablist" aria-label="פניות ופגישות" className="grid grid-cols-2">
-      {PAGE_TABS.map((key) => {
+    <div role="tablist" aria-label="פניות ופגישות" className={`grid ${tabs.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+      {tabs.map((key) => {
         const active = tab === key;
         const { title, figure, line } = labels[key];
         return (
@@ -218,7 +234,7 @@ function PageTabs({
           >
             <span className="flex flex-wrap items-baseline gap-x-2">
               <span className="font-heading text-xl md:text-2xl">{title}</span>
-              <span className="font-heading text-xl md:text-2xl tabular-nums">{figure}</span>
+              {figure ? <span className="font-heading text-xl md:text-2xl tabular-nums">{figure}</span> : null}
             </span>
             <span className="block text-sm text-muted-foreground">{line}</span>
           </button>
@@ -244,6 +260,8 @@ export default function Leads() {
   const { can } = useAgencyRole(agencyId);
   const assigns = can("leads.assign");
   const deletes = can("leads.delete");
+  const tracks = can("leads.tracking");
+  const tabs = useMemo(() => PAGE_TABS.filter((t) => t !== "tracking" || tracks), [tracks]);
   const members = useAdminUsers(assigns);
   const transcriptIds = useTranscriptLeadIds();
   const withTranscript = useMemo(() => new Set(transcriptIds.data ?? []), [transcriptIds.data]);
@@ -336,7 +354,8 @@ export default function Leads() {
   const page = (staff: StaffView | null) => {
     const leadsContent = (
       <>
-            {assigns ? <LeadTrackingPanel /> : null}
+            {/* With the tabs it is the Owner's "מעקב לידים" tab; without them, folded above the leads. */}
+            {!staff && tracks ? <LeadTrackingPanel /> : null}
 
             {/* תצוגת סיכום סטטוסים */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
@@ -567,6 +586,7 @@ export default function Leads() {
           {staff ? (
             <div className="max-w-[1200px] mx-auto px-6">
               <PageTabs
+                tabs={tabs}
                 tab={staff.tab}
                 onSelect={staff.setTab}
                 labels={{
@@ -583,6 +603,11 @@ export default function Leads() {
                     title: "פגישות",
                     figure: `${n(agenda?.week)} השבוע`,
                     line: `${n(agenda?.today)} היום · ${n(agenda?.requests)} בקשות שינוי · ${n(agenda?.unsummarised)} בלי סיכום`,
+                  },
+                  tracking: {
+                    title: "מעקב לידים",
+                    figure: "",
+                    line: "מה האתר מדווח ל-Google Analytics",
                   },
                 }}
               />
@@ -612,6 +637,11 @@ export default function Leads() {
                   />
                 ) : null}
               </div>
+              {tracks ? (
+                <div role="tabpanel" id="leads-panel-tracking" aria-labelledby="leads-tab-tracking" hidden={staff.tab !== "tracking"}>
+                  {staff.tab === "tracking" ? <LeadTrackingPanel collapsible={false} /> : null}
+                </div>
+              ) : null}
             </>
           ) : (
             leadsContent
@@ -656,7 +686,13 @@ export default function Leads() {
     );
   };
 
-  return MEETINGS_STAFF ? <WithStaffView agencyId={agencyId}>{page}</WithStaffView> : page(null);
+  return MEETINGS_STAFF ? (
+    <WithStaffView agencyId={agencyId} tabs={tabs}>
+      {page}
+    </WithStaffView>
+  ) : (
+    page(null)
+  );
 }
 
 /** "הפגישה הבאה": the lead's next meeting, which opens the agenda; or "+ קביעת פגישה"; "—" until the agenda has loaded. */
