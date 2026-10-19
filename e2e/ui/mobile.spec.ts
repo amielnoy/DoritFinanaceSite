@@ -222,8 +222,6 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
         page.locator("#about").getByRole("button", { name: "עוד עליי" }),
         page.locator("#common-questions").getByRole("link", { name: "לכל השאלות" }),
         page.locator("footer").getByText("ניווט באתר"),
-        page.locator("#proof").getByRole("button", { name: "הבא" }),
-        page.locator("#proof").getByRole("button", { name: "פרטי המקרה" }).first(),
         page.locator("#testimonials").getByRole("button", { name: "ההמלצה הבאה" }),
       ];
 
@@ -1100,19 +1098,13 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
   });
 
-  test("common questions: the first four, and לכל השאלות to /faq", async ({ page }) => {
+  test("common questions: a link to /faq in place of the questions (the Short home page, 2026-10-19)", async ({ page }) => {
     await gotoHome(page);
     const section = page.locator("#common-questions");
-    const visible = section.locator("h3 button[aria-expanded]:visible");
-    await expect(visible).toHaveCount(4);
-    // The other four are hidden, not dropped — the phone's document matches the desktop's.
-    await expect(section.locator("h3 button[aria-expanded]")).toHaveCount(8);
-    await visible.first().click();
-    await expect(visible.first()).toHaveAttribute("aria-expanded", "true");
+    await expect(section.locator("button[aria-expanded]")).toHaveCount(0);
     await section.getByRole("link", { name: "לכל השאלות" }).click();
     await expect(page).toHaveURL(/\/faq$/);
   });
-
   test("the footer: the menu folded into ניווט באתר, contact two to a row, the licence line in view", async ({ page }) => {
     await gotoHome(page);
     const footer = page.locator("footer");
@@ -1137,27 +1129,6 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     await test_step("the licence line is shown in full", async () => {
       await expect(footer.getByText(/רישיון סוכן מרשות שוק ההון מספר/)).toBeVisible();
       await expect(footer.getByText("L-00107009")).toBeVisible();
-    });
-  });
-
-  test("common questions: a one-sentence intro, and no closing button — the bar's first cell is the same link", async ({ page }) => {
-    await gotoHome(page);
-    const section = page.locator("#common-questions");
-    await section.scrollIntoViewIfNeeded();
-
-    await test_step("the intro's first sentence shows; the second is hidden, not dropped", async () => {
-      await expect(section.getByText(/לפני הפגישה הראשונה\./)).toBeVisible();
-      const more = section.getByText("אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית.");
-      await expect(more).toHaveCount(1);
-      await expect(more).toBeHidden();
-    });
-
-    await test_step("לשיחה קצרה עם דורית is hidden here but still in the document; the bar's לשיחה קצרה is in view", async () => {
-      const cta = section.getByRole("link", { name: "לשיחה קצרה עם דורית", includeHidden: true });
-      await expect(cta).toHaveCount(1);
-      await expect(cta).toBeHidden();
-      await expect(cta).toHaveAttribute("href", "#start");
-      await expect(page.locator("[data-track-location='mobile_sticky_bar']").getByRole("link", { name: "קביעת שיחה" })).toBeVisible();
     });
   });
 
@@ -1200,59 +1171,6 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     for (const p of paddings) {
       expect(p, p.id).toEqual({ id: p.id, top: 40, bottom: 40 });
     }
-  });
-
-  test("the cases: short cards in a strip, each story folded behind פרטי המקרה, the disclaimer in view", async ({ page }) => {
-    await gotoHome(page);
-    const proof = page.locator("#proof");
-    await proof.scrollIntoViewIfNeeded();
-    const strip = proof.getByRole("region", { name: "תיקי הצלחה — גלילה אופקית" });
-    const cards = strip.locator("article");
-    const toggles = proof.getByRole("button", { name: "פרטי המקרה" });
-    const story = proof.getByText(/ניהלתי את ההליך מול החברה/);
-
-    await test_step("the disclaimer, the headlines and the figures show; every story is folded, not removed", async () => {
-      await expect(proof.getByText(/תוצאות עבר אינן מבטיחות תוצאות דומות — כל מקרה תלוי בנתונים\s+האישיים\./)).toBeInViewport();
-      await expect(cards).toHaveCount(7);
-      await expect(toggles).toHaveCount(7);
-      for (let i = 0; i < 7; i++) await expect(toggles.nth(i)).toHaveAttribute("aria-expanded", "false");
-      await expect(proof.getByRole("heading", { name: "מ-דחייה לאישור מלא תוך 11 ימים" })).toBeVisible();
-      await expect(proof.getByText("850 אלף ₪ שולמו")).toBeVisible();
-      // A projected figure keeps the basis it rests on, folded or not.
-      for (const basis of await proof.getByText("הערכה המבוססת על הנחות של תשואה ודמי ניהול").all()) {
-        await expect(basis).toBeVisible();
-      }
-      // Two lines of the story show (2026-10-14: hidden, half of each card
-      // stood empty); the rest waits for פרטי המקרה.
-      await expect(story).toBeVisible();
-      await expect(story).toHaveClass(/line-clamp-2/);
-      await expect(story).toHaveCount(1);
-    });
-
-    await test_step("פרטי המקרה unfolds its own story in place, and folds it again", async () => {
-      await toggles.first().click();
-      await expect(toggles.first()).toHaveAttribute("aria-expanded", "true");
-      await expect(story).not.toHaveClass(/line-clamp-2/);
-      await expect(toggles.nth(1)).toHaveAttribute("aria-expanded", "false");
-      await toggles.first().click();
-      await expect(toggles.first()).toHaveAttribute("aria-expanded", "false");
-      await expect(story).toHaveClass(/line-clamp-2/);
-    });
-
-    await test_step("הבא brings the second case into the strip, and הקודם takes it back", async () => {
-      // Horizontally only: the cards size to their own content now, so a tall
-      // one can reach below the screen while sitting fully in the strip.
-      const width = page.viewportSize()!.width;
-      const inStrip = async (i: number) => {
-        const b = (await cards.nth(i).boundingBox())!;
-        return b.x >= -1 && b.x + b.width <= width + 1;
-      };
-      expect(await inStrip(1)).toBe(false);
-      await proof.getByRole("button", { name: "הבא" }).click();
-      await expect.poll(() => inStrip(1)).toBe(true);
-      await proof.getByRole("button", { name: "הקודם" }).click();
-      await expect.poll(() => inStrip(0)).toBe(true);
-    });
   });
 
   test("testimonials: one card at a time, sideways, with prev and next — and nothing moves by itself", async ({ page }) => {
@@ -1316,14 +1234,11 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoHome(page);
 
-    await test_step("the cases and the testimonials are short", async () => {
+    await test_step("the testimonials are short", async () => {
       // Testimonials arrive after the route commits; wait for the section.
       await expect(page.locator("#testimonials article")).toHaveCount(2);
-      const proof = (await page.locator("#proof").boundingBox())!.height;
+      // The cases (#proof) left the page with the Short take (2026-10-19).
       const testimonials = (await page.locator("#testimonials").boundingBox())!.height;
-      // 521 after 3b; ~652 once each card showed two lines of its story and a
-      // WhatsApp line followed the strip (2026-10-14).
-      expect(proof, "#proof was 898px").toBeLessThan(700);
       expect(testimonials, "#testimonials was 791px").toBeLessThan(480);
     });
 
@@ -1343,7 +1258,7 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
 
 /** The same page from md up: what stage 3 must not have touched. */
 test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
-  test("keeps its portrait, its open services, its standing form, its open cases, its testimonials grid, eight questions and its open footer menu", async ({ page }) => {
+  test("keeps its portrait, its open services, its standing form, its testimonials grid and its open footer menu", async ({ page }) => {
     await gotoApp(page);
 
     await test_step("the hero's portrait is the plate, not a circle, and no extra buttons", async () => {
@@ -1371,26 +1286,19 @@ test.describe("Home on a desktop", { tag: "@desktop-only" }, () => {
       await expect(page.locator("#interview").getByRole("heading", { name: "איפה את/ה בחיים כרגע?" })).toBeVisible();
     });
 
-    await test_step("the cases tell their stories open, and the testimonials stand in a grid", async () => {
-      await expect(page.locator("#proof").getByRole("button", { name: "פרטי המקרה" })).toHaveCount(0);
-      await expect(page.locator("#proof").getByText(/ניהלתי את ההליך מול החברה/)).toBeVisible();
-      await expect(page.locator("#proof").getByText(/מקרה 01/)).toBeVisible();
+    await test_step("the testimonials stand in a grid", async () => {
       await expect(page.locator("#testimonials article")).toHaveCount(2);
       await expect(page.locator("#testimonials").getByRole("button", { name: /ההמלצה/ })).toHaveCount(0);
       await expect(page.locator("#testimonials").getByRole("region")).toHaveCount(0);
     });
 
-    await test_step("eight questions, no לכל השאלות, an open footer menu", async () => {
-      await expect(page.locator("#common-questions h3 button[aria-expanded]:visible")).toHaveCount(8);
-      await expect(page.getByRole("link", { name: "לכל השאלות" })).toBeHidden();
+    await test_step("the common questions are a link to /faq, and the footer menu is open", async () => {
+      await expect(page.locator("#common-questions").getByRole("link", { name: "לכל השאלות" })).toBeVisible();
       await expect(page.locator("footer details")).toHaveCount(0);
       await expect(page.locator("footer").getByRole("link", { name: "מדריך תביעות" })).toBeVisible();
     });
 
-    await test_step("the common questions keep their whole intro and their closing link; the footer its quote, name and slogan", async () => {
-      const questions = page.locator("#common-questions");
-      await expect(questions.getByText(/אם לא מצאתם את התשובה שחיפשתם, נשמח לענות אישית\./)).toBeVisible();
-      await expect(questions.getByRole("link", { name: "לשיחה קצרה עם דורית" })).toBeVisible();
+    await test_step("the footer keeps its quote, name and slogan", async () => {
       const footer = page.locator("footer");
       await expect(footer.getByText(/ביטחון אמיתי מתחיל/)).toBeVisible();
       await expect(footer.getByText("התכנון שלי — השקט שלך")).toBeVisible();

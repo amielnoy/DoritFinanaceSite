@@ -28,7 +28,6 @@ const NAV_LINKS: FooterLink[] = [
   { l: "nav.services", h: "#services" },
   { l: "nav.claimsGuide", h: "/claims", route: true },
   { l: "nav.faq", h: "/faq", route: true },
-  { l: "nav.proof", h: "#proof" },
   { l: "nav.blog", h: "/blog", route: true, hebrewOnly: true },
   { l: "nav.tools", h: "/tools", route: true },
   { l: "nav.perspective", h: "/perspective", route: true, hebrewOnly: true },

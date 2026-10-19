@@ -742,8 +742,8 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-009 | "keeps the questionnaire and the FAQ block on the Hebrew page" | `#interview` and `#common-questions` present; no original-language note |
 | CMP-I18N-010 | "sends the visitor's message as written, with a Hebrew note for Dorit" | "Please enter your name and phone."; `message` "About my pension\n(מולא באנגלית)" |
 | CMP-I18N-011 | "shows the testimonials in their own Hebrew, marked so" | The card `lang="he" dir="rtl"`; the French note |
-| CMP-I18N-012 | "turns the cases' arrows with the page: back is to the left in English, to the right in Hebrew" | "Previous" scrolls by a negative `left` |
-| CMP-I18N-013 | "keeps the Hebrew page's arrows as they were" | "הקודם" scrolls by a positive `left` |
+| CMP-I18N-012 | "turns the cases' arrows with the page: back is to the left in English, to the right in Hebrew" | **Retired 2026-10-19** — the Short home page has no `#proof` to render |
+| CMP-I18N-013 | "keeps the Hebrew page's arrows as they were" | **Retired 2026-10-19** — the Short home page has no `#proof` to render |
 
 ### 4.36 /faq in English and French — `tests/component/i18n-faq.test.tsx`
 
@@ -755,7 +755,7 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 | CMP-I18N-015 | "opens an answer, and moves between topics" | "General" pressed; the first-meeting answer visible |
 | CMP-I18N-016 | "declares its questions in English to search engines, and no Hebrew-only chat" | FAQPage JSON-LD: 24 English questions, no Hebrew; no chat; canonical `/en/faq` |
 | CMP-I18N-017 | "keeps the Hebrew page Hebrew, its English subtitles and its JSON-LD" | "Income Tax · 6 שאלות"; the chat; the Hebrew first question |
-| CMP-I18N-018 | "brings the common questions back to the English home page, linking to /en/faq" | "Common questions"; "All the questions" → `/en/faq` |
+| CMP-I18N-018 | "gives the English home page its common-questions link, to /en/faq" | "Common questions"; no buttons in the block; "All the questions" → `/en/faq` |
 
 ### 4.37 /claims and /atzmaim-31-12 in English and French — `tests/component/i18n-claims.test.tsx`
 
