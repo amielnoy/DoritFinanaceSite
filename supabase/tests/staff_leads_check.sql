@@ -290,13 +290,21 @@ do $$ begin
   exception when invalid_parameter_value then
     if sqlerrm <> 'field_invalid' then raise; end if;
   end;
-  -- The agency is not the caller's.
+  -- Next to a Hebrew letter, which Postgres counts as a word character: still refused.
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0545556666', null, null, 'תז123456789',
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'an ID number next to a Hebrew letter was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'field_invalid' then raise; end if;
+  end;
+  -- Another agency: refused before anything else, agency 1 only for now.
   begin
     perform public.create_staff_lead('aaaaaaaa-0000-0000-0000-000000000002', 'x', '0545556666', null, null, null,
       'phone', null, 'new', 'verbal', null, false);
     raise exception 'a User of agency 1 created a lead in agency 2';
   exception when insufficient_privilege then
-    if sqlerrm <> 'forbidden' then raise; end if;
+    if sqlerrm <> 'agency_not_enabled' then raise; end if;
   end;
   -- Direct insert is still revoked.
   begin
@@ -424,7 +432,7 @@ do $$ begin
       'phone', null, 'new', 'verbal', null, false);
     raise exception 'a member of a suspended agency created a lead';
   exception when insufficient_privilege then
-    if sqlerrm <> 'forbidden' then raise; end if;
+    if sqlerrm <> 'agency_not_enabled' then raise; end if;
   end;
 end $$;
 set local request.jwt.claims = '{"sub":"ffffffff-0000-0000-0000-000000000003","role":"authenticated"}';
@@ -435,6 +443,14 @@ do $$ begin
     raise exception 'an Admin of agency 2 created a lead in agency 1';
   exception when insufficient_privilege then
     if sqlerrm <> 'forbidden' then raise; end if;
+  end;
+  -- Nor in their own agency: its clients would be told agency 1's notice.
+  begin
+    perform public.create_staff_lead('aaaaaaaa-0000-0000-0000-000000000002', 'x', '0540001111', null, null, null,
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'an Admin of agency 2 created a lead in agency 2';
+  exception when insufficient_privilege then
+    if sqlerrm <> 'agency_not_enabled' then raise; end if;
   end;
 end $$;
 reset role;

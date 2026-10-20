@@ -160,6 +160,26 @@ describe("staff leads, schema", () => {
 
     // A direct call to /rest/v1/rpc/create_staff_lead skips the create-lead
     // function, so the RPC holds the function's own controls.
+    it("refuses every agency but agency 1 before any other work, as create-lead does", () => {
+      const start = b().indexOf(" begin ");
+      const gate =
+        "if p_agency_id is distinct from '00000000-0000-0000-0000-000000000001'::uuid then raise exception 'agency_not_enabled' using errcode = '42501'; end if;";
+      expect(b()).toContain(gate);
+      // The first statement of the body.
+      expect(b().slice(start + " begin ".length).startsWith(gate)).toBe(true);
+      const agency = readFileSync(join(REPO_ROOT, "supabase/functions/_shared/agency.ts"), "utf8");
+      expect(agency).toContain("id: '00000000-0000-0000-0000-000000000001'");
+    });
+
+    it("takes a per-member lock before the hourly count, so parallel calls cannot pass 60", () => {
+      const lock = "perform pg_advisory_xact_lock(hashtext('staff-lead:' || v_caller::text));";
+      expect(b()).toContain(lock);
+      expect(b().indexOf(lock)).toBeGreaterThan(b().indexOf("'forbidden'"));
+      expect(b().indexOf(lock)).toBeLessThan(b().indexOf("select count(*) from public.leads where brought_by = v_caller"));
+      // and before the duplicate lookup and the insert
+      expect(b().indexOf(lock)).toBeLessThan(b().indexOf("select l.id into v_dup"));
+    });
+
     it("refuses a 61st lead from one member in an hour, with its own errcode", () => {
       expect(b()).toContain(
         "if (select count(*) from public.leads where brought_by = v_caller and created_at > now() - interval '1 hour') >= 60 then raise exception 'rate_limited' using errcode = 'P0001';",
@@ -174,6 +194,8 @@ describe("staff leads, schema", () => {
 
     it("refuses notes, topic or referrer that still hold what redact() cuts", () => {
       expect(b()).toContain(`c_secret constant text := '${SECRET_SQL}';`);
+      // Digit (and, for an IBAN, alphanumeric) boundaries, as redact() has them: never \y.
+      expect(SECRET_SQL).not.toMatch(/\\[ybmM]/);
       for (const p of ["p_notes", "p_topic", "p_referrer"]) expect(b()).toContain(`coalesce(${p}, '') ~ c_secret`);
       expect(b()).toMatch(/~ c_secret then raise exception 'field_invalid' using errcode = '22023';/);
     });

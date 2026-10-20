@@ -142,6 +142,7 @@ describe("create-lead — who may, and what it checks", () => {
     ["rate_limited", 429, "P0001"],
     ["bad_phone", 422, "22023"],
     ["field_invalid", 422, "22023"],
+    ["agency_not_enabled", 403, "42501"],
   ])("maps the RPC's %s to %i in Hebrew, never its text", async (reason, status, code) => {
     const s = fakeSupabase({ rpc: { status: status === 403 ? 403 : 400, body: { code, message: reason, details: "secret row" } } });
     const r = await create(good, USER, s);

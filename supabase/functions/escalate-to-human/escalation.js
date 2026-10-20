@@ -50,10 +50,10 @@ export const URGENT = new Set(['complaint', 'claim_or_policy', 'privacy_request'
 export function redact(text) {
   if (!text) return '';
   return String(text)
-    .replace(/\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g, '[הושמט — מספר כרטיס]')
-    .replace(/\bIL\d{2}[A-Z0-9]{17,}\b/gi, '[הושמט — חשבון בנק]')
-    .replace(/\b\d{9}\b/g, '[הושמט — מספר מזהה]')
-    .replace(/\b\d{6,8}\b/g, '[הושמט — מספר]')
+    .replace(/(?<![0-9])[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}(?![0-9])/g, '[הושמט — מספר כרטיס]')
+    .replace(/(?<![A-Za-z0-9])[Ii][Ll][0-9]{2}[A-Za-z0-9]{17,}(?![A-Za-z0-9])/g, '[הושמט — חשבון בנק]')
+    .replace(/(?<![0-9])[0-9]{9}(?![0-9])/g, '[הושמט — מספר מזהה]')
+    .replace(/(?<![0-9])[0-9]{6,8}(?![0-9])/g, '[הושמט — מספר]')
     .slice(0, 2000);
 }
 

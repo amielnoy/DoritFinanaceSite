@@ -9,6 +9,8 @@ import { liftRedact, SECRET_JS } from "../helpers/staff-lead-secret";
  * The pattern is pinned in the migration by staff-leads-schema.contract.test.ts.
  */
 const redact = liftRedact();
+/** What create-lead sends: redact() twice (its `scrub`), so a number cut in two at 2000 characters is taken too. */
+const scrub = (s: string) => redact(redact(s));
 
 const SECRETS = [
   "123456782",
@@ -23,8 +25,16 @@ const SECRETS = [
   "סניף 12, חשבון 1234567",
   "פוליסה 12345678",
   "050-1234567",
+  // Next to a Hebrew letter: Postgres counts it as a word character, so a \y
+  // boundary missed these while JavaScript's \b did not.
+  "תז123456789",
+  "ת.ז 123456789",
+  "ת.ז123456789",
+  "חשבון12345678",
+  "כרטיס4580123456789012",
+  "חשבוןIL620108000000099999999",
 ];
-const CLEAN = ["שיחה ראשונה", "פגישה ב-10:30, 05/11", "רו״ח משה", "0501234567", "12345", "1234567890", "פנסיה", ""];
+const CLEAN = ["שיחה ראשונה", "פגישה ב-10:30, 05/11", "רו״ח משה", "0501234567", "12345", "1234567890", "פנסיה", "", "AIL620108000000099999999"];
 
 describe("create_staff_lead's field_invalid pattern, against redact()", () => {
   it.each(SECRETS)("finds the raw %j", (sample) => {
@@ -42,6 +52,17 @@ describe("create_staff_lead's field_invalid pattern, against redact()", () => {
     expect(SECRET_JS.test(redact(sample))).toBe(false);
   });
 
+  it("finds nothing in what create-lead sends, even when redact() cuts a long number at 2000 characters", () => {
+    // Ten "123456 " grow to fifteen characters each, so after them and 1843
+    // letters the cut at 2000 leaves seven digits of the twelve-digit run at the end.
+    const long = "123456 ".repeat(10) + "א".repeat(1843) + "123456789012";
+    expect(long.length).toBeLessThanOrEqual(2000);
+    expect(redact(long).endsWith("א1234567")).toBe(true);
+    const once = redact(long);
+    expect(SECRET_JS.test(once), "one pass leaves a piece: the reason for the second").toBe(true);
+    expect(SECRET_JS.test(scrub(long))).toBe(false);
+  });
+
   it("finds nothing in redact() of 5000 random mixes of digits, separators, letters and IL", () => {
     // A fixed seed, so a failure repeats.
     let seed = 20261020;
@@ -55,6 +76,14 @@ describe("create_staff_lead's field_invalid pattern, against redact()", () => {
       if (SECRET_JS.test(text)) raw += 1;
       const out = redact(text);
       expect(SECRET_JS.test(out), `${text} → ${out}`).toBe(false);
+    }
+    // And long ones, past redact()'s 2000-character cut, the way create-lead sends them.
+    for (let i = 0; i < 300; i++) {
+      let text = "";
+      const len = 400 + rand(500);
+      for (let j = 0; j < len; j++) text += parts[rand(parts.length)];
+      const out = scrub(text.slice(0, 2000));
+      expect(SECRET_JS.test(out), `${text.length} characters → ${out.slice(-40)}`).toBe(false);
     }
     // Not vacuous: many of the inputs held something to cut.
     expect(raw).toBeGreaterThan(500);

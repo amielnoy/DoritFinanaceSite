@@ -161,16 +161,28 @@ declare
   v_dup      uuid;
   v_id       uuid;
   -- What redact() (supabase/functions/submit-lead/lead.js) cuts out: a card,
-  -- an IBAN, a nine-digit ID, a six-to-eight-digit account. Detection only; the
-  -- create-lead function redacts before it calls, so only a direct call trips it.
+  -- a nine-digit ID or a six-to-eight-digit account between non-digits, an IBAN
+  -- between non-alphanumerics. The same boundaries as redact(), not \y: Postgres
+  -- counts a Hebrew letter as a word character and JavaScript does not.
+  -- Detection only; the create-lead function redacts before it calls, so only
+  -- a direct call trips it.
   c_secret   constant text :=
-    '\y([0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}|[Ii][Ll][0-9]{2}[A-Za-z0-9]{17,}|[0-9]{6,9})\y';
+    '(^|[^0-9])([0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}|[0-9]{6,9})([^0-9]|$)|(^|[^A-Za-z0-9])[Ii][Ll][0-9]{2}[A-Za-z0-9]{17,}([^A-Za-z0-9]|$)';
 begin
+  -- 0 agency 1 only: the privacy notice the client is told names Dorit's agency
+  -- (create-lead's AGENCY_1, refused there too)
+  if p_agency_id is distinct from '00000000-0000-0000-0000-000000000001'::uuid then
+    raise exception 'agency_not_enabled' using errcode = '42501';
+  end if;
+
   -- 1 who may, and how often: 60 an hour, as the create-lead function allows,
-  -- so a direct call to /rest/v1/rpc cannot fill the table either
+  -- so a direct call to /rest/v1/rpc cannot fill the table either. The lock
+  -- makes the count and the insert one step per member (and their duplicate
+  -- check with it); it is released at the end of the transaction.
   if v_caller is null or not (public.has_role(p_agency_id, 'user') or public.is_admin()) then
     raise exception 'forbidden' using errcode = '42501';
   end if;
+  perform pg_advisory_xact_lock(hashtext('staff-lead:' || v_caller::text));
   if (select count(*) from public.leads
        where brought_by = v_caller and created_at > now() - interval '1 hour') >= 60 then
     raise exception 'rate_limited' using errcode = 'P0001';

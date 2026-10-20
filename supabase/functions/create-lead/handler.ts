@@ -59,13 +59,21 @@ const REFUSALS: Record<string, string> = {
   field_invalid: 'יש להסיר מספר מזהה, כרטיס או חשבון מהנושא, מההערות או ממי הפנה.',
   assignee_not_member: 'מי שנבחר/ה אינו/ה חבר/ת הסוכנות.',
   rate_limited: 'יותר מדי פניות בשעה האחרונה. נסו שוב מאוחר יותר.',
+  agency_not_enabled: 'הוספת פנייה פתוחה בסוכנות הזו רק כשיהיה לה נוסח יידוע משלה.',
 };
 /** Each refusal is a 400 unless named here. */
-const REFUSAL_STATUS: Record<string, number> = { rate_limited: 429, bad_phone: 422, field_invalid: 422 };
+const REFUSAL_STATUS: Record<string, number> = { rate_limited: 429, bad_phone: 422, field_invalid: 422, agency_not_enabled: 403 };
 /** "ללא שיוך" in the sheet: Admin+ leave the lead in the queue. */
 const NO_ASSIGNEE = 'none';
 
 const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+/**
+ * redact() replaces, then cuts at 2000 characters, so a long number can be cut
+ * in two at the end and leave a piece it would have taken. A second pass takes
+ * that piece too: create_staff_lead's field_invalid then never refuses what
+ * this function sends (tests/unit/staff-lead-secret.test.ts).
+ */
+const scrub = (v: unknown) => redact(redact(text(v)));
 
 export async function handler(req: Request): Promise<Response> {
   const cors = corsHeaders(req.headers.get('origin'));
@@ -95,9 +103,9 @@ export async function handler(req: Request): Promise<Response> {
     const name = text(body.name);
     const phone = text(body.phone);
     const email = text(body.email).toLowerCase();
-    const topic = redact(text(body.topic));
-    const notes = redact(text(body.notes));
-    const referrer = redact(text(body.referrer));
+    const topic = scrub(body.topic);
+    const notes = scrub(body.notes);
+    const referrer = scrub(body.referrer);
     const intake = text(body.intake);
     const status = text(body.status);
     const notice = text(body.notice);

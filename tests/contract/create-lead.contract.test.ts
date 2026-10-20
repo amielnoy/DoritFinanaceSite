@@ -29,7 +29,9 @@ describe("create-lead — a member's act, written by the database", () => {
 
   it("keeps staff text out of summary and message", () => {
     expect(fn).not.toMatch(/\b(summary|message)\s*:/);
-    expect(fn).toMatch(/redact\(text\(body\.notes\)\)/);
+    // redact() twice: a number cut in two at redact()'s 2000 characters is taken too.
+    expect(fn).toContain("const scrub = (v: unknown) => redact(redact(text(v)));");
+    for (const f of ["topic", "notes", "referrer"]) expect(fn).toContain(`const ${f} = scrub(body.${f});`);
   });
 
   it("limits a member to 60 creates an hour", () => {
@@ -54,9 +56,11 @@ describe("create-lead — a member's act, written by the database", () => {
     }
   });
 
-  it("maps the RPC's own controls: rate_limited 429, bad_phone and field_invalid 422", () => {
-    expect(fn).toContain("const REFUSAL_STATUS: Record<string, number> = { rate_limited: 429, bad_phone: 422, field_invalid: 422 };");
-    for (const why of ["rate_limited", "bad_phone", "field_invalid"]) expect(fn).toMatch(new RegExp(`\\b${why}: '[^']*[א-ת]`));
+  it("maps the RPC's own controls: rate_limited 429, bad_phone and field_invalid 422, agency_not_enabled 403", () => {
+    expect(fn).toContain(
+      "const REFUSAL_STATUS: Record<string, number> = { rate_limited: 429, bad_phone: 422, field_invalid: 422, agency_not_enabled: 403 };",
+    );
+    for (const why of ["rate_limited", "bad_phone", "field_invalid", "agency_not_enabled"]) expect(fn).toMatch(new RegExp(`\\b${why}: '[^']*[א-ת]`));
   });
 
   it("labels its sheet row with a code, like every other event", () => {
