@@ -21,10 +21,10 @@
  * Logged by ids alone: the client's name, phone and address stay out.
  */
 import { corsHeaders } from '../_shared/cors.ts';
-import { isEmail, oversizedField, withinLimit } from '../_shared/guard.ts';
+import { isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, sendMail } from '../_shared/mail.ts';
-import { normalizePhone } from '../_shared/masleka.ts';
+import { AGENCY_1, normalizePhone } from '../_shared/masleka.ts';
 import { opsNotice, type OpsRow } from '../_shared/ops-notice.ts';
 import { contactPhone } from '../_shared/phone.ts';
 import { callRpc, refusalReason, selectRows } from '../_shared/rest.ts';
@@ -80,7 +80,7 @@ export async function handler(req: Request): Promise<Response> {
     const email = text(body.email).toLowerCase();
     const topic = redact(text(body.topic));
     const notes = redact(text(body.notes));
-    const referrer = text(body.referrer);
+    const referrer = redact(text(body.referrer));
     const intake = text(body.intake);
     const status = text(body.status);
     const notice = text(body.notice);
@@ -134,7 +134,7 @@ export async function handler(req: Request): Promise<Response> {
         log('warn', 'create.forbidden', { rid, userId: gate.userId });
         return json({ error: 'אין לך הרשאה להוסיף פנייה בסוכנות הזו.' }, 403);
       }
-      if (why in REFUSALS) {
+      if (Object.hasOwn(REFUSALS, why)) {
         log('warn', 'create.refused', { rid, userId: gate.userId, why });
         return json({ error: REFUSALS[why] }, 400);
       }
@@ -152,7 +152,8 @@ export async function handler(req: Request): Promise<Response> {
 
     const warnings: string[] = [];
 
-    try {
+    // The sheet is Dorit's (agency 1): another agency's leads never go into it.
+    if (agencyId === AGENCY_1) try {
       const sheetStatus = await appendSheetRow(SHEET_TAB, SHEET_COLUMNS.length, [
         // Israel time, as submit-lead writes it: 'sv-SE' gives YYYY-MM-DD HH:MM:SS, which Sheets sorts as a date.
         new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jerusalem' }),
@@ -227,8 +228,17 @@ export async function handler(req: Request): Promise<Response> {
     let noticeSent: boolean | null = null;
     if (notice === 'email') {
       try {
-        await sendMail(log, { to: email, ...noticeMail(), rid, role: 'client' });
-        noticeSent = true;
+        // Not a way to mail arbitrary addresses: one notice per address per 30 days, 30 per agency per hour.
+        const addressOk = await withinLimit(log, rid, `staff-notice-addr:${await sha256Hex(email.toLowerCase())}`, 2592000, 1);
+        const agencyOk = addressOk && (await withinLimit(log, rid, `staff-notice-agency:${agencyId}`, 3600, 30));
+        if (!addressOk || !agencyOk) {
+          noticeSent = false;
+          log('warn', 'notice.rate_limited', { rid, userId: gate.userId });
+          warnings.push('notice_rate_limited');
+        } else {
+          await sendMail(log, { to: email, ...noticeMail(), rid, role: 'client' });
+          noticeSent = true;
+        }
       } catch (e) {
         noticeSent = false;
         log('warn', 'mail.failed', { rid, role: 'client', err: String((e as Error)?.message ?? e).slice(0, 200) });

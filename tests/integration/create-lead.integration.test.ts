@@ -13,6 +13,7 @@ const USER = "user-session-token-0123456789";
 const ADMIN = "admin-session-token-0123456789";
 const OUTSIDER = "outsider-session-token-0123456789";
 const ORG = "11111111-2222-4333-8444-555555555555";
+const AGENCY_1 = "00000000-0000-0000-0000-000000000001";
 const NEW_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const OTHER_ID = "99999999-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const ASSIGNEE = "77777777-bbbb-4ccc-8ddd-eeeeeeeeeeee";
@@ -28,6 +29,8 @@ function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdm
     "user-owner": "owner@example.com",
     [ASSIGNEE]: "assignee@example.com",
   };
+  const limiterKeys: string[] = [];
+  const seen = new Set<string>();
   const rpcCalls: { token: string; body: Row }[] = [];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const upstream = (call: FetchCall): Response | undefined => {
@@ -48,6 +51,13 @@ function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdm
       if (seed.failAdminsRead) return json({}, 500);
       return json([{ user_id: "user-admin" }, { user_id: "user-owner" }]);
     }
+    if (url.pathname === "/rest/v1/rpc/allow_submission" && String((call.body as Row).p_key).startsWith("staff-notice-")) {
+      limiterKeys.push(String((call.body as Row).p_key));
+      const key = String((call.body as Row).p_key);
+      if (seen.has(key)) return json(false);
+      seen.add(key);
+      return json(true);
+    }
     if (url.pathname === "/rest/v1/rpc/staff_role") {
       return json(roles[(call.body as { p_user_id: string }).p_user_id] ?? null);
     }
@@ -59,7 +69,7 @@ function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdm
     }
     return undefined;
   };
-  return { upstream, rpcCalls };
+  return { upstream, rpcCalls, limiterKeys };
 }
 
 const good = { agencyId: ORG, name: "ישראל ישראלי", phone: "050-123 4567", email: "client@example.com", topic: "פנסיה", notes: "שיחה ראשונה", intake: "phone", status: "contacted", notice: "verbal" };
@@ -173,9 +183,13 @@ describe("create-lead — the write", () => {
     }
   });
 
-  it("writes a sheet row sourced 'staff' with an Israel-time timestamp", async () => {
+  it("writes a sheet row sourced 'staff' with an Israel-time timestamp, for agency 1 only", async () => {
     const s = fakeSupabase();
-    const r = await create(good, USER, s);
+    const other = await create(good, USER, s);
+    expect(other.sheetRows).toEqual([]);
+    expect(other.callsTo("sheets.googleapis.com")).toEqual([]);
+    expect(other.json.warnings).toBeUndefined();
+    const r = await create({ ...good, agencyId: AGENCY_1 }, USER, s);
     expect(r.sheetRows).toHaveLength(1);
     const row = r.sheetRows[0].row;
     expect(String(row[0])).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
@@ -186,7 +200,7 @@ describe("create-lead — the write", () => {
 
   it("keeps the lead and warns when the sheet fails", async () => {
     const s = fakeSupabase();
-    const r = await create(good, USER, s, { failGoogle: "sheets" });
+    const r = await create({ ...good, agencyId: AGENCY_1 }, USER, s, { failGoogle: "sheets" });
     expect(r.status).toBe(200);
     expect(r.json.leadId).toBe(NEW_ID);
     expect(r.json.warnings).toContain("sheet_append_failed");
@@ -224,6 +238,26 @@ describe("create-lead — the people told", () => {
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ leadId: NEW_ID, noticeSent: false });
     expect(r.json).toHaveProperty("rid");
+  });
+
+  it("sends one privacy notice per address, and never puts the address in a limiter key", async () => {
+    const s = fakeSupabase();
+    const first = await create({ ...good, notice: "email" }, USER, s);
+    expect(first.json.noticeSent).toBe(true);
+    const second = await create({ ...good, notice: "email" }, USER, s);
+    expect(second.status).toBe(200);
+    expect(second.json).toMatchObject({ leadId: NEW_ID, noticeSent: false });
+    expect(second.json.warnings).toContain("notice_rate_limited");
+    expect(second.emails.some((e) => e.to === "client@example.com")).toBe(false);
+    expect(s.limiterKeys.length).toBeGreaterThan(0);
+    expect(s.limiterKeys.join(" ")).not.toContain("client@example.com");
+    expect(s.limiterKeys.some((k) => k.startsWith(`staff-notice-agency:${ORG}`))).toBe(true);
+  });
+
+  it("passes an ID typed in the referrer through redact", async () => {
+    const s = fakeSupabase();
+    await create({ ...good, referrer: "דרך 123456782" }, USER, s);
+    expect(JSON.stringify(s.rpcCalls[0].body)).not.toContain("123456782");
   });
 
   it("still answers when the admins cannot be read", async () => {
