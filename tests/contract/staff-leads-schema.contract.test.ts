@@ -92,4 +92,81 @@ describe("staff leads, schema", () => {
   it("grants no insert on leads to a person", () => {
     expect(flat).not.toMatch(/grant insert[^;]*on (table )?public\.leads[^;]*to[^;]*(authenticated|anon)/i);
   });
+
+  describe("create_staff_lead", () => {
+    const body = () => fns.get("create_staff_lead") ?? "";
+    const b = () => squash(body());
+
+    it("is security definer with an empty search_path", () => {
+      expect(body()).not.toBe("");
+      expect(body()).toMatch(/security definer/i);
+      expect(body()).toContain("set search_path = ''");
+    });
+
+    it("is callable by signed-in people only", () => {
+      expect(flat).toMatch(/revoke execute on function public\.create_staff_lead\([^)]*\) from public, anon, authenticated/);
+      expect(flat).toMatch(/grant\s+execute on function public\.create_staff_lead\([^)]*\) to authenticated;/);
+    });
+
+    it("takes the twelve arguments and returns (lead_id, duplicate)", () => {
+      const head = b().slice(0, b().indexOf(" as $$"));
+      for (const a of [
+        "p_agency_id uuid", "p_name text", "p_phone text", "p_email text", "p_topic text", "p_notes text",
+        "p_intake text", "p_referrer text", "p_status text", "p_notice text", "p_assignee uuid",
+        "p_duplicate_ok boolean",
+      ]) expect(head).toContain(a);
+      expect(head).toContain("returns table (lead_id uuid, duplicate text)");
+    });
+
+    it("refuses escalated and partial: the status list is exactly new, contacted, client", () => {
+      expect(b()).toContain("p_status not in ('new','contacted','client')");
+      expect(b()).toContain("bad_status");
+    });
+
+    it("sets source, brought_by, consent and agency from the function, not the caller", () => {
+      const ins = b().match(/insert into public\.leads \((.*?)\) values \((.*?)\) returning/);
+      expect(ins).not.toBeNull();
+      const [, cols, vals] = ins ?? [];
+      expect(cols).toContain("source");
+      expect(vals).toContain("'staff'");
+      // brought_by is the session's uid (v_caller := auth.uid()), never an argument.
+      expect(b()).toContain("v_caller uuid := auth.uid()");
+      expect(vals).toMatch(/\bv_caller, p_intake\b/);
+      expect(vals).toContain("'staff-intake-v1'");
+      expect(vals).toContain("now()");
+      // agency_id is the checked argument; summary and message are never written.
+      expect(cols).toContain("agency_id");
+      expect(cols).not.toMatch(/\bsummary\b|\bmessage\b/);
+      expect(cols).toContain("notes");
+      // Nothing in the argument list can name the source, brought_by or consent.
+      const head = b().slice(0, b().indexOf(" as $$"));
+      expect(head).not.toMatch(/p_(source|brought|consent)/);
+    });
+
+    it("gates on membership, checks the assignee, and refuses a long field", () => {
+      expect(b()).toContain("public.has_role(p_agency_id, 'user')");
+      expect(b()).toContain("public.is_admin()");
+      expect(b()).toContain("public.lead_assignee_ok(p_agency_id, p_assignee)");
+      expect(b()).toContain("assignee_not_member");
+      for (const e of ["forbidden", "bad_intake", "bad_notice", "field_too_long"]) expect(b()).toContain(e);
+    });
+
+    it("matches a duplicate on the last nine digits, in this agency, never an anonymised lead", () => {
+      expect(b()).toContain("right(regexp_replace(");
+      expect(b()).toContain("'\\D', '', 'g'), 9)");
+      expect(b()).toContain("anonymized_at is null");
+      expect(b()).toContain("order by");
+      expect(b()).toContain("limit 1");
+    });
+
+    it("answers a hidden duplicate with the new id only", () => {
+      expect(b()).toContain("duplicate_of");
+      expect(b()).toMatch(/return query select v_id, case when v_dup is not null then 'hidden' end::text/);
+      expect(b()).toMatch(/return query select v_dup, 'visible'/);
+    });
+
+    it("maps the intake to a channel", () => {
+      expect(b()).toContain("case when p_intake in ('referral','existing_client') then 'referral' else 'direct' end");
+    });
+  });
 });

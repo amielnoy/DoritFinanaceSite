@@ -128,8 +128,114 @@ begin
 end;
 $$;
 
+-- ── create_staff_lead ─────────────────────────────────────────────────────
+-- The only way a person adds a lead (direct insert stays revoked). Security
+-- definer so it can insert; auth.uid() still reads the caller's JWT. Source,
+-- brought_by, consent and the channel come from here, never from an argument.
+-- A hidden duplicate's answer carries only the NEW id: the caller learns that
+-- an Admin will look, never whose lead it matched.
+create function public.create_staff_lead(
+  p_agency_id    uuid,
+  p_name         text,
+  p_phone        text,
+  p_email        text,
+  p_topic        text,
+  p_notes        text,
+  p_intake       text,
+  p_referrer     text,
+  p_status       text,
+  p_notice       text,
+  p_assignee     uuid,
+  p_duplicate_ok boolean
+) returns table (lead_id uuid, duplicate text)
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+declare
+  v_caller   uuid := auth.uid();
+  v_assignee uuid;
+  v_digits   text;
+  v_dup      uuid;
+  v_id       uuid;
+begin
+  -- 1 who may
+  if v_caller is null or not (public.has_role(p_agency_id, 'user') or public.is_admin()) then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  -- 2 what may be said (name 80, email 254, topic 200 as LEAD_FIELD_LIMITS)
+  if p_status is null or p_status not in ('new','contacted','client') then
+    raise exception 'bad_status' using errcode = '22023';
+  end if;
+  if p_intake is null or p_intake not in ('phone','in_person','referral','event','existing_client','other') then
+    raise exception 'bad_intake' using errcode = '22023';
+  end if;
+  if p_notice is null or p_notice not in ('verbal','email','whatsapp') then
+    raise exception 'bad_notice' using errcode = '22023';
+  end if;
+  if coalesce(btrim(p_name), '') = '' or coalesce(btrim(p_phone), '') = '' then
+    raise exception 'field_required' using errcode = '22023';
+  end if;
+  if char_length(p_name) > 80 or char_length(p_phone) > 30
+     or char_length(coalesce(p_email, '')) > 254 or char_length(coalesce(p_topic, '')) > 200
+     or char_length(coalesce(p_notes, '')) > 4000 or char_length(coalesce(p_referrer, '')) > 120 then
+    raise exception 'field_too_long' using errcode = '22023';
+  end if;
+
+  -- 3 whose it is: a User's lead is theirs; Admin+ (and the operator) choose
+  if public.has_role(p_agency_id, 'admin') or public.is_admin() then
+    if p_assignee is not null and not public.lead_assignee_ok(p_agency_id, p_assignee) then
+      raise exception 'assignee_not_member' using errcode = '22023';
+    end if;
+    v_assignee := p_assignee;
+  else
+    v_assignee := v_caller;
+  end if;
+
+  -- 4 the same person again: the last nine digits, whatever the formatting
+  v_digits := right(regexp_replace(p_phone, '\D', '', 'g'), 9);
+  if v_digits <> '' then
+    select l.id into v_dup
+      from public.leads l
+     where l.agency_id = p_agency_id
+       and l.anonymized_at is null
+       and right(regexp_replace(l.phone, '\D', '', 'g'), 9) = v_digits
+     order by l.created_at desc
+     limit 1;
+  end if;
+  if v_dup is not null and public.can_see_lead(v_dup) then
+    if not coalesce(p_duplicate_ok, false) then
+      return query select v_dup, 'visible'::text;
+      return;
+    end if;
+    v_dup := null; -- seen and chosen: a second lead, not flagged
+  end if;
+
+  -- 5 write it
+  insert into public.leads (
+    agency_id, name, phone, email, topic, notes, status, source, channel,
+    brought_by, intake, referrer_note, notice_method, consent_version, consent_at,
+    assigned_user_id, assigned_at, assigned_by, duplicate_of
+  ) values (
+    p_agency_id, btrim(p_name), btrim(p_phone), nullif(btrim(p_email), ''), nullif(btrim(p_topic), ''),
+    nullif(btrim(p_notes), ''), p_status, 'staff',
+    case when p_intake in ('referral','existing_client') then 'referral' else 'direct' end,
+    v_caller, p_intake, nullif(btrim(p_referrer), ''), p_notice, 'staff-intake-v1', now(),
+    v_assignee,
+    case when v_assignee is not null then now() end,
+    case when v_assignee is not null then v_caller end,
+    v_dup
+  ) returning id into v_id;
+
+  return query select v_id, case when v_dup is not null then 'hidden' end::text;
+end;
+$$;
+
 -- ── grants ─────────────────────────────────────────────────────────────────
 -- Supabase's default privileges grant EXECUTE to anon and authenticated by
 -- name, so each revoke names them.
 revoke execute on function public.leads_guard_staff_fields()       from public, anon, authenticated;
 revoke execute on function public.anonymize_stale_leads(timestamptz) from public, anon, authenticated;
+revoke execute on function public.create_staff_lead(uuid, text, text, text, text, text, text, text, text, text, uuid, boolean) from public, anon, authenticated;
+grant execute on function public.create_staff_lead(uuid, text, text, text, text, text, text, text, text, text, uuid, boolean) to authenticated;
