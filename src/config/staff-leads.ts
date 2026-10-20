@@ -38,7 +38,7 @@ export const STAFF_STATUS_LABELS: Record<"new" | "contacted" | "client", string>
 // Same text as src/config/staff-leads.ts; tests/contract/staff-intake-notice.contract.test.ts keeps the two identical.
 export const STAFF_INTAKE_NOTICE = `סוכנות דורית גוב ארי (רישיון סוכן L-00107009) שומרת את הפרטים שמסרת: שם, טלפון, דוא״ל, נושא הפנייה והערות מהשיחה.
 הפרטים משמשים כדי לחזור אליך ולתת את השירות שביקשת.
-פנייה שלא הבשילה להתקשרות נשמרת 24 חודשים מהקשר האחרון; לקוחות נשמרים כל עוד הם לקוחות.
+פנייה שלא הבשילה להתקשרות נשמרת 24 חודשים מהקשר האחרון; מידע על התקשרות בפועל נשמר כנדרש על-פי דין ועל-פי הוראות רשות שוק ההון.
 הפרטים גלויים לצוות הסוכנות בלבד.
 זכותך לראות את הפרטים, לתקן אותם ולבקש למחוק אותם: ${CONTACT.email}
 המדיניות המלאה: ${SITE_URL}/privacy`;
