@@ -23,8 +23,8 @@ export const INTAKE_LABELS: Record<Intake, string> = {
 
 export const NOTICE_LABELS: Record<NoticeMethod, string> = {
   verbal: "בעל פה",
-  email: "דוא״ל",
-  whatsapp: "וואטסאפ",
+  email: "במייל",
+  whatsapp: "בוואטסאפ",
 };
 
 /** The statuses a member may start a lead with (the server refuses the rest). */

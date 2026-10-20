@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CONTACT } from '../../src/config/contact';
 import { SITE_URL } from '../../src/lib/seo';
-import { isStaffLeadsOn, STAFF_INTAKE_NOTICE } from '../../src/config/staff-leads';
+import { INTAKE_LABELS, isStaffLeadsOn, NOTICE_LABELS, STAFF_INTAKE_NOTICE, STAFF_STATUS_LABELS } from '../../src/config/staff-leads';
 
 const extract = (path: string): string => {
   const src = readFileSync(path, 'utf8');
@@ -41,5 +41,17 @@ describe('staff intake notice', () => {
     expect(isStaffLeadsOn(' true ')).toBe(true);
     expect(isStaffLeadsOn(undefined)).toBe(false);
     expect(isStaffLeadsOn('1')).toBe(false);
+  });
+  it('pins the labels the forms show', () => {
+    expect(NOTICE_LABELS).toEqual({ verbal: 'בעל פה', email: 'במייל', whatsapp: 'בוואטסאפ' });
+    expect(INTAKE_LABELS).toEqual({
+      phone: 'שיחת טלפון',
+      in_person: 'פגישה',
+      referral: 'הפניה',
+      event: 'אירוע',
+      existing_client: 'לקוח/ה קיים/ת',
+      other: 'אחר',
+    });
+    expect(STAFF_STATUS_LABELS).toEqual({ new: 'חדשה', contacted: 'נוצר קשר', client: 'לקוח/ה' });
   });
 });
