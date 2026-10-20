@@ -447,6 +447,11 @@ verify_jwt = false
 [functions.invite-user]
 verify_jwt = false
 
+# "הוספת פנייה" on /admin/leads: a session, then a member of the agency, checked
+# by the function (_shared/staff.ts); create_staff_lead decides the rest.
+[functions.create-lead]
+verify_jwt = false
+
 # Change a member's role, remove a member, or leave: the session is checked by
 # the function, and set_member_role / remove_member decide under it.
 [functions.member-admin]
