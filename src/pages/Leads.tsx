@@ -7,12 +7,17 @@ import {
 import { useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { csvCell } from "@/lib/csv";
-import { Loader2, Download, Trash2 } from "lucide-react";
+import { Loader2, Download, Plus, Trash2 } from "lucide-react";
 import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
 import LeadDrawer, { type LeadDrawerTab } from "@/components/dorit/admin/LeadDrawer";
 import LeadDetails from "@/components/dorit/admin/LeadDetails";
 import MeetingsAgenda from "@/components/dorit/admin/MeetingsAgenda";
 import { MEETINGS_STAFF } from "@/config/meetings";
+import { INTAKE_LABELS, STAFF_LEADS } from "@/config/staff-leads";
+import { GONE_MEMBER, broughtThisMonth, sameNumberLeads, staffLeadLine } from "@/lib/staff-leads";
+import NewLeadSheetHost from "@/components/dorit/admin/NewLeadSheetHost";
+import StaffLeadsStrip from "@/components/dorit/admin/StaffLeadsStrip";
+import DuplicatePointer from "@/components/dorit/admin/DuplicatePointer";
 import { agendaCounts, nextMeetingByLead, nextMeetingLabel } from "@/lib/meetings-agenda";
 
 type LeadItem = LeadRecord;
@@ -95,10 +100,13 @@ const ATTENTION = "attention";
  */
 const PINNED = "sticky left-0 bg-background shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)]";
 
-const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean }[] = [
+const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean; staffLeads?: boolean }[] = [
   { key: "escalated", label: "הועברו לטיפול" },
   { key: "partial", label: "ראיונות שלא הושלמו" },
   { key: "unassigned", label: "לא שויכו", adminOnly: true },
+  // VITE_STAFF_LEADS: the leads a member entered by hand, and (Admin+) the ones that may repeat another.
+  { key: "staff", label: "דרך הצוות", staffLeads: true },
+  { key: "duplicate", label: "כפילות אפשרית", adminOnly: true, staffLeads: true },
 ];
 
 type PageTab = "leads" | "meetings" | "tracking";
@@ -262,6 +270,8 @@ export default function Leads() {
   const assigns = can("leads.assign");
   const deletes = can("leads.delete");
   const tracks = can("leads.tracking");
+  const creates = STAFF_LEADS && can("leads.create");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const tabs = useMemo(() => PAGE_TABS.filter((t) => t !== "tracking" || tracks), [tracks]);
   const members = useAdminUsers(assigns);
   const transcriptIds = useTranscriptLeadIds();
@@ -277,6 +287,10 @@ export default function Leads() {
   const [drawerStart, setDrawerStart] = useState<{ seq: number; tab: LeadDrawerTab; meetingId: string | null; adding: boolean }>({
     seq: 0, tab: "details", meetingId: null, adding: false,
   });
+  const openFromTable = (leadId: string) => {
+    setDrawerStart((d) => ({ ...d, meetingId: null, adding: false }));
+    setOpenLeadId(leadId);
+  };
   const openOnMeetings = (leadId: string, meetingId: string | null, adding = false) => {
     setDrawerStart((d) => ({ seq: d.seq + 1, tab: "meetings", meetingId, adding }));
     setOpenLeadId(leadId);
@@ -295,12 +309,19 @@ export default function Leads() {
         .sort((a, b) => a.label.localeCompare(b.label)),
     [members.data, agencyId],
   );
-  const assigneeLabel = (id: string | null | undefined) => (id ? assignees.find((a) => a.id === id)?.label ?? "חבר/ה שכבר לא בסוכנות" : "—");
+  const assigneeLabel = (id: string | null | undefined) => (id ? assignees.find((a) => a.id === id)?.label ?? GONE_MEMBER : "—");
+  /* Who brought a lead. A User's screen knows no member addresses, so it says "חבר/ה בצוות". */
+  const broughtLabel = (id: string | null) => (!id ? GONE_MEMBER : assigns ? assigneeLabel(id) : "חבר/ה בצוות");
+  const showBrought = STAFF_LEADS && assigns;
 
   const filtered = leads.filter(
     (l) =>
       filter === "all" ||
-      (filter === "unassigned"
+      (filter === "staff"
+        ? l.source === "staff"
+        : filter === "duplicate"
+          ? l.possibleDuplicate === true
+          : filter === "unassigned"
         ? !l.assigned_user_id && l.status !== "closed"
         : filter === ATTENTION
           ? NEEDS_ATTENTION.includes(l.status)
@@ -309,7 +330,7 @@ export default function Leads() {
 
   const exportCsv = (all: boolean) => {
     const source = all ? leads : filtered;
-    const headers = ["תאריך", "שם", "טלפון", "אימייל", "מקור", "תחום/שירות", "מועד", "סטטוס", "הודעה"];
+    const headers = ["תאריך", "שם", "טלפון", "אימייל", "מקור", "תחום/שירות", "מועד", "סטטוס", "הודעה", ...(STAFF_LEADS ? ["brought_by", "intake", "referrer_note"] : [])];
     const rows = source.map((l) => [
       l.created_date ? new Date(l.created_date).toLocaleString("he-IL") : "",
       l.name,
@@ -320,6 +341,7 @@ export default function Leads() {
       l.timing || "",
       ANY_STATUS_LABEL[l.status] || l.status || "",
       l.message || "",
+      ...(STAFF_LEADS ? [l.broughtBy ? broughtLabel(l.broughtBy) : "", l.intake ? INTAKE_LABELS[l.intake] : "", l.referrerNote || ""] : []),
     ]);
     const csv = [headers, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -340,11 +362,14 @@ export default function Leads() {
     removeLead.mutate(lead.id, { onSuccess: () => setOpenLeadId((open) => (open === lead.id ? null : open)) });
   };
 
+  const brought = useMemo(() => (showBrought ? broughtThisMonth(leads, new Date()) : new Map<string, number>()), [showBrought, leads]);
   const openLead = openLeadId ? leads.find((l) => l.id === openLeadId) ?? null : null;
 
   const counts = leads.reduce<Record<string, number>>((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
     if (!l.assigned_user_id && l.status !== "closed") acc.unassigned = (acc.unassigned || 0) + 1;
+    if (l.source === "staff") acc.staff = (acc.staff || 0) + 1;
+    if (l.possibleDuplicate) acc.duplicate = (acc.duplicate || 0) + 1;
     return acc;
   }, {});
 
@@ -357,6 +382,8 @@ export default function Leads() {
       <>
             {/* With the tabs it is the Owner's "מעקב לידים" tab; without them, folded above the leads. */}
             {!staff && tracks ? <LeadTrackingPanel /> : null}
+
+            {showBrought ? <StaffLeadsStrip counts={brought} label={assigneeLabel} /> : null}
 
             {/* תצוגת סיכום סטטוסים */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
@@ -399,7 +426,7 @@ export default function Leads() {
                 {[
                   { key: "all", label: "הכל" },
                   ...STATUS.map((s) => ({ key: s, label: STATUS_LABEL[s] })),
-                  ...EXTRA_FILTERS.filter((f) => !f.adminOnly || assigns),
+                  ...EXTRA_FILTERS.filter((f) => (!f.adminOnly || assigns) && (!f.staffLeads || STAFF_LEADS)),
                 ].map(({ key: s, label }) => {
                   const active = filter === s;
                   const count = s === "all" ? leads.length : counts[s] || 0;
@@ -418,7 +445,16 @@ export default function Leads() {
                   );
                 })}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {creates ? (
+                  <button
+                    type="button"
+                    onClick={() => setSheetOpen(true)}
+                    className="inline-flex min-h-11 items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    <Plus size={16} /> פנייה חדשה
+                  </button>
+                ) : null}
                 <button
                   onClick={() => exportCsv(false)}
                   disabled={!filtered.length}
@@ -467,6 +503,7 @@ export default function Leads() {
                       <th className="px-4 py-3 font-medium">פרטים</th>
                       <th className="px-4 py-3 font-medium">סטטוס</th>
                       {assigns ? <th className="px-4 py-3 font-medium">משויכת ל</th> : null}
+                      {showBrought ? <th className="px-4 py-3 font-medium">הובאה ע״י</th> : null}
                       {staff ? <th className="px-4 py-3 font-medium whitespace-nowrap">הפגישה הבאה</th> : null}
                       <th className={`px-4 py-3 font-medium ${PINNED} bg-[image:linear-gradient(hsl(var(--secondary)/0.4),hsl(var(--secondary)/0.4))]`}>
                         <span className="sr-only">פעולות</span>
@@ -498,7 +535,19 @@ export default function Leads() {
                         </td>
                         <td className="px-4 py-3" dir="ltr">{l.phone}</td>
                         <td className="px-4 py-3 text-foreground/70" dir="ltr">{l.email || "—"}</td>
-                        <td className="px-4 py-3 text-foreground/70">{SOURCE_LABEL[l.source] || "—"}</td>
+                        <td className="px-4 py-3 text-foreground/70">
+                          {SOURCE_LABEL[l.source] || "—"}
+                          {STAFF_LEADS && l.source === "staff" && l.intake ? (
+                            <span className="ms-2 inline-block border border-border/60 px-1.5 py-0.5 text-xs">{INTAKE_LABELS[l.intake]}</span>
+                          ) : null}
+                          {STAFF_LEADS && assigns && l.possibleDuplicate ? (
+                            <DuplicatePointer
+                              others={sameNumberLeads(leads, l)}
+                              onOpen={MEETINGS_STAFF ? openFromTable : undefined}
+                              leadId={l.id}
+                            />
+                          ) : null}
+                        </td>
                         <td className="px-4 py-3">
                           <LeadDetails lead={l} />
                           {withTranscript.has(l.id) && <LeadTranscript leadId={l.id} />}
@@ -527,6 +576,7 @@ export default function Leads() {
                             </select>
                           </td>
                         ) : null}
+                        {showBrought ? <td className="px-4 py-3 text-foreground/70">{l.broughtBy ? broughtLabel(l.broughtBy) : "—"}</td> : null}
                         {staff ? (
                           <td className="px-4 py-3 whitespace-nowrap">
                             <NextMeetingCell
@@ -616,6 +666,18 @@ export default function Leads() {
           ) : null}
         </header>
 
+        {sheetOpen ? (
+          // Mounted only while open: the sheet's form is not reset between openings.
+          <NewLeadSheetHost
+            onClose={() => setSheetOpen(false)}
+            agencyId={agencyId}
+            canAssign={assigns}
+            assignees={assignees}
+            leads={leads}
+            onOpenLead={MEETINGS_STAFF ? openFromTable : undefined}
+          />
+        ) : null}
+
         <main id="main" className="max-w-[1200px] mx-auto px-6 py-8">
           {staff ? (
             <>
@@ -657,6 +719,7 @@ export default function Leads() {
               meetingId={drawerStart.meetingId}
               startAdding={drawerStart.adding}
               onClose={() => setOpenLeadId(null)}
+              note={STAFF_LEADS && openLead ? staffLeadLine(openLead, broughtLabel) : null}
               onDelete={deletes && openLead ? () => remove(openLead) : undefined}
               deleting={removeLead.isPending}
               deleteFailed={removeLead.isError}
