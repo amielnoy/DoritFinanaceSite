@@ -45,4 +45,21 @@ describe("create-lead — a member's act, written by the database", () => {
   it("never reads another lead's id out of the answer", () => {
     expect(fn).not.toMatch(/duplicate_of/);
   });
+
+  it("refuses every agency but agency 1 before the session, the RPC or any side effect", () => {
+    expect(fn).toMatch(/if \(agencyId !== AGENCY_1\) \{[\s\S]*?return json\(\{ error: 'agency_not_enabled' \}, 403\);/);
+    const gate = fn.indexOf("agencyId !== AGENCY_1");
+    for (const later of ["requireAgencyRole(", "callRpc(", "appendSheetRow(", "sendMail("]) {
+      expect(gate, later).toBeLessThan(fn.indexOf(later));
+    }
+  });
+
+  it("maps the RPC's own controls: rate_limited 429, bad_phone and field_invalid 422", () => {
+    expect(fn).toContain("const REFUSAL_STATUS: Record<string, number> = { rate_limited: 429, bad_phone: 422, field_invalid: 422 };");
+    for (const why of ["rate_limited", "bad_phone", "field_invalid"]) expect(fn).toMatch(new RegExp(`\\b${why}: '[^']*[א-ת]`));
+  });
+
+  it("labels its sheet row with a code, like every other event", () => {
+    expect(fn).toMatch(/appendSheetRow\(SHEET_TAB, SHEET_COLUMNS\.length, \[[^\]]*?'staff_lead',\s*'staff',/);
+  });
 });

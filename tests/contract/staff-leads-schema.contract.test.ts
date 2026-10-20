@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
+import { SECRET_SQL } from "../helpers/staff-lead-secret";
 
 /**
  * Staff-created leads (docs/superpowers/specs/2026-10-20-staff-lead-design.md),
@@ -61,9 +62,9 @@ describe("staff leads, schema", () => {
     expect(flat).toContain("validate constraint leads_staff_fields");
   });
 
-  it("indexes the member's own leads", () => {
+  it("indexes the member's own leads by time, for the hourly count", () => {
     expect(flat).toContain(
-      "create index leads_agency_brought_by on public.leads (agency_id, brought_by) where brought_by is not null",
+      "create index leads_brought_by_created on public.leads (brought_by, created_at) where brought_by is not null",
     );
   });
 
@@ -152,12 +153,38 @@ describe("staff leads, schema", () => {
       for (const e of ["forbidden", "bad_intake", "bad_notice", "field_too_long"]) expect(b()).toContain(e);
     });
 
+    it("allows 2000 characters of notes, where redact() cuts", () => {
+      expect(b()).toContain("char_length(coalesce(p_notes, '')) > 2000");
+      expect(b()).not.toContain("4000");
+    });
+
+    // A direct call to /rest/v1/rpc/create_staff_lead skips the create-lead
+    // function, so the RPC holds the function's own controls.
+    it("refuses a 61st lead from one member in an hour, with its own errcode", () => {
+      expect(b()).toContain(
+        "if (select count(*) from public.leads where brought_by = v_caller and created_at > now() - interval '1 hour') >= 60 then raise exception 'rate_limited' using errcode = 'P0001';",
+      );
+      // After the membership check: an outsider learns nothing from the count.
+      expect(b().indexOf("rate_limited")).toBeGreaterThan(b().indexOf("'forbidden'"));
+    });
+
+    it("refuses a phone not in normalizePhone's shape", () => {
+      expect(b()).toContain("if p_phone !~ '^0[0-9]{8,9}$' then raise exception 'bad_phone' using errcode = '22023';");
+    });
+
+    it("refuses notes, topic or referrer that still hold what redact() cuts", () => {
+      expect(b()).toContain(`c_secret constant text := '${SECRET_SQL}';`);
+      for (const p of ["p_notes", "p_topic", "p_referrer"]) expect(b()).toContain(`coalesce(${p}, '') ~ c_secret`);
+      expect(b()).toMatch(/~ c_secret then raise exception 'field_invalid' using errcode = '22023';/);
+    });
+
     it("matches a duplicate on the national number, in this agency, never an anonymised lead", () => {
       const nat = "regexp_replace(regexp_replace(%, '\\D', '', 'g'), '^(972|0)', '')";
       expect(b()).toContain(nat.replace("%", "p_phone"));
       expect(b()).toContain(nat.replace("%", "l.phone"));
       expect(b()).toContain("anonymized_at is null");
-      expect(b()).toContain("order by");
+      // One the caller can open first, so a User's own older lead wins over a newer hidden one.
+      expect(b()).toContain("order by public.can_see_lead(l.id) desc, l.created_at desc");
       expect(b()).toContain("limit 1");
     });
 

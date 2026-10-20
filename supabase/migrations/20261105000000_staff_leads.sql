@@ -26,7 +26,9 @@ alter table public.leads add constraint leads_staff_fields check (
 ) not valid;
 alter table public.leads validate constraint leads_staff_fields;
 
-create index leads_agency_brought_by on public.leads (agency_id, brought_by)
+-- A member's own leads by time: create_staff_lead's hourly count, and the
+-- lookup behind brought_by's on delete set null.
+create index leads_brought_by_created on public.leads (brought_by, created_at)
   where brought_by is not null;
 
 -- ── guard: the staff fields are fixed once written ────────────────────────
@@ -158,13 +160,24 @@ declare
   v_digits   text;
   v_dup      uuid;
   v_id       uuid;
+  -- What redact() (supabase/functions/submit-lead/lead.js) cuts out: a card,
+  -- an IBAN, a nine-digit ID, a six-to-eight-digit account. Detection only; the
+  -- create-lead function redacts before it calls, so only a direct call trips it.
+  c_secret   constant text :=
+    '\y([0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}|[Ii][Ll][0-9]{2}[A-Za-z0-9]{17,}|[0-9]{6,9})\y';
 begin
-  -- 1 who may
+  -- 1 who may, and how often: 60 an hour, as the create-lead function allows,
+  -- so a direct call to /rest/v1/rpc cannot fill the table either
   if v_caller is null or not (public.has_role(p_agency_id, 'user') or public.is_admin()) then
     raise exception 'forbidden' using errcode = '42501';
   end if;
+  if (select count(*) from public.leads
+       where brought_by = v_caller and created_at > now() - interval '1 hour') >= 60 then
+    raise exception 'rate_limited' using errcode = 'P0001';
+  end if;
 
-  -- 2 what may be said (name 80, email 254, topic 200 as LEAD_FIELD_LIMITS)
+  -- 2 what may be said (name 80, email 254, topic 200 as LEAD_FIELD_LIMITS;
+  -- notes 2000, where redact() cuts)
   if p_status is null or p_status not in ('new','contacted','client') then
     raise exception 'bad_status' using errcode = '22023';
   end if;
@@ -182,8 +195,16 @@ begin
   end if;
   if char_length(p_name) > 80 or char_length(p_phone) > 30
      or char_length(coalesce(p_email, '')) > 254 or char_length(coalesce(p_topic, '')) > 200
-     or char_length(coalesce(p_notes, '')) > 4000 or char_length(coalesce(p_referrer, '')) > 120 then
+     or char_length(coalesce(p_notes, '')) > 2000 or char_length(coalesce(p_referrer, '')) > 120 then
     raise exception 'field_too_long' using errcode = '22023';
+  end if;
+  -- the shape normalizePhone gives: 0 and eight or nine digits
+  if p_phone !~ '^0[0-9]{8,9}$' then
+    raise exception 'bad_phone' using errcode = '22023';
+  end if;
+  if coalesce(p_notes, '') ~ c_secret or coalesce(p_topic, '') ~ c_secret
+     or coalesce(p_referrer, '') ~ c_secret then
+    raise exception 'field_invalid' using errcode = '22023';
   end if;
 
   -- 3 whose it is: a User's lead is theirs; Admin+ (and the operator) choose
@@ -205,7 +226,7 @@ begin
      where l.agency_id = p_agency_id
        and l.anonymized_at is null
        and regexp_replace(regexp_replace(l.phone, '\D', '', 'g'), '^(972|0)', '') = v_digits
-     order by l.created_at desc
+     order by public.can_see_lead(l.id) desc, l.created_at desc -- one the caller can open, if any
      limit 1;
   end if;
   if v_dup is not null and public.can_see_lead(v_dup) then

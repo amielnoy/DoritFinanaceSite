@@ -225,9 +225,9 @@ do $$ begin
     if sqlerrm <> 'field_too_long' then raise; end if;
   end;
   begin
-    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0545556666', null, null, repeat('א', 4001),
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0545556666', null, null, repeat('א', 2001),
       'phone', null, 'new', 'verbal', null, false);
-    raise exception '4001 characters of notes were accepted';
+    raise exception '2001 characters of notes were accepted';
   exception when invalid_parameter_value then
     if sqlerrm <> 'field_too_long' then raise; end if;
   end;
@@ -237,6 +237,58 @@ do $$ begin
     raise exception 'a 121-character referrer was accepted';
   exception when invalid_parameter_value then
     if sqlerrm <> 'field_too_long' then raise; end if;
+  end;
+  -- A phone not in normalizePhone's shape (the create-lead function sends
+  -- only that shape; a direct call to the RPC may not).
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '054-555-6666', null, null, null,
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'a phone with dashes was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'bad_phone' then raise; end if;
+  end;
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '+972545556666', null, null, null,
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'a +972 phone was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'bad_phone' then raise; end if;
+  end;
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '--', null, null, null,
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'a punctuation-only phone was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'bad_phone' then raise; end if;
+  end;
+  -- What redact() would have cut: an ID in the notes, a card in the topic, an IBAN in the referrer.
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0545556666', null, null, 'ת.ז. 123456782',
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'an ID number in the notes was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'field_invalid' then raise; end if;
+  end;
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0545556666', null, 'כרטיס 4580-1234-5678-9012', null,
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'a card number in the topic was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'field_invalid' then raise; end if;
+  end;
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0545556666', null, null, null,
+      'referral', 'il620108000000099999999', 'new', 'verbal', null, false);
+    raise exception 'an IBAN in the referrer was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'field_invalid' then raise; end if;
+  end;
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0545556666', null, null, 'חשבון 1234567',
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'an account number in the notes was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'field_invalid' then raise; end if;
   end;
   -- The agency is not the caller's.
   begin
@@ -255,13 +307,24 @@ do $$ begin
   end;
 end $$;
 
+-- What redact() leaves, and a ten-digit number it does not touch, go through.
+do $$
+declare r record;
+begin
+  select * into r from public.create_staff_lead(
+    '00000000-0000-0000-0000-000000000001', 'מוסתר', '0545550000', null, 'כרטיס [הושמט — מספר כרטיס]',
+    'ת.ז. [הושמט — מספר מזהה], חזר מ-0501234567 ב-10:30', 'referral', 'דרך [הושמט — חשבון בנק]',
+    'new', 'verbal', null, false);
+  if r.lead_id is null then raise exception 'redacted text was refused'; end if;
+end $$;
+
 -- ── a User who cannot see the match: flagged, and the answer is the NEW id ─
 do $$
 declare r record; n integer;
 begin
   select count(*) into n from public.leads;
   select * into r from public.create_staff_lead(
-    '00000000-0000-0000-0000-000000000001', 'כפולה', '+972529998888', null, null, null,
+    '00000000-0000-0000-0000-000000000001', 'כפולה', '0529998888', null, null, null,
     'phone', null, 'new', 'verbal', null, false);
   if r.duplicate is distinct from 'hidden' then raise exception 'expected hidden, got %', r.duplicate; end if;
   if r.lead_id = '11111111-0000-0000-0000-000000000022' then
@@ -305,10 +368,10 @@ begin
     raise exception 'a null p_assignee assigned the lead';
   end if;
 
-  -- 050-1234567 exists; +972501234567 is the same number.
+  -- 050-1234567 exists; 0501234567 is the same number.
   select count(*) into n from public.leads;
   select * into r from public.create_staff_lead(
-    '00000000-0000-0000-0000-000000000001', 'קיים', '+972501234567', null, null, null,
+    '00000000-0000-0000-0000-000000000001', 'קיים', '0501234567', null, null, null,
     'phone', null, 'new', 'verbal', null, false);
   if r.duplicate is distinct from 'visible' or r.lead_id <> '11111111-0000-0000-0000-000000000021' then
     raise exception 'expected the visible match, got % / %', r.duplicate, r.lead_id;
@@ -317,7 +380,7 @@ begin
 
   -- The Admin looked and chose a second lead: inserted, not flagged.
   select * into r from public.create_staff_lead(
-    '00000000-0000-0000-0000-000000000001', 'קיים', '+972501234567', null, null, null,
+    '00000000-0000-0000-0000-000000000001', 'קיים', '0501234567', null, null, null,
     'phone', null, 'new', 'verbal', null, true);
   if (select count(*) from public.leads) <> n + 1 then raise exception 'p_duplicate_ok did not insert'; end if;
   if (select possible_duplicate from public.leads where id = r.lead_id) then
@@ -377,6 +440,7 @@ end $$;
 reset role;
 
 -- ── a landline in two shapes is one number ────────────────────────────────
+-- (the stored lead dashed, the new one as normalizePhone gives it)
 insert into public.leads (id, agency_id, name, phone, source, status) values
   ('11111111-0000-0000-0000-000000000023', '00000000-0000-0000-0000-000000000001', 'קווי', '03-1234567', 'consultation', 'new');
 set local role authenticated;
@@ -385,7 +449,7 @@ do $$
 declare r record;
 begin
   select * into r from public.create_staff_lead(
-    '00000000-0000-0000-0000-000000000001', 'קווי', '+972-3-1234567', null, null, null,
+    '00000000-0000-0000-0000-000000000001', 'קווי', '031234567', null, null, null,
     'phone', null, 'new', 'verbal', null, false);
   if r.duplicate is distinct from 'visible' or r.lead_id <> '11111111-0000-0000-0000-000000000023' then
     raise exception 'a landline in two shapes was not one number: % / %', r.duplicate, r.lead_id;
@@ -406,6 +470,62 @@ begin
   exception when invalid_parameter_value then
     if sqlerrm <> 'bad_notice' then raise; end if;
   end;
+end $$;
+reset role;
+
+-- ── a User's own older lead wins over a newer one they cannot see ──────────
+insert into public.leads (id, agency_id, name, phone, source, status, assigned_user_id, created_at) values
+  ('11111111-0000-0000-0000-000000000031', '00000000-0000-0000-0000-000000000001', 'שלי', '053-3333333', 'consultation', 'new',
+   'ffffffff-0000-0000-0000-000000000002', now() - interval '1 day'),
+  ('11111111-0000-0000-0000-000000000032', '00000000-0000-0000-0000-000000000001', 'לא שלי', '0533333333', 'consultation', 'new',
+   null, now());
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"ffffffff-0000-0000-0000-000000000002","role":"authenticated"}';
+do $$
+declare r record;
+begin
+  select * into r from public.create_staff_lead(
+    '00000000-0000-0000-0000-000000000001', 'שלי', '0533333333', null, null, null,
+    'phone', null, 'new', 'verbal', null, false);
+  if r.duplicate is distinct from 'visible' or r.lead_id <> '11111111-0000-0000-0000-000000000031' then
+    raise exception 'expected the User''s own lead, got % / %', r.duplicate, r.lead_id;
+  end if;
+end $$;
+reset role;
+
+-- ── 60 leads an hour per member, in the RPC too ───────────────────────────
+-- Sixty from two hours ago do not count; sixty more this hour do.
+insert into public.leads (agency_id, name, phone, source, status, brought_by, created_at)
+select '00000000-0000-0000-0000-000000000001', 'ישן ' || g, '0550000000', 'consultation', 'new',
+       'ffffffff-0000-0000-0000-000000000002', now() - interval '2 hours'
+  from generate_series(1, 60) g;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"ffffffff-0000-0000-0000-000000000002","role":"authenticated"}';
+do $$ begin
+  perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0551110000', null, null, null,
+    'phone', null, 'new', 'verbal', null, false);
+end $$;
+reset role;
+insert into public.leads (agency_id, name, phone, source, status, brought_by)
+select '00000000-0000-0000-0000-000000000001', 'חדש ' || g, '0550000000', 'consultation', 'new',
+       'ffffffff-0000-0000-0000-000000000002'
+  from generate_series(1, 60) g;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"ffffffff-0000-0000-0000-000000000002","role":"authenticated"}';
+do $$ begin
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0551110001', null, null, null,
+      'phone', null, 'new', 'verbal', null, false);
+    raise exception 'a 61st lead in an hour was accepted';
+  exception when raise_exception then
+    if sqlerrm <> 'rate_limited' then raise; end if;
+  end;
+end $$;
+-- Another member is not held by the User's count.
+set local request.jwt.claims = '{"sub":"ffffffff-0000-0000-0000-000000000001","role":"authenticated"}';
+do $$ begin
+  perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0551110002', null, null, null,
+    'phone', null, 'new', 'verbal', null, false);
 end $$;
 reset role;
 

@@ -4,11 +4,15 @@
  *
  * POST { agencyId, name, phone, email?, topic?, notes?, intake, referrer?,
  *        status, notice, assignee?, duplicateOk? } with the caller's session.
+ *   0. Agency 1 only: the privacy notice names Dorit's agency, and no other
+ *      agency has its own text yet.
  *   1. The session, then at least User in that agency (_shared/staff.ts).
  *   2. The input, then 60 creates per member per hour.
  *   3. The lead, through create_staff_lead under the caller's own token: the
  *      database decides who may, whose the lead is, and whether it is a
  *      duplicate. Source, consent and brought_by are set there, never here.
+ *      It also holds the hourly limit, the phone's shape and redact()'s
+ *      patterns itself, for a call that skips this function.
  *      Staff text is `notes`, never `summary` or `message` (the client sees those).
  *   4. Side effects, each on its own so none can undo the lead: the sheet row,
  *      the assignment mail, a notice to the agency's Admins and Owners, and the
@@ -42,17 +46,24 @@ const INTAKES = ['phone', 'in_person', 'referral', 'event', 'existing_client', '
 const STATUSES = ['new', 'contacted', 'client'];
 const NOTICES = ['verbal', 'email', 'whatsapp'];
 /** The same limits create_staff_lead enforces; the function refuses first, in Hebrew. */
-const LIMITS = { name: 80, phone: 30, email: 254, topic: 200, notes: 4000, referrer: 120 };
+const LIMITS = { name: 80, phone: 30, email: 254, topic: 200, notes: 2000, referrer: 120 };
 
 /** The RPC's own refusals, as a person can read them. */
 const REFUSALS: Record<string, string> = {
   bad_status: 'הסטטוס אינו מוכר.',
   bad_intake: 'דרך ההגעה אינה מוכרת.',
   bad_notice: 'אופן ההודעה על הפרטיות אינו תקין.',
+  bad_phone: 'מספר הטלפון אינו תקין.',
   field_required: 'שם וטלפון הם שדות חובה.',
   field_too_long: 'אחד השדות ארוך מדי.',
+  field_invalid: 'יש להסיר מספר מזהה, כרטיס או חשבון מהנושא, מההערות או ממי הפנה.',
   assignee_not_member: 'מי שנבחר/ה אינו/ה חבר/ת הסוכנות.',
+  rate_limited: 'יותר מדי פניות בשעה האחרונה. נסו שוב מאוחר יותר.',
 };
+/** Each refusal is a 400 unless named here. */
+const REFUSAL_STATUS: Record<string, number> = { rate_limited: 429, bad_phone: 422, field_invalid: 422 };
+/** "ללא שיוך" in the sheet: Admin+ leave the lead in the queue. */
+const NO_ASSIGNEE = 'none';
 
 const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
@@ -71,6 +82,12 @@ export async function handler(req: Request): Promise<Response> {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const agencyId = typeof body?.agencyId === 'string' ? body.agencyId : '';
     if (!body || !UUID.test(agencyId)) return json({ error: 'הסוכנות אינה מוכרת.' }, 400);
+    // The notice the client is told names agency 1; until each agency has its
+    // own, no other agency adds leads here (the screen hides the button too).
+    if (agencyId !== AGENCY_1) {
+      log('warn', 'create.agency_not_enabled', { rid, agencyId });
+      return json({ error: 'agency_not_enabled' }, 403);
+    }
 
     const gate = await requireAgencyRole(req, agencyId, 'user', rid, log);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
@@ -91,22 +108,25 @@ export async function handler(req: Request): Promise<Response> {
     }
     if (!name) return json({ error: REFUSALS.field_required }, 400);
     const normalized = normalizePhone(phone);
-    if (!contactPhone(phone) || !normalized) return json({ error: 'מספר הטלפון אינו תקין.' }, 400);
+    if (!contactPhone(phone) || !normalized) return json({ error: REFUSALS.bad_phone }, 400);
     if (email && !isEmail(email)) return json({ error: 'כתובת הדוא״ל אינה תקינה.' }, 400);
     if (!INTAKES.includes(intake)) return json({ error: REFUSALS.bad_intake }, 400);
     if (!STATUSES.includes(status)) return json({ error: REFUSALS.bad_status }, 400);
     if (!NOTICES.includes(notice)) return json({ error: REFUSALS.bad_notice }, 400);
     if (notice === 'email' && !email) return json({ error: 'כדי להודיע במייל יש להזין כתובת דוא״ל.' }, 400);
-    if (assignee && !UUID.test(assignee)) return json({ error: REFUSALS.assignee_not_member }, 400);
+    if (assignee && assignee !== NO_ASSIGNEE && !UUID.test(assignee)) return json({ error: REFUSALS.assignee_not_member }, 400);
 
     if (!(await withinLimit(log, rid, `staff-lead:${gate.userId}`, 3600, 60))) {
       log('warn', 'limit.exceeded', { rid, userId: gate.userId });
-      return json({ error: 'יותר מדי פניות בשעה האחרונה. נסו שוב מאוחר יותר.' }, 429);
+      return json({ error: REFUSALS.rate_limited }, 429);
     }
 
-    // Admin+ choose whose the lead is; for a User the database makes it theirs
-    // whatever is sent, so nothing is sent.
+    // Admin+ choose whose the lead is: a member, "none" (the queue), or by
+    // default themselves ("אני") — but the operator outside the agency cannot
+    // be its assignee, so theirs goes to the queue. For a User the database
+    // makes it theirs whatever is sent, so nothing is sent.
     const mayAssign = gate.isOperator || gate.role === 'admin' || gate.role === 'owner';
+    const assignTo = !mayAssign || assignee === NO_ASSIGNEE ? null : assignee || (gate.role ? gate.userId.toLowerCase() : null);
     let created: { lead_id?: unknown; duplicate?: unknown } | undefined;
     try {
       const answer = await callRpc(
@@ -122,7 +142,7 @@ export async function handler(req: Request): Promise<Response> {
           p_referrer: referrer || null,
           p_status: status,
           p_notice: notice,
-          p_assignee: mayAssign && assignee ? assignee : null,
+          p_assignee: assignTo,
           p_duplicate_ok: body.duplicateOk === true,
         },
         gate.token,
@@ -136,7 +156,7 @@ export async function handler(req: Request): Promise<Response> {
       }
       if (Object.hasOwn(REFUSALS, why)) {
         log('warn', 'create.refused', { rid, userId: gate.userId, why });
-        return json({ error: REFUSALS[why] }, 400);
+        return json({ error: REFUSALS[why] }, Object.hasOwn(REFUSAL_STATUS, why) ? REFUSAL_STATUS[why] : 400);
       }
       throw e;
     }
@@ -157,7 +177,7 @@ export async function handler(req: Request): Promise<Response> {
       const sheetStatus = await appendSheetRow(SHEET_TAB, SHEET_COLUMNS.length, [
         // Israel time, as submit-lead writes it: 'sv-SE' gives YYYY-MM-DD HH:MM:SS, which Sheets sorts as a date.
         new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jerusalem' }),
-        'פנייה ידנית',
+        'staff_lead',
         'staff',
         '',
         '',
@@ -175,9 +195,9 @@ export async function handler(req: Request): Promise<Response> {
       warnings.push('sheet_append_failed');
     }
 
-    if (mayAssign && assignee && assignee !== gate.userId.toLowerCase()) {
+    if (assignTo && assignTo !== gate.userId.toLowerCase()) {
       try {
-        const profiles = await selectRows('profiles', `id=eq.${assignee}&select=email`);
+        const profiles = await selectRows('profiles', `id=eq.${assignTo}&select=email`);
         const to = typeof profiles[0]?.email === 'string' ? profiles[0].email.trim().toLowerCase() : '';
         if (!isEmail(to)) {
           log('warn', 'mail.skipped', { rid, role: 'assignee', reason: 'no_address' });
@@ -228,10 +248,11 @@ export async function handler(req: Request): Promise<Response> {
     let noticeSent: boolean | null = null;
     if (notice === 'email') {
       try {
-        // Not a way to mail arbitrary addresses: one notice per address per 30 days, 30 per agency per hour.
-        const addressOk = await withinLimit(log, rid, `staff-notice-addr:${await sha256Hex(email.toLowerCase())}`, 2592000, 1);
-        const agencyOk = addressOk && (await withinLimit(log, rid, `staff-notice-agency:${agencyId}`, 3600, 30));
-        if (!addressOk || !agencyOk) {
+        // Not a way to mail arbitrary addresses: 30 per agency per hour, one notice per address per 30 days.
+        // The agency's cap first, so a refused one does not use up the address's slot.
+        const agencyOk = await withinLimit(log, rid, `staff-notice-agency:${agencyId}`, 3600, 30);
+        const addressOk = agencyOk && (await withinLimit(log, rid, `staff-notice-addr:${await sha256Hex(email.toLowerCase())}`, 2592000, 1));
+        if (!agencyOk || !addressOk) {
           noticeSent = false;
           log('warn', 'notice.rate_limited', { rid, userId: gate.userId });
           warnings.push('notice_rate_limited');

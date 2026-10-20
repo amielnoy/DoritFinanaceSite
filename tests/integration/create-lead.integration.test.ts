@@ -12,6 +12,7 @@ import { assignmentMail } from "../../supabase/functions/assign-lead/handler";
 const USER = "user-session-token-0123456789";
 const ADMIN = "admin-session-token-0123456789";
 const OUTSIDER = "outsider-session-token-0123456789";
+const OPERATOR = "operator-session-token-0123456789";
 const ORG = "11111111-2222-4333-8444-555555555555";
 const AGENCY_1 = "00000000-0000-0000-0000-000000000001";
 const NEW_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
@@ -20,8 +21,10 @@ const ASSIGNEE = "77777777-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
 type Row = Record<string, unknown>;
 
-function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdminsRead?: boolean } = {}) {
-  const sessions: Record<string, string> = { [USER]: "user-member", [ADMIN]: "user-admin", [OUTSIDER]: "user-outsider" };
+function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdminsRead?: boolean; agencyCap?: number } = {}) {
+  const sessions: Record<string, string> = {
+    [USER]: "user-member", [ADMIN]: "user-admin", [OUTSIDER]: "user-outsider", [OPERATOR]: "user-operator",
+  };
   const roles: Record<string, string> = { "user-member": "user", "user-admin": "admin", [ASSIGNEE]: "user", "user-owner": "owner" };
   const profiles: Record<string, string> = {
     "user-member": "member@example.com",
@@ -30,7 +33,8 @@ function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdm
     [ASSIGNEE]: "assignee@example.com",
   };
   const limiterKeys: string[] = [];
-  const seen = new Set<string>();
+  // The notice limiter as the database keeps it: one per address, `agencyCap` (30) per agency.
+  const counts = new Map<string, number>();
   const rpcCalls: { token: string; body: Row }[] = [];
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const upstream = (call: FetchCall): Response | undefined => {
@@ -42,7 +46,7 @@ function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdm
       const id = url.searchParams.get("id") ?? "";
       if (id.startsWith("eq.")) {
         const who = id.slice(3);
-        return json([{ id: who, role: "user", email: profiles[who] ?? null }]);
+        return json([{ id: who, role: who === "user-operator" ? "admin" : "user", email: profiles[who] ?? null }]);
       }
       const ids = id.replace(/^in\.\(|\)$/g, "").split(",");
       return json(ids.map((i) => ({ id: i, email: profiles[i] ?? null })));
@@ -54,8 +58,10 @@ function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdm
     if (url.pathname === "/rest/v1/rpc/allow_submission" && String((call.body as Row).p_key).startsWith("staff-notice-")) {
       limiterKeys.push(String((call.body as Row).p_key));
       const key = String((call.body as Row).p_key);
-      if (seen.has(key)) return json(false);
-      seen.add(key);
+      const cap = key.startsWith("staff-notice-agency:") ? (seed.agencyCap ?? 30) : 1;
+      const n = counts.get(key) ?? 0;
+      if (n >= cap) return json(false);
+      counts.set(key, n + 1);
       return json(true);
     }
     if (url.pathname === "/rest/v1/rpc/staff_role") {
@@ -72,7 +78,7 @@ function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdm
   return { upstream, rpcCalls, limiterKeys };
 }
 
-const good = { agencyId: ORG, name: "ישראל ישראלי", phone: "050-123 4567", email: "client@example.com", topic: "פנסיה", notes: "שיחה ראשונה", intake: "phone", status: "contacted", notice: "verbal" };
+const good = { agencyId: AGENCY_1, name: "ישראל ישראלי", phone: "050-123 4567", email: "client@example.com", topic: "פנסיה", notes: "שיחה ראשונה", intake: "phone", status: "contacted", notice: "verbal" };
 
 const create = (body: unknown, token: string | null, s: ReturnType<typeof fakeSupabase>, extra: EdgeOptions = {}) =>
   invokeEdge("create-lead", body, { ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}), upstream: s.upstream, ...extra });
@@ -113,16 +119,36 @@ describe("create-lead — who may, and what it checks", () => {
     expect(s.rpcCalls).toEqual([]);
   });
 
+  it("refuses any agency but agency 1 with 403 agency_not_enabled, before the session, the RPC or any side effect", async () => {
+    const s = fakeSupabase();
+    for (const token of [ADMIN, null]) {
+      const r = await create({ ...good, agencyId: ORG, notice: "email" }, token, s);
+      expect(r.status).toBe(403);
+      expect(r.json.error).toBe("agency_not_enabled");
+      expect(r.json).toHaveProperty("rid");
+      expect(r.sheetRows).toEqual([]);
+      expect(r.emails).toEqual([]);
+      expect(r.callsTo("/auth/v1/user")).toEqual([]);
+    }
+    expect(s.rpcCalls).toEqual([]);
+    expect(s.limiterKeys).toEqual([]);
+  });
+
   it.each([
     ["forbidden", 403, "42501"],
     ["bad_status", 400, "22023"],
     ["assignee_not_member", 400, "22023"],
+    // The RPC's own controls, for a call that skips this function.
+    ["rate_limited", 429, "P0001"],
+    ["bad_phone", 422, "22023"],
+    ["field_invalid", 422, "22023"],
   ])("maps the RPC's %s to %i in Hebrew, never its text", async (reason, status, code) => {
     const s = fakeSupabase({ rpc: { status: status === 403 ? 403 : 400, body: { code, message: reason, details: "secret row" } } });
     const r = await create(good, USER, s);
     expect(r.status).toBe(status);
     expect(JSON.stringify(r.json)).not.toContain(reason);
     expect(JSON.stringify(r.json)).not.toContain("secret");
+    expect(String(r.json.error)).toMatch(/[א-ת]/);
     expect(r.json).toHaveProperty("rid");
   });
 });
@@ -136,7 +162,7 @@ describe("create-lead — the write", () => {
     expect(r.json).toHaveProperty("rid");
     expect(s.rpcCalls).toHaveLength(1);
     expect(s.rpcCalls[0].token).toBe(USER);
-    expect(s.rpcCalls[0].body).toMatchObject({ p_agency_id: ORG, p_phone: "0501234567", p_intake: "phone", p_status: "contacted", p_notice: "verbal" });
+    expect(s.rpcCalls[0].body).toMatchObject({ p_agency_id: AGENCY_1, p_phone: "0501234567", p_intake: "phone", p_status: "contacted", p_notice: "verbal" });
     expect(JSON.stringify(s.rpcCalls[0].body)).not.toContain("123456782");
     // staff text is notes, never summary or message
     expect(JSON.stringify(s.rpcCalls[0].body)).not.toMatch(/summary|message/);
@@ -183,24 +209,20 @@ describe("create-lead — the write", () => {
     }
   });
 
-  it("writes a sheet row sourced 'staff' with an Israel-time timestamp, for agency 1 only", async () => {
+  it("writes a sheet row of type staff_lead, sourced 'staff', with an Israel-time timestamp", async () => {
     const s = fakeSupabase();
-    const other = await create(good, USER, s);
-    expect(other.sheetRows).toEqual([]);
-    expect(other.callsTo("sheets.googleapis.com")).toEqual([]);
-    expect(other.json.warnings).toBeUndefined();
-    const r = await create({ ...good, agencyId: AGENCY_1 }, USER, s);
+    const r = await create(good, USER, s);
     expect(r.sheetRows).toHaveLength(1);
     const row = r.sheetRows[0].row;
     expect(String(row[0])).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
-    expect(row[1]).toBe("פנייה ידנית");
+    expect(row[1]).toBe("staff_lead");
     expect(row[2]).toBe("staff");
     expect(row[10]).toBe(NEW_ID);
   });
 
   it("keeps the lead and warns when the sheet fails", async () => {
     const s = fakeSupabase();
-    const r = await create({ ...good, agencyId: AGENCY_1 }, USER, s, { failGoogle: "sheets" });
+    const r = await create(good, USER, s, { failGoogle: "sheets" });
     expect(r.status).toBe(200);
     expect(r.json.leadId).toBe(NEW_ID);
     expect(r.json.warnings).toContain("sheet_append_failed");
@@ -216,6 +238,29 @@ describe("create-lead — the people told", () => {
     const mail = r.emails.find((e) => e.to === "assignee@example.com");
     expect(mail?.subject).toBe(assignmentMail(NEW_ID).subject);
     expect(mail?.text).toBe(assignmentMail(NEW_ID).text);
+  });
+
+  it("assigns an Admin's lead to the Admin when no assignee is sent ('אני'), and mails no one", async () => {
+    const s = fakeSupabase();
+    const r = await create(good, ADMIN, s);
+    expect(r.status).toBe(200);
+    expect(s.rpcCalls[0].body.p_assignee).toBe("user-admin");
+    expect(r.emails.some((e) => e.subject === assignmentMail(NEW_ID).subject)).toBe(false);
+  });
+
+  it("leaves an Admin's lead in the queue for 'none' ('ללא שיוך')", async () => {
+    const s = fakeSupabase();
+    const r = await create({ ...good, assignee: "none" }, ADMIN, s);
+    expect(r.status).toBe(200);
+    expect(s.rpcCalls[0].body.p_assignee).toBeNull();
+    expect(r.emails.some((e) => e.subject === assignmentMail(NEW_ID).subject)).toBe(false);
+  });
+
+  it("assigns nobody by default when the caller is the operator and not a member", async () => {
+    const s = fakeSupabase();
+    const r = await create(good, OPERATOR, s);
+    expect(r.status).toBe(200);
+    expect(s.rpcCalls[0].body.p_assignee).toBeNull();
   });
 
   it("sends a User no assignment mail, and passes no assignee on", async () => {
@@ -251,7 +296,17 @@ describe("create-lead — the people told", () => {
     expect(second.emails.some((e) => e.to === "client@example.com")).toBe(false);
     expect(s.limiterKeys.length).toBeGreaterThan(0);
     expect(s.limiterKeys.join(" ")).not.toContain("client@example.com");
-    expect(s.limiterKeys.some((k) => k.startsWith(`staff-notice-agency:${ORG}`))).toBe(true);
+    expect(s.limiterKeys.some((k) => k.startsWith(`staff-notice-agency:${AGENCY_1}`))).toBe(true);
+  });
+
+  it("checks the agency's cap first, so a refused one leaves the address's slot unused", async () => {
+    const s = fakeSupabase({ agencyCap: 0 });
+    const r = await create({ ...good, notice: "email" }, USER, s);
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ leadId: NEW_ID, noticeSent: false });
+    expect(r.json.warnings).toContain("notice_rate_limited");
+    expect(s.limiterKeys.some((k) => k.startsWith("staff-notice-agency:"))).toBe(true);
+    expect(s.limiterKeys.some((k) => k.startsWith("staff-notice-addr:"))).toBe(false);
   });
 
   it("passes an ID typed in the referrer through redact", async () => {
