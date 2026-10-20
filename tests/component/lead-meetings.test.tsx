@@ -44,6 +44,8 @@ vi.mock("@/hooks/useAdmin", async (importActual) => ({
   useLeadTranscript: () => ({ data: undefined, isLoading: false, error: null }),
 }));
 vi.mock("@/services", () => ({ services: { leadsAdmin: h.service } }));
+// Rendered without an AuthProvider: nobody is signed in (useCurrentUserId reads useAuth).
+vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("@/components/dorit/admin/LeadTrackingPanel", () => ({ default: () => null }));
 const role = vi.hoisted(() => ({ role: "owner", isOperator: false }) as import("../helpers/agency-role-mock").RoleState);
 vi.mock("@/hooks/useAgency", async () => (await import("../helpers/agency-role-mock")).agencyHookMock(role));

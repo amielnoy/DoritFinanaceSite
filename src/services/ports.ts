@@ -296,6 +296,7 @@ export interface NewStaffLead {
   referrer?: string;
   status: "new" | "contacted" | "client";
   notice: NoticeMethod;
+  /** Admin+: a member's id, "none" for the queue, or absent for the caller themselves. Ignored for a User. */
   assignee?: string | null;
   duplicateOk?: boolean;
 }

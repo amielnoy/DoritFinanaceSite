@@ -13,15 +13,23 @@ const h = vi.hoisted(() => ({
   createLead: vi.fn(),
   addMeeting: vi.fn(),
   toast: vi.fn(),
+  meetingsStaff: true,
 }));
 vi.mock("@/services", () => ({ services: { leadsAdmin: { createLead: h.createLead, addMeeting: h.addMeeting } } }));
 vi.mock("@/components/ui/use-toast", () => ({ toast: h.toast }));
+vi.mock("@/config/meetings", async (original) => ({
+  ...(await original<typeof import("@/config/meetings")>()),
+  get MEETINGS_STAFF() {
+    return h.meetingsStaff;
+  },
+}));
 
 const { default: NewLeadSheet } = await import("@/components/dorit/admin/NewLeadSheet");
 const { STAFF_INTAKE_NOTICE } = await import("@/config/staff-leads");
 
 const onClose = vi.fn();
 const onCreated = vi.fn();
+const onSaved = vi.fn();
 const onOpenExisting = vi.fn();
 
 function show(over: Record<string, unknown> = {}) {
@@ -33,6 +41,7 @@ function show(over: Record<string, unknown> = {}) {
       canAssign={false}
       assignees={[{ id: "u-2", label: "נועה" }]}
       onCreated={onCreated}
+      onSaved={onSaved}
       onOpenExisting={onOpenExisting}
       {...over}
     />,
@@ -51,6 +60,7 @@ function fillRequired(method: "verbal" | "email" | "whatsapp" = "verbal") {
 }
 
 beforeEach(() => {
+  h.meetingsStaff = true;
   h.createLead.mockResolvedValue({ leadId: "L1", duplicate: null, noticeSent: null });
   h.addMeeting.mockResolvedValue(undefined);
   Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
@@ -83,6 +93,27 @@ describe("NewLeadSheet", () => {
     show({ canAssign: true });
     const select = screen.getByLabelText("שיוך") as HTMLSelectElement;
     expect(select.selectedOptions[0].textContent).toBe("אני");
+    expect([...select.options].map((o) => o.textContent)).toEqual(["אני", "ללא שיוך", "נועה"]);
+  });
+
+  it("sends no assignee for אני (the server assigns the caller), and \"none\" for ללא שיוך", async () => {
+    show({ canAssign: true });
+    fillRequired();
+    fireEvent.click(save());
+    await waitFor(() => expect(h.createLead).toHaveBeenCalledTimes(1));
+    expect(h.createLead.mock.calls[0][0].assignee).toBeUndefined();
+    cleanup();
+    show({ canAssign: true });
+    fillRequired();
+    type("שיוך", "none");
+    fireEvent.click(save());
+    await waitFor(() => expect(h.createLead).toHaveBeenCalledTimes(2));
+    expect(h.createLead.mock.calls[1][0]).toEqual(expect.objectContaining({ assignee: "none" }));
+  });
+
+  it("caps the name at 80, as the server does", () => {
+    show();
+    expect(screen.getByLabelText("שם")).toHaveAttribute("maxlength", "80");
   });
 
   it("asks מי הפנה (max 120) only for הפניה", () => {
@@ -158,6 +189,10 @@ describe("NewLeadSheet", () => {
     fillRequired();
     fireEvent.click(save());
     expect(await screen.findByText(/המספר כבר קיים בסוכנות — מנהל\/ת יבדוק\/תבדוק/)).toBeInTheDocument();
+    // The list is read again now: closing the confirmation with ✕ calls only onClose.
+    expect(onSaved).toHaveBeenCalledWith("L2");
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(h.toast).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "פתיחת הפנייה" }));
     expect(onCreated).toHaveBeenCalledWith("L2");
   });
@@ -170,6 +205,26 @@ describe("NewLeadSheet", () => {
     fireEvent.click(save());
     expect(await screen.findByText(/הנוסח לא נשלח/)).toBeInTheDocument();
     expect(screen.getByText(/שלח/, { selector: "p" })).toBeInTheDocument();
+    expect(onSaved).toHaveBeenCalledWith("L3");
+  });
+
+  it("does not call onSaved on a plain create: onCreated reads the list again", async () => {
+    show();
+    fillRequired();
+    fireEvent.click(save());
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith("L1"));
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(h.toast).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers קבענו כבר פגישה only with VITE_MEETINGS_STAFF", () => {
+    h.meetingsStaff = false;
+    show();
+    expect(screen.queryByLabelText("קבענו כבר פגישה")).toBeNull();
+    cleanup();
+    h.meetingsStaff = true;
+    show();
+    expect(screen.getByLabelText("קבענו כבר פגישה")).toBeInTheDocument();
   });
 
   it("writes the first meeting after the lead, in Israel time", async () => {

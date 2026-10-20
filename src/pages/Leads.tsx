@@ -5,7 +5,7 @@ import {
   useAdminUsers, useAgencyMeetings, useAssignLead, useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds,
 } from "@/hooks/useAdmin";
 import { useCurrentUserId } from "@/hooks/useCurrentUserId";
-import { useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
+import { AGENCY_1, useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { csvCell } from "@/lib/csv";
 import { Loader2, Download, Plus, Trash2 } from "lucide-react";
@@ -272,7 +272,8 @@ export default function Leads() {
   const deletes = can("leads.delete");
   const tracks = can("leads.tracking");
   const myId = useCurrentUserId();
-  const creates = STAFF_LEADS && can("leads.create");
+  // Agency 1 only: the privacy notice the client is told names Dorit's agency (src/config/staff-leads.ts).
+  const creates = STAFF_LEADS && agencyId === AGENCY_1 && can("leads.create");
   const [sheetOpen, setSheetOpen] = useState(false);
   const tabs = useMemo(() => PAGE_TABS.filter((t) => t !== "tracking" || tracks), [tracks]);
   const members = useAdminUsers(assigns);
@@ -333,7 +334,7 @@ export default function Leads() {
 
   const exportCsv = (all: boolean) => {
     const source = all ? leads : filtered;
-    const headers = ["תאריך", "שם", "טלפון", "אימייל", "מקור", "תחום/שירות", "מועד", "סטטוס", "הודעה", ...(STAFF_LEADS ? ["brought_by", "intake", "referrer_note"] : [])];
+    const headers = ["תאריך", "שם", "טלפון", "אימייל", "מקור", "תחום/שירות", "מועד", "סטטוס", "הודעה", ...(STAFF_LEADS ? ["הובאה ע״י", "איך הגיע/ה", "מי הפנה"] : [])];
     const rows = source.map((l) => [
       l.created_date ? new Date(l.created_date).toLocaleString("he-IL") : "",
       l.name,

@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/use-toast";
 import SideDrawer from "@/components/dorit/admin/SideDrawer";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
+import { MEETINGS_STAFF } from "@/config/meetings";
 import { MEETING_TOPICS } from "@/config/needs-wizard";
 import {
   INTAKE_LABELS, NOTICE_LABELS, STAFF_INTAKE_NOTICE, STAFF_STATUS_LABELS,
@@ -19,6 +20,7 @@ import { israelInstant, israelToday } from "@/lib/wall-clock";
  * a call (docs/superpowers/specs/2026-10-20-staff-lead-design.md, Frontend).
  * Staff text goes to `notes`, which the client never sees. A visible duplicate
  * is shown from the list the page already loaded: the API returns only its id.
+ * "קבענו כבר פגישה" shows only with VITE_MEETINGS_STAFF, where staff can see the meeting.
  */
 
 type Status = keyof typeof STAFF_STATUS_LABELS;
@@ -29,9 +31,11 @@ const METHODS = Object.keys(NOTICE_LABELS) as NoticeMethod[];
 const TOPICS = [...MEETING_TOPICS, "אחר"];
 const button = (extra = "", muted = false) => ctaClass(`min-h-11 px-4 text-base ${extra}`, { muted });
 const dateOf = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
+/** The assignee select: "" is "אני" (create-lead assigns the caller), NO_ASSIGNEE is "ללא שיוך". */
+const NO_ASSIGNEE = "none";
 
 export default function NewLeadSheet({
-  open, onClose, agencyId, canAssign, assignees, leads, onCreated, onOpenExisting,
+  open, onClose, agencyId, canAssign, assignees, leads, onCreated, onSaved, onOpenExisting,
 }: {
   open: boolean;
   onClose(): void;
@@ -41,6 +45,8 @@ export default function NewLeadSheet({
   /** The list the page already loaded, to show a visible duplicate. */
   leads?: LeadRecord[];
   onCreated(leadId: string): void;
+  /** The lead exists but the sheet stays open on its confirmation: read the list again now, as closing it with ✕ will not. */
+  onSaved?(leadId: string): void;
   onOpenExisting(leadId: string): void;
 }) {
   const [name, setName] = useState("");
@@ -94,8 +100,10 @@ export default function NewLeadSheet({
       }
       const hidden = created.duplicate === "hidden";
       const noticeFailed = created.noticeSent === false;
-      if (hidden || noticeFailed) setDone({ leadId: created.leadId, hidden, noticeFailed });
-      else {
+      if (hidden || noticeFailed) {
+        onSaved?.(created.leadId);
+        setDone({ leadId: created.leadId, hidden, noticeFailed });
+      } else {
         toast({ description: "הפנייה נשמרה" });
         onCreated(created.leadId);
       }
@@ -137,7 +145,7 @@ export default function NewLeadSheet({
           className="flex flex-col gap-4"
           onSubmit={(e) => { e.preventDefault(); submit(false); }}
         >
-          <Field label="שם"><input type="text" required maxLength={120} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} className={inputClass()} /></Field>
+          <Field label="שם"><input type="text" required maxLength={80} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} className={inputClass()} /></Field>
           <Field label="טלפון"><input type="tel" required inputMode="tel" autoComplete="off" value={phone} aria-invalid={phone !== "" && !isContactPhone(phone)} onChange={(e) => setPhone(e.target.value)} className={inputClass()} /></Field>
           <Field label="אימייל"><input type="email" maxLength={200} autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass()} /></Field>
           <Field label="נושא">
@@ -175,16 +183,19 @@ export default function NewLeadSheet({
             <Field label="שיוך">
               <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={inputClass()}>
                 <option value="">אני</option>
+                <option value={NO_ASSIGNEE}>ללא שיוך</option>
                 {assignees.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
               </select>
             </Field>
           ) : null}
 
-          <label className="flex min-h-11 items-center gap-3 text-base">
-            <input type="checkbox" checked={meeting} onChange={(e) => setMeeting(e.target.checked)} className="h-5 w-5" />
-            קבענו כבר פגישה
-          </label>
-          {meeting ? (
+          {MEETINGS_STAFF ? (
+            <label className="flex min-h-11 items-center gap-3 text-base">
+              <input type="checkbox" checked={meeting} onChange={(e) => setMeeting(e.target.checked)} className="h-5 w-5" />
+              קבענו כבר פגישה
+            </label>
+          ) : null}
+          {MEETINGS_STAFF && meeting ? (
             <div className="grid grid-cols-2 gap-3 rounded-[4px] border border-highlight p-4">
               <Field label="תאריך"><input type="date" required value={day} onChange={(e) => setDay(e.target.value)} className={inputClass()} /></Field>
               <Field label="שעה"><input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className={inputClass()} /></Field>

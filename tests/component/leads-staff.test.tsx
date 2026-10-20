@@ -42,13 +42,14 @@ vi.mock("@/config/meetings", () => ({ MEETINGS_STAFF: true, MEETINGS_CLIENT: fal
 vi.mock("@/services", () => ({ services: { leadsAdmin: h.leadsAdmin, usersAdmin: { list: h.usersList } } }));
 vi.mock("@/components/dorit/admin/LeadTrackingPanel", () => ({ default: () => <p>מעקב לידים</p> }));
 vi.mock("@/components/dorit/admin/NewLeadSheet", () => ({
-  default: (p: { canAssign: boolean; onCreated(id: string): void; onOpenExisting(id: string): void }) => {
+  default: (p: { canAssign: boolean; onCreated(id: string): void; onSaved?(id: string): void; onOpenExisting(id: string): void }) => {
     React.useEffect(() => {
       h.sheetMounts += 1;
     }, []);
     return (
       <div data-testid="sheet" data-can-assign={String(p.canAssign)}>
         <button onClick={() => p.onCreated("l-new")}>stub-created</button>
+        <button onClick={() => p.onSaved?.("l-new")}>stub-saved</button>
         <button onClick={() => p.onOpenExisting("l-1")}>stub-open-existing</button>
       </div>
     );
@@ -211,7 +212,7 @@ describe("with VITE_STAFF_LEADS, as an Admin", () => {
     expect(within(strip).queryByText(/חבר\/ה שכבר/)).toBeNull(); // September's lead is not this month
   });
 
-  it("exports brought_by, intake and referrer_note", async () => {
+  it("exports who brought it, how they arrived and who referred them, under Hebrew headers", async () => {
     let blob: Blob | undefined;
     URL.createObjectURL = vi.fn((b: Blob) => ((blob = b), "blob:x")) as never;
     URL.revokeObjectURL = vi.fn();
@@ -224,7 +225,7 @@ describe("with VITE_STAFF_LEADS, as an Admin", () => {
       r.readAsText(blob!);
     });
     const [head, ...rows] = text.replace("﻿", "").split("\n");
-    expect(head.split(",").slice(-3)).toEqual(['"brought_by"', '"intake"', '"referrer_note"'].map((s) => s.replace(/"/g, "")));
+    expect(head.split(",").slice(-3)).toEqual(["הובאה ע״י", "איך הגיע/ה", "מי הפנה"]);
     const dan = rows.find((r) => r.includes("דן לוי"))!;
     expect(dan).toContain("two@example.com");
     expect(dan).toContain("הפניה");
@@ -262,6 +263,29 @@ describe("the new-lead sheet", () => {
     expect(await screen.findByRole("dialog")).toHaveTextContent("חדש חדש");
     fireEvent.click(screen.getByRole("button", { name: "פנייה חדשה", hidden: true }));
     expect(h.sheetMounts).toBe(2);
+  });
+
+  it("reads the list again when the sheet stays on its confirmation, before it is closed", async () => {
+    show();
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "פנייה חדשה" }));
+    const calls = h.leadsAdmin.list.mock.calls.length;
+    fireEvent.click(screen.getByText("stub-saved"));
+    await waitFor(() => expect(h.leadsAdmin.list.mock.calls.length).toBeGreaterThan(calls));
+    expect(screen.getByTestId("sheet")).toBeInTheDocument();
+  });
+
+  it("is offered in agency 1 only, whose notice the text is", async () => {
+    const OTHER = "11111111-2222-4333-8444-555555555555";
+    role.agencies = [{ id: OTHER, name: "Trust", role: "owner" }];
+    h.leads = h.leads.map((l) => ({ ...l, agency_id: OTHER }));
+    try {
+      show();
+      await ready();
+      expect(screen.queryByRole("button", { name: "פנייה חדשה" })).toBeNull();
+    } finally {
+      role.agencies = undefined;
+    }
   });
 
   it("opens the existing lead from a duplicate", async () => {

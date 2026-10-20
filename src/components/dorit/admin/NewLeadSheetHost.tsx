@@ -7,6 +7,8 @@ import NewLeadSheet from "@/components/dorit/admin/NewLeadSheet";
 /**
  * The "פנייה חדשה" sheet on the leads screen. After a create the list is read
  * again and the new lead's drawer opens (`onOpenLead`; the sheet has toasted).
+ * When the sheet stays on its confirmation instead (`onSaved`), the list is
+ * read again right away, so closing it shows the new lead.
  * Render it only while open: the sheet's form is not reset between openings.
  */
 export default function NewLeadSheetHost({
@@ -39,6 +41,7 @@ export default function NewLeadSheetHost({
         void client.invalidateQueries({ queryKey: adminKeys.leads });
         onOpenLead?.(leadId);
       }}
+      onSaved={() => void client.invalidateQueries({ queryKey: adminKeys.leads })}
       onOpenExisting={(leadId) => {
         onClose();
         onOpenLead?.(leadId);
