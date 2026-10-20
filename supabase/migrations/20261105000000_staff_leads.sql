@@ -56,7 +56,6 @@ begin
         raise exception 'forbidden' using errcode = '42501';
       end if;
     end if;
-    end if;
   end if;
   return new;
 end;
