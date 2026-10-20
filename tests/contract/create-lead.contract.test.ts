@@ -29,9 +29,11 @@ describe("create-lead — a member's act, written by the database", () => {
 
   it("keeps staff text out of summary and message", () => {
     expect(fn).not.toMatch(/\b(summary|message)\s*:/);
-    // redact() twice: a number cut in two at redact()'s 2000 characters is taken too.
-    expect(fn).toContain("const scrub = (v: unknown) => redact(redact(text(v)));");
-    for (const f of ["topic", "notes", "referrer"]) expect(fn).toContain(`const ${f} = scrub(body.${f});`);
+    // redact() twice: a number cut in two at redact()'s 2000 characters, or a glued IBAN, is taken too.
+    expect(fn).toContain("export const scrub = (v: unknown) => redact(redact(text(v)));");
+    // Each capped field is scrubbed, then fitted under the RPC's cap (redaction lengthens text).
+    for (const f of ["topic", "notes", "referrer"]) expect(fn).toContain(`const ${f} = fit(body.${f}, LIMITS.${f});`);
+    expect(fn).toMatch(/if \(topic === null \|\| notes === null \|\| referrer === null\) return json\(\{ error: REFUSALS\.field_too_long \}, 400\);/);
   });
 
   it("limits a member to 60 creates an hour", () => {
@@ -49,7 +51,7 @@ describe("create-lead — a member's act, written by the database", () => {
   });
 
   it("refuses every agency but agency 1 before the session, the RPC or any side effect", () => {
-    expect(fn).toMatch(/if \(agencyId !== AGENCY_1\) \{[\s\S]*?return json\(\{ error: 'agency_not_enabled' \}, 403\);/);
+    expect(fn).toMatch(/if \(agencyId !== AGENCY_1\) \{[\s\S]*?return json\(\{ error: REFUSALS\.agency_not_enabled \}, 403\);/);
     const gate = fn.indexOf("agencyId !== AGENCY_1");
     for (const later of ["requireAgencyRole(", "callRpc(", "appendSheetRow(", "sendMail("]) {
       expect(gate, later).toBeLessThan(fn.indexOf(later));

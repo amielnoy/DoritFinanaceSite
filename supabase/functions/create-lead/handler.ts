@@ -70,10 +70,25 @@ const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 /**
  * redact() replaces, then cuts at 2000 characters, so a long number can be cut
  * in two at the end and leave a piece it would have taken. A second pass takes
- * that piece too: create_staff_lead's field_invalid then never refuses what
- * this function sends (tests/unit/staff-lead-secret.test.ts).
+ * that piece too — and a glued IBAN, which the first pass's digit rules leave
+ * behind once they have eaten the digits in front of it ("123456IL62…").
+ * One pass is not enough for either: only these two together guarantee that
+ * create_staff_lead's field_invalid never refuses what this function sends
+ * (tests/unit/staff-lead-secret.test.ts).
  */
-const scrub = (v: unknown) => redact(redact(text(v)));
+export const scrub = (v: unknown) => redact(redact(text(v)));
+/**
+ * scrub() and then fit under the RPC's cap: a marker is longer than the number
+ * it replaces, so text within its raw limit can pass it once scrubbed. Cut,
+ * not past an emoji's first half, and scrub again, since the cut can leave a
+ * piece of a number. null when it still does not fit: the caller refuses.
+ */
+export const fit = (v: unknown, cap: number): string | null => {
+  const scrubbed = scrub(v);
+  if (scrubbed.length <= cap) return scrubbed;
+  const fitted = scrub(scrubbed.slice(0, cap).replace(/[\uD800-\uDBFF]$/, ''));
+  return fitted.length > cap ? null : fitted;
+};
 
 export async function handler(req: Request): Promise<Response> {
   const cors = corsHeaders(req.headers.get('origin'));
@@ -94,7 +109,7 @@ export async function handler(req: Request): Promise<Response> {
     // own, no other agency adds leads here (the screen hides the button too).
     if (agencyId !== AGENCY_1) {
       log('warn', 'create.agency_not_enabled', { rid, agencyId });
-      return json({ error: 'agency_not_enabled' }, 403);
+      return json({ error: REFUSALS.agency_not_enabled }, 403);
     }
 
     const gate = await requireAgencyRole(req, agencyId, 'user', rid, log);
@@ -103,9 +118,6 @@ export async function handler(req: Request): Promise<Response> {
     const name = text(body.name);
     const phone = text(body.phone);
     const email = text(body.email).toLowerCase();
-    const topic = scrub(body.topic);
-    const notes = scrub(body.notes);
-    const referrer = scrub(body.referrer);
     const intake = text(body.intake);
     const status = text(body.status);
     const notice = text(body.notice);
@@ -114,9 +126,13 @@ export async function handler(req: Request): Promise<Response> {
     if (oversizedField({ name: body.name, phone: body.phone, email: body.email, topic: body.topic, notes: body.notes, referrer: body.referrer }, LIMITS)) {
       return json({ error: REFUSALS.field_too_long }, 400);
     }
+    const topic = fit(body.topic, LIMITS.topic);
+    const notes = fit(body.notes, LIMITS.notes);
+    const referrer = fit(body.referrer, LIMITS.referrer);
+    if (topic === null || notes === null || referrer === null) return json({ error: REFUSALS.field_too_long }, 400);
     if (!name) return json({ error: REFUSALS.field_required }, 400);
     const normalized = normalizePhone(phone);
-    if (!contactPhone(phone) || !normalized) return json({ error: REFUSALS.bad_phone }, 400);
+    if (!contactPhone(phone) || !normalized) return json({ error: REFUSALS.bad_phone }, 422);
     if (email && !isEmail(email)) return json({ error: 'כתובת הדוא״ל אינה תקינה.' }, 400);
     if (!INTAKES.includes(intake)) return json({ error: REFUSALS.bad_intake }, 400);
     if (!STATUSES.includes(status)) return json({ error: REFUSALS.bad_status }, 400);

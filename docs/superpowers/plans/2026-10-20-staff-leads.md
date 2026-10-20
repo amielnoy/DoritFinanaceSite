@@ -42,7 +42,7 @@
 - Create: `supabase/tests/staff_leads_check.sql` (schema blocks; Task 2 appends RPC blocks)
 
 **Interfaces:**
-- Produces: columns `leads.brought_by uuid`, `intake text`, `referrer_note text`, `notice_method text`, `duplicate_of uuid`; constraint `leads_staff_fields`; index `leads_agency_brought_by`; trigger function `public.leads_guard_staff_fields()` + trigger `leads_guard_staff_fields` (before update on `leads`).
+- Produces: columns `leads.brought_by uuid`, `intake text`, `referrer_note text`, `notice_method text`, `duplicate_of uuid`; constraint `leads_staff_fields`; index `leads_brought_by_created` (`brought_by, created_at`, partial); trigger function `public.leads_guard_staff_fields()` + trigger `leads_guard_staff_fields` (before update on `leads`).
 
 - [ ] **Step 1: Write the failing contract test** (style of `tests/contract/agency-roles-schema.contract.test.ts`: read the migration as source, strip `--` lines). Assertions:
   - `leads_source_check` lists exactly `'consultation','detailed','quick','claim','escalation','interview','staff'`.

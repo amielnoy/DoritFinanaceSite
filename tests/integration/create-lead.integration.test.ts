@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FetchCall } from "../helpers/base44-function";
 import { invokeEdge, SUPABASE_URL, type EdgeOptions } from "../helpers/edge-function";
 import { assignmentMail } from "../../supabase/functions/assign-lead/handler";
+import { SECRET_JS } from "../helpers/staff-lead-secret";
 
 /**
  * "הוספת פנייה" (supabase/functions/create-lead): the session and the agency
@@ -94,7 +95,6 @@ describe("create-lead — who may, and what it checks", () => {
   });
 
   it.each([
-    ["a phone that is not one", { ...good, phone: "123" }],
     ["a missing name", { ...good, name: "  " }],
     ["a bad email", { ...good, email: "nope" }],
     ["a name too long", { ...good, name: "א".repeat(81) }],
@@ -111,6 +111,14 @@ describe("create-lead — who may, and what it checks", () => {
     expect(s.rpcCalls).toEqual([]);
   });
 
+  it("refuses a phone that is not one with 422, like the RPC's bad_phone, and no RPC call", async () => {
+    const s = fakeSupabase();
+    const r = await create({ ...good, phone: "123" }, USER, s);
+    expect(r.status).toBe(422);
+    expect(r.json.error).toBe("מספר הטלפון אינו תקין.");
+    expect(s.rpcCalls).toEqual([]);
+  });
+
   it("answers 429 when the limiter refuses, and writes nothing", async () => {
     const s = fakeSupabase();
     const r = await create(good, USER, s, { overLimit: ["staff-lead:"] });
@@ -124,7 +132,7 @@ describe("create-lead — who may, and what it checks", () => {
     for (const token of [ADMIN, null]) {
       const r = await create({ ...good, agencyId: ORG, notice: "email" }, token, s);
       expect(r.status).toBe(403);
-      expect(r.json.error).toBe("agency_not_enabled");
+      expect(r.json.error).toBe("הוספת פנייה פתוחה בסוכנות הזו רק כשיהיה לה נוסח יידוע משלה.");
       expect(r.json).toHaveProperty("rid");
       expect(r.sheetRows).toEqual([]);
       expect(r.emails).toEqual([]);
@@ -167,6 +175,20 @@ describe("create-lead — the write", () => {
     expect(JSON.stringify(s.rpcCalls[0].body)).not.toContain("123456782");
     // staff text is notes, never summary or message
     expect(JSON.stringify(s.rpcCalls[0].body)).not.toMatch(/summary|message/);
+  });
+
+  it.each([
+    ["referrer", "referrer", "א".repeat(112) + "123456", 120],
+    ["topic", "topic", "ב".repeat(194) + "123456", 200],
+  ])("fits a %s that redaction lengthens under its cap, with nothing left to find", async (_label, field, value, cap) => {
+    expect(value.length).toBeLessThanOrEqual(cap);
+    const s = fakeSupabase();
+    const r = await create({ ...good, [field]: value }, USER, s);
+    expect(r.status).toBe(200);
+    const sent = String((s.rpcCalls[0].body as Record<string, unknown>)[field === "topic" ? "p_topic" : "p_referrer"]);
+    expect(sent.length).toBeLessThanOrEqual(cap);
+    expect(sent).toContain("[הושמט");
+    expect(SECRET_JS.test(sent)).toBe(false);
   });
 
   it("answers 409 for a visible duplicate, with that lead's id, and does no side effect", async () => {

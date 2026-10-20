@@ -91,7 +91,7 @@ alter table public.leads add constraint leads_staff_fields check (
 ) not valid;
 alter table public.leads validate constraint leads_staff_fields;
 
-create index leads_agency_brought_by on public.leads (agency_id, brought_by)
+create index leads_brought_by_created on public.leads (brought_by, created_at)
   where brought_by is not null;
 ```
 
