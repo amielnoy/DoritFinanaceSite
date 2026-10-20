@@ -19,10 +19,12 @@ insert into public.memberships (user_id, agency_id, role) values
 -- 11: an ordinary lead · 12: a staff lead flagged as a duplicate of 11
 insert into public.leads (id, agency_id, name, phone, source, status) values
   ('11111111-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'מקורי', '0501111111', 'consultation', 'new');
-insert into public.leads (id, agency_id, name, phone, source, status, brought_by, intake, notice_method,
+-- Assigned to the User, so the User's update reaches the trigger (RLS lets a
+-- User update only leads assigned to them).
+insert into public.leads (id, agency_id, name, phone, source, status, brought_by, assigned_user_id, intake, notice_method,
                           consent_version, consent_at, duplicate_of) values
   ('11111111-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'כפילות', '0501111111', 'staff', 'new',
-   'ffffffff-0000-0000-0000-000000000002', 'phone', 'verbal', 'staff-intake-v1', now(),
+   'ffffffff-0000-0000-0000-000000000002', 'ffffffff-0000-0000-0000-000000000002', 'phone', 'verbal', 'staff-intake-v1', now(),
    '11111111-0000-0000-0000-000000000011');
 
 -- ── a staff lead must say who brought it and how they were told ───────────
@@ -56,19 +58,22 @@ do $$ begin
     update public.leads set brought_by = 'ffffffff-0000-0000-0000-000000000001'
      where id = '11111111-0000-0000-0000-000000000012';
     raise exception 'an Admin changed brought_by';
-  exception when insufficient_privilege then null;
+  exception when insufficient_privilege then
+    if sqlerrm <> 'staff_fields_fixed' then raise; end if;
   end;
   begin
     update public.leads set source = 'consultation'
      where id = '11111111-0000-0000-0000-000000000012';
     raise exception 'an Admin changed source';
-  exception when insufficient_privilege then null;
+  exception when insufficient_privilege then
+    if sqlerrm <> 'staff_fields_fixed' then raise; end if;
   end;
   begin
     update public.leads set notice_method = 'email'
      where id = '11111111-0000-0000-0000-000000000012';
     raise exception 'an Admin changed notice_method';
-  exception when insufficient_privilege then null;
+  exception when insufficient_privilege then
+    if sqlerrm <> 'staff_fields_fixed' then raise; end if;
   end;
   -- Fields outside the guard still move.
   update public.leads set status = 'contacted' where id = '11111111-0000-0000-0000-000000000012';
@@ -83,7 +88,8 @@ do $$ begin
     update public.leads set duplicate_of = '11111111-0000-0000-0000-000000000012'
      where id = '11111111-0000-0000-0000-000000000011';
     raise exception 'an Admin set duplicate_of to another lead';
-  exception when insufficient_privilege then null;
+  exception when insufficient_privilege then
+    if sqlerrm <> 'forbidden' then raise; end if;
   end;
   update public.leads set duplicate_of = null where id = '11111111-0000-0000-0000-000000000012';
   if (select duplicate_of from public.leads where id = '11111111-0000-0000-0000-000000000012') is not null then
@@ -103,7 +109,8 @@ do $$ begin
   begin
     update public.leads set duplicate_of = null where id = '11111111-0000-0000-0000-000000000012';
     raise exception 'a User cleared duplicate_of';
-  exception when insufficient_privilege then null;
+  exception when insufficient_privilege then
+    if sqlerrm <> 'forbidden' then raise; end if;
   end;
 end $$;
 reset role;

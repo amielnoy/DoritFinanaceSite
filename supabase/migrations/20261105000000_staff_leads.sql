@@ -16,10 +16,12 @@ alter table public.leads
   add column notice_method text check (notice_method in ('verbal','email','whatsapp')),
   add column duplicate_of  uuid references public.leads(id) on delete set null;
 
--- A staff lead always says who brought it and how they were told.
+-- A staff lead always says how it arrived and how they were told. brought_by is
+-- not required here: it goes null when the member's account is deleted, and
+-- create_staff_lead sets it at insert.
 alter table public.leads add constraint leads_staff_fields check (
   source is distinct from 'staff'
-  or (brought_by is not null and intake is not null and notice_method is not null
+  or (intake is not null and notice_method is not null
       and consent_version is not null and consent_at is not null)
 ) not valid;
 alter table public.leads validate constraint leads_staff_fields;

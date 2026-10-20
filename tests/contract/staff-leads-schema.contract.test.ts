@@ -47,14 +47,16 @@ describe("staff leads, schema", () => {
     expect(flat).toContain("duplicate_of uuid references public.leads(id) on delete set null");
   });
 
-  it("requires the notice fields on a staff lead", () => {
+  it("requires the intake and notice fields on a staff lead, but not brought_by", () => {
     const m = flat.match(/add constraint leads_staff_fields check \((.*?)\) not valid/);
     expect(m).not.toBeNull();
     const body = m?.[1] ?? "";
     expect(body).toContain("source is distinct from 'staff'");
-    for (const col of ["brought_by", "intake", "notice_method", "consent_version", "consent_at"]) {
+    for (const col of ["intake", "notice_method", "consent_version", "consent_at"]) {
       expect(body).toContain(`${col} is not null`);
     }
+    // brought_by goes null with the member's account (on delete set null).
+    expect(body).not.toContain("brought_by");
     expect(flat).toContain("validate constraint leads_staff_fields");
   });
 
