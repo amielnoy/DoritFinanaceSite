@@ -135,6 +135,18 @@ Click a run to see its command, counts, duration and failures.
   `allure-results/`, where they live.
 - **Analyze with Claude** works on saved failures too.
 
+## Test dashboard
+
+When `.env.local` has `TEST_DASHBOARD_SUPABASE_URL` and `TEST_DASHBOARD_SUPABASE_KEY`,
+every run that finishes (not one that was stopped) is also uploaded to the test
+dashboard's Supabase project by
+[`scripts/test-dashboard/upload.mjs`](../scripts/test-dashboard/upload.mjs), marked
+`local`. CI uploads its own runs the same way, marked `ci`. Only e2e results are
+uploaded, except on the nightly run, which uploads every test; results older than 30
+days are deleted. The table is created by
+[`scripts/test-dashboard/schema.sql`](../scripts/test-dashboard/schema.sql). Without
+the two values the upload is skipped.
+
 ## Failure analysis with Claude
 
 In the window of a failed test, **Analyze with Claude** asks Claude for the likely
