@@ -90,16 +90,28 @@ create trigger agencies_guard_status
   for each row execute function public.agencies_guard_status();
 
 -- ── the agency profile: the wizard's columns ───────────────────────────────
+-- Addresses lead mail goes to, each checked on its own: one address per
+-- element, at most five, none longer than 254. No space, comma, semicolon,
+-- angle bracket or quote anywhere — each would let one entry name a second
+-- recipient, or a header, once it reaches the mailer. create_agency asks the
+-- same of the owner's address. Pure (immutable, the caller's rights), so it
+-- can sit in a CHECK; EXECUTE is granted below to whoever writes the column.
+create function public.valid_notify_emails(p_emails text[]) returns boolean
+  language sql
+  immutable
+  set search_path = ''
+as $$
+  select p_emails is null
+      or (cardinality(p_emails) <= 5
+          and not exists (
+            select 1 from unnest(p_emails) as e
+             where e is null
+                or length(e) > 254
+                or e !~ '^[^@\s,;<>"]+@[^@\s,;<>"]+\.[^@\s,;<>"]+$'))
+$$;
+
 alter table public.agency_profiles
-  -- Where lead mail goes: up to five addresses, each the shape create_agency
-  -- accepts. Joined on a space, which no address may contain.
-  add column notify_emails           text[] check (
-    notify_emails is null
-    or (cardinality(notify_emails) <= 5
-        and array_position(notify_emails, null) is null
-        and (cardinality(notify_emails) = 0
-             or array_to_string(notify_emails, ' ') ~ '^[^@\s]+@[^@\s]+\.[^@\s]+( [^@\s]+@[^@\s]+\.[^@\s]+)*$')
-        and octet_length(array_to_string(notify_emails, ' ')) <= 1300)),
+  add column notify_emails           text[] check (public.valid_notify_emails(notify_emails)),
   add column domain                  text unique check (domain = lower(domain) and domain ~ '^[a-z0-9.-]+$'),
   add column mail_from               text,
   add column consent_version         text,
@@ -270,11 +282,12 @@ create policy agents_delete_operator on public.agents
 -- links only their own account. The check covers who holds which licence, so
 -- a change to the name, number, types or regulator voids it, in every status:
 -- a check of other facts proves nothing about these.
---   · number, types or regulator: verified_licence_number stays, and the card
---     keeps showing that checked number until the new one is checked;
---   · name: verified_licence_number goes too, so the card hides the licensee
---     until the operator checks again — a checked number beside an unchecked
---     name would vouch for someone the register was never asked about.
+--   · number alone: verified_licence_number stays, and the card keeps showing
+--     that checked number until the new one is checked;
+--   · name, types or regulator: verified_licence_number goes too, so the card
+--     hides the licensee until the operator checks again — a checked number
+--     beside an unchecked name or licence would vouch for facts the register
+--     was never asked about.
 -- Runs as the caller.
 create function public.agents_guard() returns trigger
   language plpgsql
@@ -318,12 +331,12 @@ begin
     end if;
   end if;
 
-  if new.full_name is distinct from old.full_name then
+  if (new.full_name, new.licence_types, new.licence_regulator)
+     is distinct from (old.full_name, old.licence_types, old.licence_regulator) then
     new.licence_verified_at := null;
     new.licence_verified_by := null;
     new.verified_licence_number := null;
-  elsif (new.licence_number, new.licence_types, new.licence_regulator)
-        is distinct from (old.licence_number, old.licence_types, old.licence_regulator) then
+  elsif new.licence_number is distinct from old.licence_number then
     new.licence_verified_at := null;
     new.licence_verified_by := null;
   elsif new.licence_verified_at is distinct from old.licence_verified_at then
@@ -408,7 +421,8 @@ create trigger agents_after_change
 -- user_id and the verification columns — so the view reads as its owner and
 -- the two filters are the only thing keeping drafts and unchecked licensees
 -- out: a live agency, and a licensee the operator has checked
--- (verified_licence_number, which a name change clears — see agents_guard).
+-- (verified_licence_number, which a change of name, licence types or
+-- regulator clears — see agents_guard).
 -- A licensee added to a live agency stays off the card until checked.
 -- Do not drop either filter, and do not add columns without asking whether a
 -- visitor may see them. The licence number shown is the verified one.
@@ -674,7 +688,7 @@ begin
   if length(v_name) > 200 then
     raise exception 'field_too_long' using errcode = '22023';
   end if;
-  if v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' or length(v_email) > 254 then
+  if not public.valid_notify_emails(array[v_email]) then
     raise exception 'invalid_email' using errcode = '22023';
   end if;
 
@@ -842,6 +856,7 @@ grant select on public.public_agent_cards to anon, authenticated;
 revoke execute on function public.onboarding_role(uuid)                from public, anon, authenticated;
 revoke execute on function public.agency_is_active(uuid)               from public, anon, authenticated;
 revoke execute on function public.next_consent_version(text)           from public, anon, authenticated;
+revoke execute on function public.valid_notify_emails(text[])          from public, anon, authenticated;
 revoke execute on function public.agencies_guard_status()              from public, anon, authenticated;
 revoke execute on function public.agency_profiles_guard()              from public, anon, authenticated;
 revoke execute on function public.agents_guard()                       from public, anon, authenticated;
@@ -857,6 +872,8 @@ revoke execute on function public.activate_agency(uuid)                from publ
 grant execute on function public.onboarding_role(uuid)             to authenticated;
 grant execute on function public.can_write_agent_photo(text)       to authenticated;
 grant execute on function public.next_consent_version(text)        to authenticated;
+-- The notify_emails CHECK runs with the writer's rights.
+grant execute on function public.valid_notify_emails(text[])       to authenticated, service_role;
 -- success_cases_read_public is evaluated for visitors too.
 grant execute on function public.agency_is_active(uuid)            to anon, authenticated;
 grant execute on function public.create_agency(text, text, date)   to authenticated;

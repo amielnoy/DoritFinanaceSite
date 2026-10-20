@@ -84,7 +84,7 @@ describe("agency onboarding, schema", () => {
       if (INVOKER_TRIGGERS.includes(name)) {
         expect(body, name).not.toMatch(/security definer/);
         expect(body, name).toContain("current_user in ('authenticated', 'anon')");
-      } else if (name === "next_consent_version") {
+      } else if (name === "next_consent_version" || name === "valid_notify_emails") {
         expect(body).not.toMatch(/security definer/);
         expect(body).toMatch(/\bimmutable\b/);
       } else {
@@ -243,13 +243,13 @@ describe("agency onboarding, what the owner and the public may touch", () => {
     );
   });
 
-  it("voids a licence check when the name, number, types or regulator change; a new name hides the card", () => {
+  it("voids a licence check when the name, number, types or regulator change; all but the number hide the card", () => {
     const guard = fns.get("agents_guard")!;
     expect(guard).toMatch(
-      /if new\.full_name is distinct from old\.full_name then\s+new\.licence_verified_at := null;\s+new\.licence_verified_by := null;\s+new\.verified_licence_number := null;/,
+      /if \(new\.full_name, new\.licence_types, new\.licence_regulator\)\s+is distinct from \(old\.full_name, old\.licence_types, old\.licence_regulator\) then\s+new\.licence_verified_at := null;\s+new\.licence_verified_by := null;\s+new\.verified_licence_number := null;/,
     );
     expect(guard).toMatch(
-      /elsif \(new\.licence_number, new\.licence_types, new\.licence_regulator\)\s+is distinct from \(old\.licence_number, old\.licence_types, old\.licence_regulator\) then\s+new\.licence_verified_at := null;\s+new\.licence_verified_by := null;/,
+      /elsif new\.licence_number is distinct from old\.licence_number then\s+new\.licence_verified_at := null;\s+new\.licence_verified_by := null;\s+elsif/,
     );
   });
 
@@ -269,7 +269,14 @@ describe("agency onboarding, what the owner and the public may touch", () => {
       "photo_path is null or photo_path ~ ('^' || agency_id::text || '/' || id::text || '/[A-Za-z0-9_-]{1,100}\\.webp$')",
     );
     expect(flat).toContain("octet_length(onboarding::text) < 65536");
-    expect(flat).toContain("cardinality(notify_emails) <= 5");
+    // Each address on its own: no second recipient or header hidden in one entry.
+    expect(flat).toContain("add column notify_emails text[] check (public.valid_notify_emails(notify_emails))");
+    const emails = fns.get("valid_notify_emails")!;
+    expect(emails).toContain("cardinality(p_emails) <= 5");
+    expect(emails).toContain("from unnest(p_emails) as e");
+    expect(emails).toContain(`e !~ '^[^@\\s,;<>"]+@[^@\\s,;<>"]+\\.[^@\\s,;<>"]+$'`);
+    expect(emails).toContain("length(e) > 254");
+    expect(fns.get("create_agency")).toContain("if not public.valid_notify_emails(array[v_email]) then");
     expect(flat).toContain("octet_length(bio::text) <= 16384");
     expect(flat).toContain("check (char_length(service_area) <= 200)");
     expect(flat).toContain("check (char_length(photo_alt) <= 200)");

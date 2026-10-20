@@ -944,9 +944,9 @@ from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
 | CTR-ONB-014 | "gates activation on exactly the config's three gates" | `ACTIVATION_GATES` = the keys in `gates_closed` |
 | CTR-ONB-015 | "refuses everyone but the operator the operator's columns" | Every `OPERATOR_ONLY_COLUMNS` column in its guard |
 | CTR-ONB-016..019 | Owner, testimonials, the public card, success cases | Owner-only write policies, none to anon; consent constraint and composite key, and consent for every agency but agency 1 (`testimonials_agency_consent`, NOT VALID); today's testimonial policies kept; the view is definer with `a.status = 'active'` and `verified_licence_number is not null`, and no verification columns |
-| CTR-ONB-020 | "voids a licence check when the name, number, types or regulator change; a new name hides the card" | `agents_guard` clears `licence_verified_*`; a name change clears `verified_licence_number` too |
+| CTR-ONB-020 | "voids a licence check when the name, number, types or regulator change; all but the number hide the card" | `agents_guard` clears `licence_verified_*`; a name, types or regulator change clears `verified_licence_number` too |
 | CTR-ONB-021 | "moves the consent version of a live agency, and lapses the approval, when a licensee is added, removed or edited" | `agents_after_change` after insert, update or delete |
-| CTR-ONB-022 | "keeps the portrait path inside the agent's own folder, and what the owner types bounded" | `agents_photo_path`; `onboarding` < 64 KB; ≤ 5 notification addresses; bio ≤ 16 KB; service area and photo alt ≤ 200 |
+| CTR-ONB-022 | "keeps the portrait path inside the agent's own folder, and what the owner types bounded" | `agents_photo_path`; `onboarding` < 64 KB; ≤ 5 notification addresses, each checked alone by `valid_notify_emails` (no space, `,` `;` `<` `>` `"`; ≤ 254), which `create_agency` shares; bio ≤ 16 KB; service area and photo alt ≤ 200 |
 | CTR-ONB-023..024 | The `agent-photos` bucket | Public, WebP, 10 MB; four policies to authenticated through `can_write_agent_photo`, which matches the path before casting |
 
 ## 5. Runtime counterpart

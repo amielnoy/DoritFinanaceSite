@@ -127,6 +127,12 @@ begin
   exception when invalid_parameter_value then
     if sqlerrm <> 'invalid_email' then raise; end if;
   end;
+  begin
+    perform public.create_agency('x', 'owner,x@example.com', null);
+    raise exception 'an agency was opened for an address with a comma';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'invalid_email' then raise; end if;
+  end;
 
   -- The address belongs to an existing, confirmed account (a4): still no membership.
   v_id := public.create_agency('  סוכנות חדשה ', ' OB-Other@Example.com ', '2026-10-01');
@@ -211,6 +217,10 @@ begin
   -- The notification list: up to five real-looking addresses.
   update public.agency_profiles set notify_emails = array['a@example.com', 'b@example.com']
    where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+  if (select notify_emails from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d')
+     <> array['a@example.com', 'b@example.com'] then
+    raise exception 'a normal two-address list was not saved';
+  end if;
   begin
     update public.agency_profiles set notify_emails = array['not an address']
      where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
@@ -221,6 +231,32 @@ begin
     update public.agency_profiles set notify_emails = array['a@example.com', '']
      where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
     raise exception 'an empty notification address was accepted';
+  exception when check_violation then null;
+  end;
+  begin
+    -- Two recipients smuggled into one entry.
+    update public.agency_profiles set notify_emails = array['a@b.co x@y.co']
+     where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+    raise exception 'two addresses in one entry were accepted';
+  exception when check_violation then null;
+  end;
+  declare
+    bad text;
+  begin
+    foreach bad in array array['a,b@example.com', 'a@example.com;b@example.com', '"x"@example.com',
+                               'x@example.com>', '<x@example.com'] loop
+      begin
+        update public.agency_profiles set notify_emails = array['ok@example.com', bad]
+         where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+        raise exception 'a notification address with a separator was accepted: %', bad;
+      exception when check_violation then null;
+      end;
+    end loop;
+  end;
+  begin
+    update public.agency_profiles set notify_emails = array[repeat('a', 250) || '@example.com']
+     where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+    raise exception 'a 262-character notification address was accepted';
   exception when check_violation then null;
   end;
   begin
@@ -772,13 +808,14 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a1","role":"authenticated"}';
 do $$ begin
-  -- Licence types: the check lapses, the checked number stays on the card.
+  -- Licence types: the check lapses and the checked number goes, so the card
+  -- never pairs unchecked licence types with a checked number.
   update public.agents set licence_types = array['pension_agent', 'life_agent'] where id = '99999999-0000-0000-0000-00000000000d';
   if (select licence_verified_at from public.agents where id = '99999999-0000-0000-0000-00000000000d') is not null then
     raise exception 'changed licence types kept the verification';
   end if;
-  if (select verified_licence_number from public.agents where id = '99999999-0000-0000-0000-00000000000d') <> 'L-0002' then
-    raise exception 'changed licence types lost the checked number';
+  if (select verified_licence_number from public.agents where id = '99999999-0000-0000-0000-00000000000d') is not null then
+    raise exception 'changed licence types kept the checked number';
   end if;
   if (select disclosures_approved_at from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') is not null then
     raise exception 'changed licence types kept the disclosures approval';
@@ -786,6 +823,51 @@ do $$ begin
   if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v2' then
     raise exception 'changed licence types bumped consent_version';
   end if;
+end $$;
+reset role;
+
+set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
+do $$ begin
+  if exists (select 1 from public.public_agent_cards where id = '99999999-0000-0000-0000-00000000000d') then
+    raise exception 'a licensee with unchecked licence types is on the card';
+  end if;
+end $$;
+reset role;
+
+-- The operator checks again; the card returns. Then the regulator, the same way.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a0","role":"authenticated"}';
+do $$ begin
+  update public.agents set licence_verified_at = now() where id = '99999999-0000-0000-0000-00000000000d';
+  if (select verified_licence_number from public.agents where id = '99999999-0000-0000-0000-00000000000d') <> 'L-0002' then
+    raise exception 'a new check did not restore the checked number';
+  end if;
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a1","role":"authenticated"}';
+do $$ begin
+  update public.agents set licence_regulator = 'רגולטור אחר' where id = '99999999-0000-0000-0000-00000000000d';
+  if (select verified_licence_number from public.agents where id = '99999999-0000-0000-0000-00000000000d') is not null
+     or (select licence_verified_at from public.agents where id = '99999999-0000-0000-0000-00000000000d') is not null then
+    raise exception 'a changed regulator kept the check';
+  end if;
+end $$;
+reset role;
+
+-- Checked once more, so the name change below is what clears it.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a0","role":"authenticated"}';
+do $$ begin
+  update public.agents set licence_verified_at = now() where id = '99999999-0000-0000-0000-00000000000d';
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a1","role":"authenticated"}';
+do $$ begin
 
   update public.agents set grammatical_gender = 'm' where id = '99999999-0000-0000-0000-00000000000d';
   if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v3' then
