@@ -167,6 +167,8 @@ export const services: Services = {
     list: (limit) => real().then((s) => s.leadsAdmin.list(limit)),
     setStatus: (id, status) => real().then((s) => s.leadsAdmin.setStatus(id, status)),
     remove: (id) => real().then((s) => s.leadsAdmin.remove(id)),
+    createLead: (input) => real().then((s) => s.leadsAdmin.createLead(input)),
+    clearDuplicate: (leadId) => real().then((s) => s.leadsAdmin.clearDuplicate(leadId)),
     documentLink: (ref, leadId) => real().then((s) => s.leadsAdmin.documentLink(ref, leadId)),
     assign: (leadId, userId) => real().then((s) => s.leadsAdmin.assign(leadId, userId)),
     countUnassigned: () => real().then((s) => s.leadsAdmin.countUnassigned()),

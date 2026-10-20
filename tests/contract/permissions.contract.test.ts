@@ -22,6 +22,10 @@ describe("the permissions table matches the gates that decide", () => {
     expect(additive).toMatch(/public\.has_role\(old\.agency_id, 'admin'\) or public\.is_admin\(\)/);
   });
 
+  it("creating a lead is open to every member (the create-lead function and the staff insert path)", () => {
+    expect(PERMISSIONS["leads.create"]).toBe("user");
+  });
+
   it("deleting a lead and reading contacts are Admin+ in the policies", () => {
     expect(PERMISSIONS["leads.delete"]).toBe("admin");
     expect(PERMISSIONS["contacts.read"]).toBe("admin");

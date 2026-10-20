@@ -1,0 +1,278 @@
+-- Staff-created leads (docs/superpowers/specs/2026-10-20-staff-lead-design.md):
+-- a member of an agency adds a lead they met in person, by phone or by
+-- referral. Additive: five columns, one constraint, one guard trigger, and the
+-- retention job learns the new free-text column. The create_staff_lead RPC is
+-- appended below.
+
+alter table public.leads drop constraint leads_source_check;
+alter table public.leads add constraint leads_source_check
+  check (source in ('consultation','detailed','quick','claim','escalation','interview','staff'));
+
+alter table public.leads
+  add column brought_by    uuid references auth.users(id) on delete set null,
+  add column intake        text check (intake in
+                             ('phone','in_person','referral','event','existing_client','other')),
+  add column referrer_note text check (char_length(referrer_note) <= 120), -- "רו״ח משה", not a contact record
+  add column notice_method text check (notice_method in ('verbal','email','whatsapp')),
+  add column possible_duplicate boolean not null default false; -- set by create_staff_lead; says nothing about whose lead it matched
+
+-- A staff lead always says how it arrived and how they were told. brought_by is
+-- not required here: it goes null when the member's account is deleted, and
+-- create_staff_lead sets it at insert.
+alter table public.leads add constraint leads_staff_fields check (
+  source is distinct from 'staff'
+  or (intake is not null and notice_method is not null
+      and consent_version is not null and consent_at is not null)
+) not valid;
+alter table public.leads validate constraint leads_staff_fields;
+
+-- A member's own leads by time: create_staff_lead's hourly count, and the
+-- lookup behind brought_by's on delete set null.
+create index leads_brought_by_created on public.leads (brought_by, created_at)
+  where brought_by is not null;
+
+-- ── guard: the staff fields are fixed once written ────────────────────────
+-- Runs as its caller, like leads_guard_assignment: a person (authenticated or
+-- anon) is held to the rules, the server and the platform operator are not.
+-- Admin+ is held too; only the operator may correct these. possible_duplicate may
+-- be cleared by an Admin of the lead's agency ("לא כפילות"), never set.
+create function public.leads_guard_staff_fields() returns trigger
+  language plpgsql
+  set search_path = ''
+as $$
+declare
+  v_person boolean := current_user in ('authenticated', 'anon');
+begin
+  if v_person and not public.is_admin() then
+    if new.brought_by is distinct from old.brought_by
+       or new.source is distinct from old.source
+       or new.intake is distinct from old.intake
+       or new.consent_version is distinct from old.consent_version
+       or new.consent_at is distinct from old.consent_at
+       or new.notice_method is distinct from old.notice_method then
+      raise exception 'staff_fields_fixed' using errcode = '42501';
+    end if;
+
+    if new.possible_duplicate is distinct from old.possible_duplicate then
+      if new.possible_duplicate or not public.has_role(old.agency_id, 'admin') then
+        raise exception 'forbidden' using errcode = '42501';
+      end if;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger leads_guard_staff_fields
+  before update on public.leads
+  for each row execute function public.leads_guard_staff_fields();
+
+-- ── retention: the referrer note is free text about a person ──────────────
+-- Body of 20261103000000_client_meetings.sql, with referrer_note = null added
+-- to the anonymising update.
+create or replace function public.anonymize_stale_leads(p_now timestamptz default now())
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cutoff constant timestamptz := p_now - interval '24 months';
+  n integer;
+begin
+  delete from public.contacts c
+   where coalesce(c.last_seen, c.created_at) < cutoff
+     and not exists (
+       select 1 from public.leads k
+        where k.phone = c.phone
+          and (k.status = 'client' or greatest(k.created_at, k.updated_at) >= cutoff)
+     );
+
+  with stale as (
+    select l.id
+      from public.leads l
+      left join lateral (
+        select max(lm.scheduled_at) as last_at from public.meetings lm where lm.lead_id = l.id
+      ) m on true
+     where l.status <> 'client'
+       and l.anonymized_at is null
+       and greatest(l.created_at, l.updated_at, coalesce(m.last_at, l.created_at)) < cutoff
+  )
+  update public.leads l
+     set name = 'נמחק',
+         phone = '',
+         email = null,
+         message = null,
+         summary = null,
+         profile = null,
+         notes = null,
+         timing = null,
+         campaign = null,
+         referrer_note = null,
+         anonymized_at = p_now
+    from stale
+   where l.id = stale.id;
+  get diagnostics n = row_count;
+
+  -- The meeting's own free text about the person.
+  update public.meetings m
+     set timing = null, notes = null, client_summary = null, location = null
+    from public.leads l
+   where m.lead_id = l.id and l.anonymized_at = p_now;
+
+  update public.meeting_requests r
+     set note = null
+    from public.meetings m
+    join public.leads l on l.id = m.lead_id
+   where r.meeting_id = m.id and l.anonymized_at = p_now;
+
+  return n;
+end;
+$$;
+
+-- ── create_staff_lead ─────────────────────────────────────────────────────
+-- The only way a person adds a lead (direct insert stays revoked). Security
+-- definer so it can insert; auth.uid() still reads the caller's JWT. Source,
+-- brought_by, consent and the channel come from here, never from an argument.
+-- A hidden duplicate's answer carries only the NEW id: the caller learns that
+-- an Admin will look, never whose lead it matched.
+create function public.create_staff_lead(
+  p_agency_id    uuid,
+  p_name         text,
+  p_phone        text,
+  p_email        text,
+  p_topic        text,
+  p_notes        text,
+  p_intake       text,
+  p_referrer     text,
+  p_status       text,
+  p_notice       text,
+  p_assignee     uuid,
+  p_duplicate_ok boolean
+) returns table (lead_id uuid, duplicate text)
+  language plpgsql
+  security definer
+  set search_path = ''
+as $$
+declare
+  v_caller   uuid := auth.uid();
+  v_assignee uuid;
+  v_digits   text;
+  v_dup      uuid;
+  v_id       uuid;
+  -- What redact() (supabase/functions/submit-lead/lead.js) cuts out: a card,
+  -- a nine-digit ID or a six-to-eight-digit account between non-digits, an IBAN
+  -- between non-alphanumerics. The same boundaries as redact(), not \y: Postgres
+  -- counts a Hebrew letter as a word character and JavaScript does not.
+  -- Detection only; the create-lead function redacts before it calls, so only
+  -- a direct call trips it.
+  c_secret   constant text :=
+    '(^|[^0-9])([0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}[- ]?[0-9]{4}|[0-9]{6,9})([^0-9]|$)|(^|[^A-Za-z0-9])[Ii][Ll][0-9]{2}[A-Za-z0-9]{17,}([^A-Za-z0-9]|$)';
+begin
+  -- 0 agency 1 only: the privacy notice the client is told names Dorit's agency
+  -- (create-lead's AGENCY_1, refused there too)
+  if p_agency_id is distinct from '00000000-0000-0000-0000-000000000001'::uuid then
+    raise exception 'agency_not_enabled' using errcode = '42501';
+  end if;
+
+  -- 1 who may, and how often: 60 an hour, as the create-lead function allows,
+  -- so a direct call to /rest/v1/rpc cannot fill the table either. The lock
+  -- makes the count and the insert one step per member (and their duplicate
+  -- check with it); it is released at the end of the transaction.
+  if v_caller is null or not (public.has_role(p_agency_id, 'user') or public.is_admin()) then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('staff-lead:' || v_caller::text));
+  if (select count(*) from public.leads
+       where brought_by = v_caller and created_at > now() - interval '1 hour') >= 60 then
+    raise exception 'rate_limited' using errcode = 'P0001';
+  end if;
+
+  -- 2 what may be said (name 80, email 254, topic 200 as LEAD_FIELD_LIMITS;
+  -- notes 2000, where redact() cuts)
+  if p_status is null or p_status not in ('new','contacted','client') then
+    raise exception 'bad_status' using errcode = '22023';
+  end if;
+  if p_intake is null or p_intake not in ('phone','in_person','referral','event','existing_client','other') then
+    raise exception 'bad_intake' using errcode = '22023';
+  end if;
+  if p_notice is null or p_notice not in ('verbal','email','whatsapp') then
+    raise exception 'bad_notice' using errcode = '22023';
+  end if;
+  if p_notice = 'email' and nullif(btrim(p_email), '') is null then
+    raise exception 'bad_notice' using errcode = '22023'; -- told by email, but no address
+  end if;
+  if coalesce(btrim(p_name), '') = '' or coalesce(btrim(p_phone), '') = '' then
+    raise exception 'field_required' using errcode = '22023';
+  end if;
+  if char_length(p_name) > 80 or char_length(p_phone) > 30
+     or char_length(coalesce(p_email, '')) > 254 or char_length(coalesce(p_topic, '')) > 200
+     or char_length(coalesce(p_notes, '')) > 2000 or char_length(coalesce(p_referrer, '')) > 120 then
+    raise exception 'field_too_long' using errcode = '22023';
+  end if;
+  -- the shape normalizePhone gives: 0 and eight or nine digits
+  if p_phone !~ '^0[0-9]{8,9}$' then
+    raise exception 'bad_phone' using errcode = '22023';
+  end if;
+  if coalesce(p_notes, '') ~ c_secret or coalesce(p_topic, '') ~ c_secret
+     or coalesce(p_referrer, '') ~ c_secret then
+    raise exception 'field_invalid' using errcode = '22023';
+  end if;
+
+  -- 3 whose it is: a User's lead is theirs; Admin+ (and the operator) choose
+  if public.has_role(p_agency_id, 'admin') or public.is_admin() then
+    if p_assignee is not null and not public.lead_assignee_ok(p_agency_id, p_assignee) then
+      raise exception 'assignee_not_member' using errcode = '22023';
+    end if;
+    v_assignee := p_assignee;
+  else
+    v_assignee := v_caller;
+  end if;
+
+  -- 4 the same person again, whatever the formatting
+  -- the national number: digits only, without a leading 972 or 0
+  v_digits := regexp_replace(regexp_replace(p_phone, '\D', '', 'g'), '^(972|0)', '');
+  if v_digits <> '' then
+    select l.id into v_dup
+      from public.leads l
+     where l.agency_id = p_agency_id
+       and l.anonymized_at is null
+       and regexp_replace(regexp_replace(l.phone, '\D', '', 'g'), '^(972|0)', '') = v_digits
+     order by public.can_see_lead(l.id) desc, l.created_at desc -- one the caller can open, if any
+     limit 1;
+  end if;
+  if v_dup is not null and public.can_see_lead(v_dup) then
+    if not coalesce(p_duplicate_ok, false) then
+      return query select v_dup, 'visible'::text;
+      return;
+    end if;
+    v_dup := null; -- seen and chosen: a second lead, not flagged
+  end if;
+
+  -- 5 write it
+  insert into public.leads (
+    agency_id, name, phone, email, topic, notes, status, source, channel,
+    brought_by, intake, referrer_note, notice_method, consent_version, consent_at,
+    assigned_user_id, assigned_at, assigned_by, possible_duplicate
+  ) values (
+    p_agency_id, btrim(p_name), btrim(p_phone), nullif(btrim(p_email), ''), nullif(btrim(p_topic), ''),
+    nullif(btrim(p_notes), ''), p_status, 'staff',
+    case when p_intake in ('referral','existing_client') then 'referral' else 'direct' end,
+    v_caller, p_intake, nullif(btrim(p_referrer), ''), p_notice, 'staff-intake-v1', now(),
+    v_assignee,
+    case when v_assignee is not null then now() end,
+    case when v_assignee is not null then v_caller end,
+    v_dup is not null
+  ) returning id into v_id;
+
+  return query select v_id, case when v_dup is not null then 'hidden' end::text;
+end;
+$$;
+
+-- ── grants ─────────────────────────────────────────────────────────────────
+-- Supabase's default privileges grant EXECUTE to anon and authenticated by
+-- name, so each revoke names them.
+revoke execute on function public.leads_guard_staff_fields()       from public, anon, authenticated;
+revoke execute on function public.anonymize_stale_leads(timestamptz) from public, anon, authenticated;
+revoke execute on function public.create_staff_lead(uuid, text, text, text, text, text, text, text, text, text, uuid, boolean) from public, anon, authenticated;
+grant execute on function public.create_staff_lead(uuid, text, text, text, text, text, text, text, text, text, uuid, boolean) to authenticated;

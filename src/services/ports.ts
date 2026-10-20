@@ -1,6 +1,7 @@
 import type { ClientMeeting, MeetingKind, MeetingMode, MeetingRequestKind, MeetingStatus } from "@/lib/meetings";
 
 export type { ClientMeeting };
+import type { Intake, NoticeMethod } from "@/lib/staff-lead-types";
 import type { InterviewSummary } from "@/lib/interview-handoff";
 import type { Snapshot } from "@/lib/clearinghouse/snapshot";
 
@@ -42,7 +43,8 @@ export type LeadSource =
   | "consultation"
   | "claim"
   | "escalation"
-  | "interview";
+  | "interview"
+  | "staff";
 
 export interface ClaimReport {
   name: string;
@@ -274,6 +276,35 @@ export interface LeadRecord {
   /** The lead's agency, and who works it — null while it waits in the "לא שויכו" queue. */
   agency_id?: string | null;
   assigned_user_id?: string | null;
+  /** Staff-created leads (STAFF_LEADS): who brought it, how it came in, who referred, how the person was told, and whether it may repeat another lead. */
+  broughtBy?: string | null;
+  intake?: Intake | null;
+  referrerNote?: string | null;
+  noticeMethod?: NoticeMethod | null;
+  possibleDuplicate?: boolean;
+}
+
+/** A lead a member enters by hand (create-lead Edge Function). */
+export interface NewStaffLead {
+  agencyId: string;
+  name: string;
+  phone: string;
+  email?: string;
+  topic?: string;
+  notes?: string;
+  intake: Intake;
+  referrer?: string;
+  status: "new" | "contacted" | "client";
+  notice: NoticeMethod;
+  /** Admin+: a member's id, "none" for the queue, or absent for the caller themselves. Ignored for a User. */
+  assignee?: string | null;
+  duplicateOk?: boolean;
+}
+
+export interface CreatedLead {
+  leadId: string;
+  duplicate: "visible" | "hidden" | null;
+  noticeSent: boolean | null;
 }
 
 /** Managing received enquiries. Every method here touches personal data. */
@@ -342,6 +373,10 @@ export interface LeadAdminPort {
   list(limit?: number): Promise<LeadRecord[]>;
   setStatus(id: string, status: LeadStatus): Promise<void>;
   remove(id: string): Promise<void>;
+  /** A member enters a lead by hand. A 409 (a visible duplicate) resolves with `duplicate: "visible"`; other refusals throw in Hebrew. */
+  createLead(input: NewStaffLead): Promise<CreatedLead>;
+  /** Mark a possible duplicate as checked (possible_duplicate = false). */
+  clearDuplicate(leadId: string): Promise<void>;
   /**
    * A link that opens one of a claim's documents. A Base44 file URL is already
    * one; a Supabase Storage reference (`storage:claim-documents/…`) is signed

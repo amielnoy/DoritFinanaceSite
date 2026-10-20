@@ -10,6 +10,7 @@ export interface LeadAdminClient extends FunctionInvoker {
   };
 }
 
+const STAFF_LEADS_SUPABASE_ONLY = "פניות שהצוות מזין נשמרות רק ב-Supabase.";
 const MEETINGS_SUPABASE_ONLY = "פגישות נשמרות רק ב-Supabase.";
 
 /**
@@ -65,6 +66,14 @@ export class Base44LeadAdminService implements LeadAdminPort {
   /** The agenda, for the same reason: Base44 holds no meetings. */
   async agencyMeetings(): Promise<AgendaMeeting[]> {
     return [];
+  }
+
+  async createLead(): Promise<never> {
+    throw new Error(STAFF_LEADS_SUPABASE_ONLY);
+  }
+
+  async clearDuplicate(): Promise<void> {
+    throw new Error(STAFF_LEADS_SUPABASE_ONLY);
   }
 
   async addMeeting(): Promise<void> {

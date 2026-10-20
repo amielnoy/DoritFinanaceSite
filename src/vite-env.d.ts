@@ -21,6 +21,8 @@ interface ImportMetaEnv {
   readonly VITE_MASLEKA_ENABLED?: string;
   readonly VITE_MEETINGS_STAFF?: string;
   readonly VITE_MEETINGS_CLIENT?: string;
+  /** Staff-created leads — on only when exactly "true"; see `src/config/staff-leads.ts`. */
+  readonly VITE_STAFF_LEADS?: string;
   readonly VITE_SNAPSHOT_HOME?: string;
   /** Who writes articles and testimonials — see `src/config/content-writes.ts`. */
   readonly VITE_CONTENT_WRITES?: "base44" | "supabase";

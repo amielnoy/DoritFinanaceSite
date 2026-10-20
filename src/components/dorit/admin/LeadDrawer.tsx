@@ -17,6 +17,7 @@ type Tab = LeadDrawerTab;
 export default function LeadDrawer({
   lead,
   subtitle,
+  note = null,
   details,
   onClose,
   initialTab = "details",
@@ -28,6 +29,8 @@ export default function LeadDrawer({
 }: {
   lead: LeadRecord | null;
   subtitle: string;
+  /** A line under the header (staff-created leads: who entered it, how, how the person was told). */
+  note?: string | null;
   /** The "פרטים" tab: what the table's row knows, laid out by the page. */
   details: React.ReactNode;
   onClose: () => void;
@@ -58,6 +61,7 @@ export default function LeadDrawer({
 
   return (
     <SideDrawer open={Boolean(lead)} onClose={onClose} title={lead?.name ?? ""} subtitle={subtitle}>
+      {note ? <p className="-mt-2 mb-4 text-sm text-muted-foreground">{note}</p> : null}
       <div role="tablist" aria-label="פרטי הפנייה" className="-mt-2 mb-5 flex gap-1 border-b border-border">
         {tabs.map((t) => (
           <button

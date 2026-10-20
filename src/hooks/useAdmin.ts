@@ -129,6 +129,15 @@ export function useAdminUsers(enabled = true) {
   });
 }
 
+/** "לא כפילות": clears a lead's possible-duplicate flag (Admin+). */
+export function useClearDuplicate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => services.leadsAdmin.clearDuplicate(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: adminKeys.leads }),
+  });
+}
+
 export function useRemoveLead() {
   const client = useQueryClient();
   return useMutation({

@@ -505,3 +505,85 @@ describe("SupabaseLeadAdminService.agencyMeetings", () => {
     await expect(new SupabaseLeadAdminService(client).agencyMeetings("agency-1")).rejects.toThrow(/meetings read failed/);
   });
 });
+
+describe("SupabaseLeadAdminService — staff-created leads", () => {
+  const functionsOf = (answer: { data: unknown; error: { message: string; context?: unknown } | null }) => {
+    const invoke = vi.fn().mockResolvedValue(answer);
+    return { client: { functions: { invoke } }, invoke };
+  };
+  const token = async () => "session-token";
+  const input = {
+    agencyId: "a1",
+    name: "דנה",
+    phone: "050-0000000",
+    intake: "phone" as const,
+    status: "new" as const,
+    notice: "verbal" as const,
+  };
+  const make = (f: ReturnType<typeof functionsOf>) => new SupabaseLeadAdminService(tableFake({ data: [], error: null }).client, f.client, token);
+
+  it("createLead invokes create-lead with the input and the bearer token", async () => {
+    const f = functionsOf({ data: { leadId: "L1", duplicate: null, noticeSent: true, rid: "r" }, error: null });
+    expect(await make(f).createLead(input)).toEqual({ leadId: "L1", duplicate: null, noticeSent: true });
+    expect(f.invoke).toHaveBeenCalledWith("create-lead", { body: input, headers: { Authorization: "Bearer session-token" } });
+  });
+
+  it("reports a hidden duplicate and a missing noticeSent as null", async () => {
+    const f = functionsOf({ data: { leadId: "L1", duplicate: "hidden", rid: "r" }, error: null });
+    expect(await make(f).createLead(input)).toEqual({ leadId: "L1", duplicate: "hidden", noticeSent: null });
+  });
+
+  it("resolves a 409 to a visible duplicate instead of throwing", async () => {
+    const context = new Response(JSON.stringify({ duplicate: "visible", leadId: "L9", rid: "r" }), { status: 409 });
+    const f = functionsOf({ data: null, error: { message: "non-2xx", context } });
+    expect(await make(f).createLead(input)).toEqual({ leadId: "L9", duplicate: "visible", noticeSent: null });
+  });
+
+  it("throws the function's Hebrew error for the other refusals", async () => {
+    const context = new Response(JSON.stringify({ error: "נשלחו יותר מדי פניות.", rid: "r" }), { status: 429 });
+    const f = functionsOf({ data: null, error: { message: "non-2xx", context } });
+    await expect(make(f).createLead(input)).rejects.toThrow("נשלחו יותר מדי פניות.");
+  });
+
+  it("createLead needs a session", async () => {
+    const f = functionsOf({ data: null, error: null });
+    const service = new SupabaseLeadAdminService(tableFake({ data: [], error: null }).client, f.client, async () => null);
+    await expect(service.createLead(input)).rejects.toThrow("נדרשת התחברות");
+  });
+
+  it("clearDuplicate sets possible_duplicate to false on that lead, and asks for it back", async () => {
+    const { client, calls } = tableFake({ data: [], error: null }, { data: [{ id: "L1" }], error: null });
+    await new SupabaseLeadAdminService(client).clearDuplicate("L1");
+    expect(calls).toEqual([["from", "leads"], ["update", { possible_duplicate: false }], ["eq", "id", "L1"], ["select", "id"]]);
+  });
+
+  it("clearDuplicate throws when no row came back", async () => {
+    const { client } = tableFake({ data: [], error: null }, { data: [], error: null });
+    await expect(new SupabaseLeadAdminService(client).clearDuplicate("L1")).rejects.toThrow("הפעולה לא בוצעה");
+  });
+
+  it("with the flag on, selects the five staff columns and maps them", async () => {
+    const row = leadRow({ source: "staff", brought_by: "u1", intake: "phone", referrer_note: "דוד", notice_method: "email", possible_duplicate: true });
+    const { client, calls } = tableFake({ data: [row], error: null });
+    const [lead] = await new SupabaseLeadAdminService(client, null, token, true).list();
+    const select = String(calls.find((c) => c[0] === "select")![1]);
+    for (const c of ["brought_by", "intake", "referrer_note", "notice_method", "possible_duplicate"]) expect(select.split(",")).toContain(c);
+    expect(lead).toMatchObject({ broughtBy: "u1", intake: "phone", referrerNote: "דוד", noticeMethod: "email", possibleDuplicate: true });
+  });
+
+  it("with the flag on, an empty staff field maps to null and possibleDuplicate to false", async () => {
+    const { client } = tableFake({ data: [leadRow({ brought_by: null, intake: null, referrer_note: null, notice_method: null, possible_duplicate: false })], error: null });
+    const [lead] = await new SupabaseLeadAdminService(client, null, token, true).list();
+    expect(lead).toMatchObject({ broughtBy: null, intake: null, referrerNote: null, noticeMethod: null, possibleDuplicate: false });
+  });
+
+  it("with the flag off, selects exactly today's columns and adds no staff fields", async () => {
+    const { client, calls } = tableFake({ data: [leadRow()], error: null });
+    const [lead] = await new SupabaseLeadAdminService(client, null, token, false).list();
+    expect(calls.find((c) => c[0] === "select")![1]).toBe(
+      "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id",
+    );
+    expect(lead).not.toHaveProperty("possibleDuplicate");
+    expect(lead).not.toHaveProperty("broughtBy");
+  });
+});

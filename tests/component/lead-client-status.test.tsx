@@ -23,6 +23,8 @@ vi.mock("@/hooks/useAdmin", () => ({
   useLeadTranscript: () => ({ data: undefined, isLoading: false, error: null }),
 }));
 vi.mock("@/services", () => ({ services: { leadsAdmin: { documentLink: vi.fn() } } }));
+// Rendered without an AuthProvider: nobody is signed in (useCurrentUserId reads useAuth).
+vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("@/components/dorit/admin/LeadTrackingPanel", () => ({ default: () => null }));
 // The person's role in the agency (src/hooks/useAgency.ts): full access unless a case narrows it.
 const role = vi.hoisted(() => ({ role: "owner", isOperator: true }) as import("../helpers/agency-role-mock").RoleState);
