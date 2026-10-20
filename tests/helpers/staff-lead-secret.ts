@@ -28,3 +28,15 @@ export function liftRedact(): (text: string) => string {
   const fn = src.slice(start, src.indexOf("\n}", start) + 2);
   return new Function(`${fn}; return redact;`)() as (text: string) => string;
 }
+
+/**
+ * create-lead's `scrub`, as the handler defines it: redact() twice. The handler
+ * cannot be imported here (it needs Deno), so the definition is read from its
+ * source and held to that exact shape, then built from the lifted redact().
+ */
+export function liftScrub(): (text: string) => string {
+  const src = readFileSync(join(REPO_ROOT, "supabase/functions/create-lead/handler.ts"), "utf8");
+  if (!src.includes("export const scrub = (v: unknown) => redact(redact(text(v)));")) throw new Error("scrub() in create-lead/handler.ts is not redact(redact(text(v)))");
+  const redact = liftRedact();
+  return (s) => redact(redact(s.trim()));
+}
