@@ -4,6 +4,7 @@ import type { AgendaMeeting, LeadRecord, LeadSource, LeadStatus } from "@/servic
 import {
   useAdminUsers, useAgencyMeetings, useAssignLead, useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds,
 } from "@/hooks/useAdmin";
+import { useCurrentUserId } from "@/hooks/useCurrentUserId";
 import { useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { csvCell } from "@/lib/csv";
@@ -270,6 +271,7 @@ export default function Leads() {
   const assigns = can("leads.assign");
   const deletes = can("leads.delete");
   const tracks = can("leads.tracking");
+  const myId = useCurrentUserId();
   const creates = STAFF_LEADS && can("leads.create");
   const [sheetOpen, setSheetOpen] = useState(false);
   const tabs = useMemo(() => PAGE_TABS.filter((t) => t !== "tracking" || tracks), [tracks]);
@@ -310,8 +312,9 @@ export default function Leads() {
     [members.data, agencyId],
   );
   const assigneeLabel = (id: string | null | undefined) => (id ? assignees.find((a) => a.id === id)?.label ?? GONE_MEMBER : "—");
-  /* Who brought a lead. A User's screen knows no member addresses, so it says "חבר/ה בצוות". */
-  const broughtLabel = (id: string | null) => (!id ? GONE_MEMBER : assigns ? assigneeLabel(id) : "חבר/ה בצוות");
+  /* Who brought a lead: "אני" for the signed-in person; a User's screen knows no other member addresses, so "חבר/ה בצוות". */
+  const broughtLabel = (id: string | null) =>
+    !id ? GONE_MEMBER : id === myId ? "אני" : assigns ? assigneeLabel(id) : "חבר/ה בצוות";
   const showBrought = STAFF_LEADS && assigns;
 
   const filtered = leads.filter(

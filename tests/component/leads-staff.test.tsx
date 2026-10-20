@@ -37,6 +37,7 @@ vi.mock("@/config/staff-leads", async (original) => ({
     return h.on;
   },
 }));
+vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-me" } }) }));
 vi.mock("@/config/meetings", () => ({ MEETINGS_STAFF: true, MEETINGS_CLIENT: false }));
 vi.mock("@/services", () => ({ services: { leadsAdmin: h.leadsAdmin, usersAdmin: { list: h.usersList } } }));
 vi.mock("@/components/dorit/admin/LeadTrackingPanel", () => ({ default: () => <p>מעקב לידים</p> }));
@@ -93,6 +94,7 @@ beforeEach(() => {
       source: "staff", intake: "referral", referrerNote: "רו״ח משה", noticeMethod: "email", broughtBy: "u-two",
       created_date: "2026-10-12T08:00:00Z", phone: "+972501234567", possibleDuplicate: true,
     }),
+    lead("l-mine", "מירי מור", { source: "staff", intake: "event", noticeMethod: "whatsapp", broughtBy: "u-me", referrerNote: "=1+1" }),
     lead("l-3", "רונית בר", { source: "staff", intake: "phone", noticeMethod: "verbal", broughtBy: "u-gone", created_date: "2026-09-12T08:00:00Z" }),
   ];
   h.leadsAdmin.list.mockImplementation(async () => h.leads);
@@ -138,6 +140,41 @@ describe("with VITE_STAFF_LEADS, as a User", () => {
     expect(screen.queryByText("יעל כהן")).toBeNull();
     expect(screen.getByText("דן לוי")).toBeInTheDocument();
     expect(screen.getByText("רונית בר")).toBeInTheDocument();
+  });
+});
+
+async function csvText() {
+  let blob: Blob | undefined;
+  URL.createObjectURL = vi.fn((b: Blob) => ((blob = b), "blob:x")) as never;
+  URL.revokeObjectURL = vi.fn();
+  fireEvent.click(screen.getByRole("button", { name: "ייצוא הכל ל-CSV" }));
+  return new Promise<string>((res) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.readAsText(blob!);
+  });
+}
+
+describe("who brought a lead, as a User", () => {
+  beforeEach(() => {
+    role.role = "user";
+  });
+  it("reads 'אני' for their own in the drawer line and the CSV, and 'חבר/ה בצוות' for another's", async () => {
+    show();
+    await screen.findByRole("button", { name: "מירי מור" });
+    const text = await csvText();
+    const mine = text.split("\n").find((r) => r.includes("מירי מור"))!;
+    expect(mine).toContain(",אני,");
+    expect(text.split("\n").find((r) => r.includes("דן לוי"))!).toContain("חבר/ה בצוות");
+    fireEvent.click(screen.getByRole("button", { name: "מירי מור" }));
+    expect(await screen.findByText("נוספה ידנית ע״י אני · אירוע · יידוע: בוואטסאפ")).toBeInTheDocument();
+  });
+  it("escapes a referrer note that starts like a formula", async () => {
+    show();
+    await screen.findByRole("button", { name: "מירי מור" });
+    const mine = (await csvText()).split("\n").find((r) => r.includes("מירי מור"))!;
+    expect(mine).toContain("'=1+1");
+    expect(mine).not.toMatch(/,=1\+1/);
   });
 });
 
