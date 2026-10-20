@@ -75,6 +75,20 @@ describe("the permissions table matches the gates that decide", () => {
     expect(narrowing).toMatch(/create policy agency_profiles_update_owner[\s\S]*?using \(public\.has_role\(agency_id, 'owner'\) or public\.is_admin\(\)\)/);
   });
 
+  it("opening, returning and activating an agency are the operator's; a draft's profile is still the Owner's", () => {
+    expect(PERMISSIONS["agencies.manage"]).toBe("operator");
+    expect(PERMISSIONS["agencyProfile.edit"]).toBe("owner");
+    const onboarding = read("supabase/migrations/20261106000000_agency_onboarding.sql");
+    for (const name of ["create_agency", "return_agency", "activate_agency"]) {
+      expect(onboarding, name).toMatch(
+        new RegExp(`function public\\.${name}\\([\\s\\S]*?if not public\\.is_admin\\(\\) then\\s+raise exception 'forbidden'`),
+      );
+    }
+    expect(onboarding).toMatch(
+      /create policy agency_profiles_update_onboarding_owner[\s\S]*?using \(public\.onboarding_role\(agency_id\) = 'owner'\)/,
+    );
+  });
+
   it("the GA4 lead-tracking tab is the Owner's, and display only", () => {
     expect(PERMISSIONS["leads.tracking"]).toBe("owner");
     expect(can("admin", false, "leads.tracking")).toBe(false);

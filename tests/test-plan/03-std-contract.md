@@ -852,6 +852,7 @@ It also checks that a User cannot file a snapshot under another agency by naming
 | CTR-PERM-006 | "inviting is Admin+, an Admin grants User only, and only an Owner grants Admin or Owner" | invite-user's gate and pre-check; `set_member_role`'s admin branch; `grantableRoles` |
 | CTR-PERM-007 | "the agency profile is the Owner's" | `agency_profiles_update_owner` |
 | CTR-PERM-008 | "the membership history is Admin+" | `membership_events_read_admin` |
+| CTR-PERM-012 | "opening, returning and activating an agency are the operator's; a draft's profile is still the Owner's" | `agencies.manage: operator`; `create_agency`, `return_agency`, `activate_agency` refuse without `is_admin()`; `agency_profiles_update_onboarding_owner` |
 | CTR-PERM-009..011 | `can`, `grantableRoles`, `canManage` | Ranks; no role → nothing; the operator everything but leaving an agency they are not in; nobody changes someone above what they may grant |
 
 ### 4.21 An interview's conversation reference — `lead-conversation-ref.contract.test.ts`
@@ -923,6 +924,27 @@ from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
 | CTR-E2E-002 | "switches on what production switches on" | `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`, `VITE_UPLOAD_PROVIDER`, `VITE_CONTENT_IMAGES` = `supabase`; `VITE_MEETINGS_STAFF=true`; `VITE_MASLEKA_ENABLED` and `VITE_MEETINGS_CLIENT` empty (E2E-MSK-* assert the dark build); `VITE_BASE44_APP_BASE_URL` empty; `VITE_CHAT_AGENTS` is exactly `CHAT_FUNCTION_AGENTS` |
 | CTR-E2E-003 | "is built from that one file by every entry point" | `scripts/build-e2e.mjs` applies it over the process environment; `playwright.config.ts` builds with `npm run build:e2e` and gives the preview the same env; `scripts/run-tests.sh` runs `npm run build:e2e` and exports no `VITE_*` and no fixture of its own (CI's job: CTR-REB-004) |
 | CTR-E2E-004 | "answers the fake host only, so a deployment's reads stay live" | The fixture's Supabase route matches the fake origin, or a `/functions/v1/` path on any host; the prerender's matches the fake origin alone |
+
+### 4.27 The new-agency wizard's schema — `agency-onboarding.contract.test.ts`
+
+`supabase/migrations/20261106000000_agency_onboarding.sql` (the wizard spec's Rollout step 1), read as source, and held to `src/config/onboarding.ts`. `supabase/tests/onboarding_check.sql` proves the behaviour against a database. CTR-PERM-012 in `permissions.contract.test.ts` adds: opening, returning and activating are `is_admin()` (`agencies.manage: operator`), and a draft's profile is the Owner's.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ONB-001 | "sorts after every migration already applied" | After `20261105000000_staff_leads.sql` |
+| CTR-ONB-002 | "adds draft and pending_review, and keeps 'active' the default" | The four statuses; the default untouched |
+| CTR-ONB-003 | "leaves agency_role() alone" | Not redefined here; its latest body still `a.status = 'active'` |
+| CTR-ONB-004 | "opens onboarding to draft, pending_review and active members — never suspended" | `onboarding_role`'s status list |
+| CTR-ONB-005..006 | search_path, revokes, definer | Every function `set search_path = ''` and revoked from public, anon, authenticated by name; definer except the four caller-seeing guards and `next_consent_version` |
+| CTR-ONB-007 | "grants the four RPCs to authenticated only" | Only `agency_is_active` reaches anon; `onboarding_missing` granted to nobody |
+| CTR-ONB-008 | "checks the caller in every RPC" | `not_signed_in`; `is_admin()`; submit's owner test is `is not distinct from 'owner'` (a bare `=` lets a non-member through) |
+| CTR-ONB-009 | "moves status one step at a time" | draft → pending_review → draft / active; the direct-write guard |
+| CTR-ONB-010 | "opens a draft without a membership" | `create_agency` touches no memberships, `invitee_for` or `auth.users` |
+| CTR-ONB-011..013 | Required fields | `onboarding_missing`'s keys = `submitRequiredKeys()`; affiliations only when declared; submit and activate both refuse `incomplete` with the keys in the detail |
+| CTR-ONB-014 | "gates activation on exactly the config's three gates" | `ACTIVATION_GATES` = the keys in `gates_closed` |
+| CTR-ONB-015 | "refuses everyone but the operator the operator's columns" | Every `OPERATOR_ONLY_COLUMNS` column in its guard |
+| CTR-ONB-016..020 | Owner, testimonials, the public card, success cases, licence changes | Owner-only write policies, none to anon; consent constraint and composite key; today's testimonial policies kept; the view is definer with `a.status = 'active'` and no verification columns; a licence change voids the check and bumps a live agency's consent version |
+| CTR-ONB-021..022 | The `agent-photos` bucket | Public, WebP, 10 MB; four policies to authenticated through `can_write_agent_photo`, which matches the path before casting |
 
 ## 5. Runtime counterpart
 

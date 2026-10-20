@@ -1842,3 +1842,17 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4. The tab'
 | UNIT-GLOSS-010 | "marks each entry once per text" | One underline |
 | UNIT-GLOSS-011 | "shares the once-only rule across a scope, and returns the same split on a re-render" | An article underlines a term once |
 | UNIT-GLOSS-012 | "matches English and French case-insensitively" | `management-fees`, `study-fund` |
+
+### 4.78 The new-agency wizard as data — `tests/unit/onboarding-config.test.ts`
+
+`src/config/onboarding.ts`: the steps, fields and required flags the checklist and `submit_agency_for_review` share (the RPC side is CTR-ONB-011).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ONB-001 | "runs 0 to 7, operator's step first, review last" | Steps numbered 0–7 |
+| UNIT-ONB-002 | "names every column once, under a table the wizard writes" | Unique `table.column[.path]` keys |
+| UNIT-ONB-003 | "keeps the photo, testimonials, booking and the personal line optional" | Not in `submitRequiredKeys()` |
+| UNIT-ONB-004 | "lists the typed-once phone's three columns, and the conditional bodies" | e164, display, WhatsApp, affiliations; not step 0's fields |
+| UNIT-ONB-005..006 | `stepOfKey`, `missingByStep` | A reported key maps to its step; a detail string grouped in step order; an unknown key kept under review |
+| UNIT-ONB-007 | `isLicenceNumber` | "L-" and digits, loosely |
+| UNIT-ONB-008 | `ACTIVATION_GATES` | The spec's three gates |
