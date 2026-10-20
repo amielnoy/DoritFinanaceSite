@@ -14,7 +14,7 @@ alter table public.leads
                              ('phone','in_person','referral','event','existing_client','other')),
   add column referrer_note text check (char_length(referrer_note) <= 120), -- "רו״ח משה", not a contact record
   add column notice_method text check (notice_method in ('verbal','email','whatsapp')),
-  add column duplicate_of  uuid references public.leads(id) on delete set null;
+  add column possible_duplicate boolean not null default false; -- set by create_staff_lead; says nothing about whose lead it matched
 
 -- A staff lead always says how it arrived and how they were told. brought_by is
 -- not required here: it goes null when the member's account is deleted, and
@@ -32,7 +32,7 @@ create index leads_agency_brought_by on public.leads (agency_id, brought_by)
 -- ── guard: the staff fields are fixed once written ────────────────────────
 -- Runs as its caller, like leads_guard_assignment: a person (authenticated or
 -- anon) is held to the rules, the server and the platform operator are not.
--- Admin+ is held too; only the operator may correct these. duplicate_of may
+-- Admin+ is held too; only the operator may correct these. possible_duplicate may
 -- be cleared by an Admin of the lead's agency ("לא כפילות"), never set.
 create function public.leads_guard_staff_fields() returns trigger
   language plpgsql
@@ -51,10 +51,11 @@ begin
       raise exception 'staff_fields_fixed' using errcode = '42501';
     end if;
 
-    if new.duplicate_of is distinct from old.duplicate_of then
-      if new.duplicate_of is not null or not public.has_role(old.agency_id, 'admin') then
+    if new.possible_duplicate is distinct from old.possible_duplicate then
+      if new.possible_duplicate or not public.has_role(old.agency_id, 'admin') then
         raise exception 'forbidden' using errcode = '42501';
       end if;
+    end if;
     end if;
   end if;
   return new;
@@ -174,6 +175,9 @@ begin
   if p_notice is null or p_notice not in ('verbal','email','whatsapp') then
     raise exception 'bad_notice' using errcode = '22023';
   end if;
+  if p_notice = 'email' and nullif(btrim(p_email), '') is null then
+    raise exception 'bad_notice' using errcode = '22023'; -- told by email, but no address
+  end if;
   if coalesce(btrim(p_name), '') = '' or coalesce(btrim(p_phone), '') = '' then
     raise exception 'field_required' using errcode = '22023';
   end if;
@@ -193,14 +197,15 @@ begin
     v_assignee := v_caller;
   end if;
 
-  -- 4 the same person again: the last nine digits, whatever the formatting
-  v_digits := right(regexp_replace(p_phone, '\D', '', 'g'), 9);
+  -- 4 the same person again, whatever the formatting
+  -- the national number: digits only, without a leading 972 or 0
+  v_digits := regexp_replace(regexp_replace(p_phone, '\D', '', 'g'), '^(972|0)', '');
   if v_digits <> '' then
     select l.id into v_dup
       from public.leads l
      where l.agency_id = p_agency_id
        and l.anonymized_at is null
-       and right(regexp_replace(l.phone, '\D', '', 'g'), 9) = v_digits
+       and regexp_replace(regexp_replace(l.phone, '\D', '', 'g'), '^(972|0)', '') = v_digits
      order by l.created_at desc
      limit 1;
   end if;
@@ -216,7 +221,7 @@ begin
   insert into public.leads (
     agency_id, name, phone, email, topic, notes, status, source, channel,
     brought_by, intake, referrer_note, notice_method, consent_version, consent_at,
-    assigned_user_id, assigned_at, assigned_by, duplicate_of
+    assigned_user_id, assigned_at, assigned_by, possible_duplicate
   ) values (
     p_agency_id, btrim(p_name), btrim(p_phone), nullif(btrim(p_email), ''), nullif(btrim(p_topic), ''),
     nullif(btrim(p_notes), ''), p_status, 'staff',
@@ -225,7 +230,7 @@ begin
     v_assignee,
     case when v_assignee is not null then now() end,
     case when v_assignee is not null then v_caller end,
-    v_dup
+    v_dup is not null
   ) returning id into v_id;
 
   return query select v_id, case when v_dup is not null then 'hidden' end::text;

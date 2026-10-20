@@ -44,7 +44,8 @@ describe("staff leads, schema", () => {
     );
     expect(flat).toContain("referrer_note text check (char_length(referrer_note) <= 120)");
     expect(flat).toMatch(/notice_method text check \(notice_method in \('verbal','email','whatsapp'\)\)/);
-    expect(flat).toContain("duplicate_of uuid references public.leads(id) on delete set null");
+    expect(flat).toContain("possible_duplicate boolean not null default false");
+    expect(flat).not.toContain("duplicate_of");
   });
 
   it("requires the intake and notice fields on a staff lead, but not brought_by", () => {
@@ -74,7 +75,7 @@ describe("staff leads, schema", () => {
     expect(guard).toContain("current_user in ('authenticated', 'anon')");
     expect(guard).toContain("staff_fields_fixed");
     for (const col of [
-      "brought_by", "source", "intake", "consent_version", "consent_at", "notice_method", "duplicate_of",
+      "brought_by", "source", "intake", "consent_version", "consent_at", "notice_method", "possible_duplicate",
     ]) {
       expect(guard).toContain(col);
     }
@@ -151,18 +152,24 @@ describe("staff leads, schema", () => {
       for (const e of ["forbidden", "bad_intake", "bad_notice", "field_too_long"]) expect(b()).toContain(e);
     });
 
-    it("matches a duplicate on the last nine digits, in this agency, never an anonymised lead", () => {
-      expect(b()).toContain("right(regexp_replace(");
-      expect(b()).toContain("'\\D', '', 'g'), 9)");
+    it("matches a duplicate on the national number, in this agency, never an anonymised lead", () => {
+      const nat = "regexp_replace(regexp_replace(%, '\\D', '', 'g'), '^(972|0)', '')";
+      expect(b()).toContain(nat.replace("%", "p_phone"));
+      expect(b()).toContain(nat.replace("%", "l.phone"));
       expect(b()).toContain("anonymized_at is null");
       expect(b()).toContain("order by");
       expect(b()).toContain("limit 1");
     });
 
     it("answers a hidden duplicate with the new id only", () => {
-      expect(b()).toContain("duplicate_of");
+      expect(b()).toContain("possible_duplicate");
+      expect(b()).not.toContain("duplicate_of");
       expect(b()).toMatch(/return query select v_id, case when v_dup is not null then 'hidden' end::text/);
       expect(b()).toMatch(/return query select v_dup, 'visible'/);
+    });
+
+    it("refuses notice by email when no address was given", () => {
+      expect(b()).toContain("p_notice = 'email' and nullif(btrim(p_email), '') is null");
     });
 
     it("maps the intake to a channel", () => {

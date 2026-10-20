@@ -26,11 +26,11 @@
 
 ## Review Focus
 
-- **The same phone in two shapes** (`050-123 4567` vs `+972501234567`) must be one duplicate. Match on the last 9 digits of `regexp_replace(phone, '\D', '', 'g')` — test in Task 2.
+- **The same phone in two shapes** (`050-123 4567` vs `+972501234567`) must be one duplicate, landlines too (`03-1234567` vs `+972-3-1234567`). Match on the national number: `regexp_replace(regexp_replace(phone, '\D', '', 'g'), '^(972|0)', '')` — test in Task 2.
 - **A User probing for other Users' clients**: a hidden duplicate's answer must carry no id, name or assignee of the other lead — test in Tasks 2 and 4.
 - **An Admin assigning to someone outside the agency, or a User passing `p_assignee`**: refused / ignored — test in Task 2.
 - **Privacy mail fails or no email was given with method `email`**: the lead still exists, the answer says `noticeSent: false`, and the form tells the member — tests in Tasks 4 and 6. Method `email` without an email is refused by the function (400) and disabled in the form.
-- **A direct `update` from the browser** to `brought_by`, `source`, `intake`, consent fields, `notice_method`, or setting `duplicate_of` to a non-null id — refused by the trigger, Admin+ included — test in Task 1.
+- **A direct `update` from the browser** to `brought_by`, `source`, `intake`, consent fields, `notice_method`, or setting `possible_duplicate` to true — refused by the trigger, Admin+ included — test in Task 1. (Rulings 2026-10-20: `duplicate_of uuid` became `possible_duplicate boolean`; the duplicate key is the national number, not the last 9 digits.)
 
 ---
 
@@ -128,17 +128,17 @@
 ### Task 5: Port, adapter, permission, labels
 
 **Files:**
-- Modify: `src/services/ports.ts` (`LeadSource` + `'staff'`; `LeadRecord` + `broughtBy?: string | null; intake?: Intake | null; referrerNote?: string | null; noticeMethod?: NoticeMethod | null; duplicateOf?: string | null`; `LeadAdminPort` + two methods)
-- Modify: `src/services/supabase/SupabaseLeadAdminService.ts` (`LEAD_COLUMNS` + `brought_by,intake,referrer_note,notice_method,duplicate_of`; the two methods)
+- Modify: `src/services/ports.ts` (`LeadSource` + `'staff'`; `LeadRecord` + `broughtBy?: string | null; intake?: Intake | null; referrerNote?: string | null; noticeMethod?: NoticeMethod | null; possibleDuplicate?: boolean`; `LeadAdminPort` + two methods)
+- Modify: `src/services/supabase/SupabaseLeadAdminService.ts` (the list reads `brought_by,intake,referrer_note,notice_method,possible_duplicate` **only when `STAFF_LEADS` is on** — ruling: a merge before the production migration must not break the list; the two methods)
 - Modify: `src/services/base44/Base44LeadAdminService.ts` (both throw a `STAFF_LEADS_SUPABASE_ONLY` error, as the meetings methods do)
 - Modify: `src/config/permissions.ts` (`"leads.create": "user"`), `tests/contract/permissions.contract.test.ts`
 - Modify: `src/pages/Leads.tsx` (`SOURCE_LABEL.staff`), `src/pages/Account.tsx` (`SOURCE_LABELS.staff`)
 - Test: `tests/unit/supabase-lead-admin.test.ts` (or the existing adapter test file; find it with `grep -rl SupabaseLeadAdminService tests/unit`)
 
 **Interfaces:**
-- Produces: `interface NewStaffLead { agencyId: string; name: string; phone: string; email?: string; topic?: string; notes?: string; intake: Intake; referrer?: string; status: "new" | "contacted" | "client"; notice: NoticeMethod; assignee?: string | null; duplicateOk?: boolean }`; `createLead(input: NewStaffLead): Promise<{ leadId: string; duplicate: "visible" | "hidden" | null; noticeSent: boolean | null }>` (a 409 from the function resolves to `{ leadId, duplicate: "visible", noticeSent: null }`, not a throw); `clearDuplicate(leadId: string): Promise<void>` (update `duplicate_of = null`, applied-or-throw like `setStatus`).
+- Produces: `interface NewStaffLead { agencyId: string; name: string; phone: string; email?: string; topic?: string; notes?: string; intake: Intake; referrer?: string; status: "new" | "contacted" | "client"; notice: NoticeMethod; assignee?: string | null; duplicateOk?: boolean }`; `createLead(input: NewStaffLead): Promise<{ leadId: string; duplicate: "visible" | "hidden" | null; noticeSent: boolean | null }>` (a 409 from the function resolves to `{ leadId, duplicate: "visible", noticeSent: null }`, not a throw); `clearDuplicate(leadId: string): Promise<void>` (update `possible_duplicate = false`, applied-or-throw like `setStatus`).
 
-- [ ] **Step 1: Failing tests**: `createLead` invokes `create-lead` with the body above and the bearer token; maps a 409 to `duplicate: "visible"`; rethrows other errors; `clearDuplicate` updates `duplicate_of` to null and throws when no row came back; `list()` maps `brought_by` → `broughtBy` etc.; permissions contract: `leads.create` is `"user"`.
+- [ ] **Step 1: Failing tests**: `createLead` invokes `create-lead` with the body above and the bearer token; maps a 409 to `duplicate: "visible"`; rethrows other errors; `clearDuplicate` updates `possible_duplicate` to false and throws when no row came back; `list()` maps `brought_by` → `broughtBy`, `possible_duplicate` → `possibleDuplicate` etc. when the flag is on, and selects exactly today's columns when it is off; permissions contract: `leads.create` is `"user"`.
 - [ ] **Step 2: Run** — FAIL. **Step 3: Implement.** (If `call()` in the adapter cannot surface a 409's body, read it from `error.context` as `functions-js` exposes it; test both shapes.) **Step 4: Run** typecheck + the tests — PASS. **Step 5: Commit** `"Staff leads: port, adapter, permission, labels"`
 
 ### Task 6: The "פנייה חדשה" side sheet
@@ -179,7 +179,7 @@
 - [ ] **Step 2: Failing screen tests**, with `STAFF_LEADS` mocked on and off:
   - Off: no "פנייה חדשה" button, no column, no chips, no strip (the page renders exactly as today).
   - On, as a User: the button; a staff lead's source cell shows "דרך הצוות" with its intake label as a tag; the chip "דרך הצוות" filters to `source === "staff"`; no "הובאה ע״י" column, no "כפילות אפשרית" chip, no strip.
-  - On, as an Admin: the column, the "כפילות אפשרית" chip (filters to `duplicateOf != null`) with "לא כפילות" calling `clearDuplicate`, the "הובאו החודש" strip.
+  - On, as an Admin: the column, the "כפילות אפשרית" chip (filters to `possibleDuplicate`) with "לא כפילות" calling `clearDuplicate`, and on such a lead a pointer to the agency's other leads with the same national phone number (digits, leading `972`/`0` stripped) — the database stores no link to the other lead, the "הובאו החודש" strip.
   - CSV export includes `brought_by` (member label), `intake`, `referrer_note` columns.
   - The drawer shows `staffLeadLine` under its header for a staff lead.
 - [ ] **Step 3: Run** — FAIL. **Step 4: Implement**; after a create: toast, refetch the list, open the new lead's drawer. **Step 5: Run** — PASS.

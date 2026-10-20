@@ -22,10 +22,10 @@ insert into public.leads (id, agency_id, name, phone, source, status) values
 -- Assigned to the User, so the User's update reaches the trigger (RLS lets a
 -- User update only leads assigned to them).
 insert into public.leads (id, agency_id, name, phone, source, status, brought_by, assigned_user_id, intake, notice_method,
-                          consent_version, consent_at, duplicate_of) values
+                          consent_version, consent_at, possible_duplicate) values
   ('11111111-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'כפילות', '0501111111', 'staff', 'new',
    'ffffffff-0000-0000-0000-000000000002', 'ffffffff-0000-0000-0000-000000000002', 'phone', 'verbal', 'staff-intake-v1', now(),
-   '11111111-0000-0000-0000-000000000011');
+   true);
 
 -- ── a staff lead must say who brought it and how they were told ───────────
 do $$ begin
@@ -82,33 +82,31 @@ do $$ begin
   end if;
 end $$;
 
--- ── duplicate_of: an Admin may point it nowhere, never somewhere else ─────
+-- ── possible_duplicate: an Admin may clear it, never set it ──────────────
 do $$ begin
   begin
-    update public.leads set duplicate_of = '11111111-0000-0000-0000-000000000012'
-     where id = '11111111-0000-0000-0000-000000000011';
-    raise exception 'an Admin set duplicate_of to another lead';
+    update public.leads set possible_duplicate = true where id = '11111111-0000-0000-0000-000000000011';
+    raise exception 'an Admin set possible_duplicate';
   exception when insufficient_privilege then
     if sqlerrm <> 'forbidden' then raise; end if;
   end;
-  update public.leads set duplicate_of = null where id = '11111111-0000-0000-0000-000000000012';
-  if (select duplicate_of from public.leads where id = '11111111-0000-0000-0000-000000000012') is not null then
-    raise exception 'an Admin could not clear duplicate_of';
+  update public.leads set possible_duplicate = false where id = '11111111-0000-0000-0000-000000000012';
+  if (select possible_duplicate from public.leads where id = '11111111-0000-0000-0000-000000000012') then
+    raise exception 'an Admin could not clear possible_duplicate';
   end if;
 end $$;
 reset role;
 
 -- Put the flag back, as the server, for the User block.
-update public.leads set duplicate_of = '11111111-0000-0000-0000-000000000011'
- where id = '11111111-0000-0000-0000-000000000012';
+update public.leads set possible_duplicate = true where id = '11111111-0000-0000-0000-000000000012';
 
--- ── a User cannot clear duplicate_of ──────────────────────────────────────
+-- ── a User cannot clear it ────────────────────────────────────────────────
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"ffffffff-0000-0000-0000-000000000002","role":"authenticated"}';
 do $$ begin
   begin
-    update public.leads set duplicate_of = null where id = '11111111-0000-0000-0000-000000000012';
-    raise exception 'a User cleared duplicate_of';
+    update public.leads set possible_duplicate = false where id = '11111111-0000-0000-0000-000000000012';
+    raise exception 'a User cleared possible_duplicate';
   exception when insufficient_privilege then
     if sqlerrm <> 'forbidden' then raise; end if;
   end;
@@ -174,7 +172,7 @@ begin
   if l.notes <> 'הערה פנימית' or l.summary is not null or l.message is not null then
     raise exception 'staff text went somewhere the client can read, or notes is empty';
   end if;
-  if l.duplicate_of is not null then raise exception 'a fresh lead was flagged'; end if;
+  if l.possible_duplicate then raise exception 'a fresh lead was flagged'; end if;
 end $$;
 
 -- A channel for a phone intake is 'direct'.
@@ -269,15 +267,20 @@ begin
   if r.lead_id = '11111111-0000-0000-0000-000000000022' then
     raise exception 'a hidden duplicate returned the other lead''s id';
   end if;
-  if (select duplicate_of from public.leads where id = r.lead_id) is distinct from '11111111-0000-0000-0000-000000000022' then
-    raise exception 'the new lead is not flagged against the old one';
+  -- The User sees their own row; no column of it leads to the other lead.
+  if (select possible_duplicate from public.leads where id = r.lead_id) is distinct from true then
+    raise exception 'the User cannot see the new lead, or it is not flagged';
   end if;
-  -- The User gets nothing but their own row back; the other lead stays unreadable.
   if exists (select 1 from public.leads where id = '11111111-0000-0000-0000-000000000022') then
     raise exception 'the User can read a lead that is not theirs';
   end if;
 end $$;
 reset role;
+do $$ begin
+  if (select count(*) from public.leads where name = 'כפולה' and possible_duplicate) <> 1 then
+    raise exception 'the hidden match did not set possible_duplicate';
+  end if;
+end $$;
 
 -- ── an Admin: assigns to a member, sees the visible duplicate ─────────────
 set local role authenticated;
@@ -317,7 +320,7 @@ begin
     '00000000-0000-0000-0000-000000000001', 'קיים', '+972501234567', null, null, null,
     'phone', null, 'new', 'verbal', null, true);
   if (select count(*) from public.leads) <> n + 1 then raise exception 'p_duplicate_ok did not insert'; end if;
-  if (select duplicate_of from public.leads where id = r.lead_id) is not null then
+  if (select possible_duplicate from public.leads where id = r.lead_id) then
     raise exception 'a chosen second lead was flagged';
   end if;
 
@@ -369,6 +372,39 @@ do $$ begin
     raise exception 'an Admin of agency 2 created a lead in agency 1';
   exception when insufficient_privilege then
     if sqlerrm <> 'forbidden' then raise; end if;
+  end;
+end $$;
+reset role;
+
+-- ── a landline in two shapes is one number ────────────────────────────────
+insert into public.leads (id, agency_id, name, phone, source, status) values
+  ('11111111-0000-0000-0000-000000000023', '00000000-0000-0000-0000-000000000001', 'קווי', '03-1234567', 'consultation', 'new');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"ffffffff-0000-0000-0000-000000000001","role":"authenticated"}';
+do $$
+declare r record;
+begin
+  select * into r from public.create_staff_lead(
+    '00000000-0000-0000-0000-000000000001', 'קווי', '+972-3-1234567', null, null, null,
+    'phone', null, 'new', 'verbal', null, false);
+  if r.duplicate is distinct from 'visible' or r.lead_id <> '11111111-0000-0000-0000-000000000023' then
+    raise exception 'a landline in two shapes was not one number: % / %', r.duplicate, r.lead_id;
+  end if;
+
+  -- Told by email, but no address: refused.
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0540002222', null, null, null,
+      'phone', null, 'new', 'email', null, false);
+    raise exception 'notice by email without an email was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'bad_notice' then raise; end if;
+  end;
+  begin
+    perform public.create_staff_lead('00000000-0000-0000-0000-000000000001', 'x', '0540002222', '   ', null, null,
+      'phone', null, 'new', 'email', null, false);
+    raise exception 'notice by email with a blank email was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'bad_notice' then raise; end if;
   end;
 end $$;
 reset role;
