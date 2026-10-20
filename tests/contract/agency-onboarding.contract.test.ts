@@ -213,12 +213,17 @@ describe("agency onboarding, what the owner and the public may touch", () => {
     expect(flat).not.toMatch(/drop policy testimonials_read_member_or_fixed_agency/);
     expect(flat).not.toMatch(/drop policy testimonials_write_admin/);
     expect(fns.get("testimonials_stamp_consent")).toMatch(/new\.consent_confirmed_by := auth\.uid\(\)/);
+    // Any agency but agency 1, with or without a licensee (an Admin's direct write).
+    expect(flat).toContain(
+      "add constraint testimonials_agency_consent check (agency_id = '00000000-0000-0000-0000-000000000001' or consent_confirmed_at is not null) not valid;",
+    );
   });
 
   it("shows visitors a licensee only through the view, only for live agencies, never the verification columns", () => {
     const view = /create view public\.public_agent_cards with \(security_invoker = false\) as([\s\S]*?);/.exec(sql)?.[1] ?? "";
     expect(view).not.toBe("");
-    expect(view).toMatch(/where a\.status = 'active'\s*$/);
+    // A live agency, and a licensee the operator has checked (a name change clears it).
+    expect(view).toMatch(/where a\.status = 'active'\s+and g\.verified_licence_number is not null\s*$/);
     expect(view).toMatch(/g\.verified_licence_number as licence_number/);
     for (const col of ["user_id", "licence_verified_at", "licence_verified_by", "g.licence_number"]) {
       expect(view, col).not.toContain(col);
@@ -238,16 +243,36 @@ describe("agency onboarding, what the owner and the public may touch", () => {
     );
   });
 
-  it("voids a licence check when the number changes, and moves the consent version of a live agency", () => {
-    expect(fns.get("agents_guard")).toMatch(
-      /if new\.licence_number is distinct from old\.licence_number then\s+new\.licence_verified_at := null;\s+new\.licence_verified_by := null;/,
+  it("voids a licence check when the name, number, types or regulator change; a new name hides the card", () => {
+    const guard = fns.get("agents_guard")!;
+    expect(guard).toMatch(
+      /if new\.full_name is distinct from old\.full_name then\s+new\.licence_verified_at := null;\s+new\.licence_verified_by := null;\s+new\.verified_licence_number := null;/,
     );
+    expect(guard).toMatch(
+      /elsif \(new\.licence_number, new\.licence_types, new\.licence_regulator\)\s+is distinct from \(old\.licence_number, old\.licence_types, old\.licence_regulator\) then\s+new\.licence_verified_at := null;\s+new\.licence_verified_by := null;/,
+    );
+  });
+
+  it("moves the consent version of a live agency, and lapses the approval, when a licensee is added, removed or edited", () => {
     const after = fns.get("agents_after_change")!;
-    expect(after).toMatch(/public\.agency_is_active\(new\.agency_id\)/);
+    expect(after).toMatch(/v_consent and public\.agency_is_active\(v_agency\)/);
     expect(after).toMatch(/\(new\.licence_number, new\.full_name, new\.grammatical_gender\)/);
+    expect(after).toMatch(/elsif tg_op = 'INSERT' then\s+v_agency := new\.agency_id;\s+v_disclosure := true;\s+v_consent := true;/);
+    expect(after).toMatch(/else\s+v_agency := old\.agency_id;\s+v_disclosure := true;\s+v_consent := true;/);
     expect(after).toMatch(/consent_version = public\.next_consent_version\(consent_version\)/);
     expect(after).toMatch(/set disclosures_approved_at = null, disclosures_approved_by = null/);
-    expect(flat).toMatch(/after update on public\.agents/);
+    expect(flat).toMatch(/after insert or update or delete on public\.agents/);
+  });
+
+  it("keeps the portrait path inside the agent's own folder, and what the owner types bounded", () => {
+    expect(flat).toContain(
+      "photo_path is null or photo_path ~ ('^' || agency_id::text || '/' || id::text || '/[A-Za-z0-9_-]{1,100}\\.webp$')",
+    );
+    expect(flat).toContain("octet_length(onboarding::text) < 65536");
+    expect(flat).toContain("cardinality(notify_emails) <= 5");
+    expect(flat).toContain("octet_length(bio::text) <= 16384");
+    expect(flat).toContain("check (char_length(service_area) <= 200)");
+    expect(flat).toContain("check (char_length(photo_alt) <= 200)");
   });
 });
 

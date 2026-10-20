@@ -49,6 +49,12 @@ do $$ begin
   insert into public.testimonials (name, quote, agency_id, source)
   values ('ותיקה', 'תודה', '00000000-0000-0000-0000-000000000001', 'direct');
   begin
+    insert into public.testimonials (name, quote, agency_id)
+    values ('x', 'y', 'dddddddd-0000-0000-0000-00000000000e');
+    raise exception 'another agency''s testimonial without consent was accepted';
+  exception when check_violation then null;
+  end;
+  begin
     insert into public.testimonials (name, quote, agency_id, source)
     values ('x', 'y', '00000000-0000-0000-0000-000000000001', 'facebook');
     raise exception 'an unknown testimonial source was accepted';
@@ -139,6 +145,16 @@ begin
   if exists (select 1 from public.memberships where agency_id = v_id) then
     raise exception 'create_agency made a membership — that is invite-user''s';
   end if;
+
+  -- The operator's own insert of a profile: the approval is stamped now, by them.
+  insert into public.agencies (id, name) values ('dddddddd-0000-0000-0000-00000000000f', 'הוספה ישירה');
+  insert into public.agency_profiles (agency_id, display_name, disclosures_approved_at, disclosures_approved_by)
+  values ('dddddddd-0000-0000-0000-00000000000f', 'הוספה ישירה', '2001-01-01', 'eeeeeeee-0000-0000-0000-0000000000a1');
+  if (select disclosures_approved_at from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000f') < now() - interval '1 minute'
+     or (select disclosures_approved_by from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000f')
+        <> 'eeeeeeee-0000-0000-0000-0000000000a0' then
+    raise exception 'the operator''s inserted approval kept the client''s date or name';
+  end if;
 end $$;
 reset role;
 
@@ -192,6 +208,42 @@ begin
     raise exception 'the owner rewrote the operator''s review notes, or lost their own step';
   end if;
 
+  -- The notification list: up to five real-looking addresses.
+  update public.agency_profiles set notify_emails = array['a@example.com', 'b@example.com']
+   where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+  begin
+    update public.agency_profiles set notify_emails = array['not an address']
+     where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+    raise exception 'a notification address that is not one was accepted';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.agency_profiles set notify_emails = array['a@example.com', '']
+     where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+    raise exception 'an empty notification address was accepted';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.agency_profiles
+       set notify_emails = array['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com', 'f@x.com']
+     where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+    raise exception 'a sixth notification address was accepted';
+  exception when check_violation then null;
+  end;
+  update public.agency_profiles set notify_emails = null where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+  -- The wizard's state stays small.
+  begin
+    update public.agency_profiles set onboarding = jsonb_build_object('blob', repeat('x', 70000))
+     where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+    raise exception 'a 70 KB onboarding state was accepted';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.agency_profiles set service_area = repeat('א', 201) where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+    raise exception 'a 201-character service area was accepted';
+  exception when check_violation then null;
+  end;
+
   -- Not another agency's.
   update public.agency_profiles set email = 'x@example.com' where agency_id = 'dddddddd-0000-0000-0000-00000000000e';
   get diagnostics n = row_count;
@@ -231,6 +283,8 @@ begin
 
   -- Not the status: there is no write policy on agencies for them.
   update public.agencies set status = 'active' where id = 'dddddddd-0000-0000-0000-00000000000d';
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'the owner changed their agency''s status'; end if;
   update public.agencies set name = 'x' where id = 'dddddddd-0000-0000-0000-00000000000d';
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'the owner wrote the agency row'; end if;
@@ -294,6 +348,31 @@ begin
   exception when check_violation then null;
   end;
   update public.agents set review_links = '{"google": "https://g.example.com/r"}' where id = '99999999-0000-0000-0000-00000000000d';
+  -- The portrait path: this agent's own folder, a WebP — never a URL.
+  update public.agents
+     set photo_path = 'dddddddd-0000-0000-0000-00000000000d/99999999-0000-0000-0000-00000000000d/portrait-480.webp'
+   where id = '99999999-0000-0000-0000-00000000000d';
+  declare
+    bad text;
+  begin
+    foreach bad in array array[
+      'https://evil.example.com/pixel.gif',
+      'dddddddd-0000-0000-0000-00000000000e/99999999-0000-0000-0000-00000000000e/portrait-480.webp',
+      'dddddddd-0000-0000-0000-00000000000d/99999999-0000-0000-0000-00000000000d/../x.webp',
+      'dddddddd-0000-0000-0000-00000000000d/99999999-0000-0000-0000-00000000000d/portrait.jpg'
+    ] loop
+      begin
+        update public.agents set photo_path = bad where id = '99999999-0000-0000-0000-00000000000d';
+        raise exception 'a photo path was accepted: %', bad;
+      exception when check_violation then null;
+      end;
+    end loop;
+  end;
+  begin
+    update public.agents set bio = jsonb_build_object('career', repeat('א', 9000)) where id = '99999999-0000-0000-0000-00000000000d';
+    raise exception 'an 18 KB bio was accepted';
+  exception when check_violation then null;
+  end;
 
   -- Testimonials: theirs, with consent, stamped by the database.
   insert into public.testimonials (name, quote, agency_id, agent_id, source, consent_confirmed_at, consent_confirmed_by)
@@ -612,7 +691,10 @@ reset role;
 -- ═══ after activation ════════════════════════════════════════════════════
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a1","role":"authenticated"}';
-do $$ begin
+do $$
+declare
+  n integer;
+begin
   if public.agency_role('dddddddd-0000-0000-0000-00000000000d') is distinct from 'owner' then
     raise exception 'the owner of a live agency has no agency_role()';
   end if;
@@ -634,34 +716,19 @@ do $$ begin
     raise exception 'a changed licence number kept the disclosures approval';
   end if;
 
-  update public.agents set grammatical_gender = 'm' where id = '99999999-0000-0000-0000-00000000000d';
-  update public.agents set full_name = 'שם חדש' where id = '99999999-0000-0000-0000-00000000000d';
-  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v4' then
-    raise exception 'a changed gender or name did not bump consent_version';
-  end if;
-  update public.agents set bio = bio || '{"family": "שני ילדים"}' where id = '99999999-0000-0000-0000-00000000000d';
-  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v4' then
-    raise exception 'a bio edit bumped consent_version';
-  end if;
-  update public.agency_profiles set licence_entity = 'שם חדש — מתכנן פיננסי' where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
-  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v5' then
-    raise exception 'a changed licence line did not bump consent_version';
-  end if;
-  -- Still not the domain, now that it is live.
-  begin
-    update public.agency_profiles set domain = null where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
-    raise exception 'the owner cleared the domain';
-  exception when insufficient_privilege then null;
-  end;
+  -- Removing a licensee is the operator's.
+  delete from public.agents where id = '99999999-0000-0000-0000-00000000000d';
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'the owner deleted their agent'; end if;
 end $$;
 reset role;
 
--- ── what a visitor sees ──────────────────────────────────────────────────
+-- ── a visitor, while the new number awaits its check ─────────────────────
 set local role anon;
 set local request.jwt.claims = '{"role":"anon"}';
 do $$ begin
   if (select count(*) from public.public_agent_cards where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 1 then
-    raise exception 'a live agency''s licensee is not on its public card';
+    raise exception 'a live agency''s checked licensee is not on its public card';
   end if;
   if (select licence_number from public.public_agent_cards where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'L-0001' then
     raise exception 'the public card shows an unchecked licence number';
@@ -686,6 +753,136 @@ do $$ begin
   end if;
   if exists (select 1 from public.testimonials where agency_id <> '00000000-0000-0000-0000-000000000001') then
     raise exception 'the public read of testimonials widened';
+  end if;
+end $$;
+reset role;
+
+-- The operator checks the new number and approves the disclosures again.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a0","role":"authenticated"}';
+do $$ begin
+  update public.agents set licence_verified_at = now() where id = '99999999-0000-0000-0000-00000000000d';
+  update public.agency_profiles set disclosures_approved_at = now() where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+  if (select verified_licence_number from public.agents where id = '99999999-0000-0000-0000-00000000000d') <> 'L-0002' then
+    raise exception 'a new check did not record the new number';
+  end if;
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a1","role":"authenticated"}';
+do $$ begin
+  -- Licence types: the check lapses, the checked number stays on the card.
+  update public.agents set licence_types = array['pension_agent', 'life_agent'] where id = '99999999-0000-0000-0000-00000000000d';
+  if (select licence_verified_at from public.agents where id = '99999999-0000-0000-0000-00000000000d') is not null then
+    raise exception 'changed licence types kept the verification';
+  end if;
+  if (select verified_licence_number from public.agents where id = '99999999-0000-0000-0000-00000000000d') <> 'L-0002' then
+    raise exception 'changed licence types lost the checked number';
+  end if;
+  if (select disclosures_approved_at from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') is not null then
+    raise exception 'changed licence types kept the disclosures approval';
+  end if;
+  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v2' then
+    raise exception 'changed licence types bumped consent_version';
+  end if;
+
+  update public.agents set grammatical_gender = 'm' where id = '99999999-0000-0000-0000-00000000000d';
+  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v3' then
+    raise exception 'a changed gender did not bump consent_version';
+  end if;
+  -- The name: the checked number goes too, so the card hides the licensee.
+  update public.agents set full_name = 'שם חדש' where id = '99999999-0000-0000-0000-00000000000d';
+  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v4' then
+    raise exception 'a changed name did not bump consent_version';
+  end if;
+  if (select verified_licence_number from public.agents where id = '99999999-0000-0000-0000-00000000000d') is not null then
+    raise exception 'a changed name kept the checked number';
+  end if;
+  update public.agents set bio = bio || '{"family": "שני ילדים"}' where id = '99999999-0000-0000-0000-00000000000d';
+  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v4' then
+    raise exception 'a bio edit bumped consent_version';
+  end if;
+  update public.agency_profiles set licence_entity = 'שם חדש — מתכנן פיננסי' where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v5' then
+    raise exception 'a changed licence line did not bump consent_version';
+  end if;
+  -- Still not the domain, now that it is live.
+  begin
+    update public.agency_profiles set domain = null where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+    raise exception 'the owner cleared the domain';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+
+-- The operator approves the disclosures once more, for the next block.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a0","role":"authenticated"}';
+do $$ begin
+  update public.agency_profiles set disclosures_approved_at = now() where agency_id = 'dddddddd-0000-0000-0000-00000000000d';
+end $$;
+reset role;
+
+-- A second licensee, added by the owner of the live agency: off the card
+-- until checked, and the notice and its approval move on.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a1","role":"authenticated"}';
+do $$ begin
+  insert into public.agents (id, agency_id, full_name, licence_types, has_institutional_affiliation)
+  values ('99999999-0000-0000-0000-0000000000d2', 'dddddddd-0000-0000-0000-00000000000d', 'שותף לא בדוק',
+          array['pension_advisor'], false);
+  if (select disclosures_approved_at from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') is not null then
+    raise exception 'a new licensee kept the disclosures approval';
+  end if;
+  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v6' then
+    raise exception 'a new licensee did not bump consent_version';
+  end if;
+end $$;
+reset role;
+
+set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
+do $$ begin
+  if exists (select 1 from public.public_agent_cards where id = '99999999-0000-0000-0000-0000000000d2') then
+    raise exception 'an unchecked licensee of a live agency is on a public card';
+  end if;
+  if exists (select 1 from public.public_agent_cards where id = '99999999-0000-0000-0000-00000000000d') then
+    raise exception 'a renamed licensee is on the card before a new check';
+  end if;
+end $$;
+reset role;
+
+-- The live agency's Admin writes testimonials (testimonials_write_admin), and
+-- an agency other than agency 1 needs consent even without a licensee.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a2","role":"authenticated"}';
+do $$ begin
+  begin
+    insert into public.testimonials (name, quote, agency_id) values ('בלי הסכמה', 'y', 'dddddddd-0000-0000-0000-00000000000d');
+    raise exception 'a new agency''s testimonial without consent was saved';
+  exception when check_violation then null;
+  end;
+  insert into public.testimonials (name, quote, agency_id, consent_confirmed_at)
+  values ('עם הסכמה', 'y', 'dddddddd-0000-0000-0000-00000000000d', now());
+  if (select consent_confirmed_by from public.testimonials where name = 'עם הסכמה') <> 'eeeeeeee-0000-0000-0000-0000000000a2' then
+    raise exception 'the Admin''s consent was not stamped';
+  end if;
+end $$;
+reset role;
+
+-- The operator removes the second licensee: the notice moves on again.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000a0","role":"authenticated"}';
+do $$
+declare
+  n integer;
+begin
+  delete from public.agents where id = '99999999-0000-0000-0000-0000000000d2';
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'the operator could not remove a licensee'; end if;
+  if (select consent_version from public.agency_profiles where agency_id = 'dddddddd-0000-0000-0000-00000000000d') <> 'v7' then
+    raise exception 'removing a licensee did not bump consent_version';
   end if;
 end $$;
 reset role;

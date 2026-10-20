@@ -91,14 +91,24 @@ create trigger agencies_guard_status
 
 -- ── the agency profile: the wizard's columns ───────────────────────────────
 alter table public.agency_profiles
-  add column notify_emails           text[],
+  -- Where lead mail goes: up to five addresses, each the shape create_agency
+  -- accepts. Joined on a space, which no address may contain.
+  add column notify_emails           text[] check (
+    notify_emails is null
+    or (cardinality(notify_emails) <= 5
+        and array_position(notify_emails, null) is null
+        and (cardinality(notify_emails) = 0
+             or array_to_string(notify_emails, ' ') ~ '^[^@\s]+@[^@\s]+\.[^@\s]+( [^@\s]+@[^@\s]+\.[^@\s]+)*$')
+        and octet_length(array_to_string(notify_emails, ' ')) <= 1300)),
   add column domain                  text unique check (domain = lower(domain) and domain ~ '^[a-z0-9.-]+$'),
   add column mail_from               text,
   add column consent_version         text,
-  add column service_area            text,
+  add column service_area            text check (char_length(service_area) <= 200),
   -- Wizard state (last step, per-step flags). The "review" key is the
   -- operator's: owner's email, submit / return / activate stamps and notes.
-  add column onboarding              jsonb not null default '{}'::jsonb check (jsonb_typeof(onboarding) = 'object'),
+  -- Under 64 KB: it is read with every profile.
+  add column onboarding              jsonb not null default '{}'::jsonb
+    check (jsonb_typeof(onboarding) = 'object' and octet_length(onboarding::text) < 65536),
   -- Gate 3 of activation: the operator approved the disclosure sentences.
   add column disclosures_approved_at timestamptz,
   add column disclosures_approved_by uuid references auth.users(id) on delete set null;
@@ -145,6 +155,7 @@ begin
       raise exception 'operator_only' using errcode = '42501';
     end if;
     if v_person and new.disclosures_approved_at is not null then
+      new.disclosures_approved_at := now();
       new.disclosures_approved_by := auth.uid();
     end if;
     return new;
@@ -197,8 +208,10 @@ create table public.agents (
   -- Drives every Hebrew sentence that names them ("בעלת/בעל רישיון").
   grammatical_gender            text check (grammatical_gender in ('f', 'm')),
   professional_title            text,
+  -- In the agent-photos bucket, under this agent's own folder (see the
+  -- agents_photo_path constraint below): the card serves it to visitors.
   photo_path                    text,
-  photo_alt                     text,
+  photo_alt                     text check (char_length(photo_alt) <= 200),
   licence_number                text,
   licence_types                 text[] not null default '{}'
     check (licence_types <@ array['pension_agent', 'life_agent', 'general_agent', 'pension_advisor', 'pension_marketer']),
@@ -208,12 +221,17 @@ create table public.agents (
   affiliations                  text[] not null default '{}',
   -- The operator's, by trigger. verified_licence_number is the number that was
   -- checked: the site keeps showing it while a changed number awaits a check.
+  -- Null = never checked, or the name changed since: the card is hidden.
   licence_verified_at           timestamptz,
   licence_verified_by           uuid references auth.users(id) on delete set null,
   verified_licence_number       text,
-  bio                           jsonb not null default '{}'::jsonb check (jsonb_typeof(bio) = 'object'),
+  -- Bounded: Dorit's own about texts come to about 2 KB, her three stats to 100 bytes.
+  bio                           jsonb not null default '{}'::jsonb
+    check (jsonb_typeof(bio) = 'object' and octet_length(bio::text) <= 16384),
   stats                         jsonb not null default '[]'::jsonb
-    check (case when jsonb_typeof(stats) = 'array' then jsonb_array_length(stats) <= 3 else false end),
+    check (case when jsonb_typeof(stats) = 'array'
+                then jsonb_array_length(stats) <= 3 and octet_length(stats::text) <= 1024
+                else false end),
   booking_url                   text check (booking_url ~ '^https://'),
   meeting_minutes               integer not null default 15 check (meeting_minutes between 5 and 240),
   review_links                  jsonb not null default '{}'::jsonb
@@ -222,7 +240,12 @@ create table public.agents (
   created_at                    timestamptz not null default now(),
   updated_at                    timestamptz not null default now(),
   -- Lets testimonials and success cases bind their agent to their own agency.
-  unique (id, agency_id)
+  unique (id, agency_id),
+  -- Only a WebP in this agent's own folder of the bucket — never a URL, never
+  -- another agency's file.
+  constraint agents_photo_path check (
+    photo_path is null
+    or photo_path ~ ('^' || agency_id::text || '/' || id::text || '/[A-Za-z0-9_-]{1,100}\.webp$'))
 );
 
 create index agents_agency_idx on public.agents (agency_id);
@@ -244,8 +267,14 @@ create policy agents_delete_operator on public.agents
   for delete to authenticated using (public.is_admin());
 
 -- Licence verification is the operator's; the agency never changes; a person
--- links only their own account. A changed licence number voids the check in
--- every status — a check of another number proves nothing about this one.
+-- links only their own account. The check covers who holds which licence, so
+-- a change to the name, number, types or regulator voids it, in every status:
+-- a check of other facts proves nothing about these.
+--   · number, types or regulator: verified_licence_number stays, and the card
+--     keeps showing that checked number until the new one is checked;
+--   · name: verified_licence_number goes too, so the card hides the licensee
+--     until the operator checks again — a checked number beside an unchecked
+--     name would vouch for someone the register was never asked about.
 -- Runs as the caller.
 create function public.agents_guard() returns trigger
   language plpgsql
@@ -289,7 +318,12 @@ begin
     end if;
   end if;
 
-  if new.licence_number is distinct from old.licence_number then
+  if new.full_name is distinct from old.full_name then
+    new.licence_verified_at := null;
+    new.licence_verified_by := null;
+    new.verified_licence_number := null;
+  elsif (new.licence_number, new.licence_types, new.licence_regulator)
+        is distinct from (old.licence_number, old.licence_types, old.licence_regulator) then
     new.licence_verified_at := null;
     new.licence_verified_by := null;
   elsif new.licence_verified_at is distinct from old.licence_verified_at then
@@ -309,50 +343,74 @@ create trigger agents_guard
   before insert or update on public.agents
   for each row execute function public.agents_guard();
 
--- What an agent's edit does to the agency's profile. Definer, because it
--- writes columns the owner may not (agency_profiles_guard trusts it).
---   · anything the disclosure sentences are built from → the operator's
---     approval of them lapses (activation gate 3 must be passed again);
---   · licence number, name or gender of a live agency → consent_version moves
---     on: the notice its visitors consent under now reads differently.
+-- What a change to an agency's licensees does to its profile. Definer,
+-- because it writes columns the owner may not (agency_profiles_guard trusts it).
+--   · a licensee added or removed, or anything the disclosure sentences are
+--     built from edited → the operator's approval of them lapses (activation
+--     gate 3 must be passed again);
+--   · on a live agency, a licensee added or removed, or a licence number, name
+--     or gender edited → consent_version moves on: the notice its visitors
+--     consent under now reads differently.
 -- Telling the operator is a later PR.
 create function public.agents_after_change() returns trigger
   language plpgsql
   security definer
   set search_path = ''
 as $$
+declare
+  v_agency     uuid;
+  v_disclosure boolean;
+  v_consent    boolean;
 begin
-  if (new.full_name, new.grammatical_gender, new.professional_title, new.licence_number, new.licence_types,
-      new.licence_regulator, new.has_institutional_affiliation, new.affiliations)
-     is distinct from
-     (old.full_name, old.grammatical_gender, old.professional_title, old.licence_number, old.licence_types,
-      old.licence_regulator, old.has_institutional_affiliation, old.affiliations) then
-    update public.agency_profiles
-       set disclosures_approved_at = null, disclosures_approved_by = null
-     where agency_id = new.agency_id and disclosures_approved_at is not null;
+  if tg_op = 'UPDATE' then
+    v_agency := new.agency_id;
+    v_disclosure :=
+      (new.full_name, new.grammatical_gender, new.professional_title, new.licence_number, new.licence_types,
+       new.licence_regulator, new.has_institutional_affiliation, new.affiliations)
+      is distinct from
+      (old.full_name, old.grammatical_gender, old.professional_title, old.licence_number, old.licence_types,
+       old.licence_regulator, old.has_institutional_affiliation, old.affiliations);
+    v_consent :=
+      (new.licence_number, new.full_name, new.grammatical_gender)
+      is distinct from (old.licence_number, old.full_name, old.grammatical_gender);
+  elsif tg_op = 'INSERT' then
+    v_agency := new.agency_id;
+    v_disclosure := true;
+    v_consent := true;
+  else
+    v_agency := old.agency_id;
+    v_disclosure := true;
+    v_consent := true;
   end if;
 
-  if public.agency_is_active(new.agency_id)
-     and (new.licence_number, new.full_name, new.grammatical_gender)
-         is distinct from (old.licence_number, old.full_name, old.grammatical_gender) then
+  if v_disclosure then
+    update public.agency_profiles
+       set disclosures_approved_at = null, disclosures_approved_by = null
+     where agency_id = v_agency and disclosures_approved_at is not null;
+  end if;
+
+  if v_consent and public.agency_is_active(v_agency) then
     update public.agency_profiles
        set consent_version = public.next_consent_version(consent_version)
-     where agency_id = new.agency_id;
+     where agency_id = v_agency;
   end if;
   return null;
 end;
 $$;
 
 create trigger agents_after_change
-  after update on public.agents
+  after insert or update or delete on public.agents
   for each row execute function public.agents_after_change();
 
 -- The public face of a licensee: display columns of live agencies only. A
 -- definer view (security_invoker = false, the default, said out loud): anon
 -- has no grant on agents and must not get one — that would expose
 -- user_id and the verification columns — so the view reads as its owner and
--- the `a.status = 'active'` filter is the only thing keeping drafts out.
--- Do not drop the filter, and do not add columns without asking whether a
+-- the two filters are the only thing keeping drafts and unchecked licensees
+-- out: a live agency, and a licensee the operator has checked
+-- (verified_licence_number, which a name change clears — see agents_guard).
+-- A licensee added to a live agency stays off the card until checked.
+-- Do not drop either filter, and do not add columns without asking whether a
 -- visitor may see them. The licence number shown is the verified one.
 create view public.public_agent_cards with (security_invoker = false) as
   select g.id,
@@ -374,17 +432,25 @@ create view public.public_agent_cards with (security_invoker = false) as
          g.review_links
     from public.agents g
     join public.agencies a on a.id = g.agency_id
-   where a.status = 'active';
+   where a.status = 'active'
+     and g.verified_licence_number is not null;
 
 -- ── testimonials: the licensee's, with the reviewer's consent ──────────────
 -- Every existing row already has an agency (agency 1, by the tenant
--- migration's default) and no agent. A row tied to a licensee — every row the
--- wizard writes — cannot be saved without the consent stamp; the rows
--- content-admin writes for agency 1 are unaffected. consent_confirmed_by is
--- not required: it goes null when that account is deleted.
+-- migration's default; content-admin never sets another) and no agent. A
+-- row of any other agency, or tied to a licensee — every row the wizard
+-- writes — cannot be saved without the consent stamp; the rows content-admin
+-- writes for agency 1 are unaffected. consent_confirmed_by is not required by
+-- the checks: it goes null when that account is deleted, and requiring it
+-- would make deleting the account fail. The stamp trigger below always fills
+-- it for a person's write.
 alter table public.testimonials
   add column agent_id             uuid,
   add column source_url           text check (source_url ~ '^https://'),
+  -- An account id. testimonials is granted to anon whole (initial schema) and
+  -- agency 1's rows are public, so the Data API shows this column to anyone
+  -- who names it. Step 2's read side must not widen that: column grants, or a
+  -- side table, before any other agency's testimonials are public.
   add column consent_confirmed_by uuid references auth.users(id) on delete set null,
   add column consent_confirmed_at timestamptz,
   add column sort_order           integer not null default 0,
@@ -392,6 +458,14 @@ alter table public.testimonials
     foreign key (agent_id, agency_id) references public.agents (id, agency_id),
   add constraint testimonials_agent_consent
     check (agent_id is null or consent_confirmed_at is not null);
+
+-- Keyed on the agency too, so an Admin's direct write (testimonials_write_admin)
+-- cannot save a new agency's testimonial without consent by leaving agent_id
+-- out. NOT VALID: every row should be agency 1's, but production's rows were
+-- not inspected, and another agency's legacy row must not fail the migration.
+-- New and updated rows are held to it either way.
+alter table public.testimonials add constraint testimonials_agency_consent
+  check (agency_id = '00000000-0000-0000-0000-000000000001' or consent_confirmed_at is not null) not valid;
 
 alter table public.testimonials drop constraint testimonials_source_check;
 alter table public.testimonials add constraint testimonials_source_check
@@ -439,9 +513,10 @@ create table public.success_cases (
   id         uuid primary key default gen_random_uuid(),
   agency_id  uuid not null references public.agencies(id) on delete cascade,
   agent_id   uuid,
-  title      text not null,
-  body       text not null,
-  metric     text,
+  -- Bounded like the bio: Dorit's longest case body is 192 characters.
+  title      text not null check (char_length(title) <= 200),
+  body       text not null check (char_length(body) <= 2000),
+  metric     text check (char_length(metric) <= 100),
   sort_order integer not null default 0,
   published  boolean not null default false,
   created_at timestamptz not null default now(),

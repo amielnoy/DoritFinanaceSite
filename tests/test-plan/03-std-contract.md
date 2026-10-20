@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 181 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 932 including `it.each` / `describe.each` expansions (931 pass, 1 skipped)
+**Location:** `tests/contract/` · **Cases:** 311 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 1241 including `it.each` / `describe.each` expansions (1240 pass, 1 skipped; recounted 2026-10-20)
 
 ---
 
@@ -943,8 +943,11 @@ from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
 | CTR-ONB-011..013 | Required fields | `onboarding_missing`'s keys = `submitRequiredKeys()`; affiliations only when declared; submit and activate both refuse `incomplete` with the keys in the detail |
 | CTR-ONB-014 | "gates activation on exactly the config's three gates" | `ACTIVATION_GATES` = the keys in `gates_closed` |
 | CTR-ONB-015 | "refuses everyone but the operator the operator's columns" | Every `OPERATOR_ONLY_COLUMNS` column in its guard |
-| CTR-ONB-016..020 | Owner, testimonials, the public card, success cases, licence changes | Owner-only write policies, none to anon; consent constraint and composite key; today's testimonial policies kept; the view is definer with `a.status = 'active'` and no verification columns; a licence change voids the check and bumps a live agency's consent version |
-| CTR-ONB-021..022 | The `agent-photos` bucket | Public, WebP, 10 MB; four policies to authenticated through `can_write_agent_photo`, which matches the path before casting |
+| CTR-ONB-016..019 | Owner, testimonials, the public card, success cases | Owner-only write policies, none to anon; consent constraint and composite key, and consent for every agency but agency 1 (`testimonials_agency_consent`, NOT VALID); today's testimonial policies kept; the view is definer with `a.status = 'active'` and `verified_licence_number is not null`, and no verification columns |
+| CTR-ONB-020 | "voids a licence check when the name, number, types or regulator change; a new name hides the card" | `agents_guard` clears `licence_verified_*`; a name change clears `verified_licence_number` too |
+| CTR-ONB-021 | "moves the consent version of a live agency, and lapses the approval, when a licensee is added, removed or edited" | `agents_after_change` after insert, update or delete |
+| CTR-ONB-022 | "keeps the portrait path inside the agent's own folder, and what the owner types bounded" | `agents_photo_path`; `onboarding` < 64 KB; ≤ 5 notification addresses; bio ≤ 16 KB; service area and photo alt ≤ 200 |
+| CTR-ONB-023..024 | The `agent-photos` bucket | Public, WebP, 10 MB; four policies to authenticated through `can_write_agent_photo`, which matches the path before casting |
 
 ## 5. Runtime counterpart
 
@@ -957,7 +960,7 @@ time.
 
 ## 6. Pass criteria
 
-All 161 declared cases pass (vitest: 890 pass, 1 skipped, of 891 with expansions). A failure means either the frontend or the backend definition
+All 311 declared cases pass (vitest: 1240 pass, 1 skipped, of 1241 with expansions). A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 
