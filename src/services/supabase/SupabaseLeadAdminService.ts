@@ -1,4 +1,5 @@
-import type { AgendaMeeting, LeadAdminPort, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, TranscriptLine } from "../ports";
+import { STAFF_LEADS } from "@/config/staff-leads";
+import type { AgendaMeeting, CreatedLead, LeadAdminPort, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, NewStaffLead, TranscriptLine } from "../ports";
 import type { ContentFunctionsClient } from "./EdgeContentAdminService";
 import { CLAIM_DOCUMENT_REF_PREFIX } from "./SupabaseUploadService";
 import {
@@ -12,6 +13,11 @@ import {
  *  profile and consent record, none of which this list shows, and personal data
  *  the screen does not need stays out of the browser. */
 const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id";
+
+/** The staff-created-lead columns; they exist in production only once the staff-leads migration is applied, so they are asked for only when STAFF_LEADS is on. */
+const STAFF_LEAD_COLUMNS = "brought_by,intake,referrer_note,notice_method,possible_duplicate";
+
+export const leadColumns = (staffLeads: boolean): string => (staffLeads ? `${LEAD_COLUMNS},${STAFF_LEAD_COLUMNS}` : LEAD_COLUMNS);
 
 /** Leads per read; PostgREST's own default cap is 1,000. */
 export const LEAD_PAGE = 1000;
@@ -64,6 +70,7 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     private readonly client: SupabaseLeadTableClient,
     private readonly functions: ContentFunctionsClient | null = null,
     private readonly accessToken: () => Promise<string | null> = async () => null,
+    private readonly staffLeads: boolean = STAFF_LEADS,
   ) {}
 
   /** An Edge Function as the signed-in person; its refusal in its own words. */
@@ -89,12 +96,55 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     const rows: Record<string, unknown>[] = [];
     for (let from = 0; from < limit; from += LEAD_PAGE) {
       const to = Math.min(from + LEAD_PAGE, limit) - 1;
-      const query = this.client.from("leads").select(LEAD_COLUMNS).order("created_at", { ascending: false }).order("id", { ascending: false });
+      const query = this.client.from("leads").select(leadColumns(this.staffLeads)).order("created_at", { ascending: false }).order("id", { ascending: false });
       const page = await fetchRows(query.range ? query.range(from, to) : query.limit(to + 1), "leads");
       rows.push(...page);
       if (!query.range || page.length < to - from + 1) break;
     }
-    return rows.map((row) => ({ ...toPortRow(row), id: row.id }) as unknown as LeadRecord);
+    return rows.map((row) => {
+      const lead = { ...toPortRow(row), id: row.id } as Record<string, unknown>;
+      if (this.staffLeads) {
+        for (const key of ["brought_by", "intake", "referrer_note", "notice_method", "possible_duplicate"]) delete lead[key];
+        lead.broughtBy = typeof row.brought_by === "string" ? row.brought_by : null;
+        lead.intake = typeof row.intake === "string" ? row.intake : null;
+        lead.referrerNote = typeof row.referrer_note === "string" ? row.referrer_note : null;
+        lead.noticeMethod = typeof row.notice_method === "string" ? row.notice_method : null;
+        lead.possibleDuplicate = row.possible_duplicate === true;
+      }
+      return lead as unknown as LeadRecord;
+    });
+  }
+
+  /**
+   * A lead entered by a member, through create-lead. Unlike `call`, a 409 is an
+   * answer here (a visible duplicate), so the Response is read before deciding.
+   */
+  async createLead(input: NewStaffLead): Promise<CreatedLead> {
+    const token = await this.accessToken();
+    if (!token || !this.functions) throw new Error("נדרשת התחברות.");
+    const { data, error } = await this.functions.functions.invoke("create-lead", {
+      body: { ...input },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (error) {
+      const res = error.context instanceof Response ? error.context : null;
+      const answer = res ? ((await res.json().catch(() => null)) as { error?: string; leadId?: string; duplicate?: string } | null) : null;
+      if (res?.status === 409 && answer?.duplicate === "visible" && typeof answer.leadId === "string") {
+        return { leadId: answer.leadId, duplicate: "visible", noticeSent: null };
+      }
+      throw new Error(answer?.error ?? `הפעולה נכשלה (${res?.status ?? "ללא תשובה"}).`);
+    }
+    const answer = (data ?? {}) as Record<string, unknown>;
+    if (typeof answer.leadId !== "string" || !answer.leadId) throw new Error("הפנייה לא נשמרה.");
+    return {
+      leadId: answer.leadId,
+      duplicate: answer.duplicate === "hidden" || answer.duplicate === "visible" ? answer.duplicate : null,
+      noticeSent: typeof answer.noticeSent === "boolean" ? answer.noticeSent : null,
+    };
+  }
+
+  clearDuplicate(leadId: string): Promise<void> {
+    return applied(this.client.from("leads").update({ possible_duplicate: false }).eq("id", leadId).select("id"), "duplicate");
   }
 
   setStatus(id: string, status: LeadStatus): Promise<void> {

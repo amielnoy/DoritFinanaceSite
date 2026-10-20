@@ -9,8 +9,9 @@ export const isStaffLeadsOn = (value: string | undefined): boolean => (value ?? 
 
 export const STAFF_LEADS: boolean = isStaffLeadsOn(import.meta.env.VITE_STAFF_LEADS);
 
-export type Intake = "phone" | "in_person" | "referral" | "event" | "existing_client" | "other";
-export type NoticeMethod = "verbal" | "email" | "whatsapp";
+import type { Intake, NoticeMethod } from "@/lib/staff-lead-types";
+
+export type { Intake, NoticeMethod };
 
 export const INTAKE_LABELS: Record<Intake, string> = {
   phone: "שיחת טלפון",

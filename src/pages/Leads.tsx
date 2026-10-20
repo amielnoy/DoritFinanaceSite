@@ -53,6 +53,7 @@ const SOURCE_LABEL: Record<LeadSource, string> = {
   claim: "דיווח תביעה",
   escalation: "העברה לטיפול אנושי",
   interview: "ראיון היכרות",
+  staff: "דרך הצוות",
 };
 
 /** The interview behind a lead, read-only — what the client actually said, for the meeting. Plain text only: it is visitor-typed. */

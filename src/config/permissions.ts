@@ -37,6 +37,8 @@ export const PERMISSIONS = {
   "leads.changeStatus": "user",
   "leads.assign": "admin",
   "leads.delete": "admin",
+  /** A member enters a lead by hand (create-lead). */
+  "leads.create": "user",
   /** Exports what the person can already see. */
   "leads.export": "user",
   "contacts.read": "admin",

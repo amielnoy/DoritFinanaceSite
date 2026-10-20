@@ -26,6 +26,7 @@ const SOURCE_LABELS: Record<string, string> = {
   consultation: "בקשת פגישה",
   claim: "דיווח על תביעה",
   escalation: "בקשה לשיחה עם דורית",
+  staff: "פנייה דרך הצוות",
 };
 
 const time = (iso?: string) => {
