@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 572 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 665 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 579 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 667 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -1060,6 +1060,8 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4, behind `
 | CMP-AGC-004 | "flag on, the read answers — the database's content" | The record's values |
 | CMP-AGC-005 | "flag on, on localhost — asks for the host as the browser has it" | The port receives `localhost` |
 | CMP-AGC-006 | "flag on, an English page — bundled English, and nothing is asked" | No request in a non-`he` locale |
+| CMP-AGC-009 | "flag on, the read fails — one console warning naming the code; a read that answers, none" | One `[agency-content] site read failed: no_site` across two consumers and a re-render; none when the read answers |
+| CMP-AGC-009b | "flag on, the cases read fails — one console warning naming the error" | One `[agency-content] cases read failed: <message>` |
 | CMP-AGC-007a..e | The success cases | Off: bundled, nothing asked. On: agency 1's asked while the site loads, then the database's. Another agency still loading or failing: none, never Dorit's. Agency 1 failing: the bundled cases |
 | CMP-AGC-008 | "flag off asks exactly today's question; on, it names the agency" | `listTestimonials` arguments |
 | CMP-AGC-010 | "byline, licence, headline, monogram and contact are the record's" | Hero and About show the record |

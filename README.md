@@ -722,8 +722,17 @@ analysis and lists every stored report under "ניתוחים".
     falls back to the bundled agency-1 text while loading, on any error and
     for a non-Hebrew locale. Off: no request, and today's render. The
     prerender, `llms.txt` and `poa.html` stay on the bundled text either way.
-    Turn it on only after `e2e/ui/agency-content.spec.ts` is green on a preview
-    built with it.
+    A failed read logs one `[agency-content] … read failed: <code>` console
+    warning. To turn it on: apply `20261106000000`, `20261106100000` and
+    `20261107000000` to production and record them; build a Vercel preview
+    with `VITE_AGENCY_CONTENT=true` (previews use production Supabase); on it,
+    open `/`, `/perspective` and `/privacy` and check that
+    `public_agency_sites` and `public_agent_cards` answer 200 in DevTools →
+    Network, that the console has no `[agency-content]` warning, and that the
+    pages read as production does with the flag off; only then set it in
+    production. `e2e/ui/agency-content.spec.ts` is the CI gate that the
+    database render equals the bundled one on seeded data; it skips against a
+    deployment, so it cannot vouch for production's rows.
 - **Not code, waiting on the regulatory adviser:** paid claims advocacy on
   success, employer talks, accountant referrals.
 
