@@ -81,15 +81,14 @@ export class SupabaseContentService implements ContentPort {
     return toArticle(row);
   }
 
-  async listTestimonials(limit = 50): Promise<Testimonial[]> {
-    const rows = await fetchRows(
-      this.client
-        .from("testimonials")
-        .select(TESTIMONIAL_COLUMNS)
-        .order("created_at", { ascending: false })
-        .limit(limit),
-      "testimonials",
-    );
+  /**
+   * The agency filter is added only when an agency is named, so a build with
+   * VITE_AGENCY_CONTENT off sends exactly the request it always has.
+   */
+  async listTestimonials(limit = 50, agencyId?: string): Promise<Testimonial[]> {
+    const select = this.client.from("testimonials").select(TESTIMONIAL_COLUMNS);
+    const query = agencyId === undefined ? select : select.eq("agency_id", agencyId);
+    const rows = await fetchRows(query.order("created_at", { ascending: false }).limit(limit), "testimonials");
     return rows.map(toTestimonial);
   }
 }
