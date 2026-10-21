@@ -156,4 +156,65 @@ begin
   end;
 end $$;
 
+-- ── agency 1, seeded (20261107000000_seed_agency1_content.sql) ───────────
+-- The migrations already ran, so Dorit is here as the seed left her.
+do $$ begin
+  if not exists (select 1 from public.agents
+                  where id = '00000000-0000-0000-0000-0000000000a1' and agency_id = '00000000-0000-0000-0000-000000000001'
+                    and licence_verified_at is not null and verified_licence_number = 'L-00107009') then
+    raise exception 'the agency 1 agent is missing, or was not stamped as verified';
+  end if;
+  if not exists (select 1 from public.agency_profiles
+                  where agency_id = '00000000-0000-0000-0000-000000000001'
+                    and consent_version = '2026-10-agents-v5' and disclosures_approved_at is not null
+                    and domain = 'govari-fin.co.il'
+                    and notify_emails = array['amielnoy@gmail.com', 'amielnoy@outlook.com']) then
+    raise exception 'the agency 1 profile was not left as the seed writes it (it must be updated last)';
+  end if;
+end $$;
+
+set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
+do $$
+declare
+  n integer;
+begin
+  select count(*) into n from public.public_agent_cards
+   where agency_id = '00000000-0000-0000-0000-000000000001'
+     and licence_number = 'L-00107009' and full_name = 'דורית גוב ארי';
+  if n <> 1 then
+    raise exception 'anon sees % agency 1 agent cards, expected 1', n;
+  end if;
+  if (select array_agg(sort_order order by sort_order) from public.success_cases
+       where agency_id = '00000000-0000-0000-0000-000000000001') is distinct from array[1, 2, 3, 4, 5, 6, 7] then
+    raise exception 'anon does not see agency 1''s seven success cases in order';
+  end if;
+  if (select array_agg(sort_order order by sort_order) from public.success_cases
+       where agency_id = '00000000-0000-0000-0000-000000000001' and metric_is_estimate) is distinct from array[2, 6] then
+    raise exception 'only cases 2 and 6 are estimates';
+  end if;
+end $$;
+reset role;
+
+-- A second run changes nothing: not the agent, the cases, nor what the first
+-- run's profile update fixed (consent_version, the approval).
+create temp table seed_before as
+  select (select count(*) from public.agents where id = '00000000-0000-0000-0000-0000000000a1') as agents,
+         (select count(*) from public.success_cases where agency_id = '00000000-0000-0000-0000-000000000001') as cases,
+         consent_version, disclosures_approved_at
+    from public.agency_profiles where agency_id = '00000000-0000-0000-0000-000000000001';
+\ir ../migrations/20261107000000_seed_agency1_content.sql
+do $$ begin
+  if not exists (
+    select 1 from seed_before b, public.agency_profiles p
+     where p.agency_id = '00000000-0000-0000-0000-000000000001'
+       and b.agents = 1 and b.cases = 7
+       and b.agents = (select count(*) from public.agents where id = '00000000-0000-0000-0000-0000000000a1')
+       and b.cases = (select count(*) from public.success_cases where agency_id = '00000000-0000-0000-0000-000000000001')
+       and b.consent_version = p.consent_version
+       and b.disclosures_approved_at is not distinct from p.disclosures_approved_at) then
+    raise exception 'a second run of the agency 1 seed changed something';
+  end if;
+end $$;
+
 rollback;

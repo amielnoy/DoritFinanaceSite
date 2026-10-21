@@ -1,11 +1,9 @@
 import React from "react";
 import { useTestimonials } from "@/hooks/useContent";
 import { Star, ExternalLink, Loader2, Quote } from "lucide-react";
+import { AGENCY1_REVIEW_LINKS } from "@/config/agency1";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 
-// TODO: השתמש/י בקישורים האמיתיים של הפרופיל העסקי ב-Google וב-Midrag.
-const GOOGLE_URL = "https://www.google.com/search?q=דורית+גוב+ארי+ביטוח+חוות+דעת";
-const MIDRAG_URL = "https://www.midrag.co.il/";
 
 const SOURCE_LABEL: Record<string, string> = { google: "Google", midrag: "Midrag" };
 
@@ -78,7 +76,7 @@ export default function ReviewsWidget() {
             )}
             <div className="flex flex-col gap-2">
               <a
-                href={GOOGLE_URL}
+                href={AGENCY1_REVIEW_LINKS.google}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-2.5 border border-border hover:border-accent hover:text-accent transition-colors text-sm"
@@ -86,7 +84,7 @@ export default function ReviewsWidget() {
                 חוות דעת ב-Google <ExternalLink size={13} />
               </a>
               <a
-                href={MIDRAG_URL}
+                href={AGENCY1_REVIEW_LINKS.midrag}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-2.5 border border-border hover:border-accent hover:text-accent transition-colors text-sm"

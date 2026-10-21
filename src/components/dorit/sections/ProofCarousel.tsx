@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, ChevronDown, MessageCircle } from "lucide-react";
 import { CONTACT } from "@/config/contact";
+import { AGENCY1_CASES } from "@/config/agency1";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -17,21 +18,6 @@ import { dirOf } from "@/i18n/locales";
  * "5.0 · שביעות רצון מלאה" line, which rated the cases on Dorit's own say and
  * named no source.
  */
-
-/**
- * Each case's keys in home.json (`proof.c<n>.tag/title/body/metric`). `basis`
- * puts `proof.basis` under the figure, where the figure is a projection rather
- * than a fact.
- */
-const BRIEFS = [
-  { id: "c1" },
-  { id: "c2", basis: true },
-  { id: "c3" },
-  { id: "c4" },
-  { id: "c5" },
-  { id: "c6", basis: true },
-  { id: "c7" },
-] as const satisfies readonly { id: string; basis?: boolean }[];
 
 /**
  * Below md the strip stays a strip, made shorter: each case shows its tag, its
@@ -121,7 +107,7 @@ export default function ProofCarousel() {
         className="flex gap-5 overflow-x-auto px-[clamp(20px,4vw,40px)] pb-[clamp(72px,9vw,120px)] snap-x snap-mandatory max-md:items-start [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight max-md:gap-4 max-md:pb-10"
         style={{ scrollbarWidth: "none" }}
       >
-        {BRIEFS.map((b, i) => {
+        {AGENCY1_CASES.map((b, i) => {
           const expanded = open.has(i);
           return (
             <article
@@ -130,14 +116,14 @@ export default function ProofCarousel() {
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm px-2.5 py-0.5 rounded-sm bg-[hsl(33_100%_95%)] text-[hsl(37_80%_20%)]">
-                  {t(`proof.${b.id}.tag`)}
+                  {t(`proof.${b.key}.tag`)}
                 </span>
                 <span className="font-heading text-xl lining-nums tabular-nums text-muted-foreground">
                   0{i + 1}
                 </span>
               </div>
               <h3 className="font-heading font-medium text-[26px] leading-[1.3] max-md:text-[21px]">
-                {t(`proof.${b.id}.title`)}
+                {t(`proof.${b.key}.title`)}
               </h3>
               {/* Below md the story shows its first two lines until "פרטי המקרה"
                   opens it: hidden outright, half of each card stood empty
@@ -148,14 +134,14 @@ export default function ProofCarousel() {
                   !isDesktop && !expanded ? "line-clamp-2" : ""
                 }`}
               >
-                {t(`proof.${b.id}.body`)}
+                {t(`proof.${b.key}.body`)}
               </p>
               <div className="pt-[18px] border-t border-border flex items-center justify-between max-md:pt-3 max-md:flex-wrap max-md:gap-x-3">
                 <span className="flex flex-col gap-1.5 max-md:gap-1">
                   <span className="block font-heading text-[32px] text-accent leading-[1.1] max-md:text-[26px]">
-                    {t(`proof.${b.id}.metric`)}
+                    {t(`proof.${b.key}.metric`)}
                   </span>
-                  {"basis" in b ? (
+                  {b.estimate ? (
                     <span className="block text-[13px] text-muted-foreground">{t("proof.basis")}</span>
                   ) : null}
                 </span>
