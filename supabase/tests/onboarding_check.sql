@@ -791,15 +791,12 @@ do $$ begin
   if exists (select 1 from public.success_cases where agency_id = 'dddddddd-0000-0000-0000-00000000000e') then
     raise exception 'a draft agency''s success case is public';
   end if;
-  -- Testimonials: agency 1's rows, as before, and since 20261106100000
-  -- (testimonials_read_public_active) a live agency's consented rows — D's one
-  -- consented row, and nothing else of any other agency.
+  -- Testimonials: the public read is as before — agency 1's rows.
   if not exists (select 1 from public.testimonials where name = 'ותיקה') then
     raise exception 'agency 1''s testimonials are no longer public';
   end if;
-  if (select array_agg(name order by name) from public.testimonials
-       where agency_id <> '00000000-0000-0000-0000-000000000001') is distinct from array['ר״ל'] then
-    raise exception 'the public read of testimonials is not agency 1''s plus a live agency''s consented rows';
+  if exists (select 1 from public.testimonials where agency_id <> '00000000-0000-0000-0000-000000000001') then
+    raise exception 'the public read of testimonials widened';
   end if;
 end $$;
 reset role;

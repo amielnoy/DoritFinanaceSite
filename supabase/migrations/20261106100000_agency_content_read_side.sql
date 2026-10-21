@@ -8,8 +8,7 @@
 -- It fixes review M-2 first. testimonials was granted to anon whole by the
 -- initial schema, so the consent stamp 20261106000000 added
 -- (consent_confirmed_by, an account id, and consent_confirmed_at) was readable
--- by anyone who named it. Opening other agencies' testimonials to visitors
--- below would widen that, so the table-level read goes and the public columns
+-- by anyone who named it. So the table-level read goes and the public columns
 -- are granted by name. Every reader names its columns already
 -- (tests/security/agency-content.security.test.ts); service_role keeps its
 -- table-level grant (20260922000000), so the Edge Functions and scripts that
@@ -23,18 +22,14 @@ grant select (id, base44_id, agency_id, agent_id, name, role, quote, image_url, 
 -- the database's.
 grant select (consent_confirmed_at) on public.testimonials to authenticated;
 
--- ── testimonials: a live agency's, with consent ────────────────────────────
+-- ── testimonials: no public read for other agencies, not here ──────────────
 -- Agency 1's rows stay public through testimonials_read_member_or_fixed_agency,
--- unchanged, consent stamp or not (its legacy rows have none). Any other
--- agency's row is public once the agency is live and the reviewer's consent is
--- recorded. The policy reads consent_confirmed_at although anon has no grant
--- on it: RLS evaluates policies without column privileges
--- (supabase/tests/agency_content_check.sql proves it).
-create policy testimonials_read_public_active on public.testimonials
-  for select to anon, authenticated
-  using (agency_id <> '00000000-0000-0000-0000-000000000001'
-         and consent_confirmed_at is not null
-         and public.agency_is_active(agency_id));
+-- unchanged. An outside agency's public testimonials need a read policy for a
+-- live agency's consented rows and, in the same change, an agency_id filter on
+-- every testimonials reader (the public listTestimonials and
+-- SupabaseContentAdminService), whatever VITE_AGENCY_CONTENT says: without the
+-- filter, agency 1's site would list them. No outside agency goes live before
+-- Rollout 5, so both wait for it.
 
 -- ── success cases: what proof.c1…c7 show beside the body ───────────────────
 -- The chip above each case (proof.cN.tag), and whether its metric is an

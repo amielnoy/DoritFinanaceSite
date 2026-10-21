@@ -83,10 +83,10 @@ describe("agency content, read-side schema", () => {
     expect(others).toEqual(["grant select (consent_confirmed_at) on public.testimonials to authenticated;"]);
   });
 
-  it("shows a live agency's consented testimonials, and agency 1's as before (CTR-AGC-005)", () => {
-    expect(flat).toContain(
-      "create policy testimonials_read_public_active on public.testimonials for select to anon, authenticated using (agency_id <> '00000000-0000-0000-0000-000000000001' and consent_confirmed_at is not null and public.agency_is_active(agency_id))",
-    );
+  // An outside agency's public testimonials wait for Rollout 5, with an
+  // agency_id filter on every reader in the same change.
+  it("opens no other agency's testimonials to visitors (CTR-AGC-005)", () => {
+    expect(flat).not.toMatch(/create policy \S+ on public\.testimonials\b/);
   });
 
   it("shows a site's contact details only for live agencies, through a definer view of nine columns (CTR-AGC-006)", () => {

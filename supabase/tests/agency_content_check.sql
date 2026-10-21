@@ -61,12 +61,12 @@ do $$
 declare
   seen text[];
 begin
-  -- The site's own column list (TESTIMONIAL_COLUMNS). F's row shows although
-  -- anon has no grant on consent_confirmed_at, which its policy reads.
+  -- The site's own column list (TESTIMONIAL_COLUMNS). Agency 1's rows only:
+  -- an outside agency's, live and consented or not, waits for Rollout 5.
   select array_agg(name order by name) into seen
     from (select id, base44_id, name, role, quote, image_url, rating, source, created_at
             from public.testimonials where name like 'ac-%') t;
-  if seen is distinct from array['ac-agency1', 'ac-f'] then
+  if seen is distinct from array['ac-agency1'] then
     raise exception 'a visitor reads the wrong testimonials: %', seen;
   end if;
   begin
@@ -84,7 +84,7 @@ begin
     raise exception 'anon read testimonials with *';
   exception when insufficient_privilege then null;
   end;
-  if (select count(*) from public.testimonials where name like 'ac-%') <> 2 then
+  if (select count(*) from public.testimonials where name like 'ac-%') <> 1 then
     raise exception 'anon cannot count testimonials';
   end if;
 
@@ -112,7 +112,8 @@ reset role;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-0000000000c0","role":"authenticated"}';
 do $$ begin
-  if (select consent_confirmed_at from public.testimonials where name = 'ac-f') is null then
+  -- Naming the column checks the grant; agency 1's row is one the member sees.
+  if not exists (select consent_confirmed_at from public.testimonials where name = 'ac-agency1') then
     raise exception 'a member cannot read when the consent was confirmed';
   end if;
   begin
@@ -120,6 +121,9 @@ do $$ begin
     raise exception 'a member read consent_confirmed_by';
   exception when insufficient_privilege then null;
   end;
+  if exists (select 1 from public.testimonials where name = 'ac-f') then
+    raise exception 'another live agency''s testimonial is public';
+  end if;
   if exists (select 1 from public.testimonials where name = 'ac-g') then
     raise exception 'a draft agency''s testimonial is public';
   end if;
