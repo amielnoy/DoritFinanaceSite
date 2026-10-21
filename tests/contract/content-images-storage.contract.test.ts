@@ -45,4 +45,13 @@ describe("the site may show those images", () => {
     );
     expect(imgSrc.split(/\s+/)).not.toContain("https://hjowdyiwjjrqceumkvgt.supabase.co");
   });
+
+  it("allows img-src from agent-photos' public path only", () => {
+    const csp = JSON.stringify(JSON.parse(read("vercel.json")).headers);
+    const imgSrc = csp.match(/img-src([^;"]*)/)?.[1] ?? "";
+    expect(imgSrc).toContain(
+      "https://hjowdyiwjjrqceumkvgt.supabase.co/storage/v1/object/public/agent-photos/",
+    );
+    expect(imgSrc.split(/\s+/)).not.toContain("https://hjowdyiwjjrqceumkvgt.supabase.co");
+  });
 });
