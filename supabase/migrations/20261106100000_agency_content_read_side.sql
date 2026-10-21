@@ -46,8 +46,10 @@ alter table public.success_cases
 -- one — that would expose notify_emails, the onboarding state and the
 -- operator's approval — so the view reads as its owner, and its filter is the
 -- only thing keeping drafts out: a live agency.
--- Do not drop the filter, and do not add columns without asking whether a
--- visitor may see them.
+-- A site is resolved by its domain, so a live agency with no domain has no
+-- site, and its phone and email must not be listable by anyone who asks.
+-- Do not drop either condition, and do not add columns without asking whether
+-- a visitor may see them.
 create view public.public_agency_sites with (security_invoker = false) as
   select p.agency_id,
          p.domain,
@@ -60,7 +62,8 @@ create view public.public_agency_sites with (security_invoker = false) as
          p.service_area
     from public.agency_profiles p
     join public.agencies a on a.id = p.agency_id
-   where a.status = 'active';
+   where a.status = 'active'
+     and p.domain is not null;
 
 revoke all on public.public_agency_sites from anon, authenticated, service_role;
 grant select on public.public_agency_sites to anon, authenticated;

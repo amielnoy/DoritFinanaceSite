@@ -960,7 +960,7 @@ from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
 | CTR-AGC-003 | "grants visitors exactly the public columns, never the consent stamp" | The 14 columns; no `consent_confirmed_*` |
 | CTR-AGC-004 | "lets a signed-in member read the consent date, and nothing else besides" | 14 plus `consent_confirmed_at`; never `_by` |
 | CTR-AGC-005 | "opens no other agency's testimonials to visitors" | No policy is created on `testimonials` in this migration |
-| CTR-AGC-006 | "shows a site's contact details only for live agencies, through a definer view of nine columns" | `public_agency_sites`: definer, `status = 'active'`, nine columns |
+| CTR-AGC-006 | "shows a site's contact details only for live agencies with a domain, through a definer view of nine columns" | `public_agency_sites`: definer, `status = 'active'` and `domain is not null`, nine columns |
 | CTR-AGC-007 | "grants the view to visitors and members only to read" | `select` only |
 | CTR-AGC-008 | "gives visitors no grant on agency_profiles, agencies or agents" | None |
 | CTR-AGC-009 | "adds a success case's tag and estimate flag, and nothing else" | `tag` (≤ 60), `metric_is_estimate` default false |

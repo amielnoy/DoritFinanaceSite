@@ -7,17 +7,20 @@
 \set ON_ERROR_STOP on
 begin;
 
--- F: a live agency · G: a draft · agency 1 is Dorit's (seeded)
+-- F: a live agency · G: a draft · H: live, with a profile but no domain
+-- agency 1 is Dorit's (seeded)
 -- c0 the account that confirmed F's and G's consent
 insert into auth.users (instance_id, id, aud, role, email, email_confirmed_at) values
   ('00000000-0000-0000-0000-000000000000','eeeeeeee-0000-0000-0000-0000000000c0','authenticated','authenticated','ac-confirmer@example.com', now());
 
 insert into public.agencies (id, name, status) values
   ('ffffffff-0000-0000-0000-00000000000f', 'סוכנות חיה', 'active'),
-  ('ffffffff-0000-0000-0000-0000000000a9', 'סוכנות טיוטה', 'draft');
+  ('ffffffff-0000-0000-0000-0000000000a9', 'סוכנות טיוטה', 'draft'),
+  ('ffffffff-0000-0000-0000-0000000000b8', 'סוכנות בלי אתר', 'active');
 insert into public.agency_profiles (agency_id, display_name, domain) values
   ('ffffffff-0000-0000-0000-00000000000f', 'סוכנות חיה', 'f.example'),
-  ('ffffffff-0000-0000-0000-0000000000a9', 'סוכנות טיוטה', 'g.example');
+  ('ffffffff-0000-0000-0000-0000000000a9', 'סוכנות טיוטה', 'g.example'),
+  ('ffffffff-0000-0000-0000-0000000000b8', 'סוכנות בלי אתר', null);
 insert into public.agents (id, agency_id, full_name) values
   ('99999999-0000-0000-0000-0000000000f1', 'ffffffff-0000-0000-0000-00000000000f', 'סוכנת חיה'),
   ('99999999-0000-0000-0000-0000000000a9', 'ffffffff-0000-0000-0000-0000000000a9', 'סוכנת טיוטה');
@@ -99,6 +102,15 @@ begin
   end if;
   if exists (select 1 from public.public_agency_sites where domain = 'g.example') then
     raise exception 'a draft agency''s site is public';
+  end if;
+  -- A site is found by its domain; a live agency without one has no site, and
+  -- its phone and email are nobody's to list.
+  if exists (select 1 from public.public_agency_sites where agency_id = 'ffffffff-0000-0000-0000-0000000000b8') then
+    raise exception 'a live agency with no domain is listed, contact and all';
+  end if;
+  if not exists (select 1 from public.public_agency_sites
+                  where agency_id = '00000000-0000-0000-0000-000000000001' and domain = 'govari-fin.co.il') then
+    raise exception 'agency 1 is not found by its seeded domain';
   end if;
   begin
     perform 1 from public.agency_profiles limit 1;

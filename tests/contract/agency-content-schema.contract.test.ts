@@ -89,12 +89,12 @@ describe("agency content, read-side schema", () => {
     expect(flat).not.toMatch(/create policy \S+ on public\.testimonials\b/);
   });
 
-  it("shows a site's contact details only for live agencies, through a definer view of nine columns (CTR-AGC-006)", () => {
+  it("shows a site's contact details only for live agencies with a domain, through a definer view of nine columns (CTR-AGC-006)", () => {
     const view = /create view public\.public_agency_sites with \(security_invoker = false\) as([\s\S]*?);/.exec(sql)?.[1] ?? "";
     expect(view).not.toBe("");
     const select = /^\s*select([\s\S]*?)\bfrom\b/.exec(view)?.[1] ?? "";
     expect(columnsOf(select)).toEqual(SITE_COLUMNS.map((c) => `p.${c}`));
-    expect(view).toMatch(/from public\.agency_profiles p\s+join public\.agencies a on a\.id = p\.agency_id\s+where a\.status = 'active'\s*$/);
+    expect(view).toMatch(/from public\.agency_profiles p\s+join public\.agencies a on a\.id = p\.agency_id\s+where a\.status = 'active'\s+and p\.domain is not null\s*$/);
     for (const banned of ["notify_emails", "mail_from", "onboarding", "consent_version", "ga4_measurement_id", "disclosures_", "licence_", "*"]) {
       expect(view, banned).not.toContain(banned);
     }
