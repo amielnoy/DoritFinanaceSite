@@ -31,6 +31,7 @@ const FAILED = ["failed", "broken"];
 const HISTORY_DB = path.join(ROOT, ".local-runner", "history.db");
 const HISTORY_RUNS = 100;
 const HISTORY_OUTPUT_CHARS = 200_000;
+const DASHBOARD_UPLOAD = path.join(ROOT, "scripts", "test-dashboard", "upload.mjs");
 
 const run = { busy: false, child: null, onFinish: null, suites: [], single: null, output: "", exitCode: null, startedAt: null, finishedAt: null };
 
@@ -72,6 +73,15 @@ async function saveRun() {
     );
   const insert = history.db.prepare("INSERT INTO failures (run_id, name, full_name, status, message, trace) VALUES (?, ?, ?, ?, ?, ?)");
   for (const result of failures) insert.run(lastInsertRowid, result.name || "", result.fullName || "", result.status, result.message, result.trace);
+}
+
+async function uploadRun(append) {
+  try {
+    const { stdout } = await execFileAsync(process.execPath, ["--env-file-if-exists=.env.local", DASHBOARD_UPLOAD, RESULTS_DIR], { cwd: ROOT });
+    append(`\n${stdout}`);
+  } catch (error) {
+    append(`\n${error.stderr || error.message}`);
+  }
 }
 
 function listHistory() {
@@ -142,6 +152,7 @@ function launch(command, args, { suites = [], single = null, e2e = false } = {})
     run.exitCode = exitCode;
     run.finishedAt = Date.now();
     await saveRun().catch((error) => append(`\nCould not save the run to history: ${error.message}\n`));
+    if (typeof exitCode === "number") await uploadRun(append);
     run.child = null;
     run.busy = false;
     run.onFinish?.();

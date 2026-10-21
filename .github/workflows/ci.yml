@@ -1088,6 +1088,13 @@ jobs:
           find allure-parts -type f -exec cp -n {} allure-results/ \; 2>/dev/null || true
           echo "merged $(ls allure-results | wc -l) result files"
 
+      - name: Upload the results to the test dashboard
+        continue-on-error: true
+        env:
+          TEST_DASHBOARD_SUPABASE_URL: ${{ secrets.TEST_DASHBOARD_SUPABASE_URL }}
+          TEST_DASHBOARD_SUPABASE_KEY: ${{ secrets.TEST_DASHBOARD_SUPABASE_KEY }}
+        run: node scripts/test-dashboard/upload.mjs allure-results
+
       # History makes the trend graphs meaningful across runs; without it every
       # report claims to be the first one. Allure 3 reads and rewrites
       # `allure-history/history.jsonl` itself (`historyPath` in allurerc.mjs),
