@@ -11,8 +11,9 @@ import { fetchRows, type SupabaseTableClient } from "./SupabaseTableClient";
 
 /**
  * Why a site's content could not be read. The hook shows the bundled agency-1
- * constants for every one of them; the code says which, for the console and
- * the tests.
+ * constants for every one of them; the code says which, in the hook's
+ * `[agency-content] site read failed: <code>` console warning
+ * (src/hooks/useAgencyContent.ts) and in the tests.
  */
 export class AgencyContentError extends Error {
   constructor(readonly code: "no_site" | "no_agent" | "incomplete") {

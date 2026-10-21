@@ -124,6 +124,34 @@ describe("useAgencyContent", () => {
     expect(result.current.agent.byline).toBe(en["hero.byline"]);
     expect(servicesMock.agencyContent.siteContent).not.toHaveBeenCalled();
   });
+
+  // The page looks the same whether the read failed or never ran, so the
+  // console is the one place a failure shows — the preview check before the
+  // flag goes on in production looks for it.
+  it("CMP-AGC-009: flag on, the read fails — one console warning naming the code; a read that answers, none", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const failed = await load(true);
+      const { rerender } = renderHook(() => [failed.useAgencyContent(), failed.useAgencyContent()], {
+        wrapper: failed.wrapper(),
+      });
+      await waitFor(() => expect(servicesMock.agencyContent.siteContent).toHaveBeenCalled());
+      await settle();
+      rerender();
+      await settle();
+      expect(warn.mock.calls).toEqual([["[agency-content] site read failed: no_site"]]);
+
+      warn.mockClear();
+      servicesMock.agencyContent.siteContent.mockResolvedValue(RECORD);
+      const answered = await load(true);
+      const { result } = renderHook(() => answered.useAgencyContent(), { wrapper: answered.wrapper() });
+      await waitFor(() => expect(result.current.source).toBe("database"));
+      await settle();
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });
 
 describe("useSuccessCases", () => {
@@ -180,6 +208,24 @@ describe("useSuccessCases", () => {
     await waitFor(() => expect(servicesMock.agencyContent.successCases).toHaveBeenCalledWith(AGENCY1_ID));
     await settle();
     expect(result.current.cases).toEqual(bundledSuccessCases(heT));
+  });
+
+  it("CMP-AGC-009b: flag on, the cases read fails — one console warning naming the error", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      servicesMock.agencyContent.siteContent.mockResolvedValue(RECORD);
+      servicesMock.agencyContent.successCases.mockRejectedValue(new Error("success_cases read failed: boom"));
+      const { useAgencyContent, useSuccessCases, wrapper } = await load(true);
+      const { result } = renderHook(() => ({ site: useAgencyContent(), cases: useSuccessCases() }), {
+        wrapper: wrapper(),
+      });
+      await waitFor(() => expect(result.current.site.source).toBe("database"));
+      await waitFor(() => expect(servicesMock.agencyContent.successCases).toHaveBeenCalledWith(AGENCY1_ID));
+      await settle();
+      expect(warn.mock.calls).toEqual([["[agency-content] cases read failed: success_cases read failed: boom"]]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

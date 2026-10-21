@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AGENCY_CONTENT } from "@/config/agency-content";
 import { AGENCY1_ID } from "@/config/agency1";
@@ -33,6 +33,33 @@ export const agencyContentKeys = {
 /** An agency changes its texts rarely; one read per visit is plenty. */
 const STALE_TIME = 30 * 60_000;
 
+/**
+ * A failed read looks exactly like no read at all — the bundled page — so the
+ * console is the one place it shows; the preview check before the flag goes on
+ * in production looks for this line. Every component on the page observes the
+ * same query and so the same error object; it is told once.
+ */
+const warned = new WeakSet<object>();
+
+function useWarnOnFailure(error: unknown, read: "site" | "cases"): void {
+  useEffect(() => {
+    if (!error) return;
+    if (typeof error === "object") {
+      if (warned.has(error)) return;
+      warned.add(error);
+    }
+    console.warn(`[agency-content] ${read} read failed: ${failureReason(error)}`);
+  }, [error, read]);
+}
+
+/** An AgencyContentError's code, or the table error's message. */
+function failureReason(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") {
+    return error.code;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 function useHomeT(): Translate {
   // The keys read are all home.json's; `Translate` only widens their type.
   return useT("home") as unknown as Translate;
@@ -48,13 +75,14 @@ function useFromDatabase(): AgencyContent {
   const locale = useLocale();
   const bundled = useMemo(() => bundledAgencyContent(t), [t]);
   const host = siteHost(window.location.hostname);
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     queryKey: agencyContentKeys.site(host),
     queryFn: () => services.agencyContent.siteContent(host),
     enabled: locale === "he",
     staleTime: STALE_TIME,
     retry: false,
   });
+  useWarnOnFailure(error, "site");
   return useMemo(
     () =>
       data && locale === "he"
@@ -92,13 +120,14 @@ function useCasesFromDatabase(): SuccessCase[] {
   const locale = useLocale();
   const { agencyId } = useAgencyContent();
   const bundled = useMemo(() => bundledSuccessCases(t), [t]);
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     queryKey: agencyContentKeys.cases(agencyId),
     queryFn: () => services.agencyContent.successCases(agencyId),
     enabled: locale === "he",
     staleTime: STALE_TIME,
     retry: false,
   });
+  useWarnOnFailure(error, "cases");
   if (data && locale === "he") return data;
   return agencyId === AGENCY1_ID ? bundled : NO_CASES;
 }
