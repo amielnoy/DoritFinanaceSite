@@ -3,11 +3,10 @@ import { CalendarDays, MessageCircle, MessagesSquare, Phone, Send } from "lucide
 import NeedsWizard from "@/components/dorit/forms/NeedsWizard";
 import QuickContact from "@/components/dorit/forms/QuickContact";
 import { AGENTS } from "@/config/agents";
-import { CONTACT } from "@/config/contact";
-import { CAL_LINK } from "@/config/offers";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 
 /*
@@ -39,6 +38,8 @@ export default function StartConversation() {
   const chatRef = useRef<HTMLDivElement>(null);
   const t = useT("home");
   const he = useLocale() === "he";
+  const { contact, agent } = useAgencyContent();
+  const bookingUrl = agent.bookingUrl;
 
   useEffect(() => {
     const openOnHash = () => {
@@ -76,13 +77,13 @@ export default function StartConversation() {
         {/* A 15-minute phone call on Dorit's diary, first, once VITE_CAL_LINK is
             set (growth brief, 2026-10-14); the questionnaire below becomes the
             second path. Unset, the section is as it was. */}
-        {CAL_LINK ? (
+        {bookingUrl ? (
           <div data-track-location="start_booking" className="max-w-[880px] w-full rounded-[4px] border border-highlight p-5 md:p-6 flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="m-0 font-heading text-xl md:text-2xl">{t("start.calTitle")}</p>
               <p className="m-0 mt-1 text-[15px] text-muted-foreground">{t("start.calText")}</p>
             </div>
-            <a href={CAL_LINK} target="_blank" rel="noopener noreferrer" className={ctaClass("max-sm:w-full")}>
+            <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className={ctaClass("max-sm:w-full")}>
               <CalendarDays size={18} aria-hidden="true" /> {t("start.calButton")}
             </a>
           </div>
@@ -92,7 +93,7 @@ export default function StartConversation() {
             the interview's anchor alive; `#start`, above, is what the CTAs use. */}
         {he ? (
         <div id="interview" className="max-w-[880px] w-full">
-          {CAL_LINK ? <p className="m-0 mb-4 text-[15px] text-muted-foreground">או, אם נוח יותר — שלוש שאלות קצרות, ודורית חוזרת אליכם:</p> : null}
+          {bookingUrl ? <p className="m-0 mb-4 text-[15px] text-muted-foreground">או, אם נוח יותר — שלוש שאלות קצרות, ודורית חוזרת אליכם:</p> : null}
           <NeedsWizard />
           <p className="m-0 mt-6 text-[15px] leading-[1.7] text-muted-foreground">
             השאלון אוסף מידע לקראת הפגישה ואינו נותן ייעוץ.
@@ -116,13 +117,13 @@ export default function StartConversation() {
             <p id="start-alternatives" className="m-0 text-[15px] text-muted-foreground">מעדיפים אחרת?</p>
             <ul aria-labelledby="start-alternatives" className="m-0 p-0 list-none flex flex-wrap gap-2">
               <li>
-                <a href={`https://wa.me/${CONTACT.whatsapp}`} target="_blank" rel="noopener noreferrer" className={CHIP}>
+                <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noopener noreferrer" className={CHIP}>
                   <MessageCircle size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
                   וואטסאפ
                 </a>
               </li>
               <li>
-                <a href={`tel:${CONTACT.phoneE164}`} className={CHIP}>
+                <a href={`tel:${contact.phoneE164}`} className={CHIP}>
                   <Phone size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
                   טלפון
                 </a>
@@ -212,7 +213,7 @@ export default function StartConversation() {
         {/* Two ways out of the chat, for a visitor who would rather not use it. */}
         <div className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4${he ? " max-md:hidden" : ""}`}>
           <a
-            href={`https://wa.me/${CONTACT.whatsapp}`}
+            href={`https://wa.me/${contact.whatsapp}`}
             target="_blank"
             rel="noopener noreferrer"
             className={TILE}
@@ -221,7 +222,7 @@ export default function StartConversation() {
             {t("start.preferWhatsapp")}
           </a>
           <a
-            href={`tel:${CONTACT.phoneE164}`}
+            href={`tel:${contact.phoneE164}`}
             className={TILE}
           >
             <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />

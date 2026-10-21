@@ -5,6 +5,7 @@ import Photo from "@/components/dorit/primitives/Photo";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 
 // The two plates share a 3fr/2fr row: half the section from lg up, the
@@ -14,15 +15,14 @@ const ATMOS_SIZES = "(min-width: 1024px) 30vw, 60vw";
 const PEN = "/images/about-pen";
 const PEN_SIZES = "(min-width: 1024px) 20vw, 40vw";
 
-// Three, not four. "97% שיעור תביעות שאושרו" was here and is gone: a licensed
-// agent quoting a performance figure is a regulated claim, and nothing in this
-// repo could substantiate it. The grid below is sized to this list — keep the
-// two in step, or the bordered strip renders with an empty cell.
-const STATS = [
-  ["about.stat1Num", "about.stat1"],
-  ["about.stat2Num", "about.stat2"],
-  ["about.stat3Num", "about.stat3"],
-] as const;
+// The strip has as many cells as the agent has figures, so the grid is sized
+// to the data's length. Written out in full: Tailwind finds a class only as a
+// literal. More than three is not offered by the editor; it would fall back to
+// three columns and wrap.
+// Agency 1 shows three, not four: "97% שיעור תביעות שאושרו" is gone, because a
+// licensed agent quoting a performance figure is a regulated claim and nothing
+// in this repo could substantiate it.
+const STAT_COLUMNS: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" };
 
 /**
  * `brief` keeps the first paragraph and the numbers, and drops the career
@@ -48,6 +48,9 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
   const [more, setMore] = useState<boolean>(false);
   const t = useT("home");
   const he = useLocale() === "he";
+  const { bio, stats } = useAgencyContent().agent;
+  // Today's single string when both are there; whichever one is there when not.
+  const opening = [bio.family, bio.credentials].filter(Boolean).join(" ");
   return (
     <section id="about" className="relative border-b border-border">
       <div className={`max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-[clamp(72px,9vw,120px)] grid grid-cols-1 lg:grid-cols-2 gap-[clamp(40px,6vw,96px)] items-center${brief ? " max-md:py-10" : ""}`}>
@@ -78,22 +81,20 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
               // text node, because a run boundary moves the justified line by
               // a pixel.
               <p id="about-more">
-                <span className={more ? undefined : "hidden"}>{t("about.family")} </span>
-                {t("about.credentials")}
+                {bio.family ? <span className={more ? undefined : "hidden"}>{bio.family} </span> : null}
+                {bio.credentials}
               </p>
             ) : (
-              <p>
-                {`${t("about.family")} ${t("about.credentials")}`}
-              </p>
+              opening ? <p>{opening}</p> : null
             )}
-            {brief ? null : <p>
-              {t("about.career")}
+            {brief || !bio.career ? null : <p>
+              {bio.career}
             </p>}
-            {brief ? null : <p>
-              {t("about.insight")}
+            {brief || !bio.insight ? null : <p>
+              {bio.insight}
             </p>}
-            {brief ? null : <p>
-              {t("about.unique")}
+            {brief || !bio.unique ? null : <p>
+              {bio.unique}
             </p>}
           </div>
           {oneSentence ? (
@@ -124,27 +125,29 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
               ) : null}
             </div>
           ) : null}
-          {brief ? null : (
+          {brief || !bio.signature ? null : (
             <p className="mt-6 font-heading italic text-2xl text-accent">
-              {t("about.signature")}
+              {bio.signature}
             </p>
           )}
 
-          <div className={`mt-8 grid grid-cols-3 border-y border-border${brief ? " max-md:mt-6" : ""}`}>
-            {STATS.map(([num, label], i) => (
+          {stats.length === 0 ? null : (
+          <div className={`mt-8 grid ${STAT_COLUMNS[Math.min(stats.length, 3)]} border-y border-border${brief ? " max-md:mt-6" : ""}`}>
+            {stats.map(({ num, label }, i) => (
               <div
                 key={i}
                 className={`px-2 py-6 flex flex-col items-center gap-2 text-center ${i > 0 ? "border-s border-border" : ""}${brief ? " max-md:py-4" : ""}`}
               >
                 <p className="font-heading text-[clamp(36px,4vw,52px)] text-accent leading-none lining-nums tabular-nums">
-                  {t(num)}
+                  {num}
                 </p>
                 <p className="text-[15px] text-muted-foreground">
-                  {t(label)}
+                  {label}
                 </p>
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
     </section>
