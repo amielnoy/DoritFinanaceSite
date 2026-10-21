@@ -196,24 +196,22 @@ begin
 end $$;
 reset role;
 
--- A second run changes nothing: not the agent, the cases, nor what the first
--- run's profile update fixed (consent_version, the approval).
-create temp table seed_before as
-  select (select count(*) from public.agents where id = '00000000-0000-0000-0000-0000000000a1') as agents,
-         (select count(*) from public.success_cases where agency_id = '00000000-0000-0000-0000-000000000001') as cases,
-         consent_version, disclosures_approved_at
-    from public.agency_profiles where agency_id = '00000000-0000-0000-0000-000000000001';
+-- A second run changes nothing. The file is one transaction, so now() is fixed
+-- and a re-run would rewrite the profile to values equal to the old ones;
+-- sentinels the seed cannot produce are planted first, and must survive.
+update public.agency_profiles
+   set consent_version = 'sentinel-v9', disclosures_approved_at = '2000-01-01'
+ where agency_id = '00000000-0000-0000-0000-000000000001';
 \ir ../migrations/20261107000000_seed_agency1_content.sql
 do $$ begin
-  if not exists (
-    select 1 from seed_before b, public.agency_profiles p
-     where p.agency_id = '00000000-0000-0000-0000-000000000001'
-       and b.agents = 1 and b.cases = 7
-       and b.agents = (select count(*) from public.agents where id = '00000000-0000-0000-0000-0000000000a1')
-       and b.cases = (select count(*) from public.success_cases where agency_id = '00000000-0000-0000-0000-000000000001')
-       and b.consent_version = p.consent_version
-       and b.disclosures_approved_at is not distinct from p.disclosures_approved_at) then
-    raise exception 'a second run of the agency 1 seed changed something';
+  if not exists (select 1 from public.agency_profiles
+                  where agency_id = '00000000-0000-0000-0000-000000000001'
+                    and consent_version = 'sentinel-v9' and disclosures_approved_at = '2000-01-01') then
+    raise exception 'a second run of the agency 1 seed rewrote the profile';
+  end if;
+  if (select count(*) from public.agents where id = '00000000-0000-0000-0000-0000000000a1') <> 1
+     or (select count(*) from public.success_cases where agency_id = '00000000-0000-0000-0000-000000000001') <> 7 then
+    raise exception 'a second run of the agency 1 seed changed the agent or the cases';
   end if;
 end $$;
 
