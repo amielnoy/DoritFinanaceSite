@@ -25,6 +25,7 @@ export default function Hero() {
   const tp = useT("pension");
   const lp = useLocalePath();
   const content = useAgencyContent();
+  const { contact } = content;
   return (
     <section id="top" className="relative border-b border-border pt-[80px] md:pt-[127px]">
       <div className="max-w-[1200px] mx-auto w-full px-[clamp(20px,4vw,40px)] py-[clamp(32px,5vw,64px)] grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-[clamp(32px,4vw,56px)] items-center">
@@ -101,7 +102,7 @@ export default function Hero() {
                 click_phone, location "top". */}
             <div className="md:hidden grid w-full grid-cols-2 gap-3">
               <a
-                href={`https://wa.me/${content.contact.whatsapp}?text=${encodeURIComponent(tc("contact.whatsappDefault"))}`}
+                href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(tc("contact.whatsappDefault"))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={HERO_ALT}
@@ -109,7 +110,7 @@ export default function Hero() {
                 <MessageCircle size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
                 {tc("sticky.whatsapp")}
               </a>
-              <a href={`tel:${content.contact.phoneE164}`} className={HERO_ALT}>
+              <a href={`tel:${contact.phoneE164}`} className={HERO_ALT}>
                 <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
                 {tc("nav.call")}
               </a>
