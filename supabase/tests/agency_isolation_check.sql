@@ -329,8 +329,12 @@ do $$ begin
   if (select count(*) from public.contacts where agency_id = 'aaaaaaaa-0000-0000-0000-000000000002') <> 0 then
     raise exception 'agency 1 member read an agency 2 contact';
   end if;
-  if (select count(*) from public.testimonials where agency_id = 'aaaaaaaa-0000-0000-0000-000000000002') <> 0 then
-    raise exception 'agency 1 member read an agency 2 testimonial';
+  -- Agency 2 is live and its testimonial carries consent, so since
+  -- 20261106100000 (testimonials_read_public_active) it is public, as agency
+  -- 1's is above. A draft's testimonial stays hidden from other agencies'
+  -- members: agency_content_check.sql holds that.
+  if (select count(*) from public.testimonials where agency_id = 'aaaaaaaa-0000-0000-0000-000000000002') <> 1 then
+    raise exception 'agency 1 member cannot read agency 2''s public testimonial';
   end if;
   if (select count(*) from public.meetings where agency_id = 'aaaaaaaa-0000-0000-0000-000000000002') <> 0 then
     raise exception 'agency 1 member read an agency 2 meeting';

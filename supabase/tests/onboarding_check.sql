@@ -414,9 +414,9 @@ begin
   insert into public.testimonials (name, quote, agency_id, agent_id, source, consent_confirmed_at, consent_confirmed_by)
   values ('ר״ל', 'מקצועית', 'dddddddd-0000-0000-0000-00000000000d', '99999999-0000-0000-0000-00000000000d', 'google',
           '2001-01-01', 'eeeeeeee-0000-0000-0000-0000000000a0');
-  if (select consent_confirmed_by from public.testimonials where name = 'ר״ל') <> 'eeeeeeee-0000-0000-0000-0000000000a1'
-     or (select consent_confirmed_at from public.testimonials where name = 'ר״ל') < now() - interval '1 minute' then
-    raise exception 'the consent stamp took the client''s name or date';
+  -- Who confirmed it is checked after `reset role` below: no member may read it (review M-2).
+  if (select consent_confirmed_at from public.testimonials where name = 'ר״ל') < now() - interval '1 minute' then
+    raise exception 'the consent stamp took the client''s date';
   end if;
   begin
     insert into public.testimonials (name, quote, agency_id, agent_id)
@@ -489,6 +489,14 @@ begin
   values ('agent-photos', 'dddddddd-0000-0000-0000-00000000000d/99999999-0000-0000-0000-00000000000d/portrait-1080.webp');
 end $$;
 reset role;
+
+-- The owner's consent stamp above, read as the table owner: who confirmed it
+-- is not granted to authenticated (20261106100000, review M-2).
+do $$ begin
+  if (select consent_confirmed_by from public.testimonials where name = 'ר״ל') is distinct from 'eeeeeeee-0000-0000-0000-0000000000a1' then
+    raise exception 'the consent stamp took the client''s name';
+  end if;
+end $$;
 
 -- E's owner, whose wizard state has no review yet: they cannot start one.
 set local role authenticated;
@@ -783,12 +791,15 @@ do $$ begin
   if exists (select 1 from public.success_cases where agency_id = 'dddddddd-0000-0000-0000-00000000000e') then
     raise exception 'a draft agency''s success case is public';
   end if;
-  -- Testimonials: the public read is as before — agency 1's rows.
+  -- Testimonials: agency 1's rows, as before, and since 20261106100000
+  -- (testimonials_read_public_active) a live agency's consented rows — D's one
+  -- consented row, and nothing else of any other agency.
   if not exists (select 1 from public.testimonials where name = 'ותיקה') then
     raise exception 'agency 1''s testimonials are no longer public';
   end if;
-  if exists (select 1 from public.testimonials where agency_id <> '00000000-0000-0000-0000-000000000001') then
-    raise exception 'the public read of testimonials widened';
+  if (select array_agg(name order by name) from public.testimonials
+       where agency_id <> '00000000-0000-0000-0000-000000000001') is distinct from array['ר״ל'] then
+    raise exception 'the public read of testimonials is not agency 1''s plus a live agency''s consented rows';
   end if;
 end $$;
 reset role;
@@ -947,11 +958,15 @@ do $$ begin
   end;
   insert into public.testimonials (name, quote, agency_id, consent_confirmed_at)
   values ('עם הסכמה', 'y', 'dddddddd-0000-0000-0000-00000000000d', now());
-  if (select consent_confirmed_by from public.testimonials where name = 'עם הסכמה') <> 'eeeeeeee-0000-0000-0000-0000000000a2' then
+end $$;
+reset role;
+
+-- Read as the table owner: authenticated has no grant on consent_confirmed_by (review M-2).
+do $$ begin
+  if (select consent_confirmed_by from public.testimonials where name = 'עם הסכמה') is distinct from 'eeeeeeee-0000-0000-0000-0000000000a2' then
     raise exception 'the Admin''s consent was not stamped';
   end if;
 end $$;
-reset role;
 
 -- The operator removes the second licensee: the notice moves on again.
 set local role authenticated;
