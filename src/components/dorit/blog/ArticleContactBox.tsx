@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Calculator, FileSearch, MessageCircle } from "lucide-react";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import type { Article } from "@/services";
 import { articleCtaHeadline, articleOffer, articleWhatsappText } from "@/lib/articleCta";
@@ -21,6 +21,7 @@ export default function ArticleContactBox({
   post: Pick<Article, "title" | "tags" | "cta_headline">;
   placement: Placement;
 }) {
+  const { contact } = useAgencyContent();
   const titleId = `article-cta-${placement}`;
   const offer = articleOffer(post);
   return (
@@ -38,7 +39,7 @@ export default function ArticleContactBox({
       </p>
       <div className="mt-5 flex flex-col sm:flex-row gap-3">
         <a
-          href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(articleWhatsappText(post.title))}`}
+          href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(articleWhatsappText(post.title))}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-2 min-h-12 px-[26px] rounded-md bg-whatsapp text-foreground font-heading font-medium text-lg hover:bg-whatsapp/90 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"

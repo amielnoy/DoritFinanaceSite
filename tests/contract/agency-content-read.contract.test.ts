@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AGENCY_CONTENT_TABLES } from "../../src/services/supabase/agency-content-tables";
 import { REPO_ROOT } from "../helpers/entity-schema";
@@ -34,5 +34,57 @@ describe("CTR-AGC-020: the prerender refuses the agency-content reads", () => {
     const abort = code.indexOf("AGENCY_CONTENT_TABLES.some(");
     expect(serve).toBeGreaterThan(-1);
     expect(abort).toBeGreaterThan(serve);
+  });
+});
+
+/**
+ * Task 6: the public chrome and pages read contact and licence from the hook.
+ * The files below keep the bundled contact on purpose — the error screen must
+ * not wait on a query, the flows' mail still goes to _shared/recipients.ts's
+ * fixed addresses until Rollout 5, and the rest is not React. Adding a reader
+ * is a decision, so it starts here.
+ */
+const CONTACT_READERS = [
+  "src/components/ErrorBoundary.tsx",
+  "src/components/dorit/chat/AgentChat.tsx",
+  "src/components/dorit/forms/NeedsWizard.tsx",
+  "src/components/dorit/forms/QuickContact.tsx",
+  "src/components/dorit/booking/OutlookCalendarBooking.tsx",
+  "src/components/dorit/account/SnapshotView.tsx",
+  "src/hooks/useSubmission.ts",
+  "src/lib/calculator-lead.ts",
+  "src/lib/agency-content.ts",
+  "src/services/fallback-contact.ts",
+].sort();
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = join(dir, e.name);
+    return e.isDirectory() ? sourceFiles(p) : /\.(tsx?|jsx?)$/.test(e.name) ? [p] : [];
+  });
+}
+
+const stripComments = (s: string) =>
+  s
+    .split("\n")
+    .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join("\n");
+
+describe("CTR-AGC-021: only the listed files import the bundled contact", () => {
+  it("the importers of @/config/contact are CONTACT_READERS, exactly", () => {
+    const importers = sourceFiles(join(REPO_ROOT, "src"))
+      .filter((f) => /from\s+["']@\/config\/contact["']/.test(stripComments(readFileSync(f, "utf8"))))
+      .map((f) => relative(REPO_ROOT, f))
+      .sort();
+    expect(importers).toEqual(CONTACT_READERS);
+  });
+});
+
+describe("CTR-AGC-022: no component or page hard-codes the licence number", () => {
+  it("L-00107009 appears in no code line under src/components or src/pages", () => {
+    const hits = [...sourceFiles(join(REPO_ROOT, "src/components")), ...sourceFiles(join(REPO_ROOT, "src/pages"))]
+      .filter((f) => stripComments(readFileSync(f, "utf8")).includes("L-00107009"))
+      .map((f) => relative(REPO_ROOT, f));
+    expect(hits).toEqual([]);
   });
 });

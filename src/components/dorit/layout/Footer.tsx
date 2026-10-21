@@ -2,7 +2,7 @@ import React from "react";
 import Photo from "@/components/dorit/primitives/Photo";
 import { ChevronDown, Phone, Mail, MapPin, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { WHATSAPP_CHANNEL_URL } from "@/config/offers";
 import { useSectionNav } from "@/hooks/useSectionNav";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -39,6 +39,7 @@ const CONTACT_ROW = "flex items-center gap-3 max-md:min-h-11";
 const CONTACT_LINK = `${FOOT_LINK} max-md:inline-flex max-md:items-center max-md:min-h-11`;
 
 export default function Footer() {
+  const { contact, agent } = useAgencyContent();
   // The footer sits on all seven pages, so its `#section` links point at
   // something that exists on only one of them. See the hook.
   const goToSection = useSectionNav();
@@ -126,19 +127,19 @@ export default function Footer() {
           <ul className="flex flex-col gap-3 text-base text-[hsl(0_3%_84%)] max-md:grid max-md:grid-cols-2 max-md:gap-x-4 max-md:gap-y-0">
             <li className={CONTACT_ROW}>
               <Phone size={16} strokeWidth={1.5} className="text-highlight-on-dark" />
-              <a href={`tel:${CONTACT.phoneE164}`} className={CONTACT_LINK}>
-                <span dir="ltr" className="[unicode-bidi:isolate]">{CONTACT.phoneDisplay}</span>
+              <a href={`tel:${contact.phoneE164}`} className={CONTACT_LINK}>
+                <span dir="ltr" className="[unicode-bidi:isolate]">{contact.phoneDisplay}</span>
               </a>
             </li>
             <li className={CONTACT_ROW}>
               <MessageCircle size={16} strokeWidth={1.5} className="text-highlight-on-dark" />
-              <a href={`https://wa.me/${CONTACT.whatsapp}`} target="_blank" rel="noopener noreferrer" dir="ltr" className={CONTACT_LINK}>WhatsApp</a>
+              <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noopener noreferrer" dir="ltr" className={CONTACT_LINK}>WhatsApp</a>
             </li>
             {/* The email address and the place take the whole row: at 390px either
                 one in a half-width cell would break mid-word. */}
             <li className={`${CONTACT_ROW} max-md:col-span-2`}>
               <Mail size={16} strokeWidth={1.5} className="text-highlight-on-dark" />
-              <a href={`mailto:${CONTACT.email}`} dir="ltr" className={CONTACT_LINK}>{CONTACT.email}</a>
+              <a href={`mailto:${contact.email}`} dir="ltr" className={CONTACT_LINK}>{contact.email}</a>
             </li>
             <li className={`${CONTACT_ROW} max-md:col-span-2`}>
               <MapPin size={16} strokeWidth={1.5} className="text-highlight-on-dark" />
@@ -162,7 +163,7 @@ export default function Footer() {
         <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-sm text-muted-foreground-on-dark">
           <p>
             {t("footer.licence")}{" "}
-            <bdi className="whitespace-nowrap lining-nums tabular-nums">L-00107009</bdi>
+            <bdi className="whitespace-nowrap lining-nums tabular-nums">{agent.licenceNumber}</bdi>
           </p>
           <div className="flex items-center gap-5">
             <Link to={lp("/faq")} className={FOOT_LINK}>{t("nav.faq")}</Link>

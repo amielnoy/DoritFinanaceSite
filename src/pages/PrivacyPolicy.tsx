@@ -3,10 +3,11 @@ import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
 import Footer from "@/components/dorit/layout/Footer";
 import { breadcrumbLd, useSeo } from "@/lib/seo";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { MEETINGS_CLIENT } from "@/config/meetings";
 
 export default function PrivacyPolicy() {
+  const { contact } = useAgencyContent();
   useSeo({
     title: "מדיניות פרטיות | דורית גוב ארי",
     description:
@@ -180,7 +181,7 @@ export default function PrivacyPolicy() {
             <h2 className="font-heading text-2xl mb-3">9. אחראי לפרטיות</h2>
             <p>
               האחראי לענייני פרטיות בסוכנות הוא דורית גוב ארי. ניתן לפנות
-              בכתובת <a href={`mailto:${CONTACT.email}`} dir="ltr" className="text-accent underline underline-offset-4">{CONTACT.email}</a> או בטלפון המפורסם באתר.
+              בכתובת <a href={`mailto:${contact.email}`} dir="ltr" className="text-accent underline underline-offset-4">{contact.email}</a> או בטלפון המפורסם באתר.
             </p>
           </section>
         </div>

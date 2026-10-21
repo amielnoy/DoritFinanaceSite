@@ -16,7 +16,7 @@ import { faqLd } from "@/lib/structured-data";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import { CtaLink } from "@/components/dorit/primitives/Cta";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import AgentChat from "@/components/dorit/chat/AgentChat";
 import { AGENTS } from "@/config/agents";
 import { FAQ_CATEGORIES, faqByCategory } from "@/content/faq";
@@ -46,6 +46,7 @@ const CTA_CELL =
   "max-md:flex-col max-md:justify-center max-md:gap-1 max-md:min-h-16 max-md:px-1 max-md:py-2 max-md:text-[15px] max-md:leading-tight";
 
 export default function FAQPage() {
+  const { contact } = useAgencyContent();
   const t = useT("faq");
   const locale = useLocale();
   const lp = useLocalePath();
@@ -290,15 +291,15 @@ export default function FAQPage() {
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 max-md:mt-6 max-md:grid max-md:grid-cols-3 max-md:gap-2 max-md:items-stretch">
                 <CtaLink href={lp("/#start")} className={CTA_CELL}>{t("page.ctaMeeting")}</CtaLink>
                 <a
-                  href={`tel:${CONTACT.phoneE164}`}
+                  href={`tel:${contact.phoneE164}`}
                   className={`inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors ${CTA_CELL}`}
                 >
                   <Phone size={18} className="shrink-0" />
-                  <span dir="ltr" className="max-md:hidden">{CONTACT.phoneDisplay}</span>
+                  <span dir="ltr" className="max-md:hidden">{contact.phoneDisplay}</span>
                   <span className="md:hidden">{t("page.ctaPhone")}</span>
                 </a>
                 <a
-                  href={`https://wa.me/${CONTACT.whatsapp}`}
+                  href={`https://wa.me/${contact.whatsapp}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors ${CTA_CELL}`}

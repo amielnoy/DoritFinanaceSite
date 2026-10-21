@@ -3,9 +3,10 @@ import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
 import Footer from "@/components/dorit/layout/Footer";
 import { breadcrumbLd, useSeo } from "@/lib/seo";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 
 export default function Accessibility() {
+  const { contact } = useAgencyContent();
   useSeo({
     title: "הצהרת נגישות | דורית גוב ארי",
     description:
@@ -71,8 +72,8 @@ export default function Accessibility() {
           <section>
             <h2 className="font-heading text-2xl mb-3">פרטי קשר לנגישות</h2>
             <ul className="space-y-1.5">
-              <li>דוא״ל: <a href={`mailto:${CONTACT.email}`} dir="ltr" className="text-accent hover:underline">{CONTACT.email}</a></li>
-              <li>טלפון: <a href={`https://wa.me/${CONTACT.whatsapp}`} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-accent hover:underline">{CONTACT.phoneDisplay}</a></li>
+              <li>דוא״ל: <a href={`mailto:${contact.email}`} dir="ltr" className="text-accent hover:underline">{contact.email}</a></li>
+              <li>טלפון: <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noopener noreferrer" dir="ltr" className="text-accent hover:underline">{contact.phoneDisplay}</a></li>
             </ul>
           </section>
 

@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X, Phone, MessageCircle, Calendar, ChevronLeft, User, CircleHelp } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { useAuth } from "@/lib/AuthContext";
 import { useSectionNav } from "@/hooks/useSectionNav";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
@@ -67,6 +67,7 @@ const LOGIN_HREF = "/login?returnTo=/account";
 const AdminMenu = lazy(() => import("@/components/dorit/admin/AdminMenu"));
 
 export default function FloatingHeader() {
+  const { contact } = useAgencyContent();
   const [open, setOpen] = useState<boolean>(false);
   const navigateToSection = useSectionNav();
   const { isAuthenticated, isLoadingAuth, user, logout } = useAuth();
@@ -163,12 +164,12 @@ export default function FloatingHeader() {
               screen carrying four buttons for two intentions. The drawer still
               has a call button for anyone who opens it. */}
           <a
-            href={`tel:${CONTACT.phoneE164}`}
+            href={`tel:${contact.phoneE164}`}
             aria-label={t("header.callAria")}
             className="hidden md:inline-flex items-center gap-2 min-h-11 px-4 border border-border rounded-md text-[15px] text-foreground hover:bg-foreground/[0.06] transition-colors duration-200"
           >
             <Phone size={15} className="text-accent" />
-            <span dir="ltr">{CONTACT.phoneDisplay}</span>
+            <span dir="ltr">{contact.phoneDisplay}</span>
           </a>
           <button
             /* p-3 keeps the tap target at 46px — WCAG 2.5.5 / iOS HIG want >= 44. */
@@ -313,14 +314,14 @@ export default function FloatingHeader() {
                 </a>
                 <div className="grid grid-cols-2 gap-3">
                   <a
-                    href={`tel:${CONTACT.phoneE164}`}
+                    href={`tel:${contact.phoneE164}`}
                     className="flex items-center justify-center gap-2 min-h-12 border border-border rounded-md text-[15px] hover:border-highlight hover:bg-highlight/5 transition-colors duration-200"
                   >
                     <Phone size={16} />
                     {t("header.call")}
                   </a>
                   <a
-                    href={`https://wa.me/${CONTACT.whatsapp}`}
+                    href={`https://wa.me/${contact.whatsapp}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 min-h-12 border border-border rounded-md text-[15px] hover:border-highlight hover:bg-highlight/5 transition-colors duration-200"

@@ -18,7 +18,7 @@ import Footer from "@/components/dorit/layout/Footer";
 import { SITE_NAME, absoluteUrl, breadcrumbLd, useSeo } from "@/lib/seo";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import { CtaLink } from "@/components/dorit/primitives/Cta";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import ClaimForm from "@/components/dorit/forms/ClaimForm";
 import { useSectionNav } from "@/hooks/useSectionNav";
@@ -55,6 +55,7 @@ const CLAIM_TYPES: ClaimType[] = [
 const DOCS = [1, 2, 3, 4, 5, 6] as const;
 
 export default function Claims() {
+  const { contact } = useAgencyContent();
   const goToSection = useSectionNav();
   const t = useT("claims");
   const locale = useLocale();
@@ -109,17 +110,17 @@ export default function Claims() {
           <Reveal delay={0.1}>
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
               <a
-                href={`tel:${CONTACT.phoneE164}`}
+                href={`tel:${contact.phoneE164}`}
                 className="flex items-center gap-4 p-5 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 <Phone size={22} className="text-highlight" />
                 <span className="flex flex-col">
                   <span className="text-xs tracking-[0.2em] uppercase text-primary-foreground/60">{t("hero.reportNow")}</span>
-                  <span dir="ltr" className="font-medium">{CONTACT.phoneDisplay}</span>
+                  <span dir="ltr" className="font-medium">{contact.phoneDisplay}</span>
                 </span>
               </a>
               <a
-                href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(t("hero.whatsappText"))}`}
+                href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(t("hero.whatsappText"))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-4 p-5 border border-border hover:border-accent hover:text-accent transition-colors"
@@ -131,13 +132,13 @@ export default function Claims() {
                 </span>
               </a>
               <a
-                href={`mailto:${CONTACT.email}`}
+                href={`mailto:${contact.email}`}
                 className="flex items-center gap-4 p-5 border border-border hover:border-accent hover:text-accent transition-colors"
               >
                 <Mail size={22} className="text-accent" />
                 <span className="flex flex-col">
                   <span className="text-xs tracking-[0.2em] uppercase text-muted-foreground">{t("hero.documents")}</span>
-                  <span dir="ltr" className="font-medium">{CONTACT.email}</span>
+                  <span dir="ltr" className="font-medium">{contact.email}</span>
                 </span>
               </a>
             </div>
@@ -291,7 +292,7 @@ export default function Claims() {
               </p>
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a
-                  href={`tel:${CONTACT.phoneE164}`}
+                  href={`tel:${contact.phoneE164}`}
                   className="inline-flex items-center gap-2 px-7 py-3.5 bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
                 >
                   <Phone size={18} />
