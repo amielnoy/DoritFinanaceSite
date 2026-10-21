@@ -50,6 +50,12 @@ export const E2E_BUILD_ENV = {
   VITE_MASLEKA_ENABLED: "",
   // Off in production too, until the privacy wording is approved.
   VITE_MEETINGS_CLIENT: "",
+  // Off in production, and on here: the reverse of VITE_MASLEKA_ENABLED. On, so
+  // the agency-content read side runs in every spec and its visual gate
+  // (e2e/ui/agency-content.spec.ts) can compare the seeded render with the
+  // bundled one; production smoke keeps exercising it off. The bundle is sealed
+  // at build time, so one run can have only one value.
+  VITE_AGENCY_CONTENT: "true",
 
   // ── Base44: the SDK still boots, and must reach nothing ────────────────
   // The SDK is still in the bundle and keys its paths off this id. Nothing in a

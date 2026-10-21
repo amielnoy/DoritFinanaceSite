@@ -66,6 +66,15 @@ test.describe("Backend contract (observed traffic)", () => {
       expect(Number(params.get("limit"))).toBeLessThanOrEqual(100);
     });
 
+    await test_step("it asks for the site's agency, and only for columns anon may read", async () => {
+      const params = new URL(req.url).searchParams;
+      // VITE_AGENCY_CONTENT is on in the e2e build (e2e/build-env.ts); on localhost the site is agency 1's.
+      expect(params.get("agency_id")).toBe("eq.00000000-0000-0000-0000-000000000001");
+      // R6: anon is granted the public columns only, so naming a consent column would fail the whole read.
+      expect(params.get("select")).toBeTruthy();
+      expect(params.get("select")).not.toContain("consent_confirmed");
+    });
+
     await test_step("it is the anonymous read: the publishable key, as apikey and as the bearer", async () => {
       const key = req.headers["apikey"];
       expect(key, "no apikey header").toBeTruthy();
