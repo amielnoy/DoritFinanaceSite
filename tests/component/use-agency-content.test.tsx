@@ -146,6 +146,41 @@ describe("useSuccessCases", () => {
     await waitFor(() => expect(result.current).toEqual(CASES));
     expect(servicesMock.agencyContent.successCases).toHaveBeenCalledWith(AGENCY1_ID);
   });
+
+  // Dorit's client stories beside another agency's contact would be credited
+  // to that agency, so only agency 1's site falls back to them.
+  const AGENCY_F = "ffffffff-0000-0000-0000-00000000000f";
+
+  it("CMP-AGC-007c: flag on, another agency whose cases are still loading — none, not Dorit's", async () => {
+    servicesMock.agencyContent.siteContent.mockResolvedValue({ ...RECORD, agencyId: AGENCY_F });
+    servicesMock.agencyContent.successCases.mockReturnValue(never());
+    const { useSuccessCases, wrapper } = await load(true);
+    const { result } = renderHook(() => useSuccessCases(), { wrapper: wrapper() });
+    await waitFor(() => expect(servicesMock.agencyContent.successCases).toHaveBeenCalledWith(AGENCY_F));
+    await settle();
+    expect(result.current).toEqual([]);
+  });
+
+  it("CMP-AGC-007d: flag on, another agency whose cases fail — none, not Dorit's", async () => {
+    servicesMock.agencyContent.siteContent.mockResolvedValue({ ...RECORD, agencyId: AGENCY_F });
+    const { useSuccessCases, wrapper } = await load(true);
+    const { result } = renderHook(() => useSuccessCases(), { wrapper: wrapper() });
+    await waitFor(() => expect(servicesMock.agencyContent.successCases).toHaveBeenCalledWith(AGENCY_F));
+    await settle();
+    expect(result.current).toEqual([]);
+  });
+
+  it("CMP-AGC-007e: flag on, agency 1 whose cases fail — the bundled cases", async () => {
+    servicesMock.agencyContent.siteContent.mockResolvedValue(RECORD);
+    const { useAgencyContent, useSuccessCases, wrapper } = await load(true);
+    const { result } = renderHook(() => ({ site: useAgencyContent(), cases: useSuccessCases() }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.site.source).toBe("database"));
+    await waitFor(() => expect(servicesMock.agencyContent.successCases).toHaveBeenCalledWith(AGENCY1_ID));
+    await settle();
+    expect(result.current.cases).toEqual(bundledSuccessCases(heT));
+  });
 });
 
 describe("useSiteTestimonials", () => {

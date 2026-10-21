@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AGENCY_CONTENT } from "@/config/agency-content";
+import { AGENCY1_ID } from "@/config/agency1";
 import { useTestimonials } from "@/hooks/useContent";
 import { useLocale, useT } from "@/i18n/LocaleContext";
 import {
@@ -72,12 +73,20 @@ function useFromDatabase(): AgencyContent {
  */
 export const useAgencyContent: () => AgencyContent = AGENCY_CONTENT ? useFromDatabase : useBundledOnly;
 
+/** One empty list, so a component's memo sees the same value on every render. */
+const NO_CASES: SuccessCase[] = [];
+
 function useBundledCasesOnly(): SuccessCase[] {
   const t = useHomeT();
   return useMemo(() => bundledSuccessCases(t), [t]);
 }
 
-/** Keyed on the site's agency: agency 1's id while the site itself is still loading. */
+/**
+ * Keyed on the site's agency: agency 1's id while the site itself is still
+ * loading. Only agency 1's own site falls back to the bundled cases: they are
+ * Dorit's clients' stories, and beside another agency's contact they would be
+ * credited to that agency, so its site shows none until its own arrive.
+ */
 function useCasesFromDatabase(): SuccessCase[] {
   const t = useHomeT();
   const locale = useLocale();
@@ -90,7 +99,8 @@ function useCasesFromDatabase(): SuccessCase[] {
     staleTime: STALE_TIME,
     retry: false,
   });
-  return data && locale === "he" ? data : bundled;
+  if (data && locale === "he") return data;
+  return agencyId === AGENCY1_ID ? bundled : NO_CASES;
 }
 
 /** Chosen once, for the same reason as `useAgencyContent`. */
