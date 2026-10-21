@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 71 in `e2e/ui`, of 182 across the whole e2e suite. CI runs `web-chromium` on a pull request, and `web-chromium` + `android-chrome` (two shards each) on `main`, nightly and on a manual run; `web-webkit` and `ios-safari` remain in `playwright.config` for a local run
+**Location:** `e2e/ui/` · **Cases:** 87 in `e2e/ui`, of 199 across the whole e2e suite. CI runs `web-chromium` on a pull request, and `web-chromium` + `android-chrome` (two shards each) on `main`, nightly and on a manual run; `web-webkit` and `ios-safari` remain in `playwright.config` for a local run
 
 ---
 
@@ -212,6 +212,20 @@ e2e of one request end to end needs the switch on in a test build and belongs
 to PR B. Run once with `VITE_MASLEKA_ENABLED=true` the two cases above must
 fail (the page asks for the link; the board exists) — that is how they are
 known to bite.
+
+### 3.11 Agency content — `agency-content.spec.ts`
+
+The e2e build has `VITE_AGENCY_CONTENT=true` (CTR-E2E-002). Each case renders a page twice: from agency 1's rows as the seed writes them (`e2e/fixtures/agency1-seed.ts`), and with `public_agency_sites` refused (503), which falls back to the bundled constants. Both full-page screenshots must be byte-identical and `body` HTML equal (R9). Reduced motion; skipped against a deployment, whose stubs are unreachable.
+
+| ID | Title | Expected result |
+|---|---|---|
+| E2E-AGC-001 | "/ from the seeded rows matches the bundled fallback" | Same PNG and `body` HTML; `public_agent_cards` was requested |
+| E2E-AGC-002 | "/perspective from the seeded rows matches the bundled fallback" | As above |
+| E2E-AGC-003 | "/privacy from the seeded rows matches the bundled fallback" | As above |
+| E2E-AGC-004 | "/poa.html is the same page whatever the database answers" | A static file (R4): identical |
+| E2E-AGC-005 | "a value changed in the database reaches the page" | The footer shows `050-000-0000` when the site row says so; without this the gate could pass on a page that never shows a database value |
+
+Runs on `web-chromium` and `android-chrome`. Before the user turns the flag on, this spec is run on a preview built with it.
 
 ## 4. Pass criteria
 

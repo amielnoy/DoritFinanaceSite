@@ -717,6 +717,13 @@ analysis and lists every stored report under "ניתוחים".
   - `VITE_WHATSAPP_CHANNEL_URL` — her WhatsApp channel; the footer offers
     "תזכורת אחת בחודש לפני דדליינים של מס". The site keeps no list. GA4
     `join_channel`.
+  - `VITE_AGENCY_CONTENT` — on only when exactly `true`. The page then reads
+    the host's agency (contact, licence, bio, success cases) from Supabase and
+    falls back to the bundled agency-1 text while loading, on any error and
+    for a non-Hebrew locale. Off: no request, and today's render. The
+    prerender, `llms.txt` and `poa.html` stay on the bundled text either way.
+    Turn it on only after `e2e/ui/agency-content.spec.ts` is green on a preview
+    built with it.
 - **Not code, waiting on the regulatory adviser:** paid claims advocacy on
   success, employer talks, accountant referrals.
 

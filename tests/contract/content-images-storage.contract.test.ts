@@ -46,7 +46,7 @@ describe("the site may show those images", () => {
     expect(imgSrc.split(/\s+/)).not.toContain("https://hjowdyiwjjrqceumkvgt.supabase.co");
   });
 
-  it("allows img-src from agent-photos' public path only", () => {
+  it("CTR-CIS-001: allows img-src from agent-photos' public path only", () => {
     const csp = JSON.stringify(JSON.parse(read("vercel.json")).headers);
     const imgSrc = csp.match(/img-src([^;"]*)/)?.[1] ?? "";
     expect(imgSrc).toContain(
