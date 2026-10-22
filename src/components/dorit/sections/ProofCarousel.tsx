@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, ChevronDown, MessageCircle } from "lucide-react";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent, useSuccessCases } from "@/hooks/useAgencyContent";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -19,21 +19,6 @@ import { dirOf } from "@/i18n/locales";
  */
 
 /**
- * Each case's keys in home.json (`proof.c<n>.tag/title/body/metric`). `basis`
- * puts `proof.basis` under the figure, where the figure is a projection rather
- * than a fact.
- */
-const BRIEFS = [
-  { id: "c1" },
-  { id: "c2", basis: true },
-  { id: "c3" },
-  { id: "c4" },
-  { id: "c5" },
-  { id: "c6", basis: true },
-  { id: "c7" },
-] as const satisfies readonly { id: string; basis?: boolean }[];
-
-/**
  * Below md the strip stays a strip, made shorter: each case shows its tag, its
  * headline and its figure (with the figure's basis, which never leaves it), and
  * the story behind it is folded behind "פרטי המקרה" — a real button with
@@ -48,6 +33,8 @@ export default function ProofCarousel() {
   const t = useT("home");
   const tc = useT("common");
   const locale = useLocale();
+  const { contact } = useAgencyContent();
+  const cases = useSuccessCases();
   // Which way is back: towards the first case — the right in Hebrew (a
   // positive scrollBy), the left in English and French.
   const back = dirOf(locale) === "rtl" ? 1 : -1;
@@ -121,7 +108,7 @@ export default function ProofCarousel() {
         className="flex gap-5 overflow-x-auto px-[clamp(20px,4vw,40px)] pb-[clamp(72px,9vw,120px)] snap-x snap-mandatory max-md:items-start [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight max-md:gap-4 max-md:pb-10"
         style={{ scrollbarWidth: "none" }}
       >
-        {BRIEFS.map((b, i) => {
+        {cases.map((b, i) => {
           const expanded = open.has(i);
           return (
             <article
@@ -129,15 +116,18 @@ export default function ProofCarousel() {
               className="snap-start shrink-0 w-[min(84vw,400px)] rounded-md border border-border hover:border-highlight p-8 flex flex-col gap-4 transition-colors duration-200 max-md:p-5 max-md:gap-3"
             >
               <div className="flex items-center justify-between">
-                <span className="text-sm px-2.5 py-0.5 rounded-sm bg-[hsl(33_100%_95%)] text-[hsl(37_80%_20%)]">
-                  {t(`proof.${b.id}.tag`)}
-                </span>
+                {/* The number below keeps its end of the row when a case has no tag. */}
+                {b.tag ? (
+                  <span className="text-sm px-2.5 py-0.5 rounded-sm bg-[hsl(33_100%_95%)] text-[hsl(37_80%_20%)]">
+                    {b.tag}
+                  </span>
+                ) : <span />}
                 <span className="font-heading text-xl lining-nums tabular-nums text-muted-foreground">
                   0{i + 1}
                 </span>
               </div>
               <h3 className="font-heading font-medium text-[26px] leading-[1.3] max-md:text-[21px]">
-                {t(`proof.${b.id}.title`)}
+                {b.title}
               </h3>
               {/* Below md the story shows its first two lines until "פרטי המקרה"
                   opens it: hidden outright, half of each card stood empty
@@ -148,14 +138,16 @@ export default function ProofCarousel() {
                   !isDesktop && !expanded ? "line-clamp-2" : ""
                 }`}
               >
-                {t(`proof.${b.id}.body`)}
+                {b.body}
               </p>
               <div className="pt-[18px] border-t border-border flex items-center justify-between max-md:pt-3 max-md:flex-wrap max-md:gap-x-3">
                 <span className="flex flex-col gap-1.5 max-md:gap-1">
-                  <span className="block font-heading text-[32px] text-accent leading-[1.1] max-md:text-[26px]">
-                    {t(`proof.${b.id}.metric`)}
-                  </span>
-                  {"basis" in b ? (
+                  {b.metric ? (
+                    <span className="block font-heading text-[32px] text-accent leading-[1.1] max-md:text-[26px]">
+                      {b.metric}
+                    </span>
+                  ) : null}
+                  {b.estimate ? (
                     <span className="block text-[13px] text-muted-foreground">{t("proof.basis")}</span>
                   ) : null}
                 </span>
@@ -192,7 +184,7 @@ export default function ProofCarousel() {
           location "proof". */}
       <div data-track-location="proof" className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] -mt-[clamp(40px,6vw,80px)] pb-[clamp(56px,7vw,96px)] max-md:-mt-4 max-md:pb-10">
         <a
-          href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(t("proof.similarText"))}`}
+          href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(t("proof.similarText"))}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 min-h-11 font-heading text-xl text-accent underline decoration-highlight/50 underline-offset-[6px] hover:decoration-highlight"

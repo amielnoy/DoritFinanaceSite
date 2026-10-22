@@ -53,6 +53,18 @@ npx skills add base44/skills
   Supabase first, then Base44. The browser must not write Base44's `Lead` entity
   directly — Supabase would keep the old status and the deleted enquiry, and the
   personal area reads Supabase. See A-73.
+- **Agency content** (`VITE_AGENCY_CONTENT`, `src/hooks/useAgencyContent.ts`,
+  `supabase/migrations/20261107000000_seed_agency1_content.sql`).
+  - The seed equals the bundled strings (`tests/contract/agency-content-seed.contract.test.ts`),
+    so change both or neither: a one-sided edit shows a different site the day
+    the flag goes on.
+  - The prerender stays on the constants until Rollout 5; it refuses the
+    agency-content reads (CTR-AGC-020).
+  - `CONTACT_READERS` in `agency-content-read.contract.test.ts` is the deliberate
+    list of files that may import the bundled contact; add to it on purpose.
+  - Dorit's portrait is the agency-1 special case (`src/lib/portrait.ts`): agency 1
+    with a null `photo_path` gets the bundled `/images/dorit-office-portrait-*` set.
+    Every other agency gets its upload or a monogram.
 - **Agency roles: Owner, Admin, User**
   (`docs/superpowers/specs/2026-10-15-agency-roles-design.md`).
   - **`can_see_lead(lead)` is the read rule for lead data.** A User sees only

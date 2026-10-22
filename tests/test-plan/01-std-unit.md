@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 969 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 1651 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 1245 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 2084 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -1856,3 +1856,41 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4. The tab'
 | UNIT-ONB-005..006 | `stepOfKey`, `missingByStep` | A reported key maps to its step; a detail string grouped in step order; an unknown key kept under review |
 | UNIT-ONB-007 | `isLicenceNumber` | "L-" and digits, loosely |
 | UNIT-ONB-008 | `ACTIVATION_GATES` | The spec's three gates |
+
+### 4.79 Agency content as data — `tests/unit/agency-content.test.ts`, `tests/unit/supabase-agency-content.test.ts`
+
+`src/lib/agency-content.ts`, `src/config/agency-content.ts`, `src/config/agency1.ts` and the Supabase adapter behind `VITE_AGENCY_CONTENT` (R1, R5, R8, R9). The prerender never calls the adapter (CTR-AGC-020); the cases that need rows use the in-memory table fake.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-AGC-001 | "on only for exactly \"true\", like isStaffLeadsOn" | `"true"` (trimmed) on; `""`, unset, `"1"`, `"TRUE "`, `"false"`, `"yes"` off |
+| UNIT-AGC-002 | "normalizes the host and drops one leading www." | `WWW.Govari-Fin.co.il.` → `govari-fin.co.il`; `localhost` kept; only one `www.` removed; empty stays empty |
+| UNIT-AGC-003 | "is agency 1 as the site shows it today" | `bundledAgencyContent`: agency 1, source `bundled`, `CONTACT`, the hero byline and lead, licence `L-00107009`, the bundled portrait |
+| UNIT-AGC-004 | "are the seven proof cases, c2 an estimate" | Seven cases from `proof.cN.*` in order; `estimate` true on c2 |
+| UNIT-AGC-005 | "the seeded record resolves to exactly the bundled content (R9, object level)" | The seed's rows, resolved, deep-equal the bundled content |
+| UNIT-AGC-006 | "another agency without a booking link does not borrow agency 1's" | `bookingUrl` null |
+| UNIT-AGC-007 | "no professional title → the byline is the name; a missing review link is null" | Byline falls back to the name; link null |
+| UNIT-AGC-008 | "lets no undefined out — missing bio texts are null" | Every field a value or null |
+| UNIT-AGC-009 | "a known host asks for its domain or agency 1, then the agency's first agent" | Filter on `domain`/`agency_id`; the agent read follows |
+| UNIT-AGC-010 | "the agency that claims the host wins over the agency-1 fallback" | The claimant's row |
+| UNIT-AGC-011 | "an unknown host gets agency 1" | Fallback to agency 1 |
+| UNIT-AGC-012 | "the hostile or malformed host %j is never put in the filter" | `it.each`: no filter built from it; agency 1 |
+| UNIT-AGC-013 | "no site, no agent, incomplete rows and failed reads each fail loudly" | Each throws, so the hook can fall back to the constants |
+| UNIT-AGC-014 | "stats must be {num,label} strings; a review link must be https" | Bad stats refused; a non-https link refused |
+| UNIT-AGC-015, 015b | "reads the agency's published cases in order and maps the estimate flag"; "a failed read is rethrown, a case without a title is incomplete" | `sort_order` ascending, `metric_is_estimate` mapped; errors rethrown |
+
+`tests/unit/supabase-content.test.ts` gains one case in `listTestimonials`: "asks for one agency's testimonials only when it is named" (`eq agency_id` with an id; no `eq` without).
+
+### 4.80 The portrait rule — `tests/unit/portrait.test.ts`
+
+`src/lib/portrait.ts` (R3). Agency 1's bundled picture is the one documented special case.
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-POR-001 | "agency 1 without a photo gets the bundled set" | `/images/dorit-office-portrait-{480,768,1080}.{avif,webp}` |
+| UNIT-POR-002 | "agency 1 with her own upload shows the upload" | The public `agent-photos` URL, not the bundled set |
+| UNIT-POR-003 | "another agency's -768.webp path gets the 480/768/1080 srcset" | Three widths beside the 768 file |
+| UNIT-POR-004 | "a path not ending -768.webp gets a single src" | `src` only, no `srcset` |
+| UNIT-POR-005 | "another agency without a photo gets a monogram" | Monogram, not Dorit's picture |
+| UNIT-POR-006 | "a photo path with no storage base falls back to the monogram" | Monogram |
+| UNIT-POR-007 | "initials are the first letters of the first two words; the base needs a URL" | Initials; a non-URL base refused |

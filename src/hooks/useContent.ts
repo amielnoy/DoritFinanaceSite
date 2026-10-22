@@ -17,7 +17,8 @@ import type { Article, Testimonial } from "@/services";
 export const contentKeys = {
   articles: (limit: number) => ["articles", limit] as const,
   article: (id: string | undefined) => ["article", id] as const,
-  testimonials: (limit: number) => ["testimonials", limit] as const,
+  // `["testimonials"]` stays the prefix, so useAdmin.ts's invalidation still reaches every agency's list.
+  testimonials: (limit: number, agencyId?: string) => ["testimonials", limit, agencyId ?? null] as const,
 };
 
 export function useArticles(limit = 50) {
@@ -40,10 +41,14 @@ export function useArticle(key: string | undefined) {
   });
 }
 
-export function useTestimonials(limit = 50) {
+export function useTestimonials(limit = 50, agencyId?: string) {
   return useQuery<Testimonial[]>({
-    queryKey: contentKeys.testimonials(limit),
-    queryFn: () => services.content.listTestimonials(limit),
+    queryKey: contentKeys.testimonials(limit, agencyId),
+    // No agency, no second argument: the port is asked exactly what it always was.
+    queryFn: () =>
+      agencyId === undefined
+        ? services.content.listTestimonials(limit)
+        : services.content.listTestimonials(limit, agencyId),
     staleTime: 5 * 60 * 1000,
   });
 }

@@ -50,6 +50,7 @@ Vercel's environment variables, not here.
 | Chat | `VITE_CHAT_AGENTS` selects agent names individually; empty by default, or without Supabase, uses Base44. Production serves all four from the chat function |
 | Clearinghouse | `VITE_MASLEKA_ENABLED=true` and a configured client; otherwise the unavailable adapter makes no requests |
 | Client meetings | `VITE_MEETINGS_STAFF` (the lead drawer's meetings) and `VITE_MEETINGS_CLIENT` ("הפגישות שלי" in `/account`), each off by default ([config](../src/config/meetings.ts)) |
+| Public agency content | `VITE_AGENCY_CONTENT=true` plus a configured client reads `public_agency_sites`, `public_agent_cards` and `success_cases` for the agency that claims the host name. Otherwise, while loading, on any error and for a non-Hebrew locale, the bundled agency-1 constants are used. The prerender always uses the constants ([config](../src/config/agency-content.ts)) |
 
 The Base44 adapter does not imply all work executes there: `submitLead` and
 `escalateToHuman` are forwarders to Supabase. Inspect the function entry point when
@@ -75,6 +76,8 @@ the platform operator (`profiles.role = 'admin'`). Agency roles belong to
 | Admin | Agency-wide leads, assignment, deletion, publication, testimonials and management of Users |
 | Owner | Admin capabilities, management of Admins, agency profile and ownership transfer |
 | Platform operator | Platform-wide access and shared-library administration |
+
+Anonymous visitors read agency data only through the two definer views, `public_agency_sites` and `public_agent_cards`; they have no grant on `agency_profiles`, `agencies` or `agents`. `testimonials` is read by column grant: `anon` cannot read `consent_confirmed_by` or `consent_confirmed_at`, and `authenticated` can read the date but not the name (review M-2).
 
 The frontend table chooses controls; SQL and Edge Functions enforce access.
 `can_see_lead` governs lead-related reads; `can_see(agency)` alone is insufficient.

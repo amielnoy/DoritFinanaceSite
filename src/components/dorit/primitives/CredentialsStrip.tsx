@@ -1,11 +1,10 @@
 import React from "react";
 import { Phone, Mail, MessageCircle, BadgeCheck } from "lucide-react";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { useT } from "@/i18n/LocaleContext";
 
-const LICENSE = "L-00107009";
-
 export default function CredentialsStrip() {
+  const { contact, agent } = useAgencyContent();
   const t = useT("common");
   return (
     <div className="border-y border-border/60 bg-secondary/40">
@@ -15,20 +14,20 @@ export default function CredentialsStrip() {
           <span className="text-sm text-foreground/80">
             {t("credentials.licence")}{" "}
             <bdi className="whitespace-nowrap font-medium text-foreground tracking-wide lining-nums tabular-nums" dir="ltr">
-              {LICENSE}
+              {agent.licenceNumber}
             </bdi>
           </span>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
           <a
-            href={`tel:${CONTACT.phoneE164}`}
+            href={`tel:${contact.phoneE164}`}
             className="flex items-center gap-2 text-foreground/80 hover:text-accent transition-colors"
           >
             <Phone size={16} className="text-highlight" />
-            <span dir="ltr">{CONTACT.phoneDisplay}</span>
+            <span dir="ltr">{contact.phoneDisplay}</span>
           </a>
           <a
-            href={`https://wa.me/${CONTACT.whatsapp}`}
+            href={`https://wa.me/${contact.whatsapp}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-foreground/80 hover:text-accent transition-colors"
@@ -37,11 +36,11 @@ export default function CredentialsStrip() {
             WhatsApp
           </a>
           <a
-            href={`mailto:${CONTACT.email}`}
+            href={`mailto:${contact.email}`}
             className="flex items-center gap-2 text-foreground/80 hover:text-accent transition-colors"
           >
             <Mail size={16} className="text-highlight" />
-            <span dir="ltr">{CONTACT.email}</span>
+            <span dir="ltr">{contact.email}</span>
           </a>
         </div>
       </div>

@@ -142,7 +142,63 @@ export interface Testimonial {
 export interface ContentPort {
   listArticles(limit?: number): Promise<Article[]>;
   getArticle(id: string): Promise<Article>;
-  listTestimonials(limit?: number): Promise<Testimonial[]>;
+  /**
+   * Newest first. `agencyId` narrows the list to one agency; without it the
+   * request is the one the site has always sent (until Rollout 5, which makes
+   * the filter unconditional together with a public read of other agencies').
+   */
+  listTestimonials(limit?: number, agencyId?: string): Promise<Testimonial[]>;
+}
+
+/** How a visitor reaches an agency: the header, the footer and the contact buttons. */
+export interface AgencyContact {
+  phoneE164: string;
+  phoneDisplay: string;
+  whatsapp: string;
+  email: string;
+  defaultWhatsappMessage: string;
+}
+
+/** The texts of an agent's about section; `headline` is the hero's lead and is required. */
+export type BioKey = "headline" | "family" | "credentials" | "career" | "insight" | "unique" | "signature";
+
+/** An agency's first agent, as `public_agent_cards` shows her. */
+export interface AgentCardRecord {
+  fullName: string;
+  professionalTitle: string | null;
+  /** In the public `agent-photos` bucket; see src/lib/portrait.ts. */
+  photoPath: string | null;
+  photoAlt: string | null;
+  /** The verified number. */
+  licenceNumber: string;
+  bio: Partial<Record<BioKey, string>>;
+  stats: { num: string; label: string }[];
+  bookingUrl: string | null;
+  reviewLinks: { google?: string; midrag?: string };
+}
+
+/** What a site shows of the agency its host belongs to. */
+export interface AgencySiteRecord {
+  agencyId: string;
+  contact: AgencyContact;
+  agent: AgentCardRecord;
+}
+
+/** One of the home page's proof cases. `estimate` puts the basis line under the metric. */
+export interface SuccessCase {
+  tag: string | null;
+  title: string;
+  body: string;
+  metric: string | null;
+  estimate: boolean;
+}
+
+/** Reading an agency's public content, by the host the visitor came to. */
+export interface AgencyContentPort {
+  /** The agency claiming `host`, else agency 1. Rejects rather than answering half a record. */
+  siteContent(host: string): Promise<AgencySiteRecord>;
+  /** The agency's published cases, in order. */
+  successCases(agencyId: string): Promise<SuccessCase[]>;
 }
 
 export interface AgentMessage {

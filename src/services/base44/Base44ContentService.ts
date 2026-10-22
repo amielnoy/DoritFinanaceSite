@@ -34,6 +34,10 @@ export class Base44ContentService implements ContentPort {
     return (await this.client.entities.BlogPost.get(id)) as Article;
   }
 
+  /**
+   * Takes no agency: Base44 holds agency 1 alone, and is only the rollback
+   * path, so there is nothing for the port's `agencyId` to narrow.
+   */
   async listTestimonials(limit = 50): Promise<Testimonial[]> {
     const rows = await this.client.entities.Testimonial.list("-created_date", limit);
     return rows as Testimonial[];

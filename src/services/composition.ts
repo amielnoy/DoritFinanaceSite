@@ -18,6 +18,7 @@ import { Base44UploadService } from "./base44/Base44UploadService";
 import { SupabaseAgentService } from "./supabase/SupabaseAgentService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
+import { AgencyContentError, SupabaseAgencyContentService } from "./supabase/SupabaseAgencyContentService";
 import { SupabaseImageUploadService, type SupabaseImageStorageClient } from "./supabase/SupabaseImageUploadService";
 import { EdgeContentAdminService, type ContentFunctionsClient } from "./supabase/EdgeContentAdminService";
 import { SupabaseLeadAdminService } from "./supabase/SupabaseLeadAdminService";
@@ -35,6 +36,7 @@ import type { Services } from "./index";
 import { SupabaseAgencyService, type SupabaseAgencyClient } from "./supabase/SupabaseAgencyService";
 import type {
   AccountPort,
+  AgencyContentPort,
   AgencyPort,
   AgentPort,
   AuthPort,
@@ -73,6 +75,17 @@ const client = base44 as any;
 const tables: SupabaseLeadTableClient | null = supabase ? (supabase as unknown as SupabaseLeadTableClient) : null;
 
 const contentPort: ContentPort = tables ? new SupabaseContentService(tables) : new Base44ContentService(client);
+
+/**
+ * An agency's public content lives in Supabase only. Without it the read is
+ * refused, and the pages show the bundled agency-1 constants they always had.
+ */
+const agencyContentPort: AgencyContentPort = tables
+  ? new SupabaseAgencyContentService(tables)
+  : {
+      siteContent: () => Promise.reject(new AgencyContentError("no_site")),
+      successCases: () => Promise.reject(new AgencyContentError("no_site")),
+    };
 
 /**
  * Content admin: writes go through a backend function authenticated by the
@@ -225,6 +238,7 @@ const agentPort: AgentPort = new RoutedAgentService(
 export const services: Services = {
   leads: leadPort,
   content: contentPort,
+  agencyContent: agencyContentPort,
   agents: agentPort,
   uploads: uploadPort,
   claimDocuments: claimDocumentsPort,

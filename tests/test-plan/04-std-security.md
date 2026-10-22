@@ -3,8 +3,8 @@
 **Suite:** `security` · **Runners:** `npm run test:security` (static, Vitest) and
 `npm run test:e2e:security` (runtime, Playwright)
 **Location:** `tests/security/static-security.test.ts`,
-`tests/security/agent-surface.security.test.ts`, `e2e/security/security.spec.ts`
-**Cases:** 77 static declared (26 site + 51 agent surface; `npm run test:security` runs 81 including `it.each` expansions) + 16 runtime (× 4 platforms)
+`tests/security/agent-surface.security.test.ts`, `tests/security/agency-content.security.test.ts`, `e2e/security/security.spec.ts`
+**Cases:** 79 static declared (26 site + 51 agent surface + 2 agency content; `npm run test:security` runs 95 including `it.each` expansions, recounted 2026-10-21) + 16 runtime (× 4 platforms)
 
 ---
 
@@ -147,6 +147,15 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 | SEC-STAFF-001 | "keeps the clearinghouse board behind a gate that requires sign-in and an agency role, and only when switched on" | `/admin/masleka` and `/admin/masleka/guide` inside `<AgencyRoute min="user">` within the `MASLEKA_ENABLED ?` block, and nowhere else in `App.jsx` |
 | SEC-STAFF-002 | "the clearinghouse board keeps a revealed value out of storage, logs and the access log" | `MaslekaBoard.tsx` names no `masleka_access_log` (the server writes it, Ruling 17), no Web Storage or IndexedDB, no `console.`, no analytics call, no history/navigation write |
 
+## 4d. Agency content — `tests/security/agency-content.security.test.ts`
+
+Review M-2 (R6): the consent stamps stay out of public reads.
+
+| ID | Title | Expected result |
+|---|---|---|
+| SEC-AGC-001 | "is never re-granted whole to visitors or members after the revoke"; "names consent_confirmed_by in no grant" | No later migration re-grants `select` on `testimonials` as a whole; `consent_confirmed_by` is in no grant |
+| SEC-AGC-002 | "is read by every reader with a column list, never `*`" | Every anon `testimonials` reader names its columns |
+
 ## 5. Deviations
 
 `SEC-HDR-001` is opt-in because transport hardening is set by the host
@@ -155,5 +164,5 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 
 ## 6. Pass criteria
 
-All 76 static declared cases pass (vitest: 79 with expansions); all 16 runtime cases pass on all four platforms,
+All 79 static declared cases pass (vitest: 95 with expansions); all 16 runtime cases pass on all four platforms,
 with `SEC-HDR-001` skipped unless explicitly enabled.

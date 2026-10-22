@@ -37,6 +37,9 @@ describe("the e2e build", () => {
   it("switches on what production switches on (CTR-E2E-002)", () => {
     // Production's build flags, read from Vercel on 2026-10-17. Masleka is on in
     // production and off here: e2e/ui/masleka.spec.ts asserts the dark build.
+    // Agency content is the reverse, off in production and on here, so its read
+    // side runs in every spec and e2e/ui/agency-content.spec.ts can hold the
+    // seeded render to the bundled one; the production smoke covers it off.
     expect(E2E_BUILD_ENV).toMatchObject({
       VITE_LEAD_FUNCTIONS: "supabase",
       VITE_CONTENT_WRITES: "supabase",
@@ -45,6 +48,7 @@ describe("the e2e build", () => {
       VITE_MEETINGS_STAFF: "true",
       VITE_MASLEKA_ENABLED: "",
       VITE_MEETINGS_CLIENT: "",
+      VITE_AGENCY_CONTENT: "true",
       VITE_BASE44_APP_BASE_URL: "",
     });
     // Every agent the chat function can serve, so no chat in the suite runs on Base44.

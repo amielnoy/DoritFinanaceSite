@@ -64,6 +64,22 @@ See [STD-03](03-std-contract.md) for the role and permission contract cases, and
 SQL checks require the database test environment; their presence does not imply
 that a production migration or live-account check has run.
 
+## Agency content, step 2 (2026-10-21)
+
+Dorit's site (agency 1) read from per-agency content behind `VITE_AGENCY_CONTENT` (off). R1–R9 are the rulings of the step's plan; R7 (no gendered templates) is held by leaving those files alone, so its evidence is the existing compliance contract (STD-03 §4a) still passing.
+
+| Ruling | Evidence |
+| --- | --- |
+| R1 — the flag: off is today's render; on falls back to the constants while loading, on error and off `he` | UNIT-AGC-001, CMP-AGC-001..006/008, CMP-AGC-009/009b (a failed read warns once), CTR-E2E-002 |
+| R2 — the seed equals the bundled strings, profile written last, idempotent | CTR-AGC-010..017, UNIT-AGC-005, `supabase/tests/agency_content_check.sql` |
+| R3 — the portrait: bundled for agency 1, upload with srcset, or monogram | UNIT-POR-001..007, CMP-POR-001..003, CMP-AGC-011, CTR-CIS-001 |
+| R4 — the prerender stays on the constants | CTR-AGC-020, E2E-AGC-004 |
+| R5 — the licence comes from the verified agent card | CTR-ONB-018 (`public_agent_cards`: `verified_licence_number as licence_number`, live agencies only), CTR-ONB-020, CTR-AGC-022, CMP-AGC-010/020, `supabase/tests/agency_content_check.sql` (anon reads `L-00107009` on agency 1's card) |
+| R6 — review M-2: no public consent stamps | CTR-AGC-002..005, SEC-AGC-001/002, `supabase/tests/agency_content_check.sql` |
+| R7 — gendered templates untouched | The existing compliance contract (STD-03 §4a); no new case |
+| R8 — the agency comes from the host name | UNIT-AGC-002/009..012, CMP-AGC-005, CTR-AGC-006..008 |
+| R9 — the visual gate: seeded and refused renders are identical | E2E-AGC-001..005, UNIT-AGC-005, UNIT-POR-001..007, CMP-AGC-001..004, CMP-POR-001..003 |
+
 ## Coverage gaps (accepted)
 
 | Gap | Why it is accepted |

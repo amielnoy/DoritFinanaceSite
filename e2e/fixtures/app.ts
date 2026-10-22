@@ -1,6 +1,7 @@
 import { test as base, expect, type Page, type Route } from "@playwright/test";
 import { CONTACT } from "../../src/config/contact";
 import { E2E_SUPABASE_URL } from "../build-env";
+import { agency1ContentRows } from "./agency1-seed";
 import { BLOG_POSTS, TESTIMONIALS } from "./data";
 import { answerRestRead, type FakeAnswer, type Row } from "./supabase-fake";
 
@@ -163,6 +164,9 @@ export async function stubBackend(page: Page): Promise<MockApi & { readonly unmo
     ["blog_posts", [...BLOG_POSTS]],
     // Read only by a signed-in admin; seeded empty so a stray read is visible, not a 404.
     ["leads", []],
+    // Agency 1's site, agent card and success cases, as the seed migration
+    // writes them: VITE_AGENCY_CONTENT is on in the e2e build (build-env.ts).
+    ...agency1ContentRows(),
   ]);
   const failures = new Map<string, { status: number; payload: unknown }>();
   const chatTurns = new Map<string, number>();

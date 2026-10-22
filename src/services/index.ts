@@ -2,8 +2,10 @@ import { toast } from "@/components/ui/use-toast";
 import { RestTableClient } from "./supabase/RestTableClient";
 import { defaultSessionPresent } from "./supabase/SupabaseAuthService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
+import { AgencyContentError, SupabaseAgencyContentService } from "./supabase/SupabaseAgencyContentService";
 import type {
   AccountPort,
+  AgencyContentPort,
   AgentPort,
   AuthPort,
   ContentAdminPort,
@@ -44,6 +46,8 @@ import type {
 export interface Services {
   leads: LeadPort;
   content: ContentPort;
+  /** The agency a host belongs to, and what its public pages show of it (VITE_AGENCY_CONTENT). */
+  agencyContent: AgencyContentPort;
   agents: AgentPort;
   /** Public images — blog covers, testimonial photos. */
   uploads: UploadPort;
@@ -114,7 +118,20 @@ const content: ContentPort = supabaseConfigured
   : {
       listArticles: (limit) => real().then((s) => s.content.listArticles(limit)),
       getArticle: (id) => real().then((s) => s.content.getArticle(id)),
-      listTestimonials: (limit) => real().then((s) => s.content.listTestimonials(limit)),
+      listTestimonials: (limit, agencyId) => real().then((s) => s.content.listTestimonials(limit, agencyId)),
+    };
+
+/**
+ * Like `content`, read over `RestTableClient` without loading an SDK. Without
+ * Supabase there is no agency content to read, and the composition root would
+ * answer the same refusal, so this one never loads it: the pages show the
+ * bundled agency-1 constants.
+ */
+const agencyContent: AgencyContentPort = supabaseConfigured
+  ? new SupabaseAgencyContentService(new RestTableClient(SUPABASE_URL as string, SUPABASE_KEY as string))
+  : {
+      siteContent: () => Promise.reject(new AgencyContentError("no_site")),
+      successCases: () => Promise.reject(new AgencyContentError("no_site")),
     };
 
 const auth: AuthPort = {
@@ -152,6 +169,7 @@ export const services: Services = {
     submitInterview: (summary) => real().then((s) => s.leads.submitInterview(summary)),
   },
   content,
+  agencyContent,
   agents,
   uploads: {
     upload: (file) => real().then((s) => s.uploads.upload(file)),

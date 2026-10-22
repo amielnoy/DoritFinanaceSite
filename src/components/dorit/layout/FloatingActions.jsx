@@ -1,13 +1,14 @@
 import React from "react";
 import { Phone, MessageCircle, CircleHelp } from "lucide-react";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import SupportLink from "./SupportLink";
 
 export default function FloatingActions() {
+  const { contact } = useAgencyContent();
   return (
     <div data-track-location="floating_dock" className="hidden md:flex fixed bottom-4 z-50 flex-row gap-3 right-4 left-auto md:flex-col md:left-4 md:right-auto">
       <a
-        href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(CONTACT.defaultWhatsappMessage)}`}
+        href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(contact.defaultWhatsappMessage)}`}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="פתיחת שיחה בוואטסאפ"
@@ -16,7 +17,7 @@ export default function FloatingActions() {
         <MessageCircle size={26} className="group-hover:rotate-6 transition-transform" />
       </a>
       <a
-        href={`tel:${CONTACT.phoneE164}`}
+        href={`tel:${contact.phoneE164}`}
         aria-label="התקשרות לדורית גוב ארי"
         className="group w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:scale-105 transition-transform duration-300"
       >

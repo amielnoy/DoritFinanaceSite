@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 380 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 420 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 579 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 667 including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -1047,3 +1047,40 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4, behind `
 | CMP-AGENDA-017 | "lets Admin+ narrow to one member, and does not offer a User the select" | צוות select narrows to `u-2` and shows its address; a User: no select, both rows their session read |
 | CMP-AGENDA-018 | "adds a meeting from 'פגישה חדשה': a lead picked by search, then the drawer's form" | Search narrows to one; `addMeeting({ leadId: l-3, agencyId, scheduledAt: 15:30Z })` |
 | CMP-AGENDA-019 | "says when there is nothing to show, and when the meetings cannot be read" | אין פגישות להצגה.; alert לא הצלחנו לטעון את הפגישות |
+
+### 4.56 Agency content on the page — `use-agency-content.test.tsx`, `agency-content-sections.test.tsx`, `agency-content-chrome.test.tsx`
+
+`useAgencyContent` and the sections and chrome that read it, behind `VITE_AGENCY_CONTENT` (mocked in `@/config/agency-content`; the suite pins it off in `vitest.config.ts`). The port (`@/services`) is the fake. The byte-level proof that seeded and bundled render the same page is E2E-AGC-001..005.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-AGC-001 | "flag off — the bundled constants, no request, and no QueryClientProvider needed" | Bundled content; the port not called |
+| CMP-AGC-002 | "flag on, still loading — the bundled constants" | No blank, no spinner |
+| CMP-AGC-003 | "flag on, the read fails — the bundled constants" | Bundled content |
+| CMP-AGC-004 | "flag on, the read answers — the database's content" | The record's values |
+| CMP-AGC-005 | "flag on, on localhost — asks for the host as the browser has it" | The port receives `localhost` |
+| CMP-AGC-006 | "flag on, an English page — bundled English, and nothing is asked" | No request in a non-`he` locale |
+| CMP-AGC-009 | "flag on, the read fails — one console warning naming the code; a read that answers, none" | One `[agency-content] site read failed: no_site` across two consumers and a re-render; none when the read answers |
+| CMP-AGC-009b | "flag on, the cases read fails — one console warning naming the error" | One `[agency-content] cases read failed: <message>` |
+| CMP-AGC-007a..e | The success cases | Off: bundled, nothing asked. On: agency 1's asked while the site loads, then the database's. Another agency still loading or failing: none, never Dorit's. Agency 1 failing: the bundled cases |
+| CMP-AGC-008 | "flag off asks exactly today's question; on, it names the agency" | `listTestimonials` arguments |
+| CMP-AGC-010 | "byline, licence, headline, monogram and contact are the record's" | Hero and About show the record |
+| CMP-AGC-011 | "agency 1 without a photo keeps the bundled picture" | Bundled AVIF/WebP set |
+| CMP-AGC-012 | "the paragraphs are the record's bio, and the stats follow its count" | Paragraphs and strip from the record |
+| CMP-AGC-013 | "without family the first paragraph is the credentials alone" | No family clause |
+| CMP-AGC-014 | "no stats, no strip; no signature, no signature line" | Elements absent |
+| CMP-AGC-015 | "the Google link is the record's, and without a Midrag link there is none" | Links from `review_links` |
+| CMP-AGC-016 | "the cases and the WhatsApp number are the agency's, and the basis shows under estimates only" | Cases, number, basis line |
+| CMP-AGC-017, 017b | "the booking block links to the record's URL, the chips use its contact"; "another agency without a booking URL has no booking block" | Block follows `bookingUrl` |
+| CMP-AGC-018 | "asks for the site agency's testimonials, and agency 1's Admin sees no add control there" | `agencyId` passed on; control gated |
+| CMP-AGC-020 | "the footer shows the record's phone, email and licence" | Record values |
+| CMP-AGC-021 | "the sticky bar and the header call the record's number" | `tel:` and `wa.me` from the record |
+| CMP-AGC-022 | "the privacy policy mails the record's email" | `mailto:` from the record |
+
+### 4.57 The portrait — `agent-portrait.test.tsx`
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-POR-001 | "the bundled portrait is Dorit's AVIF + WebP picture" | `<picture>` with both sources |
+| CMP-POR-002 | "an uploaded photo is one <img> with src, srcset and sizes" | Single `<img>` |
+| CMP-POR-003 | "a monogram is a labelled box of initials, not an <img>" | Labelled, no `<img>` |

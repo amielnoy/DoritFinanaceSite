@@ -1,6 +1,6 @@
 import React from "react";
 import { MessageCircle, Phone } from "lucide-react";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 
 const WHATSAPP_TEXT = "שלום דורית, הגעתי מהבלוג";
@@ -10,6 +10,7 @@ const DARK_FOCUS =
 
 /** The step after reading: a person, on WhatsApp or the phone. */
 export default function BlogContactBand() {
+  const { contact } = useAgencyContent();
   return (
     <section
       aria-labelledby="blog-cta-title"
@@ -25,7 +26,7 @@ export default function BlogContactBand() {
         </p>
         <div className="mt-8 flex flex-col sm:flex-row gap-3">
           <a
-            href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(WHATSAPP_TEXT)}`}
+            href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(WHATSAPP_TEXT)}`}
             target="_blank"
             rel="noopener noreferrer"
             className={`inline-flex items-center justify-center gap-2 min-h-12 px-[26px] rounded-md bg-highlight-on-dark text-primary font-heading font-medium text-lg hover:bg-highlight-on-dark/90 transition-colors ${DARK_FOCUS}`}
@@ -33,9 +34,9 @@ export default function BlogContactBand() {
             <MessageCircle size={20} aria-hidden="true" />
             כתבו לדורית בוואטסאפ
           </a>
-          <a href={`tel:${CONTACT.phoneE164}`} className={ctaClass(DARK_FOCUS, { onDark: true })}>
+          <a href={`tel:${contact.phoneE164}`} className={ctaClass(DARK_FOCUS, { onDark: true })}>
             <Phone size={20} aria-hidden="true" />
-            חייגו <span dir="ltr">{CONTACT.phoneDisplay}</span>
+            חייגו <span dir="ltr">{contact.phoneDisplay}</span>
           </a>
         </div>
       </div>

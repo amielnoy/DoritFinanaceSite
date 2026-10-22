@@ -1,10 +1,12 @@
 import { vi, type Mock } from "vitest";
 import type { Services } from "@/services";
 import { FALLBACK_CONTACT } from "@/services/fallback-contact";
+import { AgencyContentError } from "@/services/supabase/SupabaseAgencyContentService";
 import {
   AccountLoadError,
   MaslekaError,
   type AccountPort,
+  type AgencyContentPort,
   type AgencyPort,
   type AgentPort,
   type AuthPort,
@@ -27,8 +29,8 @@ import {
  *   vi.mock("@/services", async (importOriginal) => (await import("./services-mock")).servicesModule(importOriginal));
  *
  * Every method is a `vi.fn`. Unscripted, each answers what a build without
- * Supabase answers — nobody signed in, no agency, the clearinghouse
- * unavailable — and the public writes succeed, so a component that reaches a
+ * Supabase answers — nobody signed in, no agency, no agency content, the
+ * clearinghouse unavailable — and the public writes succeed, so a component that reaches a
  * port its test does not script behaves as it does on that build.
  */
 
@@ -48,6 +50,9 @@ const signedOut = async (): Promise<never> => {
 const unavailable = async (): Promise<never> => {
   throw new MaslekaError("unavailable");
 };
+const noAgencySite = async (): Promise<never> => {
+  throw new AgencyContentError("no_site");
+};
 const noUserStore = async (): Promise<never> => {
   throw new Error("אין חיבור למאגר המשתמשים.");
 };
@@ -66,6 +71,7 @@ export const servicesMock = {
     },
     listTestimonials: async () => [],
   }),
+  agencyContent: port<AgencyContentPort>({ siteContent: noAgencySite, successCases: noAgencySite }),
   agents: port<AgentPort>({
     start: async () => ({ id: "conv_1" }),
     send: async () => {},

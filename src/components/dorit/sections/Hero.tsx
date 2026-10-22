@@ -1,25 +1,22 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, MessageCircle, Phone } from "lucide-react";
-import { CONTACT } from "@/config/contact";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { PENSION_CHECK } from "@/config/offers";
+import AgentPortrait from "@/components/dorit/primitives/AgentPortrait";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { useLocalePath, useT } from "@/i18n/LocaleContext";
 
 /**
- * The portrait, pre-sized. The original PNG was 1.85 MB — 79% of the home
- * page's weight and its LCP element. These are generated from it (480/768/1080
- * wide, AVIF + WebP); the PNG stays only as the source and is not served here.
- * `sizes` and the srcsets must match the preload in index.html exactly.
+ * The portrait itself is `AgentPortrait`, which holds the pre-sized set (see
+ * its comment). `sizes` and the srcsets must match the preload in index.html
+ * exactly.
  *
  * Below md the portrait is an 88px circle beside the licence line, so `sizes`
  * says 88px there and a phone fetches the 480 file rather than the 1080 one;
  * from md up the two clauses are the ones there always were.
  */
-const HERO = "/images/dorit-office-portrait";
-const WIDTHS = [480, 768, 1080] as const;
-const srcset = (ext: string) => WIDTHS.map((w) => `${HERO}-${w}.${ext} ${w}w`).join(", ");
 const HERO_SIZES = "(min-width: 1024px) 490px, (min-width: 768px) calc(100vw - 40px), 88px";
 
 export default function Hero() {
@@ -27,6 +24,8 @@ export default function Hero() {
   const tc = useT("common");
   const tp = useT("pension");
   const lp = useLocalePath();
+  const content = useAgencyContent();
+  const { contact } = content;
   return (
     <section id="top" className="relative border-b border-border pt-[80px] md:pt-[127px]">
       <div className="max-w-[1200px] mx-auto w-full px-[clamp(20px,4vw,40px)] py-[clamp(32px,5vw,64px)] grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-[clamp(32px,4vw,56px)] items-center">
@@ -35,32 +34,14 @@ export default function Hero() {
             name and the licence line — instead of a plate taller than the screen. */}
         <figure className="order-2 lg:order-1 m-0 flex flex-col gap-3 max-md:order-first max-md:flex-row max-md:items-center max-md:gap-4">
           <div className="plate h-[clamp(320px,46vh,440px)] max-md:h-[88px] max-md:w-[88px] max-md:shrink-0 max-md:rounded-full max-md:border-[3px]">
-            <picture className="block w-full h-full">
-              <source type="image/avif" srcSet={srcset("avif")} sizes={HERO_SIZES} />
-              <source type="image/webp" srcSet={srcset("webp")} sizes={HERO_SIZES} />
-              <img
-                src={`${HERO}-768.webp`}
-                alt={t("hero.portraitAlt")}
-                width={1122}
-                height={1402}
-                className="w-full h-full object-cover object-[center_20%]"
-                loading="eager"
-                // Lowercase, through a spread: React 18 does not know the
-                // camelCase `fetchPriority` prop and warns in development (which
-                // fails home.spec's "no console error" in the dev-mode Docker
-                // build), while it passes a lowercase attribute straight through.
-                // React 19 knows `fetchPriority`; switch back when upgrading.
-                {...{ fetchpriority: "high" }}
-                decoding="async"
-              />
-            </picture>
+            <AgentPortrait portrait={content.agent.portrait} sizes={HERO_SIZES} />
           </div>
           {/* Stacked on a phone, side by side from sm. Side by side at 390px
               squeezed the title onto two ragged lines and broke the licence
-              number at its hyphen ("L-" / "00107009"). The number never wraps. */}
+              number at its hyphen (the prefix on one line, the digits on the next). The number never wraps. */}
           <figcaption className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3 max-md:flex-col max-md:items-start max-md:gap-0.5 max-md:min-w-0 text-sm leading-relaxed text-muted-foreground">
-            <span className="max-md:[text-wrap:balance]">{t("hero.byline")}</span>
-            <bdi dir="ltr" className="self-start sm:self-auto whitespace-nowrap lining-nums tabular-nums">L-00107009</bdi>
+            <span className="max-md:[text-wrap:balance]">{content.agent.byline}</span>
+            <bdi dir="ltr" className="self-start sm:self-auto whitespace-nowrap lining-nums tabular-nums">{content.agent.licenceNumber}</bdi>
           </figcaption>
         </figure>
 
@@ -71,7 +52,7 @@ export default function Hero() {
               side — it is a double-read of the same name before the fold.
               Hidden under `sm`, still shown wherever there is room to spare. */}
           <span className="hidden text-sm text-accent animate-fade-up sm:block">
-            {t("hero.byline")}
+            {content.agent.byline}
           </span>
           <ArchStatement />
           {/* Claims of equal weight, a gold diamond between them.
@@ -93,7 +74,7 @@ export default function Hero() {
               the conversation. Still no figure and no promise — §2 binds this
               copy as it binds the agents. */}
           <p className="max-w-[480px] text-lg leading-[1.6] text-foreground/80 [text-wrap:pretty] animate-fade-up">
-            {t("hero.lead")}
+            {content.agent.bio.headline}
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-5 max-md:gap-3 animate-fade-up">
             {/* `ctaClass`'s own comment is explicit: "an outline, never a
@@ -121,7 +102,7 @@ export default function Hero() {
                 click_phone, location "top". */}
             <div className="md:hidden grid w-full grid-cols-2 gap-3">
               <a
-                href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(tc("contact.whatsappDefault"))}`}
+                href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(tc("contact.whatsappDefault"))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={HERO_ALT}
@@ -129,7 +110,7 @@ export default function Hero() {
                 <MessageCircle size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
                 {tc("sticky.whatsapp")}
               </a>
-              <a href={`tel:${CONTACT.phoneE164}`} className={HERO_ALT}>
+              <a href={`tel:${contact.phoneE164}`} className={HERO_ALT}>
                 <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
                 {tc("nav.call")}
               </a>

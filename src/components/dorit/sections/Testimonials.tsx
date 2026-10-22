@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { services, type Testimonial } from "@/services";
 import { useAuth } from "@/lib/AuthContext";
-import { useTestimonials } from "@/hooks/useContent";
+import { useAgencyContent, useSiteTestimonials } from "@/hooks/useAgencyContent";
 import { useCreateTestimonial, useRemoveTestimonial } from "@/hooks/useAdmin";
 import { Image } from "@/components/ui/image";
 import { Plus, X, Quote, Trash2, Loader2, Upload, ArrowLeft, ArrowRight } from "lucide-react";
@@ -12,7 +12,7 @@ import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { inputClass } from "@/components/dorit/primitives/Field";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useT } from "@/i18n/LocaleContext";
-import { AGENCY_1, useAgencyRole } from "@/hooks/useAgency";
+import { useAgencyRole } from "@/hooks/useAgency";
 
 type TestimonialItem = Testimonial;
 
@@ -37,13 +37,13 @@ export default function Testimonials() {
   // `tr`, not `t`: each testimonial below is `t`.
   const tr = useT("home");
   const he = useLocale() === "he";
-  // Adding and deleting are Admin+ in agency 1 (or the platform operator) —
+  // Adding and deleting are Admin+ in the site's agency (or the platform operator) —
   // content-admin and the testimonials policy refuse anyone else. Ordinary
   // visitors sign in too, so "signed in" never shows the controls. A public
   // section: the role answer is reused for a few minutes, as the header's is.
-  const { can } = useAgencyRole(AGENCY_1, { staleTime: 5 * 60_000 });
+  const { can } = useAgencyRole(useAgencyContent().agencyId, { staleTime: 5 * 60_000 });
   const isAdmin = isAuthenticated && can("testimonials.write");
-  const { data, isPending: loading } = useTestimonials();
+  const { data, isPending: loading } = useSiteTestimonials();
   const createTestimonial = useCreateTestimonial();
   const removeTestimonial = useRemoveTestimonial();
   const [open, setOpen] = useState<boolean>(false);

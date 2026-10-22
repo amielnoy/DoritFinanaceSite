@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fetchRows, toPortRow } from "@/services/supabase/SupabaseTableClient";
 import { ARTICLE_COLUMNS, SupabaseContentService } from "@/services/supabase/SupabaseContentService";
+import { AGENCY1_ID } from "@/config/agency1";
 import { tableFake } from "../helpers/supabase-table-fake";
 
 const articleRow = (over: Record<string, unknown> = {}) => ({
@@ -179,6 +180,16 @@ describe("SupabaseContentService.listTestimonials", () => {
     expect(t.rating).toBe(4);
     expect(t.id).toBe("b44-t-1");
     expect(t).not.toHaveProperty("role");
+  });
+
+  it("asks for one agency's testimonials only when it is named", async () => {
+    const named = tableFake(ok([]));
+    await new SupabaseContentService(named.client).listTestimonials(50, AGENCY1_ID);
+    expect(named.calls).toContainEqual(["eq", "agency_id", AGENCY1_ID]);
+
+    const unnamed = tableFake(ok([]));
+    await new SupabaseContentService(unnamed.client).listTestimonials();
+    expect(unnamed.calls.filter(([method]) => method === "eq")).toEqual([]);
   });
 
   it("leaves a missing rating missing, rather than NaN", async () => {

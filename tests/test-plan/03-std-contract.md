@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 311 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 1241 including `it.each` / `describe.each` expansions (1240 pass, 1 skipped; recounted 2026-10-20)
+**Location:** `tests/contract/` · **Cases:** 332 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 1264 including `it.each` / `describe.each` expansions (1263 pass, 1 skipped; recounted 2026-10-21)
 
 ---
 
@@ -921,7 +921,7 @@ from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
 | ID | Title | Expected result |
 |---|---|---|
 | CTR-E2E-001 | "points Supabase at a host that can never resolve" | `VITE_SUPABASE_URL` is `https://` on a `.invalid` host (RFC 2606), and a publishable key is set |
-| CTR-E2E-002 | "switches on what production switches on" | `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`, `VITE_UPLOAD_PROVIDER`, `VITE_CONTENT_IMAGES` = `supabase`; `VITE_MEETINGS_STAFF=true`; `VITE_MASLEKA_ENABLED` and `VITE_MEETINGS_CLIENT` empty (E2E-MSK-* assert the dark build); `VITE_BASE44_APP_BASE_URL` empty; `VITE_CHAT_AGENTS` is exactly `CHAT_FUNCTION_AGENTS` |
+| CTR-E2E-002 | "switches on what production switches on" | `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`, `VITE_UPLOAD_PROVIDER`, `VITE_CONTENT_IMAGES` = `supabase`; `VITE_MEETINGS_STAFF=true`; `VITE_AGENCY_CONTENT=true` (an approved deviation from mirroring production, where it is off: the read side runs in every spec and E2E-AGC-* compares it with the bundled render); `VITE_MASLEKA_ENABLED` and `VITE_MEETINGS_CLIENT` empty (E2E-MSK-* assert the dark build); `VITE_BASE44_APP_BASE_URL` empty; `VITE_CHAT_AGENTS` is exactly `CHAT_FUNCTION_AGENTS` |
 | CTR-E2E-003 | "is built from that one file by every entry point" | `scripts/build-e2e.mjs` applies it over the process environment; `playwright.config.ts` builds with `npm run build:e2e` and gives the preview the same env; `scripts/run-tests.sh` runs `npm run build:e2e` and exports no `VITE_*` and no fixture of its own (CI's job: CTR-REB-004) |
 | CTR-E2E-004 | "answers the fake host only, so a deployment's reads stay live" | The fixture's Supabase route matches the fake origin, or a `/functions/v1/` path on any host; the prerender's matches the fake origin alone |
 
@@ -948,6 +948,36 @@ from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
 | CTR-ONB-021 | "moves the consent version of a live agency, and lapses the approval, when a licensee is added, removed or edited" | `agents_after_change` after insert, update or delete |
 | CTR-ONB-022 | "keeps the portrait path inside the agent's own folder, and what the owner types bounded" | `agents_photo_path`; `onboarding` < 64 KB; ≤ 5 notification addresses, each checked alone by `valid_notify_emails` (no space, `,` `;` `<` `>` `"`; ≤ 254), which `create_agency` shares; bio ≤ 16 KB; service area and photo alt ≤ 200 |
 | CTR-ONB-023..024 | The `agent-photos` bucket | Public, WebP, 10 MB; four policies to authenticated through `can_write_agent_photo`, which matches the path before casting |
+
+### 4.28 Agency content: the read side and the seed — `agency-content-schema`, `agency-content-seed`, `agency-content-read` and `content-images-storage.contract.test.ts`
+
+`supabase/migrations/20261106100000_agency_content_read_side.sql` (review M-2 and the two definer views) and `20261107000000_seed_agency1_content.sql`, read as source. `supabase/tests/agency_content_check.sql` proves the behaviour against a database. The seed is held to the bundled strings (R2), so a one-sided edit fails here.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-AGC-001 | "sorts after the onboarding migration and before the agency-1 seed" | After `20261106000000`, before `20261107000000` |
+| CTR-AGC-002 | "takes the table-level read of testimonials away from visitors and members" | `revoke select` on `anon`, `authenticated` |
+| CTR-AGC-003 | "grants visitors exactly the public columns, never the consent stamp" | The 14 columns; no `consent_confirmed_*` |
+| CTR-AGC-004 | "lets a signed-in member read the consent date, and nothing else besides" | 14 plus `consent_confirmed_at`; never `_by` |
+| CTR-AGC-005 | "opens no other agency's testimonials to visitors" | No policy is created on `testimonials` in this migration |
+| CTR-AGC-006 | "shows a site's contact details only for live agencies with a domain, through a definer view of nine columns" | `public_agency_sites`: definer, `status = 'active'` and `domain is not null`, nine columns |
+| CTR-AGC-007 | "grants the view to visitors and members only to read" | `select` only |
+| CTR-AGC-008 | "gives visitors no grant on agency_profiles, agencies or agents" | None |
+| CTR-AGC-009 | "adds a success case's tag and estimate flag, and nothing else" | `tag` (≤ 60), `metric_is_estimate` default false |
+| CTR-AGC-010 | "the ids are the ones the code and the tenant migration use" | Agency 1, `…a1`, `…05c1`..`05c7` |
+| CTR-AGC-011 | "the agent's identity is the bundled one" | Licence `L-00107009`, gender `f`, institutional affiliation, empty arrays |
+| CTR-AGC-012 | "the bio, the stats and the review links are the about section's" | Strings equal the bundle's |
+| CTR-AGC-013 | "the seven success cases are proof.c1…c7" | Titles, tags, estimates equal the bundle's |
+| CTR-AGC-014 | "the profile is what the site notifies, serves and consents under" | Domain, `NOTIFY_EMAILS`, `CONSENT_VERSION` |
+| CTR-AGC-015 | "guard first, the agent, the cases, and the profile last (review N-1)" | Statement order; idempotent inserts |
+| CTR-AGC-016 | "the tenant migration's agency profile literals are AGENCY_PROFILE's" | Equal |
+| CTR-AGC-017 | "the e2e fixture serves the seed under the views' columns" | `e2e/fixtures/agency1-seed` matches the seed |
+| CTR-AGC-020 | "the prerender refuses the agency-content reads" | `scripts/prerender.mjs` imports `AGENCY_CONTENT_TABLES` (the three tables) and aborts every `/rest/v1/<table>` request, registered after `serveFixtureSupabase` (R4) |
+| CTR-AGC-021 | "only the listed files import the bundled contact" | The importers of `@/config/contact` equal `CONTACT_READERS`, the deliberate list |
+| CTR-AGC-022 | "no component or page hard-codes the licence number" | `L-00107009` appears in no code line under `src/components` or `src/pages` |
+| CTR-CIS-001 | "allows img-src from agent-photos' public path only" | `vercel.json` CSP names `…/storage/v1/object/public/agent-photos/`, never the bare Supabase host |
+
+The CTR-E2E-002 row in §4.26 gains `VITE_AGENCY_CONTENT=true`, the reverse of production, where it is off.
 
 ## 5. Runtime counterpart
 

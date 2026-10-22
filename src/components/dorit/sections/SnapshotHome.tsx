@@ -3,7 +3,7 @@ import { ArrowLeft, Calculator, FileSearch, Layers, LineChart, MessageCircle, Ph
 import type { LucideIcon } from "lucide-react";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { CtaLink } from "@/components/dorit/primitives/Cta";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { SNAPSHOT_REVIEW_BUSINESS_DAYS, SNAPSHOT_START_HREF } from "@/config/snapshot";
 import { TOOL_SECTION, toolHref } from "@/config/tools";
 
@@ -90,6 +90,7 @@ function PreviewCard() {
 }
 
 export default function SnapshotHome() {
+  const { contact } = useAgencyContent();
   const timing = stepTiming(SNAPSHOT_REVIEW_BUSINESS_DAYS);
   return (
     <>
@@ -172,13 +173,13 @@ export default function SnapshotHome() {
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <a
-                  href={`tel:${CONTACT.phoneE164}`}
+                  href={`tel:${contact.phoneE164}`}
                   className="inline-flex items-center gap-2 min-h-11 text-highlight-on-dark underline underline-offset-4"
                 >
                   <Phone size={16} aria-hidden="true" /> חיוג
                 </a>
                 <a
-                  href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(CONTACT.defaultWhatsappMessage)}`}
+                  href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(contact.defaultWhatsappMessage)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 min-h-11 text-highlight-on-dark underline underline-offset-4"

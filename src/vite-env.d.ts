@@ -23,6 +23,8 @@ interface ImportMetaEnv {
   readonly VITE_MEETINGS_CLIENT?: string;
   /** Staff-created leads — on only when exactly "true"; see `src/config/staff-leads.ts`. */
   readonly VITE_STAFF_LEADS?: string;
+  /** Agency content from the database — on only when exactly "true"; see `src/config/agency-content.ts`. */
+  readonly VITE_AGENCY_CONTENT?: string;
   readonly VITE_SNAPSHOT_HOME?: string;
   /** Who writes articles and testimonials — see `src/config/content-writes.ts`. */
   readonly VITE_CONTENT_WRITES?: "base44" | "supabase";

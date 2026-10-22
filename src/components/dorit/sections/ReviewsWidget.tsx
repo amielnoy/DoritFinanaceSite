@@ -1,11 +1,7 @@
 import React from "react";
-import { useTestimonials } from "@/hooks/useContent";
+import { useAgencyContent, useSiteTestimonials } from "@/hooks/useAgencyContent";
 import { Star, ExternalLink, Loader2, Quote } from "lucide-react";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
-
-// TODO: השתמש/י בקישורים האמיתיים של הפרופיל העסקי ב-Google וב-Midrag.
-const GOOGLE_URL = "https://www.google.com/search?q=דורית+גוב+ארי+ביטוח+חוות+דעת";
-const MIDRAG_URL = "https://www.midrag.co.il/";
 
 const SOURCE_LABEL: Record<string, string> = { google: "Google", midrag: "Midrag" };
 
@@ -38,9 +34,9 @@ function Stars({ n }: { n: number }) {
 }
 
 export default function ReviewsWidget() {
-  const { data, isPending: loading } = useTestimonials();
+  const { data, isPending: loading } = useSiteTestimonials();
+  const { google, midrag } = useAgencyContent().agent.reviewLinks;
   const items = (data ?? []) as ReviewItem[];
-
 
   const rated = (items || []).filter((t) => t.rating);
   const avg = rated.length
@@ -77,22 +73,26 @@ export default function ReviewsWidget() {
               </div>
             )}
             <div className="flex flex-col gap-2">
-              <a
-                href={GOOGLE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 border border-border hover:border-accent hover:text-accent transition-colors text-sm"
-              >
-                חוות דעת ב-Google <ExternalLink size={13} />
-              </a>
-              <a
-                href={MIDRAG_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 border border-border hover:border-accent hover:text-accent transition-colors text-sm"
-              >
-                חוות דעת ב-Midrag <ExternalLink size={13} />
-              </a>
+              {google ? (
+                <a
+                  href={google}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 border border-border hover:border-accent hover:text-accent transition-colors text-sm"
+                >
+                  חוות דעת ב-Google <ExternalLink size={13} />
+                </a>
+              ) : null}
+              {midrag ? (
+                <a
+                  href={midrag}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 border border-border hover:border-accent hover:text-accent transition-colors text-sm"
+                >
+                  חוות דעת ב-Midrag <ExternalLink size={13} />
+                </a>
+              ) : null}
             </div>
           </div>
         </div>

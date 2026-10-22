@@ -1,6 +1,6 @@
 import React from "react";
 import { Phone, MessageCircle, MessagesSquare, CircleHelp } from "lucide-react";
-import { CONTACT } from "@/config/contact";
+import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { useSectionNav } from "@/hooks/useSectionNav";
 import SupportLink from "./SupportLink";
 import { useLocalePath, useT } from "@/i18n/LocaleContext";
@@ -32,6 +32,7 @@ const CELL =
   "flex flex-col items-center justify-center gap-0.5 min-w-0 min-h-[52px] px-0.5 rounded-md text-[13px] leading-tight font-medium text-center [text-wrap:balance]";
 
 export default function MobileStickyBar() {
+  const { contact } = useAgencyContent();
   // The bar is on every route, `#start` only on the home page.
   const goToSection = useSectionNav();
   const t = useT("common");
@@ -52,7 +53,7 @@ export default function MobileStickyBar() {
           {t("sticky.book")}
         </a>
         <a
-          href={`https://wa.me/${CONTACT.whatsapp}?text=${encodeURIComponent(t("contact.whatsappDefault"))}`}
+          href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(t("contact.whatsappDefault"))}`}
           target="_blank"
           rel="noopener noreferrer"
           className={`${CELL} bg-whatsapp text-white`}
@@ -60,7 +61,7 @@ export default function MobileStickyBar() {
           <MessageCircle size={18} aria-hidden="true" />
           {t("sticky.whatsapp")}
         </a>
-        <a href={`tel:${CONTACT.phoneE164}`} className={`${CELL} bg-primary text-primary-foreground`}>
+        <a href={`tel:${contact.phoneE164}`} className={`${CELL} bg-primary text-primary-foreground`}>
           <Phone size={18} aria-hidden="true" />
           {t("sticky.call")}
         </a>

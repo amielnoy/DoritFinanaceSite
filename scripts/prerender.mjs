@@ -36,6 +36,7 @@ import { buildEnv, duplicateTitles, hebrewTitledLocalePages, planArticles } from
 import { enabledLocales, translatedRoutes } from '../src/i18n/locales.ts'
 import { E2E_SUPABASE_URL } from '../e2e/build-env.ts'
 import { answerRestRead } from '../e2e/fixtures/supabase-fake.ts'
+import { AGENCY_CONTENT_TABLES } from '../src/services/supabase/agency-content-tables.ts'
 
 const DIST = join(process.cwd(), 'dist')
 const PORT = Number(process.env.PRERENDER_PORT ?? 4183)
@@ -275,6 +276,16 @@ async function main() {
         if (articles.fixtureRows) {
           await serveFixtureSupabase(page, articles.fixtureRows)
         }
+
+        // R4: no build-time read of agency content in step 2. Refused, the
+        // pages render the bundled agency-1 constants, so the HTML a crawler
+        // reads is the same for every domain until Rollout 5 reads each
+        // agency's own at build time. Registered last because Playwright tries
+        // the newest route first: the e2e fixture above must not answer these.
+        await page.route(
+          (url) => AGENCY_CONTENT_TABLES.some((t) => url.pathname === `/rest/v1/${t}`),
+          (r) => r.abort('blockedbyclient'),
+        )
 
         await page.goto(`http://127.0.0.1:${PORT}${route}`, {
           waitUntil: 'networkidle',

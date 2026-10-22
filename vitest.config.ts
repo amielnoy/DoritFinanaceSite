@@ -33,8 +33,12 @@ export default defineConfig({
     // mock `@/api/supabaseClient` explicitly. The clearinghouse switch is
     // pinned off the same way: a developer's VITE_MASLEKA_ENABLED=true must not
     // turn on the header's board link (and its role lookup) in every suite.
-    // Tests that want it on mock `@/config/masleka`.
-    env: { VITE_SUPABASE_URL: "", VITE_SUPABASE_PUBLISHABLE_KEY: "", VITE_MASLEKA_ENABLED: "" },
+    // Tests that want it on mock `@/config/masleka`. VITE_AGENCY_CONTENT is
+    // pinned off for the same reason: on, every page that shows the agent
+    // would ask the database for her, and every test rendering one without a
+    // QueryClientProvider would fail. Tests that want it on mock
+    // `@/config/agency-content`.
+    env: { VITE_SUPABASE_URL: "", VITE_SUPABASE_PUBLISHABLE_KEY: "", VITE_MASLEKA_ENABLED: "", VITE_AGENCY_CONTENT: "" },
     // Allure results are written on every run, CI or not: they are what the
     // published report and `npm run allure:open` are built from, and without
     // this the report showed only the Playwright legs — the 174 unit,
