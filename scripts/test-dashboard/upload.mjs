@@ -22,6 +22,7 @@ function buildInfo() {
       build_number: Number(env.GITHUB_RUN_NUMBER) || null,
       git_commit: env.GITHUB_SHA || null,
       git_branch: env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME || null,
+      run_type: env.GITHUB_EVENT_NAME === "schedule" ? "nightly" : "e2e",
     };
   }
   return {
@@ -30,6 +31,7 @@ function buildInfo() {
     build_number: null,
     git_commit: git("rev-parse", "HEAD"),
     git_branch: git("rev-parse", "--abbrev-ref", "HEAD"),
+    run_type: "local",
   };
 }
 

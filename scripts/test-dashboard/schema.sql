@@ -7,6 +7,7 @@ create table if not exists public.test_results (
   build_number integer,
   git_commit text,
   git_branch text,
+  run_type text,
   test_id text not null,
   test_name text not null,
   full_name text,
