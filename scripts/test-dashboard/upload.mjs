@@ -22,6 +22,7 @@ function buildInfo() {
       build_number: Number(env.GITHUB_RUN_NUMBER) || null,
       git_commit: env.GITHUB_SHA || null,
       git_branch: env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME || null,
+      run_type: env.GITHUB_EVENT_NAME === "schedule" ? "nightly" : "e2e",
     };
   }
   return {
@@ -30,6 +31,7 @@ function buildInfo() {
     build_number: null,
     git_commit: git("rev-parse", "HEAD"),
     git_branch: git("rev-parse", "--abbrev-ref", "HEAD"),
+    run_type: "local",
   };
 }
 
@@ -98,7 +100,8 @@ async function main() {
   }
   const build = buildInfo();
   const timestamp = new Date(Math.min(...results.map((result) => result.start ?? Date.now()))).toISOString();
-  const allTests = process.env.GITHUB_EVENT_NAME === "schedule";
+  // Only the nightly run uploads the vitest suites; run_type is the one place that decides "nightly".
+  const allTests = build.run_type === "nightly";
   const rows = results.map((result) => toRow(result, build, timestamp)).filter((row) => allTests || row.project !== "vitest");
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     await rest(url, key, "", { method: "POST", body: JSON.stringify(rows.slice(i, i + BATCH_SIZE)) });
