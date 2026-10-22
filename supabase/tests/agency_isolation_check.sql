@@ -39,9 +39,10 @@ insert into public.leads (base44_id, name, phone, agency_id) values
 insert into public.contacts (phone, name, agency_id) values
   ('050-000-2001', 'איש קשר א׳', '00000000-0000-0000-0000-000000000001'),
   ('050-000-2002', 'איש קשר ב׳', 'aaaaaaaa-0000-0000-0000-000000000002');
-insert into public.testimonials (name, quote, agency_id) values
-  ('לקוחה א׳', 'מצוין', '00000000-0000-0000-0000-000000000001'),
-  ('לקוחה ב׳', 'מעולה', 'aaaaaaaa-0000-0000-0000-000000000002');
+-- Outside agency 1 a testimonial carries its consent (20261106000000_agency_onboarding.sql).
+insert into public.testimonials (name, quote, agency_id, consent_confirmed_at) values
+  ('לקוחה א׳', 'מצוין', '00000000-0000-0000-0000-000000000001', null),
+  ('לקוחה ב׳', 'מעולה', 'aaaaaaaa-0000-0000-0000-000000000002', now());
 insert into public.meetings (lead_base44_id, scheduled_at, agency_id) values
   ('ISO-A1-LEAD', now() + interval '1 day', '00000000-0000-0000-0000-000000000001'),
   ('ISO-A2-LEAD', now() + interval '2 days', 'aaaaaaaa-0000-0000-0000-000000000002');

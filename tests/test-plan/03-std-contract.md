@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 181 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 932 including `it.each` / `describe.each` expansions (931 pass, 1 skipped)
+**Location:** `tests/contract/` · **Cases:** 311 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 1241 including `it.each` / `describe.each` expansions (1240 pass, 1 skipped; recounted 2026-10-20)
 
 ---
 
@@ -852,6 +852,7 @@ It also checks that a User cannot file a snapshot under another agency by naming
 | CTR-PERM-006 | "inviting is Admin+, an Admin grants User only, and only an Owner grants Admin or Owner" | invite-user's gate and pre-check; `set_member_role`'s admin branch; `grantableRoles` |
 | CTR-PERM-007 | "the agency profile is the Owner's" | `agency_profiles_update_owner` |
 | CTR-PERM-008 | "the membership history is Admin+" | `membership_events_read_admin` |
+| CTR-PERM-012 | "opening, returning and activating an agency are the operator's; a draft's profile is still the Owner's" | `agencies.manage: operator`; `create_agency`, `return_agency`, `activate_agency` refuse without `is_admin()`; `agency_profiles_update_onboarding_owner` |
 | CTR-PERM-009..011 | `can`, `grantableRoles`, `canManage` | Ranks; no role → nothing; the operator everything but leaving an agency they are not in; nobody changes someone above what they may grant |
 
 ### 4.21 An interview's conversation reference — `lead-conversation-ref.contract.test.ts`
@@ -924,6 +925,30 @@ from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
 | CTR-E2E-003 | "is built from that one file by every entry point" | `scripts/build-e2e.mjs` applies it over the process environment; `playwright.config.ts` builds with `npm run build:e2e` and gives the preview the same env; `scripts/run-tests.sh` runs `npm run build:e2e` and exports no `VITE_*` and no fixture of its own (CI's job: CTR-REB-004) |
 | CTR-E2E-004 | "answers the fake host only, so a deployment's reads stay live" | The fixture's Supabase route matches the fake origin, or a `/functions/v1/` path on any host; the prerender's matches the fake origin alone |
 
+### 4.27 The new-agency wizard's schema — `agency-onboarding.contract.test.ts`
+
+`supabase/migrations/20261106000000_agency_onboarding.sql` (the wizard spec's Rollout step 1), read as source, and held to `src/config/onboarding.ts`. `supabase/tests/onboarding_check.sql` proves the behaviour against a database. CTR-PERM-012 in `permissions.contract.test.ts` adds: opening, returning and activating are `is_admin()` (`agencies.manage: operator`), and a draft's profile is the Owner's.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ONB-001 | "sorts after every migration already applied" | After `20261105000000_staff_leads.sql` |
+| CTR-ONB-002 | "adds draft and pending_review, and keeps 'active' the default" | The four statuses; the default untouched |
+| CTR-ONB-003 | "leaves agency_role() alone" | Not redefined here; its latest body still `a.status = 'active'` |
+| CTR-ONB-004 | "opens onboarding to draft, pending_review and active members — never suspended" | `onboarding_role`'s status list |
+| CTR-ONB-005..006 | search_path, revokes, definer | Every function `set search_path = ''` and revoked from public, anon, authenticated by name; definer except the four caller-seeing guards and `next_consent_version` |
+| CTR-ONB-007 | "grants the four RPCs to authenticated only" | Only `agency_is_active` reaches anon; `onboarding_missing` granted to nobody |
+| CTR-ONB-008 | "checks the caller in every RPC" | `not_signed_in`; `is_admin()`; submit's owner test is `is not distinct from 'owner'` (a bare `=` lets a non-member through) |
+| CTR-ONB-009 | "moves status one step at a time" | draft → pending_review → draft / active; the direct-write guard |
+| CTR-ONB-010 | "opens a draft without a membership" | `create_agency` touches no memberships, `invitee_for` or `auth.users` |
+| CTR-ONB-011..013 | Required fields | `onboarding_missing`'s keys = `submitRequiredKeys()`; affiliations only when declared; submit and activate both refuse `incomplete` with the keys in the detail |
+| CTR-ONB-014 | "gates activation on exactly the config's three gates" | `ACTIVATION_GATES` = the keys in `gates_closed` |
+| CTR-ONB-015 | "refuses everyone but the operator the operator's columns" | Every `OPERATOR_ONLY_COLUMNS` column in its guard |
+| CTR-ONB-016..019 | Owner, testimonials, the public card, success cases | Owner-only write policies, none to anon; consent constraint and composite key, and consent for every agency but agency 1 (`testimonials_agency_consent`, NOT VALID); today's testimonial policies kept; the view is definer with `a.status = 'active'` and `verified_licence_number is not null`, and no verification columns |
+| CTR-ONB-020 | "voids a licence check when the name, number, types or regulator change; all but the number hide the card" | `agents_guard` clears `licence_verified_*`; a name, types or regulator change clears `verified_licence_number` too |
+| CTR-ONB-021 | "moves the consent version of a live agency, and lapses the approval, when a licensee is added, removed or edited" | `agents_after_change` after insert, update or delete |
+| CTR-ONB-022 | "keeps the portrait path inside the agent's own folder, and what the owner types bounded" | `agents_photo_path`; `onboarding` < 64 KB; ≤ 5 notification addresses, each checked alone by `valid_notify_emails` (no space, `,` `;` `<` `>` `"`; ≤ 254), which `create_agency` shares; bio ≤ 16 KB; service area and photo alt ≤ 200 |
+| CTR-ONB-023..024 | The `agent-photos` bucket | Public, WebP, 10 MB; four policies to authenticated through `can_write_agent_photo`, which matches the path before casting |
+
 ## 5. Runtime counterpart
 
 [STD-05 §4](05-std-api.md) re-checks the same contract against **observed
@@ -935,7 +960,7 @@ time.
 
 ## 6. Pass criteria
 
-All 161 declared cases pass (vitest: 890 pass, 1 skipped, of 891 with expansions). A failure means either the frontend or the backend definition
+All 311 declared cases pass (vitest: 1240 pass, 1 skipped, of 1241 with expansions). A failure means either the frontend or the backend definition
 moved — fix the side that is wrong; do not relax the assertion.
 
 

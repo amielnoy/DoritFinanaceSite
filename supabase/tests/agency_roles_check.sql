@@ -352,7 +352,7 @@ begin
     $q$update public.blog_posts set published = true where slug = 'roles-draft'$q$,
     'new row violates row-level security policy for table "blog_posts"');
   perform pg_temp.expect_error(
-    $q$insert into public.testimonials (name, quote, agency_id) values ('לקוחה', 'טוב', 'cccccccc-0000-0000-0000-00000000000a')$q$,
+    $q$insert into public.testimonials (name, quote, agency_id, consent_confirmed_at) values ('לקוחה', 'טוב', 'cccccccc-0000-0000-0000-00000000000a', now())$q$,
     'new row violates row-level security policy for table "testimonials"');
   -- Members: seen, with their addresses; never written directly.
   if (select count(*) from public.memberships where agency_id = 'cccccccc-0000-0000-0000-00000000000a') <> 4
@@ -381,7 +381,8 @@ begin
   end if;
   perform public.clearinghouse_publish('ffffffff-0000-0000-0000-0000000000b2', 'client@roles.test',
     '[{"title":"t","body":"b","priority":"check"}]');
-  insert into public.testimonials (name, quote, agency_id) values ('לקוחה', 'טוב', 'cccccccc-0000-0000-0000-00000000000a');
+  -- Outside agency 1 a testimonial carries its consent (20261106000000_agency_onboarding.sql).
+  insert into public.testimonials (name, quote, agency_id, consent_confirmed_at) values ('לקוחה', 'טוב', 'cccccccc-0000-0000-0000-00000000000a', now());
   update public.blog_posts set published = true where slug = 'roles-draft';
   get diagnostics v_count = row_count;
   if v_count <> 1 then raise exception 'an admin cannot publish'; end if;
