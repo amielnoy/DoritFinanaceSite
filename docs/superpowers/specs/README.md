@@ -22,6 +22,8 @@ routing, permissions and release conditions.
 | [Agencies and their roles: Owner, Admin, User](2026-10-15-agency-roles-design.md) |
 | ["סוכנות חדשה" — the new-agency setup wizard](2026-10-16-new-agency-wizard-design.md) (draft for review, not built) |
 | [Saving a client's meetings with Dorit](2026-10-17-client-meetings-design.md) |
+| [Adding a lead by hand: a lead someone on the team brought in](2026-10-20-staff-lead-design.md) |
+| [Adding a client by hand: a client who never came in as a lead](2026-10-22-staff-client-design.md) (draft for review, not built) |
 
 When a design changes, record the new decision and its relationship to the old
 one. Preserve incident measurements and original implementation steps; update
