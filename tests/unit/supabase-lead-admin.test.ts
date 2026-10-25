@@ -177,6 +177,7 @@ describe("SupabaseLeadAdminService — claim-document links and assignment (agen
   it("counts open leads nobody works, by ids only", async () => {
     const { client, calls } = tableFake({ data: [{ id: "a" }, { id: "b" }], error: null });
     expect(await new SupabaseLeadAdminService(client).countUnassigned()).toBe(2);
+    expect(calls).toContainEqual(["is", "merged_into", null]);
     expect(calls).toContainEqual(["select", "id"]);
     expect(calls).toContainEqual(["is", "assigned_user_id", null]);
     expect(calls).toContainEqual(["not", "status", "eq", "closed"]);
@@ -298,6 +299,7 @@ describe("SupabaseLeadAdminService.countNew", () => {
     const { client, calls } = byTable({ leads: { data: [{ id: "a" }, { id: "b" }, { id: "c" }], error: null } });
     expect(await new SupabaseLeadAdminService(client).countNew()).toBe(3);
     expect(calls).toContainEqual(["leads", "or", "status.eq.new,status.eq.escalated"]);
+    expect(calls).toContainEqual(["leads", "is", "merged_into", null]);
     expect(calls).not.toContainEqual(["leads", "eq", "status", "new"]);
     expect(calls).toContainEqual(["leads", "limit", 1000]);
   });
@@ -581,9 +583,42 @@ describe("SupabaseLeadAdminService — staff-created leads", () => {
     const { client, calls } = tableFake({ data: [leadRow()], error: null });
     const [lead] = await new SupabaseLeadAdminService(client, null, token, false).list();
     expect(calls.find((c) => c[0] === "select")![1]).toBe(
-      "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id",
+      "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into",
     );
     expect(lead).not.toHaveProperty("possibleDuplicate");
     expect(lead).not.toHaveProperty("broughtBy");
+  });
+});
+
+describe("SupabaseLeadAdminService — merging duplicates", () => {
+  const withRpc = (answer: { data: unknown; error: { message: string } | null }) => {
+    const { client } = tableFake({ data: [], error: null });
+    const rpc = vi.fn(async () => answer);
+    return { client: { ...client, rpc } as SupabaseLeadTableClient, rpc };
+  };
+
+  it("reads merged_into as mergedInto, and null when the lead stands alone", async () => {
+    const { client } = tableFake({ data: [leadRow({ merged_into: "main-1" }), leadRow({ id: "x", merged_into: null })], error: null });
+    const [merged, alone] = await new SupabaseLeadAdminService(client).list();
+    expect(merged.mergedInto).toBe("main-1");
+    expect(merged).not.toHaveProperty("merged_into");
+    expect(alone.mergedInto).toBeNull();
+  });
+
+  it("merges through merge_leads as the person, and says how many it folded", async () => {
+    const { client, rpc } = withRpc({ data: 2, error: null });
+    expect(await new SupabaseLeadAdminService(client).mergeLeads("main", ["a", "b"])).toBe(2);
+    expect(rpc).toHaveBeenCalledWith("merge_leads", { p_primary: "main", p_others: ["a", "b"] });
+  });
+
+  it("unmerges through unmerge_lead", async () => {
+    const { client, rpc } = withRpc({ data: null, error: null });
+    await new SupabaseLeadAdminService(client).unmergeLead("a");
+    expect(rpc).toHaveBeenCalledWith("unmerge_lead", { p_id: "a" });
+  });
+
+  it("says a refusal in Hebrew", async () => {
+    const { client } = withRpc({ data: null, error: { message: "forbidden" } });
+    await expect(new SupabaseLeadAdminService(client).mergeLeads("main", ["a"])).rejects.toThrow("רק מנהל/ת בסוכנות");
   });
 });

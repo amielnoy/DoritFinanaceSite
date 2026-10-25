@@ -55,8 +55,10 @@ const { default: Leads } = await import("@/pages/Leads");
 // Thursday 22 October 2026, 09:00 in Israel (+03:00). Summer time ends on Sunday the 25th.
 const NOW = new Date("2026-10-22T06:00:00Z");
 
+// Each lead its own number: leads that share a phone show as one row (duplicate leads).
+let phoneSeq = 0;
 const lead = (id: string, name: string, over: Record<string, unknown> = {}) => ({
-  id, name, phone: `05${id.length}0000000`, email: "", source: "quick", status: "new", created_date: "2026-10-10T08:00:00Z",
+  id, name, phone: `0520000${String(++phoneSeq).padStart(3, "0")}`, email: "", source: "quick", status: "new", created_date: "2026-10-10T08:00:00Z",
   agency_id: A1, assigned_user_id: "u-me", ...over,
 });
 const agendaMeeting = (id: string, leadId: string, scheduledAt: string | null, over: Record<string, unknown> = {}) => ({

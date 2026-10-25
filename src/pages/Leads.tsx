@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom";
 import type { AgendaMeeting, LeadRecord, LeadSource, LeadStatus } from "@/services";
 import {
-  useAdminUsers, useAgencyMeetings, useAssignLead, useLeads, useLeadTranscript, useRemoveLead, useSetLeadStatus, useTranscriptLeadIds,
+  useAdminUsers, useAgencyMeetings, useAssignLead, useLeads, useLeadTranscript, useMergeLeads, useRemoveLead, useSetLeadStatus,
+  useTranscriptLeadIds, useUnmergeLead,
 } from "@/hooks/useAdmin";
 import { useCurrentUserId } from "@/hooks/useCurrentUserId";
 import { AGENCY_1, useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import { csvCell } from "@/lib/csv";
-import { ArrowLeft, CalendarDays, Download, Inbox, ListChecks, Loader2, Plus, Trash2, TrendingUp, UserRound, type LucideIcon } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronDown, Download, GitMerge, Inbox, ListChecks, Loader2, Plus, Trash2, TrendingUp, UserRound, type LucideIcon } from "lucide-react";
 import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
 import LeadDrawer, { type LeadDrawerTab } from "@/components/dorit/admin/LeadDrawer";
 import LeadDetails from "@/components/dorit/admin/LeadDetails";
@@ -15,6 +16,7 @@ import MeetingsAgenda from "@/components/dorit/admin/MeetingsAgenda";
 import { MEETINGS_STAFF } from "@/config/meetings";
 import { INTAKE_LABELS, STAFF_LEADS } from "@/config/staff-leads";
 import { GONE_MEMBER, broughtThisMonth, sameNumberLeads, staffLeadLine } from "@/lib/staff-leads";
+import { duplicateRows, foldMerged, newestFirst, type LeadRow } from "@/lib/lead-duplicates";
 import NewLeadSheetHost from "@/components/dorit/admin/NewLeadSheetHost";
 import StaffLeadsStrip from "@/components/dorit/admin/StaffLeadsStrip";
 import DuplicatePointer from "@/components/dorit/admin/DuplicatePointer";
@@ -386,6 +388,7 @@ export default function Leads() {
   const { can } = useAgencyRole(agencyId);
   const assigns = can("leads.assign");
   const deletes = can("leads.delete");
+  const merges = can("leads.merge");
   const tracks = can("leads.tracking");
   const myId = useCurrentUserId();
   // Agency 1 only: the privacy notice the client is told names Dorit's agency (src/config/staff-leads.ts).
@@ -398,6 +401,16 @@ export default function Leads() {
   const setStatus = useSetLeadStatus();
   const removeLead = useRemoveLead();
   const assignLead = useAssignLead();
+  const mergeLeads = useMergeLeads();
+  const unmergeLead = useUnmergeLead();
+  /** The rows whose other submissions are open, by the id of the lead each row shows. */
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpanded((open) => {
+      const next = new Set(open);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
   const [filter, setFilter] = useState<string>("all");
   // The lead open in the drawer (VITE_MEETINGS_STAFF), by id so a reload keeps it current.
   const [openLeadId, setOpenLeadId] = useState<string | null>(null);
@@ -417,8 +430,11 @@ export default function Leads() {
 
   // One agency at a time: someone in two sees the one the switcher names.
   const leads: LeadItem[] = (data ?? []).filter((l) => !l.agency_id || l.agency_id === agencyId);
-  const busy = setStatus.isPending || removeLead.isPending || assignLead.isPending;
+  // A merged lead is history: it folds under its main lead and leaves the counts and the filters.
+  const { top, mergedBy } = useMemo(() => foldMerged(leads), [leads]);
+  const busy = setStatus.isPending || removeLead.isPending || assignLead.isPending || mergeLeads.isPending || unmergeLead.isPending;
   const writeError = setStatus.isError || removeLead.isError || assignLead.isError;
+  const mergeError = (mergeLeads.error ?? unmergeLead.error) as Error | null;
   /** Who a lead of this agency may go to: its members, by address. */
   const assignees = useMemo(
     () =>
@@ -434,7 +450,7 @@ export default function Leads() {
     !id ? GONE_MEMBER : id === myId ? "אני" : assigns ? assigneeLabel(id) : "חבר/ה בצוות";
   const showBrought = STAFF_LEADS && assigns;
 
-  const filtered = leads.filter(
+  const filtered = top.filter(
     (l) =>
       filter === "all" ||
       (filter === "staff"
@@ -447,6 +463,9 @@ export default function Leads() {
           ? NEEDS_ATTENTION.includes(l.status)
           : l.status === filter),
   );
+
+  // The table's rows: leads that share a phone or an email are one row.
+  const rows = duplicateRows(filtered, mergedBy);
 
   const exportCsv = (all: boolean) => {
     const source = all ? leads : filtered;
@@ -475,6 +494,17 @@ export default function Leads() {
 
   const updateStatus = (id: string, status: LeadStatus) => setStatus.mutate({ id, status });
 
+  /** "מזג": the group folds into its merge target, which then shows the row with the rest open under it. */
+  const merge = (row: LeadRow) => {
+    const target = row.mergeTarget;
+    if (!target) return;
+    const otherIds = [row.lead, ...row.duplicates].filter((m) => m.id !== target.id).map((m) => m.id);
+    mergeLeads.mutate(
+      { primaryId: target.id, otherIds },
+      { onSuccess: () => setExpanded((open) => new Set(open).add(target.id)) },
+    );
+  };
+
   // The lead's meetings and their requests go with it (on delete cascade), so it
   // leaves both tabs at once; the confirmation says so.
   const remove = (lead: LeadItem) => {
@@ -485,7 +515,7 @@ export default function Leads() {
   const brought = useMemo(() => (showBrought ? broughtThisMonth(leads, new Date()) : new Map<string, number>()), [showBrought, leads]);
   const openLead = openLeadId ? leads.find((l) => l.id === openLeadId) ?? null : null;
 
-  const counts = leads.reduce<Record<string, number>>((acc, l) => {
+  const counts = top.reduce<Record<string, number>>((acc, l) => {
     acc[l.status] = (acc[l.status] || 0) + 1;
     if (!l.assigned_user_id && l.status !== "closed") acc.unassigned = (acc.unassigned || 0) + 1;
     if (l.source === "staff") acc.staff = (acc.staff || 0) + 1;
@@ -506,140 +536,59 @@ export default function Leads() {
       "actions",
     ];
     const weightSum = columns.reduce((sum, c) => sum + COLUMN_WEIGHT[c], 0);
-    const leadsContent = (
-      <>
-            {/* With the tabs it is the Owner's "מעקב לידים" tab; without them, folded above the leads. */}
-            {!staff && tracks ? <LeadTrackingPanel /> : null}
+    /** Under a row's name: its group's badge, which opens the other submissions, and "מזג" (Admin+). */
+    const groupControls = (row: LeadRow) =>
+      row.duplicates.length || row.merged.length ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => toggleExpanded(row.lead.id)}
+            aria-expanded={expanded.has(row.lead.id)}
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-normal ${
+              row.duplicates.length ? "bg-amber-500/15 text-amber-800 dark:text-amber-300" : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            {row.duplicates.length ? `כפילות (${row.duplicates.length + 1})` : `מוזגו ${row.merged.length}`}
+            <ChevronDown size={12} aria-hidden="true" className={expanded.has(row.lead.id) ? "rotate-180" : undefined} />
+          </button>
+          {merges && row.mergeTarget ? (
+            <button
+              type="button"
+              onClick={() => merge(row)}
+              disabled={busy}
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-normal hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              <GitMerge size={12} aria-hidden="true" /> מזג
+            </button>
+          ) : null}
+        </div>
+      ) : null;
 
-            {showBrought ? <StaffLeadsStrip counts={brought} label={assigneeLabel} /> : null}
+    /** Under a group member's name: what it is, and for a merged one "ביטול מיזוג" (Admin+). */
+    const memberNote = (l: LeadItem) => (
+      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+        {l.mergedInto ? "ממוזגת" : "כפילות"}
+        {merges && l.mergedInto ? (
+          <button
+            type="button"
+            onClick={() => unmergeLead.mutate(l.id)}
+            disabled={busy}
+            className="ms-2 text-accent hover:underline disabled:opacity-40"
+          >
+            ביטול מיזוג
+          </button>
+        ) : null}
+      </span>
+    );
 
-            <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-              {[
-                { key: "all", title: "סה״כ פניות", value: leads.length, line: "כל הרשומות במערכת" },
-                { key: ATTENTION, title: "דורשות טיפול", value: (counts.new || 0) + (counts.escalated || 0), line: "חדשות, ומי שביקשו את דורית — ליצור קשר" },
-                { key: "contacted", title: "בתהליך", value: counts.contacted || 0, line: "נוצר קשר — להמשיך במכירה" },
-                { key: "closed", title: "נסגרו", value: counts.closed || 0, line: "טופלו והסתיימו" },
-              ].map(({ key, title, value, line }) => {
-                const active = filter === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setFilter(key)}
-                    className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-right transition-colors ${
-                      active ? "border-accent/30 bg-accent/10" : "border-transparent bg-secondary hover:border-border"
-                    }`}
-                  >
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-sm font-semibold">
-                        <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[key === ATTENTION ? "new" : key]}`} />
-                        <span>{title}</span>
-                      </span>
-                      <span className="mt-1 block text-xs text-muted-foreground">{line}</span>
-                    </span>
-                    <span className={`font-heading text-3xl font-bold tabular-nums ${active ? "text-accent" : ""}`}>{value}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mb-6 flex flex-wrap gap-1 rounded-xl bg-secondary p-1">
-              {[
-                { key: "all", label: "הכל" },
-                ...STATUS.map((s) => ({ key: s, label: STATUS_LABEL[s] })),
-                ...EXTRA_FILTERS.filter((f) => (!f.adminOnly || assigns) && (!f.staffLeads || STAFF_LEADS)),
-              ].map(({ key: s, label }) => {
-                const active = filter === s;
-                const count = s === "all" ? leads.length : counts[s] || 0;
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setFilter(s)}
-                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                      active ? "bg-card font-semibold text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${DOT[s] ?? "bg-slate-400"}`} />
-                    {label}
-                    <span className="rounded-full bg-background px-1.5 text-xs tabular-nums">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-              <h2 className="flex items-center gap-2 text-base font-bold">
-                רשימת פניות
-                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-normal tabular-nums text-muted-foreground">{filtered.length}</span>
-              </h2>
-              <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => exportCsv(false)} disabled={!filtered.length} className={BUTTON}>
-                  <Download size={15} /> ייצוא מסונן
-                </button>
-                <button type="button" onClick={() => exportCsv(true)} disabled={!leads.length} className={BUTTON}>
-                  <Download size={15} /> ייצוא הכל ל-CSV
-                </button>
-              </div>
-            </div>
-
-            {writeError && (
-              <p role="alert" className="mb-4 text-sm text-destructive">
-                הפעולה האחרונה לא נשמרה. ניתן לנסות שוב.
-              </p>
-            )}
-
-            {loading ? (
-              <div className="flex justify-center py-20">
-                <Loader2 className="animate-spin text-accent" size={28} />
-              </div>
-            ) : isError ? (
-              <div className="py-20 text-center">
-                <p className="text-destructive">לא הצלחנו לטעון את הפניות. ניתן לרענן את הדף.</p>
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center py-14 text-center">
-                <EmptyInbox />
-                <p className="mt-4 text-lg font-bold">אין פניות להצגה.</p>
-                <p className="mt-1 text-sm text-muted-foreground">כאן יופיעו הפניות שלך, מרגע יצירתן ועד לסיום הטיפול.</p>
-                {creates && leads.length === 0 ? (
-                  <button type="button" onClick={() => setSheetOpen(true)} className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
-                    יצירת פנייה ראשונה <ArrowLeft size={14} aria-hidden="true" />
-                  </button>
-                ) : null}
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-border lg:overflow-hidden">
-                <table className={`w-full min-w-[56rem] table-fixed text-sm lg:min-w-0 ${COMPACT_TEXT}`}>
-                  <colgroup>
-                    {columns.map((c) => (
-                      <col key={c} style={{ width: `${((COLUMN_WEIGHT[c] / weightSum) * 100).toFixed(2)}%` }} />
-                    ))}
-                  </colgroup>
-                  <thead className="bg-secondary text-muted-foreground">
-                    <tr className="text-right">
-                      <th className={HEAD}>תאריך</th>
-                      <th className={HEAD}>שם</th>
-                      <th className={HEAD}>טלפון</th>
-                      <th className={HEAD}>אימייל</th>
-                      <th className={HEAD}>מקור</th>
-                      <th className={HEAD}>פרטים</th>
-                      <th className={HEAD}>סטטוס</th>
-                      {assigns ? <th className={HEAD}>משויכת ל</th> : null}
-                      {showBrought ? <th className={HEAD}>הובאה ע״י</th> : null}
-                      {staff ? <th className={HEAD}>הפגישה הבאה</th> : null}
-                      <th className={`${HEAD} ${PINNED} bg-secondary`}>
-                        <span className="sr-only">פעולות</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((l) => (
-                      <tr key={l.id} className="border-t border-border align-top">
+    /** A row of the table: a lead on its own or showing its group, or one of a group's other submissions. */
+    const leadRow = (l: LeadItem, part: { kind: "main"; row: LeadRow } | { kind: "member" }) => (
+                      <tr key={l.id} className={`border-t border-border align-top${part.kind === "member" ? " bg-secondary/40" : ""}`}>
                         <td className={`${CELL} text-muted-foreground`}>
                           {l.created_date ? new Date(l.created_date).toLocaleDateString("he-IL") : "—"}
                         </td>
                         <td className={`${CELL} font-medium`}>
+                          {part.kind === "member" ? <span aria-hidden="true" className="me-1 text-muted-foreground">↳</span> : null}
                           {MEETINGS_STAFF ? (
                             <button
                               type="button"
@@ -655,6 +604,7 @@ export default function Leads() {
                           ) : (
                             l.name
                           )}
+                          {part.kind === "main" ? groupControls(part.row) : memberNote(l)}
                         </td>
                         <td className={CONTACT} dir="ltr">{l.phone}</td>
                         <td className={`${CONTACT} text-foreground/70`} dir="ltr">{l.email || "—"}</td>
@@ -739,13 +689,155 @@ export default function Leads() {
                           </div>
                         </td>
                       </tr>
+    );
+
+    const leadsContent = (
+      <>
+            {/* With the tabs it is the Owner's "מעקב לידים" tab; without them, folded above the leads. */}
+            {!staff && tracks ? <LeadTrackingPanel /> : null}
+
+            {showBrought ? <StaffLeadsStrip counts={brought} label={assigneeLabel} /> : null}
+
+            <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[
+                { key: "all", title: "סה״כ פניות", value: leads.length, line: "כל הרשומות במערכת" },
+                { key: ATTENTION, title: "דורשות טיפול", value: (counts.new || 0) + (counts.escalated || 0), line: "חדשות, ומי שביקשו את דורית — ליצור קשר" },
+                { key: "contacted", title: "בתהליך", value: counts.contacted || 0, line: "נוצר קשר — להמשיך במכירה" },
+                { key: "closed", title: "נסגרו", value: counts.closed || 0, line: "טופלו והסתיימו" },
+              ].map(({ key, title, value, line }) => {
+                const active = filter === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFilter(key)}
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-right transition-colors ${
+                      active ? "border-accent/30 bg-accent/10" : "border-transparent bg-secondary hover:border-border"
+                    }`}
+                  >
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-sm font-semibold">
+                        <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[key === ATTENTION ? "new" : key]}`} />
+                        <span>{title}</span>
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{line}</span>
+                    </span>
+                    <span className={`font-heading text-3xl font-bold tabular-nums ${active ? "text-accent" : ""}`}>{value}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mb-6 flex flex-wrap gap-1 rounded-xl bg-secondary p-1">
+              {[
+                { key: "all", label: "הכל" },
+                ...STATUS.map((s) => ({ key: s, label: STATUS_LABEL[s] })),
+                ...EXTRA_FILTERS.filter((f) => (!f.adminOnly || assigns) && (!f.staffLeads || STAFF_LEADS)),
+              ].map(({ key: s, label }) => {
+                const active = filter === s;
+                const count = s === "all" ? leads.length : counts[s] || 0;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setFilter(s)}
+                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                      active ? "bg-card font-semibold text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${DOT[s] ?? "bg-slate-400"}`} />
+                    {label}
+                    <span className="rounded-full bg-background px-1.5 text-xs tabular-nums">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+              <h2 className="flex items-center gap-2 text-base font-bold">
+                רשימת פניות
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-normal tabular-nums text-muted-foreground">{rows.length}</span>
+              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => exportCsv(false)} disabled={!filtered.length} className={BUTTON}>
+                  <Download size={15} /> ייצוא מסונן
+                </button>
+                <button type="button" onClick={() => exportCsv(true)} disabled={!leads.length} className={BUTTON}>
+                  <Download size={15} /> ייצוא הכל ל-CSV
+                </button>
+              </div>
+            </div>
+
+            {writeError && (
+              <p role="alert" className="mb-4 text-sm text-destructive">
+                הפעולה האחרונה לא נשמרה. ניתן לנסות שוב.
+              </p>
+            )}
+            {mergeError ? (
+              <p role="alert" className="mb-4 text-sm text-destructive">
+                {mergeError.message}
+              </p>
+            ) : null}
+
+            {loading ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="animate-spin text-accent" size={28} />
+              </div>
+            ) : isError ? (
+              <div className="py-20 text-center">
+                <p className="text-destructive">לא הצלחנו לטעון את הפניות. ניתן לרענן את הדף.</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center py-14 text-center">
+                <EmptyInbox />
+                <p className="mt-4 text-lg font-bold">אין פניות להצגה.</p>
+                <p className="mt-1 text-sm text-muted-foreground">כאן יופיעו הפניות שלך, מרגע יצירתן ועד לסיום הטיפול.</p>
+                {creates && leads.length === 0 ? (
+                  <button type="button" onClick={() => setSheetOpen(true)} className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+                    יצירת פנייה ראשונה <ArrowLeft size={14} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border lg:overflow-hidden">
+                <table className={`w-full min-w-[56rem] table-fixed text-sm lg:min-w-0 ${COMPACT_TEXT}`}>
+                  <colgroup>
+                    {columns.map((c) => (
+                      <col key={c} style={{ width: `${((COLUMN_WEIGHT[c] / weightSum) * 100).toFixed(2)}%` }} />
+                    ))}
+                  </colgroup>
+                  <thead className="bg-secondary text-muted-foreground">
+                    <tr className="text-right">
+                      <th className={HEAD}>תאריך</th>
+                      <th className={HEAD}>שם</th>
+                      <th className={HEAD}>טלפון</th>
+                      <th className={HEAD}>אימייל</th>
+                      <th className={HEAD}>מקור</th>
+                      <th className={HEAD}>פרטים</th>
+                      <th className={HEAD}>סטטוס</th>
+                      {assigns ? <th className={HEAD}>משויכת ל</th> : null}
+                      {showBrought ? <th className={HEAD}>הובאה ע״י</th> : null}
+                      {staff ? <th className={HEAD}>הפגישה הבאה</th> : null}
+                      <th className={`${HEAD} ${PINNED} bg-secondary`}>
+                        <span className="sr-only">פעולות</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <React.Fragment key={row.lead.id}>
+                        {leadRow(row.lead, { kind: "main", row })}
+                        {expanded.has(row.lead.id)
+                          ? [...row.duplicates, ...row.merged].sort(newestFirst).map((m) => leadRow(m, { kind: "member" }))
+                          : null}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
             {!loading && !isError ? (
-              <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">{filtered.length} פניות להצגה</p>
+              <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">{rows.length} פניות להצגה</p>
             ) : null}
       </>
     );
@@ -791,7 +883,7 @@ export default function Leads() {
           <div className={`grid gap-4 ${staff ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
             <KpiCard
               title="לידים פעילים"
-              value={leads.filter((l) => l.status !== "closed" && l.status !== "client").length}
+              value={top.filter((l) => l.status !== "closed" && l.status !== "client").length}
               note={[`${attention} דורשות טיפול`, ...(assigns ? [`${counts.unassigned || 0} לא שויכו`] : [])].join(" · ")}
               icon={UserRound}
               tone="green"

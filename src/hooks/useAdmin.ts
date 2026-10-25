@@ -138,6 +138,24 @@ export function useClearDuplicate() {
   });
 }
 
+/** "מזג": folds a group of leads into one (Admin+). Nothing is deleted. */
+export function useMergeLeads() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ primaryId, otherIds }: { primaryId: string; otherIds: string[] }) => services.leadsAdmin.mergeLeads(primaryId, otherIds),
+    onSuccess: () => client.invalidateQueries({ queryKey: adminKeys.leads }),
+  });
+}
+
+/** "ביטול מיזוג": takes one merged lead out again (Admin+). */
+export function useUnmergeLead() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => services.leadsAdmin.unmergeLead(id),
+    onSuccess: () => client.invalidateQueries({ queryKey: adminKeys.leads }),
+  });
+}
+
 export function useRemoveLead() {
   const client = useQueryClient();
   return useMutation({

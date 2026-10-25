@@ -37,6 +37,8 @@ export interface SupabaseLeadTableClient extends SupabaseTableClient {
     delete(): SupabaseWriteQuery;
     insert(values: Record<string, unknown>): { select(columns: string): PromiseLike<SupabaseReadResult> };
   };
+  /** A database function as the signed-in person (supabase-js `rpc`); the narrower fakes may not have it. */
+  rpc?(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string; code?: string } | null }>;
 }
 
 /**
