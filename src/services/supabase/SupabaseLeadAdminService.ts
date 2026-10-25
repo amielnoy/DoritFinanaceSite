@@ -1,5 +1,5 @@
 import { STAFF_LEADS } from "@/config/staff-leads";
-import type { AgendaMeeting, CreatedLead, LeadAdminPort, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, NewStaffLead, TranscriptLine } from "../ports";
+import type { AgendaMeeting, CreatedLead, LeadAdminPort, LeadEvent, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, NewStaffLead, TranscriptLine } from "../ports";
 import type { ContentFunctionsClient } from "./EdgeContentAdminService";
 import { CLAIM_DOCUMENT_REF_PREFIX } from "./SupabaseUploadService";
 import {
@@ -12,7 +12,7 @@ import {
 /** The port's fields. Not `*`: a lead row also carries the visitor's summary,
  *  profile and consent record, none of which this list shows, and personal data
  *  the screen does not need stays out of the browser. */
-const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into";
+const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into,next_follow_up_on";
 
 /** The staff-created-lead columns; they exist in production only once the staff-leads migration is applied, so they are asked for only when STAFF_LEADS is on. */
 const STAFF_LEAD_COLUMNS = "brought_by,intake,referrer_note,notice_method,possible_duplicate";
@@ -27,12 +27,15 @@ export const LEAD_LIST_MAX = 20_000;
 const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת";
 
 const MERGE_UNAVAILABLE = "מיזוג פניות אינו זמין כאן.";
-/** merge_leads / unmerge_lead refusals, by the exception each raises. */
+/** merge_leads / unmerge_lead / add_lead_note refusals, by the exception each raises. */
 const MERGE_REFUSALS: Record<string, string> = {
   forbidden: "רק מנהל/ת בסוכנות יכול/ה למזג פניות.",
   not_found: NOT_APPLIED,
   bad_merge: "אי אפשר למזג את הפניות האלה.",
   not_merged: "הפנייה כבר לא ממוזגת.",
+  field_required: "ההערה ריקה.",
+  field_too_long: "ההערה ארוכה מדי (עד 2,000 תווים).",
+  field_invalid: "אין לכתוב בהערה מספר זהות, כרטיס אשראי או חשבון בנק.",
 };
 
 /** A meeting's columns for staff — Dorit's notes included, which the client's door never returns. */
@@ -113,7 +116,9 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     return rows.map((row) => {
       const lead = { ...toPortRow(row), id: row.id } as Record<string, unknown>;
       delete lead.merged_into;
+      delete lead.next_follow_up_on;
       lead.mergedInto = typeof row.merged_into === "string" ? row.merged_into : null;
+      lead.nextFollowUpOn = typeof row.next_follow_up_on === "string" ? row.next_follow_up_on : null;
       if (this.staffLeads) {
         for (const key of ["brought_by", "intake", "referrer_note", "notice_method", "possible_duplicate"]) delete lead[key];
         lead.broughtBy = typeof row.brought_by === "string" ? row.brought_by : null;
@@ -167,7 +172,33 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     await this.rpc("unmerge_lead", { p_id: leadId });
   }
 
-  /** A merge function as the signed-in person; its refusal in Hebrew. */
+  /** The lead's activity log, newest first; lead_events_read decides whose. */
+  async leadEvents(leadId: string): Promise<LeadEvent[]> {
+    const rows = await fetchRows(
+      this.client.from("lead_events").select("id,kind,actor_id,from_value,to_value,note,at").eq("lead_id", leadId).order("at", { ascending: false }).limit(500),
+      "lead_events",
+    );
+    const text = (v: unknown) => (typeof v === "string" ? v : null);
+    return rows.map((r) => ({
+      id: String(r.id),
+      kind: r.kind as LeadEvent["kind"],
+      actorId: text(r.actor_id),
+      from: text(r.from_value),
+      to: text(r.to_value),
+      note: text(r.note),
+      at: String(r.at ?? ""),
+    }));
+  }
+
+  async addLeadNote(leadId: string, text: string): Promise<void> {
+    await this.rpc("add_lead_note", { p_lead_id: leadId, p_note: text });
+  }
+
+  setFollowUp(leadId: string, on: string | null): Promise<void> {
+    return applied(this.client.from("leads").update({ next_follow_up_on: on }).eq("id", leadId).select("id"), "follow-up");
+  }
+
+  /** A merge or note function as the signed-in person; its refusal in Hebrew. */
   private async rpc(fn: string, args: Record<string, unknown>): Promise<unknown> {
     if (!this.client.rpc) throw new Error(MERGE_UNAVAILABLE);
     const { data, error } = await this.client.rpc(fn, args);

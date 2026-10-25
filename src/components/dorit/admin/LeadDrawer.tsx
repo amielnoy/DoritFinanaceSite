@@ -5,20 +5,21 @@ import { useLeadMeetings } from "@/hooks/useAdmin";
 import SideDrawer from "@/components/dorit/admin/SideDrawer";
 import LeadMeetings from "@/components/dorit/admin/LeadMeetings";
 
-export type LeadDrawerTab = "details" | "meetings";
+export type LeadDrawerTab = "details" | "activity" | "meetings";
 type Tab = LeadDrawerTab;
 
 /**
- * One lead, in a side drawer over /admin/leads: "פרטים" and "פגישות · N"
- * (docs/superpowers/specs/2026-10-17-client-meetings-design.md, Staff; the
- * user's choice of 2026-10-17 — a new drawer with two tabs, the table as it
- * was). Shown only with VITE_MEETINGS_STAFF.
+ * One lead, in a side drawer over /admin/leads: "פרטים", "פעילות" (the follow-up,
+ * notes and the activity log — the lead pipeline) and, with VITE_MEETINGS_STAFF,
+ * "פגישות · N" (docs/superpowers/specs/2026-10-17-client-meetings-design.md).
  */
 export default function LeadDrawer({
   lead,
   subtitle,
   note = null,
   details,
+  activity,
+  showMeetings = true,
   onClose,
   initialTab = "details",
   meetingId = null,
@@ -33,6 +34,10 @@ export default function LeadDrawer({
   note?: string | null;
   /** The "פרטים" tab: what the table's row knows, laid out by the page. */
   details: React.ReactNode;
+  /** The "פעילות" tab. */
+  activity: React.ReactNode;
+  /** The "פגישות" tab, which exists only with VITE_MEETINGS_STAFF. */
+  showMeetings?: boolean;
   onClose: () => void;
   /**
    * Where it opens. The agenda opens a lead on "פגישות", with its meeting
@@ -51,12 +56,13 @@ export default function LeadDrawer({
   deleting?: boolean;
   deleteFailed?: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>(initialTab);
-  const meetings = useLeadMeetings(lead?.id ?? "", Boolean(lead));
+  const [tab, setTab] = useState<Tab>(initialTab === "meetings" && !showMeetings ? "details" : initialTab);
+  const meetings = useLeadMeetings(lead?.id ?? "", Boolean(lead) && showMeetings);
   const count = meetings.data?.length;
   const tabs: { key: Tab; label: string }[] = [
     { key: "details", label: "פרטים" },
-    { key: "meetings", label: count === undefined ? "פגישות" : `פגישות · ${count}` },
+    { key: "activity", label: "פעילות" },
+    ...(showMeetings ? [{ key: "meetings" as const, label: count === undefined ? "פגישות" : `פגישות · ${count}` }] : []),
   ];
 
   return (
@@ -81,7 +87,13 @@ export default function LeadDrawer({
         ))}
       </div>
       <div role="tabpanel" id={`lead-panel-${tab}`} aria-labelledby={`lead-tab-${tab}`}>
-        {lead ? (tab === "details" ? details : <LeadMeetings lead={lead} initialOpenId={meetingId} startAdding={startAdding} />) : null}
+        {lead
+          ? tab === "details"
+            ? details
+            : tab === "activity"
+              ? activity
+              : <LeadMeetings lead={lead} initialOpenId={meetingId} startAdding={startAdding} />
+          : null}
       </div>
       {lead && onDelete ? (
         <div className="mt-8 border-t border-border pt-4">

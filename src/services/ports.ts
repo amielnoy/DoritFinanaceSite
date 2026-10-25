@@ -314,7 +314,7 @@ export interface UploadPort {
  * (20261025000000_lead_retention.sql) anonymizes every other lead 24 months
  * after its last contact, as the privacy policy promises, and never a client.
  */
-export type LeadStatus = "new" | "contacted" | "closed" | "client";
+export type LeadStatus = "new" | "contacted" | "meeting_set" | "proposal_sent" | "closed" | "client";
 
 /** A lead as stored, which is not the shape that was submitted: the store adds
  *  an id, a received timestamp and a status the owner moves through. */
@@ -340,6 +340,22 @@ export interface LeadRecord {
   possibleDuplicate?: boolean;
   /** The lead this one was merged into (merge_leads), or null. A merged lead is history: nothing is deleted. */
   mergedInto?: string | null;
+  /** The day of the next follow-up (Israel's date, YYYY-MM-DD), or null. */
+  nextFollowUpOn?: string | null;
+}
+
+/** One line of a lead's activity log (lead_events). */
+export interface LeadEvent {
+  id: string;
+  kind: "created" | "status" | "assigned" | "note" | "follow_up" | "merged" | "unmerged" | "whatsapp";
+  /** Who did it; null for the system (an interview, a job) or a member since removed. */
+  actorId: string | null;
+  /** The value before and after, for status, assignment and follow-up changes. */
+  from: string | null;
+  to: string | null;
+  /** A note's text. */
+  note: string | null;
+  at: string;
 }
 
 /** A lead a member enters by hand (create-lead Edge Function). */
@@ -439,6 +455,12 @@ export interface LeadAdminPort {
   mergeLeads(primaryId: string, otherIds: string[]): Promise<number>;
   /** Take one merged lead out of its main lead again (unmerge_lead, Admin+). */
   unmergeLead(leadId: string): Promise<void>;
+  /** The lead's activity log, newest first. */
+  leadEvents(leadId: string): Promise<LeadEvent[]>;
+  /** Add a note to the lead's activity log (add_lead_note): whoever may see the lead. */
+  addLeadNote(leadId: string, text: string): Promise<void>;
+  /** Set or clear the day of the lead's next follow-up: whoever may update the lead. */
+  setFollowUp(leadId: string, on: string | null): Promise<void>;
   /**
    * A link that opens one of a claim's documents. A Base44 file URL is already
    * one; a Supabase Storage reference (`storage:claim-documents/…`) is signed

@@ -11,6 +11,15 @@ const ROOT = join(__dirname, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 const migration = read("supabase/migrations/20261025000000_lead_retention.sql");
 const quoted = (s: string) => [...s.matchAll(/['"]([a-z_]+)['"]/g)].map((m) => m[1]).sort();
+/** leads_status_check as the newest migration that sets it leaves it (the pipeline added statuses after retention). */
+const currentStatuses = (() => {
+  const files = readdirSync(join(ROOT, "supabase", "migrations")).filter((f) => f.endsWith(".sql")).sort().reverse();
+  for (const f of files) {
+    const m = /add constraint leads_status_check\s+check \(status in \(([^)]*)\)\)/.exec(read(`supabase/migrations/${f}`));
+    if (m) return quoted(m[1]);
+  }
+  throw new Error("no migration sets leads_status_check");
+})();
 
 describe("lead retention", () => {
   it("sorts after every migration already applied", () => {
@@ -33,7 +42,9 @@ describe("lead retention", () => {
     const type = /export type LeadStatus = ([^;]*);/.exec(read("src/services/ports.ts"))![1];
     const settable = quoted(type);
     expect(settable).toContain("client");
-    for (const s of settable) expect(dbStatuses).toContain(s);
+    for (const s of settable) expect(currentStatuses).toContain(s);
+    // Nothing the retention migration allowed was taken away since.
+    for (const s of dbStatuses) expect(currentStatuses).toContain(s);
   });
 
   it("keeps the privacy policy's promise: 24 months from the last contact, then deleted or anonymized", () => {
