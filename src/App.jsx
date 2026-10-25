@@ -41,6 +41,7 @@ const AgencyProfile = lazy(() => import('@/pages/AgencyProfile'));
 const Blog = lazy(() => import('@/pages/Blog'));
 const BlogPost = lazy(() => import('@/pages/BlogPost'));
 const BlogAdmin = lazy(() => import('@/pages/BlogAdmin'));
+const Campaigns = lazy(() => import('@/pages/Campaigns'));
 const Claims = lazy(() => import('@/pages/Claims'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const Tools = lazy(() => import('@/pages/Tools'));
@@ -148,6 +149,7 @@ const AuthenticatedApp = () => {
             <Route path="/admin/leads" element={<Leads />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/blog" element={<BlogAdmin />} />
+            <Route path="/admin/campaigns" element={<Campaigns />} />
           </Route>
         </Route>
         <Route element={<AgencyRoute min="owner" unauthenticatedElement={<LoginRedirect />} />}>

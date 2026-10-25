@@ -16,7 +16,7 @@ const MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 
 const KNOWN_CHANNELS: readonly Channel[] = [
   "google", "facebook", "instagram", "linkedin", "ai_assistant",
-  "email", "sms", "referral", "direct",
+  "email", "sms", "referral", "direct", "reactivation",
 ];
 
 export type Channel =
@@ -28,7 +28,9 @@ export type Channel =
   | "email"
   | "sms"
   | "referral"
-  | "direct";
+  | "direct"
+  /** An agency's campaign link to its existing clients (/admin/campaigns). */
+  | "reactivation";
 
 export interface Attribution {
   channel: Channel;
@@ -59,6 +61,7 @@ const UTM_SOURCE_MAP: Record<string, Channel> = {
   cpc: "google",
   email: "email",
   sms: "sms",
+  reactivation: "reactivation",
 };
 
 /**
@@ -136,20 +139,24 @@ function classify(search: string, referrer: string): Attribution {
  * Captures the channel on first visit, once per 90 days. Safe to call on
  * every page load: it reads the existing value first and does nothing when
  * one is already on record and not yet expired — first-touch is never
- * overwritten by a later visit.
+ * overwritten by a later visit, except by a reactivation campaign link.
  */
 export function captureAttribution(): void {
   try {
     const store = storage();
     if (!store) return;
+    const { channel, campaign } = classify(window.location.search, document.referrer);
+    // A campaign link the agency sent its own client is the one exception to
+    // first touch: the person may have visited long ago, and the campaign is
+    // what brought them back — counting the old channel would hide it.
+    const campaignLink = channel === "reactivation" && campaign !== null;
     const raw = store.getItem(STORAGE_KEY);
-    if (raw) {
+    if (raw && !campaignLink) {
       const existing = JSON.parse(raw) as StoredAttribution;
       if (typeof existing.capturedAt === "number" && Date.now() - existing.capturedAt < MAX_AGE_MS) {
         return;
       }
     }
-    const { channel, campaign } = classify(window.location.search, document.referrer);
     const stored: StoredAttribution = { channel, campaign, capturedAt: Date.now() };
     store.setItem(STORAGE_KEY, JSON.stringify(stored));
   } catch {

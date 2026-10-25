@@ -34,10 +34,12 @@ import { UnconfiguredMaslekaService } from "./unconfigured/UnconfiguredMaslekaSe
 import { RoutedAgentService } from "./RoutedAgentService";
 import type { Services } from "./index";
 import { SupabaseAgencyService, type SupabaseAgencyClient } from "./supabase/SupabaseAgencyService";
+import { SupabaseCampaignService } from "./supabase/SupabaseCampaignService";
 import type {
   AccountPort,
   AgencyContentPort,
   AgencyPort,
+  CampaignPort,
   AgentPort,
   AuthPort,
   ContentAdminPort,
@@ -235,6 +237,19 @@ const agentPort: AgentPort = new RoutedAgentService(
   CHAT_AGENTS,
 );
 
+/** Reactivation campaigns: Supabase only. Without it there are none, and none can be made. */
+const campaignPort: CampaignPort = tables
+  ? new SupabaseCampaignService(tables)
+  : {
+      list: async () => [],
+      create: async () => {
+        throw new Error("אין חיבור למאגר.");
+      },
+      update: async () => {
+        throw new Error("אין חיבור למאגר.");
+      },
+    };
+
 export const services: Services = {
   leads: leadPort,
   content: contentPort,
@@ -249,6 +264,7 @@ export const services: Services = {
   account: accountPort,
   usersAdmin: usersAdminPort,
   agency: agencyPort,
+  campaigns: campaignPort,
   masleka: maslekaPort,
 };
 

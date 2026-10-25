@@ -91,7 +91,7 @@ function upstreamReasons(result) {
 // מתפצלים.
 const CHANNEL_TAXONOMY = [
   'google', 'facebook', 'instagram', 'linkedin', 'ai_assistant',
-  'email', 'sms', 'referral', 'direct', 'unknown',
+  'email', 'sms', 'referral', 'direct', 'reactivation', 'unknown',
 ];
 
 /** ערך סגור בלבד — ולעולם לא נאמן מהלקוח, גם אם הוא כבר סינן בצד שלו. */

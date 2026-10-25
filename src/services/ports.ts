@@ -338,6 +338,9 @@ export interface LeadRecord {
   referrerNote?: string | null;
   noticeMethod?: NoticeMethod | null;
   possibleDuplicate?: boolean;
+  /** Which marketing channel brought the lead ('reactivation': an agency campaign link), and the campaign's code. */
+  channel?: string | null;
+  campaign?: string | null;
   /** The lead this one was merged into (merge_leads), or null. A merged lead is history: nothing is deleted. */
   mergedInto?: string | null;
   /** The day of the next follow-up (Israel's date, YYYY-MM-DD), or null. */
@@ -563,6 +566,35 @@ export interface AgencyProfile {
   licenceRegulator: string;
   /** The WhatsApp message a member sends a lead, with {name}, {agent} and {topic} (src/lib/lead-whatsapp.ts). */
   leadWhatsappTemplate: string;
+}
+
+/** A reactivation campaign: the general link and message an agency sends its existing clients (20261111000000_campaigns.sql). */
+export interface Campaign {
+  id: string;
+  agencyId: string;
+  name: string;
+  /** The link's utm_campaign, random; a lead from the link carries it as `campaign`. */
+  code: string;
+  /** The WhatsApp message, with {agent} and {link}; always has an opt-out line. */
+  message: string;
+  createdBy: string | null;
+  createdAt: string;
+  archivedAt: string | null;
+}
+
+export interface NewCampaign {
+  agencyId: string;
+  name: string;
+  message: string;
+}
+
+/** The agency's campaigns: every member reads them, Admin+ writes them. */
+export interface CampaignPort {
+  list(agencyId: string): Promise<Campaign[]>;
+  /** Creates the campaign with a fresh random code. */
+  create(input: NewCampaign): Promise<Campaign>;
+  /** Renames, rewrites the message, archives or restores. The code never changes. */
+  update(id: string, fields: { name?: string; message?: string; archived?: boolean }): Promise<void>;
 }
 
 /** Who the signed-in person is in their agencies, and the agency's own details. */

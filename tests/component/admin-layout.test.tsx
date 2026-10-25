@@ -63,7 +63,7 @@ describe("<AdminLayout />", () => {
     renderAt("/admin/leads");
     expect(await screen.findByText("מסך הפניות")).toBeInTheDocument();
     const daily = within(sidebar()).getByRole("group", { name: "טיפול שוטף" });
-    expect(within(daily).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/admin/leads", "/admin/masleka"]);
+    expect(within(daily).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/admin/leads", "/admin/masleka", "/admin/campaigns"]);
     const setup = within(sidebar()).getByRole("group", { name: "תוכן והגדרות" });
     expect(within(setup).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/admin/blog", "/admin/users", "/admin/agency"]);
     expect(within(sidebar()).getByRole("link", { name: "ראשי" })).toHaveAttribute("href", "/account");
@@ -98,7 +98,7 @@ describe("<AdminLayout />", () => {
     renderAt("/admin/masleka", { id: "u2", email: "s@example.com", role: "user" });
     const nav = await screen.findByRole("navigation", { name: "ממשק ניהול" });
     expect(within(nav).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual([
-      "/admin/leads", "/admin/masleka", "/admin/blog", "/admin/users",
+      "/admin/leads", "/admin/masleka", "/admin/campaigns", "/admin/blog", "/admin/users",
     ]);
     expect(await within(nav).findByRole("link", { name: /פניות\s*2 חדשות/ })).toBeInTheDocument();
     expect(countUnassigned).not.toHaveBeenCalled();

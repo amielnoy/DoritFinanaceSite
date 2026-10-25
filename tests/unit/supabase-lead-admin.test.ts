@@ -583,7 +583,7 @@ describe("SupabaseLeadAdminService — staff-created leads", () => {
     const { client, calls } = tableFake({ data: [leadRow()], error: null });
     const [lead] = await new SupabaseLeadAdminService(client, null, token, false).list();
     expect(calls.find((c) => c[0] === "select")![1]).toBe(
-      "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into,next_follow_up_on",
+      "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into,next_follow_up_on,channel,campaign",
     );
     expect(lead).not.toHaveProperty("possibleDuplicate");
     expect(lead).not.toHaveProperty("broughtBy");
@@ -671,5 +671,14 @@ describe("SupabaseLeadAdminService — WhatsApp", () => {
     const rpc = vi.fn(async () => ({ data: null, error: null }));
     await new SupabaseLeadAdminService({ ...client, rpc } as SupabaseLeadTableClient).logWhatsapp("lead-1");
     expect(rpc).toHaveBeenCalledWith("log_lead_whatsapp", { p_lead_id: "lead-1" });
+  });
+});
+
+describe("SupabaseLeadAdminService — campaigns", () => {
+  it("reads a lead's channel and campaign", async () => {
+    const { client } = tableFake({ data: [leadRow({ channel: "reactivation", campaign: "k7x2m9qa1b2c" })], error: null });
+    const [lead] = await new SupabaseLeadAdminService(client).list();
+    expect(lead.channel).toBe("reactivation");
+    expect(lead.campaign).toBe("k7x2m9qa1b2c");
   });
 });

@@ -12,18 +12,18 @@ describe("adminNavFor", () => {
   it("gives the platform operator every page, grouped by task", () => {
     expect(labels(adminNavFor("operator", true))).toEqual([
       [null, ["ראשי"]],
-      ["טיפול שוטף", ["פניות", "בקשות מסלקה"]],
+      ["טיפול שוטף", ["פניות", "בקשות מסלקה", "קמפיינים"]],
       ["תוכן והגדרות", ["בלוג", "משתמשים", "פרטי הסוכנות"]],
     ]);
   });
 
   it("leaves the clearinghouse out while its switch is off", () => {
-    expect(labels(adminNavFor("operator", false))[1]).toEqual(["טיפול שוטף", ["פניות"]]);
+    expect(labels(adminNavFor("operator", false))[1]).toEqual(["טיפול שוטף", ["פניות", "קמפיינים"]]);
   });
 
   it("gives an Owner the agency's pages and its details, not the operator's main page", () => {
     expect(labels(adminNavFor("owner", true))).toEqual([
-      ["טיפול שוטף", ["פניות", "בקשות מסלקה"]],
+      ["טיפול שוטף", ["פניות", "בקשות מסלקה", "קמפיינים"]],
       ["תוכן והגדרות", ["בלוג", "משתמשים", "פרטי הסוכנות"]],
     ]);
   });
@@ -31,7 +31,7 @@ describe("adminNavFor", () => {
   it("gives an Admin and a User the same rows, but not the agency's details", () => {
     for (const role of ["admin", "user"] as const) {
       expect(labels(adminNavFor(role, true))).toEqual([
-        ["טיפול שוטף", ["פניות", "בקשות מסלקה"]],
+        ["טיפול שוטף", ["פניות", "בקשות מסלקה", "קמפיינים"]],
         ["תוכן והגדרות", ["בלוג", "משתמשים"]],
       ]);
     }
@@ -58,7 +58,7 @@ describe("adminNavFor", () => {
   it("names a route for every page, each once", () => {
     const routes = ADMIN_NAV.flatMap((g) => g.items.map((i) => i.to));
     expect(new Set(routes).size).toBe(routes.length);
-    expect(routes).toEqual(["/account", "/admin/leads", "/admin/masleka", "/admin/blog", "/admin/users", "/admin/agency"]);
+    expect(routes).toEqual(["/account", "/admin/leads", "/admin/masleka", "/admin/campaigns", "/admin/blog", "/admin/users", "/admin/agency"]);
   });
 
   it("sends the operator to their main page and an agency's members to the leads", () => {

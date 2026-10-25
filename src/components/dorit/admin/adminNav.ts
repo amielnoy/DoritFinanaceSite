@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, Inbox, LayoutDashboard, Newspaper, Users, type LucideIcon } from "lucide-react";
+import { Building2, ClipboardList, Inbox, LayoutDashboard, Megaphone, Newspaper, Users, type LucideIcon } from "lucide-react";
 import type { AgencyRole } from "@/config/permissions";
 import { reaches, type AdminAccess, type AdminCounts } from "@/hooks/useAdminMenu";
 import { MEETINGS_STAFF } from "@/config/meetings";
@@ -55,6 +55,8 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
         masleka: true,
         counter: { key: "maslekaWaiting", label: "ממתינות להגשה" },
       },
+      // Every member sees the agency's campaigns, to tell where a lead came from; Admin+ creates them.
+      { to: "/admin/campaigns", label: "קמפיינים", icon: Megaphone, min: "user" },
     ],
   },
   {

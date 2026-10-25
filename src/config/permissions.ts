@@ -43,6 +43,8 @@ export const PERMISSIONS = {
   "leads.merge": "admin",
   /** Exports what the person can already see. */
   "leads.export": "user",
+  /** Creates and edits the agency's reactivation campaigns (campaigns_insert_admin / campaigns_update_admin); every member sees them. */
+  "campaigns.manage": "admin",
   "contacts.read": "admin",
   "transcripts.read": "user",
   "claimDocuments.open": "user",
