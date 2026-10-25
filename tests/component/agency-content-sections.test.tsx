@@ -119,7 +119,7 @@ beforeEach(() => {
 });
 
 describe("<Hero /> from the record", () => {
-  it("CMP-AGC-010: byline, licence, headline, monogram and contact are the record's", async () => {
+  it("CMP-AGC-010: byline, licence, headline and monogram are the record's; the contact buttons are the sticky bar's", async () => {
     show(record());
     const { container } = renderIt(<Hero />);
     await waitFor(() => expect(screen.getAllByText("יעל כהן · מתכננת פיננסית")).toHaveLength(2));
@@ -127,9 +127,9 @@ describe("<Hero /> from the record", () => {
     expect(screen.getByText("שורת פתיחה")).toBeTruthy();
     expect(screen.getByRole("img", { name: "יעל כהן — דיוקן מקצועי" })).toBeTruthy();
     expect(container.innerHTML).not.toContain("/images/dorit-office-portrait");
+    // WhatsApp and the call are offered once, by the sticky bar (CMP-AGC-021) — not again in the hero (review, 2026-10-25).
     const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href") ?? "");
-    expect(hrefs).toContain("tel:+972521112222");
-    expect(hrefs.some((h) => h.startsWith("https://wa.me/972521112222"))).toBe(true);
+    expect(hrefs.some((h) => h.startsWith("tel:") || h.startsWith("https://wa.me/"))).toBe(false);
   });
 
   it("CMP-AGC-011: agency 1 without a photo keeps the bundled picture", async () => {

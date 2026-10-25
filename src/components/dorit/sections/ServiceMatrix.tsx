@@ -4,15 +4,13 @@ import type { LucideIcon } from "lucide-react";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
-import { useLocale, useT } from "@/i18n/LocaleContext";
+import { useT } from "@/i18n/LocaleContext";
 import Glossed from "@/components/dorit/primitives/Glossed";
 
 interface Pillar {
   icon: LucideIcon;
   /** The pillar's keys in home.json: `services.<id>.title` and `.desc`. */
   id: "p1" | "p2" | "p3" | "p4" | "p5";
-  /** The English subtitle the Hebrew page shows under each title. */
-  sub: string;
 }
 
 // The five pillars, financial work first.
@@ -38,27 +36,22 @@ const PILLARS: Pillar[] = [
   {
     icon: Landmark,
     id: "p1",
-    sub: "Pension & Provident",
   },
   {
     icon: Calculator,
     id: "p2",
-    sub: "Tax & Rights",
   },
   {
     icon: TrendingDown,
     id: "p3",
-    sub: "Fees & Costs",
   },
   {
     icon: Heart,
     id: "p4",
-    sub: "Life & Health",
   },
   {
     icon: HeartHandshake,
     id: "p5",
-    sub: "Claims Advocacy",
   },
 ];
 
@@ -71,9 +64,6 @@ const PILLARS: Pillar[] = [
 export default function ServiceMatrix() {
   const isDesktop = useMediaQuery(MD_UP, true);
   const t = useT("home");
-  // The English subtitle repeats the title on an English page and is out of
-  // place on a French one: Hebrew only.
-  const showSub = useLocale() === "he";
   const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set([0]));
   const toggle = (i: number) =>
     setOpen((prev) => {
@@ -138,12 +128,7 @@ export default function ServiceMatrix() {
                     hidden={!expanded}
                     className="px-4 pb-5 ps-[4.5rem]"
                   >
-                    {showSub ? (
-                      <p dir="ltr" className="m-0 text-end text-sm text-muted-foreground">
-                        {p.sub}
-                      </p>
-                    ) : null}
-                    <p className="m-0 mt-1.5 text-[17px] leading-[1.7] text-foreground/80"><Glossed text={t(`services.${p.id}.desc`)} /></p>
+                    <p className="m-0 text-[17px] leading-[1.7] text-foreground/80"><Glossed text={t(`services.${p.id}.desc`)} /></p>
                   </div>
                 </div>
               );
@@ -162,11 +147,6 @@ export default function ServiceMatrix() {
                     <h3 className="font-heading font-bold text-[clamp(21px,2vw,24px)] leading-[1.25]">
                       {t(`services.${p.id}.title`)}
                     </h3>
-                    {showSub ? (
-                      <p dir="ltr" className="self-start text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {p.sub}
-                      </p>
-                    ) : null}
                   </div>
                 </div>
                 {/* Always visible. The ink is `text-foreground/80`, set once and

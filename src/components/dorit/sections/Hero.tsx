@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, MessageCircle, Phone } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { PENSION_CHECK } from "@/config/offers";
@@ -25,7 +25,6 @@ export default function Hero() {
   const tp = useT("pension");
   const lp = useLocalePath();
   const content = useAgencyContent();
-  const { contact } = content;
   return (
     <section id="top" className="relative border-b border-border pt-[80px] md:pt-[127px]">
       <div className="max-w-[1200px] mx-auto w-full px-[clamp(20px,4vw,40px)] py-[clamp(32px,5vw,64px)] grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-[clamp(32px,4vw,56px)] items-center">
@@ -95,24 +94,10 @@ export default function Hero() {
             <a href="#start" className={ctaClass("max-md:hidden", { size: "lg", muted: true })}>
               {tc("cta.shortCall")}
             </a>
-            {/* Below md: WhatsApp and the phone side by side under the CTA. The
-                global click listener reports them as click_whatsapp and
-                click_phone, location "top". */}
-            <div className="md:hidden grid w-full grid-cols-2 gap-3">
-              <a
-                href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(tc("contact.whatsappDefault"))}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={HERO_ALT}
-              >
-                <MessageCircle size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-                {tc("sticky.whatsapp")}
-              </a>
-              <a href={`tel:${contact.phoneE164}`} className={HERO_ALT}>
-                <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-                {tc("nav.call")}
-              </a>
-            </div>
+            {/* Below md, WhatsApp and the phone are in the sticky bar at the
+                bottom of the screen (MobileStickyBar) — a second pair here
+                showed each one twice on the first screen (review, 2026-10-25).
+                The pension check above stays the one main button. */}
             {/* The services start a short scroll below on a phone; the link is
                 for the desktop's long first screen. */}
             <a
@@ -131,6 +116,3 @@ export default function Hero() {
 
 const CLAIM =
   "rounded-full border border-highlight/30 bg-card px-3 py-1 text-[15px] font-medium text-accent shadow-sm";
-
-const HERO_ALT =
-  "flex items-center justify-center gap-2 min-h-12 rounded-md border border-border text-[17px] text-foreground hover:border-highlight hover:bg-highlight/5 transition-colors duration-200";
