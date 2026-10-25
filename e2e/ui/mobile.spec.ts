@@ -212,8 +212,6 @@ test.describe("Mobile web (iOS + Android)", { tag: "@mobile-only" }, () => {
         stickyBar(page).getByRole("link", { name: /שאלה לעוזר/ }),
         page.getByRole("button", { name: "תפריט" }),
         page.locator("#top").getByRole("link", { name: "בדיקת תיק פנסיוני" }),
-        page.locator("#top").getByRole("link", { name: "וואטסאפ" }),
-        page.locator("#top").getByRole("link", { name: "חיוג" }),
         page.locator("#start").getByRole("link", { name: "וואטסאפ" }),
         page.locator("#start").getByRole("link", { name: "טלפון" }),
         page.locator("#start").getByRole("button", { name: "השארת פרטים" }),
@@ -795,7 +793,7 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
   const stepEvents = async (page: Page) =>
     (await queuedClicks(page)).filter((e) => e.name === "wizard_step").map((e) => e.location);
 
-  test("the hero: an 88px round portrait beside the licence line, a full-width CTA, WhatsApp and a call under it", async ({ page }) => {
+  test("the hero: an 88px round portrait beside the licence line, and one full-width CTA", async ({ page }) => {
     // The brief's screen, 390x844: the device descriptors' own heights differ
     // (an iPhone 14 in Playwright is 390x664, browser chrome taken off).
     await page.setViewportSize({ width: 390, height: 844 });
@@ -828,21 +826,18 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
     });
 
     const cta = hero.getByRole("link", { name: "בדיקת תיק פנסיוני" });
-    const wa = hero.getByRole("link", { name: "וואטסאפ" });
-    const call = hero.getByRole("link", { name: "חיוג" });
 
-    await test_step("the CTA spans the column, and WhatsApp and the call sit side by side under it, on the first screen", async () => {
+    await test_step("the pension check is the one main button, across the column; WhatsApp and the call are the sticky bar's, once", async () => {
       const c = (await cta.boundingBox())!;
       const column = (await hero.locator("h1").boundingBox())!;
       expect(c.width).toBeGreaterThanOrEqual(column.width - 1);
-      const w = (await wa.boundingBox())!;
-      const p = (await call.boundingBox())!;
-      expect(Math.abs(w.y - p.y)).toBeLessThanOrEqual(1);
-      expect(w.y).toBeGreaterThan(c.y + c.height);
-      const bar = (await stickyBar(page).boundingBox())!;
-      expect(w.y + w.height).toBeLessThanOrEqual(bar.y);
-      await expect(wa).toHaveAttribute("href", /^https:\/\/wa\.me\/972508311776/);
-      await expect(call).toHaveAttribute("href", "tel:+972508311776");
+      // Review 2026-10-25: the hero's own pair showed each a second time on the first screen.
+      await expect(hero.getByRole("link", { name: "וואטסאפ" })).toHaveCount(0);
+      await expect(hero.getByRole("link", { name: "חיוג" })).toHaveCount(0);
+      const bar = stickyBar(page);
+      await expect(bar.getByRole("link", { name: /וואטסאפ/ })).toBeVisible();
+      await expect(bar.locator('a[href^="tel:"]')).toBeVisible();
+      expect(c.y + c.height).toBeLessThanOrEqual((await bar.boundingBox())!.y);
     });
 
     await test_step("a phone fetches the small portrait, not the 1080 one", async () => {
@@ -850,15 +845,9 @@ test.describe("Home on a phone", { tag: "@mobile-only" }, () => {
       expect(src).toMatch(/-480\.(avif|webp)$/);
     });
 
-    await test_step("all three report to GA4 from location top", async () => {
-      await page.evaluate(() => window.addEventListener("click", (e) => e.preventDefault()));
-      // The flagship last: it is a router link, which moves the page before
-      // the listener above can stop it; the queue survives the navigation.
-      for (const link of [wa, call, cta]) await link.click();
+    await test_step("the main button reports to GA4 from location top", async () => {
+      await cta.click();
       const events = await queuedClicks(page);
-      for (const name of ["click_whatsapp", "click_phone"]) {
-        expect(events).toContainEqual({ name, location: "top" });
-      }
       expect(events).toContainEqual({ name: "cta_click", location: "top" });
       await expect(page).toHaveURL(/\/pension-check$/);
     });
