@@ -46,6 +46,6 @@ describe("campaigns, schema", () => {
   });
 
   it("serves /admin/campaigns as the app, not a 404", () => {
-    expect(read("vercel.json")).toContain("/admin/:page(leads|users|blog|masleka|agency|campaigns)");
+    expect(read("vercel.json")).toMatch(/"\/admin\/:page\([^)]*\bcampaigns\b[^)]*\)"/);
   });
 });

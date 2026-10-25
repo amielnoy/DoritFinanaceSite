@@ -51,6 +51,13 @@ describe("adminNavFor", () => {
     expect(rows.some((i) => i.alert)).toBe(false);
   });
 
+  it("offers the operator the agencies being set up only while the wizard is on", () => {
+    const has = (on: boolean) => adminNavFor("operator", true, on).flatMap((g) => g.items).some((i) => i.to === "/admin/agencies");
+    expect(has(true)).toBe(true);
+    expect(has(false)).toBe(false);
+    expect(adminNavFor("owner", true, true).flatMap((g) => g.items).some((i) => i.to === "/admin/agencies")).toBe(false);
+  });
+
   it("gives anyone else nothing", () => {
     expect(adminNavFor(null, true)).toEqual([]);
   });
@@ -58,7 +65,7 @@ describe("adminNavFor", () => {
   it("names a route for every page, each once", () => {
     const routes = ADMIN_NAV.flatMap((g) => g.items.map((i) => i.to));
     expect(new Set(routes).size).toBe(routes.length);
-    expect(routes).toEqual(["/account", "/admin/leads", "/admin/masleka", "/admin/campaigns", "/admin/blog", "/admin/users", "/admin/agency"]);
+    expect(routes).toEqual(["/account", "/admin/leads", "/admin/masleka", "/admin/campaigns", "/admin/blog", "/admin/users", "/admin/agency", "/admin/agencies"]);
   });
 
   it("sends the operator to their main page and an agency's members to the leads", () => {

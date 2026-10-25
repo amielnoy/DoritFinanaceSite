@@ -35,11 +35,13 @@ import { RoutedAgentService } from "./RoutedAgentService";
 import type { Services } from "./index";
 import { SupabaseAgencyService, type SupabaseAgencyClient } from "./supabase/SupabaseAgencyService";
 import { SupabaseCampaignService } from "./supabase/SupabaseCampaignService";
+import { SupabaseOnboardingService, type OnboardingClient } from "./supabase/SupabaseOnboardingService";
 import type {
   AccountPort,
   AgencyContentPort,
   AgencyPort,
   CampaignPort,
+  OnboardingPort,
   AgentPort,
   AuthPort,
   ContentAdminPort,
@@ -250,6 +252,20 @@ const campaignPort: CampaignPort = tables
       },
     };
 
+/** The new-agency wizard (VITE_AGENCY_ONBOARDING): Supabase only. Without it every call says so. */
+const noDatabase = async (): Promise<never> => {
+  throw new Error("אין חיבור למאגר.");
+};
+const onboardingPort: OnboardingPort = supabase
+  ? new SupabaseOnboardingService(supabase as unknown as OnboardingClient)
+  : {
+      createAgency: noDatabase, role: async () => null, load: noDatabase, saveProfile: noDatabase, saveAgent: noDatabase,
+      saveTestimonial: noDatabase, deleteTestimonial: noDatabase, saveSuccessCase: noDatabase, deleteSuccessCase: noDatabase,
+      uploadPortrait: noDatabase, removePortrait: noDatabase, submit: noDatabase, listInProgress: async () => [],
+      returnAgency: noDatabase, activate: noDatabase, setDpaDate: noDatabase, setLicenceVerified: noDatabase,
+      setDisclosuresApproved: noDatabase, setOperatorFields: noDatabase,
+    };
+
 export const services: Services = {
   leads: leadPort,
   content: contentPort,
@@ -265,6 +281,7 @@ export const services: Services = {
   usersAdmin: usersAdminPort,
   agency: agencyPort,
   campaigns: campaignPort,
+  onboarding: onboardingPort,
   masleka: maslekaPort,
 };
 

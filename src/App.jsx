@@ -27,6 +27,10 @@ import { stripFragment } from '@/lib/vercel-analytics';
 import Home from '@/pages/Home';
 import FloatingActions from '@/components/dorit/layout/FloatingActions';
 import AgencyRoute from '@/components/AgencyRoute';
+import AdminRoute from '@/components/AdminRoute';
+import OnboardingRoute from '@/components/OnboardingRoute';
+import DraftOwnerRedirect from '@/components/DraftOwnerRedirect';
+import { AGENCY_ONBOARDING } from '@/config/agency-onboarding';
 import { MASLEKA_ENABLED } from '@/config/masleka';
 
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
@@ -42,6 +46,10 @@ const Blog = lazy(() => import('@/pages/Blog'));
 const BlogPost = lazy(() => import('@/pages/BlogPost'));
 const BlogAdmin = lazy(() => import('@/pages/BlogAdmin'));
 const Campaigns = lazy(() => import('@/pages/Campaigns'));
+const AgencyOnboarding = lazy(() => import('@/pages/AgencyOnboarding'));
+const AgencyNew = lazy(() => import('@/pages/AgencyNew'));
+const AgencyReview = lazy(() => import('@/pages/AgencyReview'));
+const AgenciesIndex = lazy(() => import('@/pages/AgencyReview').then((m) => ({ default: m.AgenciesIndex })));
 const Claims = lazy(() => import('@/pages/Claims'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const Tools = lazy(() => import('@/pages/Tools'));
@@ -169,6 +177,25 @@ const AuthenticatedApp = () => {
             </Route>
           </Route>
         ) : null}
+        {/* The new-agency wizard (VITE_AGENCY_ONBOARDING, off): the operator opens,
+            reviews and activates; the draft's owner fills the steps. Not
+            registered at all while the switch is off — those paths are 404s. */}
+        {AGENCY_ONBOARDING ? (
+          <Route element={<AdminRoute unauthenticatedElement={<LoginRedirect />} />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/admin/agencies" element={<AgenciesIndex />} />
+              <Route path="/admin/agencies/new" element={<AgencyNew />} />
+              <Route path="/admin/agencies/:agencyId/review" element={<AgencyReview />} />
+            </Route>
+          </Route>
+        ) : null}
+        {AGENCY_ONBOARDING ? (
+          <Route element={<OnboardingRoute unauthenticatedElement={<LoginRedirect />} />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/admin/onboarding/:agencyId" element={<AgencyOnboarding />} />
+            </Route>
+          </Route>
+        ) : null}
         <Route path="*" element={<PageNotFound />} />
         </Route>
       </Routes>
@@ -199,6 +226,7 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
+          <DraftOwnerRedirect />
           <AnalyticsRouteGuard />
           <SeoRouteGuard />
           {/* Mounted only where its endpoint exists. The beacon posts to

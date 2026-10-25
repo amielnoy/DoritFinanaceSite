@@ -14,6 +14,7 @@ import type {
   UsersAdminPort,
   AgencyPort,
   CampaignPort,
+  OnboardingPort,
   LeadPort,
   MaslekaPort,
   SupportPort,
@@ -68,6 +69,8 @@ export interface Services {
   agency: AgencyPort;
   /** Reactivation campaigns: the general link an agency sends its existing clients. */
   campaigns: CampaignPort;
+  /** The new-agency wizard and the operator's review (VITE_AGENCY_ONBOARDING). */
+  onboarding: OnboardingPort;
   /** The clearinghouse requests: the client's page and the staff board. */
   masleka: MaslekaPort;
 }
@@ -237,6 +240,27 @@ export const services: Services = {
     list: (agencyId) => real().then((s) => s.campaigns.list(agencyId)),
     create: (input) => real().then((s) => s.campaigns.create(input)),
     update: (id, fields) => real().then((s) => s.campaigns.update(id, fields)),
+  },
+  onboarding: {
+    createAgency: (input) => real().then((s) => s.onboarding.createAgency(input)),
+    role: (agencyId) => real().then((s) => s.onboarding.role(agencyId)),
+    load: (agencyId) => real().then((s) => s.onboarding.load(agencyId)),
+    saveProfile: (agencyId, patch, expectedUpdatedAt) => real().then((s) => s.onboarding.saveProfile(agencyId, patch, expectedUpdatedAt)),
+    saveAgent: (agencyId, agentId, patch, expectedUpdatedAt) => real().then((s) => s.onboarding.saveAgent(agencyId, agentId, patch, expectedUpdatedAt)),
+    saveTestimonial: (agencyId, row) => real().then((s) => s.onboarding.saveTestimonial(agencyId, row)),
+    deleteTestimonial: (id) => real().then((s) => s.onboarding.deleteTestimonial(id)),
+    saveSuccessCase: (agencyId, row) => real().then((s) => s.onboarding.saveSuccessCase(agencyId, row)),
+    deleteSuccessCase: (id) => real().then((s) => s.onboarding.deleteSuccessCase(id)),
+    uploadPortrait: (agencyId, agentId, files, previousPath) => real().then((s) => s.onboarding.uploadPortrait(agencyId, agentId, files, previousPath)),
+    removePortrait: (agencyId, agentId, path) => real().then((s) => s.onboarding.removePortrait(agencyId, agentId, path)),
+    submit: (agencyId) => real().then((s) => s.onboarding.submit(agencyId)),
+    listInProgress: () => real().then((s) => s.onboarding.listInProgress()),
+    returnAgency: (agencyId, note) => real().then((s) => s.onboarding.returnAgency(agencyId, note)),
+    activate: (agencyId) => real().then((s) => s.onboarding.activate(agencyId)),
+    setDpaDate: (agencyId, date) => real().then((s) => s.onboarding.setDpaDate(agencyId, date)),
+    setLicenceVerified: (agentId, verified) => real().then((s) => s.onboarding.setLicenceVerified(agentId, verified)),
+    setDisclosuresApproved: (agencyId, approved) => real().then((s) => s.onboarding.setDisclosuresApproved(agencyId, approved)),
+    setOperatorFields: (agencyId, fields) => real().then((s) => s.onboarding.setOperatorFields(agencyId, fields)),
   },
   account: {
     myEnquiries: () => real().then((s) => s.account.myEnquiries()),

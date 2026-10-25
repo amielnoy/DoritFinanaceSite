@@ -550,6 +550,8 @@ export interface MyAgency {
   id: string;
   name: string;
   role: AgencyRole;
+  /** 'draft' and 'pending_review' while the new-agency wizard runs; the switcher sends those to it. */
+  status?: "draft" | "pending_review" | "active" | "suspended";
 }
 
 /** The agency's public details (agency_profiles) — the Owner's to edit. */
@@ -595,6 +597,78 @@ export interface CampaignPort {
   create(input: NewCampaign): Promise<Campaign>;
   /** Renames, rewrites the message, archives or restores. The code never changes. */
   update(id: string, fields: { name?: string; message?: string; archived?: boolean }): Promise<void>;
+}
+
+/** A row as its table has it (snake_case); the wizard reaches fields by onboarding.ts's keys. */
+export type OnboardingRow = Record<string, unknown>;
+
+/** Everything the wizard edits for one agency (docs/superpowers/specs/2026-10-16-new-agency-wizard-design.md). */
+export interface OnboardingRecord {
+  agencies: OnboardingRow;
+  agency_profiles: OnboardingRow;
+  /** The licensee; null until step 1 is first saved. */
+  agents: OnboardingRow | null;
+  testimonials: OnboardingRow[];
+  success_cases: OnboardingRow[];
+}
+
+/** A draft or pending agency, as the operator's list shows it. */
+export interface OnboardingAgencySummary {
+  id: string;
+  name: string;
+  status: "draft" | "pending_review" | "active" | "suspended";
+  /** The profile's updated_at: when someone last saved a step. */
+  lastEdited: string | null;
+  ownerEmail: string | null;
+}
+
+/** The three portrait files, by width, already cropped and re-encoded to WebP. */
+export type PortraitFiles = Record<480 | 768 | 1080, Blob>;
+
+/** A save that found the row changed since the step was opened (someone else saved first). */
+export class OnboardingConflictError extends Error {
+  constructor() {
+    super("השלב עודכן בינתיים ממקום אחר. טענו את הגרסה העדכנית — כדאי לבדוק ולשמור שוב.");
+    this.name = "OnboardingConflictError";
+  }
+}
+
+/** The RPCs' refusals the screens act on, with the keys they named. */
+export type OnboardingOutcome = { ok: true } | { ok: false; missing: string[]; gates: string[]; message: string };
+
+export interface OnboardingPort {
+  /** create_agency (operator): the draft agency's id. */
+  createAgency(input: { name: string; ownerEmail: string; dpaDate: string | null }): Promise<string>;
+  /** onboarding_role: the caller's membership role in an agency being set up, or null. */
+  role(agencyId: string): Promise<"owner" | "admin" | "user" | null>;
+  load(agencyId: string): Promise<OnboardingRecord>;
+  /** Writes the profile's columns; refuses with OnboardingConflictError when updated_at moved since `expectedUpdatedAt`. */
+  saveProfile(agencyId: string, patch: OnboardingRow, expectedUpdatedAt: string | null): Promise<OnboardingRow>;
+  /** Creates the licensee when `agentId` is null, else writes its columns under the same conflict rule. */
+  saveAgent(agencyId: string, agentId: string | null, patch: OnboardingRow, expectedUpdatedAt: string | null): Promise<OnboardingRow>;
+  saveTestimonial(agencyId: string, row: OnboardingRow): Promise<OnboardingRow>;
+  deleteTestimonial(id: string): Promise<void>;
+  saveSuccessCase(agencyId: string, row: OnboardingRow): Promise<OnboardingRow>;
+  deleteSuccessCase(id: string): Promise<void>;
+  /**
+   * Uploads all three sizes, then points the licensee at them, then removes the
+   * previous set — never a path to a missing file. Resolves with the row's new
+   * photo_path and updated_at: the write moved it, and the next save of the step
+   * must not mistake its own photo for someone else's edit.
+   */
+  uploadPortrait(agencyId: string, agentId: string, files: PortraitFiles, previousPath: string | null): Promise<{ photoPath: string; updatedAt: string | null }>;
+  /** Back to the monogram: the path is cleared first, then the files go. Resolves with the row's new updated_at. */
+  removePortrait(agencyId: string, agentId: string, path: string): Promise<{ updatedAt: string | null }>;
+  submit(agencyId: string): Promise<OnboardingOutcome>;
+  /** Operator: draft and pending agencies, last edited first. */
+  listInProgress(): Promise<OnboardingAgencySummary[]>;
+  returnAgency(agencyId: string, note: string): Promise<OnboardingOutcome>;
+  activate(agencyId: string): Promise<OnboardingOutcome>;
+  /** Operator's gates and columns. */
+  setDpaDate(agencyId: string, date: string | null): Promise<void>;
+  setLicenceVerified(agentId: string, verified: boolean): Promise<void>;
+  setDisclosuresApproved(agencyId: string, approved: boolean): Promise<void>;
+  setOperatorFields(agencyId: string, fields: { domain?: string | null; mail_from?: string | null; ga4_measurement_id?: string | null }): Promise<void>;
 }
 
 /** Who the signed-in person is in their agencies, and the agency's own details. */

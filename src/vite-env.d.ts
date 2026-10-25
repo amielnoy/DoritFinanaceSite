@@ -20,6 +20,8 @@ interface ImportMetaEnv {
   /** The clearinghouse pipeline — on only when exactly "true"; see `src/config/masleka.ts`. */
   readonly VITE_MASLEKA_ENABLED?: string;
   readonly VITE_MEETINGS_STAFF?: string;
+  /** The new-agency wizard (src/config/agency-onboarding.ts); off unless "true". */
+  readonly VITE_AGENCY_ONBOARDING?: string;
   /** Hours an urgent lead may stay "חדשה" before the leads screen alerts (src/config/leads.ts); default 4. */
   readonly VITE_LEAD_SLA_URGENT_HOURS?: string;
   readonly VITE_MEETINGS_CLIENT?: string;
