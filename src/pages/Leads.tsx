@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
+import ConfirmDialog from "@/components/dorit/admin/ConfirmDialog";
 import type { AgendaMeeting, LeadRecord, LeadSource, LeadStatus } from "@/services";
 import {
-  useAdminUsers, useAgencyMeetings, useAssignLead, useLeads, useLeadTranscript, useMergeLeads, useRemoveLead, useSetLeadStatus,
+  useAdminUsers, useAgencyMeetings, useAgencyProfile, useAssignLead, useLeads, useLeadTranscript, useLogWhatsapp, useMergeLeads, useRemoveLead, useSetLeadStatus,
   useTranscriptLeadIds, useUnmergeLead,
 } from "@/hooks/useAdmin";
 import { useCurrentUserId } from "@/hooks/useCurrentUserId";
 import { AGENCY_1, useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import { csvCell } from "@/lib/csv";
-import { ArrowLeft, CalendarDays, ChevronDown, Download, GitMerge, Inbox, ListChecks, Loader2, Plus, Trash2, TrendingUp, UserRound, type LucideIcon } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronDown, Download, GitMerge, Inbox, ListChecks, Loader2, MessageCircle, Plus, Trash2, TrendingUp, UserRound, type LucideIcon } from "lucide-react";
 import LeadTrackingPanel from "@/components/dorit/admin/LeadTrackingPanel";
 import LeadDrawer, { type LeadDrawerTab } from "@/components/dorit/admin/LeadDrawer";
 import LeadDetails from "@/components/dorit/admin/LeadDetails";
@@ -17,7 +19,8 @@ import { MEETINGS_STAFF } from "@/config/meetings";
 import { INTAKE_LABELS, STAFF_LEADS } from "@/config/staff-leads";
 import { GONE_MEMBER, broughtThisMonth, sameNumberLeads, staffLeadLine } from "@/lib/staff-leads";
 import { duplicateRows, foldMerged, newestFirst, type LeadRow } from "@/lib/lead-duplicates";
-import { ANY_STATUS_LABEL, IN_PROGRESS, STATUS, STATUS_LABEL, followUpState, slaBreached } from "@/lib/lead-pipeline";
+import { ANY_STATUS_LABEL, IN_PROGRESS, STATUS, STATUS_LABEL, followUpState, slaBreached, statusAfterWhatsapp } from "@/lib/lead-pipeline";
+import { DEFAULT_LEAD_WHATSAPP_TEMPLATE, fillWhatsappTemplate, leadWhatsappHref } from "@/lib/lead-whatsapp";
 import { LEAD_SLA_URGENT_HOURS } from "@/config/leads";
 import LeadActivity, { dayLabel } from "@/components/dorit/admin/LeadActivity";
 import NewLeadSheetHost from "@/components/dorit/admin/NewLeadSheetHost";
@@ -396,6 +399,14 @@ export default function Leads() {
   const assignLead = useAssignLead();
   const mergeLeads = useMergeLeads();
   const unmergeLead = useUnmergeLead();
+  const logWhatsapp = useLogWhatsapp();
+  const { user } = useAuth();
+  // The agency's message to a lead (Owner-edited on /admin/agency); the default until it loads.
+  const agencyProfile = useAgencyProfile(agencyId);
+  const waTemplate = agencyProfile.data?.leadWhatsappTemplate || DEFAULT_LEAD_WHATSAPP_TEMPLATE;
+  const waAgent = user?.full_name || agencyProfile.data?.displayName || "";
+  /** The lead a WhatsApp message was just opened to, while the screen asks whether to mark it "נוצר קשר". */
+  const [waAsk, setWaAsk] = useState<LeadRecord | null>(null);
   /** The rows whose other submissions are open, by the id of the lead each row shows. */
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const toggleExpanded = (id: string) =>
@@ -504,6 +515,36 @@ export default function Leads() {
   };
 
   const updateStatus = (id: string, status: LeadStatus) => setStatus.mutate({ id, status });
+
+  /** The lead's WhatsApp link with the agency's message, or null without a number to write to. */
+  const whatsappHref = (l: LeadItem) =>
+    leadWhatsappHref(l.phone, fillWhatsappTemplate(waTemplate, { name: l.name, agent: waAgent, topic: l.topic ?? "" }));
+  /** The link opens WhatsApp itself; here the fact is logged, and a new lead offered "נוצר קשר". */
+  const onWhatsapp = (l: LeadItem) => {
+    logWhatsapp.mutate(l.id);
+    if (statusAfterWhatsapp(l.status)) setWaAsk(l);
+  };
+  const whatsappLink = (l: LeadItem, label?: string) => {
+    const href = whatsappHref(l);
+    if (!href) return null;
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => onWhatsapp(l)}
+        aria-label={`וואטסאפ ל${l.name}`}
+        className={
+          label
+            ? "inline-flex min-h-11 items-center gap-2 text-sm text-emerald-700 hover:underline dark:text-emerald-400"
+            : "shrink-0 text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400"
+        }
+      >
+        <MessageCircle size={15} aria-hidden="true" />
+        {label}
+      </a>
+    );
+  };
 
   /** "מזג": the group folds into its merge target, which then shows the row with the rest open under it. */
   const merge = (row: LeadRow) => {
@@ -706,6 +747,7 @@ export default function Leads() {
                                 <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                               ))}
                             </select>
+                            {whatsappLink(l)}
                             {deletes ? (
                               <button
                                 onClick={() => remove(l)}
@@ -1021,6 +1063,8 @@ export default function Leads() {
                     <dt className="text-muted-foreground">טלפון</dt>
                     {/* Text, not a tel: link — the number is visitor-typed (agent-surface.security). */}
                     <dd dir="ltr" className="text-right">{openLead.phone}</dd>
+                    <dt className="text-muted-foreground">וואטסאפ</dt>
+                    <dd>{whatsappLink(openLead, "שליחת הודעה") ?? "—"}</dd>
                     <dt className="text-muted-foreground">אימייל</dt>
                     <dd dir="ltr" className="text-right">{openLead.email || "—"}</dd>
                     <dt className="text-muted-foreground">משויכת ל</dt>
@@ -1034,6 +1078,19 @@ export default function Leads() {
                 ) : null
               }
             />
+          <ConfirmDialog
+            open={Boolean(waAsk)}
+            title="לסמן את הפנייה כ״נוצר קשר״?"
+            description={`פתחת הודעת וואטסאפ ל${waAsk?.name ?? ""}. אם ההודעה נשלחה, הפנייה עוברת מ״חדשה״ ל״נוצר קשר״.`}
+            confirmLabel="כן, נוצר קשר"
+            cancelLabel="לא עכשיו"
+            onConfirm={() => {
+              const next = waAsk && statusAfterWhatsapp(waAsk.status);
+              if (waAsk && next) updateStatus(waAsk.id, next);
+              setWaAsk(null);
+            }}
+            onClose={() => setWaAsk(null)}
+          />
       </div>
     );
   };

@@ -10,7 +10,7 @@ const ROLES = new Set<string>(["owner", "admin", "user"]);
 const asRole = (v: unknown): AgencyRole | null => (typeof v === "string" && ROLES.has(v) ? (v as AgencyRole) : null);
 
 const PROFILE_COLUMNS =
-  "agency_id,display_name,phone_e164,phone_display,whatsapp,email,default_whatsapp_message,licence_entity,licence_number,licence_regulator";
+  "agency_id,display_name,phone_e164,phone_display,whatsapp,email,default_whatsapp_message,licence_entity,licence_number,licence_regulator,lead_whatsapp_template";
 
 /** The port's names and the table's, one to one. */
 const COLUMN: Record<keyof Omit<AgencyProfile, "agencyId">, string> = {
@@ -23,6 +23,7 @@ const COLUMN: Record<keyof Omit<AgencyProfile, "agencyId">, string> = {
   licenceEntity: "licence_entity",
   licenceNumber: "licence_number",
   licenceRegulator: "licence_regulator",
+  leadWhatsappTemplate: "lead_whatsapp_template",
 };
 
 /**
@@ -69,6 +70,7 @@ export class SupabaseAgencyService implements AgencyPort {
       licenceEntity: text(r.licence_entity),
       licenceNumber: text(r.licence_number),
       licenceRegulator: text(r.licence_regulator),
+      leadWhatsappTemplate: text(r.lead_whatsapp_template),
     };
   }
 

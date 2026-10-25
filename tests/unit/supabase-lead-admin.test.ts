@@ -664,3 +664,12 @@ describe("SupabaseLeadAdminService — the pipeline: activity log, notes, follow
     expect(calls).toContainEqual(["update", { next_follow_up_on: null }]);
   });
 });
+
+describe("SupabaseLeadAdminService — WhatsApp", () => {
+  it("logs a message through log_lead_whatsapp, with the lead id only", async () => {
+    const { client } = tableFake({ data: [], error: null });
+    const rpc = vi.fn(async () => ({ data: null, error: null }));
+    await new SupabaseLeadAdminService({ ...client, rpc } as SupabaseLeadTableClient).logWhatsapp("lead-1");
+    expect(rpc).toHaveBeenCalledWith("log_lead_whatsapp", { p_lead_id: "lead-1" });
+  });
+});

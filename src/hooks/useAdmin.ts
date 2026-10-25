@@ -183,6 +183,25 @@ export function useSetFollowUp() {
   });
 }
 
+/** The agency's details for the admin screens (the leads' WhatsApp message); the same cache as /admin/agency, so a save there shows here. */
+export function useAgencyProfile(agencyId: string) {
+  return useQuery({
+    queryKey: ["agency", "profile", agencyId],
+    queryFn: () => services.agency.profile(agencyId),
+    enabled: Boolean(agencyId),
+    retry: false,
+  });
+}
+
+/** A WhatsApp message opened to the lead: logged, and the open log refreshed. */
+export function useLogWhatsapp() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (leadId: string) => services.leadsAdmin.logWhatsapp(leadId),
+    onSuccess: (_, leadId) => client.invalidateQueries({ queryKey: [...adminKeys.leads, "events", leadId] }),
+  });
+}
+
 export function useRemoveLead() {
   const client = useQueryClient();
   return useMutation({
