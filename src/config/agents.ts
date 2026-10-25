@@ -85,7 +85,7 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
     agent: "procedures_agent",
     icon: FileSearch,
     sectionId: "procedures-chat",
-    sectionClassName: "py-24 md:py-32 border-t border-border/60",
+    sectionClassName: "py-16 md:py-24 border-t border-border bg-secondary/60 scroll-mt-28",
     eyebrow: "איך עושים את זה",
     heading: "איך מבצעים <br /> את זה בפועל",
     blurb:

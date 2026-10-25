@@ -32,9 +32,9 @@ export default function CalculatorLeadBox({
     <aside
       aria-labelledby={headingId}
       data-track-location="calculator"
-      className={`border border-highlight/40 bg-highlight-muted/10 p-5 md:p-7 ${className}`}
+      className={`card-raised p-5 md:p-7 ${className}`}
     >
-      <h3 id={headingId} className="font-heading text-2xl md:text-[28px] leading-snug">
+      <h3 id={headingId} className="font-heading font-bold text-2xl md:text-[26px] leading-snug">
         {t("lead.title")}
       </h3>
       <p className="mt-3 text-sm text-foreground/70 leading-relaxed max-w-xl">

@@ -1,4 +1,6 @@
 import React from "react";
+import { Bot, Calculator, ListChecks } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import AgentChat from "@/components/dorit/chat/AgentChat";
 import FloatingHeader from "@/components/dorit/layout/FloatingHeader";
 import Footer from "@/components/dorit/layout/Footer";
@@ -7,6 +9,7 @@ import PensionFeeCalculator from "@/components/dorit/sections/PensionFeeCalculat
 import RetirementCalculator from "@/components/dorit/sections/RetirementCalculator";
 import HarHabituachCheck from "@/components/dorit/sections/HarHabituachCheck";
 import { SNAPSHOT_HOME } from "@/config/snapshot";
+import { TOOL_SECTION } from "@/config/tools";
 import Reveal from "@/components/dorit/primitives/Reveal";
 import { breadcrumbLd, siteNameIn, useSeo } from "@/lib/seo";
 import Eyebrow from "@/components/dorit/primitives/Eyebrow";
@@ -51,20 +54,35 @@ export default function Tools() {
     ],
   });
 
+  const jumps: { href: string; label: string; icon: LucideIcon }[] = [
+    { href: `#${TOOL_SECTION.assessment}`, label: t("page.jumpAssess"), icon: ListChecks },
+    { href: `#${TOOL_SECTION.feeCalculator}`, label: t("page.jumpFee"), icon: Calculator },
+    ...(he ? [{ href: `#${AGENTS.procedures.sectionId}`, label: t("page.jumpChat"), icon: Bot }] : []),
+  ];
+
   return (
     <div className="relative bg-background pb-14 md:pb-0">
       <FloatingHeader />
       <main id="main">
-        <section className="pt-40 pb-16 md:pt-48 md:pb-20 border-b border-border/50">
-          <div className="max-w-[1400px] mx-auto px-6 md:px-10">
+        <section className="pt-40 pb-12 md:pt-48 md:pb-16 border-b border-border">
+          <div className="max-w-[1200px] mx-auto px-[clamp(20px,4vw,40px)]">
             <Reveal>
               <Eyebrow>{t("page.eyebrow")}</Eyebrow>
-              <h1 className="font-heading text-5xl md:text-7xl mt-5 leading-tight max-w-4xl">
+              <h1 className="font-heading font-extrabold text-[clamp(38px,4.8vw,60px)] mt-4 leading-[1.1] tracking-[-0.02em] max-w-4xl">
                 {t("page.title")}
               </h1>
-              <p className="mt-8 text-muted-foreground max-w-2xl leading-relaxed">
+              <p className="mt-5 text-foreground/75 max-w-3xl leading-relaxed">
                 <Glossed text={t("page.intro")} />
               </p>
+              {/* One way to each tool below; the chat is on the Hebrew page only. */}
+              <nav aria-label={t("page.title")} className="mt-8 flex flex-wrap gap-2.5">
+                {jumps.map(({ href, label, icon: Icon }) => (
+                  <a key={href} href={href} className={JUMP}>
+                    <Icon size={18} strokeWidth={1.75} className="text-accent" aria-hidden="true" />
+                    {label}
+                  </a>
+                ))}
+              </nav>
             </Reveal>
           </div>
         </section>
@@ -81,3 +99,6 @@ export default function Tools() {
     </div>
   );
 }
+
+const JUMP =
+  "inline-flex items-center gap-2 min-h-11 rounded-xl border border-border bg-card px-4 text-[15px] font-semibold text-foreground shadow-sm hover:border-highlight hover:text-accent transition-colors duration-200";

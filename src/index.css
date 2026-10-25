@@ -33,47 +33,71 @@
 
 @layer base {
   :root {
-    /* Belt-and-suspenders with the <meta name="color-scheme"> in index.html:
-       this is the property a browser's own force-dark heuristic actually
-       checks on the root element. No dark palette is defined below — this
-       page has never had one — so it would otherwise read as "unopinionated"
-       and become a candidate for auto-inversion. `only` — see index.html for
-       why plain `light` was not enough on its own. */
-    color-scheme: only light;
-    --background: 0 4% 95%;           /* #f3f2f2 Classical ground (was #F9F7F2 parchment) */
-    --foreground: 40 5% 12%;          /* #201f1d ink */
-    --card: 0 4% 95%;                 /* cards are unfilled: same as ground */
-    --card-foreground: 40 5% 12%;
-    --popover: 0 3% 91%;
-    --popover-foreground: 40 5% 12%;
-    --primary: 20 6% 10%;             /* #1c1a19 colophon — footer band, user chat bubble */
-    --primary-foreground: 0 4% 95%;
-    --secondary: 0 3% 91%;            /* #eae9e9 surface — plate mats, quiet bands */
-    --secondary-foreground: 40 5% 12%;
-    --muted: 0 3% 91%;
-    --muted-foreground: 0 2% 37%;     /* #605d5d — 6.0:1 on ground */
-    --accent: 37 76% 28%;             /* #7d5411 gold ink — ANY text in gold. 6.9:1 */
-    --accent-foreground: 0 4% 95%;
-    --highlight: 36 55% 46%;          /* #b68235 gold — strokes only: borders, rules, icons, ring */
-    --highlight-strong: 36 63% 38%;   /* #a06f24 pressed */
-    --highlight-muted: 34 92% 77%;    /* #facb8d light gold — subtle borders, hover tints */
-    --highlight-ink: 37 76% 28%;      /* #7d5411 = accent; figures */
-    --highlight-foreground: 37 76% 28%; /* label colour on an outlined gold CTA */
-    --highlight-on-dark: 35 67% 64%;  /* #e1ad66 gold on the colophon band (NEW) */
-    --muted-foreground-on-dark: 0 3% 72%; /* #bab6b6 */
+    color-scheme: light;
+    --background: 225 25% 96%;
+    --foreground: 222.2 47.4% 11.2%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --primary: 228 75% 50%;           /* #2046df */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 225 25% 96%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 225 25% 96%;
+    --muted-foreground: 215 19% 40%;
+    --accent: 228 75% 50%;
+    --accent-foreground: 0 0% 100%;
+    --highlight: 228 75% 50%;
+    --highlight-strong: 228 75% 42%;
+    --highlight-muted: 228 90% 90%;
+    --highlight-ink: 228 75% 45%;
+    --highlight-foreground: 228 75% 45%;
+    --highlight-on-dark: 226 100% 92%;
+    --muted-foreground-on-dark: 226 60% 88%;
     --brand-whatsapp: 142 70% 49%;
-    --destructive: 9 59% 40%;         /* #a23b2a — warmer, 6.2:1 */
-    --destructive-foreground: 0 4% 95%;
-    --surface: 60 17% 98%;            /* #fafaf8 — the admin sidebar and its menu, a step above the ground */
-    --nav-active: 37 36% 88%;         /* #ece4d7 — the current admin page's row; gold ink on it 5.3:1 */
-    --border: 40 4% 82%;              /* ≈ ink @16% on ground — the hairline */
-    --input: 40 4% 78%;
-    --ring: 36 55% 46%;
-    --radius: 0.25rem;
-    --font-heading: "Cormorant Garamond", "Frank Ruhl Libre", ui-serif, Georgia, serif;
-    --font-body: "Lora", "Noto Serif Hebrew", ui-serif, Georgia, serif;
-    --font-display: "Cormorant Garamond", "Frank Ruhl Libre", ui-serif, Georgia, serif;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --surface: 0 0% 100%;
+    --nav-active: 228 100% 96%;
+    --border: 220 16% 90%;
+    --input: 220 16% 86%;
+    --ring: 228 75% 50%;
+    --radius: 0.75rem;
+    --font-heading: "Heebo", system-ui, -apple-system, Arial, sans-serif;
+    --font-body: "Heebo", system-ui, -apple-system, Arial, sans-serif;
+    --font-display: "Heebo", system-ui, -apple-system, Arial, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  :root.dark {
+    color-scheme: dark;
+    --background: 222 47% 7%;
+    --foreground: 214 32% 91%;
+    --card: 222 40% 11%;
+    --card-foreground: 214 32% 91%;
+    --popover: 222 40% 11%;
+    --popover-foreground: 214 32% 91%;
+    --primary: 228 75% 48%;
+    --secondary: 222 35% 15%;
+    --secondary-foreground: 214 32% 91%;
+    --muted: 222 35% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 228 90% 74%;
+    --accent-foreground: 222 47% 7%;
+    --highlight: 228 90% 64%;
+    --highlight-strong: 228 90% 72%;
+    --highlight-muted: 228 50% 25%;
+    --highlight-ink: 228 90% 74%;
+    --highlight-foreground: 228 90% 74%;
+    --highlight-on-dark: 226 100% 97%;
+    --muted-foreground-on-dark: 226 50% 95%;
+    --destructive: 0 85% 70%;
+    --destructive-foreground: 222 47% 7%;
+    --surface: 222 45% 9%;
+    --nav-active: 226 45% 20%;
+    --border: 220 30% 18%;
+    --input: 220 30% 24%;
   }
 }
 
@@ -131,10 +155,13 @@
   .rule-x { border-top: 0.5px solid hsl(var(--border)); }
   .rule-y { border-right: 0.5px solid hsl(var(--border)); }
 
-  /* Photos sit in a matted plate frame; plates do not zoom. */
-  .plate { border: 6px solid hsl(var(--secondary)); outline: 1px solid hsl(var(--border)); overflow: hidden; }
-  .plate img { filter: sepia(0.22) saturate(0.82) contrast(1.05); }
-  .plate-dark { border-color: hsl(20 5% 17%); outline-color: hsl(var(--primary-foreground) / 0.14); }
+  /* Photos sit in a raised card frame; plates do not zoom. */
+  .plate { padding: 8px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 1rem; box-shadow: 0 12px 32px -12px hsl(var(--primary) / 0.2); overflow: hidden; }
+  .plate img { border-radius: 0.625rem; }
+  .plate-dark { background: hsl(0 0% 100% / 0.04); border-color: hsl(0 0% 100% / 0.1); box-shadow: none; }
+
+  /* A raised surface: the cards the home page sections sit in. */
+  .card-raised { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 1rem; box-shadow: 0 1px 3px 0 hsl(222 47% 11% / 0.05), 0 4px 20px -2px hsl(222 47% 11% / 0.05); }
 
   /* 0.2 s from 8 px, as Reveal (src/components/dorit/primitives/Reveal.tsx):
      at 0.9 s the hero's headline and buttons sat faded on a phone. */

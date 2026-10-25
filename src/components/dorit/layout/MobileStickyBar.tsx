@@ -56,7 +56,7 @@ export default function MobileStickyBar() {
           href={`https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(t("contact.whatsappDefault"))}`}
           target="_blank"
           rel="noopener noreferrer"
-          className={`${CELL} bg-whatsapp text-white`}
+          className={`${CELL} bg-whatsapp text-slate-900`}
         >
           <MessageCircle size={18} aria-hidden="true" />
           {t("sticky.whatsapp")}

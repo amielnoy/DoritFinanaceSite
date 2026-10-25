@@ -52,25 +52,25 @@ export default function InsuranceAssessment() {
   const priorityCount = recs.filter((r) => r.priority).length;
 
   return (
-    <section id={TOOL_SECTION.assessment} className="py-24 md:py-32 bg-background border-t border-border">
-      <div className="max-w-[1100px] mx-auto px-6 md:px-10">
-        <div className="text-center max-w-2xl mx-auto mb-14">
+    <section id={TOOL_SECTION.assessment} className="py-16 md:py-24 bg-secondary/60 border-t border-border scroll-mt-28">
+      <div className="max-w-[1200px] mx-auto px-[clamp(20px,4vw,40px)]">
+        <div className="max-w-3xl mb-10">
           <Eyebrow>
             {t("assess.eyebrow")}
           </Eyebrow>
-          <h2 className="font-heading text-4xl md:text-5xl mt-5 leading-tight">
+          <h2 className="font-heading font-bold text-[clamp(28px,3.2vw,40px)] mt-4 leading-tight">
             {t("assess.title")}
           </h2>
-          <p className="mt-6 text-muted-foreground leading-relaxed">
+          <p className="mt-4 text-muted-foreground leading-relaxed">
             <Glossed text={t("assess.intro")} />
           </p>
         </div>
 
-        <div className="bg-card border border-border rounded-sm overflow-hidden">
+        <div className="card-raised overflow-hidden">
           {/* Progress bar */}
-          <div className="h-1 bg-secondary">
+          <div className="mx-8 md:mx-12 mt-8 md:mt-10 h-2 rounded-full bg-secondary overflow-hidden">
             <motion.div
-              className="h-full bg-highlight"
+              className="h-full rounded-full bg-primary"
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={{ duration: 0.4, ease: "easeOut" }}
@@ -88,7 +88,7 @@ export default function InsuranceAssessment() {
                   transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-center justify-between mb-8">
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm font-semibold text-accent">
                       {t("assess.questionOf", { n: step + 1, total: QUESTIONS.length })}
                     </span>
                     {step > 0 && (
@@ -102,7 +102,7 @@ export default function InsuranceAssessment() {
                     )}
                   </div>
 
-                  <h3 className="font-heading text-2xl md:text-3xl mb-2 leading-snug">
+                  <h3 className="font-heading font-bold text-2xl md:text-[28px] mb-2 leading-snug">
                     {t(`assess.q.${current.id}.label`)}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-8">{t(`assess.q.${current.id}.hint`)}</p>
@@ -114,19 +114,19 @@ export default function InsuranceAssessment() {
                         <button
                           key={opt.value}
                           onClick={() => choose(opt.value)}
-                          className={`group text-start p-5 border rounded-sm transition-all duration-200 ${
+                          className={`group text-start p-5 border rounded-xl transition-all duration-200 ${
                             selected
-                              ? "border-highlight bg-highlight-muted/40"
-                              : "border-border hover:border-accent hover:bg-secondary/50"
+                              ? "border-primary bg-highlight/10 text-accent"
+                              : "border-border bg-secondary/60 hover:border-highlight hover:bg-card"
                           }`}
                         >
                           <span className="flex items-center justify-between">
-                            <span className="font-body text-lg">{t(`assess.q.${current.id}.${opt.value}` as KeyOf<"tools">)}</span>
+                            <span className="font-body font-semibold text-lg">{t(`assess.q.${current.id}.${opt.value}` as KeyOf<"tools">)}</span>
                             <span
                               className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${
                                 selected
-                                  ? "border-highlight bg-highlight text-primary-foreground"
-                                  : "border-border group-hover:border-accent"
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-muted-foreground/50 bg-card group-hover:border-accent"
                               }`}
                             >
                               {selected && <Check size={12} />}
@@ -145,7 +145,7 @@ export default function InsuranceAssessment() {
                   transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-center justify-between mb-8">
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm font-semibold text-accent">
                       {t("assess.yourResult")}
                     </span>
                     <button
@@ -157,7 +157,7 @@ export default function InsuranceAssessment() {
                     </button>
                   </div>
 
-                  <h3 className="font-heading text-3xl md:text-4xl mb-3 leading-tight">
+                  <h3 className="font-heading font-bold text-3xl md:text-4xl mb-3 leading-tight">
                     {t("assess.count", { n: recs.length })}
                   </h3>
                   <p className="text-muted-foreground mb-12">
@@ -175,24 +175,24 @@ export default function InsuranceAssessment() {
                           initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: idx * 0.08 }}
-                          className={`flex gap-5 p-6 md:p-7 border rounded-sm transition-colors duration-300 ${
+                          className={`flex gap-5 p-6 md:p-7 border rounded-xl transition-colors duration-300 ${
                             rec.priority
                               ? "border-highlight/40 bg-highlight-muted/15 hover:bg-highlight-muted/25"
                               : "border-border bg-secondary/30 hover:bg-secondary/50"
                           }`}
                         >
                           <div
-                            className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
-                              rec.priority ? "bg-highlight text-primary-foreground" : "bg-background text-accent border border-border"
+                            className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${
+                              rec.priority ? "bg-primary text-primary-foreground" : "bg-card text-accent border border-border"
                             }`}
                           >
                             <Icon size={22} />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2.5 mb-2">
-                              <h4 className="font-heading text-xl">{t(`assess.rec.${rec.id}` as KeyOf<"tools">)}</h4>
+                              <h4 className="font-heading font-bold text-xl">{t(`assess.rec.${rec.id}` as KeyOf<"tools">)}</h4>
                               {rec.priority && (
-                                <span className="text-sm text-highlight-ink border border-highlight/40 px-2 py-0.5 rounded-sm">
+                                <span className="text-xs font-semibold text-highlight-ink bg-highlight/10 border border-highlight/30 px-2.5 py-0.5 rounded-full">
                                   {t("assess.highPriority")}
                                 </span>
                               )}
@@ -222,7 +222,7 @@ export default function InsuranceAssessment() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6 max-w-xl mx-auto leading-relaxed">
+        <p className="text-xs text-muted-foreground mt-6 max-w-2xl leading-relaxed">
           {t("assess.disclaimer")}
         </p>
       </div>

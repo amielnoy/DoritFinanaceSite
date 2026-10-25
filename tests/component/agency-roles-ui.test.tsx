@@ -108,7 +108,7 @@ describe("the leads screen, by role", () => {
     show(<Leads />);
     expect(screen.getByRole("heading", { name: "ניהול פניות" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "מחיקה" })).toHaveLength(3);
-    fireEvent.click(screen.getByRole("button", { name: /לא שויכו \(1\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /לא שויכו\s*1/ }));
     expect(screen.getByText("לקוח 1")).toBeInTheDocument();
     expect(screen.queryByText("לקוח 2")).toBeNull();
     // The closed lead is not in the queue.
@@ -121,8 +121,8 @@ describe("the leads screen, by role", () => {
 
   it("offers everyone the escalated and partial chips", () => {
     show(<Leads />);
-    expect(screen.getByRole("button", { name: /הועברו לטיפול \(1\)/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ראיונות שלא הושלמו \(0\)/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /הועברו לטיפול\s*1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ראיונות שלא הושלמו\s*0/ })).toBeInTheDocument();
   });
 
   it("shows only the current agency's leads", () => {

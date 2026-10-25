@@ -2,8 +2,8 @@
 
 Three inks, four surfaces, and one rule that does most of the work.
 
-Token values are defined in [`src/index.css`](../src/index.css); the table below
-was checked against that source on 2026-10-15. Contrast figures retain their
+Token values are defined in [`src/index.css`](../src/index.css); the tables below
+were checked against that source on 2026-10-22. Contrast figures retain their
 original measurement context. See the [documentation index](README.md) for
 architecture, operations and test guidance.
 
@@ -33,55 +33,60 @@ ratio.
 
 ---
 
-## Classical v2
+## Blue, day and night
 
-Editorial: colour goes into strokes, not fills. One gold for lines, one gold
-ink for text. Token names are unchanged from the parchment/bronze system; only
-the values moved (`src/index.css`, `:root`).
+One blue for actions, white cards on a cool grey ground, and a dark variant
+chosen by the visitor. The values live in `src/index.css`: `:root` for day and
+`:root.dark` for night. Token names are unchanged from the earlier gold palette;
+only the values moved.
+
+The day/night switch is in the header, the phone menu and the admin top bar
+(`primitives/ThemeSwitch.tsx`, `hooks/useTheme.ts`). The choice is stored in
+`localStorage` as `theme`. With none stored, the system setting decides. The
+inline script in `index.html` sets `class="dark"` before the first paint, so a
+dark page never flashes white. That script is hashed in `vercel.json`'s CSP:
+change one character and update the hash (`scripts/check-csp-hashes.mjs`).
 
 ## Inks
 
-| Token | Value | Ratio (handoff) | Use |
+| Token | Day | Night | Use |
 |---|---|---|---|
-| `--foreground` | `40 5% 12%` · `#201f1d` | — | body copy, headings |
-| `--muted-foreground` | `0 2% 37%` · `#605d5d` | 6.0 on the ground | captions, labels, meta |
-| `--accent` / `--highlight-ink` / `--highlight-foreground` | `37 76% 28%` · `#7d5411` | 6.9 | **any text in gold**, eyebrows, figures, label on an outlined CTA |
-| `--highlight-on-dark` | `35 67% 64%` · `#e1ad66` | | gold text and strokes on the colophon band (`text-highlight-on-dark`) |
-| `--muted-foreground-on-dark` | `0 3% 72%` · `#bab6b6` | | secondary text on the colophon band |
+| `--foreground` | `222.2 47.4% 11.2%` · `#0f172a` | `214 32% 91%` | body copy, headings |
+| `--muted-foreground` | `215 19% 40%` | `215 20% 65%` | captions, labels, meta |
+| `--accent` / `--highlight-ink` / `--highlight-foreground` | `228 75% 50%` / `45%` | `228 90% 74%` | text in blue: links, eyebrows, figures |
+| `--highlight-on-dark` | `226 100% 92%` | `226 100% 97%` | text and strokes on a blue band |
+| `--muted-foreground-on-dark` | `226 60% 88%` | `226 50% 95%` | secondary text on a blue band |
 
-`--highlight` (`36 55% 46%` · `#b68235`) is **strokes only**: borders, rules,
-icons, the focus ring. It is too light to carry text. `--highlight-strong`
-(`#a06f24`) is the pressed stroke; `--highlight-muted` (`#facb8d`) is for
-subtle borders and tints.
-
-Never fade text with an opacity modifier (the one rule above still applies).
+Every ink measures at least 4.5:1 on each surface it is allowed on, in both
+modes. Never fade text with an opacity modifier (the one rule above still
+applies). Text on the WhatsApp green is `text-slate-900` in both modes: the
+theme's ink turns light at night.
 
 ## Surfaces
 
-| Token | Value | |
-|---|---|---|
-| `--background`, `--card` | `0 4% 95%` · `#f3f2f2` | the ground; cards are unfilled |
-| `--secondary`, `--muted`, `--popover` | `0 3% 91%` · `#eae9e9` | quiet bands, plate mats |
-| `--primary` | `20 6% 10%` · `#1c1a19` | the colophon (footer), user chat bubble |
-| `--border` / `--input` | `40 4% 82%` / `40 4% 78%` | hairline |
+| Token | Day | Night | |
+|---|---|---|---|
+| `--background` | `225 25% 96%` · `#f2f4f7` | `222 47% 7%` | the ground |
+| `--card`, `--popover`, `--surface` | white | `222 40% 11%` | cards, menus, the admin sidebar |
+| `--secondary`, `--muted` | `225 25% 96%` | `222 35% 15%` | quiet bands, pills, tiles |
+| `--primary` | `228 75% 50%` · `#2046df` | `228 75% 48%` | the call to action, blue bands (footer), the visitor's chat bubble |
+| `--border` / `--input` | `220 16% 90%` / `86%` | `220 30% 18%` / `24%` | hairline |
 
-Radius is 4px (`--radius`) on controls and cards, 0 on plates and bands.
+Radius is 12px (`--radius`). The favicon's tile is `--primary`'s hex
+(`favicon.contract.test.ts`).
 
-Raw hex stays banned outside `index.css` (eslint). `.plate-dark` uses
-`hsl(20 5% 17%)` for its border for that reason.
+Raw hex stays banned outside `index.css` (eslint).
 
 ## Type
 
-Headings: Cormorant Garamond (Latin) falling through to Frank Ruhl Libre
-(Hebrew), weight **400**, `letter-spacing: -0.01em`; use `font-medium` (500)
-for h3/h4-size titles. Body: Lora falling through to Noto Serif Hebrew,
-18px / line-height 1.75. Cormorant and Lora have no Hebrew glyphs, so Hebrew
-and Latin render in different faces by design.
+Heebo for everything, self-hosted like the other faces
+(`scripts/self-host-fonts.mjs`), with the system sans as fallback. The two
+Hebrew faces preloaded in `index.html` are Heebo 400 and 700.
 
 **Labels are 14px (`text-sm`) with no letter-spacing and no `uppercase`** —
 Hebrew has no capitals to track, and the old 11px tracked labels lost the
 letters' distinguishing marks. Above a heading use `<Eyebrow>` (tabular index,
-short gold rule, label). 13px is the floor, for the header tagline only.
+short rule, label). 13px is the floor, for the header tagline only.
 
 Anything a visitor is asked to read and confirm — the consent notice above all —
 is 15px with loose leading. See `AgentChat`'s gate.
@@ -89,11 +94,11 @@ is 15px with loose leading. See `AgentChat`'s gate.
 ## Components
 
 - **Call to action**: always `ctaClass()` / `CtaLink` / `CtaButton`
-  (`primitives/Cta.tsx`). An outline in gold, never a fill; `size="lg"` for the
-  hero, `onDark` for the colophon. Hover is a 12% gold tint, pressed 22%,
-  disabled 45% opacity, 200ms colour-only transitions.
+  (`primitives/Cta.tsx`). A blue fill with white text; `muted` is the hairline
+  outline, `size="lg"` for the hero, `onDark` for a blue band. Disabled is 45%
+  opacity, 200ms colour-only transitions.
 - **Inputs**: `inputClass()` / `Field` (`primitives/Field.tsx`) - 48px,
-  transparent, hairline; focus border gold plus a 3px 20% halo.
+  transparent, hairline; focus border blue plus a 3px 20% halo.
 - **Plates**: `.plate` (6px `--secondary` mat, 1px outline, slight sepia on the
   image), `.plate-dark` on the colophon. Plates do not zoom (`.lens-hover` is
   gone), and the header is opaque (`.glass` no longer blurs).

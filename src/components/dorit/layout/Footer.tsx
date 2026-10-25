@@ -51,7 +51,7 @@ export default function Footer() {
   const locale = useLocale();
 
   const navList = (
-    <ul className="grid grid-cols-2 gap-x-5 gap-y-2.5 text-base text-[hsl(0_3%_84%)] max-md:gap-y-0">
+    <ul className="grid grid-cols-2 gap-x-5 gap-y-2.5 text-base text-muted-foreground-on-dark max-md:gap-y-0">
       {NAV_LINKS.filter((n) => locale === "he" || !n.hebrewOnly).map((n) => (
         <li key={n.h}>
           {n.route ? (
@@ -71,7 +71,7 @@ export default function Footer() {
   );
 
   return (
-    <footer className="relative bg-primary text-primary-foreground">
+    <footer className="relative bg-[hsl(222_47%_11%)] text-white dark:bg-[hsl(222_50%_5%)] dark:border-t dark:border-border">
       {/* The colophon: the handshake in a dark plate beside the quote. Below
           md the whole band is hidden, not removed — the photo is decoration,
           and the quote alone was still 200px of a phone screen on every page. */}
@@ -98,7 +98,7 @@ export default function Footer() {
           <p className="text-sm text-muted-foreground-on-dark max-md:hidden">
             {t("brand.slogan")}
           </p>
-          <p className="mt-3.5 text-base text-[hsl(0_3%_84%)] leading-[1.7] max-w-[300px] max-md:mt-0">
+          <p className="mt-3.5 text-base text-muted-foreground-on-dark leading-[1.7] max-w-[300px] max-md:mt-0">
             {t("footer.tagline")}
           </p>
         </div>
@@ -124,7 +124,7 @@ export default function Footer() {
           <p className="text-sm text-highlight-on-dark mb-4 max-md:mb-2">
             {t("footer.contact")}
           </p>
-          <ul className="flex flex-col gap-3 text-base text-[hsl(0_3%_84%)] max-md:grid max-md:grid-cols-2 max-md:gap-x-4 max-md:gap-y-0">
+          <ul className="flex flex-col gap-3 text-base text-muted-foreground-on-dark max-md:grid max-md:grid-cols-2 max-md:gap-x-4 max-md:gap-y-0">
             <li className={CONTACT_ROW}>
               <Phone size={16} strokeWidth={1.5} className="text-highlight-on-dark" />
               <a href={`tel:${contact.phoneE164}`} className={CONTACT_LINK}>
@@ -149,7 +149,7 @@ export default function Footer() {
           {/* Dorit's WhatsApp channel, on every page, once VITE_WHATSAPP_CHANNEL_URL
               is set (growth brief, 2026-10-14). The site only links to it. */}
           {WHATSAPP_CHANNEL_URL ? (
-            <p data-track-location="footer_channel" className="mt-5 text-[15px] text-[hsl(0_3%_84%)] leading-relaxed max-md:mt-4">
+            <p data-track-location="footer_channel" className="mt-5 text-[15px] text-muted-foreground-on-dark leading-relaxed max-md:mt-4">
               {t("footer.channelLead")}{" "}
               <a href={WHATSAPP_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
                 {t("footer.channelLink")}

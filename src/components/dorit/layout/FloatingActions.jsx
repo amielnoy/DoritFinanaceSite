@@ -12,7 +12,7 @@ export default function FloatingActions() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="פתיחת שיחה בוואטסאפ"
-        className="group w-14 h-14 rounded-full bg-whatsapp text-white flex items-center justify-center shadow-lg hover:scale-105 transition-transform duration-300"
+        className="group w-14 h-14 rounded-full bg-whatsapp text-slate-900 flex items-center justify-center shadow-lg hover:scale-105 transition-transform duration-300"
       >
         <MessageCircle size={26} className="group-hover:rotate-6 transition-transform" />
       </a>

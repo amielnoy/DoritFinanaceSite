@@ -17,6 +17,8 @@
   "header.callAria": "Call Dorit Gov Ari",
   "header.menu": "Menu",
   "header.closeMenu": "Close menu",
+  "header.themeLight": "Light mode",
+  "header.themeDark": "Dark mode",
   "header.login": "Client sign-in",
   "header.account": "My area",
   "header.logout": "Sign out",

@@ -31,16 +31,16 @@ export default function CarrierLogos() {
   // English and French read the companies' English names; Hebrew shows both.
   const he = useLocale() === "he";
   return (
-    <section className="bg-secondary border-b border-border">
+    <section className="bg-card border-y border-border">
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] py-14 flex flex-col items-center gap-8 max-md:py-8 max-md:gap-5">
-        <p className="text-center font-heading italic text-[15px] normal-case text-accent">
+        <p className="text-center rounded-full border border-highlight/25 bg-highlight/10 px-3 py-1 text-sm font-semibold text-accent">
           {t("carriers.title")}
         </p>
 
-        {/* Below md: one strip that scrolls sideways — four rows of a 2-column
+        {/* Below md: one strip of tiles that scrolls sideways — four rows of a 2-column
             grid was most of a screen. The links stay in the tab order, and a
             focused one off the edge scrolls into the strip. */}
-        <div className="w-full grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 border-y border-border max-md:flex max-md:overflow-x-auto max-md:[scrollbar-width:none] max-md:-mx-[clamp(20px,4vw,40px)] max-md:w-auto max-md:self-stretch max-md:px-[clamp(20px,4vw,40px)] max-md:border-x-0">
+        <div className="w-full grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 max-md:flex max-md:overflow-x-auto max-md:[scrollbar-width:none] max-md:-mx-[clamp(20px,4vw,40px)] max-md:w-auto max-md:self-stretch max-md:px-[clamp(20px,4vw,40px)] max-md:pb-1">
           {CARRIERS.map((c) => (
             <a
               key={c.en}
@@ -48,13 +48,13 @@ export default function CarrierLogos() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={t("carriers.site", { name: he ? c.he : c.en })}
-              className="group flex flex-col items-center gap-1 px-2 py-[22px] text-center text-foreground/80 hover:text-foreground hover:bg-highlight/5 transition-colors duration-200 max-md:shrink-0 max-md:px-4 max-md:py-3 max-md:min-h-11 max-md:justify-center"
+              className="group flex flex-col items-center justify-center gap-0.5 rounded-xl border border-border bg-background px-2 py-4 text-center text-foreground hover:border-highlight/50 hover:bg-card transition-colors duration-200 max-md:shrink-0 max-md:px-4 max-md:py-3 max-md:min-h-11"
             >
-              <span className="font-heading text-[21px] leading-[1.1]">
+              <span className="font-heading font-bold text-lg leading-[1.2]">
                 {he ? c.he : c.en}
               </span>
               {he && c.en && c.en !== c.he && (
-                <span dir="ltr" className="font-heading italic text-[15px] normal-case text-muted-foreground">
+                <span dir="ltr" className="text-xs italic text-muted-foreground">
                   {c.en}
                 </span>
               )}

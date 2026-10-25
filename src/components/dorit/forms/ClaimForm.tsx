@@ -166,8 +166,8 @@ export default function ClaimForm() {
 
   if (done) {
     return (
-      <div className="bg-card border border-border/60 p-10 md:p-14 text-center">
-        <div className="w-16 h-16 mx-auto rounded-full border border-highlight flex items-center justify-center mb-8">
+      <div className="card-raised p-10 md:p-14 text-center">
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-highlight/10 border border-highlight/30 flex items-center justify-center mb-8">
           <Check size={28} className="text-highlight" />
         </div>
         <h3 className="font-heading text-3xl md:text-4xl">{t("form.sentTitle")}</h3>
@@ -185,8 +185,8 @@ export default function ClaimForm() {
   }
 
   return (
-    <div className="bg-card border border-border/60 p-8 md:p-12">
-      <div className="flex items-start gap-4 mb-8 p-5 bg-secondary/50 border border-border/60">
+    <div className="card-raised p-6 sm:p-8 md:p-10">
+      <div className="flex items-start gap-4 mb-8 p-5 rounded-xl bg-highlight/10 border border-highlight/25 border-s-4 border-s-primary">
         <AlertTriangle size={22} className="text-highlight mt-0.5 shrink-0" />
         <p className="text-sm text-foreground/75 leading-relaxed">
           {t("form.emergency")}
@@ -266,7 +266,7 @@ export default function ClaimForm() {
           </span>
           {/* Dropped files take the same checks as picked ones; the input stays reachable by keyboard (review 2026-10-15). */}
           <label
-            className={`flex flex-col items-center justify-center gap-2 p-8 border border-dashed hover:border-accent transition-colors cursor-pointer text-center focus-within:ring-2 focus-within:ring-ring ${dragging ? "border-accent bg-accent/5" : "border-border"}`}
+            className={`flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed bg-secondary/40 hover:border-accent transition-colors cursor-pointer text-center focus-within:ring-2 focus-within:ring-ring ${dragging ? "border-accent bg-accent/5" : "border-border"}`}
             onDragOver={(e) => {
               e.preventDefault();
               if (!sending) setDragging(true);
@@ -299,7 +299,7 @@ export default function ClaimForm() {
           {docs.length > 0 && (
             <ul className="mt-4 space-y-2">
               {docs.map((d, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 p-3 bg-secondary/40 border border-border/60">
+                <li key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-secondary/40 border border-border">
                   <span className="flex items-center gap-2 text-sm min-w-0">
                     <FileText size={16} className="text-accent shrink-0" />
                     <span className="truncate">{d.file.name}</span>

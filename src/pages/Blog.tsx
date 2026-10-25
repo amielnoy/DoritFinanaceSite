@@ -188,10 +188,10 @@ export default function Blog() {
         <section data-track-location="blog_hero" className="pt-28 md:pt-36 pb-8 md:pb-10">
           <div className="max-w-[1400px] mx-auto px-6 md:px-10 md:pl-20">
             <Eyebrow>בלוג · מידע שאפשר לפעול לפיו</Eyebrow>
-            <h1 className="font-heading text-3xl md:text-5xl mt-4 leading-tight text-foreground max-w-4xl">
+            <h1 className="font-heading font-extrabold text-[clamp(30px,3.8vw,48px)] mt-4 leading-[1.15] tracking-[-0.02em] text-foreground max-w-4xl">
               מה אפשר לסדר השבוע — ברוב המקרים בפחות מחצי שעה
             </h1>
-            <p className="mt-4 max-w-2xl text-base md:text-lg leading-relaxed text-foreground">
+            <p className="mt-4 max-w-2xl text-base md:text-lg leading-relaxed text-foreground/75">
               מדריכים קצרים לפנסיה, לביטוח ולמס. בכל מאמר: כמה זמן לוקח לבצע, מה בודקים, ואיפה כדאי
               לעצור ולהתייעץ.
             </p>
@@ -221,7 +221,7 @@ export default function Blog() {
                       clearRecommendation();
                     }}
                     placeholder="חיפוש מאמרים…"
-                    className="w-full min-h-12 bg-card border border-border rounded-md pr-12 pl-12 py-3 text-base text-foreground focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
+                    className="w-full min-h-14 bg-card border border-border rounded-xl shadow-sm pr-12 pl-12 py-3 text-base text-foreground focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
                   />
                   {query ? (
                     <button
@@ -247,14 +247,20 @@ export default function Blog() {
                         type="button"
                         aria-pressed={selected}
                         onClick={() => chooseTopic(t.id)}
-                        className={`shrink-0 whitespace-nowrap min-h-11 px-4 rounded-md border text-[15px] transition-colors ${FOCUS_RING} ${
+                        className={`shrink-0 whitespace-nowrap inline-flex items-center min-h-11 px-4 rounded-xl border text-[15px] font-semibold transition-colors ${FOCUS_RING} ${
                           selected
                             ? "bg-foreground text-background border-foreground"
-                            : "bg-card text-foreground border-border hover:border-accent"
+                            : "bg-card text-foreground border-border shadow-sm hover:border-accent"
                         }`}
                       >
                         {t.label}
-                        <span className="ms-1.5 tabular-nums">{counts[t.id]}</span>
+                        <span
+                          className={`ms-2 min-w-6 px-1.5 rounded-md text-xs font-semibold leading-5 tabular-nums ${
+                            selected ? "bg-background/20" : "bg-secondary text-muted-foreground"
+                          }`}
+                        >
+                          {counts[t.id]}
+                        </span>
                       </button>
                     );
                   })}
@@ -279,10 +285,10 @@ export default function Blog() {
                           type="button"
                           aria-pressed={selected}
                           onClick={() => chooseTag(t)}
-                          className={`shrink-0 whitespace-nowrap min-h-11 px-3 rounded-md border text-sm transition-colors ${FOCUS_RING} ${
+                          className={`shrink-0 whitespace-nowrap min-h-11 px-3 rounded-lg border text-sm transition-colors ${FOCUS_RING} ${
                             selected
-                              ? "bg-accent text-accent-foreground border-accent"
-                              : "bg-transparent text-muted-foreground border-border hover:border-accent hover:text-accent"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-secondary/70 text-foreground/80 border-transparent hover:border-accent hover:text-accent"
                           }`}
                         >
                           {t}
@@ -316,7 +322,7 @@ export default function Blog() {
             ) : failed && !posts ? (
               // A failed read is not an empty blog. It used to say "no articles
               // yet" (D-09, manual test 2026-10-14).
-              <div role="alert" className="text-center py-20 border border-dashed border-border rounded-md">
+              <div role="alert" className="text-center py-20 border-2 border-dashed border-border rounded-2xl">
                 <Newspaper size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} aria-hidden="true" />
                 <p className="text-foreground">לא הצלחנו לטעון את המאמרים כרגע.</p>
                 <button
@@ -330,7 +336,7 @@ export default function Blog() {
                 </button>
               </div>
             ) : !posts || posts.length === 0 ? (
-              <div className="text-center py-20 border border-dashed border-border rounded-md">
+              <div className="text-center py-20 border-2 border-dashed border-border rounded-2xl">
                 <Newspaper size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} aria-hidden="true" />
                 <p className="text-muted-foreground">עדיין אין מאמרים — בקרוב יעלו כאן עדכונים חדשים.</p>
               </div>
@@ -340,7 +346,7 @@ export default function Blog() {
                   id={RECOMMENDED_BANNER_ID}
                   className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 scroll-mt-28"
                 >
-                  <h2 id="blog-grid-title" className="font-heading text-2xl md:text-3xl text-foreground">
+                  <h2 id="blog-grid-title" className="font-heading font-bold text-2xl md:text-3xl text-foreground">
                     {gridTitle}
                     <span className="ms-3 text-base font-body text-muted-foreground tabular-nums">
                       {articlesLabel(total)}
@@ -357,7 +363,7 @@ export default function Blog() {
                 </div>
 
                 {total === 0 ? (
-                  <div className="mt-6 text-center py-20 border border-dashed border-border rounded-md">
+                  <div className="mt-6 text-center py-20 border-2 border-dashed border-border rounded-2xl">
                     <Search size={28} className="mx-auto text-highlight mb-4" strokeWidth={1.25} aria-hidden="true" />
                     <p className="text-muted-foreground">
                       לא נמצאו מאמרים התואמים את החיפוש. ניתן לנסות מילים אחרות או נושא אחר.
@@ -390,7 +396,7 @@ export default function Blog() {
                   <div className={`mt-8 flex justify-center ${total <= PAGE_DESKTOP ? "md:hidden" : ""}`}>
                     <button
                       onClick={() => setExpanded(true)}
-                      className={`min-h-12 px-6 rounded-md border border-foreground text-foreground hover:bg-foreground/[0.06] transition-colors ${FOCUS_RING}`}
+                      className={`min-h-12 px-6 rounded-xl border border-border bg-card font-semibold text-foreground shadow-sm hover:border-accent hover:text-accent transition-colors ${FOCUS_RING}`}
                     >
                       הצגת כל המאמרים{" "}
                       <span className="md:hidden">({moreLabel(total - PAGE_MOBILE)})</span>
