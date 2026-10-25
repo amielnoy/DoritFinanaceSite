@@ -15,8 +15,9 @@ import CountBadge from "./CountBadge";
 
 /**
  * The admin interface's frame: a sidebar on the right with the tasks, the
- * screen beside it. Below 900px the sidebar becomes a band across the top,
- * its rows wrapping and its group titles dropped.
+ * screen beside it. Below 1280px the sidebar becomes a band across the top,
+ * its rows wrapping and its group titles dropped: beside a 288px sidebar a
+ * 1024px screen left the leads table too narrow for its columns.
  *
  * A layout route only — it sits inside AgencyRoute in App.jsx, which decides
  * who gets in. With `adminOnly` (the personal area, which every signed-in
@@ -73,10 +74,10 @@ function SidebarGroup({ group, counts }: { group: AdminNavGroup; counts: AdminCo
     <div
       role={group.title ? "group" : undefined}
       aria-labelledby={group.title ? titleId : undefined}
-      className="flex flex-wrap gap-1 min-[900px]:flex-col min-[900px]:flex-nowrap"
+      className="flex flex-wrap gap-1 min-[1280px]:flex-col min-[1280px]:flex-nowrap"
     >
       {group.title ? (
-        <p id={titleId} className="hidden min-[900px]:block px-3 pt-1 pb-1.5 text-xs font-semibold tracking-wider text-muted-foreground">
+        <p id={titleId} className="hidden min-[1280px]:block px-3 pt-1 pb-1.5 text-xs font-semibold tracking-wider text-muted-foreground">
           {group.title}
         </p>
       ) : null}
@@ -131,9 +132,9 @@ export default function AdminLayout({ adminOnly = false }: { adminOnly?: boolean
     .find((item) => (item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`)));
   const name = (typeof user?.full_name === "string" && user.full_name) || (typeof user?.email === "string" && user.email) || "";
   return (
-    <div dir="rtl" className="min-h-screen bg-background font-body text-base min-[900px]:flex">
-      <aside className="print:hidden shrink-0 flex flex-col bg-surface border-b border-border min-[900px]:w-72 min-[900px]:h-screen min-[900px]:sticky min-[900px]:top-0 min-[900px]:border-b-0 min-[900px]:border-e">
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-border min-[900px]:py-5">
+    <div dir="rtl" className="min-h-screen bg-background font-body text-base min-[1280px]:flex">
+      <aside className="print:hidden shrink-0 flex flex-col bg-surface border-b border-border min-[1280px]:w-72 min-[1280px]:h-screen min-[1280px]:sticky min-[1280px]:top-0 min-[1280px]:border-b-0 min-[1280px]:border-e">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border min-[1280px]:py-5">
           <span
             aria-hidden="true"
             className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl border-2 border-amber-500/70 bg-amber-50 text-amber-800 font-heading text-lg font-bold shadow-sm dark:bg-secondary dark:text-amber-400"
@@ -156,22 +157,22 @@ export default function AdminLayout({ adminOnly = false }: { adminOnly?: boolean
         <AgencySwitcher />
         <nav
           aria-label="ממשק ניהול"
-          className="flex-1 overflow-y-auto px-3 py-3 flex flex-wrap gap-1 min-[900px]:py-4 min-[900px]:flex-col min-[900px]:flex-nowrap min-[900px]:gap-5"
+          className="flex-1 overflow-y-auto px-3 py-3 flex flex-wrap gap-1 min-[1280px]:py-4 min-[1280px]:flex-col min-[1280px]:flex-nowrap min-[1280px]:gap-5"
         >
           {groups.map((group) => (
             <SidebarGroup key={group.title ?? "main"} group={group} counts={counts} />
           ))}
         </nav>
-        <div className="border-t border-border px-3 py-3 flex flex-wrap gap-1 min-[900px]:flex-col">
+        <div className="border-t border-border px-3 py-3 flex flex-wrap gap-1 min-[1280px]:flex-col">
           <Link to="/" className={ROW}>
             <ExternalLink size={18} strokeWidth={1.6} aria-hidden="true" className="shrink-0" />
             <span>צפייה באתר</span>
           </Link>
-          <button type="button" onClick={() => logout(true, `${window.location.origin}/`)} className={cn(ROW, "text-start text-destructive hover:bg-destructive/10 hover:text-destructive min-[900px]:w-full")}>
+          <button type="button" onClick={() => logout(true, `${window.location.origin}/`)} className={cn(ROW, "text-start text-destructive hover:bg-destructive/10 hover:text-destructive min-[1280px]:w-full")}>
             <LogOut size={18} strokeWidth={1.6} aria-hidden="true" className="shrink-0 ltr:rotate-180" />
             <span>{t("header.logout")}</span>
           </button>
-          <div className="hidden min-[900px]:flex items-center gap-3 mt-2 px-3 pt-3 border-t border-border">
+          <div className="hidden min-[1280px]:flex items-center gap-3 mt-2 px-3 pt-3 border-t border-border">
             <span aria-hidden="true" className="w-9 h-9 shrink-0 rounded-full bg-nav-active text-accent flex items-center justify-center">
               <UserRound size={18} strokeWidth={1.5} />
             </span>

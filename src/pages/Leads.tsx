@@ -190,6 +190,34 @@ const ATTENTION = "attention";
  * narrow for every column scrolled out of sight — with the trash in it.
  */
 const PINNED = "sticky left-0 shadow-[inset_-1px_0_0_hsl(var(--border)/0.6)]";
+/**
+ * The table lays out fixed from lg up, so every column stays on screen with no
+ * sideways scroll: each shown column takes its weight's share of the shown
+ * columns' sum, and long values wrap inside their cell instead of widening it.
+ */
+const COLUMN_WEIGHT = {
+  date: 11,
+  name: 10,
+  phone: 11,
+  email: 14,
+  source: 9,
+  details: 15,
+  status: 9,
+  assigned: 10,
+  brought: 7,
+  meeting: 9,
+  actions: 14,
+} as const;
+type Column = keyof typeof COLUMN_WEIGHT;
+/*
+ * Compact where the table is narrowest: under 1100px, and from 1280px (where
+ * the sidebar moves beside it) to 1399px.
+ */
+const COMPACT_CELL = "max-[1100px]:px-[5px] max-[1100px]:py-2 min-[1280px]:max-[1399px]:px-[5px] min-[1280px]:max-[1399px]:py-2";
+const COMPACT_TEXT = "max-[1100px]:text-[12.5px] min-[1280px]:max-[1399px]:text-[12.5px]";
+const CELL = `px-2 py-2.5 ${COMPACT_CELL} [overflow-wrap:anywhere]`;
+const HEAD = `${CELL} font-medium`;
+const CONTACT = `${CELL} text-right text-[13px] ${COMPACT_TEXT}`;
 
 const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean; staffLeads?: boolean }[] = [
   { key: "escalated", label: "הועברו לטיפול" },
@@ -470,6 +498,14 @@ export default function Leads() {
    * then it is the leads screen exactly as it was, title and all.
    */
   const page = (staff: StaffView | null) => {
+    const columns: Column[] = [
+      "date", "name", "phone", "email", "source", "details", "status",
+      ...(assigns ? (["assigned"] as const) : []),
+      ...(showBrought ? (["brought"] as const) : []),
+      ...(staff ? (["meeting"] as const) : []),
+      "actions",
+    ];
+    const weightSum = columns.reduce((sum, c) => sum + COLUMN_WEIGHT[c], 0);
     const leadsContent = (
       <>
             {/* With the tabs it is the Owner's "מעקב לידים" tab; without them, folded above the leads. */}
@@ -573,21 +609,26 @@ export default function Leads() {
                 ) : null}
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-xl border border-border lg:overflow-hidden">
+                <table className={`w-full min-w-[56rem] table-fixed text-sm lg:min-w-0 ${COMPACT_TEXT}`}>
+                  <colgroup>
+                    {columns.map((c) => (
+                      <col key={c} style={{ width: `${((COLUMN_WEIGHT[c] / weightSum) * 100).toFixed(2)}%` }} />
+                    ))}
+                  </colgroup>
                   <thead className="bg-secondary text-muted-foreground">
                     <tr className="text-right">
-                      <th className="px-4 py-3 font-medium">תאריך</th>
-                      <th className="px-4 py-3 font-medium">שם</th>
-                      <th className="px-4 py-3 font-medium">טלפון</th>
-                      <th className="px-4 py-3 font-medium">אימייל</th>
-                      <th className="px-4 py-3 font-medium">מקור</th>
-                      <th className="px-4 py-3 font-medium">פרטים</th>
-                      <th className="px-4 py-3 font-medium">סטטוס</th>
-                      {assigns ? <th className="px-4 py-3 font-medium">משויכת ל</th> : null}
-                      {showBrought ? <th className="px-4 py-3 font-medium">הובאה ע״י</th> : null}
-                      {staff ? <th className="px-4 py-3 font-medium whitespace-nowrap">הפגישה הבאה</th> : null}
-                      <th className={`px-4 py-3 font-medium ${PINNED} bg-secondary`}>
+                      <th className={HEAD}>תאריך</th>
+                      <th className={HEAD}>שם</th>
+                      <th className={HEAD}>טלפון</th>
+                      <th className={HEAD}>אימייל</th>
+                      <th className={HEAD}>מקור</th>
+                      <th className={HEAD}>פרטים</th>
+                      <th className={HEAD}>סטטוס</th>
+                      {assigns ? <th className={HEAD}>משויכת ל</th> : null}
+                      {showBrought ? <th className={HEAD}>הובאה ע״י</th> : null}
+                      {staff ? <th className={HEAD}>הפגישה הבאה</th> : null}
+                      <th className={`${HEAD} ${PINNED} bg-secondary`}>
                         <span className="sr-only">פעולות</span>
                       </th>
                     </tr>
@@ -595,10 +636,10 @@ export default function Leads() {
                   <tbody>
                     {filtered.map((l) => (
                       <tr key={l.id} className="border-t border-border align-top">
-                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                        <td className={`${CELL} text-muted-foreground`}>
                           {l.created_date ? new Date(l.created_date).toLocaleDateString("he-IL") : "—"}
                         </td>
-                        <td className="px-4 py-3 font-medium">
+                        <td className={`${CELL} font-medium`}>
                           {MEETINGS_STAFF ? (
                             <button
                               type="button"
@@ -615,9 +656,9 @@ export default function Leads() {
                             l.name
                           )}
                         </td>
-                        <td className="px-4 py-3" dir="ltr">{l.phone}</td>
-                        <td className="px-4 py-3 text-foreground/70" dir="ltr">{l.email || "—"}</td>
-                        <td className="px-4 py-3 text-foreground/70">
+                        <td className={CONTACT} dir="ltr">{l.phone}</td>
+                        <td className={`${CONTACT} text-foreground/70`} dir="ltr">{l.email || "—"}</td>
+                        <td className={`${CELL} text-foreground/70`}>
                           {SOURCE_LABEL[l.source] || "—"}
                           {STAFF_LEADS && l.source === "staff" && l.intake ? (
                             <span className="ms-2 inline-block border border-border/60 px-1.5 py-0.5 text-xs">{INTAKE_LABELS[l.intake]}</span>
@@ -630,23 +671,23 @@ export default function Leads() {
                             />
                           ) : null}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className={CELL}>
                           <LeadDetails lead={l} />
                           {withTranscript.has(l.id) && <LeadTranscript leadId={l.id} />}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs ${STATUS_COLOR[l.status] || ""}`}>
+                        <td className={CELL}>
+                          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${STATUS_COLOR[l.status] || ""}`}>
                             {ANY_STATUS_LABEL[l.status] || l.status}
                           </span>
                         </td>
                         {assigns ? (
-                          <td className="px-4 py-3">
+                          <td className={CELL}>
                             <select
                               aria-label={`שיוך הפנייה של ${l.name}`}
                               value={l.assigned_user_id ?? ""}
                               onChange={(e) => assignLead.mutate({ id: l.id, userId: e.target.value || null })}
                               disabled={busy}
-                              className="text-xs rounded-md border border-border bg-card px-2 py-1 max-w-[12rem] focus:outline-none focus:border-accent"
+                              className="w-full min-w-0 text-xs rounded-md border border-border bg-card px-2 py-1 focus:outline-none focus:border-accent"
                             >
                               <option value="">לא שויכה</option>
                               {l.assigned_user_id && !assignees.some((a) => a.id === l.assigned_user_id) ? (
@@ -658,9 +699,9 @@ export default function Leads() {
                             </select>
                           </td>
                         ) : null}
-                        {showBrought ? <td className="px-4 py-3 text-foreground/70">{l.broughtBy ? broughtLabel(l.broughtBy) : "—"}</td> : null}
+                        {showBrought ? <td className={`${CELL} text-foreground/70`}>{l.broughtBy ? broughtLabel(l.broughtBy) : "—"}</td> : null}
                         {staff ? (
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className={CELL}>
                             <NextMeetingCell
                               staff={staff}
                               meeting={staff.next.get(l.id)}
@@ -668,14 +709,14 @@ export default function Leads() {
                             />
                           </td>
                         ) : null}
-                        <td className={`px-4 py-3 ${PINNED} bg-card`}>
+                        <td className={`${CELL} ${PINNED} bg-card`}>
                           <div className="flex items-center gap-2">
                             <select
                               aria-label={`סטטוס הפנייה של ${l.name}`}
                               value={l.status}
                               onChange={(e) => updateStatus(l.id, e.target.value as LeadStatus)}
                               disabled={busy}
-                              className="text-xs rounded-md border border-border bg-card px-2 py-1 focus:outline-none focus:border-accent"
+                              className="w-full min-w-0 text-xs rounded-md border border-border bg-card px-2 py-1 focus:outline-none focus:border-accent"
                             >
                               {/* A status the backend wrote shows as it is, and cannot be chosen back. */}
                               {!STATUS.includes(l.status) ? (
@@ -689,7 +730,7 @@ export default function Leads() {
                               <button
                                 onClick={() => remove(l)}
                                 disabled={busy}
-                                className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30"
+                                className="shrink-0 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30"
                                 aria-label="מחיקה"
                               >
                                 <Trash2 size={15} />
