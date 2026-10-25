@@ -32,9 +32,11 @@ export interface PensionCheckFormProps {
   context: string;
   /** A heading inside the form; omitted where the page already has one. */
   heading?: string;
+  /** The form as a page's centrepiece: more room, and a full-width send button. */
+  roomy?: boolean;
 }
 
-export default function PensionCheckForm({ location, context, heading }: PensionCheckFormProps) {
+export default function PensionCheckForm({ location, context, heading, roomy = false }: PensionCheckFormProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -77,7 +79,7 @@ export default function PensionCheckForm({ location, context, heading }: Pension
 
   if (sent) {
     return (
-      <div role="status" className="flex items-start gap-3 rounded-[4px] border border-highlight p-5">
+      <div role="status" className="flex items-start gap-3 rounded-2xl border border-highlight bg-card p-5">
         <Check size={20} className="mt-1 shrink-0 text-highlight" aria-hidden="true" />
         <p className="m-0 text-[17px] leading-relaxed">
           {sentWithEmail
@@ -89,8 +91,8 @@ export default function PensionCheckForm({ location, context, heading }: Pension
   }
 
   return (
-    <form onSubmit={send} noValidate data-track-location={location} className="rounded-[4px] border border-border p-5 md:p-6">
-      {heading ? <h3 className="font-heading text-xl md:text-2xl leading-snug">{heading}</h3> : null}
+    <form onSubmit={send} noValidate data-track-location={location} className={roomy ? "card-raised p-6 md:p-9" : "card-raised p-5 md:p-6"}>
+      {heading ? <h3 className="font-heading font-bold text-xl md:text-[22px] leading-snug text-accent">{heading}</h3> : null}
       <div className={`grid gap-4 sm:grid-cols-2 ${heading ? "mt-4" : ""}`}>
         <Field label={t("form.name")}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" aria-required="true" className={inputClass()} />
@@ -125,7 +127,7 @@ export default function PensionCheckForm({ location, context, heading }: Pension
           {invalid ? t(invalid) : error}
         </p>
       ) : null}
-      <CtaButton type="submit" disabled={sending} className="mt-5 max-sm:w-full">
+      <CtaButton type="submit" disabled={sending} className={roomy ? "mt-6 w-full" : "mt-5 max-sm:w-full"}>
         {sending ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : null}
         {t("form.submit")}
       </CtaButton>

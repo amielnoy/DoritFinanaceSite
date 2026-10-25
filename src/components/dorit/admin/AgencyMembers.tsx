@@ -9,7 +9,7 @@ import { services } from "@/services";
 
 const ROLES = new Set<string>(["owner", "admin", "user"]);
 const BUTTON =
-  "min-h-11 px-3 rounded-sm border border-border text-sm hover:border-highlight disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+  "min-h-11 px-4 rounded-xl border border-border bg-card text-sm font-semibold shadow-sm hover:border-highlight disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 
 /**
  * The current agency's members and what the signed-in person may change
@@ -84,8 +84,8 @@ export default function AgencyMembers() {
 
   if (!can("members.view")) return null;
   return (
-    <section aria-labelledby="agency-members-title" className="flex flex-col gap-3 rounded-md border border-border/60 p-4">
-      <h2 id="agency-members-title" className="m-0 font-heading text-xl">
+    <section aria-labelledby="agency-members-title" className="flex flex-col gap-4 card-raised p-5 md:p-6">
+      <h2 id="agency-members-title" className="m-0 font-heading font-bold text-xl">
         חברי הסוכנות{agencyName ? ` — ${agencyName}` : ""}
       </h2>
       {error ? (
@@ -100,8 +100,8 @@ export default function AgencyMembers() {
           const self = u.id === me;
           const manageable = !self && canManage(role, isOperator, theirs);
           return (
-            <li key={u.id} className="flex flex-wrap items-center gap-3 border-b border-border/40 pb-2">
-              <bdi dir="ltr" className="min-w-[12rem] font-medium">
+            <li key={u.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-2.5">
+              <bdi dir="ltr" className="min-w-[12rem] font-semibold">
                 {name}
               </bdi>
               {manageable && grantable.length > 1 ? (
@@ -115,7 +115,7 @@ export default function AgencyMembers() {
                     const next = e.target.value as AgencyRole;
                     change.mutate(() => services.usersAdmin.setRole(agencyId, u.id, next));
                   }}
-                  className="min-h-11 rounded-sm border border-border bg-background px-2 text-sm"
+                  className="min-h-11 rounded-xl border border-input bg-card px-3 text-sm shadow-sm"
                 >
                   {grantable.map((r) => (
                     <option key={r} value={r}>
@@ -124,7 +124,7 @@ export default function AgencyMembers() {
                   ))}
                 </select>
               ) : (
-                <span className="text-sm text-muted-foreground">{ROLE_LABELS[theirs]}</span>
+                <span className="rounded-md bg-highlight/10 px-2 py-0.5 text-sm font-semibold text-accent">{ROLE_LABELS[theirs]}</span>
               )}
               {workload.get(u.id) ? <span className="text-xs text-muted-foreground">{workload.get(u.id)} פניות פתוחות</span> : null}
               {manageable ? (
@@ -133,7 +133,7 @@ export default function AgencyMembers() {
                 </button>
               ) : null}
               {self ? (
-                <button type="button" className={BUTTON} disabled={change.isPending} onClick={leave}>
+                <button type="button" className={`${BUTTON} ms-auto border-destructive/40 text-destructive hover:border-destructive hover:bg-destructive/10`} disabled={change.isPending} onClick={leave}>
                   עזיבת הסוכנות
                 </button>
               ) : null}
@@ -142,10 +142,10 @@ export default function AgencyMembers() {
         })}
       </ul>
       {can("members.transferOwnership") && amMember && role === "owner" ? (
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-sm">
+        <div className="flex flex-wrap items-end gap-2 border-t border-border pt-4">
+          <label className="flex flex-col gap-1 text-sm font-medium">
             העברת בעלות ל
-            <select value={heir} onChange={(e) => setHeir(e.target.value)} className="min-h-11 rounded-sm border border-border bg-background px-2">
+            <select value={heir} onChange={(e) => setHeir(e.target.value)} className="min-h-11 min-w-56 rounded-xl border border-input bg-card px-3 font-normal shadow-sm">
               <option value="">בחירת חבר/ה</option>
               {members
                 .filter((m) => m.user.id !== me)

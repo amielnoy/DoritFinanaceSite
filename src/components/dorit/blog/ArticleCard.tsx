@@ -31,18 +31,18 @@ export default function ArticleCard({
       to={articlePath(post)}
       className={cn(
         "group flex flex-col border-t border-border py-5",
-        "md:border md:border-border md:bg-card md:p-6 md:rounded-md md:hover:border-accent md:transition-colors",
+        "md:border md:border-border md:bg-card md:p-6 md:rounded-2xl md:shadow-sm md:hover:shadow-md md:hover:border-highlight/50 md:transition-[box-shadow,border-color] md:overflow-hidden",
         FOCUS_RING,
         className
       )}
     >
       {post.image_url ? (
-        <div className="hidden md:block aspect-video -mx-6 -mt-6 mb-5 overflow-hidden rounded-t-md bg-secondary">
+        <div className="hidden md:block aspect-video -mx-6 -mt-6 mb-5 overflow-hidden bg-secondary">
           <Image src={post.image_url} alt="" className="w-full h-full object-cover" fittingType="fill" />
         </div>
       ) : null}
       {topicLabel ? <p className="text-sm font-semibold text-accent">{topicLabel}</p> : null}
-      <h3 className="font-heading text-xl mt-1.5 leading-snug text-foreground group-hover:text-accent transition-colors">
+      <h3 className="font-heading font-bold text-xl mt-1.5 leading-snug text-foreground group-hover:text-accent transition-colors">
         {post.title}
       </h3>
       {post.excerpt ? (
@@ -50,7 +50,7 @@ export default function ArticleCard({
         // would override it and unclamp the text.
         <p className="hidden md:line-clamp-2 mt-3 text-sm leading-relaxed text-foreground/80">{post.excerpt}</p>
       ) : null}
-      <ArticleMeta actionTime={post.action_time} body={post.body} className="mt-3 md:mt-auto md:pt-5" />
+      <ArticleMeta actionTime={post.action_time} body={post.body} className="mt-3 md:-mx-6 md:-mb-6 md:mt-auto md:px-6 md:py-3.5 md:bg-secondary/60 md:border-t md:border-border" />
     </Link>
   );
 }

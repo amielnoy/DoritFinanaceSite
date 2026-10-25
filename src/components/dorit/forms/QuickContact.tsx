@@ -74,9 +74,9 @@ export default function QuickContact({ embedded = false, className }: { embedded
     }
   };
 
-  // The form itself, drawn straight onto the page ground — no card around it.
+  // The form itself; embedded on the home page, in a card.
   const formBody = (
-    <div className={embedded ? "min-w-0" : "lg:col-span-7"}>
+    <div className={embedded ? "min-w-0 rounded-2xl border border-border bg-secondary/60 p-6 sm:p-8 max-md:p-5" : "lg:col-span-7"}>
           {sent ? (
             <div className="border-y border-border py-14 px-6 text-center">
               <div className="w-14 h-14 mx-auto rounded-full border border-highlight flex items-center justify-center mb-6">
@@ -94,7 +94,12 @@ export default function QuickContact({ embedded = false, className }: { embedded
               </button>
             </div>
           ) : (
-            <div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void send();
+              }}
+            >
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-5">
                 <Field label={t("quick.name")}>
                   <input
@@ -156,27 +161,27 @@ export default function QuickContact({ embedded = false, className }: { embedded
               )}
 
               <div className="mt-7 flex justify-end">
-                <CtaButton onClick={send} disabled={busy}>
+                <CtaButton type="submit" disabled={busy}>
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                   {t("quick.send")}
                 </CtaButton>
               </div>
-            </div>
+            </form>
           )}
         </div>
   );
 
   // Embedded on the home page the <section> below is not rendered, so the id
   // lives on this wrapper: #quick-contact is what the anchor links, the
-  // accessibility scans and the form tests all address. Heading and form sit
-  // side by side, the form directly on the ground.
+  // accessibility scans and the form tests all address. The heading sits
+  // centred above the form, and the form in a card.
   if (embedded) {
     return (
       <div
         id="quick-contact"
-        className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-x-16 gap-y-8 border-t border-border pt-14 mt-4 max-md:pt-8 max-md:mt-0 max-md:gap-y-5${className ? ` ${className}` : ""}`}
+        className={`w-full max-w-[880px] mx-auto flex flex-col gap-8 pt-6 max-md:pt-2 max-md:gap-5${className ? ` ${className}` : ""}`}
       >
-        <h3 className="font-heading font-normal text-[clamp(28px,3vw,36px)] leading-[1.2]">
+        <h3 className="text-center font-heading font-extrabold text-[clamp(26px,3vw,32px)] leading-[1.2]">
           {t("quick.embeddedTitle")}
         </h3>
         {formBody}

@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import InviteUserDialog from "@/components/dorit/admin/InviteUserDialog";
 import AgencyMembers from "@/components/dorit/admin/AgencyMembers";
 import { useAgencyRole, useCurrentAgency } from "@/hooks/useAgency";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Building2, Search, ShieldCheck, Users } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { services } from "@/services";
 import type { AdminUser } from "@/services/ports";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -89,19 +89,26 @@ export default function AdminUsers() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border/60 bg-card">
-        <div className="max-w-[1200px] mx-auto px-6 py-5 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <Eyebrow>תוכן והגדרות</Eyebrow>
-            <h1 className="font-heading text-2xl md:text-3xl mt-1">ניהול משתמשים</h1>
-          </div>
-          {can("members.manageUsers") ? <InviteUserDialog /> : null}
-        </div>
+      <header className="max-w-[1200px] mx-auto px-6 pt-8 flex flex-wrap items-center justify-between gap-4">
+        <h1 className="flex items-center gap-3 font-heading font-extrabold text-3xl md:text-4xl">
+          ניהול משתמשים
+          {!isLoading && !error ? (
+            <span className="rounded-lg bg-highlight/10 px-2.5 py-0.5 text-sm font-semibold text-accent">{all.length} משתמשים</span>
+          ) : null}
+        </h1>
+        {can("members.manageUsers") ? <InviteUserDialog /> : null}
       </header>
 
       <main id="main" className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col gap-5">
+        {!isLoading && !error && all.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Stat icon={Users} label='סה"כ משתמשים' value={all.length} />
+            <Stat icon={Building2} label="ארגונים" value={orgs.length} />
+            <Stat icon={ShieldCheck} label={SITE_ROLE_LABEL.admin} value={all.filter((u) => u.role === "admin").length} />
+          </div>
+        ) : null}
         <AgencyMembers />
-        <div className="flex flex-col gap-3">
+        <div className="card-raised p-4 flex flex-col gap-3">
           <label className="relative block max-w-md">
             <span className="sr-only">חיפוש משתמשים</span>
             <Search size={16} aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-3 text-muted-foreground" />
@@ -111,7 +118,7 @@ export default function AdminUsers() {
               onChange={(e) => setDraft(e.target.value)}
               aria-label="חיפוש משתמשים"
               placeholder="שם, תפקיד או ארגון"
-              className="w-full min-h-11 rounded-md border border-border bg-background ps-9 pe-3 text-[15px]"
+              className="w-full min-h-11 rounded-xl border border-input bg-secondary/50 ps-9 pe-3 text-[15px] focus:outline-none focus:border-highlight focus:ring-[3px] focus:ring-highlight/20"
             />
           </label>
           {orgs.length > 0 ? <OrgFilter orgs={orgs} selected={selected} onChange={(ids) => update({ org: ids.join(",") || null })} /> : null}
@@ -132,7 +139,7 @@ export default function AdminUsers() {
         {isLoading ? (
           <div aria-busy="true" aria-label="טוען משתמשים" className="flex flex-col gap-3">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} data-testid="user-skeleton" className="flex items-center gap-3 rounded-md border border-border/60 p-3">
+              <div key={i} data-testid="user-skeleton" className="flex items-center gap-3 card-raised p-3">
                 <Skeleton className="h-10 w-10 rounded-full" />
                 <div className="flex flex-1 flex-col gap-2">
                   <Skeleton className="h-4 w-1/3" />
@@ -142,10 +149,10 @@ export default function AdminUsers() {
             ))}
           </div>
         ) : !error && shown.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 rounded-md border border-border/60 p-6">
-            <p className="m-0 font-heading text-xl">{filtering ? "לא נמצאו משתמשים שמתאימים לחיפוש" : "עדיין אין משתמשים"}</p>
+          <div className="flex flex-col items-start gap-3 rounded-2xl border-2 border-dashed border-border p-6">
+            <p className="m-0 font-heading font-bold text-xl">{filtering ? "לא נמצאו משתמשים שמתאימים לחיפוש" : "עדיין אין משתמשים"}</p>
             {filtering ? (
-              <button type="button" onClick={clear} className="min-h-11 rounded-md border border-border px-4 hover:border-highlight">
+              <button type="button" onClick={clear} className="min-h-11 rounded-xl border border-border bg-card px-4 font-semibold shadow-sm hover:border-highlight">
                 ניקוי סינון
               </button>
             ) : null}
@@ -153,15 +160,16 @@ export default function AdminUsers() {
         ) : !error ? (
           <>
             {/* From 640px: the table. Its organization column is the indicator, so no avatar badge here. */}
+            <div className="hidden min-[680px]:block card-raised overflow-hidden">
             <table className="hidden w-full border-collapse text-start min-[680px]:table">
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-b border-border bg-secondary/60 text-sm text-muted-foreground">
                   {SORTABLE.map(({ key, label }) => (
                     <th
                       key={key}
                       scope="col"
                       aria-sort={sort === key ? (dir === "asc" ? "ascending" : "descending") : "none"}
-                      className="py-2 text-start font-medium"
+                      className="px-5 py-1 text-start font-semibold"
                     >
                       <button type="button" onClick={() => sortBy(key)} className="inline-flex min-h-11 items-center gap-1 hover:text-accent">
                         {label}
@@ -173,30 +181,33 @@ export default function AdminUsers() {
               </thead>
               <tbody>
                 {shown.map((u) => (
-                  <tr key={u.id} className="border-b border-border/60">
-                    <td className="py-3">
+                  <tr key={u.id} className="border-b border-border last:border-b-0 hover:bg-secondary/40 transition-colors">
+                    <td className="px-5 py-3">
                       <span className="inline-flex items-center gap-3">
                         <Avatar>
                           <AvatarFallback>{initial(u)}</AvatarFallback>
                         </Avatar>
-                        <bdi dir="ltr">{displayName(u)}</bdi>
+                        <bdi dir="ltr" className="font-medium">{displayName(u)}</bdi>
                       </span>
                     </td>
-                    <td className="py-3">{SITE_ROLE_LABEL[u.role]}</td>
-                    <td className="py-3">
+                    <td className="px-5 py-3">
+                      <span className={roleBadge(u.role)}>{SITE_ROLE_LABEL[u.role]}</span>
+                    </td>
+                    <td className="px-5 py-3">
                       <OrgChips orgs={orgsOf(u, dirOrgs)} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
 
             {/* Below 640px: the same users as cards, the avatar carrying the primary organization's badge. */}
             <ul aria-label="משתמשים" className="m-0 flex list-none flex-col gap-3 p-0 min-[680px]:hidden">
               {shown.map((u) => {
                 const primary = primaryOrg(u, dirOrgs);
                 return (
-                  <li key={u.id} className="flex items-start gap-3 rounded-md border border-border/60 p-3">
+                  <li key={u.id} className="flex items-start gap-3 card-raised p-4">
                     <Avatar org={primary} size={44}>
                       <AvatarFallback>{initial(u)}</AvatarFallback>
                     </Avatar>
@@ -204,7 +215,7 @@ export default function AdminUsers() {
                       <bdi dir="ltr" className="truncate font-medium">
                         {displayName(u)}
                       </bdi>
-                      <span className="text-sm text-muted-foreground">{SITE_ROLE_LABEL[u.role]}</span>
+                      <span className={`self-start ${roleBadge(u.role)}`}>{SITE_ROLE_LABEL[u.role]}</span>
                       <OrgChips orgs={orgsOf(u, dirOrgs)} />
                     </div>
                   </li>
@@ -214,6 +225,24 @@ export default function AdminUsers() {
           </>
         ) : null}
       </main>
+    </div>
+  );
+}
+
+/** The site role as a badge: the platform operator stands out. */
+const roleBadge = (role: AdminUser["role"]) =>
+  `inline-flex rounded-md px-2 py-0.5 text-sm font-semibold ${role === "admin" ? "bg-highlight/10 text-accent" : "bg-secondary text-foreground/80"}`;
+
+function Stat({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: number }) {
+  return (
+    <div className="card-raised p-5">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-muted-foreground">{label}</span>
+        <span className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-accent" aria-hidden="true">
+          <Icon size={20} />
+        </span>
+      </div>
+      <span className="mt-3 block font-heading font-extrabold text-4xl leading-none lining-nums tabular-nums">{value}</span>
     </div>
   );
 }

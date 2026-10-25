@@ -160,7 +160,7 @@ export default function Testimonials() {
               <Eyebrow>
                 {tr("testimonials.eyebrow")}
               </Eyebrow>
-              <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] leading-[1.12] mt-[18px]">{tr("testimonials.title")}</h2>
+              <h2 className="font-heading font-bold text-[clamp(32px,3.6vw,44px)] leading-[1.15] mt-[18px]">{tr("testimonials.title")}</h2>
               {/* The quotes are the clients' own words, in Hebrew; on the English
                   and French pages each card keeps Hebrew's language and direction. */}
               {he ? null : <p className="mt-3 text-[15px] text-muted-foreground">{tr("testimonials.original")}</p>}
@@ -203,7 +203,7 @@ export default function Testimonials() {
 
         {/* Add form */}
         {isAdmin && open && (
-          <div className="border border-border rounded-md p-6 md:p-8">
+          <div className="card-raised p-6 md:p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="md:col-span-1">
                 <label className="block text-[15px] text-foreground/80 mb-1.5">
@@ -326,7 +326,7 @@ export default function Testimonials() {
                 key={t.id}
                 aria-label={carousel ? tr("testimonials.item", { n: i + 1, total: items.length }) : undefined}
                 {...(he ? {} : { lang: "he", dir: "rtl" })}
-                className={carousel ? "group relative rounded-md border border-border p-5 flex flex-col shrink-0 w-[88%] snap-start" : "group relative rounded-md border border-border p-7 flex flex-col"}
+                className={carousel ? "group relative card-raised p-5 flex flex-col shrink-0 w-[88%] snap-start" : "group relative card-raised p-7 flex flex-col"}
               >
                 {isAdmin && (
                   <button
@@ -348,12 +348,12 @@ export default function Testimonials() {
                     )}
                   </div>
                   <div>
-                    <p className="font-heading text-lg leading-tight">{t.name}</p>
+                    <p className="font-heading font-bold text-lg leading-tight">{t.name}</p>
                     {t.role && <p className="text-sm text-muted-foreground mt-1">{t.role}</p>}
                     <div className="flex items-center gap-2 mt-2">
                       {t.rating ? <Stars value={t.rating} /> : null}
                       {t.source && (
-                        <span className="text-sm px-2 py-0.5 border border-border text-muted-foreground">
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
                           {t.source === "google" ? "Google" : "Midrag"}
                         </span>
                       )}
@@ -372,7 +372,7 @@ export default function Testimonials() {
 }
 
 const NAV =
-  "w-11 h-11 rounded-md border border-border flex items-center justify-center text-foreground hover:border-highlight hover:text-accent transition-colors duration-200 aria-disabled:opacity-40 aria-disabled:cursor-default";
+  "w-11 h-11 rounded-xl border border-border bg-card flex items-center justify-center text-foreground hover:border-highlight hover:text-accent transition-colors duration-200 aria-disabled:opacity-40 aria-disabled:cursor-default";
 
 const STRIP =
   "flex gap-4 overflow-x-auto snap-x snap-mandatory -mx-[clamp(20px,4vw,40px)] px-[clamp(20px,4vw,40px)] scroll-px-[clamp(20px,4vw,40px)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-highlight";

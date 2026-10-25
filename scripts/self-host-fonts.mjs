@@ -29,6 +29,7 @@ const SITE = [
   ["frank-ruhl-libre", "Frank Ruhl Libre", [["300", "normal"], ["400", "normal"], ["500", "normal"]], ["hebrew", "latin"]],
   ["lora", "Lora", [["400", "normal"], ["600", "normal"]], ["latin"]],
   ["noto-serif-hebrew", "Noto Serif Hebrew", [["400", "normal"], ["500", "normal"], ["600", "normal"]], ["hebrew", "latin"]],
+  ["heebo", "Heebo", [["400", "normal"], ["500", "normal"], ["600", "normal"], ["700", "normal"]], ["hebrew", "latin"]],
 ];
 const POA = [
   ["frank-ruhl-libre", "Frank Ruhl Libre", [["500", "normal"], ["700", "normal"]], ["hebrew", "latin"]],

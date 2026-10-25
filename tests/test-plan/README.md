@@ -25,6 +25,7 @@ Software Test Description (STD) per suite.
 | 12 | [STD — Integration](12-std-integration.md) | integration | Vitest (node) | `tests/integration/` |
 | 13 | [STD — Agent Evals](13-std-eval.md) | eval | Vitest (node), opt-in | `tests/eval/` |
 | 14 | [The procedures agent: where the line runs](14-procedures-zones.md) | contract + eval | — | `base44/agents/procedures_agent.jsonc` |
+| 15 | [Manual test plan](15-manual-test-plan.md) | manual | a person in a browser | — |
 
 ## Test case identifiers
 

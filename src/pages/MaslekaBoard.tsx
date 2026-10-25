@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import Eyebrow from "@/components/dorit/primitives/Eyebrow";
 import SideDrawer from "@/components/dorit/admin/SideDrawer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus } from "lucide-react";
+import { Info, Loader2, Plus, RefreshCw, Route, Search } from "lucide-react";
 import { CLEARINGHOUSE_ADVISOR_URL } from "@/config/masleka";
 import {
   BOARD_KEY,
@@ -74,9 +73,9 @@ const when = boardTime;
 
 /** Every control on the board is at least 44px tall. */
 const buttonClass =
-  "inline-flex min-h-11 items-center justify-center gap-1 border border-border/60 px-3 py-1.5 text-sm hover:border-accent disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-1.5 text-sm font-medium transition-colors hover:border-accent hover:text-accent disabled:opacity-60";
 const primaryClass =
-  "inline-flex min-h-11 items-center justify-center gap-1 bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60";
 
 /** The header's line: how many requests wait for someone today. */
 export function waitingLine(n: number): string {
@@ -120,7 +119,7 @@ function ManualCopy({
         autoComplete="off"
         onFocus={(e) => e.currentTarget.select()}
         onClick={(e) => e.currentTarget.select()}
-        className="w-full border border-border bg-background px-2 py-1 font-mono text-sm"
+        className="w-full rounded-lg border border-border bg-background px-2 py-1 font-mono text-sm"
       />
       <p className="mt-1 text-xs text-muted-foreground">העתק ידנית: הערך מסומן — Ctrl+C או ⌘C. הוא יוסתר בלחיצה הבאה.</p>
       <button type="button" onClick={onClose} className="mt-1 text-xs underline">
@@ -142,7 +141,7 @@ function LinkPanel({
 }) {
   const [copied, setCopied] = useState<"idle" | "copied" | "manual">("idle");
   return (
-    <div className="mt-3 border border-border/60 bg-background p-3">
+    <div className="mt-3 rounded-xl border border-border bg-secondary/40 p-4">
       <p className="text-sm">
         {link.invited
           ? "הקישור נשלח במייל ללקוח. אפשר גם להעתיק אותו:"
@@ -156,7 +155,7 @@ function LinkPanel({
         dir="ltr"
         aria-label="הקישור ללקוח"
         onFocus={(e) => e.currentTarget.select()}
-        className="mt-2 w-full border border-border bg-background px-2 py-1 font-mono text-xs"
+        className="mt-2 w-full rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-xs"
       />
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" onClick={async () => setCopied(await copyOrFallback(link.link, clipboard))} className={buttonClass}>
@@ -182,7 +181,7 @@ function LinkOnce({ link, clipboard }: { link: string; clipboard: ClipboardLike 
   return (
     <>
       <div>
-        <label htmlFor={id} className="block text-sm">
+        <label htmlFor={id} className="block text-sm font-medium">
           הקישור ללקוח
         </label>
         <div className="mt-1 flex gap-2">
@@ -192,7 +191,7 @@ function LinkOnce({ link, clipboard }: { link: string; clipboard: ClipboardLike 
             value={link}
             dir="ltr"
             onFocus={(e) => e.currentTarget.select()}
-            className="min-h-11 w-full border border-border bg-background px-2 py-1 font-mono text-xs"
+            className="min-h-11 w-full rounded-xl border border-border bg-background px-3 py-1 font-mono text-xs"
           />
           <button type="button" onClick={async () => setCopied(await copyOrFallback(link, clipboard))} className={buttonClass}>
             {copied === "copied" ? "הועתק ✓" : "העתקה"}
@@ -202,7 +201,7 @@ function LinkOnce({ link, clipboard }: { link: string; clipboard: ClipboardLike 
           <p className="mt-1 text-sm text-muted-foreground">העתק ידנית: סמנו את הקישור והעתיקו (Ctrl+C או ⌘C).</p>
         ) : null}
       </div>
-      <p className="border border-highlight bg-highlight/10 p-3 text-sm">
+      <p className="rounded-xl border border-highlight/40 bg-highlight/10 p-3 text-sm">
         הקישור מוצג כאן פעם אחת בלבד. העתיקו אותו או שלחו אותו עכשיו — אחר כך אפשר רק להחליף אותו בקישור חדש.
       </p>
       {/* The client's page as the client will see it: a new tab, no referrer. */}
@@ -220,7 +219,7 @@ const CHANNELS: { value: Channel; label: string }[] = [
   { value: "copy", label: "אעתיק בעצמי" },
 ];
 const PHONE_ERROR = "מספר נייד צריך להתחיל ב-05 ולהכיל 10 ספרות";
-const fieldClass = "mt-1 min-h-11 w-full border border-border bg-background px-3 py-2";
+const fieldClass = "mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-highlight/40";
 
 /**
  * The new-request drawer, in two steps. First: the client, how the link goes
@@ -301,7 +300,7 @@ function NewRequest({
     const wa = result.channel === "whatsapp" ? whatsappInviteUrl(result.phone, clientName, link.link) : null;
     return (
       <div className="space-y-4">
-        <h3 className="font-heading text-xl">הקישור ל{clientName} מוכן</h3>
+        <h3 className="font-heading text-xl font-bold">הקישור ל{clientName} מוכן</h3>
         {wa ? (
           <a href={wa} target="_blank" rel="noopener noreferrer" className={`${primaryClass} w-full`}>
             שליחה ל{firstNameOf(clientName)} בוואטסאפ
@@ -322,7 +321,7 @@ function NewRequest({
   return (
     <form onSubmit={submit} aria-label="בקשה חדשה" className="space-y-5" noValidate>
       <div>
-        <label htmlFor="masleka-new-name" className="block text-sm">
+        <label htmlFor="masleka-new-name" className="block text-sm font-medium">
           שם הלקוח
         </label>
         <input
@@ -335,13 +334,13 @@ function NewRequest({
         />
       </div>
       <fieldset>
-        <legend className="text-sm">איך לשלוח את הקישור?</legend>
+        <legend className="text-sm font-medium">איך לשלוח את הקישור?</legend>
         <div className="mt-2 grid grid-cols-3 gap-2">
           {CHANNELS.map((c) => (
             <label
               key={c.value}
-              className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 border px-2 py-2 text-sm ${
-                channel === c.value ? "border-highlight bg-card" : "border-border/60"
+              className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border px-2 py-2 text-sm transition-colors ${
+                channel === c.value ? "border-primary bg-highlight/10 font-medium text-accent" : "border-border hover:border-accent"
               }`}
             >
               <input
@@ -361,7 +360,7 @@ function NewRequest({
       </fieldset>
       {channel === "whatsapp" ? (
         <div>
-          <label htmlFor="masleka-new-phone" className="block text-sm">
+          <label htmlFor="masleka-new-phone" className="block text-sm font-medium">
             נייד של הלקוח
           </label>
           <input
@@ -388,7 +387,7 @@ function NewRequest({
       ) : null}
       {channel === "mail" ? (
         <div>
-          <label htmlFor="masleka-new-email" className="block text-sm">
+          <label htmlFor="masleka-new-email" className="block text-sm font-medium">
             מייל של הלקוח
           </label>
           <input
@@ -402,7 +401,7 @@ function NewRequest({
         </div>
       ) : null}
       <div>
-        <label htmlFor="masleka-new-lead" className="block text-sm">
+        <label htmlFor="masleka-new-lead" className="block text-sm font-medium">
           שיוך לפנייה (לא חובה)
         </label>
         <select id="masleka-new-lead" value={leadId} onChange={(e) => chooseLead(e.target.value)} className={fieldClass}>
@@ -447,7 +446,7 @@ function StepDot({ step }: { step: number }) {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-highlight font-heading text-sm text-accent"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-highlight/10 font-heading font-bold text-accent"
     >
       {step}
     </span>
@@ -469,18 +468,21 @@ function BoardRow({
 }) {
   const { request, plan } = row;
   return (
-    <li className="border border-border/60 bg-card p-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <li className="card-raised p-4 transition-colors hover:!border-highlight/50">
+      <div className="flex flex-wrap items-center gap-4">
         <StepDot step={plan.step} />
         <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-baseline gap-x-2">
-            <span className="font-medium">{request.clientName}</span>
-            <span className="text-sm text-muted-foreground">{STAGE_LABEL[plan.stage]}</span>
+          <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className="font-heading text-lg font-bold">{request.clientName}</span>
             {plan.urgent ? (
-              <span className="border border-destructive/60 px-1.5 text-sm text-destructive">דחוף</span>
+              <span className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                דחוף
+              </span>
             ) : null}
+            <span className="rounded-md bg-highlight/10 px-2 py-0.5 text-xs font-medium text-accent">{STAGE_LABEL[plan.stage]}</span>
           </p>
-          <p className={plan.urgent ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{plan.reason}</p>
+          <p className={`mt-1 text-sm ${plan.urgent ? "font-medium text-destructive" : "text-muted-foreground"}`}>{plan.reason}</p>
         </div>
         {/* On a phone the row is a card, and its one action takes the full width. */}
         <div className="max-sm:w-full max-sm:[&>*]:w-full sm:ms-auto">{action}</div>
@@ -505,13 +507,13 @@ function GuideStep({
   return (
     <li
       aria-current={state === "current" ? "step" : undefined}
-      className={`border p-4 ${state === "current" ? "border-highlight bg-card" : "border-border/60"}`}
+      className={`rounded-xl border p-4 ${state === "current" ? "border-primary bg-card shadow-sm" : "border-border bg-secondary/30"}`}
     >
       <p className="flex items-center gap-3 font-medium">
         <span
           aria-hidden="true"
           className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-heading text-sm ${
-            state === "done" ? "border-accent bg-accent text-primary-foreground" : "border-highlight text-accent"
+            state === "done" ? "border-primary bg-primary text-primary-foreground" : state === "current" ? "border-primary text-accent" : "border-border text-muted-foreground"
           }`}
         >
           {state === "done" ? "✓" : n}
@@ -638,7 +640,7 @@ function SubmitGuide({
         </GuideStep>
         <GuideStep n={4} title="סיימתם להגיש?" state={stateOf(3)}>
           {confirming ? (
-            <div role="alert" className="space-y-2 border border-destructive/40 bg-destructive/5 p-3">
+            <div role="alert" className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
               <p className="font-medium">לסמן את הבקשה של {request.clientName} כהוגשה?</p>
               <p className="text-sm">לא תוכלו להעתיק שוב את מספר הזהות או את קוד האימות.</p>
               <div className="flex flex-wrap gap-2">
@@ -658,9 +660,9 @@ function SubmitGuide({
           )}
         </GuideStep>
       </ol>
-      <div className="mt-6 border-t border-border/60 pt-4">
+      <div className="mt-6 border-t border-border pt-4">
         {askingReissue ? (
-          <div role="alert" className="space-y-2 border border-destructive/40 bg-destructive/5 p-3">
+          <div role="alert" className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
             <p className="font-medium">לשלוח ל{request.clientName} קישור חדש?</p>
             <p className="text-sm">קוד האימות ומספר הזהות שנמסרו יימחקו, והבקשה תחזור לשלב 1 — ממתין ללקוח.</p>
             <div className="flex flex-wrap gap-2">
@@ -830,8 +832,8 @@ export default function MaslekaBoard({
       role={notice.tone === "state" ? "status" : "alert"}
       className={
         notice.tone === "state"
-          ? "border border-border/60 bg-card p-3 text-sm"
-          : "border border-destructive/40 bg-destructive/5 p-3 text-sm"
+          ? "rounded-xl border border-border bg-card p-3 text-sm"
+          : "rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm"
       }
     >
       {notice.text}
@@ -937,16 +939,17 @@ export default function MaslekaBoard({
 
   return (
     <div dir="rtl" className="min-h-screen bg-background">
-      <header className="border-b border-border/60 bg-card">
+      <header>
         {/* A phone: the title and the round "+" share the row; nothing wraps under it. */}
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 flex items-start justify-between gap-3 sm:flex-wrap sm:items-center">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-8 flex items-start justify-between gap-3 sm:flex-wrap sm:items-end">
           <div className="min-w-0">
-            <Eyebrow>טיפול שוטף</Eyebrow>
-            <h1 className="font-heading text-2xl md:text-3xl mt-1">מסלקה</h1>
-            {requests.isSuccess ? <p className="mt-1 text-sm text-muted-foreground">{waitingLine(waitingNow)}</p> : null}
+            <span className="inline-block rounded-md bg-highlight/10 px-2.5 py-0.5 text-sm font-semibold text-accent">טיפול שוטף</span>
+            <h1 className="font-heading font-extrabold text-3xl md:text-4xl mt-2">מסלקה</h1>
+            {requests.isSuccess ? <p className="mt-1.5 text-muted-foreground">{waitingLine(waitingNow)}</p> : null}
           </div>
-          <div className="flex shrink-0 items-center gap-4 text-sm max-sm:gap-2">
-            <a href="#masleka-how" className="inline-flex min-h-11 items-center underline">
+          <div className="flex shrink-0 items-center gap-3 text-sm max-sm:gap-2">
+            <a href="#masleka-how" className={`${buttonClass} text-accent max-sm:border-0 max-sm:bg-transparent max-sm:px-1`}>
+              <Info size={16} aria-hidden="true" className="max-sm:hidden" />
               איך זה עובד?
             </a>
             {/* A phone: a round 48px "+", named by its aria-label. */}
@@ -977,45 +980,74 @@ export default function MaslekaBoard({
 
         <nav aria-label="שלבי הבקשה">
           {/* A phone: one row of chips that scrolls sideways, with the hints left for wider screens (kept for
-              screen readers; each chip is `relative`, or the sr-only hint escapes the scroll and widens the page). */}
-          <ul className="flex gap-2 max-sm:-mx-4 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 sm:flex-wrap">
-            {BOARD_VIEWS.map((v) => (
-              <li key={v.view} className="max-sm:shrink-0">
-                <button
-                  type="button"
-                  aria-pressed={view === v.view}
-                  onClick={() => choose(v.view)}
-                  className={`relative flex min-h-11 flex-col items-start border px-3 py-2 text-start max-sm:justify-center max-sm:whitespace-nowrap max-sm:rounded-full ${
-                    view === v.view ? "border-highlight bg-card" : "border-border/60 hover:border-accent"
-                  }`}
-                >
-                  <span className="flex items-baseline gap-2 text-sm font-medium">
-                    {v.label}
-                    <span className="font-heading text-accent">{requests.isSuccess ? rowsOf(v.view).length : "–"}</span>
-                  </span>
-                  <span className="text-sm text-muted-foreground max-sm:sr-only">{v.hint}</span>
-                </button>
-              </li>
-            ))}
+              screen readers; each chip is `relative`, or the sr-only hint escapes the scroll and widens the page).
+              Wider: a grid of stage cards. */}
+          <ul className="flex gap-3 max-sm:-mx-4 max-sm:overflow-x-auto max-sm:px-4 max-sm:pb-1 sm:grid sm:grid-cols-3 lg:grid-cols-5">
+            {BOARD_VIEWS.map((v) => {
+              const active = view === v.view;
+              const count = requests.isSuccess ? rowsOf(v.view).length : null;
+              return (
+                <li key={v.view} className="max-sm:shrink-0">
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => choose(v.view)}
+                    className={`relative flex min-h-11 w-full flex-col items-start overflow-hidden rounded-xl border bg-card text-start transition-colors max-sm:justify-center max-sm:whitespace-nowrap max-sm:rounded-full max-sm:px-4 max-sm:py-2 sm:h-full sm:p-4 ${
+                      active ? "border-primary shadow-sm ring-1 ring-primary" : "border-border hover:border-accent"
+                    }`}
+                  >
+                    {active ? <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-primary max-sm:hidden" /> : null}
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span className={`text-sm font-semibold sm:font-heading sm:text-base sm:font-bold ${active ? "text-accent" : ""}`}>{v.label}</span>
+                      <span
+                        className={`font-heading font-bold tabular-nums ${
+                          active
+                            ? "inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
+                            : count
+                              ? "text-accent sm:text-xl"
+                              : "text-muted-foreground sm:text-xl"
+                        }`}
+                      >
+                        {count ?? "–"}
+                      </span>
+                    </span>
+                    <span className="mt-1 text-sm text-muted-foreground max-sm:sr-only">{v.hint}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
-        <div>
-          <label htmlFor="masleka-search" className="sr-only">
-            חיפוש לקוח
-          </label>
-          <input
-            id="masleka-search"
-            type="search"
-            placeholder="חיפוש לקוח"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="min-h-11 w-full max-w-sm border border-border bg-background px-3 py-2 text-sm"
-          />
+        <div className="card-raised flex items-center gap-2 p-3">
+          <div className="relative w-full max-w-md">
+            <label htmlFor="masleka-search" className="sr-only">
+              חיפוש לקוח
+            </label>
+            <Search size={16} aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="masleka-search"
+              type="search"
+              placeholder="חיפוש לקוח"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="min-h-11 w-full rounded-xl border border-border bg-background py-2 pe-3 ps-9 text-sm focus:outline-none focus:ring-2 focus:ring-highlight/40"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            disabled={requests.isFetching}
+            aria-label="רענון רשימה"
+            title="רענון רשימה"
+            className={`${buttonClass} ms-auto w-11 shrink-0 px-0`}
+          >
+            <RefreshCw size={16} aria-hidden="true" className={requests.isFetching ? "animate-spin" : undefined} />
+          </button>
         </div>
 
         {requests.isSuccess && shownRows.length === 0 ? (
-          <p className="border border-border/60 bg-card p-6 text-center text-sm text-muted-foreground">
+          <p className="card-raised p-8 text-center text-sm text-muted-foreground">
             אין כאן כלום כרגע. בקשות חדשות יופיעו כאן לבד.
           </p>
         ) : (
@@ -1086,26 +1118,34 @@ export default function MaslekaBoard({
           ) : null
         ) : null}
 
-        <section id="masleka-how" aria-labelledby="masleka-how-title" className="scroll-mt-6 border-t border-border/60 pt-8">
-          <h2 id="masleka-how-title" className="font-heading text-2xl">
-            איך בקשה מתקדמת
-          </h2>
-          <ol className="mt-4 grid gap-4 md:grid-cols-4">
+        <section id="masleka-how" aria-labelledby="masleka-how-title" className="card-raised scroll-mt-6 p-5 md:p-7 !mt-10">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="masleka-how-title" className="flex items-center gap-3 font-heading text-2xl font-bold">
+              <span aria-hidden="true" className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-highlight/10 text-accent">
+                <Route size={20} />
+              </span>
+              איך בקשה מתקדמת
+            </h2>
+            <Link to="/admin/masleka/guide" className="inline-flex min-h-11 items-center text-sm font-medium text-accent hover:underline">
+              מדריך: הרשמה כיועץ במסלקה
+            </Link>
+          </div>
+          <ol className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {HOW_IT_WORKS.map((step, i) => (
-              <li key={step.title} className="border border-border/60 bg-card p-4">
-                <p className="flex items-center gap-3 font-medium">
-                  <StepDot step={i + 1} />
+              <li key={step.title} className="rounded-xl border border-border bg-secondary/40 p-4">
+                <p className="flex items-center gap-3 font-heading font-bold">
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm text-primary-foreground"
+                  >
+                    {i + 1}
+                  </span>
                   {step.title}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">{step.text}</p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
               </li>
             ))}
           </ol>
-          <p className="mt-4 text-sm">
-            <Link to="/admin/masleka/guide" className="inline-flex min-h-11 items-center underline">
-              מדריך: הרשמה כיועץ במסלקה
-            </Link>
-          </p>
         </section>
       </main>
 

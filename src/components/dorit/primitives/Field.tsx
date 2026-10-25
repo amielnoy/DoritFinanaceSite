@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /** The text-control styling shared by every form on the site — 48px, transparent, hairline, gold focus. */
 export const inputClass = (className?: string) =>
   cn(
-    "w-full min-h-12 rounded-md bg-transparent border border-input px-3.5 py-2.5 text-[17px] text-foreground placeholder:text-muted-foreground caret-highlight",
+    "w-full min-h-12 rounded-xl bg-card border border-input shadow-sm px-3.5 py-2.5 text-[17px] text-foreground placeholder:text-muted-foreground caret-highlight",
     "hover:border-foreground/45 focus:outline-none focus:border-highlight focus:ring-[3px] focus:ring-highlight/20 transition-colors",
     "aria-[invalid=true]:border-destructive",
     className

@@ -17,6 +17,8 @@
   "header.callAria": "התקשרות לדורית גוב ארי",
   "header.menu": "תפריט",
   "header.closeMenu": "סגירת תפריט",
+  "header.themeLight": "מצב יום",
+  "header.themeDark": "מצב לילה",
   "header.login": "כניסה ללקוחות",
   "header.account": "האזור שלי",
   "header.logout": "יציאה",

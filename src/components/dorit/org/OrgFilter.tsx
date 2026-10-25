@@ -8,7 +8,7 @@ import { OrgMark } from "./OrgBadge";
 export const PILL_LIMIT = 6;
 
 const PILL =
-  "inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-[15px] transition-colors aria-pressed:border-highlight aria-pressed:bg-highlight/10 aria-pressed:text-accent hover:border-highlight";
+  "inline-flex min-h-11 items-center gap-2 rounded-full border bg-card px-4 text-[15px] font-semibold transition-colors aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground hover:border-highlight";
 
 /**
  * Filtering by organization: "כל הארגונים" and one button per organization
@@ -77,7 +77,7 @@ function OrgMultiSelect({
             aria-label="חיפוש ארגון"
             aria-controls={listId}
             placeholder="חיפוש ארגון…"
-            className="mb-2 w-full rounded-md border border-border bg-background px-3 py-2 text-[15px]"
+            className="mb-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-[15px]"
           />
           <ul id={listId} aria-label="ארגונים" className="m-0 max-h-72 list-none overflow-y-auto p-0">
             {shown.map((o) => (

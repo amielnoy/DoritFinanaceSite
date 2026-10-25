@@ -12,6 +12,8 @@ import { adminHome } from "@/components/dorit/admin/adminNav";
 import CountBadge from "@/components/dorit/admin/CountBadge";
 import SupportLink from "./SupportLink";
 import LanguageSwitcher from "./LanguageSwitcher";
+import ThemeSwitch from "@/components/dorit/primitives/ThemeSwitch";
+import { useTheme } from "@/hooks/useTheme";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
 import type { KeyOf } from "@/i18n/resources";
 
@@ -69,6 +71,7 @@ const AdminMenu = lazy(() => import("@/components/dorit/admin/AdminMenu"));
 export default function FloatingHeader() {
   const { contact } = useAgencyContent();
   const [open, setOpen] = useState<boolean>(false);
+  const [dark, setDark] = useTheme();
   const navigateToSection = useSectionNav();
   const { isAuthenticated, isLoadingAuth, user, logout } = useAuth();
   // Not while the auth check is still answering: a signed-in visitor would see
@@ -123,7 +126,7 @@ export default function FloatingHeader() {
           onClick={(e) => goToSection(e, "#top")}
           className="flex items-center gap-3 leading-none"
         >
-          <span className="hidden sm:flex w-[38px] h-[38px] shrink-0 items-center justify-center border border-highlight font-heading text-[19px] text-accent">
+          <span className="hidden sm:flex w-10 h-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground font-heading text-lg font-bold shadow-sm">
             {t("brand.monogram")}
           </span>
           <span className="flex flex-col leading-none">
@@ -138,6 +141,7 @@ export default function FloatingHeader() {
 
         <div className="flex items-center gap-2.5">
           <LanguageSwitcher className="hidden md:inline-flex" />
+          <ThemeSwitch dark={dark} onChange={setDark} className="hidden md:flex" />
           {access ? (
             <div className="hidden md:block">
               <Suspense fallback={null}>
@@ -176,6 +180,8 @@ export default function FloatingHeader() {
             className="md:hidden p-3"
             onClick={() => setOpen((v) => !v)}
             aria-label={t("header.menu")}
+            aria-expanded={open}
+            aria-controls={open ? "mobile-menu" : undefined}
           >
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -235,6 +241,7 @@ export default function FloatingHeader() {
               onClick={() => setOpen(false)}
             />
             <motion.div
+              id="mobile-menu"
               className="md:hidden fixed top-0 right-0 bottom-0 z-[70] w-[86%] max-w-sm bg-background border-l border-border flex flex-col"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
@@ -304,6 +311,7 @@ export default function FloatingHeader() {
 
               <div className="px-6 py-5 border-t border-border/60 space-y-3">
                 <LanguageSwitcher className="flex w-full justify-center" />
+                <ThemeSwitch dark={dark} onChange={setDark} className="w-fit mx-auto" />
                 <a
                   href={lp("/#start")}
                   onClick={(e) => goToSection(e, "#start")}

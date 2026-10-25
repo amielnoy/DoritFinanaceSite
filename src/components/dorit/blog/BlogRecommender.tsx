@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import AgentChat from "@/components/dorit/chat/AgentChat";
 import { AGENTS } from "@/config/agents";
 import { CONSENT } from "@/config/compliance";
@@ -41,12 +41,15 @@ export default function BlogRecommender({
     <section
       aria-labelledby="blog-recommender-title"
       data-track-location="blog_recommender"
-      className="border border-border rounded-md bg-card p-6 md:p-8"
+      className="card-raised p-6 md:p-10 md:text-center"
     >
-      <h2 id="blog-recommender-title" className="font-heading text-2xl md:text-3xl text-foreground">
+      <span className="hidden md:flex mx-auto mb-4 w-12 h-12 rounded-full bg-highlight/10 items-center justify-center text-accent" aria-hidden="true">
+        <Sparkles size={22} />
+      </span>
+      <h2 id="blog-recommender-title" className="font-heading font-bold text-2xl md:text-3xl text-foreground">
         לא בטוחים מאיפה להתחיל?
       </h2>
-      <form onSubmit={submit} className="mt-4 flex flex-col sm:flex-row gap-3">
+      <form onSubmit={submit} className="mt-5 flex flex-col sm:flex-row gap-3 md:max-w-3xl md:mx-auto">
         <label htmlFor="blog-recommender-input" className="sr-only">
           ספרו בקצרה מה קרה אצלכם
         </label>

@@ -67,28 +67,28 @@ export default function PensionFeeCalculator() {
   );
 
   return (
-    <section id={TOOL_SECTION.feeCalculator} className="relative py-24 md:py-32 border-t border-border/60">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-10 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
-        <div className="lg:col-span-5 flex flex-col justify-center">
+    <section id={TOOL_SECTION.feeCalculator} className="relative py-16 md:py-24 border-t border-border scroll-mt-28">
+      <div className="max-w-[1200px] mx-auto px-[clamp(20px,4vw,40px)] grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+        <div className="lg:col-span-12 max-w-3xl mb-4">
           <Eyebrow>
             {t("fee.eyebrow")}
           </Eyebrow>
-          <h2 className="font-heading text-5xl md:text-6xl mt-5 leading-tight">
+          <h2 className="font-heading font-bold text-[clamp(28px,3.2vw,40px)] mt-4 leading-tight">
             {t("fee.titleLine1")}
-            <br />
+            <br className="sm:hidden" />{" "}
             {t("fee.titleLine2")}
           </h2>
-          <p className="mt-8 text-foreground/70 max-w-md leading-relaxed">
+          <p className="mt-4 text-foreground/75 leading-relaxed">
             <Glossed text={t("fee.intro")} />
           </p>
-          <div className="mt-10 flex items-center gap-3 text-sm text-muted-foreground">
-            <Calculator size={16} className="text-accent" />
+          <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
+            <Calculator size={16} className="text-accent" aria-hidden="true" />
             <span>{t("fee.estimate")}</span>
           </div>
         </div>
 
-        <div className="lg:col-span-7 bg-card border border-border/60 p-8 md:p-12">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="lg:col-span-5 card-raised p-6 md:p-8 lg:sticky lg:top-32">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-5">
             <NumField
               label={t("fee.deposit")}
               value={monthlyDeposit}
@@ -117,7 +117,7 @@ export default function PensionFeeCalculator() {
               step={0.05}
               range={PENSION_FEE_RANGES.annualFee}
             />
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 lg:col-span-1">
               <NumField
                 label={t("fee.return")}
                 value={annualReturn}
@@ -127,8 +127,10 @@ export default function PensionFeeCalculator() {
               />
             </div>
           </div>
+        </div>
 
-          <div className="mt-10 grid grid-cols-2 gap-4">
+        <div className="lg:col-span-7 flex flex-col gap-6">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <ResultCard
               icon={PiggyBank}
               label={t("fee.totalDeposited")}
@@ -152,8 +154,11 @@ export default function PensionFeeCalculator() {
             />
           </div>
 
-          <div className="mt-6 p-5 bg-background border border-border/60">
-            <p className="text-sm text-foreground/70 leading-relaxed">
+          <div className="flex items-start gap-4 rounded-2xl border border-highlight/25 bg-highlight/10 p-5 md:p-6">
+            <span className="shrink-0 w-11 h-11 rounded-xl bg-primary text-primary-foreground flex items-center justify-center" aria-hidden="true">
+              <Wallet size={20} strokeWidth={1.75} />
+            </span>
+            <p className="text-[15px] text-foreground/80 leading-relaxed">
               {t("fee.sumTotal")}{" "}
               <span className="font-semibold text-foreground">
                 {ils(result.totalFees)}
@@ -172,11 +177,11 @@ export default function PensionFeeCalculator() {
 
           {/* The strongest moment on the site, turned into a lead: right after
               the result, the clearinghouse check that shows the real fees. */}
-          <div className="mt-8">
+          <div>
             <PensionCheckForm location="calculator_check" context="אחרי מחשבון דמי הניהול" heading={tp("form.calculatorHeadline")} />
           </div>
 
-          <CalculatorLeadBox className="mt-8" message={feeCalculatorMessageIn(locale, { monthlyDeposit, years }, result)}>
+          <CalculatorLeadBox message={feeCalculatorMessageIn(locale, { monthlyDeposit, years }, result)}>
             <CtaLink muted href={lp("/#start")} className="max-sm:w-full">
               {t("fee.ask")}
             </CtaLink>
@@ -204,7 +209,7 @@ function NumField({ label, value, onChange, step = 1, range }: NumFieldProps) {
   };
   return (
     <div>
-      <label htmlFor={id} className="block text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+      <label htmlFor={id} className="block text-sm font-medium text-foreground/80 mb-2">
         {label}
       </label>
       <input
@@ -216,7 +221,7 @@ function NumField({ label, value, onChange, step = 1, range }: NumFieldProps) {
         step={step}
         onChange={(e) => onChange(e.target.value)}
         onBlur={settle}
-        className="w-full bg-background border border-border px-4 py-3 text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
+        className="w-full rounded-xl bg-secondary/60 border border-input px-4 py-3 text-base font-medium focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 transition-colors"
       />
     </div>
   );
@@ -225,15 +230,13 @@ function NumField({ label, value, onChange, step = 1, range }: NumFieldProps) {
 function ResultCard({ icon: Icon, label, value, highlight }: ResultCardProps) {
   return (
     <div
-      className={`p-4 border ${
-        highlight ? "border-highlight-muted/50 bg-highlight-muted/5" : "border-border/50 bg-background"
-      }`}
+      className={`card-raised p-4 sm:p-5 ${highlight ? "!border-highlight/40" : ""}`}
     >
-      <div className="flex items-center gap-2 text-xs tracking-[0.15em] uppercase text-muted-foreground mb-2">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
         <Icon size={14} className={highlight ? "text-highlight-ink" : "text-accent"} />
         {label}
       </div>
-      <p className={`font-heading text-2xl ${highlight ? "text-highlight-ink" : "text-foreground"}`}>
+      <p className={`font-heading font-extrabold text-[clamp(22px,2.4vw,30px)] leading-tight lining-nums tabular-nums ${highlight ? "text-accent" : "text-foreground"}`}>
         {value}
       </p>
     </div>

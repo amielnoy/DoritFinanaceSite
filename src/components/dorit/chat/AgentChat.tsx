@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { ChevronDown, Loader2, MessageCircle, RotateCcw, Send, Sparkles, UserRound, X } from "lucide-react";
+import { CircleCheck, CircleX, ChevronDown, Loader2, MessageCircle, RotateCcw, Send, Sparkles, UserRound, X } from "lucide-react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { AnimatePresence, motion } from "framer-motion";
 import { services } from "@/services";
@@ -726,23 +726,32 @@ export default function AgentChat({
   const fence = (className: string) =>
     descriptor.guardrails ? (
       <div className={className}>
-        <p className="text-sm text-accent">כללי הגדר</p>
-        <dl className="mt-4 space-y-3.5 text-[15px] leading-[1.7]">
-          <div>
-            <dt className="text-sm text-accent">מה הוא עושה</dt>
-            <dd className="text-foreground/80">
+        <p className="font-heading font-bold text-[17px]">כללי הגדר</p>
+        <dl className="mt-4 space-y-3 text-[15px] leading-[1.7]">
+          <div className={FENCE_CARD}>
+            <dt className="flex items-center gap-2 text-sm font-semibold text-accent">
+              <CircleCheck size={16} aria-hidden="true" />
+              מה הוא עושה
+            </dt>
+            <dd className="mt-1 text-foreground/80">
               {descriptor.guardrails.allowed.join(" · ")}
             </dd>
           </div>
-          <div>
-            <dt className="text-sm text-accent">מה הוא לא עושה</dt>
-            <dd className="text-foreground/80">
+          <div className={FENCE_CARD}>
+            <dt className="flex items-center gap-2 text-sm font-semibold text-destructive">
+              <CircleX size={16} aria-hidden="true" />
+              מה הוא לא עושה
+            </dt>
+            <dd className="mt-1 text-foreground/80">
               {descriptor.guardrails.forbidden.join(" · ")}
             </dd>
           </div>
-          <div>
-            <dt className="text-sm text-accent">מתי עובר לאדם</dt>
-            <dd className="text-foreground/80">{descriptor.guardrails.handoff}</dd>
+          <div className={FENCE_CARD}>
+            <dt className="flex items-center gap-2 text-sm font-semibold text-accent">
+              <UserRound size={16} aria-hidden="true" />
+              מתי עובר לאדם
+            </dt>
+            <dd className="mt-1 text-foreground/80">{descriptor.guardrails.handoff}</dd>
           </div>
         </dl>
       </div>
@@ -752,7 +761,7 @@ export default function AgentChat({
     ? "fixed inset-x-0 top-0 z-[100] h-[100dvh] flex flex-col overflow-y-auto overscroll-contain bg-background outline-none"
     : sheet
       ? "hidden"
-      : `${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-md shadow-sm flex flex-col h-[560px] overflow-y-auto`;
+      : `${embedded ? "w-full" : "lg:col-span-7"} border border-input rounded-2xl bg-card shadow-sm flex flex-col h-[560px] overflow-y-auto`;
 
   // The chat itself. Rendered alone when embedded, or beside the heading
   // column below when the agent is the whole section.
@@ -1143,8 +1152,8 @@ export default function AgentChat({
            * explanation that stood here — a screen of it — is one tap away in
            * the <details>, word for word, and the chat is a layer of its own.
            */
-          <div className="border border-border/60 bg-secondary/30 px-5 py-6">
-            <h2 className="font-heading font-normal text-[28px] leading-[1.2]">
+          <div className="card-raised px-5 py-6">
+            <h2 className="font-heading font-bold text-[26px] leading-[1.2]">
               {[line1, line2].filter(Boolean).map((l) => l!.trim()).join(" ")}
             </h2>
             <p className="mt-3 text-base leading-relaxed text-foreground/75">{sheet.cardText}</p>
@@ -1162,7 +1171,7 @@ export default function AgentChat({
               // The brief asked for a filled button; the system's CTA is "an
               // outline, never a fill" (primitives/Cta.tsx). The hero's answer
               // to the same tension is reused: a heavier border and a tint.
-              className={ctaClass("mt-5 w-full border-2 bg-highlight/[0.08] hover:bg-highlight/[0.18]")}
+              className={ctaClass("mt-5 w-full")}
             >
               <MessageCircle size={18} aria-hidden="true" />
               {sheet.openLabel}
@@ -1192,7 +1201,7 @@ export default function AgentChat({
             <Eyebrow>
               {descriptor.eyebrow}
             </Eyebrow>
-            <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-5 leading-[1.12]">
+            <h2 className="font-heading font-bold text-[clamp(30px,3.4vw,42px)] mt-5 leading-[1.15]">
               {line1?.trim()}
               {line2 ? (
                 <>
@@ -1208,7 +1217,7 @@ export default function AgentChat({
             </div>
 
             {descriptor.tagline ? (
-              <p className="mt-8 border-r border-highlight pr-[18px] font-heading text-[21px] leading-[1.6]">
+              <p className="mt-8 rounded-2xl border border-highlight/25 bg-highlight/10 px-6 py-5 font-heading font-semibold text-[19px] leading-[1.6] text-accent">
                 {descriptor.tagline}
               </p>
             ) : null}
@@ -1222,3 +1231,5 @@ export default function AgentChat({
     </section>
   );
 }
+
+const FENCE_CARD = "rounded-xl border border-border bg-card px-4 py-3.5 shadow-sm";

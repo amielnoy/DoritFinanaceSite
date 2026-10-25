@@ -54,7 +54,7 @@ describe("open meeting requests on the leads row", () => {
     const row = await within(nav()).findByRole("link", { name: /^פניות ופגישות\s*4 לא שויכו\s*2 בקשות שינוי$/ });
     const badge = within(row).getByText("2 בקשות שינוי").parentElement!;
     expect(badge).toHaveClass("bg-destructive");
-    expect(within(row).getByText("4 לא שויכו").parentElement).toHaveClass("bg-accent");
+    expect(within(row).getByText("4 לא שויכו").parentElement).toHaveClass("bg-amber-700");
   });
 
   it("shows nothing for none, and keeps the leads' counter", async () => {

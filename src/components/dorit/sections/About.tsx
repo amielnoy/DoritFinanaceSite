@@ -68,7 +68,7 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
             <Eyebrow>
               {t("about.eyebrow")}
             </Eyebrow>
-            <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-5 leading-[1.12]">
+            <h2 className="font-heading font-bold text-[clamp(32px,3.6vw,44px)] mt-5 leading-[1.15] tracking-[-0.01em]">
               {t("about.titleLine1")}
               <br />
               {t("about.titleLine2")}
@@ -132,16 +132,16 @@ export default function About({ variant = "full" }: { variant?: "full" | "brief"
           )}
 
           {stats.length === 0 ? null : (
-          <div className={`mt-8 grid ${STAT_COLUMNS[Math.min(stats.length, 3)]} border-y border-border${brief ? " max-md:mt-6" : ""}`}>
+          <div className={`mt-8 grid ${STAT_COLUMNS[Math.min(stats.length, 3)]} gap-3 sm:gap-4${brief ? " max-md:mt-6" : ""}`}>
             {stats.map(({ num, label }, i) => (
               <div
                 key={i}
-                className={`px-2 py-6 flex flex-col items-center gap-2 text-center ${i > 0 ? "border-s border-border" : ""}${brief ? " max-md:py-4" : ""}`}
+                className={`card-raised px-2 py-6 flex flex-col items-center gap-2 text-center${brief ? " max-md:py-4" : ""}`}
               >
-                <p className="font-heading text-[clamp(36px,4vw,52px)] text-accent leading-none lining-nums tabular-nums">
+                <p className="font-heading font-extrabold text-[clamp(30px,3.4vw,42px)] tracking-[-0.02em] text-accent leading-none lining-nums tabular-nums">
                   {num}
                 </p>
-                <p className="text-[15px] text-muted-foreground">
+                <p className="text-[15px] font-medium text-muted-foreground">
                   {label}
                 </p>
               </div>

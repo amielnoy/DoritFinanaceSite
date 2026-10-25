@@ -140,7 +140,7 @@ export default function FAQPage() {
             <Eyebrow className="max-md:hidden">
               {t("page.name")}
             </Eyebrow>
-            <h1 className="font-heading text-4xl md:text-6xl md:mt-5 leading-tight max-w-3xl">
+            <h1 className="font-heading font-extrabold text-4xl md:text-[clamp(44px,5vw,64px)] md:mt-5 leading-[1.1] tracking-[-0.02em] max-w-3xl">
               {t("page.titleLine1")}{" "}
               <br className="max-md:hidden" />
               {t("page.titleLine2")}
@@ -190,14 +190,14 @@ export default function FAQPage() {
                         aria-pressed={active}
                         onClick={(e) => selectTopic(cat.id, e.currentTarget)}
                         onFocus={(e) => revealTopic(e.currentTarget)}
-                        className={`flex items-center gap-3 px-5 py-4 border transition-all duration-300 text-start whitespace-nowrap lg:whitespace-normal max-md:shrink-0 max-md:min-h-11 max-md:px-4 max-md:py-2 ${
+                        className={`flex items-center gap-3 px-5 py-4 rounded-xl border transition-all duration-300 text-start whitespace-nowrap lg:whitespace-normal max-md:shrink-0 max-md:min-h-11 max-md:px-4 max-md:py-2 ${
                           active
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "border-border hover:border-accent hover:bg-secondary/40"
+                            ? "bg-primary text-primary-foreground border-primary shadow-md"
+                            : "bg-card border-border shadow-sm hover:border-accent"
                         }`}
                       >
-                        <cat.icon size={18} className={`max-md:hidden ${active ? "text-highlight" : "text-accent"}`} />
-                        <span className="font-heading text-lg max-md:text-base">{cat.label}</span>
+                        <cat.icon size={18} className={`max-md:hidden ${active ? "text-primary-foreground" : "text-accent"}`} aria-hidden="true" />
+                        <span className="font-heading font-semibold text-lg max-md:text-base">{cat.label}</span>
                       </button>
                     );
                   })}
@@ -205,8 +205,8 @@ export default function FAQPage() {
 
                 {/* Below md the support chat's card says this directly
                     underneath, and the CTA band after it. */}
-                <div className="mt-8 p-6 border border-border/60 bg-secondary/30 max-md:hidden">
-                  <p className="font-heading text-xl mb-2">{t("page.notFoundTitle")}</p>
+                <div className="mt-8 p-6 card-raised max-md:hidden">
+                  <p className="font-heading font-bold text-xl mb-2">{t("page.notFoundTitle")}</p>
                   <p className="text-sm text-foreground/70 leading-relaxed mb-5">
                     {t("page.notFoundText")}
                   </p>
@@ -238,8 +238,8 @@ export default function FAQPage() {
                   className="max-md:scroll-mt-[148px]"
                 >
                   <div className="mb-6 max-md:mb-4">
-                    <h2 className="font-heading text-3xl md:text-4xl">{cat.label}</h2>
-                    <p className="text-sm tracking-[0.2em] uppercase text-accent mt-2">
+                    <h2 className="font-heading font-bold text-3xl md:text-4xl">{cat.label}</h2>
+                    <p className="text-sm font-semibold tracking-[0.08em] uppercase text-accent mt-2">
                       {he ? `${cat.labelEn} · ` : ""}{t("page.count", { count: cat.items.length })}
                     </p>
                   </div>
@@ -247,18 +247,18 @@ export default function FAQPage() {
                     {...(isDesktop
                       ? { type: "single" as const, collapsible: true }
                       : { type: "multiple" as const })}
-                    className="border-t border-border/60"
+                    className="flex flex-col gap-3"
                   >
                     {cat.items.map((item) => (
                       <AccordionItem
                         key={item.id}
                         value={item.id}
-                        className="border-b border-border/60"
+                        className="card-raised px-5 md:px-6 transition-shadow hover:shadow-md"
                       >
-                        <AccordionTrigger className="text-start text-lg md:text-xl font-heading py-6 max-md:py-4 hover:no-underline hover:text-accent transition-colors [&[data-state=open]>svg]:text-highlight">
+                        <AccordionTrigger className="text-start text-lg md:text-xl font-heading font-semibold py-5 max-md:py-4 hover:no-underline hover:text-accent transition-colors data-[state=open]:text-accent [&[data-state=open]>svg]:text-accent">
                           {item.q}
                         </AccordionTrigger>
-                        <AccordionContent className="text-foreground/70 leading-relaxed text-base pb-6">
+                        <AccordionContent className="text-foreground/80 leading-relaxed text-base pb-6">
                           <Glossed text={item.a} />
                         </AccordionContent>
                       </AccordionItem>
@@ -278,21 +278,21 @@ export default function FAQPage() {
         {he ? <AgentChat descriptor={AGENTS.support} /> : null}
 
         {/* CTA */}
-        <section data-track-location="faq" className="relative py-12 md:py-32 border-t border-border/60 bg-primary text-primary-foreground">
+        <section data-track-location="faq" className="relative py-12 md:py-24 bg-primary text-primary-foreground">
           <div className="max-w-3xl mx-auto px-6 text-center">
             <Reveal>
-              <h2 className="font-heading text-3xl md:text-5xl leading-tight">
+              <h2 className="font-heading font-extrabold text-3xl md:text-5xl leading-tight">
                 {t("page.ctaTitle")}
               </h2>
-              <p className="mt-3 md:mt-6 text-primary-foreground/70 leading-relaxed">
+              <p className="mt-3 md:mt-6 text-muted-foreground-on-dark leading-relaxed">
                 {t("page.ctaText")}
               </p>
               {/* Below md: one row, a grid of three, each a label under its icon. */}
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 max-md:mt-6 max-md:grid max-md:grid-cols-3 max-md:gap-2 max-md:items-stretch">
-                <CtaLink href={lp("/#start")} className={CTA_CELL}>{t("page.ctaMeeting")}</CtaLink>
+                <CtaLink href={lp("/#start")} className={`border-white bg-white text-primary shadow-md hover:bg-white/90 ${CTA_CELL}`}>{t("page.ctaMeeting")}</CtaLink>
                 <a
                   href={`tel:${contact.phoneE164}`}
-                  className={`inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors ${CTA_CELL}`}
+                  className={`inline-flex items-center gap-2 min-h-12 px-7 rounded-xl border border-primary-foreground/40 text-primary-foreground font-semibold hover:bg-white/10 transition-colors ${CTA_CELL}`}
                 >
                   <Phone size={18} className="shrink-0" />
                   <span dir="ltr" className="max-md:hidden">{contact.phoneDisplay}</span>
@@ -302,7 +302,7 @@ export default function FAQPage() {
                   href={`https://wa.me/${contact.whatsapp}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`inline-flex items-center gap-2 px-7 py-3.5 border border-primary-foreground/30 text-primary-foreground font-medium hover:border-highlight hover:text-highlight transition-colors ${CTA_CELL}`}
+                  className={`inline-flex items-center gap-2 min-h-12 px-7 rounded-xl border border-primary-foreground/40 text-primary-foreground font-semibold hover:bg-white/10 transition-colors ${CTA_CELL}`}
                 >
                   <MessageCircle size={18} className="shrink-0" />
                   WhatsApp
@@ -310,7 +310,7 @@ export default function FAQPage() {
               </div>
               <Link
                 to={lp("/")}
-                className="mt-10 max-md:mt-6 inline-flex items-center gap-1 text-sm text-primary-foreground/60 hover:text-highlight transition-colors"
+                className="mt-10 max-md:mt-6 inline-flex items-center gap-1 text-sm text-muted-foreground-on-dark hover:text-highlight transition-colors"
               >
                 <ChevronLeft size={16} className="ltr:rotate-180" />
                 {t("page.backHome")}

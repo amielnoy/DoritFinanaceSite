@@ -152,11 +152,13 @@ describe("the tabs", () => {
       agendaMeeting("m-held", "l-3", "2026-10-21T08:00:00Z", { status: "done" }),
     ];
     show();
+    const card = (name: string) => screen.getByRole("heading", { name }).closest("section")!;
     await waitFor(() => expect(tab(/^פניות/).textContent).toContain("4"));
     // New (l-1, l-3) and escalated (l-4); l-3 nobody's.
-    expect(tab(/^פניות/).textContent).toContain("3 דורשות טיפול · 1 לא שויכו");
-    await waitFor(() => expect(tab(/^פגישות/).textContent).toContain("2 השבוע"));
-    expect(tab(/^פגישות/).textContent).toContain("1 היום · 1 בקשות שינוי · 1 בלי סיכום");
+    expect(card("לידים פעילים").textContent).toContain("3 דורשות טיפול · 1 לא שויכו");
+    await waitFor(() => expect(tab(/^פגישות/).textContent).toContain("2"));
+    expect(card("פגישות השבוע").textContent).toContain("1 היום");
+    expect(card("משימות פתוחות").textContent).toContain("1 בקשות שינוי · 1 בלי סיכום");
   });
 
   it("switch on a click and keep the choice in the URL, beside ?agency=", async () => {
@@ -212,9 +214,11 @@ describe("the leads tab, by role", () => {
     // Every role may change a status and export.
     expect(screen.getAllByRole("combobox", { name: /סטטוס הפנייה/ })).toHaveLength(4);
     expect(screen.getByRole("button", { name: /ייצוא הכל/ })).toBeInTheDocument();
-    // A User's tab keeps the screen's old name, without the unassigned count.
-    expect(tab(adminPlus ? /^פניות/ : /^הפניות שלי/).textContent).toContain(adminPlus ? "לא שויכו" : "דורשות טיפול");
-    if (!adminPlus) expect(tab(/^הפניות שלי/).textContent).not.toContain("לא שויכו");
+    // A User's tab keeps the screen's old name, and the active-leads card leaves out the unassigned count.
+    expect(tab(adminPlus ? /^פניות/ : /^הפניות שלי/)).toBeInTheDocument();
+    const active = screen.getByRole("heading", { name: "לידים פעילים" }).closest("section")!;
+    expect(active.textContent).toContain("דורשות טיפול");
+    expect(active.textContent?.includes("לא שויכו")).toBe(adminPlus);
   });
 });
 

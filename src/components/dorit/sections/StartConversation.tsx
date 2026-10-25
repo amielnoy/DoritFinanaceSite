@@ -67,104 +67,128 @@ export default function StartConversation() {
           narrower the viewport, since centering stops adding its own margin
           below the 1400px breakpoint. */}
       <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] md:pl-20 py-[clamp(72px,9vw,120px)] flex flex-col gap-10 max-md:py-10">
-        <Reveal>
-          <Eyebrow>{t("start.eyebrow")}</Eyebrow>
-          <h2 className="font-heading font-normal text-[clamp(34px,4vw,48px)] mt-[18px] leading-[1.12] max-w-[880px] [text-wrap:balance]">
-            {t("start.title")}
-          </h2>
-        </Reveal>
+        {/* The heading, the questionnaire and the two direct ways in, in one
+            raised card; the chat opens below it. */}
+        <div className="card-raised w-full max-w-[880px] mx-auto p-6 sm:p-10 flex flex-col gap-8 max-md:p-5 max-md:gap-6">
+          <Reveal className="text-center">
+            <Eyebrow>{t("start.eyebrow")}</Eyebrow>
+            <h2 className="font-heading font-extrabold text-[clamp(26px,3vw,34px)] mt-4 leading-[1.2] [text-wrap:balance]">
+              {t("start.title")}
+            </h2>
+          </Reveal>
 
-        {/* A 15-minute phone call on Dorit's diary, first, once VITE_CAL_LINK is
-            set (growth brief, 2026-10-14); the questionnaire below becomes the
-            second path. Unset, the section is as it was. */}
-        {bookingUrl ? (
-          <div data-track-location="start_booking" className="max-w-[880px] w-full rounded-[4px] border border-highlight p-5 md:p-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="m-0 font-heading text-xl md:text-2xl">{t("start.calTitle")}</p>
-              <p className="m-0 mt-1 text-[15px] text-muted-foreground">{t("start.calText")}</p>
+          {/* A 15-minute phone call on Dorit's diary, first, once VITE_CAL_LINK is
+              set (growth brief, 2026-10-14); the questionnaire below becomes the
+              second path. Unset, the section is as it was. */}
+          {bookingUrl ? (
+            <div data-track-location="start_booking" className="w-full rounded-xl border border-highlight p-5 md:p-6 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="m-0 font-heading text-xl md:text-2xl">{t("start.calTitle")}</p>
+                <p className="m-0 mt-1 text-[15px] text-muted-foreground">{t("start.calText")}</p>
+              </div>
+              <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className={ctaClass("max-sm:w-full")}>
+                <CalendarDays size={18} aria-hidden="true" /> {t("start.calButton")}
+              </a>
             </div>
-            <a href={bookingUrl} target="_blank" rel="noopener noreferrer" className={ctaClass("max-sm:w-full")}>
-              <CalendarDays size={18} aria-hidden="true" /> {t("start.calButton")}
+          ) : null}
+
+          {/* The wizard, where the interview chat used to be. `#interview` keeps
+              the interview's anchor alive; `#start`, above, is what the CTAs use. */}
+          {he ? (
+          <div id="interview" className="w-full">
+            {bookingUrl ? <p className="m-0 mb-4 text-[15px] text-muted-foreground">או, אם נוח יותר — שלוש שאלות קצרות, ודורית חוזרת אליכם:</p> : null}
+            <NeedsWizard />
+            <p className="m-0 mt-6 text-[15px] leading-[1.7] text-muted-foreground">
+              השאלון אוסף מידע לקראת הפגישה ואינו נותן ייעוץ.
+            </p>
+            <button
+              type="button"
+              onClick={() => setChatOpen((v) => !v)}
+              aria-expanded={chatOpen}
+              aria-controls="interview-chat"
+              className="mt-3 min-h-11 inline-flex items-center text-[15px] text-accent underline decoration-highlight/50 underline-offset-4 hover:decoration-highlight max-md:hidden"
+            >
+              מעדיפ/ה לכתוב במקום ללחוץ? לשיחה עם העוזר
+            </button>
+
+            {/* Below md: every other way in, as one row of chips instead of two
+                tiles, a link and a form standing open under the questionnaire.
+                WhatsApp and the phone are the tiles' own links, so click_whatsapp
+                and click_phone still report location "start"; צ'אט is the same
+                toggle as the link above, and השארת פרטים opens the form in place. */}
+            <div className="md:hidden mt-5 flex flex-col gap-2.5">
+              <p id="start-alternatives" className="m-0 text-[15px] text-muted-foreground">מעדיפים אחרת?</p>
+              <ul aria-labelledby="start-alternatives" className="m-0 p-0 list-none flex flex-wrap gap-2">
+                <li>
+                  <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noopener noreferrer" className={CHIP}>
+                    <MessageCircle size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+                    וואטסאפ
+                  </a>
+                </li>
+                <li>
+                  <a href={`tel:${contact.phoneE164}`} className={CHIP}>
+                    <Phone size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+                    טלפון
+                  </a>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setFormOpen((v) => !v)}
+                    aria-expanded={formOpen}
+                    aria-controls="quick-contact"
+                    className={CHIP}
+                  >
+                    <Send size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+                    השארת פרטים
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setChatOpen((v) => !v)}
+                    aria-expanded={chatOpen}
+                    aria-controls="interview-chat"
+                    className={CHIP}
+                  >
+                    <MessagesSquare size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+                    צ'אט
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+          ) : (
+            // English and French: the wizard and the chat speak Hebrew (their answers
+            // are Hebrew values Dorit reads), so the short form below leads instead.
+            <p className="m-0 max-w-[880px] text-[17px] leading-[1.7] text-foreground/80">{t("start.formFirst")}</p>
+          )}
+
+          {/* Two ways out of the chat, for a visitor who would rather not use it. */}
+          <div className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4${he ? " max-md:hidden" : ""}`}>
+            <a
+              href={`https://wa.me/${contact.whatsapp}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={TILE}
+            >
+              <MessageCircle size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+              {t("start.preferWhatsapp")}
+            </a>
+            <a
+              href={`tel:${contact.phoneE164}`}
+              className={TILE}
+            >
+              <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
+              {t("start.preferPhone")}
             </a>
           </div>
-        ) : null}
-
-        {/* The wizard, where the interview chat used to be. `#interview` keeps
-            the interview's anchor alive; `#start`, above, is what the CTAs use. */}
-        {he ? (
-        <div id="interview" className="max-w-[880px] w-full">
-          {bookingUrl ? <p className="m-0 mb-4 text-[15px] text-muted-foreground">או, אם נוח יותר — שלוש שאלות קצרות, ודורית חוזרת אליכם:</p> : null}
-          <NeedsWizard />
-          <p className="m-0 mt-6 text-[15px] leading-[1.7] text-muted-foreground">
-            השאלון אוסף מידע לקראת הפגישה ואינו נותן ייעוץ.
-          </p>
-          <button
-            type="button"
-            onClick={() => setChatOpen((v) => !v)}
-            aria-expanded={chatOpen}
-            aria-controls="interview-chat"
-            className="mt-3 min-h-11 inline-flex items-center text-[15px] text-accent underline decoration-highlight/50 underline-offset-4 hover:decoration-highlight max-md:hidden"
-          >
-            מעדיפ/ה לכתוב במקום ללחוץ? לשיחה עם העוזר
-          </button>
-
-          {/* Below md: every other way in, as one row of chips instead of two
-              tiles, a link and a form standing open under the questionnaire.
-              WhatsApp and the phone are the tiles' own links, so click_whatsapp
-              and click_phone still report location "start"; צ'אט is the same
-              toggle as the link above, and השארת פרטים opens the form in place. */}
-          <div className="md:hidden mt-5 flex flex-col gap-2.5">
-            <p id="start-alternatives" className="m-0 text-[15px] text-muted-foreground">מעדיפים אחרת?</p>
-            <ul aria-labelledby="start-alternatives" className="m-0 p-0 list-none flex flex-wrap gap-2">
-              <li>
-                <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noopener noreferrer" className={CHIP}>
-                  <MessageCircle size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-                  וואטסאפ
-                </a>
-              </li>
-              <li>
-                <a href={`tel:${contact.phoneE164}`} className={CHIP}>
-                  <Phone size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-                  טלפון
-                </a>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => setFormOpen((v) => !v)}
-                  aria-expanded={formOpen}
-                  aria-controls="quick-contact"
-                  className={CHIP}
-                >
-                  <Send size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-                  השארת פרטים
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => setChatOpen((v) => !v)}
-                  aria-expanded={chatOpen}
-                  aria-controls="interview-chat"
-                  className={CHIP}
-                >
-                  <MessagesSquare size={16} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-                  צ'אט
-                </button>
-              </li>
-            </ul>
-          </div>
         </div>
-        ) : (
-          // English and French: the wizard and the chat speak Hebrew (their answers
-          // are Hebrew values Dorit reads), so the short form below leads instead.
-          <p className="m-0 max-w-[880px] text-[17px] leading-[1.7] text-foreground/80">{t("start.formFirst")}</p>
-        )}
 
         {/* The chat, for anyone who would rather write — with its fence and
             disclaimer, which describe the agent and so travel with it. */}
         {he && chatOpen ? (
-          <div id="interview-chat" ref={chatRef} className="flex flex-col gap-10 scroll-mt-28">
+          <div id="interview-chat" ref={chatRef} className="w-full max-w-[880px] mx-auto flex flex-col gap-10 scroll-mt-28">
             <Suspense fallback={<div className="min-h-[420px]" aria-busy="true" />}>
               <AgentChat descriptor={AGENTS.needsInterview} embedded />
             </Suspense>
@@ -210,26 +234,6 @@ export default function StartConversation() {
           </div>
         ) : null}
 
-        {/* Two ways out of the chat, for a visitor who would rather not use it. */}
-        <div className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-4${he ? " max-md:hidden" : ""}`}>
-          <a
-            href={`https://wa.me/${contact.whatsapp}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={TILE}
-          >
-            <MessageCircle size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-            {t("start.preferWhatsapp")}
-          </a>
-          <a
-            href={`tel:${contact.phoneE164}`}
-            className={TILE}
-          >
-            <Phone size={18} strokeWidth={1.5} className="text-accent shrink-0" aria-hidden="true" />
-            {t("start.preferPhone")}
-          </a>
-        </div>
-
         {/* And the short form: heading and form side by side, on the ground.
             Below md it stays in the page (and in the document) but hidden until
             the chip above opens it. */}
@@ -243,4 +247,4 @@ const CHIP =
   "inline-flex items-center gap-2 min-h-11 px-4 rounded-full border border-border text-[16px] text-foreground hover:border-highlight hover:bg-highlight/5 aria-expanded:border-highlight aria-expanded:bg-highlight/10 transition-colors duration-200";
 
 const TILE =
-  "flex items-center justify-center gap-3 min-h-16 rounded-md border border-border text-[17px] text-foreground hover:border-highlight hover:bg-highlight/5 transition-colors duration-200";
+  "flex items-center justify-center gap-3 min-h-14 rounded-xl border border-border text-[17px] text-foreground hover:border-highlight hover:bg-highlight/5 transition-colors duration-200";

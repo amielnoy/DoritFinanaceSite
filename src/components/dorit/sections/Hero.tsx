@@ -28,12 +28,12 @@ export default function Hero() {
   const { contact } = content;
   return (
     <section id="top" className="relative border-b border-border pt-[80px] md:pt-[127px]">
-      <div className="max-w-[1200px] mx-auto w-full px-[clamp(20px,4vw,40px)] py-[clamp(32px,5vw,64px)] grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-[clamp(32px,4vw,56px)] items-center">
-        {/* Portrait, in a matted plate. The name sits under it as a caption.
+      <div className="max-w-[1200px] mx-auto w-full px-[clamp(20px,4vw,40px)] py-[clamp(32px,5vw,64px)] grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-[clamp(32px,4vw,56px)] items-center">
+        {/* Portrait, in a card frame. The name sits under it as a caption.
             Below md: a byline at the top — an 88px round portrait beside the
             name and the licence line — instead of a plate taller than the screen. */}
-        <figure className="order-2 lg:order-1 m-0 flex flex-col gap-3 max-md:order-first max-md:flex-row max-md:items-center max-md:gap-4">
-          <div className="plate h-[clamp(320px,46vh,440px)] max-md:h-[88px] max-md:w-[88px] max-md:shrink-0 max-md:rounded-full max-md:border-[3px]">
+        <figure className="order-2 m-0 flex flex-col gap-3 max-md:order-first max-md:flex-row max-md:items-center max-md:gap-4">
+          <div className="plate h-[clamp(320px,46vh,440px)] max-md:h-[88px] max-md:w-[88px] max-md:shrink-0 max-md:rounded-full max-md:p-1">
             <AgentPortrait portrait={content.agent.portrait} sizes={HERO_SIZES} />
           </div>
           {/* Stacked on a phone, side by side from sm. Side by side at 390px
@@ -46,27 +46,25 @@ export default function Hero() {
         </figure>
 
         {/* Headline */}
-        <div className="order-1 lg:order-2 flex flex-col gap-5">
+        <div className="order-1 flex flex-col gap-5">
           {/* The figcaption below the portrait repeats this exact line, so on a
               phone — where the two sit one above the other instead of side by
               side — it is a double-read of the same name before the fold.
               Hidden under `sm`, still shown wherever there is room to spare. */}
-          <span className="hidden text-sm text-accent animate-fade-up sm:block">
+          <span className="hidden self-start rounded-full border border-highlight/25 bg-highlight/10 px-3 py-1 text-sm font-semibold text-accent animate-fade-up sm:block">
             {content.agent.byline}
           </span>
           <ArchStatement />
-          {/* Claims of equal weight, a gold diamond between them.
+          {/* Claims of equal weight, each in its own pill.
               "97% תביעות שאושרו" used to sit in the middle. It is gone: a
               licensed agent quoting a performance figure is a regulated claim,
               and nothing here could substantiate it. */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-heading text-xl text-accent animate-fade-up">
-            <span>{t("hero.claimLicence")}</span>
-            <span aria-hidden="true" className="w-1.5 h-1.5 rotate-45 border border-highlight" />
-            <span>{t("hero.claimPersonal")}</span>
+          <div className="flex flex-wrap items-center gap-2 animate-fade-up">
+            <span className={CLAIM}>{t("hero.claimLicence")}</span>
+            <span className={CLAIM}>{t("hero.claimPersonal")}</span>
             {/* The FAQ already says it ("פגישת ההיכרות הראשונה ללא עלות וללא
                 התחייבות"); it belongs where the decision to write is made. */}
-            <span aria-hidden="true" className="w-1.5 h-1.5 rotate-45 border border-highlight" />
-            <span>{t("hero.claimMeeting")}</span>
+            <span className={CLAIM}>{t("hero.claimMeeting")}</span>
           </div>
           {/* The financial work, named. "מתכננת עתיד" is true and says nothing
               a visitor can act on; most people arrive holding a pension, a
@@ -87,7 +85,7 @@ export default function Hero() {
                 away, as the secondary button. */}
             <Link
               to={lp(PENSION_CHECK.path)}
-              className={ctaClass("border-2 bg-highlight/[0.08] hover:bg-highlight/[0.18] max-md:w-full", { size: "lg" })}
+              className={ctaClass("max-md:w-full", { size: "lg" })}
             >
               {tp("page.title")}
             </Link>
@@ -130,6 +128,9 @@ export default function Hero() {
     </section>
   );
 }
+
+const CLAIM =
+  "rounded-full border border-highlight/30 bg-card px-3 py-1 text-[15px] font-medium text-accent shadow-sm";
 
 const HERO_ALT =
   "flex items-center justify-center gap-2 min-h-12 rounded-md border border-border text-[17px] text-foreground hover:border-highlight hover:bg-highlight/5 transition-colors duration-200";
