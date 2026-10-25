@@ -194,6 +194,10 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     await this.rpc("add_lead_note", { p_lead_id: leadId, p_note: text });
   }
 
+  async logWhatsapp(leadId: string): Promise<void> {
+    await this.rpc("log_lead_whatsapp", { p_lead_id: leadId });
+  }
+
   setFollowUp(leadId: string, on: string | null): Promise<void> {
     return applied(this.client.from("leads").update({ next_follow_up_on: on }).eq("id", leadId).select("id"), "follow-up");
   }

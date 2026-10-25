@@ -73,6 +73,16 @@ describe("SupabaseAgencyService", () => {
     expect(calls).toContainEqual(["agency_profiles", "update", { display_name: "חדש", licence_number: "L-2" }]);
   });
 
+  it("reads and writes the leads' WhatsApp message as lead_whatsapp_template", async () => {
+    const { client: c, calls } = client({
+      agency_profiles: [{ agency_id: A1, display_name: "דורית", lead_whatsapp_template: "היי {name}" }],
+    });
+    const service = new SupabaseAgencyService(c);
+    expect((await service.profile(A1))?.leadWhatsappTemplate).toBe("היי {name}");
+    await service.updateProfile(A1, { leadWhatsappTemplate: "שלום {name}, כאן {agent}" });
+    expect(calls).toContainEqual(["agency_profiles", "update", { lead_whatsapp_template: "שלום {name}, כאן {agent}" }]);
+  });
+
   it("calls a save the policy filtered out an error — only the Owner may", async () => {
     const { client: c } = client({}, undefined, { data: [], error: null });
     await expect(new SupabaseAgencyService(c).updateProfile(A1, { displayName: "x" })).rejects.toThrow("רק בעלי הסוכנות");

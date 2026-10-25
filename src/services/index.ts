@@ -192,6 +192,7 @@ export const services: Services = {
     leadEvents: (leadId) => real().then((s) => s.leadsAdmin.leadEvents(leadId)),
     addLeadNote: (leadId, text) => real().then((s) => s.leadsAdmin.addLeadNote(leadId, text)),
     setFollowUp: (leadId, on) => real().then((s) => s.leadsAdmin.setFollowUp(leadId, on)),
+    logWhatsapp: (leadId) => real().then((s) => s.leadsAdmin.logWhatsapp(leadId)),
     documentLink: (ref, leadId) => real().then((s) => s.leadsAdmin.documentLink(ref, leadId)),
     assign: (leadId, userId) => real().then((s) => s.leadsAdmin.assign(leadId, userId)),
     countUnassigned: () => real().then((s) => s.leadsAdmin.countUnassigned()),

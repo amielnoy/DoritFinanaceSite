@@ -39,6 +39,11 @@ export function canChooseStatus(from: string, to: string): boolean {
   return to !== from && (STATUS as string[]).includes(to);
 }
 
+/** Where a lead moves once a member has written to it on WhatsApp: a new lead to "נוצר קשר" (after the member confirms); any other stays. */
+export function statusAfterWhatsapp(status: string): LeadStatus | null {
+  return status === "new" ? "contacted" : null;
+}
+
 /** A lead that needs nothing more: won, or let go. */
 const done = (status: string) => status === "client" || status === "closed";
 

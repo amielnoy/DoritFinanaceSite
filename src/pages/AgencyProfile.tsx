@@ -18,11 +18,16 @@ const FIELDS: { key: keyof Fields; label: string; dir?: "ltr"; hint?: string }[]
   { key: "licenceEntity", label: "שם בעל הרישיון", hint: "זה השם שבו המבקרים נותנים הסכמה" },
   { key: "licenceNumber", label: "מספר רישיון", dir: "ltr" },
   { key: "licenceRegulator", label: "הגוף המפקח" },
+  {
+    key: "leadWhatsappTemplate",
+    label: "הודעת וואטסאפ לפונה",
+    hint: "נשלחת מכפתור הוואטסאפ ברשימת הפניות. {name} — שם הפונה, {agent} — שמך, {topic} — נושא הפנייה.",
+  },
 ];
 
 const EMPTY: Fields = {
   displayName: "", phoneE164: "", phoneDisplay: "", whatsapp: "", email: "",
-  defaultWhatsappMessage: "", licenceEntity: "", licenceNumber: "", licenceRegulator: "",
+  defaultWhatsappMessage: "", licenceEntity: "", licenceNumber: "", licenceRegulator: "", leadWhatsappTemplate: "",
 };
 
 /**

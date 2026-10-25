@@ -99,6 +99,10 @@ export class Base44LeadAdminService implements LeadAdminPort {
     throw new Error(PIPELINE_SUPABASE_ONLY);
   }
 
+  async logWhatsapp(): Promise<void> {
+    throw new Error(PIPELINE_SUPABASE_ONLY);
+  }
+
   async addMeeting(): Promise<void> {
     throw new Error(MEETINGS_SUPABASE_ONLY);
   }

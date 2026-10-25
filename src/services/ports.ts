@@ -461,6 +461,8 @@ export interface LeadAdminPort {
   addLeadNote(leadId: string, text: string): Promise<void>;
   /** Set or clear the day of the lead's next follow-up: whoever may update the lead. */
   setFollowUp(leadId: string, on: string | null): Promise<void>;
+  /** "נשלחה הודעת וואטסאפ" in the lead's log (log_lead_whatsapp) — the fact only, never the number or the text. */
+  logWhatsapp(leadId: string): Promise<void>;
   /**
    * A link that opens one of a claim's documents. A Base44 file URL is already
    * one; a Supabase Storage reference (`storage:claim-documents/…`) is signed
@@ -559,6 +561,8 @@ export interface AgencyProfile {
   licenceEntity: string;
   licenceNumber: string;
   licenceRegulator: string;
+  /** The WhatsApp message a member sends a lead, with {name}, {agent} and {topic} (src/lib/lead-whatsapp.ts). */
+  leadWhatsappTemplate: string;
 }
 
 /** Who the signed-in person is in their agencies, and the agency's own details. */
