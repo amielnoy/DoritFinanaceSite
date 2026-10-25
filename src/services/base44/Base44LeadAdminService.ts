@@ -11,6 +11,7 @@ export interface LeadAdminClient extends FunctionInvoker {
 }
 
 const STAFF_LEADS_SUPABASE_ONLY = "פניות שהצוות מזין נשמרות רק ב-Supabase.";
+const MERGE_SUPABASE_ONLY = "מיזוג פניות זמין רק ב-Supabase.";
 const MEETINGS_SUPABASE_ONLY = "פגישות נשמרות רק ב-Supabase.";
 
 /**
@@ -74,6 +75,14 @@ export class Base44LeadAdminService implements LeadAdminPort {
 
   async clearDuplicate(): Promise<void> {
     throw new Error(STAFF_LEADS_SUPABASE_ONLY);
+  }
+
+  async mergeLeads(): Promise<never> {
+    throw new Error(MERGE_SUPABASE_ONLY);
+  }
+
+  async unmergeLead(): Promise<void> {
+    throw new Error(MERGE_SUPABASE_ONLY);
   }
 
   async addMeeting(): Promise<void> {

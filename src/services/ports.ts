@@ -338,6 +338,8 @@ export interface LeadRecord {
   referrerNote?: string | null;
   noticeMethod?: NoticeMethod | null;
   possibleDuplicate?: boolean;
+  /** The lead this one was merged into (merge_leads), or null. A merged lead is history: nothing is deleted. */
+  mergedInto?: string | null;
 }
 
 /** A lead a member enters by hand (create-lead Edge Function). */
@@ -433,6 +435,10 @@ export interface LeadAdminPort {
   createLead(input: NewStaffLead): Promise<CreatedLead>;
   /** Mark a possible duplicate as checked (possible_duplicate = false). */
   clearDuplicate(leadId: string): Promise<void>;
+  /** Fold `otherIds` into `primaryId` (merge_leads, Admin+). Nothing is deleted; unmergeLead undoes it. Resolves with how many were merged. */
+  mergeLeads(primaryId: string, otherIds: string[]): Promise<number>;
+  /** Take one merged lead out of its main lead again (unmerge_lead, Admin+). */
+  unmergeLead(leadId: string): Promise<void>;
   /**
    * A link that opens one of a claim's documents. A Base44 file URL is already
    * one; a Supabase Storage reference (`storage:claim-documents/…`) is signed

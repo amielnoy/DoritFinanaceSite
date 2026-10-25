@@ -26,6 +26,10 @@ describe("the permissions table matches the gates that decide", () => {
     expect(PERMISSIONS["leads.create"]).toBe("user");
   });
 
+  it("merging leads is Admin+, as merge_leads and unmerge_lead require", () => {
+    expect(PERMISSIONS["leads.merge"]).toBe("admin");
+  });
+
   it("deleting a lead and reading contacts are Admin+ in the policies", () => {
     expect(PERMISSIONS["leads.delete"]).toBe("admin");
     expect(PERMISSIONS["contacts.read"]).toBe("admin");

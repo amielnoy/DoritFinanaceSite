@@ -12,7 +12,7 @@ import {
 /** The port's fields. Not `*`: a lead row also carries the visitor's summary,
  *  profile and consent record, none of which this list shows, and personal data
  *  the screen does not need stays out of the browser. */
-const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id";
+const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into";
 
 /** The staff-created-lead columns; they exist in production only once the staff-leads migration is applied, so they are asked for only when STAFF_LEADS is on. */
 const STAFF_LEAD_COLUMNS = "brought_by,intake,referrer_note,notice_method,possible_duplicate";
@@ -25,6 +25,15 @@ export const LEAD_PAGE = 1000;
 export const LEAD_LIST_MAX = 20_000;
 
 const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת";
+
+const MERGE_UNAVAILABLE = "מיזוג פניות אינו זמין כאן.";
+/** merge_leads / unmerge_lead refusals, by the exception each raises. */
+const MERGE_REFUSALS: Record<string, string> = {
+  forbidden: "רק מנהל/ת בסוכנות יכול/ה למזג פניות.",
+  not_found: NOT_APPLIED,
+  bad_merge: "אי אפשר למזג את הפניות האלה.",
+  not_merged: "הפנייה כבר לא ממוזגת.",
+};
 
 /** A meeting's columns for staff — Dorit's notes included, which the client's door never returns. */
 const MEETING_COLUMNS = "id,scheduled_at,duration_min,topic,kind,status,mode,location,notes,client_summary,summary_published_at,source";
@@ -103,6 +112,8 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     }
     return rows.map((row) => {
       const lead = { ...toPortRow(row), id: row.id } as Record<string, unknown>;
+      delete lead.merged_into;
+      lead.mergedInto = typeof row.merged_into === "string" ? row.merged_into : null;
       if (this.staffLeads) {
         for (const key of ["brought_by", "intake", "referrer_note", "notice_method", "possible_duplicate"]) delete lead[key];
         lead.broughtBy = typeof row.brought_by === "string" ? row.brought_by : null;
@@ -145,6 +156,23 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
 
   clearDuplicate(leadId: string): Promise<void> {
     return applied(this.client.from("leads").update({ possible_duplicate: false }).eq("id", leadId).select("id"), "duplicate");
+  }
+
+  async mergeLeads(primaryId: string, otherIds: string[]): Promise<number> {
+    const data = await this.rpc("merge_leads", { p_primary: primaryId, p_others: otherIds });
+    return typeof data === "number" ? data : 0;
+  }
+
+  async unmergeLead(leadId: string): Promise<void> {
+    await this.rpc("unmerge_lead", { p_id: leadId });
+  }
+
+  /** A merge function as the signed-in person; its refusal in Hebrew. */
+  private async rpc(fn: string, args: Record<string, unknown>): Promise<unknown> {
+    if (!this.client.rpc) throw new Error(MERGE_UNAVAILABLE);
+    const { data, error } = await this.client.rpc(fn, args);
+    if (error) throw new Error(MERGE_REFUSALS[error.message] ?? `${fn} failed: ${error.message}`);
+    return data;
   }
 
   setStatus(id: string, status: LeadStatus): Promise<void> {
