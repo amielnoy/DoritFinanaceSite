@@ -40,11 +40,23 @@
       "destination": "/app"
     },
     {
-      "source": "/admin/:page(leads|users|blog|masleka|agency|campaigns)",
+      "source": "/admin/:page(leads|users|blog|masleka|agency|campaigns|agencies)",
       "destination": "/app"
     },
     {
       "source": "/admin/masleka/guide",
+      "destination": "/app"
+    },
+    {
+      "source": "/admin/agencies/new",
+      "destination": "/app"
+    },
+    {
+      "source": "/admin/agencies/:agencyId/review",
+      "destination": "/app"
+    },
+    {
+      "source": "/admin/onboarding/:agencyId",
       "destination": "/app"
     },
     {

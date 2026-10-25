@@ -2,6 +2,7 @@ import { Building2, ClipboardList, Inbox, LayoutDashboard, Megaphone, Newspaper,
 import type { AgencyRole } from "@/config/permissions";
 import { reaches, type AdminAccess, type AdminCounts } from "@/hooks/useAdminMenu";
 import { MEETINGS_STAFF } from "@/config/meetings";
+import { AGENCY_ONBOARDING } from "@/config/agency-onboarding";
 
 /**
  * The admin sidebar, grouped by task rather than by table: what Dorit handles
@@ -18,6 +19,8 @@ export interface AdminNavItem {
   min: AgencyRole | "operator";
   /** Mounted only while the clearinghouse is on (VITE_MASLEKA_ENABLED). */
   masleka?: boolean;
+  /** Mounted only while the new-agency wizard is on (VITE_AGENCY_ONBOARDING). */
+  onboarding?: boolean;
   /** Which counter sits on the row, and the word a screen reader hears after the number. */
   counter?: { key: Exclude<keyof AdminCounts, "total">; label: string };
   /** A second counter after it, in the alert colour: what a client is waiting on. */
@@ -65,6 +68,8 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
       { to: "/admin/blog", label: "בלוג", icon: Newspaper, min: "user" },
       { to: "/admin/users", label: "משתמשים", icon: Users, min: "user" },
       { to: "/admin/agency", label: "פרטי הסוכנות", icon: Building2, min: "owner" },
+      // The operator's list of agencies being set up, and "סוכנות חדשה".
+      { to: "/admin/agencies", label: "סוכנויות בהקמה", icon: Building2, min: "operator", onboarding: true },
     ],
   },
 ];
@@ -74,13 +79,13 @@ export const ADMIN_NAV: readonly AdminNavGroup[] = [
  * row counts what its reader acts on: the unassigned queue for Admin+, who
  * assign it; a User's own new leads otherwise.
  */
-export function adminNavFor(access: AdminAccess, maslekaEnabled: boolean): AdminNavGroup[] {
+export function adminNavFor(access: AdminAccess, maslekaEnabled: boolean, onboardingEnabled: boolean = AGENCY_ONBOARDING): AdminNavGroup[] {
   if (!access) return [];
   const assigns = reaches(access, "admin");
   return ADMIN_NAV.map((group) => ({
     ...group,
     items: group.items
-      .filter((item) => reaches(access, item.min) && (!item.masleka || maslekaEnabled))
+      .filter((item) => reaches(access, item.min) && (!item.masleka || maslekaEnabled) && (!item.onboarding || onboardingEnabled))
       .map((item) =>
         item.to === "/admin/leads" && assigns ? { ...item, counter: { key: "unassigned" as const, label: "לא שויכו" } } : item,
       ),

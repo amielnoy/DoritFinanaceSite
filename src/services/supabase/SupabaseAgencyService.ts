@@ -9,6 +9,8 @@ export interface SupabaseAgencyClient extends SupabaseLeadTableClient {
 const ROLES = new Set<string>(["owner", "admin", "user"]);
 const asRole = (v: unknown): AgencyRole | null => (typeof v === "string" && ROLES.has(v) ? (v as AgencyRole) : null);
 
+const STATUSES = ["draft", "pending_review", "active", "suspended"] as const;
+
 const PROFILE_COLUMNS =
   "agency_id,display_name,phone_e164,phone_display,whatsapp,email,default_whatsapp_message,licence_entity,licence_number,licence_regulator,lead_whatsapp_template";
 
@@ -38,13 +40,23 @@ export class SupabaseAgencyService implements AgencyPort {
   async myAgencies(userId: string): Promise<MyAgency[]> {
     const [memberships, agencies] = await Promise.all([
       fetchRows(this.client.from("memberships").select("agency_id,role").eq("user_id", userId), "memberships"),
-      fetchRows(this.client.from("agencies").select("id,name"), "agencies"),
+      fetchRows(this.client.from("agencies").select("id,name,status"), "agencies"),
     ]);
     // An agency the person cannot read (suspended) is not theirs to switch to.
     const name = new Map(agencies.map((a) => [String(a.id), String(a.name ?? "")]));
+    const status = new Map(agencies.map((a) => [String(a.id), a.status]));
     return memberships
       .filter((m) => name.has(String(m.agency_id)) && asRole(m.role))
-      .map((m) => ({ id: String(m.agency_id), name: name.get(String(m.agency_id)) ?? "", role: asRole(m.role)! }))
+      .map((m) => {
+        const raw = status.get(String(m.agency_id));
+        const s = STATUSES.find((x) => x === raw);
+        return {
+          id: String(m.agency_id),
+          name: name.get(String(m.agency_id)) ?? "",
+          role: asRole(m.role)!,
+          ...(s ? { status: s } : {}),
+        };
+      })
       .sort((a, b) => a.name.localeCompare(b.name, "he"));
   }
 

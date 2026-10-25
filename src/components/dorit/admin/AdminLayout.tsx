@@ -1,5 +1,6 @@
 import React, { useId } from "react";
-import { Link, NavLink, Outlet, useLocation, useSearchParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { AGENCY_ONBOARDING } from "@/config/agency-onboarding";
 import { ChevronLeft, ExternalLink, LayoutGrid, LogOut, UserRound } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useTheme } from "@/hooks/useTheme";
@@ -92,6 +93,9 @@ function SidebarGroup({ group, counts }: { group: AdminNavGroup; counts: AdminCo
 export function AgencySwitcher() {
   const { agencyId, agencies, setAgency } = useCurrentAgency();
   const id = useId();
+  const navigate = useNavigate();
+  // With the wizard on, an agency still being set up is listed as such and opens its wizard (#285's open item).
+  const settingUp = (status?: string) => AGENCY_ONBOARDING && (status === "draft" || status === "pending_review");
   if (agencies.length < 2) return null;
   return (
     <div className="px-5 py-3 border-b border-border">
@@ -101,12 +105,17 @@ export function AgencySwitcher() {
       <select
         id={id}
         value={agencyId}
-        onChange={(e) => setAgency(e.target.value)}
+        onChange={(e) => {
+          const chosen = agencies.find((a) => a.id === e.target.value);
+          if (chosen && settingUp(chosen.status)) navigate(`/admin/onboarding/${chosen.id}`);
+          else setAgency(e.target.value);
+        }}
         className="w-full min-h-11 rounded-lg border border-border bg-background px-2 text-sm"
       >
         {agencies.map((a) => (
           <option key={a.id} value={a.id}>
             {a.name}
+            {settingUp(a.status) ? " (בהקמה)" : ""}
           </option>
         ))}
       </select>
