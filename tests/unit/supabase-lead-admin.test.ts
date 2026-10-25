@@ -177,6 +177,7 @@ describe("SupabaseLeadAdminService — claim-document links and assignment (agen
   it("counts open leads nobody works, by ids only", async () => {
     const { client, calls } = tableFake({ data: [{ id: "a" }, { id: "b" }], error: null });
     expect(await new SupabaseLeadAdminService(client).countUnassigned()).toBe(2);
+    expect(calls).toContainEqual(["is", "merged_into", null]);
     expect(calls).toContainEqual(["select", "id"]);
     expect(calls).toContainEqual(["is", "assigned_user_id", null]);
     expect(calls).toContainEqual(["not", "status", "eq", "closed"]);
@@ -298,6 +299,7 @@ describe("SupabaseLeadAdminService.countNew", () => {
     const { client, calls } = byTable({ leads: { data: [{ id: "a" }, { id: "b" }, { id: "c" }], error: null } });
     expect(await new SupabaseLeadAdminService(client).countNew()).toBe(3);
     expect(calls).toContainEqual(["leads", "or", "status.eq.new,status.eq.escalated"]);
+    expect(calls).toContainEqual(["leads", "is", "merged_into", null]);
     expect(calls).not.toContainEqual(["leads", "eq", "status", "new"]);
     expect(calls).toContainEqual(["leads", "limit", 1000]);
   });

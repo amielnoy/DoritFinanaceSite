@@ -203,7 +203,8 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
   /** Open (not closed) leads with nobody on them; capped at a thousand, as countNew. */
   async countUnassigned(): Promise<number> {
     const rows = await fetchRows(
-      this.client.from("leads").select("id").is("assigned_user_id", null).not("status", "eq", "closed").limit(1000),
+      // A merged lead is history, as on the screen: its main lead is the one to assign.
+      this.client.from("leads").select("id").is("assigned_user_id", null).not("status", "eq", "closed").is("merged_into", null).limit(1000),
       "leads",
     );
     return rows.length;
@@ -250,7 +251,10 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
    * Capped at a thousand, which the menu shows as it is.
    */
   async countNew(): Promise<number> {
-    const rows = await fetchRows(this.client.from("leads").select("id").or("status.eq.new,status.eq.escalated").limit(1000), "leads");
+    const rows = await fetchRows(
+      this.client.from("leads").select("id").or("status.eq.new,status.eq.escalated").is("merged_into", null).limit(1000),
+      "leads",
+    );
     return rows.length;
   }
 
