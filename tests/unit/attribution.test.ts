@@ -157,3 +157,35 @@ describe("captureAttribution / getAttribution", () => {
     expect(getAttribution()?.channel).toBe("referral");
   });
 });
+
+describe("a reactivation campaign link", () => {
+  it("records the reactivation channel and the campaign's code", () => {
+    setPage("?utm_source=reactivation&utm_campaign=k7x2m9qa", "");
+    captureAttribution();
+    expect(getAttribution()).toEqual({ channel: "reactivation", campaign: "k7x2m9qa" });
+  });
+
+  it("overrides an earlier first touch: an existing client who visited before is counted for the campaign", () => {
+    setPage("?utm_source=google", "");
+    captureAttribution();
+    setPage("?utm_source=reactivation&utm_campaign=k7x2m9qa", "");
+    captureAttribution();
+    expect(getAttribution()).toEqual({ channel: "reactivation", campaign: "k7x2m9qa" });
+  });
+
+  it("is kept when the person comes back later without the link", () => {
+    setPage("?utm_source=reactivation&utm_campaign=k7x2m9qa", "");
+    captureAttribution();
+    setPage("?utm_source=facebook", "");
+    captureAttribution();
+    expect(getAttribution()?.channel).toBe("reactivation");
+  });
+
+  it("without a campaign code is an ordinary first touch, and overrides nothing", () => {
+    setPage("?utm_source=google", "");
+    captureAttribution();
+    setPage("?utm_source=reactivation", "");
+    captureAttribution();
+    expect(getAttribution()?.channel).toBe("google");
+  });
+});

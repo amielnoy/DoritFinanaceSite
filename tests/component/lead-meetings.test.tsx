@@ -45,6 +45,7 @@ vi.mock("@/hooks/useAdmin", async (importActual) => ({
   useSetFollowUp: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useLogWhatsapp: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useAgencyProfile: () => ({ data: undefined }),
+  useCampaigns: () => ({ data: [] }),
   useAssignLead: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useAdminUsers: () => ({ data: [] }),
   useTranscriptLeadIds: () => ({ data: [] }),

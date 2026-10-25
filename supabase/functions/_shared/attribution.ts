@@ -1,7 +1,7 @@
 /** The closed marketing-channel vocabulary — the same list as src/lib/attribution.ts plus the server-only 'unknown'. tests/contract/edge-functions.contract.test.ts fails if it drifts from base44/functions/submitClaim. */
 export const CHANNEL_TAXONOMY = [
   'google', 'facebook', 'instagram', 'linkedin', 'ai_assistant',
-  'email', 'sms', 'referral', 'direct', 'unknown',
+  'email', 'sms', 'referral', 'direct', 'reactivation', 'unknown',
 ];
 
 /** ערך סגור בלבד — ולעולם לא נאמן מהלקוח, גם אם הוא כבר סינן בצד שלו. */

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { services } from "@/services";
-import type { Article, ArticleDraft, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, TestimonialDraft } from "@/services";
+import type { Article, ArticleDraft, LeadMeetingUpdate, LeadRecord, LeadStatus, NewCampaign, NewLeadMeeting, TestimonialDraft } from "@/services";
 
 /**
  * The admin screens' data idiom, matching `useContent.ts` for the public site.
@@ -199,6 +199,32 @@ export function useLogWhatsapp() {
   return useMutation({
     mutationFn: (leadId: string) => services.leadsAdmin.logWhatsapp(leadId),
     onSuccess: (_, leadId) => client.invalidateQueries({ queryKey: [...adminKeys.leads, "events", leadId] }),
+  });
+}
+
+/** The agency's reactivation campaigns, newest first. */
+export function useCampaigns(agencyId: string) {
+  return useQuery({
+    queryKey: ["admin", "campaigns", agencyId],
+    queryFn: () => services.campaigns.list(agencyId),
+    enabled: Boolean(agencyId),
+  });
+}
+
+export function useCreateCampaign() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: NewCampaign) => services.campaigns.create(input),
+    onSuccess: (campaign) => client.invalidateQueries({ queryKey: ["admin", "campaigns", campaign.agencyId] }),
+  });
+}
+
+export function useUpdateCampaign(agencyId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fields }: { id: string; fields: { name?: string; message?: string; archived?: boolean } }) =>
+      services.campaigns.update(id, fields),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["admin", "campaigns", agencyId] }),
   });
 }
 

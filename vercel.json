@@ -40,7 +40,7 @@
       "destination": "/app"
     },
     {
-      "source": "/admin/:page(leads|users|blog|masleka|agency)",
+      "source": "/admin/:page(leads|users|blog|masleka|agency|campaigns)",
       "destination": "/app"
     },
     {

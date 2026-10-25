@@ -12,7 +12,7 @@ import {
 /** The port's fields. Not `*`: a lead row also carries the visitor's summary,
  *  profile and consent record, none of which this list shows, and personal data
  *  the screen does not need stays out of the browser. */
-const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into,next_follow_up_on";
+const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into,next_follow_up_on,channel,campaign";
 
 /** The staff-created-lead columns; they exist in production only once the staff-leads migration is applied, so they are asked for only when STAFF_LEADS is on. */
 const STAFF_LEAD_COLUMNS = "brought_by,intake,referrer_note,notice_method,possible_duplicate";

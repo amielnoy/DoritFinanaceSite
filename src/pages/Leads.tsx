@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import ConfirmDialog from "@/components/dorit/admin/ConfirmDialog";
 import type { AgendaMeeting, LeadRecord, LeadSource, LeadStatus } from "@/services";
 import {
-  useAdminUsers, useAgencyMeetings, useAgencyProfile, useAssignLead, useLeads, useLeadTranscript, useLogWhatsapp, useMergeLeads, useRemoveLead, useSetLeadStatus,
+  useAdminUsers, useAgencyMeetings, useAgencyProfile, useAssignLead, useCampaigns, useLeads, useLeadTranscript, useLogWhatsapp, useMergeLeads, useRemoveLead, useSetLeadStatus,
   useTranscriptLeadIds, useUnmergeLead,
 } from "@/hooks/useAdmin";
 import { useCurrentUserId } from "@/hooks/useCurrentUserId";
@@ -51,6 +51,7 @@ const DOT: Record<string, string> = {
   proposal_sent: "bg-violet-500",
   closed: "bg-slate-400",
   client: "bg-emerald-500",
+  campaign: "bg-accent",
   today: "bg-destructive",
   escalated: "bg-orange-500",
   partial: "bg-slate-400",
@@ -218,6 +219,8 @@ const CONTACT = `${CELL} text-right text-[13px] ${COMPACT_TEXT}`;
 const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean; staffLeads?: boolean }[] = [
   // A follow-up due today, or already late.
   { key: "today", label: "לטיפול היום" },
+  // A reactivation campaign link brought them (/admin/campaigns).
+  { key: "campaign", label: "מקמפיין" },
   { key: "escalated", label: "הועברו לטיפול" },
   { key: "partial", label: "ראיונות שלא הושלמו" },
   { key: "unassigned", label: "לא שויכו", adminOnly: true },
@@ -403,6 +406,9 @@ export default function Leads() {
   const { user } = useAuth();
   // The agency's message to a lead (Owner-edited on /admin/agency); the default until it loads.
   const agencyProfile = useAgencyProfile(agencyId);
+  // The agency's campaigns, to name the one a reactivation lead came from.
+  const campaigns = useCampaigns(agencyId);
+  const campaignName = (code: string | null | undefined) => (code ? campaigns.data?.find((c) => c.code === code)?.name : undefined);
   const waTemplate = agencyProfile.data?.leadWhatsappTemplate || DEFAULT_LEAD_WHATSAPP_TEMPLATE;
   const waAgent = user?.full_name || agencyProfile.data?.displayName || "";
   /** The lead a WhatsApp message was just opened to, while the screen asks whether to mark it "נוצר קשר". */
@@ -476,6 +482,8 @@ export default function Leads() {
           ? NEEDS_ATTENTION.includes(l.status)
         : filter === "in_progress"
           ? IN_PROGRESS.has(l.status)
+        : filter === "campaign"
+          ? l.channel === "reactivation"
         : filter === "today"
           ? followUpState(l, today) === "overdue" || followUpState(l, today) === "today"
         : filter === "sla"
@@ -573,6 +581,7 @@ export default function Leads() {
     if (l.source === "staff") acc.staff = (acc.staff || 0) + 1;
     if (l.possibleDuplicate) acc.duplicate = (acc.duplicate || 0) + 1;
     if (IN_PROGRESS.has(l.status)) acc.in_progress = (acc.in_progress || 0) + 1;
+    if (l.channel === "reactivation") acc.campaign = (acc.campaign || 0) + 1;
     const due = followUpState(l, today);
     if (due === "overdue" || due === "today") acc.today = (acc.today || 0) + 1;
     return acc;
@@ -674,6 +683,11 @@ export default function Leads() {
                         <td className={`${CONTACT} text-foreground/70`} dir="ltr">{l.email || "—"}</td>
                         <td className={`${CELL} text-foreground/70`}>
                           {SOURCE_LABEL[l.source] || "—"}
+                          {l.channel === "reactivation" ? (
+                            <span className="mt-1 block text-xs text-accent">
+                              לקוח קיים – קמפיין{campaignName(l.campaign) ? `: ${campaignName(l.campaign)}` : ""}
+                            </span>
+                          ) : null}
                           {STAFF_LEADS && l.source === "staff" && l.intake ? (
                             <span className="ms-2 inline-block border border-border/60 px-1.5 py-0.5 text-xs">{INTAKE_LABELS[l.intake]}</span>
                           ) : null}

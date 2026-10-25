@@ -13,6 +13,7 @@ import type {
   LeadAdminPort,
   UsersAdminPort,
   AgencyPort,
+  CampaignPort,
   LeadPort,
   MaslekaPort,
   SupportPort,
@@ -65,6 +66,8 @@ export interface Services {
   usersAdmin: UsersAdminPort;
   /** Who the signed-in person is in their agencies, and the agency's own details. */
   agency: AgencyPort;
+  /** Reactivation campaigns: the general link an agency sends its existing clients. */
+  campaigns: CampaignPort;
   /** The clearinghouse requests: the client's page and the staff board. */
   masleka: MaslekaPort;
 }
@@ -229,6 +232,11 @@ export const services: Services = {
     myRole: (agencyId) => real().then((s) => s.agency.myRole(agencyId)),
     profile: (agencyId) => real().then((s) => s.agency.profile(agencyId)),
     updateProfile: (agencyId, fields) => real().then((s) => s.agency.updateProfile(agencyId, fields)),
+  },
+  campaigns: {
+    list: (agencyId) => real().then((s) => s.campaigns.list(agencyId)),
+    create: (input) => real().then((s) => s.campaigns.create(input)),
+    update: (id, fields) => real().then((s) => s.campaigns.update(id, fields)),
   },
   account: {
     myEnquiries: () => real().then((s) => s.account.myEnquiries()),
