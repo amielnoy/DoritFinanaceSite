@@ -52,6 +52,6 @@ describe('staff intake notice', () => {
       existing_client: 'לקוח/ה קיים/ת',
       other: 'אחר',
     });
-    expect(STAFF_STATUS_LABELS).toEqual({ new: 'חדשה', contacted: 'נוצר קשר', client: 'לקוח/ה' });
+    expect(STAFF_STATUS_LABELS).toEqual({ new: 'חדשה', contacted: 'נוצר קשר', client: 'נסגר (לקוח/ה)' });
   });
 });

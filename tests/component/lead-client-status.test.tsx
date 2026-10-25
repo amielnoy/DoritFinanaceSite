@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
-/* "לקוח/ה" on /admin/leads: the status that keeps an enquiry from the 24-month anonymization. */
+/* "נסגר (לקוח/ה)" on /admin/leads (stored `client`): the status that keeps an enquiry from the 24-month anonymization. */
 const h = vi.hoisted(() => ({
   leads: [
     { id: "l-1", name: "דנה", phone: "050", source: "quick", status: "contacted", topic: "פנסיה", created_date: "2026-10-10T08:00:00Z" },
@@ -19,6 +19,10 @@ vi.mock("@/hooks/useAdmin", () => ({
   useRemoveLead: () => ({ mutate: vi.fn(), isError: false }),
   useMergeLeads: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useUnmergeLead: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useLeadEvents: () => ({ data: [], isPending: false, isError: false }),
+  useAddLeadNote: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useSetFollowUp: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useLeadMeetings: () => ({ data: [], isPending: false, isError: false }),
   useAssignLead: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useAdminUsers: () => ({ data: [] }),
   useTranscriptLeadIds: () => ({ data: [] }),
@@ -35,10 +39,10 @@ vi.mock("@/hooks/useAgency", async () => (await import("../helpers/agency-role-m
 const { default: Leads } = await import("@/pages/Leads");
 
 describe("the client status on /admin/leads", () => {
-  it("offers לקוח/ה, labels a client lead with it, and filters by it", () => {
+  it("offers נסגר (לקוח/ה), labels a client lead with it, and filters by it", () => {
     render(<MemoryRouter><Leads /></MemoryRouter>);
-    expect(screen.getAllByText("לקוח/ה").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("button", { name: /^לקוח\/ה/ }));
+    expect(screen.getAllByText("נסגר (לקוח/ה)").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: /^נסגר \(לקוח\/ה\)/ }));
     expect(screen.queryByText("דנה")).toBeNull();
     expect(screen.getByText("יוסי")).toBeInTheDocument();
   });
@@ -46,7 +50,7 @@ describe("the client status on /admin/leads", () => {
   it("marks a lead as a client", () => {
     render(<MemoryRouter><Leads /></MemoryRouter>);
     const select = screen.getAllByRole("combobox").find((s) => (s as HTMLSelectElement).value === "contacted") as HTMLSelectElement;
-    expect(within(select).getByRole("option", { name: "לקוח/ה" })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "נסגר (לקוח/ה)" })).toBeInTheDocument();
     fireEvent.change(select, { target: { value: "client" } });
     expect(h.mutate).toHaveBeenCalledWith({ id: "l-1", status: "client" });
   });

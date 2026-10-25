@@ -583,7 +583,7 @@ describe("SupabaseLeadAdminService — staff-created leads", () => {
     const { client, calls } = tableFake({ data: [leadRow()], error: null });
     const [lead] = await new SupabaseLeadAdminService(client, null, token, false).list();
     expect(calls.find((c) => c[0] === "select")![1]).toBe(
-      "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into",
+      "id,name,phone,email,source,topic,timing,message,status,created_at,agency_id,assigned_user_id,merged_into,next_follow_up_on",
     );
     expect(lead).not.toHaveProperty("possibleDuplicate");
     expect(lead).not.toHaveProperty("broughtBy");
@@ -620,5 +620,47 @@ describe("SupabaseLeadAdminService — merging duplicates", () => {
   it("says a refusal in Hebrew", async () => {
     const { client } = withRpc({ data: null, error: { message: "forbidden" } });
     await expect(new SupabaseLeadAdminService(client).mergeLeads("main", ["a"])).rejects.toThrow("רק מנהל/ת בסוכנות");
+  });
+});
+
+describe("SupabaseLeadAdminService — the pipeline: activity log, notes, follow-ups", () => {
+  it("reads next_follow_up_on as nextFollowUpOn", async () => {
+    const { client } = tableFake({ data: [leadRow({ next_follow_up_on: "2026-11-02" }), leadRow({ id: "y" })], error: null });
+    const [planned, none] = await new SupabaseLeadAdminService(client).list();
+    expect(planned.nextFollowUpOn).toBe("2026-11-02");
+    expect(planned).not.toHaveProperty("next_follow_up_on");
+    expect(none.nextFollowUpOn).toBeNull();
+  });
+
+  it("reads a lead's log newest first, in the port's shape", async () => {
+    const { client, calls } = tableFake({
+      data: [{ id: 7, kind: "status", actor_id: "u-1", from_value: "new", to_value: "contacted", note: null, at: "2026-10-25T10:00:00Z" }],
+      error: null,
+    });
+    const [event] = await new SupabaseLeadAdminService(client).leadEvents("lead-1");
+    expect(event).toEqual({ id: "7", kind: "status", actorId: "u-1", from: "new", to: "contacted", note: null, at: "2026-10-25T10:00:00Z" });
+    expect(calls).toContainEqual(["from", "lead_events"]);
+    expect(calls).toContainEqual(["eq", "lead_id", "lead-1"]);
+    expect(calls).toContainEqual(["order", "at", { ascending: false }]);
+  });
+
+  it("adds a note through add_lead_note, and says a refused one in Hebrew", async () => {
+    const { client } = tableFake({ data: [], error: null });
+    const rpc = vi.fn(async () => ({ data: 12, error: null }));
+    await new SupabaseLeadAdminService({ ...client, rpc } as SupabaseLeadTableClient).addLeadNote("lead-1", "נקבעה שיחה");
+    expect(rpc).toHaveBeenCalledWith("add_lead_note", { p_lead_id: "lead-1", p_note: "נקבעה שיחה" });
+    const refusing = vi.fn(async () => ({ data: null, error: { message: "field_invalid" } }));
+    await expect(
+      new SupabaseLeadAdminService({ ...client, rpc: refusing } as SupabaseLeadTableClient).addLeadNote("lead-1", "ת.ז. 123456789"),
+    ).rejects.toThrow("אין לכתוב בהערה מספר זהות");
+  });
+
+  it("sets and clears the follow-up on that lead, and asks for it back", async () => {
+    const { client, calls } = tableFake({ data: [{ id: "lead-1" }], error: null });
+    const service = new SupabaseLeadAdminService(client);
+    await service.setFollowUp("lead-1", "2026-11-02");
+    await service.setFollowUp("lead-1", null);
+    expect(calls).toContainEqual(["update", { next_follow_up_on: "2026-11-02" }]);
+    expect(calls).toContainEqual(["update", { next_follow_up_on: null }]);
   });
 });

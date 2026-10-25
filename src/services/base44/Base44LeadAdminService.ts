@@ -12,6 +12,7 @@ export interface LeadAdminClient extends FunctionInvoker {
 
 const STAFF_LEADS_SUPABASE_ONLY = "פניות שהצוות מזין נשמרות רק ב-Supabase.";
 const MERGE_SUPABASE_ONLY = "מיזוג פניות זמין רק ב-Supabase.";
+const PIPELINE_SUPABASE_ONLY = "הערות ומעקב זמינים רק ב-Supabase.";
 const MEETINGS_SUPABASE_ONLY = "פגישות נשמרות רק ב-Supabase.";
 
 /**
@@ -83,6 +84,19 @@ export class Base44LeadAdminService implements LeadAdminPort {
 
   async unmergeLead(): Promise<void> {
     throw new Error(MERGE_SUPABASE_ONLY);
+  }
+
+  /** No activity log in Base44: an empty one, and every write refused. */
+  async leadEvents(): Promise<never[]> {
+    return [];
+  }
+
+  async addLeadNote(): Promise<void> {
+    throw new Error(PIPELINE_SUPABASE_ONLY);
+  }
+
+  async setFollowUp(): Promise<void> {
+    throw new Error(PIPELINE_SUPABASE_ONLY);
   }
 
   async addMeeting(): Promise<void> {

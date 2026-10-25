@@ -17,6 +17,9 @@ import { MEETINGS_STAFF } from "@/config/meetings";
 import { INTAKE_LABELS, STAFF_LEADS } from "@/config/staff-leads";
 import { GONE_MEMBER, broughtThisMonth, sameNumberLeads, staffLeadLine } from "@/lib/staff-leads";
 import { duplicateRows, foldMerged, newestFirst, type LeadRow } from "@/lib/lead-duplicates";
+import { ANY_STATUS_LABEL, IN_PROGRESS, STATUS, STATUS_LABEL, followUpState, slaBreached } from "@/lib/lead-pipeline";
+import { LEAD_SLA_URGENT_HOURS } from "@/config/leads";
+import LeadActivity, { dayLabel } from "@/components/dorit/admin/LeadActivity";
 import NewLeadSheetHost from "@/components/dorit/admin/NewLeadSheetHost";
 import StaffLeadsStrip from "@/components/dorit/admin/StaffLeadsStrip";
 import DuplicatePointer from "@/components/dorit/admin/DuplicatePointer";
@@ -25,29 +28,14 @@ import { addDays, israelToday } from "@/lib/wall-clock";
 
 type LeadItem = LeadRecord;
 
-/* The statuses an admin may set. `escalated` and `partial` are written by the
-   backend and are not offered here — an admin moves such a lead on to
-   "contacted" or "closed" rather than back into them. */
-/* "לקוח/ה" is what keeps an enquiry from being anonymized 24 months after its
-   last contact (the privacy policy's period for an enquiry that did not become
-   an engagement) — see 20261025000000_lead_retention.sql. */
-const STATUS: LeadStatus[] = ["new", "contacted", "closed", "client"];
-const STATUS_LABEL: Record<LeadStatus, string> = {
-  new: "חדשה",
-  contacted: "טופלה",
-  closed: "נסגרה",
-  client: "לקוח/ה",
-};
-/* Display labels for every status the entity can hold, settable or not. Without
-   the backend-written ones a lead rendered with its raw English key. */
-const ANY_STATUS_LABEL: Record<string, string> = {
-  ...STATUS_LABEL,
-  escalated: "הועברה לטיפול אישי",
-  partial: "ראיון שלא הושלם",
-};
+/* The statuses, their labels and the pipeline's rules: src/lib/lead-pipeline.ts.
+   "נסגר (לקוח/ה)" (`client`) is what keeps an enquiry from being anonymized 24
+   months after its last contact — see 20261025000000_lead_retention.sql. */
 const STATUS_COLOR: Record<LeadStatus, string> = {
   new: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   contacted: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  meeting_set: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  proposal_sent: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
   closed: "bg-muted text-muted-foreground",
   client: "bg-accent/10 text-accent",
 };
@@ -56,8 +44,11 @@ const DOT: Record<string, string> = {
   all: "bg-accent",
   new: "bg-emerald-500",
   contacted: "bg-orange-500",
+  meeting_set: "bg-sky-500",
+  proposal_sent: "bg-violet-500",
   closed: "bg-slate-400",
   client: "bg-emerald-500",
+  today: "bg-destructive",
   escalated: "bg-orange-500",
   partial: "bg-slate-400",
   unassigned: "bg-orange-500",
@@ -222,6 +213,8 @@ const HEAD = `${CELL} font-medium`;
 const CONTACT = `${CELL} text-right text-[13px] ${COMPACT_TEXT}`;
 
 const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean; staffLeads?: boolean }[] = [
+  // A follow-up due today, or already late.
+  { key: "today", label: "לטיפול היום" },
   { key: "escalated", label: "הועברו לטיפול" },
   { key: "partial", label: "ראיונות שלא הושלמו" },
   { key: "unassigned", label: "לא שויכו", adminOnly: true },
@@ -412,6 +405,13 @@ export default function Leads() {
       return next;
     });
   const [filter, setFilter] = useState<string>("all");
+  // The minute, for the urgent-lead SLA and today's follow-ups.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const today = israelToday(now);
   // The lead open in the drawer (VITE_MEETINGS_STAFF), by id so a reload keeps it current.
   const [openLeadId, setOpenLeadId] = useState<string | null>(null);
   // Where the drawer opens when the agenda or "+ קביעת פגישה" opens it. Each such
@@ -449,6 +449,8 @@ export default function Leads() {
   const broughtLabel = (id: string | null) =>
     !id ? GONE_MEMBER : id === myId ? "אני" : assigns ? assigneeLabel(id) : "חבר/ה בצוות";
   const showBrought = STAFF_LEADS && assigns;
+  /* Who did something in a lead's log: "אני", a member (Admin+ knows them), or the system. */
+  const memberLabel = (id: string | null) => (!id ? "המערכת" : id === myId ? "אני" : assigns ? assigneeLabel(id) : "חבר/ה בצוות");
 
   const filtered = top.filter(
     (l) =>
@@ -461,11 +463,20 @@ export default function Leads() {
         ? !l.assigned_user_id && l.status !== "closed"
         : filter === ATTENTION
           ? NEEDS_ATTENTION.includes(l.status)
+        : filter === "in_progress"
+          ? IN_PROGRESS.has(l.status)
+        : filter === "today"
+          ? followUpState(l, today) === "overdue" || followUpState(l, today) === "today"
+        : filter === "sla"
+          ? slaBreached(l, now, LEAD_SLA_URGENT_HOURS)
           : l.status === filter),
   );
 
   // The table's rows: leads that share a phone or an email are one row.
-  const rows = duplicateRows(filtered, mergedBy);
+  // Overdue follow-ups lead the list; otherwise the newest activity first.
+  const overdue = (r: LeadRow) => (followUpState(r.lead, today) === "overdue" ? 0 : 1);
+  const rows = duplicateRows(filtered, mergedBy).sort((a, b) => overdue(a) - overdue(b));
+  const slaCount = top.filter((l) => slaBreached(l, now, LEAD_SLA_URGENT_HOURS)).length;
 
   const exportCsv = (all: boolean) => {
     const source = all ? leads : filtered;
@@ -520,6 +531,9 @@ export default function Leads() {
     if (!l.assigned_user_id && l.status !== "closed") acc.unassigned = (acc.unassigned || 0) + 1;
     if (l.source === "staff") acc.staff = (acc.staff || 0) + 1;
     if (l.possibleDuplicate) acc.duplicate = (acc.duplicate || 0) + 1;
+    if (IN_PROGRESS.has(l.status)) acc.in_progress = (acc.in_progress || 0) + 1;
+    const due = followUpState(l, today);
+    if (due === "overdue" || due === "today") acc.today = (acc.today || 0) + 1;
     return acc;
   }, {});
 
@@ -536,6 +550,22 @@ export default function Leads() {
       "actions",
     ];
     const weightSum = columns.reduce((sum, c) => sum + COLUMN_WEIGHT[c], 0);
+    /** Under a row's status: the next follow-up — red when late, amber today. */
+    const followUpLine = (l: LeadItem) => {
+      const state = followUpState(l, today);
+      if (!state || !l.nextFollowUpOn) return null;
+      const tone = state === "overdue" ? "text-destructive font-medium" : state === "today" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground";
+      const dot = state === "overdue" ? "bg-destructive" : state === "today" ? "bg-amber-500" : "bg-slate-400";
+      // This year's day as "22.10"; another year's in full.
+      const day = l.nextFollowUpOn.slice(0, 4) === today.slice(0, 4) ? dayLabel(l.nextFollowUpOn).slice(0, 5) : dayLabel(l.nextFollowUpOn);
+      return (
+        <span className={`mt-1 block text-xs leading-snug ${tone}`}>
+          <span aria-hidden="true" className={`me-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${dot}`} />
+          {state === "overdue" ? "מעקב באיחור" : state === "today" ? "מעקב היום" : "מעקב"} {day}
+        </span>
+      );
+    };
+
     /** Under a row's name: its group's badge, which opens the other submissions, and "מזג" (Admin+). */
     const groupControls = (row: LeadRow) =>
       row.duplicates.length || row.merged.length ? (
@@ -589,21 +619,14 @@ export default function Leads() {
                         </td>
                         <td className={`${CELL} font-medium`}>
                           {part.kind === "member" ? <span aria-hidden="true" className="me-1 text-muted-foreground">↳</span> : null}
-                          {MEETINGS_STAFF ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                // As before: the drawer opens where it was; no meeting expanded, no form open.
-                                setDrawerStart((d) => ({ ...d, meetingId: null, adding: false }));
-                                setOpenLeadId(l.id);
-                              }}
-                              className="text-right underline decoration-highlight underline-offset-4 hover:text-accent"
-                            >
-                              {l.name}
-                            </button>
-                          ) : (
-                            l.name
-                          )}
+                          {/* The name opens the lead's drawer: details, activity and — with VITE_MEETINGS_STAFF — meetings. */}
+                          <button
+                            type="button"
+                            onClick={() => openFromTable(l.id)}
+                            className="text-right underline decoration-highlight underline-offset-4 hover:text-accent"
+                          >
+                            {l.name}
+                          </button>
                           {part.kind === "main" ? groupControls(part.row) : memberNote(l)}
                         </td>
                         <td className={CONTACT} dir="ltr">{l.phone}</td>
@@ -616,7 +639,7 @@ export default function Leads() {
                           {STAFF_LEADS && assigns && l.possibleDuplicate ? (
                             <DuplicatePointer
                               others={sameNumberLeads(leads, l)}
-                              onOpen={MEETINGS_STAFF ? openFromTable : undefined}
+                              onOpen={openFromTable}
                               leadId={l.id}
                             />
                           ) : null}
@@ -626,9 +649,16 @@ export default function Leads() {
                           {withTranscript.has(l.id) && <LeadTranscript leadId={l.id} />}
                         </td>
                         <td className={CELL}>
-                          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${STATUS_COLOR[l.status] || ""}`}>
+                          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${STATUS_COLOR[l.status as LeadStatus] || ""}`}>
                             {ANY_STATUS_LABEL[l.status] || l.status}
                           </span>
+                          {followUpLine(l)}
+                          {slaBreached(l, now, LEAD_SLA_URGENT_HOURS) ? (
+                            <span className="mt-1 block text-xs font-medium leading-snug text-destructive">
+                              <span aria-hidden="true" className="me-1 inline-block h-1.5 w-1.5 rounded-full bg-destructive align-middle" />
+                              דחופה, ממתינה מעל {LEAD_SLA_URGENT_HOURS} שעות
+                            </span>
+                          ) : null}
                         </td>
                         {assigns ? (
                           <td className={CELL}>
@@ -702,8 +732,8 @@ export default function Leads() {
               {[
                 { key: "all", title: "סה״כ פניות", value: leads.length, line: "כל הרשומות במערכת" },
                 { key: ATTENTION, title: "דורשות טיפול", value: (counts.new || 0) + (counts.escalated || 0), line: "חדשות, ומי שביקשו את דורית — ליצור קשר" },
-                { key: "contacted", title: "בתהליך", value: counts.contacted || 0, line: "נוצר קשר — להמשיך במכירה" },
-                { key: "closed", title: "נסגרו", value: counts.closed || 0, line: "טופלו והסתיימו" },
+                { key: "in_progress", title: "בתהליך", value: counts.in_progress || 0, line: "נוצר קשר, נקבעה פגישה או נשלחה הצעה" },
+                { key: "client", title: "נסגרו", value: counts.client || 0, line: "הפכו ללקוחות" },
               ].map(({ key, title, value, line }) => {
                 const active = filter === key;
                 return (
@@ -735,7 +765,7 @@ export default function Leads() {
                 ...EXTRA_FILTERS.filter((f) => (!f.adminOnly || assigns) && (!f.staffLeads || STAFF_LEADS)),
               ].map(({ key: s, label }) => {
                 const active = filter === s;
-                const count = s === "all" ? leads.length : counts[s] || 0;
+                const count = s === "all" ? top.length : counts[s] || 0;
                 return (
                   <button
                     key={s}
@@ -768,6 +798,16 @@ export default function Leads() {
               </div>
             </div>
 
+            {slaCount ? (
+              <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <span>
+                  {slaCount === 1 ? "פנייה דחופה אחת ממתינה" : `${slaCount} פניות דחופות ממתינות`} כ״חדשה״ יותר מ-{LEAD_SLA_URGENT_HOURS} שעות.
+                </span>
+                <button type="button" onClick={() => setFilter("sla")} className="font-medium underline underline-offset-4">
+                  הצגה
+                </button>
+              </div>
+            ) : null}
             {writeError && (
               <p role="alert" className="mb-4 text-sm text-destructive">
                 הפעולה האחרונה לא נשמרה. ניתן לנסות שוב.
@@ -843,8 +883,9 @@ export default function Leads() {
     );
     const agenda = staff?.agenda.isSuccess ? agendaCounts(staff.agenda.data ?? [], staff.now) : null;
     const n = (v: number | undefined) => (v === undefined ? "—" : String(v));
-    const today = israelToday(staff?.now ?? new Date());
-    const week = Array.from({ length: 7 }, (_, i) => addDays(endOfWeek(today), i - 6));
+    // The KPI sparklines' week, on the agenda's clock when there is one.
+    const chartDay = israelToday(staff?.now ?? new Date());
+    const week = Array.from({ length: 7 }, (_, i) => addDays(endOfWeek(chartDay), i - 6));
     const meetings = staff?.agenda.data ?? [];
     const perDay = <T,>(items: readonly T[], day: (item: T) => string | null) => week.map((d) => items.filter((item) => day(item) === d).length);
     const attention = (counts.new || 0) + (counts.escalated || 0);
@@ -958,9 +999,10 @@ export default function Leads() {
           </div>
         </main>
 
-          {MEETINGS_STAFF ? (
-            <LeadDrawer
+          <LeadDrawer
               key={drawerStart.seq}
+              showMeetings={MEETINGS_STAFF}
+              activity={openLead ? <LeadActivity lead={openLead} today={today} memberLabel={memberLabel} /> : null}
               lead={openLead}
               initialTab={drawerStart.tab}
               meetingId={drawerStart.meetingId}
@@ -992,7 +1034,6 @@ export default function Leads() {
                 ) : null
               }
             />
-          ) : null}
       </div>
     );
   };

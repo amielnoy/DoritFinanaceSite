@@ -40,6 +40,9 @@ vi.mock("@/hooks/useAdmin", async (importActual) => ({
   useRemoveLead: () => ({ mutate: vi.fn(), isError: false }),
   useMergeLeads: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   useUnmergeLead: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+  useLeadEvents: () => ({ data: [], isPending: false, isError: false }),
+  useAddLeadNote: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useSetFollowUp: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useAssignLead: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useAdminUsers: () => ({ data: [] }),
   useTranscriptLeadIds: () => ({ data: [] }),
@@ -90,10 +93,14 @@ beforeEach(() => {
 });
 
 describe("the lead drawer, behind VITE_MEETINGS_STAFF", () => {
-  it("leaves the table as it was when the switch is off", () => {
+  it("opens the drawer without its meetings tab when the switch is off, and reads no meetings", async () => {
     h.staff = false;
     renderLeads();
-    expect(screen.getByText("יעל כהן").closest("button")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "יעל כהן" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("tab", { name: "פרטים" })).toBeTruthy();
+    expect(within(dialog).getByRole("tab", { name: "פעילות" })).toBeTruthy();
+    expect(within(dialog).queryByRole("tab", { name: /^פגישות/ })).toBeNull();
     expect(h.service.meetings).not.toHaveBeenCalled();
   });
 

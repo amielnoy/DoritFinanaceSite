@@ -156,6 +156,33 @@ export function useUnmergeLead() {
   });
 }
 
+/** A lead's activity log, newest first (the drawer's "פעילות" tab). */
+export function useLeadEvents(leadId: string, enabled = true) {
+  return useQuery({
+    queryKey: [...adminKeys.leads, "events", leadId],
+    queryFn: () => services.leadsAdmin.leadEvents(leadId),
+    enabled: enabled && Boolean(leadId),
+  });
+}
+
+/** "הוספת הערה": a note in the lead's log. */
+export function useAddLeadNote() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ leadId, text }: { leadId: string; text: string }) => services.leadsAdmin.addLeadNote(leadId, text),
+    onSuccess: (_, { leadId }) => client.invalidateQueries({ queryKey: [...adminKeys.leads, "events", leadId] }),
+  });
+}
+
+/** The day of the lead's next follow-up, or none. The list and the log both change. */
+export function useSetFollowUp() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ leadId, on }: { leadId: string; on: string | null }) => services.leadsAdmin.setFollowUp(leadId, on),
+    onSuccess: () => client.invalidateQueries({ queryKey: adminKeys.leads }),
+  });
+}
+
 export function useRemoveLead() {
   const client = useQueryClient();
   return useMutation({

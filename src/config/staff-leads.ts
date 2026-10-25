@@ -32,7 +32,7 @@ export const NOTICE_LABELS: Record<NoticeMethod, string> = {
 export const STAFF_STATUS_LABELS: Record<"new" | "contacted" | "client", string> = {
   new: "חדשה",
   contacted: "נוצר קשר",
-  client: "לקוח/ה",
+  client: "נסגר (לקוח/ה)",
 };
 
 // DRAFT for the compliance adviser: wording not yet approved (staff-leads spec D6).
