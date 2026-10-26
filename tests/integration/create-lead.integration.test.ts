@@ -345,3 +345,112 @@ describe("create-lead — the people told", () => {
     expect(r.json.leadId).toBe(NEW_ID);
   });
 });
+
+describe("create-lead — a client (kind 'client', behind STAFF_CLIENTS)", () => {
+  const on = { envPatch: { STAFF_CLIENTS: "true" } };
+  const client = { ...good, kind: "client", status: undefined, topic: undefined, intake: "existing_client", notice: "agreement", clientSince: "2019-03", products: ["pension", "health"] };
+
+  it("refuses a client with 400 and no RPC call when the server's switch is off", async () => {
+    const s = fakeSupabase();
+    const r = await create(client, USER, s);
+    expect(r.status).toBe(400);
+    expect(String(r.json.error)).toMatch(/[א-ת]/);
+    expect(r.json).toHaveProperty("rid");
+    expect(s.rpcCalls).toEqual([]);
+  });
+
+  it("sends the RPC a client: p_as_client, the month as its first day, the products, status client", async () => {
+    const s = fakeSupabase();
+    const r = await create(client, USER, s, on);
+    expect(r.status).toBe(200);
+    expect(s.rpcCalls[0].body).toMatchObject({
+      p_as_client: true, p_client_since: "2019-03-01", p_products: ["pension", "health"], p_status: "client", p_notice: "agreement",
+    });
+  });
+
+  it("sends none of the client arguments for a lead, so the old call is unchanged", async () => {
+    const s = fakeSupabase();
+    await create(good, USER, s, on);
+    for (const key of ["p_as_client", "p_client_since", "p_products"]) expect(s.rpcCalls[0].body).not.toHaveProperty(key);
+  });
+
+  it.each([
+    ["agreement on a lead", { ...good, notice: "agreement" }],
+    ["a month that is not one", { ...client, clientSince: "2019-13" }],
+    ["a date, not a month", { ...client, clientSince: "2019-03-01" }],
+    ["no products", { ...client, products: [] }],
+    ["an unknown product", { ...client, products: ["pension", "crypto"] }],
+    ["products that are not a list", { ...client, products: "pension" }],
+    ["an unknown kind", { ...client, kind: "household" }],
+  ])("refuses %s with 400 and no RPC call", async (_label, body) => {
+    const s = fakeSupabase();
+    const r = await create(body, USER, s, on);
+    expect(r.status).toBe(400);
+    expect(String(r.json.error)).toMatch(/[א-ת]/);
+    expect(s.rpcCalls).toEqual([]);
+  });
+
+  it.each([["bad_since"], ["bad_products"]])("maps the RPC's %s to a Hebrew 400", async (reason) => {
+    const s = fakeSupabase({ rpc: { status: 400, body: { code: "22023", message: reason } } });
+    const r = await create(client, USER, s, on);
+    expect(r.status).toBe(400);
+    expect(JSON.stringify(r.json)).not.toContain(reason);
+    expect(String(r.json.error)).toMatch(/[א-ת]/);
+  });
+
+  it("mails the client notice, not the enquiry one, when told by email", async () => {
+    const s = fakeSupabase();
+    const r = await create({ ...client, notice: "email" }, USER, s, on);
+    expect(r.json.noticeSent).toBe(true);
+    const mail = r.emails.find((e) => e.to === "client@example.com");
+    expect(mail?.text).toContain("הסכם ההתקשרות");
+    expect(mail?.text).not.toContain("24 חודשים");
+  });
+
+  it("sends nothing to the client when told in the agreement", async () => {
+    const s = fakeSupabase();
+    const r = await create(client, USER, s, on);
+    expect(r.json.noticeSent).toBeNull();
+    expect(r.emails.some((e) => e.to === "client@example.com")).toBe(false);
+  });
+
+  it("tells the admins a client was added, with the product lines, never the name, phone or email", async () => {
+    const s = fakeSupabase();
+    const r = await create(client, USER, s, on);
+    const ops = r.emails.filter((e) => e.to === "admin@example.com");
+    expect(ops).toHaveLength(1);
+    const all = `${ops[0].subject}\n${ops[0].text}\n${ops[0].html}`;
+    expect(ops[0].subject).toContain("הוסיף/ה לקוח/ה");
+    expect(all).toContain("פנסיה, בריאות וסיעוד");
+    for (const secret of ["ישראל ישראלי", "0501234567", "client@example.com"]) expect(all).not.toContain(secret);
+  });
+
+  it("writes the sheet row with the summary cell starting 'לקוח/ה ·', and no new column", async () => {
+    const s = fakeSupabase();
+    const r = await create(client, USER, s, on);
+    const row = r.sheetRows[0].row;
+    expect(row).toHaveLength(19);
+    expect(row[1]).toBe("staff_lead");
+    expect(row[2]).toBe("staff");
+    expect(String(row[12])).toBe("לקוח/ה · פנסיה, בריאות וסיעוד");
+  });
+
+  it("answers what can come next: the invite when there is an email, the clearinghouse when it is on", async () => {
+    const s = fakeSupabase();
+    const withEmail = await create(client, USER, s, on);
+    expect(withEmail.json.next).toEqual({ invite: true, masleka: false });
+    const noEmail = await create({ ...client, email: undefined, phone: "050-765 4321" }, USER, fakeSupabase(), {
+      envPatch: { STAFF_CLIENTS: "true", MASLEKA_ENABLED: "true" },
+    });
+    expect(noEmail.json.next).toEqual({ invite: false, masleka: true });
+    const lead = await create(good, USER, fakeSupabase(), on);
+    expect(lead.json).not.toHaveProperty("next");
+  });
+
+  it("still answers 409 for a visible duplicate, with that lead's id", async () => {
+    const s = fakeSupabase({ rpc: { lead_id: OTHER_ID, duplicate: "visible" } });
+    const r = await create(client, USER, s, on);
+    expect(r.status).toBe(409);
+    expect(r.json).toMatchObject({ duplicate: "visible", leadId: OTHER_ID });
+  });
+});

@@ -3,7 +3,12 @@
  * or spoke to themselves (docs/superpowers/specs/2026-10-20-staff-lead-design.md).
  *
  * POST { agencyId, name, phone, email?, topic?, notes?, intake, referrer?,
- *        status, notice, assignee?, duplicateOk? } with the caller's session.
+ *        status, notice, assignee?, duplicateOk?,
+ *        kind?, clientSince?, products? } with the caller's session.
+ *   kind 'client' (docs/superpowers/specs/2026-10-22-staff-client-design.md):
+ *   someone who is already a client — status is always client, with since-when
+ *   (YYYY-MM) and the product lines, and may be told "in the agreement". Refused
+ *   unless the server's STAFF_CLIENTS is on, whatever the browser's flag says.
  *   0. Agency 1 only: the privacy notice names Dorit's agency, and no other
  *      agency has its own text yet.
  *   1. The session, then at least User in that agency (_shared/staff.ts).
@@ -28,12 +33,13 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, sendMail } from '../_shared/mail.ts';
-import { AGENCY_1, normalizePhone } from '../_shared/masleka.ts';
+import { AGENCY_1, maslekaEnabled, normalizePhone } from '../_shared/masleka.ts';
 import { opsNotice, type OpsRow } from '../_shared/ops-notice.ts';
 import { contactPhone } from '../_shared/phone.ts';
 import { callRpc, refusalReason, selectRows } from '../_shared/rest.ts';
 import { appendSheetRow } from '../_shared/sheets.ts';
 import { requireAgencyRole } from '../_shared/staff.ts';
+import { isProduct, PRODUCT_LABELS, staffClientsEnabled, type Product } from '../_shared/staff-clients.ts';
 import { assignmentMail } from '../assign-lead/handler.ts';
 import { redact, SHEET_COLUMNS, SHEET_TAB } from '../submit-lead/lead.js';
 import { noticeMail } from './notice.ts';
@@ -45,6 +51,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const INTAKES = ['phone', 'in_person', 'referral', 'event', 'existing_client', 'other'];
 const STATUSES = ['new', 'contacted', 'client'];
 const NOTICES = ['verbal', 'email', 'whatsapp'];
+/** A client may also have been told in the engagement agreement. */
+const CLIENT_NOTICES = [...NOTICES, 'agreement'];
+/** clientSince: a month, YYYY-MM. Not in the future and not before 1990 is the RPC's to say. */
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** The same limits create_staff_lead enforces; the function refuses first, in Hebrew. */
 const LIMITS = { name: 80, phone: 30, email: 254, topic: 200, notes: 2000, referrer: 120 };
 
@@ -60,6 +70,8 @@ const REFUSALS: Record<string, string> = {
   assignee_not_member: 'מי שנבחר/ה אינו/ה חבר/ת הסוכנות.',
   rate_limited: 'יותר מדי פניות בשעה האחרונה. נסו שוב מאוחר יותר.',
   agency_not_enabled: 'הוספת פנייה פתוחה בסוכנות הזו רק כשיהיה לה נוסח יידוע משלה.',
+  bad_since: 'החודש שבו התחילה ההתקשרות אינו תקין.',
+  bad_products: 'יש לבחור לפחות תחום אחד מהרשימה.',
 };
 /** Each refusal is a 400 unless named here. */
 const REFUSAL_STATUS: Record<string, number> = { rate_limited: 429, bad_phone: 422, field_invalid: 422, agency_not_enabled: 403 };
@@ -112,6 +124,14 @@ export async function handler(req: Request): Promise<Response> {
       return json({ error: REFUSALS.agency_not_enabled }, 403);
     }
 
+    const kind = body.kind === undefined ? 'lead' : body.kind;
+    if (kind !== 'lead' && kind !== 'client') return json({ error: 'סוג הרשומה אינו מוכר.' }, 400);
+    const asClient = kind === 'client';
+    if (asClient && !staffClientsEnabled()) {
+      log('warn', 'create.clients_off', { rid });
+      return json({ error: 'הוספת לקוח/ה אינה פעילה כרגע.' }, 400);
+    }
+
     const gate = await requireAgencyRole(req, agencyId, 'user', rid, log);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
 
@@ -119,7 +139,8 @@ export async function handler(req: Request): Promise<Response> {
     const phone = text(body.phone);
     const email = text(body.email).toLowerCase();
     const intake = text(body.intake);
-    const status = text(body.status);
+    // A client is a client: the status the form shows for a lead is not read.
+    const status = asClient ? 'client' : text(body.status);
     const notice = text(body.notice);
     const assignee = text(body.assignee).toLowerCase();
 
@@ -136,9 +157,21 @@ export async function handler(req: Request): Promise<Response> {
     if (email && !isEmail(email)) return json({ error: 'כתובת הדוא״ל אינה תקינה.' }, 400);
     if (!INTAKES.includes(intake)) return json({ error: REFUSALS.bad_intake }, 400);
     if (!STATUSES.includes(status)) return json({ error: REFUSALS.bad_status }, 400);
-    if (!NOTICES.includes(notice)) return json({ error: REFUSALS.bad_notice }, 400);
+    if (!(asClient ? CLIENT_NOTICES : NOTICES).includes(notice)) return json({ error: REFUSALS.bad_notice }, 400);
     if (notice === 'email' && !email) return json({ error: 'כדי להודיע במייל יש להזין כתובת דוא״ל.' }, 400);
     if (assignee && assignee !== NO_ASSIGNEE && !UUID.test(assignee)) return json({ error: REFUSALS.assignee_not_member }, 400);
+    let clientSince = '';
+    let products: Product[] = [];
+    if (asClient) {
+      const since = text(body.clientSince);
+      if (!MONTH.test(since)) return json({ error: REFUSALS.bad_since }, 400);
+      clientSince = `${since}-01`;
+      if (!Array.isArray(body.products) || body.products.length === 0 || !body.products.every(isProduct)) {
+        return json({ error: REFUSALS.bad_products }, 400);
+      }
+      products = [...new Set(body.products as Product[])];
+    }
+    const productLabels = products.map((p) => PRODUCT_LABELS[p]).join(', ');
 
     if (!(await withinLimit(log, rid, `staff-lead:${gate.userId}`, 3600, 60))) {
       log('warn', 'limit.exceeded', { rid, userId: gate.userId });
@@ -168,6 +201,8 @@ export async function handler(req: Request): Promise<Response> {
           p_notice: notice,
           p_assignee: assignTo,
           p_duplicate_ok: body.duplicateOk === true,
+          // Only for a client: a lead's call names the twelve it always did.
+          ...(asClient ? { p_as_client: true, p_client_since: clientSince, p_products: products } : {}),
         },
         gate.token,
       );
@@ -192,7 +227,7 @@ export async function handler(req: Request): Promise<Response> {
       log('info', 'create.duplicate_visible', { rid, userId: gate.userId, leadId });
       return json({ duplicate, leadId }, 409);
     }
-    log('info', 'create.ok', { rid, userId: gate.userId, agencyId, leadId, duplicate, intake, status, notice });
+    log('info', 'create.ok', { rid, userId: gate.userId, agencyId, leadId, duplicate, kind, intake, status, notice });
 
     const warnings: string[] = [];
 
@@ -211,7 +246,8 @@ export async function handler(req: Request): Promise<Response> {
         normalized,
         email,
         leadId,
-        ...SHEET_COLUMNS.slice(11).map(() => ''),
+        // A client's row says so in the summary cell, with the product lines: no new column.
+        ...SHEET_COLUMNS.slice(11).map((column) => (asClient && column === 'תקציר' ? `לקוח/ה · ${productLabels}` : '')),
       ]);
       log('info', 'sheet.appended', { rid, tab: SHEET_TAB, status: sheetStatus });
     } catch (e) {
@@ -243,9 +279,10 @@ export async function handler(req: Request): Promise<Response> {
       const ids = [...new Set(members.map((m) => String(m.user_id ?? '')).filter((id) => /^[\w-]+$/.test(id)))];
       const mine = await selectRows('profiles', `id=eq.${gate.userId}&select=email`);
       const who = typeof mine[0]?.email === 'string' && mine[0].email ? mine[0].email : 'חבר/ת צוות';
-      const title = duplicate === 'hidden' ? `כפילות אפשרית: ${who} הוסיף/ה פנייה` : `${who} הוסיף/ה פנייה`;
+      const added = `${who} הוסיף/ה ${asClient ? 'לקוח/ה' : 'פנייה'}`;
+      const title = duplicate === 'hidden' ? `כפילות אפשרית: ${added}` : added;
       const rows: OpsRow[] = [
-        ['נושא', topic],
+        asClient ? ['תחומים', productLabels] : ['נושא', topic],
         ['מזהה רשומה', leadId],
         ...(duplicate === 'hidden' ? [['כפילות', 'כפילות אפשרית — הפנייה מסומנת במסך הפניות'] as OpsRow] : []),
       ];
@@ -281,7 +318,7 @@ export async function handler(req: Request): Promise<Response> {
           log('warn', 'notice.rate_limited', { rid, userId: gate.userId });
           warnings.push('notice_rate_limited');
         } else {
-          await sendMail(log, { to: email, ...noticeMail(), rid, role: 'client' });
+          await sendMail(log, { to: email, ...noticeMail(asClient ? 'client' : 'lead'), rid, role: 'client' });
           noticeSent = true;
         }
       } catch (e) {
@@ -292,7 +329,11 @@ export async function handler(req: Request): Promise<Response> {
     }
 
     log('info', 'request.end', { rid, ms: Date.now() - startedAt, leadId, noticeSent, warnings: warnings.length });
-    return json({ leadId, duplicate, noticeSent, ...(warnings.length ? { warnings } : {}) });
+    // What the sheet can offer next, so it doesn't guess: the personal-area
+    // invite needs an email; a clearinghouse request needs the clearinghouse on
+    // (every role holds masleka.create).
+    const next = asClient ? { next: { invite: Boolean(email), masleka: maslekaEnabled() } } : {};
+    return json({ leadId, duplicate, noticeSent, ...next, ...(warnings.length ? { warnings } : {}) });
   } catch (e) {
     log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String((e as Error)?.message ?? e).slice(0, 200) });
     return json({ error: 'הוספת הפנייה נכשלה. נסו שוב.' }, 500);

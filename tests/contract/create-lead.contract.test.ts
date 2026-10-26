@@ -68,4 +68,16 @@ describe("create-lead — a member's act, written by the database", () => {
   it("labels its sheet row with a code, like every other event", () => {
     expect(fn).toMatch(/appendSheetRow\(SHEET_TAB, SHEET_COLUMNS\.length, \[[^\]]*?'staff_lead',\s*'staff',/);
   });
+
+  it("refuses a client on the server's own switch before the session or the RPC", () => {
+    expect(fn).toContain("if (asClient && !staffClientsEnabled())");
+    const check = fn.indexOf("!staffClientsEnabled()");
+    expect(check).toBeLessThan(fn.indexOf("requireAgencyRole("));
+    expect(check).toBeLessThan(fn.indexOf("callRpc("));
+  });
+
+  it("sends the client arguments only for a client, and never opened_as or a consent", () => {
+    expect(fn).toContain("...(asClient ? { p_as_client: true, p_client_since: clientSince, p_products: products } : {})");
+    expect(fn).not.toMatch(/p_opened_as|p_consent/);
+  });
 });
