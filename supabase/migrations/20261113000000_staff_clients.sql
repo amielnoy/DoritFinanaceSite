@@ -33,13 +33,17 @@ alter table public.leads add constraint leads_agreement_notice check (
 
 -- ── guard: opened_as joins the fixed fields ───────────────────────────────
 -- Body of 20261105000000_staff_leads.sql with opened_as added to the fixed
--- list. client_since and products are not fixed: they follow leads_update_*.
+-- list. client_since and products are not fixed: they follow leads_update_*,
+-- but a person may set them only on a client, and only to what
+-- client_fields_ok allows — else a direct PATCH of client_since on any lead
+-- would take it out of the 24-month anonymisation, which skips such rows.
 create or replace function public.leads_guard_staff_fields() returns trigger
   language plpgsql
   set search_path = ''
 as $$
 declare
   v_person boolean := current_user in ('authenticated', 'anon');
+  v_err    text;
 begin
   if v_person and not public.is_admin() then
     if new.brought_by is distinct from old.brought_by
@@ -55,6 +59,17 @@ begin
     if new.possible_duplicate is distinct from old.possible_duplicate then
       if new.possible_duplicate or not public.has_role(old.agency_id, 'admin') then
         raise exception 'forbidden' using errcode = '42501';
+      end if;
+    end if;
+
+    -- A client's since-when and service lines: on a client only, and checked.
+    if new.client_since is distinct from old.client_since or new.products is distinct from old.products then
+      if new.status <> 'client' and new.opened_as <> 'client' then
+        raise exception 'field_invalid' using errcode = '22023';
+      end if;
+      v_err := public.client_fields_ok(new.client_since, new.products);
+      if v_err is not null then
+        raise exception '%', v_err using errcode = '22023';
       end if;
     end if;
   end if;

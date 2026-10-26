@@ -75,6 +75,33 @@ do $$ begin
 end $$;
 reset role;
 
+-- ── a person sets since-when and lines on a client only, and only valid ones ──
+-- Retention skips a row with client_since: a direct PATCH must not buy any lead that.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"ffffffff-0000-0000-0000-0000000000c2","role":"authenticated"}';
+do $$ begin
+  begin
+    update public.leads set client_since = date '2019-01-01', products = array['pension']
+     where id = '11111111-0000-0000-0000-0000000000c2';
+    raise exception 'a User set client_since on a lead that is not a client';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'field_invalid' then raise; end if;
+  end;
+  begin
+    update public.leads set client_since = date '2099-01-01' where id = '11111111-0000-0000-0000-0000000000c1';
+    raise exception 'a User set a client_since in the future';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'bad_since' then raise; end if;
+  end;
+  begin
+    update public.leads set products = array[]::text[] where id = '11111111-0000-0000-0000-0000000000c1';
+    raise exception 'a User emptied a client''s products';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'bad_products' then raise; end if;
+  end;
+end $$;
+reset role;
+
 -- ── retention: a client-opened row survives, a plain stale lead does not ──
 -- leads_touch would stamp updated_at = now() and make the row recent; off for
 -- this one update (rolled back with everything else).

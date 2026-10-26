@@ -127,7 +127,6 @@ export default function NewLeadSheet({
   };
   const notice = asClient ? STAFF_CLIENT_NOTICE : STAFF_INTAKE_NOTICE;
   const methods: NoticeMethod[] = asClient ? CLIENT_NOTICE_METHODS : METHODS;
-  const noun = asClient ? "הלקוח/ה" : "הפנייה";
 
   const submit = async (duplicateOk: boolean) => {
     if (!valid || !intake || !method || busy) return;
@@ -151,7 +150,11 @@ export default function NewLeadSheet({
             kind: asClient ? "other" : "first", topic: asClient ? "" : topic || "",
           });
         } catch {
-          toast({ description: `${noun} נוספ/ה, אבל הפגישה לא נשמרה. ניתן להוסיף אותה מהכרטיס.` });
+          toast({
+            description: asClient
+              ? "הלקוח/ה נוספ/ה, אבל הפגישה לא נשמרה. ניתן להוסיף אותה מכרטיס הלקוח/ה."
+              : "הפנייה נוצרה, אבל הפגישה לא נשמרה. ניתן להוסיף אותה מכרטיס הפנייה.",
+          });
         }
       }
       const hidden = created.duplicate === "hidden";
@@ -167,7 +170,7 @@ export default function NewLeadSheet({
         onCreated(created.leadId);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : `${noun} לא נשמר/ה. ניתן לנסות שוב.`);
+      setError(e instanceof Error ? e.message : asClient ? "הלקוח/ה לא נשמר/ה. ניתן לנסות שוב." : "הפנייה לא נשמרה. ניתן לנסות שוב.");
     } finally {
       setBusy(false);
     }

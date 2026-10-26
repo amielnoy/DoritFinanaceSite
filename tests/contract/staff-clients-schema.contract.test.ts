@@ -74,9 +74,11 @@ describe("staff clients, schema", () => {
     for (const col of ["brought_by", "source", "intake", "consent_version", "consent_at", "notice_method", "opened_as"]) {
       expect(guard).toContain(`new.${col} is distinct from old.${col}`);
     }
-    // client_since and products follow the update policies, like notes.
-    expect(guard).not.toContain("client_since");
-    expect(guard).not.toContain("products");
+    // client_since and products follow the update policies, but a person sets
+    // them on a client only, and through the same check as the RPCs: retention
+    // skips a row with client_since.
+    expect(squash(guard)).toContain("if new.status <> 'client' and new.opened_as <> 'client' then raise exception 'field_invalid'");
+    expect(guard).toContain("public.client_fields_ok(new.client_since, new.products)");
   });
 
   it("keeps client-opened rows out of the 24-month anonymisation", () => {

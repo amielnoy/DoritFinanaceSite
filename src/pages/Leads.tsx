@@ -1117,7 +1117,8 @@ export default function Leads() {
                       <LeadDetails lead={openLead} compact={false} />
                       {withTranscript.has(openLead.id) && <LeadTranscript leadId={openLead.id} />}
                     </dd>
-                    {clientsOn() && openLead.status === "client" ? (
+                    {/* Not on a merged lead: it is history, and convert_lead_to_client would write to its main lead. */}
+                    {clientsOn() && openLead.status === "client" && !openLead.mergedInto ? (
                       <dd className="col-span-2">
                         <LeadClientFields key={openLead.id} lead={openLead} />
                       </dd>
