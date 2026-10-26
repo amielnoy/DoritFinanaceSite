@@ -28,9 +28,10 @@ do $$ begin
   if not public.allow_submission('check:a', 3600, 2) then raise exception 'an expired request still counted'; end if;
 end $$;
 
--- Rows older than a day are pruned on the way through.
+-- Rows past their own window are pruned on the way through (20261114000000:
+-- by expires_at, no longer by a fixed day).
 reset role;
-insert into public.submission_limits (key, at) values ('check:old', now() - interval '25 hours');
+insert into public.submission_limits (key, at, expires_at) values ('check:old', now() - interval '25 hours', now() - interval '1 hour');
 set local role service_role;
 do $$ begin
   perform public.allow_submission('check:c', 3600, 5);
