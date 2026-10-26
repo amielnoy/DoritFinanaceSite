@@ -36,7 +36,9 @@ describe("GA4 on the admin area", () => {
   it("is switched off by index.html, before the tag is configured, for a page that loads on /admin", () => {
     const html = readFileSync("index.html", "utf8");
     const script = /<script>\s*(window\.dataLayer[\s\S]*?)<\/script>/.exec(html)![1];
-    const optOut = script.indexOf(`window['${FLAG}'] = true`);
+    // Since VITE_GA_CONSENT the script names the id once (`var id`) and builds the flag from it.
+    expect(FLAG).toBe(`ga-disable-${/var id = '([^']+)'/.exec(script)![1]}`);
+    const optOut = script.indexOf("window['ga-disable-' + id] = true");
     expect(optOut).toBeGreaterThan(-1);
     expect(optOut).toBeLessThan(script.indexOf("gtag('config'"));
     // The page's own copy of the rule, run on the paths above.

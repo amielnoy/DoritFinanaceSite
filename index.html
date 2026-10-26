@@ -136,15 +136,30 @@
     }
     </script>
 
-    <!-- Google Analytics 4 -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-LLSYPMGV58"></script>
+    <!-- Google Analytics 4. With VITE_GA_CONSENT on, only after the visitor agreed (src/lib/consent.ts). The flag
+         reaches the script through this meta, so the script's text and its CSP hash in vercel.json never change. -->
+    <meta name="ga-consent" content="%VITE_GA_CONSENT%" />
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag() { dataLayer.push(arguments); }
-      // The admin area is never measured: its URLs carry searches and record ids (src/lib/analytics.ts, measureRoute).
-      if (/^\/admin(\/|$)/.test(location.pathname)) window['ga-disable-G-LLSYPMGV58'] = true;
-      gtag('js', new Date());
-      gtag('config', 'G-LLSYPMGV58');
+      (function () {
+        var id = 'G-LLSYPMGV58';
+        var meta = document.querySelector('meta[name="ga-consent"]');
+        var choice = null;
+        try { choice = localStorage.getItem('ga-consent'); } catch (e) {}
+        // Asked, and not (yet) agreed: no gtag at all, so nothing is sent or queued.
+        if (meta && meta.content === 'true' && choice !== 'granted') return;
+        window.gtag = function () { dataLayer.push(arguments); };
+        // The admin area is never measured: its URLs carry searches and record ids (src/lib/analytics.ts, measureRoute).
+        if (/^\/admin(\/|$)/.test(location.pathname)) window['ga-disable-' + id] = true;
+        gtag('js', new Date());
+        gtag('config', id);
+        if (!document.querySelector('script[src^="https://www.googletagmanager.com/gtag/js"]')) {
+          var s = document.createElement('script');
+          s.async = true;
+          s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+          document.head.appendChild(s);
+        }
+      })();
       try { var theme = localStorage.getItem('theme'); if (theme === 'dark' || (!theme && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark'); } catch (e) {}
     </script>
 

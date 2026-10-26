@@ -31,6 +31,8 @@ interface ImportMetaEnv {
   readonly VITE_STAFF_LEADS?: string;
   /** Staff-added clients — on only when exactly "true" (and VITE_STAFF_LEADS); see `src/config/staff-clients.ts`. */
   readonly VITE_STAFF_CLIENTS?: string;
+  /** "true" asks before Google Analytics loads (src/lib/consent.ts). Off: GA4 loads as it always has. */
+  readonly VITE_GA_CONSENT?: string;
   /** Agency content from the database — on only when exactly "true"; see `src/config/agency-content.ts`. */
   readonly VITE_AGENCY_CONTENT?: string;
   readonly VITE_SNAPSHOT_HOME?: string;
