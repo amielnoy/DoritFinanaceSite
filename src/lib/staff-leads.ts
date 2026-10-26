@@ -1,5 +1,6 @@
 import type { LeadRecord } from "@/services";
-import { INTAKE_LABELS, NOTICE_LABELS } from "@/config/staff-leads";
+import { INTAKE_LABELS } from "@/config/staff-leads";
+import { CLIENT_NOTICE_LABELS } from "@/config/staff-clients";
 import { israelToday } from "@/lib/wall-clock";
 
 /** What the list says for a `broughtBy` that is no longer among the agency's members. */
@@ -33,6 +34,6 @@ export function broughtThisMonth(leads: LeadRecord[], now: Date): Map<string, nu
 export function staffLeadLine(lead: LeadRecord, memberLabel: (id: string | null) => string): string | null {
   if (lead.source !== "staff") return null;
   const intake = lead.intake ? INTAKE_LABELS[lead.intake] : "—";
-  const notice = lead.noticeMethod ? NOTICE_LABELS[lead.noticeMethod] : "—";
+  const notice = lead.noticeMethod ? CLIENT_NOTICE_LABELS[lead.noticeMethod] : "—";
   return `נוספה ידנית ע״י ${memberLabel(lead.broughtBy ?? null)} · ${intake} · יידוע: ${notice}`;
 }

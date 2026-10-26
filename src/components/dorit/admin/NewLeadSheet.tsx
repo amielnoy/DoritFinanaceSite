@@ -9,7 +9,7 @@ import { MEETINGS_STAFF } from "@/config/meetings";
 import { MEETING_TOPICS } from "@/config/needs-wizard";
 import {
   INTAKE_LABELS, NOTICE_LABELS, STAFF_INTAKE_NOTICE, STAFF_STATUS_LABELS,
-  type Intake, type NoticeMethod,
+  type Intake, type LeadNoticeMethod, type NoticeMethod,
 } from "@/config/staff-leads";
 import { isContactPhone } from "@/lib/phone";
 import { MEETING_MODE_LABEL, type MeetingMode } from "@/lib/meetings";
@@ -27,7 +27,7 @@ type Status = keyof typeof STAFF_STATUS_LABELS;
 type Done = { leadId: string; hidden: boolean; noticeFailed: boolean };
 
 const INTAKES = Object.keys(INTAKE_LABELS) as Intake[];
-const METHODS = Object.keys(NOTICE_LABELS) as NoticeMethod[];
+const METHODS = Object.keys(NOTICE_LABELS) as LeadNoticeMethod[];
 const TOPICS = [...MEETING_TOPICS, "אחר"];
 const button = (extra = "", muted = false) => ctaClass(`min-h-11 px-4 text-base ${extra}`, { muted });
 const dateOf = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
