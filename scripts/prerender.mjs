@@ -132,7 +132,18 @@ function restoreAsyncFont(html) {
  * working.
  */
 function dropVercelBeacon(html) {
-  return html.replace(/<script\b[^>]*\bsrc="\/_vercel\/[^"]*"[^>]*><\/script>/g, '')
+  return dropGaTag(html.replace(/<script\b[^>]*\bsrc="\/_vercel\/[^"]*"[^>]*><\/script>/g, ''))
+}
+
+/**
+ * Drop the GA4 library tag index.html's inline script adds. The capture runs
+ * that script, so without this every prerendered page would ship the tag as
+ * markup: loaded before any consent with VITE_GA_CONSENT on, and loaded twice
+ * otherwise. The inline script itself stays and adds the tag at load when it
+ * should (src/lib/consent.ts).
+ */
+function dropGaTag(html) {
+  return html.replace(/<script\b[^>]*\bsrc="https:\/\/www\.googletagmanager\.com\/gtag\/js[^"]*"[^>]*><\/script>/g, '')
 }
 
 /**

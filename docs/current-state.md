@@ -57,6 +57,7 @@ Vercel's environment variables, not here.
 | Call briefing | `VITE_LEAD_BRIEFING=true` shows "תדריך" in the lead drawer; the `lead-briefing` function also needs `LEAD_BRIEFING_MONTHLY_BUDGET_USD` above 0 (default 0, off). Both off until the privacy line and the adviser's sign-off (`docs/COMPLIANCE.md` §12) ([config](../src/config/lead-briefing.ts)) |
 | Staff-entered leads | `VITE_STAFF_LEADS=true` shows "פנייה חדשה" on the leads screen for a member of agency 1, through `create-lead` and the `staff-intake-v1` notice ([config](../src/config/staff-leads.ts)). On in production since 2026-10-26; the adviser's approval of `staff-intake-v1` was still open then |
 | Clients added by hand | `VITE_STAFF_CLIENTS=true` (with `VITE_STAFF_LEADS`) turns "פנייה חדשה" into "הוספה" with a client mode, product tags, "נפתחו כלקוחות" and the drawer's client fields; `create-lead` (kind `client`) and `invite-client` also need the Supabase secret `STAFF_CLIENTS=true` (exactly lowercase `true`). The privacy policy shows its line on these clients (section 2) with the same two build switches. All three on in production since 2026-10-26; the adviser's approval of the `staff-client-v1` notice and that line was still open then ([config](../src/config/staff-clients.ts)) |
+| Analytics consent | `VITE_GA_CONSENT=true` loads GA4 only after the visitor's "אישור" in a consent card (bottom-right on desktop, above the phone's contact bar), with "הגדרות עוגיות" in the footer and a line in the privacy policy (section 6). Off: GA4 loads on every page as before. The flag reaches `index.html` through `<meta name="ga-consent">`, so the inline script's CSP hash is the same either way. Off until Dorit's adviser decides ([consent](../src/lib/consent.ts), [COMPLIANCE §8](COMPLIANCE.md)) |
 | Client meetings | `VITE_MEETINGS_STAFF` (the lead drawer's meetings) and `VITE_MEETINGS_CLIENT` ("הפגישות שלי" in `/account`), each off by default ([config](../src/config/meetings.ts)) |
 | Public agency content | `VITE_AGENCY_CONTENT=true` plus a configured client reads `public_agency_sites`, `public_agent_cards` and `success_cases` for the agency that claims the host name. Otherwise, while loading, on any error and for a non-Hebrew locale, the bundled agency-1 constants are used. The prerender always uses the constants ([config](../src/config/agency-content.ts)) |
 
@@ -152,7 +153,7 @@ Never return internal exception messages or log personal data. Keep request IDs
 through the response and logs. Analytics goes through `src/lib/analytics.ts` and
 its restricted parameters; saved leads count only after successful persistence.
 GA4 disclosure and consent remain an open compliance item in
-[COMPLIANCE.md](COMPLIANCE.md).
+[COMPLIANCE.md](COMPLIANCE.md); the banner and policy line wait behind `VITE_GA_CONSENT`.
 
 ## Verification and document maintenance
 

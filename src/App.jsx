@@ -18,6 +18,7 @@ import SeoRouteGuard from '@/components/SeoRouteGuard';
 // `/react`, not `/next`: Vercel's docs lead with the Next entry, which pulls
 // `next/navigation` and has nothing to bind to in a Vite SPA.
 import { Analytics } from '@vercel/analytics/react';
+import ConsentBanner from '@/components/dorit/layout/ConsentBanner';
 import { stripFragment } from '@/lib/vercel-analytics';
 // Add page imports here
 // The home page is the marketing entry point and the LCP path, so it stays in
@@ -229,6 +230,8 @@ function App() {
           <DraftOwnerRedirect />
           <AnalyticsRouteGuard />
           <SeoRouteGuard />
+          {/* The question before Google Analytics; renders nothing unless VITE_GA_CONSENT is on. */}
+          <ConsentBanner />
           {/* Mounted only where its endpoint exists. The beacon posts to
               `/_vercel/insights/*`, a path Vercel's edge synthesises and no
               other host serves — so on Base44, while it was production, the

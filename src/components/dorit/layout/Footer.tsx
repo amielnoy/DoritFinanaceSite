@@ -8,6 +8,7 @@ import { useSectionNav } from "@/hooks/useSectionNav";
 import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
 import type { KeyOf } from "@/i18n/resources";
+import { GA_CONSENT, reopenConsent } from "@/lib/consent";
 
 // Half the 1400px band from md up; the band is hidden below md.
 const HANDSHAKE = "/images/footer-handshake";
@@ -169,6 +170,9 @@ export default function Footer() {
             <Link to={lp("/faq")} className={FOOT_LINK}>{t("nav.faq")}</Link>
             <Link to="/privacy" className={FOOT_LINK}>{t("footer.privacy")}{locale === "he" ? "" : ` ${t("lang.hebrewOnly")}`}</Link>
             <Link to="/accessibility" className={FOOT_LINK}>{t("footer.accessibility")}{locale === "he" ? "" : ` ${t("lang.hebrewOnly")}`}</Link>
+            {GA_CONSENT ? (
+              <button type="button" onClick={reopenConsent} className={FOOT_LINK}>{t("footer.cookies")}</button>
+            ) : null}
           </div>
         </div>
         <div className="max-w-[1400px] mx-auto px-[clamp(20px,4vw,40px)] pb-6 flex flex-col md:flex-row items-center justify-between gap-3 text-sm text-muted-foreground-on-dark">

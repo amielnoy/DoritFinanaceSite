@@ -8,6 +8,7 @@ import { MEETINGS_CLIENT } from "@/config/meetings";
 import { LEAD_BRIEFING } from "@/config/lead-briefing";
 import { STAFF_LEADS } from "@/config/staff-leads";
 import { STAFF_CLIENTS } from "@/config/staff-clients";
+import { GA_CONSENT } from "@/lib/consent";
 
 export default function PrivacyPolicy() {
   const { contact } = useAgencyContent();
@@ -157,6 +158,15 @@ export default function PrivacyPolicy() {
               שנעביר פרטים לחברות ביטוח לשם הנפקת פוליסות או טיפול בתביעות
               בהתאם לבקשתך, ולרשויות מפקחות ככל שהדבר נדרש על-פי דין.
             </p>
+            {/* With the consent banner (VITE_GA_CONSENT): shown with it and not before it. DRAFT for the compliance adviser (docs/COMPLIANCE.md §8). */}
+            {GA_CONSENT ? (
+              <p className="mt-3">
+                סטטיסטיקה אנונימית: רק אם אישרת זאת בהודעה שהאתר מציג, האתר משתמש
+                ב־<bdi dir="ltr">Google Analytics</bdi> כדי למדוד אילו עמודים נצפים ואילו כפתורים נלחצים. לא נשלחים
+                שם, טלפון, מייל או תוכן של טופס, ו־Google שומרת בדפדפן שלך עוגיות למדידה. בלי אישור הכלי אינו נטען
+                כלל. אפשר לשנות את הבחירה בכל עת בקישור &quot;הגדרות עוגיות&quot; בתחתית העמוד.
+              </p>
+            ) : null}
           </section>
 
           <section>
