@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Check } from "lucide-react";
 import ArchStatement from "@/components/dorit/sections/ArchStatement";
 import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { PENSION_CHECK } from "@/config/offers";
@@ -46,25 +46,24 @@ export default function Hero() {
 
         {/* Headline */}
         <div className="order-1 flex flex-col gap-5">
-          {/* The figcaption below the portrait repeats this exact line, so on a
-              phone — where the two sit one above the other instead of side by
-              side — it is a double-read of the same name before the fold.
-              Hidden under `sm`, still shown wherever there is room to spare. */}
-          <span className="hidden self-start rounded-full border border-highlight/25 bg-highlight/10 px-3 py-1 text-sm font-semibold text-accent animate-fade-up sm:block">
-            {content.agent.byline}
-          </span>
+          {/* No name pill above the headline: the figcaption under the portrait
+              already says the byline, and the header says the name, so a third
+              copy was a triple-read before the fold (UX review, 2026-10-26). */}
           <ArchStatement />
-          {/* Claims of equal weight, each in its own pill.
+          {/* Claims of equal weight, each a checkmark and plain text. They were
+              outlined pills in the accent colour, the same look as the intake's
+              answer chips, so on a phone they read as buttons that did nothing
+              when tapped (UX review, 2026-10-26).
               "97% תביעות שאושרו" used to sit in the middle. It is gone: a
               licensed agent quoting a performance figure is a regulated claim,
               and nothing here could substantiate it. */}
-          <div className="flex flex-wrap items-center gap-2 animate-fade-up">
-            <span className={CLAIM}>{t("hero.claimLicence")}</span>
-            <span className={CLAIM}>{t("hero.claimPersonal")}</span>
+          <ul className="m-0 p-0 list-none flex flex-wrap items-center gap-x-5 gap-y-2 text-base font-medium text-foreground/80 animate-fade-up">
+            <li className={CLAIM}><Check aria-hidden="true" size={18} strokeWidth={2.5} className="shrink-0 text-highlight" />{t("hero.claimLicence")}</li>
+            <li className={CLAIM}><Check aria-hidden="true" size={18} strokeWidth={2.5} className="shrink-0 text-highlight" />{t("hero.claimPersonal")}</li>
             {/* The FAQ already says it ("פגישת ההיכרות הראשונה ללא עלות וללא
                 התחייבות"); it belongs where the decision to write is made. */}
-            <span className={CLAIM}>{t("hero.claimMeeting")}</span>
-          </div>
+            <li className={CLAIM}><Check aria-hidden="true" size={18} strokeWidth={2.5} className="shrink-0 text-highlight" />{t("hero.claimMeeting")}</li>
+          </ul>
           {/* The financial work, named. "מתכננת עתיד" is true and says nothing
               a visitor can act on; most people arrive holding a pension, a
               gemel fund and a study fund they have never looked at, and that is
@@ -114,5 +113,4 @@ export default function Hero() {
   );
 }
 
-const CLAIM =
-  "rounded-full border border-highlight/30 bg-card px-3 py-1 text-[15px] font-medium text-accent shadow-sm";
+const CLAIM = "flex items-center gap-1.5";

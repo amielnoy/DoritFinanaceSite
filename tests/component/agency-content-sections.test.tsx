@@ -122,7 +122,7 @@ describe("<Hero /> from the record", () => {
   it("CMP-AGC-010: byline, licence, headline and monogram are the record's; the contact buttons are the sticky bar's", async () => {
     show(record());
     const { container } = renderIt(<Hero />);
-    await waitFor(() => expect(screen.getAllByText("יעל כהן · מתכננת פיננסית")).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText("יעל כהן · מתכננת פיננסית")).toHaveLength(1)); // the portrait caption only; the pill above the headline is gone (2026-10-26)
     expect(screen.getByText("L-0001")).toBeTruthy();
     expect(screen.getByText("שורת פתיחה")).toBeTruthy();
     expect(screen.getByRole("img", { name: "יעל כהן — דיוקן מקצועי" })).toBeTruthy();
@@ -135,7 +135,7 @@ describe("<Hero /> from the record", () => {
   it("CMP-AGC-011: agency 1 without a photo keeps the bundled picture", async () => {
     show(record({ agencyId: AGENCY1_ID }));
     const { container } = renderIt(<Hero />);
-    await waitFor(() => expect(screen.getAllByText("יעל כהן · מתכננת פיננסית")).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText("יעל כהן · מתכננת פיננסית")).toHaveLength(1));
     expect(container.querySelector("picture source[type='image/avif']")?.getAttribute("srcset")).toContain(
       "/images/dorit-office-portrait-480.avif",
     );
