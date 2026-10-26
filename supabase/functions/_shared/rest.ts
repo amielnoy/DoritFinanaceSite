@@ -226,6 +226,22 @@ export async function authAccount(
   };
 }
 
+/** An account as the Auth admin API has it, read with the service key: its address and the provider's name. `null` when there is none. */
+export async function authAdminUser(id: string): Promise<{ id: string; email: string; name: string } | null> {
+  const { url, auth } = target();
+  const res = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
+    method: 'GET',
+    headers: { ...auth },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`auth_admin_http_${res.status}`);
+  const body = (await res.json().catch(() => null)) as { id?: unknown; email?: unknown; user_metadata?: { full_name?: unknown; name?: unknown } | null } | null;
+  const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  if (text(body?.id) !== id) throw new Error('auth_admin_returned_another_user');
+  return { id, email: text(body?.email), name: text(body?.user_metadata?.full_name) || text(body?.user_metadata?.name) };
+}
+
 /**
  * A Supabase Auth account for `email`, made by the service role with no
  * password and the address marked confirmed — for invite-user, inviting

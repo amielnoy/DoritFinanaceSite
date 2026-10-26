@@ -13,14 +13,19 @@
  *      outlives WINDOW. If the limiter cannot answer, nothing is sent: a
  *      missing welcome is better than two.
  *
+ * The resend, for an account that signed up before this existed: POST
+ * { email } with the service key as the bearer. It skips step 2 only — the
+ * account must be a confirmed one with a profile (invitee_for), and step 3
+ * still holds. Nothing in the app calls it; the operator runs it by hand.
+ *
  * Logged by ids alone: the address and the name stay out.
  */
 import { corsHeaders } from '../_shared/cors.ts';
-import { greetingName, isEmail } from '../_shared/guard.ts';
+import { greetingName, isEmail, sha256Hex } from '../_shared/guard.ts';
 import { buildClientHtml } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { sendMail } from '../_shared/mail.ts';
-import { authAccount, callRpc } from '../_shared/rest.ts';
+import { authAccount, authAdminUser, callRpc } from '../_shared/rest.ts';
 
 const FN = 'welcome-user';
 const log = createLog(FN);
@@ -64,6 +69,18 @@ export async function handler(req: Request): Promise<Response> {
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
     const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+
+    if (token && (await isServiceKey(token))) {
+      const body = (await req.json().catch(() => null)) as { email?: unknown } | null;
+      const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+      if (!isEmail(email)) return json({ error: 'כתובת לא תקינה.' }, 400);
+      const id = await callRpc('invitee_for', { p_email: email });
+      const account = typeof id === 'string' && id ? await authAdminUser(id) : null;
+      if (!account) return json({ sent: false, reason: 'not_found' }, 404);
+      log('info', 'resend.requested', { rid, userId: account.id });
+      return await deliver(account, rid, startedAt, json);
+    }
+
     const account = token ? await authAccount(token) : null;
     if (!account) return json({ error: 'נדרשת התחברות.' }, 401);
 
@@ -71,29 +88,61 @@ export async function handler(req: Request): Promise<Response> {
     if (!Number.isFinite(confirmed) || Date.now() - confirmed > WINDOW_MS || confirmed > Date.now() + 60_000) {
       return json({ sent: false, reason: 'not_new' });
     }
-    const to = account.email.trim().toLowerCase();
-    if (!isEmail(to)) return json({ sent: false, reason: 'no_email' });
-
-    let first: unknown;
-    try {
-      first = await callRpc('allow_submission', { p_key: `welcome:${account.id}`, p_window_seconds: ONCE_SECONDS, p_max: 1 });
-    } catch (e) {
-      log('warn', 'limit.unavailable', { rid, userId: account.id, err: String((e as Error)?.message ?? e).slice(0, 200) });
-      return json({ sent: false, reason: 'unavailable' }, 503);
-    }
-    if (first !== true) return json({ sent: false, reason: 'already_sent' });
-
-    try {
-      await sendMail(log, { to, ...welcomeMail(account.name), rid, role: 'client' });
-    } catch (e) {
-      log('warn', 'mail.failed', { rid, role: 'client', userId: account.id, err: String((e as Error)?.message ?? e).slice(0, 200) });
-      return json({ sent: false, reason: 'mail_failed' }, 502);
-    }
-
-    log('info', 'request.end', { rid, ms: Date.now() - startedAt, userId: account.id, sent: true });
-    return json({ sent: true });
+    return await deliver(account, rid, startedAt, json);
   } catch (e) {
     log('error', 'request.failed', { rid, ms: Date.now() - startedAt, err: String((e as Error)?.message ?? e).slice(0, 200) });
     return json({ error: 'הפעולה נכשלה.' }, 500);
   }
+}
+
+/** Steps 3 and on: an address, once per account, then the mail. */
+async function deliver(
+  account: { id: string; email: string; name: string },
+  rid: string,
+  startedAt: number,
+  json: (body: Record<string, unknown>, status?: number) => Response,
+): Promise<Response> {
+  const to = account.email.trim().toLowerCase();
+  if (!isEmail(to)) return json({ sent: false, reason: 'no_email' });
+
+  let first: unknown;
+  try {
+    first = await callRpc('allow_submission', { p_key: `welcome:${account.id}`, p_window_seconds: ONCE_SECONDS, p_max: 1 });
+  } catch (e) {
+    log('warn', 'limit.unavailable', { rid, userId: account.id, err: String((e as Error)?.message ?? e).slice(0, 200) });
+    return json({ sent: false, reason: 'unavailable' }, 503);
+  }
+  if (first !== true) return json({ sent: false, reason: 'already_sent' });
+
+  try {
+    await sendMail(log, { to, ...welcomeMail(account.name), rid, role: 'client' });
+  } catch (e) {
+    log('warn', 'mail.failed', { rid, role: 'client', userId: account.id, err: String((e as Error)?.message ?? e).slice(0, 200) });
+    return json({ sent: false, reason: 'mail_failed' }, 502);
+  }
+
+  log('info', 'request.end', { rid, ms: Date.now() - startedAt, userId: account.id, sent: true });
+  return json({ sent: true });
+}
+
+/** The service key, legacy or new, compared without leaking its length or prefix through timing. */
+async function isServiceKey(token: string): Promise<boolean> {
+  const keys: string[] = [];
+  const legacy = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  if (legacy) keys.push(legacy);
+  try {
+    const secret = (JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}') as Record<string, unknown>).default;
+    if (typeof secret === 'string' && secret.trim()) keys.push(secret.trim());
+  } catch {
+    // Unparseable: only the legacy key counts.
+  }
+  const given = await sha256Hex(token);
+  let match = false;
+  for (const key of keys) {
+    const expected = await sha256Hex(key);
+    let diff = given.length ^ expected.length;
+    for (let i = 0; i < given.length && i < expected.length; i += 1) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
+    match = match || diff === 0;
+  }
+  return match;
 }
