@@ -386,3 +386,49 @@ describe("publishing an article rebuilds the site (CTR-REB-002)", () => {
     expect(dispatch.inputs.deploy.type).toBe("boolean");
   });
 });
+
+describe("Playwright's OS packages come from a cache, not the Ubuntu mirror each time", () => {
+  // 2026-10-26: a slow mirror cancelled e2e shards mid `install-deps` twice,
+  // and main deployed as a preview both times. .github/actions/playwright-browser
+  // caches the .deb files per runner image.
+  const action = parse(
+    readFileSync(join(REPO_ROOT, ".github/actions/playwright-browser/action.yml"), "utf8"),
+  ) as { runs: { using: string; steps: Array<{ name?: string; id?: string; uses?: string; run?: string; with?: Record<string, string> }> } };
+  const installer = action.runs.steps.find((s) => s.name === "Install the browser's OS packages");
+
+  it("leaves no job installing them straight from the mirror", () => {
+    for (const [name, job] of jobs) {
+      for (const step of stepsOf(job)) {
+        expect(step.run ?? "", `${name}: ${step.name ?? step.run}`).not.toMatch(/--with-deps|install-deps/);
+      }
+    }
+  });
+
+  it("runs the action in every job that drives a browser", () => {
+    for (const name of ["build", "test-e2e", "smoke"]) {
+      const uses = stepsOf(workflow.jobs[name]).map((s) => s.uses);
+      expect(uses, name).toContain("./.github/actions/playwright-browser");
+    }
+  });
+
+  it("keys the package cache on the runner image and installs it with dpkg, which fetches nothing", () => {
+    expect(action.runs.using).toBe("composite");
+    const debs = action.runs.steps.find((s) => s.id === "deb-cache");
+    expect(debs?.with?.key).toContain("${{ steps.image.outputs.id }}");
+    expect(installer?.run).toContain('if sudo dpkg -i "${files[@]}"; then');
+    // apt-get against the runner's stale lists asked for archives it didn't have (PR #304's first warm run)
+    expect(installer?.run).not.toMatch(/apt-get install[^\n]*\.deb|apt-get install[^\n]*files/);
+  });
+
+  it("bounds the mirror fallback and never caches a half-fetched set", () => {
+    expect(installer?.run).toContain('timeout --kill-after=10 "$limit" npx playwright install-deps');
+    expect(installer?.run).toContain('for attempt in 1 2; do');
+    expect(installer?.run).toContain("echo 120 || echo 180");
+    // the retry leaves the Azure mirror that stalled
+    // …in the mirror list the image's sources actually read, not only in sources
+    expect(installer?.run).toContain("sudo sed -i '/azure\\.archive\\.ubuntu\\.com/d' /etc/apt/apt-mirrors.txt");
+    expect(installer?.run).toContain("s#http://azure\\.archive\\.ubuntu\\.com#http://archive.ubuntu.com#g");
+    expect(installer?.run).toMatch(/rm -rf "\$debs"\n\s+echo "::error::/);
+    expect(installer?.run).toContain('touch "$debs/.complete"');
+  });
+});

@@ -1,0 +1,122 @@
+name: Playwright browser and its OS packages
+description: >-
+  The browser binary from the cache (or Playwright's CDN), and the apt packages
+  it needs from the cache (or the Ubuntu mirror), so a slow mirror stalls a run
+  only on the first run after a runner image update.
+
+# Why: `npx playwright install-deps` fetches ~17 packages (fonts, xvfb) from the
+# runner's Ubuntu mirror on every job. On 2026-10-26 that mirror slowed to
+# 10-15 s per package twice, the 10-minute e2e shards were cancelled before a
+# test ran, and both times main deployed as a preview instead of production.
+# Now the .deb files are cached per runner image and installed with dpkg,
+# which fetches nothing; the mirror is used only on a miss, with a time limit and one
+# retry on Ubuntu's own archive instead of the runner's Azure mirror.
+
+inputs:
+  browser:
+    description: The Playwright browser to install (chromium, webkit, firefox).
+    required: false
+    default: chromium
+
+runs:
+  using: composite
+  steps:
+    # The packages apt fetches depend on what the image already has, so the
+    # deb cache is per image. ImageOS and ImageVersion are runner variables, not
+    # in the `env` context, hence this step.
+    - name: Name the runner image
+      id: image
+      shell: bash
+      run: echo "id=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Playwright browsers
+      id: browser-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ inputs.browser }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Cache the browser's OS packages
+      id: deb-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/playwright-debs
+        key: playwright-debs-${{ steps.image.outputs.id }}-${{ inputs.browser }}-${{ hashFiles('package-lock.json') }}
+
+    # From Playwright's CDN, not the Ubuntu mirror: no --with-deps here.
+    - name: Install Playwright browser
+      if: steps.browser-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx playwright install "$BROWSER"
+      env:
+        BROWSER: ${{ inputs.browser }}
+
+    - name: Install the browser's OS packages
+      shell: bash
+      env:
+        BROWSER: ${{ inputs.browser }}
+        HIT: ${{ steps.deb-cache.outputs.cache-hit }}
+      run: |
+        set -uo pipefail
+        debs="$HOME/playwright-debs"
+
+        # A hit holds every .deb the last network install fetched for this image
+        # (none at all is a valid answer: the image already had them).
+        if [ "$HIT" = "true" ] && [ -f "$debs/.complete" ]; then
+          shopt -s nullglob
+          files=("$debs"/*.deb)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "The runner image already has the packages."
+            exit 0
+          fi
+          # dpkg, not apt-get: apt resolves the files against this runner's
+          # package lists, which no `apt-get update` has refreshed, and then asks
+          # for archives it doesn't have. The set was resolved by apt on this same
+          # image; dpkg installs it as one transaction and fetches nothing.
+          if sudo dpkg -i "${files[@]}"; then
+            echo "Installed ${#files[@]} packages from the cache, without the mirror."
+            exit 0
+          fi
+          echo "::warning::The cached packages did not install; falling back to the mirror."
+        fi
+
+        # The mirror: keep what apt downloads, so the next job can skip it.
+        rm -rf "$debs" && mkdir -p "$debs/partial"
+        printf 'Dir::Cache::Archives "%s/";\nAPT::Keep-Downloaded-Packages "true";\nBinary::apt-get::APT::Keep-Downloaded-Packages "true";\n' "$debs" \
+          | sudo tee /etc/apt/apt.conf.d/99playwright-debs >/dev/null
+
+        ok=0
+        for attempt in 1 2; do
+          # A healthy mirror takes seconds. Both attempts together stay under
+          # five minutes, so a shard fails with this message, not a bare cancel.
+          limit=$([ "$attempt" = 1 ] && echo 120 || echo 180)
+          if timeout --kill-after=10 "$limit" npx playwright install-deps "$BROWSER"; then
+            ok=1
+            break
+          fi
+          echo "::warning::playwright install-deps attempt $attempt failed or passed ${limit}s (slow Ubuntu mirror?)"
+          sudo killall -q apt-get dpkg 2>/dev/null || true
+          sudo dpkg --configure -a || true
+          # The stalls were on the runner's Azure mirror: the retry uses Ubuntu's
+          # own. The image's sources read `mirror+file:/etc/apt/apt-mirrors.txt`,
+          # a list apt falls down only on errors, never on slowness, so Azure
+          # leaves the list (and any source naming it directly). What attempt 1
+          # did fetch stays in $debs and is not fetched again.
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt 2>/dev/null || true
+          if ! grep -q 'archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt 2>/dev/null; then
+            echo 'http://archive.ubuntu.com/ubuntu/' | sudo tee -a /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          sudo sed -i 's#http://azure\.archive\.ubuntu\.com#http://archive.ubuntu.com#g' \
+            /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+        done
+
+        sudo rm -f /etc/apt/apt.conf.d/99playwright-debs
+        sudo rm -rf "$debs/partial" "$debs/lock"
+        sudo chown -R "$(id -u):$(id -g)" "$debs"
+        if [ "$ok" != 1 ]; then
+          # Nothing half-fetched may be cached as complete.
+          rm -rf "$debs"
+          echo "::error::The browser's OS packages could not be installed from the Ubuntu mirror."
+          exit 1
+        fi
+        touch "$debs/.complete"
