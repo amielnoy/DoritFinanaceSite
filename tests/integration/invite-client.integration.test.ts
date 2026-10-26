@@ -18,7 +18,7 @@ const HIDDEN = "dddddddd-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
 type Row = Record<string, unknown>;
 
-function fakeSupabase() {
+function fakeSupabase(opts: { limiterDown?: boolean } = {}) {
   const sessions: Record<string, string> = { [USER]: "user-member", [OUTSIDER]: "user-outsider" };
   // What row-level security lets USER see; HIDDEN exists but is someone else's.
   const visible: Record<string, Row> = {
@@ -44,6 +44,7 @@ function fakeSupabase() {
       return json(token === USER && visible[id] ? [visible[id]] : []);
     }
     if (url.pathname === "/rest/v1/rpc/allow_submission") {
+      if (opts.limiterDown) return json({ message: "down" }, 503);
       const key = String((call.body as Row).p_key);
       const max = Number((call.body as Row).p_max ?? 1);
       const n = counts.get(key) ?? 0;
@@ -138,6 +139,14 @@ describe("invite-client — the mail", () => {
     expect(third.status).toBe(409);
     expect(third.emails).toEqual([]);
     expect([...s.counts.keys()]).toEqual([`client-invite:${CLIENT}`]);
+  });
+
+  it("answers 503 and mails nothing when the limiter cannot answer: never unlimited", async () => {
+    const r = await invite({ agencyId: AGENCY_1, leadId: CLIENT }, USER, fakeSupabase({ limiterDown: true }));
+    expect(r.status).toBe(503);
+    expect(String(r.json.error)).toMatch(/[א-ת]/);
+    expect(r.emails).toEqual([]);
+    expect(r.sheetRows).toEqual([]);
   });
 
   it("answers 502, not sent, when the mailer fails", async () => {

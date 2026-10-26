@@ -102,11 +102,35 @@ export function clientIp(req: Request): string {
 
 /**
  * Whether one more request under `key` fits `max` per `windowSeconds`, and if
- * so, counts it.
+ * so, counts it: 'ok' (counted), 'over', or 'unavailable' when the limiter
+ * could not answer. Unconfigured (no Supabase, as in some local runs) is 'ok'.
+ */
+export async function limitCheck(
+  log: Log,
+  rid: string,
+  key: string,
+  windowSeconds: number,
+  max: number,
+): Promise<'ok' | 'over' | 'unavailable'> {
+  if (!supabaseConfigured()) return 'ok';
+  try {
+    const allowed = await callRpc('allow_submission', { p_key: key, p_window_seconds: windowSeconds, p_max: max });
+    return allowed === false ? 'over' : 'ok';
+  } catch (e) {
+    log('warn', 'limit.unavailable', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
+    return 'unavailable';
+  }
+}
+
+/**
+ * limitCheck for request volume and mail to the agency's own staff. Fails
+ * open: a limiter that cannot answer lets the request through. A lost enquiry
+ * is worse than a burst the next request will catch, and the store is the same
+ * database the enquiry itself goes to.
  *
- * Fails open: a limiter that is unconfigured or unreachable lets the request
- * through. A lost enquiry is worse than a burst of mail the next request will
- * catch, and the store is the same database the enquiry itself goes to.
+ * A limit on mail to an address someone typed uses limitCheck and sends only
+ * on 'ok': open there, an outage is unlimited mail from Dorit's domain to any
+ * address.
  */
 export async function withinLimit(
   log: Log,
@@ -115,12 +139,5 @@ export async function withinLimit(
   windowSeconds: number,
   max: number,
 ): Promise<boolean> {
-  if (!supabaseConfigured()) return true;
-  try {
-    const allowed = await callRpc('allow_submission', { p_key: key, p_window_seconds: windowSeconds, p_max: max });
-    return allowed !== false;
-  } catch (e) {
-    log('warn', 'limit.unavailable', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
-    return true;
-  }
+  return (await limitCheck(log, rid, key, windowSeconds, max)) !== 'over';
 }

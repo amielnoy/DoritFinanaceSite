@@ -30,7 +30,7 @@
  * Logged by ids alone: the client's name, phone and address stay out.
  */
 import { corsHeaders } from '../_shared/cors.ts';
-import { isEmail, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
+import { isEmail, limitCheck, oversizedField, sha256Hex, withinLimit } from '../_shared/guard.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { deliveryWarning, sendMail } from '../_shared/mail.ts';
 import { AGENCY_1, maslekaEnabled, normalizePhone } from '../_shared/masleka.ts';
@@ -310,12 +310,15 @@ export async function handler(req: Request): Promise<Response> {
     if (notice === 'email') {
       try {
         // Not a way to mail arbitrary addresses: 30 per agency per hour, one notice per address per 30 days.
-        // The agency's cap first, so a refused one does not use up the address's slot.
-        const agencyOk = await withinLimit(log, rid, `staff-notice-agency:${agencyId}`, 3600, 30);
-        const addressOk = agencyOk && (await withinLimit(log, rid, `staff-notice-addr:${await sha256Hex(email.toLowerCase())}`, 2592000, 1));
-        if (!agencyOk || !addressOk) {
+        // The agency's cap first, so a refused one does not use up the address's slot. Closed when the
+        // limiter cannot answer, as every limit on mail to a typed address (_shared/guard.ts).
+        const agency = await limitCheck(log, rid, `staff-notice-agency:${agencyId}`, 3600, 30);
+        const address = agency === 'ok'
+          ? await limitCheck(log, rid, `staff-notice-addr:${await sha256Hex(email.toLowerCase())}`, 2592000, 1)
+          : agency;
+        if (address !== 'ok') {
           noticeSent = false;
-          log('warn', 'notice.rate_limited', { rid, userId: gate.userId });
+          log('warn', 'notice.rate_limited', { rid, userId: gate.userId, reason: address === 'over' ? 'rate_limited' : 'limit_unavailable' });
           warnings.push('notice_rate_limited');
         } else {
           await sendMail(log, { to: email, ...noticeMail(asClient ? 'client' : 'lead'), rid, role: 'client' });

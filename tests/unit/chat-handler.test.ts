@@ -427,8 +427,21 @@ describe("one turn at a time (I3)", () => {
     store.conversations.get(id)!.turns = 39;
     const { model, open } = gated();
     deps.model = model;
-    const both = Promise.all([chat(post(next(id, "א"))), chat(post(next(id, "ב")))]);
-    await vi.waitFor(() => expect(model.calls).toBe(1));
+    // Both arrive together. Release the model only once one of them has been
+    // answered: that one was refused while the other held the turn. Released
+    // earlier, a slow second request (CI under load) arrives after the first
+    // has finished and is refused for the cap instead (400), not the lock.
+    let answered = 0;
+    const both = Promise.all(
+      [chat(post(next(id, "א"))), chat(post(next(id, "ב")))].map((p) => p.then((r) => ((answered += 1), r))),
+    );
+    await vi.waitFor(
+      () => {
+        expect(model.calls).toBe(1);
+        expect(answered).toBe(1);
+      },
+      { timeout: 5000 },
+    );
     open();
     const statuses = (await Promise.all((await both).map(json))).map((a) => a.status).sort();
     expect(statuses).toEqual([200, 409]);
