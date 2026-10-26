@@ -17,7 +17,7 @@
  * Logged by ids alone: the client's name and address stay out.
  */
 import { corsHeaders } from '../_shared/cors.ts';
-import { greetingName, isEmail, withinLimit } from '../_shared/guard.ts';
+import { greetingName, isEmail, limitCheck } from '../_shared/guard.ts';
 import { buildClientHtml } from '../_shared/html.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
 import { sendMail } from '../_shared/mail.ts';
@@ -92,10 +92,13 @@ export async function handler(req: Request): Promise<Response> {
     const to = typeof lead.email === 'string' ? lead.email.trim().toLowerCase() : '';
     if (!isEmail(to)) return json({ error: 'אין כתובת דוא״ל ללקוח/ה.' }, 400);
 
-    if (!(await withinLimit(log, rid, `client-invite:${leadId}`, YEAR, 2))) {
+    // Closed when the limiter cannot answer: mail to a typed address (_shared/guard.ts).
+    const limit = await limitCheck(log, rid, `client-invite:${leadId}`, YEAR, 2);
+    if (limit === 'over') {
       log('warn', 'invite.already_sent', { rid, leadId });
       return json({ error: 'כבר נשלחה הזמנה ללקוח/ה הזה/הזו.' }, 409);
     }
+    if (limit === 'unavailable') return json({ error: 'ההזמנה לא נשלחה. אפשר לנסות שוב.' }, 503);
 
     try {
       await sendMail(log, { to, ...inviteMail(lead.name), rid, role: 'client' });

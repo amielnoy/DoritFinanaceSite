@@ -417,6 +417,17 @@ describe.each(IMPLEMENTATIONS)("$label — the public entry point's limits", ({ 
     expect(r.invitations ?? []).toEqual([]);
   });
 
+  it("with the limiter down, saves the lead and mails the staff, but holds the visitor's confirmation", async () => {
+    // Volume and staff mail fail open; mail to a typed address fails closed.
+    const r = await run(consultation, { ...fromIp, failLimiter: 503 });
+    expect(r.status).toBe(200);
+    expect(r.leads).toHaveLength(1);
+    const to = r.emails.map((e) => e.to);
+    expect(to).not.toContain("yael@example.com");
+    expect(to).toContain(AGENCY);
+    expect(r.json.warnings).toContain("client_confirmation_limit_unavailable");
+  });
+
   it("past the hourly staff cap, saves the lead and confirms to the visitor, but mails no staff and books nothing", async () => {
     const r = await run(consultation, { overLimit: ["lead-staff-notify"] });
     expect(r.status).toBe(200);

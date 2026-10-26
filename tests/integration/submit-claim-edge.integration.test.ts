@@ -207,11 +207,15 @@ describe("submit-claim — how often", () => {
     expect((to.body as { p_key: string }).p_key).toBe((lower.body as { p_key: string }).p_key);
   });
 
-  it("lets the claim through when the limiter itself is down", async () => {
+  it("lets the claim through when the limiter itself is down, but holds the visitor's confirmation", async () => {
+    // Volume fails open (a lost claim is worse); mail to a typed address fails
+    // closed, or an outage is unlimited mail from Dorit's domain to any address.
     const r = await invokeEdge("submit-claim", claim, { ...fromIp, failLimiter: 503 });
     expect(r.status).toBe(200);
     expect(r.leads).toHaveLength(1);
-    expect(r.emails.map((e) => e.to)).toContain("ronit@example.com");
+    expect(r.emails.map((e) => e.to)).not.toContain("ronit@example.com");
+    expect(r.emails.length).toBeGreaterThan(0);
+    expect(r.json.warnings).toContain("client_confirmation_limit_unavailable");
   });
 
   it("limits a request with no address under the one key such callers share (review 2026-10-15)", async () => {

@@ -22,7 +22,7 @@ const ASSIGNEE = "77777777-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
 type Row = Record<string, unknown>;
 
-function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdminsRead?: boolean; agencyCap?: number } = {}) {
+function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdminsRead?: boolean; agencyCap?: number; noticeLimiterDown?: boolean } = {}) {
   const sessions: Record<string, string> = {
     [USER]: "user-member", [ADMIN]: "user-admin", [OUTSIDER]: "user-outsider", [OPERATOR]: "user-operator",
   };
@@ -58,6 +58,7 @@ function fakeSupabase(seed: { rpc?: Row | { status: number; body: Row }; failAdm
     }
     if (url.pathname === "/rest/v1/rpc/allow_submission" && String((call.body as Row).p_key).startsWith("staff-notice-")) {
       limiterKeys.push(String((call.body as Row).p_key));
+      if (seed.noticeLimiterDown) return json({ message: "down" }, 503);
       const key = String((call.body as Row).p_key);
       const cap = key.startsWith("staff-notice-agency:") ? (seed.agencyCap ?? 30) : 1;
       const n = counts.get(key) ?? 0;
@@ -330,6 +331,16 @@ describe("create-lead — the people told", () => {
     expect(r.json.warnings).toContain("notice_rate_limited");
     expect(s.limiterKeys.some((k) => k.startsWith("staff-notice-agency:"))).toBe(true);
     expect(s.limiterKeys.some((k) => k.startsWith("staff-notice-addr:"))).toBe(false);
+  });
+
+  it("sends no notice when the limiter cannot answer, and still saves the lead", async () => {
+    // Mail to a typed address fails closed (_shared/guard.ts limitCheck).
+    const s = fakeSupabase({ noticeLimiterDown: true });
+    const r = await create({ ...good, notice: "email" }, USER, s);
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ leadId: NEW_ID, noticeSent: false });
+    expect(r.json.warnings).toContain("notice_rate_limited");
+    expect(r.emails.some((e) => e.to === "client@example.com")).toBe(false);
   });
 
   it("passes an ID typed in the referrer through redact", async () => {

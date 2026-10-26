@@ -19,6 +19,7 @@ import {
   isEmail,
   isoDateOr,
   knownOr,
+  limitCheck,
   oversizedField,
   sha256Hex,
   withinLimit,
@@ -239,12 +240,15 @@ export async function handler(req: Request): Promise<Response> {
 
     // The reporter's confirmation — best effort, and only to something that is
     // an address, at most a few times a day per address.
+    let confirmLimit: 'ok' | 'over' | 'unavailable' = 'ok';
     if (email && !isEmail(email)) {
       log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'invalid_address' });
       warnings.push('client_email_invalid');
-    } else if (email && !(await withinLimit(log, rid, `confirm-to:${await sha256Hex(email.toLowerCase())}`, 86400, CONFIRMATIONS_PER_ADDRESS_PER_DAY))) {
-      log('warn', 'mail.skipped', { rid, role: 'visitor', reason: 'rate_limited' });
-      warnings.push('client_confirmation_rate_limited');
+    } else if (email && (confirmLimit = await limitCheck(log, rid, `confirm-to:${await sha256Hex(email.toLowerCase())}`, 86400, CONFIRMATIONS_PER_ADDRESS_PER_DAY)) !== 'ok') {
+      // Closed when the limiter cannot answer: mail to a typed address, unlimited in an outage otherwise.
+      const over = confirmLimit === 'over';
+      log('warn', 'mail.skipped', { rid, role: 'visitor', reason: over ? 'rate_limited' : 'limit_unavailable' });
+      warnings.push(over ? 'client_confirmation_rate_limited' : 'client_confirmation_limit_unavailable');
     } else if (email) {
       try {
         const firstName = greetingName(name);
