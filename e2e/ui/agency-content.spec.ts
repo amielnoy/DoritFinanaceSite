@@ -24,12 +24,34 @@ interface Capture {
   html: string;
 }
 
+/**
+ * Every rendered image, loaded and decoded. The photos are `loading="lazy"`, and
+ * on a phone the About pair sits ~4000px down /perspective: at network idle they
+ * were often still arriving, so the screenshot froze them half-painted in one
+ * render and whole in the other (E2E-AGC-002 flaked on android-chrome).
+ */
+async function settleImages(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      [...document.images]
+        .filter((img) => img.getClientRects().length > 0)
+        .map((img) => {
+          img.loading = "eager";
+          return img.decode().catch(() => undefined);
+        }),
+    ),
+  );
+}
+
 async function capture(page: Page): Promise<Capture> {
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready);
+  // Read before settleImages, which flips the `loading` attribute.
+  const html = await page.locator("body").innerHTML();
+  await settleImages(page);
   return {
     png: await page.screenshot({ fullPage: true, animations: "disabled", caret: "hide" }),
-    html: await page.locator("body").innerHTML(),
+    html,
   };
 }
 
