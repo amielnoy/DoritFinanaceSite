@@ -58,7 +58,7 @@
 
 **Interfaces:**
 - Consumes: Task 1's columns.
-- Produces: `public.create_staff_lead(<the 12 existing args>, p_as_client boolean default false, p_client_since date default null, p_products text[] default null) returns table (lead_id uuid, duplicate text)`; `public.convert_lead_to_client(p_lead_id uuid, p_client_since date, p_products text[]) returns void`, security **invoker**. New refusals: `bad_since`, `bad_products` (errcode `22023`), `not_found` (`P0002`).
+- Produces: `public.create_staff_lead(<the 12 existing args>, p_as_client boolean default false, p_client_since date default null, p_products text[] default null) returns table (lead_id uuid, duplicate text)`; `public.convert_lead_to_client(p_lead_id uuid, p_client_since date, p_products text[]) returns uuid` (the converted lead's id; a lead merged into another converts its main lead — decided 2026-10-26), security **invoker**. New refusals: `bad_since`, `bad_products` (errcode `22023`), `not_found` (`P0002`).
 
 - [ ] **Step 1: Extend the contract test**: `drop function public.create_staff_lead(uuid, text, text, text, text, text, text, text, text, text, uuid, boolean)` precedes the create; the new signature has the three defaulted args last; insert names `case when p_as_client then 'client' else 'lead' end` and both consent versions; revoke/grant lines name the 15-arg signature; `convert_lead_to_client` is not `security definer`, sets `search_path = ''`, never writes `opened_as`, `consent_*` or `source`, and is granted to `authenticated` only.
 - [ ] **Step 2: Run** — FAIL.

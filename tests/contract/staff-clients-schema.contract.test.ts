@@ -98,3 +98,61 @@ describe("staff clients, schema", () => {
     expect(flat).not.toMatch(/grant insert[^;]*on (table )?public\.leads[^;]*to[^;]*(authenticated|anon)/i);
   });
 });
+
+describe("staff clients, the RPCs", () => {
+  const flat = squash(sql);
+  const fns = functions(sql);
+  const OLD = "uuid, text, text, text, text, text, text, text, text, text, uuid, boolean";
+  const NEW = `${OLD}, boolean, date, text[]`;
+
+  it("replaces create_staff_lead with three trailing, defaulted arguments", () => {
+    const drop = flat.indexOf(`drop function public.create_staff_lead(${OLD});`);
+    expect(drop).toBeGreaterThan(-1);
+    expect(drop).toBeLessThan(flat.indexOf("create function public.create_staff_lead("));
+    const fn = squash(fns.get("create_staff_lead") ?? "");
+    expect(fn).toContain(
+      "p_duplicate_ok boolean, p_as_client boolean default false, p_client_since date default null, p_products text[] default null ) returns table (lead_id uuid, duplicate text)",
+    );
+    expect(fn).toMatch(/security definer/);
+    expect(fn).toContain("set search_path = ''");
+  });
+
+  it("writes a client's status, opened_as and consent itself, never from an argument", () => {
+    const fn = squash(fns.get("create_staff_lead") ?? "");
+    expect(fn).toContain("v_status := 'client'");
+    expect(fn).toContain("case when v_client then 'staff-client-v1' else 'staff-intake-v1' end");
+    expect(fn).toContain("case when v_client then 'client' else 'lead' end");
+    expect(fn).toContain("(p_notice = 'agreement' and not v_client)");
+    expect(fn).toContain("public.client_fields_ok(p_client_since, p_products)");
+    // the rules 20261105000000 holds are all still here
+    for (const rule of ["agency_not_enabled", "rate_limited", "pg_advisory_xact_lock", "bad_phone", "c_secret", "lead_assignee_ok", "'visible'::text"]) {
+      expect(fn).toContain(rule);
+    }
+  });
+
+  it("checks the month in Israel time and the product list in one stable function", () => {
+    const fn = squash(fns.get("client_fields_ok") ?? "");
+    expect(fn).toMatch(/language sql stable set search_path = ''/);
+    expect(fn).not.toMatch(/security definer/);
+    expect(fn).toContain("date_trunc('month', (now() at time zone 'Asia/Jerusalem'))::date");
+    expect(fn).toContain("'bad_since'");
+    expect(fn).toContain("'bad_products'");
+  });
+
+  it("converts under the caller's own rights and never touches the fixed fields", () => {
+    const fn = squash(fns.get("convert_lead_to_client") ?? "");
+    expect(fn).toContain("(p_lead_id uuid, p_client_since date, p_products text[]) returns uuid");
+    expect(fn).not.toMatch(/security definer/);
+    expect(fn).toContain("set search_path = ''");
+    expect(fn).toContain("set status = 'client', client_since = p_client_since, products = p_products");
+    expect(fn).toContain("raise exception 'not_found'");
+    for (const col of ["opened_as =", "consent_", "source =", "brought_by"]) expect(fn).not.toContain(col);
+  });
+
+  it("grants the new signatures to signed-in people only", () => {
+    expect(flat).toContain(`revoke execute on function public.create_staff_lead(${NEW}) from public, anon, authenticated;`);
+    expect(flat).toContain(`grant execute on function public.create_staff_lead(${NEW}) to authenticated;`);
+    expect(flat).toContain("grant execute on function public.convert_lead_to_client(uuid, date, text[]) to authenticated;");
+    for (const grant of flat.match(/grant execute[^;]+;/g) ?? []) expect(grant).toMatch(/to authenticated;$/);
+  });
+});
