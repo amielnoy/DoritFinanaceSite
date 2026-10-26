@@ -457,6 +457,11 @@ verify_jwt = false
 [functions.invite-client]
 verify_jwt = false
 
+# The welcome mail after a new account's first sign-in: the session is checked
+# by the function itself (_shared/rest.ts authAccount), like the others here.
+[functions.welcome-user]
+verify_jwt = false
+
 # Change a member's role, remove a member, or leave: the session is checked by
 # the function, and set_member_role / remove_member decide under it.
 [functions.member-admin]

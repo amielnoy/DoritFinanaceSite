@@ -15,6 +15,8 @@ export interface SupabaseAuthClient {
           email?: string | null;
           /** Whatever the provider sent about the person; Google supplies a name. */
           user_metadata?: { full_name?: string | null; name?: string | null } | null;
+          /** When the address was confirmed: at once for Google, on the link for a password account. */
+          email_confirmed_at?: string | null;
         } | null;
       };
       error: SupabaseError | null;
@@ -28,6 +30,10 @@ export interface SupabaseAuthClient {
       email: string;
       password: string;
     }): Promise<{ error: SupabaseError | null }>;
+  };
+  /** Edge Functions, for the welcome mail. Optional: the tests' fakes need not have it. */
+  functions?: {
+    invoke(name: string, options?: { body?: unknown }): Promise<unknown>;
   };
   from(table: "profiles"): {
     select(columns: string): {
@@ -63,7 +69,13 @@ const authFailure = (reason: string, message: string) =>
     data: { extra_data: { reason } },
   });
 
+/** As welcome-user's own WINDOW_MS: an address confirmed longer ago is not a new account. */
+const WELCOME_WINDOW_MS = 30 * 60 * 1000;
+
 export class SupabaseAuthService implements AuthPort {
+  /** Asked at most once per page load; welcome-user itself makes sure it is once per account. */
+  private welcomeAsked = false;
+
   constructor(
     private readonly client: SupabaseAuthClient,
     /**
@@ -126,6 +138,8 @@ export class SupabaseAuthService implements AuthPort {
       throw authFailure("user_not_registered", "User not registered for this app");
     }
 
+    this.welcomeIfNew(data.user.email_confirmed_at);
+
     // The display name comes from the provider rather than the table — Google
     // supplies it, and `profiles` deliberately stores only what authorises.
     const meta = data.user.user_metadata;
@@ -135,6 +149,21 @@ export class SupabaseAuthService implements AuthPort {
       full_name: meta?.full_name ?? meta?.name ?? undefined,
       role: profile.role ?? "user",
     };
+  }
+
+  /**
+   * The welcome mail is sent by welcome-user, which decides again (new, once,
+   * the limiter); this only spares an old account the call. Neither waited on
+   * nor allowed to fail the sign-in.
+   */
+  private welcomeIfNew(confirmedAt: string | null | undefined): void {
+    if (this.welcomeAsked || !this.client.functions) return;
+    const confirmed = Date.parse(confirmedAt ?? "");
+    if (!Number.isFinite(confirmed) || Date.now() - confirmed > WELCOME_WINDOW_MS) return;
+    this.welcomeAsked = true;
+    void Promise.resolve()
+      .then(() => this.client.functions?.invoke("welcome-user", { body: {} }))
+      .catch(() => undefined);
   }
 
   logout(redirectUrl?: string): void {
