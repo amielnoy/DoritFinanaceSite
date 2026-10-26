@@ -9,6 +9,7 @@
 
 import { getAttribution } from "./attribution";
 import { AGENCY_PROFILE } from "@/config/agencyProfile";
+import { analyticsWithheld } from "@/lib/consent";
 import { CONCERNS, URGENCY } from "@/config/needs-wizard";
 
 const INTERNAL_KEY = "ga_internal_user";
@@ -89,7 +90,9 @@ export const isUnmeasuredPath = (pathname: string): boolean => /^\/admin(\/|$)/.
  */
 export function measureRoute(pathname: string): void {
   try {
-    (window as unknown as Record<string, unknown>)[`ga-disable-${GA4_MEASUREMENT_ID}`] = isUnmeasuredPath(pathname);
+    // Off on /admin, and off everywhere while consent is withheld (VITE_GA_CONSENT, src/lib/consent.ts).
+    (window as unknown as Record<string, unknown>)[`ga-disable-${GA4_MEASUREMENT_ID}`] =
+      isUnmeasuredPath(pathname) || analyticsWithheld();
   } catch {
     /* ignore */
   }

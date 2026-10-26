@@ -1,4 +1,7 @@
-import { GA4_MEASUREMENT_ID } from "@/lib/analytics";
+// The id from the profile, not from analytics.ts: that module imports this one (measureRoute).
+import { AGENCY_PROFILE } from "@/config/agencyProfile";
+
+const GA4_MEASUREMENT_ID = AGENCY_PROFILE.ga4MeasurementId;
 
 /**
  * Consent for Google Analytics (docs/COMPLIANCE.md §8), behind
@@ -40,6 +43,28 @@ function store(choice: ConsentChoice | null): void {
   }
 }
 
+/**
+ * Whether GA4 must stay off for want of a "yes": the flag is on and the stored
+ * choice is not "granted". measureRoute (analytics.ts) keeps Google's opt-out
+ * set while this holds, so a route change can never switch a declined GA4 back on.
+ */
+export function analyticsWithheld(enabled: boolean = GA_CONSENT): boolean {
+  return enabled && readConsent() !== "granted";
+}
+
+/**
+ * Every domain a GA cookie may sit on for this host: none (host-only), the
+ * host itself and each parent down to two labels. GA4 sets `_ga` on the
+ * registrable domain, `.govari-fin.co.il` — three labels — so the last two
+ * labels alone (`.co.il`) would miss it.
+ */
+export function cookieDomains(hostname: string): string[] {
+  const labels = hostname.split(".").filter(Boolean);
+  const out = [""];
+  for (let i = 0; i <= labels.length - 2; i += 1) out.push(`.${labels.slice(i).join(".")}`);
+  return out;
+}
+
 type Win = Window & { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void } & Record<string, unknown>;
 
 const TAG_SRC = (id: string) => `https://www.googletagmanager.com/gtag/js?id=${id}`;
@@ -69,10 +94,11 @@ export function loadAnalytics(id: string = GA4_MEASUREMENT_ID): void {
   }
 }
 
-/** "אישור": remember it and load GA4 now. */
-export function grantConsent(): void {
+/** "אישור": remember it, lift a pause from an earlier "no" or reopen, and load GA4 now. */
+export function grantConsent(id: string = GA4_MEASUREMENT_ID): void {
   store("granted");
-  loadAnalytics();
+  (window as unknown as Win)[`ga-disable-${id}`] = /^\/admin(\/|$)/.test(window.location.pathname);
+  loadAnalytics(id);
 }
 
 /**
@@ -83,18 +109,25 @@ export function declineConsent(id: string = GA4_MEASUREMENT_ID): void {
   store("denied");
   const w = window as unknown as Win;
   w[`ga-disable-${id}`] = true;
-  const host = window.location.hostname.split(".").slice(-2).join(".");
+  if (typeof w.gtag === "function") {
+    w.gtag("consent", "update", { analytics_storage: "denied" });
+    // track() sends only through gtag: without it nothing more is sent or queued.
+    delete w.gtag;
+  }
+  const domains = cookieDomains(window.location.hostname);
   for (const name of document.cookie.split(";").map((c) => c.split("=")[0].trim())) {
     if (name === "_ga" || name.startsWith("_ga_")) {
-      for (const domain of ["", `; domain=.${host}`]) {
-        document.cookie = `${name}=; Max-Age=0; path=/${domain}`;
+      for (const domain of domains) {
+        document.cookie = `${name}=; Max-Age=0; path=/${domain ? `; domain=${domain}` : ""}`;
       }
     }
   }
 }
 
 /** The footer's link: forget the choice and show the banner again. */
-export function reopenConsent(): void {
+export function reopenConsent(id: string = GA4_MEASUREMENT_ID): void {
   store(null);
+  // No choice is not a "yes": GA4 pauses until the visitor answers again.
+  (window as unknown as Win)[`ga-disable-${id}`] = true;
   window.dispatchEvent(new Event(CONSENT_REOPEN_EVENT));
 }

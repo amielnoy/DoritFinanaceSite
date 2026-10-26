@@ -171,7 +171,7 @@ export default function Footer() {
             <Link to="/privacy" className={FOOT_LINK}>{t("footer.privacy")}{locale === "he" ? "" : ` ${t("lang.hebrewOnly")}`}</Link>
             <Link to="/accessibility" className={FOOT_LINK}>{t("footer.accessibility")}{locale === "he" ? "" : ` ${t("lang.hebrewOnly")}`}</Link>
             {GA_CONSENT ? (
-              <button type="button" onClick={reopenConsent} className={FOOT_LINK}>{t("footer.cookies")}</button>
+              <button type="button" onClick={() => reopenConsent()} className={FOOT_LINK}>{t("footer.cookies")}</button>
             ) : null}
           </div>
         </div>

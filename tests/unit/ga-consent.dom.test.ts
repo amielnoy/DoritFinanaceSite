@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CONSENT_KEY,
+  analyticsWithheld,
+  cookieDomains,
   CONSENT_REOPEN_EVENT,
   declineConsent,
   grantConsent,
@@ -151,5 +153,63 @@ describe("src/lib/consent.ts", () => {
     });
     expect(readConsent()).toBeNull();
     expect(() => grantConsent()).not.toThrow();
+  });
+});
+
+describe("a 'no' stays a 'no' (security review of #311)", () => {
+  it("covers the registrable domain of a three-label host, which the last two labels miss", () => {
+    expect(cookieDomains("www.govari-fin.co.il")).toEqual(["", ".www.govari-fin.co.il", ".govari-fin.co.il", ".co.il"]);
+    expect(cookieDomains("govari-fin.co.il")).toContain(".govari-fin.co.il");
+    expect(cookieDomains("localhost")).toEqual([""]);
+  });
+
+  it("removes gtag on a 'no', so track() has nothing to send through", () => {
+    grantConsent();
+    expect(typeof w.gtag).toBe("function");
+    declineConsent();
+    expect(w.gtag).toBeUndefined();
+    expect(w[`ga-disable-${ID}`]).toBe(true);
+  });
+
+  it("is withheld with the flag on until a 'yes', and never with it off", () => {
+    expect(analyticsWithheld(true)).toBe(true);
+    window.localStorage.setItem(CONSENT_KEY, "denied");
+    expect(analyticsWithheld(true)).toBe(true);
+    window.localStorage.setItem(CONSENT_KEY, "granted");
+    expect(analyticsWithheld(true)).toBe(false);
+    window.localStorage.removeItem(CONSENT_KEY);
+    expect(analyticsWithheld(false)).toBe(false);
+  });
+
+  it("with the flag on, a route change after a 'no' or a reopen keeps GA4 off; a 'yes' lifts it", async () => {
+    vi.stubEnv("VITE_GA_CONSENT", "true");
+    vi.resetModules();
+    try {
+      const consent = await import("@/lib/consent");
+      const { measureRoute } = await import("@/lib/analytics");
+      consent.grantConsent();
+      measureRoute("/");
+      expect(w[`ga-disable-${ID}`]).toBe(false);
+      consent.declineConsent();
+      measureRoute("/blog");
+      expect(w[`ga-disable-${ID}`]).toBe(true);
+      consent.grantConsent();
+      expect(w[`ga-disable-${ID}`]).toBe(false);
+      consent.reopenConsent();
+      expect(w[`ga-disable-${ID}`]).toBe(true);
+      measureRoute("/");
+      expect(w[`ga-disable-${ID}`]).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  });
+
+  it("with the flag off, measureRoute is what it was: off on /admin only", async () => {
+    const { measureRoute } = await import("@/lib/analytics");
+    measureRoute("/");
+    expect(w[`ga-disable-${ID}`]).toBe(false);
+    measureRoute("/admin/leads");
+    expect(w[`ga-disable-${ID}`]).toBe(true);
   });
 });
