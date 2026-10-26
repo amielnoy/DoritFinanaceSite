@@ -5,7 +5,7 @@ import { adminKeys } from "@/hooks/useAdmin";
 import NewLeadSheet from "@/components/dorit/admin/NewLeadSheet";
 
 /**
- * The "פנייה חדשה" sheet on the leads screen. After a create the list is read
+ * The "פנייה חדשה" sheet on the leads screen ("הוספה", with a client mode, under VITE_STAFF_CLIENTS). After a create the list is read
  * again and the new lead's drawer opens (`onOpenLead`; the sheet has toasted).
  * When the sheet stays on its confirmation instead (`onSaved`), the list is
  * read again right away, so closing it shows the new lead.
@@ -18,6 +18,7 @@ export default function NewLeadSheetHost({
   assignees,
   leads,
   onOpenLead,
+  canAddClient = false,
 }: {
   onClose(): void;
   agencyId: string;
@@ -26,6 +27,8 @@ export default function NewLeadSheetHost({
   leads: LeadRecord[];
   /** Absent when the lead drawer is not available. */
   onOpenLead?: (leadId: string) => void;
+  /** VITE_STAFF_CLIENTS and clients.create: the sheet's "לקוח/ה" mode. */
+  canAddClient?: boolean;
 }) {
   const client = useQueryClient();
   return (
@@ -36,6 +39,7 @@ export default function NewLeadSheetHost({
       canAssign={canAssign}
       assignees={assignees}
       leads={leads}
+      canAddClient={canAddClient}
       onCreated={(leadId) => {
         onClose();
         void client.invalidateQueries({ queryKey: adminKeys.leads });
