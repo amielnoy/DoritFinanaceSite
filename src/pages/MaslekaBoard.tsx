@@ -234,6 +234,7 @@ function NewRequest({
   onStart,
   onCreated,
   onFailure,
+  initialLeadId = "",
 }: {
   service: MaslekaPort;
   clipboard: ClipboardLike | null;
@@ -242,6 +243,8 @@ function NewRequest({
   onStart: () => void;
   onCreated: () => Promise<unknown>;
   onFailure: (e: unknown) => void;
+  /** ?lead= — the client just added by hand (the add sheet's "בקשת מסלקה"): chosen once the leads arrive. */
+  initialLeadId?: string;
 }) {
   const [name, setName] = useState("");
   const [channel, setChannel] = useState<Channel>("whatsapp");
@@ -259,6 +262,14 @@ function NewRequest({
     if (!name.trim()) setName(lead.name.slice(0, 80));
     if (!phone.trim() && isIsraeliMobile(lead.phone)) setPhone(lead.phone);
   };
+  const [preset, setPreset] = useState(initialLeadId);
+  useEffect(() => {
+    if (!preset || !leads.some((l) => l.id === preset)) return;
+    chooseLead(preset);
+    setPreset("");
+    // chooseLead reads the fields it fills; running it once, when the lead is there, is the point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset, leads]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -839,7 +850,14 @@ export default function MaslekaBoard({
       {notice.text}
     </p>
   ) : null;
-  const [newOpen, setNewOpen] = useState(false);
+  // ?lead=<id> opens the new request with that lead chosen (from the add sheet's next steps).
+  const presetLead = /^[0-9a-f-]{36}$/i.test(params.get("lead") ?? "") ? (params.get("lead") as string) : "";
+  const [newOpen, setNewOpenState] = useState(() => presetLead !== "");
+  const setNewOpen = (open: boolean) => {
+    setNewOpenState(open);
+    // Closed: a refresh should not open it again.
+    if (!open && presetLead) setParams((p) => { const next = new URLSearchParams(p); next.delete("lead"); return next; }, { replace: true });
+  };
   // For "שיוך לפנייה": read when the drawer opens; the agency's open leads the caller can see.
   const myLeads = useQuery({ queryKey: LEADS_KEY, queryFn: leads, enabled: newOpen });
   const openLeads = (myLeads.data ?? [])
@@ -1189,6 +1207,7 @@ export default function MaslekaBoard({
           onStart={clearNotice}
           onCreated={refresh}
           onFailure={report}
+          initialLeadId={presetLead}
         />
       </SideDrawer>
     </div>

@@ -17,7 +17,8 @@ import LeadDetails from "@/components/dorit/admin/LeadDetails";
 import MeetingsAgenda from "@/components/dorit/admin/MeetingsAgenda";
 import { MEETINGS_STAFF } from "@/config/meetings";
 import { INTAKE_LABELS, STAFF_LEADS } from "@/config/staff-leads";
-import { GONE_MEMBER, broughtThisMonth, sameNumberLeads, staffLeadLine } from "@/lib/staff-leads";
+import { PRODUCT_LABELS, STAFF_CLIENTS } from "@/config/staff-clients";
+import { GONE_MEMBER, broughtThisMonth, clientsThisMonth, productsLabel, sameNumberLeads, sinceLabel, staffLeadLine } from "@/lib/staff-leads";
 import { duplicateRows, foldMerged, newestFirst, type LeadRow } from "@/lib/lead-duplicates";
 import { ANY_STATUS_LABEL, IN_PROGRESS, STATUS, STATUS_LABEL, followUpState, slaBreached, statusAfterWhatsapp } from "@/lib/lead-pipeline";
 import { DEFAULT_LEAD_WHATSAPP_TEMPLATE, fillWhatsappTemplate, leadWhatsappHref } from "@/lib/lead-whatsapp";
@@ -27,6 +28,7 @@ import LeadActivity, { dayLabel } from "@/components/dorit/admin/LeadActivity";
 import LeadBriefing from "@/components/dorit/admin/LeadBriefing";
 import NewLeadSheetHost from "@/components/dorit/admin/NewLeadSheetHost";
 import StaffLeadsStrip from "@/components/dorit/admin/StaffLeadsStrip";
+import LeadClientFields from "@/components/dorit/admin/LeadClientFields";
 import DuplicatePointer from "@/components/dorit/admin/DuplicatePointer";
 import { agendaCounts, endOfWeek, isAwaitingSummary, meetingDay, nextMeetingByLead, nextMeetingLabel } from "@/lib/meetings-agenda";
 import { addDays, israelToday } from "@/lib/wall-clock";
@@ -218,7 +220,7 @@ const CELL = `px-2 py-2.5 ${COMPACT_CELL} [overflow-wrap:anywhere]`;
 const HEAD = `${CELL} font-medium`;
 const CONTACT = `${CELL} text-right text-[13px] ${COMPACT_TEXT}`;
 
-const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean; staffLeads?: boolean }[] = [
+const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean; staffLeads?: boolean; staffClients?: boolean }[] = [
   // A follow-up due today, or already late.
   { key: "today", label: "לטיפול היום" },
   // A reactivation campaign link brought them (/admin/campaigns).
@@ -229,7 +231,11 @@ const EXTRA_FILTERS: { key: string; label: string; adminOnly?: boolean; staffLea
   // VITE_STAFF_LEADS: the leads a member entered by hand, and (Admin+) the ones that may repeat another.
   { key: "staff", label: "דרך הצוות", staffLeads: true },
   { key: "duplicate", label: "כפילות אפשרית", adminOnly: true, staffLeads: true },
+  // VITE_STAFF_CLIENTS: the clients a member added by hand (opened as a client).
+  { key: "opened_client", label: "נפתחו כלקוחות", adminOnly: true, staffClients: true },
 ];
+/** The client mode needs both switches: it lives in the staff-lead sheet. Read at render, like the other switches here. */
+const clientsOn = () => STAFF_LEADS && STAFF_CLIENTS;
 
 type PageTab = "leads" | "meetings" | "tracking";
 /**
@@ -394,6 +400,7 @@ export default function Leads() {
   const myId = useCurrentUserId();
   // Agency 1 only: the privacy notice the client is told names Dorit's agency (src/config/staff-leads.ts).
   const creates = STAFF_LEADS && agencyId === AGENCY_1 && can("leads.create");
+  const addsClients = creates && clientsOn() && can("clients.create");
   const [sheetOpen, setSheetOpen] = useState(false);
   const tabs = useMemo(() => PAGE_TABS.filter((t) => t !== "tracking" || tracks), [tracks]);
   const members = useAdminUsers(assigns);
@@ -476,6 +483,8 @@ export default function Leads() {
       filter === "all" ||
       (filter === "staff"
         ? l.source === "staff"
+        : filter === "opened_client"
+          ? l.openedAs === "client"
         : filter === "duplicate"
           ? l.possibleDuplicate === true
           : filter === "unassigned"
@@ -501,7 +510,11 @@ export default function Leads() {
 
   const exportCsv = (all: boolean) => {
     const source = all ? leads : filtered;
-    const headers = ["תאריך", "שם", "טלפון", "אימייל", "מקור", "תחום/שירות", "מועד", "סטטוס", "הודעה", ...(STAFF_LEADS ? ["הובאה ע״י", "איך הגיע/ה", "מי הפנה"] : [])];
+    const headers = [
+      "תאריך", "שם", "טלפון", "אימייל", "מקור", "תחום/שירות", "מועד", "סטטוס", "הודעה",
+      ...(STAFF_LEADS ? ["הובאה ע״י", "איך הגיע/ה", "מי הפנה"] : []),
+      ...(clientsOn() ? ["נפתח/ה כ", "לקוח/ה מאז", "תחומים"] : []),
+    ];
     const rows = source.map((l) => [
       l.created_date ? new Date(l.created_date).toLocaleString("he-IL") : "",
       l.name,
@@ -513,6 +526,9 @@ export default function Leads() {
       ANY_STATUS_LABEL[l.status] || l.status || "",
       l.message || "",
       ...(STAFF_LEADS ? [l.broughtBy ? broughtLabel(l.broughtBy) : "", l.intake ? INTAKE_LABELS[l.intake] : "", l.referrerNote || ""] : []),
+      ...(clientsOn()
+        ? [l.openedAs === "client" ? "לקוח/ה" : "פנייה", sinceLabel(l.clientSince), (l.products ?? []).map((p) => PRODUCT_LABELS[p] ?? p).join(";")]
+        : []),
     ]);
     const csv = [headers, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -575,6 +591,7 @@ export default function Leads() {
   };
 
   const brought = useMemo(() => (showBrought ? broughtThisMonth(leads, new Date()) : new Map<string, number>()), [showBrought, leads]);
+  const broughtClients = useMemo(() => (showBrought && clientsOn() ? clientsThisMonth(leads, new Date()) : undefined), [showBrought, leads]);
   const openLead = openLeadId ? leads.find((l) => l.id === openLeadId) ?? null : null;
 
   const counts = top.reduce<Record<string, number>>((acc, l) => {
@@ -582,6 +599,7 @@ export default function Leads() {
     if (!l.assigned_user_id && l.status !== "closed") acc.unassigned = (acc.unassigned || 0) + 1;
     if (l.source === "staff") acc.staff = (acc.staff || 0) + 1;
     if (l.possibleDuplicate) acc.duplicate = (acc.duplicate || 0) + 1;
+    if (l.openedAs === "client") acc.opened_client = (acc.opened_client || 0) + 1;
     if (IN_PROGRESS.has(l.status)) acc.in_progress = (acc.in_progress || 0) + 1;
     if (l.channel === "reactivation") acc.campaign = (acc.campaign || 0) + 1;
     const due = followUpState(l, today);
@@ -693,6 +711,13 @@ export default function Leads() {
                           {STAFF_LEADS && l.source === "staff" && l.intake ? (
                             <span className="ms-2 inline-block border border-border/60 px-1.5 py-0.5 text-xs">{INTAKE_LABELS[l.intake]}</span>
                           ) : null}
+                          {clientsOn() && l.status === "client" && l.products?.length ? (
+                            <span className="mt-1 flex flex-wrap gap-1" aria-label={`תחומים: ${productsLabel(l.products)}`}>
+                              {l.products.map((p) => (
+                                <span key={p} className="border border-border/60 px-1.5 py-0.5 text-xs">{PRODUCT_LABELS[p] ?? p}</span>
+                              ))}
+                            </span>
+                          ) : null}
                           {STAFF_LEADS && assigns && l.possibleDuplicate ? (
                             <DuplicatePointer
                               others={sameNumberLeads(leads, l)}
@@ -784,7 +809,7 @@ export default function Leads() {
             {/* With the tabs it is the Owner's "מעקב לידים" tab; without them, folded above the leads. */}
             {!staff && tracks ? <LeadTrackingPanel /> : null}
 
-            {showBrought ? <StaffLeadsStrip counts={brought} label={assigneeLabel} /> : null}
+            {showBrought ? <StaffLeadsStrip counts={brought} label={assigneeLabel} clients={broughtClients} /> : null}
 
             <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
               {[
@@ -820,7 +845,7 @@ export default function Leads() {
               {[
                 { key: "all", label: "הכל" },
                 ...STATUS.map((s) => ({ key: s, label: STATUS_LABEL[s] })),
-                ...EXTRA_FILTERS.filter((f) => (!f.adminOnly || assigns) && (!f.staffLeads || STAFF_LEADS)),
+                ...EXTRA_FILTERS.filter((f) => (!f.adminOnly || assigns) && (!f.staffLeads || STAFF_LEADS) && (!f.staffClients || clientsOn())),
               ].map(({ key: s, label }) => {
                 const active = filter === s;
                 const count = s === "all" ? top.length : counts[s] || 0;
@@ -961,7 +986,7 @@ export default function Leads() {
               onClick={() => setSheetOpen(true)}
               className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
             >
-              <Plus size={16} /> פנייה חדשה
+              <Plus size={16} /> {addsClients ? "הוספה" : "פנייה חדשה"}
             </button>
           ) : null}
         </div>
@@ -975,6 +1000,7 @@ export default function Leads() {
             assignees={assignees}
             leads={leads}
             onOpenLead={MEETINGS_STAFF ? openFromTable : undefined}
+            canAddClient={addsClients}
           />
         ) : null}
 
@@ -1091,6 +1117,11 @@ export default function Leads() {
                       <LeadDetails lead={openLead} compact={false} />
                       {withTranscript.has(openLead.id) && <LeadTranscript leadId={openLead.id} />}
                     </dd>
+                    {clientsOn() && openLead.status === "client" ? (
+                      <dd className="col-span-2">
+                        <LeadClientFields key={openLead.id} lead={openLead} />
+                      </dd>
+                    ) : null}
                   </dl>
                 ) : null
               }
