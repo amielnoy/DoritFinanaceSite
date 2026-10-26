@@ -16,6 +16,11 @@ A successful build with failed tests can still become a Vercel preview. The nigh
 scheduled run rebuilds Vercel production after green checks and the Supabase
 deployment. Missing deployment credentials must not be confused with a successful
 release; production smoke checks publication and waits for the expected served asset.
+The build, e2e and smoke jobs install the browser and its OS packages through
+[`.github/actions/playwright-browser`](../.github/actions/playwright-browser/action.yml):
+the `.deb` files are cached per runner image and installed with `dpkg`, so only the
+first run after a runner-image update reaches the Ubuntu mirror, with a time limit
+and a retry that avoids the Azure mirror (#304, after it stalled deploys on 2026-10-26).
 
 **Nothing is published to Base44 any more** (2026-10-17). The Base44 host
 (`safe-arch-plan.base44.app`) still serves the last version published there, and
@@ -50,7 +55,8 @@ Vercel's environment variables, not here.
 | Chat | `VITE_CHAT_AGENTS` selects agent names individually; empty by default, or without Supabase, uses Base44. Production serves all four from the chat function |
 | Clearinghouse | `VITE_MASLEKA_ENABLED=true` and a configured client; otherwise the unavailable adapter makes no requests |
 | Call briefing | `VITE_LEAD_BRIEFING=true` shows "תדריך" in the lead drawer; the `lead-briefing` function also needs `LEAD_BRIEFING_MONTHLY_BUDGET_USD` above 0 (default 0, off). Both off until the privacy line and the adviser's sign-off (`docs/COMPLIANCE.md` §12) ([config](../src/config/lead-briefing.ts)) |
-| Clients added by hand | `VITE_STAFF_CLIENTS=true` (with `VITE_STAFF_LEADS`) turns "פנייה חדשה" into "הוספה" with a client mode, product tags, "נפתחו כלקוחות" and the drawer's client fields; `create-lead` (kind `client`) and `invite-client` also need the Supabase secret `STAFF_CLIENTS=true`. The privacy policy shows its line on these clients (section 2) with the same two build switches. Both off until the adviser approves the `staff-client-v1` notice and that line ([config](../src/config/staff-clients.ts)) |
+| Staff-entered leads | `VITE_STAFF_LEADS=true` shows "פנייה חדשה" on the leads screen for a member of agency 1, through `create-lead` and the `staff-intake-v1` notice ([config](../src/config/staff-leads.ts)). On in production since 2026-10-26; the adviser's approval of `staff-intake-v1` was still open then |
+| Clients added by hand | `VITE_STAFF_CLIENTS=true` (with `VITE_STAFF_LEADS`) turns "פנייה חדשה" into "הוספה" with a client mode, product tags, "נפתחו כלקוחות" and the drawer's client fields; `create-lead` (kind `client`) and `invite-client` also need the Supabase secret `STAFF_CLIENTS=true` (exactly lowercase `true`). The privacy policy shows its line on these clients (section 2) with the same two build switches. All three on in production since 2026-10-26; the adviser's approval of the `staff-client-v1` notice and that line was still open then ([config](../src/config/staff-clients.ts)) |
 | Client meetings | `VITE_MEETINGS_STAFF` (the lead drawer's meetings) and `VITE_MEETINGS_CLIENT` ("הפגישות שלי" in `/account`), each off by default ([config](../src/config/meetings.ts)) |
 | Public agency content | `VITE_AGENCY_CONTENT=true` plus a configured client reads `public_agency_sites`, `public_agent_cards` and `success_cases` for the agency that claims the host name. Otherwise, while loading, on any error and for a non-Hebrew locale, the bundled agency-1 constants are used. The prerender always uses the constants ([config](../src/config/agency-content.ts)) |
 
@@ -125,6 +131,22 @@ attendees; Outlook receives an ICS invitation by mail. Retained Base44 calendar
 code uses OAuth connectors. Verify ownership and sharing against the external
 account, not a repository assumption.
 Human-readable dates use Israel time; preserve provider-specific timezone names.
+
+A new account gets one welcome mail (`welcome-user`, #306): the app asks after a
+sign-in whose address was confirmed in the last 30 minutes, and the function
+checks that again and sends once per account. Accounts made earlier get nothing
+unless the operator runs the service-key resend (#308; see the function's header).
+
+Rate limits go through `allow_submission`, which keeps each row until its own
+window ends (windows up to 366 days since migration 20261114000000; before it,
+anything over a day was refused and so never held). `withinLimit` fails open, for
+request volume and mail to the agency's own staff; a limit on mail to an address
+someone typed uses `limitCheck` and sends only on `'ok'`, so a limiter outage
+holds that mail instead of making it unlimited (#309).
+
+Edge Functions call PostgREST through `_shared/rest.ts`. A `void` function answers
+204 with no body, which `callRpc` reads as `null` (#305); test stubs must answer
+the same way, or a failure after a successful write goes unseen.
 
 Never return internal exception messages or log personal data. Keep request IDs
 through the response and logs. Analytics goes through `src/lib/analytics.ts` and
