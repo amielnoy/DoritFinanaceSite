@@ -1,5 +1,7 @@
 import type { LeadRecord } from "@/services";
-import { INTAKE_LABELS, NOTICE_LABELS } from "@/config/staff-leads";
+import { INTAKE_LABELS } from "@/config/staff-leads";
+import { CLIENT_NOTICE_LABELS, PRODUCT_LABELS } from "@/config/staff-clients";
+import type { Product } from "@/lib/staff-lead-types";
 import { israelToday } from "@/lib/wall-clock";
 
 /** What the list says for a `broughtBy` that is no longer among the agency's members. */
@@ -29,10 +31,30 @@ export function broughtThisMonth(leads: LeadRecord[], now: Date): Map<string, nu
   return counts;
 }
 
-/** "נוספה ידנית ע״י …" for the drawer; null for a lead that did not come through the staff form. */
+/** Of those, the clients a member added by hand (opened as a client) — "פניות · לקוחות" on the strip, with VITE_STAFF_CLIENTS. */
+export function clientsThisMonth(leads: LeadRecord[], now: Date): Map<string, number> {
+  return broughtThisMonth(leads.filter((l) => l.openedAs === "client"), now);
+}
+
+/** A client's service lines in Hebrew, ", "-joined; "" for none. */
+export function productsLabel(products: Product[] | null | undefined): string {
+  return (products ?? []).map((p) => PRODUCT_LABELS[p] ?? p).join(", ");
+}
+
+/** "YYYY-MM" as "MM/YYYY"; "" for none. */
+export function sinceLabel(since: string | null | undefined): string {
+  return since && /^\d{4}-\d{2}$/.test(since) ? `${since.slice(5)}/${since.slice(0, 4)}` : "";
+}
+
+/** "נוספה ידנית ע״י …" (or, for a client added by hand, "נפתח/ה כלקוח/ה ע״י …") for the drawer; null for a lead that did not come through the staff form. */
 export function staffLeadLine(lead: LeadRecord, memberLabel: (id: string | null) => string): string | null {
   if (lead.source !== "staff") return null;
+  if (lead.openedAs === "client") {
+    return [`נפתח/ה כלקוח/ה ע״י ${memberLabel(lead.broughtBy ?? null)}`, lead.clientSince ? `לקוח/ה מאז ${sinceLabel(lead.clientSince)}` : "", productsLabel(lead.products)]
+      .filter(Boolean)
+      .join(" · ");
+  }
   const intake = lead.intake ? INTAKE_LABELS[lead.intake] : "—";
-  const notice = lead.noticeMethod ? NOTICE_LABELS[lead.noticeMethod] : "—";
+  const notice = lead.noticeMethod ? CLIENT_NOTICE_LABELS[lead.noticeMethod] : "—";
   return `נוספה ידנית ע״י ${memberLabel(lead.broughtBy ?? null)} · ${intake} · יידוע: ${notice}`;
 }

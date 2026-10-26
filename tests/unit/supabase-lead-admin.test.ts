@@ -682,3 +682,77 @@ describe("SupabaseLeadAdminService — campaigns", () => {
     expect(lead.campaign).toBe("k7x2m9qa1b2c");
   });
 });
+
+describe("SupabaseLeadAdminService — staff-added clients (VITE_STAFF_CLIENTS)", () => {
+  const functionsOf = (answer: { data: unknown; error: { message: string; context?: unknown } | null }) => {
+    const invoke = vi.fn().mockResolvedValue(answer);
+    return { client: { functions: { invoke } }, invoke };
+  };
+  const token = async () => "session-token";
+  const withRpc = (answer: { data: unknown; error: { message: string } | null }) => {
+    const { client } = tableFake({ data: [], error: null });
+    const rpc = vi.fn(async () => answer);
+    return { client: { ...client, rpc } as SupabaseLeadTableClient, rpc };
+  };
+
+  it("asks for opened_as, client_since and products only with the switch on", async () => {
+    const off = tableFake({ data: [], error: null });
+    await new SupabaseLeadAdminService(off.client, null, token, true, false).list();
+    const offCols = String(off.calls.find((c) => c[0] === "select")![1]).split(",");
+    for (const col of ["opened_as", "client_since", "products"]) expect(offCols).not.toContain(col);
+    const on = tableFake({ data: [], error: null });
+    await new SupabaseLeadAdminService(on.client, null, token, true, true).list();
+    const onCols = String(on.calls.find((c) => c[0] === "select")![1]).split(",");
+    for (const col of ["opened_as", "client_since", "products"]) expect(onCols).toContain(col);
+  });
+
+  it("reads a client's fields as openedAs, a YYYY-MM clientSince and products", async () => {
+    const { client } = tableFake({
+      data: [
+        leadRow({ opened_as: "client", client_since: "2019-03-01", products: ["pension", "health"], status: "client" }),
+        leadRow({ id: "plain", opened_as: "lead", client_since: null, products: null }),
+      ],
+      error: null,
+    });
+    const [added, plain] = await new SupabaseLeadAdminService(client, null, token, true, true).list();
+    expect(added).toMatchObject({ openedAs: "client", clientSince: "2019-03", products: ["pension", "health"] });
+    expect(added).not.toHaveProperty("client_since");
+    expect(added).not.toHaveProperty("opened_as");
+    expect(plain).toMatchObject({ openedAs: "lead", clientSince: null, products: null });
+  });
+
+  it("sends a client's kind, month and products to create-lead, and passes `next` back", async () => {
+    const f = functionsOf({ data: { leadId: "L1", duplicate: null, noticeSent: null, next: { invite: true, masleka: false }, rid: "r" }, error: null });
+    const service = new SupabaseLeadAdminService(tableFake({ data: [], error: null }).client, f.client, token);
+    const input = { agencyId: "a1", name: "רחל", phone: "0501110010", intake: "existing_client" as const, status: "client" as const,
+      notice: "agreement" as const, kind: "client" as const, clientSince: "2019-03", products: ["pension" as const] };
+    expect(await service.createLead(input)).toEqual({ leadId: "L1", duplicate: null, noticeSent: null, next: { invite: true, masleka: false } });
+    expect(f.invoke).toHaveBeenCalledWith("create-lead", { body: input, headers: { Authorization: "Bearer session-token" } });
+  });
+
+  it("converts through convert_lead_to_client with the month's first day, and returns the id it converted", async () => {
+    const { client, rpc } = withRpc({ data: "main-1", error: null });
+    expect(await new SupabaseLeadAdminService(client).convertToClient("merged-1", "2019-03", ["life"])).toBe("main-1");
+    expect(rpc).toHaveBeenCalledWith("convert_lead_to_client", { p_lead_id: "merged-1", p_client_since: "2019-03-01", p_products: ["life"] });
+  });
+
+  it.each([
+    ["not_found", "הפעולה לא בוצעה"],
+    ["bad_since", "החודש"],
+    ["bad_products", "תחום"],
+  ])("says the conversion's %s in Hebrew", async (reason, text) => {
+    const { client } = withRpc({ data: null, error: { message: reason } });
+    await expect(new SupabaseLeadAdminService(client).convertToClient("x", "2019-03", ["life"])).rejects.toThrow(text);
+  });
+
+  it("invites through invite-client as the person, and throws its Hebrew refusal", async () => {
+    const ok = functionsOf({ data: { sent: true, rid: "r" }, error: null });
+    await new SupabaseLeadAdminService(tableFake({ data: [], error: null }).client, ok.client, token).inviteClient("a1", "L1");
+    expect(ok.invoke).toHaveBeenCalledWith("invite-client", { body: { agencyId: "a1", leadId: "L1" }, headers: { Authorization: "Bearer session-token" } });
+    const context = new Response(JSON.stringify({ error: "כבר נשלחה הזמנה ללקוח/ה הזה/הזו.", rid: "r" }), { status: 409 });
+    const refused = functionsOf({ data: null, error: { message: "non-2xx", context } });
+    await expect(
+      new SupabaseLeadAdminService(tableFake({ data: [], error: null }).client, refused.client, token).inviteClient("a1", "L1"),
+    ).rejects.toThrow("כבר נשלחה הזמנה");
+  });
+});

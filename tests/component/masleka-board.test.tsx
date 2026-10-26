@@ -55,14 +55,14 @@ function service(over: Partial<MaslekaPort> = {}): MaslekaPort {
   };
 }
 
-/** `stage` opens the board at `?stage=<stage>`; without it, "לטיפול עכשיו". */
-function renderBoard(props: MaslekaBoardProps & { stage?: string }) {
-  const { stage, ...rest } = props;
+/** `stage` opens the board at `?stage=<stage>`; without it, "לטיפול עכשיו". `entry` is the whole address instead. */
+function renderBoard(props: MaslekaBoardProps & { stage?: string; entry?: string }) {
+  const { stage, entry, ...rest } = props;
   props = rest;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[stage ? `/admin/masleka?stage=${stage}` : "/admin/masleka"]}>
+      <MemoryRouter initialEntries={[entry ?? (stage ? `/admin/masleka?stage=${stage}` : "/admin/masleka")]}>
         <MaslekaBoard now={() => NOW} leads={vi.fn(async () => [])} {...props} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -326,6 +326,14 @@ describe("<MaslekaBoard /> — the new-request drawer", () => {
     expect(drawer.getByLabelText("נייד של הלקוח")).toHaveValue("052-765-4321");
     await userEvent.click(drawer.getByRole("button", { name: "יצירת קישור" }));
     expect(svc.create).toHaveBeenCalledWith({ clientName: "שירה בן דוד", contactEmail: undefined, sendInvite: false, leadId: LEADS[0].id });
+  });
+
+  it("opens a new request with the lead chosen for ?lead= (the add sheet's next step)", async () => {
+    const svc = service();
+    renderBoard({ service: svc, clipboard: null, leads: vi.fn(async () => LEADS), entry: `/admin/masleka?lead=${LEADS[0].id}` });
+    const drawer = within(await screen.findByRole("dialog"));
+    await waitFor(() => expect(drawer.getByLabelText("שיוך לפנייה (לא חובה)")).toHaveValue(LEADS[0].id));
+    expect(drawer.getByLabelText("שם הלקוח")).toHaveValue("שירה בן דוד");
   });
 
   it("reads the leads only once the drawer opens", async () => {

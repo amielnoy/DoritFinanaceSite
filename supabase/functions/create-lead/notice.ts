@@ -18,9 +18,21 @@ export const STAFF_INTAKE_NOTICE = `סוכנות דורית גוב ארי (רי�
 זכותך לראות את הפרטים, לתקן אותם ולבקש למחוק אותם: ${CONTACT.email}
 המדיניות המלאה: ${SITE_URL}/privacy`;
 
-/** The notice as a letter, for a lead the member chose to notify by email. */
-export function noticeMail(): { subject: string; html: string; text: string } {
-  const lines = STAFF_INTAKE_NOTICE.split('\n');
+/** Stored as consent_version on a client a member added (create_staff_lead sets it). */
+export const STAFF_CLIENT_VERSION = 'staff-client-v1';
+
+// DRAFT for the compliance adviser: wording not yet approved (staff-client spec C5).
+// Same text as src/config/staff-clients.ts; tests/contract/staff-intake-notice.contract.test.ts keeps the two identical.
+export const STAFF_CLIENT_NOTICE = `סוכנות דורית גוב ארי (רישיון סוכן L-00107009) שומרת את הפרטים שמסרת במסגרת הסכם ההתקשרות: שם, טלפון, דוא״ל, תחומי השירות והערות מהשיחות.
+הפרטים משמשים כדי לתת לך את השירות שסוכם בהסכם ההתקשרות.
+הפרטים נשמרים כנדרש על-פי דין ועל-פי הוראות רשות שוק ההון.
+הפרטים גלויים לצוות הסוכנות בלבד.
+זכותך לראות את הפרטים, לתקן אותם ולבקש למחוק אותם: ${CONTACT.email}
+המדיניות המלאה: ${SITE_URL}/privacy`;
+
+/** The notice as a letter, for a lead (or a client) the member chose to notify by email. */
+export function noticeMail(kind: 'lead' | 'client' = 'lead'): { subject: string; html: string; text: string } {
+  const lines = (kind === 'client' ? STAFF_CLIENT_NOTICE : STAFF_INTAKE_NOTICE).split('\n');
   const html = buildClientHtml({
     firstName: '',
     eyebrow: 'הודעת פרטיות',

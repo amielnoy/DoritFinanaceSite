@@ -39,6 +39,8 @@ export const PERMISSIONS = {
   "leads.delete": "admin",
   /** A member enters a lead by hand (create-lead). */
   "leads.create": "user",
+  /** A member adds someone who is already a client (create-lead kind "client", invite-client). */
+  "clients.create": "user",
   /** Folds duplicate leads into one, and takes them apart again (merge_leads, unmerge_lead). */
   "leads.merge": "admin",
   /** Exports what the person can already see. */

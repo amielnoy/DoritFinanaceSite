@@ -193,6 +193,8 @@ export const services: Services = {
     remove: (id) => real().then((s) => s.leadsAdmin.remove(id)),
     createLead: (input) => real().then((s) => s.leadsAdmin.createLead(input)),
     clearDuplicate: (leadId) => real().then((s) => s.leadsAdmin.clearDuplicate(leadId)),
+    convertToClient: (leadId, since, products) => real().then((s) => s.leadsAdmin.convertToClient(leadId, since, products)),
+    inviteClient: (agencyId, leadId) => real().then((s) => s.leadsAdmin.inviteClient(agencyId, leadId)),
     mergeLeads: (primaryId, otherIds) => real().then((s) => s.leadsAdmin.mergeLeads(primaryId, otherIds)),
     unmergeLead: (leadId) => real().then((s) => s.leadsAdmin.unmergeLead(leadId)),
     leadEvents: (leadId) => real().then((s) => s.leadsAdmin.leadEvents(leadId)),

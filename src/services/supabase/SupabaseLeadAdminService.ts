@@ -1,4 +1,6 @@
+import { STAFF_CLIENTS } from "@/config/staff-clients";
 import { STAFF_LEADS } from "@/config/staff-leads";
+import type { Product } from "@/lib/staff-lead-types";
 import type { AgendaMeeting, CreatedLead, LeadAdminPort, LeadBriefing, LeadEvent, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, NewStaffLead, TranscriptLine } from "../ports";
 import type { ContentFunctionsClient } from "./EdgeContentAdminService";
 import { CLAIM_DOCUMENT_REF_PREFIX } from "./SupabaseUploadService";
@@ -17,12 +19,20 @@ const LEAD_COLUMNS = "id,name,phone,email,source,topic,timing,message,status,cre
 /** The staff-created-lead columns; they exist in production only once the staff-leads migration is applied, so they are asked for only when STAFF_LEADS is on. */
 const STAFF_LEAD_COLUMNS = "brought_by,intake,referrer_note,notice_method,possible_duplicate";
 
-export const leadColumns = (staffLeads: boolean): string => (staffLeads ? `${LEAD_COLUMNS},${STAFF_LEAD_COLUMNS}` : LEAD_COLUMNS);
+/** The staff-added-client columns (20261113000000_staff_clients.sql), asked for only when STAFF_CLIENTS is on, for the same reason. */
+const STAFF_CLIENT_COLUMNS = "opened_as,client_since,products";
+
+export const leadColumns = (staffLeads: boolean, staffClients = false): string =>
+  [LEAD_COLUMNS, ...(staffLeads ? [STAFF_LEAD_COLUMNS] : []), ...(staffClients ? [STAFF_CLIENT_COLUMNS] : [])].join(",");
 
 /** Leads per read; PostgREST's own default cap is 1,000. */
 export const LEAD_PAGE = 1000;
 /** A bound on one list, far past what the agency holds. */
 export const LEAD_LIST_MAX = 20_000;
+
+/** create-lead's `next`, when it is the shape the sheet reads. */
+const isNext = (v: unknown): v is { invite: boolean; masleka: boolean } =>
+  typeof v === "object" && v !== null && typeof (v as { invite?: unknown }).invite === "boolean" && typeof (v as { masleka?: unknown }).masleka === "boolean";
 
 /** A text[] column (or the function's array) as strings; anything else is none. */
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -30,7 +40,7 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת";
 
 const MERGE_UNAVAILABLE = "מיזוג פניות אינו זמין כאן.";
-/** merge_leads / unmerge_lead / add_lead_note refusals, by the exception each raises. */
+/** merge_leads / unmerge_lead / add_lead_note / convert_lead_to_client refusals, by the exception each raises. */
 const MERGE_REFUSALS: Record<string, string> = {
   forbidden: "רק מנהל/ת בסוכנות יכול/ה למזג פניות.",
   not_found: NOT_APPLIED,
@@ -39,6 +49,8 @@ const MERGE_REFUSALS: Record<string, string> = {
   field_required: "ההערה ריקה.",
   field_too_long: "ההערה ארוכה מדי (עד 2,000 תווים).",
   field_invalid: "אין לכתוב בהערה מספר זהות, כרטיס אשראי או חשבון בנק.",
+  bad_since: "החודש שבו התחילה ההתקשרות אינו תקין.",
+  bad_products: "יש לבחור לפחות תחום אחד מהרשימה.",
 };
 
 /** A meeting's columns for staff — Dorit's notes included, which the client's door never returns. */
@@ -86,6 +98,7 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     private readonly functions: ContentFunctionsClient | null = null,
     private readonly accessToken: () => Promise<string | null> = async () => null,
     private readonly staffLeads: boolean = STAFF_LEADS,
+    private readonly staffClients: boolean = STAFF_CLIENTS,
   ) {}
 
   /** An Edge Function as the signed-in person; its refusal in its own words. */
@@ -111,7 +124,7 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
     const rows: Record<string, unknown>[] = [];
     for (let from = 0; from < limit; from += LEAD_PAGE) {
       const to = Math.min(from + LEAD_PAGE, limit) - 1;
-      const query = this.client.from("leads").select(leadColumns(this.staffLeads)).order("created_at", { ascending: false }).order("id", { ascending: false });
+      const query = this.client.from("leads").select(leadColumns(this.staffLeads, this.staffClients)).order("created_at", { ascending: false }).order("id", { ascending: false });
       const page = await fetchRows(query.range ? query.range(from, to) : query.limit(to + 1), "leads");
       rows.push(...page);
       if (!query.range || page.length < to - from + 1) break;
@@ -129,6 +142,13 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
         lead.referrerNote = typeof row.referrer_note === "string" ? row.referrer_note : null;
         lead.noticeMethod = typeof row.notice_method === "string" ? row.notice_method : null;
         lead.possibleDuplicate = row.possible_duplicate === true;
+      }
+      if (this.staffClients) {
+        for (const key of ["opened_as", "client_since", "products"]) delete lead[key];
+        lead.openedAs = row.opened_as === "client" ? "client" : "lead";
+        // Stored as the month's first day; the screen speaks in months.
+        lead.clientSince = typeof row.client_since === "string" ? row.client_since.slice(0, 7) : null;
+        lead.products = Array.isArray(row.products) ? strings(row.products) : null;
       }
       return lead as unknown as LeadRecord;
     });
@@ -159,7 +179,17 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
       leadId: answer.leadId,
       duplicate: answer.duplicate === "hidden" || answer.duplicate === "visible" ? answer.duplicate : null,
       noticeSent: typeof answer.noticeSent === "boolean" ? answer.noticeSent : null,
+      ...(isNext(answer.next) ? { next: { invite: answer.next.invite, masleka: answer.next.masleka } } : {}),
     };
+  }
+
+  async convertToClient(leadId: string, since: string, products: Product[]): Promise<string> {
+    const data = await this.rpc("convert_lead_to_client", { p_lead_id: leadId, p_client_since: `${since}-01`, p_products: products });
+    return typeof data === "string" ? data : leadId;
+  }
+
+  async inviteClient(agencyId: string, leadId: string): Promise<void> {
+    await this.call("invite-client", { agencyId, leadId });
   }
 
   clearDuplicate(leadId: string): Promise<void> {

@@ -78,6 +78,14 @@ export class Base44LeadAdminService implements LeadAdminPort {
     throw new Error(STAFF_LEADS_SUPABASE_ONLY);
   }
 
+  async convertToClient(): Promise<never> {
+    throw new Error(STAFF_LEADS_SUPABASE_ONLY);
+  }
+
+  async inviteClient(): Promise<void> {
+    throw new Error(STAFF_LEADS_SUPABASE_ONLY);
+  }
+
   async mergeLeads(): Promise<never> {
     throw new Error(MERGE_SUPABASE_ONLY);
   }

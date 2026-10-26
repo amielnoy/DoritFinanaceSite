@@ -9,9 +9,9 @@ export const isStaffLeadsOn = (value: string | undefined): boolean => (value ?? 
 
 export const STAFF_LEADS: boolean = isStaffLeadsOn(import.meta.env.VITE_STAFF_LEADS);
 
-import type { Intake, NoticeMethod } from "@/lib/staff-lead-types";
+import type { Intake, LeadNoticeMethod, NoticeMethod } from "@/lib/staff-lead-types";
 
-export type { Intake, NoticeMethod };
+export type { Intake, LeadNoticeMethod, NoticeMethod };
 
 export const INTAKE_LABELS: Record<Intake, string> = {
   phone: "שיחת טלפון",
@@ -22,7 +22,8 @@ export const INTAKE_LABELS: Record<Intake, string> = {
   other: "אחר",
 };
 
-export const NOTICE_LABELS: Record<NoticeMethod, string> = {
+/** The methods the enquiry form offers. A client's list, with "בהסכם ההתקשרות", is in staff-clients.ts. */
+export const NOTICE_LABELS: Record<LeadNoticeMethod, string> = {
   verbal: "בעל פה",
   email: "במייל",
   whatsapp: "בוואטסאפ",

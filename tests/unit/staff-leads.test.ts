@@ -65,3 +65,41 @@ describe("sameNumberLeads", () => {
     expect(sameNumberLeads([a, b, c], a).map((l) => l.id)).toEqual(["b"]);
   });
 });
+
+describe("staff-added clients", () => {
+  const base = { id: "x", name: "n", phone: "0500000000", source: "staff" as const, status: "client" as const, created_date: "2026-10-12T08:00:00Z" };
+
+  it("counts this month's clients added by hand, per member, in Israel time", async () => {
+    const { clientsThisMonth } = await import("@/lib/staff-leads");
+    const counts = clientsThisMonth(
+      [
+        { ...base, id: "a", broughtBy: "u1", openedAs: "client" },
+        { ...base, id: "b", broughtBy: "u1", openedAs: "lead" },
+        // 31 Oct 22:30 UTC is already November in Israel
+        { ...base, id: "c", broughtBy: "u2", openedAs: "client", created_date: "2026-10-31T22:30:00Z" },
+      ],
+      new Date("2026-11-02T08:00:00Z"),
+    );
+    expect([...counts]).toEqual([["u2", 1]]);
+  });
+
+  it("writes the drawer line of a client added by hand; a lead's line is unchanged", async () => {
+    const { staffLeadLine } = await import("@/lib/staff-leads");
+    const label = () => "נועה";
+    expect(staffLeadLine({ ...base, openedAs: "client", clientSince: "2019-03", products: ["pension", "health"], broughtBy: "u1" }, label)).toBe(
+      "נפתח/ה כלקוח/ה ע״י נועה · לקוח/ה מאז 03/2019 · פנסיה, בריאות וסיעוד",
+    );
+    expect(staffLeadLine({ ...base, status: "new", openedAs: "lead", intake: "phone", noticeMethod: "verbal", broughtBy: "u1" }, label)).toBe(
+      "נוספה ידנית ע״י נועה · שיחת טלפון · יידוע: בעל פה",
+    );
+  });
+
+  it("labels products and months, and nothing for none", async () => {
+    const { productsLabel, sinceLabel } = await import("@/lib/staff-leads");
+    expect(productsLabel([])).toBe("");
+    expect(productsLabel(null)).toBe("");
+    expect(productsLabel(["claims", "other"])).toBe("ליווי תביעות, אחר");
+    expect(sinceLabel("2019-03")).toBe("03/2019");
+    expect(sinceLabel(null)).toBe("");
+  });
+});

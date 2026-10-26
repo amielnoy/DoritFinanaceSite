@@ -1,7 +1,7 @@
 import type { ClientMeeting, MeetingKind, MeetingMode, MeetingRequestKind, MeetingStatus } from "@/lib/meetings";
 
 export type { ClientMeeting };
-import type { Intake, NoticeMethod } from "@/lib/staff-lead-types";
+import type { Intake, NoticeMethod, Product } from "@/lib/staff-lead-types";
 import type { InterviewSummary } from "@/lib/interview-handoff";
 import type { Snapshot } from "@/lib/clearinghouse/snapshot";
 
@@ -345,6 +345,10 @@ export interface LeadRecord {
   mergedInto?: string | null;
   /** The day of the next follow-up (Israel's date, YYYY-MM-DD), or null. */
   nextFollowUpOn?: string | null;
+  /** Staff-added clients (STAFF_CLIENTS): opened as a client or as a lead (fixed at insert), since when (YYYY-MM), and the service lines. */
+  openedAs?: "lead" | "client";
+  clientSince?: string | null;
+  products?: Product[] | null;
 }
 
 /**
@@ -395,12 +399,18 @@ export interface NewStaffLead {
   /** Admin+: a member's id, "none" for the queue, or absent for the caller themselves. Ignored for a User. */
   assignee?: string | null;
   duplicateOk?: boolean;
+  /** "client" (STAFF_CLIENTS): someone who is already a client — since when (YYYY-MM) and the service lines; the status sent is not read. */
+  kind?: "lead" | "client";
+  clientSince?: string;
+  products?: Product[];
 }
 
 export interface CreatedLead {
   leadId: string;
   duplicate: "visible" | "hidden" | null;
   noticeSent: boolean | null;
+  /** For a client: whether the personal-area invite (an email was given) and a clearinghouse request are open now. */
+  next?: { invite: boolean; masleka: boolean };
 }
 
 /** Managing received enquiries. Every method here touches personal data. */
@@ -471,6 +481,14 @@ export interface LeadAdminPort {
   remove(id: string): Promise<void>;
   /** A member enters a lead by hand. A 409 (a visible duplicate) resolves with `duplicate: "visible"`; other refusals throw in Hebrew. */
   createLead(input: NewStaffLead): Promise<CreatedLead>;
+  /**
+   * The lead becomes a client (convert_lead_to_client), with since when
+   * (YYYY-MM) and the service lines, under the person's own update rights. A
+   * lead merged into another converts its main lead; resolves with that id.
+   */
+  convertToClient(leadId: string, since: string, products: Product[]): Promise<string>;
+  /** Mail a client the personal-area sign-in link (invite-client); its refusal in Hebrew. */
+  inviteClient(agencyId: string, leadId: string): Promise<void>;
   /** Mark a possible duplicate as checked (possible_duplicate = false). */
   clearDuplicate(leadId: string): Promise<void>;
   /** Fold `otherIds` into `primaryId` (merge_leads, Admin+). Nothing is deleted; unmergeLead undoes it. Resolves with how many were merged. */

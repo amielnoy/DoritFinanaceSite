@@ -7,9 +7,13 @@ import { ctaClass } from "@/components/dorit/primitives/Cta";
 import { Field, inputClass } from "@/components/dorit/primitives/Field";
 import { MEETINGS_STAFF } from "@/config/meetings";
 import { MEETING_TOPICS } from "@/config/needs-wizard";
+import { CLIENT_NOTICE_LABELS, CLIENT_NOTICE_METHODS, STAFF_CLIENT_NOTICE } from "@/config/staff-clients";
+import ClientFields, { israelMonth } from "@/components/dorit/admin/ClientFields";
+import ClientNextSteps from "@/components/dorit/admin/ClientNextSteps";
+import type { Product } from "@/lib/staff-lead-types";
 import {
   INTAKE_LABELS, NOTICE_LABELS, STAFF_INTAKE_NOTICE, STAFF_STATUS_LABELS,
-  type Intake, type NoticeMethod,
+  type Intake, type LeadNoticeMethod, type NoticeMethod,
 } from "@/config/staff-leads";
 import { isContactPhone } from "@/lib/phone";
 import { MEETING_MODE_LABEL, type MeetingMode } from "@/lib/meetings";
@@ -21,13 +25,37 @@ import { israelInstant, israelToday } from "@/lib/wall-clock";
  * Staff text goes to `notes`, which the client never sees. A visible duplicate
  * is shown from the list the page already loaded: the API returns only its id.
  * "קבענו כבר פגישה" shows only with VITE_MEETINGS_STAFF, where staff can see the meeting.
+ *
+ * With `canAddClient` (VITE_STAFF_CLIENTS) the sheet is "הוספה", with a switch
+ * between an enquiry and someone who is already a client
+ * (docs/superpowers/specs/2026-10-22-staff-client-design.md): the client mode
+ * hides מצב and נושא, asks since when and the service lines, tells the client
+ * notice ("בהסכם ההתקשרות" first), offers to make a matching lead a client, and
+ * ends on the next steps instead of a toast. The last mode is remembered.
  */
 
 type Status = keyof typeof STAFF_STATUS_LABELS;
-type Done = { leadId: string; hidden: boolean; noticeFailed: boolean };
+type Done = { leadId: string; hidden: boolean; noticeFailed: boolean; next?: { invite: boolean; masleka: boolean } };
+type Mode = "lead" | "client";
+/** Where the last mode is kept, per browser: a convenience, so a failed read is "lead". */
+export const MODE_KEY = "staff-sheet-mode";
+const readMode = (): Mode => {
+  try {
+    return localStorage.getItem(MODE_KEY) === "client" ? "client" : "lead";
+  } catch {
+    return "lead";
+  }
+};
+const keepMode = (mode: Mode) => {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    /* private window: not remembered */
+  }
+};
 
 const INTAKES = Object.keys(INTAKE_LABELS) as Intake[];
-const METHODS = Object.keys(NOTICE_LABELS) as NoticeMethod[];
+const METHODS = Object.keys(NOTICE_LABELS) as LeadNoticeMethod[];
 const TOPICS = [...MEETING_TOPICS, "אחר"];
 const button = (extra = "", muted = false) => ctaClass(`min-h-11 px-4 text-base ${extra}`, { muted });
 const dateOf = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
@@ -35,7 +63,7 @@ const dateOf = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { time
 const NO_ASSIGNEE = "none";
 
 export default function NewLeadSheet({
-  open, onClose, agencyId, canAssign, assignees, leads, onCreated, onSaved, onOpenExisting,
+  open, onClose, agencyId, canAssign, assignees, leads, onCreated, onSaved, onOpenExisting, canAddClient = false, now,
 }: {
   open: boolean;
   onClose(): void;
@@ -48,12 +76,20 @@ export default function NewLeadSheet({
   /** The lead exists but the sheet stays open on its confirmation: read the list again now, as closing it with ✕ will not. */
   onSaved?(leadId: string): void;
   onOpenExisting(leadId: string): void;
+  /** VITE_STAFF_CLIENTS and clients.create: the switch to "לקוח/ה". */
+  canAddClient?: boolean;
+  /** The clock, for the since-when month (tests). */
+  now?: Date;
 }) {
+  const [mode, setModeState] = useState<Mode>(() => (canAddClient ? readMode() : "lead"));
+  const asClient = canAddClient && mode === "client";
+  const [since, setSince] = useState(() => israelMonth(now ?? new Date()));
+  const [products, setProducts] = useState<Product[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [topic, setTopic] = useState("");
-  const [intake, setIntake] = useState<Intake | null>(null);
+  const [intake, setIntake] = useState<Intake | null>(() => (canAddClient && readMode() === "client" ? "existing_client" : null));
   const [referrer, setReferrer] = useState("");
   const [status, setStatus] = useState<Status>("contacted");
   const [notes, setNotes] = useState("");
@@ -61,10 +97,10 @@ export default function NewLeadSheet({
   const [meeting, setMeeting] = useState(false);
   const [day, setDay] = useState(israelToday(new Date()));
   const [time, setTime] = useState("10:00");
-  const [mode, setMode] = useState<MeetingMode>("office");
+  const [meetingMode, setMeetingMode] = useState<MeetingMode>("office");
   const [place, setPlace] = useState("");
   const [informed, setInformed] = useState(false);
-  const [method, setMethod] = useState<NoticeMethod | null>(null);
+  const [method, setMethod] = useState<NoticeMethod | null>(() => (canAddClient && readMode() === "client" ? "agreement" : null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
@@ -73,7 +109,24 @@ export default function NewLeadSheet({
   const scheduledAt = israelInstant(day, time);
   const valid =
     name.trim() !== "" && isContactPhone(phone) && intake !== null && informed && method !== null &&
-    !(method === "email" && email.trim() === "") && (!meeting || scheduledAt !== null);
+    !(method === "email" && email.trim() === "") && (!meeting || scheduledAt !== null) &&
+    (!asClient || (since !== "" && products.length > 0));
+
+  // Switching keeps what was typed; only what one mode cannot carry changes:
+  // "בהסכם ההתקשרות" is a client's, and a client starts on "לקוח/ה קיים/ת" and the agreement.
+  const setMode = (next: Mode) => {
+    setModeState(next);
+    keepMode(next);
+    setError("");
+    if (next === "client") {
+      setIntake((i) => i ?? "existing_client");
+      setMethod((m) => m ?? "agreement");
+    } else if (method === "agreement") {
+      setMethod(null);
+    }
+  };
+  const notice = asClient ? STAFF_CLIENT_NOTICE : STAFF_INTAKE_NOTICE;
+  const methods: NoticeMethod[] = asClient ? CLIENT_NOTICE_METHODS : METHODS;
 
   const submit = async (duplicateOk: boolean) => {
     if (!valid || !intake || !method || busy) return;
@@ -83,7 +136,8 @@ export default function NewLeadSheet({
       const created = await services.leadsAdmin.createLead({
         agencyId, name: name.trim(), phone: phone.trim(), email: email.trim() || undefined, topic: topic || undefined,
         notes: notes.trim() || undefined, intake, referrer: intake === "referral" ? referrer.trim() || undefined : undefined,
-        status, notice: method, assignee: canAssign && assignee ? assignee : undefined, duplicateOk: duplicateOk || undefined,
+        status: asClient ? "client" : status, notice: method, assignee: canAssign && assignee ? assignee : undefined, duplicateOk: duplicateOk || undefined,
+        ...(asClient ? { kind: "client" as const, clientSince: since, products, topic: undefined } : {}),
       });
       if (created.duplicate === "visible") {
         setDuplicateId(created.leadId);
@@ -92,15 +146,23 @@ export default function NewLeadSheet({
       if (meeting && scheduledAt) {
         try {
           await services.leadsAdmin.addMeeting({
-            leadId: created.leadId, agencyId, scheduledAt, durationMin: 45, mode, location: place.trim(), kind: "first", topic: topic || "",
+            leadId: created.leadId, agencyId, scheduledAt, durationMin: 45, mode: meetingMode, location: place.trim(),
+            kind: asClient ? "other" : "first", topic: asClient ? "" : topic || "",
           });
         } catch {
-          toast({ description: "הפנייה נוצרה, אבל הפגישה לא נשמרה. ניתן להוסיף אותה מכרטיס הפנייה." });
+          toast({
+            description: asClient
+              ? "הלקוח/ה נוספ/ה, אבל הפגישה לא נשמרה. ניתן להוסיף אותה מכרטיס הלקוח/ה."
+              : "הפנייה נוצרה, אבל הפגישה לא נשמרה. ניתן להוסיף אותה מכרטיס הפנייה.",
+          });
         }
       }
       const hidden = created.duplicate === "hidden";
       const noticeFailed = created.noticeSent === false;
-      if (hidden || noticeFailed) {
+      if (asClient) {
+        onSaved?.(created.leadId);
+        setDone({ leadId: created.leadId, hidden, noticeFailed, next: created.next ?? { invite: false, masleka: false } });
+      } else if (hidden || noticeFailed) {
         onSaved?.(created.leadId);
         setDone({ leadId: created.leadId, hidden, noticeFailed });
       } else {
@@ -108,7 +170,24 @@ export default function NewLeadSheet({
         onCreated(created.leadId);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "הפנייה לא נשמרה. ניתן לנסות שוב.");
+      setError(e instanceof Error ? e.message : asClient ? "הלקוח/ה לא נשמר/ה. ניתן לנסות שוב." : "הפנייה לא נשמרה. ניתן לנסות שוב.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Client mode's answer to a lead it can see: that lead becomes the client (one row, its history with it).
+  const convert = async () => {
+    if (!duplicateId || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const id = await services.leadsAdmin.convertToClient(duplicateId, since, products);
+      toast({ description: "הפנייה הקיימת סומנה כלקוח/ה" });
+      onSaved?.(id);
+      onOpenExisting(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "הפנייה לא עודכנה. ניתן לנסות שוב.");
     } finally {
       setBusy(false);
     }
@@ -117,8 +196,26 @@ export default function NewLeadSheet({
   const existing = duplicateId ? leads?.find((l) => l.id === duplicateId) : undefined;
 
   return (
-    <SideDrawer open={open} onClose={onClose} title="פנייה חדשה" subtitle="פרטי הפונה, כפי שנמסרו בשיחה">
-      {done ? (
+    <SideDrawer
+      open={open}
+      onClose={onClose}
+      title={canAddClient ? "הוספה" : "פנייה חדשה"}
+      subtitle={asClient ? "לקוח/ה שכבר עובד/ת איתנו" : "פרטי הפונה, כפי שנמסרו בשיחה"}
+    >
+      {done && done.next ? (
+        <ClientNextSteps
+          name={name.trim()}
+          leadId={done.leadId}
+          agencyId={agencyId}
+          next={done.next}
+          notes={[
+            ...(done.hidden ? ["המספר כבר קיים בסוכנות — מנהל/ת יבדוק/תבדוק."] : []),
+            ...(done.noticeFailed ? ["הנוסח לא נשלח במייל — יש לשלוח אותו ללקוח/ה בדרך אחרת."] : []),
+          ]}
+          onClose={onClose}
+          onOpenLead={onCreated}
+        />
+      ) : done ? (
         <div className="flex flex-col gap-3" role="status">
           <p className="font-heading text-xl">הפנייה נשמרה</p>
           {done.hidden ? <p>המספר כבר קיים בסוכנות — מנהל/ת יבדוק/תבדוק.</p> : null}
@@ -136,24 +233,49 @@ export default function NewLeadSheet({
             <p>הפנייה כבר קיימת אצלך</p>
           )}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          <button type="button" className={button()} onClick={() => onOpenExisting(duplicateId)}>פתיחת הפנייה הקיימת</button>
-          <button type="button" disabled={busy} className={button("", true)} onClick={() => submit(true)}>פנייה חדשה לאותו אדם</button>
+          {asClient ? (
+            <>
+              <button type="button" disabled={busy} className={button()} onClick={() => void convert()}>הפיכת הפנייה הקיימת ללקוח/ה</button>
+              <button type="button" disabled={busy} className="min-h-11 self-start text-base text-muted-foreground hover:text-foreground" onClick={() => submit(true)}>
+                לקוח/ה חדש/ה בכל זאת
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className={button()} onClick={() => onOpenExisting(duplicateId)}>פתיחת הפנייה הקיימת</button>
+              <button type="button" disabled={busy} className={button("", true)} onClick={() => submit(true)}>פנייה חדשה לאותו אדם</button>
+            </>
+          )}
         </div>
       ) : (
         <form
-          aria-label="פנייה חדשה"
+          aria-label={asClient ? "לקוח/ה חדש/ה" : "פנייה חדשה"}
           className="flex flex-col gap-4"
           onSubmit={(e) => { e.preventDefault(); submit(false); }}
         >
+          {canAddClient ? (
+            <div role="group" aria-label="מה מוסיפים" className="grid grid-cols-2 rounded-md border border-input p-1">
+              {(["lead", "client"] as const).map((m) => (
+                <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}
+                  className={`min-h-11 rounded-[4px] text-base ${mode === m ? "bg-highlight/15 font-semibold" : "text-muted-foreground"}`}>
+                  {m === "lead" ? "פנייה" : "לקוח/ה"}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <Field label="שם"><input type="text" required maxLength={80} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} className={inputClass()} /></Field>
           <Field label="טלפון"><input type="tel" required inputMode="tel" autoComplete="off" value={phone} aria-invalid={phone !== "" && !isContactPhone(phone)} onChange={(e) => setPhone(e.target.value)} className={inputClass()} /></Field>
           <Field label="אימייל"><input type="email" maxLength={200} autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass()} /></Field>
-          <Field label="נושא">
-            <select value={topic} onChange={(e) => setTopic(e.target.value)} className={inputClass()}>
-              <option value="">לא נבחר</option>
-              {TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </Field>
+          {asClient ? (
+            <ClientFields since={since} products={products} now={now} onChange={(v) => { setSince(v.since); setProducts(v.products); }} />
+          ) : (
+            <Field label="נושא">
+              <select value={topic} onChange={(e) => setTopic(e.target.value)} className={inputClass()}>
+                <option value="">לא נבחר</option>
+                {TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+          )}
 
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1.5 text-[15px] text-foreground/80">איך הגיע/ה</legend>
@@ -170,11 +292,13 @@ export default function NewLeadSheet({
             ) : null}
           </fieldset>
 
-          <Field label="מצב">
-            <select value={status} onChange={(e) => setStatus(e.target.value as Status)} className={inputClass()}>
-              {(Object.keys(STAFF_STATUS_LABELS) as Status[]).map((s) => <option key={s} value={s}>{STAFF_STATUS_LABELS[s]}</option>)}
-            </select>
-          </Field>
+          {asClient ? null : (
+            <Field label="מצב">
+              <select value={status} onChange={(e) => setStatus(e.target.value as Status)} className={inputClass()}>
+                {(Object.keys(STAFF_STATUS_LABELS) as Status[]).map((s) => <option key={s} value={s}>{STAFF_STATUS_LABELS[s]}</option>)}
+              </select>
+            </Field>
+          )}
           <div>
             <Field label="הערות פנימיות"><textarea rows={3} maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass()} /></Field>
             <p className="mt-1 text-sm text-muted-foreground">לא מוצגות ללקוח</p>
@@ -200,7 +324,7 @@ export default function NewLeadSheet({
               <Field label="תאריך"><input type="date" required value={day} onChange={(e) => setDay(e.target.value)} className={inputClass()} /></Field>
               <Field label="שעה"><input type="time" required value={time} onChange={(e) => setTime(e.target.value)} className={inputClass()} /></Field>
               <Field label="אופן">
-                <select value={mode} onChange={(e) => setMode(e.target.value as MeetingMode)} className={inputClass()}>
+                <select value={meetingMode} onChange={(e) => setMeetingMode(e.target.value as MeetingMode)} className={inputClass()}>
                   {(Object.keys(MEETING_MODE_LABEL) as MeetingMode[]).map((m) => <option key={m} value={m}>{MEETING_MODE_LABEL[m]}</option>)}
                 </select>
               </Field>
@@ -212,30 +336,30 @@ export default function NewLeadSheet({
             <legend className="px-1 text-[15px] text-foreground/80">יידוע</legend>
             <details>
               <summary className="min-h-11 cursor-pointer py-2 text-base">נוסח היידוע</summary>
-              <p className="whitespace-pre-line text-sm text-muted-foreground">{STAFF_INTAKE_NOTICE}</p>
+              <p className="whitespace-pre-line text-sm text-muted-foreground">{notice}</p>
             </details>
             <label className="flex items-start gap-3 text-base">
               <input type="checkbox" required checked={informed} onChange={(e) => setInformed(e.target.checked)} className="mt-1 h-5 w-5" />
-              יידעתי את הפונה איך ישמשו הפרטים שלו/ה
+              {asClient ? "הלקוח/ה יודע/ת איך ישמשו הפרטים" : "יידעתי את הפונה איך ישמשו הפרטים שלו/ה"}
             </label>
             <div role="radiogroup" aria-label="איך יודע/ה" className="flex flex-wrap gap-4">
-              {METHODS.map((m) => (
+              {methods.map((m) => (
                 <label key={m} className="flex min-h-11 items-center gap-2 text-base">
                   <input type="radio" name="notice-method" checked={method === m} disabled={m === "email" && email.trim() === ""} onChange={() => setMethod(m)} className="h-5 w-5" />
-                  {NOTICE_LABELS[m]}
+                  {CLIENT_NOTICE_LABELS[m]}
                 </label>
               ))}
             </div>
             {method === "whatsapp" ? (
               <div className="flex flex-col gap-2">
-                <p className="whitespace-pre-line rounded-md bg-muted/40 p-3 text-sm">{STAFF_INTAKE_NOTICE}</p>
-                <button type="button" className={button("self-start", true)} onClick={() => void navigator.clipboard.writeText(STAFF_INTAKE_NOTICE)}>העתקת הנוסח</button>
+                <p className="whitespace-pre-line rounded-md bg-muted/40 p-3 text-sm">{notice}</p>
+                <button type="button" className={button("self-start", true)} onClick={() => void navigator.clipboard.writeText(notice)}>העתקת הנוסח</button>
               </div>
             ) : null}
           </fieldset>
 
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-          <button type="submit" disabled={!valid || busy} className={button()}>שמירה</button>
+          <button type="submit" disabled={!valid || busy} className={button()}>{asClient ? "שמירת לקוח/ה" : "שמירה"}</button>
         </form>
       )}
     </SideDrawer>
