@@ -5,12 +5,13 @@ import { useLeadMeetings } from "@/hooks/useAdmin";
 import SideDrawer from "@/components/dorit/admin/SideDrawer";
 import LeadMeetings from "@/components/dorit/admin/LeadMeetings";
 
-export type LeadDrawerTab = "details" | "activity" | "meetings";
+export type LeadDrawerTab = "details" | "activity" | "briefing" | "meetings";
 type Tab = LeadDrawerTab;
 
 /**
  * One lead, in a side drawer over /admin/leads: "פרטים", "פעילות" (the follow-up,
- * notes and the activity log — the lead pipeline) and, with VITE_MEETINGS_STAFF,
+ * notes and the activity log — the lead pipeline), with VITE_LEAD_BRIEFING
+ * "תדריך" (the AI's draft before a call) and, with VITE_MEETINGS_STAFF,
  * "פגישות · N" (docs/superpowers/specs/2026-10-17-client-meetings-design.md).
  */
 export default function LeadDrawer({
@@ -19,6 +20,7 @@ export default function LeadDrawer({
   note = null,
   details,
   activity,
+  briefing = null,
   showMeetings = true,
   onClose,
   initialTab = "details",
@@ -36,6 +38,8 @@ export default function LeadDrawer({
   details: React.ReactNode;
   /** The "פעילות" tab. */
   activity: React.ReactNode;
+  /** The "תדריך" tab, which exists only when given (VITE_LEAD_BRIEFING). */
+  briefing?: React.ReactNode;
   /** The "פגישות" tab, which exists only with VITE_MEETINGS_STAFF. */
   showMeetings?: boolean;
   onClose: () => void;
@@ -56,12 +60,15 @@ export default function LeadDrawer({
   deleting?: boolean;
   deleteFailed?: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>(initialTab === "meetings" && !showMeetings ? "details" : initialTab);
+  const [tab, setTab] = useState<Tab>(
+    (initialTab === "meetings" && !showMeetings) || (initialTab === "briefing" && !briefing) ? "details" : initialTab,
+  );
   const meetings = useLeadMeetings(lead?.id ?? "", Boolean(lead) && showMeetings);
   const count = meetings.data?.length;
   const tabs: { key: Tab; label: string }[] = [
     { key: "details", label: "פרטים" },
     { key: "activity", label: "פעילות" },
+    ...(briefing ? [{ key: "briefing" as const, label: "תדריך" }] : []),
     ...(showMeetings ? [{ key: "meetings" as const, label: count === undefined ? "פגישות" : `פגישות · ${count}` }] : []),
   ];
 
@@ -92,7 +99,9 @@ export default function LeadDrawer({
             ? details
             : tab === "activity"
               ? activity
-              : <LeadMeetings lead={lead} initialOpenId={meetingId} startAdding={startAdding} />
+              : tab === "briefing"
+                ? briefing
+                : <LeadMeetings lead={lead} initialOpenId={meetingId} startAdding={startAdding} />
           : null}
       </div>
       {lead && onDelete ? (

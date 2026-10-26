@@ -347,6 +347,25 @@ export interface LeadRecord {
   nextFollowUpOn?: string | null;
 }
 
+/**
+ * "תדריך לפני שיחה" (VITE_LEAD_BRIEFING): the AI's draft for the agent before
+ * a call, from the interview alone (lead_briefings, the lead-briefing function).
+ */
+export interface LeadBriefing {
+  id: string;
+  /** Up to three lines on the interview. */
+  summary: string[];
+  /** The client's main concern. */
+  concern: string;
+  /** Questions to ask on the call. */
+  questions: string[];
+  /** Service areas worth raising — never a company, product or figure. */
+  talkingPoints: string[];
+  createdAt: string;
+  /** Who asked for it; null for a member since removed. */
+  createdBy: string | null;
+}
+
 /** One line of a lead's activity log (lead_events). */
 export interface LeadEvent {
   id: string;
@@ -466,6 +485,10 @@ export interface LeadAdminPort {
   setFollowUp(leadId: string, on: string | null): Promise<void>;
   /** "נשלחה הודעת וואטסאפ" in the lead's log (log_lead_whatsapp) — the fact only, never the number or the text. */
   logWhatsapp(leadId: string): Promise<void>;
+  /** The lead's newest briefing, or null. Whoever may see the lead (lead_briefings_read). */
+  briefing(leadId: string): Promise<LeadBriefing | null>;
+  /** A new briefing from the lead-briefing function; its refusal (off, budget, nothing to brief on) in Hebrew. */
+  generateBriefing(leadId: string): Promise<LeadBriefing>;
   /**
    * A link that opens one of a claim's documents. A Base44 file URL is already
    * one; a Supabase Storage reference (`storage:claim-documents/…`) is signed

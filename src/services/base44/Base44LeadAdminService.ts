@@ -103,6 +103,15 @@ export class Base44LeadAdminService implements LeadAdminPort {
     throw new Error(PIPELINE_SUPABASE_ONLY);
   }
 
+  /** No briefings in Base44: none, and none can be made. */
+  async briefing(): Promise<null> {
+    return null;
+  }
+
+  async generateBriefing(): Promise<never> {
+    throw new Error(PIPELINE_SUPABASE_ONLY);
+  }
+
   async addMeeting(): Promise<void> {
     throw new Error(MEETINGS_SUPABASE_ONLY);
   }

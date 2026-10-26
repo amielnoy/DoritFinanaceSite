@@ -202,6 +202,24 @@ export function useLogWhatsapp() {
   });
 }
 
+/** The lead's newest AI briefing (VITE_LEAD_BRIEFING), or null. */
+export function useLeadBriefing(leadId: string, enabled = true) {
+  return useQuery({
+    queryKey: [...adminKeys.leads, "briefing", leadId],
+    queryFn: () => services.leadsAdmin.briefing(leadId),
+    enabled: enabled && Boolean(leadId),
+  });
+}
+
+/** "תדריך לפני שיחה": a new briefing, which becomes the lead's newest. */
+export function useGenerateBriefing() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (leadId: string) => services.leadsAdmin.generateBriefing(leadId),
+    onSuccess: (briefing, leadId) => client.setQueryData([...adminKeys.leads, "briefing", leadId], briefing),
+  });
+}
+
 /** The agency's reactivation campaigns, newest first. */
 export function useCampaigns(agencyId: string) {
   return useQuery({

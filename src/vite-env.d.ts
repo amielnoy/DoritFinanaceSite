@@ -24,6 +24,8 @@ interface ImportMetaEnv {
   readonly VITE_AGENCY_ONBOARDING?: string;
   /** Hours an urgent lead may stay "חדשה" before the leads screen alerts (src/config/leads.ts); default 4. */
   readonly VITE_LEAD_SLA_URGENT_HOURS?: string;
+  /** "תדריך לפני שיחה" in a lead's drawer (src/config/lead-briefing.ts); off unless "true". */
+  readonly VITE_LEAD_BRIEFING?: string;
   readonly VITE_MEETINGS_CLIENT?: string;
   /** Staff-created leads — on only when exactly "true"; see `src/config/staff-leads.ts`. */
   readonly VITE_STAFF_LEADS?: string;

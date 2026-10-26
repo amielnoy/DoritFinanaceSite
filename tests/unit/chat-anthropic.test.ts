@@ -35,6 +35,15 @@ describe("createAnthropicClient", () => {
     expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body))).not.toHaveProperty("tool_choice");
   });
 
+  it("sends tool_choice tool when the request names the one tool to call", async () => {
+    const fetchImpl = vi.fn(async (_u: string, _i?: RequestInit) =>
+      new Response(JSON.stringify({ model: "m", stop_reason: "tool_use", content: [], usage: {} }), { status: 200 }),
+    );
+    const client = createAnthropicClient({ apiKey: "k", model: "m", fetchImpl: fetchImpl as unknown as typeof fetch });
+    await client.complete({ ...REQUEST, toolChoice: { name: "write_briefing" } }, signal);
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))).toMatchObject({ tool_choice: { type: "tool", name: "write_briefing" } });
+  });
+
   it("turns an HTTP refusal into ModelError('http') with its status", async () => {
     const client = createAnthropicClient({ apiKey: "k", model: "m", fetchImpl: (async () => new Response("{}", { status: 529 })) as unknown as typeof fetch });
     await expect(client.complete(REQUEST, signal)).rejects.toMatchObject({ kind: "http", status: 529 });

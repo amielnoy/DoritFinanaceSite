@@ -5,6 +5,7 @@ import { breadcrumbLd, useSeo } from "@/lib/seo";
 import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { MEETINGS_CLIENT } from "@/config/meetings";
+import { LEAD_BRIEFING } from "@/config/lead-briefing";
 
 export default function PrivacyPolicy() {
   const { contact } = useAgencyContent();
@@ -108,6 +109,15 @@ export default function PrivacyPolicy() {
                 תוכן השיחה מעובד אצל ספק תשתית הבינה המלאכותית של האתר לצורך
                 ניהול השיחה בלבד, ואינו משמש לשיווק ולא נמכר לצד שלישי.
               </li>
+              {/* With the agent's call briefing (VITE_LEAD_BRIEFING): shown with the feature and not before it — docs/COMPLIANCE.md §12. */}
+              {LEAD_BRIEFING ? (
+                <li>
+                  כדי להתכונן לשיחה איתך, תוכן הראיון או הפנייה — אחרי שהוסרו ממנו שם,
+                  טלפון, אימייל ומספרים מזהים — עשוי לעבור עיבוד אצל אותו ספק, לכתיבת
+                  תדריך פנימי קצר. התדריך נראה לצוות בלבד, אינו נשלח אליך ואינו מחליף
+                  את שיקול הדעת המקצועי, ונמחק יחד עם הפנייה.
+                </li>
+              ) : null}
               <li>
                 לא מתקבלת לגביך שום החלטה באופן אוטומטי. כל החלטה מקצועית מתקבלת
                 על ידי דורית באופן אישי.
