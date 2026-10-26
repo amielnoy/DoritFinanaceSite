@@ -449,7 +449,10 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     if ((u === `${SUPABASE_URL}/rest/v1/rpc/set_member_role` || u === `${SUPABASE_URL}/rest/v1/rpc/remove_member`) && method === "POST") {
       memberCalls.push({ fn: u.split("/rpc/")[1], args: parsed, as: sessionOf(init.headers) });
       if (masleka.refuse) return new Response(JSON.stringify({ code: "P0001", message: masleka.refuse, details: null, hint: null }), { status: 400 });
-      return new Response("null", { status: 200 });
+      // Both return void, and PostgREST answers a void function with 204 and no
+      // body. A "null" 200 here hid a production failure (the change was made,
+      // then reading the empty answer as JSON threw).
+      return new Response(null, { status: 204 });
     }
     if (u.startsWith(`${SUPABASE_URL}/rest/v1/profiles?`) && method === "GET") {
       const q = new URLSearchParams(u.split("?")[1]);

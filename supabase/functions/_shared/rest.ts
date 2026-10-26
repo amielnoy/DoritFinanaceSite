@@ -251,7 +251,10 @@ export async function callRpc(fn: string, args: Record<string, unknown>, session
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error(`rpc_http_${res.status}${await reason(res)}`);
-  return res.json();
+  // A void function (set_member_role, remove_member) answers 204 with no body:
+  // the call succeeded, and there is nothing to read.
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 /**

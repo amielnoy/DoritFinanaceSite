@@ -88,7 +88,8 @@ function fakeSupabase(seed: { profiles?: Row[]; authUsers?: Row[]; agencies?: Ro
       const row = { user_id: p_user_id, agency_id: p_agency_id, role: p_role };
       if (at >= 0) memberships[at] = row;
       else memberships.push(row);
-      return new Response("null", { status: 200 });
+      // set_member_role returns void: PostgREST's 204, no body.
+      return new Response(null, { status: 204 });
     }
     return undefined;
   };
