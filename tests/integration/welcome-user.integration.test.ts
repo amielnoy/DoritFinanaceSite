@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { FetchCall } from "../helpers/base44-function";
 import { invokeEdge, SUPABASE_URL, type EdgeOptions } from "../helpers/edge-function";
 
+/** The service key the harness gives the function (tests/helpers/edge-function.ts). */
+const SERVICE_KEY = "service-role-test";
+
 /**
  * The welcome mail (supabase/functions/welcome-user): only for an account
  * whose address was confirmed in the last 30 minutes, once per account, never
@@ -29,6 +32,18 @@ function fakeSupabase(opts: { limiterDown?: boolean } = {}) {
     const token = String(call.headers.Authorization ?? "").replace(/^Bearer /, "");
     if (url.pathname === "/auth/v1/user") {
       return accounts[token] ? json({ aud: "authenticated", ...accounts[token] }) : json({ code: 403, error_code: "bad_jwt" }, 403);
+    }
+    if (url.pathname === "/rest/v1/rpc/invitee_for") {
+      // Service only, as granted: the confirmed account with a profile at that address.
+      if (token !== SERVICE_KEY) return json({ code: "42501" }, 403);
+      const p = String((call.body as { p_email: string }).p_email).toLowerCase();
+      const hit = Object.values(accounts).find((a) => String(a.email).toLowerCase() === p && a.email_confirmed_at);
+      return json(hit ? hit.id : null);
+    }
+    if (url.pathname.startsWith("/auth/v1/admin/users/")) {
+      if (token !== SERVICE_KEY) return json({ code: 403 }, 403);
+      const hit = Object.values(accounts).find((a) => a.id === url.pathname.split("/").pop());
+      return hit ? json(hit) : json({ code: 404 }, 404);
     }
     if (url.pathname === "/rest/v1/rpc/allow_submission") {
       if (opts.limiterDown) return json({ message: "down" }, 503);
@@ -123,5 +138,41 @@ describe("welcome-user — when something fails", () => {
     } finally {
       spies.forEach((s) => s.mockRestore());
     }
+  });
+});
+
+describe("welcome-user — the resend, with the service key only", () => {
+  const resend = (email: unknown, s: ReturnType<typeof fakeSupabase>, bearer = SERVICE_KEY) =>
+    invokeEdge("welcome-user", { email }, { headers: { Authorization: `Bearer ${bearer}` }, upstream: s.upstream });
+
+  it("mails an account older than the window, found by its address, once", async () => {
+    const s = fakeSupabase();
+    const r = await resend("  OLD@example.com ", s);
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ sent: true });
+    expect(r.emails).toHaveLength(1);
+    expect(r.emails[0].to).toBe("old@example.com");
+    expect(r.emails[0].text).toContain("שלום דן,");
+    const again = await resend("old@example.com", s);
+    expect(again.json).toMatchObject({ sent: false, reason: "already_sent" });
+    expect(again.emails).toEqual([]);
+  });
+
+  it("answers 404 for an address with no confirmed account, and 400 for one that is not an address", async () => {
+    const s = fakeSupabase();
+    const missing = await resend("nobody@example.com", s);
+    expect(missing.status).toBe(404);
+    expect(missing.emails).toEqual([]);
+    expect((await resend("not-an-address", s)).status).toBe(400);
+  });
+
+  it("is not a resend for anyone else's bearer: a user's session gets the ordinary rule", async () => {
+    const s = fakeSupabase();
+    const r = await resend("new@example.com", s, OLD);
+    expect(r.json).toMatchObject({ sent: false, reason: "not_new" });
+    expect(r.emails).toEqual([]);
+    const forged = await resend("old@example.com", s, `${SERVICE_KEY}x`);
+    expect(forged.status).toBe(401);
+    expect(forged.emails).toEqual([]);
   });
 });
