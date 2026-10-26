@@ -158,7 +158,7 @@ jobs:
       # that is the command Base44 runs, and prerendering it would test a build
       # nobody performs.
       - name: Install the browser the prerender step drives
-        run: npx playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-browser
 
       - name: Build
         env:
@@ -390,25 +390,12 @@ jobs:
 
       - run: npm ci
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        id: playwright-cache
+      # The browser and its OS packages, both from caches when they can be: see
+      # .github/actions/playwright-browser for why the Ubuntu mirror is avoided.
+      - name: Install Playwright browser and OS packages
+        uses: ./.github/actions/playwright-browser
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('package-lock.json') }}
-
-      # The cache above was being populated and then ignored: this step had no
-      # `if`, so every job re-downloaded a browser it already had on disk. That
-      # was a minute of waste per job when there were four; with ten shards it
-      # is ten. On a hit only the OS packages are installed — those live outside
-      # ~/.cache/ms-playwright and are not what the cache holds.
-      - name: Install Playwright browser
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps ${{ matrix.browser }}
-
-      - name: Install Playwright OS dependencies (browser came from cache)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps ${{ matrix.browser }}
+          browser: ${{ matrix.browser }}
 
       - name: Download build output
         uses: actions/download-artifact@v4
@@ -858,7 +845,8 @@ jobs:
           probe "/api/csp-report" 405
 
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install Playwright browser and OS packages
+        uses: ./.github/actions/playwright-browser
 
       # Against a real deployment the API/UI/a11y suites run untouched; the
       # security suite additionally enforces the transport hardening headers.
