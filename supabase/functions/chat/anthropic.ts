@@ -25,8 +25,11 @@ export interface ModelRequest {
   messages: ModelMessage[];
   tools: ToolDefinition[];
   maxTokens: number;
-  /** 'none': the tools stay listed (the conversation names them) but the model may not call one. */
-  toolChoice?: 'none';
+  /**
+   * 'none': the tools stay listed (the conversation names them) but the model may not call one.
+   * { name }: the model must call that tool — its input is the answer (lead-briefing's structured draft).
+   */
+  toolChoice?: 'none' | { name: string };
 }
 
 export interface ModelUsage {
@@ -75,7 +78,11 @@ export function createAnthropicClient(opts: { apiKey: string; model: string; fet
             system: req.system,
             messages: req.messages,
             tools: req.tools,
-            ...(req.toolChoice ? { tool_choice: { type: req.toolChoice } } : {}),
+            ...(req.toolChoice === 'none'
+              ? { tool_choice: { type: 'none' } }
+              : req.toolChoice
+                ? { tool_choice: { type: 'tool', name: req.toolChoice.name } }
+                : {}),
           }),
           signal,
         });

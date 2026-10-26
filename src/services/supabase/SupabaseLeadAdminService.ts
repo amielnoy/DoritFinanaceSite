@@ -1,5 +1,5 @@
 import { STAFF_LEADS } from "@/config/staff-leads";
-import type { AgendaMeeting, CreatedLead, LeadAdminPort, LeadEvent, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, NewStaffLead, TranscriptLine } from "../ports";
+import type { AgendaMeeting, CreatedLead, LeadAdminPort, LeadBriefing, LeadEvent, LeadMeeting, LeadMeetingUpdate, LeadRecord, LeadStatus, NewLeadMeeting, NewStaffLead, TranscriptLine } from "../ports";
 import type { ContentFunctionsClient } from "./EdgeContentAdminService";
 import { CLAIM_DOCUMENT_REF_PREFIX } from "./SupabaseUploadService";
 import {
@@ -23,6 +23,9 @@ export const leadColumns = (staffLeads: boolean): string => (staffLeads ? `${LEA
 export const LEAD_PAGE = 1000;
 /** A bound on one list, far past what the agency holds. */
 export const LEAD_LIST_MAX = 20_000;
+
+/** A text[] column (or the function's array) as strings; anything else is none. */
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
 const NOT_APPLIED = "הפעולה לא בוצעה — אין הרשאה או שהפנייה כבר לא קיימת";
 
@@ -196,6 +199,45 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
 
   async logWhatsapp(leadId: string): Promise<void> {
     await this.rpc("log_lead_whatsapp", { p_lead_id: leadId });
+  }
+
+  async briefing(leadId: string): Promise<LeadBriefing | null> {
+    const rows = await fetchRows(
+      this.client
+        .from("lead_briefings")
+        .select("id,summary,concern,questions,talking_points,created_by,created_at")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: false })
+        .limit(1),
+      "lead_briefings",
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      id: String(r.id),
+      summary: strings(r.summary),
+      concern: String(r.concern ?? ""),
+      questions: strings(r.questions),
+      talkingPoints: strings(r.talking_points),
+      createdAt: String(r.created_at ?? ""),
+      createdBy: typeof r.created_by === "string" ? r.created_by : null,
+    };
+  }
+
+  /** The lead-briefing function, as the signed-in person: it checks can_see_lead, the cap and the budget. */
+  async generateBriefing(leadId: string): Promise<LeadBriefing> {
+    const answer = await this.call("lead-briefing", { leadId });
+    const b = (answer.briefing ?? null) as Record<string, unknown> | null;
+    if (!b) throw new Error("התדריך לא נוצר. אפשר לנסות שוב.");
+    return {
+      id: String(b.id ?? ""),
+      summary: strings(b.summary),
+      concern: String(b.concern ?? ""),
+      questions: strings(b.questions),
+      talkingPoints: strings(b.talkingPoints),
+      createdAt: String(b.createdAt ?? ""),
+      createdBy: typeof b.createdBy === "string" ? b.createdBy : null,
+    };
   }
 
   setFollowUp(leadId: string, on: string | null): Promise<void> {

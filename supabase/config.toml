@@ -461,6 +461,11 @@ verify_jwt = false
 [functions.assign-lead]
 verify_jwt = false
 
+# "תדריך לפני שיחה" (VITE_LEAD_BRIEFING): a session, then can_see_lead under
+# it, checked by the function; off until LEAD_BRIEFING_MONTHLY_BUDGET_USD > 0.
+[functions.lead-briefing]
+verify_jwt = false
+
 # A short link to a claim's document, for whoever may see that lead.
 [functions.claim-document-link]
 verify_jwt = false

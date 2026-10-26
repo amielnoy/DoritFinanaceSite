@@ -22,7 +22,9 @@ import { duplicateRows, foldMerged, newestFirst, type LeadRow } from "@/lib/lead
 import { ANY_STATUS_LABEL, IN_PROGRESS, STATUS, STATUS_LABEL, followUpState, slaBreached, statusAfterWhatsapp } from "@/lib/lead-pipeline";
 import { DEFAULT_LEAD_WHATSAPP_TEMPLATE, fillWhatsappTemplate, leadWhatsappHref } from "@/lib/lead-whatsapp";
 import { LEAD_SLA_URGENT_HOURS } from "@/config/leads";
+import { LEAD_BRIEFING } from "@/config/lead-briefing";
 import LeadActivity, { dayLabel } from "@/components/dorit/admin/LeadActivity";
+import LeadBriefing from "@/components/dorit/admin/LeadBriefing";
 import NewLeadSheetHost from "@/components/dorit/admin/NewLeadSheetHost";
 import StaffLeadsStrip from "@/components/dorit/admin/StaffLeadsStrip";
 import DuplicatePointer from "@/components/dorit/admin/DuplicatePointer";
@@ -1059,6 +1061,7 @@ export default function Leads() {
               key={drawerStart.seq}
               showMeetings={MEETINGS_STAFF}
               activity={openLead ? <LeadActivity lead={openLead} today={today} memberLabel={memberLabel} /> : null}
+              briefing={LEAD_BRIEFING && openLead ? <LeadBriefing lead={openLead} memberLabel={memberLabel} /> : null}
               lead={openLead}
               initialTab={drawerStart.tab}
               meetingId={drawerStart.meetingId}
