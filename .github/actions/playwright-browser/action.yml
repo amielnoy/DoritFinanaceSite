@@ -8,8 +8,8 @@ description: >-
 # runner's Ubuntu mirror on every job. On 2026-10-26 that mirror slowed to
 # 10-15 s per package twice, the 10-minute e2e shards were cancelled before a
 # test ran, and both times main deployed as a preview instead of production.
-# Now the .deb files are cached per runner image and installed with
-# --no-download; the mirror is used only on a miss, with a time limit and one
+# Now the .deb files are cached per runner image and installed with dpkg,
+# which fetches nothing; the mirror is used only on a miss, with a time limit and one
 # retry on Ubuntu's own archive instead of the runner's Azure mirror.
 
 inputs:
@@ -69,7 +69,11 @@ runs:
             echo "The runner image already has the packages."
             exit 0
           fi
-          if sudo apt-get install -y --no-install-recommends --no-download "${files[@]}"; then
+          # dpkg, not apt-get: apt resolves the files against this runner's
+          # package lists, which no `apt-get update` has refreshed, and then asks
+          # for archives it doesn't have. The set was resolved by apt on this same
+          # image; dpkg installs it as one transaction and fetches nothing.
+          if sudo dpkg -i "${files[@]}"; then
             echo "Installed ${#files[@]} packages from the cache, without the mirror."
             exit 0
           fi

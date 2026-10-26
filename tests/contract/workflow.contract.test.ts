@@ -411,11 +411,13 @@ describe("Playwright's OS packages come from a cache, not the Ubuntu mirror each
     }
   });
 
-  it("keys the package cache on the runner image and installs it with --no-download", () => {
+  it("keys the package cache on the runner image and installs it with dpkg, which fetches nothing", () => {
     expect(action.runs.using).toBe("composite");
     const debs = action.runs.steps.find((s) => s.id === "deb-cache");
     expect(debs?.with?.key).toContain("${{ steps.image.outputs.id }}");
-    expect(installer?.run).toContain("apt-get install -y --no-install-recommends --no-download");
+    expect(installer?.run).toContain('if sudo dpkg -i "${files[@]}"; then');
+    // apt-get against the runner's stale lists asked for archives it didn't have (PR #304's first warm run)
+    expect(installer?.run).not.toMatch(/apt-get install[^\n]*\.deb|apt-get install[^\n]*files/);
   });
 
   it("bounds the mirror fallback and never caches a half-fetched set", () => {
