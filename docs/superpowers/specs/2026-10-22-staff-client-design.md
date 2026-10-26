@@ -1,6 +1,6 @@
 # Adding a client by hand: a client who never came in as a lead
 
-**Date:** 2026-10-22 · **Status:** draft for review. Nothing here is built.
+**Date:** 2026-10-22 · **Status:** C1–C8 accepted as proposed (2026-10-22); being built from `docs/superpowers/plans/2026-10-22-staff-clients.md`.
 Extends `2026-10-20-staff-lead-design.md` (built in #282/#283, behind
 `VITE_STAFF_LEADS`), `2026-10-15-agency-roles-design.md` and
 `2026-10-17-client-meetings-design.md`.
@@ -85,7 +85,9 @@ balances — ever.
 
 ## Data
 
-### Migration (additive) — `20261106000000_staff_clients.sql`
+### Migration (additive) — `20261113000000_staff_clients.sql`
+
+(`20261106000000` and `20261108000000` were taken by agency onboarding and lead duplicates; prod history ends `20261112000000`.)
 
 ```sql
 alter table public.leads
@@ -328,7 +330,8 @@ The confirmation replaces the toast with a short card:
 - Component: switch remembers mode; status hidden in client mode; save
   disabled until since + products + notice; conversion path; next-step card
   buttons by flags; User sees no assignee.
-- e2e: add a client on a phone viewport, then the invite.
+- ~~e2e: add a client on a phone viewport, then the invite.~~ Covered by
+  component tests instead: no admin e2e exists, since CI has no Supabase session.
 - STDs in `tests/test-plan/` for each suite touched.
 
 ## Rollout
