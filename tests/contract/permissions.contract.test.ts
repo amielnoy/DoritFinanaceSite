@@ -26,6 +26,12 @@ describe("the permissions table matches the gates that decide", () => {
     expect(PERMISSIONS["leads.create"]).toBe("user");
   });
 
+  it("adding a client is open to every member, as create-lead and invite-client ask (User in agency 1)", () => {
+    expect(PERMISSIONS["clients.create"]).toBe("user");
+    expect(fn("create-lead")).toContain("requireAgencyRole(req, agencyId, 'user', rid, log)");
+    expect(fn("invite-client")).toContain("requireAgencyRole(req, agencyId, 'user', rid, log)");
+  });
+
   it("merging leads is Admin+, as merge_leads and unmerge_lead require", () => {
     expect(PERMISSIONS["leads.merge"]).toBe("admin");
   });
