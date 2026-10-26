@@ -423,6 +423,8 @@ describe("Playwright's OS packages come from a cache, not the Ubuntu mirror each
     expect(installer?.run).toContain('for attempt in 1 2; do');
     expect(installer?.run).toContain("echo 120 || echo 180");
     // the retry leaves the Azure mirror that stalled
+    // …in the mirror list the image's sources actually read, not only in sources
+    expect(installer?.run).toContain("sudo sed -i '/azure\\.archive\\.ubuntu\\.com/d' /etc/apt/apt-mirrors.txt");
     expect(installer?.run).toContain("s#http://azure\\.archive\\.ubuntu\\.com#http://archive.ubuntu.com#g");
     expect(installer?.run).toMatch(/rm -rf "\$debs"\n\s+echo "::error::/);
     expect(installer?.run).toContain('touch "$debs/.complete"');

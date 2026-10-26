@@ -93,7 +93,15 @@ runs:
           echo "::warning::playwright install-deps attempt $attempt failed or passed ${limit}s (slow Ubuntu mirror?)"
           sudo killall -q apt-get dpkg 2>/dev/null || true
           sudo dpkg --configure -a || true
-          # The stalls were on the runner's Azure mirror: the retry uses Ubuntu's own.
+          # The stalls were on the runner's Azure mirror: the retry uses Ubuntu's
+          # own. The image's sources read `mirror+file:/etc/apt/apt-mirrors.txt`,
+          # a list apt falls down only on errors, never on slowness, so Azure
+          # leaves the list (and any source naming it directly). What attempt 1
+          # did fetch stays in $debs and is not fetched again.
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt 2>/dev/null || true
+          if ! grep -q 'archive\.ubuntu\.com' /etc/apt/apt-mirrors.txt 2>/dev/null; then
+            echo 'http://archive.ubuntu.com/ubuntu/' | sudo tee -a /etc/apt/apt-mirrors.txt >/dev/null
+          fi
           sudo sed -i 's#http://azure\.archive\.ubuntu\.com#http://archive.ubuntu.com#g' \
             /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
         done
