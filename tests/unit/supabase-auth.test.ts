@@ -329,3 +329,46 @@ describe("SupabaseAuthService", () => {
   });
 
 });
+
+describe("SupabaseAuthService — the welcome mail after a new account's first sign-in", () => {
+  const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  const withFunctions = (confirmedAt: string | null | undefined, invoke = vi.fn(async () => ({ data: { sent: true }, error: null }))) => {
+    const client = clientWith({ user: { id: "u1", email: "new@example.com" }, profile: { role: "user" } });
+    const getUser = client.auth.getUser;
+    client.auth.getUser = async () => {
+      const answer = await getUser();
+      return { ...answer, data: { user: answer.data.user ? { ...answer.data.user, email_confirmed_at: confirmedAt } : null } };
+    };
+    client.functions = { invoke };
+    return { svc: new SupabaseAuthService(client), invoke };
+  };
+
+  it("asks welcome-user once for an address confirmed minutes ago", async () => {
+    const { svc, invoke } = withFunctions(minutesAgo(2));
+    await svc.me();
+    await svc.me();
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("welcome-user", { body: {} });
+  });
+
+  it("does not ask for an account confirmed more than 30 minutes ago, or never", async () => {
+    for (const confirmed of [minutesAgo(31), minutesAgo(60 * 24 * 30), null, undefined, "not a date"]) {
+      const { svc, invoke } = withFunctions(confirmed);
+      await svc.me();
+      expect(invoke, String(confirmed)).not.toHaveBeenCalled();
+    }
+  });
+
+  it("never lets the welcome hold up or fail the sign-in", async () => {
+    const { svc } = withFunctions(minutesAgo(1), vi.fn(async () => { throw new Error("offline"); }));
+    await expect(svc.me()).resolves.toMatchObject({ id: "u1", role: "user" });
+  });
+
+  it("does not ask when the account is not provisioned for the app", async () => {
+    const client = clientWith({ user: { id: "u1" }, profile: null });
+    const invoke = vi.fn(async () => ({ data: null, error: null }));
+    client.functions = { invoke };
+    await expect(new SupabaseAuthService(client).me()).rejects.toBeTruthy();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+});

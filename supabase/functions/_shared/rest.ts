@@ -189,13 +189,27 @@ export async function deleteRows(table: string, filter: string): Promise<void> {
  * session had expired — advice signing in again could never fix.
  */
 export async function authUser(token: string): Promise<{ id: string } | null> {
+  const account = await authAccount(token);
+  return account ? { id: account.id } : null;
+}
+
+/** authUser, with what Auth also says of the account: its confirmed address, when it was confirmed, the provider's name. */
+export async function authAccount(
+  token: string,
+): Promise<{ id: string; email: string; confirmedAt: string; name: string } | null> {
   const { url, auth } = target();
   const res = await fetch(`${url}/auth/v1/user`, {
     method: 'GET',
     headers: { apikey: auth.apikey, Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(10000),
   });
-  const body = (await res.json().catch(() => null)) as { id?: unknown; error_code?: unknown } | null;
+  const body = (await res.json().catch(() => null)) as {
+    id?: unknown;
+    error_code?: unknown;
+    email?: unknown;
+    email_confirmed_at?: unknown;
+    user_metadata?: { full_name?: unknown; name?: unknown } | null;
+  } | null;
   if (res.status === 401 || res.status === 403) {
     if (typeof body?.error_code === 'string' && body.error_code) return null;
     throw new Error(`auth_http_${res.status}_not_an_auth_refusal`);
@@ -203,7 +217,13 @@ export async function authUser(token: string): Promise<{ id: string } | null> {
   if (!res.ok) throw new Error(`auth_http_${res.status}`);
   const id = body?.id;
   if (typeof id !== 'string' || !id) throw new Error('auth_returned_no_user');
-  return { id };
+  const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  return {
+    id,
+    email: text(body?.email),
+    confirmedAt: text(body?.email_confirmed_at),
+    name: text(body?.user_metadata?.full_name) || text(body?.user_metadata?.name),
+  };
 }
 
 /**
