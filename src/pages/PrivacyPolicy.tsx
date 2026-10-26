@@ -6,6 +6,8 @@ import CredentialsStrip from "@/components/dorit/primitives/CredentialsStrip";
 import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { MEETINGS_CLIENT } from "@/config/meetings";
 import { LEAD_BRIEFING } from "@/config/lead-briefing";
+import { STAFF_LEADS } from "@/config/staff-leads";
+import { STAFF_CLIENTS } from "@/config/staff-clients";
 
 export default function PrivacyPolicy() {
   const { contact } = useAgencyContent();
@@ -55,6 +57,16 @@ export default function PrivacyPolicy() {
               <li>כתובת דוא״ל</li>
               <li>תוכן הודעה / הערות (לרבות נושא הפגישה המבוקש ומועד)</li>
             </ul>
+            {/* With clients added by hand (VITE_STAFF_LEADS and VITE_STAFF_CLIENTS): shown with the feature and not before it. DRAFT for the compliance adviser, with the staff-client-v1 notice. */}
+            {STAFF_LEADS && STAFF_CLIENTS ? (
+              <p className="mt-3">
+                מי שכבר לקוח/ה של הסוכנות: צוות הסוכנות עשוי לפתוח עבורך רשומה במאגר גם בלי
+                טופס באתר, על סמך הסכם ההתקשרות — שם, טלפון, דוא״ל, החודש שבו החלה ההתקשרות
+                ותחומי השירות. הרשומה משמשת לאותן מטרות, גלויה לצוות הסוכנות בלבד, ונשמרת
+                כמידע הנוגע להתקשרות בפועל (סעיף 7). אם נמסרה כתובת דוא״ל, ייתכן שתישלח
+                אליה הזמנה לאזור האישי.
+              </p>
+            ) : null}
           </section>
 
           <section>
