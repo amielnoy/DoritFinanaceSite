@@ -5,7 +5,7 @@
  * refused unless it can be one, and a warning before a published article's
  * address changes (there is no redirect table — the old address will 404).
  * The hooks are stubbed; the writes are contentAdmin's, covered in
- * tests/integration/content-admin.integration.test.ts.
+ * tests/integration/content-admin-edge.integration.test.ts.
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";

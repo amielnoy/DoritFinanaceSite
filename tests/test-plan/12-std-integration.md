@@ -499,10 +499,12 @@ as one number). The site chat has no number, so today that column is always
 empty — it is pinned anyway, so a channel that does carry one cannot write it in
 a second spelling.
 
-Failure is the point of the last three. The agent is told not to report this
-call to the visitor, so the function has to leave it nothing to report: a
-refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
-`200`, and the conversation the visitor already had is unaffected.
+Failure is the point of the last three. The chat function's sweep makes this
+call, not the model, and the visitor must never see it fail, so the function
+leaves nothing to report: a refusing sheet, a service account that cannot sign
+in (`failGoogle: "token"`, see `log-support-chat.integration.test.ts`) and a
+missing `SHEET_ID` all answer `200`, and the conversation the visitor already
+had is unaffected.
 
 ### 4.21 `adminLead` — retired — `INT-ADL-001..031`
 

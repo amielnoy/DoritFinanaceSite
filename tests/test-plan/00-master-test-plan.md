@@ -171,7 +171,8 @@ waiting on a page, not CPU-bound work. See `playwright.config.ts`. The pull-requ
 `synchronize` as well would run the whole matrix twice per commit.
 
 Everything keyed to a `builder` branch is dormant (it was built for the Base44
-Builder, which left with the Base44 exit). Merging stays a person's action, so
+Builder, which is retired; its GitHub App is removed by the checklist in
+docs/current-state.md). Merging stays a person's action, so
 the enforcement lives at the publish step, which only runs from `main` and only
 on a green run.
 

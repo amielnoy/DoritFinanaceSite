@@ -26,7 +26,10 @@ and a retry that avoids the Azure mirror (#304, after it stalled deploys on 2026
 **Base44: none.** The site, its backend and all four chat agents run on Vercel
 and Supabase; the repository holds no Base44 code, SDK, adapter or switch
 ([exit record](base44-exit/README.md)). What remains of Base44 is `base44_id` on
-rows that came from it and the `/blog/<24 hex>` old-link redirect.
+rows that came from it and the `/blog/<24 hex>` old-link redirect. Two things in
+code still name it: the `safe-arch-plan.base44.app` origin in
+`supabase/functions/_shared/cors.ts` (pinned by `tests/unit/edge-cors.test.ts`)
+and the mailer (`dorit-mailer` `send-email.js`), which still accepts `MAILER_TOKEN`.
 
 ### After the exit: dashboard actions
 
@@ -45,6 +48,8 @@ These are the account owner's, not the repository's:
 - [ ] Confirm whether the Base44 support agent still answers on WhatsApp, before
   deleting the app.
 - [ ] Then delete the Base44 app.
+- [ ] Follow-up PR: drop the `safe-arch-plan.base44.app` CORS origin (and its
+  test) and the mailer's `MAILER_TOKEN`, then empty the token.
 
 Allure reports publish separately to Cloudflare Pages. CI probes both report
 hostnames for anonymous access, but currently warns rather than fails when the

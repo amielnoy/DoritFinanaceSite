@@ -303,7 +303,7 @@ fixture stubs `/functions/v1/` on any host, so the smoke files no real lead. `pr
 pins that `scripts/prerender.mjs` aborts `googletagmanager.com` / `google-analytics.com`
 before navigating, as the e2e fixture does, so a build sends no fake page_views.
 `article-slug.contract.test.ts` (CTR-SLG-REF) pins the 400 and 409 slug-refusal texts
-in `BlogAdmin.tsx` to the ones in `contentAdmin`.
+in `BlogAdmin.tsx` to the ones in `content-admin`.
 
 **`deploy-gate.contract.test.ts`** — that exactly one thing promotes production.
 `vercel.json` must disable Git-triggered deploys on `main` and `builder` and
@@ -488,7 +488,7 @@ Regenerate the files with `node scripts/self-host-fonts.mjs`; never edit
 ### 4.8 Article addresses — `article-slug.contract.test.ts`
 
 `blog_posts.slug` is shaped by four things that cannot import one another — the
-migration's CHECK, `src/lib/articlePath.ts`, `contentAdmin` and
+migration's CHECK, `src/lib/articlePath.ts`, `content-admin` and
 `scripts/published-articles.mjs` — and these cases keep them one rule. The
 backfill is checked against the files it names, from its own side, so a draft
 added to `content/blog/` later needs no row in a migration that has shipped.

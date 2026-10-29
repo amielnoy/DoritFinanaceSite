@@ -347,17 +347,17 @@ The mapper and the Supabase adapter behind `AccountPort`.
 | UNIT-ACC-003 | "drops a profile that is not label/value pairs rather than crashing" | An object gives `[]`; malformed pairs are filtered out and valid ones kept |
 | UNIT-ACC-004 | "reads my_enquiries over RPC" | `rpc("my_enquiries")` called; rows mapped |
 | UNIT-ACC-005 | "turns an RPC error into AccountLoadError" | Rejects with `AccountLoadError` |
-| UNIT-ACC-007 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
+| UNIT-ACC-007 | (retired 2026-10-29, Base44 exit B2 task 8: orphaned rows; the cases went with the Base44 account adapter in #139, commit 63b65c8) | — |
 | UNIT-ACC-008 | "names RPC error 42501 as signed out" | `AccountLoadError("signed_out")` — `my_enquiries` is revoked from anon |
 | UNIT-ACC-009 | "names RPC error PGRST301 as signed out" | `signed_out` — JWT missing, expired or invalid |
 | UNIT-ACC-010 | "names an unrecognised RPC error code as failed" | `failed`; Supabase never yields `unverified` |
-| UNIT-ACC-011 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
-| UNIT-ACC-012 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
-| UNIT-ACC-013 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
-| UNIT-ACC-014 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
-| UNIT-ACC-015 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
-| UNIT-ACC-016 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
-| UNIT-ACC-017 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
+| UNIT-ACC-011 | (retired 2026-10-29, Base44 exit B2 task 8: orphaned rows; the cases went with the Base44 account adapter in #139, commit 63b65c8) | — |
+| UNIT-ACC-012 | (retired 2026-10-29, Base44 exit B2 task 8: orphaned rows; the cases went with the Base44 account adapter in #139, commit 63b65c8) | — |
+| UNIT-ACC-013 | (retired 2026-10-29, Base44 exit B2 task 8: orphaned rows; the cases went with the Base44 account adapter in #139, commit 63b65c8) | — |
+| UNIT-ACC-014 | (retired 2026-10-29, Base44 exit B2 task 8: orphaned rows; the cases went with the Base44 account adapter in #139, commit 63b65c8) | — |
+| UNIT-ACC-015 | (retired 2026-10-29, Base44 exit B2 task 8: orphaned rows; the cases went with the Base44 account adapter in #139, commit 63b65c8) | — |
+| UNIT-ACC-016 | (retired 2026-10-29, Base44 exit B2 task 8: orphaned rows; the cases went with the Base44 account adapter in #139, commit 63b65c8) | — |
+| UNIT-ACC-017 | (retired 2026-10-29, Base44 exit B2 task 8: orphaned rows; the cases went with the Base44 account adapter in #139, commit 63b65c8) | — |
 
 ### 4.15 Lead events for GA4 — `tests/unit/analytics.dom.test.ts`
 

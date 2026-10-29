@@ -1,9 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { join } from "node:path";
 import { REPO_ROOT } from "../helpers/entity-schema";
-import { findObjectLiteralCalls, read, rel, sourceFiles } from "../helpers/source-scan";
+import { filesUnder, findObjectLiteralCalls, read, rel, sourceFiles } from "../helpers/source-scan";
 
 /**
  * Lead capture crosses two boundaries, and this file pins both:
@@ -133,9 +132,8 @@ describe("adapter → submit-claim (Supabase)", () => {
 
 describe("Base44 is out of the build", () => {
   it("nothing imports a Base44 package", () => {
-    const tracked = execFileSync("git", ["ls-files", "src", "api", "scripts", "e2e"], { cwd: REPO_ROOT, encoding: "utf8" })
-      .split("\n")
-      .filter((f) => f && existsSync(join(REPO_ROOT, f)));
+    const tracked = filesUnder(["src", "api", "scripts", "e2e"]);
+    expect(tracked.length, "no source files found under src/ api/ scripts/ e2e/").toBeGreaterThan(0);
     const offenders = tracked.filter((f) => /from ["']@base44\//.test(readFileSync(join(REPO_ROOT, f), "utf8")));
     expect(offenders, "these still import @base44/*").toEqual([]);
     const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));

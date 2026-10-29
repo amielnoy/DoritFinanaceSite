@@ -4,8 +4,8 @@
 # gets the "safe to merge" verdict, on the PR and in the run summary (see §9).
 #
 # Everything keyed to `builder` is DORMANT and triggers only on pushes to that
-# branch, which does not exist. It was built for the Base44 Builder, which
-# left with the Base44 exit (2026-10); a push to `builder` would still get the
+# branch, which does not exist. It was built for the Base44 Builder, which is
+# retired (its GitHub App is removed by the checklist in docs/current-state.md); a push to `builder` would still get the
 # full battery, a Vercel preview on its own URL and a published report. It
 # never gets an automatic merge.
 #

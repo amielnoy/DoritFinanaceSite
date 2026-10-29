@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
-import { read, rel, sourceFiles } from "../helpers/source-scan";
+import { filesUnder, read, rel, sourceFiles } from "../helpers/source-scan";
 
 const FILES = sourceFiles();
 const INDEX_HTML = readFileSync(join(REPO_ROOT, "index.html"), "utf8");
@@ -144,9 +144,7 @@ describe("auth and token handling", () => {
   it("no first-party file touches a Base44 token in storage", () => {
     // Sign-in is Supabase's now; nothing may read, write or clear a token the
     // retired Base44 SDK kept in the browser (inverts the retired SEC-STA-018).
-    const files = (tracked() ?? [])
-      .filter((f) => /^(src|api)\//.test(f) && /\.(js|jsx|ts|tsx|mjs)$/.test(f))
-      .map((f) => join(REPO_ROOT, f));
+    const files = filesUnder(["src", "api"]).map((f) => join(REPO_ROOT, f));
     expect(files.length, "no tracked src/ or api/ files found").toBeGreaterThan(0);
     const TOKEN_KEY = /(?:localStorage|sessionStorage)\s*\.\s*(?:getItem|setItem|removeItem)\s*\(\s*["'`]token["'`]|(?:localStorage|sessionStorage)\s*\[\s*["'`]token["'`]\s*\]/;
     const hits = files.filter((f) => {

@@ -1035,7 +1035,7 @@ rather than storage — and a failed write is logged, never shown to the visitor
 
 Tabs on one spreadsheet: `Events` for what happened, `Support` for what was
 asked. `SHEET_ID`
-selects the spreadsheet and `SHEET_TAB`, `SHEET_TAB_CONTACTS` and
+selects the spreadsheet and `SHEET_TAB` and
 `SHEET_TAB_SUPPORT` name the tabs. No `SHEET_ID`, and every writer skips
 silently — a deployment without a spreadsheet still takes enquiries.
 
@@ -1646,7 +1646,8 @@ A pull request triggers a run when it **opens**; later commits are covered by
 the push trigger, so the matrix does not run twice for the same SHA.
 
 Everything keyed to `builder` is **dormant**: it was built for the Base44
-Builder, which left with the Base44 exit, and no branch of that name exists.
+Builder, which is retired (its GitHub App is removed by the checklist in
+[`docs/current-state.md`](docs/current-state.md)), and no branch of that name exists.
 
 **CI does not merge for you, on purpose.** It runs everything and posts the
 verdict; merging stays a person's action.

@@ -1,8 +1,9 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import { REPO_ROOT } from "./entity-schema";
 
-const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx"]);
+const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs"]);
 
 /** All first-party source files, excluding the untouched shadcn/ui primitives. */
 export function sourceFiles(
@@ -20,6 +21,27 @@ export function sourceFiles(
     }
   }
   return out.sort();
+}
+
+/**
+ * Source files under the given repo-relative roots, as repo-relative paths.
+ * Asks git first; where git is unavailable or lists nothing (the Docker test
+ * image has no .git), falls back to walking the disk with sourceFiles().
+ */
+export function filesUnder(roots: string[]): string[] {
+  try {
+    const out = execFileSync("git", ["ls-files", ...roots], { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+      .split("\n")
+      .filter((f) => f && SOURCE_EXT.has(extname(f)) && existsSync(join(REPO_ROOT, f)));
+    if (out.length > 0) return out;
+  } catch {
+    // not a git work tree
+  }
+  return roots
+    .map((r) => join(REPO_ROOT, r))
+    .filter((d) => existsSync(d) && statSync(d).isDirectory())
+    .flatMap((d) => sourceFiles(d, { includeUiPrimitives: true }))
+    .map((f) => relative(REPO_ROOT, f));
 }
 
 export const read = (file: string): string => readFileSync(file, "utf8");
