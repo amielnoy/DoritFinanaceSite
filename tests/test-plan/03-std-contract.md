@@ -64,7 +64,7 @@ Two helpers do the work:
 | CTR-LED-013 | "rejects a payload with an unknown source or a stray field" | Exactly two issues: `source`, `utm_campaign` (negative control) |
 | CTR-BLG-001 | "the admin payload carries title and body and nothing undeclared" | `BlogAdmin` payload conforms |
 | CTR-BLG-002 | "publish toggles only flip the declared boolean field" | Every updated key is declared |
-| CTR-BLG-003 | "the public blog list filters on the published flag only" | **Retired 2026-10-29** — Base44 exit B1 task 3: it read `Base44ContentService`, which is deleted |
+| CTR-BLG-003 | (retired 2026-10-29, Base44 exit B1 task 3: it read `Base44ContentService`, which is deleted) | — |
 | CTR-BLG-004 | "keeps the mirror-only fields off the BlogPost entity" | `slug` is not a BlogPost property |
 | CTR-TST-001 | "sends only declared fields and both required ones" | `Testimonial.create` conforms |
 | CTR-TST-002 | "keeps the rating inside the declared 1..5 range" | 5 valid; 6 and 0 rejected |
@@ -80,24 +80,24 @@ Two helpers do the work:
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-FN-001 | "is issued by the lead adapter, so components never call it directly" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-002 | "the client sends exactly the fields the function reads" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-003 | "the function's mandatory fields are the same as the Lead entity's" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-004 | "returns 400 with an error message when name or phone is missing" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-005 | "surfaces an upstream calendar failure as 502, not as a success" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-006 | "catches unexpected errors as 500" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-007 | "returns `{ ok, eventId, htmlLink }` on success" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-008 | "every error response carries an `error` key" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-009 | "takes every calendar token from a connector, never from a literal" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-010 | "does not echo the access token back to the caller" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-011 | "uses declared connectors that exist in the repo" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-012 | "asks Outlook for the scope it actually needs" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-013 | "both calendars are reached through one function, not two" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-014 | "writes to Outlook and Google, Outlook first" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-015 | "gives each calendar the timezone name it understands" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-016 | "reads the event link under each calendar's own name" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-017 | "one calendar failing does not lose the other" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
-| CTR-FN-018 | "refuses rather than reporting success when no calendar is configured" | **Retired 2026-10-29** — Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site |
+| CTR-FN-001 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-002 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-003 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-004 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-005 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-006 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-007 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-008 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-009 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-010 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-011 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-012 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-013 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-014 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-015 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-016 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-017 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-018 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
 
 `CTR-FN-013..018` exist because the two calendars differ in five small,
 trap-shaped ways, and every one of them fails *silently* when it is wrong: the
@@ -517,8 +517,8 @@ selected by tag, not skipped by a condition callback (A-68).
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-SDK-001 | "finds at least one function pin" | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK is no longer a dependency, so there is no pin to compare |
-| CTR-SDK-002 | "`<function>` pins the SDK version the lockfile installs" (one per function) | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK is no longer a dependency, so there is no pin to compare |
+| CTR-SDK-001 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK is no longer a dependency, so there is no pin to compare) | — |
+| CTR-SDK-002 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK is no longer a dependency, so there is no pin to compare) | — |
 
 ### 4.6 Self-hosted fonts — `fonts.contract.test.ts`
 
