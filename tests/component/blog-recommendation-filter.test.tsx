@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The blog page's own responsibility in the reading-recommender feature:
- * given recommended post ids, narrow the grid to those posts, offer a way
+ * given recommended post slugs, narrow the grid to those posts, offer a way
  * back to the full list, and scroll the result into view. AgentChat's
  * plumbing (stripping the block, calling onAssistantMessage) is covered
  * separately in blog-recommendation-chat.test.tsx — here AgentChat is stubbed
@@ -53,8 +53,8 @@ vi.mock("@/components/dorit/chat/AgentChat", () => ({
 }));
 
 const POSTS: Article[] = [
-  { id: "post-a", title: "דמי ניהול בפנסיה", excerpt: "", tags: "פנסיה", created_date: "2026-01-01" },
-  { id: "post-b", title: "ביטוח חיים ומשכנתא", excerpt: "", tags: "ביטוח", created_date: "2026-01-02" },
+  { id: "post-a", slug: "dmei-nihul", title: "דמי ניהול בפנסיה", excerpt: "", tags: "פנסיה", created_date: "2026-01-01" },
+  { id: "post-b", slug: "bituach-chaim", title: "ביטוח חיים ומשכנתא", excerpt: "", tags: "ביטוח", created_date: "2026-01-02" },
   { id: "post-c", slug: "livui-tviot", title: "ליווי תביעות", excerpt: "", tags: "תביעות", created_date: "2026-01-03" },
 ];
 
@@ -115,7 +115,7 @@ describe("the blog page shows only the recommended posts", () => {
     // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
     await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
 
-    await recommend(["post-a"]);
+    await recommend(["dmei-nihul"]);
 
     await waitFor(() => expect(card("post-b")).toBeNull());
     expect(card("post-a")).not.toBeNull();
@@ -123,7 +123,7 @@ describe("the blog page shows only the recommended posts", () => {
     expect(screen.getByRole("heading", { name: /מאמרים שהומלצו בצ'אט\s*מאמר אחד/ })).toBeTruthy();
   });
 
-  it("finds a post the chat function named by its slug, as one Base44 named by its id", async () => {
+  it("finds a post the chat function named by its slug", async () => {
     renderBlog();
     await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
 
@@ -133,12 +133,22 @@ describe("the blog page shows only the recommended posts", () => {
     expect(card("post-c")).not.toBeNull();
   });
 
+  it("a recommended id that is not a slug matches nothing", async () => {
+    renderBlog();
+    await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
+
+    await recommend(["post-c"]);
+
+    expect(shownIds()).toEqual(["post-a", "post-b", "post-c"]);
+    expect(screen.queryByText(BACK_TO_ALL)).toBeNull();
+  });
+
   it("orders the posts the way the chat ranked them", async () => {
     renderBlog();
     // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
     await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
 
-    await recommend(["post-c", "post-a"]);
+    await recommend(["livui-tviot", "dmei-nihul"]);
 
     await waitFor(() => expect(shownIds()).toEqual(["post-c", "post-a"]));
     expect(screen.getByRole("heading", { name: /מאמרים שהומלצו בצ'אט\s*2 מאמרים/ })).toBeTruthy();
@@ -148,7 +158,7 @@ describe("the blog page shows only the recommended posts", () => {
     renderBlog();
     // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
     await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
-    await recommend(["post-a"]);
+    await recommend(["dmei-nihul"]);
     await waitFor(() => expect(card("post-b")).toBeNull());
 
     fireEvent.click(screen.getByText(BACK_TO_ALL));
@@ -175,7 +185,7 @@ describe("the blog page shows only the recommended posts", () => {
     fireEvent.click(keyword("תביעות"));
     expect(shownIds()).toEqual(["post-c"]);
 
-    await recommend(["post-a"]);
+    await recommend(["dmei-nihul"]);
 
     await waitFor(() => expect(shownIds()).toEqual(["post-a"]));
     expect(keyword("תביעות").getAttribute("aria-pressed")).toBe("false");
@@ -185,7 +195,7 @@ describe("the blog page shows only the recommended posts", () => {
     renderBlog();
     // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
     await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
-    await recommend(["post-a"]);
+    await recommend(["dmei-nihul"]);
     await waitFor(() => expect(card("post-b")).toBeNull());
 
     fireEvent.click(keyword("ביטוח"));
@@ -197,7 +207,7 @@ describe("the blog page shows only the recommended posts", () => {
     renderBlog();
     // 5 s, not the 1 s default: under a loaded full run the first render has missed 1 s (M5).
     await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
-    await recommend(["post-a"]);
+    await recommend(["dmei-nihul"]);
     await waitFor(() => expect(card("post-b")).toBeNull());
 
     fireEvent.change(screen.getByPlaceholderText("חיפוש מאמרים…"), { target: { value: "ביטוח" } });
@@ -213,7 +223,7 @@ describe("the blog page shows only the recommended posts", () => {
     fireEvent.change(search, { target: { value: "ביטוח" } });
     expect(shownIds()).toEqual(["post-b"]);
 
-    await recommend(["post-a"]);
+    await recommend(["dmei-nihul"]);
 
     await waitFor(() => expect(shownIds()).toEqual(["post-a"]));
     expect(search.value).toBe("");
@@ -226,7 +236,7 @@ describe("the blog page shows only the recommended posts", () => {
     await screen.findByText("דמי ניהול בפנסיה", {}, { timeout: 5000 });
     scrollSpy.mockClear();
 
-    await recommend(["post-b"]);
+    await recommend(["bituach-chaim"]);
 
     await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
     scrollSpy.mockRestore();

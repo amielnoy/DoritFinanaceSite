@@ -37,9 +37,10 @@ export interface InterviewSummary {
    */
   stage?: "complete" | "details";
   /**
-   * Which conversation the save belongs to (`base44:<id>`, `wizard:<id>`), so
-   * a later save finds this lead by it — never by the phone and name, which
-   * anyone may know (review 2026-10-15). Absent: the save stands alone.
+   * Which conversation the save belongs to (`wizard:<id>`; until Base44 exit
+   * B1 also `base44:<id>` from the chat's close), so a later save finds this
+   * lead by it — never by the phone and name, which anyone may know (review
+   * 2026-10-15). Absent: the save stands alone.
    */
   conversationRef?: string;
   /**

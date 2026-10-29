@@ -10,9 +10,10 @@
  * the chosen ids in a fenced block: the page reads it to narrow its grid to
  * the matching cards and scroll to them, and the visitor never sees it.
  *
- * Two producers write it: Base44's agent itself (post ids), and, for the
- * `chat` function, SupabaseAgentService from the turn's `recommended` list
- * (the `recommendArticles` tool; slugs). The page matches a card by either.
+ * SupabaseAgentService writes it from the `chat` function's `recommended`
+ * list (the `recommendArticles` tool), so it names posts by slug, and the
+ * page matches a card by slug only. (Base44's recommender, gone since Base44
+ * exit B1, wrote post ids into it itself.)
  */
 
 export interface RecommendationResult {

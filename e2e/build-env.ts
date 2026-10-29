@@ -37,7 +37,6 @@ export const E2E_BUILD_ENV = {
   VITE_SUPABASE_PUBLISHABLE_KEY: E2E_SUPABASE_PUBLISHABLE_KEY,
 
   // ── Production's provider switches (Vercel, verified 2026-10-17) ───────
-  VITE_CHAT_AGENTS: "needs_interview,support_agent,procedures_agent,blog_recommender",
   // On in production; reachable only behind a staff sign-in, which no spec has.
   VITE_MEETINGS_STAFF: "true",
   // On in production, and off here: e2e/ui/masleka.spec.ts asserts the dark

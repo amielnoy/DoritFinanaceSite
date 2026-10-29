@@ -6,6 +6,9 @@
  * whatever `readHandoff`/`readRecommendation` remove before rendering, and
  * reports each new assistant message to `onAssistantMessage` — once, with
  * the raw content, for a caller (the blog page) to parse itself.
+ *
+ * Driven through the chat function's adapter: a turn's `recommended` slugs
+ * become the block the page reads.
  */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -31,37 +34,22 @@ vi.mock("framer-motion", async () => {
   };
 });
 
-const RECOMMENDATION =
-  'דורית ממליצה לקרוא על "דמי ניהול בפנסיה" — רלוונטי למה שתיארת.\n\n```recommended\n["abc123"]\n```';
+const REPLY = 'דורית ממליצה לקרוא על "דמי ניהול בפנסיה" — רלוונטי למה שתיארת.';
+/** What the page is handed: the reply, and the block the adapter writes from the turn's `recommended` slugs. */
+const RECOMMENDATION = `${REPLY}\n\n\`\`\`recommended\n["dmei-nihul"]\n\`\`\``;
 
-/** Lets the test push further server updates after the conversation starts. */
-let pushMessages: ((msgs: unknown[]) => void) | undefined;
-
+/** The chat function, faked at `functions.invoke`; the adapter is the real one. */
+const invoke = vi.fn();
 vi.mock("@/services", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services")>();
-  return {
-    ...actual,
-    services: {
-      ...actual.services,
-      agents: {
-        start: vi.fn(async () => ({ id: "conv_1" })),
-        send: vi.fn(async () => undefined),
-        subscribe: (_id: string, cb: (msgs: unknown[]) => void) => {
-          pushMessages = cb;
-          cb([
-            { role: "assistant", content: "שלום, איזה נושא פיננסי מעניין אותך לקרוא?" },
-            { role: "user", content: "דמי ניהול" },
-            { role: "assistant", content: RECOMMENDATION },
-          ]);
-          return () => undefined;
-        },
-      },
-    },
-  };
+  const { SupabaseAgentService } = await import("@/services/supabase/SupabaseAgentService");
+  const chat = new SupabaseAgentService({ functions: { invoke } }, () => "local-1");
+  return { ...actual, services: { ...actual.services, agents: chat } };
 });
 
 const { default: AgentChat } = await import("@/components/dorit/chat/AgentChat");
 const { AGENTS } = await import("@/config/agents");
+const { CHAT_FUNCTION_BLOG_CONSENT_POINTS } = await import("@/config/compliance");
 
 async function startConversation() {
   const user = userEvent.setup();
@@ -82,7 +70,11 @@ const onAssistantMessage = vi.fn();
 
 beforeEach(() => {
   onAssistantMessage.mockClear();
-  pushMessages = undefined;
+  invoke.mockReset();
+  invoke.mockResolvedValue({
+    data: { ok: true, conversationId: "b1", token: "t".repeat(64), reply: REPLY, recommended: ["dmei-nihul"], leadSaved: false },
+    error: null,
+  });
 });
 
 describe("AgentChat reports each new assistant message", () => {
@@ -96,24 +88,22 @@ describe("AgentChat reports each new assistant message", () => {
     await waitFor(() => {
       const chatText = document.body.textContent ?? "";
       expect(chatText).not.toContain("```recommended");
-      expect(chatText).not.toContain("abc123");
+      expect(chatText).not.toContain("dmei-nihul");
       expect(chatText).toContain('דורית ממליצה לקרוא על "דמי ניהול בפנסיה"');
     });
   });
 
   it("does not re-report the same trailing assistant message once a later user message arrives", async () => {
-    await startConversation();
+    const user = await startConversation();
     await waitFor(() => expect(onAssistantMessage).toHaveBeenLastCalledWith(RECOMMENDATION));
     const callsSoFar = onAssistantMessage.mock.calls.length;
 
-    // The server echoes a further visitor message; the trailing assistant
-    // content is unchanged, so this must not call onAssistantMessage again.
-    pushMessages!([
-      { role: "assistant", content: "שלום, איזה נושא פיננסי מעניין אותך לקרוא?" },
-      { role: "user", content: "דמי ניהול" },
-      { role: "assistant", content: RECOMMENDATION },
-      { role: "user", content: "תודה" },
-    ]);
+    // A further visitor message shows at once, before its answer; the
+    // trailing assistant content is unchanged, so this must not call
+    // onAssistantMessage again.
+    invoke.mockImplementationOnce(() => new Promise(() => undefined));
+    await user.type(screen.getByPlaceholderText("כתבו כאן…"), "תודה");
+    await user.click(screen.getByRole("button", { name: "שליחה" }));
 
     await waitFor(() => expect(screen.getByText("תודה")).toBeInTheDocument());
     expect(onAssistantMessage).toHaveBeenCalledTimes(callsSoFar);
@@ -128,11 +118,12 @@ describe("the reading recommender's consent gate", () => {
       </MemoryRouter>,
     );
 
-  it("shows the approved one line and the licence, not the interview's notice", () => {
+  it("shows the approved one line, the licence and the v6 line, not the interview's notice", () => {
     renderGate();
     expect(screen.getByText("עוזר אוטומטי של דורית, לא ייעוץ. אין לכתוב תעודת זהות או מספרי פוליסה.")).toBeInTheDocument();
     expect(screen.getByText(/L-00107009/)).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getByText(CHAT_FUNCTION_BLOG_CONSENT_POINTS[2])).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
     expect(document.body.textContent).not.toContain("נאספים שם וטלפון בלבד");
   });
 

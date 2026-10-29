@@ -971,9 +971,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHSWEEP-013 | "claims nothing while there is no sheet: the rows wait for one rather than being marked logged" | Sheet unconfigured: 0, `claimSheetLogs` not called, a `sweep.sheet_unconfigured` warn line |
 | UNIT-CHSWEEP-014 | "lets a failed claim fail the sweep, so the route reports it" | A rejected claim rejects the sweep with `select_http_503` |
 
-### 4.36 The browser's chat adapter, router and switch — `tests/unit/supabase-agent.test.ts`, `routed-agent.test.ts`, `chat-agents-config.test.ts`, `services-wiring.test.ts`
+### 4.36 The browser's chat adapter, router and switch — `tests/unit/supabase-agent.test.ts`, `routed-agent.test.ts`, `chat-agents-config.test.ts` (now `chat-consent-points.test.ts`), `services-wiring.test.ts`
 
-`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort`; `RoutedAgentService` sends each agent to its adapter; `src/config/chat-agents.ts` reads `VITE_CHAT_AGENTS` and serves `needs_interview` and `support_agent`; `src/config/compliance.ts` holds each agent's v6 notice. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
+`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort`; `RoutedAgentService` sends each agent to its adapter; `src/config/chat-agents.ts` read `VITE_CHAT_AGENTS` (deleted in Base44 exit B1 task 2: every agent is on the chat function); `src/config/compliance.ts` holds each agent's v6 notice. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -1004,19 +1004,19 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHROUTE-001 | (retired 2026-10-29, Base44 exit B1 task 1: `RoutedAgentService` is deleted; every agent is on the chat function, UNIT-WIRING-004) | — |
 | UNIT-CHROUTE-002 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHROUTE-001; without Supabase the agents are `UnconfiguredAgentService`, UNIT-WIRING-009) | — |
 | UNIT-CHROUTE-003 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHROUTE-001; the signal reaches `SupabaseAgentService` directly, UNIT-CHADAPTER-026) | — |
-| UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
-| UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
-| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | an unknown agent is dropped from `some_other_agent,needs_interview`; `needs_interview` stays |
-| UNIT-CHCONFIG-004 | "is empty without Supabase, whatever it says" | Not configured gives no agents |
-| UNIT-CHCONFIG-005 | "may serve the FAQ chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `support_agent`; empty switch gives none; `support_agent` and `needs_interview,support_agent` are read in order; without Supabase none; `some_other_agent` none |
-| UNIT-CHCONFIG-006 | "exists for every one of them" (the v6 notice of each agent the function may serve) | `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` has an entry for every `CHAT_FUNCTION_AGENTS` name |
-| UNIT-CHCONFIG-007 | "is the interview's for the interview" | `needs_interview` maps to `CHAT_FUNCTION_CONSENT_POINTS` |
-| UNIT-CHCONFIG-008 | "is the FAQ chat's own for the FAQ chat: its first three points, never the interview's promise of a name, a phone and a meeting" | `support_agent` maps to `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`; its first three equal the first three of `SUPPORT_CONSENT_POINTS`; neither of the interview's points 1 and 3 appears; no "name and phone collected" or "arranges a meeting" wording |
-| UNIT-CHCONFIG-009 | "says, for the FAQ chat as for the interview, who processes the conversation and how long it is kept" | The FAQ chat's fourth point names the AI provider outside Israel and 12 months; the interview's names the provider; the FAQ point is not the old one |
-| UNIT-CHCONFIG-010 | "may serve the procedures chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `procedures_agent`; read when named; none without Supabase |
-| UNIT-CHCONFIG-011 | "is the procedures chat's own for the procedures chat: its three points and the v6 fourth" | `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS`: `PROCEDURES_CONSENT_POINTS[0..2]` and the FAQ chat's v6 fourth; never the interview's first point or "מתאם פגישה" |
-| UNIT-CHCONFIG-012 | "may serve the blog recommender from the function, but only when VITE_CHAT_AGENTS names it" | `blog_recommender` in `CHAT_FUNCTION_AGENTS`; read when named; none without Supabase |
-| UNIT-CHCONFIG-013 | "is the adviser's two lines and the v6 line, never the interview's" | `CHAT_FUNCTION_BLOG_CONSENT_POINTS` = the two approved lines + the FAQ chat's v6 fourth |
+| UNIT-CHCONFIG-001 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-002 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-003 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-004 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-005 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-006 | "exists for every one of them" (the v6 notice of each agent the function may serve) | `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` has an entry for every agent in `AGENTS` (was every `CHAT_FUNCTION_AGENTS` name) (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-007 | "is the interview's for the interview" | `needs_interview` maps to `CHAT_FUNCTION_CONSENT_POINTS` (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-008 | "is the FAQ chat's own for the FAQ chat: its first three points, never the interview's promise of a name, a phone and a meeting" | `support_agent` maps to `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`; its first three equal the first three of `SUPPORT_CONSENT_POINTS`; neither of the interview's points 1 and 3 appears; no "name and phone collected" or "arranges a meeting" wording (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-009 | "says, for the FAQ chat as for the interview, who processes the conversation and how long it is kept" | The FAQ chat's fourth point names the AI provider outside Israel and 12 months; the interview's names the provider; the FAQ point is not the old one (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-010 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-011 | "is the procedures chat's own for the procedures chat: its three points and the v6 fourth" | `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS`: `PROCEDURES_CONSENT_POINTS[0..2]` and the FAQ chat's v6 fourth; never the interview's first point or "מתאם פגישה" (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-012 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-013 | "is the adviser's two lines and the v6 line, never the interview's" | `CHAT_FUNCTION_BLOG_CONSENT_POINTS` = the two approved lines + the FAQ chat's v6 fourth (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
 | UNIT-CHWIRE-001 | (retired 2026-10-29, Base44 exit B1 task 1: no Base44 agent adapter is wired; `services.agents` is `SupabaseAgentService`, UNIT-WIRING-004) | — |
 | UNIT-CHWIRE-002 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHWIRE-001) | — |
 

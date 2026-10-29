@@ -16,7 +16,7 @@ broken.
 
 The production bundle served by `vite preview`, built by `npm run build:e2e` with
 production's configuration (`e2e/build-env.ts`: every port on Supabase, as the
-composition root wires it; all four agents in `VITE_CHAT_AGENTS`, `VITE_MEETINGS_STAFF` on;
+composition root wires it, all four agents on the `chat` function; `VITE_MEETINGS_STAFF` on;
 `VITE_MASLEKA_ENABLED` stays off for §3.10) and Supabase at
 `https://supabase.e2e.invalid`, a host that never resolves. `e2e/fixtures/app.ts`
 answers that host — PostgREST reads over seeded tables in Supabase row shape

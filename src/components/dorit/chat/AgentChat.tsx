@@ -13,10 +13,8 @@ import {
   CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT,
   CHAT_FUNCTION_CONSENT_VERSION,
   CONSENT,
-  CONSENT_VERSION,
   HUMAN_HANDOFF,
 } from "@/config/compliance";
-import { servedByChatFunction } from "@/config/chat-agents";
 import { CONTACT } from "@/config/contact";
 import { readHandoff } from "@/lib/interview-handoff";
 import { readRecommendation } from "@/lib/blog-recommendation";
@@ -50,10 +48,11 @@ const allowTel = (url: string): string =>
   url.startsWith("tel:") ? url : defaultUrlTransform(url);
 
 /**
- * An article link the Base44 agents write: `/blog/<record id>`. Their
- * BlogPost has no slug, so that is all they can name, and the address only
- * worked through the 301 to the slug (D-10, manual test 2026-10-14). The chat
- * shows the slug's address instead, once it knows it.
+ * An article link by record id: `/blog/<record id>`, which the Base44 agents
+ * wrote because their BlogPost had no slug, and which reaches the article only
+ * through the 301 to the slug (D-10, manual test 2026-10-14). The chat
+ * function's agents link by slug; a reply that still names an id is shown the
+ * slug's address, once the chat knows it.
  */
 const LEGACY_ARTICLE_LINK = /^\/blog\/([0-9a-f]{24})$/;
 const hasLegacyArticleLink = (text: string) => /\]\(\/blog\/[0-9a-f]{24}\)/.test(text);
@@ -68,7 +67,7 @@ const CHAT_METHOD: Record<string, ChatMethod> = {
 
 /** Everything that distinguishes one on-site agent from another. */
 export interface AgentDescriptor {
-  /** Agent name registered in base44/agents/. */
+  /** Agent name the `chat` function serves (supabase/functions/chat/prompts/). */
   agent: string;
   sectionId: string;
   sectionClassName: string;
@@ -98,7 +97,9 @@ export interface AgentDescriptor {
    */
   tagline?: string;
   /**
-   * The consent points shown before this agent's chat may start.
+   * The v5 consent points this agent's v6 notice is built from
+   * (`CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` in compliance.ts). The chat shows
+   * the v6 notice, never these alone.
    *
    * Defaults to the interview's, which promise that a name and a phone number
    * are collected. An agent that collects neither must not show that text — a
@@ -109,7 +110,7 @@ export interface AgentDescriptor {
    * The fence, stated out loud. Publishing the boundary is half of honouring
    * it: a visitor who can see what the automation will not do is a visitor who
    * knows to ask for a person, and a reviewer can check the claim against the
-   * prompt in `base44/agents/`.
+   * prompt in `supabase/functions/chat/prompts/`.
    */
   guardrails?: {
     allowed: string[];
@@ -157,23 +158,9 @@ const LIMIT_COPY: Record<AgentLimitError["reason"], string> = {
   still_processing: "ההודעה התקבלה ועדיין בטיפול. התשובה מתעכבת — אפשר לכתוב שוב בעוד דקה.",
 };
 
-/**
- * How long to wait for a reply before treating the conversation as stuck.
- *
- * `send()` can succeed — the backend accepts the message, no exception is
- * thrown — and the reply still never arrives: an intermittent Base44 fault
- * resolving an anonymous conversation's owner has been observed to do exactly
- * this, silently, with no error anywhere a visitor or a console can see. That
- * failure lands entirely outside `send()`'s own try/catch, in the separate
- * subscribe/polling path that pushes replies into `messages` — so this is
- * the one place left to catch it.
- */
-export const NO_REPLY_TIMEOUT_MS = 20_000;
-
 /** What Tab may land on inside the full-screen layer. */
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
-const NO_REPLY_COPY = "מצטערת, נראה שההודעה לא התקבלה כראוי. אפשר לנסות שוב, או לעבור ישירות לדורית.";
 
 /**
  * One chat surface, driven entirely by its descriptor.
@@ -298,29 +285,17 @@ export default function AgentChat({
   const layerRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const layerTitleId = useId();
-  /** Set the moment a closing payload is accepted, so it is submitted once. */
+  /** Set the moment the reply that saved the lead arrives, so it is counted once. */
   const submittedRef = useRef<boolean>(false);
   /** The last assistant message already handed to `onAssistantMessage`, so a
    *  user message appended after it does not report the same content twice. */
   const lastReportedRef = useRef<string>("");
-  /** Set after a successful send, cleared the moment a reply arrives — see
-   *  `NO_REPLY_TIMEOUT_MS`. */
-  const noReplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearNoReplyTimeout = () => {
-    if (noReplyTimeoutRef.current) {
-      clearTimeout(noReplyTimeoutRef.current);
-      noReplyTimeoutRef.current = null;
-    }
-  };
   /** Which chat GA4 events name, by agent. */
   const chatMethod: ChatMethod = CHAT_METHOD[descriptor.agent] ?? "ai_interview";
 
-  /** On the `chat` function (VITE_CHAT_AGENTS), not Base44: its own notice, no fenced block, no watchdog. */
-  const viaChatFunction = servedByChatFunction(descriptor.agent);
-  const consentVersion = viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION;
-  const consentPoints = viaChatFunction
-    ? (CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT[descriptor.agent] ?? CHAT_FUNCTION_CONSENT_POINTS)
-    : (descriptor.consentPoints ?? CONSENT.points);
+  /** Every agent is on the `chat` function: its v6 notice, stamped with the v6 version. */
+  const consentVersion = CHAT_FUNCTION_CONSENT_VERSION;
+  const consentPoints = CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT[descriptor.agent] ?? CHAT_FUNCTION_CONSENT_POINTS;
 
   useEffect(() => {
     if (!conversationId) return;
@@ -329,11 +304,6 @@ export default function AgentChat({
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
-  /** A reply arrived — whatever was waiting on NO_REPLY_TIMEOUT_MS is answered. */
-  useEffect(() => {
-    if (messages[messages.length - 1]?.role === "assistant") clearNoReplyTimeout();
   }, [messages]);
 
   /**
@@ -350,76 +320,24 @@ export default function AgentChat({
     inFlightRef.current = null;
   };
 
-  useEffect(
-    () => () => {
-      clearNoReplyTimeout();
-      abandonSend();
-    },
-    [],
-  );
+  useEffect(() => () => abandonSend(), []);
 
   /**
-   * The close of the interview, submitted by the page.
-   *
-   * The agent cannot do it: its tool calls are not executed in an anonymous
-   * conversation, and every visitor is anonymous (A-59). It therefore states
-   * the summary in a fenced block and this submits it — the same call the
-   * quick-contact form has always made, which an anonymous visitor is allowed
-   * to make.
+   * The close of the interview. The `chat` function saves the lead itself;
+   * the reply that saved it says so, and the page only counts it.
    *
    * `submittedRef` rather than state: two pushes can arrive in the same tick,
-   * and a second send means Dorit gets the enquiry twice.
+   * and a second count is a second lead in GA4.
    */
   useEffect(() => {
-    if (viaChatFunction || submittedRef.current) return;
-    const last = [...messages].reverse().find((m) => m.role === "assistant");
-    if (!last) return;
-    const { summary, malformed } = readHandoff(last.content);
-
-    if (malformed) {
-      // The block was there and unusable. Saying nothing would repeat the
-      // failure this exists to fix — the visitor believing they were passed on.
-      submittedRef.current = true;
-      console.warn("[interview] closing payload was unreadable; showing direct channels");
-      showChannelsOnly();
-      return;
-    }
-    if (!summary) return;
-
-    submittedRef.current = true;
-    void (async () => {
-      try {
-        const attribution = getAttribution();
-        const receipt = await services.leads.submitInterview({
-          ...summary,
-          // This conversation, so a save from it is never matched by phone and name.
-          conversationRef: conversationId ? `base44:${conversationId}` : undefined,
-          channel: attribution?.channel,
-          campaign: attribution?.campaign ?? undefined,
-          landingPath: window.location.pathname,
-        });
-        if (!receipt?.ok) throw new Error(`rejected${receipt?.rid ? ` rid=${receipt.rid}` : ""}`);
-        leadEvents.interviewCompleted();
-      } catch (e) {
-        // The id, where anyone can find it. It names every log line the
-        // submission produced, and it is the difference between "a visitor says
-        // it did not work" and one search.
-        console.warn("[interview] the close was refused — showing direct channels", String(e));
-        showChannelsOnly();
-      }
-    })();
-  }, [messages, viaChatFunction]);
-
-  /** On the chat function the lead is saved server-side; the reply that saved it says so. */
-  useEffect(() => {
-    if (!viaChatFunction || submittedRef.current) return;
+    if (submittedRef.current) return;
     const last = [...messages].reverse().find((m) => m.role === "assistant");
     if (last?.signal !== "lead_saved") return;
     submittedRef.current = true;
     leadEvents.interviewCompleted();
     // Saved, but the reply that would have said so was lost: the confirmation, and her channels for anything else.
     if (last.replyMissing) setHandoffNotice({ message: HUMAN_HANDOFF.reachHer, contact: FALLBACK_CONTACT });
-  }, [messages, viaChatFunction]);
+  }, [messages]);
 
   useEffect(() => {
     if (!onAssistantMessage) return;
@@ -439,16 +357,15 @@ export default function AgentChat({
       // the exact notice the visitor was shown.
       consent_version: consentVersion,
       consent_at: consentAt ?? "",
-      // The function stores these on the conversation. Only for its agents: a Base44
-      // conversation keeps exactly the metadata it had before the function existed.
-      ...(viaChatFunction
-        ? { channel: getAttribution()?.channel ?? "", campaign: getAttribution()?.campaign ?? "", landing_path: window.location.pathname }
-        : {}),
+      // The function stores these on the conversation.
+      channel: getAttribution()?.channel ?? "",
+      campaign: getAttribution()?.campaign ?? "",
+      landing_path: window.location.pathname,
     });
     // Opened for a conversation the visitor has since reset: not this panel's.
     if (generation === generationRef.current) setConversationId(conv.id);
     return conv;
-  }, [conversationId, consentAt, descriptor, consentVersion, viaChatFunction]);
+  }, [conversationId, consentAt, descriptor, consentVersion]);
 
   const say = (content: string) =>
     setMessages((m) => [...m, { role: "assistant" as const, content }]);
@@ -458,21 +375,8 @@ export default function AgentChat({
     if (!text || sending || !consentAt) return;
     setSending(true);
     setInput("");
-    // Armed before the send, not after it. The gap this covers is a reply that
-    // never arrives at all — but Base44's send can resolve only once the agent
-    // has finished answering, and the answer reaches the page first, through
-    // the subscription. Armed after the await, the timer started after the
-    // reply had already come and gone, and the apology appeared 20 seconds
-    // later under a perfectly good answer (2026-10-11).
-    clearNoReplyTimeout();
-    // Off on the chat function: its reply arrives with the send itself, the
-    // adapter times out at 40 s and the function's own budget is 25 s.
-    if (!viaChatFunction) {
-      noReplyTimeoutRef.current = setTimeout(() => {
-        noReplyTimeoutRef.current = null;
-        say(NO_REPLY_COPY);
-      }, NO_REPLY_TIMEOUT_MS);
-    }
+    // No reply watchdog: the reply arrives with the send itself, the adapter
+    // times out at 40 s and the function's own budget is 25 s.
     const generation = generationRef.current;
     const controller = new AbortController();
     inFlightRef.current = controller;
@@ -483,8 +387,6 @@ export default function AgentChat({
     } catch (e) {
       // A send the visitor abandoned (reset): the panel shows another conversation now.
       if (generation !== generationRef.current) return;
-      // A failed send says so itself, below; it is not "no reply".
-      clearNoReplyTimeout();
       // Put the text back in the box. The visitor's own message reaches the
       // transcript only by way of the server echoing it, so a failed send
       // leaves it nowhere at all: cleared from the input, absent from the
@@ -588,7 +490,6 @@ export default function AgentChat({
   };
 
   const reset = () => {
-    clearNoReplyTimeout();
     abandonSend();
     setSending(false);
     setConversationId(null);
@@ -973,14 +874,14 @@ export default function AgentChat({
                           <p className="whitespace-pre-wrap">{m.content}</p>
                         ) : (
                           <div className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                            {/* A closing payload (interview-handoff.ts) or a
-                                recommendation (blog-recommendation.ts) can
-                                travel inside the message, and both are
-                                machinery, not conversation. Stripped here
-                                rather than on arrival so `messages` stays
-                                exactly what the server sent; stripping the
-                                second is a no-op for any agent that never
-                                emits it. */}
+                            {/* A recommendation (blog-recommendation.ts) can
+                                travel inside the message, and is machinery,
+                                not conversation; so is a `lead` block
+                                (interview-handoff.ts), which the function's
+                                agents never write but a model could slip in.
+                                Stripped here rather than on arrival so
+                                `messages` stays exactly what the server sent;
+                                stripping is a no-op for a reply without one. */}
                             <ReactMarkdown
                               urlTransform={allowTel}
                               components={{

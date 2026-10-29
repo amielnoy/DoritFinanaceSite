@@ -20,12 +20,6 @@ vi.mock("framer-motion", async () => {
   const passthrough = new Proxy({}, { get: (_t, tag: string) => ({ children, ...props }: any) => R.createElement(tag, props, children) });
   return { motion: passthrough, AnimatePresence: ({ children }: any) => R.createElement(R.Fragment, null, children), useReducedMotion: () => true };
 });
-vi.mock("@/config/chat-agents", () => ({
-  CHAT_FUNCTION_AGENTS: ["needs_interview", "support_agent", "procedures_agent", "blog_recommender"],
-  CHAT_AGENTS: new Set(["blog_recommender"]),
-  parseChatAgents: () => new Set(["blog_recommender"]),
-  servedByChatFunction: (agent: string) => agent === "blog_recommender",
-}));
 
 const invoke = vi.fn();
 vi.mock("@/services", async (importOriginal) => {

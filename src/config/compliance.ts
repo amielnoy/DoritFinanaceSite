@@ -193,16 +193,16 @@ export const HUMAN_HANDOFF = {
 } as const;
 
 /**
- * v6 — the notice for agents served by the `chat` Edge Function only
- * (`VITE_CHAT_AGENTS`). v5 above stays the notice for every agent still on
- * Base44, so turning the switch off restores both the transport and the notice.
+ * v6 — the notice the chat shows, every on-site agent being served by the
+ * `chat` Edge Function (Base44 exit B1). The v5 points above are what each
+ * agent's v6 notice is built from; v5 alone is no longer shown in the chat.
  *
  * The fourth point replaces "not passed to any other party", which the chat
  * cannot promise: the conversation is processed by an AI provider outside
  * Israel, and its transcript is kept for 12 months.
  *
- * TODO(compliance): adviser to approve — the fourth point's wording is a
- * release gate before VITE_CHAT_AGENTS is set (spec, "Compliance").
+ * TODO(compliance): adviser to approve the fourth point's wording (spec,
+ * "Compliance").
  */
 export const CHAT_FUNCTION_CONSENT_VERSION = "2026-10-agents-v6";
 
@@ -221,8 +221,7 @@ export const CHAT_FUNCTION_CONSENT_POINTS = [
  * provider outside Israel processes the conversation, and the transcript is
  * kept for 12 months.
  *
- * TODO(compliance): adviser to approve with the interview's fourth point —
- * the same release gate, before VITE_CHAT_AGENTS names support_agent.
+ * TODO(compliance): adviser to approve with the interview's fourth point.
  */
 export const CHAT_FUNCTION_SUPPORT_CONSENT_POINTS = [
   SUPPORT_CONSENT_POINTS[0],
@@ -237,8 +236,7 @@ export const CHAT_FUNCTION_SUPPORT_CONSENT_POINTS = [
  * the FAQ chat's v6 fourth, for the same two reasons (an AI provider outside
  * Israel processes the conversation; the transcript is kept 12 months).
  *
- * TODO(compliance): the same release gate as the FAQ chat's fourth point,
- * before VITE_CHAT_AGENTS names procedures_agent.
+ * TODO(compliance): adviser to approve, with the FAQ chat's fourth point.
  */
 export const CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS = [
   PROCEDURES_CONSENT_POINTS[0],
@@ -253,8 +251,7 @@ export const CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS = [
  * who processes the conversation (an AI provider outside Israel) and that the
  * transcript is kept 12 months, which the function newly does.
  *
- * TODO(compliance): the same release gate as the other v6 lines, before
- * VITE_CHAT_AGENTS names blog_recommender.
+ * TODO(compliance): adviser to approve, with the other v6 lines.
  */
 export const CHAT_FUNCTION_BLOG_CONSENT_POINTS = [
   BLOG_RECOMMENDER_CONSENT_POINTS[0],
@@ -263,9 +260,9 @@ export const CHAT_FUNCTION_BLOG_CONSENT_POINTS = [
 ] as const;
 
 /**
- * The v6 notice of each agent the `chat` function may serve
- * (`CHAT_FUNCTION_AGENTS`), by agent name. A served agent missing here would
- * fall back to the interview's — a unit test fails first.
+ * The v6 notice of each on-site agent (`AGENTS` in src/config/agents.ts), by
+ * agent name. An agent missing here would fall back to the interview's — a
+ * unit test fails first (tests/unit/chat-consent-points.test.ts).
  */
 export const CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT: Readonly<Record<string, readonly string[]>> = {
   needs_interview: CHAT_FUNCTION_CONSENT_POINTS,

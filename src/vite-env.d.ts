@@ -31,8 +31,6 @@ interface ImportMetaEnv {
   /** Agency content from the database — on only when exactly "true"; see `src/config/agency-content.ts`. */
   readonly VITE_AGENCY_CONTENT?: string;
   readonly VITE_SNAPSHOT_HOME?: string;
-  /** Agents served by the `chat` Edge Function — see `src/config/chat-agents.ts`. */
-  readonly VITE_CHAT_AGENTS?: string;
   readonly VITE_BASE44_APP_ID?: string;
   readonly VITE_BASE44_FUNCTIONS_VERSION?: string;
   readonly VITE_BASE44_APP_BASE_URL?: string;

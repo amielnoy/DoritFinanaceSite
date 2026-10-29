@@ -306,18 +306,19 @@ visitor would.
 | CMP-REC-008 | "scrolls the recommendation into view" | `scrollIntoView` called |
 | CMP-REC-009 | "clears a chosen keyword when a recommendation arrives" | Recommended card only; keyword no longer pressed |
 | CMP-REC-010 | "drops the recommendation filter once the visitor picks a keyword" | The keyword's cards, not the recommendation |
-| CMP-REC-011 | "finds a post the chat function named by its slug, as one Base44 named by its id" | A block naming `livui-tviot` shows `post-c` alone |
+| CMP-REC-011 | "finds a post the chat function named by its slug" | A block naming `livui-tviot` shows `post-c` alone (2026-10-29, Base44 exit B1 task 2: was "…, as one Base44 named by its id"; every fixture post now has a slug and every case recommends by slug) |
+| CMP-REC-012 | "a recommended id that is not a slug matches nothing" | A block naming `post-c` (an id, not a slug) filters nothing: all three posts, no "חזרה לכל המאמרים" (Base44 exit B1 task 2: the page matches by slug only) |
 
 ### 4.14 Reading-recommender chat — `tests/component/blog-recommendation-chat.test.tsx`
 
-The real `AgentChat` with the recommender's descriptor; the agent service is faked.
+The real `AgentChat` with the recommender's descriptor, over the real `SupabaseAgentService` with `functions.invoke` faked (a reply and `recommended: ["dmei-nihul"]`, which the adapter writes into the block). Base44 exit B1 task 2: was a faked port pushing a Base44-shaped block of ids.
 
 | ID | Title | Expected result |
 |---|---|---|
 | CMP-RCH-001 | "calls onAssistantMessage with the raw content, block included" | The `recommended` block reaches the page |
-| CMP-RCH-002 | "never shows the recommended block to the visitor" | No fence, no ids in the transcript |
-| CMP-RCH-003 | "does not re-report the same trailing assistant message once a later user message arrives" | No second call for the same content |
-| CMP-RCH-004 | "shows the approved one line and the licence, not the interview's notice" | The approved sentence and `L-00107009`; exactly two points; no "נאספים שם וטלפון בלבד" |
+| CMP-RCH-002 | "never shows the recommended block to the visitor" | No fence, no slugs in the transcript |
+| CMP-RCH-003 | "does not re-report the same trailing assistant message once a later user message arrives" | A second message, its answer pending, shows "תודה"; no second call for the same content |
+| CMP-RCH-004 | "shows the approved one line, the licence and the v6 line, not the interview's notice" | The approved sentence, `L-00107009` and `CHAT_FUNCTION_BLOG_CONSENT_POINTS[2]`; exactly three points; no "נאספים שם וטלפון בלבד" (Base44 exit B1 task 2: was the two-point v5 notice) |
 | CMP-RCH-005 | "still gates the first message on the checkbox" | Start and send disabled before consent; the pre-filled text waits in the input |
 
 ### 4.15 `<BlogPost />` — old addresses — `tests/component/blog-post-redirect.test.tsx`
@@ -360,14 +361,14 @@ The hooks are stubbed; contentAdmin repeats every refusal server-side (§4.24 of
 | CMP-CHATFN-010 | "answers a message sent while the last one is still being answered, and gives the text back" | 409 `busy`: `הודעה קודמת עדיין בטיפול — רגע אחד.`; box refilled (I3) |
 | CMP-CHATFN-011 | "shows the saved confirmation and Dorit's channels when the lead was saved but the reply failed (503 leadSaved)" | `LEAD_SAVED_WITHOUT_REPLY`, `HUMAN_HANDOFF.reachHer` and a `tel:` link; no failure copy; `interviewCompleted` once; box left empty (I5) |
 | CMP-CHATFN-012 | "shows the visitor's message while the reply is on its way" | The sent text is on screen before the answer; then the reply (I4) |
-| CMP-CHATFN-013 | "open their Base44 conversation with main's metadata only, no attribution keys (dark means byte-exact)" | A Base44 agent's `start` metadata has exactly `name`, `description`, `consent_version` (v5), `consent_at` (triage 7) |
-| CMP-CHATFN-014 | "while the interview on the chat function sends its attribution" | The served interview's metadata adds `channel`, `campaign`, `landing_path` (triage 7) |
-| CMP-CHATFN-007 | "keep the v5 notice, byte for byte" | A Base44 agent shows its v5 points and not the v6 fourth point |
-| CMP-CHATFN-008 | "stays off for an agent on the chat function, even when the reply takes longer than 20 s" | No no-reply copy at 21 s; the slow reply shows at 25 s (Ruling 7) |
-| CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | No-reply copy after `NO_REPLY_TIMEOUT_MS` |
+| CMP-CHATFN-013 | "open their Base44 conversation with main's metadata only, no attribution keys (dark means byte-exact)" | **Retired 2026-10-29** — Base44 exit B1 task 2: every agent is on the chat function; no Base44 conversation is opened |
+| CMP-CHATFN-014 | "while the interview on the chat function sends its attribution" | The interview's metadata adds `channel`, `campaign`, `landing_path` (triage 7); now under "the conversation's metadata" |
+| CMP-CHATFN-007 | "keep the v5 notice, byte for byte" | **Retired 2026-10-29** — Base44 exit B1 task 2: every agent is on the chat function; no agent shows the v5 notice |
+| CMP-CHATFN-008 | "is waited for with no apology, even when it takes longer than 20 s" (a slow reply) | No "מצטערת" at 21 s; the slow reply shows at 25 s, still no apology (Ruling 7; Base44 exit B1 task 2: was "stays off for an agent on the chat function, …" — the watchdog is gone) |
+| CMP-CHATFN-009 | "still fires for a Base44 agent whose reply never comes" | **Retired 2026-10-29** — Base44 exit B1 task 2: every agent is on the chat function; the no-reply watchdog, `NO_REPLY_TIMEOUT_MS` and its copy are deleted |
 | CMP-CHATFN-015 | "says the message is still being answered, keeps it in the transcript, and does not hand it back" (a turn still running when the adapter stops waiting) | The send and every status request say busy: after 40 s + 60 s the panel shows "ההודעה התקבלה ועדיין בטיפול…", the visitor's line stays, and the input stays empty (review 2026-10-15, item 14) |
 | CMP-CHATFN-016 | "aborts the chat function's request and leaves the new conversation clean and usable" (a reset while a message is on its way) | Reset mid-send: the request's signal is aborted; the old line, an apology and the old text are all absent; the next message goes out under a new conversation id and its reply shows (review 2026-10-15, item 13) |
-| CMP-CHATFN-017 | "ignores what an earlier conversation's send ends with, even from an adapter that cannot abort" (a reset while a message is on its way) | A Base44 send that fails after the reset: the input stays empty and no apology appears (the panel's generation guard) |
+| CMP-CHATFN-017 | "ignores what an earlier conversation's send ends with, even from an adapter that cannot abort" (a reset while a message is on its way) | A send that ignores its abort signal and fails after the reset: the input stays empty and no apology appears (the panel's generation guard; Base44 exit B1 task 2: was a Base44 send) |
 
 The "שיחה" tab on `/admin/leads` (`tests/component/lead-transcript.test.tsx`, hooks stubbed). Read-only; visitor text is plain text.
 
@@ -509,7 +510,7 @@ renders as on a desktop, which is what every other component test relies on.
 | ID | Title | Expected result |
 |---|---|---|
 | CMP-SHEET-001 | "shows the card, with the fence in a closed <details>, and no chat until asked" | At 390: heading, "שאלו את העוזר" with `aria-expanded=false`, no dialog; the `<details>` is closed and holds the tagline, the note and every guardrail line verbatim |
-| CMP-SHEET-002 | "opens a modal dialog, locks the page's scroll, and shows the notice word for word" | `dialog` "העוזר של דורית", `aria-modal`, `body` overflow hidden, "אוטומטי · לא דורית עצמה", every `SUPPORT_CONSENT_POINTS` entry |
+| CMP-SHEET-002 | "opens a modal dialog, locks the page's scroll, and shows the notice word for word" | `dialog` "העוזר של דורית", `aria-modal`, `body` overflow hidden, "אוטומטי · לא דורית עצמה", every `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS` entry (Base44 exit B1 task 2: was the v5 `SUPPORT_CONSENT_POINTS`) |
 | CMP-SHEET-003 | "closes on Escape and on the X, and gives focus back to the button" | Both close it; focus on the opener; overflow restored |
 | CMP-SHEET-004 | "fires chat_start and chat_handoff from inside the layer, and generate_lead only once it reaches Dorit" | `gtag` sees `chat_start` and `chat_handoff` (`ai_support`), and `generate_lead` only after `escalate` |
 | CMP-SHEET-005 | "keeps the conversation, and the consent, across closing and reopening" | No checkbox on reopening; the typed draft still there |
@@ -522,7 +523,7 @@ renders as on a desktop, which is what every other component test relies on.
 
 ### 4.23 `<AgentChat />` — the FAQ chat on the chat function — `tests/component/chat-function-support.test.tsx`
 
-`@/config/chat-agents` is mocked so `support_agent` is served by the chat function; `services.agents` is a real `SupabaseAgentService` over a fake `functions.invoke`; `framer-motion` is stubbed. No network.
+Every agent is on the chat function (Base44 exit B1 task 2 deleted `@/config/chat-agents` and its mock); `services.agents` is a real `SupabaseAgentService` over a fake `functions.invoke`; `framer-motion` is stubbed. No network.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -963,7 +964,7 @@ Review 2026-10-15, item 22. `StartConversation` imports `AgentChat` with `lazy()
 
 ### 4.51 Article links in a chat reply — `tests/component/chat-article-links.test.tsx`
 
-D-10, manual test 2026-10-14. The support chat on the Base44 engine linked `/blog/6ac496b66444c62d843db5b9`. Base44's `BlogPost` has no slug, so its record id is all the agent can name, and the address worked only through the 301. `AgentChat` now reads the articles once a reply carries a `/blog/<24 hex>` link, and renders `articlePath(article)` for it. Supabase articles carry the Base44 id as `id` (`toPortRow`). The agents' own JSON block (`recommended`) keeps the ids, which the blog page reads.
+D-10, manual test 2026-10-14. The support chat on the Base44 engine linked `/blog/6ac496b66444c62d843db5b9`. Since Base44 exit B1 every agent is on the chat function, whose prompts link by slug; the rewrite stays for any reply that still names an id, and the cases run on the function path unchanged. Base44's `BlogPost` has no slug, so its record id is all the agent can name, and the address worked only through the 301. `AgentChat` now reads the articles once a reply carries a `/blog/<24 hex>` link, and renders `articlePath(article)` for it. Supabase articles carry the Base44 id as `id` (`toPortRow`). The agents' own JSON block (`recommended`) keeps the ids, which the blog page reads.
 
 | ID | Title | Expected result |
 |---|---|---|
