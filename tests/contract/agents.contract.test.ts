@@ -387,9 +387,9 @@ describe("the procedures agent", () => {
  * what `MANDATORY_CLAUSES` is — and wrong for rationale, where it only means
  * that rewording a paragraph for clarity costs a red build and buys nothing.
  *
- * The bank these were written against is `tests/test-plan/14-procedures-zones.md`,
- * and `tests/eval/procedures-agent.eval.test.ts` runs its load-bearing rows
- * against the deployed agent. This file only proves the prompt still says it.
+ * The bank these were written against is `tests/test-plan/14-procedures-zones.md`.
+ * This file only proves the prompt still says it; the model doing it is
+ * `npm run test:eval:chat`, by hand, against the deployed chat function.
  */
 describe("the procedures agent sorts by one test, then by four zones", () => {
   const prompt = loadAgent("procedures_agent").instructions;

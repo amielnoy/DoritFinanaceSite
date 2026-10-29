@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import { watchFreshness } from '@/lib/freshness'
 import { installTrustedTypes } from '@/lib/trusted-types'
-import { leaveLegacyHost } from '@/lib/legacy-host-boot'
 import '@/fonts.css'
 import '@/index.css'
 
@@ -23,9 +22,4 @@ function boot() {
   )
 }
 
-// On the old Base44 host (safe-arch-plan.base44.app), which Base44 goes on
-// serving and cannot 301: mark the page noindex with its canonical on the
-// production domain, and — unless a sign-in is in flight or the page is
-// framed — move the visitor to the same address there and render nothing
-// here. Anywhere else this is a no-op. See legacy-host.ts.
-if (!leaveLegacyHost()) boot()
+boot()

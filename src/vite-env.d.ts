@@ -30,8 +30,6 @@ interface ImportMetaEnv {
   /** Agency content from the database — on only when exactly "true"; see `src/config/agency-content.ts`. */
   readonly VITE_AGENCY_CONTENT?: string;
   readonly VITE_SNAPSHOT_HOME?: string;
-  /** Hosts the page leaves for the canonical one, comma-separated; `none` turns it off — see `src/lib/legacy-host.ts`. */
-  readonly VITE_LEGACY_HOSTS?: string;
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_LOCALES?: string;
   readonly VITE_CAL_LINK?: string;

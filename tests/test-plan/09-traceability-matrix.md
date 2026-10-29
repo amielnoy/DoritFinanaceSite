@@ -22,16 +22,16 @@ gap is visible and a failure points at a feature.
 | F-18 | Rich results: FAQ, article, breadcrumb, service | SEO-BRD-001 | — | — | — | — | — | SEO-LD-001..005, SEO-PRE-010 | SEO-MOB-001 | — | — |
 | F-19 | Mobile-first indexing parity and mobile usability | — | — | — | — | — | — | — | SEO-MOB-001..007 | — | A11Y-STR-007, E2E-MOB-005/010 |
 | F-15 | Site degrades safely when the backend fails | UNIT-SUB-005/007 | CMP-RVW-003, CMP-QCF-004, CMP-CLM-002 | — | INT-LEAD-018..024, INT-CLAIM-008..011 | — | — | E2E-HOM-006, E2E-BLG-006, E2E-FRM-003, E2E-CLM-004 | — | SEC-ERR-001 | — |
-| F-20 | Visitor talks to an on-site agent, behind a consent gate | — | — | CTR-AGT-* (compliance block) | INT-LEAD-031..064 | EVAL-INT-001..008 | — | E2E-AGT-001..003 | — | — | — |
-| F-21 | Visitor is handed to a person whenever the agent may not answer | UNIT-RCP-004 | — | CTR-AGT-*, CTR-FN-* | INT-ESC-001..019 | EVAL-INT-006/008 | — | E2E-AGT-004/005, E2E-AGT-010 | — | — | — |
+| F-20 | Visitor talks to an on-site agent, behind a consent gate | — | — | CTR-AGT-* (compliance block) | INT-LEAD-031..064 | — (`test:eval:chat` by hand, [STD-13](13-std-eval.md) §6) | — | E2E-AGT-001..003 | — | — | — |
+| F-21 | Visitor is handed to a person whenever the agent may not answer | UNIT-RCP-004 | — | CTR-AGT-*, CTR-FN-* | INT-ESC-001..019 | — (`test:eval:chat` by hand) | — | E2E-AGT-004/005, E2E-AGT-010 | — | — | — |
 | F-22 | Published articles carry the mandatory גילוי נאות | UNIT-SEED-001..007 | — | CTR-ART-001..019 | — | — | — | — | — | — | — |
 | F-23 | Visitor reports an insurance claim | UNIT-SUB-001..008 | CMP-CLM-001..003 | CTR-LED-*, CTR-EML-* | INT-CLAIM-001..013 | — | — | E2E-CLM-001..005 | — | SEC-XSS-* | A11Y-AXE-008 |
-| F-24 | Interview hands the agency a structured summary, not free text | — | — | CTR-AGT-* (profile schema) | INT-LEAD-039..064 | EVAL-INT-002..005/007 | — | — | — | SEC-AGT-* | — |
+| F-24 | Interview hands the agency a structured summary, not free text | — | — | CTR-AGT-* (profile schema) | INT-LEAD-039..064 | — (`test:eval:chat` by hand) | — | — | — | SEC-AGT-* | — |
 | F-25 | Every enquiry reaches the agency by mail | — | — | CTR-AGT-*, CTR-EML-*, CTR-CLK-001/002 | INT-LEAD-*, INT-ESC-*, INT-MAIL-*, INT-CLAIM-* | — | — | — | — | SEC-AGT-* | — |
 | F-16 | No secrets ship to the browser | — | — | CTR-FN-009/010 | — | — | — | — | — | SEC-STA-001..009, SEC-BND-001 | — |
 | F-26 | Visitor runs the insurance self-assessment (/tools) | UNIT-ASM-001..008, UNIT-CLD-005..007 | CMP-CLD-011..015 | — | — | — | — | E2E-CAL-008 | E2E-CAL-009 | — | A11Y-AXE-009 |
 | F-27 | Visitor reads the FAQ library and asks the support chat (/faq) | UNIT-FAQ-001..006, UNIT-GA4-022..027 | CMP-FAQ-001, CMP-BAR-002/003, CMP-FLA-003, CMP-HDR-009/010, CMP-SHEET-001..011 | CTR-AGT-* | INT-SUPPORT-001..012 | — | API-HTP-008 | E2E-NAV-004, E2E-AGT-006..008, E2E-SUP-001..005 | E2E-SUP-001/002, E2E-MOB-011..020, E2E-DSK-003/004 | — | A11Y-AXE-001 |
-| F-28 | Visitor asks how a procedure is carried out, in the procedures chat (/tools) | — | — | CTR-AGT-* | — | EVAL-PRC-001..009 | — | E2E-AGT-009..012 | — | — | A11Y-AXE-008 |
+| F-28 | Visitor asks how a procedure is carried out, in the procedures chat (/tools) | — | — | CTR-AGT-* | — | — (`test:eval:chat` by hand: `proc-01..06`) | — | E2E-AGT-009..012 | — | — | A11Y-AXE-008 |
 | F-29 | Signed-in visitor sees their own enquiries (/account) | UNIT-ACC-001..017 | CMP-ACC-001..023, CMP-HDR-001..005 | CTR-ACC-001..006 | INT-ACC-001..010 | — | — | E2E-ACC-001 | — | — | — |
 | F-30 | Admin sees which lead events reach GA4, and marks a browser internal (/admin/leads) | UNIT-GA4-001..014 | CMP-GA4-001..005, CMP-QCF-006 | — | — | — | — | — | — | — | — |
 | F-31 | The FAQ chat runs on the chat function: its own tools, its own notice, no lead tool | UNIT-CHTOOL-020..028, UNIT-CHART-001..009, UNIT-CHHANDLER-048..051, UNIT-CHCONFIG-005..009 | CMP-CHSUP-001/002 | CTR-CHPROMPT-009..012 | — | EVAL-CHAT (UNIT-EVALCHAT-034..042; `npm run test:eval:chat`, manual) | — | — | — | — | — |

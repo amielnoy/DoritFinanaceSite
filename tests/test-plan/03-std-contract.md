@@ -121,6 +121,8 @@ and data-minimisation rule, the complaint and privacy-request routes, the
 `escalateToHuman` is wired as a tool, that the prompt opens by disclosing it is
 automated, and that no agent is granted an entity operation beyond its job.
 
+**Retired 2026-10-29** — Base44 exit B1 task 5: the case "and something runs the bank against the deployed agent" read `tests/eval/procedures-agent.eval.test.ts` for two scenarios (23, no opinion under pressure; 24, stops offering דורית when asked to), and that file is deleted with the Base44 agent evals. It is not re-pointed at `tests/eval/chat/personas.json`: the six `procedures_agent` personas there (`proc-01..06`) have no zone field and no equivalent of scenarios 23 and 24, so a case asserting them would claim coverage that does not exist. The gap is recorded in [14-procedures-zones](14-procedures-zones.md) §4.
+
 One case there is about reachability rather than compliance: every agent must
 carry `allow_anonymous_access: true`. All three sit on public pages, and Base44
 answers `createConversation` for an agent without it with a 401 — "User must be
