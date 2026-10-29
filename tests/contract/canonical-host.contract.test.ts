@@ -99,23 +99,14 @@ describe("the canonical host has a single source", () => {
     ).toEqual([]);
   });
 
-  it("no longer proxies the Base44 agent socket", () => {
+  it("no longer proxies the Base44 agent socket or /api", () => {
     // `/ws-user-apps/*` carried the Base44 chat's transcript. All four agents
     // run on the Supabase chat function since 2026-10-16, and the SDK's
-    // fallback reaches Base44 directly (VITE_BASE44_SERVER_URL), not through
+    // fallback reaches Base44 directly, not through
     // this host — so the rewrite went with the Base44 publish (2026-10-17).
     const rewrites = JSON.parse(read("vercel.json")).rewrites as { source: string }[];
     expect(rewrites.map((r) => r.source)).not.toContain("/ws-user-apps/:path*");
-  });
-
-  it("still points the API rewrite at Base44, which is a backend address and not the canonical host", () => {
-    /* vercel.json forwards /api to Base44. That destination is deliberately *not*
-       governed by VITE_SITE_URL: it names where the backend lives, which is a
-       different question from where the site is served, and the two separate
-       exactly when a Python backend starts taking paths over. */
-    const vercel = JSON.parse(read("vercel.json"));
-    const apiRewrite = vercel.rewrites.find((r: { source: string }) => r.source === "/api/:path*");
-    expect(apiRewrite.destination).toContain("base44.app");
+    expect(rewrites.map((r) => r.source)).not.toContain("/api/:path*");
   });
 });
 

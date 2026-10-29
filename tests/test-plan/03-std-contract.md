@@ -413,6 +413,8 @@ host out must be one the build rewrites. `index.html` was missing from that list
 so a host move shifted the sitemap and left the served document advertising the
 old origin in its canonical tag, `og:url` and two static JSON-LD blocks.
 
+**`vercel-functions.contract.test.ts`, no Base44 host.** "no rewrite or header names a base44.app host": `JSON.stringify(vercel.json)` has no `base44.app` (Base44 exit B1 task 4 removed the `/api` rewrite and the CSP `connect-src` origins). Retired the same day: canonical-host's "still points the API rewrite at Base44, which is a backend address and not the canonical host" (the rewrite is gone; the sibling case now also asserts `/api/:path*` is absent).
+
 **`vercel-functions.contract.test.ts`, old article addresses.** Every
 `/blog/<24 hex>` — a Base44 id, what article links were before slugs — must be
 rewritten to `api/og/blog.ts` with no `has` condition (people get the 301 as
@@ -458,8 +460,8 @@ starred fields, so a new starred field is covered without listing it.
 **`site-hardening.contract.test.ts`.** D-18. Pages answered
 `access-control-allow-origin: *`, Vercel's default for static files. A
 vercel.json rule now sets it to `https://govari-fin.co.il` on everything but
-`/assets/`, `/fonts/` and `/api/` (the Base44 rewrite and the og and
-csp-report functions answer for themselves), and no rule hands out `*`.
+`/assets/`, `/fonts/` and `/api/` (the og and
+csp-report functions answer for themselves; the Base44 rewrite was removed 2026-10-29, Base44 exit B1 task 4), and no rule hands out `*`.
 `public/.well-known/security.txt` exists with a contact on the site's domain,
 a canonical address, and an `Expires` in the future and at most a year out.
 That case fails once the date passes, on purpose: renew the file a year ahead.

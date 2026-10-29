@@ -1676,7 +1676,7 @@ The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). 
 | UNIT-AGY-006..009 | "%s goes to member-admin as the person" | `setRole`, `remove`, `leave`, `transferOwnership` → `member-admin` with the op's body and the bearer |
 | UNIT-AGY-010 | "says the function's refusal in its own words, and asks nothing without a session" | `last_owner`'s Hebrew; no call without a token |
 | UNIT-SLA-DOC-001 | "asks claim-document-link, as the person, for this lead's document" | `{ leadId, path }` with the bearer; the returned URL |
-| UNIT-SLA-DOC-002 | "returns a Base44 file URL unchanged, asking nobody" | No call |
+| UNIT-SLA-DOC-002 | "a document ref outside claim-documents is refused" | Throws `לא ניתן לפתוח את המסמך`; no call (was: a Base44 file URL returned unchanged, retired 2026-10-29, Base44 exit B1 task 4) |
 | UNIT-SLA-DOC-003 | "says the function's own refusal — another User's lead, or a document not on it" | The Hebrew refusal |
 | UNIT-SLA-DOC-004 | "asks nothing without a session" | `נדרשת התחברות` |
 | UNIT-SLA-ASG-001 | "assigns through assign-lead, and back to the queue with null" | `{ leadId, userId }`, then `userId: null` |

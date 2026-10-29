@@ -26,6 +26,10 @@ function functionFiles(dir = "api"): string[] {
 }
 
 describe("Vercel functions under api/", () => {
+  it("no rewrite or header names a base44.app host", () => {
+    expect(JSON.stringify(vercelConfig)).not.toMatch(/base44\.app/);
+  });
+
   it("have fixed paths — the catch-all rewrites shadow dynamic ones", () => {
     const dynamic = functionFiles().filter((f) => /\[[^\]]+\]/.test(f));
     expect(dynamic, "a [segment] in a function path is never reached").toEqual([]);
