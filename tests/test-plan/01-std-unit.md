@@ -1001,9 +1001,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHADAPTER-025 | "fails, not 'still processing', when the window ends with no answer at all" | Every status request fails: `AgentUnavailableError` |
 | UNIT-CHADAPTER-021 | "recovers a first message too: it asks about turn 1 of the conversation it named" | Status request `{conversationId, token, status: true, turn: 1}`; the reply is shown, not a failure (review 2026-10-15, item 12) |
 | UNIT-CHADAPTER-024 | "stops asking at once when the first message never opened the conversation" | A 403 status answer ends recovery: two requests in all, `AgentUnavailableError` |
-| UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |
-| UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
-| UNIT-CHROUTE-003 | "hands the page's abort signal to the adapter that sends (review 2026-10-15)" | `send(conv, "1", { signal })` reaches the chat port with the same options |
+| UNIT-CHROUTE-001 | (retired 2026-10-29, Base44 exit B1 task 1: `RoutedAgentService` is deleted; every agent is on the chat function, UNIT-WIRING-004) | — |
+| UNIT-CHROUTE-002 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHROUTE-001; without Supabase the agents are `UnconfiguredAgentService`, UNIT-WIRING-009) | — |
+| UNIT-CHROUTE-003 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHROUTE-001; the signal reaches `SupabaseAgentService` directly, UNIT-CHADAPTER-026) | — |
 | UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
 | UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
 | UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | an unknown agent is dropped from `some_other_agent,needs_interview`; `needs_interview` stays |
@@ -1017,8 +1017,8 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHCONFIG-011 | "is the procedures chat's own for the procedures chat: its three points and the v6 fourth" | `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS`: `PROCEDURES_CONSENT_POINTS[0..2]` and the FAQ chat's v6 fourth; never the interview's first point or "מתאם פגישה" |
 | UNIT-CHCONFIG-012 | "may serve the blog recommender from the function, but only when VITE_CHAT_AGENTS names it" | `blog_recommender` in `CHAT_FUNCTION_AGENTS`; read when named; none without Supabase |
 | UNIT-CHCONFIG-013 | "is the adviser's two lines and the v6 line, never the interview's" | `CHAT_FUNCTION_BLOG_CONSENT_POINTS` = the two approved lines + the FAQ chat's v6 fourth |
-| UNIT-CHWIRE-001 | "sends the named agent to the chat function and every other agent to Base44" | With `VITE_CHAT_AGENTS=needs_interview`, the composed `services.agents` start/send/subscribe for it reach the Supabase `chat` invoke and never Base44; `support_agent` reaches Base44 and never `chat` (Ruling 8) |
-| UNIT-CHWIRE-002 | "sends every agent to Base44 when the switch is empty" | With `VITE_CHAT_AGENTS` empty, `needs_interview` goes to Base44 and `chat` is never invoked (Ruling 8) |
+| UNIT-CHWIRE-001 | (retired 2026-10-29, Base44 exit B1 task 1: no Base44 agent adapter is wired; `services.agents` is `SupabaseAgentService`, UNIT-WIRING-004) | — |
+| UNIT-CHWIRE-002 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHWIRE-001) | — |
 
 `SupabaseLeadAdminService.transcript` and `.transcriptLeadIds` (`tests/unit/supabase-lead-admin.test.ts`) read `chat_conversations` and `chat_messages` under the admin's session; Ruling 11 means the linked lead may be the interview lead or the hand-off lead.
 
@@ -1258,7 +1258,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKCFG-008 | "sends people to the clearinghouse operator over https" | Both URLs on `https://www.swiftness.co.il/` |
 | UNIT-MSKCFG-009 | "agrees with the Edge switch for every input, so the site and the functions cannot disagree" | `isMaslekaOn` equals `maslekaEnabled` over true, " true ", TRUE, 1, "", unset |
 | UNIT-LAZY-007 | "loads the composition root on its first call and delegates to it" | `services.masleka.myRole()` reaches the root once |
-| UNIT-WIRING-001 | "falls back to Base44 when Supabase is not configured" (extended) | `services.masleka` is `UnconfiguredMaslekaService` |
+| UNIT-WIRING-001 | (retired 2026-10-29, Base44 exit B1 task 1: no Base44 fallback; the stand-ins, `UnconfiguredMaslekaService` included, are UNIT-WIRING-007) | — |
 | UNIT-WIRING-002 | "uses the Supabase clearinghouse adapter only when the switch is on and a client exists" | `SupabaseMaslekaService` |
 | UNIT-WIRING-003 | "ships dark: with the switch off and a client, no masleka-* function or staff RPC is ever called" | Unconfigured adapter; zero `functions.invoke` and zero `rpc` calls |
 
@@ -1894,3 +1894,23 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4. The tab'
 | UNIT-POR-005 | "another agency without a photo gets a monogram" | Monogram, not Dorit's picture |
 | UNIT-POR-006 | "a photo path with no storage base falls back to the monogram" | Monogram |
 | UNIT-POR-007 | "initials are the first letters of the first two words; the base needs a URL" | Initials; a non-URL base refused |
+
+### 4.81 The composition root wires Supabase alone — `tests/unit/services-wiring.test.ts`, `tests/unit/supabase-lead.test.ts`
+
+Base44 exit B1, task 1 (2026-10-29). `src/services/composition.ts` picks one adapter per port: Supabase's when a client exists, else an `Unconfigured*` stand-in that reads empty and refuses writes with "אין חיבור למאגר.", so a build without credentials still starts. The switches `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`, `VITE_UPLOAD_PROVIDER` and `VITE_CONTENT_IMAGES` are gone; `SupabaseLeadService` takes the functions client alone and sends every lead and interview to `submit-lead`. `LeadPort.requestConsultationEvent` is gone (calendar holds are `submit-lead`'s).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-WIRING-004 | "wires every port to its Supabase adapter" | `content` `SupabaseContentService`, `leads` `SupabaseLeadService`, `support` `SupabaseSupportService`, `uploads` `SupabaseImageUploadService`, `claimDocuments` `SupabaseUploadService`, `contentAdmin` `EdgeContentAdminService`, `leadsAdmin` `SupabaseLeadAdminService`, `agents` `SupabaseAgentService` |
+| UNIT-WIRING-005 | "sends a lead to submit-lead, which fills in interviews" | `functions.invoke("submit-lead", …)`; `updatesInterviews === true` |
+| UNIT-WIRING-006 | "reads the admin's articles from the table, drafts included" | A `blog_posts` read with no `eq` filter |
+| UNIT-WIRING-007 | "gives every port its stand-in" | Each of the ports in UNIT-WIRING-004 is its `Unconfigured*` stand-in (both upload ports `UnconfiguredUploadService`); `masleka` `UnconfiguredMaslekaService` |
+| UNIT-WIRING-008 | "reads nothing and refuses every write" | Lead submissions reject "אין חיבור למאגר."; `updatesInterviews` falsy; content lists `[]`; `getArticle` rejects with `status: 404`; uploads and content-admin writes reject; content-admin lists `[]` |
+| UNIT-WIRING-009 | "tells the chat panel the agent is unavailable" | `start` and `send` reject with `AgentUnavailableError`; `subscribe` returns a harmless unsubscribe |
+| UNIT-WIRING-010 | "still hands a visitor who asked for a person the direct channels" | `escalate` resolves `ok: false` with the fallback contact — never rejects |
+| UNIT-WIRING-011 | "answers the admin's lead screens empty and refuses their writes" | Lists `[]`, `briefing` `null`, counts `0`; status, delete, merge, note, briefing, assignment, document link and meeting-request writes reject "אין חיבור למאגר." |
+| UNIT-WIRING-012 | "keeps the Supabase-only ports on their stand-ins" | `campaigns` and `onboarding` read empty and refuse writes; `agencyContent` rejects `AgencyContentError` |
+| UNIT-SBLEAD-001 | "sends a lead to submit-lead" | `invoke("submit-lead", { body: leadBody(lead) })` |
+| UNIT-SBLEAD-002 | "sends an interview to submit-lead" | `invoke("submit-lead", { body: interviewBody(summary) })` |
+| UNIT-SBLEAD-003 | "throws with the function's message and rid when submit-lead refuses, and does not retry" | `submit-lead failed: נדרשים שם וטלפון (rid ab12)`; `invoke` called once |
+| UNIT-SBLEAD-004 | "fills in an interview's just-saved lead" | `updatesInterviews === true` |

@@ -41,10 +41,6 @@ describe("the e2e build", () => {
     // side runs in every spec and e2e/ui/agency-content.spec.ts can hold the
     // seeded render to the bundled one; the production smoke covers it off.
     expect(E2E_BUILD_ENV).toMatchObject({
-      VITE_LEAD_FUNCTIONS: "supabase",
-      VITE_CONTENT_WRITES: "supabase",
-      VITE_UPLOAD_PROVIDER: "supabase",
-      VITE_CONTENT_IMAGES: "supabase",
       VITE_MEETINGS_STAFF: "true",
       VITE_MASLEKA_ENABLED: "",
       VITE_MEETINGS_CLIENT: "",

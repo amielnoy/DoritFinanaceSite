@@ -61,7 +61,6 @@ export const servicesMock = {
   leads: port<LeadPort>({
     submitLead: async () => ({ ok: true }),
     submitClaim: async () => ({ ok: true }),
-    requestConsultationEvent: async () => {},
     submitInterview: async () => ({ ok: true }),
   }),
   content: port<ContentPort>({

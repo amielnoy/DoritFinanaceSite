@@ -5,23 +5,11 @@ import { tableFake } from "../helpers/supabase-table-fake";
  * Which adapter the composition root (`@/services/composition`) picks, with and
  * without a Supabase client.
  *
- * Each case re-imports `@/services` under its own mocks, because the choice is
- * made once, at module load.
+ * Each case re-imports the composition root under its own mock, because the
+ * choice is made once, at module load.
  */
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
-
-const base44Fake = () => {
-  const blogList = vi.fn(async () => []);
-  const entities = new Proxy(
-    {},
-    { get: () => ({ list: blogList, filter: vi.fn(async () => []), get: vi.fn(async () => ({})) }) },
-  );
-  return { client: { entities, functions: { invoke: vi.fn(), fetch: vi.fn() } }, blogList };
-};
-
-async function load(supabase: unknown, base44: unknown) {
+async function load(supabase: unknown) {
   vi.resetModules();
-  vi.doMock("@/api/base44Client", () => ({ base44 }));
   vi.doMock("@/api/supabaseClient", () => ({ supabase }));
   // The composition root, not `@/services`: that is a lazy front which loads
   // this module on a port's first real call (see src/services/index.ts).
@@ -29,71 +17,173 @@ async function load(supabase: unknown, base44: unknown) {
   return {
     services,
     SupabaseContentService: (await import("@/services/supabase/SupabaseContentService")).SupabaseContentService,
-    SupabaseLeadAdminService: (await import("@/services/supabase/SupabaseLeadAdminService")).SupabaseLeadAdminService,
-    Base44ContentService: (await import("@/services/base44/Base44ContentService")).Base44ContentService,
-    Base44LeadAdminService: (await import("@/services/base44/Base44LeadAdminService")).Base44LeadAdminService,
     SupabaseLeadService: (await import("@/services/supabase/SupabaseLeadService")).SupabaseLeadService,
-    Base44LeadService: (await import("@/services/base44/Base44LeadService")).Base44LeadService,
+    SupabaseSupportService: (await import("@/services/supabase/SupabaseSupportService")).SupabaseSupportService,
+    SupabaseImageUploadService: (await import("@/services/supabase/SupabaseImageUploadService")).SupabaseImageUploadService,
+    SupabaseUploadService: (await import("@/services/supabase/SupabaseUploadService")).SupabaseUploadService,
+    EdgeContentAdminService: (await import("@/services/supabase/EdgeContentAdminService")).EdgeContentAdminService,
+    SupabaseLeadAdminService: (await import("@/services/supabase/SupabaseLeadAdminService")).SupabaseLeadAdminService,
+    SupabaseAgentService: (await import("@/services/supabase/SupabaseAgentService")).SupabaseAgentService,
     SupabaseMaslekaService: (await import("@/services/supabase/SupabaseMaslekaService")).SupabaseMaslekaService,
+    UnconfiguredContentService: (await import("@/services/unconfigured/UnconfiguredContentService")).UnconfiguredContentService,
+    UnconfiguredLeadService: (await import("@/services/unconfigured/UnconfiguredLeadService")).UnconfiguredLeadService,
+    UnconfiguredSupportService: (await import("@/services/unconfigured/UnconfiguredSupportService")).UnconfiguredSupportService,
+    UnconfiguredUploadService: (await import("@/services/unconfigured/UnconfiguredUploadService")).UnconfiguredUploadService,
+    UnconfiguredContentAdminService: (await import("@/services/unconfigured/UnconfiguredContentAdminService")).UnconfiguredContentAdminService,
+    UnconfiguredLeadAdminService: (await import("@/services/unconfigured/UnconfiguredLeadAdminService")).UnconfiguredLeadAdminService,
+    UnconfiguredAgentService: (await import("@/services/unconfigured/UnconfiguredAgentService")).UnconfiguredAgentService,
     UnconfiguredMaslekaService: (await import("@/services/unconfigured/UnconfiguredMaslekaService")).UnconfiguredMaslekaService,
+    AgentUnavailableError: (await import("@/services/agent-errors")).AgentUnavailableError,
   };
 }
+
+/** A Supabase client with every surface the ports are built from at load time. */
+const supabaseFake = () => {
+  const fake = tableFake({ data: [], error: null });
+  return {
+    fake,
+    client: {
+      ...fake.client,
+      auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
+      storage: { from: () => ({}) },
+      rpc: vi.fn(async () => ({ data: [], error: null })),
+      functions: { invoke: vi.fn(async () => ({ data: { ok: true }, error: null })) },
+    },
+  };
+};
+
+const LEAD = { name: "דנה", phone: "0501234567", source: "consultation" as const };
+const NO_DATABASE = "אין חיבור למאגר.";
 
 describe("composition root", () => {
   beforeEach(() => vi.restoreAllMocks());
   afterEach(() => vi.unstubAllEnvs());
 
-  it("reads content and leads from Supabase when a client is configured", async () => {
-    const fake = tableFake({ data: [], error: null });
-    // Only `from` is exercised; `auth` and `storage` are there because other
-    // ports are built from the same client at load time.
-    const supabase = {
-      ...fake.client,
-      auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
-      storage: { from: () => ({}) },
-      rpc: async () => ({ data: [], error: null }),
-      functions: { invoke: vi.fn() },
-    };
-    const m = await load(supabase, base44Fake().client);
-    expect(m.services.content).toBeInstanceOf(m.SupabaseContentService);
-    expect(m.services.leadsAdmin).toBeInstanceOf(m.SupabaseLeadAdminService);
-    expect(m.services.leads).toBeInstanceOf(m.SupabaseLeadService);
+  describe("with a Supabase client", () => {
+    it("wires every port to its Supabase adapter", async () => {
+      const m = await load(supabaseFake().client);
+      expect(m.services.content).toBeInstanceOf(m.SupabaseContentService);
+      expect(m.services.leads).toBeInstanceOf(m.SupabaseLeadService);
+      expect(m.services.support).toBeInstanceOf(m.SupabaseSupportService);
+      expect(m.services.uploads).toBeInstanceOf(m.SupabaseImageUploadService);
+      expect(m.services.claimDocuments).toBeInstanceOf(m.SupabaseUploadService);
+      expect(m.services.contentAdmin).toBeInstanceOf(m.EdgeContentAdminService);
+      expect(m.services.leadsAdmin).toBeInstanceOf(m.SupabaseLeadAdminService);
+      expect(m.services.agents).toBeInstanceOf(m.SupabaseAgentService);
+    });
 
-    await m.services.contentAdmin.listArticles();
-    expect(fake.calls).toContainEqual(["from", "blog_posts"]);
-    expect(fake.calls.filter((c) => c[0] === "eq")).toEqual([]); // admin list: drafts included
+    it("sends a lead to submit-lead, which fills in interviews", async () => {
+      const supabase = supabaseFake().client;
+      const m = await load(supabase);
+      await m.services.leads.submitLead(LEAD);
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("submit-lead", expect.anything());
+      expect(m.services.leads.updatesInterviews).toBe(true);
+    });
+
+    it("reads the admin's articles from the table, drafts included", async () => {
+      const { fake, client } = supabaseFake();
+      const m = await load(client);
+      await m.services.contentAdmin.listArticles();
+      expect(fake.calls).toContainEqual(["from", "blog_posts"]);
+      expect(fake.calls.filter((c) => c[0] === "eq")).toEqual([]);
+    });
   });
 
-  it("falls back to Base44 when Supabase is not configured", async () => {
-    const b = base44Fake();
-    const m = await load(null, b.client);
-    expect(m.services.content).toBeInstanceOf(m.Base44ContentService);
-    expect(m.services.leadsAdmin).toBeInstanceOf(m.Base44LeadAdminService);
-    expect(m.services.leads).toBeInstanceOf(m.Base44LeadService);
-    expect(m.services.masleka).toBeInstanceOf(m.UnconfiguredMaslekaService);
+  describe("without one", () => {
+    it("gives every port its stand-in", async () => {
+      const m = await load(null);
+      expect(m.services.content).toBeInstanceOf(m.UnconfiguredContentService);
+      expect(m.services.leads).toBeInstanceOf(m.UnconfiguredLeadService);
+      expect(m.services.support).toBeInstanceOf(m.UnconfiguredSupportService);
+      expect(m.services.uploads).toBeInstanceOf(m.UnconfiguredUploadService);
+      expect(m.services.claimDocuments).toBeInstanceOf(m.UnconfiguredUploadService);
+      expect(m.services.contentAdmin).toBeInstanceOf(m.UnconfiguredContentAdminService);
+      expect(m.services.leadsAdmin).toBeInstanceOf(m.UnconfiguredLeadAdminService);
+      expect(m.services.agents).toBeInstanceOf(m.UnconfiguredAgentService);
+      expect(m.services.masleka).toBeInstanceOf(m.UnconfiguredMaslekaService);
+    });
 
-    await m.services.contentAdmin.listArticles();
-    expect(b.blogList).toHaveBeenCalled();
+    it("reads nothing and refuses every write", async () => {
+      const { services } = await load(null);
+      await expect(services.leads.submitLead(LEAD)).rejects.toThrow(NO_DATABASE);
+      await expect(services.leads.submitClaim({ name: "a", phone: "050" })).rejects.toThrow(NO_DATABASE);
+      await expect(services.leads.submitInterview({ name: "a", phone: "050" })).rejects.toThrow(NO_DATABASE);
+      expect(services.leads.updatesInterviews).toBeFalsy();
+      await expect(services.content.listArticles()).resolves.toEqual([]);
+      await expect(services.content.listTestimonials()).resolves.toEqual([]);
+      await expect(services.content.getArticle("a-slug")).rejects.toMatchObject({ status: 404 });
+      await expect(services.uploads.upload(new File(["x"], "a.png"))).rejects.toThrow(NO_DATABASE);
+      await expect(services.claimDocuments.upload(new File(["x"], "a.pdf"))).rejects.toThrow(NO_DATABASE);
+      await expect(services.contentAdmin.listArticles()).resolves.toEqual([]);
+      await expect(services.contentAdmin.listTestimonials()).resolves.toEqual([]);
+      await expect(services.contentAdmin.createArticle({ title: "t", body: "b", published: false })).rejects.toThrow(NO_DATABASE);
+      await expect(services.contentAdmin.removeTestimonial("t1")).rejects.toThrow(NO_DATABASE);
+    });
+
+    it("still hands a visitor who asked for a person the direct channels", async () => {
+      const { services } = await load(null);
+      const receipt = await services.support.escalate({ reason: "user_request", summary: "רוצה לדבר עם דורית" });
+      expect(receipt.ok).toBe(false);
+      expect(receipt.contact.phoneE164).toBeTruthy();
+    });
+
+    it("answers the admin's lead screens empty and refuses their writes", async () => {
+      const { services } = await load(null);
+      const admin = services.leadsAdmin;
+      await expect(admin.list()).resolves.toEqual([]);
+      await expect(admin.leadEvents("l1")).resolves.toEqual([]);
+      await expect(admin.briefing("l1")).resolves.toBeNull();
+      await expect(admin.transcript("l1")).resolves.toEqual([]);
+      await expect(admin.transcriptLeadIds()).resolves.toEqual([]);
+      await expect(admin.meetings("l1")).resolves.toEqual([]);
+      await expect(admin.agencyMeetings("a1")).resolves.toEqual([]);
+      await expect(admin.countNew()).resolves.toBe(0);
+      await expect(admin.countUnassigned()).resolves.toBe(0);
+      await expect(admin.countOpenMeetingRequests()).resolves.toBe(0);
+      await expect(admin.setStatus("l1", "contacted")).rejects.toThrow(NO_DATABASE);
+      await expect(admin.remove("l1")).rejects.toThrow(NO_DATABASE);
+      await expect(admin.mergeLeads("l1", ["l2"])).rejects.toThrow(NO_DATABASE);
+      await expect(admin.addLeadNote("l1", "note")).rejects.toThrow(NO_DATABASE);
+      await expect(admin.generateBriefing("l1")).rejects.toThrow(NO_DATABASE);
+      await expect(admin.assign("l1", null)).rejects.toThrow(NO_DATABASE);
+      await expect(admin.documentLink("ref", "l1")).rejects.toThrow(NO_DATABASE);
+      await expect(admin.handleMeetingRequest("r1")).rejects.toThrow(NO_DATABASE);
+    });
+
+    it("tells the chat panel the agent is unavailable", async () => {
+      const m = await load(null);
+      await expect(m.services.agents.start("needs_interview")).rejects.toBeInstanceOf(m.AgentUnavailableError);
+      await expect(m.services.agents.send({ id: "c1" }, "היי")).rejects.toBeInstanceOf(m.AgentUnavailableError);
+      expect(() => m.services.agents.subscribe("c1", () => undefined)()).not.toThrow();
+    });
+
+    it("keeps the Supabase-only ports on their stand-ins", async () => {
+      const { services } = await load(null);
+      await expect(services.campaigns.list("a1")).resolves.toEqual([]);
+      await expect(services.campaigns.create({ agencyId: "a1", name: "n", message: "m" })).rejects.toThrow(NO_DATABASE);
+      await expect(services.onboarding.listInProgress()).resolves.toEqual([]);
+      await expect(services.onboarding.role("a1")).resolves.toBeNull();
+      await expect(services.onboarding.load("a1")).rejects.toThrow(NO_DATABASE);
+      await expect(services.agencyContent.siteContent("example.co.il")).rejects.toMatchObject({ name: "AgencyContentError" });
+      await expect(services.agencyContent.successCases("a1")).rejects.toMatchObject({ name: "AgencyContentError" });
+    });
   });
 
   const maslekaSupabase = () => ({
-    ...tableFake({ data: [], error: null }).client,
-    auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
-    storage: { from: () => ({}) },
+    ...supabaseFake().client,
     rpc: vi.fn(async () => ({ data: "staff", error: null })),
-    functions: { invoke: vi.fn(async () => ({ data: { ok: true }, error: null })) },
   });
 
   it("uses the Supabase clearinghouse adapter only when the switch is on and a client exists", async () => {
     vi.stubEnv("VITE_MASLEKA_ENABLED", "true");
-    const m = await load(maslekaSupabase(), base44Fake().client);
+    const m = await load(maslekaSupabase());
     expect(m.services.masleka).toBeInstanceOf(m.SupabaseMaslekaService);
   });
 
   it("ships dark: with the switch off and a client, no masleka-* function or staff RPC is ever called", async () => {
     vi.stubEnv("VITE_MASLEKA_ENABLED", "");
     const supabase = maslekaSupabase();
-    const m = await load(supabase, base44Fake().client);
+    const m = await load(supabase);
     expect(m.services.masleka).toBeInstanceOf(m.UnconfiguredMaslekaService);
     const port = m.services.masleka;
     await port.submitCode("t", "c", "i").catch(() => {});
@@ -104,100 +194,5 @@ describe("composition root", () => {
     await port.markSubmitted("r").catch(() => {});
     expect(supabase.functions.invoke).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalled();
-  });
-
-  describe("the content-writes switch (VITE_CONTENT_WRITES)", () => {
-    afterEach(() => vi.unstubAllEnvs());
-
-    const supabaseFake = () => ({
-      ...tableFake({ data: [], error: null }).client,
-      auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
-      storage: { from: () => ({}) },
-      rpc: async () => ({ data: [], error: null }),
-      functions: { invoke: vi.fn() },
-    });
-
-    it("writes through Base44's contentAdmin by default", async () => {
-      const m = await load(supabaseFake(), base44Fake().client);
-      const { FunctionContentAdminService } = await import("@/services/base44/FunctionContentAdminService");
-      expect(m.services.contentAdmin).toBeInstanceOf(FunctionContentAdminService);
-    });
-
-    it("writes through the content-admin Edge Function when switched to supabase", async () => {
-      vi.stubEnv("VITE_CONTENT_WRITES", "supabase");
-      const m = await load(supabaseFake(), base44Fake().client);
-      const { EdgeContentAdminService } = await import("@/services/supabase/EdgeContentAdminService");
-      expect(m.services.contentAdmin).toBeInstanceOf(EdgeContentAdminService);
-    });
-
-    it("stays on Base44 when switched on without a Supabase client", async () => {
-      vi.stubEnv("VITE_CONTENT_WRITES", "supabase");
-      const m = await load(null, base44Fake().client);
-      const { FunctionContentAdminService } = await import("@/services/base44/FunctionContentAdminService");
-      expect(m.services.contentAdmin).toBeInstanceOf(FunctionContentAdminService);
-    });
-  });
-
-  describe("the chat switch (VITE_CHAT_AGENTS)", () => {
-    afterEach(() => vi.unstubAllEnvs());
-
-    const supabaseFake = () => ({
-      ...tableFake({ data: [], error: null }).client,
-      auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) },
-      storage: { from: () => ({}) },
-      rpc: async () => ({ data: [], error: null }),
-      functions: { invoke: vi.fn(async () => ({ data: { ok: true, conversationId: "srv", token: "t".repeat(64), reply: "שלום" }, error: null })) },
-    });
-    const base44WithAgents = () => {
-      const agents = {
-        createConversation: vi.fn(async () => ({ id: "b44-1" })),
-        getConversation: vi.fn(async (id: string) => ({ id })),
-        addMessage: vi.fn(async () => undefined),
-        subscribeToConversation: vi.fn(() => () => undefined),
-      };
-      return { ...base44Fake().client, agents };
-    };
-    const META = { consent_version: "v6", consent_at: "2026-10-13T09:00:00.000Z" };
-
-    it("sends the named agent to the chat function and every other agent to Base44", async () => {
-      vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
-      vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_x");
-      vi.stubEnv("VITE_CHAT_AGENTS", "needs_interview");
-      const supabase = supabaseFake();
-      const b44 = base44WithAgents();
-      const { services } = await load(supabase, b44);
-
-      const interview = await services.agents.start("needs_interview", META);
-      await services.agents.send(interview, "היי");
-      services.agents.subscribe(interview.id, () => undefined);
-      expect(supabase.functions.invoke).toHaveBeenCalledWith("chat", expect.objectContaining({ body: expect.objectContaining({ agent: "needs_interview", message: "היי" }) }));
-      expect(b44.agents.createConversation).not.toHaveBeenCalled();
-      expect(b44.agents.addMessage).not.toHaveBeenCalled();
-      expect(b44.agents.subscribeToConversation).not.toHaveBeenCalled();
-
-      supabase.functions.invoke.mockClear();
-      const support = await services.agents.start("support_agent");
-      await services.agents.send(support, "שלום");
-      services.agents.subscribe(support.id, () => undefined);
-      expect(b44.agents.createConversation).toHaveBeenCalledTimes(1);
-      expect(b44.agents.addMessage).toHaveBeenCalledTimes(1);
-      expect(b44.agents.subscribeToConversation).toHaveBeenCalledTimes(1);
-      expect(supabase.functions.invoke).not.toHaveBeenCalled();
-    });
-
-    it("sends every agent to Base44 when the switch is empty", async () => {
-      vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
-      vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_x");
-      vi.stubEnv("VITE_CHAT_AGENTS", "");
-      const supabase = supabaseFake();
-      const b44 = base44WithAgents();
-      const { services } = await load(supabase, b44);
-
-      const interview = await services.agents.start("needs_interview", META);
-      await services.agents.send(interview, "היי");
-      expect(b44.agents.createConversation).toHaveBeenCalledTimes(1);
-      expect(b44.agents.addMessage).toHaveBeenCalledTimes(1);
-      expect(supabase.functions.invoke).not.toHaveBeenCalled();
-    });
   });
 });
