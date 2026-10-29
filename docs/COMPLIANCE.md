@@ -12,9 +12,9 @@
 | סוכן | תפקיד | כלים |
 |---|---|---|
 | `needs_interview` | ראיון היכרות בסכימה קבועה לפי מסלול שנגזר מהיעד, וקביעת הפגישה עצמה | `submitLead`, `escalateToHuman` |
-| `blog_recommender` | הפניה למאמרים מהבלוג | `BlogPost.read`, `escalateToHuman` |
-| `support_agent` | מענה על שאלות כלליות מתוך התוכן שפורסם, בצ׳אט החופשי ב-`/faq` | `BlogPost.read`, `logSupportChat`, `escalateToHuman` |
-| `procedures_agent` | הסבר תהליך: איך קוראים גמל נט ופנסיה נט, ומה דרוש לשליפה מהמסלקה — בתחתית `/tools` | `BlogPost.read`, `logSupportChat`, `escalateToHuman` |
+| `blog_recommender` | הפניה למאמרים מהבלוג | `listArticles`, `readArticle`, `recommendArticles`, `escalateToHuman` |
+| `support_agent` | מענה על שאלות כלליות מתוך התוכן שפורסם, בצ׳אט החופשי ב-`/faq` | `listArticles`, `readArticle`, `escalateToHuman` (את שורת הגיליון כותב ה-sweep, לא המודל) |
+| `procedures_agent` | הסבר תהליך: איך קוראים גמל נט ופנסיה נט, ומה דרוש לשליפה מהמסלקה — בתחתית `/tools` | `listArticles`, `readArticle`, `escalateToHuman` (את שורת הגיליון כותב ה-sweep, לא המודל) |
 
 `booking_assistant` היה סוכן נוסף ואינו קיים עוד: תיאום הפגישה אינו מטלה נפרדת
 מהראיון שקדם לו, והמבקר פגש צ׳אט שני ששאל אותו שוב לשמו. הראיון סוגר את הפגישה
@@ -373,7 +373,7 @@ says").** נוסח השיווק באתר הוצמד לגילוי הנאות:
    `tests/contract/slogan.contract.test.ts` נכשל אם הסלוגן הישן מופיע שוב בכל מה שהאתר שולח.
 3. **"ייעוץ" כשם לשירות נשאר מחוץ ל-`src/`:** בתבניות המייל ובהודעות
    (`submitLead`: "בקשת ייעוץ", "תחום ייעוץ", "קיבלנו את בקשת הייעוץ"),
-   באירוע היומן ש-`createConsultationEvent` כותבת ("ייעוץ חדש"), ב-
+   בכותרת הפנייה ש-`submit-lead` שולחת ("בקשת ייעוץ חדשה"), ב-
    `public/manifest.json` ("ייעוץ ביטוחי ופיננסי אישי") ובתווית המנהל
    `consultation` ב-`src/pages/Leads.tsx`. הנוסח שנשאר בתוך `src/` הוא בעיקר
    הצהרות שלילה ("אינו נותן ייעוץ") — אלה מתאימות לגילוי. הרשימה נמצאת ב-

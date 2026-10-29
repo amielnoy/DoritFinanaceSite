@@ -309,14 +309,10 @@ would have migrated her account and taken normal WhatsApp off her phone.
 Resolved by removing the channel rather than the number: the agent answers in
 the free chat on `/faq` only, and its prompt now hands over *every* channel
 `escalateToHuman` returns, WhatsApp included, because a human answers on all
-three. A contract case pins that inversion, and another pins that no agent holds
-`upsertContact`.
-
-**What stays built:** the `Contact` entity, `upsertContact` and their seventeen
-integration cases. They are dormant, not dead — they exist for a channel that
-delivers a phone number with the message, and re-enabling one means adding a
-separate number, wiring the tool back to the agent, and deciding how the saving
-is disclosed on a channel with no consent screen.
+three. A contract case pins that inversion, and another pins that no agent's
+prompt offers `upsertContact`. (The `Contact` entity and `upsertContact` were
+deleted with the Base44 functions; a channel that delivers a phone number would
+need a new store and its own disclosure.)
 
 ### B-10 · The Resend sending domain had no DNS records, so no mail could leave
 
@@ -397,25 +393,8 @@ no hits anywhere in the repo outside that comment, so the trade-off has never
 been recorded, let alone accepted. That is what makes this a finding rather than
 a documented decision.
 
-The caps are also weaker than they read. `private turns = new Map()` is
-module-instance memory in one browser tab: a reload resets it, and a request
-made outside the browser never sees it at all.
-
-What this does **not** change is reachability. `submitLead` and
-`createConsultationEvent` were already invoked anonymously from the browser by
-`Base44LeadService` and `QuickContact`, `Lead`'s RLS already allows `create`,
-and `API-LIV-004` asserts the consultation function answers anonymous callers by
-design. Re-opening the agents (A-42) added no endpoint that `curl` could not
-already reach; the agent is a slower, more expensive path to the same writes.
-
-What *is* newly live is anonymous model inference on a public endpoint, and the
-6-hour interview dedup is keyed on the phone number, so varying it defeats the
-one limit that exists. The exposure worth pricing is `createConsultationEvent`,
-which writes to a real person's calendar.
-
-Closing it: a `RateLimit` row keyed on a hashed IP and hour, checked in
-`submitLead` and `createConsultationEvent` — roughly twenty lines per function,
-hand-duplicated per the convention in `AGENTS.md` and pinned by
-`agents.contract.test.ts` like every other duplicated helper. If only one gets a
-limit, it is the calendar one. Until then this entry is the record that the
-exposure is known.
+The caps were also weaker than they read: module-instance memory in one browser
+tab, reset by a reload and never seen by a request made outside the browser.
+The exposure worth pricing was `createConsultationEvent`, which wrote to a real
+person's calendar from an anonymous call; the proposed fix was a per-IP, per-hour
+limit in each function. The Edge Functions now carry that limit (`allow_submission`).

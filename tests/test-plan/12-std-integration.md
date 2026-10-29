@@ -42,13 +42,10 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 
 | Function | Where it is called from |
 |---|---|
-| `submitLead` | every form on the site, and the interview agent |
-| `escalateToHuman` | all three on-site agents |
-| `submitClaim` | the claims form |
-| `submit-claim` (Edge) | a claim, saved to Supabase and announced |
-| `submit-lead` / `escalate-to-human` / `log-support-chat` (Edge) | every form, the interview and handoff agents, and the support agent |
+| `submit-claim` (Edge) | the claims form: a claim, saved to Supabase and announced |
+| `submit-lead` / `escalate-to-human` (Edge) | every form, and the chat's `submitLead` and `escalateToHuman` tools |
+| `log-support-chat` (Edge) | the chat function's sweep, once per closed support or procedures conversation |
 | `upsertContact` | (retired 2026-10-29, Base44 exit B2 task 7) |
-| `logSupportChat` | the support agent, at the end of every conversation |
 | `adminLead` | (retired 2026-10-29, Base44 exit B2 task 7) |
 | `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
@@ -488,21 +485,19 @@ agent is named, so a pattern is visible later.
 | INT-CONTACT-022 | (retired 2026-10-29, Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness) | — |
 | INT-CONTACT-023 | (retired 2026-10-29, Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness) | — |
 
-### 4.19 `logSupportChat` — what was actually asked — `INT-SUPPORT-001..012`
+### 4.19 `log-support-chat` — what was actually asked — `INT-SUPPORT-001..012`
 
-The event log records that someone got in touch and the contact list records who
-they are. Neither records the question, which is the only one of the three that
+The event log records that someone got in touch. It does not record the question, which is the only one of the three that
 can say what to write next or where the agent keeps stopping.
 
 Recording a conversation is also the most intrusive thing on this site, so most
 of these cases are about restraint: the transcript is redacted and capped, the
 outcome comes from a fixed list rather than being phrased freshly by the model
 each time, and a call carrying nothing to record is refused rather than writing
-an empty row. The phone column is normalised by the same function
-`upsertContact` uses. The site chat has no number, so today that column is
-always empty — it is pinned anyway, because two tabs of one spreadsheet
-normalised differently cannot be read together, and that would only surface long
-after this was written.
+an empty row. The phone column is normalised (`972…`, `050-…` and `+972 …` read
+as one number). The site chat has no number, so today that column is always
+empty — it is pinned anyway, so a channel that does carry one cannot write it in
+a second spelling.
 
 Failure is the point of the last three. The agent is told not to report this
 call to the visitor, so the function has to leave it nothing to report: a

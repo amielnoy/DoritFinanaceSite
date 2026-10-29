@@ -238,9 +238,10 @@ there is no profile yet; ask them to sign in once with Google, then run it again
 ### Lead functions on Supabase
 
 Enquiries, hand-offs and support-chat logs are the Supabase Edge Functions
-`submit-lead`, `escalate-to-human` and `log-support-chat` (the chat's tools
-`submitLead`, `escalateToHuman` and `logSupportChat` run them), with Google
-Calendar and Sheets reached through a service account.
+`submit-lead`, `escalate-to-human` and `log-support-chat`, with Google Calendar
+and Sheets reached through a service account. The chat's tools `submitLead` and
+`escalateToHuman` run the first two; the chat function's sweep runs
+`log-support-chat`.
 
 In **Supabase Edge Function secrets** (set by hand — the CI token cannot write
 secrets): `GOOGLE_SERVICE_ACCOUNT_JSON` (the service account's JSON key),
@@ -1024,25 +1025,16 @@ opposite way from what a WhatsApp agent would need: this one hands over *every*
 channel `escalateToHuman` returns, WhatsApp included, because a human answers on
 all three.
 
-Each conversation ends with one `logSupportChat` call. The event log says
-someone got in touch and the contact list says who they are; neither says what
-was actually asked, which is the only one of the three that tells Dorit what to
-write next or where the agent keeps stopping. The transcript passes through
-`redact()` and is capped — a limit of proportion rather than storage. The call
-is internal: the agent is told not to report it, not to wait for it, and a
-failed write answers `ok: true` with a warning so an internal fault never
-becomes the visitor's problem.
+Each closed support conversation gets one row in the sheet's Support tab,
+written by the chat function's sweep through `log-support-chat` — never by the
+model (see [The FAQ chat's sheet log](#the-faq-chats-sheet-log)). The event log
+says someone got in touch; it does not say what was actually asked, which is
+what tells Dorit what to write next or where the agent keeps stopping. The
+transcript passes through `redact()` and is capped — a limit of proportion
+rather than storage — and a failed write is logged, never shown to the visitor.
 
-`Contact` and `upsertContact` are **built, tested and dormant**. They exist for
-a channel that hands over a phone number with the message — one row per person
-rather than per enquiry, keyed on a normalised number so `972501234567`,
-`050-123-4567` and `+972 50 123 4567` cannot become three people. No agent is
-wired to them, and a contract test fails if one is: enabling that is a
-deliberate act of turning on a channel, which also means deciding how the saving
-is disclosed there.
-
-Three tabs on one spreadsheet: `Events` for what happened, `Contacts` for who
-(empty until the above is switched on), `Support` for what was asked. `SHEET_ID`
+Tabs on one spreadsheet: `Events` for what happened, `Support` for what was
+asked. `SHEET_ID`
 selects the spreadsheet and `SHEET_TAB`, `SHEET_TAB_CONTACTS` and
 `SHEET_TAB_SUPPORT` name the tabs. No `SHEET_ID`, and every writer skips
 silently — a deployment without a spreadsheet still takes enquiries.
