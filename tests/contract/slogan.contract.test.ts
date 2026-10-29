@@ -11,7 +11,7 @@ import { REPO_ROOT } from "../helpers/entity-schema";
  * backend functions, which that change did not reach, so every visitor kept
  * receiving the old line. This scans everything that ships, not just the site.
  */
-const SHIPPED = ["src", "base44", "public", "index.html", "dorit-mailer"];
+const SHIPPED = ["src", "supabase/functions", "public", "index.html", "dorit-mailer"];
 const TEXT = /\.(tsx?|jsx?|mjs|html|txt|md|json|jsonc|css)$/;
 
 function files(path: string): string[] {
@@ -38,7 +38,6 @@ describe("the slogan", () => {
 
   it("says the current one in the mails a visitor receives", () => {
     const sources = {
-      submitClaim: "base44/functions/submitClaim/entry.ts",
       // The visitor's copy of a lead is built here since submitLead became a forwarder.
       "submit-lead": "supabase/functions/_shared/html.ts",
     };

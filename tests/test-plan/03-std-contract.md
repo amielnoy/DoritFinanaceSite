@@ -7,31 +7,33 @@
 
 ## 1. Purpose
 
-Keep the frontend and the Base44 backend definitions from drifting apart. These
+Keep the frontend and the Supabase backend definitions from drifting apart. These
 tests do not restate the payloads: they **read the real call sites out of
-`src/`** and the **real schemas out of `base44/`**, so a renamed field, a new
-`source` value outside the entity enum, or a loosened RLS rule fails here rather
-than in production.
+`src/`** and the **real definitions out of `supabase/`** (migrations, Edge
+Functions and the chat prompts), so a renamed field, a new `source` value
+outside the table's check, or a reworded compliance clause fails here rather
+than in production. Nothing here reads the retired `base44/` folder any more
+(Base44 exit B2 task 6, 2026-10-29).
 
 ## 2. Test items
 
 | Item | Source |
 |---|---|
-| Entity schemas | `base44/entities/{BlogPost,Contact,Lead,Testimonial,User}.jsonc` |
-| Agent prompts | `base44/agents/{needs_interview,blog_recommender,support_agent}.jsonc` |
+| Table definitions | `supabase/migrations/*.sql` (the leads `source` check, the blog table's `action_time`) |
+| Agent prompts | `supabase/functions/chat/prompts/*.md`, assembled by `systemBlocks()` (compliance block, the agent's prompt, the agency profile) |
 | Published articles | `content/blog/*.md` |
-| Frontend write paths | `base44.entities.*.create/update/filter`, `integrations.Core.SendEmail` |
-| Backend functions | `base44/functions/{createConsultationEvent,escalateToHuman,upsertContact,logSupportChat}/entry.ts` |
-| Connectors | `base44/connectors/{googlecalendar,googlesheets}.jsonc` |
-| Function logging | every `base44/functions/*/entry.ts` and Edge Function (the nightly Base44 log archive and its credential gate were removed with the Base44 publish, 2026-10-17) |
+| Frontend write paths | the adapters' payload literals in `src/` |
+| Backend functions | `supabase/functions/{submit-lead,submit-claim,escalate-to-human,log-support-chat}` and the `_shared` modules they import |
+| Function logging | every Edge Function (the nightly Base44 log archive and its credential gate were removed with the Base44 publish, 2026-10-17) |
 
 ## 3. Approach
 
 Two helpers do the work:
 
-- `tests/helpers/entity-schema.ts` — loads the `.jsonc` entity definitions and
-  validates a payload against the JSON-Schema subset they use (type, required,
-  enum, minimum/maximum, no undeclared properties).
+- `tests/helpers/entity-schema.ts` — exports `REPO_ROOT` only. It used to load
+  the Base44 `.jsonc` entity definitions and validate payloads against them;
+  those readers (`loadEntity`, `entityNames`, `validateAgainstEntity`) and
+  `backendFiles()` in `source-scan.ts` were removed in Base44 exit B2 task 6.
 - `tests/helpers/source-scan.ts` — a balanced-brace scanner that extracts the
   object literal passed to a call matching a pattern, returning its top-level
   keys and string-literal values; `edgeSource()` reads an Edge function's
@@ -45,34 +47,36 @@ Two helpers do the work:
 
 ### 4.1 Entity definitions — `entities.contract.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B2 task 6: `entities.contract.test.ts` is deleted. It was entirely `base44/entities/*.jsonc`; the tables' shape and row-level security are pinned by the migrations' own checks and `supabase/tests/*.sql`.
+
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-ENT-001 | "ships the entities the frontend depends on" | Exactly `BlogPost, Lead, Testimonial, User` |
-| CTR-ENT-002..017 | Per entity (×4): well-formed and name matches filename; only supported property types; `required` lists only declared properties; enums and defaults consistent | All pass |
-| CTR-RLS-001 | "Lead: anyone may submit, only admins may read/update/delete" | `create === true`; read/update/delete gated on `role: admin` |
-| CTR-RLS-002 | "BlogPost: world-readable, admin-writable" | `read === true`; writes gated on `role: admin` |
-| CTR-RLS-003 | "no entity is left world-writable by accident" | No entity has `update`/`delete` set to `true` |
+| CTR-ENT-001 | (retired 2026-10-29, Base44 exit B2 task 6: the Base44 entity folder it listed is no longer read) | — |
+| CTR-ENT-002..017 | (retired 2026-10-29, Base44 exit B2 task 6: per-entity schema checks on the `.jsonc` files; the file is deleted) | — |
+| CTR-RLS-001 | (retired 2026-10-29, Base44 exit B2 task 6: Base44 entity RLS; the Supabase policies are pinned by the migrations and `supabase/tests`) | — |
+| CTR-RLS-002 | (retired 2026-10-29, Base44 exit B2 task 6: Base44 entity RLS; the Supabase policies are pinned by the migrations and `supabase/tests`) | — |
+| CTR-RLS-003 | (retired 2026-10-29, Base44 exit B2 task 6: Base44 entity RLS; the Supabase policies are pinned by the migrations and `supabase/tests`) | — |
 
 ### 4.2 Frontend payloads — `frontend-payloads.contract.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-LED-001 | "finds every Lead.create call site" | None in the browser — the three backend functions own every write |
-| CTR-LED-002..010 | Per call site (×3): sends only declared fields; sends `name` and `phone`; uses enum-legal `source`/`status` literals | All pass |
-| CTR-LED-011 | "covers all three declared lead sources across the site" | `{quick, detailed, consultation}` = the entity's `source` enum |
-| CTR-LED-012 | "validates a representative payload from each form end to end" | Zero validation issues for all three |
-| CTR-LED-013 | "rejects a payload with an unknown source or a stray field" | Exactly two issues: `source`, `utm_campaign` (negative control) |
-| CTR-BLG-001 | "the admin payload carries title and body and nothing undeclared" | `BlogAdmin` payload conforms |
-| CTR-BLG-002 | "publish toggles only flip the declared boolean field" | Every updated key is declared |
+| CTR-LED-001 | (retired 2026-10-29, Base44 exit B2 task 6: it counted `base44.entities.Lead.create` call sites; the SDK is gone) | — |
+| CTR-LED-002..010 | (retired 2026-10-29, Base44 exit B2 task 6: per-call-site checks of the Base44 `submitClaim` entity write against `Lead.jsonc`) | — |
+| CTR-LED-011 | "the lead source union matches the leads table's source check" | `LeadSource` in `ports.ts` = the latest `leads_source_check` in `supabase/migrations` |
+| CTR-LED-012 | (retired 2026-10-29, Base44 exit B2 task 6: validated a payload against the Base44 entity schema) | — |
+| CTR-LED-013 | (retired 2026-10-29, Base44 exit B2 task 6: the negative control for the entity validator, which is deleted) | — |
+| CTR-BLG-001 | "the admin payload carries title, body and slug" | `BlogAdmin` payload literal has the three keys |
+| CTR-BLG-002 | "publish toggles are authored at the port call" | `services.contentAdmin.updateArticle(…, {…})` literals exist |
 | CTR-BLG-003 | (retired 2026-10-29, Base44 exit B1 task 3: it read `Base44ContentService`, which is deleted) | — |
-| CTR-BLG-004 | "keeps the mirror-only fields off the BlogPost entity" | `slug` is not a BlogPost property |
-| CTR-TST-001 | "sends only declared fields and both required ones" | `Testimonial.create` conforms |
-| CTR-TST-002 | "keeps the rating inside the declared 1..5 range" | 5 valid; 6 and 0 rejected |
+| CTR-BLG-004 | (retired 2026-10-29, Base44 exit B2 task 6: it kept `slug` off the Base44 BlogPost entity) | — |
+| CTR-TST-001 | "a testimonial is sent with its name and quote" | `createTestimonial.mutateAsync` literals carry `name` and `quote` |
+| CTR-TST-002 | (retired 2026-10-29, Base44 exit B2 task 6: the 1..5 rating range came from the Base44 entity schema) | — |
 | CTR-TST-003 | "only accepts the declared review sources" | `google \| midrag`; `yelp` rejected |
-| CTR-EML-001 | "every send supplies to, subject and body" | Exactly those three keys on every `SendEmail` |
-| CTR-EML-002 | "never hardcodes a recipient inline" | No literal `to:` string — recipients come from named constants |
+| CTR-EML-001 | (retired 2026-10-29, Base44 exit B2 task 6: it scanned the Base44 functions' `sendMail` calls) | — |
+| CTR-EML-002 | (retired 2026-10-29, Base44 exit B2 task 6: it scanned the Base44 functions' `sendMail` calls) | — |
 
-`slug` is the one key the admin's BlogPost payload may carry that the entity lacks — it is the Supabase mirror's alone — and a case fails if it ever becomes a Base44 field.
+
 
 ### 4.3 Backend function — `consultation-function.contract.test.ts`
 
@@ -112,35 +116,21 @@ diary Dorit actually reads.
 Two files here test text rather than shape, and do so on purpose. Both cover
 artefacts that a regulator, not a compiler, is the reader of.
 
-**`agents.contract.test.ts` — `CTR-AGT-001..180`** — the three agent prompts. For each
+**`agents.contract.test.ts` — `CTR-AGT-001..180`** — the four agent prompts, read from
+`supabase/functions/chat/prompts/*.md` as the model receives them (compliance block,
+the agent's prompt, the agency profile, placeholders filled; B2 task 6). For each
 agent it asserts the eighteen mandatory clauses of the compliance block (bot
 disclosure, licence number `L-00107009`, the marketing-not-advice statement, the
 absolute bans on product recommendation and figures, the privacy-law citation
 and data-minimisation rule, the complaint and privacy-request routes, the
 "never guess — escalate" default, and the fallback phone and email), that
-`escalateToHuman` is wired as a tool, that the prompt opens by disclosing it is
-automated, and that no agent is granted an entity operation beyond its job.
+the prompt names `escalateToHuman`, and that it opens by disclosing it is
+automated. The cases about the Base44 definition files (model, `tool_configs`,
+entity grants, `allow_anonymous_access`, the description wording) are retired.
 
 **Retired 2026-10-29** — Base44 exit B1 task 5: the case "and something runs the bank against the deployed agent" read `tests/eval/procedures-agent.eval.test.ts` for two scenarios (23, no opinion under pressure; 24, stops offering דורית when asked to), and that file is deleted with the Base44 agent evals. It is not re-pointed at `tests/eval/chat/personas.json`: the six `procedures_agent` personas there (`proc-01..06`) have no zone field and no equivalent of scenarios 23 and 24, so a case asserting them would claim coverage that does not exist. The gap is recorded in [14-procedures-zones](14-procedures-zones.md) §4.
 
-One case there is about reachability rather than compliance: every agent must
-carry `allow_anonymous_access: true`. All three sit on public pages, and Base44
-answers `createConversation` for an agent without it with a 401 — "User must be
-authenticated to create a conversation" — which the chat reports as the same
-"לא הצלחתי לשלוח את ההודעה כרגע" line a network blip produces. The flag was
-absent from these files until a Builder "Update base44 packages" commit wrote
-out the full agent schema and stamped the server default, `false`, into all
-three at once, taking every chat on the site down silently. It is pinned here
-because the next regeneration will try the same thing.
-
-A second block, "the configuration nobody typed by hand", pins the *whole*
-non-prompt surface of each agent with `toEqual` against a hand-written literal:
-every key, the tool list, the memory settings, the model. That commit added
-eighteen previously-absent keys in one go and two of them carried behaviour;
-pinning one flag leaves seventeen. The assertion is deliberately not a snapshot
-— `vitest -u` rewrites a snapshot mechanically with nobody reading the delta,
-which reproduces the failure this exists to prevent, one layer up. A literal can
-only be made green by a person opening the file and typing the new value.
+**Retired 2026-10-29** — Base44 exit B2 task 6: the reachability case (`allow_anonymous_access: true`) and the block "the configuration nobody typed by hand", which pinned every non-prompt key of the three `base44/agents/*.jsonc` files with `toEqual`. Both guarded a Builder regeneration of those files, which no longer exist; the chat function's tools are pinned by `tools.ts` and its own tests.
 
 Two further cases in the same file cover what the chat shell must keep doing
 when the backend does not: the route to a person is rendered from state the
@@ -150,7 +140,7 @@ into it survives only until the next one — and a failed send hands the visitor
 back what they typed.
 
 It then pins the four places the escalation vocabulary is written down —
-`Lead.escalation_reason`, each prompt, `src/config/compliance.ts` and the
+the `REASONS` table in `escalate-to-human/escalation.js`, each prompt, `src/config/compliance.ts` and the
 `EscalationReason` union — and fails if any of them drifts from the others.
 
 Finally it asserts what the shell enforces and a prompt cannot: no message may
@@ -169,51 +159,29 @@ there fails silently in the direction that shows least, with the agent
 collecting answers the function drops on the floor. A second case pins the
 declaration that the interview collects rather than advises, in the prompt and
 in the mail; a third pins that the health question stays a flag and never grows
-back into asking what the condition is, with the `Lead` entity checked for a
+back into asking what the condition is, with the `leads` table's columns checked for a
 place to put one.
 
-The **operations mailbox list** is the fourth thing Base44's isolated entry
-points force us to duplicate, alongside `redact`, `escapeHtml` and
+The **operations mailbox list** is one of the things the Edge functions duplicate, alongside `redact`, `escapeHtml` and
 `SHEET_COLUMNS`, and the one whose drift is hardest to see: a mailbox added to
 `submitLead` and not to `escalateToHuman` produces no error anywhere —
 enquiries arrive, and escalations, the messages that matter most, quietly reach
-one fewer person. One case pins the three copies byte-identical; another pins
+one fewer person. One case pins the copies byte-identical (two since B2 task 6: the Base44 `submitClaim` copy is no longer read); another pins
 that each mailbox gets its own `try`, since one wrapped around the whole loop
 would let the first bounce swallow the rest.
 
-The **sheet cell rule** is duplicated the same way: `upsertContact`'s
-`appendEventRow` carries the line `_shared/sheets.ts`'s `sheetCell` returns, and
-one case pins both to the same text. Under `USER_ENTERED` a cell starting with
+The **sheet cell rule** lives in `_shared/sheets.ts`'s `sheetCell` (the Base44 `upsertContact` copy that used to be compared with it is no longer read, B2 task 6). Under `USER_ENTERED` a cell starting with
 `=`, `+`, `-`, `@`, a tab or a carriage return runs as a formula, so a visitor's
 name could fetch a URL or rewrite the sheet; the leading apostrophe stores it as
 text, as it already did for a phone's leading zero.
 
 A last block covers how the interview agent *ends*. A finished interview has to
-reach a person, and a bare `Lead.create` reaches nobody — it stores the summary
-and sends no mail, so it waits for whoever next opens the leads screen. The
-block pins that the agent is wired to `submitLead` and not to the `Lead` entity,
-that it calls it with the source the function knows how to lay out, that the
-prompt says in so many words not to write the record directly, that it carries
-the same data-minimisation rule as the booking agent, and that it does not
-confirm a save that failed.
+reach a person, and a bare `Lead.create` reaches nobody. The block pins that the
+prompt ends through `submitLead` (the closing `stage='complete'` call is "the only way to end an interview"; no fenced `lead` block), that it carries the same data-minimisation rule as the booking agent, and that it reports only what the function returned. The cases that read the Base44 `tool_configs` and the "the page sends, not the agent" wording (A-59) are retired.
 
-One block covers **which transport reaches whom**. `Core.SendEmail` delivers
-only to registered users of the app, so `CORE_EMAILS` is not a list of people —
-it is the list of addresses the platform is able to reach, and everyone else
-takes the mailer. The tests pin that list byte-identical across the three
-isolated entry points, because a disagreement would mail the same address one
-way here and another way there; that the single `Core.SendEmail` call sits
-inside the routing helper rather than being a choice made three times; and that
-**the agency never appears on the Core path** — that last one is the original
-defect stated as an assertion, since a copy that silently fails to her looks
-exactly like one that arrived.
+One block covers **which transport reaches whom**: `dorit-mailer` is the only transport, and neither Edge function declares `CORE_EMAILS` or calls `Core.SendEmail` (the Base44 `submitClaim` copy is no longer read, B2 task 6).
 
-A second block pins `escapeHtml`, `detailRow`, `block` and `proseRow`
-byte-identical across every function that renders mail. `escalateToHuman` grew
-an HTML notification of its own, which meant a third copy of the palette
-helpers; Base44's isolated entries leave no way to share them. Duplicated is
-fine, drifted is not, and a drifted `escapeHtml` is a phishing vector rather
-than a cosmetic difference.
+A second block pins `escapeHtml`, `detailRow`, `block` and `proseRow` across every Edge function that renders mail, and the customer letter (`buildClientHtml`) of `submit-lead` only; the Base44 `submitClaim` letter is no longer read. A drifted `escapeHtml` is a phishing vector rather than a cosmetic difference.
 
 Two blocks cover the **support agent**, which answers in the free chat on `/faq`
 and nowhere else. The first pins the boundary of that: it collects nothing, has
@@ -222,20 +190,11 @@ the inversion worth stating — hands over *every* channel `escalateToHuman`
 returns, WhatsApp included. That last one reads backwards until you know why a
 WhatsApp channel was rejected (B-8): the published number is Dorit's own
 account, so withholding it here would withhold a human from someone asking for
-one. A companion case pins that no agent holds `upsertContact`, which makes the
-contact flow a capability decision rather than a prompt decision.
+one. A companion case pins that the support and procedures prompts never offer `upsertContact`.
 
 The second covers the **record**. A chat that keeps its transcript has to say so
 before it starts, and the interview's consent notice describes different
-processing entirely: it promises that a name and a phone number are collected,
-which here would be a precise description of something that does not happen. So
-the support chat carries `SUPPORT_CONSENT_POINTS`, and the block fails if that
-notice loses the storage sentence, gains the interview's collection promise, or
-drops the licence. Alongside it: that `logSupportChat` is called once at the end
-and never mentioned to the visitor — which is only acceptable *because* the
-notice says it, so the two cases hold each other up — that the transcript and
-topic are redacted before anything is written, and that the support row is keyed
-on the same normalised phone number `upsertContact` uses.
+processing entirely. So the support chat's notice (`CHAT_FUNCTION_SUPPORT_CONSENT_POINTS` in `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT`, built from `SUPPORT_CONSENT_POINTS`) must keep the storage sentence, not gain the interview's collection promise, and keep the licence; and the transcript and topic are redacted before anything is written. The cases about the prompt's `logSupportChat` wording and about `normalisePhone` parity with `upsertContact` are retired (B2 task 6). The descriptor field `consentPoints` in `src/config/agents.ts` was dead since the chat shell stopped reading it (the shell uses `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT`), so the pins on it were replaced by pins on that map and the field was removed.
 
 The reading recommender had the same defect until `CONSENT_VERSION` v5: it
 showed the interview's notice. It now carries `BLOG_RECOMMENDER_CONSENT_POINTS`,
@@ -245,16 +204,10 @@ approved sentence word for word, the licence and affiliation beside it, the
 absence of the interview's collection promise, and the v5 version stamp — so
 wording that drifts from what was approved fails before it ships.
 
-The `Contact` entity has a block of its own, covering code no agent calls today.
-It pins that the record is keyed on the phone number and nothing else, that the
-number is normalised before it becomes that key, and — the one that matters most
-— that the field list is exactly the six a callback needs. An ID number, a
-policy number or anything medical has no field to land in, so a reworded prompt
-alone cannot start storing them.
+**Retired 2026-10-29** — Base44 exit B2 task 6: the `Contact` block ("the contact record behind the enquiries") read `base44/functions/upsertContact` and `base44/entities/Contact.jsonc`; the function was dormant and is not carried over.
 
-**`logging.contract.test.ts` — `CTR-LOG-001..067`** — (it reads only the
-folders under `base44/functions`: a macOS `.DS_Store` there crashed the whole
-file with ENOTDIR) — what the backend is
+**`logging.contract.test.ts` — `CTR-LOG-001..067`** — (it reads the Edge Functions
+only, since B2 task 6) — what the backend is
 allowed to write down. These functions logged nothing until now, so the only
 diagnosis available was the warnings appendix in the operations email — which
 means only an enquiry whose mail went out could be diagnosed, and the failures
@@ -267,8 +220,7 @@ keep identifiers out of storage. So half these cases are about restraint: every
 forbidden field names, mail lines must carry a `role` rather than a recipient,
 and any provider error text must be truncated — it is not ours and not bounded.
 The other half are about usefulness: every function opens and closes its
-request, every line carries the correlation id, the helper is byte-identical
-across all seven isolated entries, and each declares its own name exactly once.
+request, every line carries the correlation id, the "same helper in every function" case (Base44 entries only) is retired, and each declares its own name exactly once.
 
 A final block pins the archive: nightly only, never committed (the repository
 is public), each file named for the window it covers rather than the day it
@@ -497,8 +449,8 @@ the runtime, which put every interview summary three hours early (A-63).
 
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-CLK-001 | "finds the functions to check" | More than five `entry.ts` scanned — an empty scan would pass everything |
-| CTR-CLK-002 | "names the zone on every date it formats" | Every `toLocale(Date\|Time)?String(…)` in `base44/functions/*/entry.ts` carries `timeZone: 'Asia/Jerusalem'` |
+| CTR-CLK-001 | "finds the functions to check" | More than five Edge function sources scanned — an empty scan would pass everything |
+| CTR-CLK-002 | "names the zone on every date it formats" | Every `toLocale(Date\|Time)?String(…)` in the Edge Functions carries `timeZone: 'Asia/Jerusalem'` |
 
 **`frontend-payloads.contract.test.ts`, the call shape.** The adapters call
 functions through `invokeFunction(this.client, "submitLead", {…})` since A-67;
@@ -576,7 +528,7 @@ that writes real slugs.
 | CTR-SLUG-004 | "maps 22 distinct titles to 22 distinct slugs" | 22 rows, no title or slug twice |
 | CTR-SLUG-005 | "builds no /blog/<…> address by hand" | No `/blog/${` or `"/blog/" +` in `src/` or `api/` outside `articlePath.ts` |
 | CTR-SLUG-006 | "%s links articles through articlePath" (7 files) | `articlePath(` in ArticleCard, FeaturedRow, Blog, BlogPost, blogSeo, BlogAdmin, api/og/blog.ts |
-| CTR-SLUG-007 | "contentAdmin's copy is the same" | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
+| CTR-SLUG-007 | "supabase/functions/content-admin/handler.ts has the same copy" (the Base44 `contentAdmin` row is retired, B2 task 6) | Both patterns equal `articlePath.ts`'s; `ARTICLE_FIELDS` has no `slug` |
 | CTR-SLUG-008 | "the build's copy is the same" | `scripts/published-articles.mjs` patterns equal `articlePath.ts`'s |
 
 ### 4.9 IndexNow — `indexnow.contract.test.ts`
@@ -904,7 +856,7 @@ Review 2026-10-15, item 23. `public/favicon.svg` is a monogram ד drawn as shape
 |---|---|---|
 | CTR-MTGM-001 | "sorts after the additive migration it depends on" | After `20261103000000` |
 | CTR-MTGM-002 | "drops the one-meeting key and indexes a lead's meetings by time" | `drop constraint meetings_lead_id_key`; `(lead_id, scheduled_at)` index |
-| CTR-MTGM-003 | "leaves no writer upserting meetings on lead_id" | No `on_conflict=lead_id`, `onConflict: 'lead_id'`, `on conflict (lead_id)` or `upsertRow('meetings'` in functions, pages, Base44 functions, scripts or migrations |
+| CTR-MTGM-003 | "leaves no writer upserting meetings on lead_id" | No `on_conflict=lead_id`, `onConflict: 'lead_id'`, `on conflict (lead_id)` or `upsertRow('meetings'` in functions, pages, scripts or migrations |
 
 ### 4.26 The e2e build is production's configuration — `e2e-build-env.contract.test.ts`
 
@@ -995,7 +947,7 @@ moved — fix the side that is wrong; do not relax the assertion.
 | ID | Title | Expected result |
 |---|---|---|
 | CTR-RET-001 | "sorts after every migration already applied" | After `20261024000000_clearinghouse_publish.sql` |
-| CTR-RET-002 | "allows the same statuses in the database, the Base44 entity and adminLead" | new, contacted, closed, escalated, partial, client — in all three |
+| CTR-RET-002 | "allows exactly these statuses in the database" | new, contacted, closed, escalated, partial, client (the Base44 entity and adminLead copies are no longer read, B2 task 6) |
 | CTR-RET-003 | "lets an admin set every status the type names, client included, and each one exists in the database" | `LeadStatus` ⊆ the check constraint |
 | CTR-RET-004 | "keeps the privacy policy's promise: 24 months from the last contact, then deleted or anonymized" | The policy's sentence; `interval '24 months'`; the last contact = latest of created, updated, meeting |
 | CTR-RET-005 | "never touches a client, and anonymizes what identifies the person" | `status <> 'client'`; name, phone, email, message, summary, profile, notes cleared |

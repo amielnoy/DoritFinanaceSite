@@ -1,8 +1,5 @@
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { REPO_ROOT } from "../helpers/entity-schema";
-import { backendFiles, edgeFunctionFiles, edgeSource, read, rel } from "../helpers/source-scan";
+import { edgeFunctionFiles, edgeSource, read, rel } from "../helpers/source-scan";
 
 /**
  * What the backend is allowed to write down about a request.
@@ -26,26 +23,12 @@ import { backendFiles, edgeFunctionFiles, edgeSource, read, rel } from "../helpe
  * afternoon somebody is debugging something urgent.
  */
 
-const FUNCTIONS_DIR = join(REPO_ROOT, "base44/functions");
-/**
- * The agents' three tools only pass a request to an Edge Function and its answer
- * back (agents.contract.test.ts pins that). The diary is the Edge function's.
- */
-const FORWARDERS = ["submitLead", "escalateToHuman", "logSupportChat"];
-// Folders only: macOS drops a .DS_Store beside them, and opening
-// ".DS_Store/entry.ts" crashed the whole file with ENOTDIR.
-const functionNames = readdirSync(FUNCTIONS_DIR, { withFileTypes: true })
-  .filter((e) => e.isDirectory() && !FORWARDERS.includes(e.name))
-  .map((e) => e.name)
-  .sort();
-const sources = Object.fromEntries(
-  functionNames.map((name) => [name, read(join(FUNCTIONS_DIR, name, "entry.ts"))]),
-);
+const sources: Record<string, string> = {};
 
 /** Supabase Edge Functions, keyed by directory name, each with the shared modules it imports. */
 const edgeNames = edgeFunctionFiles().map((f) => f.split("/").at(-2)!);
 for (const f of edgeFunctionFiles()) sources[f.split("/").at(-2)!] = edgeSource(f);
-const allNames = [...functionNames, ...edgeNames];
+const allNames = [...edgeNames];
 
 /** Every `log(...)` call in a file, as source text. */
 function logCalls(src: string): string[] {
@@ -92,21 +75,6 @@ describe("every backend function keeps a diary", () => {
 
   it.each(allNames)("%s reports how long it took", (name) => {
     expect(sources[name]).toMatch(/Date\.now\(\) - startedAt|Date\.now\(\) - started/);
-  });
-
-  it("writes the same helper in every function", () => {
-    // Base44 gives these isolated entries no module to share, so the helper is
-    // duplicated. Duplicated is fine; drifted means one function's lines parse
-    // differently from the rest and the archive stops being one dataset.
-    const norm = (src: string) => {
-      const start = src.indexOf("function log(");
-      expect(start).toBeGreaterThan(-1);
-      return src.slice(start, src.indexOf("\n}", start)).replace(/\s+/g, " ").trim();
-    };
-    const [first, ...rest] = functionNames.map((n) => norm(sources[n]));
-    for (const [i, copy] of rest.entries()) {
-      expect(copy, `${functionNames[i + 1]} has drifted`).toBe(first);
-    }
   });
 
   it("names the function it came from, and never the same name twice", () => {
@@ -161,15 +129,6 @@ describe("what the diary may not contain", () => {
     }
   });
 
-  it("passes a role, not an address, into the mail helper", () => {
-    for (const name of ["submitClaim"]) {
-      const send = sources[name].slice(sources[name].indexOf("async function sendMail("));
-      expect(send.slice(0, send.indexOf("\n}")), `${name}`).toMatch(
-        /log\('info', 'mail\.sent', \{ rid, role, transport/,
-      );
-    }
-  });
-
   it("truncates whatever an error message turned out to contain", () => {
     // A provider's error text is not ours and is not bounded: Resend has
     // returned the recipient list, and a stack can carry a URL with a token.
@@ -195,7 +154,7 @@ describe("what the diary may not contain", () => {
  * Eight characters turn that into one search.
  */
 describe("a failure you can look up", () => {
-  const fns = [...backendFiles().filter((f) => !FORWARDERS.some((n) => f.includes(`/${n}/`))), ...edgeFunctionFiles()];
+  const fns = edgeFunctionFiles();
 
   it("returns the request id with every answer", () => {
     for (const f of fns) {

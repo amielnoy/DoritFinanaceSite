@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { REPO_ROOT, entityNames, loadEntity } from "../helpers/entity-schema";
+import { REPO_ROOT } from "../helpers/entity-schema";
 import { read, rel, sourceFiles } from "../helpers/source-scan";
 
 const FILES = sourceFiles();
@@ -202,22 +202,5 @@ describe("auth and token handling", () => {
     expect(board).not.toMatch(/\bconsole\./);
     expect(board).not.toMatch(/\b(gtag|dataLayer|trackEvent|track)\s*\(/);
     expect(board).not.toMatch(/history\.(push|replace)State|navigate\(/);
-  });
-});
-
-describe("data exposure via entity RLS", () => {
-  it("no entity that stores personal data is world-readable", () => {
-    const pii = ["Lead"];
-    for (const name of pii) {
-      expect(loadEntity(name).rls?.read, `${name} leads are readable by anyone`).not.toBe(true);
-    }
-  });
-
-  it("every entity used by the app has an explicit definition", () => {
-    const referenced = new Set<string>();
-    for (const f of FILES) {
-      for (const m of read(f).matchAll(/base44\.entities\.(\w+)\./g)) referenced.add(m[1]);
-    }
-    for (const name of referenced) expect(entityNames()).toContain(name);
   });
 });

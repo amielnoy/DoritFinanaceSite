@@ -29,13 +29,8 @@ describe("lead retention", () => {
 
   const dbStatuses = quoted(/check \(status in \(([^)]*)\)\)/.exec(migration)![1]);
 
-  it("allows the same statuses in the database, the Base44 entity and adminLead", () => {
+  it("allows exactly these statuses in the database", () => {
     expect(dbStatuses).toEqual(["client", "closed", "contacted", "escalated", "new", "partial"]);
-    const entity = read("base44/entities/Lead.jsonc");
-    const statusEnum = /"status":\s*\{[^}]*"enum":\s*\[([^\]]*)\]/s.exec(entity)![1];
-    expect(quoted(statusEnum)).toEqual(dbStatuses);
-    const adminLead = /const STATUSES = \[([^\]]*)\]/.exec(read("base44/functions/adminLead/entry.ts"))![1];
-    expect(quoted(adminLead)).toEqual(dbStatuses);
   });
 
   it("lets an admin set every status the type names, client included, and each one exists in the database", () => {

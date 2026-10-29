@@ -20,7 +20,7 @@ describe("campaigns, schema", () => {
 
   it("adds 'reactivation' to the leads' channels, and every copy of the list agrees", () => {
     const db = /add constraint leads_channel_check check \(channel in \(([^)]*)\)\)/.exec(flat)![1];
-    for (const path of ["supabase/functions/_shared/attribution.ts", "base44/functions/submitClaim/entry.ts"]) {
+    for (const path of ["supabase/functions/_shared/attribution.ts"]) {
       const list = /CHANNEL_TAXONOMY = \[([^\]]*)\]/.exec(read(path))![1].replace(/\s+/g, " ");
       for (const c of list.match(/'[a-z_]+'/g)!) expect(db).toContain(c);
       expect(list).toContain("'reactivation'");

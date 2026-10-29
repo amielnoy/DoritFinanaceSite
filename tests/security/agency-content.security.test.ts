@@ -39,7 +39,7 @@ function grantsWholeTable(stmt: string): boolean {
   return privileges.some((p) => p === "select" || p === "all" || p === "all privileges");
 }
 
-const SOURCE_DIRS = ["src", "api", "scripts", "supabase/functions", "e2e", "base44/functions"];
+const SOURCE_DIRS = ["src", "api", "scripts", "supabase/functions", "e2e"];
 const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 function walk(dir: string): string[] {
   let names: string[];

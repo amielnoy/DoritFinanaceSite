@@ -54,8 +54,8 @@ lead inbox.
 | SEC-STA-020 | "no page reads `returnTo` out of the query string without the guard" | Zero offenders outside `authReturnTo.js` |
 | SEC-STA-021 | "redirects derived from `returnTo` are assigned from the guarded value" | `Login` assigns `window.location.href` from `safeReturnTo()` |
 | SEC-STA-022 | "admin routes stay behind a gate that requires sign-in and an agency role (agency roles)" | `/admin/leads`, `/admin/blog`, `/admin/users` inside `<AgencyRoute min="user">`, `/admin/agency` inside `min="owner"`, each registered once; AgencyRoute falls back to ProtectedRoute and turns away `!meets(role, min)`; the role is asked of `services.agency.myRole`; AdminRoute still gates `role !== "admin"` for the operator's own screens |
-| SEC-STA-023 | "no entity that stores personal data is world-readable" | `Lead.rls.read !== true` |
-| SEC-STA-024 | "every entity used by the app has an explicit definition" | Every `base44.entities.X` has a `.jsonc` |
+| SEC-STA-023 | (retired 2026-10-29, Base44 exit B2 task 6: it read `Lead.jsonc`'s RLS; the leads table's policies are pinned by the migrations and `supabase/tests`) | — |
+| SEC-STA-024 | (retired 2026-10-29, Base44 exit B2 task 6: it matched `base44.entities.X` against `base44/entities`; the SDK is gone) | — |
 
 ## 4. Runtime test cases — `e2e/security/security.spec.ts`
 
@@ -114,9 +114,9 @@ whatever the model does.
 | Group | Cases | What it holds |
 |---|---|---|
 | `SEC-AGT-XSS-*` | 9 + 6 + 4 | Dorit's "שיחה" tab shows a stored transcript as plain text with no write path (`SEC-AGT-XSS-009` is the tab; the email cases keep their IDs by title). The chat renders replies through `react-markdown` with no raw-HTML plugin and no `dangerouslySetInnerHTML`; the confirmation email escapes every visitor-supplied binding; the shared letter's button (`SEC-AGT-XSS-017..019`) renders only an `https://` href with no quote, bracket or space, never as `javascript:`/`data:`/relative, and escapes its label; a linked detail (the clearinghouse invitation's address, `SEC-AGT-XSS-020`) follows the same rule and escapes its text. The escaping helper is **lifted out of the Deno source and executed** here, so these assert behaviour rather than the presence of a call. |
-| `SEC-AGT-PHI-*` | 8 | No visitor value reaches an `href`; template links stay on the agency domain; recipients resolve from constants; every `tel:`/`mailto:` target binds from the contact config or the server's escalation receipt; the chat's contact block comes from the backend, not from a reply that merely claims a number; no request body may widen a recipient list. |
+| `SEC-AGT-PHI-*` | 8 | No visitor value reaches an `href`; template links stay on the agency domain; recipients resolve from constants; every `tel:`/`mailto:` target binds from the contact config or the server's escalation receipt; the chat's contact block comes from the backend, not from a reply that merely claims a number; the case "never widens an email recipient from the request body" scanned the Base44 functions only and is retired (B2 task 6). |
 | `SEC-AGT-INJ-*` | 10 + 1 | Each prompt declares its compliance block to override any later instruction and routes doubt to `escalateToHuman`; the shell never parses a reply for commands; the consent stamp is the shell's (v6, every agent being on the chat function since Base44 exit B1, chosen from its own constants), so a persuaded model cannot backdate what a visitor agreed to; and no `...body` is spread into an entity write. |
-| `SEC-AGT-DLP-*` | 13 | `redact()` is **executed against real payloads** — ID numbers, spaced and hyphenated card numbers, an Israeli IBAN, account-length digits — and asserted to leave ordinary prose intact and cap its output. Plus: the `Lead` schema carries no sensitive field, the sheet has no sensitive column, no token is echoed or logged, and the consent notice names exactly the fields that are collected. |
+| `SEC-AGT-DLP-*` | 13 | `redact()` is **executed against real payloads** — ID numbers, spaced and hyphenated card numbers, an Israeli IBAN, account-length digits — and asserted to leave ordinary prose intact and cap its output. Plus: the `leads` table (initial schema) carries no sensitive column, the sheet has no sensitive column, no token is echoed or logged, and the consent notice names exactly the fields that are collected. |
 
 > The former `SEC-AGT-API-*` block — the `hasOwnProperty` clamp on the
 > escalation reason, the phone format, the pinned `status`/`source` — was
@@ -135,10 +135,11 @@ Two findings came out of writing these, one of them a defect that is now fixed:
   carrying their own markup to a third party**. It is not browser XSS; it is a
   phishing vector riding the agency's verified domain. `escapeHtml()` now wraps
   each binding, and `SEC-AGT-XSS-009..016` fail if one is unwrapped.
-- **`base44/functions/**` is checked by nothing.** `tsconfig.json` includes only
-  `src/**`, and those files run on Deno inside Base44, so neither `tsc` nor the
+- **`supabase/functions/**` is partly checked by text only.** `tsconfig.json` includes only
+  `src/**`, and those files run on Deno, so neither `tsc` nor the
   lint step sees them. These tests read the source as text, which is the only
-  check that currently exists on the code holding the compliance logic.
+  check that currently exists on the code holding the compliance logic. (The
+  Base44 functions this note used to name are no longer read, B2 task 6.)
 
 ## 4c. The clearinghouse board's gate — `tests/security/static-security.test.ts`
 

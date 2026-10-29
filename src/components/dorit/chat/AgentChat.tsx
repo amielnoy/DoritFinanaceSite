@@ -97,16 +97,6 @@ export interface AgentDescriptor {
    */
   tagline?: string;
   /**
-   * The v5 consent points this agent's v6 notice is built from
-   * (`CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` in compliance.ts). The chat shows
-   * the v6 notice, never these alone.
-   *
-   * Defaults to the interview's, which promise that a name and a phone number
-   * are collected. An agent that collects neither must not show that text — a
-   * notice describing the wrong processing is worse than a generic one.
-   */
-  consentPoints?: readonly string[];
-  /**
    * The fence, stated out loud. Publishing the boundary is half of honouring
    * it: a visitor who can see what the automation will not do is a visitor who
    * knows to ask for a person, and a reviewer can check the claim against the
