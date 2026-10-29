@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
 import { read } from "../helpers/source-scan";
+import { leadsColumns } from "../helpers/leads-columns";
 import { systemBlocks, type ChatRole } from "../../supabase/functions/chat/prompt.ts";
 
 /**
@@ -1012,10 +1013,9 @@ describe("who receives a lead, and whether the consent text admits it", () => {
       expect(interview.instructions).toMatch(/health_flag/);
       expect(interview.instructions).toMatch(/אל תשאל מה, אל תתעד תיאור, אבחנה, תרופה או טיפול/);
       // And nothing downstream grew a place to put one.
-      const leads = /create table public\.leads \(([\s\S]*?)\n\);/.exec(
-        read(join(REPO_ROOT, "supabase/migrations/20260921000000_initial_schema.sql")),
-      )![1];
-      expect(leads).not.toMatch(/medical|רפואי/);
+      const columns = leadsColumns();
+      expect(columns.length, "no leads columns found").toBeGreaterThan(10);
+      expect(columns.filter((c) => /medical|health|רפואי/.test(c))).toEqual([]);
     });
 
     /**

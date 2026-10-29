@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
 import { buildClientHtml as buildSharedClientHtml } from "../../supabase/functions/_shared/html.ts";
 import { edgeFunctionFiles, read, sourceFiles } from "../helpers/source-scan";
+import { leadsColumns } from "../helpers/leads-columns";
 
 /**
  * The attack surface the agents added.
@@ -491,13 +492,12 @@ describe("DLP — what may leave, and in whose hands", () => {
 
 
   it("collects no field the consent notice does not name", () => {
-    const LEADS_TABLE = /create table (?:if not exists )?public\.leads \(([\s\S]*?)\n\);/.exec(
-      read(join(REPO_ROOT, "supabase/migrations/20260921000000_initial_schema.sql")),
-    )![1];
+    const columns = leadsColumns();
+    expect(columns.length, "no leads columns found").toBeGreaterThan(10);
     // The notice promises name, phone and an optional email. Anything else
     // reaching the leads table is a promise broken in code.
     for (const forbidden of ["id_number", "tz", "account_number", "policy_number", "salary", "medical"]) {
-      expect(LEADS_TABLE, forbidden).not.toMatch(new RegExp(`^\\s*${forbidden}\\s`, "m"));
+      expect(columns, forbidden).not.toContain(forbidden);
     }
   });
 
