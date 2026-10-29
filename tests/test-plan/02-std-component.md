@@ -1,7 +1,7 @@
 # STD-02 — Component Tests
 
 **Suite:** `component` · **Runner:** `npm run test:component` (Vitest + React Testing Library)
-**Location:** `tests/component/` · **Cases:** 579 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 667 including `it.each` / `describe.each` expansions · **Environment:** jsdom
+**Location:** `tests/component/` · **Cases:** 579 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:component` runs 754 (recounted 2026-10-29) including `it.each` / `describe.each` expansions · **Environment:** jsdom
 
 ---
 
@@ -24,7 +24,7 @@ not here.
 
 | Concern | Handling |
 |---|---|
-| Services | `vi.mock("@/services")` → `tests/component/services-mock.ts`: every port method a `vi.fn`, unscripted answering as a build without Supabase does (nobody signed in, the clearinghouse unavailable, the public writes succeed); `resetServicesMock()` drops a case's script. Assertions are on the recorded port calls. No test reaches a backend adapter, the Base44 SDK client or `@/lib/app-params`, so neither is mocked |
+| Services | `vi.mock("@/services")` → `tests/component/services-mock.ts`: every port method a `vi.fn`, unscripted answering as a build without Supabase does (nobody signed in, the clearinghouse unavailable, the public writes succeed); `resetServicesMock()` drops a case's script. Assertions are on the recorded port calls. No test reaches a backend adapter or the Supabase client, so neither is mocked |
 | `framer-motion` | Replaced with a pass-through proxy; jsdom has no layout engine for its animations |
 | Router | Components using `<Link>` are wrapped in `MemoryRouter` |
 | Queries | Role and label based (`getByRole`, `getByLabelText`) — the same accessibility surface the e2e suite asserts on |
@@ -331,7 +331,7 @@ article is cached under the slug first, so the switch reads nothing again.
 |---|---|---|
 | CMP-POST-001 | "takes its slug address, keeping the query and the hash" | `/blog/horadat-dmei-nihul?utm_source=whatsapp#mah-bodkim`; one read |
 | CMP-POST-002 | "stays where it is when the address already is the slug" | Unchanged |
-| CMP-POST-003 | "stays on the id where the store has no slug (a build reading Base44)" | Unchanged |
+| CMP-POST-003 | "stays on the id where the article has no slug" | Unchanged |
 
 ### 4.16 `<BlogAdmin />` — the article's address — `tests/component/blog-admin-slug.test.tsx`
 

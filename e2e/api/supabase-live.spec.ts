@@ -4,13 +4,14 @@ import { expect, test, test_step } from "../fixtures/app";
 /**
  * Live Supabase, reached with the key the deployed bundle actually carries.
  *
- * Opt-in, like the "Live Base44 backend" block beside it, and on in the
- * production smoke job, which sets E2E_LIVE_API_URL to PRODUCTION_URL.
+ * Opt-in, and on in the production smoke job, which sets E2E_LIVE_API_URL to
+ * PRODUCTION_URL.
  *
  * On 2026-10-11 production shipped with another Supabase project's publishable
  * key. Every Supabase call — the blog, the testimonials, sign-in — answered 401
  * "Invalid API key", and the smoke job went green: it checked that the bundle
- * was served and that Base44 answered, and nothing asked Supabase anything.
+ * was served and that the old backend answered, and nothing asked Supabase
+ * anything.
  *
  * The URL and key are read from the scripts the site serves rather than from
  * CI's environment, because the bundle is what a visitor runs; a correct value

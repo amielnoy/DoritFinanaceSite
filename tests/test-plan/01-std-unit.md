@@ -1,7 +1,7 @@
 # STD-01 — Unit Tests
 
 **Suite:** `unit` · **Runner:** `npm run test:unit` (Vitest) · **Location:** `tests/unit/`
-**Cases:** 1245 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 2084 including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
+**Cases:** 1248 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:unit` runs 2122 (recounted 2026-10-29) including `it.each` / `describe.each` expansions · **Environment:** node, except files ending `.dom.test.ts` (jsdom)
 
 `tests/unit/seo.dom.test.ts` also runs under `npm run test:unit`; its 19 cases
 are specified in [11-std-seo](11-std-seo.md) beside the e2e cases they pair
@@ -33,10 +33,10 @@ something outside the repository.
 | `SupabaseAuthService` | `src/services/supabase/SupabaseAuthService.ts` |
 | FAQ content | `src/content/faq.ts` |
 | Insurance self-assessment | `src/lib/insurance-assessment.ts` |
-| `reconcile-stores`, `prune-vercel-deployments` | `scripts/*.mjs` |
+| `prune-vercel-deployments` | `scripts/prune-vercel-deployments.mjs` |
 | `planSeed`, `rowFor`, `selectArticles` | `scripts/seed-blog.mjs` |
 | `articlePath`, `slugProblem`, `isValidSlug` | `src/lib/articlePath.ts` |
-| `planReconcile`, `readExecResult` | `scripts/reconcile-leads.mjs` |
+| `planReconcile`, `readExecResult` | (deleted 2026-10-29, Base44 exit B2 task 8) |
 | `groupOpenLeads`, `planAssignments`, `describeOpenLeads` | `scripts/assign-open-leads.mjs` |
 | `fetchPublishedArticles`, `planArticles`, `duplicateTitles` | `scripts/published-articles.mjs` |
 | `answerRestRead` — the PostgREST subset the e2e fake and the e2e prerender answer | `e2e/fixtures/supabase-fake.ts` |
@@ -116,7 +116,7 @@ the fee rate). Hostile input is exercised because every field is a free-text
 
 **Retired 2026-10-29** — Base44 exit B1 task 3: `src/lib/clear-access-token.ts` and its test are deleted with the SDK.
 
-`?clear_access_token=true` is honoured at boot by `src/lib/clear-access-token.ts` (SEC-TOK-002). It used to run only when the lazily loaded SDK did.
+`?clear_access_token=true` was honoured at boot by `src/lib/clear-access-token.ts` (SEC-TOK-002).
 
 | ID | Title | Input | Expected result |
 |---|---|---|---|
@@ -168,20 +168,20 @@ distinguishes on.
 
 ### 4.6 Store reconciliation — `tests/unit/reconcile.test.ts`
 
-The gate phase 4 rests on: the flip is safe once the two stores have agreed for
-a sustained stretch, and "agreed" has to be checkable. Exits non-zero on drift
-so it can gate the cutover rather than merely describe it.
+**Retired 2026-10-29** — Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and its test are deleted with the `base44/` folder.
+
+The gate phase 4 rested on: whether Base44 and Supabase held the same rows.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-REC-001 | "is silent when they agree, despite blanks spelled differently" | `""` and NULL are not a disagreement |
-| UNIT-REC-002 | "reports a lead the mirror never copied" | Listed as missing |
-| UNIT-REC-003 | "reports a Supabase row with no counterpart" | Listed as orphaned |
-| UNIT-REC-004 | "reports an update that reached only one store" | Listed as mismatched |
-| UNIT-REC-005 | "names every field that differs, not just the first" | All differing fields |
-| UNIT-REC-006 | "matches contacts on the phone number, however punctuated" | No false drift |
-| UNIT-REC-007 | "compares a rating by value" | `5` equals `"5"` |
-| UNIT-REC-008 | "compares published by truth, not spelling" | Real drift still caught |
+| UNIT-REC-001 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and `reconcile.test.ts` are deleted; there is one store) | — |
+| UNIT-REC-002 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and `reconcile.test.ts` are deleted; there is one store) | — |
+| UNIT-REC-003 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and `reconcile.test.ts` are deleted; there is one store) | — |
+| UNIT-REC-004 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and `reconcile.test.ts` are deleted; there is one store) | — |
+| UNIT-REC-005 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and `reconcile.test.ts` are deleted; there is one store) | — |
+| UNIT-REC-006 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and `reconcile.test.ts` are deleted; there is one store) | — |
+| UNIT-REC-007 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and `reconcile.test.ts` are deleted; there is one store) | — |
+| UNIT-REC-008 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-stores.mjs` and `reconcile.test.ts` are deleted; there is one store) | — |
 
 ### 4.7 Vercel preview pruning — `tests/unit/prune-vercel.test.ts`
 
@@ -338,12 +338,7 @@ every other fake returns a bare body, which is how A-67 went unseen.
 
 ### 4.14 Personal area adapters — `account-services.test.ts`
 
-One mapper and two adapters behind `AccountPort`. The Base44 cases are fed the
-SDK's real axios-wrapped response and the rejection the SDK really throws — an
-AxiosError with `.status` and the body under `.response.data`, because the SDK
-builds its functions client with `interceptResponses: false` — not a bare body,
-because a bare body is what hid the wrapper before. One case keeps the
-Base44Error shape (`.status`, `.data`) so both work.
+The mapper and the Supabase adapter behind `AccountPort`.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -352,17 +347,17 @@ Base44Error shape (`.status`, `.data`) so both work.
 | UNIT-ACC-003 | "drops a profile that is not label/value pairs rather than crashing" | An object gives `[]`; malformed pairs are filtered out and valid ones kept |
 | UNIT-ACC-004 | "reads my_enquiries over RPC" | `rpc("my_enquiries")` called; rows mapped |
 | UNIT-ACC-005 | "turns an RPC error into AccountLoadError" | Rejects with `AccountLoadError` |
-| UNIT-ACC-007 | "names a 401 as signed out, a 403 as unverified, else failed — keeping the rid, off the AxiosError the SDK throws" | `signed_out`, `unverified`, and `failed` for 500, each with the rid read from `response.data` |
+| UNIT-ACC-007 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
 | UNIT-ACC-008 | "names RPC error 42501 as signed out" | `AccountLoadError("signed_out")` — `my_enquiries` is revoked from anon |
 | UNIT-ACC-009 | "names RPC error PGRST301 as signed out" | `signed_out` — JWT missing, expired or invalid |
 | UNIT-ACC-010 | "names an unrecognised RPC error code as failed" | `failed`; Supabase never yields `unverified` |
-| UNIT-ACC-011 | "fails with the rid when the body says ok:false" | `failed` with the rid |
-| UNIT-ACC-012 | "fails with the rid when ok:true carries no enquiries array" | `failed` with the rid, not an empty list |
-| UNIT-ACC-013 | "also reads a Base44Error-shaped rejection (status and data on the error)" | 403 with `data.rid` gives `unverified` and the rid |
-| UNIT-ACC-014 | "failureOf: reads an AxiosError: status and body under response" | `{ status: 500, body: { rid } }` |
-| UNIT-ACC-015 | "failureOf: prefers the response status when the error has none of its own" | Status and body taken from `response` |
-| UNIT-ACC-016 | "failureOf: reads a Base44Error: status and data on the error" | Status and body taken from the error itself |
-| UNIT-ACC-017 | "failureOf: gives nothing for a body that is not an object, or a non-error" | `body` is undefined for an HTML string, `undefined` or a string rejection |
+| UNIT-ACC-011 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
+| UNIT-ACC-012 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
+| UNIT-ACC-013 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
+| UNIT-ACC-014 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
+| UNIT-ACC-015 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
+| UNIT-ACC-016 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
+| UNIT-ACC-017 | (retired 2026-10-29, Base44 exit B2 task 8: a case on the Base44 account adapter or its `failureOf`, deleted with them in B1 task 3) | — |
 
 ### 4.15 Lead events for GA4 — `tests/unit/analytics.dom.test.ts`
 
@@ -409,29 +404,27 @@ only with a value from `CALCULATOR_TOOLS`, so a figure cannot travel in it.
 
 ### 4.16 Reconciling the lead mirror — `tests/unit/reconcile-leads.test.ts`
 
-The planning step of `scripts/reconcile-leads.mjs`, which finds Supabase `leads`
-rows whose lead Base44 no longer holds, rows whose status differs, and Base44
-leads with no Supabase row at all (a failed create-time mirror). The script is a
-dry run unless given `--apply`, and creates missing copies only with
-`--create-missing` as well; what is pinned here is what it would do, and the row
-it would write.
+**Retired 2026-10-29** — Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and its test are deleted with the `base44/` folder.
+
+The planning step of `scripts/reconcile-leads.mjs` compared Supabase `leads`
+with the Base44 `Lead` entity.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-REC-001 | "deletes the Supabase rows whose lead is gone from Base44" | `toDelete` holds the orphan's `base44_id` |
-| UNIT-REC-002 | "updates a row whose status differs, to Base44's value" | `toUpdate` carries id, from, to |
-| UNIT-REC-003 | "plans nothing when the stores agree" | All three lists empty |
-| UNIT-REC-004 | "leaves alone a Supabase row with no base44_id" | All three lists empty |
-| UNIT-REC-005 | "treats a Base44 lead without a status as the default, new" | No update |
-| UNIT-REC-006 | "carries ids and statuses only" | No name or phone in the plan |
-| UNIT-REC-007 | "finds the marked line among the CLI's other output" | The JSON after the marker |
-| UNIT-REC-008 | "says so when the CLI printed no result" | Throws, naming `base44 login` |
-| UNIT-REC-009 | "lists the Base44 leads Supabase never got, as ids only" | `toCreate` holds the id; no name or phone in the plan |
-| UNIT-REC-010 | "maps the Base44 lead onto the Supabase columns, keyed by base44_id" | Exactly the shared columns; Base44's own fields (`created_by`, `is_sample`) dropped |
-| UNIT-REC-011 | "keeps the original date, so ordering and the 24-month retention stay right" | `created_at` = Base44 `created_date` |
-| UNIT-REC-012 | "defaults a missing status to new and an empty constrained value to null" | `status: "new"`, `source: null` |
-| UNIT-REC-013 | "drops a value the Supabase check constraint would refuse, rather than failing the row" | Unknown `source` → null; unknown `status` → `"new"` |
-| UNIT-REC-014 | "refuses a lead without the two columns Supabase requires" | `null` without a name or a phone |
+| UNIT-REC-001 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-002 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-003 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-004 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-005 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-006 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-007 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-008 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-009 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-010 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-011 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-012 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-013 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
+| UNIT-REC-014 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/reconcile-leads.mjs` and `reconcile-leads.test.ts` are deleted) | — |
 
 ### 4.17 Reading time — `tests/unit/reading-time.test.ts`
 
@@ -521,7 +514,7 @@ A slug shaped like a Base44 id is refused because `vercel.json` sends every
 | ID | Title | Expected result |
 |---|---|---|
 | UNIT-SLUG-001 | "is /blog/<slug> when the article has one" | `/blog/horadat-dmei-nihul` |
-| UNIT-SLUG-002 | "falls back to the id where the store has no slug (Base44)" | `/blog/<id>`, also for an empty slug |
+| UNIT-SLUG-002 | "falls back to the id where the article has no slug" | `/blog/<id>`, also for an empty slug |
 | UNIT-SLUG-003 | "accepts %j" (5 slugs) | `null`; `isValidSlug` is true |
 | UNIT-SLUG-004 | "asks for a slug when there is none" | `SLUG_PROBLEMS.missing` |
 | UNIT-SLUG-005 | "refuses %j as not Latin kebab-case" (10 inputs) | `SLUG_PROBLEMS.format` |
@@ -560,7 +553,7 @@ and test articles can never reach a deployment.
 | UNIT-PUBART-025..029 | "fetchPublishedArticles — every row, or an error" (asks for an exact count and a range; reads page after page until the total is reached; refuses fewer rows than the total; refuses an answer with no total; accepts an empty list when the total says zero) | `Prefer`, `Range-Unit`, `Range: 0-999`; two pages of a three-row list; `incomplete: 1 of 5`; `Content-Range` error; `[]` |
 | UNIT-PUBART-030..033 | "loadPublishedArticles — the same rules for every build step" (live rows with the columns asked for; fixture rows; warns when not required; throws when required) | `{ rows, fromFixture, warning }`; `select=slug%2Ctitle`; `HTTP 500` warning or throw |
 | UNIT-PUBART-034..036 | "refuses the fixture in a bundle that reads %s" (a real project; the fake host with a trailing slash; a look-alike host) | Throws naming the fake host; the fixture file is never read |
-| UNIT-PUBART-037 | "refuses the fixture in a bundle that reads no Supabase (the Base44 path)" | Throws `this bundle reads no Supabase` |
+| UNIT-PUBART-037 | "refuses the fixture in a bundle that reads no Supabase" | Throws `this bundle reads no Supabase` |
 | UNIT-PUBART-038 | "reads the real table in a production build: a real project and no fixture" | One request to the real project's origin; its rows' routes; `fixtureRows: null` |
 | UNIT-PUBART-039 | "refuses the fake host without its fixture, rather than asking a host that never answers" | Throws `fake Supabase host`; no request |
 | UNIT-PUBART-040 | "filters with eq., orders and limits, as the blog list asks" (`answerRestRead`) | `published=eq.true&order=created_at.desc` → newest published first; `limit` honoured |
@@ -609,12 +602,14 @@ row that is not there is a failure rather than a row silently created.
 
 ### 4.26 The Base44 export backfill — `tests/unit/base44-repair-scripts.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B2 task 8: `scripts/backfill-from-base44.mjs`, `scripts/reconcile-leads.mjs` and their test are deleted with the `base44/` folder.
+
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-BKF-001 | "gives an imported article a fallback slug, and never overwrites one already set" | `slug` column with `'post-<lowercased id>'`; no `slug = excluded.slug` |
-| UNIT-BKF-002 | "turns %j into what the migration's SQL does" (9 inputs) | Uppercase, symbols, leading/trailing symbols, non-Latin; all-symbols and empty fall back to the uuid |
-| UNIT-BKF-003 | "refuses to invent an address from nothing" | Throws `no id` |
-| UNIT-BKF-004 | "is spelled the way the migration spells it" | The migration's SQL holds the same regex, trim and `p_id::text` fallback |
+| UNIT-BKF-001 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/backfill-from-base44.mjs` and `base44-repair-scripts.test.ts` are deleted) | — |
+| UNIT-BKF-002 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/backfill-from-base44.mjs` and `base44-repair-scripts.test.ts` are deleted) | — |
+| UNIT-BKF-003 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/backfill-from-base44.mjs` and `base44-repair-scripts.test.ts` are deleted) | — |
+| UNIT-BKF-004 | (retired 2026-10-29, Base44 exit B2 task 8: `scripts/backfill-from-base44.mjs` and `base44-repair-scripts.test.ts` are deleted) | — |
 
 ### 4.24 The server's answer for an article address — `tests/unit/og-blog-handler.test.ts`
 
@@ -981,7 +976,7 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 
 ### 4.36 The browser's chat adapter, router and switch — `tests/unit/supabase-agent.test.ts`, `routed-agent.test.ts`, `chat-agents-config.test.ts` (now `chat-consent-points.test.ts`), `services-wiring.test.ts`
 
-`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort`; `RoutedAgentService` sends each agent to its adapter; `src/config/chat-agents.ts` read `VITE_CHAT_AGENTS` (deleted in Base44 exit B1 task 2: every agent is on the chat function); `src/config/compliance.ts` holds each agent's v6 notice. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
+`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort` for every agent; `src/config/compliance.ts` holds each agent's v6 notice. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -1737,7 +1732,7 @@ Review 2026-10-15, item 12. The page makes the conversation's id (a uuid) and to
 
 ### 4.71 A send the page abandons — `tests/unit/supabase-agent.test.ts`, `tests/unit/routed-agent.test.ts` (new cases)
 
-Review 2026-10-15, item 13. `AgentPort.send` takes an optional `signal`. When the panel is reset or closed, the chat function's adapter aborts its request and stops its status polling, and the send rejects with `SendAbandoned`. Base44's adapter has nothing to stop. The panel's own guard is in CMP-CHATFN-016 and 017.
+Review 2026-10-15, item 13. `AgentPort.send` takes an optional `signal`. When the panel is reset or closed, the chat function's adapter aborts its request and stops its status polling, and the send rejects with `SendAbandoned`. The panel's own guard is in CMP-CHATFN-016 and 017.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -1922,3 +1917,15 @@ Base44 exit B1, task 1 (2026-10-29). `src/services/composition.ts` picks one ada
 | UNIT-SBLEAD-002 | "sends an interview to submit-lead" | `invoke("submit-lead", { body: interviewBody(summary) })` |
 | UNIT-SBLEAD-003 | "throws with the function's message and rid when submit-lead refuses, and does not retry" | `submit-lead failed: נדרשים שם וטלפון (rid ab12)`; `invoke` called once |
 | UNIT-SBLEAD-004 | "fills in an interview's just-saved lead" | `updatesInterviews === true` |
+
+### 4.82 A host name, normalised — `tests/unit/host.test.ts`
+
+`normalizeHost` in `src/lib/host.ts`, which the agency-content reads use to
+match the host a visitor asked for (moved from the retired legacy-host module,
+SEO-OLD-001/002).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-HOST-001 | "lower-cases and drops a trailing dot" | `B.Example.` → `b.example`; surrounding spaces and repeated dots go too |
+| UNIT-HOST-002 | "reads the hostname out of a URL" | `https://A.Example:8080/x?y#z` → `a.example` |
+| UNIT-HOST-003 | "returns an empty string for an unparseable URL or an empty value" | `http://` and `""` → `""` |

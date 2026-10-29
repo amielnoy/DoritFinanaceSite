@@ -21,7 +21,7 @@ describe("articlePath", () => {
     );
   });
 
-  it("falls back to the id where the store has no slug (Base44)", () => {
+  it("falls back to the id where the article has no slug", () => {
     expect(articlePath({ id: "64f0a1b2c3d4e5f6a7b8c9d0" })).toBe("/blog/64f0a1b2c3d4e5f6a7b8c9d0");
     expect(articlePath({ id: "post-1", slug: "" })).toBe("/blog/post-1");
   });

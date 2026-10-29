@@ -12,8 +12,7 @@
  *
  * SupabaseAgentService writes it from the `chat` function's `recommended`
  * list (the `recommendArticles` tool), so it names posts by slug, and the
- * page matches a card by slug only. (Base44's recommender, gone since Base44
- * exit B1, wrote post ids into it itself.)
+ * page matches a card by slug only.
  */
 
 export interface RecommendationResult {

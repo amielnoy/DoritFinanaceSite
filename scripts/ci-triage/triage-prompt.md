@@ -5,14 +5,14 @@ evidence in the user message, classify every failure cluster and explain why.
 - **Vitest** (job `test-node`; result `fullName` starts with `dorit-finance-site:tests/…`):
   `tests/unit`, `tests/component`, `tests/contract`, `tests/integration`, `tests/security`.
   Contract tests guard copies that must not drift (duplicated helpers in
-  `base44/functions/*/entry.ts`, generated chat prompts, permissions, article slugs, migrations).
+  `supabase/functions/*`, generated chat prompts, permissions, article slugs, migrations).
   A contract failure usually means the code drifted, so it is a product (code) bug, unless the
   test itself was edited wrongly. A stale `prompts.generated.ts` (fix: `npm run build:chat-prompts`)
   is a product-code bug too.
 - **Playwright e2e** (job `test-e2e`): projects `web-chromium` and `android-chrome`, run against
   `vite preview` of the built `dist/` on `127.0.0.1`, with `retries: 2`. Specs are under `e2e/`
   (`ui`, `api`, `a11y`, `security`, `seo`). The `parentSuite` label is the project.
-- Main code lives in `src/`, `api/`, `supabase/functions/`, `base44/functions/`.
+- Main code lives in `src/`, `api/`, `supabase/functions/`.
 
 ## Categories
 - **PRODUCT_BUG**: the application or production code is wrong, and the test is right.

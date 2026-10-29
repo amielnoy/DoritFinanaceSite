@@ -100,7 +100,7 @@ A public door with no sign-in: each caller is counted by a hash of their address
 
 ### 4.2b `escalate-to-human` — how often, and what it accepts (review 2026-10-15) — `INT-ESC-030..041`
 
-A hand-off that does not reach a person is a regulatory failure, so the limits never stand between an urgent reason and the staff. Base44's agents call from Base44's server, so one address stands for all their visitors: the per-caller limit is generous.
+A hand-off that does not reach a person is a regulatory failure, so the limits never stand between an urgent reason and the staff. A chat's hand-off arrives from the chat function's server, so one address stands for all its visitors: the per-caller limit is generous.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -134,7 +134,7 @@ A hand-off that does not reach a person is a regulatory failure, so the limits n
 ### 4.2f `submit-lead` — an interview's saves meet by the conversation (review 2026-10-15)
 
 A later save (complete, or the questionnaire's details) updates an earlier one only if both name the same `conversationRef`, which is stored as `leads.conversation_ref` (migration `20261101000000`). Nothing else matches: not the phone, not the name, not the address. A save without a reference is a new lead.
-- **The senders:** the chat tool sends `chat:<conversation id>`, the needs wizard one `wizard:<uuid>` per run, and the Base44 hand-off `base44:<conversation id>`.
+- **The senders:** the chat tool sends `chat:<conversation id>` and the needs wizard one `wizard:<uuid>` per run (rows from before the Base44 exit may carry `base44:<conversation id>`).
 - **Fixtures:** the "partial interview" and "details" suites carry `REF`, and the leads they should adopt carry the same `conversation_ref`.
 - **"whose interview it is", rewritten:**
   - the same number and name from another conversation is not adopted;
@@ -525,8 +525,7 @@ refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 ### 4.22 `submit-claim` — the claim, on Supabase — `INT-CLM-EDGE-001..011`
 
 `submit-claim.integration.test.ts` runs the Edge Function through the claim cases
-(Base44 exit B2 task 7: its Base44 twin and the two cases that compared the
-twins' mail are retired with the harness; `INT-CLAIM-001..013` now run once).
+(`INT-CLAIM-001..013`).
 `submit-claim-edge.integration.test.ts` holds what only the
 Edge Function does: the row it writes (today's fields, no Base44 id, `leadId`
 is its uuid), the service-key insert ahead of any mail, a non-JSON body
@@ -539,9 +538,7 @@ answer, none for a stranger's.
 
 `submit-lead.integration.test.ts`, `escalate-to-human.integration.test.ts` and
 `log-support-chat.integration.test.ts` run their cases through the Edge
-functions, which keep the guards, answers, mail and sheet rows the retired Base44
-ones had (Base44 exit B2 task 7). Differences from those are
-their own cases: Edge `submit-lead` writes the Google event and sheet row
+functions. Behaviour particular to the Edge functions has its own cases: Edge `submit-lead` writes the Google event and sheet row
 through the service account (the event in the calendar `GOOGLE_CALENDAR_ID`
 names, without attendees), mails Dorit and `amielnoy@outlook.com` an `.ics`
 invitation by mail instead of using Outlook — independently of the Google event
@@ -841,7 +838,7 @@ Time is fixed with `vi.setSystemTime` (Date only) at Sunday 2026-10-18 13:00 Isr
 | INT-CDP-004 | "does nothing when nothing is due" | No delete call |
 | INT-CDP-005 | "reports a refused delete as a failure, and never logs a file's name" | 500; no path in any log line |
 | INT-CDP-006 | "tells Dorit to keep a stored file, since the site deletes it after two months" | The staff mail carries the line for a `storage:claim-documents/…` file |
-| INT-CDP-007 | "says nothing of it when no file is stored on the site" | No such line — the Base44 and Edge mails still match |
+| INT-CDP-007 | "says nothing of it when no file is stored on the site" | No such line |
 
 ### 4.32 `sheet-retention` — the leads sheet keeps what the database keeps — `INT-SRET-001..007`
 

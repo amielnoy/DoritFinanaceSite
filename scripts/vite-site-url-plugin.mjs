@@ -14,10 +14,9 @@ import { join } from "node:path";
  * they are still correct on their own and readable in a diff. This rewrites the
  * emitted copies when — and only when — a different origin is configured.
  *
- * The default is the production domain, and was the old Base44 host until
- * 2026-10-14: a builder without the variable (the Base44 Builder, whose
- * environment is set only in its dashboard) shipped a copy that called itself
- * canonical. `src/lib/seo.ts` names the same default.
+ * The default is the production domain, so a build without the variable never
+ * ships a copy that calls another host canonical. `src/lib/seo.ts` names the
+ * same default.
  */
 export const DEFAULT_SITE_URL = "https://govari-fin.co.il";
 

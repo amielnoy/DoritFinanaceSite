@@ -1,7 +1,7 @@
 /**
  * The needs wizard: the same fields the interview agent collects, as choices.
  *
- * The free-text interview (`base44/agents/needs_interview.jsonc`) took a visitor
+ * The free-text interview (`supabase/functions/chat/prompts/interview.md`) took a visitor
  * many turns, several minutes and a model's patience to produce what Dorit
  * receives — and an anonymous visitor's agent cannot even save it (A-59), so the
  * page submits the close regardless. A deterministic form asks the same

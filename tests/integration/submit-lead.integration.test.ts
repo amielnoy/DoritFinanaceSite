@@ -23,21 +23,19 @@ import { REPO_ROOT } from "../helpers/entity-schema";
 type RunOptions = EdgeOptions;
 type Result = Awaited<ReturnType<typeof invokeEdge>> & { invitations?: EmailCall[] };
 
-/** Settings a case may give Base44's harness that the Edge function reads too. */
+/** Settings a case may set; the Edge run drops its own defaults for these. */
 const SHARED_ENV = ["SHEET_ID", "SHEET_TAB", "POA_URL"] as const;
 
 /**
  * The Edge function on the shared cases' terms.
  *
- * Settings: Base44's harness has no sheet and no mandate link unless a case
- * sets one, so the Edge run drops its own defaults for those and takes the
- * case's. Supabase, Google and the mailer it always has; in Base44's `env`,
- * `SUPABASE_URL` only switches the mirror on.
+ * Settings: no sheet and no mandate link unless a case sets one, so the run
+ * drops its own defaults for those and takes the case's. Supabase, Google and
+ * the mailer it always has.
  *
- * Invitations: Base44's went out from the calendar provider, the Edge
- * function's go out by mail (spec, "Invites by mail"). The shared cases read
- * the notifications both send; the invitations are in `invitations`, with
- * their own cases at the end.
+ * Invitations go out by mail (spec, "Invites by mail"). `emails` holds the
+ * notifications; the invitations are in `invitations`, with their own cases at
+ * the end.
  */
 async function runEdge(body: unknown, o: RunOptions = {}) {
   const { env, ...rest } = o;
@@ -559,7 +557,7 @@ describe.each(IMPLEMENTATIONS)("$label — what survives a failure", ({ run, dow
  * The meeting, in Supabase.
  *
  * The agreed time used to exist only as an argument on its way to a calendar
- * API: no column on the Base44 `Lead`, none on `leads`, and no table of its
+ * API: no column on the old Base44 `Lead`, none on `leads`, and no table of its
  * own. When the interview agent stopped sending it, the mail still went out
  * and the calendar quietly booked a default slot — and the only record that
  * anything had gone wrong was a line in a function log.
@@ -568,7 +566,7 @@ describe.each(IMPLEMENTATIONS)("$label — what survives a failure", ({ run, dow
  * short-circuits unless SUPABASE_URL and the service key are set, so every
  * earlier test ran with mirroring switched off without ever saying so.
  */
-describe.each(IMPLEMENTATIONS)("$label — what it stores about the meeting", ({ run, edge, calendarCall }) => {
+describe.each(IMPLEMENTATIONS)("$label — what it stores about the meeting", ({ run, calendarCall }) => {
   const SUPABASE = "https://stub.supabase.co";
   const env = {
     MAILER_URL,
@@ -589,10 +587,9 @@ describe.each(IMPLEMENTATIONS)("$label — what it stores about the meeting", ({
     scheduledAt: "2026-09-24T10:00:00",
   };
 
-  // The rows written to Supabase: Base44's mirror, or the Edge function's own
-  // writes. Writes only — the Edge function reads `leads` first, for an open
-  // interview.
-  // Writes: a POST, and — for the Edge function's meetings, written by id — a PATCH.
+  // The rows written to Supabase. Writes only — the function reads `leads`
+  // first, for an open interview.
+  // Writes: a POST, and — for meetings, written by id — a PATCH.
   const bodyOf = (r: Result, table: string) => {
     const calls = r.callsTo(`/rest/v1/${table}`).filter((c) => c.method === "POST" || c.method === "PATCH");
     expect(calls.length, `no write reached ${table}`).toBeGreaterThan(0);
@@ -627,19 +624,13 @@ describe.each(IMPLEMENTATIONS)("$label — what it stores about the meeting", ({
   it("writes the booking to the meetings table, keyed on the lead", async () => {
     const r = await run(booked, { env });
     const calls = r.callsTo("/rest/v1/meetings");
-    // Base44 keys the booking by its own lead id. The Edge function inserts
-    // the booking as its own row — a lead may hold many meetings
-    // (20261103000000_client_meetings.sql) — and hands back its id.
-    const key = edge ? { lead_id: r.leads[0].id } : { lead_base44_id: "LEAD-1" };
-    if (edge) {
-      expect(calls[0].method).toBe("POST");
-      expect(calls[0].url).not.toContain("on_conflict");
-      expect(calls[0].body).toMatchObject({ kind: "first" });
-    } else {
-      expect(calls[0].url).toContain(`on_conflict=${Object.keys(key)[0]}`);
-    }
+    // The booking is its own row — a lead may hold many meetings
+    // (20261103000000_client_meetings.sql) — keyed on the lead's id.
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).not.toContain("on_conflict");
+    expect(calls[0].body).toMatchObject({ kind: "first" });
     expect(calls[0].body).toMatchObject({
-      ...key,
+      lead_id: r.leads[0].id,
       scheduled_at: "2026-09-24T07:00:00.000Z",
       topic: "גמל, השתלמות ופנסיה",
       timing: "חמישי השבוע, 24/09, 10:00",
@@ -1241,7 +1232,7 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
 
   /**
    * The completion writes the full name and the agreed time — or keeps the
-   * time already stored. That both stores agree is Base44's own case, below.
+   * time already stored.
    */
   describe("the completion's name and time", () => {
     // A fresh object per test: an update writes into the stored lead, and a
@@ -1380,13 +1371,10 @@ describe.each(IMPLEMENTATIONS)("$label — a partial interview, and the upsert t
 });
 
 /**
- * The completion writes the same name and time to both stores.
+ * The completion writes the name and time the visitor actually agreed.
  *
- * The update used to leave `name` and `timing` out of the Base44 write while
- * the Supabase mirror took them from the request — so the two copies of one
- * interview disagreed, and reconcile-stores reported 11 of 49 leads drifted
- * on exactly these two fields. Whichever store a screen reads, it should see
- * the time the visitor actually agreed.
+ * An earlier update left `name` and `timing` out of one of its writes, so two
+ * records of one interview disagreed on exactly these two fields.
  */
 describe.each(IMPLEMENTATIONS)("$label — how complete the interview was", ({ run }) => {
   const base = {
@@ -2096,14 +2084,14 @@ describe("Edge submit-lead — what only it does", () => {
     expect(r.sheetRows[0].row[1]).toBe("consultation_request");
   });
 
-  it("asks nothing of Docs, Outlook or Base44", async () => {
+  it("asks nothing of Docs or Outlook", async () => {
     const r = await invokeEdge("submit-lead", consultation);
-    for (const host of ["docs.googleapis.com", "graph.microsoft.com", "base44"]) {
+    for (const host of ["docs.googleapis.com", "graph.microsoft.com"]) {
       expect(r.callsTo(host), `called ${host}`).toEqual([]);
     }
   });
 
-  // The Google counterparts of Base44's Outlook event cases above.
+  // Google's calendar event.
   it("asks Google for today's reminders, in Israel time", async () => {
     const r = await invokeEdge("submit-lead", consultation);
     expect(r.calendarEvents[0]).toMatchObject({

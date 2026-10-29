@@ -4,8 +4,8 @@ import type { SupabaseFunctionsClient } from "./SupabaseLeadService";
 import { FALLBACK_CONTACT } from "../fallback-contact";
 
 /**
- * The hand-off, on the `escalate-to-human` Edge Function. Like the Base44
- * adapter it never rejects: the visitor has just been told a person will call.
+ * The hand-off, on the `escalate-to-human` Edge Function. It never rejects:
+ * the visitor has just been told a person will call.
  */
 export class SupabaseSupportService implements SupportPort {
   constructor(private readonly client: SupabaseFunctionsClient) {}

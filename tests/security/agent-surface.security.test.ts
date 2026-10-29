@@ -27,8 +27,8 @@ import { leadsColumns } from "../helpers/leads-columns";
  */
 
 const CHAT = read(join(REPO_ROOT, "src/components/dorit/chat/AgentChat.tsx"));
-// submitLead and escalateToHuman are forwarders in Base44 now; the code that
-// composes the mail, redacts and appends the sheet row lives in the Edge functions.
+// The code behind submitLead and escalateToHuman — composing the mail,
+// redacting and appending the sheet row — lives in the Edge functions.
 const HTML_MAIL = read(join(REPO_ROOT, "supabase/functions/_shared/html.ts"));
 const SUBMIT_LEAD = read(join(REPO_ROOT, "supabase/functions/submit-lead/lead.js"));
 const ESCALATE = read(join(REPO_ROOT, "supabase/functions/escalate-to-human/escalation.js"));

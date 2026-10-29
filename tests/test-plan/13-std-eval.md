@@ -27,10 +27,8 @@ The cases drive the **real deployed agent**, over the same
 site uses — so what is measured is the agent visitors reach, not a local
 re-implementation of it.
 
-The Vitest evals that drove the Base44 agents through `@base44/sdk` are
-retired (2026-10-29, Base44 exit B1 task 3): the files, the `test:eval` script and
-the CI step are deleted. What replaces them is `npm run test:eval:chat` (§6),
-which runs by hand against the deployed `chat` function.
+The evaluation is `npm run test:eval:chat` (§6), which runs by hand against the
+deployed `chat` function.
 
 ## 3. Why the retired interview scenarios stopped early
 
@@ -94,8 +92,8 @@ from is [14-procedures-zones](14-procedures-zones.md) §3.
 
 ## 6. The chat function evaluation
 
-`npm run test:eval:chat` (`scripts/eval-chat.mjs`) is the gate before the chat
-function replaces Base44 for the interview (rollout step 3). It is a script, not
+`npm run test:eval:chat` (`scripts/eval-chat.mjs`) is the evaluation gate the
+chat function's prompts answer to (rollout step 3). It is a script, not
 a Vitest suite, and it is run by hand by the user.
 
 **What it runs.** A Sonnet model plays each of the 53 personas in

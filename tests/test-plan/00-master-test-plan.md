@@ -1,6 +1,6 @@
 # Master Test Plan — Dorit Gov-Ari Finance Site
 
-**Document ID:** MTP-01 · **Version:** 1.1 · **Status:** Maintained · **Updated:** 2026-10-17
+**Document ID:** MTP-01 · **Version:** 1.2 · **Status:** Maintained · **Updated:** 2026-10-29
 
 ---
 
@@ -9,9 +9,8 @@
 The system under test (SUT) is a React 18 + Vite
 single-page marketing and lead-generation site for an insurance and financial
 adviser, in Hebrew (RTL), hosted on Vercel and backed by Supabase auth, tables,
-storage and Edge Functions; the chat agents run on the Supabase chat function.
-Base44 adapters remain as a build-time rollback until cleanup 2. A
-Cloudflare Pages Function sends outbound mail. Adapter selection is documented in
+storage and Edge Functions; the chat agents run on the Supabase chat function. A
+Cloudflare Pages Function sends outbound mail. The wiring is documented in
 [the current-state guide](../../docs/current-state.md).
 
 In scope:
@@ -20,18 +19,18 @@ In scope:
 |---|---|
 | Pure logic | Pension fee maths, URL/class helpers, the open-redirect guard, contact config, the submission state machine, the admin data services, published FAQ and self-assessment content, and maintenance scripts |
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
-| Contracts | Frontend payloads and Base44 entities, Supabase schemas and function configuration, agency permissions and RLS, prompt sources, release gates and generated artifacts |
-| Integration | The Base44 and Supabase Edge Function handlers executed in-process against recording dependencies — what is stored, who is mailed, what each recipient sees, and what survives a failure |
-| Eval | The deployed `chat` function's interview, FAQ, procedures and blog agents played by a model persona (`npm run test:eval:chat`, by hand) — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. No Vitest cases (the Base44 agent evals were retired 2026-10-29); see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank behind the procedures personas |
+| Contracts | Frontend payloads, Supabase schemas and function configuration, agency permissions and RLS, prompt sources, release gates and generated artifacts |
+| Integration | The Supabase Edge Function handlers and the mailer executed in-process against recording dependencies — what is stored, who is mailed, what each recipient sees, and what survives a failure |
+| Eval | The deployed `chat` function's interview, FAQ, procedures and blog agents played by a model persona (`npm run test:eval:chat`, by hand) — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. No Vitest cases; see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank behind the procedures personas |
 | Agent compliance | The four agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
-| API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
+| API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets), the backend requests the bundle makes, and opt-in live Supabase probes |
 | UI e2e | Landing page, routing, calculator, the quick contact form and the claim report, blog, the agent chat's regulatory shell |
 | Mobile web | iOS Safari and Android Chrome behaviour and layout |
 | Security | XSS (page and chat), HTML injection into outbound mail, phishing vectors, prompt injection via UI and via tool payloads, DLP, open redirect, token handling, tab-nabbing, secret leakage, RLS |
 | Accessibility | WCAG 2.1 AA via axe-core, plus structural RTL/labelling checks |
 
 Out of scope: native iOS/Android applications (none exist in this repo — the
-"iOS" and "Android" suites are mobile **web**), Base44 platform internals,
+"iOS" and "Android" suites are mobile **web**),
 third-party services (Google Calendar, Resend, Vercel Analytics, WhatsApp),
 visual regression, and load/performance testing.
 
@@ -56,9 +55,8 @@ is built by `npm run build:e2e` with `e2e/build-env.ts` (production's provider
 switches, Supabase at the never-resolving `https://supabase.e2e.invalid`), and
 `e2e/fixtures/app.ts` answers that host — `/rest/v1`, `/functions/v1`,
 `/storage/v1`, `/auth/v1` — and aborts third-party beacons, so no test needs
-credentials or network access, and no test can touch production data. A Base44
-`/api` request fails the test (since 2026-10-18; before that the build ran the
-Base44 adapters and the fixture stubbed `/api/**`).
+credentials or network access, and no test can touch production data. An `/api`
+request other than the site's own Vercel functions fails the test.
 An opt-in block (`E2E_LIVE_API_URL`) runs the same contract against a real
 backend when one is available.
 
@@ -68,7 +66,7 @@ backend when one is available.
 |---|---|
 | Application source | `src/**` at the commit under test |
 | Chat function | `supabase/functions/chat/` (handler, tools, articles, sweep, prompts for the interview and the FAQ chat) and its migrations; the FAQ chat's sheet-log sweep and `log-support-chat` |
-| Backend definitions | `base44/entities/*.jsonc`, `base44/functions/{submitLead,submitClaim,createConsultationEvent,escalateToHuman,logSupportChat,upsertContact,contentAdmin,adminLead}`, `base44/agents/*.jsonc`, `dorit-mailer/functions/api/send-email.js` |
+| Backend definitions | `supabase/functions/*` (the Edge Functions), `supabase/migrations/*.sql`, `dorit-mailer/functions/api/send-email.js` |
 | Published copy | `content/blog/*.md`, `src/config/compliance.ts` |
 | Static assets | `index.html`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt`, `public/manifest.json` |
 | Build output | `dist/` produced by `npm run build:prerender` — the plain `npm run build` omits the prerendered route files, and the e2e suite tests what is in `dist/` |
@@ -125,9 +123,9 @@ Resume after the environment is corrected; no partial sign-off.
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
 Both runners write Allure results into the same `allure-results/`, so one
-`allure generate` covers the whole battery — 5190 Vitest results (2159 unit, 754
-component, 1336 contract, 848 integration, 93 security, counted 2026-10-29 after the
-Base44 agent evals were retired) plus the e2e cases per platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
+`allure generate` covers the whole battery — 4858 Vitest results (2122 unit, 754
+component, 1196 contract, 704 integration, 82 security, counted 2026-10-29 after
+Base44 exit B2) plus the e2e cases per platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
 eleven on the full matrix, two on a feature branch — into a single published
 report; generating per-leg would give a pile of partial reports instead of one
 picture of the run, and sharding only makes that worse. Allure 3 emits the merged report as a single self-contained
@@ -172,13 +170,10 @@ waiting on a page, not CPU-bound work. See `playwright.config.ts`. The pull-requ
 `opened`/`reopened` because pushes to the branch already run — reacting to
 `synchronize` as well would run the whole matrix twice per commit.
 
-Work made in the Base44 Builder currently syncs straight to `main`, so it lands
-untested and `main` can go red without warning. Dormant support for a `builder`
-branch runs the full battery on each Builder push, deploys a preview of it, and
-reports whether it is safe to merge; it activates the day the Builder is pointed
-at that branch — see the README. Merging stays the Builder's own action, so the
-enforcement lives at the publish step, which only runs from `main` and only on
-a green run.
+Everything keyed to a `builder` branch is dormant (it was built for the Base44
+Builder, which left with the Base44 exit). Merging stays a person's action, so
+the enforcement lives at the publish step, which only runs from `main` and only
+on a green run.
 
 **One nightly job deletes rather than reports.** `prune-vercel` removes Vercel
 preview deployments older than a month. It runs on the schedule only — no
@@ -191,9 +186,9 @@ credentials are absent.
 
 A red run costs production, not staging. The Vercel staging deployment goes out
 whenever the build succeeds — a failing run is exactly when it helps to open the
-broken build next to the report that says what broke — while the Base44
-production publish requires every suite to have passed, and the post-deploy
-smoke test runs only after that publish succeeds.
+broken build next to the report that says what broke — while the Vercel
+production promotion requires every suite to have passed, and the post-deploy
+smoke test runs only after that promotion succeeds.
 
 ## 10. Risks
 

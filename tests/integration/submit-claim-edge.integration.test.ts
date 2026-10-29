@@ -87,8 +87,7 @@ describe("submit-claim — the key it writes with", () => {
 });
 
 describe("submit-claim — what it refuses", () => {
-  // D-01, manual test 2026-10-14: a claim with the phone "abc" was filed. Edge
-  // only: Base44's submitClaim is the rollback N-03 retires, and was not changed.
+  // D-01, manual test 2026-10-14: a claim with the phone "abc" was filed.
   it.each(["abc", "123", "050123", "+1 202 555 0143"])("refuses a phone Dorit cannot call back (%s), touching nothing", async (phone) => {
     const r = await invokeEdge("submit-claim", { ...claim, phone });
     expect(r.status).toBe(400);

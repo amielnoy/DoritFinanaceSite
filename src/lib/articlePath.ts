@@ -12,7 +12,7 @@
 //
 // The slug rule is spelled in four places that cannot import one another:
 // here, the CHECK in supabase/migrations/20261014000000_blog_slug.sql,
-// base44/functions/contentAdmin/entry.ts and scripts/published-articles.mjs.
+// supabase/functions/content-admin/handler.ts and scripts/published-articles.mjs.
 // The same contract test fails when they drift.
 
 import type { Article } from "../services/ports.js";
@@ -57,8 +57,8 @@ export const isValidSlug = (slug: unknown): slug is string =>
 /**
  * The article's address: `/blog/<slug>`.
  *
- * Only the Supabase store holds slugs. A build that reads Base44 instead (no
- * Supabase configured) links by id, which is what every address was before.
+ * A row without a slug (none in production) links by id, which is what every
+ * address was before slugs.
  */
 export function articlePath(post: Pick<Article, "id" | "slug">): string {
   return `/blog/${post.slug || post.id}`;

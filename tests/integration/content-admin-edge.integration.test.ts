@@ -5,13 +5,12 @@ import { invokeEdge, SUPABASE_URL, type FetchCall } from "../helpers/edge-functi
 const serviceKeyOf = (f: FetchCall) => String(f.headers.apikey ?? "");
 
 /**
- * content-admin: the Edge twin of base44/functions/contentAdmin, writing
- * Supabase only. Same gate (a Supabase session whose profile is `admin`), same
- * slug rules, same allowed fields — and no Base44 write at all.
+ * content-admin: the admin's article and testimonial writes, on Supabase. The
+ * gate is a Supabase session whose profile is `admin`.
  *
  * Supabase is faked here as a tiny in-memory store: auth answers by token,
  * PostgREST by table and filter. Ids are either a Supabase uuid (rows written
- * since this function) or a Base44 id (rows the dual-write era created), and
+ * since this function) or a Base44 id (rows from before the move), and
  * both must find their row.
  */
 // Session tokens as long as real ones: _shared/staff.ts's bearer() wants 20+ characters.
@@ -267,7 +266,7 @@ describe("content-admin — articles, on Supabase only", () => {
     expect(r.json.id).toBe(row.id);
     const { id: _id, ...written } = row;
     expect(written).toEqual({ ...draft, published: false });
-    // Nothing went to Base44: this function holds no Base44 credential at all.
+    // Nothing went anywhere but Supabase.
     expect(r.fetches.every((f) => f.url.startsWith(SUPABASE_URL))).toBe(true);
   });
 

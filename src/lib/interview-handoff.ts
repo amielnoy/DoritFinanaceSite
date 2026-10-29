@@ -37,8 +37,7 @@ export interface InterviewSummary {
    */
   stage?: "complete" | "details";
   /**
-   * Which conversation the save belongs to (`wizard:<id>`; until Base44 exit
-   * B1 also `base44:<id>` from the chat's close), so a later save finds this
+   * Which conversation the save belongs to (`wizard:<id>`), so a later save finds this
    * lead by it — never by the phone and name, which anyone may know (review
    * 2026-10-15). Absent: the save stands alone.
    */
@@ -46,8 +45,9 @@ export interface InterviewSummary {
   /**
    * Marketing channel attribution — see src/lib/attribution.ts. Never parsed
    * out of the agent's fenced block: the model has no way to know this, so
-   * `readHandoff` below never sets these. `AgentChat.tsx` merges them in from
-   * `getAttribution()` at the point it calls `submitInterview`.
+   * `readHandoff` below never sets these. The wizard and the pension check
+   * merge them in from `getAttribution()` at the point they call
+   * `submitInterview`.
    */
   channel?: string;
   campaign?: string;

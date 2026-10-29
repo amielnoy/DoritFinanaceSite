@@ -16,7 +16,7 @@ export function safeReturnTo() {
     if (url.origin !== window.location.origin) return "/";
     // Nothing reads these from the URL any more, but the whole bootstrap set
     // stays stripped: one going back to a URL read must not silently become
-    // injectable again. Normal app-flow params (e.g. the OAuth consent ctx) are kept.
+    // injectable again. Every other param is kept.
     for (const p of ["access_token", "clear_access_token", "app_id", "app_base_url", "functions_version", "from_url"]) {
       url.searchParams.delete(p);
     }

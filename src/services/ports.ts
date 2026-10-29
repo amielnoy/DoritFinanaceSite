@@ -11,9 +11,7 @@ export type { InterviewSummary };
  * Ports — the interfaces the application depends on.
  *
  * Dependency Inversion: components and hooks depend on these abstractions, not
- * on the Base44 SDK. Before this, 14 files imported the vendor singleton
- * directly, so the SDK's shape *was* the application's architecture and every
- * test had to mock the vendor module.
+ * on a vendor SDK, so no test has to mock a vendor module.
  *
  * Interface Segregation: four narrow ports rather than one client interface, so
  * a blog page cannot reach lead submission and a form cannot reach content.
@@ -102,9 +100,8 @@ export interface LeadPort {
 export interface Article {
   id: string;
   /**
-   * The article's address, `/blog/<slug>`, in Latin kebab-case. Only the
-   * Supabase store has one (Base44's BlogPost does not), so a build reading
-   * Base44 links by `id`. Build links with `articlePath()`, never by hand.
+   * The article's address, `/blog/<slug>`, in Latin kebab-case. Build links
+   * with `articlePath()`, never by hand.
    */
   slug?: string;
   title: string;
@@ -223,7 +220,7 @@ export interface AgentPort {
   /**
    * `signal` abandons the send (the panel was reset or closed): the chat
    * function's adapter stops its request and its status polling and publishes
-   * nothing more. Base44's adapter has nothing to stop and ignores it.
+   * nothing more.
    */
   send(conversation: AgentConversation, text: string, options?: AgentSendOptions): Promise<void>;
   subscribe(conversationId: string, onMessages: (messages: AgentMessage[]) => void): () => void;
@@ -506,8 +503,8 @@ export interface LeadAdminPort {
   /** A new briefing from the lead-briefing function; its refusal (off, budget, nothing to brief on) in Hebrew. */
   generateBriefing(leadId: string): Promise<LeadBriefing>;
   /**
-   * A link that opens one of a claim's documents. A Base44 file URL is already
-   * one; a Supabase Storage reference (`storage:claim-documents/…`) is signed
+   * A link that opens one of a claim's documents. A Supabase Storage
+   * reference (`storage:claim-documents/…`) is signed
    * for a few minutes by the claim-document-link function, for whoever may see
    * that lead — so a link copied out of the screen stops working rather than
    * lasting for years.
@@ -742,8 +739,7 @@ export interface InviteResult {
 export interface ArticleDraft {
   title: string;
   /**
-   * Required to create an article. Stored in the Supabase mirror only:
-   * `contentAdmin` keeps it out of the Base44 write, whose entity has no such field.
+   * Required to create an article.
    */
   slug?: string;
   excerpt?: string;
@@ -773,11 +769,6 @@ export interface ContentAdminPort {
   listArticles(limit?: number): Promise<Article[]>;
   /**
    * Returns the new row's id.
-   *
-   * It used to return nothing, which was fine while one store existed. The id
-   * is what ties the two copies together: `contentAdmin` writes Base44 first
-   * and stamps the id it gets back into Supabase's `base44_id`, so a row
-   * created during the migration is one row and not two unrelated ones.
    */
   createArticle(draft: ArticleDraft): Promise<string>;
   updateArticle(id: string, draft: Partial<ArticleDraft>): Promise<void>;
@@ -792,11 +783,8 @@ export interface ContentAdminPort {
  * Auth
  *
  * What the app needs to know about the signed-in owner, and nothing about
- * how Base44 stores the token. `AuthContext` was the last first-party module
- * besides the composition root importing the SDK singleton; behind this port
- * a test can render the admin guards against a fake instead of mocking the
- * vendor module. The sign-in screens themselves (login, register, password
- * reset) are Base44's own flow and keep talking to the SDK directly.
+ * how the session is stored. Behind this port a test can render the admin
+ * guards against a fake instead of mocking a vendor module.
  * ───────────────────────────────────────────────────────────────────────── */
 
 export interface AuthUser {
@@ -826,15 +814,9 @@ export interface AuthPort {
   logout(redirectUrl?: string): void;
   redirectToLogin(returnUrl: string): void;
   /**
-   * Start a Google sign-in, returning to `returnUrl`.
-   *
-   * Distinct from `redirectToLogin`, which hands off to whatever sign-in screen
-   * the provider hosts. This is the button on our own login page, and it exists
-   * on the port so that switching provider switches what the button does —
-   * while it called the SDK directly, flipping VITE_AUTH_PROVIDER changed who
-   * answered `me()` and left the visitor signing in to the old system.
+   * Start a Google sign-in, returning to `returnUrl`: the button on our own
+   * login page. Rejects when it could not start, so the page can say so.
    */
-  /** Starts Google's sign-in; rejects when it could not start, so the page can say so. */
   signInWithGoogle(returnUrl: string): Promise<void>;
   /**
    * Sign in with an address and a password.

@@ -2,8 +2,8 @@
 //
 // `check-production-publish.mjs` answers a different question: did a publish
 // happen in this run. It cannot answer whether the edge is serving it yet, and
-// on Base44 it often is not — the CLI returns, the job reports success, and the
-// CDN keeps handing out the previous bundle for a while.
+// often it is not — the CLI returns, the job reports success, and the CDN
+// keeps handing out the previous bundle for a while.
 //
 // The smoke suite then opens a browser against the old release and fails on
 // whatever the new one added. That is what happened to `#start`: red at publish
@@ -24,7 +24,7 @@
 //                   wait for — this used to sit out the full timeout instead,
 //                   eight minutes on every backend-, docs- or SEO-file merge.
 //   PREVIOUS_ASSET  What the host served before the publish. Without an
-//                   expected asset (a Base44-only or preview run), wait for it
+//                   expected asset (a preview run), wait for it
 //                   to change, as before.
 //
 // The timeout is not a failure — it warns and lets the smoke run. The smoke is

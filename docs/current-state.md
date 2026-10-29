@@ -1,8 +1,9 @@
 # Current architecture and operations
 
-Checked against repository code on **2026-10-17**, after Base44 cleanup 1 (#262).
-This describes implemented behavior and defaults, not a fresh audit of deployed
-flags, account ownership, DNS, mail delivery or applied database migrations.
+Checked against repository code on **2026-10-29**, after the Base44 exit (B1
+#312 and B2). This describes implemented behavior and defaults, not a fresh audit
+of deployed flags, account ownership, DNS, mail delivery or applied database
+migrations.
 
 ## Hosting and releases
 
@@ -22,37 +23,57 @@ the `.deb` files are cached per runner image and installed with `dpkg`, so only 
 first run after a runner-image update reaches the Ubuntu mirror, with a time limit
 and a retry that avoids the Azure mirror (#304, after it stalled deploys on 2026-10-26).
 
-**Nothing is published to Base44 any more** (2026-10-17). The Base44 host
-(`safe-arch-plan.base44.app`) still serves the last version published there, and
-the Base44 code and adapters remain in the repository as a rollback path until
-cleanup 2, on or after 2026-10-29 ([exit record](base44-exit/README.md)). A
-rollback to a Base44 adapter is a build-time flag change; any Base44-side change
-would also need a manual deploy and a dashboard Publish, which CI no longer runs.
+**Base44: none.** The site, its backend and all four chat agents run on Vercel
+and Supabase; the repository holds no Base44 code, SDK, adapter or switch
+([exit record](base44-exit/README.md)). What remains of Base44 is `base44_id` on
+rows that came from it and the `/blog/<24 hex>` old-link redirect.
+
+### After the exit: dashboard actions
+
+These are the account owner's, not the repository's:
+
+- [ ] Delete the Vercel variables `VITE_BASE44_APP_ID`, `VITE_BASE44_SERVER_URL`,
+  `VITE_BASE44_APP_BASE_URL`, `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`,
+  `VITE_UPLOAD_PROVIDER`, `VITE_CONTENT_IMAGES` and `VITE_CHAT_AGENTS`. Nothing
+  reads them.
+- [ ] Delete the GitHub secrets `BASE44_API_KEY`, `BASE44_ACCESS_TOKEN` and
+  `BASE44_REFRESH_TOKEN`, and the variables `BASE44_APP_ID` and `BASE44_URL`.
+- [ ] Revoke the Base44 connectors.
+- [ ] Uninstall the Base44 GitHub App. The Builder restores five `.jsx` auth
+  pages whenever its environment starts, and a `.jsx` beside a `.tsx` now turns
+  `main` red (the frontend-payloads contract).
+- [ ] Confirm whether the Base44 support agent still answers on WhatsApp, before
+  deleting the app.
+- [ ] Then delete the Base44 app.
 
 Allure reports publish separately to Cloudflare Pages. CI probes both report
 hostnames for anonymous access, but currently warns rather than fails when the
 report is public. Verify Access configuration directly before assuming privacy.
 
-## Backend selection
+## Backend
 
-[Service composition](../src/services/composition.ts) selects adapters. Frontend
-flags are build-time settings: changing one requires a rebuild and deployment.
-Supabase is configured when both `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_PUBLISHABLE_KEY` are present. Never put service-role keys in `VITE_`
-variables. The defaults below are the code's; what production sets is checked in
-Vercel's environment variables, not here.
+[Service composition](../src/services/composition.ts) wires every port to Supabase
+when both `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are present;
+without them each port is an `Unconfigured*` stand-in that reads empty and refuses
+writes ("אין חיבור למאגר."), so a build without credentials still starts. Never put
+service-role keys in `VITE_` variables. Frontend flags are build-time settings:
+changing one requires a rebuild and deployment. The defaults below are the code's;
+what production sets is checked in Vercel's environment variables, not here.
 
-| Capability | Selection and fallback |
+| Capability | Where it runs |
 | --- | --- |
-| Identity, personal area, memberships and user administration | Supabase; without it, unconfigured adapters expose no signed-in identity or agency membership |
-| Public content and admin reads | Supabase when configured; otherwise Base44 |
-| Admin lead writes | Supabase under the caller's session when configured; otherwise the Base44 `adminLead` function |
-| Claim submission | Supabase `submit-claim` when configured; otherwise Base44 |
-| Leads, interviews, handoffs and support logs | `VITE_LEAD_FUNCTIONS=supabase` plus a configured client selects Edge Functions; default is the Base44 adapter |
-| Content writes | `VITE_CONTENT_WRITES=supabase` plus a configured client selects `content-admin`; default is Base44 `contentAdmin` |
-| Claim documents | `VITE_UPLOAD_PROVIDER=supabase` plus a configured client; default Base44 |
-| Public content images | Independent `VITE_CONTENT_IMAGES=supabase` switch; default Base44. The About and footer photos are files in `public/images/` since #262 |
-| Chat | `VITE_CHAT_AGENTS` selects agent names individually; empty by default, or without Supabase, uses Base44. Production serves all four from the chat function |
+| Identity, personal area, memberships and user administration | Supabase Auth and tables |
+| Public content and admin reads | Supabase tables |
+| Admin lead writes | `leads` under the caller's session |
+| Claim submission | the `submit-claim` Edge Function; documents in the private `claim-documents` bucket |
+| Leads, interviews, handoffs and support logs | the `submit-lead`, `escalate-to-human` and `log-support-chat` Edge Functions |
+| Content writes | the `content-admin` Edge Function; images in Supabase Storage |
+| Chat | the `chat` Edge Function, for all four agents |
+
+Feature switches:
+
+| Switch | Behaviour |
+| --- | --- |
 | Clearinghouse | `VITE_MASLEKA_ENABLED=true` and a configured client; otherwise the unavailable adapter makes no requests |
 | Call briefing | `VITE_LEAD_BRIEFING=true` shows "תדריך" in the lead drawer; the `lead-briefing` function also needs `LEAD_BRIEFING_MONTHLY_BUDGET_USD` above 0 (default 0, off). Both off until the privacy line and the adviser's sign-off (`docs/COMPLIANCE.md` §12) ([config](../src/config/lead-briefing.ts)) |
 | Staff-entered leads | `VITE_STAFF_LEADS=true` shows "פנייה חדשה" on the leads screen for a member of agency 1, through `create-lead` and the `staff-intake-v1` notice ([config](../src/config/staff-leads.ts)). On in production since 2026-10-26; the adviser's approval of `staff-intake-v1` was still open then |
@@ -61,17 +82,7 @@ Vercel's environment variables, not here.
 | Client meetings | `VITE_MEETINGS_STAFF` (the lead drawer's meetings) and `VITE_MEETINGS_CLIENT` ("הפגישות שלי" in `/account`), each off by default ([config](../src/config/meetings.ts)) |
 | Public agency content | `VITE_AGENCY_CONTENT=true` plus a configured client reads `public_agency_sites`, `public_agent_cards` and `success_cases` for the agency that claims the host name. Otherwise, while loading, on any error and for a non-Hebrew locale, the bundled agency-1 constants are used. The prerender always uses the constants ([config](../src/config/agency-content.ts)) |
 
-The Base44 adapter does not imply all work executes there: `submitLead` and
-`escalateToHuman` are forwarders to Supabase. Inspect the function entry point when
-tracing requests. Removing a chat name or reverting a provider flag restores that
-adapter on the next build, but does not copy records between stores. Content created
-only in Supabase cannot be edited through the Base44 content rollback path.
-
-Content writes were held on Base44 while a Base44 agent still read `BlogPost`.
-Production switched to `VITE_CONTENT_WRITES=supabase` on 2026-10-16, and all four
-roles now run on the chat function — `needs_interview`, `support_agent`,
-`procedures_agent`, `blog_recommender` — so `blog_posts` is the one article store;
-`scripts/seed-blog.mjs` writes only there.
+`blog_posts` is the one article store; `scripts/seed-blog.mjs` writes only there.
 
 ## Agency access
 
@@ -108,29 +119,23 @@ Sources live in `supabase/functions/chat/prompts/`. After an intentional prompt
 change run `npm run build:chat-prompts`; the change ships with the chat function
 in CI's Supabase deployment. Role tools are restricted in `handler.ts`. FAQ and
 procedures support records are written by the sweep, not by a model tool call.
-Consent and attribution come from the conversation row.
-
-The Base44 agent definitions under `base44/agents/` are no longer published.
-Until cleanup 2 removes them, `chat-prompts.contract.test.ts` still holds their
-JSONC prompts to the Markdown sources, so keep both in step. The page-side fenced
-`lead` handoff for the Base44 interview stays while that rollback transport is in
-the code.
+Consent and attribution come from the conversation row. The function runs the
+interview's `submitLead` itself; the page only counts the `lead_saved` signal.
 
 ## Mail, calendars and personal data
 
 All outbound mail goes through `dorit-mailer/functions/api/send-email.js` on
-Cloudflare Pages. It holds the Resend key and verified sender. Backends hold
-`MAILER_URL` and their own caller token; use the [README mailer runbook](../README.md)
+Cloudflare Pages. It holds the Resend key and verified sender. The Edge Functions
+hold `MAILER_URL` and their caller token; use the [README mailer runbook](../README.md)
 for configuration. Do not restore direct Resend keys in backend setup instructions.
 
 Supabase's `_shared/recipients.ts` defines `SECONDARY_EMAIL`, notification
 recipients (with the `NOTIFY_EMAILS` secret override), and calendar attendees.
 Attendees include the secondary address and notification addresses; invitation
-handling accounts for the calendar owner. Base44 copies are protected by contracts.
+handling accounts for the calendar owner.
 The Edge calendar writer uses a service account to create a Google event without
-attendees; Outlook receives an ICS invitation by mail. Retained Base44 calendar
-code uses OAuth connectors. Verify ownership and sharing against the external
-account, not a repository assumption.
+attendees; Outlook receives an ICS invitation by mail. Verify ownership and
+sharing against the external account, not a repository assumption.
 Human-readable dates use Israel time; preserve provider-specific timezone names.
 
 A new account gets one welcome mail (`welcome-user`, #306): the app asks after a
@@ -164,7 +169,7 @@ For application changes run `npm run lint`, `npm run typecheck`,
 change that looks UI-only can still fail them. Since 2026-10-18 the e2e bundle is
 built with production's switches (`e2e/build-env.ts`, `npm run build:e2e`) against
 a fake Supabase host the e2e fixture answers, so the suite exercises the Supabase
-adapters rather than the Base44 rollback path. Live API and model evals are opt-in
+adapters. Live API and model evals are opt-in
 and can contact deployed services; consult [the test plan](../tests/test-plan/README.md)
 first. Update the relevant STD when tests change. Documentation-only changes need
 link, command and source checks; record exactly which checks ran.

@@ -2,7 +2,7 @@
  * The chat's redaction: redact()'s rules (ID, card, bank account and IBAN),
  * except for the visitor's phone number, which the interview exists to take.
  *
- * redact() (log-support-chat/redact.js, kept identical to its Base44 copy) treats
+ * redact() (log-support-chat/redact.js, kept identical to its other copies) treats
  * any 6–8-digit run as an account number and any 9-digit run as an ID, so it
  * cut the 7-digit tail off `050-1234567` and took `031234567` for an ID. The
  * model read the stored text back, so it never saw the phone and the lead

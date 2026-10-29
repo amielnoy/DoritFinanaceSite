@@ -23,8 +23,8 @@ Software Test Description (STD) per suite.
 | 10 | [Known issues & deviations](10-known-issues.md) | all | — | — |
 | 11 | [STD — SEO](11-std-seo.md) | seo | Playwright + Vitest | `e2e/seo/`, `tests/unit/seo.dom.test.ts` |
 | 12 | [STD — Integration](12-std-integration.md) | integration | Vitest (node) | `tests/integration/` |
-| 13 | [STD — Agent Evals](13-std-eval.md) | eval | Vitest (node), opt-in | `tests/eval/` |
-| 14 | [The procedures agent: where the line runs](14-procedures-zones.md) | contract + eval | — | `base44/agents/procedures_agent.jsonc` |
+| 13 | [STD — Agent Evals](13-std-eval.md) | eval | `npm run test:eval:chat` (script), by hand | `tests/eval/chat/` |
+| 14 | [The procedures agent: where the line runs](14-procedures-zones.md) | contract + eval | — | `supabase/functions/chat/prompts/procedures.md` |
 | 15 | [Manual test plan](15-manual-test-plan.md) | manual | a person in a browser | — |
 
 ## Test case identifiers

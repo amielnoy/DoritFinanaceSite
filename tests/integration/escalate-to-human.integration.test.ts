@@ -138,9 +138,9 @@ describe.each(IMPLEMENTATIONS)("$label — identifiers in a model-written summar
   it("redacts before the notification is sent", async () => {
     const r = await run(leaky);
     for (const mail of r.emails) {
-      // Every half of every copy. `body` is absent once a message carries HTML
-      // — Base44 rejects the two together — so asserting on it alone would pass
-      // by reading undefined rather than by finding nothing.
+      // Every half of every copy. `body` is absent once a message carries HTML,
+      // so asserting on it alone would pass by reading undefined rather than by
+      // finding nothing.
       const whole = `${mail.html ?? ""}${mail.text ?? ""}${mail.body ?? ""}`;
       expect(whole, mail.to).not.toContain("123456789");
       expect(whole, mail.to).not.toContain("4580");
@@ -329,10 +329,8 @@ describe.each(IMPLEMENTATIONS)("$label — channel attribution", ({ run }) => {
   });
 });
 
-// What only the port does. The Base44 function mirrored each lead into Supabase
-// after writing its own entity; the port writes Supabase alone and appends the
-// sheet row through the service account (spec: Supabase is the only store, no
-// connectors), so these have no Base44 counterpart.
+// What the function itself stores: Supabase alone, and the sheet row through
+// the service account (spec: Supabase is the only store, no connectors).
 describe("Edge escalate-to-human — what only it does", () => {
   const handoff = { reason: "user_request", summary: "רוצה לדבר עם דורית", name: "דנה", phone: "0501234567", agent: "support_agent" };
 
@@ -358,7 +356,7 @@ describe("Edge escalate-to-human — what only it does", () => {
 
   it("answers ok: false with the contact details when the body is not usable", async () => {
     const r = await invokeEdge("escalate-to-human", handoff, { rawBody: "{not json" });
-    // Base44's `await req.json()` throws into the catch; the port does the same.
+    // `await req.json()` throws into the catch.
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ ok: false });
     expect(r.json.contact).toMatchObject({ phoneDisplay: "050-831-1776" });

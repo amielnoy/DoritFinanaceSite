@@ -21,8 +21,8 @@ import { systemBlocks, type ChatRole } from "../../supabase/functions/chat/promp
 
 /**
  * An Edge function's whole source: its handler and sibling modules, and the
- * shared modules it imports. submitLead, escalateToHuman and logSupportChat are
- * forwarders in Base44 now, so what they used to do is read from here.
+ * shared modules it imports. submitLead, escalateToHuman and logSupportChat
+ * run here, so their rules are read from here.
  */
 function edgeBundle(dir: string): string {
   const base = join(REPO_ROOT, "supabase/functions", dir);
@@ -782,14 +782,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   });
 
   /**
-   * The mirror is the fifth duplicated helper, and its drift is the quietest of
-   * the lot. It cannot throw — Base44 is authoritative during the migration and
-   * a failed shadow write must never cost a visitor their enquiry — so a copy
-   * that stops working stops working in silence. One function's leads reach
-   * Supabase, another's do not, and the only trace is a log line nobody reads.
-   */
-  /**
-   * The device label is the sixth duplicated helper. Its drift is cosmetic
+   * The device label is a duplicated helper. Its drift is cosmetic
    * rather than dangerous — a wrong label on a notification is not a lost
    * enquiry — but three copies of a regex are three chances for one to learn
    * about a device the others do not, and then the same phone reads as
@@ -1021,10 +1014,10 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     /**
      * An email the platform cannot deliver must not be promised.
      *
-     * Base44's `Core.SendEmail` delivers only to registered users of the app —
-     * "Send emails to registered users of your app". A visitor is never one, so
-     * the confirmation the prompt used to offer ("אשלח אליך אישור") could not
-     * arrive, and the interview was making a promise the system fails silently.
+     * The interview first ran where mail reached only registered users of the
+     * app (Base44's `Core.SendEmail`). A visitor is never one, so the
+     * confirmation the prompt used to offer ("אשלח אליך אישור") could not
+     * arrive, and the interview was making a promise the system failed silently.
      * The address is still worth asking for; it is a way to reach them, not a
      * mailbox the site can write to.
      */
@@ -1076,9 +1069,9 @@ describe("who receives a lead, and whether the consent text admits it", () => {
  * RTL message; no `text-align`; a different panel colour; and no escaping at all
  * on a name that arrives from a public form.
  *
- * The shape is shared by duplication, because Base44 gives these entry points no
- * module to share — the same arrangement `redact()` is under, and the same rule:
- * duplicated is fine, drifted is not. What differs between messages is content,
+ * The shape lives in one shared module (supabase/functions/_shared/html.ts);
+ * where a copy exists, the rule is the one `redact()` is under: duplicated is
+ * fine, drifted is not. What differs between messages is content,
  * and content is passed in.
  */
 describe("the letter a customer gets", () => {
@@ -1146,8 +1139,8 @@ describe("the letter a customer gets", () => {
 /**
  * The event log in Google Sheets.
  *
- * Two functions append to one sheet, and Base44 gives them no shared module —
- * so the column order exists twice. Nothing fails when the two disagree: rows
+ * Two functions append to one sheet, each with its own column list — so the
+ * column order exists twice. Nothing fails when the two disagree: rows
  * keep appending, in the wrong columns, and the corruption is only visible to
  * whoever reads the sheet weeks later. That is what these pin.
  */

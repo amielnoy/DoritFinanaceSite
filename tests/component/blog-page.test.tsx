@@ -70,7 +70,7 @@ const POSTS = [
   post("pen-4", "פנסיה"),
   post("pen-5", "פנסיה"),
   post("pen-6", "פנסיה"),
-  post("pen-7", "פנסיה", { image_url: "https://media.base44.com/images/public/test/real.jpg" }),
+  post("pen-7", "פנסיה", { image_url: "https://images.example.test/blog/real.jpg" }),
 ];
 
 const { default: Blog } = await import("@/pages/Blog");

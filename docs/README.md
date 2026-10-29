@@ -10,8 +10,7 @@ environment variables, publishing and operational runbooks.
 | [Design system](design-system.md) | UI foundations and component conventions |
 | [Test plan and STDs](../tests/test-plan/README.md) | Coverage, commands, traceability and known issues |
 | [Local test runner](local-runner.md) | Running and analyzing tests from a local page |
-| [Architecture review](../Architecture.html) | Architecture and dated review findings |
-| [System map](../SystemMap.html) | Visual component and service inventory |
+| [Architecture review](../Architecture.html) | Dated record (Rev 2.1, 2026-10-15, before the Base44 exit) and its review findings |
 | [Design drift review](../CodeReview.html) | Recorded design-system findings |
 | [Base44 exit record](base44-exit/README.md) | Historical measurements and migration evidence |
 | [Agency roles design](superpowers/specs/2026-10-15-agency-roles-design.md) | Owner/Admin/User permissions and rollout |

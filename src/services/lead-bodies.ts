@@ -1,8 +1,8 @@
 import type { EscalationRequest, InterviewSummary, Lead } from "./ports";
 
 /**
- * The request bodies the lead functions take. Shared by the Base44 and the
- * Supabase adapters so that switching backend cannot change what is sent.
+ * The request bodies the lead functions take, built in one place so the
+ * adapter and its tests agree on what is sent.
  */
 
 export function leadBody(lead: Lead): Record<string, unknown> {

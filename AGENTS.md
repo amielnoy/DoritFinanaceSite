@@ -2,40 +2,33 @@
 
 ## Project Context
 
-This is a Base44 app repository. Treat it as user-owned application code, keep changes focused on the user's request, and preserve existing project conventions.
+This is the repository of Dorit Gov Ari's site: a React (Vite) frontend served by Vercel, on a Supabase backend (Postgres, Auth, Storage and Edge Functions). Treat it as user-owned application code, keep changes focused on the user's request, and preserve existing project conventions.
 
 Start with `README.md` for local setup, environment variables, and publish workflow.
-`docs/README.md` indexes the documentation; `docs/current-state.md` records current
-adapter selection, release gates and agency access. Keep dated plans and incident
+`docs/README.md` indexes the documentation; `docs/current-state.md` records the
+current backend, release gates and agency access. Keep dated plans and incident
 measurements distinguishable from current operations.
-
-## Base44 References
-
-- CLI overview: https://docs.base44.com/developers/references/cli/get-started/overview.md
-- Agent skills: https://docs.base44.com/developers/backend/overview/skills.md
-
-If your agent supports Agent Skills, install or update Base44 skills before Base44-specific work:
-
-```bash
-npx skills add base44/skills
-```
 
 ## Key Files
 
 - `src/`: frontend application source.
-- `src/api/base44Client.js`: frontend Base44 SDK client.
-- `base44/functions/*/entry.ts`: backend functions. Isolated entry points with no
-  shared module, so some helpers are duplicated by hand — `redact`, `escapeHtml`,
-  `buildClientHtml`, `SHEET_COLUMNS`, `appendEventRow`, `NOTIFY_EMAILS`, `wallClock`,
-  `upstreamReasons`, and in the two calendar writers `CALENDARS`,
-  `CALENDAR_PROVIDERS` and `CALENDAR_ATTENDEES`. Duplicated is fine; drifted is not, and
+- `src/api/supabaseClient.ts`: the frontend Supabase client, or null when
+  `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` are unset — then every
+  port is an `src/services/unconfigured/` stand-in that reads empty and refuses
+  writes.
+- **Copies kept by hand in the Edge Functions:** `redact` (in
+  `submit-lead/lead.js`, `escalate-to-human/escalation.js` and
+  `log-support-chat/redact.js`) and the event sheet's `SHEET_COLUMNS` (in
+  `lead.js` and `escalation.js`). Duplicated is fine; drifted is not, and
   `tests/contract/agents.contract.test.ts` fails when copies stop matching.
-  Every one of these drifts silently, and two have already cost something:
-  `NOTIFY_EMAILS` is the easiest to get wrong, because a mailbox added to one
-  function and not another raises no error anywhere — the mail simply reaches
-  one fewer person, and escalations are where that costs most. `wallClock` is
-  the one that did: the copy that kept `new Date(x).toISOString()` filed every
-  agreed meeting three hours late, in the only diary anyone reads.
+  The recipient lists — `NOTIFY_EMAILS`, `SECONDARY_EMAIL`,
+  `CALENDAR_ATTENDEES` — live once, in `supabase/functions/_shared/recipients.ts`.
+  Every one of these drifted silently once, and two cost something:
+  `NOTIFY_EMAILS` is the easiest to get wrong, because a mailbox missing from a
+  list raises no error anywhere — the mail simply reaches one fewer person, and
+  escalations are where that costs most. `wallClock` is the one that did: the
+  copy that kept `new Date(x).toISOString()` filed every agreed meeting three
+  hours late, in the only diary anyone reads.
   `CALENDAR_ATTENDEES` must list every address that receives the enquiry by
   mail — `NOTIFY_EMAILS` plus `SECONDARY_EMAIL` — and not one address more.
   It left Dorit out for eleven days on the theory that she owned the `outlook`
@@ -48,11 +41,6 @@ npx skills add base44/skills
   column to it deliberately, never by opening `leads`. The revokes name `anon` and
   `authenticated` because Supabase's default privileges grant EXECUTE to them by
   name; a bare `from public` leaves the functions open.
-- `base44/functions/adminLead`: the rollback path for an admin's status change
-  and delete on a lead, used only when Supabase is not configured. Writes
-  Supabase first, then Base44. The browser must not write Base44's `Lead` entity
-  directly — Supabase would keep the old status and the deleted enquiry, and the
-  personal area reads Supabase. See A-73.
 - **Agency content** (`VITE_AGENCY_CONTENT`, `src/hooks/useAgencyContent.ts`,
   `supabase/migrations/20261107000000_seed_agency1_content.sql`).
   - The seed equals the bundled strings (`tests/contract/agency-content-seed.contract.test.ts`),
@@ -91,37 +79,37 @@ npx skills add base44/skills
     other. `src/config/permissions.ts` mirrors the permissions table for the
     screens, and `tests/contract/permissions.contract.test.ts` holds it to the
     gates.
-- `src/services/supabase/SupabaseLeadAdminService.ts`: with Supabase configured,
-  the admin's lead writes go straight to `leads` under her session
+- `src/services/supabase/SupabaseLeadAdminService.ts`: the admin's lead writes
+  go straight to `leads` under her session
   (`leads_update_admin` / `leads_delete_admin`), by Supabase `id`, and ask for
   the row back — a write row-level security filters out changes nothing and
   returns no error, so an empty answer is an error, never a success.
-- `supabase/functions/chat/`: the on-site agents served by our own function (`VITE_CHAT_AGENTS`; the interview first).
-  - The prompts' source of truth is `prompts/*.md`. Run `npm run build:chat-prompts` after editing one; a contract test fails while `prompts.generated.ts` is stale.
-  - The `.md` files are the prompts' only source: the `base44/agents/*.jsonc` copies are no longer published or compared (2026-10-17). `compliance.md` is `docs/COMPLIANCE.md` §3 and §5 verbatim — change the record, then the prompt.
+- `supabase/functions/chat/`: every on-site agent (the interview, the FAQ chat, the procedures chat and the reading recommender), served by our own function.
+  - The prompts live in `supabase/functions/chat/prompts/*.md`, their only source. Run `npm run build:chat-prompts` after editing one; a contract test fails while `prompts.generated.ts` is stale. They ship with the `chat` function, which CI deploys on green `main`.
+  - `compliance.md` is `docs/COMPLIANCE.md` §3 and §5 verbatim — change the record, then the prompt.
   - Each role gets only its own tools (`ROLE_TOOLS` in `handler.ts`); a tool outside the set answers `unknown_tool` and never runs. The FAQ and procedures chats' Support-tab rows are written by the 15-minute sweep (`sweep.ts`, the `x-chat-sweep` route), never by the model.
   - `_shared/agency.ts` is a pinned copy of `agencyProfile.ts`.
   - The tool names stay `submitLead` and `escalateToHuman`, because the prompt names them.
   - Consent and attribution come from the conversation row, never from the model.
 - **An article's address is `blog_posts.slug`, and its rule is spelled four times.**
-  Supabase holds it alone (Base44's `BlogPost` has none), so `contentAdmin` sends
-  it to the mirror and never to Base44. It is Latin kebab-case and never 24 hex
-  characters, because `vercel.json` sends every `/blog/<24 hex>` to
+  The `content-admin` Edge Function writes it. It is Latin kebab-case and never
+  24 hex characters, because `vercel.json` sends every `/blog/<24 hex>` to
   `api/og/blog.ts`, which answers an old Base44-id link with a 301 to the slug.
   The rule lives in `src/lib/articlePath.ts`, the CHECK in
-  `supabase/migrations/20261014000000_blog_slug.sql`, `contentAdmin` and
+  `supabase/migrations/20261014000000_blog_slug.sql`, `content-admin` and
   `scripts/published-articles.mjs`; `tests/contract/article-slug.contract.test.ts`
   fails when they drift, and when an article link is built by hand instead of
-  with `articlePath()`. A partial write to `blog_posts` is a PATCH by
-  `base44_id`, never an upsert: it touches only what changed, and fails when
-  the row is missing instead of creating one. A row inserted without a slug
-  gets `post-<id>` from the `blog_posts_fill_slug` trigger, so the mirror never
-  sends a null slug: with none in the draft, the key is absent.
+  with `articlePath()`. A partial write to `blog_posts` is a PATCH by the row's
+  id (its uuid, or `base44_id` for an article from before the move), never an
+  upsert: it touches only what changed, and fails when the row is missing
+  instead of creating one. A row inserted without a slug gets `post-<id>` from
+  the `blog_posts_fill_slug` trigger, so a write never sends a null slug: with
+  none in the draft, the key is absent.
 - `supabase/functions/<name>/`: Supabase Edge Functions (Deno).
   - **Layout:** `handler.ts` exports `handler`, and `index.ts` is only `Deno.serve(handler)`.
-  - **Shared code:** helpers live once in `supabase/functions/_shared/` and are imported, never copied. The Base44 "duplicated helper" rule does not apply here.
+  - **Shared code:** a new helper lives once in `supabase/functions/_shared/` and is imported, never copied. The older copies named above (`redact`, `SHEET_COLUMNS`) are the only exception.
   - **JWT:** every function has a `[functions.<name>]` block with `verify_jwt` in `supabase/config.toml`.
-  - **Tests:** `tests/helpers/edge-function.ts` runs a handler in-process, as `base44-function.ts` does for Base44.
+  - **Tests:** `tests/helpers/edge-function.ts` runs a handler in-process, with fetch and Deno recorded.
   - **Deploy:** CI deploys every function on green `main`, before either production goes out.
   - **Contracts:** the logging, clock and rid contracts scan them, with the modules beside each handler and the shared modules they import. A module that logs through an injected `deps.log` should bind it to a bare `log` first: the scan reads `log(` calls only.
 - `src/lib/analytics.ts`: every event the site sends to GA4, and the one place
@@ -139,26 +127,13 @@ npx skills add base44/skills
   agency's own (`traffic_type: internal`), `?internal=0` clears it. The
   privacy policy does not mention GA4 or cookies and there is no consent banner —
   an open question for Dorit's compliance adviser (`COMPLIANCE.md` section 8).
-- `src/lib/interview-handoff.ts`: **the page sends the interview's close, not
-  the agent.** Base44 does not execute an agent's tool calls in an anonymous
-  conversation, and every visitor is anonymous — so the agent ends with a fenced
-  ```lead``` block and `AgentChat` submits it through `submitInterview`. Same
-  backend function, same validation; only the caller differs. A workaround for a
-  platform defect, meant to be removed — see A-59, and do not "tidy" it away by
-  putting the final `submitLead` back in the agent's instructions.
-- `base44/agents/*.jsonc`: agent definitions — prompts, tools, model, memory,
-  and `allow_anonymous_access`. **`base44 deploy` ships these; narrower
-  commands do not.** CI's publish runs `base44 deploy --yes --build`, and its log
-  lists `4 agents` — confirmed 2026-10-06 by pulling the live definitions, which
-  matched the repo. A site-only or functions-only deploy, or a Builder publish,
-  leaves them as they were; outside CI, `npx base44 agents push --yes` is the
-  agent-only step, a full sync that deletes any remote agent absent here. A
-  release that skips the agents looks exactly like nothing being wrong — see
-  A-42 in `tests/test-plan/10-known-issues.md`. To check what is live, pull into a
-  scratch worktree, never this checkout (README, "Which releases ship the
-  agents"). The whole non-prompt surface is
-  pinned by `toEqual` against a literal, because a Builder regeneration writes
-  the file wholesale and buries behavioural flags in escaped Hebrew.
+- `supabase/functions/chat/tools.ts`: **the chat function runs the agents'
+  tools itself**, `submitLead` and `escalateToHuman` included, in an anonymous
+  conversation too — the fix for A-59, where the old agent host never ran them
+  for an anonymous visitor. The interview's close is the function's own
+  `submitLead`; the page only counts the `lead_saved` signal. `readHandoff` in
+  `src/lib/interview-handoff.ts` still strips a fenced ```lead``` block from a
+  reply, so a visitor never sees the machinery.
 - **The event sheet is 19 columns, and the last six are the interview's.** Its
   answers used to be flattened into one `תקציר` cell, so the sheet could display
   them and nothing else — it could not be asked who wants a clearinghouse pull,
@@ -176,17 +151,13 @@ npx skills add base44/skills
   service exists. The sender must be on the Resend-verified subdomain; the apex
   `govari-fin.co.il` is Microsoft 365 with an SPF that ends `-all`, so mail from
   it is rejected.
-- `src/pages/{Login,Register,ForgotPassword,ResetPassword,OAuthConsent}.jsx` and
-  `src/components/{AuthLayout,GoogleIcon}.jsx`: **the platform's, not ours. Do not
-  delete them.** Base44 restores these whenever the app environment starts, and
-  support have confirmed there is no setting to stop it. They were deleted five
-  times; the fifth went unnoticed and left `main` red for two days, which gated
-  the publish and stranded every change merged behind it. They are inert because
-  `resolve.extensions` in `vite.config.js` puts `.ts`/`.tsx` first, so the real
-  pages — `Login.tsx` and the rest — are what load. Lint ignores them and the
-  contract suite allows their shadow; `PLATFORM_AUTH_PAGES` in
-  `tests/contract/frontend-payloads.contract.test.ts` is the list, and a case
-  there fails if it and the eslint ignores drift apart. See A-52.
+- **No `.jsx` may shadow a `.tsx` of the same name.** `resolve.extensions` in
+  `vite.config.js` puts `.ts`/`.tsx` first, and "no .jsx shadows a .tsx" in
+  `tests/contract/frontend-payloads.contract.test.ts` fails on a collision. The
+  Base44 Builder used to restore five boilerplate `.jsx` auth pages on every
+  start (A-46, A-52); if `src/pages/Login.jsx` and its siblings reappear, its
+  GitHub App is still installed — remove it (`docs/current-state.md`), and
+  delete the pages.
 - **Every answer carries `rid`, and no answer carries an error message.** The
   id names every log line the request produced, so a visitor can quote it and
   one search finds everything. It was generated, stamped on every log line and
@@ -194,17 +165,9 @@ npx skills add base44/skills
   absences, and why the one genuine outage here took three days. `error.message`
   used to be returned as `error` or `details`: it told the visitor nothing they
   could use and told anyone reading it the shape of our internals. Log the
-  message, return the id. `contentAdmin` does this through a `json()` helper, so
-  it cannot be forgotten; that shape is the one to copy when the others are next
-  touched.
-- `src/services/base44/invoke.ts`: **call a backend function through
-  `invokeFunction`, never by casting `functions.invoke`.** The SDK builds its
-  functions client with `interceptResponses: false`, so `invoke` resolves to the
-  whole axios response and the body is its `data`. Reading `.ok` off the wrapper
-  finds nothing — which is how every interview the page closed, and every
-  handoff that reached Dorit, told the visitor it had failed while the logs read
-  `warnings: 0`. Fakes that return a bare body hide it; give a new adapter test
-  the `{ data, status, headers }` shape. See A-67.
+  message, return the id. `content-admin` does this through a `json()` helper,
+  so it cannot be forgotten; that shape is the one to copy when the others are
+  next touched.
 - **A time a person reads is Israel time.** The functions run in UTC, and
   `toLocaleString("he-IL")` takes its zone from the runtime, so every stamp in a
   mail was three hours early. Name `timeZone: 'Asia/Jerusalem'` on every date a
@@ -216,32 +179,34 @@ npx skills add base44/skills
   `src/config/compliance.ts` is the source the notices interpolate; changing it
   changes what a visitor consents under, so it bumps `CONSENT_VERSION`. The
   same string is spelled out in the legal pages, `index.html` JSON-LD,
-  `llms.txt`, every article's disclosure, the agents' instructions (escaped) and
+  `llms.txt`, every article's disclosure, the agents' prompts and
   `public/poa.html`. See A-66.
 - `scripts/*.mjs`: maintenance jobs CI runs on a schedule. `prune-vercel-deployments.mjs`
   deletes, so it is a dry run unless given `--apply` — check its output before
-  adding the flag. `reconcile-stores.mjs` exits non-zero on drift. `reconcile-leads.mjs` is a dry run
-  unless given `--apply` and deletes Supabase leads Base44 no longer has.
+  adding the flag.
   `assign-open-leads.mjs` lists each agency's open, unassigned leads, and
   assigns them from a `--plan` file only with `--apply`. Run it before the
   agency-roles narrowing ships, or every User's list goes blank.
-  `seed-blog.mjs --apply` writes `content/blog/` to Supabase `blog_posts` only
-  (Base44 is no longer written), matching posts by slug then title; it needs
+  `seed-blog.mjs --apply` writes `content/blog/` to Supabase `blog_posts`,
+  matching posts by slug then title; it needs
   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`, never changes
   `published` or the slug of a post that exists, and should be run with
   `--only <file>.md` so other posts' /admin/blog edits survive. See A-65.
-- `vite.config.js`: Vite config and Base44 Vite plugin setup.
+- `vite.config.js`: Vite config — the React plugin, the site-URL plugin
+  (`scripts/vite-site-url-plugin.mjs`) and the `.ts`-first resolution order.
 - `.env.local`: local-only environment values; never commit secrets.
 - `tests/test-plan/`: the test plan and one Software Test Description per suite.
   Update the relevant STD when you add or change tests.
 
 ## Working Notes
 
-- Use `base44 dev` as the default local development command when you need the local Base44 backend. It can run the backend and frontend together.
-- When docs or code mention the frontend being started automatically, that usually means the Base44 project config includes `site.serveCommand`, for example `"serveCommand": "npm run dev"` in `base44/config.jsonc`.
-- Use `npm run dev` only for frontend-only work against the hosted Base44 backend.
-- Prefer the existing Base44 CLI workflow over adding new npm scripts for Base44-specific tasks.
-- Reuse the existing SDK client and Vite plugin patterns before adding new Base44 integration paths.
+- `npm run dev` starts the frontend. With `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local` it talks to that Supabase
+  project; without them it runs on the unconfigured stand-ins.
+- Schema changes are migrations under `supabase/migrations/`, and backend code
+  is an Edge Function under `supabase/functions/`; reuse the existing client
+  (`src/api/supabaseClient.ts`) and ports (`src/services/ports.ts`) before adding
+  a new integration path.
 - Run the relevant checks from `package.json` before finishing code changes:
   `npm run lint`, `npm run typecheck`, `npm run test:vitest`, and
   `npm run test:e2e` (or `./scripts/run-tests.sh` for everything with a summary).

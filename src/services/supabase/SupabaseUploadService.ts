@@ -22,8 +22,8 @@ export const CLAIM_DOCUMENTS_BUCKET = "claim-documents";
 
 /**
  * What a claim document is known by once uploaded: its path in the private
- * bucket, marked so `submit-claim` and the leads screen can tell it from a
- * Base44 file URL. Never a signed URL — see the class comment.
+ * bucket, marked so `submit-claim` and the leads screen can tell it from any
+ * other URL. Never a signed URL — see the class comment.
  */
 export const CLAIM_DOCUMENT_REF_PREFIX = `storage:${CLAIM_DOCUMENTS_BUCKET}/`;
 

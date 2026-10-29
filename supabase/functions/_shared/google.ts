@@ -2,7 +2,7 @@
  * An access token for Dorit's calendar and leads sheet, from a Google service
  * account she shares them with.
  *
- * Replaces Base44's connector OAuth, whose refresh tokens lapsed without a
+ * A service account, because connector OAuth refresh tokens lapse without a
  * sound (docs/base44-exit/00-inventory.md §5). A service account has no
  * refresh token and no consent screen: its key signs a JWT, Google answers
  * with an hour's access token. The key lives only in the function secret

@@ -134,14 +134,14 @@ test.describe("Backend contract (observed traffic)", () => {
       expect(elsewhere).toEqual([]);
     });
 
-    await test_step("and nothing went to Base44's /api", async () => {
+    await test_step("and nothing went to an /api route the site does not serve", async () => {
       // The fixture fails any such request at teardown too; this names it here.
-      const base44 = seen.filter(
+      const unknownApi = seen.filter(
         (u) =>
           u.pathname.startsWith("/api/") &&
           !/^\/api\/(og\/|csp-report)/.test(u.pathname),
       );
-      expect(base44.map((u) => u.href)).toEqual([]);
+      expect(unknownApi.map((u) => u.href)).toEqual([]);
     });
   });
 

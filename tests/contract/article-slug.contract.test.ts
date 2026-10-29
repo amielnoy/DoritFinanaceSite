@@ -11,8 +11,8 @@ import * as published from "../../scripts/published-articles.mjs";
  * An article's address, as a contract.
  *
  * `blog_posts.slug` is shaped by four things that cannot import one another:
- * the migration's CHECK, the app (`src/lib/articlePath.ts`), the Base44
- * function that writes the mirror (`contentAdmin`) and the build that prebuilds
+ * the migration's CHECK, the app (`src/lib/articlePath.ts`), the Edge
+ * Function that writes articles (`content-admin`) and the build that prebuilds
  * the pages (`scripts/published-articles.mjs`). A copy that drifted would let
  * the form accept a slug the database refuses, or the build write a page the
  * redirect can never reach. Duplicated is fine; drifted is not.
@@ -38,7 +38,7 @@ describe("one slug rule, wherever it is spelled", () => {
     const fn = read(file);
     expect(fn.match(/const SLUG_PATTERN = \/(.+)\/;/)?.[1]).toBe(SLUG_PATTERN.source);
     expect(fn.match(/const BASE44_ID_PATTERN = \/(.+)\/;/)?.[1]).toBe(BASE44_ID_PATTERN.source);
-    // The slug is the mirror's alone: Base44's BlogPost has no such field.
+    // The slug is written by its own rule, never among the plain fields.
     expect(fn.match(/const ARTICLE_FIELDS = \[([^\]]*)\]/)?.[1]).not.toContain("'slug'");
   });
 });

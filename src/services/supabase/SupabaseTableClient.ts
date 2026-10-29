@@ -59,11 +59,11 @@ export async function fetchRows(query: SupabaseQuery, table: string): Promise<Re
  *
  * `id` is the Base44 id, because that is what every URL, bookmark and indexed
  * link already holds (`/blog/:id`); Supabase's own uuid would 404 all of them.
- * A row that never had a Base44 id falls back to the uuid, the same key
- * scripts/reconcile-stores.mjs uses, so it still shows up instead of vanishing.
+ * A row that never had a Base44 id falls back to the uuid, so it still shows
+ * up instead of vanishing.
  *
- * Null columns are dropped: Postgres says null where Base44 left the field out,
- * and the ports declare these fields optional, not nullable.
+ * Null columns are dropped: the ports declare these fields optional, not
+ * nullable.
  */
 export function toPortRow(row: Record<string, unknown>): Record<string, unknown> {
   const { id, base44_id, created_at, ...rest } = row;

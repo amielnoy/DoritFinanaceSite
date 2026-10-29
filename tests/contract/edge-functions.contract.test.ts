@@ -5,8 +5,7 @@ import { REPO_ROOT } from "../helpers/entity-schema";
 import { edgeFunctionFiles, read } from "../helpers/source-scan";
 
 /**
- * The shape every Supabase Edge Function keeps, and the one list that must
- * stay identical to the Base44 copies while both run.
+ * The shape every Supabase Edge Function keeps.
  */
 
 const names = edgeFunctionFiles().map((f) => f.split("/").at(-2)!);
@@ -36,9 +35,8 @@ describe("Edge Functions", () => {
   });
 
   it("tells the people about a claim that the shared recipients list names", () => {
-    // The costliest drift AGENTS.md names: a mailbox added to submitLead and
-    // submitClaim (which the agents contract forces together) but missing here
-    // would leave the live path silently short of a recipient.
+    // The costliest drift AGENTS.md names: a mailbox missing from a function's
+    // recipients leaves it silently short of one, with no error anywhere.
     const addresses = (src: string, decl: RegExp) => {
       const m = src.match(decl);
       expect(m, `${decl} not found`).not.toBeNull();

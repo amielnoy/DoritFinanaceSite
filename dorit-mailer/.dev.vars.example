@@ -11,9 +11,10 @@ MAIL_FROM=דורית גוב ארי <notifications@mail.govari-fin.co.il>
 # Comma-separated. The first is the agency's and is used as Reply-To.
 MAIL_TO=dorit@govari-fin.co.il,amielnoy@gmail.com,amielnoy@outlook.com
 
-# Shared secret the Base44 backend sends as `Authorization: Bearer <token>`.
-# Without it this endpoint is an open relay for anyone who reads the site's JS.
-# Generate: openssl rand -hex 32
-MAILER_TOKEN=
+# Shared secret the Supabase Edge Functions send as `Authorization: Bearer <token>`
+# (their own secret is named MAILER_TOKEN). Without a token this endpoint is an
+# open relay. Generate: openssl rand -hex 32
+MAILER_TOKEN_SUPABASE=
 
-ALLOWED_ORIGIN=https://safe-arch-plan.base44.app
+# CORS only — no browser calls this endpoint.
+ALLOWED_ORIGIN=https://govari-fin.co.il

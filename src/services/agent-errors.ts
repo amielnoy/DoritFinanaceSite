@@ -1,7 +1,7 @@
 /**
  * The limits every agent adapter enforces, and the two ways a send fails that
- * the chat panel answers differently. Shared by the Base44 adapter and the
- * chat function's adapter; the function enforces the same numbers
+ * the chat panel answers differently. The chat function's adapter enforces
+ * them; the function enforces the same numbers
  * (tests/contract/chat-function.contract.test.ts).
  */
 export const MAX_MESSAGE_CHARS = 1000;

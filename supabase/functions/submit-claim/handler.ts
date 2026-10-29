@@ -1,10 +1,9 @@
 /**
  * A claim report: saved first, then announced.
  *
- * The Supabase twin of base44/functions/submitClaim — same input, same checks,
- * same mail — except that the record is written to Supabase, the only store
- * from here on. tests/integration/submit-claim.integration.test.ts runs both
- * against one set of cases while both exist.
+ * The record is written to Supabase, the only store.
+ * tests/integration/submit-claim.integration.test.ts and
+ * submit-claim-edge.integration.test.ts run it.
  */
 import { channelLine, validCampaign, validChannel, validLandingPath } from '../_shared/attribution.ts';
 import { corsHeaders } from '../_shared/cors.ts';

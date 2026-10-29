@@ -165,7 +165,7 @@ describe("dependency inversion holds", () => {
     /**
      * Vite's default order puts `.jsx` before `.tsx`. The case below fails when
      * a collision exists, but it runs in CI and the swap is silent until then —
-     * and the Base44 Builder re-adds those boilerplate `.jsx` templates on its
+     * and the Base44 Builder re-added those boilerplate `.jsx` templates on its
      * own schedule, three times in one day (A-46, A-50). Reordering makes the
      * collision harmless rather than merely detectable: this repo is
      * TypeScript, and the TypeScript file is always the one that means

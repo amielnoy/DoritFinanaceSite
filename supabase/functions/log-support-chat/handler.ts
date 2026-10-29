@@ -1,7 +1,6 @@
 /**
- * A support or procedures chat, logged to the sheet's Support tab. The Edge
- * twin of base44/functions/logSupportChat — same input, same redaction, same
- * row — through the service account instead of a connector.
+ * A support or procedures chat, logged to the sheet's Support tab through the
+ * service account.
  */
 import { corsHeaders } from '../_shared/cors.ts';
 import { clientIp, sha256Hex, withinLimit } from '../_shared/guard.ts';
@@ -25,8 +24,7 @@ const OUTCOMES: Record<string, string> = {
 
 /**
  * Rows per caller, and for every caller together. The chat sweep logs at most
- * 10 conversations every 15 minutes, in-process; Base44's agents call from
- * Base44's server, so one address stands for all of them. Both fit well under.
+ * 10 conversations every 15 minutes, in-process, well under both.
  */
 const ROWS_PER_IP_PER_HOUR = 60;
 const ROWS_PER_HOUR = 300;

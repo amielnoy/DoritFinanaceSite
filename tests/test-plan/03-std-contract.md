@@ -1,7 +1,7 @@
 # STD-03 — Contract Tests
 
 **Suite:** `contract` · **Runner:** `npm run test:contract` (Vitest, node)
-**Location:** `tests/contract/` · **Cases:** 332 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 1264 including `it.each` / `describe.each` expansions (1263 pass, 1 skipped; recounted 2026-10-21)
+**Location:** `tests/contract/` · **Cases:** 332 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:contract` runs 1196 including `it.each` / `describe.each` expansions (1195 pass, 1 skipped; recounted 2026-10-29)
 
 ---
 
@@ -12,8 +12,7 @@ tests do not restate the payloads: they **read the real call sites out of
 `src/`** and the **real definitions out of `supabase/`** (migrations, Edge
 Functions and the chat prompts), so a renamed field, a new `source` value
 outside the table's check, or a reworded compliance clause fails here rather
-than in production. Nothing here reads the retired `base44/` folder any more
-(Base44 exit B2 task 6, 2026-10-29).
+than in production.
 
 ## 2. Test items
 
@@ -24,22 +23,19 @@ than in production. Nothing here reads the retired `base44/` folder any more
 | Published articles | `content/blog/*.md` |
 | Frontend write paths | the adapters' payload literals in `src/` |
 | Backend functions | `supabase/functions/{submit-lead,submit-claim,escalate-to-human,log-support-chat}` and the `_shared` modules they import |
-| Function logging | every Edge Function (the nightly Base44 log archive and its credential gate were removed with the Base44 publish, 2026-10-17) |
+| Function logging | every Edge Function |
 
 ## 3. Approach
 
 Two helpers do the work:
 
-- `tests/helpers/entity-schema.ts` — exports `REPO_ROOT` only. It used to load
-  the Base44 `.jsonc` entity definitions and validate payloads against them;
-  those readers (`loadEntity`, `entityNames`, `validateAgainstEntity`) and
-  `backendFiles()` in `source-scan.ts` were removed in Base44 exit B2 task 6.
+- `tests/helpers/entity-schema.ts` — exports `REPO_ROOT` only.
 - `tests/helpers/source-scan.ts` — a balanced-brace scanner that extracts the
   object literal passed to a call matching a pattern, returning its top-level
   keys and string-literal values; `edgeSource()` reads an Edge function's
   handler, its sibling modules and the `_shared` modules they import.
-- `tests/helpers/chat-prompt-sources.mjs` — the rules that turn a Base44
-  agent's instructions into the chat function's Markdown prompts
+- `tests/helpers/chat-prompt-sources.mjs` — the rules the chat function's
+  Markdown prompts were derived by
   (`INTERVIEW_TOOL_SECTION`, `SUPPORT_TOOL_SECTION`, `withToolSection`,
   `collapseBlankRuns`).
 
@@ -166,11 +162,11 @@ The **operations mailbox list** is one of the things the Edge functions duplicat
 `SHEET_COLUMNS`, and the one whose drift is hardest to see: a mailbox added to
 `submitLead` and not to `escalateToHuman` produces no error anywhere —
 enquiries arrive, and escalations, the messages that matter most, quietly reach
-one fewer person. One case pins the copies byte-identical (two since B2 task 6: the Base44 `submitClaim` copy is no longer read); another pins
+one fewer person. One case pins the two copies byte-identical; another pins
 that each mailbox gets its own `try`, since one wrapped around the whole loop
 would let the first bounce swallow the rest.
 
-The **sheet cell rule** lives in `_shared/sheets.ts`'s `sheetCell` (the Base44 `upsertContact` copy that used to be compared with it is no longer read, B2 task 6). Under `USER_ENTERED` a cell starting with
+The **sheet cell rule** lives in `_shared/sheets.ts`'s `sheetCell`. Under `USER_ENTERED` a cell starting with
 `=`, `+`, `-`, `@`, a tab or a carriage return runs as a formula, so a visitor's
 name could fetch a URL or rewrite the sheet; the leading apostrophe stores it as
 text, as it already did for a phone's leading zero.
@@ -179,9 +175,9 @@ A last block covers how the interview agent *ends*. A finished interview has to
 reach a person, and a bare `Lead.create` reaches nobody. The block pins that the
 prompt ends through `submitLead` (the closing `stage='complete'` call is "the only way to end an interview"; no fenced `lead` block), that it carries the same data-minimisation rule as the booking agent, and that it reports only what the function returned. The cases that read the Base44 `tool_configs` and the "the page sends, not the agent" wording (A-59) are retired.
 
-One block covers **which transport reaches whom**: `dorit-mailer` is the only transport, and neither Edge function declares `CORE_EMAILS` or calls `Core.SendEmail` (the Base44 `submitClaim` copy is no longer read, B2 task 6).
+One block covers **which transport reaches whom**: `dorit-mailer` is the only transport, and neither Edge function declares `CORE_EMAILS` or calls `Core.SendEmail`.
 
-A second block pins `escapeHtml`, `detailRow`, `block` and `proseRow` across every Edge function that renders mail, and the customer letter (`buildClientHtml`) of `submit-lead` only; the Base44 `submitClaim` letter is no longer read. A drifted `escapeHtml` is a phishing vector rather than a cosmetic difference.
+A second block pins `escapeHtml`, `detailRow`, `block` and `proseRow` across every Edge function that renders mail, and the customer letter (`buildClientHtml`) of `submit-lead` only. A drifted `escapeHtml` is a phishing vector rather than a cosmetic difference.
 
 Two blocks cover the **support agent**, which answers in the free chat on `/faq`
 and nowhere else. The first pins the boundary of that: it collects nothing, has
@@ -220,22 +216,7 @@ keep identifiers out of storage. So half these cases are about restraint: every
 forbidden field names, mail lines must carry a `role` rather than a recipient,
 and any provider error text must be truncated — it is not ours and not bounded.
 The other half are about usefulness: every function opens and closes its
-request, every line carries the correlation id, the "same helper in every function" case (Base44 entries only) is retired, and each declares its own name exactly once.
-
-A final block pins the archive: nightly only, never committed (the repository
-is public), each file named for the window it covers rather than the day it
-ran, and a fetch failure that warns instead of reddening the nightly badge.
-
-A last block *executes* the publish gate rather than reading it. Base44 offers
-two credentials and only one exists on every plan — a workspace API key, or the
-access/refresh pair a local login leaves behind — and the first version of the
-gate failed the run whenever `BASE44_API_KEY` held anything that was not a
-workspace key. That is right when it is the only credential (the CLI would fall
-back to a device login and hang) and wrong when a working session sits beside
-it, which is how the merge of #48 failed with all three secrets present. The
-cases extract the step's shell out of the YAML and run it under `bash -e` for
-each combination, since shell embedded in a workflow is covered by nothing else
-here.
+request, every line carries the correlation id, and each declares its own name exactly once.
 
 **`ai-surface.contract.test.ts` — `CTR-AI-001..018`** — what an AI assistant can
 read. The app is client-rendered, so a crawler that does not execute JavaScript
@@ -254,7 +235,7 @@ that `robots.txt` names each AI crawler explicitly rather than leaving them to
 the wildcard. `CTR-AI-015..017` pin that `robots.txt` tells a crawler where
 `/llms-full.txt` is, that `build:prerender` runs `scripts/build-seo-files.mjs`
 after the prerender (so Vercel and CI write the sitemap, `llms.txt` and
-`llms-full.txt` with the published articles), and that the Base44 Builder's plain
+`llms-full.txt` with the published articles), and that the plain
 `build` stays `vite build`. `CTR-AI-018` pins that the prerender and the SEO
 files both read their environment through `buildEnv`.
 
@@ -297,8 +278,7 @@ the default `dist/` is retired 2026-10-29, Base44 exit B1 task 3: the Builder-bu
 step and the variable are gone.)
 Since articles are prebuilt, the nightly run is no longer deploy-free: CTR-REB-001
 requires `deploy-vercel` and `deploy-supabase` to run on `schedule` (the functions
-first, because `--prod` waits for them), and a companion case keeps the Base44
-publish — which ships the agents — off it. CTR-REB-002 pins that the publish
+first, because `--prod` waits for them). CTR-REB-002 pins that the publish
 workflow ends by dispatching `ci.yml` on `main` with `deploy=true`, with
 `actions: write` and only after a real publish. CTR-REB-003 requires
 `PRERENDER_REQUIRED=1` on the production Vercel build only; CTR-REB-004 keeps the
@@ -311,7 +291,7 @@ Vercel build or `vercel.json` (until 2026-10-18 the variable sat in that step's
 production deploy check to fetch `/blog`, which now shares its name with the
 `blog/` directory of articles. CTR-REB-006 requires the workflow's `cancel-in-progress`
 to be false on `schedule`, so the nightly run queues behind an in-flight push rather
-than cancelling it (Vercel on new code, Base44 on old); CTR-REB-007 requires the
+than cancelling it (Vercel on new code, the functions on old); CTR-REB-007 requires the
 production smoke to skip the agent-conversation probes on `schedule`, and the spec to
 honour `E2E_SKIP_AGENT_PROBES` (retired 2026-10-18: the probes were Base44's
 `createConversation`, and left with `e2e/api/base44-contract.spec.ts`). Two
@@ -586,7 +566,7 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 | CTR-CHPROMPT-007 | "no longer lists createConsultationEvent as an interview tool" | The stale `createConsultationEvent` row is gone from `COMPLIANCE.md` |
 | CTR-CHPROMPT-008 | "is what the build script writes from the Markdown files today" | `prompts.generated.ts` equals `renderPromptsModule` output; stale means run `npm run build:chat-prompts` |
 
-`support.md` is the FAQ agent's prompt (`base44/agents/support_agent.jsonc`) with the tool section changed: the BlogPost line names `listArticles` / `readArticle` and links by slug, and the five `logSupportChat` lines are removed because the function logs the sheet itself (see `SUPPORT_TOOL_SECTION` in `tests/helpers/chat-prompt-sources.mjs`).
+`support.md` is the FAQ agent's prompt, derived from its first (Base44) definition with the tool section changed: the BlogPost line names `listArticles` / `readArticle` and links by slug, and the five `logSupportChat` lines are removed because the function logs the sheet itself (see `SUPPORT_TOOL_SECTION` in `tests/helpers/chat-prompt-sources.mjs`).
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -595,7 +575,7 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 | CTR-CHPROMPT-011 | "names its real tools and no Base44 one" | Names `listArticles`, `readArticle`, `escalateToHuman` and the `(/blog/<slug>)` link form; not `BlogPost` or `logSupportChat` |
 | CTR-CHPROMPT-012 | "carries the agency's details as placeholders, not literals" | No `050-831-1776`, `dorit@govari-fin.co.il` or `L-00107009` in `PROMPTS.support` |
 
-`procedures.md` is the procedures agent's prompt (`base44/agents/procedures_agent.jsonc`) with `PROCEDURES_TOOL_SECTION` applied: the BlogPost line names `listArticles` / `readArticle` and links by slug, the `logSupportChat` line is dropped (the sweep logs the chat), and the one "מגבלת הירוק" line that read an article "ב-BlogPost" reads it with `readArticle`.
+`procedures.md` is the procedures agent's prompt, derived from its first (Base44) definition with `PROCEDURES_TOOL_SECTION` applied: the BlogPost line names `listArticles` / `readArticle` and links by slug, the `logSupportChat` line is dropped (the sweep logs the chat), and the one "מגבלת הירוק" line that read an article "ב-BlogPost" reads it with `readArticle`.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -604,7 +584,7 @@ The chat function's prompts are Markdown files under `supabase/functions/chat/pr
 | CTR-CHPROMPT-016 | "names its real tools and no Base44 one" (procedures.md) | Names `listArticles`, `readArticle`, `escalateToHuman` and `(/blog/<slug>)`; not `BlogPost` or `logSupportChat` |
 | CTR-CHPROMPT-017 | "carries the agency's details as placeholders, not literals" (procedures.md) | No `050-831-1776`, `dorit@govari-fin.co.il` or `L-00107009` in `PROMPTS.procedures` |
 
-`blog.md` is the reading recommender's prompt (`base44/agents/blog_recommender.jsonc`) with `BLOG_TOOL_SECTION`: its two BlogPost reads become `listArticles` / `readArticle`, step 5 links by slug and calls `recommendArticles`, and the hidden block's five lines (the fence matched with `equals`) are dropped; step 6 points to `/#start` instead of a `#consultation` anchor no page has, and the link rule names `/blog/<slug>`.
+`blog.md` is the reading recommender's prompt, derived from its first (Base44) definition with `BLOG_TOOL_SECTION`: its two BlogPost reads become `listArticles` / `readArticle`, step 5 links by slug and calls `recommendArticles`, and the hidden block's five lines (the fence matched with `equals`) are dropped; step 6 points to `/#start` instead of a `#consultation` anchor no page has, and the link rule names `/blog/<slug>`.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -947,7 +927,7 @@ moved — fix the side that is wrong; do not relax the assertion.
 | ID | Title | Expected result |
 |---|---|---|
 | CTR-RET-001 | "sorts after every migration already applied" | After `20261024000000_clearinghouse_publish.sql` |
-| CTR-RET-002 | "allows exactly these statuses in the database" | new, contacted, closed, escalated, partial, client (the Base44 entity and adminLead copies are no longer read, B2 task 6) |
+| CTR-RET-002 | "allows exactly these statuses in the database" | new, contacted, closed, escalated, partial, client |
 | CTR-RET-003 | "lets an admin set every status the type names, client included, and each one exists in the database" | `LeadStatus` ⊆ the check constraint |
 | CTR-RET-004 | "keeps the privacy policy's promise: 24 months from the last contact, then deleted or anonymized" | The policy's sentence; `interval '24 months'`; the last contact = latest of created, updated, meeting |
 | CTR-RET-005 | "never touches a client, and anonymizes what identifies the person" | `status <> 'client'`; name, phone, email, message, summary, profile, notes cleared |
@@ -969,10 +949,9 @@ moved — fix the side that is wrong; do not relax the assertion.
 ### Production smoke publish preflight
 
 `production-smoke.contract.test.ts` executes the CI preflight and checks that
-only the publisher of `PRODUCTION_URL` can enable browser smoke tests. Covers
-missing Base44 credentials despite a successful Vercel deploy, trailing slashes,
-a configured Base44 origin, Vercel previews, skipped deployments, and successful
-production publishes. `deploy-gate.contract.test.ts` verifies the workflow passes
+only a Vercel production promotion in the same run can enable browser smoke
+tests. Covers a run that published only to Base44 (refused), Vercel previews,
+selecting production without deploying it, and an actual production deploy. `deploy-gate.contract.test.ts` verifies the workflow passes
 actual deployment outputs into this preflight before starting Playwright.
 Missing production publication stays a CI failure with an actionable message;
 it does not weaken the home section or accessibility assertions.

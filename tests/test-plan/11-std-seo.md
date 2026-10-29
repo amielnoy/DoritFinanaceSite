@@ -155,8 +155,7 @@ what fails if `scripts/prerender.mjs` silently stops running.
 > bundle reads Supabase at the e2e build's fake host, and the prerender answers
 > that host's table reads from the file — `blog_posts` from its rows (so `/blog`
 > is prebuilt listing it, as production's lists the real ones), `testimonials`
-> empty; until then it answered Base44's `/entities/BlogPost/<slug>` for the
-> article pages alone. The fixture is refused for any other Supabase URL and in
+> empty. The fixture is refused for any other Supabase URL and in
 > any Vercel build.
 
 **These cases test an artifact, so the artifact has to be the right one.** In CI
@@ -173,8 +172,7 @@ Two guards came out of it, both worth keeping in mind when changing the build:
   a missing browser fails **there** rather than as nine opaque failures in a
   later job.
 - Without that variable the script warns and ships the plain SPA, which is the
-  right behaviour for a host that cannot prerender and the reason Base44's build
-  is unaffected.
+  right behaviour for a host that cannot prerender.
 
 To reproduce the failure deliberately: `rm -rf dist && npm run build`, then
 `SKIP_BUILD=1 npx playwright test e2e/seo/prerender.spec.ts`.

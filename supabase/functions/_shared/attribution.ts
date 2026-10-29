@@ -1,4 +1,4 @@
-/** The closed marketing-channel vocabulary — the same list as src/lib/attribution.ts plus the server-only 'unknown'. tests/contract/edge-functions.contract.test.ts fails if it drifts from base44/functions/submitClaim. */
+/** The closed marketing-channel vocabulary — the same list as src/lib/attribution.ts plus the server-only 'unknown'. tests/contract/agents.contract.test.ts fails if it drifts from the client's. */
 export const CHANNEL_TAXONOMY = [
   'google', 'facebook', 'instagram', 'linkedin', 'ai_assistant',
   'email', 'sms', 'referral', 'direct', 'reactivation', 'unknown',

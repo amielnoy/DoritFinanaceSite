@@ -13,8 +13,9 @@ import { readFile } from 'node:fs/promises'
 import { E2E_SUPABASE_URL } from '../e2e/build-env.ts'
 
 /**
- * Latin kebab-case, never shaped like a Base44 id. The same rule as
- * src/lib/articlePath.ts, the slug migration's CHECK and contentAdmin —
+ * Latin kebab-case, never shaped like a Base44 id (the old `/blog/<id>`
+ * links). The same rule as src/lib/articlePath.ts, the slug migration's CHECK
+ * and the content-admin Edge Function —
  * tests/contract/article-slug.contract.test.ts fails when they drift.
  */
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
@@ -117,8 +118,8 @@ export async function loadPublishedArticles(
         'PRERENDER_ARTICLES_FIXTURE is set in a Vercel build — refusing to prebuild test articles into a deployment.',
       )
     }
-    // Exactly the fake host: a real project's URL, or none (a bundle that
-    // reads Base44), must never be answered from a test file.
+    // Exactly the fake host: a real project's URL, or none (a bundle with no
+    // Supabase), must never be answered from a test file.
     if (url !== E2E_SUPABASE_URL) {
       throw new Error(
         `PRERENDER_ARTICLES_FIXTURE answers the e2e build's reads at ${E2E_SUPABASE_URL}, but this bundle reads ` +

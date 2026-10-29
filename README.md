@@ -1,105 +1,57 @@
 # Dorit Gov-Ari Finance Site
 
-Hebrew (RTL) financial planning and insurance site for Dorit Gov-Ari, built with React 18 and Vite, hosted on Vercel, with Supabase for auth, data, storage and Edge Functions. The Base44 code still in the repo is a rollback path, removed in Base44 cleanup 2 (on or after 2026-10-29).
+Hebrew (RTL) financial planning and insurance site for Dorit Gov-Ari, built with React 18 and Vite, hosted on Vercel, with Supabase for auth, data, storage and Edge Functions.
 
-Start with the [documentation index](docs/README.md) and [current architecture and operations](docs/current-state.md). The latter describes repository behavior as of 2026-10-17; deployment settings still require checking in the relevant account.
-
-The Base44 Builder still syncs from `main`, but nothing is published to Base44 any more.
+Start with the [documentation index](docs/README.md) and [current architecture and operations](docs/current-state.md). Deployment settings still require checking in the relevant account.
 
 ## The deployed environments
 
 | Target | Host | Deploys when |
 | --- | --- | --- |
 | Production — `https://govari-fin.co.il` | Vercel | Green `main`, after the Supabase functions deploy; also the nightly scheduled rebuild |
-| Preview / staging | Vercel | A successful build on `main` or `builder`, including red test runs; see the run summary for its URL |
-| Old site — `https://safe-arch-plan.base44.app` | Base44 | Never, since 2026-10-17: it serves the last version published there and redirects visitors to production |
+| Preview / staging | Vercel | A successful build on `main`, including red test runs; see the run summary for its URL |
+| Backend | Supabase (`hjowdyiwjjrqceumkvgt`) | Edge Functions on green `main`, before production; migrations are applied by hand |
 
 `.github/workflows/ci.yml` is the release source of truth. A red run can publish a
 preview but cannot promote Vercel production. Supabase Edge Functions deploy before
-either production publish. Feature branches run checks without CI site deployment;
-Vercel's Git integration can still provide PR previews.
+production. Feature branches run checks without CI site deployment; Vercel's Git
+integration can still provide PR previews.
 
 `PRODUCTION_URL` identifies the customer-facing origin, and production smoke
 requires a Vercel production promotion in the same run.
 
 ## Prerequisites
 
-For frontend work against Supabase, `npm install` and `npm run dev` are enough:
-Vite reads the Supabase settings from `.env.local`, which is gitignored (ask for
-its values; never commit them). The Base44 CLI steps below run the retained
-Base44 backend, and go with cleanup 2.
-
 1. Clone the repository using the project's Git URL.
 2. Navigate to the project directory.
 3. Install dependencies: `npm install`.
-4. Use the Base44 CLI through `npx base44` (authenticate and link as below).
-5. Install [Deno](https://docs.deno.com/runtime/getting_started/installation/) — the local Base44 backend runs on it.
-
-Run `base44 --help` (or see the [CLI reference](https://docs.base44.com/developers/references/cli/commands/introduction)) for the full command surface.
+4. For the Edge Functions' type-check (`deno check`), install
+   [Deno](https://docs.deno.com/runtime/getting_started/installation/).
 
 ## Run Locally
 
-Three commands, from the project root:
-
 ```bash
-base44 login   # one-time per machine
-base44 link    # one-time per clone
-base44 dev     # local backend + frontend together
+npm run dev
 ```
 
-Open the frontend URL that `base44 dev` prints (typically `http://localhost:5173`).
-
-Notes:
-
-- **Every fresh clone needs `base44 link`.** It writes `base44/.app.jsonc` (the app-id pointer), which is deliberately gitignored. Your app id is in the Builder URL (`app.base44.com/apps/<id>/...`); `base44 link --help` shows the non-interactive flags.
-- **`base44 dev` runs the frontend for you** (via `site.serveCommand` in this repo's `base44/config.jsonc`) — do not start a second Vite beside it. Use `npm run dev` only for frontend work with hosted-backend configuration; it does not start a local Base44 backend.
-- **The app must be published at least once for the UI to load under `base44 dev`.** The frontend boots by fetching app settings from the hosted app; before the first publish that fails and every page redirects to login. The local API works regardless.
-- Entities, functions, and auth run locally — entity data is **in-memory only**, wiped when `base44 dev` restarts. Everything else (Core integrations, OAuth login) is forwarded to your deployed app. Full breakdown: [Local development overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview).
-
-## Frontend Only, Hosted Backend
-
-To work on just the frontend against your app's live hosted backend:
-
-```bash
-base44 dev --remote
-```
-
-⚠️ In this mode writes go to your app's **production data** — plain `base44 dev` keeps everything local.
+Vite reads the Supabase settings — `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_PUBLISHABLE_KEY` — from `.env.local`, which is gitignored (ask for
+its values; never commit them). Those are the production project's, so a form
+you submit locally creates a real lead and sends real email. Without them the
+site still starts, on the unconfigured stand-ins in `src/services/unconfigured/`:
+reads come back empty and every write answers "אין חיבור למאגר.".
 
 ## Previewing the Production Build
 
 `npm run preview` rebuilds and then serves the real `dist/` bundle, which is the
 only way to check the site the way a visitor gets it. It rebuilds because `dist/`
-is shared with the e2e suite, which seals `VITE_BASE44_APP_ID=e2e-sanity-app`
-into whatever it builds: previewing that bundle 404s every backend call and says
-so on screen in the same words a real outage uses. Two things that Base44's
-hosting supplies are missing from a local build, and the repo now fills both in:
+is shared with the e2e suite, which builds against a Supabase host that does not
+exist (`e2e/build-env.ts`): previewing that bundle fails every backend call and
+says so on screen in the same words a real outage uses.
 
-- **The app id.** Base44 injects `VITE_BASE44_APP_ID` into its own builds, and
-  Vite inlines it, so a build from a clone used to ship `appId: undefined` and
-  post every form to `/api/apps/undefined/...`. It now falls back to the app this
-  clone is linked to, read from `base44/.app.jsonc` — so `base44 link` is what
-  makes a local build able to reach a backend at all.
-- **The `/api` route.** `vite preview` serves static files and nothing else. The
-  deployed site answers `/api` (Vercel rewrites it to Base44; Base44's own host
-  owns the path), so the preview needs a proxy to match. It is **opt-in**, by
-  naming the backend:
-
-  ```bash
-  VITE_BASE44_APP_BASE_URL=https://safe-arch-plan.base44.app npm run preview
-  ```
-
-⚠️ That proxy points at **production data** — a form you submit through it creates
-a real lead and sends real email. It stays off by default for that reason, and
-because `npm run test:e2e` serves the site from this same preview server: its
-specs are hermetic only because the e2e bundle calls nothing real — its Supabase
-is a fake host `e2e/fixtures/app.ts` answers, and any `/api` call fails the test —
-and a proxy that switched itself on would turn any request the fixture missed into
-a write against the live app.
-
-Without the variable, `/api` simply 404s and every form on the site reports
-*"לא הצלחנו לשלוח את הבקשה כרגע"*. That is the preview server having no backend,
-not the site being broken.
+`vite preview` serves static files and nothing else, so the site's own Vercel
+functions (`/api/og/*`, `/api/csp-report`) answer 404 there. Everything else the
+site calls is Supabase, reached directly from the browser.
 
 ## Publish Your Changes
 
@@ -108,231 +60,47 @@ checkout after the checks pass: Supabase functions first, then Vercel production
 Prompt changes ship with the chat function. Avoid deploying a local tree outside
 this workflow: it can diverge from git.
 
-For credentials, promotion conditions and rollback switches, see
+For credentials and promotion conditions, see
 [current operations](docs/current-state.md). No deployment is needed for a local
 review of documentation changes.
 
-### Published is not the same as running
-
-A publish reports success, stores the new source, and may go on running the
-previous build of a function. Measured on 2026-10-04: `createConsultationEvent`
-was changed to log `client.stale`, published, and published twice more over the
-following two hours. Every request still logged the event name from the build
-before it. `base44 functions pull` returned source byte-identical to the commit
-that was published, so the two were genuinely out of step.
-
-Site bundles do not behave this way — a frontend change was verifiable in the
-served bundle by its content hash minutes after the same publish. **It is
-specifically the functions.**
-
-The practical damage is the asymmetry: the two halves of the application can be
-from different commits, and nothing anywhere says so. When a backend change does
-not appear to take effect, confirm which build is answering before assuming the
-change is wrong. The cheapest way is a log line that only the new build emits,
-called with a payload that stops at the function's own guard so nothing is
-created.
-
 ### Which releases ship the agents
 
-**CI no longer publishes to Base44** (2026-10-17): all four chat agents run on
-the Supabase chat function, and the "Publish to Base44" job is gone. What
-follows is how a Base44 release worked, kept until the Base44 code is removed.
+All four on-site agents are the `chat` Edge Function, and their prompts are
+`supabase/functions/chat/prompts/*.md`. A prompt change ships when CI deploys
+the functions on green `main`; `npm run build:chat-prompts` regenerates
+`prompts.generated.ts`, and a contract test fails while it is stale.
+`e2e/api/supabase-live.spec.ts`, run by the production smoke, probes the
+deployed functions.
 
-**`base44 deploy` ships `base44/agents/`; narrower commands do not.** CI's
-"Publish to Base44" job ran `base44 deploy --yes --build`, which deploys
-entities, functions, agents and the site together. Verified 2026-10-06: the
-job's log reads `Deploying: 5 entities · 7 functions · 4 agents · Site`, and a
-fresh `base44 agents pull` of the live definitions matched `base44/agents/`
-field for field — the only difference was `emails_settings: null`, which the
-CLI drops on a pull.
+## The domain
 
-Anything that deploys less — `base44 site deploy`, `base44 functions deploy`, a
-publish from the Builder — leaves the agents as they were. For an agent change
-made outside CI, the agent-only command is:
+The client-facing site is `govari-fin.co.il` on Vercel, since 2026-10-11. What
+keeps it that way:
 
-```bash
-npx base44 agents push --yes
-```
-
-It is a **full sync** — an agent on the backend that is not in `base44/agents/`
-is deleted — which is the intended direction, since the repo is the source of
-truth and `tests/contract/agents.contract.test.ts` pins every field of all four
-before anything reaches this point.
-
-Getting this wrong is expensive and looks like nothing. `allow_anonymous_access:
-true` was once committed, reviewed, merged and published with CI green from end
-to end, while every chat on the site went on answering `401` because the value
-the backend held had never been replaced (A-42). Whatever path that release
-took, it did not include the agents.
-
-One thing now looks. (The live probe that opened an anonymous conversation with
-each agent on Base44 left with `e2e/api/base44-contract.spec.ts` on 2026-10-18:
-production's chats are on the `chat` Edge Function, which
-`e2e/api/supabase-live.spec.ts` probes instead.) To see what the backend holds,
-pull into a scratch checkout — never this one, since a pull overwrites
-`base44/agents/` — and compare:
-
-```bash
-git worktree add --detach /tmp/agents-check origin/main
-cp base44/.app.jsonc /tmp/agents-check/base44/
-(cd /tmp/agents-check && npx base44 agents pull && git diff --stat)
-```
-
-CI can do the publish for you instead, from a clean checkout of `main` and only
-when the whole run is green. It is opt-in: set the `BASE44_API_KEY` secret (a
-workspace API key — it starts with `b44k_`) and the `BASE44_APP_ID` variable on
-the repository. Without them the step is skipped and production simply stays
-where it was.
-
-> The sync moves code into the Builder; it is not a publish. If the Builder
-> reports **"Couldn't fetch your code"**, check that the Base44 GitHub App is
-> installed on the account that *currently owns* this repository — the stored
-> connection is an owner/name pair, and transferring the repo between accounts
-> leaves it pointing at the old path while push webhooks keep arriving.
-
-## Moving production to the custom domain
-
-*Repository status, 2026-10-15:* the hosting move is complete. The Base44 half of
-step 4 is no longer required: the canonical origin defaults to production, and
-the old host redirects visitors and marks itself `noindex`. Search Console
-resubmission still requires an account check; the historical steps follow. Since 2026-10-11 the client-facing site is
-`govari-fin.co.il` on Vercel. Each step below carries its own status line.
-
-The client-facing site used to be `safe-arch-plan.base44.app`, where Base44 served
-both the app and the backend. Moving it to `govari-fin.co.il` on Vercel keeps
-Base44 as the backend and is the precondition for the Python migration: the Vercel
-`/api/*` rewrite is what lets a Python service take paths over one at a time, and
-Base44's own host has no equivalent — it answers `405` to any path it does not own.
-
-`VITE_SITE_URL` sets the canonical origin: `src/lib/seo.ts` reads it at runtime, and a
-build plugin rewrites `index.html`, `sitemap.xml`, `robots.txt` and `llms.txt` to match.
-Unset, the build emits `https://govari-fin.co.il` — the default since 2026-10-14. It
-used to be the Base44 origin, which is how a builder without the variable kept
-declaring the old host canonical.
-
-`index.html` is on that list because the document a crawler is served is the one that
-matters, and it was the one being missed: the sitemap moved hosts while the served HTML
-kept advertising the old origin in its canonical tag, `og:url` and two static JSON-LD
-blocks. `applySeo` patches the first two in the browser — the audience that did not need
-it — and never touches the JSON-LD at all.
-
-**Do these in order.** The variable goes last, because a sitemap advertising a host that
-does not resolve is worse than one pointing at the old site.
-
-0. **Check that only CI promotes production.** Vercel's Git integration and this
-   workflow both deploy the project, so a push to `main` built it twice and the later
-   one won. That was merely wasteful while Vercel was staging. It is not once the
-   domain points there: the Git integration fires immediately and ignores the test run,
-   so a red push would reach customers while the workflow was still deciding whether to
-   allow it. `vercel.json` now sets `git.deploymentEnabled` to `false` for `main` and
-   `builder` — the two branches CI deploys itself — and leaves it on everywhere else so
-   pull requests keep their previews. Confirm in the Vercel dashboard that a push to
-   `main` produces exactly one deployment, and that it is the one from the workflow.
-
-   This makes CI the only path to production, so its Vercel credentials have to be
-   working: `VERCEL_TOKEN`, `VERCEL_SCOPE` and `VERCEL_PROJECT_NAME`. The job skips with
-   a notice rather than failing when they are missing, which before this change meant a
-   missed staging deploy and afterwards means production silently stops updating.
-
-   *Status, 2026-10-12: confirmed.* The last six pushes to `main` each produced exactly
-   one production deployment, all with source `cli`, which is the workflow's deploy.
-
-1. **Point DNS at Vercel.** Add `govari-fin.co.il` and `www.govari-fin.co.il` to the
-   Vercel project, then set the records the dashboard shows at the registrar. Pick one
-   as canonical — `www` or the apex — and let Vercel redirect the other. Wait for both
-   to resolve before continuing.
-
-   *Status, 2026-10-12: done.* DTNT (ticket 84851895) applied `A 216.198.79.1`,
-   `A 64.29.17.1` and `CNAME www → 30fa16059da418c7.vercel-dns-017.com.` on
-   2026-10-11. The apex serves `200` and `www` answers `308` to it, both on valid
-   Let's Encrypt certificates. The two stray domains on the Vercel project,
-   `mail.govari-fin.co.il` and `dorit-govari-fin.co.il`, were removed on
-   2026-10-12. Neither resolved, and Resend's records for `mail.` live in DTNT's
-   DNS, not on Vercel. See `docs/base44-exit/01-hosting.md`.
-2. **Take the production deployment out from behind login.** Vercel → Settings →
-   Deployment Protection. Staging is protected on purpose; production cannot be, or the
-   site is unreachable. Leave preview protection alone.
-
-   *Status: done.* The setting is Standard Protection, and production answers `200`
-   anonymously.
-3. **Check the site answers on the domain**, including `/api/*`. The rewrite forwards to
-   Base44, so a form submission is the honest test: if a lead arrives, the domain and the
-   backend are talking.
-
-   *Status, 2026-10-12: done.* A `POST` with an empty body to
-   `govari-fin.co.il/api/apps/<id>/functions/submitLead` gets `submitLead`'s own guard,
-   `400 נדרשים שם וטלפון`, so the rewrite reaches the backend.
-4. **Set `VITE_SITE_URL`** to the canonical origin — in **both** builders.
-
-   In the Vercel project (Production scope): `vercel pull` carries it into the build.
-   In Base44's app settings too, and this half is easy to forget. Base44 keeps serving a
-   complete copy of the site at `safe-arch-plan.base44.app` after the move; if that copy
-   still declares itself canonical, it competes with the real site for the same content.
-   Given the variable it declares the production domain instead, which is what tells a
-   search engine the two are one site.
-
-   There is now a second reason the Vercel copy should be the canonical one: it is
-   the only one that is prerendered. Vercel runs `npm run build:prerender`, so its
-   public routes (the static pages plus every published article) ship their own HTML; Base44 runs plain `npm run build` and
-   serves the client-rendered shell. Two copies of the same content where only one
-   is legible to an AI crawler — point the canonical at that one.
-
-   Either way the next build moves the canonical tags, the sitemap, robots.txt,
-   llms.txt and the share links together — Vite resolves the variable from the shell or
-   from a `.env` file, and the build plugin reads the same resolved value the
-   application does, so the two cannot disagree.
-
-   *Status, 2026-10-14: done in the repo.* The Vercel copy names
-   `https://govari-fin.co.il/` in its canonical tag, `og:url`, JSON-LD, robots.txt and
-   sitemap. The Base44 half no longer needs the dashboard: the default origin is now
-   the production domain, so a Builder build without the variable names it too, and
-   the copy Base44 serves also goes `noindex` and sends its visitors on — see [The old
-   Base44 host](#the-old-base44-host). It takes effect on the next Base44 publish.
-5. **Set the `PRODUCTION_URL` repository variable** to the same origin, and
-   `BASE44_URL` to `https://safe-arch-plan.base44.app`. The smoke test targets
-   `PRODUCTION_URL`, so this is what repoints it; the two were one variable while the
-   two hosts coincided.
-
-   *Status: done.* `PRODUCTION_URL` was set on 2026-10-11 and `BASE44_URL` on
-   2026-10-12.
-6. **Resubmit the sitemap** in Search Console for the new property, and keep the old
-   one until it stops receiving traffic. Base44 cannot `301` to Vercel — you do not
-   control its routing — so the page does the next best thing itself: see [The old
-   Base44 host](#the-old-base44-host).
-
-   *Status, 2026-10-12: open.* The verification TXT record
-   (`google-site-verification=pSXd…aiI`) is live at DTNT. What remains is to verify
-   the property in Search Console and submit `https://govari-fin.co.il/sitemap.xml`.
-
-Base44 was kept as a compatibility backend and agent fallback until 2026-10-17,
-when CI stopped publishing to it (#262). Auth is Supabase-only, and other
-capabilities follow the provider switches in
-[the current-state guide](docs/current-state.md). The hosting move and the backend
-cutovers were separate changes.
-
-### Publishing from the Base44 dashboard stays supported
-
-**Status, 2026-10-17:** still possible, but no longer part of any release: CI does
-not publish to Base44, and a dashboard publish would only change the old host. It
-goes with the Base44 code in cleanup 2.
-
-Nothing above takes it away, and that is deliberate rather than incidental. The GitHub
-App still syncs the repo into the Builder, and `base44 dashboard open` → publish works
-exactly as it does today. The `git.deploymentEnabled` setting in step 0 lives in
-`vercel.json`, which only Vercel reads; Base44 builds from `base44/config.jsonc` and is
-unaffected by it.
-
-What could quietly take it away is a build that starts depending on something only CI or
-Vercel provides. CI sets `VITE_BASE44_APP_ID` for the whole workflow and Vercel adds
-`VITE_SITE_URL`, so a green build here says nothing about the Builder's environment —
-the failure would appear after a publish, on production. The build job therefore builds a
-second time with those unset, the way the Builder runs it. If that step goes red, a
-dashboard publish is broken even though everything else is green.
-
-The Builder has its own environment, set only in its dashboard. It no longer needs
-`VITE_SITE_URL`: the default is the production domain (step 4). Leave the variable unset
-there, or set it to `https://govari-fin.co.il` — never to the Base44 host, which would
-make that copy canonical again.
+- **Only CI promotes production.** `vercel.json` sets `git.deploymentEnabled` to
+  `false` for `main` (and the dormant `builder` branch), the branches CI deploys
+  itself, and leaves it on everywhere else so pull requests keep their previews.
+  CI's Vercel credentials therefore have to work: `VERCEL_TOKEN`, `VERCEL_SCOPE`
+  and `VERCEL_PROJECT_NAME`. Confirmed 2026-10-12: each push to `main` produced
+  exactly one production deployment, with source `cli`.
+- **DNS** is at DTNT (ticket 84851895): `A 216.198.79.1`, `A 64.29.17.1` and
+  `CNAME www → 30fa16059da418c7.vercel-dns-017.com.`, applied 2026-10-11. The
+  apex serves `200` and `www` answers `308` to it. Resend's records for `mail.`
+  live in DTNT's DNS too. See `docs/base44-exit/01-hosting.md`.
+- **Production is not behind login.** Vercel → Settings → Deployment Protection
+  is Standard Protection: previews are protected, production answers `200`
+  anonymously.
+- **`VITE_SITE_URL` sets the canonical origin**: `src/lib/seo.ts` reads it at
+  runtime, and a build plugin rewrites `index.html`, `sitemap.xml`, `robots.txt`
+  and `llms.txt` to match. Unset, the build emits `https://govari-fin.co.il`.
+  `index.html` is on that list because the document a crawler is served is the
+  one that matters: `applySeo` patches the canonical tag and `og:url` in the
+  browser — the audience that did not need it — and never touches the JSON-LD.
+- **`PRODUCTION_URL`** (a repository variable) is the origin the smoke test
+  targets.
+- **Search Console and Bing**: see [Search Console and Bing
+  verification](#search-console-and-bing-verification).
 
 ## The home page, and the one conversation
 
@@ -380,20 +148,11 @@ Mail leaves through [`dorit-mailer`](dorit-mailer/), a Cloudflare Pages Function
 that holds the Resend key, the sender identity and the recipient list in its own
 environment — none of that lives in this app's config.
 
-`sendMail()` — byte-identical in `submitLead`, `submitClaim` and
-`escalateToHuman` — routes by recipient. `CORE_EMAILS` go through Base44's own
-`Core.SendEmail`; everyone else goes to the mailer, which posts the *finished*
-message to Resend.
+`sendMail()` (`supabase/functions/_shared/mail.ts`) posts the *finished*
+message to the mailer, which sends it through Resend — one transport for every
+recipient.
 
-That list is not "who is on the team" — it is **which addresses Base44 is able
-to reach**, and it holds one: `Core.SendEmail` delivers only to registered users
-of the app, and an account exists only once that address has signed into the app
-itself. The agency and the second operations mailbox are not users and cannot
-practically become them, so they take the mailer. `CORE_EMAILS` is meant to
-shrink to nothing once the sending domain is verified, at which point there is
-one transport again.
-
-These functions keep the templates, the HTML escaping and `redact()` on anything a model wrote; the
+The Edge Functions keep the templates, the HTML escaping and `redact()` on anything a model wrote; the
 mailer sends what it is given (`type: "rendered"`) rather than rebuilding it. It
 also carries its own `contact` and `intake` templates for a browser posting
 directly, which this backend does not use.
@@ -429,11 +188,10 @@ Root directory to `dorit-mailer` and Build output directory to `public`, with no
 build command. Left empty, Cloudflare serves the repo root — which is the
 website — and the function is never deployed at all.
 
-In **Base44 secrets**: `MAILER_URL` and the same `MAILER_TOKEN`.
 In **Supabase Edge Function secrets**: `MAILER_URL`, and as `MAILER_TOKEN` the value of the
-mailer's `MAILER_TOKEN_SUPABASE` — a token of its own, so either caller can be rotated or revoked
-without the other. Neither value can be read back once stored; to replace one, generate a new
-value and write it to both ends.
+mailer's `MAILER_TOKEN_SUPABASE`. Neither value can be read back once stored; to replace one,
+generate a new value and write it to both ends. The mailer's own `MAILER_TOKEN` was the Base44
+functions' token; no caller sends it any more, and it can be emptied in the Pages settings.
 
 **Who receives an enquiry** is one module for every Edge function:
 `supabase/functions/_shared/recipients.ts` — the operating team's mailboxes
@@ -445,13 +203,11 @@ team's mailboxes get a notice without the visitor's details
 went, and a link to `/admin/leads`), and the team's diary — the Google event and
 the `amielnoy@outlook.com` invitation — holds the name, phone and topic of a
 meeting, not the summary or profile. Dorit's invitation carries the whole
-enquiry. Base44's `submitClaim` twin (off production's path, retired by N-03)
-still sends the team the full report. The optional Edge Function secret **`NOTIFY_EMAILS`**
+enquiry. The optional Edge Function secret **`NOTIFY_EMAILS`**
 (comma-separated) replaces the team's list without a code change; an empty or
 malformed value is ignored and the default stands. Whoever is on it must stay
 within what the consent text discloses ("the team that operates the site for
-her"). Base44's `submitClaim` still keeps its own copy, which a contract test
-holds equal to the module's default.
+her").
 
 **Adding a user** ("הוספת משתמש" on `/admin/users`) goes through the
 `invite-user` Edge Function: the admin gate (`_shared/admin.ts`, shared with
@@ -481,14 +237,10 @@ there is no profile yet; ask them to sign in once with Google, then run it again
 
 ### Lead functions on Supabase
 
-`submitLead`, `escalateToHuman` and `logSupportChat` also exist as Supabase Edge
-Functions (`submit-lead`, `escalate-to-human`, `log-support-chat`), with Google
-Calendar and Sheets reached through a service account instead of Base44's
-connectors. `VITE_LEAD_FUNCTIONS` picks which the site calls, the same way
-`VITE_AUTH_PROVIDER` does for sign-in: `supabase` switches, anything else (the
-default) keeps Base44's functions, which stay deployed as the rollback. The
-interview and support agents still call Base44's tool functions until a second
-PR makes them forwarders.
+Enquiries, hand-offs and support-chat logs are the Supabase Edge Functions
+`submit-lead`, `escalate-to-human` and `log-support-chat` (the chat's tools
+`submitLead`, `escalateToHuman` and `logSupportChat` run them), with Google
+Calendar and Sheets reached through a service account.
 
 In **Supabase Edge Function secrets** (set by hand — the CI token cannot write
 secrets): `GOOGLE_SERVICE_ACCOUNT_JSON` (the service account's JSON key),
@@ -504,16 +256,11 @@ event. The invitations do not depend on the event: with `GOOGLE_CALENDAR_ID`
 unset, or the Google call failing (a `calendar_google_*` warning), they still go
 out, under a local `lead-<id>@govari-fin.co.il` UID instead of the event's; in that
 case `amielnoy@gmail.com` is invited too, so his Google calendar still gets the meeting.
-There is no Outlook or Google Docs step any more.
-Release order: apply `supabase/migrations/20261013000000_meetings_lead_id.sql` to
-the production database by hand after merge (CI deploys functions only) and before
-switching `VITE_LEAD_FUNCTIONS` — a Supabase-only lead has no Base44 id, so its
-booking needs `meetings.lead_id` to be stored and shown. Also confirm `dorit-mailer` is deployed from this commit before switching: an older mailer ignores `ics`, so invitations would go out as plain text while the ops footer reports them sent. Rollout: ship dark, set the secrets and sharing until the smoke's `submit-lead`
-case answers `ready` all true, set `VITE_LEAD_FUNCTIONS=supabase` on Vercel and
-redeploy (and the GitHub repo variable `LEAD_FUNCTIONS=supabase` alongside it, which
-makes the smoke require Google readiness), then send one real enquiry and one consultation. To go back, unset it
-and redeploy. Revoking access is un-sharing the calendar and sheet, or deleting
-the key.
+There is no Outlook or Google Docs step.
+The smoke's `submit-lead` case answers whether Google, the database and the
+mailer are all reachable; the GitHub repo variable `LEAD_FUNCTIONS=supabase`
+makes it require Google readiness. Revoking access is un-sharing the calendar
+and sheet, or deleting the key.
 
 `MAIL_FROM` must be on the domain verified in Resend — the subdomain
 `mail.govari-fin.co.il`, never the apex, which points at Microsoft 365 with an
@@ -578,9 +325,8 @@ expired a code nobody submitted (`masleka-remind`: "קוד מסלקה נמחק �
 marked in `wipe_notified_at`). Neither mail carries the code, the ID number or
 the link.
 
-**Automatic invitations** come from `submit-lead`, so they need
-`VITE_LEAD_FUNCTIONS=supabase` as well; until then, staff create requests by
-hand on the board and copy the link. A second completed interview from a
+**Automatic invitations** come from `submit-lead`; staff can also create
+requests by hand on the board and copy the link. A second completed interview from a
 contact who already has an `invited` request reuses it: the confirmation
 carries a new link, and the old one stops working once that mail is accepted.
 "The same contact" is all three of: the request's address (case and outer
@@ -914,25 +660,21 @@ does exactly that, nightly at 03:45 (`leads-retention`):
 
 ## The chat function (Phase 3)
 
-The `chat` Edge Function (`supabase/functions/chat/`) answers the on-site agents
-named in `VITE_CHAT_AGENTS`, a comma-separated list that is **empty by default**,
-so nothing calls it until it is set. It serves `needs_interview` (the
-interview), `support_agent` (the FAQ chat) and `procedures_agent` (the
+The `chat` Edge Function (`supabase/functions/chat/`) answers every on-site
+agent: `needs_interview` (the interview), `support_agent` (the FAQ chat) and `procedures_agent` (the
 procedures chat on /tools, with the FAQ chat's tools and its own v6 notice, its
 conversations logged to the Support tab by the same sweep) and `blog_recommender`
 (the reading recommender on /blog: it marks the articles it recommends with a
 `recommendArticles` tool, the function answers them as `recommended`, and the
-site's adapter hands the page the same ```` ```recommended ```` block Base44's agent
-writes, so /blog reads one protocol and matches a card by slug or id). For the interview it fixes A-59: the model calls `submitLead` and `escalateToHuman` itself, on the
-server, instead of the page parsing a fenced `lead` block. It also keeps a
+site's adapter hands the page the list as a ```` ```recommended ```` block, and
+/blog matches a card by slug). For the interview it fixes A-59: the model calls `submitLead` and `escalateToHuman` itself, on the
+server. It also keeps a
 redacted transcript that Dorit reads on `/admin/leads` (the "שיחה" button on any
 lead with a linked conversation). The page stops waiting for a reply at 40 s;
 on a conversation that already exists it then asks the function how the turn
 ended (`status: true` with the conversation's token, every 3 s for up to 60 s)
 and shows the reply or the saved-lead confirmation rather than a failure — a
 turn's tools run outside the model's budget and may finish after the wait.
-Agents not named in `VITE_CHAT_AGENTS` stay on
-Base44, with the fenced block.
 
 Files: `handler.ts` (flow and logs), `prompt.ts`, `tools.ts`, `turn.ts`,
 `anthropic.ts`, `budget.ts`, `store.ts`, `redact-chat.ts`, `articles.ts` (the
@@ -971,10 +713,8 @@ What it stores and how a turn runs:
   503 (#192). Only a model that still asks for a tool fails the turn
   (`too_many_tool_rounds`).
 
-### Switch and secrets
+### Secrets
 
-- `VITE_CHAT_AGENTS` (Vercel, build time): the agents the site sends to `chat`.
-  Empty means none. The switch is the rollback too.
 - In **Supabase Edge Function secrets** (set by hand):
   - `ANTHROPIC_API_KEY`: without it the function answers `unavailable`.
   - `CHAT_MODEL`: default `claude-haiku-5-5`. The id is checked against
@@ -1000,8 +740,7 @@ evaluation conversations are purged after one day.
 ### The FAQ chat
 
 `support_agent` runs on the same function with its own prompt
-(`prompts/support.md`, Base44's instructions word for word except the tool
-lines, pinned by a contract test) and its own tools: `listArticles` and
+(`prompts/support.md`, pinned by a contract test) and its own tools: `listArticles` and
 `readArticle`, which read only published articles of agency 1 (or shared ones)
 from `blog_posts` and link to them as `/blog/<slug>`, and `escalateToHuman`. It
 is never offered `submitLead`, and a tool its role was not given is never run,
@@ -1015,8 +754,7 @@ page as before, apart from the agent backend.
 
 #### The FAQ chat's sheet log
 
-Base44's agent called `logSupportChat` at the end of a chat when it remembered
-to. On the function the model is not asked: a sweep writes the Support tab.
+The model is not asked to log a chat: a sweep writes the Support tab.
 
 - **When:** pg_cron runs `public.chat_sweep_tick()` every 15 minutes, which
   posts to the `chat` function with the `x-chat-sweep` header (pg_net, 30 s
@@ -1045,9 +783,7 @@ to. On the function the model is not asked: a sweep writes the Support tab.
   nothing (`sweep.sheet_unconfigured`).
 
 **Status: on since 2026-10-14.** `CHAT_SWEEP_TOKEN` and both Vault secrets are
-set; the first tick (11:00 UTC) answered `200 {"ok":true,"logged":0}`. It logs
-nothing until `VITE_CHAT_AGENTS` names `support_agent`, since no FAQ chat runs on
-the function before then.
+set; the first tick (11:00 UTC) answered `200 {"ok":true,"logged":0}`.
 
 Setup, by hand and only when asked (the migration is already applied):
 
@@ -1108,92 +844,36 @@ on the function.
 
 ### Rollout
 
-Each step is reversible. Shipping the PR is step 1 (dark); the rest is by hand,
-in this order:
+All four agents run on the function since 2026-10-16/17. The gates that were
+open then, and remain the adviser's to close:
 
-1. The two migrations applied (`pg_cron` is already enabled in production).
-   **Done 2026-10-14.**
-2. `ANTHROPIC_API_KEY` set, the provider's business terms confirmed to exclude
-   training on API data, and the `CHAT_MODEL` id checked. **Key set 2026-10-14;
-   `chat_usage.model` reads `claude-haiku-5-5`, which is in the price table.**
-3. The evaluation passed and its 10 transcripts read with Dorit. **Open.** Run 4
-   (2026-10-14, all 43 personas) failed: 7 of 12 complete leads (median 11 /
-   longest 19 visitor turns), from an empty `submitLead` taken as complete
-   (fixed, #188) and turns that hit the tool-round cap (fixed, #192); en-01, an
-   English-only visitor, was handed off instead of interviewed.
-4. The compliance adviser approved consent v6 (`2026-10-agents-v6`, shown only
-   for agents served by `chat`), the transcript storage and the "שיחה" tab. The
-   v6 sentence carries `TODO(compliance): adviser to approve` in
-   `src/config/compliance.ts`; that TODO is a release gate, not a code gap.
-   **Open:** both v6 notices went to Dorit on 2026-10-14 to forward to her
-   adviser.
-5. Phase 2 step 6 done (a test lead seen end to end), because the interview
-   books through the same `submit-lead` handler. Done 2026-10-14: an interview,
-   a hand-off and the Outlook invitations were verified on production.
-6. Only then set `VITE_CHAT_AGENTS=needs_interview` on Vercel, redeploy, and run
-   one real interview: the lead, the mail, the event, the sheet row, the tab.
+- The compliance adviser approves consent v6 (`2026-10-agents-v6`) for the
+  interview and `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS` for the FAQ chat, the
+  transcript storage and the "שיחה" tab. Each v6 sentence carries
+  `TODO(compliance): adviser to approve` in `src/config/compliance.ts`; that TODO
+  is a release gate, not a code gap. Both notices went to Dorit on 2026-10-14 to
+  forward to her adviser.
+- The evaluation passes (all 43 personas; `EVAL_ONLY` is not the gate) and its 10
+  transcripts are read with Dorit. Run 4 (2026-10-14) failed: 7 of 12 complete
+  leads, from an empty `submitLead` taken as complete (fixed, #188) and turns
+  that hit the tool-round cap (fixed, #192); en-01, an English-only visitor, was
+  handed off instead of interviewed.
 
-The FAQ chat follows the same gate, separately:
+Checked on production on 2026-10-14: `chat_usage.model` reads
+`claude-haiku-5-5`, which is in the price table in
+`supabase/functions/chat/budget.ts` (the lookup is by exact id; a dated snapshot
+id falls back to the most expensive known rate); two simultaneous messages to
+one conversation answer one 200 and one `409 busy`; and Supabase's gateway puts
+the real address first in `x-forwarded-for`, so the per-IP limit (`clientIp` in
+`_shared/guard.ts`) cannot be spoofed.
 
-- the compliance adviser approved its v6 notice too
-  (`CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`, the same `TODO(compliance)`);
-- the FAQ personas pass (`EVAL_ONLY` is not the gate: run all 43);
-- the sheet-log setup above is done and one tick answered 200 (**done
-  2026-10-14**);
-- then `VITE_CHAT_AGENTS=needs_interview,support_agent` and a redeploy, and one
-  real FAQ chat: a reply that links an article, and its Support-tab row about
-  2 hours after its last message.
-
-Rollback is removing `support_agent` from `VITE_CHAT_AGENTS` and redeploying;
-the FAQ chat is then back on Base44 with its v5 notice.
-
-Checks that remain before or at the switch:
-
-- After the step-3 evaluation, compare the `model` values in `chat_usage` with
-  the price table in `supabase/functions/chat/budget.ts`. The lookup is by exact
-  id: a dated snapshot id (`claude-haiku-5-5-2026…`) falls back to the most
-  expensive known rate, so the budget would overcount. Add the id the API
-  actually reports. **Done 2026-10-14:** the API reports `claude-haiku-5-5`.
-- Once, after the migrations are applied, check the turn claim against the real
-  PostgREST, not the unit tests' fake: send two messages to one conversation at
-  the same moment (e.g. two `curl`s in the evaluation mode). Exactly one should
-  answer 200 and the other `409 busy`, and afterwards the row's `busy_until`
-  should be empty and `turns` up by one. A claim filter PostgREST reads
-  differently from the fake would show here as two 200s or a stuck
-  `busy_until`. **Done 2026-10-14:** one 200, one `409 busy`; `busy_until`
-  empty and `turns` up by one afterwards.
-- Once, after the function is deployed, confirm how Supabase's gateway sets
-  `x-forwarded-for`: the per-IP limit (`clientIp` in `_shared/guard.ts`) takes
-  its first entry, which is only safe if a client cannot prepend its own. Send
-  one request with a made-up `X-Forwarded-For` and check the `chat-ip:` key the
-  limiter counted. **Done 2026-10-14:** the gateway puts the real address first;
-  the spoofed one was not counted.
-
-**Rollback:** remove the agent from `VITE_CHAT_AGENTS` and redeploy; it is back on
-Base44 with the fenced block. `CHAT_MONTHLY_BUDGET_USD=0` stops new conversations
-without a deploy. The fenced-block path is deleted only after all four agents
-have moved.
-
-## The platform limit that led there
-
-Base44's `Core.SendEmail` delivers **only to registered users of the app**. An
-address that is not registered fails silently and shows up as a warning in the
-operations copy, nowhere else.
-
-This is not theoretical: `dorit@govari-fin.co.il` was not a registered user, so
-she received none of the leads the site collected while the operations mailbox
-received all of them. Adding an address to `NOTIFY_EMAILS` is therefore only
-half the job — the other half is registering it as a user of the app.
-
-A visitor is never a registered user, so the confirmation email the site used to
-offer them could not arrive. The interview no longer promises one. Sending real
-confirmations needs an external mail provider with a verified domain rather than
-the Core integration.
+**Stopping it:** `CHAT_MONTHLY_BUDGET_USD=0` stops new conversations without a
+deploy.
 
 ## The agents, and where they stop
 
 Four LLM agents run on the site — `needs_interview`, `blog_recommender`,
-`support_agent` and `procedures_agent` (`base44/agents/`). They belong to a licensed insurance
+`support_agent` and `procedures_agent` (`supabase/functions/chat/prompts/`). They belong to a licensed insurance
 agency, which makes most of what a visitor would like to ask them off-limits:
 no product recommendation, no figures, no view on whether to move, withdraw or
 cancel anything. Every one of those ends in a handoff to דורית rather than a
@@ -1212,55 +892,36 @@ Two of those guarantees do not depend on the model at all, on purpose:
   to reach them (A-55). A visitor who will not leave a number still gets her
   details; what that no longer does is raise an alert she cannot act on.
 
-A finished interview reaches `submitLead` the same way a form does — **and that
-is now literally true, because the page sends it rather than the agent.**
+A finished interview reaches `submitLead` the same way a form does: the `chat`
+function runs the agent's tool itself, on the server, in an anonymous
+conversation too. That is the fix for A-59 — the old agent host never ran an
+agent's tools for an anonymous visitor, and for three days every interview
+completed on a phone was discarded while the visitor was told it had reached
+דורית. A save the backend refuses shows the visitor דורית's direct channels:
+the failure this exists to prevent is a visitor believing they were passed on
+when they were not, and a silent one is no better.
 
-Base44 does not execute an agent's tool calls in an anonymous conversation, and
-every visitor is anonymous. Proven by running the same scripted interview twice
-against the same build: signed in, `submitLead` fires and everything lands;
-anonymous, it is never invoked and the agent signs off telling the visitor it
-could not save. For three days every interview completed on a phone was
-discarded while the visitor was told it had reached דורית. See A-59.
-
-So the agent ends its last message with a fenced ```` ```lead ```` block,
-`AgentChat` strips it from the transcript before rendering, validates it, and
-calls `submitLead` itself — the same function, the same validation, reached by
-the caller that is permitted to reach it. A block it cannot read, or a
-submission the backend refuses, shows the visitor דורית's direct channels: the
-failure this exists to fix is a visitor believing they were passed on when they
-were not, and a silent one is no better. `src/lib/interview-handoff.ts` carries
-the detail.
-
-**This is a workaround for a platform defect and is meant to be removed.** Do
-not "tidy" the closing `submitLead` back into the agent's instructions —
-`AGENTS.md` says so beside the file.
-
-Either way the function does the rest: it mails דורית and the team operating the
-site in the site's own layout, confirms to the visitor if they gave an address,
-and — when a time was agreed — books it in both calendars without a second tool
-call (see [the meeting](#the-meeting-and-which-diary-it-lands-in)). It used to
-end at `Lead.create` instead — stored, and nobody told, until somebody happened
-to open the leads screen.
+The function does the rest: it mails דורית and the team operating the site in
+the site's own layout, confirms to the visitor if they gave an address, and —
+when a time was agreed — books it (see [the
+meeting](#the-meeting-and-which-diary-it-lands-in)).
 
 What it hands over is a **fixed schema, not free text**. The agent picks one of
 seven tracks from the visitor's stated goal — pension, insurance, retirement,
 tax, savings, self-employed, or a general fallback — and fills that track's
-named fields. `INTERVIEW_TRACKS` in `submitLead/entry.ts` is the whitelist: a
+named fields. `INTERVIEW_TRACKS` in `supabase/functions/submit-lead/lead.js` is the whitelist: a
 key the model invents is dropped before it reaches anyone, which is what stops a
 model handed a form from inventing a field called `advice`. Every value passes
 through `redact()`, because a profile is written by a model that just heard the
 visitor type things it was told not to record.
 
-The interview is saved **twice** — when it can be. Name and phone are asked
-after the goal and before the track questions, and the agent saves a `partial`
-record the moment it has them, silently, mailing nobody. That one is still the
-agent's own tool call, so for an anonymous visitor it does not happen: the
-abandonment row is lost and only the closing call, which the page makes, gets
-through. Another thing the platform fix would restore. A visitor who answers four questions and
+The interview is saved **twice**. Name and phone are asked after the goal and
+before the track questions, and the agent saves a `partial` record the moment it
+has them, silently, mailing nobody. A visitor who answers four questions and
 closes the tab used to leave nothing at all; now they leave a row דורית can
 follow up. The closing call updates that same row rather than creating a second,
-keyed on the phone number within a six-hour window, which is also what stops a
-visitor running the interview three times from producing three leads.
+keyed on the conversation it came from (`conversation_ref`) — never on the phone
+and name, which anyone may know.
 
 Two fields are deliberately narrower than they look. **Management fees** are
 recorded as the visitor stated them, or as "לא ידוע למבקר" — the agent notes the
@@ -1314,7 +975,8 @@ obvious implementation is wrong:
   with no human at all. If the visitor says they have decided, the prompt gives
   them the operational information, says the irreversibility warning once, and
   does not raise it again — while a red question stays red.
-- **Green names no form.** The agent holds `BlogPost.read` and nothing else: no
+- **Green names no form.** The agent holds `listArticles`, `readArticle` and
+  `escalateToHuman` and nothing else: no
   CRM, no document store, no file on anybody. "Which form, which documents,
   where to send, how long" is the exact shape of answer a model invents, and an
   invented form number is worse than a handoff because somebody will fill it
@@ -1399,26 +1061,9 @@ they sign in. Decided 2026-10-06 by the site operator; the privacy policy says
 so, and the wording needs Dorit's and her compliance adviser's approval (see
 `docs/COMPLIANCE.md` section 6). Data is reached only through
 `enquiries_for` in Supabase (migration `20261006000000_personal_area.sql`), via
-`my_enquiries()` — a wrapper that calls `enquiries_for(my_email())`. (The Base44
-function `myAccount`, which served Base44 sign-in, was removed on 2026-10-12.) Phone, name, notes and
-handling status are never returned.
-
-Release order: apply `supabase/migrations/20261006000000_personal_area.sql` to
-production BEFORE merging. CI deployed `submitLead` (and the since-removed `myAccount`) on merge, and
-`submitLead` now sends summary, profile and track label, so the Supabase mirror
-rejects every lead row until those columns exist. Enquiries from before
-summaries were recorded have no summary, and the page says so.
-
-Release order: apply `supabase/migrations/20261009000000_lead_channel.sql` to
-production BEFORE merging. CI deploys `submitLead`, `submitClaim` and
-`escalateToHuman` on merge, and all three now send `channel`/`campaign` to the
-Supabase mirror, so it rejects every lead row until those columns exist.
-
-Release order: apply `supabase/migrations/20261011000000_blog_action_time.sql` to
-production BEFORE the next `seed-blog.mjs --apply`. The seed now writes
-`action_time` to both stores, so the Supabase mirror rejects every post row until
-the column exists. Base44 takes the field on the next CI publish (the entity ships
-with `base44 deploy`); until it is seeded, cards simply show no action-time chip.
+`my_enquiries()` — a wrapper that calls `enquiries_for(my_email())`. Phone, name, notes and
+handling status are never returned. Enquiries from before summaries were
+recorded have no summary, and the page says so.
 
 What the page shows, in order (#115):
 
@@ -1434,23 +1079,13 @@ What the page shows, in order (#115):
   `unverified` are not.
 - **Admins see both admin links** in the header, "ניהול פניות" and "ניהול בלוג"
   (desktop bar and drawer); everyone signed in sees "האזור שלי".
-- **Supabase is the record for leads.** With Supabase configured, `/admin/leads`
-  status changes and deletes write the `leads` table directly under the admin's
-  session (row-level security), and claims are saved by the `submit-claim` Edge
-  Function — so Base44's `Lead` copy is stale by design: it lacks claims, keeps
-  deleted leads and old statuses. `adminLead` and Base44's `submitClaim` remain
-  only as the rollback. **Never copy leads from Base44 into Supabase:**
-  `scripts/reconcile-leads.mjs` is a read-only comparison now (`--apply` and
-  `--create-missing` refuse), and `scripts/backfill-from-base44.mjs` no longer
-  imports `Lead` — either would undo Dorit's changes and bring back leads a
-  visitor asked to have removed.
-
-"ביומן" is not shown for consultation-form bookings: that form was removed from
-the site, and only stale clients still reach `createConsultationEvent`.
+- **Supabase is the record for leads.** `/admin/leads` status changes and
+  deletes write the `leads` table directly under the admin's session (row-level
+  security), and claims are saved by the `submit-claim` Edge Function.
 
 ### Signing in, and out
 
-Sign-in goes through `AuthPort`; `VITE_AUTH_PROVIDER` picks Base44 or Supabase.
+Sign-in goes through `AuthPort`, on Supabase Auth with Google.
 A signed-in visitor can leave in two ways:
 
 - **"יציאה" in the header** (desktop bar and drawer), shown only when signed in.
@@ -1460,10 +1095,8 @@ A signed-in visitor can leave in two ways:
 - **"יציאה והתחברות עם חשבון אחר" on `/account`.** It signs out and opens
   `/login?returnTo=/account`, where "Sign in with Google" asks which account.
 
-Google always shows its account chooser. Base44's sign-in already sends
-`prompt=select_account` (checked against the live redirect, `…/api/apps/auth/login`
-→ `accounts.google.com/…&prompt=select_account`); the Supabase adapter now passes
-`prompt: "select_account"` too. Without it, signing out of Supabase would not be
+Google always shows its account chooser: the Supabase adapter passes
+`prompt: "select_account"`. Without it, signing out of Supabase would not be
 enough: Google signs the browser straight back into the account it remembers.
 `AuthContext.logout(shouldRedirect, redirectTo?)` takes the optional destination;
 existing callers are unchanged.
@@ -1479,14 +1112,9 @@ its response.
 
 Every function now emits a structured line per step: `request.start`,
 `lead.created`, `mail.sent`, `sheet.appended`, `escalation.received`,
-`request.end`, and the failure counterpart of each. Base44 collects the output
-and serves it:
-
-```
-npm run logs                       # the last hour, production
-npx base44 logs --env prod --since 2d --level error
-npx base44 logs --function submitLead --follow
-```
+`request.end`, and the failure counterpart of each. Supabase collects the output:
+the dashboard's Edge Functions → Logs, searchable by the `rid` every answer
+carries.
 
 Every line from one request carries the same short `rid`, so an enquiry can be
 followed from arrival to the last mailbox even when several were in flight at
@@ -1507,11 +1135,6 @@ description. A log recording "all steps" verbatim would reinstate every one of
 them, in the least reachable place. `tests/contract/logging.contract.test.ts`
 enforces this mechanically, because it is the kind of rule that holds until the
 first afternoon somebody is debugging something urgent.
-
-The site's functions run on Supabase now, and their logs are in the Supabase
-dashboard (Edge Functions → Logs), searchable by the `rid` every answer carries.
-The nightly archive of Base44's function logs was removed with the Base44
-publish on 2026-10-17: nothing the site serves runs there any more.
 
 ## The practice the site describes
 
@@ -1554,32 +1177,15 @@ largest SEO constraint on this site, written up as B-0, and it was measured
 rather than assumed: `/`, `/faq` and `/claims` returned byte-identical HTML from
 live production, all three naming the home page as their canonical.
 
-### And only one of the two hosts actually does it
+### Why `index.html` alone was not enough
 
-Measured 2026-10-05 against both live copies:
-
-| | Base44 (production on 2026-10-05) | Vercel |
-|---|---|---|
-| HTML served | 25,708 bytes | 109,870 bytes |
-| `rel="canonical"` | `rel="canonical"/` — **no href** | filled |
-| `og:url` | `property="og:url"/` — **no content** | filled |
-| `<h1>` in the HTML | absent | present |
-
-Base44's build command is `npm run build`; Vercel's is `build:prerender`.
+Measured 2026-10-05, a host serving the plain `npm run build` shipped 25,708
+bytes of HTML with an empty `rel="canonical"` (no href), an empty `og:url` and
+no `<h1>`; the prerendered Vercel copy shipped 109,870 bytes with all three.
 `applySeo` fills the canonical tag and `og:url` **in the browser** — for the
-audience that did not need them. A crawler that does not run JavaScript gets an
-empty canonical element and no content.
-
-The JSON-LD blocks are correct in both, because the build plugin rewrites static
-files. It is precisely the two tags patched at runtime that are empty in the
-document.
-
-At that measurement, production lacked the prerendered HTML and staging had it.
-Since 2026-10-11 Vercel serves production. Prerendering on Base44 instead would need Chromium
-in its build environment — `scripts/prerender.mjs` launches Playwright and fails
-loudly without it — which puts a browser install in front of the production
-publish for a host we intend to leave. The fix is the move below, and
-`docs/base44-exit/01-hosting.md` records which of its steps are already done.
+audience that did not need them — so a crawler that does not run JavaScript got
+an empty canonical element and no content. The JSON-LD blocks were correct in
+both, because the build plugin rewrites static files.
 
 ### Prerendering closes it
 
@@ -1599,10 +1205,9 @@ Worth knowing before changing it:
   untouched copy of the shell; `cleanUrls: true` serves `dist/<route>.html` at
   `/<route>` and 308s the literal `.html` address to it), rather than to the prerendered home page. Otherwise a crawler
   fetching `/blog/some-post` gets the home page's *content* under that URL.
-- **The build command is per host.** Vercel and the CI `build` job run
-  `build:prerender`; Base44 runs plain `npm run build` and is unaffected. Both
-  of the first two install the browser first — Vercel in its `buildCommand`, CI
-  in a step before the build.
+- **The build command is `build:prerender`.** Vercel and the CI `build` job run
+  it, and both install the browser first — Vercel in its `buildCommand`, CI in a
+  step before the build. Plain `npm run build` does not prerender.
 - **A host with no Chromium binary warns and ships the plain SPA** rather than
   failing the deploy — except where `PRERENDER_REQUIRED=1` is set, which the CI
   `build` job does. The e2e shards test the artifact that job uploads and never
@@ -1647,9 +1252,8 @@ saying how to opt out of training while staying answerable in AI search.
 ### The sitemap, llms.txt and llms-full.txt
 
 `public/sitemap.xml` and `public/llms.txt` are templates. They hold the static
-routes and the fixed text, and the Base44 Builder's `npm run build` ships them
-unchanged, so a host that cannot prerender still serves a correct, if
-article-less, pair.
+routes and the fixed text, and a plain `npm run build` ships them unchanged, so
+a build that cannot prerender still serves a correct, if article-less, pair.
 
 `npm run build:prerender` ends with `scripts/build-seo-files.mjs`, which rewrites
 `dist/sitemap.xml` and `dist/llms.txt` with the published articles and writes
@@ -1713,7 +1317,7 @@ The sitemap to submit in both is `https://govari-fin.co.il/sitemap.xml`.
 ## Blog articles in the repo
 
 Articles under [`content/blog/`](content/blog/) are Markdown with front matter.
-They live here rather than only in the Builder because a post published by a
+They live here rather than only in the database because a post published by a
 licensed agent carries a mandatory גילוי נאות block, and a disclosure that
 exists only as a database row is one nobody reviews.
 
@@ -1722,9 +1326,8 @@ node --env-file=.env.local scripts/seed-blog.mjs                          # dry 
 node --env-file=.env.local scripts/seed-blog.mjs --apply --only <file>.md # writes that article
 ```
 
-The seed writes Supabase's `blog_posts` only — the one store the site,
-`/admin/blog` and the blog recommender use since `VITE_CONTENT_WRITES=supabase`
-(2026-10-16). Base44's `BlogPost` is no longer written. It needs
+The seed writes Supabase's `blog_posts` — the one store the site,
+`/admin/blog` and the blog recommender use. It needs
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, which live in `.env.local` (no
 `VITE_` prefix, so neither reaches the bundle). With them, the dry run reads the
 table and says which articles would be created and which updated.
@@ -1763,15 +1366,15 @@ fails every article query.
 ### Article addresses
 
 An article lives at `/blog/<slug>`: Latin kebab-case (`horadat-dmei-nihul`),
-held in Supabase's `blog_posts.slug` only — Base44's `BlogPost` has no such
-field, so `contentAdmin` passes it to the mirror and nowhere else. A repo
+held in Supabase's `blog_posts.slug`, written by the `content-admin` Edge
+Function. A repo
 article's slug is its file name; one written in `/admin/blog` gets the slug
 typed in the form, which refuses anything but kebab-case, a slug another
 article has, and one shaped like a Base44 id.
 
 Every link the site builds goes through `articlePath()` in
 `src/lib/articlePath.ts`. Old links — `/blog/<Base44 id>`, in bookmarks, search
-results and the agents' answers — keep working: `vercel.json` sends every
+results and the old agents' answers — keep working: `vercel.json` sends every
 `/blog/<24 hex characters>` to `api/og/blog.ts` for every visitor, which reads
 Supabase and answers `301` to `/blog/<slug>` (keeping the visitor's query
 string, cached for a day), or `404` with `noindex` for a draft or an unknown id.
@@ -1874,21 +1477,21 @@ them separately so its summary can report each suite's own pass/fail.
 evaluation is the script `npm run test:eval:chat`, run by hand and never gated — see
 [STD-13](tests/test-plan/13-std-eval.md).
 
-**The integration suite runs the Base44 backend functions for real.** They sit
-outside `tsconfig.json` and execute on Deno inside Base44, so nothing else in
-the repo ever runs them — the other suites match strings against their source.
-`tests/helpers/base44-function.ts` loads one in-process against a recording
-client and reports what it stored, who it mailed, what each recipient saw, and
-what survived a failure.
+**The integration suite runs the Supabase Edge Functions for real.** They sit
+outside `tsconfig.json` and execute on Deno, so nothing else in the repo runs
+them — the other suites match strings against their source.
+`tests/helpers/edge-function.ts` bundles a handler and evaluates it in-process
+with `fetch` and `Deno` recorded, and reports what it stored, who it mailed,
+what each recipient saw, and what survived a failure.
 
 The end-to-end suites are hermetic and run production's configuration: the bundle
-is built by `npm run build:e2e` with `e2e/build-env.ts` — the provider switches
-Vercel sets, and Supabase at `https://supabase.e2e.invalid`, a host that never
+is built by `npm run build:e2e` with `e2e/build-env.ts` — production's
+settings, with Supabase at `https://supabase.e2e.invalid`, a host that never
 resolves. `e2e/fixtures/app.ts` answers that host (PostgREST reads over seeded
 tables, the Edge Functions, storage, auth) and aborts third-party beacons, so the
 suites need no credentials and can never write to production data. Any `/api`
-request but the site's own Vercel functions (and, until the SDK goes, its
-telemetry) fails the test: that is the Base44 path the bundle no longer takes.
+request but the site's own Vercel functions fails the test: the bundle has no
+other backend.
 They run against the build served by `vite preview` — point `PLAYWRIGHT_BASE_URL`
 at a deployment to smoke-test it instead; there only the functions are stubbed.
 
@@ -2041,47 +1644,22 @@ because the publish job refuses to run unless e2e passed — narrowing it there
 would quietly weaken the gate in front of the client's site.
 
 A feature branch deploys **nothing**: every deploy job checks the ref, so
-`main` and `builder` stay the only branches that can reach a site, and only
-those two publish the report. The nightly run deploys the Vercel site and the Supabase functions: it rebuilds
-and promotes the Vercel site from `main` (after deploying the Supabase functions
-it calls, behind the same green gate), so an article edited from `/admin/blog`
-has its prebuilt page the next morning. It never publishes Base44 — that still
-takes a push or a manual run with `deploy` ticked.
+`main` (and the dormant `builder`) stay the only branches that can reach a
+site, and only those publish the report. The nightly run rebuilds and promotes
+the Vercel site from `main` (after deploying the Supabase functions it calls,
+behind the same green gate), so an article edited from `/admin/blog` has its
+prebuilt page the next morning.
 
 A pull request triggers a run when it **opens**; later commits are covered by
 the push trigger, so the matrix does not run twice for the same SHA.
 
-**Today the Base44 Builder syncs straight to `main`**, so its edits land on the
-trunk untested. Nothing reaches the client's site regardless — the Base44
-publish requires a green run — but `main` itself can go red at any time, and
-has.
+Everything keyed to `builder` is **dormant**: it was built for the Base44
+Builder, which left with the Base44 exit, and no branch of that name exists.
 
-CI already carries the support for working on a Builder branch, and it is
-**dormant** — everything keyed to `builder` triggers only on pushes to that
-branch, and the Builder isn't pointed at one yet. To switch over (a Base44-side
-setting that costs Builder tokens):
+**CI does not merge for you, on purpose.** It runs everything and posts the
+verdict; merging stays a person's action.
 
-1. In the Builder's branch dropdown, **Create new branch**, named `builder`.
-2. Confirm it appears on GitHub (`git ls-remote --heads origin`).
-
-No workflow change is needed. From then on, every Builder edit gets:
-
-```
-builder ──[unit · component · contract · security · e2e × 4]──┬── Vercel preview URL
-                                                              ├── Allure report
-                                                              └── ✅ / 🛑 safe to merge
-```
-
-The preview is the part worth having: a URL for *that* change, which you open
-and look at before merging, instead of judging a Builder edit from a diff.
-
-**CI does not merge for you, on purpose.** On a branch the Builder replaces its
-Publish button with **Merge to main**, and Base44 keeps each Builder branch as
-a real branch here — so merging is already its job, and a CI job doing it too
-would race and leave the two disagreeing. CI runs everything and posts the
-verdict; you press the button.
-
-**The verdict is not Builder-only.** The `Safe to merge?` job runs on every
+**The verdict is on every branch.** The `Safe to merge?` job runs on every
 branch except `main`, writes to the run summary, and — when the commit has an
 open PR — posts a comment on it, edited in place so there is one comment always
 describing the latest run. The check goes red when the answer is no, because a
@@ -2091,10 +1669,6 @@ merge* is worse than no check at all.
 That isn't a weaker guarantee than it sounds, because **publishing only ever
 happens from main**, and the publish there requires a green run. The gate sits
 where users are actually affected.
-
-⚠️ Every Builder branch shares the app's **live data** — "the same live records
-everywhere", in Base44's words. Tests never touch it, but anything you do by
-hand in the Builder writes to דורית's real leads.
 
 ### The nightly job that deletes
 
@@ -2126,24 +1700,21 @@ up to be hard to fire by accident:
 
 | Target | Deploys when |
 |---|---|
-| **Vercel production** — client-facing | green `main`, Supabase deployed, Base44 published (except scheduled rebuilds) |
-| **Vercel preview** — staging | the build succeeds on `main` or `builder`, tests green **or red** |
-| **Base44** — compatibility backend and old site | green `main` push or requested manual release |
+| **Vercel production** — client-facing | green `main`, Supabase functions deployed; also the nightly rebuild |
+| **Vercel preview** — staging | the build succeeds on `main`, tests green **or red** |
+| **Supabase Edge Functions** | green `main`, before production |
 
 A failing run is exactly when you want the broken build somewhere you can open
 it, so staging takes it either way; production does not.
 
 - **Test plan and per-suite test descriptions:** [`tests/test-plan/`](tests/test-plan/)
-- **Architecture record and review findings:** [`Architecture.html`](Architecture.html)
+- **Architecture record and review findings (dated 2026-10-15):** [`Architecture.html`](Architecture.html)
 - **CI/CD:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
 ## Docs & Support
 
-GitHub integration: [https://docs.base44.com/developers/app-code/local-development/github](https://docs.base44.com/developers/app-code/local-development/github)
-
-Local development: [https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview](https://docs.base44.com/developers/backend/overview/local-dev/local-development-overview)
-
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+Supabase: [https://supabase.com/docs](https://supabase.com/docs) ·
+Vercel: [https://vercel.com/docs](https://vercel.com/docs)
 
 ## The fonts are ours
 
@@ -2178,20 +1749,19 @@ so the component is mounted only on a Vercel build:
 
 That flag is inlined by `vite.config.js` from `VERCEL`, which Vercel sets in
 every build on its own infrastructure — **not** from a variable set per
-environment. A hand-set flag fails by being left on in a Base44 build, which is
-the state this replaces, and a clone would have to know to set it at all. Here
-the default is off and nothing has to be configured anywhere: a clone, `base44
-dev`, `vite preview` and the Base44 production build all read `false`. Because
-the value is a literal, the branch is dead code off Vercel and
-`@vercel/analytics` drops out of the bundle entirely.
+environment. A hand-set flag fails by being left on in a build for another
+host, and a clone would have to know to set it at all. Here the default is off
+and nothing has to be configured anywhere: a clone, `npm run dev` and `vite
+preview` all read `false`. Because the value is a literal, the branch is dead
+code off Vercel and `@vercel/analytics` drops out of the bundle entirely.
 
-Before that gate existed, Base44 production mounted the component, found no
+Before that gate existed, the site's first host mounted the component, found no
 endpoint, and spent a failed request on every page load reporting data nobody
 could read — and the prerenderer captured the injected `<script>` into all
 eight route files, where it resolved to the SPA shell and the browser refused
 to execute an HTML document as a script (A-42/A-43 in
 `tests/test-plan/10-known-issues.md`). Both halves are now pinned: the mount by
-`base44-backend.contract.test.ts`, the capture by `dropVercelBeacon` in
+`vite-build.contract.test.ts`, the capture by `dropVercelBeacon` in
 `scripts/prerender.mjs`. Both are needed — the Vercel build is the one case
 where the component *does* mount and the prerenderer *does* run.
 
@@ -2249,7 +1819,7 @@ there is no consent banner. That is a question for Dorit's compliance adviser
 ## The meeting, and which diary it lands in
 
 An interview with an agreed time books through the Supabase `submit-lead`
-implementation, including when called through the Base44 `submitLead` forwarder.
+function.
 `supabase/functions/_shared/calendar.ts` writes to `GOOGLE_CALENDAR_ID` using the
 Google service account, with `Asia/Jerusalem` wall-clock times. This event has no
 attendees: a service account cannot invite on a consumer calendar.
@@ -2259,25 +1829,20 @@ creation and invitation delivery are separate results; inspect both when a meeti
 is missing. `_shared/recipients.ts` defines the invitees from `SECONDARY_EMAIL`
 plus `NOTIFY_EMAILS` and accounts for the Google calendar owner. Confirm the actual
 owner and sharing permissions in the Google account.
-
-The historical Base44 `createConsultationEvent` writer retains the OAuth connector
-path and provider-specific timezone names (`Israel Standard Time` for Outlook,
-`Asia/Jerusalem` for Google). Its presence does not mean new interviews use those
-connectors. Preserve contracts on the retained copies while that path remains.
-See the earlier connectors runbook and [current operations](docs/current-state.md).
+See [current operations](docs/current-state.md).
 
 ## Dorit's notifications through Resend
 
 All outbound messages go through the Cloudflare Pages Function in
 `dorit-mailer/functions/api/send-email.js`, which calls Resend. The Resend key,
 verified sender and recipient configuration belong to the Pages project, not
-the browser or the Base44 functions.
+the browser or the Edge Functions.
 
-Configure `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO`, `MAILER_TOKEN`,
-`MAILER_TOKEN_SUPABASE` and `ALLOWED_ORIGIN` on the mailer. Configure `MAILER_URL`
-and the corresponding `MAILER_TOKEN` in each calling backend: Base44 uses the
-mailer's Base44 token; Supabase uses its separate Supabase token. See the earlier
-mailer runbook in this README for rotation and deployment details.
+Configure `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO`, `MAILER_TOKEN_SUPABASE` and
+`ALLOWED_ORIGIN` on the mailer, and `MAILER_URL` plus `MAILER_TOKEN` (the
+mailer's `MAILER_TOKEN_SUPABASE` value) in the Supabase Edge Function secrets.
+See [Every message goes through the mailer](#every-message-goes-through-the-mailer)
+for rotation and deployment details.
 
 Use the Resend-verified sending subdomain; the apex domain is Microsoft 365.
 Check acceptance in the provider and delivery in the mailbox separately. A saved
@@ -2288,14 +1853,13 @@ receipt. Runtime notification recipients and calendar invitees are described in
 ### Production smoke says the deployed page is missing `#start`
 
 A successful deployment **job** may have skipped its publish step because its
-credentials were missing. Run #105 did exactly that: Base44 stayed on an older
-page while Vercel updated, then new smoke tests ran against the older Base44 site.
+credentials were missing. Run #105 did exactly that: one host stayed on an
+older page while the other updated, then new smoke tests ran against the older
+site.
 
 CI now checks actual publish outputs for the host named by `PRODUCTION_URL`
 before starting smoke tests. Missing publication fails immediately with the
 relevant deployment configuration, and the run summary reports no publication.
 `scripts/check-production-publish.mjs` requires a Vercel **production**
-promotion in this run; a preview does not count. (It also accepted a Base44
-publish while `PRODUCTION_URL` could name the Base44 host; that went with the
-Base44 publish on 2026-10-17.) Changing test selectors or increasing timeouts
+promotion in this run; a preview does not count. Changing test selectors or increasing timeouts
 cannot update an older deployment.

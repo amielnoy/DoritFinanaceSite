@@ -48,8 +48,8 @@ const allowTel = (url: string): string =>
   url.startsWith("tel:") ? url : defaultUrlTransform(url);
 
 /**
- * An article link by record id: `/blog/<record id>`, which the Base44 agents
- * wrote because their BlogPost had no slug, and which reaches the article only
+ * An article link by record id: `/blog/<record id>`, which the old (Base44)
+ * agents wrote because their BlogPost had no slug, and which reaches the article only
  * through the 301 to the slug (D-10, manual test 2026-10-14). The chat
  * function's agents link by slug; a reply that still names an id is shown the
  * slug's address, once the chat knows it.

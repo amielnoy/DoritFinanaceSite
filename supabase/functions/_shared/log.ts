@@ -1,7 +1,7 @@
 /**
  * One structured line per event, to the function's output: what happened, never
  * who. The rule and its reasons are in tests/contract/logging.contract.test.ts,
- * which reads these files as it reads the Base44 functions.
+ * which reads these files.
  */
 export type Level = 'info' | 'warn' | 'error';
 export type Log = (level: Level, event: string, fields: Record<string, unknown>) => void;

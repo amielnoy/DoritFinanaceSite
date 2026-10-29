@@ -1,9 +1,6 @@
-// What escalate-to-human says and stores, moved verbatim from
-// base44/functions/escalateToHuman/entry.ts: the reasons, the notification
-// text and HTML, the redaction and the sheet's columns. Plain JavaScript, as
-// it was, so the two stay comparable line by line while both are deployed.
-// The only edits: `export` on each declaration, and escapeHtml and
-// channelLine are the shared copies.
+// What escalate-to-human says and stores: the reasons, the notification text
+// and HTML, the redaction and the sheet's columns. Plain JavaScript.
+// escapeHtml and channelLine are the shared copies.
 import { channelLine } from '../_shared/attribution.ts';
 import { escapeHtml } from '../_shared/html.ts';
 

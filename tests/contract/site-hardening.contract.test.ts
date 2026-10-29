@@ -35,7 +35,7 @@ describe("pages name the site as their only allowed origin", () => {
   });
 
   it.each(["/api/csp-report", "/api/og/blog"])("leaves %s to answer for itself", (path) => {
-    // The rewrite to Base44 and the og/csp functions set their own CORS.
+    // The og/csp functions set their own CORS.
     expect(allowOrigin(path)).toBeNull();
   });
 });

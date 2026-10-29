@@ -4,7 +4,7 @@
 `npm run test:e2e:security` (runtime, Playwright)
 **Location:** `tests/security/static-security.test.ts`,
 `tests/security/agent-surface.security.test.ts`, `tests/security/agency-content.security.test.ts`, `e2e/security/security.spec.ts`
-**Cases:** 79 static declared (26 site + 51 agent surface + 2 agency content; `npm run test:security` runs 95 including `it.each` expansions, recounted 2026-10-21) + 16 runtime (× 4 platforms)
+**Cases:** 79 static declared (26 site + 51 agent surface + 2 agency content; `npm run test:security` runs 82 including `it.each` expansions, recounted 2026-10-29) + 16 runtime (× 4 platforms)
 
 ---
 
@@ -39,7 +39,7 @@ lead inbox.
 |---|---|---|
 | SEC-STA-001..006 | "contains no `<secret type>`" (Stripe live key, AWS access key id, Google API key, private key block, hardcoded JWT, assigned secret literal) | No match in `src/**` or `index.html` |
 | SEC-STA-007 | "keeps env files out of version control" | No `.env*` tracked by git (falls back to a filesystem check when `.git` is absent, e.g. inside the test image) |
-| SEC-STA-008 | "gitignores the local env and the Base44 app pointer" | `.gitignore` covers `.env` and `base44/.app.jsonc` |
+| SEC-STA-008 | (retired 2026-10-29, Base44 exit B2 task 8: `base44/` is deleted, so `.gitignore` no longer names `base44/.app.jsonc`; SEC-STA-007 keeps `.env*` out of git) | — |
 | SEC-STA-009 | (retired 2026-10-29, Base44 exit B1 task 3: it read `app-params.js`, which is deleted) | — |
 | SEC-STA-010 | "never uses eval or the Function constructor" | No `eval(` / `new Function(` |
 | SEC-STA-011 | "never injects raw HTML" | No `dangerouslySetInnerHTML` / `.innerHTML =` / `document.write` in first-party code |
@@ -108,7 +108,7 @@ logs show the admin pages clean.
 
 ## 4a. Agent surface — `tests/security/agent-surface.security.test.ts`
 
-50 cases over the four surfaces the agents introduced. A model's behaviour
+51 declared cases (57 with `it.each` expansions, recounted 2026-10-29) over the four surfaces the agents introduced. A model's behaviour
 cannot be asserted, so none of them try: every case pins something that holds
 whatever the model does.
 
@@ -139,8 +139,7 @@ Two findings came out of writing these, one of them a defect that is now fixed:
 - **`supabase/functions/**` is partly checked by text only.** `tsconfig.json` includes only
   `src/**`, and those files run on Deno, so neither `tsc` nor the
   lint step sees them. These tests read the source as text, which is the only
-  check that currently exists on the code holding the compliance logic. (The
-  Base44 functions this note used to name are no longer read, B2 task 6.)
+  check that currently exists on the code holding the compliance logic.
 
 ## 4c. The clearinghouse board's gate — `tests/security/static-security.test.ts`
 
@@ -161,7 +160,7 @@ Review M-2 (R6): the consent stamps stay out of public reads.
 ## 5. Deviations
 
 `SEC-HDR-001` is opt-in because transport hardening is set by the host
-(Base44/CDN), not by the SPA, and the local `vite preview` sets none of it. See
+(Vercel's edge), not by the SPA, and the local `vite preview` sets none of it. See
 [10-known-issues](10-known-issues.md).
 
 ## 6. Pass criteria

@@ -83,7 +83,7 @@ do $$ begin
   end if;
 end $$;
 
--- ── Base44's mirror still writes by lead_base44_id alone ───────────────────
+-- ── A meeting written by lead_base44_id alone (rows from before the move) ──
 insert into public.leads (id, base44_id, name, phone, email, source, status)
 values ('00000000-0000-4000-8000-0000000000c2', 'b44-check-1', 'מבייס44', '0500000002', 'b44@example.test', 'consultation', 'new');
 insert into public.meetings (lead_base44_id, topic) values ('b44-check-1', 'פנסיה');

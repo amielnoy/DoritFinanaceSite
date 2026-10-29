@@ -1,7 +1,6 @@
 /**
- * The FAQ chat's Support-tab row, written by the function. Base44's agent
- * called logSupportChat itself at the end of a chat, when it remembered; this
- * logs every support conversation once, after the function has closed it —
+ * The FAQ chat's Support-tab row, written by the function. This logs every
+ * support conversation once, after the function has closed it —
  * IDLE_MS (2 hours) without a message, plus SHEET_LOG_MARGIN_MS — through the existing log-support-chat
  * handler (in-process), which redacts the text and knows the sheet. A
  * conversation that idle is refused as closed on its next message, so the row
@@ -23,7 +22,7 @@ import type { ChatStore } from './store.ts';
 import type { EdgeHandler } from './tools.ts';
 import type { StoredMessage } from './turn.ts';
 
-/** The roles whose conversations go to the Support tab: the FAQ chat and the procedures chat, as Base44's logSupportChat did for both. */
+/** The roles whose conversations go to the Support tab: the FAQ chat and the procedures chat. */
 export const SHEET_LOGGED_ROLES: readonly string[] = ['support', 'procedures'];
 /**
  * Past the handler's idle close. The handler reads last_message_at, checks it

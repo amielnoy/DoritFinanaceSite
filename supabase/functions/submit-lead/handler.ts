@@ -2,14 +2,12 @@
  * An enquiry — the contact form, the detailed enquiry, the consultation and the
  * interview's two saves: stored first, then announced.
  *
- * The Supabase twin of base44/functions/submitLead, transcribed top to bottom:
- * same input, same checks, same mail. What differs is decided in
- * docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md — Supabase
- * is the only store, Google is reached through a service account Dorit shared
- * her calendar and the sheet with, there is no per-enquiry Doc, and the
- * meeting reaches each attendee as a mailed invitation rather than from the
- * calendar provider. tests/integration/submit-lead.integration.test.ts runs
- * both against one set of cases while both exist.
+ * Supabase is the only store, Google is reached through a service account
+ * Dorit shared her calendar and the sheet with, there is no per-enquiry Doc,
+ * and the meeting reaches each attendee as a mailed invitation rather than
+ * from the calendar provider (decided in
+ * docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md).
+ * tests/integration/submit-lead.integration.test.ts runs it.
  */
 import { channelLine, validCampaign, validChannel, validLandingPath } from '../_shared/attribution.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -35,7 +33,7 @@ import {
   clientMailFor, completenessLine, eventTypeFor, interviewCompleteness, isUrgent, israelInstant, profileValue,
   redact, sameInterviewee, subjectFor, tomorrowInIsrael, wallClock, wantsClearinghouse,
 } from './lead.js';
-// lead.js is plain JavaScript, as Base44's file was. The few `as` casts below
+// lead.js is plain JavaScript. The few `as` casts below
 // tell Deno's checker the shapes it cannot infer from it.
 
 const FN = 'submit-lead';
@@ -70,7 +68,7 @@ interface OpenInterview {
  */
 const DETAILS_WINDOW_MS = 30 * 60_000;
 
-/** The conversation an interview save names: `chat:<id>`, `base44:<id>`, `wizard:<id>` — the column's own pattern. */
+/** The conversation an interview save names: `chat:<id>`, `wizard:<id>` (and `base44:<id>` on older rows) — the column's own pattern. */
 const CONVERSATION_REF = /^[A-Za-z0-9:_-]{8,100}$/;
 
 /**
@@ -97,7 +95,7 @@ async function findOpenInterview(
     );
     return (rows[0] as unknown as OpenInterview | undefined) ?? null;
   } catch (e) {
-    // Best-effort, as Base44's was: a duplicate beats a lost interview.
+    // Best-effort: a duplicate beats a lost interview.
     log('warn', 'interview.lookup_failed', { rid, err: String((e as Error)?.message ?? e).slice(0, 200) });
     return null;
   }
@@ -377,8 +375,8 @@ export async function handler(req: Request): Promise<Response> {
     // שם ומועד: מועד שכבר נשמר נשמר, אם הסיום לא שלח חדש; ריק לא דורס אותו.
     const storedName = name || openInterview?.name || '';
     const storedTiming = timing || openInterview?.timing || '';
-    // The meeting and what the personal area shows, on the enquiry itself —
-    // the fields Base44's mirror wrote beside its own record. `profile` and
+    // The meeting and what the personal area shows, on the enquiry itself.
+    // `profile` and
     // `summary` are the redacted copies the mail carries, never the raw payload.
     const meetingFields = {
       scheduled_at: israelInstant(scheduledAt),

@@ -117,10 +117,10 @@ function restoreAsyncFont(html) {
  * `<Analytics />` appends `<script src="/_vercel/insights/script.js">` on
  * mount, so the captured DOM carries it and every prerendered page ships it as
  * static markup. Nothing under `/_vercel/` is a file in this build: the path is
- * synthesised by Vercel's edge, and production is Base44, which has never heard
- * of it. There the tag resolves to the SPA fallback — `index.html`, 200,
- * `text/html` — and the browser refuses to execute a document as a script on
- * every page load, for a beacon that collects nothing on that host anyway.
+ * synthesised by Vercel's edge, and any other host has never heard of it. There
+ * the tag resolves to the SPA fallback — `index.html`, 200, `text/html` — and
+ * the browser refuses to execute a document as a script on every page load,
+ * for a beacon that collects nothing on that host anyway.
  *
  * Removing it costs nothing on Vercel either: the component re-injects the tag
  * when React mounts, which is how it works for a client-rendered visit today.

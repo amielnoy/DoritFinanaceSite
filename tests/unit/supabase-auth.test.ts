@@ -122,8 +122,8 @@ describe("SupabaseAuthService", () => {
     const signInWithOAuth = vi.fn(async () => ({ error: null }));
     const svc = new SupabaseAuthService(clientWith({ spy: { signInWithOAuth } }));
 
-    // Base44 hosted its own sign-in screen, so the port had two doors. Supabase
-    // has one: both must reach Google or the flag would half-switch.
+    // The port has two doors (signInWithGoogle and redirectToLogin); Supabase has one
+    // flow, so both must reach Google.
     svc.redirectToLogin("/admin");
 
     expect(signInWithOAuth).toHaveBeenCalledWith({

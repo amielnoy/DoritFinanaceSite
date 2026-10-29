@@ -9,10 +9,11 @@ import { REPO_ROOT } from "../helpers/entity-schema";
  *
  * `dorit-mailer` is a Cloudflare Pages Function, so nothing else in this
  * repository runs it: it is outside `tsconfig.json`, it executes on Workers
- * rather than on the CI runner, and the Base44 suites stop at the HTTP call.
+ * rather than on the CI runner, and the Edge Function suites stop at the HTTP
+ * call.
  *
  * It is also the one component here that is reachable from the open internet.
- * Everything else needs a Base44 session or a form on the site; this answers a
+ * Everything else needs a Supabase session or a form on the site; this answers a
  * POST from anyone who knows the URL, and sends mail from the agency's verified
  * domain when it does. The token check is the whole of what stands between it
  * and a stranger sending branded mail as Dorit — which is why the first block
@@ -21,7 +22,7 @@ import { REPO_ROOT } from "../helpers/entity-schema";
 
 const SOURCE = join(REPO_ROOT, "dorit-mailer/functions/api/send-email.js");
 
-/** Load the Worker module in-process, the way the Base44 harness loads entries. */
+/** Load the Worker module in-process. */
 async function loadMailer() {
   const { code } = transformSync(readFileSync(SOURCE, "utf8"), { loader: "js", format: "cjs" });
   const module = { exports: {} as Record<string, unknown> };
@@ -38,7 +39,7 @@ const ENV = {
   MAIL_FROM: "Dorit <notifications@mail.govari-fin.co.il>",
   MAIL_TO: "dorit@govari-fin.co.il,amielnoy@gmail.com,amielnoy@outlook.com",
   MAILER_TOKEN: "test-only-token",
-  ALLOWED_ORIGIN: "https://safe-arch-plan.base44.app",
+  ALLOWED_ORIGIN: "https://govari-fin.co.il",
 };
 
 const post = (body: unknown, headers: Record<string, string> = {}) =>
@@ -105,7 +106,7 @@ describe("dorit-mailer — who is allowed to send", () => {
 
   it("refuses an ordinary contact submission too", async () => {
     // The contact and intake types were for a form posting from a browser, and
-    // nothing does — the site talks to Base44 and Base44 talks to this. An
+    // nothing does — the site talks to its Edge Functions and they talk to this. An
     // unauthenticated way into an endpoint that sends from a verified domain is
     // a surface with no user, so it is closed: there is one way in.
     const mailer = await loadMailer();
@@ -145,8 +146,8 @@ describe("dorit-mailer — who is allowed to send", () => {
 });
 
 /**
- * One token per caller. Base44's functions and the Supabase Edge Functions each
- * hold their own, so either can be rotated or revoked without touching the
+ * One token per caller. The first (MAILER_TOKEN, once the Base44 functions')
+ * and the Supabase Edge Functions' each have their own, so either can be rotated or revoked without touching the
  * other — and the second could be added without reading the first, which no
  * system will reveal once stored.
  */
@@ -161,13 +162,13 @@ describe("dorit-mailer — a second caller's token", () => {
     expect(sent).toHaveLength(1);
   });
 
-  it("still accepts Base44's token beside it", async () => {
+  it("still accepts the first caller's token beside it", async () => {
     const mailer = await loadMailer();
     const res = await mailer.onRequestPost({ request: post(rendered, AUTH), env: BOTH });
     expect(res.status).toBe(200);
   });
 
-  it("accepts the Supabase token even where Base44's is not configured", async () => {
+  it("accepts the Supabase token even where the first one is not configured", async () => {
     const mailer = await loadMailer();
     const { MAILER_TOKEN, ...onlySupabase } = BOTH;
     const res = await mailer.onRequestPost({ request: post(rendered, bearer("supabase-only-token")), env: onlySupabase });
@@ -213,7 +214,7 @@ describe("dorit-mailer — what it sends", () => {
   });
 
   it("passes the rendered body through untouched", async () => {
-    // The Base44 functions own the templates, the escaping and redact(). If
+    // The Edge Functions own the templates, the escaping and redact(). If
     // this rebuilt the message, that work would be silently discarded.
     const mailer = await loadMailer();
     await mailer.onRequestPost({ request: post(rendered, AUTH), env: ENV });

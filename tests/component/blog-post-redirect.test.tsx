@@ -98,7 +98,7 @@ describe("an article reached by an old-form address", () => {
     expect(where()).toBe("/blog/horadat-dmei-nihul");
   });
 
-  it("stays on the id where the store has no slug (a build reading Base44)", async () => {
+  it("stays on the id where the article has no slug", async () => {
     servicesMock.content.getArticle.mockResolvedValue({ ...ARTICLE, slug: undefined });
     renderAt(`/blog/${B44}`);
     await screen.findByRole("heading", { level: 1, name: ARTICLE.title });
