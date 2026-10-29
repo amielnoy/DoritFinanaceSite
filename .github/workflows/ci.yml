@@ -208,9 +208,11 @@ jobs:
       - name: Type-check the Edge Functions
         run: deno check --no-config supabase/functions/*/index.ts
 
-      # Runs the Base44 functions in-process against a recording client. They
-      # are outside tsconfig and execute on Deno in production, so this is the
-      # only place their behaviour — not their source — is checked.
+      # Runs the Supabase Edge Functions in-process (tests/helpers/edge-function.ts):
+      # each handler is bundled and evaluated with fetch and Deno recorded, so no
+      # network is reached. They execute on Deno in production and sit outside
+      # tsconfig, so this is the only place their behaviour — not their source —
+      # is checked.
       - name: Integration tests
         run: npm run test:integration
 

@@ -2,11 +2,29 @@ import { generateKeyPairSync } from "node:crypto";
 import { join } from "node:path";
 import { buildSync } from "esbuild";
 import { REPO_ROOT } from "./entity-schema";
-import { MAILER_URL, type EmailCall, type FetchCall } from "./base44-function";
+
+/** Where the backend posts finished mail. Mirrors MAILER_URL in production. */
+export const MAILER_URL = "https://dorit-mailer.pages.dev/api/send-email";
+
+export interface EmailCall {
+  to: string;
+  subject: string;
+  body?: string;
+  html?: string;
+  text?: string;
+  /** A meeting invitation the mailer attaches. */
+  ics?: string;
+}
+
+export interface FetchCall {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body: unknown;
+}
 
 /**
- * Runs a Supabase Edge Function in-process, the way tests/helpers/base44-function.ts
- * runs a Base44 one: what executes is the code that deploys.
+ * Runs a Supabase Edge Function in-process, what executes is the code that deploys.
  *
  * `handler.ts` and the `_shared` modules it imports are bundled with esbuild
  * into one CommonJS chunk and evaluated with `fetch` and `Deno` passed in, so
@@ -121,7 +139,7 @@ export interface EdgeOptions {
   envPatch?: Record<string, string | null>;
   /** The leads lookup (`GET /rest/v1/leads?…`) answers 500. */
   failLeadLookup?: boolean;
-  /** Every mailer call answers this status — the same knob as base44-function.ts. */
+  /** Every mailer call answers this status. */
   resendStatus?: number;
   /** …with this body instead of the default. */
   resendResponse?: unknown;
@@ -246,7 +264,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
   const calendarEvents: Record<string, unknown>[] = [];
   const sheetRows: { tab: string; row: unknown[] }[] = [];
   // Copies: a PATCH writes into the stored row, and a suite that runs the same
-  // fixture against Base44 and then Edge must not see the first run's update.
+  // fixture twice must not see the first run's update.
   const stored: Record<string, unknown>[] = (options.existingLeads ?? []).map((l) => ({ ...l }));
   const masleka = options.masleka ?? {};
   const maslekaRequests: Record<string, unknown>[] = (masleka.requests ?? []).map((r) => ({ ...r }));
@@ -281,7 +299,7 @@ export async function invokeEdge(name: string, body: unknown, options: EdgeOptio
     const custom = options.upstream?.(call);
     if (custom) return custom;
 
-    // The mailer, not the provider — the same boundary base44-function.ts records.
+    // The mailer, not the provider.
     if (u === MAILER_URL) {
       const refused = options.failEmailTo?.includes(parsed.to);
       const status = options.resendStatus ?? (refused ? 422 : 200);

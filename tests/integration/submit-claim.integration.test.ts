@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { invokeFunction } from "../helpers/base44-function";
-import { invokeEdge } from "../helpers/edge-function";
+import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
 
 /**
  * `submitClaim`, executed.
@@ -16,9 +15,7 @@ import { invokeEdge } from "../helpers/edge-function";
  * written first and every notification is best-effort after it, same as
  * `submitLead` — these pin that a bounce costs a message and never the report.
  *
- * Both implementations run every case below while both exist: Base44's
- * `submitClaim` (the rollback) and the `submit-claim` Edge Function that
- * replaced it. A case that passes for one and fails for the other is drift.
+ * The `submit-claim` Edge Function runs every case below.
  */
 
 const AGENCY = "dorit@govari-fin.co.il";
@@ -36,29 +33,11 @@ const claim = {
   documents: ["אישור משטרה.pdf", "תמונות.zip"],
 };
 
-type Run = (
-  body: unknown,
-  options?: { failLeadWrite?: boolean; failEmailTo?: string[] },
-) => Promise<{
-  status: number;
-  json: Record<string, unknown>;
-  leads: Record<string, unknown>[];
-  emails: { to: string; subject: string; html?: string; text?: string; body?: string }[];
-  mailTo(address: string): { subject: string; html?: string; text?: string; body?: string };
-}>;
-
-/**
- * `minimalOps`: the operations mailboxes get a notice without the reporter's
- * details (N-02). The Edge function — production's path — does; Base44's twin,
- * reached only where Supabase is not configured and retired by N-03, still
- * sends them the whole report.
- */
-const IMPLEMENTATIONS: { label: string; run: Run; minimalOps: boolean }[] = [
-  { label: "Base44 submitClaim", run: (body, options) => invokeFunction("submitClaim", body, options), minimalOps: false },
-  { label: "Edge submit-claim", run: (body, options) => invokeEdge("submit-claim", body, options), minimalOps: true },
+const IMPLEMENTATIONS = [
+  { label: "Edge submit-claim", run: (body: unknown, options?: EdgeOptions) => invokeEdge("submit-claim", body, options) },
 ];
 
-describe.each(IMPLEMENTATIONS)("$label", ({ run, minimalOps }) => {
+describe.each(IMPLEMENTATIONS)("$label", ({ run }) => {
   describe("submitClaim — the report lands", () => {
     it("stores the claim and tells the agency and both operations mailboxes", async () => {
       const r = await run(claim);
@@ -81,13 +60,9 @@ describe.each(IMPLEMENTATIONS)("$label", ({ run, minimalOps }) => {
       for (const to of [OPS, OPS2]) {
         const mail = r.mailTo(to);
         const body = `${mail.subject}\n${mail.body ?? mail.text ?? ""}\n${mail.html ?? ""}`;
-        if (minimalOps) {
-          for (const d of details) expect(body, `${to}: ${d}`).not.toContain(d);
-          expect(body, to).toContain("דיווח אירוע ביטוחי חדש");
-          expect(body, to).toContain("https://govari-fin.co.il/admin/leads");
-        } else {
-          for (const d of details) expect(body, `${to}: ${d}`).toContain(d);
-        }
+        for (const d of details) expect(body, `${to}: ${d}`).not.toContain(d);
+        expect(body, to).toContain("דיווח אירוע ביטוחי חדש");
+        expect(body, to).toContain("https://govari-fin.co.il/admin/leads");
       }
     });
 
@@ -254,24 +229,6 @@ describe.each(IMPLEMENTATIONS)("$label", ({ run, minimalOps }) => {
       expect(r.status).toBe(200);
       expect(r.leads[0].channel).toBe("unknown");
     });
-  });
-});
-
-describe("the two implementations say the same thing", () => {
-  it("send the reporter the same HTML", async () => {
-    const [base44, edge] = await Promise.all([invokeFunction("submitClaim", claim), invokeEdge("submit-claim", claim)]);
-    expect(edge.mailTo("ronit@example.com").html).toBe(base44.mailTo("ronit@example.com").html);
-    expect(edge.mailTo("ronit@example.com").subject).toBe(base44.mailTo("ronit@example.com").subject);
-  });
-
-  // Dorit's copy only: the operations mailboxes get a notice from the Edge function (N-02).
-  it("send Dorit the same report, apart from the timestamp line", async () => {
-    const [base44, edge] = await Promise.all([invokeFunction("submitClaim", claim), invokeEdge("submit-claim", claim)]);
-    const rest = (text = "") => text.split("\n").slice(1).join("\n");
-    for (const to of [AGENCY]) {
-      expect(rest(edge.mailTo(to).text), to).toBe(rest(base44.mailTo(to).body ?? base44.mailTo(to).text));
-      expect(edge.mailTo(to).subject, to).toBe(base44.mailTo(to).subject);
-    }
   });
 });
 

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MAILER_URL, invokeFunction, type EmailCall, type HarnessOptions } from "../helpers/base44-function";
-import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
+import { MAILER_URL, invokeEdge, type EdgeOptions, type EmailCall } from "../helpers/edge-function";
 import { REPO_ROOT } from "../helpers/entity-schema";
 
 /**
@@ -18,13 +17,11 @@ import { REPO_ROOT } from "../helpers/entity-schema";
  * reached the HTML, whether the plain-text copy was escaped by mistake, or
  * whether a bounce to one recipient silently dropped the other two.
  *
- * The Edge function `submit-lead` does the work; Base44's `submitLead` is a
- * forwarder to it (forwarders.integration.test.ts).
+ * The Edge function `submit-lead` does the work.
  */
 
-/** Both harnesses' options. A case passes only knobs both understand, or takes them from `down`. */
-type RunOptions = HarnessOptions & EdgeOptions;
-type Result = Awaited<ReturnType<typeof invokeFunction>> & { invitations?: EmailCall[] };
+type RunOptions = EdgeOptions;
+type Result = Awaited<ReturnType<typeof invokeEdge>> & { invitations?: EmailCall[] };
 
 /** Settings a case may give Base44's harness that the Edge function reads too. */
 const SHARED_ENV = ["SHEET_ID", "SHEET_TAB", "POA_URL"] as const;

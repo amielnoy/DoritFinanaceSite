@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FetchCall } from "../helpers/base44-function";
-import { invokeEdge, SUPABASE_URL } from "../helpers/edge-function";
+import { invokeEdge, SUPABASE_URL, type FetchCall } from "../helpers/edge-function";
 
 /** The harness's default env carries this legacy service key (tests/helpers/edge-function.ts). */
 const serviceKeyOf = (f: FetchCall) => String(f.headers.apikey ?? "");

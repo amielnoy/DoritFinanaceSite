@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MAILER_URL } from "../helpers/base44-function";
-import { invokeEdge, SUPABASE_URL } from "../helpers/edge-function";
+import { invokeEdge, MAILER_URL, SUPABASE_URL } from "../helpers/edge-function";
 
 /**
  * What only the Edge Function does: the row it writes to Supabase, the CORS

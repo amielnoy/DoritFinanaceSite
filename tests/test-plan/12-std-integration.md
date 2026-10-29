@@ -1,19 +1,18 @@
 # STD-12 — Integration Tests
 
 **Suite:** `integration` · **Runner:** `npm run test:integration` (Vitest, node)
-**Location:** `tests/integration/` · **Cases:** 161 declared cases (IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 625 including `it.each` / `describe.each` expansions
+**Location:** `tests/integration/` · **Cases:** 92 declared cases (161 before B2 task 7 retired `INT-CCE-001..003`, `INT-CONTACT-001..017`/`020..023` and `INT-ADL-001..031` and `INT-CNT-001..014`: 69; IDs in section 4; a range such as `X-001..014` counts each ID); `npm run test:integration` runs 704 (848 before task 7) including `it.each` / `describe.each` expansions
 
 ---
 
 ## 1. Purpose
 
-Execute the Base44 backend functions and look at what came out.
+Execute the Supabase Edge Functions and look at what came out.
 
-Nothing else in the repository runs them. They sit outside `tsconfig.json`, they
-import the Base44 SDK from a `npm:` specifier, and in production they execute on
-Deno inside Base44 — so the type-checker never sees them, the frontend suites
-never reach them, and the contract suite reads their *source* rather than their
-behaviour.
+Nothing else in the repository runs them. They are Deno modules outside
+`tsconfig.json`, and in production they execute on Supabase rather than on the
+CI runner — so the type-checker never sees them, the frontend suites never reach
+them, and the contract suite reads their *source* rather than their behaviour.
 
 That difference is not academic. A source check confirms `escapeHtml(` sits next
 to `firstName`. It cannot tell you whether the escaped value actually reached the
@@ -23,17 +22,18 @@ the function.
 
 ## 2. Environment
 
-`tests/helpers/base44-function.ts` loads a function's `entry.ts` and runs its
-default export against a recording client. Entity writes and reads,
-`Core.SendEmail`, connector lookups and outbound `fetch` are all captured rather
-than performed, so a run touches no network, no mailbox and no live data. The
-harness can be told to fail any of them — `failLeadWrite`, `failLeadLookup`,
-`failEmailTo`, `failFetch`, a `null` connector token — which is how the failure
-paths below are reached.
+`tests/helpers/edge-function.ts` bundles a function's `handler.ts` and the
+`_shared` modules it imports with esbuild into one CommonJS chunk and evaluates
+it with `fetch` and `Deno` passed in. Supabase REST calls, Google APIs, the
+mailer and the limiter are answered and recorded rather than reached, so a run
+touches no network, no mailbox and no live data. The harness can be told to fail
+any of them — `failGoogle`, `failLimiter`, `overLimit`, `failEmailTo`,
+`failFetch`, and the like — which is how the failure paths below are reached.
+It also exports `MAILER_URL`, `EmailCall` and `FetchCall`, which the suites share.
 
 `existingLeads` seeds rows the function can find *before* it writes. Without a
 readable store the interview lookup always misses, every case takes the create
-path, and the upsert in §4.11 would be exercised by nothing.
+path, and the upsert in §4.12 would be exercised by nothing.
 
 Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 `mailTo(address)` and `callsTo(host)`.
@@ -45,14 +45,14 @@ Its result exposes `status`, `json`, `leads`, `leadUpdates`, `emails`,
 | `submitLead` | every form on the site, and the interview agent |
 | `escalateToHuman` | all three on-site agents |
 | `submitClaim` | the claims form |
-| `submit-claim` (Edge) | a claim, saved to Supabase and announced — the same cases as `submitClaim`, plus its own |
-| `submit-lead` / `escalate-to-human` / `log-support-chat` (Edge) | the same callers as their Base44 versions, behind `VITE_LEAD_FUNCTIONS=supabase`; the same cases run against both |
-| `upsertContact` | no caller yet — built for a channel that supplies a phone number, dormant per B-8 |
+| `submit-claim` (Edge) | a claim, saved to Supabase and announced |
+| `submit-lead` / `escalate-to-human` / `log-support-chat` (Edge) | every form, the interview and handoff agents, and the support agent |
+| `upsertContact` | (retired 2026-10-29, Base44 exit B2 task 7) |
 | `logSupportChat` | the support agent, at the end of every conversation |
-| `adminLead` | `/admin/leads` — an admin's status change and delete, written to Supabase and then Base44 |
+| `adminLead` | (retired 2026-10-29, Base44 exit B2 task 7) |
 | `dorit-mailer` | every message the backend sends — a Cloudflare Pages Function, run in-process here |
 
-`createConsultationEvent` is not yet executed here. See §6.
+`createConsultationEvent` is retired (§4.2e).
 
 ## 4. Test cases
 
@@ -121,15 +121,15 @@ A hand-off that does not reach a person is a regulatory failure, so the limits n
 
 `submit-claim-edge.integration.test.ts` "how often" changed. "does not limit a request with no forwarded address" became "limits a request with no address under the one key such callers share": `claim-ip:` + the hash of `no-address`. A new case, "counts the address the gateway appended, not one the client put first", checks `6.6.6.6, 203.0.113.7` → the hash of `203.0.113.7`. The same `clientIp` serves submit-lead, escalate-to-human, log-support-chat, masleka-code and the chat. The `ip &&` guards that skipped a limit without an address are gone.
 
-### 4.2e `createConsultationEvent` — kept for stale clients, under a cap (review 2026-10-15) — `INT-CCE-001..003`
+### 4.2e `createConsultationEvent` — retired — `INT-CCE-001..003`
 
-`tests/integration/create-consultation-event.integration.test.ts`. Nothing in the current build calls it, but a stale client still can (it logs `client.stale`), and then its event is the only trace of that visitor's interview. So it is not retired with a 410: it keeps booking under a cap, and stops returning a provider's own error text.
+**Retired 2026-10-29** — Base44 exit B2 task 7: the in-process Base44 harness and `create-consultation-event.integration.test.ts` are deleted with the `base44/` folder; no Edge Function replaces it
 
 | ID | Title | Expected result |
 |---|---|---|
-| INT-CCE-001 | "still books, and asks the shared limiter once, for every caller together" | 200 `ok`; one `allow_submission` with `consultation-event`, 3600 s, 20 |
-| INT-CCE-002 | "refuses past the cap with 429 and rid, booking nothing" | 429 with `rid`; no calendar call |
-| INT-CCE-003 | "never hands a calendar provider's own error text to the browser" | A provider refusing with its own text: 200, and no `details` in `events`, the text nowhere in the answer (fails without the fix) |
+| INT-CCE-001 | (retired 2026-10-29, Base44 exit B2 task 7: the in-process Base44 harness and `create-consultation-event.integration.test.ts` are deleted with the `base44/` folder; no Edge Function replaces it) | — |
+| INT-CCE-002 | (retired 2026-10-29, Base44 exit B2 task 7: the in-process Base44 harness and `create-consultation-event.integration.test.ts` are deleted with the `base44/` folder; no Edge Function replaces it) | — |
+| INT-CCE-003 | (retired 2026-10-29, Base44 exit B2 task 7: the in-process Base44 harness and `create-consultation-event.integration.test.ts` are deleted with the `base44/` folder; no Edge Function replaces it) | — |
 
 ### 4.2f `submit-lead` — an interview's saves meet by the conversation (review 2026-10-15)
 
@@ -271,7 +271,7 @@ failure and one that reached two of three is not.
 
 ### 4.10 `dorit-mailer` — the one endpoint a stranger can reach — `INT-MAIL-001..015`
 
-Everything else on this site needs a Base44 session or a form; the mailer
+Everything else on this site needs a session or a form; the mailer
 answers a POST from anyone who knows its URL, and sends from the agency's
 verified domain when it does. So the first block is about refusing, and it
 covers every way in: a rendered message with no token and with the wrong token,
@@ -284,22 +284,20 @@ configured at all, which must fail closed rather than open.
 The rest pin that the sender identity comes from the environment and not from
 the caller, that Reply-To is the agency rather than the visitor, that a rendered
 body passes through untouched (rebuilding it would discard the templates,
-escaping and `redact()` the Base44 functions apply), and that a form submission
+escaping and `redact()` the Edge functions apply), and that a form submission
 fans out to every configured mailbox. Failure cases: one rejected mailbox still
 reports success for the others, no mailbox taking it reports 502, and the
 provider's error text — which can quote the API key — never reaches the
 response.
 
-The Worker is loaded and executed in-process, the way the Base44 harness loads
-an entry point. Nothing else in the repository runs this file.
+The Worker is loaded and executed in-process, the way the Edge harness loads
+a handler. Nothing else in the repository runs this file.
 
 ### 4.11 `submitClaim` — the claim lands — `INT-CLAIM-001..013`
 
 Previously a known gap, now executed. Stores the claim and tells the agency,
 both operations mailboxes and the reporter; gives Dorit the whole report and the
-operations mailboxes a notice without the reporter's details (N-02; Base44's twin,
-off production's path and retired by N-03, still sends them the report, and is
-compared with the Edge function on Dorit's copy alone); pins `status` and `source` rather than taking them from the caller;
+operations mailboxes a notice without the reporter's details (N-02); pins `status` and `source` rather than taking them from the caller;
 says so when no documents were attached; skips the confirmation when no address
 was given. The mailbox cases mirror §4.9. The failure cases pin that a claim
 nobody stored fails loudly and mails nobody — worse than an unmailed claim,
@@ -411,8 +409,7 @@ pin that the details fill in that lead (the visitor's: same phone, same person,
 an interview, saved as `new` within 30 minutes) with one follow-up mail whose
 subject starts "פרטים נוספים — ", and that anything else — no recent lead, an
 older one, another person's, a non-interview — is saved as a lead of its own
-rather than lost. Edge only: the Base44 rollback backend reports
-`updatesInterviews` false, and the questionnaire never sends it details.
+rather than lost. 
 
 | ID | Title |
 |---|---|
@@ -472,46 +469,24 @@ phone number, or a failed write still produces a notification, and the agent
 still receives contact channels even when every mailbox bounces. The handing
 agent is named, so a pattern is visible later.
 
-### 4.18 `upsertContact` — one person, however they spelled their number — `INT-CONTACT-001..017`
+### 4.18 `upsertContact` — retired — `INT-CONTACT-001..017`
 
-These cover code that nothing currently calls, and they are here rather than
-deleted on purpose: the function is dormant per B-8, not abandoned, and the day
-a channel supplying phone numbers is switched on is the day nobody will remember
-what it was supposed to do.
-
-Such a channel changes the shape of the problem. On the site a visitor types a
-phone number into a field that enforces its format, once. There the number
-arrives with the message, in whatever form the channel hands over, from someone
-who may have written last month under a different name and no email at all.
-
-So the cases are about the two things that actually go wrong. One person becomes
-several rows when their number is spelled three ways — `972501234567` from the
-channel, `050-123-4567` from a form, `+972 50 123 4567` typed by hand — and
-three rows mean Dorit rings someone she has already spoken to as a stranger.
-And a second message erases what the first established: an update has to carry
-what was learned, not what was sent, or a bare "hello" blanks the name.
-
-The rest are restraint and failure. A note taken from a WhatsApp message goes
-through `redact()`, because such a channel is where people paste an ID number
-without being asked for one. A failed lookup creates rather than losing the contact — a
-duplicate is an annoyance, a dropped enquiry is someone nobody calls back. The
-`saved` block returns what was stored rather than echoing the request, since the
-agent reads it back to confirm details and confirming the request would be
-theatre. Nothing is mailed: recording a contact is not an enquiry, and if it
-notified anyone, every "היי" would reach Dorit's inbox. A new contact appends a
-row to `Contacts`; a returning one does not, because a row per message would
-turn the list of people into a second event log.
-
-### 4.18a `upsertContact` — who may call, and what a caller may change (review 2026-10-15) — `INT-CONTACT-020..023`
-
-Every call now carries `X-Contact-Secret`, which must match the Base44 secret `CONTACT_FUNCTION_SECRET`. While no channel is connected the secret is unset, and the function refuses everyone (it fails closed).
+**Retired 2026-10-29** — Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness; the function was dormant and has no Edge port
 
 | ID | Title | Expected result |
 |---|---|---|
-| INT-CONTACT-020 | "refuses a caller without the shared secret, or with the wrong one, and writes nothing" | 401 with `rid`; no row |
-| INT-CONTACT-021 | "refuses everyone while no secret is configured — no channel is connected yet" | 401 |
-| INT-CONTACT-022 | "never overwrites a known contact's name, email or note — it only fills what is empty" | The update keeps the existing name, email and note; `saved` reports them |
-| INT-CONTACT-023 | "refuses a caller over the hourly limit, counted by a hash of the address" | 429; `contact-ip:<64 hex>` (30 an hour); no row |
+| INT-CONTACT-001..017 | (retired 2026-10-29, Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness; the function was dormant and has no Edge port) | — |
+
+### 4.18a `upsertContact` — retired — `INT-CONTACT-020..023`
+
+**Retired 2026-10-29** — Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness
+
+| ID | Title | Expected result |
+|---|---|---|
+| INT-CONTACT-020 | (retired 2026-10-29, Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness) | — |
+| INT-CONTACT-021 | (retired 2026-10-29, Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness) | — |
+| INT-CONTACT-022 | (retired 2026-10-29, Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness) | — |
+| INT-CONTACT-023 | (retired 2026-10-29, Base44 exit B2 task 7: `upsert-contact.integration.test.ts` is deleted with the Base44 harness) | — |
 
 ### 4.19 `logSupportChat` — what was actually asked — `INT-SUPPORT-001..012`
 
@@ -534,39 +509,25 @@ call to the visitor, so the function has to leave it nothing to report: a
 refusing sheet, an unauthorised connector and a missing `SHEET_ID` all answer
 `200`, and the conversation the visitor already had is unaffected.
 
-### 4.21 `adminLead` — an admin's writes to a lead — `INT-ADL-001..031`
+### 4.21 `adminLead` — retired — `INT-ADL-001..031`
 
-An admin's status change and delete used to reach Base44 only, so Supabase kept
-every status at "new" and kept a lead Dorit had deleted — which the visitor's
-personal area still showed. The function writes Supabase first and Base44
-second: both writes are idempotent, so a failure part-way leaves the lead in the
-admin list and the retry completes it. The other order would drop the lead from
-the list and leave its Supabase copy with no way back to it.
+**Retired 2026-10-29** — Base44 exit B2 task 7: `admin-lead.integration.test.ts` is deleted with the Base44 harness; the admin writes go to Supabase directly and are covered by the unit and e2e suites
 
-`INT-ADL-001` to `004` are who may call: nobody signed in (and a `403` from the
-SDK) is `401`, a Base44 outage is `500`, a signed-in non-admin is `403` — each
-with the request id and no write anywhere. `INT-ADL-005` to `020` are the strict
-validation: an unknown or missing action, a status outside the five the entity
-declares, and a missing, blank, numeric, over-long or filter-widening id are all
-`400` with nothing written; each of the five statuses is accepted.
-`INT-ADL-021` and `022` pin the status write (`PATCH leads?base44_id=eq.<id>`
-with only `{status}`, then `Lead.update`) and its order. `INT-ADL-023` pins the
-delete (`DELETE`, then `Lead.delete`; the `meetings` row goes by `on delete
-cascade`). `INT-ADL-024` to `030` are failure: Supabase refusing or unreachable
-is `502` with `error` and `rid` only, and Base44 is never called; Base44
-refusing after Supabase succeeded is `502` with no internal message; Supabase
-not configured still writes Base44; and every refusal carries exactly `error`
-and `rid`. `INT-ADL-031` is a retried delete: when Base44 answers `404` because
-an earlier delete went through and only its response was lost, the function
-answers `200` — the lead is gone from both stores, and an error there would
-leave the admin stuck on one that no retry could clear.
+| ID | Title | Expected result |
+|---|---|---|
+| INT-ADL-001..004 | (retired 2026-10-29, Base44 exit B2 task 7: `admin-lead.integration.test.ts` is deleted with the Base44 harness; the admin writes go to Supabase directly and are covered by the unit and e2e suites) | — |
+| INT-ADL-005..020 | (retired 2026-10-29, Base44 exit B2 task 7: `admin-lead.integration.test.ts` is deleted with the Base44 harness; the admin writes go to Supabase directly and are covered by the unit and e2e suites) | — |
+| INT-ADL-021..022 | (retired 2026-10-29, Base44 exit B2 task 7: `admin-lead.integration.test.ts` is deleted with the Base44 harness; the admin writes go to Supabase directly and are covered by the unit and e2e suites) | — |
+| INT-ADL-023 | (retired 2026-10-29, Base44 exit B2 task 7: `admin-lead.integration.test.ts` is deleted with the Base44 harness; the admin writes go to Supabase directly and are covered by the unit and e2e suites) | — |
+| INT-ADL-024..030 | (retired 2026-10-29, Base44 exit B2 task 7: `admin-lead.integration.test.ts` is deleted with the Base44 harness; the admin writes go to Supabase directly and are covered by the unit and e2e suites) | — |
+| INT-ADL-031 | (retired 2026-10-29, Base44 exit B2 task 7: `admin-lead.integration.test.ts` is deleted with the Base44 harness; the admin writes go to Supabase directly and are covered by the unit and e2e suites) | — |
 
 ### 4.22 `submit-claim` — the claim, on Supabase — `INT-CLM-EDGE-001..011`
 
-Every `submitClaim` case runs against both implementations (`describe.each` in
-`submit-claim.integration.test.ts`), and two cases compare what they send: the
-reporter's HTML must be identical, and the staff report identical apart from
-its timestamp line. `submit-claim-edge.integration.test.ts` holds what only the
+`submit-claim.integration.test.ts` runs the Edge Function through the claim cases
+(Base44 exit B2 task 7: its Base44 twin and the two cases that compared the
+twins' mail are retired with the harness; `INT-CLAIM-001..013` now run once).
+`submit-claim-edge.integration.test.ts` holds what only the
 Edge Function does: the row it writes (today's fields, no Base44 id, `leadId`
 is its uuid), the service-key insert ahead of any mail, a non-JSON body
 answered as 400 with nothing touched, missing Supabase credentials as 500 with
@@ -574,12 +535,12 @@ no mail, a database refusal that quotes the row kept out of the log, and the
 CORS answers — a preflight that does nothing, the site's origin on every
 answer, none for a stranger's.
 
-### 4.23 The lead functions on Supabase — one suite, two implementations
+### 4.23 The lead functions on Supabase
 
 `submit-lead.integration.test.ts`, `escalate-to-human.integration.test.ts` and
-`log-support-chat.integration.test.ts` run their cases with `describe.each`
-over Base44 and Edge, as §4.22 does for the claim, so the Edge functions keep
-the guards, answers, mail and sheet rows the Base44 ones have. Differences are
+`log-support-chat.integration.test.ts` run their cases through the Edge
+functions, which keep the guards, answers, mail and sheet rows the retired Base44
+ones had (Base44 exit B2 task 7). Differences from those are
 their own cases: Edge `submit-lead` writes the Google event and sheet row
 through the service account (the event in the calendar `GOOGLE_CALENDAR_ID`
 names, without attendees), mails Dorit and `amielnoy@outlook.com` an `.ics`
@@ -614,34 +575,26 @@ Invitations independent of the Google event — `INT-INV-001..007`, in the Edge
 With the Google event created, the one existing case asserts that the two
 invitations carry the event's own UID and that none goes to `amielnoy@gmail.com`.
 
-### 4.24 `contentAdmin` — the article's address, and who may write — `INT-CNT-001..014`
+### 4.24 `contentAdmin` — retired — `INT-CNT-001..014`
 
-`content-admin.integration.test.ts`. The slug is the Supabase mirror's alone,
-so it is validated and checked for uniqueness before Base44 is written — a
-refusal from the mirror's unique constraint would arrive after the Base44 row
-exists. An update is a PATCH by `base44_id` carrying only what changed, so a
-publish toggle touches `published` and nothing else; a PATCH that finds no row
-is a failure, never a silently created row.
+**Retired 2026-10-29** — Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`
 
 | ID | Title | Expected result |
 |---|---|---|
-| INT-CNT-001 | "refuses to create an article with %s, before writing anything" (4) | 400 with `error` and `rid`; no Base44 create; no `blog_posts` call |
-| INT-CNT-002 | "refuses a slug another article has with 409, before writing Base44" | 409 "הכתובת כבר בשימוש במאמר אחר."; no create, no mirror POST |
-| INT-CNT-003 | "writes the slug to the mirror and keeps it out of Base44" | Base44 fields have no `slug`; the mirror POST has `slug: koteret` |
-| INT-CNT-004 | "updates the mirror in place with a PATCH of only what changed" | `PATCH …?base44_id=eq.post-1` with `{ published: false }`; no slug lookup |
-| INT-CNT-005 | "never sends a null or empty slug to the mirror" | An update without a slug sends a body with no `slug` key; a null or empty slug is 400 with no write; a create always sends the validated slug |
-| INT-CNT-006 | "lets an article keep its own slug, and sends it to the mirror only" | 200; Base44 update has no `slug`; PATCH carries it |
-| INT-CNT-007 | "fails an update whose mirror row is missing" | 500 |
-| INT-CNT-008 | "refuses to rename an article to a slug another one has" | 409; no Base44 update |
-
-**Who may write** (agency roles, 2026-10-16): the platform operator, or an Admin or Owner of agency 1 (`staff_role`), as the screens offer the controls. Dorit, the agency's Owner and not the operator, was refused on every publish toggle before this.
-
-| ID | Title | Expected result |
-|---|---|---|
-| INT-CNT-009..010 | "lets an agency %s who is not the operator publish an article" (owner, admin) | 200; the mirror PATCH made; `staff_role` asked with the caller and agency 1 |
-| INT-CNT-011..012 | "refuses an agency %s (or no membership) with 403, and writes nothing" (user, null) | 403 "הפעולה מותרת למנהלים בלבד." with `rid`; no mirror write |
-| INT-CNT-013 | "answers 500 — not 'not an admin' — when the agency role cannot be read, and writes nothing" | `staff_role` 500 → 500; no mirror write |
-| INT-CNT-014 | "lets the operator through without asking the agency role" | 200; `staff_role` never called |
+| INT-CNT-001 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-002 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-003 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-004 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-005 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-006 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-007 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-008 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-009 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-010 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-011 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-012 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-013 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
+| INT-CNT-014 | (retired 2026-10-29, Base44 exit B2 task 7: `content-admin.integration.test.ts` is deleted with the Base44 harness; the Edge `content-admin` is covered by `content-admin-edge.integration.test.ts`) | — |
 
 ### 4.25 `masleka-code` — the client hands over the code — `INT-MSKCODE-001..036`
 
@@ -985,23 +938,13 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 1. `submit-
 
 ## 5. Pass criteria
 
-All 171 declared cases pass (vitest: 751 with expansions). These assert behaviour, not shape — a failure means the
+All declared cases pass (vitest: 704 with expansions). These assert behaviour, not shape — a failure means the
 function now does something different, so fix the function rather than the
 expectation.
 
 ## 6. Known gaps
 
-- **`createConsultationEvent`** is not executed here. It is no longer on the
-  interview agent either — `submitLead` writes the diary itself, in the request
-  that saved the lead, and *that* path **is** covered: `submit-lead.integration.test.ts`
-  drives the provider loop, asserts the agreed hour reaches the calendar, and
-  asserts that a refusal is reported per calendar rather than as one flat
-  failure. What is left uncovered is the function's own HTTP surface, which now
-  has a live caller only if the adapter's `requestConsultationEvent` is wired
-  up; today nothing calls it.
-
-That one belongs in [10-known-issues.md](10-known-issues.md) until it is covered.
-`submitClaim` was on this list and no longer is — §4.10 executes it.
+- **`createConsultationEvent`** was retired with the Base44 harness (§4.2e); `submit-lead` writes the diary itself, and that path is covered by `submit-lead.integration.test.ts`.
 
 ### Resend delivery to the agency
 
@@ -1012,4 +955,4 @@ network failures, and malformed successful responses. Failures retain the enquir
 and allow operations notifications to proceed. The helper parity check guards
 against drift across isolated entry points. No test sends real email.
 The shared harness injects Deno environment access and records Resend deliveries
-alongside existing Base44 deliveries for the existing recipient/content tests.
+alongside the recipient/content tests.

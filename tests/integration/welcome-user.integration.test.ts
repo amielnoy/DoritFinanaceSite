@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FetchCall } from "../helpers/base44-function";
-import { invokeEdge, SUPABASE_URL, type EdgeOptions } from "../helpers/edge-function";
+import { invokeEdge, SUPABASE_URL, type EdgeOptions, type FetchCall } from "../helpers/edge-function";
 
 /** The service key the harness gives the function (tests/helpers/edge-function.ts). */
 const SERVICE_KEY = "service-role-test";

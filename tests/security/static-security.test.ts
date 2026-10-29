@@ -147,6 +147,21 @@ describe("auth and token handling", () => {
     expect(login).toMatch(/services\.auth\.signInWithGoogle\(\s*returnTo\s*\)/);
   });
 
+  it("no first-party file touches a Base44 token in storage", () => {
+    // Sign-in is Supabase's now; nothing may read, write or clear a token the
+    // retired Base44 SDK kept in the browser (inverts the retired SEC-STA-018).
+    const files = (tracked() ?? [])
+      .filter((f) => /^(src|api)\//.test(f) && /\.(js|jsx|ts|tsx|mjs)$/.test(f))
+      .map((f) => join(REPO_ROOT, f));
+    expect(files.length, "no tracked src/ or api/ files found").toBeGreaterThan(0);
+    const TOKEN_KEY = /(?:localStorage|sessionStorage)\s*\.\s*(?:getItem|setItem|removeItem)\s*\(\s*["'`]token["'`]|(?:localStorage|sessionStorage)\s*\[\s*["'`]token["'`]\s*\]/;
+    const hits = files.filter((f) => {
+      const src = read(f);
+      return /base44_access_token/.test(src) || TOKEN_KEY.test(src);
+    }).map(rel);
+    expect(hits).toEqual([]);
+  });
+
   it("admin routes stay behind a gate that requires sign-in and an agency role (agency roles)", () => {
     // Each agency screen sits inside AgencyRoute at the least role it needs; the
     // gate delegates to ProtectedRoute when signed out, asks the database for

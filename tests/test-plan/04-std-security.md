@@ -56,6 +56,7 @@ lead inbox.
 | SEC-STA-022 | "admin routes stay behind a gate that requires sign-in and an agency role (agency roles)" | `/admin/leads`, `/admin/blog`, `/admin/users` inside `<AgencyRoute min="user">`, `/admin/agency` inside `min="owner"`, each registered once; AgencyRoute falls back to ProtectedRoute and turns away `!meets(role, min)`; the role is asked of `services.agency.myRole`; AdminRoute still gates `role !== "admin"` for the operator's own screens |
 | SEC-STA-023 | (retired 2026-10-29, Base44 exit B2 task 6: it read `Lead.jsonc`'s RLS; the leads table's policies are pinned by the migrations and `supabase/tests`) | — |
 | SEC-STA-024 | (retired 2026-10-29, Base44 exit B2 task 6: it matched `base44.entities.X` against `base44/entities`; the SDK is gone) | — |
+| SEC-STA-025 | "no first-party file touches a Base44 token in storage" | Zero tracked `src/`/`api/` files mention `base44_access_token` or read/write a `token` key in `localStorage`/`sessionStorage` (inverts the retired SEC-STA-018) |
 
 ## 4. Runtime test cases — `e2e/security/security.spec.ts`
 

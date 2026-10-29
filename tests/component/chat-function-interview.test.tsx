@@ -222,6 +222,10 @@ describe("a reset while a message is on its way", () => {
     deafSend = null;
   });
 
+  afterEach(() => {
+    deafSend = null;
+  });
+
   it("aborts the chat function's request and leaves the new conversation clean and usable", async () => {
     let signal: AbortSignal | undefined;
     invoke.mockImplementationOnce((_n: string, o: { signal?: AbortSignal }) => {

@@ -120,8 +120,9 @@ has typecheck && run_suite "typecheck" npm run typecheck
 has unit      && run_suite "unit" npx vitest run tests/unit
 has component && run_suite "component" npx vitest run tests/component
 has contract  && run_suite "contract" npx vitest run tests/contract
-# Runs the Base44 functions for real, against a recording client. Nothing
-# else executes them: they sit outside tsconfig and run on Deno in production.
+# Runs the Supabase Edge Functions in-process, against a recording fetch and
+# Deno. Nothing else executes them: they sit outside tsconfig and run on Deno
+# in production.
 has integration && run_suite "integration" npx vitest run tests/integration
 has security  && run_suite "security (static)" npx vitest run tests/security
 

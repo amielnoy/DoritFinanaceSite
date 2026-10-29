@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FetchCall } from "../helpers/base44-function";
-import { invokeEdge, SUPABASE_URL, type EdgeOptions } from "../helpers/edge-function";
+import { invokeEdge, SUPABASE_URL, type EdgeOptions, type FetchCall } from "../helpers/edge-function";
 import { assignmentMail } from "../../supabase/functions/assign-lead/handler";
 import { SECRET_JS } from "../helpers/staff-lead-secret";
 

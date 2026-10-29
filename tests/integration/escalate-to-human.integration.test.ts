@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { invokeFunction, type HarnessOptions } from "../helpers/base44-function";
 import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
 
 /**
@@ -17,13 +16,11 @@ import { invokeEdge, type EdgeOptions } from "../helpers/edge-function";
  * that `__proto__` comes back as `uncertain` rather than as a truthy lookup
  * against `Object.prototype`.
  *
- * The Edge function `escalate-to-human` does the work; Base44's `escalateToHuman`
- * is a forwarder to it (forwarders.integration.test.ts).
+ * The Edge function `escalate-to-human` does the work.
  */
 
-/** Both harnesses' options. A case passes only knobs both understand. */
-type RunOptions = HarnessOptions & EdgeOptions;
-type Result = Awaited<ReturnType<typeof invokeFunction>>;
+type RunOptions = EdgeOptions;
+type Result = Awaited<ReturnType<typeof invokeEdge>>;
 
 const IMPLEMENTATIONS = [
   {
