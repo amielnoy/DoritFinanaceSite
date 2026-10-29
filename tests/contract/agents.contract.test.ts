@@ -504,15 +504,6 @@ describe("the procedures agent sorts by one test, then by four zones", () => {
     // Somewhere to put what the agent actually answered.
     expect(bank).toMatch(/What the agent actually answered/);
   });
-
-  it("and something runs the bank against the deployed agent", () => {
-    // The prompt saying it and the model doing it are different claims, and
-    // this file can only make the first one.
-    const evals = read(join(REPO_ROOT, "tests/eval/procedures-agent.eval.test.ts"));
-    expect(evals).toMatch(/openConversation\("procedures_agent"\)/);
-    expect(evals).toMatch(/gives no opinion under pressure/);
-    expect(evals).toMatch(/stops offering דורית when asked to/);
-  });
 });
 
 describe("escalation reasons agree across prompt, entity and UI config", () => {

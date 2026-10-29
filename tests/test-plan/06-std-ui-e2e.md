@@ -22,7 +22,7 @@ composition root wires it, all four agents on the `chat` function; `VITE_MEETING
 answers that host — PostgREST reads over seeded tables in Supabase row shape
 (`e2e/fixtures/data.ts`), the Edge Functions per function, storage and auth — and
 aborts the third-party beacons. A request it does not model, and any `/api` call
-but the site's own Vercel functions and the Base44 SDK's telemetry, fails the
+but the site's own Vercel functions, fails the
 test at teardown. Locale `he-IL`, timezone `Asia/Jerusalem`.
 
 Until 2026-10-18 the bundle was built with no Supabase, so every adapter fell

@@ -5,7 +5,6 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
 const auth = vi.hoisted(() => ({
   value: { user: null, isAuthenticated: false, logout: () => {} } as {

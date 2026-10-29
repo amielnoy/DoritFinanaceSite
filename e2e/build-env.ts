@@ -5,8 +5,6 @@
  * The one place it is spelled. `npm run build:e2e` (scripts/build-e2e.mjs)
  * builds with it, and every e2e build goes through that script:
  * playwright.config.ts's webServer, scripts/run-tests.sh and CI's build job.
- * The preview server gets it too (playwright.config.ts), for the one value
- * read at serve time rather than inlined: VITE_BASE44_APP_BASE_URL.
  *
  * Loaded by Node directly (scripts/build-e2e.mjs, scripts/published-articles.mjs),
  * so only erasable TypeScript here: no enums, no namespaces, no parameter
@@ -51,15 +49,6 @@ export const E2E_BUILD_ENV = {
   // bundled one; production smoke keeps exercising it off. The bundle is sealed
   // at build time, so one run can have only one value.
   VITE_AGENCY_CONTENT: "true",
-
-  // ── Base44: the SDK still boots, and must reach nothing ────────────────
-  // The SDK is still in the bundle and keys its paths off this id. Nothing in a
-  // passing run reaches /api any more; e2e/fixtures/app.ts fails a test that does.
-  VITE_BASE44_APP_ID: "e2e-sanity-app",
-  // Holds the preview server's /api proxy off, whatever `.env.local` says
-  // (README: setting it points a local preview at the live Base44 backend).
-  VITE_BASE44_APP_BASE_URL: "",
-  VITE_BASE44_SERVER_URL: "",
 
   // ── The prerender's article list ───────────────────────────────────────
   PRERENDER_ARTICLES_FIXTURE: E2E_ARTICLES_FIXTURE,

@@ -155,10 +155,8 @@ export default defineConfig({
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,
         // The build's environment is e2e/build-env.ts, applied by `npm run
-        // build:e2e`. Given to the preview server as well, for the one value it
-        // reads at serve time rather than at build time: VITE_BASE44_APP_BASE_URL,
-        // empty, which holds the preview's /api proxy off whatever .env.local
-        // says. This suite is hermetic because e2e/fixtures/app.ts answers the
+        // build:e2e`. Given to the preview server as well, so it sees the same
+        // environment as the build. This suite is hermetic because e2e/fixtures/app.ts answers the
         // fake Supabase host the bundle calls; a request that slipped past it
         // has to fail, not create a real lead and send real email.
         //

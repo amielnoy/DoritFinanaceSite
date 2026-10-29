@@ -29,7 +29,7 @@ something outside the repository.
 | `safeReturnTo` | `src/lib/authReturnTo.js` |
 | `CONTACT` | `src/config/contact.ts` (values from `src/config/agencyProfile.ts`) |
 | `useSubmission`, `submissionErrorMessage` | `src/hooks/useSubmission.ts` |
-| `Base44LeadAdminService`, `Base44ContentAdminService` | `src/services/base44/` |
+| `Base44LeadAdminService`, `Base44ContentAdminService` | (deleted 2026-10-29, Base44 exit B1 task 3) |
 | `SupabaseAuthService` | `src/services/supabase/SupabaseAuthService.ts` |
 | FAQ content | `src/content/faq.ts` |
 | Insurance self-assessment | `src/lib/insurance-assessment.ts` |
@@ -40,7 +40,7 @@ something outside the repository.
 | `groupOpenLeads`, `planAssignments`, `describeOpenLeads` | `scripts/assign-open-leads.mjs` |
 | `fetchPublishedArticles`, `planArticles`, `duplicateTitles` | `scripts/published-articles.mjs` |
 | `answerRestRead` — the PostgREST subset the e2e fake and the e2e prerender answer | `e2e/fixtures/supabase-fake.ts` |
-| `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
+| `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | (deleted 2026-10-29, Base44 exit B1 task 3) |
 
 > **Note.** `computePensionFees` was extracted from `PensionFeeCalculator.tsx`
 > during this work so the maths could be exercised without a DOM. The component
@@ -114,18 +114,20 @@ the fee rate). Hostile input is exercised because every field is a free-text
 
 ### Token wipe at boot — `tests/unit/clear-access-token.dom.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `src/lib/clear-access-token.ts` and its test are deleted with the SDK.
+
 `?clear_access_token=true` is honoured at boot by `src/lib/clear-access-token.ts` (SEC-TOK-002). It used to run only when the lazily loaded SDK did.
 
 | ID | Title | Input | Expected result |
 |---|---|---|---|
-| UNIT-TOK-001 | "wipes both token keys when the flag is set" | both keys seeded, `/faq?clear_access_token=true` | returns `true`; both keys `null` |
-| UNIT-TOK-002 | "leaves unrelated storage alone" | a Supabase session key beside the tokens | the Supabase key survives |
-| UNIT-TOK-003 | "removes only the flag from the URL, keeping the path, other params and hash" | `/blog/x?access_token=new&clear_access_token=true&utm_source=mail#faq` | `/blog/x?access_token=new&utm_source=mail#faq` |
-| UNIT-TOK-004 | "drops the `?` when the flag was the only parameter" | `/tools?clear_access_token=true` | `/tools` |
-| UNIT-TOK-005..008 | "does nothing for …" (4 cases) | no query, `=false`, `=1`, `=` | returns `false`; token kept; URL unchanged |
-| UNIT-TOK-009 | "strips the flag from a path that starts with // without leaving the origin" | `<origin>//evil.example/x?clear_access_token=true` | same origin; path `//evil.example/x`; tokens gone (a relative `//…` would be protocol-relative and make `replaceState` throw at boot) |
-| UNIT-TOK-010 | "still wipes, and does not throw, when replaceState throws" | `replaceState` throws `SecurityError` | no throw; both keys `null` |
-| UNIT-TOK-011 | "still removes the flag when storage throws" | `removeItem` throws `SecurityError` | returns `true`; flag gone |
+| UNIT-TOK-001 | "wipes both token keys when the flag is set" | both keys seeded, `/faq?clear_access_token=true` | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe |
+| UNIT-TOK-002 | "leaves unrelated storage alone" | a Supabase session key beside the tokens | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe |
+| UNIT-TOK-003 | "removes only the flag from the URL, keeping the path, other params and hash" | `/blog/x?access_token=new&clear_access_token=true&utm_source=mail#faq` | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe |
+| UNIT-TOK-004 | "drops the `?` when the flag was the only parameter" | `/tools?clear_access_token=true` | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe |
+| UNIT-TOK-005..008 | "does nothing for …" (4 cases) | no query, `=false`, `=1`, `=` | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe |
+| UNIT-TOK-009 | "strips the flag from a path that starts with // without leaving the origin" | `<origin>//evil.example/x?clear_access_token=true` | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe |
+| UNIT-TOK-010 | "still wipes, and does not throw, when replaceState throws" | `replaceState` throws `SecurityError` | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe |
+| UNIT-TOK-011 | "still removes the flag when storage throws" | `removeItem` throws `SecurityError` | **Retired 2026-10-29** — Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe |
 
 ### 4.4 Contact configuration — `tests/unit/contact-config.test.ts`
 
@@ -199,6 +201,8 @@ cannot quietly turn a janitor into a production reaper.
 
 ### 4.8 Admin data services — `tests/unit/admin-services.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `tests/unit/admin-services.test.ts` is deleted with the Base44 adapters.
+
 The two services the admin screens talk to, exercised against a recording
 store. What matters here is the request that leaves: a partial update must stay
 partial, because the admin forms send only the field that changed and anything
@@ -206,20 +210,20 @@ the service adds of its own would overwrite a column nobody edited.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-ADM-001 | "asks for leads newest-first" | Sorted descending by creation |
-| UNIT-ADM-002 | "accepts a caller-chosen page size" | Limit forwarded |
-| UNIT-ADM-003 | "returns an array when the store answers with nothing" | `[]`, never `undefined` |
-| UNIT-ADM-004 | "moves a lead along through the adminLead function, not the entity" | `invoke("adminLead", { action: "status", id, status })`; no entity update |
-| UNIT-ADM-005 | "deletes through the adminLead function, not the entity" | `invoke("adminLead", { action: "delete", id })`; no entity delete |
-| UNIT-ADM-010 | "rejects when the function call fails, so the screen shows its write error" | `setStatus` and `remove` both reject |
-| UNIT-ADM-011 | "rejects when the function answers with an error body and no throw" | A body without `ok: true` rejects |
-| UNIT-ADM-012 | "has no agenda: Base44 holds no meetings, and reads nothing for one" | `agencyMeetings()` → `[]`; no entity read, no function call |
-| UNIT-ADM-006 | "lists every article, drafts included" | No published filter |
-| UNIT-ADM-007 | "creates an article with published coerced to a boolean" | `true`/`false`, not `"on"` |
-| UNIT-ADM-008 | "forwards a partial update without inventing the fields it was not given" | Payload has exactly the edited keys |
-| UNIT-ADM-009 | "defaults a testimonial's rating and source rather than sending empty ones" | Defaults applied |
-| UNIT-ADM-010 | "keeps a rating the visitor actually chose" | Explicit value survives |
-| UNIT-ADM-011 | "removes an article and a testimonial by id" | Delete called on both entities |
+| UNIT-ADM-001 | "asks for leads newest-first" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-002 | "accepts a caller-chosen page size" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-003 | "returns an array when the store answers with nothing" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-004 | "moves a lead along through the adminLead function, not the entity" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-005 | "deletes through the adminLead function, not the entity" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-010 | "rejects when the function call fails, so the screen shows its write error" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-011 | "rejects when the function answers with an error body and no throw" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-012 | "has no agenda: Base44 holds no meetings, and reads nothing for one" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-006 | "lists every article, drafts included" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-007 | "creates an article with published coerced to a boolean" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-008 | "forwards a partial update without inventing the fields it was not given" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-009 | "defaults a testimonial's rating and source rather than sending empty ones" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-010 | "keeps a rating the visitor actually chose" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
+| UNIT-ADM-011 | "removes an article and a testimonial by id" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests |
 
 ### 4.9 FAQ content — `tests/unit/faq-content.test.ts`
 
@@ -274,21 +278,23 @@ is the single place that stops one enquiry being filed twice.
 
 ### The agent adapter — `agent-service.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `agent-service.test.ts` is deleted with `Base44AgentService`.
+
 Nine cases on `Base44AgentService`, all of them failure paths, because the
 failure paths are what was wrong. Nothing in the battery had ever exercised a
 failing `/agents/` call.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-AGT-001 | "does not spend a turn on a send that failed" | 45 failed sends all reach the backend; the cap never fires. Counting attempts rather than model invocations meant an outage eventually reported itself as "השיחה הגיעה לאורכה המרבי" |
-| UNIT-AGT-002 | "still refuses once the visitor has actually taken the maximum turns" | `AgentLimitError("too_many_turns")` after 40 successful sends |
-| UNIT-AGT-003 | "refuses an over-long message without calling the backend at all" | `AgentLimitError("too_long")`; `addMessage` never called |
-| UNIT-AGT-004 | "fails with its own error instead of handing undefined to the SDK" | `agent_conversation_gone`; `addMessage` never called |
-| UNIT-AGT-005 | "keeps ordinary user and assistant turns unchanged" | Both pass through |
-| UNIT-AGT-006 | "drops a message the platform marked hidden" | `[]` |
-| UNIT-AGT-007 | "drops a system message rather than dressing it as the agent" | `[]` — `role === "user"` is false for `system`, so it used to render in an assistant bubble |
-| UNIT-AGT-008 | "drops content that is not a non-empty string" | `[]` for an object, a missing `content` and an empty one. An object reaches `<ReactMarkdown>` as a React child and, with no error boundary above the chat, whites out the SPA |
-| UNIT-AGT-009 | "passes the survivors through in order" | Order preserved after filtering |
+| UNIT-AGT-001 | "does not spend a turn on a send that failed" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
+| UNIT-AGT-002 | "still refuses once the visitor has actually taken the maximum turns" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
+| UNIT-AGT-003 | "refuses an over-long message without calling the backend at all" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
+| UNIT-AGT-004 | "fails with its own error instead of handing undefined to the SDK" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
+| UNIT-AGT-005 | "keeps ordinary user and assistant turns unchanged" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
+| UNIT-AGT-006 | "drops a message the platform marked hidden" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
+| UNIT-AGT-007 | "drops a system message rather than dressing it as the agent" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
+| UNIT-AGT-008 | "drops content that is not a non-empty string" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
+| UNIT-AGT-009 | "passes the survivors through in order" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function |
 
 ### 4.12 Seeding the articles into Supabase — `tests/unit/seed-blog.test.ts`
 
@@ -317,16 +323,18 @@ to a new address. See [A-65](10-known-issues.md).
 
 ### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `function-receipts.test.ts` is deleted with the Base44 adapters.
+
 `functions.invoke` resolves to the whole axios response, not the body
 (`interceptResponses: false` in the SDK). These feed the adapters that shape —
 every other fake returns a bare body, which is how A-67 went unseen.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-RCP-001 | "reports an interview that saved as saved" | `ok: true`, `rid` read from the body |
-| UNIT-RCP-002 | "reports a lead that saved as saved" | `ok: true` |
-| UNIT-RCP-003 | "still accepts a bare body, as the in-memory fakes return" | `ok: true` |
-| UNIT-RCP-004 | "reports a handoff that reached Dorit as one that did" | `ok: true`, `contact` from the body — not the fallback |
+| UNIT-RCP-001 | "reports an interview that saved as saved" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadService` and `Base44SupportService` are deleted |
+| UNIT-RCP-002 | "reports a lead that saved as saved" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadService` and `Base44SupportService` are deleted |
+| UNIT-RCP-003 | "still accepts a bare body, as the in-memory fakes return" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadService` and `Base44SupportService` are deleted |
+| UNIT-RCP-004 | "reports a handoff that reached Dorit as one that did" | **Retired 2026-10-29** — Base44 exit B1 task 3: `Base44LeadService` and `Base44SupportService` are deleted |
 
 ### 4.14 Personal area adapters — `account-services.test.ts`
 

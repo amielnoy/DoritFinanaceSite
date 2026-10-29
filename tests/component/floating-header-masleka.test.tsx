@@ -5,7 +5,6 @@ import { MemoryRouter } from "react-router-dom";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
 const auth = vi.hoisted(() => ({ value: { user: null, isAuthenticated: false } as { user: Record<string, unknown> | null; isAuthenticated: boolean; isLoadingAuth?: boolean } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));

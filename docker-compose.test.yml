@@ -19,7 +19,6 @@ x-test-base: &test-base
   init: true
   environment:
     CI: "1"
-    VITE_BASE44_APP_ID: e2e-sanity-app
     # Point at a deployment to smoke-test it instead of the local preview build.
     PLAYWRIGHT_BASE_URL: ${PLAYWRIGHT_BASE_URL:-}
     E2E_ENFORCE_CONTRAST: ${E2E_ENFORCE_CONTRAST:-}

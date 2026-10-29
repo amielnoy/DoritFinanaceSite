@@ -57,16 +57,6 @@ const FAKE_ORIGIN = new URL(E2E_SUPABASE_URL).origin;
 /** The site's own Vercel functions (api/). Not Base44, and never stubbed. */
 const VERCEL_FUNCTIONS = /^\/api\/(og\/|csp-report(\/|$))/;
 
-/**
- * The one Base44 call left: the SDK's own telemetry. `createClient` in
- * src/api/base44Client.js starts it whenever the composition root loads (a
- * form, a chat, a sign-in), whatever the adapters use, and it reads and writes
- * nothing of the site's. It goes when the SDK does (Base44 cleanup 2, part B) —
- * or sooner, with `analytics: { enabled: false }` on that client. Answered 204
- * and kept apart, so the tripwire below stays exact about everything else.
- */
-export const BASE44_SDK_TELEMETRY = /^\/api\/apps\/[^/]+\/analytics\/track\/batch$/;
-
 const TRANSPARENT_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64",
@@ -150,7 +140,7 @@ function functionAnswer(name: string, body: Record<string, unknown>, chatTurns: 
  *   /auth/v1/user          401: the visitor is anonymous
  *
  * Anything else on the fake host answers 501, and any `/api/` request that is
- * not one of the site's own Vercel functions (or the SDK's telemetry, above)
+ * not one of the site's own Vercel functions
  * answers 501 too — that is the Base44 path the bundle no longer takes. Both
  * fail the test when it ends.
  *
@@ -189,7 +179,6 @@ export async function stubBackend(page: Page): Promise<MockApi & { readonly unmo
   await page.route("**/api/**", (route) => {
     const url = new URL(route.request().url());
     if (VERCEL_FUNCTIONS.test(url.pathname)) return route.fallback();
-    if (BASE44_SDK_TELEMETRY.test(url.pathname)) return route.fulfill({ status: 204, headers: CORS });
     unmodelled.push(`${route.request().method()} ${url.origin}${url.pathname} (Base44 /api)`);
     return fulfill(route, { status: 501, body: { error: `unstubbed: ${url.pathname} — the e2e bundle must not reach Base44` } });
   });

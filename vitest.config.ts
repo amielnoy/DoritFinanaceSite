@@ -2,13 +2,12 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 // Standalone config — it deliberately does NOT extend vite.config.js, so the
-// Base44 Vite plugin (which expects a linked app + dev server) stays out of the
-// unit/contract test run. Playwright e2e keeps using the real Vite build.
+// site's build plugins stay out of the unit/contract test run. Playwright e2e
+// keeps using the real Vite build.
 export default defineConfig({
   resolve: {
-    // vite.config.js's order: the real pages (.ts/.tsx) before the Base44
-    // boilerplate .jsx it restores beside them (AGENTS.md). Without it a test
-    // of "@/pages/Login" rendered Base44's English page, not the site's.
+    // vite.config.js's order: .ts/.tsx before .jsx, so a name collision
+    // resolves to the TypeScript file.
     extensions: [".mjs", ".mts", ".ts", ".tsx", ".js", ".jsx", ".json"],
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -25,7 +24,7 @@ export default defineConfig({
     // Default is node; files needing a DOM opt in with a
     // `@vitest-environment jsdom` docblock (see tests/unit/auth-return-to).
     environment: "node",
-    // Every test run takes the Base44 fallback, as CI always has. Vitest loads
+    // Every test run takes the no-Supabase fallback, as CI always has. Vitest loads
     // .env.local, which holds real Supabase credentials on a developer's
     // machine — without this, a test that lets a call through to a real port
     // (rather than tests/component/services-mock.ts) would read the live

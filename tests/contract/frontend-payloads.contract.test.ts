@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadEntity, validateAgainstEntity } from "../helpers/entity-schema";
@@ -26,13 +27,8 @@ function destructuredBody(src: string): string[] {
   return m[1].split(",").map((s) => s.trim()).filter(Boolean).sort();
 }
 
-const ADAPTERS = [
-  join(REPO_ROOT, "src/services/base44/Base44LeadService.ts"),
-  join(REPO_ROOT, "src/services/base44/Base44ContentService.ts"),
-];
-
 describe("adapter → submitLead", () => {
-  // The bodies live in `lead-bodies.ts` (shared by the Base44 and Supabase
+  // The bodies live in `lead-bodies.ts` (shared with the Supabase
   // adapters), so the contract reads the returned literals from there.
   const calls = findObjectLiteralCalls(
     /export function (?:leadBody|interviewBody)\([^)]*\)[^{]*\{\s*return\s*/,
@@ -123,25 +119,6 @@ describe("adapter → submitLead", () => {
   });
 });
 
-describe("adapter → submitClaim", () => {
-  const calls = findObjectLiteralCalls(
-    /(?:functions\.invoke\(|invokeFunction(?:<\w+>)?\(\s*this\.client\s*,)\s*["']submitClaim["']\s*,\s*/,
-    ADAPTERS
-  );
-  const accepted = destructuredBody(backendSource("submitClaim"));
-
-  it("exactly one adapter owns the call", () => {
-    expect(calls).toHaveLength(1);
-  });
-
-  it("sends only fields the function reads, including name and phone", () => {
-    expect(calls[0].keys.filter((k) => !accepted.includes(k))).toEqual([]);
-    for (const required of ["name", "phone"]) {
-      expect(calls[0].keys).toContain(required);
-    }
-  });
-});
-
 describe("adapter → submit-claim (Supabase)", () => {
   const ADAPTER = [join(REPO_ROOT, "src/services/supabase/SupabaseLeadService.ts")];
   const calls = existsSync(ADAPTER[0])
@@ -157,76 +134,18 @@ describe("adapter → submit-claim (Supabase)", () => {
     expect(calls[0].keys.filter((k) => !accepted.includes(k))).toEqual([]);
     for (const required of ["name", "phone"]) expect(calls[0].keys).toContain(required);
   });
-
-  it("sends what the Base44 adapter sends, so switching store changes nothing the function sees", () => {
-    const base44 = findObjectLiteralCalls(
-      /invokeFunction(?:<\w+>)?\(\s*this\.client\s*,\s*["']submitClaim["']\s*,\s*/,
-      [join(REPO_ROOT, "src/services/base44/Base44LeadService.ts")],
-    );
-    expect([...calls[0].keys].sort()).toEqual([...base44[0].keys].sort());
-  });
 });
 
-/**
- * The seven files the platform owns.
- *
- * Base44 support, 2026-09-30: *"Base44 apps use login, register,
- * forgot-password and reset-password pages built as .jsx files… When the
- * platform starts your app's environment and doesn't find those files, it adds
- * them back automatically… there is no setting to stop the platform from
- * restoring the standard files."*
- *
- * So they are not ours to delete. We tried five times; the fifth went unnoticed
- * and left `main` red for two days, which gated the publish and stranded
- * everything merged behind it (A-51, A-52).
- *
- * They are harmless where it matters: `resolve.extensions` in `vite.config.js`
- * puts `.ts`/`.tsx` first, so our own pages are the ones that load and these
- * are never imported. The cases below hold that line — they stop enforcing
- * rules against files we cannot change, and start enforcing the one thing that
- * keeps them inert.
- */
-const PLATFORM_AUTH_PAGES = [
-  "src/components/AuthLayout.jsx",
-  "src/components/GoogleIcon.jsx",
-  "src/pages/Login.jsx",
-  "src/pages/Register.jsx",
-  "src/pages/ForgotPassword.jsx",
-  "src/pages/ResetPassword.jsx",
-  "src/pages/OAuthConsent.jsx",
-];
-
-describe("the pages the platform restores", () => {
-  it("is the same list lint ignores", () => {
-    // Two copies of one list. If lint stops ignoring a file this still allows,
-    // the build breaks again for a file nobody is permitted to fix.
-    const config = read(join(REPO_ROOT, "eslint.config.js"));
-    for (const path of PLATFORM_AUTH_PAGES) {
-      expect(config, `eslint does not ignore ${path}`).toContain(`"${path}"`);
-    }
-  });
-
-  it("stays inert because TypeScript resolves first", () => {
-    // The whole accommodation rests on this. Without it these files are not an
-    // untidy extra — they are the login page.
-    const config = read(join(REPO_ROOT, "vite.config.js"));
-    const order = config.match(/extensions:\s*\[([^\]]*)\]/)?.[1] ?? "";
-    const exts = [...order.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    expect(exts.indexOf(".tsx"), ".tsx must resolve before .jsx").toBeLessThan(
-      exts.indexOf(".jsx")
-    );
-  });
-
-  it("has a .tsx of our own behind each one that is a page", () => {
-    // If the platform's copy is the only file at that name, it is not shadowed
-    // — it *is* the page, and the resolution order protects nothing.
-    for (const path of ["src/pages/Login.jsx", "src/components/AuthLayout.jsx", "src/components/GoogleIcon.jsx"]) {
-      const ours = path.replace(/\.jsx$/, ".tsx");
-      expect(
-        existsSync(join(REPO_ROOT, ours)),
-        `${path} has no ${ours} behind it — the platform's copy is what loads`
-      ).toBe(true);
-    }
+describe("Base44 is out of the build", () => {
+  it("nothing imports a Base44 package", () => {
+    const tracked = execFileSync("git", ["ls-files", "src", "api", "scripts", "e2e"], { cwd: REPO_ROOT, encoding: "utf8" })
+      .split("\n")
+      .filter((f) => f && existsSync(join(REPO_ROOT, f)));
+    const offenders = tracked.filter((f) => /from ["']@base44\//.test(readFileSync(join(REPO_ROOT, f), "utf8")));
+    expect(offenders, "these still import @base44/*").toEqual([]);
+    const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies };
+    expect(Object.keys(deps).filter((d) => d.startsWith("@base44/"))).toEqual([]);
   });
 });
 
@@ -234,31 +153,6 @@ describe("dependency inversion holds", () => {
   const uiFiles = sourceFiles().filter(
     (f) => rel(f).startsWith("src/components/") || rel(f).startsWith("src/pages/")
   );
-
-  /**
-   * No carve-out is left. There used to be one.
-   *
-   * The admin screens came off it when the ports grew an owner-only surface
-   * (`leadsAdmin`, `contentAdmin`), which is what lets them be tested against a fake
-   * instead of a mocked vendor module. Auth was the last entry, and it came off when
-   * `AuthPort` grew `signInWithPassword` and `signInWithGoogle` — `Login.tsx` has gone
-   * through `@/services` ever since.
-   *
-   * The list outlived that, naming `Login.tsx`, which no longer imports the SDK, and
-   * three `.tsx` files that do not exist. A list of paths rather than of files is a
-   * permission waiting for someone to create the path, and that is nearly what
-   * happened: A-46 arrived as `src/pages/Register.jsx`, one letter away from being
-   * waved through. Empty is the honest state, so the constant is gone rather than
-   * emptied — the next exception should be argued for, not inherited.
-   */
-  it("no public-facing component imports the Base44 SDK directly", () => {
-    const offenders = uiFiles
-      .filter((f) => /from ["']@\/api\/base44Client["']/.test(read(f)))
-      .map(rel)
-      // Not ours, not removable, and never loaded — see PLATFORM_AUTH_PAGES.
-      .filter((f) => !PLATFORM_AUTH_PAGES.includes(f));
-    expect(offenders, "these should depend on @/services instead").toEqual([]);
-  });
 
   /**
    * And no `.jsx` may shadow a `.tsx` of the same name.
@@ -305,9 +199,6 @@ describe("dependency inversion holds", () => {
     const shadowed = [...byStem.values()]
       .filter((v) => v.length > 1)
       .flat()
-      // A shadow cast by a file the platform restores is expected and inert.
-      // Any other one is the bug this case was written for.
-      .filter((f) => !PLATFORM_AUTH_PAGES.includes(f) && !PLATFORM_AUTH_PAGES.includes(f.replace(/\.tsx$/, ".jsx")))
       .sort();
     expect(shadowed, "Vite resolves .jsx first, so the .tsx here is dead code").toEqual(
       []
@@ -318,7 +209,7 @@ describe("dependency inversion holds", () => {
     const wiring = sourceFiles().filter((f) => {
       const r = rel(f);
       if (r.startsWith("src/services/")) return false;
-      return /new (Base44|Supabase)\w+Service\(/.test(read(f));
+      return /new Supabase\w+Service\(/.test(read(f));
     });
     expect(wiring.map(rel)).toEqual([]);
   });
@@ -478,19 +369,6 @@ describe("BlogPost writes match the BlogPost entity", () => {
         expect(Object.keys(blogPost.properties), `${call.file} → ${key}`).toContain(key);
       }
     }
-  });
-
-  it("the published filter lives in the content adapter, not in a page", () => {
-    // Keeping it in the port means no caller can accidentally list drafts.
-    const inAdapter = findObjectLiteralCalls(/BlogPost\.filter\(\s*/, [
-      join(REPO_ROOT, "src/services/base44/Base44ContentService.ts"),
-    ]);
-    expect(inAdapter).toHaveLength(1);
-    expect(inAdapter[0].keys).toEqual(["published"]);
-    expect(blogPost.properties.published.type).toBe("boolean");
-
-    const inPages = findObjectLiteralCalls(/BlogPost\.filter\(\s*/, sourceFiles().filter((f) => rel(f).startsWith("src/pages/")));
-    expect(inPages).toEqual([]);
   });
 });
 

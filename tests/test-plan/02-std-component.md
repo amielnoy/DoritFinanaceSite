@@ -855,7 +855,7 @@ The shell and `/pension-check` through `LocaleLayout`, as `App.jsx` routes `/en`
 
 ### 4.45 `/login` — Google — `tests/component/login-google.test.tsx`
 
-`vitest.config.ts` now resolves `.ts`/`.tsx` before `.jsx`, as `vite.config.js` does, so `@/pages/Login` is the site's page, not Base44's restored boilerplate.
+`vitest.config.ts` resolves `.ts`/`.tsx` before `.jsx`, as `vite.config.js` does. (The Base44 boilerplate `.jsx` pages beside it were deleted 2026-10-29, Base44 exit B1 task 3.)
 
 | ID | Title | Expected result |
 |---|---|---|

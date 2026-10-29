@@ -5,7 +5,6 @@ import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 const auth = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => auth.value }));
 const agency = vi.hoisted(() => ({

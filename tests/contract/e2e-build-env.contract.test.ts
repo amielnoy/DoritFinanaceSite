@@ -44,7 +44,6 @@ describe("the e2e build", () => {
       VITE_MASLEKA_ENABLED: "",
       VITE_MEETINGS_CLIENT: "",
       VITE_AGENCY_CONTENT: "true",
-      VITE_BASE44_APP_BASE_URL: "",
     });
   });
 

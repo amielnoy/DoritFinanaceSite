@@ -15,7 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 if (!("scrollTo" in Element.prototype)) {
   Object.defineProperty(Element.prototype, "scrollTo", { value: () => undefined, writable: true });
 }
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 vi.mock("framer-motion", async () => {
   const R = await import("react");
   const passthrough = new Proxy({}, { get: (_t, tag: string) => ({ children, ...props }: any) => R.createElement(tag, props, children) });

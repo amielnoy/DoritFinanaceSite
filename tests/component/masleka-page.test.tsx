@@ -5,7 +5,6 @@ import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
 import Masleka from "@/pages/Masleka";
 import SeoRouteGuard from "@/components/SeoRouteGuard";

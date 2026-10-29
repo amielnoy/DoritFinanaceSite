@@ -8,8 +8,7 @@ FROM mcr.microsoft.com/playwright:v1.64.0-noble
 
 ENV CI=1 \
     NODE_ENV=development \
-    PLAYWRIGHT_PORT=4173 \
-    VITE_BASE44_APP_ID=e2e-sanity-app
+    PLAYWRIGHT_PORT=4173
 
 WORKDIR /app
 

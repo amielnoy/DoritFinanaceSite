@@ -56,12 +56,6 @@ describe("no secrets in the repo", () => {
     expect(ignore).toMatch(/^\.env$/m);
     expect(ignore).toMatch(/base44\/\.app\.jsonc/);
   });
-
-  it("reads app configuration from import.meta.env, never from literals", () => {
-    const appParams = read(join(REPO_ROOT, "src/lib/app-params.js"));
-    expect(appParams).toContain("import.meta.env.VITE_BASE44_APP_ID");
-    expect(appParams).not.toMatch(/appId:\s*["'][\w-]{8,}["']/);
-  });
 });
 
 describe("no dangerous DOM/JS sinks in first-party code", () => {
@@ -121,13 +115,6 @@ describe("outbound links are safe", () => {
 });
 
 describe("auth and token handling", () => {
-  it("only clear-access-token.ts and the SDK touch the stored access token", () => {
-    // One place in src/ may name the stored token: the boot-time wipe for
-    // ?clear_access_token=true (SEC-TOK-002). app-params.js delegates to it.
-    const touchers = FILES.filter((f) => /base44_access_token|localStorage\.(get|set|remove)Item\(\s*["']token["']/.test(read(f))).map(rel);
-    expect(touchers).toEqual(["src/lib/clear-access-token.ts"]);
-  });
-
   it("pages that consume ?returnTo= go through the shared open-redirect guard", () => {
     // Login reads an attacker-controllable returnTo out of the URL. Register
     // did too, until sign-up went with email-and-password.
