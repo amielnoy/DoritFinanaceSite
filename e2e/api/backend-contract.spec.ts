@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { E2E_SUPABASE_URL } from "../build-env";
-import { AGAINST_A_DEPLOYMENT, BASE44_SDK_TELEMETRY, STUBS_UNREACHABLE, expect, gotoApp, openQuickContact, test, test_step } from "../fixtures/app";
+import { AGAINST_A_DEPLOYMENT, STUBS_UNREACHABLE, expect, gotoApp, openQuickContact, test, test_step } from "../fixtures/app";
 
 /**
  * Runtime contract: what the browser actually puts on the wire, checked
@@ -134,14 +134,12 @@ test.describe("Backend contract (observed traffic)", () => {
       expect(elsewhere).toEqual([]);
     });
 
-    await test_step("and nothing went to Base44's /api but the SDK's own telemetry", async () => {
+    await test_step("and nothing went to Base44's /api", async () => {
       // The fixture fails any such request at teardown too; this names it here.
-      // The telemetry goes with the SDK (see BASE44_SDK_TELEMETRY).
       const base44 = seen.filter(
         (u) =>
           u.pathname.startsWith("/api/") &&
-          !/^\/api\/(og\/|csp-report)/.test(u.pathname) &&
-          !BASE44_SDK_TELEMETRY.test(u.pathname),
+          !/^\/api\/(og\/|csp-report)/.test(u.pathname),
       );
       expect(base44.map((u) => u.href)).toEqual([]);
     });

@@ -22,7 +22,7 @@ In scope:
 | Components | Every first-party component in `src/components/dorit/` that carries behaviour |
 | Contracts | Frontend payloads and Base44 entities, Supabase schemas and function configuration, agency permissions and RLS, prompt sources, release gates and generated artifacts |
 | Integration | The Base44 and Supabase Edge Function handlers executed in-process against recording dependencies — what is stored, who is mailed, what each recipient sees, and what survives a failure |
-| Eval | The deployed interview, FAQ, procedures and blog agents driven over the real conversation API — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. Opt-in; see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank the procedures cases come from |
+| Eval | The deployed `chat` function's interview, FAQ, procedures and blog agents played by a model persona (`npm run test:eval:chat`, by hand) — whether the model obeys the prompt, as opposed to whether the prompt contains the clause. No Vitest cases (the Base44 agent evals were retired 2026-10-29); see [13-std-eval](13-std-eval.md), and [14-procedures-zones](14-procedures-zones.md) for the scenario bank behind the procedures personas |
 | Agent compliance | The four agent prompts, the consent gate and handoff path in the chat shell, and the disclosure carried by repo-held articles |
 | API / HTTP | The site's own HTTP surface (SPA fallback, SEO files, assets) and observed Base44 traffic |
 | UI e2e | Landing page, routing, calculator, the quick contact form and the claim report, blog, the agent chat's regulatory shell |
@@ -100,7 +100,7 @@ backend when one is available.
 | lint | zero errors |
 | typecheck | `tsc` reports zero errors (the inherited-error ratchet is gone — see [10-known-issues](10-known-issues.md) B-3) |
 | unit, component, contract, integration, security | 100% pass |
-| eval | not gated — opt-in, non-deterministic, and a failure wants a human reading the transcript |
+| eval (`test:eval:chat`) | not gated — by hand, non-deterministic, and a failure wants a human reading the transcript |
 | e2e (all four platforms) | 100% pass, no more than the documented skips |
 | accessibility | zero `serious`/`critical` axe violations except the tracked colour-contrast finding |
 
@@ -125,12 +125,9 @@ Resume after the environment is corrected; no partial sign-off.
 | CI artefacts | uploaded per job in `.github/workflows/ci.yml` |
 
 Both runners write Allure results into the same `allure-results/`, so one
-`allure generate` covers the whole battery — 1052 Vitest cases (252 unit, 30
-component, 448 contract, 240 integration, 72 security, plus 8 opt-in agent
-`allure generate` covers the whole battery — 1046 Vitest cases (252 unit, 30
-component, 445 contract, 237 integration, 72 security, plus 8 opt-in agent
-evals that skip without credentials and the one marker case that reports the
-skip) plus 179 e2e cases per platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
+`allure generate` covers the whole battery — 5190 Vitest results (2159 unit, 754
+component, 1336 contract, 848 integration, 93 security, counted 2026-10-29 after the
+Base44 agent evals were retired) plus the e2e cases per platform. CI merges one upload per e2e **shard** plus one for the Vitest job —
 eleven on the full matrix, two on a feature branch — into a single published
 report; generating per-leg would give a pile of partial reports instead of one
 picture of the run, and sharding only makes that worse. Allure 3 emits the merged report as a single self-contained

@@ -25,7 +25,6 @@ const h = vi.hoisted(() => ({
   updateProfile: vi.fn(async () => {}),
 }));
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 vi.mock("@/lib/AuthContext", () => ({ useAuth: () => ({ user: { id: "me", role: "user" }, isAuthenticated: true }) }));
 vi.mock("@/components/dorit/admin/LeadTrackingPanel", () => ({ default: () => <p>מעקב לידים</p> }));
 vi.mock("@/hooks/useAdmin", () => ({

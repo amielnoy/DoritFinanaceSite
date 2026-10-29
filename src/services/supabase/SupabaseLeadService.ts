@@ -12,40 +12,28 @@ export interface SupabaseFunctionsClient {
 }
 
 /**
- * Claims, on the `submit-claim` Edge Function; leads and interviews on `submit-lead`
- * when `useEdge` is on; every other lead path, unchanged.
- *
- * Contact forms, interviews and calendar holds still run on Base44's functions,
- * which hold the calendar and Sheets connections. They go to `rest`, the Base44
- * adapter, as they did before this class existed.
+ * Every enquiry, on the Edge Functions: claims on `submit-claim`; contact
+ * forms, interviews and their follow-up details on `submit-lead`, which also
+ * places the calendar hold a consultation asks for.
  */
 export class SupabaseLeadService implements LeadPort {
-  constructor(
-    private readonly client: SupabaseFunctionsClient,
-    private readonly rest: LeadPort,
-    private readonly useEdge: boolean = false,
-  ) {}
+  constructor(private readonly client: SupabaseFunctionsClient) {}
 
-  get updatesInterviews(): boolean {
-    return this.useEdge;
-  }
+  /** `submit-lead` fills in the lead an interview has just saved. */
+  readonly updatesInterviews = true;
 
   submitLead(lead: Lead): Promise<SubmissionReceipt> {
-    return this.useEdge ? this.edge("submit-lead", leadBody(lead)) : this.rest.submitLead(lead);
+    return this.edge("submit-lead", leadBody(lead));
   }
 
   submitInterview(summary: InterviewSummary): Promise<SubmissionReceipt> {
-    return this.useEdge ? this.edge("submit-lead", interviewBody(summary)) : this.rest.submitInterview(summary);
+    return this.edge("submit-lead", interviewBody(summary));
   }
 
   private async edge(name: string, body: Record<string, unknown>): Promise<SubmissionReceipt> {
     const { data, error } = await this.client.functions.invoke(name, { body });
     if (error) throw await functionFailure(name, error);
     return (data as SubmissionReceipt | null) ?? { ok: true };
-  }
-
-  requestConsultationEvent(lead: Lead): Promise<void> {
-    return this.rest.requestConsultationEvent(lead);
   }
 
   async submitClaim(report: ClaimReport): Promise<SubmissionReceipt> {

@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * later call, and the per-page auth probe quietly loading the SDKs anyway.
  */
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
 type Deferred = { promise: Promise<void>; resolve: () => void };
 const deferred = (): Deferred => {

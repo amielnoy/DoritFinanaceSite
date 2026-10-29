@@ -2,7 +2,7 @@ import { AGENCY1_CASES, AGENCY1_ID, AGENCY1_REVIEW_LINKS } from "@/config/agency
 import { AGENCY_PROFILE } from "@/config/agencyProfile";
 import { CONTACT } from "@/config/contact";
 import { CAL_LINK } from "@/config/offers";
-import { normalizeHost } from "@/lib/legacy-host";
+import { normalizeHost } from "@/lib/host";
 import { portraitFor, type Portrait } from "@/lib/portrait";
 import type { AgencyContact, AgencySiteRecord, SuccessCase } from "@/services/ports";
 

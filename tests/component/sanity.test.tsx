@@ -259,7 +259,6 @@ describe("<QuickContact />", () => {
       source: "quick",
     });
     expect(submitClaim).not.toHaveBeenCalled();
-    expect(servicesMock.leads.requestConsultationEvent).not.toHaveBeenCalled();
     expect(servicesMock.support.escalate).not.toHaveBeenCalled();
   });
 

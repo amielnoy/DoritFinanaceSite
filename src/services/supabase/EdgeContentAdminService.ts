@@ -12,12 +12,8 @@ export interface ContentFunctionsClient {
 
 /**
  * Content writes on the `content-admin` Edge Function, Supabase only — the
- * successor of FunctionContentAdminService, which goes through Base44's
- * `contentAdmin` and also writes Base44's copy.
- *
- * Switched on by VITE_CONTENT_WRITES=supabase, and not before Phase 3: three
- * Base44 chats still read Base44's BlogPost, and an article written only here
- * is invisible to them (supabase/functions/content-admin/handler.ts).
+ * successor of FunctionContentAdminService, which went through Base44's
+ * `contentAdmin` and also wrote Base44's copy.
  *
  * The session's token travels on `Authorization`, where the function reads
  * it. supabase-js would attach it unasked; naming it here keeps "signed out"

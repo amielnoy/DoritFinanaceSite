@@ -25,14 +25,14 @@ import type {
  * The services the app talks to — a light front for `./composition.ts`.
  *
  * `composition.ts` is the composition root: the one place that names concrete
- * implementations, and the one that imports both SDKs. Imported eagerly, it put
- * `@supabase/supabase-js` and `@base44/sdk` (~100 KB gzipped together) on the
- * critical path of every page, modulepreloaded ahead of the hero — while an
- * anonymous visitor reading the home page calls neither.
+ * implementations, and the one that imports the SDK. Imported eagerly, it put
+ * `@supabase/supabase-js` on the critical path of every page, modulepreloaded
+ * ahead of the hero — while an anonymous visitor reading the home page never
+ * calls it.
  *
  * So this module exposes the same `services` object, but each port loads the
  * composition root on its first real call and delegates to it. A visitor who
- * submits a form, opens a chat or signs in pays for the SDKs at that moment;
+ * submits a form, opens a chat or signs in pays for the SDK at that moment;
  * one who only reads never does. Two things are answered here, without it:
  *
  *   - `auth.hasStoredToken()` and `auth.getPublicSettings()`, which AuthContext
@@ -89,7 +89,7 @@ function real(): Promise<Services> {
   return loading;
 }
 
-/** Start loading the SDKs ahead of need — e.g. when a form or chat first comes into view. */
+/** Start loading the SDK ahead of need — e.g. when a form or chat first comes into view. */
 export function preloadServices(): void {
   void real().catch(() => {});
 }
@@ -141,7 +141,7 @@ const agencyContent: AgencyContentPort = supabaseConfigured
     };
 
 const auth: AuthPort = {
-  // Same answers as SupabaseAuthService / UnconfiguredAuthService, without loading either SDK.
+  // Same answers as SupabaseAuthService / UnconfiguredAuthService, without loading the SDK.
   hasStoredToken: () => (supabaseConfigured ? defaultSessionPresent() : false),
   getPublicSettings: async () => ({}),
   me: () => real().then((s) => s.auth.me()),
@@ -171,7 +171,6 @@ export const services: Services = {
   leads: {
     submitLead: (lead) => real().then((s) => s.leads.submitLead(lead)),
     submitClaim: (report) => real().then((s) => s.leads.submitClaim(report)),
-    requestConsultationEvent: (lead) => real().then((s) => s.leads.requestConsultationEvent(lead)),
     submitInterview: (summary) => real().then((s) => s.leads.submitInterview(summary)),
   },
   content,

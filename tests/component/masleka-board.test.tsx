@@ -6,7 +6,6 @@ import React from "react";
 import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 
 import MaslekaBoard, { REVEAL_MS, waitingLine, type MaslekaBoardProps } from "@/pages/MaslekaBoard";
 import { MaslekaError, type MaslekaPort, type MaslekaRequest } from "@/services/ports";

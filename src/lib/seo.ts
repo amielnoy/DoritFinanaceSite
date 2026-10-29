@@ -6,7 +6,6 @@
 // homepage. This module gives each route its own head.
 
 import { useEffect } from "react";
-import { isLegacyHost } from "./legacy-host.js";
 import { jsonLdText } from "./trusted-types.js";
 // Relative, like the imports above: api/og/blog.ts runs this file in a Vercel
 // function, whose bundler does not resolve the "@/" alias (#212 broke it so).
@@ -21,7 +20,7 @@ const viteEnv = (import.meta as unknown as { env?: Env }).env;
 // Vercel functions under api/ import this module, and in their Node runtime
 // `import.meta.env` does not exist — Vite only inlines it into the browser
 // bundle. Without this, SITE_URL there fell back to the default host, so
-// api/og/blog fetched Base44's shell and wrote Base44 canonicals. Read through
+// api/og/blog fetched the wrong host's shell and wrote its canonicals. Read through
 // `globalThis` with a `typeof` guard so the browser bundle (where `process` is
 // undefined, and the app tsconfig has no Node types) never names `process`.
 const serverEnv: Env =
@@ -37,11 +36,8 @@ const serverEnv: Env =
  * Host header would let a visitor choose the origin the server fetches from and
  * links to).
  *
- * The default was the old Base44 host until 2026-10-14. Every builder that did
- * not set the variable — the Base44 Builder above all, whose environment lives
- * only in its dashboard — kept declaring that host canonical, so the copy it
- * serves competed with the real site. A build now has to opt *out* of the
- * production domain rather than remember to opt in.
+ * A build has to opt *out* of the production domain rather than remember to
+ * opt in.
  */
 export function resolveSiteUrl(fromVite: Env, fromServer: Env): string {
   const pick = (env: Env) => env?.VITE_SITE_URL?.trim() || undefined;
@@ -138,43 +134,9 @@ function upsertLink(rel: string, href: string) {
   el.setAttribute("href", href);
 }
 
-/**
- * Is this document being served on the old Base44 host? Read per call, not
- * once: it is the page's own address, and tests move it.
- */
-function onLegacyHost(): boolean {
-  return typeof window !== "undefined" && isLegacyHost(window.location.hostname);
-}
-
-/**
- * The robots directive for a route. On the old host every page is `noindex`
- * whatever the route says: it is a copy, and the copy must leave the index
- * while the canonical names the production URL. `follow` is kept for public
- * routes there (its links all lead to pages that are themselves canonicalised
- * to production) and `nofollow` stays on the private ones, as everywhere.
- */
-function robotsFor(noIndex: boolean, legacy = onLegacyHost()): string {
-  if (legacy) return noIndex ? "noindex, nofollow" : "noindex";
+/** The robots directive for a route. */
+function robotsFor(noIndex: boolean): string {
   return noIndex ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1";
-}
-
-/**
- * The head a page served on the old host needs before anything else runs:
- * canonical and `og:url` on the production URL of the same path, and
- * `noindex` for every crawler that reads robots meta. It runs at boot, so it
- * covers the page that redirects away before React ever renders and the
- * moment before a route applies its own SEO. `applySeo` keeps the same
- * answers afterwards.
- */
-export function applyLegacyHostHead(path: string): void {
-  if (typeof document === "undefined") return;
-  const url = absoluteUrl(path);
-  upsertLink("canonical", url);
-  og("og:url", url);
-  meta("robots", robotsFor(false, true));
-  // index.html also ships a googlebot-specific `index`. Google takes the most
-  // restrictive of the two, but a page should not say both.
-  meta("googlebot", "noindex");
 }
 
 /** Drop the previous route's multi-valued and route-scoped tags. */

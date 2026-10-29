@@ -11,8 +11,7 @@
 // the page's path and the source position. What is not: query strings, which
 // on this site can carry a visitor's name and phone, and the rest of the URL.
 //
-// A fixed path, like api/og/blog.ts: files are matched before vercel.json's
-// `/api/*` rewrite to Base44.
+// A fixed path, like api/og/blog.ts: files are matched before any rewrite.
 
 interface CspRequest {
   method?: string;

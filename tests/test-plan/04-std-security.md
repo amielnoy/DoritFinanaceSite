@@ -40,7 +40,7 @@ lead inbox.
 | SEC-STA-001..006 | "contains no `<secret type>`" (Stripe live key, AWS access key id, Google API key, private key block, hardcoded JWT, assigned secret literal) | No match in `src/**` or `index.html` |
 | SEC-STA-007 | "keeps env files out of version control" | No `.env*` tracked by git (falls back to a filesystem check when `.git` is absent, e.g. inside the test image) |
 | SEC-STA-008 | "gitignores the local env and the Base44 app pointer" | `.gitignore` covers `.env` and `base44/.app.jsonc` |
-| SEC-STA-009 | "reads app configuration from `import.meta.env`, never from literals" | `app-params.js` uses `VITE_BASE44_APP_ID`; no inline app id |
+| SEC-STA-009 | (retired 2026-10-29, Base44 exit B1 task 3: it read `app-params.js`, which is deleted) | — |
 | SEC-STA-010 | "never uses eval or the Function constructor" | No `eval(` / `new Function(` |
 | SEC-STA-011 | "never injects raw HTML" | No `dangerouslySetInnerHTML` / `.innerHTML =` / `document.write` in first-party code |
 | SEC-STA-012 | "renders blog markdown without enabling raw HTML passthrough" | No `rehype-raw`, `skipHtml={false}` or `remark-html` in `BlogPost.tsx` |
@@ -49,7 +49,7 @@ lead inbox.
 | SEC-STA-015 | "every `target=_blank` link also sets `noreferrer`" | Zero offenders |
 | SEC-STA-016 | "no source file loads anything over plaintext `http://`" | Zero offenders (localhost excepted) |
 | SEC-STA-017 | "`index.html` loads every external asset over https" | Zero `http://` in `href`/`src` |
-| SEC-STA-018 | "only `clear-access-token.ts` and the SDK touch the stored access token" | Exactly that one file in `src/` (the boot-time wipe; `app-params.js` delegates to it) |
+| SEC-STA-018 | (retired 2026-10-29, Base44 exit B1 task 3: `clear-access-token.ts` and the SDK are deleted) | — |
 | SEC-STA-019 | "pages that consume `?returnTo=` go through the shared guard" | `Login` imports `safeReturnTo` (`Register` went with email/password sign-in) |
 | SEC-STA-020 | "no page reads `returnTo` out of the query string without the guard" | Zero offenders outside `authReturnTo.js` |
 | SEC-STA-021 | "redirects derived from `returnTo` are assigned from the guarded value" | `Login` assigns `window.location.href` from `safeReturnTo()` |
@@ -73,7 +73,7 @@ carries a `<script>`, an `<img onerror>`, a `javascript:` markdown link and a
 | SEC-XSS-004 | "a hostile post title is escaped in the heading" | as above | `h1` text contains `<img`; zero `<img>` children |
 | SEC-XSS-005 | "a hostile testimonial cannot inject markup on the home page" | Serve a testimonial with script/img payloads | `window.__xss_t` unset |
 | SEC-TOK-001 | "no access token is written to storage for an anonymous visitor" | Load `/` | No storage key matching `token\|secret\|password`; no JWT-shaped value |
-| SEC-TOK-002 | "`?clear_access_token=true` wipes any stored token on `/`" and "… on `/faq`" | Seed both token keys, open the route with the flag | Both keys `null`, and the flag is gone from the URL. The wipe runs at boot (`src/lib/clear-access-token.ts`), so it no longer depends on a backend call loading the SDK; `/faq` makes none on load |
+| SEC-TOK-002 | (retired 2026-10-29, Base44 exit B1 task 3: `clear-access-token.ts` is deleted with the SDK (`e2e/security/security.spec.ts`)) | — |
 | SEC-RED-001 | "a hostile `?returnTo=` cannot bounce the visitor off-site" | 4 hostile values on `/login` | Page stays on the login screen and on the suite's own origin |
 | SEC-LNK-001 | "every new-tab link is protected against reverse tabnabbing" | Load `/` | Every rendered `target=_blank` anchor has `noopener` |
 | SEC-MIX-001 | "no mixed content: the page loads nothing over plain http" | Load `/`, scroll to the bottom | Zero non-localhost `http://` requests |
@@ -115,7 +115,7 @@ whatever the model does.
 |---|---|---|
 | `SEC-AGT-XSS-*` | 9 + 6 + 4 | Dorit's "שיחה" tab shows a stored transcript as plain text with no write path (`SEC-AGT-XSS-009` is the tab; the email cases keep their IDs by title). The chat renders replies through `react-markdown` with no raw-HTML plugin and no `dangerouslySetInnerHTML`; the confirmation email escapes every visitor-supplied binding; the shared letter's button (`SEC-AGT-XSS-017..019`) renders only an `https://` href with no quote, bracket or space, never as `javascript:`/`data:`/relative, and escapes its label; a linked detail (the clearinghouse invitation's address, `SEC-AGT-XSS-020`) follows the same rule and escapes its text. The escaping helper is **lifted out of the Deno source and executed** here, so these assert behaviour rather than the presence of a call. |
 | `SEC-AGT-PHI-*` | 8 | No visitor value reaches an `href`; template links stay on the agency domain; recipients resolve from constants; every `tel:`/`mailto:` target binds from the contact config or the server's escalation receipt; the chat's contact block comes from the backend, not from a reply that merely claims a number; no request body may widen a recipient list. |
-| `SEC-AGT-INJ-*` | 10 + 1 | Each prompt declares its compliance block to override any later instruction and routes doubt to `escalateToHuman`; the shell never parses a reply for commands; the consent stamp is the shell's (v5, or v6 for an agent on the chat function, chosen from its own constants), so a persuaded model cannot backdate what a visitor agreed to; and no `...body` is spread into an entity write. |
+| `SEC-AGT-INJ-*` | 10 + 1 | Each prompt declares its compliance block to override any later instruction and routes doubt to `escalateToHuman`; the shell never parses a reply for commands; the consent stamp is the shell's (v6, every agent being on the chat function since Base44 exit B1, chosen from its own constants), so a persuaded model cannot backdate what a visitor agreed to; and no `...body` is spread into an entity write. |
 | `SEC-AGT-DLP-*` | 13 | `redact()` is **executed against real payloads** — ID numbers, spaced and hyphenated card numbers, an Israeli IBAN, account-length digits — and asserted to leave ordinary prose intact and cap its output. Plus: the `Lead` schema carries no sensitive field, the sheet has no sensitive column, no token is echoed or logged, and the consent notice names exactly the fields that are collected. |
 
 > The former `SEC-AGT-API-*` block — the `hasOwnProperty` clamp on the

@@ -14,18 +14,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 if (!("scrollTo" in Element.prototype)) {
   Object.defineProperty(Element.prototype, "scrollTo", { value: () => undefined, writable: true });
 }
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 vi.mock("framer-motion", async () => {
   const R = await import("react");
   const passthrough = new Proxy({}, { get: (_t, tag: string) => ({ children, ...props }: any) => R.createElement(tag, props, children) });
   return { motion: passthrough, AnimatePresence: ({ children }: any) => R.createElement(R.Fragment, null, children), useReducedMotion: () => true };
 });
-vi.mock("@/config/chat-agents", () => ({
-  CHAT_FUNCTION_AGENTS: ["needs_interview", "support_agent"],
-  CHAT_AGENTS: new Set(["support_agent"]),
-  parseChatAgents: () => new Set(["support_agent"]),
-  servedByChatFunction: (agent: string) => agent === "support_agent",
-}));
 
 const invoke = vi.fn();
 vi.mock("@/services", async (importOriginal) => {

@@ -1,5 +1,10 @@
+/**
+ * Each on-site agent's v6 notice, the one the chat shows (every agent is on
+ * the `chat` function since Base44 exit B1). Moved from
+ * chat-agents-config.test.ts when the per-agent switch went.
+ */
 import { describe, expect, it } from "vitest";
-import { CHAT_FUNCTION_AGENTS, parseChatAgents } from "@/config/chat-agents";
+import { AGENTS } from "@/config/agents";
 import {
   CHAT_FUNCTION_CONSENT_POINTS,
   BLOG_RECOMMENDER_CONSENT_POINTS,
@@ -12,36 +17,9 @@ import {
   SUPPORT_CONSENT_POINTS,
 } from "@/config/compliance";
 
-describe("parseChatAgents", () => {
-  it("is empty by default", () => expect([...parseChatAgents(undefined, true)]).toEqual([]));
-  it("reads a comma-separated list", () => expect([...parseChatAgents(" needs_interview , ", true)]).toEqual(["needs_interview"]));
-  it("ignores agents the function cannot serve yet", () =>
-    expect([...parseChatAgents("some_other_agent,needs_interview", true)]).toEqual(["needs_interview"]));
-  it("may serve the blog recommender from the function, but only when VITE_CHAT_AGENTS names it", () => {
-    expect(CHAT_FUNCTION_AGENTS).toContain("blog_recommender");
-    expect([...parseChatAgents("blog_recommender", true)]).toEqual(["blog_recommender"]);
-    expect([...parseChatAgents("blog_recommender", false)]).toEqual([]);
-  });
-  it("may serve the procedures chat from the function, but only when VITE_CHAT_AGENTS names it", () => {
-    expect(CHAT_FUNCTION_AGENTS).toContain("procedures_agent");
-    expect([...parseChatAgents("procedures_agent", true)]).toEqual(["procedures_agent"]);
-    expect([...parseChatAgents("procedures_agent", false)]).toEqual([]);
-  });
-  it("is empty without Supabase, whatever it says", () => expect([...parseChatAgents("needs_interview", false)]).toEqual([]));
-
-  it("may serve the FAQ chat from the function, but only when VITE_CHAT_AGENTS names it", () => {
-    expect(CHAT_FUNCTION_AGENTS).toContain("support_agent");
-    expect([...parseChatAgents("", true)]).toEqual([]);
-    expect([...parseChatAgents("support_agent", true)]).toEqual(["support_agent"]);
-    expect([...parseChatAgents("needs_interview,support_agent", true)]).toEqual(["needs_interview", "support_agent"]);
-    expect([...parseChatAgents("support_agent", false)]).toEqual([]);
-    expect([...parseChatAgents("some_other_agent", true)]).toEqual([]);
-  });
-});
-
 describe("the v6 notice of each agent the function may serve", () => {
   it("exists for every one of them", () => {
-    for (const agent of CHAT_FUNCTION_AGENTS) expect(CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT[agent], agent).toBeDefined();
+    for (const { agent } of Object.values(AGENTS)) expect(CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT[agent], agent).toBeDefined();
   });
 
   it("is the interview's for the interview", () => {

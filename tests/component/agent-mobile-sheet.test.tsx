@@ -19,7 +19,6 @@ if (!("scrollTo" in Element.prototype)) {
   Object.defineProperty(Element.prototype, "scrollTo", { value: () => undefined, writable: true });
 }
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 vi.mock("framer-motion", async () => {
   const R = await import("react");
   const passthrough = new Proxy(
@@ -58,7 +57,7 @@ vi.mock("@/services", async (importOriginal) => {
 
 const { default: AgentChat } = await import("@/components/dorit/chat/AgentChat");
 const { AGENTS } = await import("@/config/agents");
-const { SUPPORT_CONSENT_POINTS } = await import("@/config/compliance");
+const { CHAT_FUNCTION_SUPPORT_CONSENT_POINTS } = await import("@/config/compliance");
 
 /** A viewport `width` px wide, as far as `matchMedia("(min-width: …)")` is concerned. */
 let width = 1440;
@@ -148,7 +147,7 @@ describe("on a phone, the support chat is a card that opens a layer", () => {
     expect(opener().getAttribute("aria-expanded")).toBe("true");
     expect(document.body.style.overflow).toBe("hidden");
     expect(within(dialog).getByText("אוטומטי · לא דורית עצמה")).toBeTruthy();
-    for (const point of SUPPORT_CONSENT_POINTS) expect(within(dialog).getByText(point)).toBeTruthy();
+    for (const point of CHAT_FUNCTION_SUPPORT_CONSENT_POINTS) expect(within(dialog).getByText(point)).toBeTruthy();
   });
 
   it("closes on Escape and on the X, and gives focus back to the button", async () => {

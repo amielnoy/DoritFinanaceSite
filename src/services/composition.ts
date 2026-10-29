@@ -1,20 +1,7 @@
-import { base44 } from "@/api/base44Client";
 import { supabase } from "@/api/supabaseClient";
-import { CHAT_AGENTS } from "@/config/chat-agents";
-import { CONTENT_WRITES } from "@/config/content-writes";
-import { LEAD_FUNCTIONS } from "@/config/lead-functions";
 import { MASLEKA_ENABLED } from "@/config/masleka";
-import { CONTENT_IMAGES, UPLOAD_PROVIDER } from "@/config/upload-provider";
-import { FunctionContentAdminService, type FunctionsClient } from "./base44/FunctionContentAdminService";
 import { SupabaseAccountService, type SupabaseRpcClient } from "./supabase/SupabaseAccountService";
 import { SupabaseAuthService, type SupabaseAuthClient } from "./supabase/SupabaseAuthService";
-import { Base44AgentService } from "./base44/Base44AgentService";
-import { Base44ContentAdminService } from "./base44/Base44ContentAdminService";
-import { Base44ContentService } from "./base44/Base44ContentService";
-import { Base44LeadAdminService } from "./base44/Base44LeadAdminService";
-import { Base44LeadService } from "./base44/Base44LeadService";
-import { Base44SupportService } from "./base44/Base44SupportService";
-import { Base44UploadService } from "./base44/Base44UploadService";
 import { SupabaseAgentService } from "./supabase/SupabaseAgentService";
 import { SupabaseContentAdminService } from "./supabase/SupabaseContentAdminService";
 import { SupabaseContentService } from "./supabase/SupabaseContentService";
@@ -29,9 +16,15 @@ import { SupabaseMaslekaService, type SupabaseMaslekaClient } from "./supabase/S
 import { SupabaseSupportService } from "./supabase/SupabaseSupportService";
 import { SupabaseUploadService, type SupabaseStorageClient } from "./supabase/SupabaseUploadService";
 import { UnconfiguredAccountService } from "./unconfigured/UnconfiguredAccountService";
+import { UnconfiguredAgentService } from "./unconfigured/UnconfiguredAgentService";
 import { UnconfiguredAuthService } from "./unconfigured/UnconfiguredAuthService";
+import { UnconfiguredContentAdminService } from "./unconfigured/UnconfiguredContentAdminService";
+import { UnconfiguredContentService } from "./unconfigured/UnconfiguredContentService";
+import { UnconfiguredLeadAdminService } from "./unconfigured/UnconfiguredLeadAdminService";
+import { UnconfiguredLeadService } from "./unconfigured/UnconfiguredLeadService";
 import { UnconfiguredMaslekaService } from "./unconfigured/UnconfiguredMaslekaService";
-import { RoutedAgentService } from "./RoutedAgentService";
+import { UnconfiguredSupportService } from "./unconfigured/UnconfiguredSupportService";
+import { UnconfiguredUploadService } from "./unconfigured/UnconfiguredUploadService";
 import type { Services } from "./index";
 import { SupabaseAgencyService, type SupabaseAgencyClient } from "./supabase/SupabaseAgencyService";
 import { SupabaseCampaignService } from "./supabase/SupabaseCampaignService";
@@ -58,27 +51,19 @@ import type {
  * Composition root — the single place that knows the concrete implementations.
  *
  * Loaded on demand by `./index.ts`, never imported eagerly: this module pulls
- * in both SDKs (~100 KB gzipped), which an anonymous visitor reading the home
- * page never needs. See the comment at the top of index.ts.
+ * in the Supabase SDK, which an anonymous visitor reading the home page never
+ * needs. See the comment at the top of index.ts.
  *
- * Everything else imports the ports. Swapping Base44 for another backend, or a
- * fake in a test, means changing this file and nothing else.
+ * Everything else imports the ports. Every port is Supabase's; a build without
+ * Supabase credentials gets a stand-in per port that reads empty and refuses
+ * writes, so the site still starts. Swapping the backend, or a fake in a
+ * test, means changing this file and nothing else.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const client = base44 as any;
-
-/**
- * Table reads, on Supabase when it is configured.
- *
- * Every write already mirrors into these tables, so the data is there and
- * current. A build without Supabase reads Base44 as before. Content and leads
- * are data, not identity, so a missing client means "the old path", not
- * "broken", unlike `authPort` below.
- */
+/** Table reads. The cast is narrowing, for the reason given at `authPort`. */
 const tables: SupabaseLeadTableClient | null = supabase ? (supabase as unknown as SupabaseLeadTableClient) : null;
 
-const contentPort: ContentPort = tables ? new SupabaseContentService(tables) : new Base44ContentService(client);
+const contentPort: ContentPort = tables ? new SupabaseContentService(tables) : new UnconfiguredContentService();
 
 /**
  * An agency's public content lives in Supabase only. Without it the read is
@@ -91,33 +76,25 @@ const agencyContentPort: AgencyContentPort = tables
       successCases: () => Promise.reject(new AgencyContentError("no_site")),
     };
 
-/**
- * Content admin: writes go through a backend function authenticated by the
- * Supabase session; reads come from `tables` like the public ones.
- *
- * The browser cannot write Base44 directly: its rules want a Base44 admin
- * session, and the only identity on offer now is Supabase's, which is refused
- * with 403 before the shadow write is even reached. So the writes go through a
- * backend function, which holds both credentials and needs no browser identity
- * — only proof of who is asking.
- */
-const adminReads: ContentAdminPort = tables ? new SupabaseContentAdminService(tables) : new Base44ContentAdminService(client);
 const sessionToken = async () => (await supabase?.auth.getSession())?.data.session?.access_token ?? null;
 
 /**
- * …and with `VITE_CONTENT_WRITES=supabase`, the writes go to the `content-admin`
- * Edge Function instead, Supabase only — see src/config/content-writes.ts for
- * why that waits for Phase 3.
+ * Content admin: writes go to the `content-admin` Edge Function, authenticated
+ * by the Supabase session; reads come from `tables` like the public ones.
  */
 const contentAdmin: ContentAdminPort =
-  CONTENT_WRITES === "supabase" && supabase
-    ? new EdgeContentAdminService(supabase as unknown as ContentFunctionsClient, adminReads, sessionToken)
-    : new FunctionContentAdminService(client as unknown as FunctionsClient, adminReads, sessionToken);
+  supabase && tables
+    ? new EdgeContentAdminService(
+        supabase as unknown as ContentFunctionsClient,
+        new SupabaseContentAdminService(tables),
+        sessionToken,
+      )
+    : new UnconfiguredContentAdminService();
 
-/** The admin's leads: read and written in Supabase when it is configured, else through Base44 as before. */
+/** The admin's leads, read and written in Supabase. */
 const leadsAdminPort: LeadAdminPort = tables
-  ? new SupabaseLeadAdminService(tables, supabase as unknown as ContentFunctionsClient | null, sessionToken)
-  : new Base44LeadAdminService(client);
+  ? new SupabaseLeadAdminService(tables, supabase as unknown as ContentFunctionsClient, sessionToken)
+  : new UnconfiguredLeadAdminService();
 
 /**
  * Identity, on Supabase. A build without Supabase credentials gets a stand-in
@@ -133,12 +110,8 @@ const authPort: AuthPort = supabase
   : new UnconfiguredAuthService();
 
 /**
- * The personal area, on Supabase — the same rule as `authPort`, so the page
- * asks the system that knows who the visitor is.
- */
-/**
  * The accounts screen reads Supabase only: a build without it has no accounts
- * to list (Base44 never kept them), so the screen shows its empty state.
+ * to list, so the screen shows its empty state.
  */
 const usersAdminPort: UsersAdminPort = tables
   ? new SupabaseUsersAdminService(tables, supabase as unknown as ContentFunctionsClient | null, sessionToken)
@@ -177,47 +150,37 @@ const agencyPort: AgencyPort = supabase
       },
     };
 
+/**
+ * The personal area, on Supabase — the same rule as `authPort`, so the page
+ * asks the system that knows who the visitor is.
+ */
 const accountPort: AccountPort = supabase
   ? new SupabaseAccountService(supabase as unknown as SupabaseRpcClient)
   : new UnconfiguredAccountService();
 
 /**
  * Public images (blog covers, testimonial photos), into the public
- * content-images bucket when `VITE_CONTENT_IMAGES=supabase`, else Base44.
- * Never the claim-documents bucket: it is private, and an image put there
- * would be unreadable to every visitor.
+ * content-images bucket. Never the claim-documents bucket: it is private, and
+ * an image put there would be unreadable to every visitor.
  */
-const uploadPort: UploadPort =
-  CONTENT_IMAGES === "supabase" && supabase
-    ? new SupabaseImageUploadService(supabase as unknown as SupabaseImageStorageClient)
-    : new Base44UploadService(client);
+const uploadPort: UploadPort = supabase
+  ? new SupabaseImageUploadService(supabase as unknown as SupabaseImageStorageClient)
+  : new UnconfiguredUploadService();
 
-/**
- * Where a claim document lands, from whichever provider is switched on.
- *
- * Falls back to Base44 when Supabase is unconfigured — a checkout without
- * Supabase credentials should still accept a claim's attachments.
- */
-const claimDocumentsPort: UploadPort =
-  UPLOAD_PROVIDER === "supabase" && supabase
-    ? new SupabaseUploadService(supabase as unknown as SupabaseStorageClient)
-    : new Base44UploadService(client);
+/** A claim's documents, into the private claim-documents bucket. */
+const claimDocumentsPort: UploadPort = supabase
+  ? new SupabaseUploadService(supabase as unknown as SupabaseStorageClient)
+  : new UnconfiguredUploadService();
 
-/**
- * Claims go to the `submit-claim` Edge Function when Supabase is configured.
- * Leads, interviews and hand-offs follow `VITE_LEAD_FUNCTIONS`: Base44's
- * functions by default, the Supabase Edge Functions once it says "supabase".
- */
-const base44Leads = new Base44LeadService(client);
+/** Leads, interviews and claims, on the `submit-lead` and `submit-claim` Edge Functions. */
 const leadPort: LeadPort = supabase
-  ? new SupabaseLeadService(supabase as unknown as SupabaseFunctionsClient, base44Leads, LEAD_FUNCTIONS === "supabase")
-  : base44Leads;
+  ? new SupabaseLeadService(supabase as unknown as SupabaseFunctionsClient)
+  : new UnconfiguredLeadService();
 
-const base44Support = new Base44SupportService(client);
-const supportPort: SupportPort =
-  supabase && LEAD_FUNCTIONS === "supabase"
-    ? new SupabaseSupportService(supabase as unknown as SupabaseFunctionsClient)
-    : base44Support;
+/** The hand-off to a person, on the `escalate-to-human` Edge Function. */
+const supportPort: SupportPort = supabase
+  ? new SupabaseSupportService(supabase as unknown as SupabaseFunctionsClient)
+  : new UnconfiguredSupportService();
 
 /**
  * The clearinghouse pipeline: on Supabase only when the switch is on AND a
@@ -229,15 +192,10 @@ const maslekaPort: MaslekaPort =
     ? new SupabaseMaslekaService(supabase as unknown as SupabaseMaslekaClient)
     : new UnconfiguredMaslekaService();
 
-/**
- * The on-site agents: the `chat` Edge Function for those named in
- * `VITE_CHAT_AGENTS` (empty by default), Base44 for the rest.
- */
-const agentPort: AgentPort = new RoutedAgentService(
-  new Base44AgentService(client),
-  supabase ? new SupabaseAgentService(supabase as unknown as SupabaseFunctionsClient) : null,
-  CHAT_AGENTS,
-);
+/** The on-site agents, on the `chat` Edge Function. */
+const agentPort: AgentPort = supabase
+  ? new SupabaseAgentService(supabase as unknown as SupabaseFunctionsClient)
+  : new UnconfiguredAgentService();
 
 /** Reactivation campaigns: Supabase only. Without it there are none, and none can be made. */
 const campaignPort: CampaignPort = tables
@@ -284,4 +242,3 @@ export const services: Services = {
   onboarding: onboardingPort,
   masleka: maslekaPort,
 };
-

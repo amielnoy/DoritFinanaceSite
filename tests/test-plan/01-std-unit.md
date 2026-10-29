@@ -29,7 +29,7 @@ something outside the repository.
 | `safeReturnTo` | `src/lib/authReturnTo.js` |
 | `CONTACT` | `src/config/contact.ts` (values from `src/config/agencyProfile.ts`) |
 | `useSubmission`, `submissionErrorMessage` | `src/hooks/useSubmission.ts` |
-| `Base44LeadAdminService`, `Base44ContentAdminService` | `src/services/base44/` |
+| `Base44LeadAdminService`, `Base44ContentAdminService` | (deleted 2026-10-29, Base44 exit B1 task 3) |
 | `SupabaseAuthService` | `src/services/supabase/SupabaseAuthService.ts` |
 | FAQ content | `src/content/faq.ts` |
 | Insurance self-assessment | `src/lib/insurance-assessment.ts` |
@@ -40,7 +40,7 @@ something outside the repository.
 | `groupOpenLeads`, `planAssignments`, `describeOpenLeads` | `scripts/assign-open-leads.mjs` |
 | `fetchPublishedArticles`, `planArticles`, `duplicateTitles` | `scripts/published-articles.mjs` |
 | `answerRestRead` — the PostgREST subset the e2e fake and the e2e prerender answer | `e2e/fixtures/supabase-fake.ts` |
-| `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | `src/services/base44/invoke.ts` |
+| `invokeFunction`, `responseBody` — through `Base44LeadService`, `Base44SupportService` | (deleted 2026-10-29, Base44 exit B1 task 3) |
 
 > **Note.** `computePensionFees` was extracted from `PensionFeeCalculator.tsx`
 > during this work so the maths could be exercised without a DOM. The component
@@ -114,18 +114,20 @@ the fee rate). Hostile input is exercised because every field is a free-text
 
 ### Token wipe at boot — `tests/unit/clear-access-token.dom.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `src/lib/clear-access-token.ts` and its test are deleted with the SDK.
+
 `?clear_access_token=true` is honoured at boot by `src/lib/clear-access-token.ts` (SEC-TOK-002). It used to run only when the lazily loaded SDK did.
 
 | ID | Title | Input | Expected result |
 |---|---|---|---|
-| UNIT-TOK-001 | "wipes both token keys when the flag is set" | both keys seeded, `/faq?clear_access_token=true` | returns `true`; both keys `null` |
-| UNIT-TOK-002 | "leaves unrelated storage alone" | a Supabase session key beside the tokens | the Supabase key survives |
-| UNIT-TOK-003 | "removes only the flag from the URL, keeping the path, other params and hash" | `/blog/x?access_token=new&clear_access_token=true&utm_source=mail#faq` | `/blog/x?access_token=new&utm_source=mail#faq` |
-| UNIT-TOK-004 | "drops the `?` when the flag was the only parameter" | `/tools?clear_access_token=true` | `/tools` |
-| UNIT-TOK-005..008 | "does nothing for …" (4 cases) | no query, `=false`, `=1`, `=` | returns `false`; token kept; URL unchanged |
-| UNIT-TOK-009 | "strips the flag from a path that starts with // without leaving the origin" | `<origin>//evil.example/x?clear_access_token=true` | same origin; path `//evil.example/x`; tokens gone (a relative `//…` would be protocol-relative and make `replaceState` throw at boot) |
-| UNIT-TOK-010 | "still wipes, and does not throw, when replaceState throws" | `replaceState` throws `SecurityError` | no throw; both keys `null` |
-| UNIT-TOK-011 | "still removes the flag when storage throws" | `removeItem` throws `SecurityError` | returns `true`; flag gone |
+| UNIT-TOK-001 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe) | — | — |
+| UNIT-TOK-002 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe) | — | — |
+| UNIT-TOK-003 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe) | — | — |
+| UNIT-TOK-004 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe) | — | — |
+| UNIT-TOK-005..008 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe) | — | — |
+| UNIT-TOK-009 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe) | — | — |
+| UNIT-TOK-010 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe) | — | — |
+| UNIT-TOK-011 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK and `clear-access-token.ts` are gone; nothing holds a Base44 token to wipe) | — | — |
 
 ### 4.4 Contact configuration — `tests/unit/contact-config.test.ts`
 
@@ -199,6 +201,8 @@ cannot quietly turn a janitor into a production reaper.
 
 ### 4.8 Admin data services — `tests/unit/admin-services.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `tests/unit/admin-services.test.ts` is deleted with the Base44 adapters.
+
 The two services the admin screens talk to, exercised against a recording
 store. What matters here is the request that leaves: a partial update must stay
 partial, because the admin forms send only the field that changed and anything
@@ -206,20 +210,20 @@ the service adds of its own would overwrite a column nobody edited.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-ADM-001 | "asks for leads newest-first" | Sorted descending by creation |
-| UNIT-ADM-002 | "accepts a caller-chosen page size" | Limit forwarded |
-| UNIT-ADM-003 | "returns an array when the store answers with nothing" | `[]`, never `undefined` |
-| UNIT-ADM-004 | "moves a lead along through the adminLead function, not the entity" | `invoke("adminLead", { action: "status", id, status })`; no entity update |
-| UNIT-ADM-005 | "deletes through the adminLead function, not the entity" | `invoke("adminLead", { action: "delete", id })`; no entity delete |
-| UNIT-ADM-010 | "rejects when the function call fails, so the screen shows its write error" | `setStatus` and `remove` both reject |
-| UNIT-ADM-011 | "rejects when the function answers with an error body and no throw" | A body without `ok: true` rejects |
-| UNIT-ADM-012 | "has no agenda: Base44 holds no meetings, and reads nothing for one" | `agencyMeetings()` → `[]`; no entity read, no function call |
-| UNIT-ADM-006 | "lists every article, drafts included" | No published filter |
-| UNIT-ADM-007 | "creates an article with published coerced to a boolean" | `true`/`false`, not `"on"` |
-| UNIT-ADM-008 | "forwards a partial update without inventing the fields it was not given" | Payload has exactly the edited keys |
-| UNIT-ADM-009 | "defaults a testimonial's rating and source rather than sending empty ones" | Defaults applied |
-| UNIT-ADM-010 | "keeps a rating the visitor actually chose" | Explicit value survives |
-| UNIT-ADM-011 | "removes an article and a testimonial by id" | Delete called on both entities |
+| UNIT-ADM-001 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-002 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-003 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-004 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-005 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-010 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-011 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-012 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-006 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-007 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-008 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-009 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-010 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
+| UNIT-ADM-011 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadAdminService` and `Base44ContentAdminService` are deleted; the Supabase admin services have their own tests) | — |
 
 ### 4.9 FAQ content — `tests/unit/faq-content.test.ts`
 
@@ -274,21 +278,23 @@ is the single place that stops one enquiry being filed twice.
 
 ### The agent adapter — `agent-service.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `agent-service.test.ts` is deleted with `Base44AgentService`.
+
 Nine cases on `Base44AgentService`, all of them failure paths, because the
 failure paths are what was wrong. Nothing in the battery had ever exercised a
 failing `/agents/` call.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-AGT-001 | "does not spend a turn on a send that failed" | 45 failed sends all reach the backend; the cap never fires. Counting attempts rather than model invocations meant an outage eventually reported itself as "השיחה הגיעה לאורכה המרבי" |
-| UNIT-AGT-002 | "still refuses once the visitor has actually taken the maximum turns" | `AgentLimitError("too_many_turns")` after 40 successful sends |
-| UNIT-AGT-003 | "refuses an over-long message without calling the backend at all" | `AgentLimitError("too_long")`; `addMessage` never called |
-| UNIT-AGT-004 | "fails with its own error instead of handing undefined to the SDK" | `agent_conversation_gone`; `addMessage` never called |
-| UNIT-AGT-005 | "keeps ordinary user and assistant turns unchanged" | Both pass through |
-| UNIT-AGT-006 | "drops a message the platform marked hidden" | `[]` |
-| UNIT-AGT-007 | "drops a system message rather than dressing it as the agent" | `[]` — `role === "user"` is false for `system`, so it used to render in an assistant bubble |
-| UNIT-AGT-008 | "drops content that is not a non-empty string" | `[]` for an object, a missing `content` and an empty one. An object reaches `<ReactMarkdown>` as a React child and, with no error boundary above the chat, whites out the SPA |
-| UNIT-AGT-009 | "passes the survivors through in order" | Order preserved after filtering |
+| UNIT-AGT-001 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
+| UNIT-AGT-002 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
+| UNIT-AGT-003 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
+| UNIT-AGT-004 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
+| UNIT-AGT-005 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
+| UNIT-AGT-006 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
+| UNIT-AGT-007 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
+| UNIT-AGT-008 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
+| UNIT-AGT-009 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44AgentService` is deleted; every agent is on the chat function) | — |
 
 ### 4.12 Seeding the articles into Supabase — `tests/unit/seed-blog.test.ts`
 
@@ -317,16 +323,18 @@ to a new address. See [A-65](10-known-issues.md).
 
 ### 4.13 Reading a function's answer — `tests/unit/function-receipts.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `function-receipts.test.ts` is deleted with the Base44 adapters.
+
 `functions.invoke` resolves to the whole axios response, not the body
 (`interceptResponses: false` in the SDK). These feed the adapters that shape —
 every other fake returns a bare body, which is how A-67 went unseen.
 
 | ID | Title | Expected result |
 |---|---|---|
-| UNIT-RCP-001 | "reports an interview that saved as saved" | `ok: true`, `rid` read from the body |
-| UNIT-RCP-002 | "reports a lead that saved as saved" | `ok: true` |
-| UNIT-RCP-003 | "still accepts a bare body, as the in-memory fakes return" | `ok: true` |
-| UNIT-RCP-004 | "reports a handoff that reached Dorit as one that did" | `ok: true`, `contact` from the body — not the fallback |
+| UNIT-RCP-001 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadService` and `Base44SupportService` are deleted) | — |
+| UNIT-RCP-002 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadService` and `Base44SupportService` are deleted) | — |
+| UNIT-RCP-003 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadService` and `Base44SupportService` are deleted) | — |
+| UNIT-RCP-004 | (retired 2026-10-29, Base44 exit B1 task 3: `Base44LeadService` and `Base44SupportService` are deleted) | — |
 
 ### 4.14 Personal area adapters — `account-services.test.ts`
 
@@ -971,9 +979,9 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHSWEEP-013 | "claims nothing while there is no sheet: the rows wait for one rather than being marked logged" | Sheet unconfigured: 0, `claimSheetLogs` not called, a `sweep.sheet_unconfigured` warn line |
 | UNIT-CHSWEEP-014 | "lets a failed claim fail the sweep, so the route reports it" | A rejected claim rejects the sweep with `select_http_503` |
 
-### 4.36 The browser's chat adapter, router and switch — `tests/unit/supabase-agent.test.ts`, `routed-agent.test.ts`, `chat-agents-config.test.ts`, `services-wiring.test.ts`
+### 4.36 The browser's chat adapter, router and switch — `tests/unit/supabase-agent.test.ts`, `routed-agent.test.ts`, `chat-agents-config.test.ts` (now `chat-consent-points.test.ts`), `services-wiring.test.ts`
 
-`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort`; `RoutedAgentService` sends each agent to its adapter; `src/config/chat-agents.ts` reads `VITE_CHAT_AGENTS` and serves `needs_interview` and `support_agent`; `src/config/compliance.ts` holds each agent's v6 notice. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
+`src/services/supabase/SupabaseAgentService.ts` maps the `chat` function's answers onto `AgentPort`; `RoutedAgentService` sends each agent to its adapter; `src/config/chat-agents.ts` read `VITE_CHAT_AGENTS` (deleted in Base44 exit B1 task 2: every agent is on the chat function); `src/config/compliance.ts` holds each agent's v6 notice. Per Ruling 8 the interview's end-to-end test waits for the switch-on PR, and the wiring cases below prove the composition root routes by the switch. One row per declared `it`; a `it.each` row names its cases.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -1001,24 +1009,24 @@ Pure string builders in `scripts/seo-files.mjs`; the templates are the emitted c
 | UNIT-CHADAPTER-025 | "fails, not 'still processing', when the window ends with no answer at all" | Every status request fails: `AgentUnavailableError` |
 | UNIT-CHADAPTER-021 | "recovers a first message too: it asks about turn 1 of the conversation it named" | Status request `{conversationId, token, status: true, turn: 1}`; the reply is shown, not a failure (review 2026-10-15, item 12) |
 | UNIT-CHADAPTER-024 | "stops asking at once when the first message never opened the conversation" | A 403 status answer ends recovery: two requests in all, `AgentUnavailableError` |
-| UNIT-CHROUTE-001 | "sends a served agent to the chat function and everything else to Base44" | `needs_interview` start, send and subscribe reach the chat port; `support_agent` reaches the fallback |
-| UNIT-CHROUTE-002 | "uses Base44 for everything when there is no chat adapter" | With no chat port a served name still starts on the fallback |
-| UNIT-CHROUTE-003 | "hands the page's abort signal to the adapter that sends (review 2026-10-15)" | `send(conv, "1", { signal })` reaches the chat port with the same options |
-| UNIT-CHCONFIG-001 | "is empty by default" | `undefined` gives no agents |
-| UNIT-CHCONFIG-002 | "reads a comma-separated list" | `" needs_interview , "` gives `needs_interview` |
-| UNIT-CHCONFIG-003 | "ignores agents the function cannot serve yet" | an unknown agent is dropped from `some_other_agent,needs_interview`; `needs_interview` stays |
-| UNIT-CHCONFIG-004 | "is empty without Supabase, whatever it says" | Not configured gives no agents |
-| UNIT-CHCONFIG-005 | "may serve the FAQ chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `support_agent`; empty switch gives none; `support_agent` and `needs_interview,support_agent` are read in order; without Supabase none; `some_other_agent` none |
-| UNIT-CHCONFIG-006 | "exists for every one of them" (the v6 notice of each agent the function may serve) | `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` has an entry for every `CHAT_FUNCTION_AGENTS` name |
-| UNIT-CHCONFIG-007 | "is the interview's for the interview" | `needs_interview` maps to `CHAT_FUNCTION_CONSENT_POINTS` |
-| UNIT-CHCONFIG-008 | "is the FAQ chat's own for the FAQ chat: its first three points, never the interview's promise of a name, a phone and a meeting" | `support_agent` maps to `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`; its first three equal the first three of `SUPPORT_CONSENT_POINTS`; neither of the interview's points 1 and 3 appears; no "name and phone collected" or "arranges a meeting" wording |
-| UNIT-CHCONFIG-009 | "says, for the FAQ chat as for the interview, who processes the conversation and how long it is kept" | The FAQ chat's fourth point names the AI provider outside Israel and 12 months; the interview's names the provider; the FAQ point is not the old one |
-| UNIT-CHCONFIG-010 | "may serve the procedures chat from the function, but only when VITE_CHAT_AGENTS names it" | `CHAT_FUNCTION_AGENTS` contains `procedures_agent`; read when named; none without Supabase |
-| UNIT-CHCONFIG-011 | "is the procedures chat's own for the procedures chat: its three points and the v6 fourth" | `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS`: `PROCEDURES_CONSENT_POINTS[0..2]` and the FAQ chat's v6 fourth; never the interview's first point or "מתאם פגישה" |
-| UNIT-CHCONFIG-012 | "may serve the blog recommender from the function, but only when VITE_CHAT_AGENTS names it" | `blog_recommender` in `CHAT_FUNCTION_AGENTS`; read when named; none without Supabase |
-| UNIT-CHCONFIG-013 | "is the adviser's two lines and the v6 line, never the interview's" | `CHAT_FUNCTION_BLOG_CONSENT_POINTS` = the two approved lines + the FAQ chat's v6 fourth |
-| UNIT-CHWIRE-001 | "sends the named agent to the chat function and every other agent to Base44" | With `VITE_CHAT_AGENTS=needs_interview`, the composed `services.agents` start/send/subscribe for it reach the Supabase `chat` invoke and never Base44; `support_agent` reaches Base44 and never `chat` (Ruling 8) |
-| UNIT-CHWIRE-002 | "sends every agent to Base44 when the switch is empty" | With `VITE_CHAT_AGENTS` empty, `needs_interview` goes to Base44 and `chat` is never invoked (Ruling 8) |
+| UNIT-CHROUTE-001 | (retired 2026-10-29, Base44 exit B1 task 1: `RoutedAgentService` is deleted; every agent is on the chat function, UNIT-WIRING-004) | — |
+| UNIT-CHROUTE-002 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHROUTE-001; without Supabase the agents are `UnconfiguredAgentService`, UNIT-WIRING-009) | — |
+| UNIT-CHROUTE-003 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHROUTE-001; the signal reaches `SupabaseAgentService` directly, UNIT-CHADAPTER-026) | — |
+| UNIT-CHCONFIG-001 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-002 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-003 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-004 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-005 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-006 | "exists for every one of them" (the v6 notice of each agent the function may serve) | `CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` has an entry for every agent in `AGENTS` (was every `CHAT_FUNCTION_AGENTS` name) (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-007 | "is the interview's for the interview" | `needs_interview` maps to `CHAT_FUNCTION_CONSENT_POINTS` (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-008 | "is the FAQ chat's own for the FAQ chat: its first three points, never the interview's promise of a name, a phone and a meeting" | `support_agent` maps to `CHAT_FUNCTION_SUPPORT_CONSENT_POINTS`; its first three equal the first three of `SUPPORT_CONSENT_POINTS`; neither of the interview's points 1 and 3 appears; no "name and phone collected" or "arranges a meeting" wording (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-009 | "says, for the FAQ chat as for the interview, who processes the conversation and how long it is kept" | The FAQ chat's fourth point names the AI provider outside Israel and 12 months; the interview's names the provider; the FAQ point is not the old one (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-010 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-011 | "is the procedures chat's own for the procedures chat: its three points and the v6 fourth" | `CHAT_FUNCTION_PROCEDURES_CONSENT_POINTS`: `PROCEDURES_CONSENT_POINTS[0..2]` and the FAQ chat's v6 fourth; never the interview's first point or "מתאם פגישה" (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHCONFIG-012 | (retired 2026-10-29, Base44 exit B1 task 2: `VITE_CHAT_AGENTS`, `parseChatAgents` and `src/config/chat-agents.ts` are deleted; every agent is on the chat function) | — |
+| UNIT-CHCONFIG-013 | "is the adviser's two lines and the v6 line, never the interview's" | `CHAT_FUNCTION_BLOG_CONSENT_POINTS` = the two approved lines + the FAQ chat's v6 fourth (moved 2026-10-29 to `tests/unit/chat-consent-points.test.ts`, Base44 exit B1 task 2) |
+| UNIT-CHWIRE-001 | (retired 2026-10-29, Base44 exit B1 task 1: no Base44 agent adapter is wired; `services.agents` is `SupabaseAgentService`, UNIT-WIRING-004) | — |
+| UNIT-CHWIRE-002 | (retired 2026-10-29, Base44 exit B1 task 1: with UNIT-CHWIRE-001) | — |
 
 `SupabaseLeadAdminService.transcript` and `.transcriptLeadIds` (`tests/unit/supabase-lead-admin.test.ts`) read `chat_conversations` and `chat_messages` under the admin's session; Ruling 11 means the linked lead may be the interview lead or the hand-off lead.
 
@@ -1258,7 +1266,7 @@ The pure half of the chat evaluation harness (`scripts/eval-chat-lib.mjs`) and i
 | UNIT-MSKCFG-008 | "sends people to the clearinghouse operator over https" | Both URLs on `https://www.swiftness.co.il/` |
 | UNIT-MSKCFG-009 | "agrees with the Edge switch for every input, so the site and the functions cannot disagree" | `isMaslekaOn` equals `maslekaEnabled` over true, " true ", TRUE, 1, "", unset |
 | UNIT-LAZY-007 | "loads the composition root on its first call and delegates to it" | `services.masleka.myRole()` reaches the root once |
-| UNIT-WIRING-001 | "falls back to Base44 when Supabase is not configured" (extended) | `services.masleka` is `UnconfiguredMaslekaService` |
+| UNIT-WIRING-001 | (retired 2026-10-29, Base44 exit B1 task 1: no Base44 fallback; the stand-ins, `UnconfiguredMaslekaService` included, are UNIT-WIRING-007) | — |
 | UNIT-WIRING-002 | "uses the Supabase clearinghouse adapter only when the switch is on and a client exists" | `SupabaseMaslekaService` |
 | UNIT-WIRING-003 | "ships dark: with the switch off and a client, no masleka-* function or staff RPC is ever called" | Unconfigured adapter; zero `functions.invoke` and zero `rpc` calls |
 
@@ -1668,7 +1676,7 @@ The planning step of `scripts/assign-open-leads.mjs` (agency roles, Rollout 2). 
 | UNIT-AGY-006..009 | "%s goes to member-admin as the person" | `setRole`, `remove`, `leave`, `transferOwnership` → `member-admin` with the op's body and the bearer |
 | UNIT-AGY-010 | "says the function's refusal in its own words, and asks nothing without a session" | `last_owner`'s Hebrew; no call without a token |
 | UNIT-SLA-DOC-001 | "asks claim-document-link, as the person, for this lead's document" | `{ leadId, path }` with the bearer; the returned URL |
-| UNIT-SLA-DOC-002 | "returns a Base44 file URL unchanged, asking nobody" | No call |
+| UNIT-SLA-DOC-002 | "a document ref outside claim-documents is refused" | Throws `לא ניתן לפתוח את המסמך`; no call (was: a Base44 file URL returned unchanged, retired 2026-10-29, Base44 exit B1 task 4) |
 | UNIT-SLA-DOC-003 | "says the function's own refusal — another User's lead, or a document not on it" | The Hebrew refusal |
 | UNIT-SLA-DOC-004 | "asks nothing without a session" | `נדרשת התחברות` |
 | UNIT-SLA-ASG-001 | "assigns through assign-lead, and back to the queue with null" | `{ leadId, userId }`, then `userId: null` |
@@ -1894,3 +1902,23 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4. The tab'
 | UNIT-POR-005 | "another agency without a photo gets a monogram" | Monogram, not Dorit's picture |
 | UNIT-POR-006 | "a photo path with no storage base falls back to the monogram" | Monogram |
 | UNIT-POR-007 | "initials are the first letters of the first two words; the base needs a URL" | Initials; a non-URL base refused |
+
+### 4.81 The composition root wires Supabase alone — `tests/unit/services-wiring.test.ts`, `tests/unit/supabase-lead.test.ts`
+
+Base44 exit B1, task 1 (2026-10-29). `src/services/composition.ts` picks one adapter per port: Supabase's when a client exists, else an `Unconfigured*` stand-in that reads empty and refuses writes with "אין חיבור למאגר.", so a build without credentials still starts. The switches `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`, `VITE_UPLOAD_PROVIDER` and `VITE_CONTENT_IMAGES` are gone; `SupabaseLeadService` takes the functions client alone and sends every lead and interview to `submit-lead`. `LeadPort.requestConsultationEvent` is gone (calendar holds are `submit-lead`'s).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-WIRING-004 | "wires every port to its Supabase adapter" | `content` `SupabaseContentService`, `leads` `SupabaseLeadService`, `support` `SupabaseSupportService`, `uploads` `SupabaseImageUploadService`, `claimDocuments` `SupabaseUploadService`, `contentAdmin` `EdgeContentAdminService`, `leadsAdmin` `SupabaseLeadAdminService`, `agents` `SupabaseAgentService` |
+| UNIT-WIRING-005 | "sends a lead to submit-lead, which fills in interviews" | `functions.invoke("submit-lead", …)`; `updatesInterviews === true` |
+| UNIT-WIRING-006 | "reads the admin's articles from the table, drafts included" | A `blog_posts` read with no `eq` filter |
+| UNIT-WIRING-007 | "gives every port its stand-in" | Each of the ports in UNIT-WIRING-004 is its `Unconfigured*` stand-in (both upload ports `UnconfiguredUploadService`); `masleka` `UnconfiguredMaslekaService` |
+| UNIT-WIRING-008 | "reads nothing and refuses every write" | Lead submissions reject "אין חיבור למאגר."; `updatesInterviews` falsy; content lists `[]`; `getArticle` rejects with `status: 404`; uploads and content-admin writes reject; content-admin lists `[]` |
+| UNIT-WIRING-009 | "tells the chat panel the agent is unavailable" | `start` and `send` reject with `AgentUnavailableError`; `subscribe` returns a harmless unsubscribe |
+| UNIT-WIRING-010 | "still hands a visitor who asked for a person the direct channels" | `escalate` resolves `ok: false` with the fallback contact — never rejects |
+| UNIT-WIRING-011 | "answers the admin's lead screens empty and refuses their writes" | Lists `[]`, `briefing` `null`, counts `0`; status, delete, merge, note, briefing, assignment, document link and meeting-request writes reject "אין חיבור למאגר." |
+| UNIT-WIRING-012 | "keeps the Supabase-only ports on their stand-ins" | `campaigns` and `onboarding` read empty and refuse writes; `agencyContent` rejects `AgencyContentError` |
+| UNIT-SBLEAD-001 | "sends a lead to submit-lead" | `invoke("submit-lead", { body: leadBody(lead) })` |
+| UNIT-SBLEAD-002 | "sends an interview to submit-lead" | `invoke("submit-lead", { body: interviewBody(summary) })` |
+| UNIT-SBLEAD-003 | "throws with the function's message and rid when submit-lead refuses, and does not retry" | `submit-lead failed: נדרשים שם וטלפון (rid ab12)`; `invoke` called once |
+| UNIT-SBLEAD-004 | "fills in an interview's just-saved lead" | `updatesInterviews === true` |

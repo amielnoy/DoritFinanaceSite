@@ -44,7 +44,7 @@ export default function Blog() {
   /** A keyword from the row under the topics; narrows within the topic. */
   const [tag, setTag] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<boolean>(false);
-  /** Post ids the reading-recommender chose, read from its `recommended`
+  /** Post slugs the reading-recommender chose, read from its `recommended`
    *  block — see src/lib/blog-recommendation.ts. While set, the grid shows
    *  only these posts. */
   const [recommendedIds, setRecommendedIds] = useState<string[]>([]);
@@ -122,15 +122,15 @@ export default function Blog() {
     });
   }, [posts, query, topic, tag]);
 
-  // In the order the agent ranked them. Ids with no matching post (one taken
+  // In the order the agent ranked them. Slugs with no matching post (one taken
   // down since, or a model slip) are dropped; if none match, nothing is
   // filtered — an empty page answers the visitor's question worse than all.
   const recommended = React.useMemo(() => {
     if (!posts || !recommendedIds.length) return [];
-    // Base44's recommender names a post by its id, the chat function's by its slug.
-    const byKey = new Map<string, Article>(posts.flatMap((p) => [[p.id, p] as const, ...(p.slug ? [[p.slug, p] as const] : [])]));
+    // The chat function's recommender names a post by its slug, and only so.
+    const bySlug = new Map<string, Article>(posts.flatMap((p) => (p.slug ? [[p.slug, p] as const] : [])));
     return [...new Set(recommendedIds)]
-      .map((id) => byKey.get(id))
+      .map((slug) => bySlug.get(slug))
       .filter((p): p is Article => Boolean(p));
   }, [posts, recommendedIds]);
 

@@ -164,8 +164,8 @@ if has e2e; then
   done
   run_suite "e2e (web + iOS + Android)" npx playwright test \
     ${E2E_PROJECTS[@]+"${E2E_PROJECTS[@]}"} ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
-  # The bundle just tested has the fake Supabase host and `e2e-sanity-app`
-  # inlined — Vite seals them in at build time. dist/ is also what `vite
+  # The bundle just tested has the fake Supabase host inlined — Vite
+  # seals it in at build time. dist/ is also what `vite
   # preview` serves, so leaving it here hands the next person a site whose every
   # backend call fails,
   # reported on screen as the same "try again" line a real outage produces.

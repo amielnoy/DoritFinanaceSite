@@ -64,7 +64,7 @@ Two helpers do the work:
 | CTR-LED-013 | "rejects a payload with an unknown source or a stray field" | Exactly two issues: `source`, `utm_campaign` (negative control) |
 | CTR-BLG-001 | "the admin payload carries title and body and nothing undeclared" | `BlogAdmin` payload conforms |
 | CTR-BLG-002 | "publish toggles only flip the declared boolean field" | Every updated key is declared |
-| CTR-BLG-003 | "the public blog list filters on the published flag only" | One `filter` call, `{published}`, declared boolean |
+| CTR-BLG-003 | (retired 2026-10-29, Base44 exit B1 task 3: it read `Base44ContentService`, which is deleted) | — |
 | CTR-BLG-004 | "keeps the mirror-only fields off the BlogPost entity" | `slug` is not a BlogPost property |
 | CTR-TST-001 | "sends only declared fields and both required ones" | `Testimonial.create` conforms |
 | CTR-TST-002 | "keeps the rating inside the declared 1..5 range" | 5 valid; 6 and 0 rejected |
@@ -76,26 +76,28 @@ Two helpers do the work:
 
 ### 4.3 Backend function — `consultation-function.contract.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `consultation-function.contract.test.ts` is deleted; the Base44 `createConsultationEvent` call it pinned is gone.
+
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-FN-001 | "is issued by the lead adapter, so components never call it directly" | `invoke("createConsultationEvent"` appears in the adapter and in no component |
-| CTR-FN-002 | "the client sends exactly the fields the function reads" | Client keys ≡ the function's destructured body fields |
-| CTR-FN-003 | "the function's mandatory fields are the same as the Lead entity's" | Guard is on `name` and `phone`, matching `Lead.required` |
-| CTR-FN-004 | "returns 400 with an error message when name or phone is missing" | A 400 `Response.json({error})` exists |
-| CTR-FN-005 | "surfaces an upstream calendar failure as 502, not as a success" | `if (!res.ok)` → status 502 |
-| CTR-FN-006 | "catches unexpected errors as 500" | `catch (error)` → status 500 |
-| CTR-FN-007 | "returns `{ ok, eventId, htmlLink }` on success" | Success literal carries all three keys |
-| CTR-FN-008 | "every error response carries an `error` key" | ≥3 error responses, all with `error` |
-| CTR-FN-009 | "takes every calendar token from a connector, never from a literal" | Both connectors named in the provider table; token read as `getConnection(cal.connector)`; no secret literals |
-| CTR-FN-010 | "does not echo the access token back to the caller" | No `accessToken` in any `Response.json(...)` |
-| CTR-FN-011 | "uses declared connectors that exist in the repo" | `outlook.jsonc` and `googlecalendar.jsonc` both present |
-| CTR-FN-012 | "asks Outlook for the scope it actually needs" | `outlook.jsonc` carries `Calendars.ReadWrite` |
-| CTR-FN-013 | "both calendars are reached through one function, not two" | One payload; one `invoke`; **no** `invoke("createOutlookEvent"` anywhere in the adapter |
-| CTR-FN-014 | "writes to Outlook and Google, Outlook first" | Default provider list is `outlook,google` |
-| CTR-FN-015 | "gives each calendar the timezone name it understands" | `Israel Standard Time` for Graph, `Asia/Jerusalem` for Google |
-| CTR-FN-016 | "reads the event link under each calendar's own name" | `data.webLink` and `data.htmlLink` |
-| CTR-FN-017 | "one calendar failing does not lose the other" | The loop `continue`s; the 502 is conditioned on `created.length === 0` |
-| CTR-FN-018 | "refuses rather than reporting success when no calendar is configured" | `PROVIDERS.length === 0` → 500 |
+| CTR-FN-001 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-002 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-003 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-004 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-005 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-006 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-007 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-008 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-009 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-010 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-011 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-012 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-013 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-014 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-015 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-016 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-017 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
+| CTR-FN-018 | (retired 2026-10-29, Base44 exit B1 task 3: the Base44 `createConsultationEvent` function it pins is no longer called by the site) | — |
 
 `CTR-FN-013..018` exist because the two calendars differ in five small,
 trap-shaped ways, and every one of them fails *silently* when it is wrong: the
@@ -118,6 +120,8 @@ and data-minimisation rule, the complaint and privacy-request routes, the
 "never guess — escalate" default, and the fallback phone and email), that
 `escalateToHuman` is wired as a tool, that the prompt opens by disclosing it is
 automated, and that no agent is granted an entity operation beyond its job.
+
+**Retired 2026-10-29** — Base44 exit B1 task 5: the case "and something runs the bank against the deployed agent" read `tests/eval/procedures-agent.eval.test.ts` for two scenarios (23, no opinion under pressure; 24, stops offering דורית when asked to), and that file is deleted with the Base44 agent evals. It is not re-pointed at `tests/eval/chat/personas.json`: the six `procedures_agent` personas there (`proc-01..06`) have no zone field and no equivalent of scenarios 23 and 24, so a case asserting them would claim coverage that does not exist. The gap is recorded in [14-procedures-zones](14-procedures-zones.md) §4.
 
 One case there is about reachability rather than compliance: every agent must
 carry `allow_anonymous_access: true`. All three sit on public pages, and Base44
@@ -336,10 +340,9 @@ about application data. They exist because each covers something that fails
 grepped. No job may upload two artifacts under one name (a real 409 that failed a
 run after the whole battery had passed), every Vitest suite on disk must be run
 by some job, and no job may depend on or read an output from a job that does not
-declare it. It also forbids a build that strips `VITE_BASE44_APP_ID` from writing
-the default `dist/` in any job that uploads `dist` — that arrangement shipped a
-bundle whose app id inlined to `undefined` as the artifact all ten e2e shards
-tested, and the suite stayed green because the fixture stubs `**/api/**`.
+declare it. (The case that forbade a build stripping `VITE_BASE44_APP_ID` from writing
+the default `dist/` is retired 2026-10-29, Base44 exit B1 task 3: the Builder-build
+step and the variable are gone.)
 Since articles are prebuilt, the nightly run is no longer deploy-free: CTR-REB-001
 requires `deploy-vercel` and `deploy-supabase` to run on `schedule` (the functions
 first, because `--prod` waits for them), and a companion case keeps the Base44
@@ -379,13 +382,9 @@ that "behind the tests" while a red run still reached `--prod`. A companion case
 pins that a red run *does* still deploy, as a preview — staging on red is the
 point of staging, and a later fix must not buy the gate by removing it.
 
-Two cases pin that the Vercel build gets the project's own app id (A-76). The
-workflow sets `VITE_BASE44_APP_ID=e2e-sanity-app` globally for the e2e bundle,
-and a process variable outranks what `vercel pull` writes, so every Vercel
-deploy shipped a bundle posting to `/api/apps/e2e-sanity-app/...`. One case
-requires the "Build for Vercel" step to drop the variable before `vercel build`;
-the other requires the step to refuse a bundle under `.vercel/output` that still
-names the placeholder.
+The two cases that pinned the Vercel build's app id (A-76) are retired 2026-10-29
+(Base44 exit B1 task 3): `VITE_BASE44_APP_ID` is no longer set by the workflow,
+so there is no placeholder to drop or to refuse.
 
 The "waits for the new release to be served" case also pins how long that wait
 can be. The Vercel job records the bundle it is deploying to production (step
@@ -415,6 +414,8 @@ one of them.
 host out must be one the build rewrites. `index.html` was missing from that list,
 so a host move shifted the sitemap and left the served document advertising the
 old origin in its canonical tag, `og:url` and two static JSON-LD blocks.
+
+**`vercel-functions.contract.test.ts`, no Base44 host.** "no rewrite or header names a base44.app host": `JSON.stringify(vercel.json)` has no `base44.app` (Base44 exit B1 task 4 removed the `/api` rewrite and the CSP `connect-src` origins). Retired the same day: canonical-host's "still points the API rewrite at Base44, which is a backend address and not the canonical host" (the rewrite is gone; the sibling case now also asserts `/api/:path*` is absent).
 
 **`vercel-functions.contract.test.ts`, old article addresses.** Every
 `/blog/<24 hex>` — a Base44 id, what article links were before slugs — must be
@@ -461,8 +462,8 @@ starred fields, so a new starred field is covered without listing it.
 **`site-hardening.contract.test.ts`.** D-18. Pages answered
 `access-control-allow-origin: *`, Vercel's default for static files. A
 vercel.json rule now sets it to `https://govari-fin.co.il` on everything but
-`/assets/`, `/fonts/` and `/api/` (the Base44 rewrite and the og and
-csp-report functions answer for themselves), and no rule hands out `*`.
+`/assets/`, `/fonts/` and `/api/` (the og and
+csp-report functions answer for themselves; the Base44 rewrite was removed 2026-10-29, Base44 exit B1 task 4), and no rule hands out `*`.
 `public/.well-known/security.txt` exists with a contact on the site's domain,
 a canonical address, and an `Expires` in the future and at most a year out.
 That case fails once the date passes, on purpose: renew the file a year ahead.
@@ -472,22 +473,13 @@ needs. `package.json` `engines.node` is `>=22.12.0` (Vite 8's floor), the
 lockfile's root entry agrees, `.nvmrc` names the major that `ci.yml`'s
 `NODE_VERSION` runs, and that major meets the floor.
 
-**`base44-backend.contract.test.ts`** — the Vite plugin that lets a locally built
-bundle reach a real backend. The app id falls back to the linked app only when
-the environment supplies none, never overriding it; a checkout with no
-`base44/.app.jsonc` stays silent, which is what keeps CI's "build the way the
-Builder does" guard meaningful; and the `/api` preview proxy stays opt-in,
-because `npm run test:e2e` serves the site from that same preview server and is
-hermetic only while every `/api` call is stubbed. Two more cover the analytics
-beacon: `<Analytics />` must be mounted behind a flag `vite.config.js` derives
-from Vercel's own `VERCEL`, not from a variable set per environment — a hand-set
-flag fails by being left on in a Base44 build, which is the state it replaces
-(A-43). Two further cases close the
-other end of that arrangement: the e2e build seals `e2e-sanity-app` into `dist/`,
-and `dist/` is what `vite preview` serves, so `npm run preview` must rebuild
-before serving and `scripts/run-tests.sh` must discard the bundle it built. A
-preview left on that artifact 404s every backend call and reports it as the one
-line a real outage produces — "מצטערת, לא הצלחתי לשלוח את ההודעה כרגע".
+**`base44-backend.contract.test.ts`** — retired 2026-10-29 (Base44 exit B1 task 3):
+the Vite plugin it pinned (the linked app id, the opt-in `/api` preview proxy) is
+deleted. Its four cases that were not about Base44 moved to
+**`vite-build.contract.test.ts`**: `npm run preview` rebuilds before serving,
+`scripts/run-tests.sh` discards the e2e bundle once the suite has run, and
+`<Analytics />` is mounted only behind a flag `vite.config.js` derives from
+Vercel's own `VERCEL` (A-43), not from a variable set per environment.
 
 **`carriers.contract.test.ts`** — every insurer link resolves to a domain that
 exists, and each carrier's name and URL agree.
@@ -525,10 +517,12 @@ selected by tag, not skipped by a condition callback (A-68).
 
 ### 4.5 Base44 SDK parity — `sdk-version.contract.test.ts`
 
+**Retired 2026-10-29** — Base44 exit B1 task 3: `sdk-version.contract.test.ts` is deleted with `@base44/sdk`.
+
 | ID | Title | Expected result |
 |---|---|---|
-| CTR-SDK-001 | "finds at least one function pin" | At least one `npm:@base44/sdk@<version>` import under `base44/functions` |
-| CTR-SDK-002 | "`<function>` pins the SDK version the lockfile installs" (one per function) | Pinned version equals `package-lock.json`'s `node_modules/@base44/sdk` version — what `npm ci` installs, unlike a local `node_modules` an earlier install may have left. Functions pick up a bump only on the next Base44 publish. |
+| CTR-SDK-001 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK is no longer a dependency, so there is no pin to compare) | — |
+| CTR-SDK-002 | (retired 2026-10-29, Base44 exit B1 task 3: the SDK is no longer a dependency, so there is no pin to compare) | — |
 
 ### 4.6 Self-hosted fonts — `fonts.contract.test.ts`
 
@@ -679,7 +673,7 @@ The interview's tools ask the model for nothing their Edge handlers do not read,
 | CTR-CHFN-004 | "is public, like the forms, and registered" | `config.toml` has `[functions.chat]` with `verify_jwt = false` |
 | CTR-CHFN-005 | "enforces the same limits the page states" | The handler's `MAX_MESSAGE_CHARS` and `MAX_TURNS` equal the page's |
 | CTR-CHFN-006 | "accepts no consent version longer than submit-lead's column holds" | `MAX_CONSENT_VERSION_CHARS` equals `LEAD_FIELD_LIMITS.consent_version` in `submit-lead/lead.js` |
-| CTR-CHFN-008 | "stamps every conversation with the consent version it was given under" (changed pin, `agents.contract.test.ts`) | `consent_version: consentVersion`, chosen as `viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION` |
+| CTR-CHFN-008 | "stamps every conversation with the consent version it was given under" (changed pin, `agents.contract.test.ts`) | `consent_version: consentVersion`, with `const consentVersion = CHAT_FUNCTION_CONSENT_VERSION;` (2026-10-29, Base44 exit B1 task 2: every agent is on the chat function, so v6 always; was `viaChatFunction ? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION`) |
 | CTR-CHFN-007 | "sends only fields the function reads" | Every key the browser adapter posts, on the first and the following message, is read by `handler.ts` as `input.<key>` |
 | CTR-CHFN-009 | "sends only fields log-support-chat reads, and never a phone" (the sheet-log sweep → log-support-chat) | `channel` and every key of `sheetRow()`'s output are destructured by `log-support-chat/handler.ts`; no `phone` key |
 | CTR-CHFN-010 | "files only outcomes log-support-chat knows, so none lands as 'לא ידוע'" | `SHEET_OUTCOMES` equals the keys of `OUTCOMES` in `log-support-chat/handler.ts` |
@@ -921,7 +915,7 @@ from one file, `e2e/build-env.ts`, by `npm run build:e2e`, and these keep it so.
 | ID | Title | Expected result |
 |---|---|---|
 | CTR-E2E-001 | "points Supabase at a host that can never resolve" | `VITE_SUPABASE_URL` is `https://` on a `.invalid` host (RFC 2606), and a publishable key is set |
-| CTR-E2E-002 | "switches on what production switches on" | `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`, `VITE_UPLOAD_PROVIDER`, `VITE_CONTENT_IMAGES` = `supabase`; `VITE_MEETINGS_STAFF=true`; `VITE_AGENCY_CONTENT=true` (an approved deviation from mirroring production, where it is off: the read side runs in every spec and E2E-AGC-* compares it with the bundled render); `VITE_MASLEKA_ENABLED` and `VITE_MEETINGS_CLIENT` empty (E2E-MSK-* assert the dark build); `VITE_BASE44_APP_BASE_URL` empty; `VITE_CHAT_AGENTS` is exactly `CHAT_FUNCTION_AGENTS` |
+| CTR-E2E-002 | "switches on what production switches on" | `VITE_MEETINGS_STAFF=true`; `VITE_AGENCY_CONTENT=true` (an approved deviation from mirroring production, where it is off: the read side runs in every spec and E2E-AGC-* compares it with the bundled render); `VITE_MASLEKA_ENABLED` and `VITE_MEETINGS_CLIENT` empty (E2E-MSK-* assert the dark build). (2026-10-29, Base44 exit B1: the four provider switches are gone — the composition root wires Supabase alone; task 2: `VITE_CHAT_AGENTS` is gone too — every agent is on the chat function.) |
 | CTR-E2E-003 | "is built from that one file by every entry point" | `scripts/build-e2e.mjs` applies it over the process environment; `playwright.config.ts` builds with `npm run build:e2e` and gives the preview the same env; `scripts/run-tests.sh` runs `npm run build:e2e` and exports no `VITE_*` and no fixture of its own (CI's job: CTR-REB-004) |
 | CTR-E2E-004 | "answers the fake host only, so a deployment's reads stay live" | The fixture's Supabase route matches the fake origin, or a `/functions/v1/` path on any host; the prerender's matches the fake origin alone |
 

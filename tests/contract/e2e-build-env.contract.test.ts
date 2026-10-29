@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { E2E_BUILD_ENV, E2E_SUPABASE_URL } from "../../e2e/build-env";
-import { CHAT_FUNCTION_AGENTS } from "@/config/chat-agents";
 import { REPO_ROOT } from "../helpers/entity-schema";
 
 /**
@@ -41,18 +40,11 @@ describe("the e2e build", () => {
     // side runs in every spec and e2e/ui/agency-content.spec.ts can hold the
     // seeded render to the bundled one; the production smoke covers it off.
     expect(E2E_BUILD_ENV).toMatchObject({
-      VITE_LEAD_FUNCTIONS: "supabase",
-      VITE_CONTENT_WRITES: "supabase",
-      VITE_UPLOAD_PROVIDER: "supabase",
-      VITE_CONTENT_IMAGES: "supabase",
       VITE_MEETINGS_STAFF: "true",
       VITE_MASLEKA_ENABLED: "",
       VITE_MEETINGS_CLIENT: "",
       VITE_AGENCY_CONTENT: "true",
-      VITE_BASE44_APP_BASE_URL: "",
     });
-    // Every agent the chat function can serve, so no chat in the suite runs on Base44.
-    expect(E2E_BUILD_ENV.VITE_CHAT_AGENTS.split(",").sort()).toEqual([...CHAT_FUNCTION_AGENTS].sort());
   });
 
   it("is built from that one file by every entry point (CTR-E2E-003)", () => {

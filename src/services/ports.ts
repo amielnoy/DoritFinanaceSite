@@ -82,8 +82,6 @@ export interface SubmissionReceipt {
 export interface LeadPort {
   submitLead(lead: Lead): Promise<SubmissionReceipt>;
   submitClaim(report: ClaimReport): Promise<SubmissionReceipt>;
-  /** Best-effort calendar holds. Failure here must never fail a submission. */
-  requestConsultationEvent(lead: Lead): Promise<void>;
   /**
    * The close of an interview, submitted by the page rather than by the agent.
    *

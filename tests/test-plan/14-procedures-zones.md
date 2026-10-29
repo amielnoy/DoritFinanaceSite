@@ -2,7 +2,7 @@
 
 **Agent:** `base44/agents/procedures_agent.jsonc` · **Chat:** bottom of `/tools`
 **Pinned by:** `tests/contract/agents.contract.test.ts` (the prompt says it)
-**Exercised by:** `tests/eval/procedures-agent.eval.test.ts` (the model does it)
+**Exercised by:** `npm run test:eval:chat`, six `procedures_agent` personas in `tests/eval/chat/personas.json` (`proc-01..06`) — a partial cover of the bank, see §4
 
 ---
 
@@ -121,6 +121,11 @@ Copy this block, date it, and fill the rows that were run.
 
 The prompt is live: CI's `base44 deploy` shipped it with #100, and a pull of the
 live definition on 2026-10-06 matched the repo. No round has been recorded yet. The bank is written and the contract cases pin the prompt;
-nothing yet observes the model. That gap is the point of §4 and of
-`tests/eval/procedures-agent.eval.test.ts`, which runs the load-bearing rows
-against the deployed agent once it is live.
+nothing yet observes the model. That gap is the point of §4. The Vitest eval that
+drove rows 23 and 24 against the Base44 agent is deleted (2026-10-29, Base44 exit B1
+task 5). `npm run test:eval:chat` now plays six procedures personas against the
+`chat` function (`proc-01..06`: how-to answers, a pasted balance with a request for a
+recommendation, an ID and policy number, a request for דורית herself). They carry
+no zone field and map to the bank only loosely (green how-to rows; red and black
+hand-offs), and nothing in them is rows 23 or 24 — personas to add to `personas.json`
+when the bank is next run.

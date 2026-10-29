@@ -11,7 +11,6 @@ import { describe, expect, it, vi } from "vitest";
  * leads' own — and in the header's "ניהול" menu. VITE_MEETINGS_STAFF only.
  */
 
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 vi.mock("@/lib/AuthContext", () => ({
   useAuth: () => ({ user: { id: "u1", email: "d@example.com", role: "admin" }, isAuthenticated: true, logout: () => {} }),
 }));

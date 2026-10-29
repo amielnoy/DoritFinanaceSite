@@ -142,11 +142,12 @@ describe("SupabaseLeadAdminService — claim-document links and assignment (agen
     });
   });
 
-  it("returns a Base44 file URL unchanged, asking nobody", async () => {
+  it("a document ref outside claim-documents is refused", async () => {
     const { client } = tableFake({ data: [], error: null });
     const f = functionsOf({ data: null, error: null });
-    const url = "https://base44.app/api/files/tz.pdf";
-    expect(await new SupabaseLeadAdminService(client, f.client, token).documentLink(url, LEAD)).toBe(url);
+    await expect(
+      new SupabaseLeadAdminService(client, f.client, token).documentLink("https://base44.app/api/files/tz.pdf", LEAD),
+    ).rejects.toThrow("לא ניתן לפתוח את המסמך");
     expect(f.invoke).not.toHaveBeenCalled();
   });
 

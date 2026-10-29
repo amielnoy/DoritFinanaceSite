@@ -387,9 +387,9 @@ describe("the procedures agent", () => {
  * what `MANDATORY_CLAUSES` is — and wrong for rationale, where it only means
  * that rewording a paragraph for clarity costs a red build and buys nothing.
  *
- * The bank these were written against is `tests/test-plan/14-procedures-zones.md`,
- * and `tests/eval/procedures-agent.eval.test.ts` runs its load-bearing rows
- * against the deployed agent. This file only proves the prompt still says it.
+ * The bank these were written against is `tests/test-plan/14-procedures-zones.md`.
+ * This file only proves the prompt still says it; the model doing it is
+ * `npm run test:eval:chat`, by hand, against the deployed chat function.
  */
 describe("the procedures agent sorts by one test, then by four zones", () => {
   const prompt = loadAgent("procedures_agent").instructions;
@@ -504,15 +504,6 @@ describe("the procedures agent sorts by one test, then by four zones", () => {
     // Somewhere to put what the agent actually answered.
     expect(bank).toMatch(/What the agent actually answered/);
   });
-
-  it("and something runs the bank against the deployed agent", () => {
-    // The prompt saying it and the model doing it are different claims, and
-    // this file can only make the first one.
-    const evals = read(join(REPO_ROOT, "tests/eval/procedures-agent.eval.test.ts"));
-    expect(evals).toMatch(/openConversation\("procedures_agent"\)/);
-    expect(evals).toMatch(/gives no opinion under pressure/);
-    expect(evals).toMatch(/stops offering דורית when asked to/);
-  });
 });
 
 describe("escalation reasons agree across prompt, entity and UI config", () => {
@@ -603,10 +594,10 @@ describe("the chat shell enforces what a prompt cannot", () => {
   });
 
   it("stamps every conversation with the consent version it was given under", () => {
-    // The shell chooses the stamp — v5, or v6 for an agent on the chat
+    // The shell chooses the stamp — v6, every agent being on the chat
     // function — from its own constants; never from the conversation.
     expect(chat).toMatch(/consent_version: consentVersion/);
-    expect(chat).toMatch(/const consentVersion = viaChatFunction \? CHAT_FUNCTION_CONSENT_VERSION : CONSENT_VERSION;/);
+    expect(chat).toMatch(/const consentVersion = CHAT_FUNCTION_CONSENT_VERSION;/);
   });
 });
 

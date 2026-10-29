@@ -105,7 +105,6 @@ env:
   # out of sync, and any install would silently skip the cooldown the policy
   # exists to enforce. Pin the client that honours it.
   NPM_VERSION: "12"
-  VITE_BASE44_APP_ID: e2e-sanity-app
 
 jobs:
   # ── 1. Install + static checks + build ────────────────────────────────────
@@ -153,10 +152,6 @@ jobs:
       # with. The fixture is refused in any Vercel build and for any other
       # Supabase host (scripts/published-articles.mjs); workflow.contract.test.ts
       # keeps build:e2e out of every other job.
-      #
-      # The Base44-builder guard below deliberately stays on the plain `build`:
-      # that is the command Base44 runs, and prerendering it would test a build
-      # nobody performs.
       - name: Install the browser the prerender step drives
         uses: ./.github/actions/playwright-browser
 
@@ -166,27 +161,6 @@ jobs:
           # plain bundle that fails the prerender suite three jobs later.
           PRERENDER_REQUIRED: "1"
         run: npm run build:e2e
-
-      # Publishing from the Base44 dashboard stays supported, so the build has to
-      # keep working without anything this workflow supplies. CI sets
-      # VITE_BASE44_APP_ID globally and Vercel adds VITE_SITE_URL, which means the
-      # build above proves nothing about the Builder's environment — a step that
-      # started requiring either of them would pass here and fail there, after a
-      # publish, on production.
-      #
-      # `env -u` rather than a separate job: same checkout, a few seconds, and it
-      # fails next to the build it is guarding.
-      #
-      # `--outDir` is not tidiness. Without it this wrote over `dist/`, and the
-      # upload below then shipped *this* bundle as the `dist` artifact — the one
-      # every e2e shard downloads. Since the point of the step is to strip
-      # VITE_BASE44_APP_ID, the whole suite was running against a bundle whose
-      # app id inlined to `undefined`, posting every form to
-      # `/api/apps/undefined/...`, and staying green only because
-      # e2e/fixtures/app.ts stubs `**/api/**` and never looks at the app id.
-      # The guard for a build must not be able to become the build.
-      - name: Build the way the Base44 Builder does (no CI environment)
-        run: env -u VITE_BASE44_APP_ID -u VITE_SITE_URL -u VERCEL -u CI npm run build -- --outDir dist-builder-check
 
       - name: Upload build output
         uses: actions/upload-artifact@v4
@@ -242,13 +216,6 @@ jobs:
 
       - name: Static security tests
         run: npm run test:security
-
-      # Prompt-adherence evals against the live agent. Every case is skipped
-      # unless EVAL_BASE44_APP_ID and EVAL_BASE44_TOKEN are set, which CI does
-      # not set: a completed interview would mail דורית and write a real lead.
-      # The step runs so the suite stays compiled and its skip stays visible.
-      - name: Agent evals (skipped without credentials)
-        run: npm run test:eval
 
       - name: Upload JUnit report
         if: always()
@@ -662,24 +629,12 @@ jobs:
           # pages. A preview warns and goes on (scripts/published-articles.mjs).
           PRERENDER_REQUIRED: ${{ steps.target.outputs.env == 'production' && '1' || '0' }}
         run: |
-          # The workflow-wide VITE_BASE44_APP_ID is the e2e placeholder, and a
-          # process variable outranks what `vercel pull` writes — so without
-          # this every Vercel deploy shipped a bundle posting to
-          # /api/apps/e2e-sanity-app/... ("App not found"). Drop it and let the
-          # project's own value, pulled below, through (A-76).
-          unset VITE_BASE44_APP_ID
           npx vercel link --yes --project "$PROJECT" --scope "$SCOPE" --token "$VERCEL_TOKEN"
           npx vercel pull --yes --environment=${{ steps.target.outputs.env }} --scope "$SCOPE" --token "$VERCEL_TOKEN"
           npx vercel build ${{ steps.target.outputs.prod }} --token "$VERCEL_TOKEN"
-          # Belt and braces: a bundle that still names the placeholder never ships.
-          if grep -rlq "e2e-sanity-app" .vercel/output/static; then
-            echo "::error::The Vercel bundle still carries the e2e app id (e2e-sanity-app) — refusing to deploy it."
-            exit 1
-          fi
           # The CSP is enforced and allows inline scripts by hash only. One whose
-          # text changed (the gtag snippet, or the Base44 plugin's page-view
-          # logger with its baked-in app id) would be refused without a sound.
-          # Fatal for production; a preview only warns, since its app id may differ.
+          # text changed (the gtag snippet, say) would be refused without a sound.
+          # Fatal for production; a preview only warns.
           if [ "${{ steps.target.outputs.env }}" = production ]; then
             node scripts/check-csp-hashes.mjs .vercel/output/static
           else

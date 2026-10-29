@@ -292,11 +292,11 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
 
   /**
    * A storage reference signed for five minutes by claim-document-link, for
-   * whoever may see the lead it belongs to. Anything else (a Base44 file URL
-   * from before the switch) is returned as it is.
+   * whoever may see the lead it belongs to. Any other reference is refused:
+   * no Base44 file URL exists in production data.
    */
   async documentLink(ref: string, leadId: string): Promise<string> {
-    if (!ref.startsWith(CLAIM_DOCUMENT_REF_PREFIX)) return ref;
+    if (!ref.startsWith(CLAIM_DOCUMENT_REF_PREFIX)) throw new Error("לא ניתן לפתוח את המסמך");
     const answer = await this.call("claim-document-link", { leadId, path: ref.slice(CLAIM_DOCUMENT_REF_PREFIX.length) });
     if (typeof answer.url !== "string" || !answer.url) throw new Error("לא ניתן לפתוח את המסמך");
     return answer.url;

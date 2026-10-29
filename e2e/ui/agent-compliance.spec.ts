@@ -26,9 +26,9 @@ const handoffForm = (section: Locator) =>
 const INTERVIEW = "#start";
 
 /**
- * Where the chats talk to: the `chat` Edge Function for every agent production
- * serves from it (VITE_CHAT_AGENTS, e2e/build-env.ts), one POST per message,
- * and `escalate-to-human` for the hand-off (src/services/supabase/).
+ * Where the chats talk to: the `chat` Edge Function, which serves every agent,
+ * one POST per message, and `escalate-to-human` for the hand-off
+ * (src/services/supabase/).
  */
 const CHAT = "/functions/v1/chat";
 const HANDOFF = "/functions/v1/escalate-to-human";

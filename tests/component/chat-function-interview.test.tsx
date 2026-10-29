@@ -3,8 +3,8 @@
  *
  * The interview on the chat function: consent v6, the reply through the
  * adapter, the lead saved by the function (no fenced block), and Dorit's
- * channels when the function cannot answer. Agents NOT served by the function
- * keep v5 and the 20 s watchdog.
+ * channels when the function cannot answer. Every agent is on the function
+ * (Base44 exit B1): no v5 notice, no 20 s watchdog.
  */
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -15,25 +15,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 if (!("scrollTo" in Element.prototype)) {
   Object.defineProperty(Element.prototype, "scrollTo", { value: () => undefined, writable: true });
 }
-vi.mock("@/lib/app-params", () => ({ appParams: { token: "" } }));
 vi.mock("framer-motion", async () => {
   const R = await import("react");
   const passthrough = new Proxy({}, { get: (_t, tag: string) => ({ children, ...props }: any) => R.createElement(tag, props, children) });
   return { motion: passthrough, AnimatePresence: ({ children }: any) => R.createElement(R.Fragment, null, children), useReducedMotion: () => true };
 });
-vi.mock("@/config/chat-agents", () => ({
-  CHAT_FUNCTION_AGENTS: ["needs_interview"],
-  CHAT_AGENTS: new Set(["needs_interview"]),
-  parseChatAgents: () => new Set(["needs_interview"]),
-  servedByChatFunction: (agent: string) => agent === "needs_interview",
-}));
 
 const invoke = vi.fn();
 /** Every agents.start call: the agent and the conversation metadata it was given. */
 const starts: [string, Record<string, unknown>][] = [];
 const submitInterview = vi.fn(async () => ({ ok: true }));
-/** What a Base44 agent's send does here: accepted, and no reply ever comes. */
-const base44Send = vi.fn(async () => undefined);
+/** A send that ignores its abort signal, for the panel's own guard; null = the adapter's. */
+let deafSend: (() => Promise<void>) | null = null;
 vi.mock("@/services", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services")>();
   const { SupabaseAgentService } = await import("@/services/supabase/SupabaseAgentService");
@@ -41,11 +34,11 @@ vi.mock("@/services", async (importOriginal) => {
   const agents = {
     start: async (agent: string, meta: Record<string, unknown>) => {
       starts.push([agent, meta]);
-      return agent === "needs_interview" ? chat.start(agent, meta) : { id: "b44_1" };
+      return chat.start(agent, meta);
     },
     send: async (conv: { id: string }, text: string, options?: { signal?: AbortSignal }) =>
-      conv.id === "b44_1" ? base44Send() : chat.send(conv, text, options),
-    subscribe: (id: string, cb: (m: any[]) => void) => (id === "b44_1" ? () => undefined : chat.subscribe(id, cb)),
+      deafSend ? deafSend() : chat.send(conv, text, options),
+    subscribe: (id: string, cb: (m: any[]) => void) => chat.subscribe(id, cb),
   };
   return {
     ...actual,
@@ -53,9 +46,9 @@ vi.mock("@/services", async (importOriginal) => {
   };
 });
 
-const { default: AgentChat, NO_REPLY_TIMEOUT_MS } = await import("@/components/dorit/chat/AgentChat");
+const { default: AgentChat } = await import("@/components/dorit/chat/AgentChat");
 const { AGENTS } = await import("@/config/agents");
-const { CHAT_FUNCTION_CONSENT_POINTS, CHAT_FUNCTION_CONSENT_VERSION, CONSENT, CONSENT_VERSION, HUMAN_HANDOFF } = await import("@/config/compliance");
+const { CHAT_FUNCTION_CONSENT_POINTS, CHAT_FUNCTION_CONSENT_VERSION, HUMAN_HANDOFF } = await import("@/config/compliance");
 const { LEAD_SAVED_WITHOUT_REPLY } = await import("@/services/agent-errors");
 const { leadEvents } = await import("@/lib/analytics");
 const { CHAT_REQUEST_TIMEOUT_MS, STATUS_POLL_MS, STATUS_RECOVERY_MS } = await import("@/services/supabase/SupabaseAgentService");
@@ -87,7 +80,6 @@ describe("the interview on the chat function", () => {
   beforeEach(() => {
     invoke.mockReset();
     submitInterview.mockClear();
-    base44Send.mockClear();
   });
 
   it("shows the v6 notice", () => {
@@ -165,55 +157,32 @@ describe("the interview on the chat function", () => {
   });
 });
 
-describe("agents not served by the chat function", () => {
-  it("open their Base44 conversation with main's metadata only, no attribution keys (dark means byte-exact)", async () => {
-    starts.length = 0;
-    await startAndSendSync(AGENTS.support);
-    const [agent, meta] = starts.at(-1)!;
-    expect(agent).toBe(AGENTS.support.agent);
-    expect(Object.keys(meta).sort()).toEqual(["consent_at", "consent_version", "description", "name"]);
-    expect(meta).toMatchObject({ name: AGENTS.support.conversationName, description: AGENTS.support.conversationDescription, consent_version: CONSENT_VERSION });
-  });
-
+describe("the conversation's metadata", () => {
   it("while the interview on the chat function sends its attribution", async () => {
     starts.length = 0;
     invoke.mockResolvedValue({ data: { ok: true, conversationId: "s1", token: "t".repeat(64), reply: "שלום", leadSaved: false }, error: null });
     await startAndSendSync(AGENTS.needsInterview);
     expect(Object.keys(starts.at(-1)![1]).sort()).toEqual(["campaign", "channel", "consent_at", "consent_version", "description", "landing_path", "name"]);
   });
-
-  it("keep the v5 notice, byte for byte", () => {
-    render(<MemoryRouter><AgentChat descriptor={AGENTS.support} /></MemoryRouter>);
-    const points = AGENTS.support.consentPoints ?? CONSENT.points;
-    for (const point of points) expect(screen.getByText(point)).toBeTruthy();
-    expect(screen.queryByText(CHAT_FUNCTION_CONSENT_POINTS[3])).toBeNull();
-  });
 });
 
-describe("the no-reply watchdog", () => {
+describe("a slow reply", () => {
   beforeEach(() => {
     invoke.mockReset();
-    base44Send.mockClear();
     vi.useFakeTimers();
   });
   afterEach(() => vi.useRealTimers());
 
-  it("stays off for an agent on the chat function, even when the reply takes longer than 20 s", async () => {
+  it("is waited for with no apology, even when it takes longer than 20 s", async () => {
     invoke.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({ data: { ok: true, conversationId: "s1", token: "t".repeat(64), reply: "תשובה איטית", leadSaved: false }, error: null }), NO_REPLY_TIMEOUT_MS + 5_000)),
+      () => new Promise((resolve) => setTimeout(() => resolve({ data: { ok: true, conversationId: "s1", token: "t".repeat(64), reply: "תשובה איטית", leadSaved: false }, error: null }), 25_000)),
     );
     await startAndSendSync(AGENTS.needsInterview);
-    await act(async () => vi.advanceTimersByTimeAsync(NO_REPLY_TIMEOUT_MS + 1_000));
-    expect(screen.queryByText(/לא התקבלה כראוי/)).toBeNull();
+    await act(async () => vi.advanceTimersByTimeAsync(21_000));
+    expect(screen.queryByText(/מצטערת/)).toBeNull();
     await act(async () => vi.advanceTimersByTimeAsync(5_000));
     expect(screen.getByText("תשובה איטית")).toBeTruthy();
-  });
-
-  it("still fires for a Base44 agent whose reply never comes", async () => {
-    await startAndSendSync(AGENTS.support);
-    expect(base44Send).toHaveBeenCalledTimes(1);
-    await act(async () => vi.advanceTimersByTimeAsync(NO_REPLY_TIMEOUT_MS));
-    expect(screen.getByText(/לא התקבלה כראוי/)).toBeTruthy();
+    expect(screen.queryByText(/מצטערת/)).toBeNull();
   });
 });
 
@@ -250,7 +219,7 @@ describe("a turn still running when the adapter stops waiting", () => {
 describe("a reset while a message is on its way", () => {
   beforeEach(() => {
     invoke.mockReset();
-    base44Send.mockReset();
+    deafSend = null;
   });
 
   it("aborts the chat function's request and leaves the new conversation clean and usable", async () => {
@@ -275,7 +244,7 @@ describe("a reset while a message is on its way", () => {
 
   it("ignores what an earlier conversation's send ends with, even from an adapter that cannot abort", async () => {
     let fail: (e: Error) => void = () => undefined;
-    base44Send.mockImplementationOnce(() => new Promise((_resolve, reject) => (fail = reject)));
+    deafSend = () => new Promise((_resolve, reject) => (fail = reject));
     const user = userEvent.setup();
     render(<MemoryRouter><AgentChat descriptor={AGENTS.support} /></MemoryRouter>);
     await user.click(screen.getByRole("checkbox"));

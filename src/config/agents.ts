@@ -13,7 +13,7 @@ import { BLOG_RECOMMENDER_CONSENT_POINTS, PROCEDURES_CONSENT_POINTS,
  * first meeting was never a separate errand from being interviewed for one —
  * the visitor had already answered six questions before meeting a second chat
  * that asked for their name again. The interview now closes the meeting itself;
- * see the scheduling step in `base44/agents/needs_interview.jsonc`. Everything that genuinely differed between
+ * see the scheduling step in `supabase/functions/chat/prompts/interview.md`. Everything that genuinely differed between
  * NeedsInterviewChat, BookingAssistantChat and BlogRecommenderChat is here;
  * everything they shared now lives once, in <AgentChat />.
  */
@@ -59,9 +59,8 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
    * The other two chats each want something from the visitor: one interviews
    * them, one recommends reading. Someone who arrives with a plain question —
    * what is a קרן השתלמות, what happens at the first meeting — had nowhere to
-   * ask it and had to start an interview to find out. This is the same agent
-   * that answers on WhatsApp, so the answer is the same answer wherever it is
-   * asked; see `base44/agents/support_agent.jsonc`.
+   * ask it and had to start an interview to find out. See
+   * `supabase/functions/chat/prompts/support.md`.
    */
   /**
    * The procedures chat.
@@ -76,7 +75,7 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
    * The prompt sorts every question by one test before it sorts it by subject:
    * **would the answer change depending on who is asking?** If age, salary,
    * balance or health would change it, it is a personal recommendation and it
-   * is דורית's. The four zones in `base44/agents/procedures_agent.jsonc` are
+   * is דורית's. The four zones in `supabase/functions/chat/prompts/procedures.md` are
    * that test applied to the cases that actually arrive;
    * `tests/test-plan/14-procedures-zones.md` is the bank they were written
    * against.

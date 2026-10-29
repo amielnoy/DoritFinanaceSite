@@ -332,39 +332,7 @@ dashboard publish is broken even though everything else is green.
 The Builder has its own environment, set only in its dashboard. It no longer needs
 `VITE_SITE_URL`: the default is the production domain (step 4). Leave the variable unset
 there, or set it to `https://govari-fin.co.il` — never to the Base44 host, which would
-make that copy canonical again and switch its redirect off (the redirect will not send a
-visitor to the host they are already on).
-
-### The old Base44 host
-
-Base44 keeps serving a complete copy of the site at `safe-arch-plan.base44.app`, and it
-cannot answer that copy with a `301`. Its site config has four fields — install, build,
-serve and output directory — and nothing for routes, redirects or headers; the CLI's
-deploy, when it meets a `_redirects` or `_headers` file, warns that they are "not
-supported yet" and ignores them. So a page booted on that host deals with it itself,
-first thing in `main.jsx` (`src/lib/legacy-host.ts`, `src/lib/legacy-host-boot.ts`):
-
-| Request on `safe-arch-plan.base44.app` | What happens |
-| --- | --- |
-| A page (`/`, `/faq`, `/blog/…`, `/login`, `/admin/…`, …), top-level, no sign-in in flight | The head gets `noindex` and a canonical/`og:url` on `https://govari-fin.co.il/<path>`; the page renders nothing but a one-line notice and `location.replace`s to `https://govari-fin.co.il/<path><query><fragment>`. No React, no API call, no chat. |
-| A page carrying a sign-in (`code`, `error`, `access_token` in the query or fragment, `token`, `token_hash`, `from_url`, `clear_access_token`, Base44's `app_id`/`app_base_url`/`functions_version`) | Stays, so the sign-in completes on the origin whose storage holds its state. Still `noindex`, canonical on production. |
-| `/register`, `/forgot-password`, `/reset-password`, `/oauth/*` (the platform's own auth pages) | Stays, for the same reason. Still `noindex`. |
-| A page inside a frame (the Base44 dashboard showing the app) | Stays: production refuses to be framed, so a redirect would only blank the frame. Still `noindex`. |
-| `/api/*`, `/ws-user-apps/*`, the agents' socket, assets, images, any non-HTML response | Untouched. None of it runs the app's HTML, so none of it runs this code — and the page refuses those paths too, in case one is ever opened in a tab. |
-
-A conversation already open in a tab is not cut off: this runs once, at boot. (A tab
-that reloads itself after a deploy — `freshness.ts` — reboots there, and a reload
-already loses an open chat today; the difference is that it now lands on production.)
-The Builder's preview runs on other hosts and is left alone: the match is exact.
-
-`VITE_LEGACY_HOSTS` (comma-separated hostnames) replaces the host list; `none` turns all
-of it off — the switch, set in the Builder's environment and published, if it ever
-misbehaves.
-
-A crawler that does not run JavaScript still gets the plain `index.html` from Base44,
-which now names production in its canonical, `og:url` and JSON-LD (measured on
-2026-10-05, Base44 served the canonical and `og:url` tags with their values stripped;
-that is Base44's doing and the runtime tags cover it).
+make that copy canonical again.
 
 ## The home page, and the one conversation
 
@@ -1365,8 +1333,8 @@ The 24-scenario bank the zones were written against, with the three places the
 implementation deliberately departs from the drafted zoning, is
 [`tests/test-plan/14-procedures-zones.md`](tests/test-plan/14-procedures-zones.md).
 `tests/contract/agents.contract.test.ts` fails if the prompt stops saying any of
-it; `tests/eval/procedures-agent.eval.test.ts` drives the deployed agent through
-the rows that matter, because those are two different claims.
+it; `npm run test:eval:chat` plays six procedures personas against the deployed
+`chat` function, which is a different claim (they cover the bank only in part).
 
 ## The open question, and the record it leaves
 
@@ -1878,7 +1846,7 @@ docker compose -f docker-compose.test.yml run --rm e2e-ios
 | Contract | `npm run test:contract` | `tests/contract/` |
 | Integration | `npm run test:integration` | `tests/integration/` |
 | Security (static) | `npm run test:security` | `tests/security/` |
-| Eval (opt-in, needs credentials) | `npm run test:eval` | `tests/eval/` |
+| Chat evaluation (by hand, needs credentials) | `npm run test:eval:chat` | `tests/eval/chat/` |
 | e2e — UI, API, security, a11y, SEO (all four devices) | `npm run test:e2e` | `e2e/` |
 | e2e — desktop Chromium + WebKit | `npm run test:e2e:web` | `e2e/` |
 | e2e — iOS / Android | `npm run test:e2e:ios` / `test:e2e:android` | `e2e/` |
@@ -1902,9 +1870,9 @@ them when that was measured; 917 today) in one process. The per-suite commands
 remain for running one on its own, and `./scripts/run-tests.sh` still invokes
 them separately so its summary can report each suite's own pass/fail.
 
-`npm run test:vitest` is a bare `vitest run`, so it also picks up `tests/eval/`.
-That suite skips itself without `EVAL_BASE44_APP_ID` and `EVAL_BASE44_TOKEN`
-and is never gated — see [STD-13](tests/test-plan/13-std-eval.md).
+`tests/eval/` holds data only (`personas.json` and the rubrics), no Vitest files; the
+evaluation is the script `npm run test:eval:chat`, run by hand and never gated — see
+[STD-13](tests/test-plan/13-std-eval.md).
 
 **The integration suite runs the Base44 backend functions for real.** They sit
 outside `tsconfig.json` and execute on Deno inside Base44, so nothing else in

@@ -19,14 +19,12 @@
     "typecheck:gate": "npm run typecheck",
     "preview": "npm run build && vite preview",
     "seed:blog": "node scripts/seed-blog.mjs",
-    "logs": "base44 logs --env prod --since 1h",
     "prune:vercel": "node scripts/prune-vercel-deployments.mjs",
     "test": "npm run test:vitest && npm run test:e2e",
     "test:unit": "vitest run tests/unit",
     "test:component": "vitest run tests/component",
     "test:contract": "vitest run tests/contract",
     "test:integration": "vitest run tests/integration",
-    "test:eval": "vitest run tests/eval",
     "test:eval:chat": "node scripts/eval-chat.mjs",
     "test:security": "vitest run tests/security",
     "test:vitest": "vitest run",
@@ -49,8 +47,6 @@
     "test:docker": "docker compose -f docker-compose.test.yml run --rm tests"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.54",
-    "@base44/vite-plugin": "^1.0.47",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-aspect-ratio": "^1.1.2",

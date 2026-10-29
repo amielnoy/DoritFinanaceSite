@@ -62,10 +62,9 @@ interface ChatAnswer {
 }
 
 /**
- * The reply as the page reads it. The blog page has one protocol for both
- * backends — the ```recommended block (src/lib/blog-recommendation.ts), which
- * Base44's agent writes itself — so the function's `recommended` list is
- * written into the same block here. A reply that already carries one keeps it,
+ * The reply as the page reads it. The blog page reads the ```recommended block
+ * (src/lib/blog-recommendation.ts), so the function's `recommended` list is
+ * written into that block here. A reply that already carries one keeps it,
  * and gets no second.
  */
 function withRecommendation(reply: string, recommended: unknown): string {
