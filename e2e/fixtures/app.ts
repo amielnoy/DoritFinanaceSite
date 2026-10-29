@@ -54,7 +54,7 @@ export const STUBS_UNREACHABLE =
 /** The host the e2e bundle calls Supabase at — e2e/build-env.ts. Nothing else is answered as Supabase. */
 const FAKE_ORIGIN = new URL(E2E_SUPABASE_URL).origin;
 
-/** The site's own Vercel functions (api/). Not Base44, and never stubbed. */
+/** The site's own Vercel functions (api/). Never stubbed. */
 const VERCEL_FUNCTIONS = /^\/api\/(og\/|csp-report(\/|$))/;
 
 const TRANSPARENT_PNG = Buffer.from(
@@ -140,9 +140,8 @@ function functionAnswer(name: string, body: Record<string, unknown>, chatTurns: 
  *   /auth/v1/user          401: the visitor is anonymous
  *
  * Anything else on the fake host answers 501, and any `/api/` request that is
- * not one of the site's own Vercel functions
- * answers 501 too — that is the Base44 path the bundle no longer takes. Both
- * fail the test when it ends.
+ * not one of the site's own Vercel functions answers 501 too: the bundle has
+ * no other backend. Both fail the test when it ends.
  *
  * Exported for a spec that opens its own context (seo/mobile-parity.spec.ts).
  */
@@ -173,14 +172,14 @@ export async function stubBackend(page: Page): Promise<MockApi & { readonly unmo
   await page.route(/googletagmanager\.com|google-analytics\.com/, (route) => route.abort());
   // Fonts are self-hosted (public/fonts), so the tests render in the real ones.
 
-  // --- the tripwire: nothing reaches Base44 -------------------------------
-  // The bundle reads and writes Supabase; a request here is a regression to the
-  // Base44 path, answered 501 and failed at the end of the test.
+  // --- the tripwire: no /api route the site does not serve ---------------
+  // The bundle reads and writes Supabase; a request here is a regression,
+  // answered 501 and failed at the end of the test.
   await page.route("**/api/**", (route) => {
     const url = new URL(route.request().url());
     if (VERCEL_FUNCTIONS.test(url.pathname)) return route.fallback();
-    unmodelled.push(`${route.request().method()} ${url.origin}${url.pathname} (Base44 /api)`);
-    return fulfill(route, { status: 501, body: { error: `unstubbed: ${url.pathname} — the e2e bundle must not reach Base44` } });
+    unmodelled.push(`${route.request().method()} ${url.origin}${url.pathname} (unknown /api)`);
+    return fulfill(route, { status: 501, body: { error: `unstubbed: ${url.pathname} — not one of the site's own /api functions` } });
   });
 
   // --- Supabase ----------------------------------------------------------
@@ -287,7 +286,7 @@ export const test = base.extend<{ mockApi: MockApi }>({
     if (!AGAINST_A_DEPLOYMENT) {
       expect(
         api.unmodelled,
-        "requests the e2e backend does not model — a Base44 /api call, or a Supabase table, function or route " +
+        "requests the e2e backend does not model — an unknown /api call, or a Supabase table, function or route " +
           "e2e/fixtures/app.ts does not answer. Model it, or find out why the page made it.",
       ).toEqual([]);
     }

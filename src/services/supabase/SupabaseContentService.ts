@@ -23,8 +23,8 @@ export const toTestimonial = (row: Record<string, unknown>): Testimonial => {
 };
 
 /**
- * "No such article", shaped the way api/og/blog.ts and Base44's `get` both
- * spell it: a 404 status on the error. BlogPost.tsx reads any error as
+ * "No such article", shaped the way api/og/blog.ts spells it: a 404 status on
+ * the error. BlogPost.tsx reads any error as
  * "not found"; the server tells a 404 from a failed read by this.
  */
 const notFound = (key: string) => Object.assign(new Error(`article ${key} not found`), { status: 404 });
@@ -35,7 +35,7 @@ const notFound = (key: string) => Object.assign(new Error(`article ${key} not fo
  * The `published` filter is in the query even though RLS already hides drafts
  * from an anonymous reader: a signed-in admin passes that policy, and the
  * public blog must not list drafts to her either. The rule belongs to the
- * port, as it did in Base44ContentService.
+ * port.
  */
 export class SupabaseContentService implements ContentPort {
   constructor(private readonly client: SupabaseTableClient) {}
@@ -57,7 +57,7 @@ export class SupabaseContentService implements ContentPort {
    * One article, by whatever followed `/blog/` in the address.
    *
    * That is a slug (every link the site builds now), a Base44 id (every link
-   * before slugs: bookmarks, search results, the agents' answers), or Supabase's
+   * before slugs: bookmarks, search results, the old agents' answers), or Supabase's
    * uuid for a row that never had a Base44 id. One request asks for all three,
    * and the slug wins, then the Base44 id, then the uuid.
    *

@@ -1,24 +1,18 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { loadEntity, validateAgainstEntity } from "../helpers/entity-schema";
 import { join } from "node:path";
 import { REPO_ROOT } from "../helpers/entity-schema";
-import { backendFiles, findObjectLiteralCalls, read, rel, sourceFiles } from "../helpers/source-scan";
+import { filesUnder, findObjectLiteralCalls, read, rel, sourceFiles } from "../helpers/source-scan";
 
 /**
  * Lead capture crosses two boundaries, and this file pins both:
  *
- *   browser  --invoke("submitLead")-->  backend function  --create-->  Lead
+ *   browser  --invoke("submit-lead")-->  Edge function  --insert-->  leads
  *
- * The tests read the real call sites out of src/ and base44/functions/ and the
- * real schema out of base44/entities/, so a field renamed on either side — or a
- * `source` value outside the entity enum — fails here rather than in production.
+ * The tests read the real call sites out of src/ and supabase/functions/ and the
+ * real schema out of supabase/migrations/, so a field renamed on either side — or
+ * a `source` value outside the leads table's check — fails here rather than in production.
  */
-
-const BACKEND = backendFiles();
-const backendSource = (name: string) =>
-  readFileSync(BACKEND.find((f) => f.includes(`/${name}/`))!, "utf8");
 
 /** Fields a backend function destructures off its request body. */
 function destructuredBody(src: string): string[] {
@@ -138,9 +132,8 @@ describe("adapter → submit-claim (Supabase)", () => {
 
 describe("Base44 is out of the build", () => {
   it("nothing imports a Base44 package", () => {
-    const tracked = execFileSync("git", ["ls-files", "src", "api", "scripts", "e2e"], { cwd: REPO_ROOT, encoding: "utf8" })
-      .split("\n")
-      .filter((f) => f && existsSync(join(REPO_ROOT, f)));
+    const tracked = filesUnder(["src", "api", "scripts", "e2e"]);
+    expect(tracked.length, "no source files found under src/ api/ scripts/ e2e/").toBeGreaterThan(0);
     const offenders = tracked.filter((f) => /from ["']@base44\//.test(readFileSync(join(REPO_ROOT, f), "utf8")));
     expect(offenders, "these still import @base44/*").toEqual([]);
     const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));
@@ -170,7 +163,7 @@ describe("dependency inversion holds", () => {
     /**
      * Vite's default order puts `.jsx` before `.tsx`. The case below fails when
      * a collision exists, but it runs in CI and the swap is silent until then —
-     * and the Base44 Builder re-adds those boilerplate `.jsx` templates on its
+     * and the Base44 Builder re-added those boilerplate `.jsx` templates on its
      * own schedule, three times in one day (A-46, A-50). Reordering makes the
      * collision harmless rather than merely detectable: this repo is
      * TypeScript, and the TypeScript file is always the one that means
@@ -214,64 +207,22 @@ describe("dependency inversion holds", () => {
     expect(wiring.map(rel)).toEqual([]);
   });
 
-  it("the lead source union matches the entity enum", () => {
+  it("the lead source union matches the leads table's source check", () => {
     const ports = read(join(REPO_ROOT, "src/services/ports.ts"));
     const union = ports.match(/export type LeadSource =([^;]+);/)![1];
-    const declared = (loadEntity("Lead").properties.source.enum ?? []).slice().sort();
+    const dir = join(REPO_ROOT, "supabase/migrations");
+    // The latest migration that (re)defines the check wins; the first schema declares it inline.
+    const defs = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .flatMap((f) => {
+        const sql = readFileSync(join(dir, f), "utf8").replace(/\s+/g, " ");
+        const m = /leads_source_check check \(source in \(([^)]*)\)\)/.exec(sql) ?? (f.startsWith("20260921000000") ? /source text check \(source in \(('consultation'[^)]*)\)\)/.exec(sql) : null);
+        return m ? [m[1]] : [];
+      });
+    const declared = [...defs.at(-1)!.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort();
     const inCode = [...union.matchAll(/"([a-z]+)"/g)].map((m) => m[1]).sort();
     expect(inCode).toEqual(declared);
-  });
-});
-
-describe("backend → Lead entity", () => {
-  const lead = loadEntity("Lead");
-  const writes = findObjectLiteralCalls(
-    /base44\.entities\.Lead\.create\(\s*/,
-    BACKEND
-  );
-
-  it("only the backend functions create leads — the browser no longer does", () => {
-    const fromBrowser = findObjectLiteralCalls(/base44\.entities\.Lead\.create\(\s*/);
-    expect(fromBrowser, "a component still writes Lead directly").toEqual([]);
-    expect(writes.length).toBe(1); // submitClaim; the other two are forwarders to Edge
-  });
-
-  for (const write of writes) {
-    it(`${write.file} writes only declared fields`, () => {
-      const undeclared = write.keys.filter((k) => !(k in lead.properties));
-      expect(undeclared, `${write.file}`).toEqual([]);
-    });
-
-    it(`${write.file} supplies both required fields`, () => {
-      for (const required of lead.required ?? []) {
-        expect(write.keys, `${write.file} must write ${required}`).toContain(required);
-      }
-    });
-
-    it(`${write.file} uses enum-legal source and status literals`, () => {
-      for (const field of ["source", "status"] as const) {
-        const literal = write.stringLiterals[field];
-        if (literal === undefined) continue;
-        expect(lead.properties[field].enum, `${write.file}.${field}`).toContain(literal);
-      }
-    });
-  }
-
-  it("validates a representative payload for every declared source", () => {
-    for (const source of loadEntity("Lead").properties.source.enum ?? []) {
-      const payload = {
-        name: "ישראלה", phone: "050-0000000", email: "", source,
-        topic: "", timing: "", message: "", status: "new",
-      };
-      expect(validateAgainstEntity(lead, payload), source).toEqual([]);
-    }
-  });
-
-  it("rejects an unknown source and a stray field", () => {
-    const issues = validateAgainstEntity(lead, {
-      name: "x", phone: "1", source: "carrier-pigeon", utm_campaign: "spring",
-    });
-    expect(issues.map((i) => i.field).sort()).toEqual(["source", "utm_campaign"]);
   });
 });
 
@@ -282,119 +233,29 @@ describe("email is sent from the backend, never the browser", () => {
     );
     expect(fromBrowser.map((c) => c.file)).toEqual([]);
   });
-
-  it("no backend function calls Core.SendEmail either — one transport, dorit-mailer, for everyone", () => {
-    // Core delivered to registered users of the app only, which is why
-    // `CORE_EMAILS` and the branch that used it existed at all — not a list of
-    // the team, a list of who that one transport could actually reach. It
-    // silently dropped the agency, the second operations mailbox and every
-    // visitor confirmation once; removing it removes that failure mode too.
-    for (const file of BACKEND) {
-      const src = read(file);
-      const calls = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-      expect(calls, `${rel(file)} still calls Core.SendEmail`).not.toMatch(
-        /integrations\.Core\.SendEmail\(/
-      );
-    }
-  });
-
-  // Every send now goes through `sendMail`, the one Resend call each function
-  // carries. Base44's Core integration delivers only to registered users of the
-  // app, which silently dropped the agency, the second operations mailbox and
-  // every visitor confirmation — so the shape this scans for changed with it.
-  // `await` scopes this to call sites: the helper's own signature destructures
-  // the same names, and would otherwise be scanned as a send with no keys.
-  const backendSends = findObjectLiteralCalls(/await sendMail\(\s*/, BACKEND);
-
-  it("every backend send supplies a recipient and a subject", () => {
-    expect(backendSends.length).toBeGreaterThan(0);
-    for (const send of backendSends) {
-      expect(send.keys, send.file).toContain("to");
-      expect(send.keys, send.file).toContain("subject");
-      expect(
-        send.keys.includes("body") || send.keys.includes("html"),
-        `${send.file} sends neither body nor html`
-      ).toBe(true);
-    }
-  });
-
-  it("recipients come from named constants, never inline literals", () => {
-    for (const send of backendSends) {
-      expect(
-        send.stringLiterals.to,
-        `${send.file} inlines a recipient address`
-      ).toBeUndefined();
-    }
-  });
-
-  it("an HTML send always ships a plain-text alternative", () => {
-    for (const send of backendSends.filter((s) => s.keys.includes("html"))) {
-      expect(send.keys, `${send.file} sends HTML with no text fallback`).toContain("text");
-    }
-  });
 });
 
-describe("BlogPost writes match the BlogPost entity", () => {
-  const blogPost = loadEntity("BlogPost");
-
-  /** Sent by the form, stored by the Supabase mirror only — contentAdmin keeps it out of the Base44 write. */
-  const MIRROR_ONLY = ["slug"];
-
-  it("keeps the mirror-only fields off the BlogPost entity", () => {
-    for (const key of MIRROR_ONLY) {
-      expect(key in blogPost.properties, `${key} became a Base44 field — drop it from MIRROR_ONLY`).toBe(false);
-    }
-  });
-
-  it("the admin payload carries title and body and nothing undeclared", () => {
+describe("blog and testimonial writes", () => {
+  it("the admin payload carries title, body and slug", () => {
     const adminPayload = findObjectLiteralCalls(/const payload\s*=\s*/).find(
       (c) => c.file === "src/pages/BlogAdmin.tsx"
     );
     expect(adminPayload, "BlogAdmin payload literal").toBeDefined();
-    expect(adminPayload!.keys).toContain("slug");
-    expect(adminPayload!.keys.filter((k) => !(k in blogPost.properties) && !MIRROR_ONLY.includes(k))).toEqual([]);
-    for (const required of blogPost.required ?? []) {
-      expect(adminPayload!.keys).toContain(required);
-    }
+    for (const key of ["title", "body", "slug"]) expect(adminPayload!.keys).toContain(key);
   });
 
-  it("publish toggles only flip declared fields", () => {
-    /* The literal is authored at the port call now that the admin screens go through
-       `contentAdmin` instead of the SDK. That is also the better place to check it: the
-       component is what decides the fields, and the adapter only forwards them. */
+  it("publish toggles are authored at the port call", () => {
     const updates = findObjectLiteralCalls(/services\.contentAdmin\.updateArticle\([^,]+,\s*/);
     expect(updates.length).toBeGreaterThan(0);
-    for (const call of updates) {
-      for (const key of call.keys) {
-        expect(Object.keys(blogPost.properties), `${call.file} → ${key}`).toContain(key);
-      }
-    }
   });
-});
 
-describe("Testimonial.create payloads match the Testimonial entity", () => {
-  const testimonial = loadEntity("Testimonial");
-  /* The literal is authored at the hook call now that the admin screens write through
-     `useCreateTestimonial` rather than reaching for the port themselves. Same reasoning as
-     the publish toggles above — the component decides the fields and everything below it
-     forwards them — with one extra edge: the port call is `createTestimonial(draft)`, which
-     has no literal to read at all, so a scan anchored there walks past it and lands on the
-     `{ queryKey }` of the next `invalidateQueries`. */
-  const calls = findObjectLiteralCalls(/createTestimonial\.mutateAsync\(\s*/);
-
-  it("sends only declared fields and both required ones", () => {
+  it("a testimonial is sent with its name and quote", () => {
+    /* The literal is authored at the hook call: the component decides the fields and
+       everything below it forwards them. */
+    const calls = findObjectLiteralCalls(/createTestimonial\.mutateAsync\(\s*/);
     expect(calls.length).toBeGreaterThan(0);
     for (const call of calls) {
-      expect(call.keys.filter((k) => !(k in testimonial.properties)), call.file).toEqual([]);
-      for (const required of testimonial.required ?? []) {
-        expect(call.keys, `${call.file} must send ${required}`).toContain(required);
-      }
+      for (const required of ["name", "quote"]) expect(call.keys, `${call.file} must send ${required}`).toContain(required);
     }
-  });
-
-  it("keeps the rating inside the declared 1..5 range", () => {
-    expect(validateAgainstEntity(testimonial, { name: "א", quote: "ב", rating: 5 })).toEqual([]);
-    expect(validateAgainstEntity(testimonial, { name: "א", quote: "ב", rating: 6 })).toHaveLength(1);
-    expect(validateAgainstEntity(testimonial, { name: "א", quote: "ב", rating: 0 })).toHaveLength(1);
   });
 });

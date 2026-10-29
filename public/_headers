@@ -1,7 +1,8 @@
-# Cloudflare/Netlify-style headers. Base44 hosting may ignore this file; it is
-# here because the header it asks for is the actual fix, and because the day it
-# is honoured the self-check in src/lib/freshness.ts becomes a belt beside a
-# brace rather than the only thing holding the trousers up.
+# Cloudflare/Netlify-style headers. Vercel does not read this file —
+# vercel.json's `headers` carry the same rules, and
+# tests/contract/deploy-gate.contract.test.ts holds the two together. It stays
+# so any host that honours it gets them too; the self-check in
+# src/lib/freshness.ts is the belt beside this brace.
 #
 # The HTML must never be cached without a validator. It names the hashed assets,
 # and those are immutable for a year — so a stale copy of this one file pins a

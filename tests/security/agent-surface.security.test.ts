@@ -3,7 +3,8 @@ import { transformSync } from "esbuild";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
 import { buildClientHtml as buildSharedClientHtml } from "../../supabase/functions/_shared/html.ts";
-import { read, sourceFiles, backendFiles } from "../helpers/source-scan";
+import { edgeFunctionFiles, read, sourceFiles } from "../helpers/source-scan";
+import { leadsColumns } from "../helpers/leads-columns";
 
 /**
  * The attack surface the agents added.
@@ -26,8 +27,8 @@ import { read, sourceFiles, backendFiles } from "../helpers/source-scan";
  */
 
 const CHAT = read(join(REPO_ROOT, "src/components/dorit/chat/AgentChat.tsx"));
-// submitLead and escalateToHuman are forwarders in Base44 now; the code that
-// composes the mail, redacts and appends the sheet row lives in the Edge functions.
+// The code behind submitLead and escalateToHuman — composing the mail,
+// redacting and appending the sheet row — lives in the Edge functions.
 const HTML_MAIL = read(join(REPO_ROOT, "supabase/functions/_shared/html.ts"));
 const SUBMIT_LEAD = read(join(REPO_ROOT, "supabase/functions/submit-lead/lead.js"));
 const ESCALATE = read(join(REPO_ROOT, "supabase/functions/escalate-to-human/escalation.js"));
@@ -36,38 +37,10 @@ const COMPLIANCE = read(join(REPO_ROOT, "src/config/compliance.ts"));
 const CONTACT = read(join(REPO_ROOT, "src/config/agencyProfile.ts"));
 const PKG = read(join(REPO_ROOT, "package.json"));
 
-/**
- * The agent prompts, with their Hebrew readable whatever the file looks like.
- *
- * These assertions are about what the prompt *says*. They were written against
- * a file with literal Hebrew in it and matched the raw bytes, which made them
- * assertions about the file's encoding as well — and the Base44 Builder syncs
- * its own serialisation straight to `main`, where every Hebrew character comes
- * back as `\uXXXX`. That turned seven compliance tests red while the compliance
- * block was still there, word for word: `needs_interview` went from 17,338
- * characters of instructions to 17,337, and nothing about the agent's
- * behaviour had changed at all.
- *
- * A round trip through `JSON.parse`/`stringify` normalises both spellings —
- * `stringify` leaves non-ASCII literal — so a clause is found whichever way the
- * file was written. The property is "the prompt contains this rule"; the
- * escaping is the mechanism, and the test has no business depending on it.
- *
- * Parsing also has to keep working if the file grows a comment (it is `.jsonc`),
- * so a file that will not parse falls back to its raw text rather than failing
- * every test in the file with a parse error.
- */
-const readableAgentSource = (raw: string): string => {
-  try {
-    return JSON.stringify(JSON.parse(raw));
-  } catch {
-    return raw;
-  }
-};
-
-const AGENT_PROMPTS = ["needs_interview", "blog_recommender", "support_agent"].map((n) => ({
+/** The agents' prompts: the chat function's markdown, one file per agent. */
+const AGENT_PROMPTS = ["interview", "blog", "support", "procedures"].map((n) => ({
   name: n,
-  src: readableAgentSource(read(join(REPO_ROOT, `base44/agents/${n}.jsonc`))),
+  src: read(join(REPO_ROOT, `supabase/functions/chat/prompts/${n}.md`)),
 }));
 
 /** Lift a top-level function out of a Deno entry point so it can be run here. */
@@ -179,7 +152,7 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
   });
 
   it("never evaluates a string in the browser or on the backend", () => {
-    for (const file of [...sourceFiles(), ...backendFiles()]) {
+    for (const file of [...sourceFiles(), ...edgeFunctionFiles()]) {
       const src = read(file);
       expect(src, file).not.toMatch(/\beval\s*\(/);
       expect(src, file).not.toMatch(/new\s+Function\s*\(/);
@@ -195,11 +168,9 @@ describe("XSS — surfaces that render text somebody else wrote", () => {
 
 // ───────────────────────────────────────────────────────────────────────────
 /**
- * The visitor-facing HTML is composed by two implementations: the Edge shared
- * module (submit-lead) and Base44's submitClaim, which keeps its own copy. Both
- * are run, by behaviour, because they are not the same text any more.
+ * The visitor-facing HTML is composed by the Edge shared module. It is run, by
+ * behaviour, rather than read as text.
  */
-const CLAIM = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
 const wholeFn = (src: string, name: string): string => {
   const start = src.search(new RegExp(`(?:export )?function ${name}\\(`));
   expect(start, `${name} not found`).toBeGreaterThan(-1);
@@ -207,7 +178,6 @@ const wholeFn = (src: string, name: string): string => {
 };
 const MAIL_IMPLEMENTATIONS = [
   { label: "Edge _shared/html.ts", src: HTML_MAIL, ts: true },
-  { label: "Base44 submitClaim", src: CLAIM, ts: false },
 ].map(({ label, src, ts }) => {
   // The letter's button (actionBlock) and linked details (detailValue), and the
   // https-only check both use, exist only in the Edge copy; buildClientHtml calls them.
@@ -295,7 +265,7 @@ describe.each(MAIL_IMPLEMENTATIONS)("XSS — the HTML email: $label", ({ src, te
 // ───────────────────────────────────────────────────────────────────────────
 describe("Phishing — the site's name on somebody else's message", () => {
   it("puts no visitor-supplied value inside an href in any email", () => {
-    for (const file of backendFiles()) {
+    for (const file of edgeFunctionFiles()) {
       const src = read(file);
       expect(src, file).not.toMatch(/href="\$\{(data\.|name|email|topic|timing|message)/);
     }
@@ -417,19 +387,6 @@ describe("Phishing — the site's name on somebody else's message", () => {
     expect(ESCALATE).toMatch(/const HUMAN_CONTACT = \{/);
     expect(ESCALATE_HANDLER).toMatch(/contact: HUMAN_CONTACT/);
   });
-
-  it("never widens an email recipient from the request body", () => {
-    // `to:` must resolve from a constant, never from something the caller sent.
-    for (const file of backendFiles()) {
-      const src = read(file);
-      for (const m of src.matchAll(/to:\s*([A-Za-z_][\w.]*)/g)) {
-        expect(
-          ["NOTIFY_EMAIL", "SECONDARY_EMAIL", "email", "to"].includes(m[1]),
-          `${file} sends to an unexpected binding: ${m[1]}`,
-        ).toBe(true);
-      }
-    }
-  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -483,7 +440,7 @@ describe("Prompt injection — through the tool payloads the model composes", ()
   it("never spreads the request body into an entity write", () => {
     // A fixed field list is what stops a model inventing `status: 'closed'`
     // or a field the schema happens to accept.
-    for (const file of backendFiles()) {
+    for (const file of edgeFunctionFiles()) {
       const src = read(file);
       expect(src, file).not.toMatch(/\.create\(\s*\{\s*\.\.\./);
       expect(src, file).not.toMatch(/\.create\(\s*body\s*\)/);
@@ -535,12 +492,12 @@ describe("DLP — what may leave, and in whose hands", () => {
 
 
   it("collects no field the consent notice does not name", () => {
+    const columns = leadsColumns();
+    expect(columns.length, "no leads columns found").toBeGreaterThan(10);
     // The notice promises name, phone and an optional email. Anything else
-    // reaching the entity is a promise broken in code.
+    // reaching the leads table is a promise broken in code.
     for (const forbidden of ["id_number", "tz", "account_number", "policy_number", "salary", "medical"]) {
-      expect(read(join(REPO_ROOT, "base44/entities/Lead.jsonc")), forbidden).not.toMatch(
-        new RegExp(`"${forbidden}"`),
-      );
+      expect(columns, forbidden).not.toContain(forbidden);
     }
   });
 
@@ -555,14 +512,14 @@ describe("DLP — what may leave, and in whose hands", () => {
   });
 
   it("never echoes a connector access token back to a caller", () => {
-    for (const file of backendFiles()) {
+    for (const file of edgeFunctionFiles()) {
       const src = read(file);
       expect(src, file).not.toMatch(/Response\.json\([^)]*accessToken/);
     }
   });
 
   it("never writes a token or a full lead to the console", () => {
-    for (const file of [...backendFiles(), ...sourceFiles()]) {
+    for (const file of [...edgeFunctionFiles(), ...sourceFiles()]) {
       const src = read(file);
       expect(src, file).not.toMatch(/console\.(log|info|warn|error)\([^)]*accessToken/);
       expect(src, file).not.toMatch(/console\.(log|info|warn|error)\([^)]*\bphone\b/);

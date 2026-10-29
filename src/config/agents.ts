@@ -1,7 +1,5 @@
 import { BookOpen, FileSearch, CircleHelp, MessagesSquare } from "lucide-react";
 import type { AgentDescriptor } from "@/components/dorit/chat/AgentChat";
-import { BLOG_RECOMMENDER_CONSENT_POINTS, PROCEDURES_CONSENT_POINTS,
-  SUPPORT_CONSENT_POINTS } from "@/config/compliance";
 
 /**
  * The on-site agents, expressed as data.
@@ -97,7 +95,6 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
       "שלום, כאן העוזר האוטומטי של דורית גוב ארי — לא דורית עצמה. אני מסביר איך מבצעים דברים: תהליכים, טפסים ומסמכים בפנסיה, בגמל ובביטוח, ואיך קוראים את גמל נט ופנסיה נט. אני לא מפרש נתונים, לא משווה ולא ממליץ — לכל שאלה כזו אפשר לעבור לדורית בכל רגע. במה להתחיל?",
     conversationName: "שאלה על תהליך",
     conversationDescription: "הסבר על תהליכים, טפסים, גמל נט, פנסיה נט והמסלקה הפנסיונית",
-    consentPoints: PROCEDURES_CONSENT_POINTS,
     tagline:
       "אם התשובה הייתה משתנה לפי מי ששואל — היא של דורית. אם היא זהה לכולם — הצ׳אט עונה עליה בעצמו.",
     guardrails: {
@@ -134,7 +131,6 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
     greeting: "שלום, כאן העוזר האוטומטי של דורית גוב ארי — לא דורית עצמה. אני עונה על שאלות כלליות מתוך התוכן שפורסם באתר, לא נותן ייעוץ, ואפשר לעבור לדורית בכל רגע. מה תרצו לדעת?",
     conversationName: "שאלה לתמיכה",
     conversationDescription: "מענה על שאלות כלליות מתוך תוכן האתר",
-    consentPoints: SUPPORT_CONSENT_POINTS,
     tagline:
       "עונה ממה שכבר פורסם. כל דבר שנוגע למקרה שלכם עובר לדורית — היא בעלת הרישיון, לא הצ׳אט.",
     guardrails: {
@@ -174,6 +170,5 @@ export const AGENTS: Record<AgentKey, AgentDescriptor> = {
     greeting: "שלום. אני כאן כדי להמליץ לך על מאמרים רלוונטיים מהבלוג של דורית. באיזה נושא פיננסי מעניין אותך לקרוא? למשל: פנסיה, גמל והשתלמות, מיסוי, קיבוע זכויות, ביטוחי חיים ובריאות, דמי ניהול, פרישה.",
     conversationName: "המלצות קריאה",
     conversationDescription: "המלצות מאמרים לפי נושא",
-    consentPoints: BLOG_RECOMMENDER_CONSENT_POINTS,
   },
 };

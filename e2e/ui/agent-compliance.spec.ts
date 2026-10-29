@@ -383,8 +383,8 @@ test.describe("Agent chat — when the backend refuses", () => {
 
     await test_step("the failure is reported rather than swallowed, with a way to reach her", async () => {
       // On the chat function an unavailable agent hands over the direct
-      // channels (AgentChat's showChannelsOnly) instead of Base44's "try
-      // again" line: there is no socket to wait on, so the answer is final.
+      // channels (AgentChat's showChannelsOnly) instead of a "try again"
+      // line: there is no socket to wait on, so the answer is final.
       await expect(section.getByText(HUMAN_HANDOFF.failure)).toBeVisible();
       await expect(page.locator("#interview-chat").getByRole("link", { name: /050-831-1776/ })).toBeVisible();
     });

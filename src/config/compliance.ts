@@ -194,7 +194,7 @@ export const HUMAN_HANDOFF = {
 
 /**
  * v6 — the notice the chat shows, every on-site agent being served by the
- * `chat` Edge Function (Base44 exit B1). The v5 points above are what each
+ * `chat` Edge Function. The v5 points above are what each
  * agent's v6 notice is built from; v5 alone is no longer shown in the chat.
  *
  * The fourth point replaces "not passed to any other party", which the chat

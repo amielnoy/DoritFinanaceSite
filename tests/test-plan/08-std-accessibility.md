@@ -42,8 +42,7 @@ gold link rule outranked the box's own colours: on production the WhatsApp
 label was gold on green, 3.37:1 (D-07, manual test 2026-10-14). The fixture
 article is too short to get the inline box, which is why the page sweep never
 saw it; this case serves a four-paragraph one, as a `blog_posts` row
-(`blogPostRow` in `e2e/fixtures/data.ts`, `mockApi.setRow`) — until 2026-10-18 a
-Base44 `BlogPost` document.
+(`blogPostRow` in `e2e/fixtures/data.ts`, `mockApi.setRow`).
 
 | ID | Title | Expected result |
 |---|---|---|

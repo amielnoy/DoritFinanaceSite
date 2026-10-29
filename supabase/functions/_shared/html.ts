@@ -60,10 +60,7 @@ export function escapeHtml(text: unknown): string {
  * מה שמשתנה בין הודעה להודעה הוא תוכן ולא עיצוב, ולכן הוא נכנס כפרמטרים:
  * כותרת קטנה, כותרת, פסקת פתיחה ורשימת שדות. ההודעה עצמה זהה.
  *
- * One letter for every message to a visitor. Edge Functions share this module;
- * the Base44 copies are kept identical by
- * tests/integration/submit-claim.integration.test.ts, which compares the HTML
- * both send.
+ * One letter for every message to a visitor. Edge Functions share this module.
  *
  * Callers pass raw values. Escaping happens here, at the binding site, so a new
  * field cannot be added without it.

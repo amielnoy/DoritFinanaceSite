@@ -15,9 +15,7 @@ Two things sit under "API" for this app:
 2. **The backend contract as actually exercised** — the requests the running
    app puts on the wire to Supabase, checked against what the backend accepts:
    the fields `submit-lead` reads off its body and the values `leads.source`
-   allows, both read from their own source. (Until 2026-10-18 this was the Base44
-   API contract, checked against `base44/entities`; the e2e build then ran on
-   Base44's adapters.)
+   allows, both read from their own source.
 
 ## 2. Environment
 
@@ -53,8 +51,6 @@ skip there, and the lead cases still run (no real lead is filed).
 
 ## 4. Test cases — observed backend traffic (`backend-contract.spec.ts`)
 
-`e2e/api/base44-contract.spec.ts` was renamed to `backend-contract.spec.ts` on
-2026-10-18 and its cases re-pointed at the Supabase path; the ids are kept.
 
 | ID | Title | Expected result |
 |---|---|---|
@@ -81,11 +77,8 @@ skip there, and the lead cases still run (no real lead is filed).
 | API-LIV-004 | (retired 2026-10-18: "the consultation function rejects a body without name/phone" — a Base44 function) | — |
 | API-LIV-005..007 | (retired 2026-10-18: "\<agent\> opens a conversation for a signed-out visitor" — Base44's `createConversation`; production's chats are on the `chat` Edge Function since 2026-10-14) | — |
 
-The block needed `E2E_LIVE_APP_ID`, which the production smoke stopped setting on
-2026-10-17 (production does not use Base44); it had not run since. `API-LIV-005..007`
-were the checks that would have caught A-42 on Base44 — a signed-out visitor
-refused by the running backend while the repo was correct. The same class on the
-chat function is the live Supabase block's to catch.
+A signed-out visitor refused by the running backend while the repo is correct
+(the class of A-42) is the live Supabase block's to catch.
 
 ## 6. Pass criteria
 

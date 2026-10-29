@@ -5,8 +5,7 @@ import { REPO_ROOT } from "../helpers/entity-schema";
 import { edgeFunctionFiles, read } from "../helpers/source-scan";
 
 /**
- * The shape every Supabase Edge Function keeps, and the one list that must
- * stay identical to the Base44 copies while both run.
+ * The shape every Supabase Edge Function keeps.
  */
 
 const names = edgeFunctionFiles().map((f) => f.split("/").at(-2)!);
@@ -35,10 +34,9 @@ describe("Edge Functions", () => {
     expect(read(join(REPO_ROOT, "supabase/config.toml"))).toMatch(/\[functions\.submit-claim\]\s*\nverify_jwt = false/);
   });
 
-  it("tells the same people about a claim as the Base44 function does", () => {
-    // The costliest drift AGENTS.md names: a mailbox added to submitLead and
-    // submitClaim (which the agents contract forces together) but missing here
-    // would leave the live path silently short of a recipient.
+  it("tells the people about a claim that the shared recipients list names", () => {
+    // The costliest drift AGENTS.md names: a mailbox missing from a function's
+    // recipients leaves it silently short of one, with no error anywhere.
     const addresses = (src: string, decl: RegExp) => {
       const m = src.match(decl);
       expect(m, `${decl} not found`).not.toBeNull();
@@ -48,26 +46,20 @@ describe("Edge Functions", () => {
     const handler = read(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"));
     expect(handler).toMatch(/import \{ NOTIFY_EMAILS, SECONDARY_EMAIL \} from '\.\.\/_shared\/recipients\.ts';/);
     const edge = read(join(REPO_ROOT, "supabase/functions/_shared/recipients.ts"));
-    const base44 = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
     const notify = /const (?:DEFAULT_)?NOTIFY_EMAILS = \[([^\]]*)\]/;
     const secondary = /const SECONDARY_EMAIL = ([^;]+);/;
-    expect(addresses(edge, notify)).toEqual(addresses(base44, notify));
     expect(addresses(edge, notify).length).toBeGreaterThan(0);
-    expect(addresses(edge, secondary)).toEqual(addresses(base44, secondary));
+    expect(addresses(edge, secondary).length).toBeGreaterThan(0);
   });
 
-  it("lets the same closed vocabulary of mailer reasons through", () => {
+  it("lets a closed vocabulary of mailer reasons through", () => {
     const pattern = (src: string) => src.match(/\/\^\(http_[^/]+\/\.test/)?.[0];
-    const edge = pattern(read(join(REPO_ROOT, "supabase/functions/_shared/mail.ts")));
-    expect(edge).toBeDefined();
-    expect(edge).toBe(pattern(read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"))));
+    expect(pattern(read(join(REPO_ROOT, "supabase/functions/_shared/mail.ts")))).toBeDefined();
   });
 
-  it("uses the same channel vocabulary as the Base44 functions", () => {
+  it("has a channel vocabulary", () => {
     const edge = quoted(read(join(REPO_ROOT, "supabase/functions/_shared/attribution.ts")), "CHANNEL_TAXONOMY = [");
-    const base44 = quoted(read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts")), "const CHANNEL_TAXONOMY = [");
     expect(edge.length).toBeGreaterThan(5);
-    expect(edge).toEqual(base44);
   });
 });
 

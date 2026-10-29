@@ -1,9 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { transformSync } from "esbuild";
 import { describe, expect, it } from "vitest";
-import { REPO_ROOT, loadEntity } from "../helpers/entity-schema";
+import { REPO_ROOT } from "../helpers/entity-schema";
 import { read } from "../helpers/source-scan";
+import { leadsColumns } from "../helpers/leads-columns";
+import { systemBlocks, type ChatRole } from "../../supabase/functions/chat/prompt.ts";
 
 /**
  * The compliance contract of the four on-site agents.
@@ -18,12 +19,10 @@ import { read } from "../helpers/source-scan";
  * compliance review approved, so the wording is what must not drift silently.
  */
 
-const AGENTS_DIR = join(REPO_ROOT, "base44/agents");
-
 /**
  * An Edge function's whole source: its handler and sibling modules, and the
- * shared modules it imports. submitLead, escalateToHuman and logSupportChat are
- * forwarders in Base44 now, so what they used to do is read from here.
+ * shared modules it imports. submitLead, escalateToHuman and logSupportChat
+ * run here, so their rules are read from here.
  */
 function edgeBundle(dir: string): string {
   const base = join(REPO_ROOT, "supabase/functions", dir);
@@ -38,28 +37,26 @@ function edgeBundle(dir: string): string {
   return [...own, ...[...shared].sort().map((f) => read(join(REPO_ROOT, "supabase/functions/_shared", `${f}.ts`)))].join("\n");
 }
 
-interface AgentDefinition {
-  name: string;
-  description: string;
-  instructions: string;
-  tool_configs?: Array<{
-    function_name?: string;
-    entity_name?: string;
-    allowed_operations?: string[];
-  }>;
-  allow_anonymous_access?: boolean;
-}
+/** The four agents, by the name the frontend gives them, and the chat function's role for each. */
+const ROLES: Record<string, ChatRole> = {
+  blog_recommender: "blog",
+  needs_interview: "interview",
+  procedures_agent: "procedures",
+  support_agent: "support",
+};
+const agentNames = Object.keys(ROLES).sort();
 
-const parseJsonc = (raw: string): unknown =>
-  JSON.parse(raw.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, ""));
-
-const agentNames = readdirSync(AGENTS_DIR)
-  .filter((f) => f.endsWith(".jsonc"))
-  .map((f) => f.replace(/\.jsonc$/, ""))
-  .sort();
-
-const loadAgent = (name: string): AgentDefinition =>
-  parseJsonc(readFileSync(join(AGENTS_DIR, `${name}.jsonc`), "utf8")) as AgentDefinition;
+/**
+ * What the model is given as its system prompt: the compliance block, the
+ * agent's own prompt and the agency profile, placeholders filled (the clock
+ * block is left out — it changes by the minute).
+ */
+const loadAgent = (name: string): { instructions: string } => ({
+  instructions: systemBlocks(ROLES[name], 0)
+    .slice(0, 3)
+    .map((b) => b.text)
+    .join("\n\n"),
+});
 
 /** Clauses every agent must carry, whatever else its prompt says. */
 const MANDATORY_CLAUSES: Array<[label: string, needle: string]> = [
@@ -93,32 +90,23 @@ const MANDATORY_CLAUSES: Array<[label: string, needle: string]> = [
  */
 const OPS_FANOUT = /for \(const to of NOTIFY_EMAILS\)|NOTIFY_EMAILS\.map\(/;
 
-describe("on-site agent definitions", () => {
+describe("on-site agent prompts", () => {
   it("ships exactly the agents the frontend renders", () => {
     // `booking_assistant` was merged into `needs_interview`: booking a first
-    // meeting was never a separate errand from being interviewed for one, and
-    // the visitor met a second chat that asked for their name again after
-    // answering six questions.
+    // meeting was never a separate errand from being interviewed for one.
     //
     // `procedures_agent` is a fourth because it is a different job, not a
     // different subject: it explains how to read גמל נט and פנסיה נט and what
     // the clearinghouse requires. It teaches a method and never states a
     // conclusion, which is the line that keeps it on the right side of §2.
-    expect(agentNames).toEqual([
-      "blog_recommender",
-      "needs_interview",
-      "procedures_agent",
-      "support_agent",
-    ]);
+    expect(agentNames).toEqual(["blog_recommender", "needs_interview", "procedures_agent", "support_agent"]);
   });
 
   for (const name of agentNames) {
     describe(name, () => {
       const agent = loadAgent(name);
 
-      it("is well-formed and its name matches its filename", () => {
-        expect(agent.name).toBe(name);
-        expect(agent.description.length).toBeGreaterThan(0);
+      it("has a prompt", () => {
         expect(agent.instructions.length).toBeGreaterThan(0);
       });
 
@@ -128,48 +116,9 @@ describe("on-site agent definitions", () => {
         });
       }
 
-      /**
-       * Every one of these chats sits on a public page, and Base44 refuses
-       * `createConversation` outright for an agent that does not allow
-       * anonymous access: 401, "User must be authenticated to create a
-       * conversation". The visitor is told only "לא הצלחתי לשלוח את ההודעה
-       * כרגע", which is what a network blip says too, so the chat can be dead
-       * for days without anyone hearing about it.
-       *
-       * Nobody here chose `false`. The flag was absent from these files until
-       * a Builder "Update base44 packages" commit wrote out the full agent
-       * schema and stamped the server-side default into all three at once —
-       * precisely the drift a future regeneration will reintroduce.
-       */
-      it("is reachable by a signed-out visitor", () => {
-        expect(agent.allow_anonymous_access).toBe(true);
-      });
-
-      it("can reach a human — escalateToHuman is wired as a tool", () => {
-        const fns = (agent.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
-        expect(fns).toContain("escalateToHuman");
-      });
-
       it("opens by disclosing that it is automated", () => {
         expect(agent.instructions).toMatch(/פתיחה — חובה בהודעה הראשונה/);
         expect(agent.instructions).toMatch(/עוזר אוטומטי/);
-      });
-
-      it("never claims to give advice in its own description", () => {
-        expect(agent.description).not.toMatch(/מעניק ייעוץ|נותן ייעוץ פנסיוני/);
-        expect(agent.description).toMatch(/אוטומטי/);
-      });
-
-      it("grants no entity write beyond what its job needs", () => {
-        for (const tool of agent.tool_configs ?? []) {
-          if (!tool.entity_name) continue;
-          expect(tool.allowed_operations ?? [], `${name} → ${tool.entity_name}`).not.toContain(
-            "delete"
-          );
-          if (tool.entity_name === "BlogPost") {
-            expect(tool.allowed_operations).toEqual(["read"]);
-          }
-        }
       });
     });
   }
@@ -227,15 +176,13 @@ describe("the support agent", () => {
   });
 
   it("answers from published content rather than from itself", () => {
-    expect(support.instructions).toMatch(/BlogPost/);
+    expect(support.instructions).toMatch(/listArticles/);
+    expect(support.instructions).toMatch(/readArticle/);
     expect(support.instructions).toMatch(/אל תמציא/);
-    const entities = (support.tool_configs ?? []).map((t) => t.entity_name).filter(Boolean);
-    expect(entities).toContain("BlogPost");
   });
 
   it("can reach a person, and says where the conversation came from", () => {
-    const fns = (support.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
-    expect(fns).toContain("escalateToHuman");
+    expect(support.instructions).toMatch(/escalateToHuman/);
     expect(support.instructions).toMatch(/הגיעה מהצ׳אט שבאתר/);
   });
 
@@ -245,11 +192,9 @@ describe("the support agent", () => {
   });
 
   it("cannot record a contact, whatever its prompt says", () => {
-    // Capability, not instruction. The contact flow is built and dormant, and
-    // the agent that would use it has no phone number to key on — so the tool
-    // is not wired. Re-wiring it is the deliberate act of enabling a channel.
-    const fns = (support.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
-    expect(fns).not.toContain("upsertContact");
+    // The contact flow is built and dormant, and the agent that would use it
+    // has no phone number to key on — so the prompt never offers the tool.
+    expect(support.instructions).not.toMatch(/upsertContact/);
   });
 });
 
@@ -330,9 +275,7 @@ describe("the procedures agent", () => {
 
   it("asks for no contact detail, having a different chat for that", () => {
     expect(prompt).toMatch(/אין בידך שום פרט מזהה עליו/);
-    const fns = (procedures.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
-    expect(fns).not.toContain("upsertContact");
-    expect(fns).not.toContain("submitLead");
+    expect(prompt).not.toMatch(/upsertContact|submitLead/);
   });
 
   it("is reachable: the page mounts it", () => {
@@ -506,14 +449,17 @@ describe("the procedures agent sorts by one test, then by four zones", () => {
   });
 });
 
-describe("escalation reasons agree across prompt, entity and UI config", () => {
-  const declared = loadEntity("Lead").properties.escalation_reason.enum ?? [];
+describe("escalation reasons agree across prompt, function and UI config", () => {
+  const escalationSource = read(join(REPO_ROOT, "supabase/functions/escalate-to-human/escalation.js"));
+  const declared = [
+    ...(escalationSource.match(/export const REASONS = \{([\s\S]*?)\n\};/)?.[1] ?? "").matchAll(/^\s*([a-z_]+):/gm),
+  ].map((m) => m[1]);
 
-  it("the Lead entity declares the full set", () => {
+  it("the escalation function declares the full set", () => {
     expect(declared.length).toBeGreaterThan(0);
   });
 
-  it("every prompt offers exactly the reasons the entity accepts", () => {
+  it("every prompt offers exactly the reasons the function accepts", () => {
     for (const name of agentNames) {
       const prompt = loadAgent(name).instructions;
       const listed = prompt.match(/reason \(אחד מ: ([^)]+)\)/)?.[1];
@@ -651,21 +597,6 @@ describe("the interview agent states its fence in the page, not only in the prom
  * send back to metadata while the notice still names a wider team also fails,
  * because an over-broad disclosure is its own defect.
  */
-describe("the agents' three tools", () => {
-  it("leaves them as forwarders only", () => {
-    const EDGE = { submitLead: "submit-lead", escalateToHuman: "escalate-to-human", logSupportChat: "log-support-chat" };
-    for (const [fn, edge] of Object.entries(EDGE)) {
-      const src = read(join(REPO_ROOT, `base44/functions/${fn}/entry.ts`));
-      for (const banned of ["entities.", "connectors.", "sendMail", "MAILER_URL"]) {
-        expect(src.includes(banned), `${fn} still does work itself (${banned})`).toBe(false);
-      }
-      // The URL is built from EDGE, so pin both halves: the path and the name.
-      expect(src).toContain("/functions/v1/${EDGE}");
-      expect(src, `${fn} forwards to the wrong function`).toContain(`const EDGE = '${edge}';`);
-    }
-  });
-});
-
 describe("who receives a lead, and whether the consent text admits it", () => {
   const submitLead = edgeBundle("submit-lead");
   const escalate = edgeBundle("escalate-to-human");
@@ -730,40 +661,8 @@ describe("who receives a lead, and whether the consent text admits it", () => {
 
 
 
-  it("keeps submitClaim's upstream-reason filter reading the body before it throws", () => {
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    expect(claim, "submitClaim has no upstream-reason filter").toMatch(/function upstreamReasons/);
-    // Read before the status is judged: on a refusal the body is the only
-    // place the cause exists, and throwing first discards it.
-    const readsBody = claim.indexOf("const result = await response.json()");
-    const throwsOnStatus = claim.indexOf("if (!response.ok) throw");
-    expect(readsBody, "submitClaim never reads the mailer's answer").toBeGreaterThan(-1);
-    expect(readsBody, "submitClaim throws on the status before reading the reason").toBeLessThan(throwsOnStatus);
-    // And the reason reaches the warning the operations mail prints.
-    expect(claim, "submitClaim drops the reason it just read").toMatch(/mailer_http_\$\{response\.status\}\$\{why\}/);
-  });
-
-  it("keeps createConsultationEvent's calendar provider table declared, used and the only route out", () => {
-    const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
-    expect(consultation, "createConsultationEvent has no calendar provider table").toMatch(/const CALENDARS = \{/);
-    expect(consultation, "createConsultationEvent declares the table but never uses it").toMatch(/CALENDARS\[provider\]/);
-    // Posting straight at one vendor is how the table gets bypassed without
-    // anyone editing it.
-    expect(consultation, "createConsultationEvent calls a calendar API outside the table").not.toMatch(
-      /fetch\(\s*['"`]https:\/\/(graph\.microsoft|www\.googleapis)/
-    );
-  });
-
-  it("keeps submitClaim's Supabase mirror declared and called", () => {
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    expect(claim, "submitClaim has no Supabase mirror").toMatch(/async function mirrorLeadToSupabase/);
-    expect(claim, "submitClaim declares the mirror but never calls it").toMatch(/await mirrorLeadToSupabase\(/);
-  });
-
   it("keeps the operations mailbox list identical in every function that mails", () => {
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    // The Edge functions share _shared/recipients.ts (DEFAULT_NOTIFY_EMAILS);
-    // Base44's submitClaim still keeps its own copy (NOTIFY_EMAILS).
+    // The Edge functions share _shared/recipients.ts (DEFAULT_NOTIFY_EMAILS).
     const listOf = (src: string, name: string) => {
       const m = /const (?:DEFAULT_)?NOTIFY_EMAILS = \[([^\]]*)\]/.exec(src);
       expect(m, `${name} declares no NOTIFY_EMAILS`).not.toBeNull();
@@ -772,16 +671,13 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     const lists = [
       listOf(submitLead, "submitLead"),
       listOf(escalate, "escalateToHuman"),
-      listOf(claim, "submitClaim"),
     ];
     expect(lists[1], "escalateToHuman drifted from submitLead").toBe(lists[0]);
-    expect(lists[2], "submitClaim drifted from submitLead").toBe(lists[0]);
     // And it is a list rather than a single address that happens to parse.
     expect(JSON.parse(lists[0])).not.toHaveLength(0);
   });
 
   it("keeps the channel taxonomy identical in every function that mails", () => {
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
     const listOf = (src: string, name: string) => {
       const i = src.indexOf("const CHANNEL_TAXONOMY = [");
       expect(i, `${name} declares no CHANNEL_TAXONOMY`).toBeGreaterThan(-1);
@@ -790,10 +686,8 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     const lists = [
       listOf(submitLead, "submitLead"),
       listOf(escalate, "escalateToHuman"),
-      listOf(claim, "submitClaim"),
     ];
     expect(lists[1], "escalateToHuman drifted from submitLead").toBe(lists[0]);
-    expect(lists[2], "submitClaim drifted from submitLead").toBe(lists[0]);
     // And it agrees with the client-side taxonomy, minus the server-only
     // "unknown" catch-all the client never produces.
     const clientSide = read(join(REPO_ROOT, "src/lib/attribution.ts"));
@@ -830,7 +724,6 @@ describe("who receives a lead, and whether the consent text admits it", () => {
    * seen the enquiry that produced it. `COMPLIANCE.md` §6 says so.
    */
   it("invites everyone the mail reaches, and nobody it does not", () => {
-    const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
     const addresses = (src: string, decl: string, name: string) => {
       const i = src.indexOf(decl);
       expect(i, `${name} declares no ${decl}`).toBeGreaterThan(-1);
@@ -848,22 +741,6 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(recipients).toMatch(/CALENDAR_ATTENDEES: readonly string\[\] = \[SECONDARY_EMAIL, \.\.\.NOTIFY_EMAILS\]/);
     expect(recipients).toMatch(/INVITE_ATTENDEES: readonly string\[\] = CALENDAR_ATTENDEES\.filter\(/);
     expect(recipients).toMatch(/INVITE_FALLBACK_GOOGLE: string \| null = NOTIFY_EMAILS\.includes\(GOOGLE_CALENDAR_OWNER\)/);
-
-    // Base44's createConsultationEvent still lists its own.
-    for (const [src, name] of [[consultation, "createConsultationEvent"]] as const) {
-      const invited = addresses(src, "const CALENDAR_ATTENDEES = [", name);
-      // Nobody in the diary who is not on the enquiry.
-      expect(
-        invited.filter((a) => !mailed.includes(a)),
-        `${name}: invited to the meeting without receiving the enquiry`
-      ).toEqual([]);
-      // And nobody on the enquiry who is missing from the diary — the direction
-      // that fails silently, since an absent invitation looks like no meeting.
-      expect(
-        mailed.filter((a) => !invited.includes(a)),
-        `${name}: receives the enquiry but gets no entry in the diary`
-      ).toEqual([]);
-    }
   });
 
   /**
@@ -904,35 +781,15 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     );
   });
 
-  it("asks Google to actually send the invitations", () => {
-    // Graph sends them itself. Google adds the attendee and stays silent unless
-    // `sendUpdates=all` is on the URL — so without it the invite never arrives
-    // and the diary the person checks stays empty, with no error anywhere.
-    // (submit-lead sends its invitations by mail instead.)
-    const consultation = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
-    expect(consultation, "createConsultationEvent adds attendees to Google without asking it to notify them").toMatch(
-      /googleapis\.com[^']*sendUpdates=all/
-    );
-  });
-
   /**
-   * The mirror is the fifth duplicated helper, and its drift is the quietest of
-   * the lot. It cannot throw — Base44 is authoritative during the migration and
-   * a failed shadow write must never cost a visitor their enquiry — so a copy
-   * that stops working stops working in silence. One function's leads reach
-   * Supabase, another's do not, and the only trace is a log line nobody reads.
-   */
-  /**
-   * The device label is the sixth duplicated helper. Its drift is cosmetic
+   * The device label is a duplicated helper. Its drift is cosmetic
    * rather than dangerous — a wrong label on a notification is not a lost
    * enquiry — but three copies of a regex are three chances for one to learn
    * about a device the others do not, and then the same phone reads as
    * "אנדרואיד" on a claim and "לא ידוע" on an escalation.
    */
   it("keeps the device label identical in every function that notifies", () => {
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    // The Edge functions share one module; submitClaim is the only Base44 copy.
-    for (const [src, name] of [[submitLead, "submit-lead"], [escalate, "escalate-to-human"], [claim, "submitClaim"]] as const) {
+    for (const [src, name] of [[submitLead, "submit-lead"], [escalate, "escalate-to-human"]] as const) {
       expect(src, `${name} declares the device label but never uses it`).toMatch(/deviceLabel\(/);
       expect(src, `${name} never puts it in the notification`).toMatch(/נשלח מ/);
     }
@@ -946,21 +803,13 @@ describe("who receives a lead, and whether the consent text admits it", () => {
    * meeting was booked at 13:00. One copy learning that and not the other is
    * how Google and Outlook end up holding the same meeting an hour apart.
    */
-  it("keeps the wall-clock conversion identical in both calendar writers", () => {
-    const google = read(join(REPO_ROOT, "base44/functions/createConsultationEvent/entry.ts"));
-    const bodyOf = (src: string, name: string) => {
-      const i = src.indexOf("function wallClock");
-      expect(i, `${name} has no wall-clock helper`).toBeGreaterThan(-1);
-      return src.slice(i, src.indexOf("\n}", i)).replace(/\s+/g, " ").trim();
-    };
-    expect(bodyOf(google, "createConsultationEvent"), "the two calendar writers drifted").toBe(
-      bodyOf(submitLead, "submitLead")
-    );
+  it("converts the agreed time through the wall-clock helper, never through an instant", () => {
+    expect(submitLead.indexOf("function wallClock"), "submitLead has no wall-clock helper").toBeGreaterThan(-1);
     // Comments stripped first: the helper's own docstring names the bug it
     // replaced, and a scan of the prose would keep finding it there forever.
     const code = (src: string) =>
       src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-    for (const [src, name] of [[submitLead, "submitLead"], [google, "createConsultationEvent"]] as const) {
+    for (const [src, name] of [[submitLead, "submitLead"]] as const) {
       expect(src, `${name} declares the helper but never uses it`).toMatch(/wallClock\(/);
       // The bug this replaced, in the shape it had: a scheduled time pushed
       // through a real instant and then labelled with a timeZone.
@@ -976,8 +825,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     // copy that silently failed to her looked the same as one that arrived.
     // CORE_EMAILS and the branch that used it are gone from all three —
     // dorit-mailer is the only transport left, and it reaches everyone.
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    for (const [src, name] of [[submitLead, "submitLead"], [escalate, "escalateToHuman"], [claim, "submitClaim"]] as const) {
+    for (const [src, name] of [[submitLead, "submitLead"], [escalate, "escalateToHuman"]] as const) {
       // Comments still name Core.SendEmail, explaining why it once existed —
       // only actual code is disqualifying here.
       const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
@@ -989,8 +837,7 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   it("gives every mailbox its own delivery attempt", () => {
     // One `try` around the whole loop would let the first bounce swallow the
     // rest of the list. The catch has to be inside the loop, in each function.
-    const claim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-    for (const [name, src] of [["submitLead", submitLead], ["submitClaim", claim]] as const) {
+    for (const [name, src] of [["submitLead", submitLead]] as const) {
       const i = src.search(OPS_FANOUT);
       expect(i, `${name} does not iterate the mailbox list`).toBeGreaterThan(-1);
       const loop = src.slice(i, i + 700);
@@ -1007,15 +854,10 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   });
 
   it("keeps every copy of redact() identical", () => {
-    // Each Edge function that redacts keeps its own copy, and upsertContact (a
-    // Base44 function, so no shared module) the last Base44 one. Duplicated is
+    // Each Edge function that redacts keeps its own copy. Duplicated is
     // fine; drifted is not.
-    //
-    // `upsertContact` redacts a note taken from a WhatsApp message, where
-    // people paste an ID number or a policy number without being asked for one.
     const norm = (src: string) => topLevelFn(src, "redact").replace(/\s+/g, " ").trim();
     const copies = {
-      upsertContact: read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts")),
       "log-support-chat": edgeBundle("log-support-chat"),
       "escalate-to-human": escalate,
     };
@@ -1052,10 +894,6 @@ describe("who receives a lead, and whether the consent text admits it", () => {
     expect(interview.instructions, "the prompt books the diary again").not.toMatch(
       /createConsultationEvent/
     );
-    const tools = (interview.tool_configs ?? []).map((t) => t.function_name);
-    expect(tools, "the calendar function is wired back onto the agent").not.toContain(
-      "createConsultationEvent"
-    );
     // And the one field that now matters is still demanded of it.
     expect(interview.instructions).toMatch(/scheduledAt/);
   });
@@ -1073,11 +911,9 @@ describe("who receives a lead, and whether the consent text admits it", () => {
   describe("the interview agent ends through submitLead, not a bare entity write", () => {
     const interview = loadAgent("needs_interview");
 
-    it("is wired to submitLead and no longer to Lead.create", () => {
-      const fns = (interview.tool_configs ?? []).map((t) => t.function_name).filter(Boolean);
-      expect(fns).toContain("submitLead");
-      const entities = (interview.tool_configs ?? []).map((t) => t.entity_name).filter(Boolean);
-      expect(entities, "a direct Lead write would send no mail at all").not.toContain("Lead");
+    it("ends through submitLead, never a bare write of the lead", () => {
+      expect(interview.instructions).toMatch(/submitLead/);
+      expect(interview.instructions, "a direct Lead write would send no mail at all").not.toMatch(/Lead\.create/);
     });
 
     it("calls it with the source the function knows how to lay out", () => {
@@ -1085,13 +921,11 @@ describe("who receives a lead, and whether the consent text admits it", () => {
       expect(interview.instructions).toMatch(/source='interview'/);
     });
 
-    it("says in so many words that the closing block is what ends an interview", () => {
-      // It used to say "never write the Lead directly; submitLead is the only
-      // way to end an interview". Both halves changed when the page took over
-      // the send (A-59): the agent no longer calls the function at the end, and
-      // the block is now the thing without which nobody hears about the visitor.
-      expect(interview.instructions).toMatch(/```lead/);
-      expect(interview.instructions).toMatch(/בלוק ה-lead הוא הדרך היחידה לסיים ראיון/);
+    it("says in so many words that the closing call is what ends an interview", () => {
+      // The closing submitLead call (stage='complete') is the thing without
+      // which nobody hears about the visitor; there is no fenced block any more.
+      expect(interview.instructions).toMatch(/הקריאה ל-submitLead עם stage='complete' היא הדרך היחידה לסיים ראיון/);
+      expect(interview.instructions).not.toMatch(/```lead/);
     });
 
     it("carries the same data-minimisation rule as the booking agent", () => {
@@ -1172,16 +1006,18 @@ describe("who receives a lead, and whether the consent text admits it", () => {
       expect(interview.instructions).toMatch(/health_flag/);
       expect(interview.instructions).toMatch(/אל תשאל מה, אל תתעד תיאור, אבחנה, תרופה או טיפול/);
       // And nothing downstream grew a place to put one.
-      expect(read(join(REPO_ROOT, "base44/entities/Lead.jsonc"))).not.toMatch(/medical|רפואי/);
+      const columns = leadsColumns();
+      expect(columns.length, "no leads columns found").toBeGreaterThan(10);
+      expect(columns.filter((c) => /medical|health|רפואי/.test(c))).toEqual([]);
     });
 
     /**
      * An email the platform cannot deliver must not be promised.
      *
-     * Base44's `Core.SendEmail` delivers only to registered users of the app —
-     * "Send emails to registered users of your app". A visitor is never one, so
-     * the confirmation the prompt used to offer ("אשלח אליך אישור") could not
-     * arrive, and the interview was making a promise the system fails silently.
+     * The interview first ran where mail reached only registered users of the
+     * app (Base44's `Core.SendEmail`). A visitor is never one, so the
+     * confirmation the prompt used to offer ("אשלח אליך אישור") could not
+     * arrive, and the interview was making a promise the system failed silently.
      * The address is still worth asking for; it is a way to reach them, not a
      * mailbox the site can write to.
      */
@@ -1190,14 +1026,8 @@ describe("who receives a lead, and whether the consent text admits it", () => {
       expect(interview.instructions).toMatch(/אל תבטיח שיישלח אישור או עותק למייל/);
     });
 
-    it("does not report on a send it does not perform", () => {
-      // This asked the agent to announce a failed save. It no longer performs
-      // the save at all — the page does (A-59) — so any such announcement is a
-      // guess, and in practice it guessed wrong: visitors were told the system
-      // was broken while the enquiry had in fact been delivered. The page shows
-      // the direct channels itself when the submission really does fail.
-      expect(interview.instructions).toMatch(/אל תאמר למבקר שלא הצלחת לשמור/);
-      expect(interview.instructions).toMatch(/השליחה אינה בידיך אלא בידי הדף/);
+    it("reports only what the function returned", () => {
+      expect(interview.instructions).toMatch(/אל תמציא הצלחה ואל תמציא כשל/);
     });
 
     it.skip("does not announce a failure it never attempted", () => {
@@ -1239,15 +1069,14 @@ describe("who receives a lead, and whether the consent text admits it", () => {
  * RTL message; no `text-align`; a different panel colour; and no escaping at all
  * on a name that arrives from a public form.
  *
- * The shape is shared by duplication, because Base44 gives these entry points no
- * module to share — the same arrangement `redact()` is under, and the same rule:
- * duplicated is fine, drifted is not. What differs between messages is content,
+ * The shape lives in one shared module (supabase/functions/_shared/html.ts);
+ * where a copy exists, the rule is the one `redact()` is under: duplicated is
+ * fine, drifted is not. What differs between messages is content,
  * and content is passed in.
  */
 describe("the letter a customer gets", () => {
   const submitLead = edgeBundle("submit-lead");
-  const submitClaim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
-  const CUSTOMER_MAILERS = { submitLead, submitClaim };
+  const CUSTOMER_MAILERS = { submitLead };
 
   /** A top-level function, from its signature to the start of the next one. */
   const fnSource = (src: string, name: string): string => {
@@ -1310,8 +1139,8 @@ describe("the letter a customer gets", () => {
 /**
  * The event log in Google Sheets.
  *
- * Two functions append to one sheet, and Base44 gives them no shared module —
- * so the column order exists twice. Nothing fails when the two disagree: rows
+ * Two functions append to one sheet, each with its own column list — so the
+ * column order exists twice. Nothing fails when the two disagree: rows
  * keep appending, in the wrong columns, and the corruption is only visible to
  * whoever reads the sheet weeks later. That is what these pin.
  */
@@ -1320,8 +1149,7 @@ describe("the event log in Google Sheets", () => {
     submitLead: edgeBundle("submit-lead"),
     escalateToHuman: edgeBundle("escalate-to-human"),
   };
-  /** The other two writers, each on its own tab of the same spreadsheet. */
-  const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
+  /** The support log writes its own tab of the same spreadsheet. */
   const supportLog = edgeBundle("log-support-chat");
 
   const block = (src: string, start: string, close: string): string => {
@@ -1329,15 +1157,6 @@ describe("the event log in Google Sheets", () => {
     expect(i, `${start} is missing`).toBeGreaterThan(-1);
     return src.slice(i, src.indexOf(close, i) + close.length).replace(/\s+/g, " ").trim();
   };
-
-  it("declares the connector the contact writer still asks for", () => {
-    expect(contacts).toMatch(/getConnection\('googlesheets'\)/);
-    const connector = read(join(REPO_ROOT, "base44/connectors/googlesheets.jsonc"));
-    expect(connector).toMatch(/"type":\s*"googlesheets"/);
-    expect(connector).toMatch(/auth\/spreadsheets/);
-    // The narrower scope on purpose: drive would reach every other file.
-    expect(connector).not.toMatch(/auth\/drive/);
-  });
 
   it("asks the profile only for labels the schema defines", () => {
     const submitLead = writers.submitLead;
@@ -1361,12 +1180,10 @@ describe("the event log in Google Sheets", () => {
     }
   });
 
-  it("stores formula-like values and leading-zero numbers as text, with one rule in both appenders", () => {
+  it("stores formula-like values and leading-zero numbers as text, with one rule, in the shared appender", () => {
     // USER_ENTERED runs a cell starting = + - @ (or a tab or CR) as a formula.
-    // The Base44 copy is a hand duplicate of _shared/sheets.ts's sheetCell.
     const rule = "return /^[=+\\-@\\t\\r]/.test(s) || /^0\\d+$/.test(s) ? `'${s}` : s;";
     expect(read(join(REPO_ROOT, "supabase/functions/_shared/sheets.ts"))).toContain(rule);
-    expect(contacts).toContain(rule);
     expect(read(join(REPO_ROOT, "supabase/functions/_shared/sheets.ts"))).toContain("row.map(sheetCell)");
   });
 
@@ -1434,89 +1251,6 @@ describe("the event log in Google Sheets", () => {
 });
 
 /**
- * The contact behind the enquiries.
- *
- * `Lead` is an event: one enquiry, at one moment, with whatever was said in it.
- * `Contact` is the person those enquiries came from, and WhatsApp is why it
- * exists — there, the phone number arrives with the message, before a name and
- * before any consent screen, and the same person can write again next month
- * from the same number with nothing to tie the two together.
- *
- * Two failures are worth pinning. The first is quiet duplication: the number
- * spelled `972…` by the channel and `05…` by the site is one person, and two
- * rows mean Dorit rings someone she has already spoken to as a stranger. The
- * second is the channel's own hazard — a number that was never requested is
- * still personal data, and a person who was never asked has to be told what was
- * kept and be able to have it removed.
- */
-describe("the contact record behind the enquiries", () => {
-  const contacts = read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts"));
-  const entity = read(join(REPO_ROOT, "base44/entities/Contact.jsonc"));
-  const support = loadAgent("support_agent");
-
-  it("keys the record on the phone number and nothing else", () => {
-    expect(entity).toMatch(/"required":\s*\[\s*"phone"\s*\]/);
-    expect(contacts).toMatch(/Contact\.filter\(\{ phone: key \}\)/);
-  });
-
-  it("normalises the number before it becomes a key", () => {
-    // Without this the entity has three rows for one person and the filter
-    // above matches none of them.
-    expect(contacts).toMatch(/function normalisePhone\(/);
-    expect(contacts).toMatch(/startsWith\('972'\)/);
-  });
-
-  it("asks for nothing the agency has no reason to hold", () => {
-    // Minimisation under חוק הגנת הפרטיות: the fields are the ones needed to
-    // call someone back. An ID number, a policy number or anything medical has
-    // no field to land in, so a prompt change alone cannot start storing them.
-    const fields = Object.keys((parseJsonc(entity) as { properties: Record<string, unknown> }).properties);
-    expect(fields).toEqual(["phone", "name", "email", "channel", "notes", "last_seen"]);
-  });
-
-  it("redacts the free-text note the way every other model-written text is", () => {
-    expect(contacts).toMatch(/const safeNotes = redact\(notes\)/);
-  });
-
-  it("returns what was stored, so a caller can read it back rather than guess", () => {
-    // The confirmation step this exists for: a number kept without being asked
-    // for has to be disclosed, correctable and erasable, and an agent that
-    // recited the request instead of the record would be confirming nothing.
-    expect(contacts).toMatch(/saved: \{ phone: key/);
-  });
-
-  it("is wired to no agent, and is dormant until a channel needs it", () => {
-    // Built, tested and switched off. `support_agent` is the only agent that
-    // would call it, and it answers in the site chat where there is no phone
-    // number to key on — so the tool is not on its list. Enabling a channel is
-    // then a deliberate act, not a prompt edit.
-    for (const name of agentNames) {
-      const fns = (loadAgent(name).tool_configs ?? []).map((t) => t.function_name);
-      expect(fns, `${name} can write contacts`).not.toContain("upsertContact");
-    }
-  });
-
-  it("writes new contacts to their own tab, not the event log", () => {
-    // Same spreadsheet, different sheet. A row per message would turn the list
-    // of people into a second event log, and one of those already exists.
-    expect(contacts).toMatch(/SHEET_TAB_CONTACTS.*\|\| 'Contacts'/);
-    expect(contacts).toMatch(/if \(created\) \{/);
-  });
-
-  it("sends no mail when someone says hello", () => {
-    expect(contacts).not.toMatch(/sendMail|SendEmail|MAILER_URL/);
-  });
-
-  it("keeps the record admin-only, like the leads it sits beside", () => {
-    const rls = (parseJsonc(entity) as { rls: Record<string, unknown> }).rls;
-    expect(rls.create).toBe(true);
-    for (const op of ["read", "update", "delete"]) {
-      expect(rls[op], op).toEqual({ user_condition: { role: "admin" } });
-    }
-  });
-});
-
-/**
  * The support chat on the site, and the record it keeps.
  *
  * A chat that keeps its transcript has to say so before it starts, and the
@@ -1548,7 +1282,7 @@ describe("the support chat on the site", () => {
     // The interview's notice promises that a name and a phone number are
     // collected. Shown here it would be a precise description of processing
     // that does not happen — and consent to that is not consent to this.
-    expect(agentsConfig).toMatch(/consentPoints: SUPPORT_CONSENT_POINTS/);
+    expect(compliance).toMatch(/support_agent: CHAT_FUNCTION_SUPPORT_CONSENT_POINTS/);
     expect(compliance).toMatch(/export const SUPPORT_CONSENT_POINTS/);
     const points = compliance.slice(compliance.indexOf("SUPPORT_CONSENT_POINTS"));
     expect(points).toContain("תוכן השיחה נשמר אצל דורית");
@@ -1563,20 +1297,6 @@ describe("the support chat on the site", () => {
     expect(descriptor.slice(0, descriptor.indexOf("},\n  blogRecommender"))).toMatch(/guardrails/);
   });
 
-  it("logs the conversation once, at the end, and says nothing about it", () => {
-    expect(support.instructions).toMatch(/רישום השיחה — פעם אחת, בסופה/);
-    expect(support.instructions).toMatch(/logSupportChat/);
-    expect(support.instructions).toMatch(/קריאה אחת לשיחה/);
-    expect(support.instructions).toMatch(/אל תדווח עליו/);
-  });
-
-  it("leans on the notice for disclosure rather than repeating it", () => {
-    // Silence about the logging is fine here precisely because the visitor
-    // accepted a notice before typing — which is why the notice has to say it,
-    // and why the case above fails if it stops.
-    expect(support.instructions).toMatch(/כבר נאמרה למבקר בהודעת ההסכמה/);
-  });
-
   it("writes the support log to its own tab, with a fixed set of outcomes", () => {
     expect(log).toMatch(/SHEET_TAB_SUPPORT'\) \|\| 'Support'/);
     expect(log).toMatch(/const OUTCOMES: Record<string, string> = \{/);
@@ -1586,31 +1306,6 @@ describe("the support chat on the site", () => {
   it("redacts the transcript before it is written anywhere", () => {
     expect(log).toMatch(/const safeTranscript: string = redact\(transcript\)/);
     expect(log).toMatch(/const safeTopic: string = redact\(topic\)/);
-  });
-
-  it("keys the support row on the same normalised number as the contact list", () => {
-    // The site chat sends no number, so today this column is always empty.
-    // It is pinned anyway: two tabs of one spreadsheet normalised differently
-    // cannot be read together, and that would surface on the day a channel
-    // that does have a number is switched on — long after this was written.
-    // The Edge copy is TypeScript, so the two are compared by what they return.
-    const compile = (src: string, ts: boolean) => {
-      const start = src.indexOf("function normalisePhone(");
-      expect(start, "normalisePhone is missing").toBeGreaterThan(-1);
-      const fn = src.slice(start, src.indexOf("\n}", start) + 2);
-      const js = ts ? transformSync(fn, { loader: "ts" }).code : fn;
-      return new Function(`${js}; return normalisePhone;`)() as (raw: unknown) => string;
-    };
-    const edge = compile(log, true);
-    const base44 = compile(read(join(REPO_ROOT, "base44/functions/upsertContact/entry.ts")), false);
-    for (const raw of ["0501234567", "+972 50-123-4567", "972501234567", "501234567", "", null, undefined, "abc"]) {
-      expect(edge(raw), String(raw)).toBe(base44(raw));
-    }
-  });
-
-  it("gives the agent the tool it is told to call", () => {
-    const names = (support.tool_configs ?? []).map((t) => t.function_name ?? t.entity_name);
-    expect(names).toContain("logSupportChat");
   });
 });
 
@@ -1629,8 +1324,7 @@ describe("the reading recommender's notice", () => {
   )?.[1];
 
   it("is its own, not the interview's", () => {
-    const descriptor = agentsConfig.slice(agentsConfig.indexOf('agent: "blog_recommender"'));
-    expect(descriptor).toMatch(/consentPoints: BLOG_RECOMMENDER_CONSENT_POINTS/);
+    expect(compliance).toMatch(/blog_recommender: CHAT_FUNCTION_BLOG_CONSENT_POINTS/);
     expect(points, "no BLOG_RECOMMENDER_CONSENT_POINTS").toBeDefined();
     expect(points).not.toContain("נאספים שם וטלפון בלבד");
   });
@@ -1836,129 +1530,11 @@ describe("what the head claims the practice is", () => {
   });
 });
 /**
- * The whole agent configuration except the prose.
- *
- * The prompts are pinned clause by clause above, because a reworded paragraph
- * is the drift everyone expects. This pins everything that is *not* a prompt,
- * because the drift that actually took the site down came from the other
- * direction: `7bce20c` — a Builder "Update base44 packages" commit — wrote out
- * the full agent schema and stamped eighteen previously-absent server defaults
- * into all three files at once. Two of the eighteen carried behaviour.
- * `allow_anonymous_access: false` returned 401 on every conversation and killed
- * every chat on the site for ten days (A-42). `memory_config` decided whether
- * three agents that anonymous strangers share retain what they are told. The
- * review that merged it could not have caught either: the diff was seventy
- * lines of `\uXXXX`-escaped Hebrew with the flags buried in it.
- *
- * So the test reads that diff for you. Any key the platform adds, or any value
- * a regeneration changes, fails here and names itself, and the only way to go
- * green is for a person to open this file and type the new value on purpose.
- *
- * `toEqual` against a literal, deliberately — never `toMatchSnapshot` or
- * `toMatchInlineSnapshot`. `vitest -u` rewrites a snapshot mechanically, with
- * nobody reading the delta, which reproduces the exact failure this exists to
- * prevent, one layer up.
- */
-const NON_PROMPT_SURFACE = {
-  context_files: [],
-  app_user_connector_configs: [],
-  selected_skill_names: [],
-  selected_workspace_skill_ids: [],
-  // Worth a decision of its own one day: the model behind a compliance-critical
-  // prompt can change without a commit. Pinned here so at least the *setting*
-  // cannot change without one.
-  model: "automatic",
-  whatsapp_greeting: null,
-  telegram_greeting: null,
-  line_greeting: null,
-  // Off, deliberately. `scope: "both"` includes a bucket shared across all end
-  // users, and every one of these chats is reached by anonymous visitors who
-  // are indistinguishable from one another — so "remember across conversations"
-  // and "remember across strangers" are the same setting here. The prompts are
-  // built around collecting the minimum and forgetting it; agent memory is
-  // platform-side, upstream of every guardrail this repo owns, and a
-  // `privacy_request` handoff cannot reach it. The scope is left as-is rather
-  // than tidied: with `enabled: false` it selects nothing, and changing two
-  // fields would make a future diff harder to read than changing one.
-  memory_config: {
-    enabled: false,
-    scope: "both",
-    include_other_conversation_context: false,
-    instructions: null,
-  },
-  voice_config: { voice_id: null },
-  emails_settings: null,
-  // The flag whose silent flip to `false` returned 401 on every conversation.
-  // Also asserted on its own above, where the failure message can say what it
-  // costs a visitor; here it is one field among the eighteen.
-  allow_anonymous_access: true,
-} as const;
-
-/** Capability, per agent. The one place a new tool cannot arrive unnoticed. */
-const TOOL_CONFIGS: Record<string, unknown[]> = {
-  blog_recommender: [
-    { entity_name: "BlogPost", allowed_operations: ["read"] },
-    { function_name: "escalateToHuman" },
-  ],
-  // No calendar function: `submitLead` writes the diary itself, server-side, in
-  // the request that saved the lead. See "does not ask the model to book the
-  // diary as a second step".
-  needs_interview: [
-    { function_name: "submitLead" },
-    { function_name: "escalateToHuman" },
-  ],
-  support_agent: [
-    { entity_name: "BlogPost", allowed_operations: ["read"] },
-    { function_name: "logSupportChat" },
-    { function_name: "escalateToHuman" },
-  ],
-  // Same capability as the support agent, and deliberately no more. It answers
-  // from published content and the regulator's own sites; it writes nothing,
-  // books nothing, and collects nothing — a visitor who wants to be called back
-  // is sent to the interview, which is built to ask for that.
-  procedures_agent: [
-    { entity_name: "BlogPost", allowed_operations: ["read"] },
-    { function_name: "logSupportChat" },
-    { function_name: "escalateToHuman" },
-  ],
-};
-
-/** Everything in the file that is configuration rather than prose. */
-const nonPromptSurface = (name: string): Record<string, unknown> => {
-  const raw = parseJsonc(
-    readFileSync(join(AGENTS_DIR, `${name}.jsonc`), "utf8")
-  ) as Record<string, unknown>;
-  delete raw.instructions;
-  delete raw.description;
-  raw.tool_configs = (raw.tool_configs as Array<Record<string, unknown>>).map((tool) => {
-    const copy = { ...tool };
-    // A tool description is prose too, and is pinned by the compliance block.
-    delete copy.description;
-    return copy;
-  });
-  return raw;
-};
-
-describe("the configuration nobody typed by hand", () => {
-  for (const name of agentNames) {
-    it(`${name} carries exactly the settings someone chose`, () => {
-      expect(nonPromptSurface(name)).toEqual({
-        ...NON_PROMPT_SURFACE,
-        tool_configs: TOOL_CONFIGS[name],
-        name,
-      });
-    });
-  }
-});
-
-/**
- * The public entry points' guards, duplicated because Base44 functions share
- * no module. A drifted copy is a hole in exactly one door: a looser isEmail or
+ * The public entry points' guards. A drifted copy is a hole in exactly one door: a looser isEmail or
  * greetingName in one function makes that one the relay again.
  */
 describe("the guards on the no-sign-in functions", () => {
   const submitLead = edgeBundle("submit-lead");
-  const submitClaim = read(join(REPO_ROOT, "base44/functions/submitClaim/entry.ts"));
   const edgeClaim = read(join(REPO_ROOT, "supabase/functions/submit-claim/handler.ts"));
   const claimForm = read(join(REPO_ROOT, "src/components/dorit/forms/ClaimForm.tsx"));
 
@@ -1970,7 +1546,7 @@ describe("the guards on the no-sign-in functions", () => {
   };
 
   it("checks the address and the daily limit before every visitor confirmation", () => {
-    for (const [name, src] of [["submitLead", submitLead], ["submitClaim", submitClaim], ["submit-claim", edgeClaim], ["submit-lead", read(join(REPO_ROOT, "supabase/functions/submit-lead/handler.ts"))]]) {
+    for (const [name, src] of [["submit-claim", edgeClaim], ["submit-lead", read(join(REPO_ROOT, "supabase/functions/submit-lead/handler.ts"))]]) {
       // The send's own property line, not the log lines that mention the role.
       const at = src.search(/role: 'visitor',\s*\n/);
       expect(at, `${name} sends no visitor confirmation`).toBeGreaterThan(-1);
@@ -1986,7 +1562,6 @@ describe("the guards on the no-sign-in functions", () => {
       expect(m, "CLAIM_TYPES is missing").not.toBeNull();
       return [...m![1].matchAll(/["']([^"']+)["']/g)].map((x) => x[1]);
     };
-    expect(list(submitClaim)).toEqual(list(claimForm));
     expect(list(edgeClaim)).toEqual(list(claimForm));
   });
 });

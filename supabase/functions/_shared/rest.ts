@@ -2,8 +2,8 @@
  * One row into a Supabase table through PostgREST, with the service key, and
  * the row as stored — its generated `id` is the lead id the page reports.
  *
- * Plain `fetch`, as the Base44 functions' mirror writes have always been: no
- * client library, so the in-process test harness runs it unchanged.
+ * Plain `fetch`, no client library, so the in-process test harness runs it
+ * unchanged.
  *
  * A refusal is reported by status and PostgREST's error code only. Its message
  * and details can quote the row back ("Failing row contains (…)"), which is

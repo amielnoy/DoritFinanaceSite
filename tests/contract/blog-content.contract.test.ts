@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { REPO_ROOT, loadEntity, validateAgainstEntity } from "../helpers/entity-schema";
+import { REPO_ROOT } from "../helpers/entity-schema";
 
 /**
  * The repo-held blog articles.
@@ -57,10 +57,9 @@ describe("repo-held blog articles", () => {
     expect(articles.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("the BlogPost entity declares action_time as an optional string", () => {
-    const entity = loadEntity("BlogPost") as { properties: Record<string, { type: string }>; required: string[] };
-    expect(entity.properties.action_time?.type).toBe("string");
-    expect(entity.required).not.toContain("action_time");
+  it("the blog table declares action_time as an optional text column", () => {
+    const sql = readFileSync(join(REPO_ROOT, "supabase/migrations/20261011000000_blog_action_time.sql"), "utf8");
+    expect(sql).toMatch(/add column (if not exists )?action_time text\b(?![^;]*not null)/i);
   });
 
   for (const article of articles) {
@@ -98,19 +97,6 @@ describe("repo-held blog articles", () => {
 
       it("keeps its optional action time short enough for a chip", () => {
         expect(article.action_time.length).toBeLessThanOrEqual(ACTION_TIME_MAX);
-      });
-
-      it("maps onto the BlogPost entity without stray fields", () => {
-        const issues = validateAgainstEntity(loadEntity("BlogPost"), {
-          title: article.title,
-          excerpt: article.excerpt,
-          body: article.body,
-          tags: article.tags,
-          action_time: article.action_time,
-          image_url: "",
-          published: article.published,
-        });
-        expect(issues).toEqual([]);
       });
 
       it("ships as a draft — publishing is a human decision", () => {

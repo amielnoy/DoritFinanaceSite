@@ -49,7 +49,7 @@ describe("many meetings per lead", () => {
         .split("\n")
         .filter((l) => !/^\s*(--|\/\/|\*|\/\*)/.test(l))
         .join("\n");
-    const offenders = sources("supabase/functions", "src", "api", "base44/functions", "scripts", "supabase/migrations").filter((file) =>
+    const offenders = sources("supabase/functions", "src", "api", "scripts", "supabase/migrations").filter((file) =>
       /on_conflict=lead_id|onConflict:?\s*["']lead_id|on conflict \(lead_id\)|upsertRow\(\s*["']meetings/.test(code(file)),
     );
     expect(offenders).toEqual([]);

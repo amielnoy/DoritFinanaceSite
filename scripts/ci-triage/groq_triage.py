@@ -40,7 +40,7 @@ MAX_TOKENS = int(os.getenv("TRIAGE_MAX_TOKENS", "3000"))
 MAX_CLUSTERS = 15
 MAX_DIFFS = 3
 # A path in a stack frame, e.g. "e2e/ui/home.spec.ts:62" or "src/pages/Home.tsx".
-PATH_IN_TRACE = re.compile(r"(?:^|[\s(/])((?:src|e2e|tests|api|supabase|scripts|base44)/[\w./-]+\.\w+)")
+PATH_IN_TRACE = re.compile(r"(?:^|[\s(/])((?:src|e2e|tests|api|supabase|scripts)/[\w./-]+\.\w+)")
 
 
 def _cut(text, n):

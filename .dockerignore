@@ -5,5 +5,4 @@ playwright-report
 .git
 .env
 .env.*
-base44/.app.jsonc
 *.log

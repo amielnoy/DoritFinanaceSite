@@ -160,7 +160,7 @@ describe("planArticles", () => {
     expect(readFileImpl).not.toHaveBeenCalled();
   });
 
-  it("refuses the fixture in a bundle that reads no Supabase (the Base44 path)", async () => {
+  it("refuses the fixture in a bundle that reads no Supabase", async () => {
     await expect(
       planArticles({ PRERENDER_ARTICLES_FIXTURE: "f.json" }, { readFileImpl: readFixture(FIXTURE) }),
     ).rejects.toThrow(/this bundle reads no Supabase/);

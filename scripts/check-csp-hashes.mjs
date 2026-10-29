@@ -3,8 +3,7 @@
 //
 // vercel.json's `script-src` allows inline scripts by hash, not with
 // 'unsafe-inline'. A hash is of the script's exact text, so any change to it —
-// an edit to the gtag snippet in index.html, the one inline script since the
-// Base44 plugin's page-view logger was turned off (2026-10-17) — leaves a
+// an edit to the gtag snippet in index.html, the one inline script — leaves a
 // script the browser silently refuses. Nothing on the page says
 // so; analytics just stop. Run after `vercel build`, this fails the deploy
 // instead, naming the hash to add.

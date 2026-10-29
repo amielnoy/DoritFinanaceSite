@@ -97,10 +97,9 @@ export class SupabaseAuthService implements AuthPort {
   }
 
   /**
-   * Base44 gated on an app-level reachability check that could reject with
-   * "you are not a user of this app". Supabase has no such notion — a project
-   * either answers or does not — so this resolves and the real decision is made
-   * by `me()` and by row-level security.
+   * An app-level reachability check. Supabase has no notion of "not a user of
+   * this app" — a project either answers or does not — so this resolves and
+   * the real decision is made by `me()` and by row-level security.
    */
   async getPublicSettings(): Promise<unknown> {
     return {};
@@ -191,8 +190,7 @@ export class SupabaseAuthService implements AuthPort {
       provider: "google",
       // Always ask which Google account. Without it Google signs the browser
       // straight back into the account it remembers, so signing out to switch
-      // accounts lands the visitor in the same one again. Base44's Google
-      // sign-in already sends this.
+      // accounts lands the visitor in the same one again.
       options: { redirectTo: absoluteOnThisOrigin(returnUrl), queryParams: { prompt: "select_account" } },
     });
     if (error) throw new Error(error.message ?? "Google sign-in did not start");

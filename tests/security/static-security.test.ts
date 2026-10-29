@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { REPO_ROOT, entityNames, loadEntity } from "../helpers/entity-schema";
-import { read, rel, sourceFiles } from "../helpers/source-scan";
+import { REPO_ROOT } from "../helpers/entity-schema";
+import { filesUnder, read, rel, sourceFiles } from "../helpers/source-scan";
 
 const FILES = sourceFiles();
 const INDEX_HTML = readFileSync(join(REPO_ROOT, "index.html"), "utf8");
@@ -43,18 +43,12 @@ describe("no secrets in the repo", () => {
   it("keeps env files out of version control", () => {
     const files = tracked();
     if (files === null) {
-      // No .git here — the .gitignore assertion below still covers the rule.
+      // No .git here (the test image): no .env on disk is the next best check.
       expect(existsSync(join(REPO_ROOT, ".env"))).toBe(false);
       return;
     }
     const committed = files.filter((f) => /(^|\/)\.env($|\.)/.test(f));
     expect(committed).toEqual([]);
-  });
-
-  it("gitignores the local env and the Base44 app pointer", () => {
-    const ignore = readFileSync(join(REPO_ROOT, ".gitignore"), "utf8");
-    expect(ignore).toMatch(/^\.env$/m);
-    expect(ignore).toMatch(/base44\/\.app\.jsonc/);
   });
 });
 
@@ -147,6 +141,19 @@ describe("auth and token handling", () => {
     expect(login).toMatch(/services\.auth\.signInWithGoogle\(\s*returnTo\s*\)/);
   });
 
+  it("no first-party file touches a Base44 token in storage", () => {
+    // Sign-in is Supabase's now; nothing may read, write or clear a token the
+    // retired Base44 SDK kept in the browser (inverts the retired SEC-STA-018).
+    const files = filesUnder(["src", "api"]).map((f) => join(REPO_ROOT, f));
+    expect(files.length, "no tracked src/ or api/ files found").toBeGreaterThan(0);
+    const TOKEN_KEY = /(?:localStorage|sessionStorage)\s*\.\s*(?:getItem|setItem|removeItem)\s*\(\s*["'`]token["'`]|(?:localStorage|sessionStorage)\s*\[\s*["'`]token["'`]\s*\]/;
+    const hits = files.filter((f) => {
+      const src = read(f);
+      return /base44_access_token/.test(src) || TOKEN_KEY.test(src);
+    }).map(rel);
+    expect(hits).toEqual([]);
+  });
+
   it("admin routes stay behind a gate that requires sign-in and an agency role (agency roles)", () => {
     // Each agency screen sits inside AgencyRoute at the least role it needs; the
     // gate delegates to ProtectedRoute when signed out, asks the database for
@@ -202,22 +209,5 @@ describe("auth and token handling", () => {
     expect(board).not.toMatch(/\bconsole\./);
     expect(board).not.toMatch(/\b(gtag|dataLayer|trackEvent|track)\s*\(/);
     expect(board).not.toMatch(/history\.(push|replace)State|navigate\(/);
-  });
-});
-
-describe("data exposure via entity RLS", () => {
-  it("no entity that stores personal data is world-readable", () => {
-    const pii = ["Lead"];
-    for (const name of pii) {
-      expect(loadEntity(name).rls?.read, `${name} leads are readable by anyone`).not.toBe(true);
-    }
-  });
-
-  it("every entity used by the app has an explicit definition", () => {
-    const referenced = new Set<string>();
-    for (const f of FILES) {
-      for (const m of read(f).matchAll(/base44\.entities\.(\w+)\./g)) referenced.add(m[1]);
-    }
-    for (const name of referenced) expect(entityNames()).toContain(name);
   });
 });

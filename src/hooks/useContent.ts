@@ -10,7 +10,7 @@ import type { Article, Testimonial } from "@/services";
  * `useEffect` plus manual loading/error state, with no caching, no retry and no
  * deduplication. Three components asking for testimonials made three requests.
  *
- * These hooks depend on the ContentPort, not on the Base44 SDK, so a test
+ * These hooks depend on the ContentPort, not on a vendor SDK, so a test
  * substitutes a fake service rather than mocking a vendor module.
  */
 

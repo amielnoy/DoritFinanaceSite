@@ -1,5 +1,10 @@
 # Leaving Base44 — the record
 
+**Done, 2026-10-29:** the exit is complete. [B1 (#312)](https://github.com/amielnoy/DoritFinanaceSite/pull/312)
+moved the site onto Supabase alone (no SDK, switches or `/api` rewrite), and [B2 (#313)](https://github.com/amielnoy/DoritFinanaceSite/pull/313) removed the `base44/` folder, its repair scripts,
+agent skills and tests. The account actions left are in
+[current architecture and operations](../current-state.md#after-the-exit-dashboard-actions).
+
 **Current status, 2026-10-17:** these are dated migration measurements. See
 [current architecture and operations](../current-state.md) for implemented adapters,
 release gates and rollback switches. Production hosting has moved to Vercel; auth,

@@ -5,8 +5,8 @@ import { releaseServed } from "../../scripts/wait-for-deployment.mjs";
 /**
  * When the smoke may open a browser. With the asset the Vercel job just built
  * (`expected`), the answer is "when production serves that asset" — at once if
- * the bundle did not change, which is most commits. Without it (a Base44-only
- * or preview run), the old rule: "when production serves something other than
+ * the bundle did not change, which is most commits. Without it (a preview
+ * run), the old rule: "when production serves something other than
  * what it served before the publish".
  */
 describe("releaseServed", () => {

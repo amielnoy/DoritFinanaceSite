@@ -13,8 +13,7 @@ interface PhotoProps {
 
 /**
  * A decorative photo served from `public/images`, pre-sized to 480/768/1080
- * WebP like the Hero portrait. These used to be hot-linked from Base44's media
- * host, which goes away with Base44. All three sources are 1200×896, so the
+ * WebP like the Hero portrait. All three sources are 1200×896, so the
  * width and height give the browser the aspect ratio before the file loads.
  */
 export default function Photo({ base, alt, sizes, className }: PhotoProps) {

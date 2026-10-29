@@ -212,7 +212,7 @@ test.describe("Client-side security posture", () => {
 });
 
 /**
- * Transport-level hardening lives at the host (Base44 / CDN), not in the SPA.
+ * Transport-level hardening lives at the host (Vercel's edge), not in the SPA.
  * These assertions are informational against the local preview and enforced
  * only when E2E_ENFORCE_SECURITY_HEADERS=1 is set against a real deployment.
  */

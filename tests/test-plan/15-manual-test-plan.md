@@ -19,7 +19,7 @@ Case IDs are `MAN-<AREA>-<NNN>`. The last section is the log of each run.
 | Env | What it is | What may be done there |
 |---|---|---|
 | **PROD** | https://govari-fin.co.il | **Read only.** Browse, click links, check layout, headers, SEO and accessibility. Never submit a form, send a chat message, report a claim or sign in as staff: every write is a real lead, a real mail to Dorit and a row in her sheet. |
-| **LOCAL** | `npm run build:e2e`, then `VITE_BASE44_APP_BASE_URL="" npx vite preview --host 127.0.0.1 --port 4173`, driven through `e2e/fixtures/app.ts` | Everything a visitor does. Supabase is a fake answered in the browser; nothing leaves the machine. Blank `VITE_BASE44_APP_BASE_URL`, or `/api` is proxied to the real Base44. |
+| **LOCAL** | `npm run build:e2e`, then `npx vite preview --host 127.0.0.1 --port 4173`, driven through `e2e/fixtures/app.ts` | Everything a visitor does. Supabase is a fake answered in the browser; nothing leaves the machine. |
 | **PREVIEW** | The Vercel preview of a PR, signed in with a staff test account | Admin and personal-area flows on real screens. Use test leads only (name starts with "בדיקה"), and delete them afterwards. |
 | **DESIGN** | A local render of a screen with sample data | Layout, theme, contrast and keyboard checks of a screen whose data needs a sign-in. |
 

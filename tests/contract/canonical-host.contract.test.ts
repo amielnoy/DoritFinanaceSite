@@ -100,10 +100,9 @@ describe("the canonical host has a single source", () => {
   });
 
   it("no longer proxies the Base44 agent socket or /api", () => {
-    // `/ws-user-apps/*` carried the Base44 chat's transcript. All four agents
-    // run on the Supabase chat function since 2026-10-16, and the SDK's
-    // fallback reaches Base44 directly, not through
-    // this host — so the rewrite went with the Base44 publish (2026-10-17).
+    // `/ws-user-apps/*` carried the old Base44 chat's transcript and `/api/*`
+    // its SDK's calls. All four agents run on the Supabase chat function since
+    // 2026-10-16, so both rewrites went with Base44 (2026-10-17).
     const rewrites = JSON.parse(read("vercel.json")).rewrites as { source: string }[];
     expect(rewrites.map((r) => r.source)).not.toContain("/ws-user-apps/:path*");
     expect(rewrites.map((r) => r.source)).not.toContain("/api/:path*");

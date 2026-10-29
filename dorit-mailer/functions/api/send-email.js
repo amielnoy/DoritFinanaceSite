@@ -6,7 +6,7 @@
  *
  * שלושה סוגי הודעות:
  *   type: "rendered" — הודעה שנבנתה כבר במלואה (subject/html/text) על ידי
- *                      פונקציות Base44. הן מחזיקות את התבניות של האתר, את
+ *                      פונקציות ה-Edge של Supabase. הן מחזיקות את התבניות של האתר, את
  *                      בריחת ה-HTML ואת redact() על טקסט שנכתב על ידי מודל,
  *                      ולכן מה שמגיע לכאן נשלח כפי שהוא. דורש אימות.
  *   type: "contact"  — טופס צור קשר (name, phone, email?, message?)
@@ -21,13 +21,15 @@
  *   MAIL_TO          dorit@govari-fin.co.il,amielnoy@gmail.com,amielnoy@outlook.com
  *                    רשימה מופרדת בפסיקים. כל נמען הוא ניסיון מסירה נפרד, כדי
  *                    שתיבה אחת שנכשלת לא תיקח איתה את השאר.
- *   MAILER_TOKEN     מחרוזת אקראית. חובה לכל בקשה, בלי יוצא מן הכלל. בלעדיה
+ *   MAILER_TOKEN     הטוקן של הקורא הראשון (פונקציות Base44, שאינן קיימות עוד).
+ *                    אין היום קורא ששולח אותו, ואפשר לרוקן אותו בהגדרות.
+ *                    טוקן — זה או הבא — חובה לכל בקשה, בלי יוצא מן הכלל. בלעדיו
  *                    הנקודה הזו היא ממסר דואר פתוח שכל אחד יכול לשלוח ממנו
  *                    בשם הסוכנות, מהדומיין המאומת שלה.
  *   MAILER_TOKEN_SUPABASE  מחרוזת אקראית נפרדת לפונקציות ה-Edge של Supabase
  *                    (שם הסוד אצלן: MAILER_TOKEN). טוקן לכל קורא, כדי שאפשר
  *                    יהיה להחליף או לבטל אחד בלי לגעת בשני.
- *   ALLOWED_ORIGIN   https://safe-arch-plan.base44.app
+ *   ALLOWED_ORIGIN   https://govari-fin.co.il
  *                    CORS בלבד, ואינו אמצעי אבטחה: הוא נאכף על ידי דפדפנים
  *                    ומתעלמים ממנו לחלוטין curl או שרת. מה ששומר על הנקודה
  *                    הזו הוא הטוקן.
@@ -67,8 +69,8 @@ export async function onRequestPost({ request, env }) {
   // Every request, not only the ones that name their own recipient.
   //
   // The contact/intake types were meant for a form posting straight from the
-  // browser, and nothing does: the site talks to Base44, and Base44 talks to
-  // this. So that path was an unauthenticated way into an endpoint that sends
+  // browser, and nothing does: the site talks to its Edge Functions, and they
+  // talk to this. So that path was an unauthenticated way into an endpoint that sends
   // mail from a verified domain, with no user to justify it. One way in now.
   //
   // A honeypot and a Turnstile check lived here for that browser path. They are
@@ -140,8 +142,9 @@ export async function onRequestPost({ request, env }) {
 /**
  * Bearer token, compared in full against each caller's own token.
  *
- * MAILER_TOKEN is Base44's functions'; MAILER_TOKEN_SUPABASE is the Supabase
- * Edge Functions'. One per caller, so either can be rotated or revoked alone.
+ * MAILER_TOKEN was the Base44 functions' (no caller sends it since the Base44
+ * exit); MAILER_TOKEN_SUPABASE is the Supabase Edge Functions'. One per
+ * caller, so either can be rotated or revoked alone.
  * A token that is not configured authorises nothing — an empty setting never
  * matches an empty bearer — and with neither set, nothing is authorised.
  */

@@ -89,39 +89,27 @@ describe('production smoke requires the actual production publisher', () => {
     expect(smoke).toContain("github.ref == 'refs/heads/main'");
   });
 
-  /**
-   * A publish that returned is not a release that is being served.
-   *
-   * `check-production-publish.mjs` proves a publish happened in this run. It
-   * cannot prove the edge is serving it, and on Base44 it frequently is not —
-   * the CLI returns, the job reports success, and the CDN hands out the
-   * previous bundle for minutes. The smoke then opens a browser on the old
-   * release and fails on whatever the new one added. That is exactly how
-   * `#start` went red at publish time and passed against the same URL later,
-   * with nothing in between but propagation.
-   *
-   * Playwright's own retries do not cover it — they are seconds apart and this
-   * is minutes — so the wait has to happen before any browser starts.
-   */
-  /**
-   * A wrong key must fail, not hang.
-   *
-   * The CLI only honours `BASE44_API_KEY` when it starts with `b44k_`:
-   * `usingWorkspaceApiKey()` checks exactly that prefix. Any other value — a
-   * `B44U_` user token, say — is ignored and it falls back to a device-code
-   * login, which on a runner is a prompt nobody can answer. That is not an
-   * error but a five-minute silence ending in a timeout and an orphan process,
-   * and it says nothing about the cause.
-   *
-   * Absent credentials still skip, because a fork has none and should get green
-   * CI. Present-but-wrong is a misconfiguration and must be loud.
-   */
+  // Base44 publishing left on 2026-10-17; the job and its credentials must not come back.
   it('publishes nothing to Base44, so holds no Base44 credential', () => {
     const workflow = read('.github/workflows/ci.yml');
     expect(workflow).not.toMatch(/\n {2}deploy:\n/);
     expect(workflow).not.toMatch(/base44 deploy|secrets\.BASE44_API_KEY|secrets\.BASE44_ACCESS_TOKEN/);
   });
 
+  /**
+   * A publish that returned is not a release that is being served.
+   *
+   * `check-production-publish.mjs` proves a publish happened in this run. It
+   * cannot prove the edge is serving it, and often it is not — the CLI
+   * returns, the job reports success, and the CDN hands out the previous
+   * bundle for minutes. The smoke then opens a browser on the old release and
+   * fails on whatever the new one added. That is exactly how `#start` went red
+   * at publish time and passed against the same URL later, with nothing in
+   * between but propagation.
+   *
+   * Playwright's own retries do not cover it — they are seconds apart and this
+   * is minutes — so the wait has to happen before any browser starts.
+   */
   it('waits for the new release to be served before opening a browser', () => {
     const workflow = read('.github/workflows/ci.yml');
     const smoke = workflow.slice(workflow.indexOf('  smoke:'), workflow.indexOf('  # ── 7.'));

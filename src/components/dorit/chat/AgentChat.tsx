@@ -48,8 +48,8 @@ const allowTel = (url: string): string =>
   url.startsWith("tel:") ? url : defaultUrlTransform(url);
 
 /**
- * An article link by record id: `/blog/<record id>`, which the Base44 agents
- * wrote because their BlogPost had no slug, and which reaches the article only
+ * An article link by record id: `/blog/<record id>`, which the old (Base44)
+ * agents wrote because their BlogPost had no slug, and which reaches the article only
  * through the 301 to the slug (D-10, manual test 2026-10-14). The chat
  * function's agents link by slug; a reply that still names an id is shown the
  * slug's address, once the chat knows it.
@@ -96,16 +96,6 @@ export interface AgentDescriptor {
    * chat, not inside it, so a visitor reads it before typing rather than after.
    */
   tagline?: string;
-  /**
-   * The v5 consent points this agent's v6 notice is built from
-   * (`CHAT_FUNCTION_CONSENT_POINTS_BY_AGENT` in compliance.ts). The chat shows
-   * the v6 notice, never these alone.
-   *
-   * Defaults to the interview's, which promise that a name and a phone number
-   * are collected. An agent that collects neither must not show that text — a
-   * notice describing the wrong processing is worse than a generic one.
-   */
-  consentPoints?: readonly string[];
   /**
    * The fence, stated out loud. Publishing the boundary is half of honouring
    * it: a visitor who can see what the automation will not do is a visitor who

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FetchCall } from "../helpers/base44-function";
-import { SUPABASE_URL, invokeEdge, type EdgeOptions } from "../helpers/edge-function";
+import { SUPABASE_URL, invokeEdge, type EdgeOptions, type FetchCall } from "../helpers/edge-function";
 
 /**
  * A client asks to move or cancel a meeting (supabase/functions/meeting-request,

@@ -1,9 +1,8 @@
 /**
  * A conversation handed to a person — the agent has decided it may not answer.
  *
- * Where base44/functions/escalateToHuman used to do this work, and now forwards
- * here. Decided in docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md:
- * Supabase is the only store (no entity write, no mirror), and the sheet row
+ * Decided in docs/superpowers/specs/2026-10-12-connectors-off-base44-design.md:
+ * Supabase is the only store, and the sheet row
  * goes in through the service account. tests/integration/
  * escalate-to-human.integration.test.ts runs it.
  */
@@ -20,7 +19,7 @@ import {
   HUMAN_CONTACT, NOTIFY_EMAILS, REASONS, SECONDARY_EMAIL, SHEET_COLUMNS, SHEET_TAB, URGENT,
   buildEscalationHtml, buildNotification, redact, validPhone,
 } from './escalation.js';
-// escalation.js is plain JavaScript, as Base44's file was. The few casts below
+// escalation.js is plain JavaScript. The few casts below
 // tell Deno's checker the shapes it cannot infer from it.
 
 const FN = 'escalate-to-human';
@@ -31,8 +30,8 @@ const log = createLog(FN);
 // a person is a regulatory failure — and hitting it alerts (an error line).
 const NOTIFY_PER_HOUR = 60;
 /**
- * Hand-offs per caller. Generous: a Base44 agent's call reaches this function
- * from Base44's server, so its address stands for every visitor those agents
+ * Hand-offs per caller. Generous: a chat's call reaches this function from the
+ * chat function's server, so its address stands for every visitor the chats
  * serve. Urgent reasons are never refused by it either.
  */
 const HANDOFFS_PER_IP_PER_HOUR = 20;

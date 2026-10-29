@@ -1,5 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT } from "../helpers/entity-schema";
 import { edgeFunctionFiles, edgeSource } from "../helpers/source-scan";
@@ -7,7 +6,7 @@ import { edgeFunctionFiles, edgeSource } from "../helpers/source-scan";
 /**
  * A time a person reads is Israel time, whatever clock the server keeps.
  *
- * The Base44 functions run on Deno in UTC. `toLocaleString("he-IL")` picks the
+ * The Edge Functions run on Deno in UTC. `toLocaleString("he-IL")` picks the
  * format from the locale and the zone from the runtime, so an interview summary
  * sent at 08:57 in Tel Aviv was stamped `6.10.2026, 5:57:36` — three hours
  * early, in a mail דורית reads to decide who to call back first. The Sheets log
@@ -16,21 +15,7 @@ import { edgeFunctionFiles, edgeSource } from "../helpers/source-scan";
  * Browser code is exempt: there the runtime zone is the reader's own.
  */
 
-const FUNCTIONS = join(REPO_ROOT, "base44/functions");
-
-const entries = readdirSync(FUNCTIONS, { withFileTypes: true })
-  .filter((d) => d.isDirectory())
-  .map((d) => join(FUNCTIONS, d.name, "entry.ts"))
-  .flatMap((path) => {
-    try {
-      return [{ path, source: readFileSync(path, "utf8") }];
-    } catch {
-      return [];
-    }
-  });
-
-// The Supabase Edge Functions run on Deno in UTC too.
-entries.push(...edgeFunctionFiles().map((path) => ({ path, source: edgeSource(path) })));
+const entries = edgeFunctionFiles().map((path) => ({ path, source: edgeSource(path) }));
 
 /** Every `toLocale…String(…)` call, with its argument list as written. */
 function localeCalls(source: string): string[] {

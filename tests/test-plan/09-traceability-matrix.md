@@ -85,7 +85,7 @@ Dorit's site (agency 1) read from per-agency content behind `VITE_AGENCY_CONTENT
 | Gap | Why it is accepted |
 |---|---|
 | The detailed contact form and the three-step consultation builder (was F-05, E2E-FRM-005..011, API-CTR-004) | Both were removed from the site; the interview agent in `#start` and the short form beside it replaced them. Nothing is untested — there is nothing left to test. See [STD-06 §3.4](06-std-ui-e2e.md) |
-| Registration, password reset, OTP flows against a live identity provider | Supabase adapters and return-to handling have unit coverage (`supabase-auth.test.ts`, `auth-return-to.dom.test.ts`); live delivery and provider redirects require configured integration checks. The retained Base44 JSX pages are inert shadows, not the active auth implementation |
+| Registration, password reset, OTP flows against a live identity provider | Supabase adapters and return-to handling have unit coverage (`supabase-auth.test.ts`, `auth-return-to.dom.test.ts`); live delivery and provider redirects require configured integration checks |
 | `BlogAdmin` and `Leads` admin UIs end-to-end | Require an authenticated admin session; covered statically (CTR-BLG-*, SEC-STA-022) and by RLS assertions |
 | Google Calendar event creation | Third-party side effect; the client contract and error handling are covered (CTR-FN-*, INT-LEAD-025..030) |
 | Visual regression | No baseline strategy chosen; layout is guarded indirectly by E2E-MOB-005 |

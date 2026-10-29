@@ -11,8 +11,8 @@ import * as published from "../../scripts/published-articles.mjs";
  * An article's address, as a contract.
  *
  * `blog_posts.slug` is shaped by four things that cannot import one another:
- * the migration's CHECK, the app (`src/lib/articlePath.ts`), the Base44
- * function that writes the mirror (`contentAdmin`) and the build that prebuilds
+ * the migration's CHECK, the app (`src/lib/articlePath.ts`), the Edge
+ * Function that writes articles (`content-admin`) and the build that prebuilds
  * the pages (`scripts/published-articles.mjs`). A copy that drifted would let
  * the form accept a slug the database refuses, or the build write a page the
  * redirect can never reach. Duplicated is fine; drifted is not.
@@ -34,11 +34,11 @@ describe("one slug rule, wherever it is spelled", () => {
     expect(sql.match(/check \(slug !~ '([^']+)'\)/)?.[1]).toBe(BASE44_ID_PATTERN.source);
   });
 
-  it.each(["base44/functions/contentAdmin/entry.ts", "supabase/functions/content-admin/handler.ts"])("%s has the same copy", (file) => {
+  it.each(["supabase/functions/content-admin/handler.ts"])("%s has the same copy", (file) => {
     const fn = read(file);
     expect(fn.match(/const SLUG_PATTERN = \/(.+)\/;/)?.[1]).toBe(SLUG_PATTERN.source);
     expect(fn.match(/const BASE44_ID_PATTERN = \/(.+)\/;/)?.[1]).toBe(BASE44_ID_PATTERN.source);
-    // The slug is the mirror's alone: Base44's BlogPost has no such field.
+    // The slug is written by its own rule, never among the plain fields.
     expect(fn.match(/const ARTICLE_FIELDS = \[([^\]]*)\]/)?.[1]).not.toContain("'slug'");
   });
 });
@@ -109,7 +109,6 @@ describe("every article link goes through articlePath", () => {
 describe.each([
   // The 409 count is the slug check on create and on update — plus, on Supabase,
   // the unique key refusing a save that raced past that check.
-  { file: "base44/functions/contentAdmin/entry.ts", invalid: 2, taken: 2 },
   { file: "supabase/functions/content-admin/handler.ts", invalid: 2, taken: 3 },
 ])("the slug refusals the form shows are the ones $file sends (M8)", ({ file, invalid, taken }) => {
   // BlogAdmin shows a refusal only when the server's text equals its own copy,

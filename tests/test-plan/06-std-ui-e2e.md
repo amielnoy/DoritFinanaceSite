@@ -1,7 +1,7 @@
 # STD-06 — UI End-to-End Tests
 
 **Suite:** `ui` · **Runner:** `npm run test:e2e:ui` (Playwright)
-**Location:** `e2e/ui/` · **Cases:** 87 in `e2e/ui`, of 199 across the whole e2e suite. CI runs `web-chromium` on a pull request, and `web-chromium` + `android-chrome` (two shards each) on `main`, nightly and on a manual run; `web-webkit` and `ios-safari` remain in `playwright.config` for a local run
+**Location:** `e2e/ui/` · **Cases:** 87 in `e2e/ui`, of 193 across the whole e2e suite (`--list --project=web-chromium`, 2026-10-29). CI runs `web-chromium` on a pull request, and `web-chromium` + `android-chrome` (two shards each) on `main`, nightly and on a manual run; `web-webkit` and `ios-safari` remain in `playwright.config` for a local run
 
 ---
 
@@ -25,9 +25,6 @@ aborts the third-party beacons. A request it does not model, and any `/api` call
 but the site's own Vercel functions, fails the
 test at teardown. Locale `he-IL`, timezone `Asia/Jerusalem`.
 
-Until 2026-10-18 the bundle was built with no Supabase, so every adapter fell
-back to Base44 and the fixture stubbed Base44's `/api`; the cases below were
-re-pointed at the Supabase path that day, case for case.
 
 ## 3. Test cases
 
@@ -35,7 +32,7 @@ re-pointed at the Supabase path that day, case for case.
 
 | ID | Title | Expected result |
 |---|---|---|
-| E2E-HOM-001 | "boots past the auth/bootstrap spinner and renders the page shell" | `#top` and `main` visible; no spinner; no console errors; no `/auth/v1/` request (it read "public-settings requested" until 2026-10-18; Base44's bootstrap is gone) |
+| E2E-HOM-001 | "boots past the auth/bootstrap spinner and renders the page shell" | `#top` and `main` visible; no spinner; no console errors; no `/auth/v1/` request |
 | E2E-HOM-002 | "has the RTL Hebrew document contract search engines rely on" | `lang=he`, `dir=rtl`, title present, and the description is the home route's own (applied by `useSeo`, not the static one from `index.html`) |
 | E2E-HOM-003 | "renders every top-level section of the landing page" | All 7 section ids present (the default fixture carries testimonials, so `testimonials` is among them) (`top`, `about`, `services`, `start`, `quick-contact`, `testimonials`, `common-questions`); `proof` left with the Short home page, 2026-10-19 |
 | E2E-HOM-004 | "exposes exactly one h1 and a sane heading order" | One `h1`; no heading level skipped by more than one |
@@ -148,7 +145,7 @@ These ten cases cover only what the shell enforces regardless of what the
 model does — the part that is a gate rather than an instruction. Every chat here
 is served by the `chat` Edge Function (one POST to `/functions/v1/chat` per
 message), and the hand-off goes to `/functions/v1/escalate-to-human` — as in
-production since 2026-10-14; until 2026-10-18 the e2e build ran them on Base44.
+production since 2026-10-14.
 
 | ID | Title | Expected result |
 |---|---|---|

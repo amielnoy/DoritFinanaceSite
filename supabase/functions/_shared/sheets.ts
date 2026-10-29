@@ -1,7 +1,6 @@
 /**
  * The leads sheet, through the service account Dorit gave editor access.
- * appendSheetRow is the body of base44/functions/submitLead's appendEventRow,
- * with the connector token replaced by googleAccessToken(); readSheetRange and
+ * appendSheetRow writes with googleAccessToken(); readSheetRange and
  * clearSheetRanges serve the nightly retention job (sheet-retention).
  */
 import { googleAccessToken } from './google.ts';

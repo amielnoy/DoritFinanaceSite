@@ -1,44 +1,25 @@
 # CI/CD — install → build → test → deploy.
 #
-# Branches. Today the Base44 Builder syncs straight to `main`, so its edits
-# land there untested — twice in one day that put a broken suite on `main`.
+# Branches. Work reaches `main` through pull requests; every branch but `main`
+# gets the "safe to merge" verdict, on the PR and in the run summary (see §9).
 #
-# The support for working on a Builder branch instead is already here and is
-# DORMANT: everything keyed to `builder` triggers only on pushes to that
-# branch, and no such branch is in use yet. Pointing the Builder at one is a
-# Base44-side setting that costs Builder tokens, which is why it has not
-# happened. Nothing below changes behaviour until it does — the README carries
-# the switch-over.
-#
-# Once it is live, a push to `builder` gets the full battery, a Vercel preview
-# on its own URL, and a published report. The "safe to merge" verdict is no
-# longer part of that list, because it is no longer a Builder perk: every
-# branch but `main` gets one, on the PR and in the run summary (see §9).
-#
-# What `builder` does NOT get is an automatic merge: on a branch the Builder
-# replaces its Publish button with "Merge to main", and Base44 keeps each
-# Builder branch as a real branch here, so merging is already its job. A CI
-# job that merged `builder` into `main` would race that and leave the two
-# disagreeing about what happened.
+# Everything keyed to `builder` is DORMANT and triggers only on pushes to that
+# branch, which does not exist. It was built for the Base44 Builder, which is
+# retired (its GitHub App is removed by the checklist in docs/current-state.md); a push to `builder` would still get the
+# full battery, a Vercel preview on its own URL and a published report. It
+# never gets an automatic merge.
 #
 # Deployment: Vercel serves production (govari-fin.co.il) since 2026-10-11,
 # promoted only when every test passed and the Supabase functions deployed; a
 # red `main` run deploys a login-protected preview instead, because a failing
 # run is when you most want to open it. So a test failure costs you
 # production, never staging.
-#
-# Nothing is published to Base44 any more (2026-10-17): the site, its content
-# writes and all four chat agents run on Vercel and Supabase, and the
-# "Publish to Base44" job, the gate that held Vercel for it, and the nightly
-# Base44 log archive are gone. The Base44 code still in the repo is removed
-# in a follow-up once the rollback window closes (docs/base44-exit/).
 name: CI
 
 on:
   push:
     # Only the branches that deploy. `main` publishes production; `builder` is
-    # named ahead of being used: the day the Base44 Builder is pointed at it,
-    # its pushes are previewed and judged with no change here.
+    # the dormant preview branch described at the top.
     #
     # Feature branches used to run here too, on every push, with the PR event
     # firing only on `opened`. Every new PR then started two runs for one
@@ -93,8 +74,8 @@ concurrency:
   # cancelled half posts no verdict.
   group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
   # The nightly run queues behind an in-flight push instead of cancelling it:
-  # cancelling a deploying push could leave Vercel on the new code and Base44
-  # on the old.
+  # cancelling a deploying push could leave Vercel on the new code and the
+  # Supabase functions on the old.
   cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 env:
@@ -208,9 +189,11 @@ jobs:
       - name: Type-check the Edge Functions
         run: deno check --no-config supabase/functions/*/index.ts
 
-      # Runs the Base44 functions in-process against a recording client. They
-      # are outside tsconfig and execute on Deno in production, so this is the
-      # only place their behaviour — not their source — is checked.
+      # Runs the Supabase Edge Functions in-process (tests/helpers/edge-function.ts):
+      # each handler is bundled and evaluated with fetch and Deno recorded, so no
+      # network is reached. They execute on Deno in production and sit outside
+      # tsconfig, so this is the only place their behaviour — not their source —
+      # is checked.
       - name: Integration tests
         run: npm run test:integration
 
@@ -245,8 +228,8 @@ jobs:
   # (GStreamer, libav*, fonts, …) that is intermittently slow on GitHub-hosted
   # runners. It blew the 10-minute per-shard timeout twice in a row on
   # 2026-10-08 (pushes 404b0c4/71826d8), once past 10m even with the browser
-  # binary already cache-hit, taking real Base44 publishes down with it since
-  # that job depends on every e2e shard passing. A flaky dependency install is
+  # binary already cache-hit, taking real publishes down with it since the
+  # publish depends on every e2e shard passing. A flaky dependency install is
   # not a signal about the product, but it was blocking every merge to main.
   #
   # Chromium-based legs (`web-chromium`, `android-chrome`) cover the large
@@ -430,7 +413,7 @@ jobs:
   # the strictest one in the file. Staging still deploys; see deploy-vercel.
   # ── Supabase Edge Functions ───────────────────────────────────────────────
   # The backend the site calls for claims (and, piece by piece, the rest). On
-  # green main only — the same rule as the Base44 publish — and before either
+  # green main only — the same rule as the Vercel promotion — and before either
   # production goes out, so the site is never live ahead of the function it
   # calls. The token is scoped to Edge Functions read-write on this one
   # project. Without it the job fails, and so neither production goes out: a
@@ -734,11 +717,10 @@ jobs:
 
   # ── 6. Post-deploy smoke test against the live site ──────────────────────
   #
-  # Waits on both publishes and smokes whatever `PRODUCTION_URL` names, rather
-  # than assuming which host is the client-facing one. That assumption is about
-  # to change: production moves from Base44 to Vercel with the custom domain, and
-  # a smoke wired to one publisher would either stop running or keep testing the
-  # host nobody visits any more. This way the cutover is a variable, not an edit.
+  # Waits on the publish and smokes whatever `PRODUCTION_URL` names, rather
+  # than assuming which host is the client-facing one: a smoke wired to one
+  # publisher would keep testing a host nobody visits after a move. This way a
+  # cutover is a variable, not an edit.
   #
   # Check the publisher of PRODUCTION_URL before starting browsers. A successful
   # job can have skipped its publish step, and a staging deploy is not production.
@@ -812,8 +794,7 @@ jobs:
       # deployed bundle carries) rather than to a stub. Without it this job
       # smoke-tests the published *bundle* against a mock and reports green
       # while every call behind it 401s — which is exactly how three dead chats
-      # went unnoticed for ten days (A-42). The "Live Base44 backend" block is
-      # no longer run here: production does not use Base44 (2026-10-17).
+      # went unnoticed for ten days (A-42).
       # A skip is a pass, and this job is the one place where that is fatal:
       # its whole purpose is to answer "does the deployed thing work". Assert
       # the inputs exist before the suite runs, so a missing variable fails
@@ -1402,13 +1383,9 @@ jobs:
   # unanswered on every PR. It now runs on every branch except `main`, where
   # there is nothing left to merge and the "Deployed sites" table says more.
   #
-  # CI reports; it does not merge. On a Builder branch that is because Base44
-  # owns promotion — the Builder replaces its Publish button with "Merge to
-  # main", and it keeps each Builder branch as a real branch here, so a CI job
-  # that merged would race it and leave the two disagreeing about what happened.
-  # On an ordinary PR it is because nobody asked for an unattended merge. Either
-  # way the enforcement that matters is downstream: publishing happens only from
-  # main, and the publish job there demands a green run.
+  # CI reports; it does not merge: nobody asked for an unattended merge. The
+  # enforcement that matters is downstream: publishing happens only from main,
+  # and the publish job there demands a green run.
   #
   # The verdict goes two places. The run summary, as before, and — when the
   # commit has an open PR — a comment on it, edited in place so there is one

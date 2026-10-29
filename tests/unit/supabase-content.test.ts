@@ -79,7 +79,7 @@ describe("SupabaseContentService.listArticles", () => {
     expect(calls).toContainEqual(["limit", 7]);
   });
 
-  it("defaults to 50, as the Base44 adapter does", async () => {
+  it("defaults to 50", async () => {
     const { client, calls } = tableFake(ok([]));
     await new SupabaseContentService(client).listArticles();
     expect(calls).toContainEqual(["limit", 50]);

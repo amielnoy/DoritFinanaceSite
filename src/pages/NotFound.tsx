@@ -21,7 +21,7 @@ const LINKS: Array<{ label: KeyOf<"common">; href: string; hebrewOnly?: boolean 
 /**
  * Any address no route claims, in the site's own frame and language.
  *
- * This replaced Base44's template page, which said "Page Not Found … Go Home"
+ * This replaced the template page, which said "Page Not Found … Go Home"
  * in English on a Hebrew site, outside the header and footer, with a grey
  * "404" heading below the contrast floor and no `<main id="main">` (D-04, D-07 and D-08,
  * manual test 2026-10-14).

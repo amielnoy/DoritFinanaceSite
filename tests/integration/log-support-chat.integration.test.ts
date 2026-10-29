@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { invokeFunction, MAILER_URL } from "../helpers/base44-function";
-import { invokeEdge } from "../helpers/edge-function";
+import { invokeEdge, MAILER_URL } from "../helpers/edge-function";
 
 /**
  * `logSupportChat`, executed.
@@ -16,9 +15,8 @@ import { invokeEdge } from "../helpers/edge-function";
  * written, how much is kept, and the fact that a failed write is never allowed
  * to become the visitor's problem.
  *
- * Two implementations answer these cases while both are deployed: Base44's
- * `logSupportChat` and its Supabase Edge port `log-support-chat`. A case that
- * holds for one must hold for the other; what only the port does is at the end.
+ * The Supabase Edge Function `log-support-chat` answers these cases; what only
+ * it does is at the end.
  */
 
 const ENV = { MAILER_URL, MAILER_TOKEN: "test-only-token", SHEET_ID: "sheet-1" };

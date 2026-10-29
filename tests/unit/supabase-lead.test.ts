@@ -12,7 +12,7 @@ const functionsClient = (result: InvokeResult) => {
 };
 
 describe("SupabaseLeadService.submitClaim", () => {
-  it("invokes submit-claim with the body the Base44 adapter sends, blanks filled", async () => {
+  it("invokes submit-claim with the lead body, blanks filled", async () => {
     const { client, invoke } = functionsClient({ data: { ok: true, rid: "r1", leadId: "uuid-1", warnings: [] }, error: null });
     await new SupabaseLeadService(client).submitClaim(report);
     expect(invoke).toHaveBeenCalledWith("submit-claim", {

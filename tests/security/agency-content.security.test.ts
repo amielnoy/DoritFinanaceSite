@@ -39,7 +39,7 @@ function grantsWholeTable(stmt: string): boolean {
   return privileges.some((p) => p === "select" || p === "all" || p === "all privileges");
 }
 
-const SOURCE_DIRS = ["src", "api", "scripts", "supabase/functions", "e2e", "base44/functions"];
+const SOURCE_DIRS = ["src", "api", "scripts", "supabase/functions", "e2e"];
 const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 function walk(dir: string): string[] {
   let names: string[];
@@ -59,11 +59,10 @@ const SOURCES = SOURCE_DIRS.flatMap((d) => walk(join(REPO_ROOT, d))).sort();
 /**
  * Readers that name testimonials only as one of several tables and ask for `*`
  * with the service-role key, which keeps its table-level grant
- * (20260922000000_service_role_grants.sql). Each must hold that key.
+ * (20260922000000_service_role_grants.sql). Each must hold that key. None
+ * today; a new one is named here with the reason it needs the whole row.
  */
-const SERVICE_ROLE_READERS: Record<string, string> = {
-  "scripts/reconcile-stores.mjs": "compares Base44 and Supabase row by row, as service_role",
-};
+const SERVICE_ROLE_READERS: Record<string, string> = {};
 
 const STAR = /select=\*|\.select\(\s*\)|\.select\(\s*["'`]\*["'`]|\bselect["']?\s*:\s*["'`]\*["'`]/;
 

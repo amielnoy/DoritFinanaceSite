@@ -33,8 +33,7 @@ export interface Mail {
 
 /**
  * The one way these functions send mail: a finished message posted to
- * `dorit-mailer`, which holds the Resend key. The same code as
- * base44/functions/submitClaim's sendMail, with `log` passed in.
+ * `dorit-mailer`, which holds the Resend key.
  */
 export async function sendMail(log: Log, { to, subject, html, text, body, rid, role, ics }: Mail): Promise<void> {
   // התפקיד ולא הכתובת. אחד הנמענים הוא המבקר עצמו, וכתובתו לא תיכתב ליומן

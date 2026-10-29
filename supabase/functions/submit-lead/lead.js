@@ -1,10 +1,8 @@
-// What submit-lead says and stores, moved verbatim from
-// base44/functions/submitLead/entry.ts: the mail and sheet builders, the
-// interview schema and the guards' limits. Plain JavaScript, as it was, so the
-// two stay comparable line by line while both are deployed. The only edits:
-// there is no per-enquiry Doc, so the footers and the links no longer name one,
-// and the operations appendix reports the mailed invitations in its place.
-// escapeHtml, greetingName and channelLine are the shared copies.
+// What submit-lead says and stores: the mail and sheet builders, the
+// interview schema and the guards' limits. Plain JavaScript. There is no
+// per-enquiry Doc, so the footers and the links name none, and the operations
+// appendix reports the mailed invitations. escapeHtml, greetingName and
+// channelLine are the shared copies.
 import { channelLine } from '../_shared/attribution.ts';
 import { greetingName } from '../_shared/guard.ts';
 import { escapeHtml } from '../_shared/html.ts';
@@ -18,8 +16,7 @@ import { escapeHtml } from '../_shared/html.ts';
  * ב-13:00. לכן אין כאן מעבר דרך רגע אמיתי בזמן: השדות נשארים כפי שנמסרו,
  * ו-Date.UTC משמש כאן כאריתמטיקה על שעון קיר בלבד.
  *
- * משוכפלת בכל פונקציה בכוונה — אין מודול משותף ב-Base44. משוכפל זה בסדר,
- * מפוצל זה לא.
+ * משוכפלת בכל פונקציה בכוונה. משוכפל זה בסדר, מפוצל זה לא.
  */
 export function wallClock(iso, addMinutes = 0) {
   const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
@@ -79,8 +76,8 @@ export const INVITE_ORGANIZER = "notifications@mail.govari-fin.co.il";
 /**
  * הסרת מזהים רגישים מתקציר שנכתב על ידי מודל.
  *
- * משוכפל מ-escalateToHuman/entry.ts בכוונה: כל פונקציה ב-Base44 היא נקודת
- * כניסה עצמאית ואין ביניהן מודול משותף. שתי העותקות חייבות להישאר זהות —
+ * משוכפל בכוונה: לכל פונקציה שמסירה מזהים יש עותק משלה. כל העותקים חייבים
+ * להישאר זהים —
  * tests/contract/agents.contract.test.ts נכשל אם אחת מהן מתפצלת.
  *
  * הגבול הוא ספרה (או אות לטינית, בחשבון בנק), לא \b: ב-JavaScript אות עברית

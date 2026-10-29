@@ -9,8 +9,8 @@ import { expect, test, test_step } from "../fixtures/app";
 /**
  * Read a tag's attributes instead of matching raw markup.
  *
- * Base44 serves the deployed HTML through a pretty-printer that reorders every
- * attribute alphabetically: what the source writes as
+ * A host may serve the deployed HTML through a pretty-printer that reorders
+ * every attribute alphabetically (the site's first host did): what the source writes as
  * `<meta name="description" content="…">` arrives as
  * `<meta content="…" name="description"/>`. A regex over the byte order
  * therefore passes against the local `dist/` and fails against production —

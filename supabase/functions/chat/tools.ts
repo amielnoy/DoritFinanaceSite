@@ -1,6 +1,6 @@
 /**
- * The chat tools, run by the function itself — the fix for A-59, where Base44
- * never ran them in an anonymous conversation. The interview has submitLead and
+ * The chat tools, run by the function itself — the fix for A-59, where the
+ * old agent host never ran them in an anonymous conversation. The interview has submitLead and
  * escalateToHuman; the support agent has escalateToHuman and two article tools
  * that only read (listArticles, readArticle).
  *

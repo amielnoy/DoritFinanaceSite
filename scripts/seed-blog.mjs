@@ -9,9 +9,8 @@
  *   node --env-file=.env.local scripts/seed-blog.mjs                 # dry run — prints what it would write
  *   node --env-file=.env.local scripts/seed-blog.mjs --apply         # writes
  *
- * Supabase is the only store: the site, /admin/blog (VITE_CONTENT_WRITES=
- * supabase) and the blog recommender all read and write `blog_posts`, and
- * nothing the site serves reads Base44's BlogPost any more. `blog_posts` accepts
+ * Supabase is the only store: the site, /admin/blog and the blog recommender
+ * all read and write `blog_posts`. `blog_posts` accepts
  * writes only from an admin or the service role, so this needs:
  *
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY      (e.g. in .env.local)

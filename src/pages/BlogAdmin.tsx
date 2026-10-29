@@ -182,9 +182,7 @@ export default function BlogAdmin() {
         setUploading(false);
       }
     }
-    // Kept as a literal object: tests/contract/frontend-payloads pins its keys
-    // to the BlogPost entity schema. `slug` is the one exception, sent for the
-    // Supabase mirror only (contentAdmin keeps it out of the Base44 write).
+    // Kept as a literal object: tests/contract/frontend-payloads reads its keys.
     const payload = {
       title: editing.title,
       slug: editing.slug,

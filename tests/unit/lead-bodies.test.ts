@@ -11,4 +11,10 @@ describe("interviewBody", () => {
   it("sends an empty reference when there is none — a save that stands alone", () => {
     expect(interviewBody({ name: "דנה", phone: "0501234567" }).conversationRef).toBe("");
   });
+
+  it("names the interview as its source and defaults the stage to complete — submit-lead routes on both", () => {
+    const body = interviewBody({ name: "דנה", phone: "0501234567" });
+    expect(body.source).toBe("interview");
+    expect(body.stage).toBe("complete");
+  });
 });

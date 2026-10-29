@@ -1,8 +1,8 @@
 // After the prerender: sitemap.xml and llms.txt with every published article,
 // and llms-full.txt with the FAQ and every article's text.
 //
-// Runs as the last step of `npm run build:prerender` (Vercel and CI). The
-// Base44 Builder's `npm run build` does not run it and ships public/ as is.
+// Runs as the last step of `npm run build:prerender` (Vercel and CI). A plain
+// `npm run build` does not run it and ships public/ as is.
 //
 // Templates are the dist/ copies, already pointed at the configured host by the
 // site-url plugin (scripts/vite-site-url-plugin.mjs). The article list follows

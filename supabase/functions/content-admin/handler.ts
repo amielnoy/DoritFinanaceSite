@@ -1,11 +1,5 @@
 /**
- * The admin's article and testimonial writes, on Supabase only. The Edge twin
- * of base44/functions/contentAdmin — same gate, same slug rules, same allowed
- * fields — without the Base44 copy, which only the Base44 chats still read.
- *
- * The site switches to it with VITE_CONTENT_WRITES=supabase. That waits for
- * Phase 3: until support_agent, procedures_agent and blog_recommender stop
- * reading Base44's BlogPost, an article written only here is invisible to them.
+ * The admin's article and testimonial writes, on Supabase, the only store.
  *
  * Writes go with the service key, which bypasses row-level security, so the
  * gate below is the whole of the access control. It runs before every op, per
@@ -14,9 +8,6 @@
  * testimonial write are Admin+; a shared-library article (no agency) is the
  * platform operator's. The agency is the row's own, or agency 1 for a new row
  * (the column default every insert here takes).
- *
- * Once switched on, rows written here exist in Supabase only, so
- * scripts/reconcile-stores.mjs reports them as drift — expected, not a fault.
  */
 import { corsHeaders } from '../_shared/cors.ts';
 import { createLog, newRequestId } from '../_shared/log.ts';
@@ -52,7 +43,7 @@ const TESTIMONIAL_FIELDS = ['name', 'role', 'quote', 'image_url', 'rating', 'sou
 /**
  * The article's address, `/blog/<slug>`. The same pattern as
  * src/lib/articlePath.ts, the 20261014000000_blog_slug.sql migration and
- * base44/functions/contentAdmin — tests/contract/article-slug.contract.test.ts
+ * scripts/published-articles.mjs — tests/contract/article-slug.contract.test.ts
  * fails when they drift. A Base44-id-shaped slug is refused: vercel.json sends
  * every such address to the old-link redirect, so the article would be unreachable.
  */
@@ -65,8 +56,8 @@ const isValidSlug = (s: unknown): s is string => typeof s === 'string' && SLUG_P
  * The PostgREST filter that finds a row by the id the admin screen holds.
  *
  * Content is handed out as `base44_id ?? id` (SupabaseTableClient.toPortRow):
- * a Base44 id for rows from the dual-write era, the Supabase uuid for rows
- * written since. Anything else is refused before it reaches a filter — an
+ * a Base44 id for rows from before the move to Supabase, the Supabase uuid
+ * for rows written since. Anything else is refused before it reaches a filter — an
  * `id=eq.` with a non-uuid is a Postgres error, and free text in a query
  * string is a filter someone else wrote.
  */

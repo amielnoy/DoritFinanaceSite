@@ -89,8 +89,8 @@ function meetingColumns(update: LeadMeetingUpdate): Record<string, unknown> {
  * claim-document-link), which ask the same rules under the same session.
  *
  * Leads are handed out under their Supabase `id`, not `base44_id ?? id` as
- * `toPortRow` does for content — the writes below act on `id`, and claims
- * written by the `submit-claim` Edge Function have no Base44 id at all.
+ * `toPortRow` does for content — the writes below act on `id`, and leads
+ * written since the move to Supabase have no Base44 id at all.
  */
 export class SupabaseLeadAdminService implements LeadAdminPort {
   constructor(
@@ -292,8 +292,7 @@ export class SupabaseLeadAdminService implements LeadAdminPort {
 
   /**
    * A storage reference signed for five minutes by claim-document-link, for
-   * whoever may see the lead it belongs to. Any other reference is refused:
-   * no Base44 file URL exists in production data.
+   * whoever may see the lead it belongs to. Any other reference is refused.
    */
   async documentLink(ref: string, leadId: string): Promise<string> {
     if (!ref.startsWith(CLAIM_DOCUMENT_REF_PREFIX)) throw new Error("לא ניתן לפתוח את המסמך");

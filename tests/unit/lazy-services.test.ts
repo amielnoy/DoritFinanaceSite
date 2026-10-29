@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
  * `@/services` is a light front: each port loads the composition root — and
- * with it both SDKs — on its first real call. These pin the three ways that can
+ * with it the Supabase SDK — on its first real call. These pin the three ways that can
  * go wrong without anything else noticing: a chat subscription that outlives
  * the component that asked for it, one failed chunk download poisoning every
- * later call, and the per-page auth probe quietly loading the SDKs anyway.
+ * later call, and the per-page auth probe quietly loading the SDK anyway.
  */
 
 

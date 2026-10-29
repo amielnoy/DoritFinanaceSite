@@ -7,19 +7,13 @@ import { CLEARINGHOUSE, CLEARINGHOUSE_TEXT, GOAL, LIFE_STAGE, TRACK_QUESTIONS, T
 /**
  * The wizard and the interview agent collect the same profile, by the same keys.
  *
- * Three copies of the list exist and must agree: the agent's instructions (what
+ * Three copies of the list exist and must agree: the agent's prompt (what
  * the chat asks), `submitLead`'s `INTERVIEW_TRACKS` (what it keeps — an unknown
  * key is dropped without a word), and the wizard's questions. A key renamed in
  * one place would reach Dorit from one path and silently vanish from the other.
  */
 
-const instructions = (
-  JSON.parse(
-    readFileSync(join(REPO_ROOT, "base44/agents/needs_interview.jsonc"), "utf8")
-      .replace(/^\s*\/\/.*$/gm, "")
-      .replace(/\/\*[\s\S]*?\*\//g, ""),
-  ) as { instructions: string }
-).instructions;
+const instructions = readFileSync(join(REPO_ROOT, "supabase/functions/chat/prompts/interview.md"), "utf8");
 
 const submitLead = readFileSync(join(REPO_ROOT, "supabase/functions/submit-lead/lead.js"), "utf8");
 
@@ -28,7 +22,7 @@ const TRACKS: Track[] = ["pension", "insurance", "retirement", "tax", "savings",
 /** "  - pension: employer, seniority, products, fees." from the agent's profile section. */
 function agentKeys(label: string): string[] {
   const line = instructions.split("\n").find((l) => new RegExp(`^\\s*-\\s*${label}:`).test(l));
-  if (!line) throw new Error(`no profile line for "${label}" in needs_interview.jsonc`);
+  if (!line) throw new Error(`no profile line for "${label}" in prompts/interview.md`);
   return line.replace(/^\s*-\s*[^:]+:\s*/, "").replace(/\.\s*$/, "").split(/\s*,\s*/);
 }
 

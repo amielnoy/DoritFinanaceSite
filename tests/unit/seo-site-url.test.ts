@@ -22,8 +22,8 @@ describe("resolveSiteUrl — where the canonical origin comes from", () => {
   });
 
   it("falls back to the production domain when neither names one — never the old Base44 host", () => {
-    // The Base44 Builder builds without the variable, and the copy it serves on
-    // the old host must name production as canonical, not itself.
+    // A build without the variable must name production as canonical, never
+    // the host the site first ran on.
     expect(resolveSiteUrl(undefined, undefined)).toBe(PROD);
     expect(resolveSiteUrl({}, {})).toBe(PROD);
     expect(resolveSiteUrl(undefined, undefined)).not.toBe(OLD);

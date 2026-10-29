@@ -158,7 +158,7 @@ describe("the SEO files are written by every prerendered build", () => {
     );
   });
 
-  it("leaves the Base44 Builder's plain build alone", () => {
+  it("leaves the plain build alone", () => {
     expect(pkg.scripts.build).toBe("vite build");
   });
 

@@ -12,9 +12,8 @@
  * prune-vercel.mjs: it reports what each title resolves to and changes
  * nothing until `--apply` is given.
  *
- * Supabase's `blog_posts` is the only store — the site and /admin/blog
- * (VITE_CONTENT_WRITES=supabase) read and write it, and Base44's BlogPost is
- * no longer written. Both the preview and `--apply` need SUPABASE_URL and
+ * Supabase's `blog_posts` is the only store — the site and /admin/blog read
+ * and write it. Both the preview and `--apply` need SUPABASE_URL and
  * SUPABASE_SERVICE_ROLE_KEY: `blog_posts` holds drafts only an admin or the
  * service role can see.
  */
