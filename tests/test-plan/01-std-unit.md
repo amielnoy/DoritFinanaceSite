@@ -1929,3 +1929,18 @@ SEO-OLD-001/002).
 | UNIT-HOST-001 | "lower-cases and drops a trailing dot" | `B.Example.` → `b.example`; surrounding spaces and repeated dots go too |
 | UNIT-HOST-002 | "reads the hostname out of a URL" | `https://A.Example:8080/x?y#z` → `a.example` |
 | UNIT-HOST-003 | "returns an empty string for an unparseable URL or an empty value" | `http://` and `""` → `""` |
+
+### 4.83 An agency's own links — `tests/unit/agency-links.test.ts`
+
+`src/lib/agency-links.ts`: the website, WhatsApp group and Facebook group an
+agency may give in the wizard's step 3, with the same patterns as the CHECKs of
+`20261115000000_agency_links.sql` (CTR-ALK-002).
+
+| ID | Title | Expected result |
+|---|---|---|
+| UNIT-ALK-001 | "%s accepts %s" | `it.each`: https sites, `chat.whatsapp.com/…`, `(www.\|m.)facebook.com/…` pass |
+| UNIT-ALK-002 | "%s refuses %s" | `it.each`: `http:`, `javascript:`, `wa.me`, look-alike hosts and a site without a dot are refused with a Hebrew reason |
+| UNIT-ALK-003 | "every link is optional, and an over-long one is refused" | Empty, null and blank pass; over 500 characters → "הקישור ארוך מדי." |
+| UNIT-ALK-004 | "the wizard's fieldProblem asks the same rules by field key" | `fieldProblem("agency_profiles.<column>", …)` answers as `agencyLinkProblem` |
+| UNIT-ALK-005 | "a site row's links come out null unless they pass, never a hostile href" | `toAgencyLinks` keeps only passing values |
+

@@ -920,6 +920,21 @@ All 311 declared cases pass (vitest: 1240 pass, 1 skipped, of 1241 with expansio
 moved — fix the side that is wrong; do not relax the assertion.
 
 
+### Agency links — `agency-links.contract.test.ts`
+
+`supabase/migrations/20261115000000_agency_links.sql`, read as source, with the
+wizard's field list and the site's read. `supabase/tests/agency_content_check.sql`
+proves the CHECKs and the view against a database.
+
+| ID | Title | Expected result |
+|---|---|---|
+| CTR-ALK-001 | "sorts after every migration it builds on" | After `20261106100000_agency_content_read_side.sql` |
+| CTR-ALK-002 | "%s is a nullable text column whose CHECK is agency-links.ts's pattern" | `it.each` over the three columns: ≤ 500 characters and the exact pattern of `AGENCY_LINK_PATTERNS` |
+| CTR-ALK-003 | "the public view appends exactly the three links, and keeps its filters and grants" | The nine columns of CTR-AGC-006, then the three links; `status = 'active'` and `domain is not null`; `select` to `anon`, `authenticated` only |
+| CTR-ALK-004 | "touches no policy, grant or guard on agency_profiles" | Who may write is unchanged: the owner, or the operator on the owner's behalf |
+| CTR-ALK-005 | "%s is an optional url field of step 3, and the site reads it" | In `ONBOARDING_STEPS` "contact", `optional`, `url` widget, in `SITE_COLUMNS` |
+| CTR-ALK-006 | "the footer renders the links from the agency's content" | `Footer.tsx` reads `links` from `useAgencyContent()` |
+
 ### Lead retention — `lead-retention.contract.test.ts`
 
 `supabase/migrations/20261025000000_lead_retention.sql` against what it must agree with. The job itself is exercised end to end in a scratch Postgres by `supabase/tests/lead_retention_check.sql`.

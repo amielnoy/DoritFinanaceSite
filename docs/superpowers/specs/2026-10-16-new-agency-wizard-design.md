@@ -178,13 +178,16 @@ gender. This is the text the compliance reviewer approves.
 One mobile number (→ e164, display, WhatsApp) · email · opening WhatsApp
 message (pre-filled template with the first name) · service area (optional) ·
 notification addresses (default: the email above).
+Optional, and shown in the footer only when set (added 2026-11-03,
+`20261115000000_agency_links.sql`): the agency's website, a WhatsApp group
+(`https://chat.whatsapp.com/…`) and a Facebook group (`https://…facebook.com/…`).
 
 ### 4 · אודות
 Structured, so every agency's page reads well without a copywriter:
 
 | Field | Shown as | Required |
 |---|---|---|
-| Headline sentence | hero lead | ✓ (template offered) |
+| Headline sentence — "משפט שיווקי קצר", the marketing pitch | hero lead | ✓ (template offered) |
 | Professional background | about › career | ✓ |
 | Education and certificates | about › credentials | — |
 | What sets you apart | about › unique | — |

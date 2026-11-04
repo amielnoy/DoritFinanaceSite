@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
-import { ONBOARDING_STEPS, isLicenceNumber, missingByStep, type OnboardingField, type StepId } from "@/config/onboarding";
+import { ONBOARDING_STEPS, isLicenceNumber, missingByStep, submitRequiredKeys, type OnboardingField, type StepId } from "@/config/onboarding";
 import { services, OnboardingConflictError, type OnboardingRecord, type OnboardingRow } from "@/services";
 import { onboardingKeys, useOnboardingRecord } from "@/hooks/useOnboarding";
 import {
@@ -11,6 +11,7 @@ import {
   disclosurePreview,
   fieldProblem,
   getField,
+  isAgentDefault,
   isMobile,
   missingKeys,
   phoneFields,
@@ -27,7 +28,32 @@ import { useSeo } from "@/lib/seo";
 
 /** The owner's steps (1–7); step 0 is the operator's, on /admin/agencies/new. */
 const STEPS = ONBOARDING_STEPS.filter((s) => s.number > 0);
-const LABEL = new Map(ONBOARDING_STEPS.flatMap((s) => s.fields).map((f) => [f.key, f.label]));
+/** Every key a field writes, the columns it also writes included, to its label: the checklist never prints a raw key. */
+const LABEL = new Map(ONBOARDING_STEPS.flatMap((s) => s.fields).flatMap((f) => [f.key, ...(f.alsoWrites ?? [])].map((k) => [k, f.label] as const)));
+/** The licensee's fields in every step: the row is created with all of them at once. */
+const AGENT_KEYS = STEPS.flatMap((s) => s.fields).map((f) => f.key).filter((k) => k.startsWith("agents."));
+/** A conditional field (the institutional bodies) shows only while its question is answered yes. */
+const shownIn = (draft: OnboardingDraft, f: OnboardingField) => !f.requiredWhen || getField(draft, `agents.${f.requiredWhen}`) === true;
+/** Why each field of a step cannot be saved as typed, by key. */
+function problemsFor(step: { id: StepId; fields: readonly OnboardingField[] }, draft: OnboardingDraft, phoneText: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const f of step.fields) {
+    if (!shownIn(draft, f)) continue;
+    const p = fieldProblem(f.key, getField(draft, f.key));
+    if (p) out.set(f.key, p);
+  }
+  if (step.id === "contact" && phoneText.trim() && !isMobile(phoneText)) out.set("agency_profiles.phone_e164", "נדרש מספר נייד ישראלי, למשל 052-1234567.");
+  if (step.id === "licence") {
+    const n = text(getField(draft, "agents.licence_number"));
+    if (n.trim() && !isLicenceNumber(n)) out.set("agents.licence_number", "מספר רישיון נראה כמו L-0012345.");
+  }
+  return out;
+}
+
+const isStep = (v: unknown): v is StepId => STEPS.some((s) => s.id === v);
+
+/** The fields that hang on a yes/no question, by the question's key. */
+const dependentsOf = (key: string) => STEPS.flatMap((s) => s.fields).filter((f) => f.requiredWhen && `agents.${f.requiredWhen}` === key);
 
 const toDraft = (r: OnboardingRecord): OnboardingDraft => ({ agencies: r.agencies, agency_profiles: r.agency_profiles, agents: r.agents });
 const text = (v: unknown) => (typeof v === "string" ? v : "");
@@ -52,6 +78,23 @@ export default function AgencyOnboarding() {
   const [saved, setSaved] = useState<OnboardingDraft | null>(null);
   const [draft, setDraft] = useState<OnboardingDraft | null>(null);
   const [step, setStep] = useState<StepId | null>(null);
+  /**
+   * The open step is in the address (`?step=`), one history entry per move,
+   * so the browser's Back and Forward go between steps rather than out of the wizard.
+   */
+  const [params, setParams] = useSearchParams();
+  const urlStep = isStep(params.get("step")) ? (params.get("step") as StepId) : null;
+  const moveTo = useCallback(
+    (next: StepId) => {
+      setStep(next);
+      setParams((p) => {
+        const out = new URLSearchParams(p);
+        out.set("step", next);
+        return out;
+      });
+    },
+    [setParams],
+  );
   const [phoneText, setPhoneText] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,66 +125,109 @@ export default function AgencyOnboarding() {
   }, [commitSaved]);
 
   useEffect(() => {
-    if (!record.data || loadedFor.current === agencyId) return;
+    // Only a read made for this visit: a cached copy may predate the last save, and editing it would start from stale rows.
+    if (!record.data || !record.isFetchedAfterMount || loadedFor.current === agencyId) return;
     loadedFor.current = agencyId;
     adopt(record.data);
     const last = (record.data.agency_profiles.onboarding as OnboardingRow | undefined)?.last_step;
-    setStep(STEPS.some((s) => s.id === last) ? (last as StepId) : "licensee");
-  }, [record.data, agencyId, adopt]);
+    const first = urlStep ?? (isStep(last) ? last : "licensee");
+    setStep(first);
+    if (urlStep !== first)
+      setParams(
+        (p) => {
+          const out = new URLSearchParams(p);
+          out.set("step", first);
+          return out;
+        },
+        { replace: true },
+      );
+  }, [record.data, record.isFetchedAfterMount, agencyId, adopt, urlStep, setParams]);
+
+  // A new step opens at its top, not where the last one was scrolled to.
+  const firstStep = useRef(true);
+  useEffect(() => {
+    if (!step) return;
+    if (firstStep.current) {
+      firstStep.current = false;
+      return;
+    }
+    if (typeof window.scrollTo === "function") window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
 
   const current = STEPS.find((s) => s.id === step) ?? STEPS[0];
   const gender = (draft ? getField(draft, "agents.grammatical_gender") : null) as Gender | null;
   const g = (f: string, m: string) => (gender === "m" ? m : f);
 
   /** The checklist as one types; the server's answer replaces it on submit. */
-  const missing = useMemo(() => (draft ? missingKeys(draft) : []), [draft]);
-  const problems = useMemo(() => {
-    const out = new Map<string, string>();
-    if (!draft) return out;
-    for (const f of current.fields) {
-      const p = fieldProblem(f.key, getField(draft, f.key));
-      if (p) out.set(f.key, p);
-    }
-    if (current.id === "contact" && phoneText.trim() && !isMobile(phoneText)) out.set("agency_profiles.phone_e164", "נדרש מספר נייד ישראלי, למשל 052-1234567.");
-    if (current.id === "licence") {
-      const n = text(getField(draft, "agents.licence_number"));
-      if (n.trim() && !isLicenceNumber(n)) out.set("agents.licence_number", "מספר רישיון נראה כמו L-0012345.");
+  /**
+   * The checklist as one types: what is empty, and a required value typed but
+   * not acceptable — it is never saved, so it must not tick its step.
+   */
+  const missing = useMemo(() => {
+    if (!draft) return [];
+    const out = missingKeys(draft);
+    const required = new Set(submitRequiredKeys());
+    for (const f of STEPS.flatMap((s) => s.fields)) {
+      if (!required.has(f.key) || out.includes(f.key) || !shownIn(draft, f)) continue;
+      const value = getField(draft, f.key);
+      const bad =
+        fieldProblem(f.key, value) !== null ||
+        (f.key === "agents.licence_number" && !isLicenceNumber(text(value))) ||
+        (f.key === "agency_profiles.phone_e164" && phoneText.trim() !== "" && !isMobile(phoneText));
+      if (bad) out.push(f.key);
     }
     return out;
-  }, [draft, current, phoneText]);
+  }, [draft, phoneText]);
+  const problems = useMemo(() => (draft ? problemsFor(current, draft, phoneText) : new Map<string, string>()), [draft, current, phoneText]);
 
   const update = (key: string, value: unknown) => {
-    setDraft((d) => (d ? setField(d, key, value) : d));
+    setDraft((d) => {
+      if (!d) return d;
+      // "לא" clears what hangs on the question (the bodies): the field hides, and a hidden list must not stay behind.
+      const cleared = value === false ? dependentsOf(key) : [];
+      return cleared.reduce((acc, f) => setField(acc, f.key, []), setField(d, key, value));
+    });
     setNotice(null);
   };
 
-  /** Saves the open step; `next` also moves on and remembers where. Resolves false when nothing could be saved. */
-  const save = (next?: StepId): Promise<boolean> => {
-    if (problems.size) {
-      setError("יש שדות שצריך לתקן לפני השמירה.");
-      return Promise.resolve(false);
-    }
-    const keys = current.fields.flatMap((f) => [f.key, ...(f.alsoWrites ?? [])]);
-    const run = chain.current.then(() => saveNow(keys, next));
+  /**
+   * Saves the open step; `next` also moves on and remembers where. A field
+   * that is not acceptable yet is left out of the save — it never blocks the
+   * other fields or a move — and stays marked on its step.
+   */
+  const save = (next?: StepId, from: (typeof STEPS)[number] = current, move = true): Promise<boolean> => {
+    const bad = from.id === current.id ? problems : draftRef.current ? problemsFor(from, draftRef.current, phoneText) : new Map<string, string>();
+    const valid = from.fields.filter((f) => !bad.has(f.key));
+    const keys = valid.flatMap((f) => [f.key, ...(f.alsoWrites ?? [])]);
+    const skipped = from.fields.filter((f) => bad.has(f.key)).map((f) => f.key);
+    if (next && skipped.length) setNotice(`לא נשמר כי הערך אינו תקין: ${skipped.map((k) => LABEL.get(k) ?? k).join(" · ")}.`);
+    const run = chain.current.then(() => saveNow(keys, skipped, next, move));
     chain.current = run.catch(() => undefined);
     return run;
   };
 
-  const saveNow = async (keys: string[], next?: StepId): Promise<boolean> => {
+  /** `move` false: the step already changed (the browser's Back or Forward) — save and remember it, but do not navigate. */
+  const saveNow = async (keys: string[], skipped: string[], next?: StepId, move = true): Promise<boolean> => {
     const draft = draftRef.current;
     const saved = savedRef.current;
     if (!draft || !saved) return false;
     const patch = stepPatches(keys, draft, saved);
-    const agentPatch = patch.agents;
-    const writesAgent = Object.keys(agentPatch).length > 0;
-    if (writesAgent && !saved.agents && !text(getField(draft, "agents.full_name")).trim()) {
-      setError("כדי לשמור, יש להשלים קודם את השם המלא בשלב 1.");
-      return false;
+    let agentPatch = patch.agents;
+    if (!saved.agents) {
+      // The licensee's row is created once, with everything typed for it in any step.
+      agentPatch = stepPatches(AGENT_KEYS.filter((k) => !skipped.includes(k)), draft, saved).agents;
+      if (!text(getField(draft, "agents.full_name")).trim()) {
+        // Without a name the row cannot be created yet: keep what was typed and move on.
+        // Said on a move only: a banner that appears on leaving a field shifts the page under the next click.
+        if (next && Object.entries(agentPatch).some(([c, v]) => !isAgentDefault(c, v))) setNotice("הפרטים של בעל/ת הרישיון יישמרו ברגע שימולא השם המלא בשלב 1.");
+        agentPatch = {};
+      }
     }
+    const writesAgent = Object.keys(agentPatch).length > 0;
     const onboarding = next ? { ...((saved.agency_profiles.onboarding as OnboardingRow) ?? {}), last_step: next } : null;
     const profilePatch = onboarding ? { ...patch.agency_profiles, onboarding } : patch.agency_profiles;
     if (!writesAgent && !Object.keys(profilePatch).length) {
-      if (next) setStep(next);
+      if (next && move) moveTo(next);
       return true;
     }
     setSaving(true);
@@ -157,9 +243,12 @@ export default function AgencyOnboarding() {
         nextSaved = { ...nextSaved, agency_profiles: row };
       }
       commitSaved(nextSaved);
+      // The review screen and the agencies list read the same record: mark it stale, so they show this save.
+      void client.invalidateQueries({ queryKey: onboardingKeys.record(agencyId) });
+      void client.invalidateQueries({ queryKey: onboardingKeys.inProgress });
       // What was typed meanwhile stays; the saved rows' timestamps move on.
       setDraft((d) => (d ? { ...d, agents: nextSaved.agents ? { ...nextSaved.agents, ...(d.agents ?? {}), id: nextSaved.agents.id, updated_at: nextSaved.agents.updated_at } : d.agents, agency_profiles: { ...d.agency_profiles, updated_at: nextSaved.agency_profiles.updated_at, onboarding: nextSaved.agency_profiles.onboarding } } : d));
-      if (next) setStep(next);
+      if (next && move) moveTo(next);
       return true;
     } catch (e) {
       if (e instanceof OnboardingConflictError) {
@@ -178,8 +267,64 @@ export default function AgencyOnboarding() {
   // Step moves are never disabled while a save runs: leaving a field saves on
   // mousedown, and a button disabled by that save would swallow the click.
   // Saves queue (`chain`), so a move waits for the save before it.
-  const go = (id: StepId) => void save(id);
+  /** A testimonial or case typed and not added: leaving the step asks first, or it would be dropped unseen. */
+  const unfinishedRef = useRef(false);
+  const onUnfinished = useCallback((u: boolean) => {
+    unfinishedRef.current = u;
+  }, []);
+  const [leaveTo, setLeaveTo] = useState<StepId | null>(null);
+  // Asked from a step chip at the top, the question sits at the bottom: bring it into view.
+  const leaveRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (leaveTo) leaveRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  }, [leaveTo]);
+  const go = (id: StepId) => {
+    if (id !== current.id && current.id === "testimonials" && unfinishedRef.current) {
+      setLeaveTo(id);
+      return;
+    }
+    setLeaveTo(null);
+    void save(id);
+  };
   const index = STEPS.findIndex((s) => s.id === current.id);
+
+  // The browser's Back or Forward changed the address: save the step being left, then show the other.
+  useEffect(() => {
+    if (!urlStep || !step || urlStep === step) return;
+    const leaving = STEPS.find((s) => s.id === step)!;
+    if (leaving.id === "testimonials" && unfinishedRef.current) {
+      // Back to the testimonials, and ask — the typed testimonial would be dropped unseen.
+      setParams(
+        (p) => {
+          const out = new URLSearchParams(p);
+          out.set("step", "testimonials");
+          return out;
+        },
+        { replace: true },
+      );
+      setLeaveTo(urlStep);
+      return;
+    }
+    setLeaveTo(null);
+    void save(urlStep, leaving, false);
+    setStep(urlStep);
+  }, [urlStep]);
+
+  // Leaving the wizard any other way — a link, the tab hidden or closed — saves what the open step has typed.
+  const flushRef = useRef<() => void>(() => {});
+  flushRef.current = () => {
+    if (step && step !== "review") void save(undefined, current, false);
+  };
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushRef.current();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      flushRef.current();
+    };
+  }, []);
 
   /** Defaults offered once their source is typed, never over what the owner wrote. */
   const offerDefaults = (key: string) => {
@@ -214,7 +359,7 @@ export default function AgencyOnboarding() {
   const status = text(draft.agencies.status);
   const review = ((saved?.agency_profiles.onboarding as OnboardingRow | undefined)?.review ?? {}) as OnboardingRow;
   const fieldsOf = (fields: readonly OnboardingField[]) =>
-    fields.map((f) => (
+    fields.filter((f) => shownIn(draft, f)).map((f) => (
       <FieldInput
         key={f.key}
         field={f}
@@ -248,11 +393,11 @@ export default function AgencyOnboarding() {
     regulator: text(getField(draft, "agents.licence_regulator")),
     number: text(getField(draft, "agents.licence_number")) || "[מספר רישיון]",
     affiliated: getField(draft, "agents.has_institutional_affiliation") as boolean | null,
-    displayName: text(getField(draft, "agency_profiles.display_name")) || "[השם באתר]",
+    name: text(getField(draft, "agents.full_name")).trim() || "[השם המלא]",
   });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div dir="rtl" className="min-h-screen bg-background">
       <div className="mx-auto max-w-[1200px] px-6 pt-8">
         <h1 className="font-heading text-3xl font-bold">הקמת {text(draft.agencies.name)}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -285,7 +430,7 @@ export default function AgencyOnboarding() {
           })}
         </nav>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+        <div className={`grid gap-6 ${current.id === "review" ? "" : "lg:grid-cols-[1fr_22rem]"}`}>
           <section aria-labelledby="step-title" className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <h2 id="step-title" className="mb-5 text-xl font-bold">{current.title}</h2>
 
@@ -327,7 +472,11 @@ export default function AgencyOnboarding() {
                       const out = await services.onboarding.submit(agencyId);
                       setSaving(false);
                       setSubmitted(out.ok ? { ok: true, missing: [] } : { ok: false, missing: out.missing, message: out.message });
-                      if (out.ok) await client.invalidateQueries({ queryKey: onboardingKeys.record(agencyId) });
+                      if (out.ok) {
+                        // The banner follows at once: the old return note gives way to "נשלח לאישור".
+                        setDraft((d) => (d ? { ...d, agencies: { ...d.agencies, status: "pending_review" } } : d));
+                        await client.invalidateQueries({ queryKey: onboardingKeys.record(agencyId) });
+                      }
                     }}
                     className="min-h-11 rounded-md bg-accent px-5 text-sm font-medium text-accent-foreground disabled:opacity-40"
                   >
@@ -354,12 +503,35 @@ export default function AgencyOnboarding() {
                     testimonials={record.data?.testimonials ?? []}
                     cases={record.data?.success_cases ?? []}
                     onChanged={() => void client.invalidateQueries({ queryKey: onboardingKeys.record(agencyId) })}
+                    onUnfinished={onUnfinished}
                   />
                 ) : null}
               </div>
             )}
 
             {error ? <p role="alert" className="mt-4 text-sm text-destructive">{error}</p> : null}
+            {leaveTo ? (
+              <div ref={leaveRef} role="alert" className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+                <p>התחלת למלא המלצה או תיק הצלחה ולא הוספת אותם. אם ממשיכים עכשיו, מה שהוקלד לא יישמר.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setLeaveTo(null)} className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground">
+                    להישאר כאן
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const to = leaveTo;
+                      unfinishedRef.current = false;
+                      setLeaveTo(null);
+                      void save(to);
+                    }}
+                    className="min-h-11 rounded-md border border-border px-4 text-sm"
+                  >
+                    להמשיך בלי להוסיף
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {current.id !== "review" ? (
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <button type="button" onClick={() => go(STEPS[index + 1].id)} className="min-h-11 rounded-md bg-accent px-5 text-sm font-medium text-accent-foreground disabled:opacity-40">
@@ -374,9 +546,12 @@ export default function AgencyOnboarding() {
               </div>
             ) : null}
           </section>
-          <aside className="lg:sticky lg:top-6 lg:self-start">
-            <OnboardingPreview draft={draft} />
-          </aside>
+          {/* The review step shows the preview large in its own column; a second copy beside it says nothing new. */}
+          {current.id === "review" ? null : (
+            <aside className="lg:sticky lg:top-6 lg:self-start">
+              <OnboardingPreview draft={draft} />
+            </aside>
+          )}
         </div>
       </main>
     </div>

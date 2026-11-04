@@ -1,6 +1,6 @@
 import React from "react";
 import Photo from "@/components/dorit/primitives/Photo";
-import { ChevronDown, Phone, Mail, MapPin, MessageCircle } from "lucide-react";
+import { ChevronDown, Phone, Mail, MapPin, MessageCircle, Globe, Users, Facebook, type LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAgencyContent } from "@/hooks/useAgencyContent";
 import { WHATSAPP_CHANNEL_URL } from "@/config/offers";
@@ -9,6 +9,7 @@ import { MD_UP, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useLocale, useLocalePath, useT } from "@/i18n/LocaleContext";
 import type { KeyOf } from "@/i18n/resources";
 import { GA_CONSENT, reopenConsent } from "@/lib/consent";
+import type { AgencyLinkName } from "@/lib/agency-links";
 
 // Half the 1400px band from md up; the band is hidden below md.
 const HANDSHAKE = "/images/footer-handshake";
@@ -39,8 +40,15 @@ const NAV_LINKS: FooterLink[] = [
 const CONTACT_ROW = "flex items-center gap-3 max-md:min-h-11";
 const CONTACT_LINK = `${FOOT_LINK} max-md:inline-flex max-md:items-center max-md:min-h-11`;
 
+/** The agency's own links, in this order; each row appears only when the agency gave that link. */
+const AGENCY_LINKS: { name: AgencyLinkName; l: KeyOf<"common">; Icon: LucideIcon }[] = [
+  { name: "website", l: "footer.website", Icon: Globe },
+  { name: "whatsappGroup", l: "footer.whatsappGroup", Icon: Users },
+  { name: "facebookGroup", l: "footer.facebookGroup", Icon: Facebook },
+];
+
 export default function Footer() {
-  const { contact, agent } = useAgencyContent();
+  const { contact, links, agent } = useAgencyContent();
   // The footer sits on all seven pages, so its `#section` links point at
   // something that exists on only one of them. See the hook.
   const goToSection = useSectionNav();
@@ -146,6 +154,15 @@ export default function Footer() {
               <MapPin size={16} strokeWidth={1.5} className="text-highlight-on-dark" />
               <span>{t("footer.place")}</span>
             </li>
+            {AGENCY_LINKS.map(({ name, l, Icon }) => {
+              const href = links[name];
+              return href ? (
+                <li key={name} className={CONTACT_ROW}>
+                  <Icon size={16} strokeWidth={1.5} aria-hidden="true" className="text-highlight-on-dark" />
+                  <a href={href} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>{t(l)}</a>
+                </li>
+              ) : null;
+            })}
           </ul>
           {/* Dorit's WhatsApp channel, on every page, once VITE_WHATSAPP_CHANNEL_URL
               is set (growth brief, 2026-10-14). The site only links to it. */}

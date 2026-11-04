@@ -6,6 +6,7 @@ import type {
   BioKey,
   SuccessCase,
 } from "../ports";
+import { toAgencyLinks } from "@/lib/agency-links";
 import { CARD_COLUMNS, SITE_COLUMNS, SUCCESS_CASE_COLUMNS } from "./agency-content-tables";
 import { fetchRows, type SupabaseTableClient } from "./SupabaseTableClient";
 
@@ -90,6 +91,7 @@ export function toSiteRecord(site: Row, card: Row): AgencySiteRecord {
       email: required(site.email),
       defaultWhatsappMessage: text(site.default_whatsapp_message) ?? "",
     },
+    links: toAgencyLinks(site),
     agent: {
       fullName: required(card.full_name),
       professionalTitle: text(card.professional_title),

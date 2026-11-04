@@ -1,4 +1,4 @@
-import React, { useId } from "react";
+import React, { useEffect, useId, useState } from "react";
 import type { OnboardingField } from "@/config/onboarding";
 
 /**
@@ -50,8 +50,16 @@ export const FIELD_WIDGETS: Record<string, Widget> = {
   "agency_profiles.default_whatsapp_message": { kind: "textarea", maxLength: 500, hint: "ההודעה שהמבקר/ת שולח/ת כשלוחצים על וואטסאפ באתר." },
   "agency_profiles.service_area": { kind: "text", maxLength: 200 },
   "agency_profiles.notify_emails": { kind: "emails" },
+  "agency_profiles.website_url": { kind: "url", hint: "אם יש לסוכנות אתר משלה, למשל https://www.example.co.il" },
+  "agency_profiles.whatsapp_group_url": { kind: "url", hint: "קישור ההצטרפות לקבוצה, https://chat.whatsapp.com/…" },
+  "agency_profiles.facebook_group_url": { kind: "url", hint: "הקישור לקבוצה או לעמוד, https://www.facebook.com/…" },
   // 4 · אודות
-  "agents.bio.headline": { kind: "textarea", maxLength: 200, recommended: 90 },
+  "agents.bio.headline": {
+    kind: "textarea",
+    maxLength: 200,
+    recommended: 90,
+    hint: "משפט אחד שאומר ללקוחות למה לבחור בך. מופיע בראש האתר, מתחת לשם.",
+  },
   "agents.bio.career": { kind: "textarea", maxLength: 1200, recommended: 500 },
   "agents.bio.credentials": { kind: "textarea", maxLength: 600, recommended: 250 },
   "agents.bio.unique": { kind: "textarea", maxLength: 600, recommended: 250 },
@@ -78,6 +86,79 @@ export const LICENCE_TYPE_LABELS: Record<string, string> = {
 const INPUT = "w-full min-h-11 rounded-md border border-border bg-card px-3 text-sm focus:border-accent focus:outline-none";
 const CHIP = (on: boolean) =>
   `min-h-11 rounded-full border px-3 text-sm ${on ? "border-accent bg-accent/10 text-accent" : "border-border hover:border-accent"}`;
+
+/**
+ * Hebrew text with a link or an address inside: each Latin run is isolated
+ * left-to-right, or the bidi algorithm prints "https://chat.whatsapp.com/…"
+ * back to front inside the right-to-left line.
+ */
+export function Bidi({ text }: { text: string }) {
+  // A Latin run keeps its spaces and commas while Latin follows: "Google appointment schedule, Calendly" is one isolate, not four.
+  const parts = text.split(/((?:https?:\/\/)?[A-Za-z0-9](?:[\w\-/:?=&%#@+…]|\.(?=[\w/])|[ ,]+(?=[A-Za-z0-9]))*)/);
+  return (
+    <>
+      {parts.map((p, i) => (i % 2 ? <bdi key={i} dir="ltr">{p}</bdi> : p))}
+    </>
+  );
+}
+
+type StatRow = { num?: string; label?: string };
+const statFilled = (r: StatRow) => Boolean((r.num ?? "").trim() || (r.label ?? "").trim());
+
+/**
+ * The three stat rows keep their places while one types: the stored list
+ * drops empty rows (the site shows only filled ones), the rows on screen do not.
+ */
+function StatsRows({ value, onChange, onBlur, readOnly }: { value: unknown; onChange: (v: unknown) => void; onBlur?: () => void; readOnly?: boolean }) {
+  const stored = (Array.isArray(value) ? value : []) as StatRow[];
+  const fill = (list: StatRow[]) => [0, 1, 2].map((i) => list[i] ?? { num: "", label: "" });
+  const [rows, setRows] = useState<StatRow[]>(() => fill(stored));
+  // Follow the stored list when it changes from outside (a reload after a conflict).
+  useEffect(() => {
+    if (JSON.stringify(rows.filter(statFilled)) !== JSON.stringify(stored)) setRows(fill(stored));
+  }, [JSON.stringify(stored)]);
+  const write = (i: number, key: "num" | "label", v: string) => {
+    const next = rows.map((r, j) => (j === i ? { ...r, [key]: v } : r));
+    setRows(next);
+    onChange(next.filter(statFilled));
+  };
+  return (
+    <div className="mt-1 space-y-2">
+      {rows.map((r, i) => (
+        <div key={i} className="grid grid-cols-[6rem_1fr] gap-2">
+          <input aria-label={`מספר ${i + 1}`} maxLength={12} value={r.num ?? ""} onChange={(e) => write(i, "num", e.target.value)} onBlur={onBlur} disabled={readOnly} className={INPUT} placeholder="15+" />
+          <input aria-label={`תיאור מספר ${i + 1}`} maxLength={40} value={r.label ?? ""} onChange={(e) => write(i, "label", e.target.value)} onBlur={onBlur} disabled={readOnly} className={INPUT} placeholder="שנות ניסיון" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const parseList = (text: string) => text.split(/\n|,/).map((s) => s.trim()).filter(Boolean);
+
+/**
+ * One item per line. The box keeps exactly what is typed — a new line
+ * included — and the stored list is parsed from it; rebuilding the box from
+ * the list on every key would swallow the Enter before the next item is typed.
+ */
+function ListText({ value, onChange, ...rest }: { value: unknown; onChange: (v: unknown) => void } & Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange">) {
+  const stored = (Array.isArray(value) ? value : []).map(String);
+  const [text, setText] = useState(() => stored.join("\n"));
+  // Follow the stored list when it changes from outside (a reload, "לא" clearing the bodies).
+  useEffect(() => {
+    if (JSON.stringify(parseList(text)) !== JSON.stringify(stored)) setText(stored.join("\n"));
+  }, [JSON.stringify(stored)]);
+  return (
+    <textarea
+      {...rest}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(parseList(e.target.value));
+      }}
+    />
+  );
+}
 
 const asText = (v: unknown) => (typeof v === "string" ? v : "");
 const asList = (v: unknown) => (Array.isArray(v) ? (v as unknown[]).map(String) : []);
@@ -109,8 +190,8 @@ export function FieldInput({ field, value, onChange, onBlur, problem, phoneText,
       {required ? <span aria-hidden="true" className="text-destructive"> *</span> : <span className="text-xs text-muted-foreground"> (רשות)</span>}
     </span>
   );
-  const hint = widget && "hint" in widget && widget.hint ? <span className="mt-1 block text-xs text-muted-foreground">{widget.hint}</span> : null;
-  const issue = problem ? <span role="alert" className="mt-1 block text-xs text-destructive">{problem}</span> : null;
+  const hint = widget && "hint" in widget && widget.hint ? <span className="mt-1 block text-xs text-muted-foreground"><Bidi text={widget.hint} /></span> : null;
+  const issue = problem ? <span role="alert" className="mt-1 block text-xs text-destructive"><Bidi text={problem} /></span> : null;
   const common = { id, onBlur, disabled: readOnly, "aria-invalid": problem ? true : undefined, "aria-required": required || undefined };
 
   if (!widget) return null;
@@ -127,7 +208,8 @@ export function FieldInput({ field, value, onChange, onBlur, problem, phoneText,
             dir={widget.kind === "text" ? widget.dir : "ltr"}
             maxLength={widget.kind === "text" ? widget.maxLength : 254}
             value={asText(value)}
-            onChange={(e) => onChange(e.target.value)}
+            // A cleared link is stored as null, never "": the url columns' CHECKs refuse an empty string.
+            onChange={(e) => onChange(widget.kind === "url" ? e.target.value.trim() || null : e.target.value)}
             className={`${INPUT} mt-1 ${widget.kind !== "text" || widget.dir ? "text-left" : ""}`}
           />
           {hint}
@@ -236,16 +318,16 @@ export function FieldInput({ field, value, onChange, onBlur, problem, phoneText,
       return (
         <label htmlFor={id} className="block">
           {label}
-          <textarea
+          <ListText
             {...common}
             rows={3}
             dir={widget.kind === "emails" ? "ltr" : undefined}
-            value={asList(value).join("\n")}
-            onChange={(e) => onChange(e.target.value.split(/\n|,/).map((s) => s.trim()).filter(Boolean))}
+            value={value}
+            onChange={onChange}
             className={`${INPUT} mt-1 py-2 ${widget.kind === "emails" ? "text-left" : ""}`}
           />
           <span className="mt-1 block text-xs text-muted-foreground">
-            {widget.kind === "emails" ? "כתובת אחת בכל שורה. לשם יישלחו הודעות על פניות חדשות." : widget.hint}
+            {widget.kind === "emails" ? "כתובת אחת בכל שורה. לשם יישלחו הודעות על פניות חדשות." : widget.hint ? <Bidi text={widget.hint} /> : null}
           </span>
           {issue}
         </label>
@@ -259,26 +341,14 @@ export function FieldInput({ field, value, onChange, onBlur, problem, phoneText,
           {issue}
         </label>
       );
-    case "stats": {
-      const stats = (Array.isArray(value) ? value : []) as { num?: string; label?: string }[];
-      const rows = [0, 1, 2].map((i) => stats[i] ?? { num: "", label: "" });
-      const write = (i: number, key: "num" | "label", v: string) =>
-        onChange(rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)).filter((r) => (r.num ?? "").trim() || (r.label ?? "").trim()));
+    case "stats":
       return (
         <fieldset>
           <legend>{label}</legend>
-          <div className="mt-1 space-y-2">
-            {rows.map((r, i) => (
-              <div key={i} className="grid grid-cols-[6rem_1fr] gap-2">
-                <input aria-label={`מספר ${i + 1}`} maxLength={12} value={r.num ?? ""} onChange={(e) => write(i, "num", e.target.value)} onBlur={onBlur} disabled={readOnly} className={INPUT} placeholder="15+" />
-                <input aria-label={`תיאור מספר ${i + 1}`} maxLength={40} value={r.label ?? ""} onChange={(e) => write(i, "label", e.target.value)} onBlur={onBlur} disabled={readOnly} className={INPUT} placeholder="שנות ניסיון" />
-              </div>
-            ))}
-          </div>
+          <StatsRows value={value} onChange={onChange} onBlur={onBlur} readOnly={readOnly} />
           {issue}
         </fieldset>
       );
-    }
     case "reviewLinks": {
       const links = (value && typeof value === "object" ? value : {}) as Record<string, string>;
       const write = (k: string, v: string) => {

@@ -115,18 +115,19 @@ describe("the licensee's wording", () => {
   });
 
   it("builds the disclosure sentences in the licensee's grammatical gender", () => {
-    const f = disclosurePreview({ entity: "רחל לוי", gender: "f", regulator: "רשות שוק ההון, ביטוח וחיסכון", number: "L-12345", affiliated: true, displayName: "רחל לוי" });
+    const f = disclosurePreview({ entity: "רחל לוי", gender: "f", regulator: "רשות שוק ההון, ביטוח וחיסכון", number: "L-12345", affiliated: true, name: "רחל לוי" });
     expect(f.licence).toBe("רחל לוי בעלת רישיון סוכן מרשות שוק ההון, ביטוח וחיסכון מס' L-12345, ולה זיקה לגופים מוסדיים. הפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.");
-    expect(f.bot).toBe("זהו עוזר אוטומטי (בינה מלאכותית) של רחל לוי — לא רחל לוי עצמה ולא בעלת רישיון.");
-    const m = disclosurePreview({ entity: "דן כהן", gender: "m", regulator: "רשות שוק ההון, ביטוח וחיסכון", number: "L-1", affiliated: false, displayName: "דן כהן" });
+    expect(f.bot).toBe("זהו עוזר אוטומטי (בינה מלאכותית) של רחל לוי — לא רחל עצמה ולא בעל רישיון.");
+    const m = disclosurePreview({ entity: "דן כהן", gender: "m", regulator: "רשות שוק ההון, ביטוח וחיסכון", number: "L-1", affiliated: false, name: "דן כהן" });
     expect(m.licence).toBe("דן כהן בעל רישיון סוכן מרשות שוק ההון, ביטוח וחיסכון מס' L-1, ואין לו זיקה לגופים מוסדיים.");
-    expect(m.bot).toBe("זהו עוזר אוטומטי (בינה מלאכותית) של דן כהן — לא דן כהן עצמו ולא בעל רישיון.");
+    expect(m.bot).toBe("זהו עוזר אוטומטי (בינה מלאכותית) של דן כהן — לא דן עצמו ולא בעל רישיון.");
   });
 
   it("matches Dorit's live disclosure word for word", async () => {
-    const { PENSION_MARKETING_DISCLOSURE, LICENCE } = await import("@/config/compliance");
-    const d = disclosurePreview({ entity: LICENCE.entity, gender: "f", regulator: LICENCE.regulator, number: LICENCE.number, affiliated: true, displayName: "דורית גוב ארי" });
+    const { PENSION_MARKETING_DISCLOSURE, LICENCE, BOT_DISCLOSURE } = await import("@/config/compliance");
+    const d = disclosurePreview({ entity: LICENCE.entity, gender: "f", regulator: LICENCE.regulator, number: LICENCE.number, affiliated: true, name: "דורית גוב ארי" });
     expect(d.licence).toBe(PENSION_MARKETING_DISCLOSURE);
+    expect(d.bot).toBe(BOT_DISCLOSURE);
   });
 });
 

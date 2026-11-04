@@ -1,4 +1,5 @@
 import { ONBOARDING_STEPS, submitRequiredKeys } from "@/config/onboarding";
+import { agencyLinkProblem } from "@/lib/agency-links";
 
 /**
  * The new-agency wizard's draft: the three rows a step writes, kept as the
@@ -28,6 +29,9 @@ export function emptyDraft(agencyId: string, name: string): OnboardingDraft {
   };
 }
 
+const empty = (v: unknown): boolean =>
+  v === null || v === undefined || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
+
 /** The agent row's defaults, as the table gives them, for a licensee not yet saved. */
 const AGENT_DEFAULTS: Row = {
   licence_types: [],
@@ -38,6 +42,15 @@ const AGENT_DEFAULTS: Row = {
   review_links: {},
   meeting_minutes: 15,
 };
+
+/**
+ * Whether a column of a licensee not yet saved holds only what the table
+ * would give it anyway (or nothing): such a value is no reason to create the
+ * row, and losing it loses nothing the owner typed.
+ */
+export function isAgentDefault(column: string, value: unknown): boolean {
+  return empty(value) || JSON.stringify(value) === JSON.stringify(AGENT_DEFAULTS[column] ?? null) || (typeof value === "object" && value !== null && !Array.isArray(value) && Object.values(value).every(empty));
+}
 
 const parts = (key: string) => {
   const [table, ...path] = key.split(".");
@@ -68,8 +81,6 @@ export function setField(draft: OnboardingDraft, key: string, value: unknown): O
   return { ...draft, [table]: write(base as Row, path) };
 }
 
-const empty = (v: unknown): boolean =>
-  v === null || v === undefined || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
 
 /**
  * The required keys still empty — the browser's copy of onboarding_missing
@@ -138,13 +149,14 @@ export function disclosurePreview(input: {
   regulator: string;
   number: string;
   affiliated: boolean | null;
-  displayName: string;
+  /** The licensee's full name — the bot is theirs ("של דורית גוב ארי — לא דורית עצמה"). A "[placeholder]" is kept whole. */
+  name: string;
 }): { licence: string; bot: string } {
   const holder = `${input.entity} ${g(input.gender, "בעלת", "בעל")} רישיון סוכן מ${input.regulator} מס' ${input.number}`;
   const licence = input.affiliated
     ? `${holder}, ו${g(input.gender, "לה", "לו")} זיקה לגופים מוסדיים. הפעילות היא שיווק פנסיוני ולא ייעוץ פנסיוני אובייקטיבי.`
     : `${holder}, ואין ${g(input.gender, "לה", "לו")} זיקה לגופים מוסדיים.`;
-  const bot = `זהו עוזר אוטומטי (בינה מלאכותית) של ${input.displayName} — לא ${input.displayName} ${g(input.gender, "עצמה", "עצמו")} ולא ${g(input.gender, "בעלת", "בעל")} רישיון.`;
+  const bot = `זהו עוזר אוטומטי (בינה מלאכותית) של ${input.name} — לא ${/^\[.*\]$/.test(input.name.trim()) ? input.name : firstName(input.name) || input.name} ${g(input.gender, "עצמה", "עצמו")} ולא בעל רישיון.`;
   return { licence, bot };
 }
 
@@ -177,6 +189,10 @@ export function fieldProblem(key: string, value: unknown): string | null {
   if (key === "agency_profiles.notify_emails") {
     const bad = (Array.isArray(value) ? value : []).find((e) => !EMAIL.test(String(e)));
     return bad ? `הכתובת ${String(bad)} אינה תקינה.` : null;
+  }
+  if (key.startsWith("agency_profiles.")) {
+    const link = agencyLinkProblem(key.slice("agency_profiles.".length), value);
+    if (link) return link;
   }
   if (key === "agents.booking_url") return text && !/^https:\/\//.test(text) ? "הקישור צריך להתחיל ב-https://" : null;
   if (key === "agents.review_links") {

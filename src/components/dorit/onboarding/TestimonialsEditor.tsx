@@ -1,9 +1,32 @@
-import React, { useState } from "react";
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { ArrowDown, ArrowUp, Pencil, Trash2 } from "lucide-react";
 import { services, type OnboardingRow } from "@/services";
+import { Bidi } from "./fields";
 
 const INPUT = "w-full min-h-11 rounded-md border border-border bg-card px-3 text-sm focus:border-accent focus:outline-none";
 const EMPTY = { name: "", role: "", quote: "", rating: 5, source: "google", source_url: "", consent: false };
+const EMPTY_CASE = { title: "", body: "", metric: "" };
+export const SOURCE_LABELS: Record<string, string> = { google: "Google", midrag: "מידרג", direct: "ישירות ממני" };
+const ICON_BUTTON = "min-h-11 min-w-11 px-2 disabled:opacity-30";
+
+/** A delete asks once more, in place: the row is gone for good after "כן, למחוק". */
+function DeleteButton({ label, busy, onConfirm }: { label: string; busy: boolean; onConfirm: () => void }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return (
+      <button type="button" aria-label={label} disabled={busy} onClick={() => setAsking(true)} className={`${ICON_BUTTON} hover:text-destructive`}>
+        <Trash2 size={15} />
+      </button>
+    );
+  }
+  return (
+    <span role="group" aria-label={label} className="flex items-center gap-1 text-xs">
+      <span>למחוק?</span>
+      <button type="button" disabled={busy} onClick={() => { setAsking(false); onConfirm(); }} className="min-h-11 rounded-md bg-destructive px-2 font-medium text-destructive-foreground">כן, למחוק</button>
+      <button type="button" onClick={() => setAsking(false)} className="min-h-11 rounded-md border border-border px-2">ביטול</button>
+    </span>
+  );
+}
 
 /** Why a testimonial cannot be saved yet, in Hebrew; null when it can. The consent box is the database's rule too. */
 export function testimonialProblem(t: typeof EMPTY): string | null {
@@ -25,18 +48,32 @@ export default function TestimonialsEditor({
   testimonials,
   cases,
   onChanged,
+  onUnfinished,
 }: {
   agencyId: string;
   agentId: string | null;
   testimonials: OnboardingRow[];
   cases: OnboardingRow[];
   onChanged: () => void;
+  /** Whether a testimonial or a case is typed and not yet added — the page asks before leaving the step. */
+  onUnfinished?: (unfinished: boolean) => void;
 }) {
   const [form, setForm] = useState(EMPTY);
-  const [caseForm, setCaseForm] = useState({ title: "", body: "", metric: "" });
+  const [caseForm, setCaseForm] = useState(EMPTY_CASE);
+  /** The row open for editing in the form below, or null for a new one. */
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editingCase, setEditingCase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const problem = testimonialProblem(form);
+  const unfinished =
+    Boolean(form.name.trim() || form.role.trim() || form.quote.trim() || form.source_url.trim()) ||
+    Boolean(caseForm.title.trim() || caseForm.body.trim() || caseForm.metric.trim());
+  useEffect(() => {
+    onUnfinished?.(unfinished);
+  }, [unfinished, onUnfinished]);
+  // Leaving the step unmounts the forms: nothing is unfinished any more.
+  useEffect(() => () => onUnfinished?.(false), [onUnfinished]);
 
   const run = async (work: () => Promise<unknown>) => {
     setBusy(true);
@@ -70,26 +107,47 @@ export default function TestimonialsEditor({
                 <p className="text-sm">״{String(t.quote ?? "")}״</p>
                 <p className="text-xs text-muted-foreground">
                   {String(t.name ?? "")}
-                  {t.role ? ` · ${String(t.role)}` : ""} · {String(t.source ?? "")}
+                  {t.role ? ` · ${String(t.role)}` : ""} · {SOURCE_LABELS[String(t.source ?? "")] ?? String(t.source ?? "")}
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">
-                <button type="button" aria-label="למעלה" disabled={busy || i === 0} onClick={() => move(i, -1)} className="min-h-11 px-2 disabled:opacity-30"><ArrowUp size={15} /></button>
-                <button type="button" aria-label="למטה" disabled={busy || i === testimonials.length - 1} onClick={() => move(i, 1)} className="min-h-11 px-2 disabled:opacity-30"><ArrowDown size={15} /></button>
-                <button type="button" aria-label={`מחיקת ההמלצה של ${String(t.name ?? "")}`} disabled={busy} onClick={() => void run(() => services.onboarding.deleteTestimonial(String(t.id)))} className="min-h-11 px-2 hover:text-destructive"><Trash2 size={15} /></button>
+                <button type="button" aria-label="למעלה" disabled={busy || i === 0} onClick={() => move(i, -1)} className={ICON_BUTTON}><ArrowUp size={15} /></button>
+                <button type="button" aria-label="למטה" disabled={busy || i === testimonials.length - 1} onClick={() => move(i, 1)} className={ICON_BUTTON}><ArrowDown size={15} /></button>
+                <button
+                  type="button"
+                  aria-label={`עריכת ההמלצה של ${String(t.name ?? "")}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setEditing(String(t.id));
+                    // Consent is asked again: the text it was given for may change.
+                    setForm({ name: String(t.name ?? ""), role: String(t.role ?? ""), quote: String(t.quote ?? ""), rating: Number(t.rating ?? 5), source: String(t.source ?? "google"), source_url: String(t.source_url ?? ""), consent: false });
+                  }}
+                  className={ICON_BUTTON}
+                >
+                  <Pencil size={15} />
+                </button>
+                <DeleteButton
+                  label={`מחיקת ההמלצה של ${String(t.name ?? "")}`}
+                  busy={busy}
+                  onConfirm={() =>
+                    void run(async () => {
+                      await services.onboarding.deleteTestimonial(String(t.id));
+                      if (editing === String(t.id)) { setEditing(null); setForm(EMPTY); }
+                    })
+                  }
+                />
               </div>
             </li>
           ))}
         </ol>
 
         <form
-          aria-label="המלצה חדשה"
+          aria-label={editing ? "עריכת המלצה" : "המלצה חדשה"}
           onSubmit={(e) => {
             e.preventDefault();
             if (problem) return;
             void run(async () => {
-              await services.onboarding.saveTestimonial(agencyId, {
-                agent_id: agentId,
+              const values = {
                 name: form.name.trim(),
                 role: form.role.trim() || null,
                 quote: form.quote.trim(),
@@ -97,9 +155,10 @@ export default function TestimonialsEditor({
                 source: form.source,
                 source_url: form.source_url.trim() || null,
                 consent_confirmed_at: new Date().toISOString(),
-                sort_order: testimonials.length,
-              });
+              };
+              await services.onboarding.saveTestimonial(agencyId, editing ? { id: editing, ...values } : { agent_id: agentId, ...values, sort_order: testimonials.length });
               setForm(EMPTY);
+              setEditing(null);
             });
           }}
           className="grid gap-3 rounded-xl border border-dashed border-border p-4 md:grid-cols-2"
@@ -124,10 +183,17 @@ export default function TestimonialsEditor({
             <input type="checkbox" checked={form.consent} onChange={(e) => setForm({ ...form, consent: e.target.checked })} className="mt-1 h-5 w-5" />
             ההמלצה אמיתית, והממליץ/ה הסכים/ה לפרסומה
           </label>
-          {form.name || form.quote ? (problem ? <p role="alert" className="text-xs text-destructive md:col-span-2">{problem}</p> : null) : null}
-          <button type="submit" disabled={Boolean(problem) || busy} className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground disabled:opacity-40 md:col-span-2 md:justify-self-start">
-            הוספת ההמלצה
-          </button>
+          {form.name || form.quote ? (problem ? <p role="alert" className="text-xs text-destructive md:col-span-2"><Bidi text={problem} /></p> : null) : null}
+          <div className="flex flex-wrap gap-2 md:col-span-2">
+            <button type="submit" disabled={Boolean(problem) || busy} className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground disabled:opacity-40">
+              {editing ? "שמירת השינויים" : "הוספת ההמלצה"}
+            </button>
+            {editing ? (
+              <button type="button" onClick={() => { setEditing(null); setForm(EMPTY); }} className="min-h-11 rounded-md border border-border px-4 text-sm">
+                ביטול העריכה
+              </button>
+            ) : null}
+          </div>
         </form>
       </section>
 
@@ -141,25 +207,43 @@ export default function TestimonialsEditor({
                 <p className="font-medium">{String(c.title ?? "")}</p>
                 <p className="text-muted-foreground">{String(c.body ?? "")}</p>
               </div>
-              <button type="button" aria-label={`מחיקת ${String(c.title ?? "")}`} disabled={busy} onClick={() => void run(() => services.onboarding.deleteSuccessCase(String(c.id)))} className="min-h-11 px-2 hover:text-destructive"><Trash2 size={15} /></button>
+              <div className="flex shrink-0 gap-1">
+                <button
+                  type="button"
+                  aria-label={`עריכת ${String(c.title ?? "")}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setEditingCase(String(c.id));
+                    setCaseForm({ title: String(c.title ?? ""), body: String(c.body ?? ""), metric: String(c.metric ?? "") });
+                  }}
+                  className={ICON_BUTTON}
+                >
+                  <Pencil size={15} />
+                </button>
+                <DeleteButton
+                  label={`מחיקת ${String(c.title ?? "")}`}
+                  busy={busy}
+                  onConfirm={() =>
+                    void run(async () => {
+                      await services.onboarding.deleteSuccessCase(String(c.id));
+                      if (editingCase === String(c.id)) { setEditingCase(null); setCaseForm(EMPTY_CASE); }
+                    })
+                  }
+                />
+              </div>
             </li>
           ))}
         </ul>
         <form
-          aria-label="תיק הצלחה חדש"
+          aria-label={editingCase ? "עריכת תיק הצלחה" : "תיק הצלחה חדש"}
           onSubmit={(e) => {
             e.preventDefault();
             if (!caseForm.title.trim() || !caseForm.body.trim()) return;
             void run(async () => {
-              await services.onboarding.saveSuccessCase(agencyId, {
-                agent_id: agentId,
-                title: caseForm.title.trim(),
-                body: caseForm.body.trim(),
-                metric: caseForm.metric.trim() || null,
-                sort_order: cases.length,
-                published: true,
-              });
-              setCaseForm({ title: "", body: "", metric: "" });
+              const values = { title: caseForm.title.trim(), body: caseForm.body.trim(), metric: caseForm.metric.trim() || null };
+              await services.onboarding.saveSuccessCase(agencyId, editingCase ? { id: editingCase, ...values } : { agent_id: agentId, ...values, sort_order: cases.length, published: true });
+              setCaseForm(EMPTY_CASE);
+              setEditingCase(null);
             });
           }}
           className="grid gap-3 rounded-xl border border-dashed border-border p-4"
@@ -167,7 +251,12 @@ export default function TestimonialsEditor({
           <label className="text-sm">כותרת<input value={caseForm.title} maxLength={200} onChange={(e) => setCaseForm({ ...caseForm, title: e.target.value })} className={`${INPUT} mt-1`} /></label>
           <label className="text-sm">מה היה ומה עשינו<textarea value={caseForm.body} maxLength={2000} rows={3} onChange={(e) => setCaseForm({ ...caseForm, body: e.target.value })} className={`${INPUT} mt-1 py-2`} /></label>
           <label className="text-sm">התוצאה במילים (רשות)<input value={caseForm.metric} maxLength={100} onChange={(e) => setCaseForm({ ...caseForm, metric: e.target.value })} className={`${INPUT} mt-1`} /></label>
-          <button type="submit" disabled={busy || !caseForm.title.trim() || !caseForm.body.trim()} className="min-h-11 justify-self-start rounded-md border border-border px-4 text-sm disabled:opacity-40">הוספת תיק</button>
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={busy || !caseForm.title.trim() || !caseForm.body.trim()} className="min-h-11 rounded-md border border-border px-4 text-sm disabled:opacity-40">{editingCase ? "שמירת השינויים" : "הוספת תיק"}</button>
+            {editingCase ? (
+              <button type="button" onClick={() => { setEditingCase(null); setCaseForm(EMPTY_CASE); }} className="min-h-11 rounded-md border border-border px-4 text-sm">ביטול העריכה</button>
+            ) : null}
+          </div>
         </form>
       </section>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
