@@ -47,7 +47,7 @@ export default function OnboardingPreview({ draft, large = false }: { draft: Onb
         </div>
       </div>
       <p className={`mt-4 font-heading font-bold leading-snug ${large ? "text-3xl" : "text-xl"}`}>
-        {text(getField(draft, "agents.bio.headline")) || "משפט הפתיחה שלך יופיע כאן"}
+        {text(getField(draft, "agents.bio.headline")) || "המשפט השיווקי שלך יופיע כאן"}
       </p>
       {stats.length ? (
         <ul className="mt-4 flex flex-wrap gap-4">

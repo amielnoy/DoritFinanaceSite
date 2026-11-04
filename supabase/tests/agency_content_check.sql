@@ -151,7 +151,8 @@ begin
     from information_schema.columns
    where table_schema = 'public' and table_name = 'public_agency_sites';
   if cols is distinct from array['agency_id', 'domain', 'display_name', 'phone_e164', 'phone_display', 'whatsapp',
-                                 'email', 'default_whatsapp_message', 'service_area'] then
+                                 'email', 'default_whatsapp_message', 'service_area',
+                                 'website_url', 'whatsapp_group_url', 'facebook_group_url'] then
     raise exception 'public_agency_sites shows the wrong columns: %', cols;
   end if;
 
@@ -226,5 +227,51 @@ do $$ begin
     raise exception 'a second run of the agency 1 seed changed the agent or the cases';
   end if;
 end $$;
+
+-- ── an agency's own links (20261115000000_agency_links.sql) ──────────────
+-- Each CHECK refuses what src/lib/agency-links.ts refuses; a live agency's
+-- links are public through the view, a draft's are not.
+do $$
+declare
+  bad record;
+begin
+  update public.agency_profiles
+     set website_url = 'https://www.f.example',
+         whatsapp_group_url = 'https://chat.whatsapp.com/AbC123',
+         facebook_group_url = 'https://www.facebook.com/groups/1'
+   where agency_id in ('ffffffff-0000-0000-0000-00000000000f', 'ffffffff-0000-0000-0000-0000000000a9');
+
+  for bad in
+    select * from (values
+      ('website_url', 'http://www.f.example'),
+      ('website_url', 'javascript:alert(1)'),
+      ('website_url', ''),
+      ('whatsapp_group_url', 'https://wa.me/972500000000'),
+      ('whatsapp_group_url', 'https://chat.whatsapp.com.evil.example/x'),
+      ('facebook_group_url', 'https://facebook.com.evil.example/groups/x'),
+      ('facebook_group_url', 'https://www.facebook.com/' || repeat('a', 500))
+    ) as t(col, val)
+  loop
+    begin
+      execute format('update public.agency_profiles set %I = $1 where agency_id = $2', bad.col)
+        using bad.val, 'ffffffff-0000-0000-0000-00000000000f'::uuid;
+      raise exception '% accepted %', bad.col, bad.val;
+    exception when check_violation then null;
+    end;
+  end loop;
+end $$;
+
+set local role anon;
+do $$ begin
+  if (select whatsapp_group_url from public.public_agency_sites
+       where agency_id = 'ffffffff-0000-0000-0000-00000000000f') is distinct from 'https://chat.whatsapp.com/AbC123' then
+    raise exception 'a live agency''s WhatsApp group is not in the view';
+  end if;
+  if exists (select 1 from public.public_agency_sites where facebook_group_url is not null
+              and agency_id = 'ffffffff-0000-0000-0000-0000000000a9') then
+    raise exception 'a draft agency''s links are public';
+  end if;
+end $$;
+reset role;
 
 rollback;

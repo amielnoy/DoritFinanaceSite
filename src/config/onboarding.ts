@@ -107,6 +107,10 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
       { key: "agency_profiles.default_whatsapp_message", label: "הודעת פתיחה בוואטסאפ", required: "submit" },
       { key: "agency_profiles.service_area", label: "אזור שירות", required: "optional" },
       { key: "agency_profiles.notify_emails", label: "כתובות להתראות", required: "submit" },
+      // The agency's own links, shown in the footer when set (20261115000000_agency_links.sql).
+      { key: "agency_profiles.website_url", label: "אתר הסוכנות", required: "optional" },
+      { key: "agency_profiles.whatsapp_group_url", label: "קבוצת וואטסאפ", required: "optional" },
+      { key: "agency_profiles.facebook_group_url", label: "קבוצת פייסבוק", required: "optional" },
     ],
   },
   {
@@ -114,7 +118,8 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
     number: 4,
     title: "אודות",
     fields: [
-      { key: "agents.bio.headline", label: "משפט פתיחה", required: "submit" },
+      // The marketing pitch: one short sentence, the hero's lead.
+      { key: "agents.bio.headline", label: "משפט שיווקי קצר", required: "submit" },
       { key: "agents.bio.career", label: "רקע מקצועי", required: "submit" },
       { key: "agents.bio.credentials", label: "השכלה ותעודות", required: "optional" },
       { key: "agents.bio.unique", label: "מה מייחד אותך", required: "optional" },

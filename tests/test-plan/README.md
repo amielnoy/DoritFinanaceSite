@@ -26,6 +26,8 @@ Software Test Description (STD) per suite.
 | 13 | [STD — Agent Evals](13-std-eval.md) | eval | `npm run test:eval:chat` (script), by hand | `tests/eval/chat/` |
 | 14 | [The procedures agent: where the line runs](14-procedures-zones.md) | contract + eval | — | `supabase/functions/chat/prompts/procedures.md` |
 | 15 | [Manual test plan](15-manual-test-plan.md) | manual | a person in a browser | — |
+| 16 | [Manual test plan — admin area](16-manual-admin-test-plan.md) | manual | a person in a browser, signed in as staff | — |
+| 17 | [Manual test plan — onboarding wizard](17-manual-onboarding-wizard-test-plan.md) | manual | a person in a browser, local Supabase only | — |
 
 ## Test case identifiers
 

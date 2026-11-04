@@ -32,6 +32,8 @@ vi.mock("@/lib/AuthContext", () => ({
 vi.mock("@/hooks/useAgency", () => ({
   useMyAgencies: () => ({ data: h.agencies }),
   useCurrentAgency: () => ({ agencyId: String(h.agencies[0]?.id ?? ""), agencies: h.agencies, setAgency: vi.fn(), isLoading: false }),
+  // The owner of a draft has no role in it yet: the wizard gets the owner's own bar.
+  useAgencyRole: () => ({ role: null, isOperator: false }),
 }));
 vi.mock("@/config/agency-onboarding", () => ({ AGENCY_ONBOARDING: true, isAgencyOnboardingOn: () => true }));
 
@@ -116,6 +118,21 @@ describe("/admin/agencies/:id/review", () => {
     await waitFor(() => expect(h.onb.setDisclosuresApproved).toHaveBeenCalledWith(AGENCY, true));
   });
 
+  it("CMP-ONB-108: reads the details in words, and confirms a save of the operator's fields (ONB-D-08, ONB-D-11)", async () => {
+    const r = record();
+    h.onb.load.mockResolvedValue({ ...r, agents: { ...r.agents, licence_types: ["life_agent", "pension_agent"], meeting_minutes: 30 } });
+    h.onb.setOperatorFields.mockResolvedValue(undefined);
+    show();
+    expect(await screen.findByText("נקבה")).toBeTruthy();
+    expect(screen.getByText("סוכן/ת ביטוח חיים, סוכן/ת ביטוח פנסיוני")).toBeTruthy();
+    expect(screen.getByText("30 דקות")).toBeTruthy();
+    expect(screen.queryByText("life_agent", { exact: false })).toBeNull();
+    fireEvent.change(screen.getByLabelText("דומיין"), { target: { value: "rachel.example" } });
+    fireEvent.click(screen.getByRole("button", { name: "שמירה" }));
+    expect(await screen.findByText("נשמר ✓")).toBeTruthy();
+    expect(h.onb.setOperatorFields).toHaveBeenCalledWith(AGENCY, { domain: "rachel.example", mail_from: null, ga4_measurement_id: null });
+  });
+
   it("names the gates still closed when activation is refused", async () => {
     h.onb.load.mockResolvedValue(record());
     h.onb.activate.mockResolvedValue({ ok: false, missing: [], gates: ["agents.licence_verified_at", "agencies.data_processing_agreement_date"], message: "אחד מתנאי ההפעלה עדיין לא התקיים." });
@@ -164,6 +181,8 @@ describe("the wizard's gate, the redirect and the switcher", () => {
   it("lets the operator and the agency's owner in, and no other member", async () => {
     guarded();
     expect(await screen.findByText("the wizard")).toBeTruthy();
+    // The operator has the admin frame: no second bar.
+    expect(screen.queryByRole("link", { name: /לאתר/ })).toBeNull();
   });
 
   it("lets the owner of the draft in", async () => {
@@ -171,6 +190,9 @@ describe("the wizard's gate, the redirect and the switcher", () => {
     h.onb.role.mockResolvedValue("owner");
     guarded();
     expect(await screen.findByText("the wizard")).toBeTruthy();
+    // The owner has no admin frame yet: the wizard brings its own way out (ONB-D-03).
+    expect(screen.getByRole("link", { name: /לאתר/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /יציאה/ })).toBeTruthy();
   });
 
   it("sends an Admin of the draft home", async () => {
