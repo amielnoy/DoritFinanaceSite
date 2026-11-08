@@ -4,6 +4,7 @@ export type { ClientMeeting };
 import type { Intake, NoticeMethod, Product } from "@/lib/staff-lead-types";
 import type { InterviewSummary } from "@/lib/interview-handoff";
 import type { Snapshot } from "@/lib/clearinghouse/snapshot";
+import type { AgencyLinks } from "@/lib/agency-links";
 
 export type { InterviewSummary };
 
@@ -176,6 +177,8 @@ export interface AgentCardRecord {
 export interface AgencySiteRecord {
   agencyId: string;
   contact: AgencyContact;
+  /** The agency's website, WhatsApp group and Facebook group, each null when not given. */
+  links: AgencyLinks;
   agent: AgentCardRecord;
 }
 

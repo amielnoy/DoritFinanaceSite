@@ -2,6 +2,7 @@ import { AGENCY1_CASES, AGENCY1_ID, AGENCY1_REVIEW_LINKS } from "@/config/agency
 import { AGENCY_PROFILE } from "@/config/agencyProfile";
 import { CONTACT } from "@/config/contact";
 import { CAL_LINK } from "@/config/offers";
+import { NO_AGENCY_LINKS, type AgencyLinks } from "@/lib/agency-links";
 import { normalizeHost } from "@/lib/host";
 import { portraitFor, type Portrait } from "@/lib/portrait";
 import type { AgencyContact, AgencySiteRecord, SuccessCase } from "@/services/ports";
@@ -28,6 +29,8 @@ export interface AgencyContent {
   agencyId: string;
   source: "bundled" | "database";
   contact: AgencyContact;
+  /** Shown in the footer, each only when set. Agency 1 has none. */
+  links: AgencyLinks;
   agent: {
     fullName: string;
     /** "name · title", as the hero prints it; the name alone without a title. */
@@ -52,6 +55,7 @@ export function bundledAgencyContent(t: Translate): AgencyContent {
     agencyId: AGENCY1_ID,
     source: "bundled",
     contact: { ...CONTACT },
+    links: { ...NO_AGENCY_LINKS },
     agent: {
       fullName: AGENCY_PROFILE.displayName,
       byline: t("hero.byline"),
@@ -102,6 +106,7 @@ export function resolveAgencyContent(
     agencyId,
     source: "database",
     contact: { ...record.contact },
+    links: { ...record.links },
     agent: {
       fullName: agent.fullName,
       byline: agent.professionalTitle ? `${agent.fullName} · ${agent.professionalTitle}` : agent.fullName,

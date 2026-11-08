@@ -39,7 +39,7 @@ export interface OnboardingClient {
 export const AGENT_PHOTOS_BUCKET = "agent-photos";
 
 const PROFILE_COLUMNS =
-  "agency_id,display_name,phone_e164,phone_display,whatsapp,email,default_whatsapp_message,licence_entity,service_area,notify_emails,onboarding,updated_at,domain,mail_from,ga4_measurement_id,disclosures_approved_at,consent_version";
+  "agency_id,display_name,phone_e164,phone_display,whatsapp,email,default_whatsapp_message,licence_entity,service_area,website_url,whatsapp_group_url,facebook_group_url,notify_emails,onboarding,updated_at,domain,mail_from,ga4_measurement_id,disclosures_approved_at,consent_version";
 const AGENT_COLUMNS =
   "id,agency_id,full_name,grammatical_gender,professional_title,photo_path,photo_alt,licence_number,licence_types,licence_regulator,has_institutional_affiliation,affiliations,bio,stats,booking_url,meeting_minutes,review_links,licence_verified_at,verified_licence_number,updated_at";
 const TESTIMONIAL_COLUMNS = "id,agency_id,agent_id,name,role,quote,rating,source,source_url,consent_confirmed_at,sort_order";

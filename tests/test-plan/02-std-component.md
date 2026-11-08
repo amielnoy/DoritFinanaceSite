@@ -1077,6 +1077,7 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4, behind `
 | CMP-AGC-020 | "the footer shows the record's phone, email and licence" | Record values |
 | CMP-AGC-021 | "the sticky bar and the header call the record's number" | `tel:` and `wa.me` from the record |
 | CMP-AGC-022 | "the privacy policy mails the record's email" | `mailto:` from the record |
+| CMP-AGC-023 | "the footer links the agency's website and groups only when it has them" | No link rows with `links` all null; with all three set, three `noopener noreferrer` links labelled "האתר שלנו", "קבוצת הוואטסאפ", "קבוצת הפייסבוק" |
 
 ### 4.57 The portrait — `agent-portrait.test.tsx`
 
@@ -1085,3 +1086,26 @@ docs/superpowers/specs/2026-10-17-client-meetings-design.md, rollout 4, behind `
 | CMP-POR-001 | "the bundled portrait is Dorit's AVIF + WebP picture" | `<picture>` with both sources |
 | CMP-POR-002 | "an uploaded photo is one <img> with src, srcset and sizes" | Single `<img>` |
 | CMP-POR-003 | "a monogram is a labelled box of initials, not an <img>" | Labelled, no `<img>` |
+
+### 4.58 The new-agency wizard's fixes — `agency-onboarding.test.tsx`, `agency-onboarding-operator.test.tsx`
+
+Regression cases for the defects of manual plan 17 (`17-manual-onboarding-wizard-test-plan.md`, §4).
+
+| ID | Title | Expected result |
+|---|---|---|
+| CMP-ONB-101 | "moves freely before step 1's name is saved, and creates the licensee with what was typed later" | "הקודם" from step 2 moves with no name and no `saveAgent`; the notice says the details wait for the name; once the name is typed, one insert carries the name and the step 2 licence number (ONB-D-01) |
+| CMP-ONB-102 | "a step with nothing typed moves without a word, even with no licensee yet" | "המשך" from an empty step 4 moves, no notice, no `saveAgent` (ONB-D-01) |
+| CMP-ONB-103 | "shows the institutional bodies only after יש זיקה = כן, and clears them on לא" | Hidden before and after "לא"; the save has `has_institutional_affiliation: false` and no `affiliations` (ONB-D-04) |
+| CMP-ONB-104 | "a stat typed in row 2 stays in row 2" | Row 2 holds "לקוחות" after three keystrokes; row 1 stays empty (ONB-D-05) |
+| CMP-ONB-105 | "a saved testimonial opens for editing and saves in place; a delete asks first" | Source shown as "Google"; edit saves with the row's `id`; delete calls nothing until "כן, למחוק", and "ביטול" cancels (ONB-D-06, ONB-D-08, ONB-D-10) |
+| CMP-ONB-106 | "the checklist names the phone once, never its raw columns" | Step 3's row says "טלפון נייד", no `agency_profiles.` (ONB-D-07) |
+| CMP-ONB-107 | "after sending, the old return note gives way to the pending banner" | The return note is gone once the server accepts (ONB-D-11) |
+| CMP-ONB-108 | "reads the details in words, and confirms a save of the operator's fields" | "נקבה", the licence types in Hebrew, "30 דקות", no `life_agent`; "נשמר ✓" after saving the domain (ONB-D-08, ONB-D-11) |
+| CMP-ONB-109 | "a new line in a one-per-line box stays while the next item is typed" | The box keeps "a@example.com\n"; the save has both addresses (ONB-D-13) |
+| CMP-ONB-110 | "a required value typed but not acceptable does not tick its step" | Step 2's ✓ goes when its licence number becomes "12345" (ONB-D-15) |
+| CMP-ONB-111 | "an English phrase in a Hebrew hint stays in one piece, its full stop outside" | Two `<bdi>` runs: "Google appointment schedule, Calendly" and "Outlook Bookings" (ONB-D-09, ONB-D-16) |
+| CMP-ONB-112 | "the address names the step, and opens it" | `?step=meetings` opens step 6 though `last_step` is step 3 (ONB-D-21) |
+| CMP-ONB-113 | "the browser's Back and Forward move between steps, saving what was typed on the way" | Back from step 4 returns to step 3 and saves the headline typed but never left; Forward shows it (ONB-D-21, ONB-D-22) |
+| CMP-ONB-114 | "leaving step 5 with a testimonial typed and not added asks first" | "המשך" asks and stays; "להישאר כאן" keeps the text; "להמשיך בלי להוסיף" moves to step 6 (ONB-D-20) |
+
+Also changed in these files: the phone case (a bad value is skipped and the move goes on, ONB-D-02), the disclosure case (the bot line by the licensee's first name, ONB-D-12), and the owner's gate case (the owner gets "לאתר" and "יציאה", the operator no second bar, ONB-D-03).

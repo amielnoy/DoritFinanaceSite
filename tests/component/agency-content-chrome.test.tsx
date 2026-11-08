@@ -55,6 +55,7 @@ const SENTINEL: AgencySiteRecord = {
     email: "sentinel@example.test",
     defaultWhatsappMessage: "שלום",
   },
+  links: { website: null, whatsappGroup: null, facebookGroup: null },
   agent: {
     fullName: "יעל כהן",
     professionalTitle: "מתכננת פיננסית",
@@ -94,6 +95,29 @@ describe("chrome and pages from the record", () => {
     expect(container.textContent).not.toContain("L-00107009");
     expect(hrefs(container)).toContain("mailto:sentinel@example.test");
     expect(hrefs(container)).toContain("tel:+972500000000");
+  });
+
+  it("CMP-AGC-023: the footer links the agency's website and groups only when it has them", async () => {
+    const bare = renderIt(<Footer />);
+    await waitFor(() => expect(bare.container.textContent).toContain("050-000-0000"));
+    expect(bare.container.textContent).not.toContain("קבוצת הוואטסאפ");
+    expect(hrefs(bare.container).some((h) => h.includes("chat.whatsapp.com") || h.includes("facebook.com"))).toBe(false);
+    bare.unmount();
+
+    servicesMock.agencyContent.siteContent.mockResolvedValue({
+      ...SENTINEL,
+      links: {
+        website: "https://www.example.co.il",
+        whatsappGroup: "https://chat.whatsapp.com/abc",
+        facebookGroup: "https://www.facebook.com/groups/1",
+      },
+    });
+    const { container } = renderIt(<Footer />);
+    await waitFor(() => expect(hrefs(container)).toContain("https://chat.whatsapp.com/abc"));
+    expect(hrefs(container)).toEqual(expect.arrayContaining(["https://www.example.co.il", "https://www.facebook.com/groups/1"]));
+    for (const label of ["האתר שלנו", "קבוצת הוואטסאפ", "קבוצת הפייסבוק"]) expect(container.textContent).toContain(label);
+    const group = [...container.querySelectorAll("a")].find((a) => a.getAttribute("href") === "https://chat.whatsapp.com/abc")!;
+    expect(group.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
   it("CMP-AGC-021: the sticky bar and the header call the record's number", async () => {
