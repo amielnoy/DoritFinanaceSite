@@ -47,6 +47,11 @@ jobs:
           node-version: 22
           cache: npm
 
+      # npm 12, as in ci.yml: Node 22's npm ignores the .npmrc release
+      # cooldown and `npm ci` then fails as out of sync.
+      - name: Pin npm (honours the .npmrc release cooldown)
+        run: npm i -g npm@12
+
       - run: npm ci --ignore-scripts
 
       # SUPABASE_URL isn't sensitive (it's already public in the client
