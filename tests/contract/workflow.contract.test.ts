@@ -142,6 +142,18 @@ describe("the workflow tests every PR commit once and deploys from only two bran
     expect(workflow.jobs["merge-readiness"].name).toBe("Safe to merge?");
   });
 
+  it("checks a PR's migrations against production before 'Safe to merge?' says yes", () => {
+    // #316 merged an unapplied migration; the check on main then froze every
+    // production deploy. The PR verdict waits on the same check, and both jobs
+    // run the one script.
+    const job = workflow.jobs["migrations-applied"];
+    expect(job.if).toContain("pull_request");
+    expect(JSON.stringify(job.steps)).toContain("scripts/check-migrations.sh");
+    expect(JSON.stringify(workflow.jobs["deploy-supabase"].steps)).toContain("scripts/check-migrations.sh");
+    expect(workflow.jobs["merge-readiness"].needs).toContain("migrations-applied");
+    expect(JSON.stringify(workflow.jobs["merge-readiness"])).toContain("MIGRATIONS");
+  });
+
   it("names Vercel as production in the PR verdict, not Base44", () => {
     const verdict = JSON.stringify(workflow.jobs["merge-readiness"]);
     expect(verdict).not.toContain("**Base44** (production");
