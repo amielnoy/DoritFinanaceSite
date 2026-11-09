@@ -94,9 +94,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -144,7 +144,7 @@ jobs:
         run: npm run build:e2e
 
       - name: Upload build output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: dist
           path: dist
@@ -156,12 +156,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # The security suite runs `git ls-files`, so it needs the work tree.
           fetch-depth: 1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -202,7 +202,7 @@ jobs:
 
       - name: Upload JUnit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: vitest-results
           path: test-results/
@@ -214,7 +214,7 @@ jobs:
       # report silently goes back to being e2e-only.
       - name: Upload Allure results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: allure-results-vitest
           path: allure-results/
@@ -328,9 +328,9 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -348,7 +348,7 @@ jobs:
           browser: ${{ matrix.browser }}
 
       - name: Download build output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: dist
           path: dist
@@ -381,7 +381,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-report-${{ matrix.project }}-${{ matrix.shard }}
           path: |
@@ -399,7 +399,7 @@ jobs:
       # downloads, which is the only contract between the two jobs.
       - name: Upload Allure results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: allure-results-${{ matrix.project }}-${{ matrix.shard }}
           path: allure-results/
@@ -433,7 +433,7 @@ jobs:
     env:
       SUPABASE_PROJECT_REF: hjowdyiwjjrqceumkvgt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check deploy credentials
         env:
@@ -516,9 +516,9 @@ jobs:
       url: ${{ steps.deploy.outputs.url }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -730,9 +730,9 @@ jobs:
       needs['deploy-vercel'].result == 'success'
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -824,7 +824,7 @@ jobs:
 
       - name: Upload smoke report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-report-smoke
           path: playwright-report/
@@ -982,9 +982,9 @@ jobs:
       alias: ${{ steps.cfdeploy.outputs.alias }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -995,7 +995,7 @@ jobs:
       - run: npm ci
 
       - name: Collect the results from every platform
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: allure-results-*
           path: allure-parts
@@ -1020,7 +1020,7 @@ jobs:
       # so restoring the cache is the whole mechanism — none of the copying in
       # and out of the report directory that Allure 2 needed.
       - name: Restore report history
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: allure-history
           key: allure-history-${{ github.run_id }}
@@ -1054,7 +1054,7 @@ jobs:
 
       - name: Attach the report to this run
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: allure-report
           path: allure-report/
@@ -1268,14 +1268,14 @@ jobs:
       contents: read
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # The diff against the base is evidence: a failure right after an
           # app-code change reads differently from one after a config change.
           fetch-depth: 0
 
       - name: Collect the results from every platform
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: allure-results-*
           path: allure-parts
@@ -1289,13 +1289,13 @@ jobs:
       # Includes this run's own entry; the MCP server ignores runs newer than
       # the earliest result, so the history it reports is the past only.
       - name: Restore report history
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: allure-history
           key: allure-history-${{ github.run_id }}
           restore-keys: allure-history-
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -1360,7 +1360,7 @@ jobs:
 
       - name: Attach the triage to this run
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: failure-triage
           path: |
@@ -1386,7 +1386,7 @@ jobs:
     env:
       SUPABASE_PROJECT_REF: hjowdyiwjjrqceumkvgt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Every migration is applied in production
         env:
@@ -1546,7 +1546,7 @@ jobs:
       - name: Fetch the failure triage, if there is one
         if: needs.triage.result == 'success'
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: failure-triage
           path: triage
@@ -1621,9 +1621,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
