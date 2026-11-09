@@ -5,7 +5,6 @@ describe("allowedOrigin", () => {
   it.each([
     "https://govari-fin.co.il",
     "https://www.govari-fin.co.il",
-    "https://safe-arch-plan.base44.app",
     "https://dorit-finance-site.vercel.app",
     "https://dorit-finance-site-git-main-amielnoy-9725s-projects.vercel.app",
     "https://dorit-finance-site-abc123-amielnoy-9725s-projects.vercel.app",
@@ -24,6 +23,7 @@ describe("allowedOrigin", () => {
     "https://someone-else.vercel.app",
     "https://dorit-finance-site.vercel.app.evil.example",
     "http://localhost.evil.example",
+    "https://safe-arch-plan.base44.app",
   ])("refuses %s", (origin) => {
     expect(allowedOrigin(origin)).toBeNull();
   });
