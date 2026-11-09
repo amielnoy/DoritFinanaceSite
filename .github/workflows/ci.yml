@@ -444,9 +444,12 @@ jobs:
             exit 1
           fi
 
+      # Pinned, not `latest`: v3 (Nov 2026) rejects `[inbucket]` in
+      # supabase/config.toml, so a new major broke every deploy overnight.
+      # Move this together with the local CLI and the config.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.67.1
 
       # Migrations are applied to production by hand (README). Before the
       # functions that may depend on one go out — and so before Vercel is
@@ -1599,8 +1602,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
+
+      - name: Pin npm (honours the .npmrc release cooldown)
+        run: npm i -g npm@${{ env.NPM_VERSION }}
 
       # The same three, checked the same way, as the deploy job.
       - name: Check Vercel credentials
