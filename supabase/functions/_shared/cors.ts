@@ -14,7 +14,6 @@
 const EXACT = new Set([
   'https://govari-fin.co.il',
   'https://www.govari-fin.co.il',
-  'https://safe-arch-plan.base44.app',
 ]);
 const VERCEL = /^https:\/\/dorit-finance-site(-[a-z0-9-]+)?\.vercel\.app$/;
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
