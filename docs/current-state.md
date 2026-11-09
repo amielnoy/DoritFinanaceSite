@@ -35,12 +35,13 @@ accepts `MAILER_TOKEN`. The Edge Functions no longer allow the
 
 These are the account owner's, not the repository's:
 
-- [ ] Delete the Vercel variables `VITE_BASE44_APP_ID`, `VITE_BASE44_SERVER_URL`,
+- [x] Delete the Vercel variables `VITE_BASE44_APP_ID`, `VITE_BASE44_SERVER_URL`,
   `VITE_BASE44_APP_BASE_URL`, `VITE_LEAD_FUNCTIONS`, `VITE_CONTENT_WRITES`,
   `VITE_UPLOAD_PROVIDER`, `VITE_CONTENT_IMAGES` and `VITE_CHAT_AGENTS`. Nothing
-  reads them.
-- [ ] Delete the GitHub secrets `BASE44_API_KEY`, `BASE44_ACCESS_TOKEN` and
+  reads them. **Done 2026-11-09.**
+- [x] Delete the GitHub secrets `BASE44_API_KEY`, `BASE44_ACCESS_TOKEN` and
   `BASE44_REFRESH_TOKEN`, and the variables `BASE44_APP_ID` and `BASE44_URL`.
+  **Done 2026-11-09**, with the two `B44U_…` secrets the Builder had added.
 - [ ] Revoke the Base44 connectors.
 - [ ] Uninstall the Base44 GitHub App. The Builder restores five `.jsx` auth
   pages whenever its environment starts, and a `.jsx` beside a `.tsx` now turns
