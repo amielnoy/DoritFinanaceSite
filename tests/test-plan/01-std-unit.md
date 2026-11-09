@@ -1576,7 +1576,7 @@ Every file under `api/` and everything it imports at run time: Vercel bundles th
 
 ### 4.59 Production's migration history — `tests/unit/check-migrations.test.ts`
 
-`scripts/check-migrations.mjs`, run in CI's Supabase deploy job on the output of `supabase migration list --linked`.
+`scripts/check-migrations.mjs`, run through `scripts/check-migrations.sh` on every PR ("Migrations applied in production", which "Safe to merge?" waits on) and in the Supabase deploy job on main, on the Management API's migration list.
 
 | ID | Title | Expected result |
 |---|---|---|

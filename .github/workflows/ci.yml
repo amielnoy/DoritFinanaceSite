@@ -466,16 +466,8 @@ jobs:
       - name: Every migration is applied in production
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_MIGRATIONS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN2 }}
-        # The Management API, not `supabase link`: link also reads the project's
-        # API keys (service_role included); this needs database_migrations_read.
-        run: |
-          status=$(curl -sS --max-time 30 -o remote.json -w '%{http_code}' \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/migrations") || status=000
-          if [ "$status" != 200 ]; then
-            echo "::warning::Could not read production's migration history (HTTP $status) — not checked. A scoped token needs database_migrations_read; set SUPABASE_MIGRATIONS_TOKEN to one that has it."; cat remote.json 2>/dev/null; exit 0
-          fi
-          node scripts/check-migrations.mjs remote.json supabase/migrations
+        # The same script as the PR job "Migrations applied in production".
+        run: bash scripts/check-migrations.sh
 
       # No function named: every directory under supabase/functions except
       # `_shared`, with each one's verify_jwt from supabase/config.toml.
@@ -1377,6 +1369,30 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # ── Migrations before merge ──────────────────────────────────────────────
+  #
+  # The deploy job on main asks the same question, but only after the merge:
+  # #316 merged a migration nobody had applied, and every production deploy
+  # stopped there until it was. Asked on the PR, a missing migration turns
+  # "Safe to merge?" red instead. Apply it (psql, then migration repair — see
+  # README), then re-run this job; the verdict re-runs with it.
+  migrations-applied:
+    name: Migrations applied in production
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      SUPABASE_PROJECT_REF: hjowdyiwjjrqceumkvgt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Every migration is applied in production
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_MIGRATIONS_TOKEN || secrets.SUPABASE_ACCESS_TOKEN2 }}
+        run: bash scripts/check-migrations.sh
+
   # ── 9. Is this safe to merge? ────────────────────────────────────────────
   #
   # This job was gated to `builder` and skipped everywhere else, which meant the
@@ -1405,7 +1421,7 @@ jobs:
     name: Safe to merge?
     runs-on: ubuntu-latest
     # `triage` only adds its write-up to the comment; the verdict ignores it.
-    needs: [build, test-node, test-e2e, deploy-vercel, allure, triage]
+    needs: [build, test-node, test-e2e, deploy-vercel, allure, triage, migrations-applied]
     # `!cancelled()` rather than `always()`. `always()` includes cancellation,
     # and this workflow sets `cancel-in-progress: true` — so pushing twice in
     # quick succession cancelled run #1, whose verdict job still ran, read
@@ -1423,6 +1439,8 @@ jobs:
           BUILD: ${{ needs.build.result }}
           UNIT: ${{ needs.test-node.result }}
           E2E: ${{ needs.test-e2e.result }}
+          # `skipped` off a PR (the builder branch), where there is no merge to gate.
+          MIGRATIONS: ${{ needs.migrations-applied.result }}
           PREVIEW_URL: ${{ needs.deploy-vercel.outputs.url }}
           ALLURE_RESULT: ${{ needs.allure.result }}
           ALLURE_URL: ${{ needs.allure.outputs.url }}
@@ -1445,7 +1463,8 @@ jobs:
             ALLURE_HOME="https://main.${PAGES_PROJECT}.pages.dev"
           fi
 
-          if [ "$BUILD" = "success" ] && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ]; then
+          if [ "$BUILD" = "success" ] && [ "$UNIT" = "success" ] && [ "$E2E" = "success" ] \
+            && { [ "$MIGRATIONS" = "success" ] || [ "$MIGRATIONS" = "skipped" ]; }; then
             green=true
             verdict="## ✅ Safe to merge"
             if [ "$IS_BUILDER" = "true" ]; then
@@ -1461,6 +1480,9 @@ jobs:
             else
               advice="Something is red. Open the report below and fix it on this branch — merging now would put it on main."
             fi
+            if [ "$MIGRATIONS" = "failure" ]; then
+              advice="$advice A migration on this branch is not applied in production: apply it (psql, then \`supabase migration repair --status applied <version> --linked\`, README), then re-run the failed jobs. Merging first stops every production deploy."
+            fi
           fi
           echo "green=$green" >> "$GITHUB_OUTPUT"
 
@@ -1474,6 +1496,7 @@ jobs:
             echo "| Build · lint · typecheck | ${BUILD} |"
             echo "| Unit · component · contract · security | ${UNIT} |"
             echo "| e2e across four platforms | ${E2E} |"
+            echo "| Migrations applied in production | ${MIGRATIONS} |"
             echo
             # One table, the same three rows `main` gets from the "Deployed
             # sites" job, so the answer to "where do I look" does not depend on
